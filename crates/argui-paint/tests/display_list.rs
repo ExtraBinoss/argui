@@ -1,5 +1,5 @@
 use argui_core::{Point, Rect, Size};
-use argui_paint::{Border, Color, CornerRadii, DisplayCommand, DisplayList, Quad};
+use argui_paint::{Border, Color, CornerRadii, DisplayCommand, DisplayList, LayerStyle, Quad};
 
 #[test]
 fn display_lists_preserve_cross_primitive_order() {
@@ -21,6 +21,10 @@ fn display_lists_preserve_cross_primitive_order() {
         list.commands(),
         &[DisplayCommand::Quad(quad), DisplayCommand::Text(3)]
     );
+
+    list.begin_layer(LayerStyle::new(Default::default()));
+    list.end_layer();
+    assert_eq!(list.quad_count(), 1);
 
     list.clear();
     assert_eq!(list.quad_count(), 0);

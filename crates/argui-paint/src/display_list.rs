@@ -1,10 +1,38 @@
-use crate::Quad;
+use core::fmt;
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+use crate::{LayerStyle, Quad};
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum DisplayCommand {
     Quad(Quad),
     Text(usize),
+    BeginLayer(LayerStyle),
+    EndLayer,
 }
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DisplayListError {
+    UnexpectedLayerEnd { command: usize },
+    UnclosedLayers { count: usize },
+}
+
+impl fmt::Display for DisplayListError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::UnexpectedLayerEnd { command } => {
+                write!(
+                    formatter,
+                    "layer ends without a matching begin at command {command}"
+                )
+            }
+            Self::UnclosedLayers { count } => {
+                write!(formatter, "display list has {count} unclosed layers")
+            }
+        }
+    }
+}
+
+impl std::error::Error for DisplayListError {}
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct DisplayList {
@@ -30,6 +58,14 @@ impl DisplayList {
         self.commands.push(DisplayCommand::Text(block));
     }
 
+    pub fn begin_layer(&mut self, style: LayerStyle) {
+        self.commands.push(DisplayCommand::BeginLayer(style));
+    }
+
+    pub fn end_layer(&mut self) {
+        self.commands.push(DisplayCommand::EndLayer);
+    }
+
     pub fn clear(&mut self) {
         self.commands.clear();
         self.quad_count = 0;
@@ -43,5 +79,24 @@ impl DisplayList {
     #[must_use]
     pub const fn quad_count(&self) -> usize {
         self.quad_count
+    }
+
+    pub fn validate(&self) -> Result<(), DisplayListError> {
+        let mut depth = 0_usize;
+        for (command, item) in self.commands.iter().enumerate() {
+            match item {
+                DisplayCommand::BeginLayer(_) => depth += 1,
+                DisplayCommand::EndLayer if depth == 0 => {
+                    return Err(DisplayListError::UnexpectedLayerEnd { command });
+                }
+                DisplayCommand::EndLayer => depth -= 1,
+                DisplayCommand::Quad(_) | DisplayCommand::Text(_) => {}
+            }
+        }
+        if depth == 0 {
+            Ok(())
+        } else {
+            Err(DisplayListError::UnclosedLayers { count: depth })
+        }
     }
 }

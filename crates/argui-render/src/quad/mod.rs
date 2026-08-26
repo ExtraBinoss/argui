@@ -34,7 +34,9 @@ impl QuadGpu {
                 .iter()
                 .filter_map(|command| match command {
                     DisplayCommand::Quad(quad) => Some(QuadInstance::new(*quad, scale_factor)),
-                    DisplayCommand::Text(_) => None,
+                    DisplayCommand::Text(_)
+                    | DisplayCommand::BeginLayer(_)
+                    | DisplayCommand::EndLayer => None,
                 }),
         );
         self.pipeline

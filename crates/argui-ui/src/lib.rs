@@ -12,7 +12,8 @@ mod virtual_list;
 mod widget;
 
 pub use argui_paint::{
-    Border, BorderWidths, ClipBehavior, Color, CornerRadii, Fill, PaintStyle, QuadStyle,
+    BlendMode, Border, BorderWidths, ClipBehavior, Color, CornerRadii, CustomEffect, Fill, Filter,
+    LayerMask, LayerStyle, PaintStyle, QuadStyle, Refraction, ShaderEffectId, Shadow,
 };
 pub use element::{Element, ElementKind};
 pub use interaction::{

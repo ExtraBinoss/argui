@@ -33,6 +33,16 @@ impl CornerRadii {
             self.bottom_left,
         ]
     }
+
+    #[must_use]
+    pub const fn scaled(self, factor: f32) -> Self {
+        Self {
+            top_left: self.top_left * factor,
+            top_right: self.top_right * factor,
+            bottom_right: self.bottom_right * factor,
+            bottom_left: self.bottom_left * factor,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]

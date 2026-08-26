@@ -191,3 +191,28 @@ fn spring_retarget_and_bounded_inertia_return_the_scheduler_to_idle() {
     }
     assert!(!app.wants_animation_frame());
 }
+
+#[test]
+fn effects_popover_is_composed_and_only_animates_while_open() {
+    let mut app = StateShowcase::default();
+    assert_eq!(click(&mut app, "popover-toggle"), ViewUpdate::Rebuild);
+    assert!(app.wants_animation_frame());
+    assert!(node_index(&app.view(), "effects-popover") > 0);
+
+    assert_eq!(
+        app.animation_frame(Frame {
+            now: Time::ZERO,
+            elapsed: Duration::ZERO,
+        }),
+        ViewUpdate::None
+    );
+    assert_eq!(
+        app.animation_frame(Frame {
+            now: Time::from_nanos(700_000_000),
+            elapsed: Duration::from_millis(700),
+        }),
+        ViewUpdate::Rebuild
+    );
+    assert_eq!(click(&mut app, "popover-close"), ViewUpdate::Rebuild);
+    assert!(!app.wants_animation_frame());
+}

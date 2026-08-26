@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use argui_core::{Point, Rect, Size};
 use argui_paint::{Border, ClipBehavior, Color, DisplayList, Fill, Quad};
 use argui_text::{TextBlock, TextEngine, TextScene};
@@ -103,7 +101,9 @@ impl LayoutEngine {
                         let Some(node) = ui.node_id_at(index) else {
                             return TaffySize::ZERO;
                         };
-                        let Some((content, style)) = text_content(ui, node, elements[index]) else {
+                        let Some((content, style)) =
+                            crate::text::content(ui, node, elements[index])
+                        else {
                             return TaffySize::ZERO;
                         };
                         let width = known.width.or_else(|| available.width.into_option());
@@ -171,9 +171,19 @@ impl LayoutEngine {
         if let Some(root) = &self.root {
             collect_paint_order(root, &elements, &mut order);
         }
-        for index in order {
+        for (index, entering) in order {
             let node = &output.nodes[index];
             let element = elements[node.index];
+            if !entering {
+                if element.layer.is_some() {
+                    output.display_list.end_layer();
+                }
+                continue;
+            }
+            if let Some(mut layer) = element.layer.clone() {
+                layer.bounds = node.bounds;
+                output.display_list.begin_layer(layer);
+            }
             if let Some(interaction) = element.interaction
                 && interaction.enabled
                 && let Some(clip) = node.clip.and_then(|clip| clip.intersection(node.bounds))
@@ -296,7 +306,7 @@ fn collect_layout(
     );
     let element = elements[node.index];
     let mut text_index = None;
-    if let Some((content, style)) = text_content(ui, node.node, element) {
+    if let Some((content, style)) = crate::text::content(ui, node.node, element) {
         let text_bounds = Rect::new(
             Point::new(
                 origin.x + layout.padding.left,
@@ -311,28 +321,27 @@ fn collect_layout(
             ClipBehavior::None => placement.clip,
             ClipBehavior::Bounds => placement.clip.and_then(|clip| clip.intersection(bounds)),
         };
-        if let Some(text_clip) = text_clip {
-            let mut block = TextBlock::new(content, text_bounds);
-            block.clip = text_clip;
-            block.style = style.clone();
-            if let Some((region, scroll_x)) = input::prepare(
-                ui,
-                node.node,
-                element,
-                text_engine,
-                input::InputPlacement {
-                    text: text_bounds,
-                    hit: bounds,
-                    clip: text_clip,
-                    scroll_x: 0.0,
-                },
-            ) {
-                block.bounds.origin.x -= scroll_x;
-                output.text_inputs.push(region);
-            }
-            output.text.push(block);
-            text_index = Some(output.text.blocks().len() - 1);
+        let text_clip = text_clip.unwrap_or_default();
+        let mut block = TextBlock::new(content, text_bounds);
+        block.clip = text_clip;
+        block.style = style.clone();
+        if let Some((region, scroll_x)) = input::prepare(
+            ui,
+            node.node,
+            element,
+            text_engine,
+            input::InputPlacement {
+                text: text_bounds,
+                hit: bounds,
+                clip: text_clip,
+                scroll_x: 0.0,
+            },
+        ) {
+            block.bounds.origin.x -= scroll_x;
+            output.text_inputs.push(region);
         }
+        output.text.push(block);
+        text_index = Some(output.text.blocks().len() - 1);
     }
     output.nodes.push(LayoutNode {
         index: node.index,
@@ -473,37 +482,14 @@ fn content_size(tree: &TaffyTree<usize>, node: &NodeMap) -> Result<Size, LayoutE
     Ok(size)
 }
 
-fn text_content<'a>(
-    ui: &'a UiTree,
-    node: UiNodeId,
-    element: &'a Element,
-) -> Option<(Cow<'a, str>, &'a argui_text::TextStyle)> {
-    match &element.kind {
-        ElementKind::Text { content, style } => Some((Cow::Borrowed(content), style)),
-        ElementKind::TextInput {
-            placeholder,
-            text,
-            placeholder_text,
-            ..
-        } => {
-            let value = ui.text_input_display(node)?;
-            if value.is_empty() {
-                Some((Cow::Borrowed(placeholder), placeholder_text))
-            } else {
-                Some((Cow::Owned(value), text))
-            }
-        }
-        ElementKind::Container => None,
-    }
-}
-
-fn collect_paint_order(node: &NodeMap, elements: &[&Element], output: &mut Vec<usize>) {
-    output.push(node.index);
+fn collect_paint_order(node: &NodeMap, elements: &[&Element], output: &mut Vec<(usize, bool)>) {
+    output.push((node.index, true));
     let mut children = node.children.iter().collect::<Vec<_>>();
     children.sort_by_key(|child| elements[child.index].z_index);
     for child in children {
         collect_paint_order(child, elements, output);
     }
+    output.push((node.index, false));
 }
 
 pub(crate) fn flattened(root: &Element) -> Vec<&Element> {

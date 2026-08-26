@@ -1,5 +1,7 @@
 use argui_animation::{DecayConfig, Inertia, InertiaConfig, InertiaState, Spring, SpringConfig};
-use argui_paint::{Border, Color, CornerRadii};
+use argui_paint::{
+    BlendMode, Border, Color, CornerRadii, Filter, LayerMask, LayerStyle, Refraction, Shadow,
+};
 use argui_text::{TextColor, TextWrap};
 use argui_ui::{Edges, Element, Length, Wrap};
 
@@ -83,8 +85,23 @@ impl StateShowcase {
         ])
         .gap(12.0)
         .padding(Edges::all(16.0))
-        .background(Color::rgb(0.045, 0.06, 0.09))
+        .background(Color::rgba(0.045, 0.06, 0.09, 0.78))
         .radius(CornerRadii::all(14.0))
+        .layer(
+            LayerStyle::new(Default::default())
+                .blend(BlendMode::Normal)
+                .backdrop(Filter::Blur(7.0))
+                .backdrop(Filter::Saturation(1.25))
+                .backdrop(Filter::Refraction(
+                    Refraction::new(0.12).chromatic_aberration(0.08),
+                ))
+                .shadow(Shadow::drop(
+                    [0.0, 12.0],
+                    14.0,
+                    Color::rgba(0.0, 0.0, 0.0, 0.35),
+                ))
+                .mask(LayerMask::Rounded(CornerRadii::all(14.0))),
+        )
     }
 }
 

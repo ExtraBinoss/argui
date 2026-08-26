@@ -1,6 +1,7 @@
 //! One showcase shared by native and WebAssembly launchers.
 
 mod physics;
+mod popover;
 
 use argui_animation::{
     CubicBezier, Direction, Duration, Easing, FillMode, Frame, Inertia, Iterations, Keyframe,
@@ -15,6 +16,7 @@ use argui_ui::{
     VirtualList, Wrap,
 };
 use physics::{PhysicsCommand, PhysicsMode, showcase_inertia, showcase_spring};
+use popover::shadow_timeline;
 
 pub struct StateShowcase {
     count: u32,
@@ -31,6 +33,9 @@ pub struct StateShowcase {
     physics_mode: PhysicsMode,
     physics_command: Option<PhysicsCommand>,
     physics_value: f32,
+    popover_open: bool,
+    shadow_color: Color,
+    shadow_animation: Timeline<Color>,
 }
 
 #[derive(Clone, Copy)]
@@ -45,6 +50,7 @@ enum AnimationCommand {
 impl Default for StateShowcase {
     fn default() -> Self {
         let animated_color = Color::rgb(0.20, 0.68, 0.94);
+        let shadow_color = Color::rgb(0.28, 0.72, 1.0);
         Self {
             count: 0,
             warm: false,
@@ -60,6 +66,9 @@ impl Default for StateShowcase {
             physics_mode: PhysicsMode::default(),
             physics_command: None,
             physics_value: 0.0,
+            popover_open: false,
+            shadow_color,
+            shadow_animation: shadow_timeline(shadow_color),
         }
     }
 }
@@ -125,6 +134,7 @@ impl UiApp for StateShowcase {
             Element::row(items).wrap(Wrap::Wrap).gap(10.0),
             self.animation_demo(accent),
             self.physics_demo(accent),
+            self.popover_demo(accent),
             self.virtual_list(accent),
             Element::text("OVERLAY · z-index 100")
                 .text_style(text_style(
@@ -182,6 +192,16 @@ impl UiApp for StateShowcase {
             Some("transition") => self.transitioned = !self.transitioned,
             Some("reorder") => self.reversed = !self.reversed,
             Some("polarity") => self.inverted_scroll = !self.inverted_scroll,
+            Some("popover-toggle") => {
+                self.popover_open = !self.popover_open;
+                if !self.popover_open {
+                    self.shadow_animation.cancel();
+                }
+            }
+            Some("popover-close") => {
+                self.popover_open = false;
+                self.shadow_animation.cancel();
+            }
             Some("animation-play") => {
                 self.animation_command = Some(AnimationCommand::Restart);
                 return ViewUpdate::None;
@@ -216,6 +236,18 @@ impl UiApp for StateShowcase {
     }
 
     fn animation_frame(&mut self, frame: Frame) -> ViewUpdate {
+        if self.popover_open
+            && matches!(
+                self.shadow_animation.state(),
+                PlaybackState::Idle | PlaybackState::Canceled | PlaybackState::Finished
+            )
+        {
+            self.shadow_animation.restart(frame.now);
+        }
+        let shadow_sample = self.shadow_animation.sample(frame.now);
+        let next_shadow = shadow_sample.value.unwrap_or(self.shadow_color);
+        let shadow_changed = next_shadow != self.shadow_color;
+        self.shadow_color = next_shadow;
         let physics_command = self.apply_physics_command();
         let physics_changed = match self.physics_mode {
             PhysicsMode::Spring => self.spring.advance(frame.elapsed),
@@ -245,7 +277,7 @@ impl UiApp for StateShowcase {
         let color = sample.value.unwrap_or_else(|| self.accent());
         let changed = color != self.animated_color || sample.events != Default::default();
         self.animated_color = color;
-        if changed || physics_command || physics_changed {
+        if changed || shadow_changed || physics_command || physics_changed {
             ViewUpdate::Rebuild
         } else {
             ViewUpdate::None
@@ -261,6 +293,7 @@ impl UiApp for StateShowcase {
             || self.animation.needs_frame()
             || self.physics_command.is_some()
             || physics_active
+            || self.popover_open
     }
 }
 

@@ -1,4 +1,4 @@
-use argui_paint::DisplayList;
+use argui_paint::{DisplayList, Filter, LayerStyle, ShaderEffectId};
 use argui_text::{PreparedText, TextEngine};
 use wgpu::{
     CurrentSurfaceTexture, LoadOp, Operations, RenderPassColorAttachment, RenderPassDescriptor,
@@ -8,9 +8,17 @@ use wgpu::{
 use crate::{
     RendererConfig, RendererError,
     batch::{DrawBatch, DrawKind, build_batches},
+    effect::{
+        EffectDraw, EffectGpu, EffectUniform, blend_mode, layer_radii, uniform as effect_uniform,
+    },
+    effect_graph::{EffectGraph, EffectNode},
+    offscreen::{TexturePool, TexturePoolStats},
     quad::QuadGpu,
     text::TextGpu,
 };
+
+mod effects;
+use effects::EffectPass;
 
 enum FrameContent<'a> {
     None,
@@ -45,8 +53,11 @@ pub struct SurfaceRenderer {
     batches: Vec<DrawBatch>,
     quad: QuadGpu,
     text: TextGpu,
+    effect: EffectGpu,
+    offscreen: TexturePool,
 }
 
+#[cfg_attr(coverage_nightly, coverage(off))]
 impl SurfaceRenderer {
     #[cfg_attr(coverage_nightly, coverage(off))]
     pub async fn new(
@@ -86,6 +97,8 @@ impl SurfaceRenderer {
         surface.configure(&device, &surface_config);
         let quad = QuadGpu::new(&device, target_format);
         let text = TextGpu::new(&device, target_format);
+        let effect = EffectGpu::new(&device, target_format);
+        let offscreen = TexturePool::new(target_format, 128 * 1024 * 1024);
 
         Ok(Self {
             instance,
@@ -98,6 +111,8 @@ impl SurfaceRenderer {
             batches: Vec::new(),
             quad,
             text,
+            effect,
+            offscreen,
         })
     }
 
@@ -155,6 +170,19 @@ impl SurfaceRenderer {
         })
     }
 
+    #[must_use]
+    pub fn texture_pool_stats(&self) -> TexturePoolStats {
+        self.offscreen.stats()
+    }
+
+    pub fn register_effect_shader(
+        &mut self,
+        id: ShaderEffectId,
+        wgsl: &str,
+    ) -> Result<(), RendererError> {
+        self.effect.register(&self.device, id, wgsl)
+    }
+
     #[cfg_attr(coverage_nightly, coverage(off))]
     fn render_frame(&mut self, content: FrameContent<'_>) -> Result<RenderStatus, RendererError> {
         let (frame, status) = match self.surface.get_current_texture() {
@@ -172,6 +200,7 @@ impl SurfaceRenderer {
             self.surface_config.width as f32,
             self.surface_config.height as f32,
         ];
+        let mut effect_graph = None;
         match content {
             FrameContent::None => self.batches.clear(),
             FrameContent::Text { engine, text } => {
@@ -204,6 +233,10 @@ impl SurfaceRenderer {
                     .text
                     .prepare(&self.device, &self.queue, engine, text, viewport)?;
                 build_batches(display_list, draw.ranges(), &mut self.batches);
+                let graph = EffectGraph::build(display_list, draw.ranges(), scale_factor)
+                    .map_err(|error| RendererError::InvalidDisplayList(error.to_string()))?;
+                self.validate_custom_effects(&graph)?;
+                effect_graph = Some(graph);
             }
         }
         let view = frame.texture.create_view(&TextureViewDescriptor {
@@ -220,6 +253,14 @@ impl SurfaceRenderer {
             },
         });
         let mut encoder = self.device.create_command_encoder(&Default::default());
+        if let Some(graph) = effect_graph
+            && graph.needs_offscreen_root()
+        {
+            self.render_effect_graph(&mut encoder, &view, &graph, viewport);
+            self.queue.submit([encoder.finish()]);
+            self.queue.present(frame);
+            return Ok(status);
+        }
         {
             let mut pass = encoder.begin_render_pass(&RenderPassDescriptor {
                 label: Some("argui-clear-pass"),
@@ -236,6 +277,277 @@ impl SurfaceRenderer {
         self.queue.submit([encoder.finish()]);
         self.queue.present(frame);
         Ok(status)
+    }
+
+    fn render_effect_graph(
+        &mut self,
+        encoder: &mut wgpu::CommandEncoder,
+        surface: &wgpu::TextureView,
+        graph: &EffectGraph,
+        viewport: [f32; 2],
+    ) {
+        self.offscreen.begin_frame();
+        self.effect.begin_frame();
+        let width = viewport[0] as u32;
+        let height = viewport[1] as u32;
+        let root = self.offscreen.acquire(&self.device, width, height);
+        self.clear_target(encoder, root, self.renderer_config.wgpu_clear_color());
+        self.render_effect_nodes(encoder, &graph.roots, root, viewport);
+        let surface_attachment = Some(RenderPassColorAttachment {
+            view: surface,
+            depth_slice: None,
+            resolve_target: None,
+            ops: Operations {
+                load: LoadOp::Clear(self.renderer_config.wgpu_clear_color()),
+                store: StoreOp::Store,
+            },
+        });
+        drop(encoder.begin_render_pass(&RenderPassDescriptor {
+            label: Some("argui-effect-surface-clear"),
+            color_attachments: &[surface_attachment],
+            ..Default::default()
+        }));
+        let uniform = EffectUniform {
+            viewport,
+            mode: 99,
+            data: [1.0, 0.0, 0.0, 0.0],
+            ..EffectUniform::default()
+        };
+        self.effect.draw(
+            &self.device,
+            &self.queue,
+            encoder,
+            EffectDraw {
+                target: surface,
+                source: self.offscreen.view(root),
+                backdrop: self.offscreen.view(root),
+                uniform,
+                shader: None,
+            },
+        );
+    }
+
+    fn render_effect_nodes(
+        &mut self,
+        encoder: &mut wgpu::CommandEncoder,
+        nodes: &[EffectNode],
+        target: usize,
+        viewport: [f32; 2],
+    ) {
+        for node in nodes {
+            match node {
+                EffectNode::Draw(batch) => self.draw_offscreen(encoder, target, batch, viewport),
+                EffectNode::Layer(layer) if !layer.style.requires_offscreen() => {
+                    self.render_effect_nodes(encoder, &layer.children, target, viewport);
+                }
+                EffectNode::Layer(layer) => {
+                    let layer_target = self.offscreen.acquire(
+                        &self.device,
+                        viewport[0] as u32,
+                        viewport[1] as u32,
+                    );
+                    self.clear_target(encoder, layer_target, wgpu::Color::TRANSPARENT);
+                    self.render_effect_nodes(encoder, &layer.children, layer_target, viewport);
+                    let foreground = self.apply_filters(
+                        encoder,
+                        layer_target,
+                        &layer.style.filters,
+                        viewport,
+                        layer.style.expanded_bounds(),
+                    );
+                    self.composite_layer(encoder, target, foreground, &layer.style, viewport);
+                }
+            }
+        }
+    }
+
+    fn draw_offscreen(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        target: usize,
+        batch: &DrawBatch,
+        viewport: [f32; 2],
+    ) {
+        let attachment = Some(RenderPassColorAttachment {
+            view: self.offscreen.view(target),
+            depth_slice: None,
+            resolve_target: None,
+            ops: Operations {
+                load: LoadOp::Load,
+                store: StoreOp::Store,
+            },
+        });
+        let mut pass = encoder.begin_render_pass(&RenderPassDescriptor {
+            label: Some("argui-layer-content"),
+            color_attachments: &[attachment],
+            ..Default::default()
+        });
+        pass.set_viewport(0.0, 0.0, viewport[0], viewport[1], 0.0, 1.0);
+        match batch.kind {
+            DrawKind::Quad => self.quad.draw(&mut pass, batch.instances.clone()),
+            DrawKind::Text => self.text.draw(&mut pass, batch.instances.clone()),
+        }
+    }
+
+    fn clear_target(&self, encoder: &mut wgpu::CommandEncoder, target: usize, color: wgpu::Color) {
+        let attachment = Some(RenderPassColorAttachment {
+            view: self.offscreen.view(target),
+            depth_slice: None,
+            resolve_target: None,
+            ops: Operations {
+                load: LoadOp::Clear(color),
+                store: StoreOp::Store,
+            },
+        });
+        drop(encoder.begin_render_pass(&RenderPassDescriptor {
+            label: Some("argui-layer-clear"),
+            color_attachments: &[attachment],
+            ..Default::default()
+        }));
+    }
+
+    fn effect_pass(
+        &mut self,
+        encoder: &mut wgpu::CommandEncoder,
+        source: usize,
+        viewport: [f32; 2],
+        effect_pass: EffectPass,
+    ) -> usize {
+        let size = effect_pass
+            .target_size
+            .unwrap_or([viewport[0] as u32, viewport[1] as u32]);
+        let target = self.offscreen.acquire(&self.device, size[0], size[1]);
+        self.clear_target(encoder, target, wgpu::Color::TRANSPARENT);
+        let mut uniform = effect_uniform(viewport, effect_pass.bounds);
+        uniform.mode = effect_pass.mode;
+        uniform.data = effect_pass.data;
+        if let Some(matrix) = effect_pass.matrix {
+            let rows = matrix.as_chunks::<4>().0;
+            uniform.matrix.copy_from_slice(rows);
+        }
+        self.effect.draw(
+            &self.device,
+            &self.queue,
+            encoder,
+            EffectDraw {
+                target: self.offscreen.view(target),
+                source: self.offscreen.view(source),
+                backdrop: self.offscreen.view(source),
+                uniform,
+                shader: effect_pass.shader,
+            },
+        );
+        target
+    }
+
+    fn composite_layer(
+        &mut self,
+        encoder: &mut wgpu::CommandEncoder,
+        target: usize,
+        foreground: usize,
+        style: &LayerStyle,
+        viewport: [f32; 2],
+    ) {
+        let snapshot = self.snapshot(encoder, target, viewport);
+        let filtered_backdrop = self.apply_filters(
+            encoder,
+            snapshot,
+            &style.backdrop_filters,
+            viewport,
+            style.bounds,
+        );
+        let mut backdrop = if style.backdrop_filters.is_empty() {
+            snapshot
+        } else {
+            let merged =
+                self.offscreen
+                    .acquire(&self.device, viewport[0] as u32, viewport[1] as u32);
+            self.clear_target(encoder, merged, wgpu::Color::TRANSPARENT);
+            let mut uniform = effect_uniform(viewport, style.bounds);
+            uniform.mode = 12;
+            uniform.radii = layer_radii(style.mask);
+            self.effect.draw(
+                &self.device,
+                &self.queue,
+                encoder,
+                EffectDraw {
+                    target: self.offscreen.view(merged),
+                    source: self.offscreen.view(filtered_backdrop),
+                    backdrop: self.offscreen.view(snapshot),
+                    uniform,
+                    shader: None,
+                },
+            );
+            merged
+        };
+        for shadow in &style.shadows {
+            let blurred = self.apply_filters(
+                encoder,
+                foreground,
+                &[Filter::Blur(shadow.blur)],
+                viewport,
+                style.expanded_bounds(),
+            );
+            let shadowed =
+                self.offscreen
+                    .acquire(&self.device, viewport[0] as u32, viewport[1] as u32);
+            self.clear_target(encoder, shadowed, wgpu::Color::TRANSPARENT);
+            let mut uniform = effect_uniform(viewport, style.bounds);
+            uniform.mode = if shadow.inset { 11 } else { 10 };
+            uniform.color = shadow.color.as_array();
+            uniform.data = [1.0, shadow.offset[0], shadow.offset[1], shadow.spread];
+            uniform.radii = layer_radii(style.mask);
+            self.effect.draw(
+                &self.device,
+                &self.queue,
+                encoder,
+                EffectDraw {
+                    target: self.offscreen.view(shadowed),
+                    source: self.offscreen.view(blurred),
+                    backdrop: self.offscreen.view(backdrop),
+                    uniform,
+                    shader: None,
+                },
+            );
+            backdrop = shadowed;
+        }
+        let mut uniform = effect_uniform(viewport, style.bounds);
+        uniform.blend = blend_mode(style.blend_mode);
+        uniform.data[0] = style.opacity;
+        uniform.radii = layer_radii(style.mask);
+        self.effect.draw(
+            &self.device,
+            &self.queue,
+            encoder,
+            EffectDraw {
+                target: self.offscreen.view(target),
+                source: self.offscreen.view(foreground),
+                backdrop: self.offscreen.view(backdrop),
+                uniform,
+                shader: None,
+            },
+        );
+    }
+
+    fn snapshot(
+        &mut self,
+        encoder: &mut wgpu::CommandEncoder,
+        source: usize,
+        viewport: [f32; 2],
+    ) -> usize {
+        let target = self
+            .offscreen
+            .acquire(&self.device, viewport[0] as u32, viewport[1] as u32);
+        encoder.copy_texture_to_texture(
+            self.offscreen.texture(source).as_image_copy(),
+            self.offscreen.texture(target).as_image_copy(),
+            wgpu::Extent3d {
+                width: viewport[0] as u32,
+                height: viewport[1] as u32,
+                depth_or_array_layers: 1,
+            },
+        );
+        target
     }
 }
 

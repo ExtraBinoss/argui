@@ -35,11 +35,11 @@ check before the next feature starts.
    lists and a composed single-line `TextInput` share native and web code. Add
    variable-row virtualization, reusable state ownership, focus traps, controlled
    inputs, and accessibility nodes. See the [scroll model](scroll.md).
-8. **Layers and effects.** Follow the staged [effects plan](effects.md): declarative
-   layer commands in `argui-paint`, a render graph and bounded texture pool in
-   `argui-render`, then group opacity, masks, shadows, filters, destination-aware
-   blend modes, backdrop filters, and a stable custom-WGSL ABI. Allocate layers
-   only when their semantics require them.
+8. **Layers and effects — implemented.** Declarative nested layers, a render
+   graph, bounded texture pool, blend modes, Gaussian blur, drop/inset shadows,
+   color and backdrop filters, refraction, rounded masks, and validated cached
+   custom WGSL work on the shared native/WASM path. See the remaining
+   optimization and high-level registration work in the [effects guide](effects.md).
 9. **Animation — physics implemented.** Follow the staged
    [animation plan](animation.md): paint transforms are next, followed by layout
    transitions, caret/scroll consumers, and shader parameters. Typed keyframes,

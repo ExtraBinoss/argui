@@ -153,6 +153,7 @@ dependencies = [
  "argui-paint",
  "argui-text",
  "bytemuck",
+ "naga",
  "wgpu",
 ]
 

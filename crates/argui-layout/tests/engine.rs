@@ -1,4 +1,4 @@
-use argui_core::{Point, ScrollDelta, Size, TextPosition};
+use argui_core::{Point, Rect, ScrollDelta, Size, TextPosition};
 use argui_layout::LayoutEngine;
 use argui_paint::{CornerRadii, DisplayCommand, PaintStyle, QuadStyle};
 use argui_text::{TextEngine, TextStyle};
@@ -27,7 +27,7 @@ fn interaction_repaint_reuses_layout_and_shaped_text() {
         .compute(&mut ui, &mut text, Size::new(300.0, 100.0))
         .unwrap();
     let text_before = output.text.clone();
-    let base = output.display_list.commands()[0];
+    let base = output.display_list.commands()[0].clone();
 
     let update = ui.pointer_moved(Point::new(10.0, 10.0), &output.hit_regions);
     assert!(update.paint_changed);
@@ -225,6 +225,7 @@ fn scroll_translates_geometry_without_rebuilding_taffy() {
             .shrink(0.0),
         Element::text("Overscan row")
             .height(Length::Px(200.0))
+            .clip(argui_paint::ClipBehavior::Bounds)
             .shrink(0.0),
     ])
     .keyed("scroll")
@@ -240,6 +241,7 @@ fn scroll_translates_geometry_without_rebuilding_taffy() {
     let revision = ui.revision();
     let before = output.nodes[1].bounds;
     assert_eq!(output.text.blocks().len(), 2);
+    assert_eq!(output.text.blocks()[1].clip, Rect::default());
 
     let update = ui.scroll(
         Point::new(10.0, 10.0),
@@ -253,6 +255,7 @@ fn scroll_translates_geometry_without_rebuilding_taffy() {
     assert_eq!(output.nodes[1].bounds.origin.y, before.origin.y - 40.0);
     assert_eq!(output.text.blocks()[0].bounds.origin.y, -40.0);
     assert_eq!(output.text.blocks()[1].bounds.origin.y, 60.0);
+    assert_eq!(output.text.blocks()[1].clip.size.height, 40.0);
     assert_eq!(output.text.blocks()[0].clip.size.height, 100.0);
 }
 

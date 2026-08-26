@@ -1,4 +1,4 @@
-use argui_paint::{Border, ClipBehavior, Color, CornerRadii, Fill, PaintStyle};
+use argui_paint::{Border, ClipBehavior, Color, CornerRadii, Fill, LayerStyle, PaintStyle};
 use argui_text::TextStyle;
 
 use crate::{
@@ -31,6 +31,7 @@ pub struct Element {
     pub paint: PaintStyle,
     pub interaction: Option<Interaction>,
     pub transition: Option<crate::Transition>,
+    pub layer: Option<LayerStyle>,
     pub scroll: Option<ScrollConfig>,
     pub z_index: i32,
     pub children: Vec<Self>,
@@ -46,6 +47,7 @@ impl Element {
             paint: PaintStyle::default(),
             interaction: None,
             transition: None,
+            layer: None,
             scroll: None,
             z_index: 0,
             children: children.into_iter().collect(),
@@ -74,6 +76,7 @@ impl Element {
             paint: PaintStyle::default(),
             interaction: None,
             transition: None,
+            layer: None,
             scroll: None,
             z_index: 0,
             children: Vec::new(),
@@ -124,6 +127,12 @@ impl Element {
     #[must_use]
     pub const fn height(mut self, height: Length) -> Self {
         self.style.height = height;
+        self
+    }
+
+    #[must_use]
+    pub const fn max_width(mut self, width: Length) -> Self {
+        self.style.max_width = width;
         self
     }
 
@@ -227,6 +236,12 @@ impl Element {
     #[must_use]
     pub fn transition(mut self, transition: crate::Transition) -> Self {
         self.transition = Some(transition);
+        self
+    }
+
+    #[must_use]
+    pub fn layer(mut self, style: LayerStyle) -> Self {
+        self.layer = Some(style);
         self
     }
 

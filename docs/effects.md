@@ -1,4 +1,4 @@
-# Effects implementation plan
+# GPU effects
 
 Effects keep the existing dependency direction:
 
@@ -16,7 +16,8 @@ off-screen texture or extra-pass cost.
 
 ## Public model
 
-The paint model will grow only when its first renderer implementation lands:
+The renderer-independent paint model is implemented around nested `LayerStyle`
+values:
 
 ```rust
 enum Filter {
@@ -24,7 +25,10 @@ enum Filter {
     Brightness(f32),
     Contrast(f32),
     Saturation(f32),
+    HueRotate(f32),
+    Opacity(f32),
     ColorMatrix([f32; 20]),
+    Refraction(Refraction),
     Custom(CustomEffect),
 }
 
@@ -38,47 +42,59 @@ enum BlendMode {
 
 struct CustomEffect {
     shader: ShaderEffectId,
-    parameters: ParameterRange,
+    parameters: Vec<f32>,
 }
 ```
 
-The display list will use balanced `BeginLayer(LayerStyle)` and `EndLayer`
-commands. A layer may describe group opacity, a blend mode, foreground filters,
-backdrop filters, and a mask or rounded clip. Shader source is registered once
-with the renderer; display commands contain only a stable ID and parameters in
-a reusable per-frame data arena.
+The display list uses validated, balanced `BeginLayer(LayerStyle)` and
+`EndLayer` commands. A layer describes group opacity, blend mode, foreground
+filters, backdrop filters, rounded masks, drop/inset shadows, and custom WGSL.
+Logical geometry is converted to physical pixels once while lowering the render
+graph, so DPI scaling is shared by native and WebGPU.
 
-## Implementation order
+## Implemented rendering path
 
-1. **Layer semantics.** Add renderer-independent layer/filter/blend descriptors
-   and validate balanced display-list commands. Compute conservative layer
-   bounds, including filter expansion, without touching the GPU.
-2. **Render graph.** Lower flat commands and nested layers into explicit passes.
-   Keep ordinary content on the surface path; allocate an intermediate target
-   only when the layer semantics require one.
-3. **Bounded texture pool.** Reuse off-screen textures by format and power-of-two
-   size class, enforce a configurable memory budget, evict deterministically,
-   and release oversized targets after the frame.
-4. **Compositing foundation.** Implement group opacity, transforms, rectangular
-   and rounded masks, then the blend modes supported safely by fixed-function
-   WGPU blending. Fall back to an explicit composition pass when destination
-   sampling is required.
-5. **Blur and shadows.** Implement separable GPU blur with downsampling for large
-   radii. Build box/text shadows from the same mask and blur machinery instead
-   of maintaining a second effect path.
-6. **Color filters.** Combine brightness, contrast, saturation, and color matrix
-   operations into one pass when possible. Fuse adjacent compatible filters to
-   avoid temporary textures.
-7. **Backdrop filters.** Snapshot only the affected background region, filter
-   it, clip it to the layer shape, and composite its foreground. Nested backdrop
-   layers must preserve paint order and never sample later content.
-8. **Custom WGSL effects.** Define a small, versioned shader ABI for input
-   texture, sampler, geometry, frame data, and parameters. Validate and compile
-   registration once, cache pipelines by shader ID and target format, and
-   return structured errors on native and WebGPU.
-9. **Optimization and diagnostics.** Merge compatible passes, skip identity
-   effects, expose pass/texture-byte counters, and profile representative native
-   and browser scenes before adding special cases.
+- Scenes without effects keep the direct surface path and allocate no offscreen
+  texture.
+- Nested layers lower to an explicit graph backed by a bounded 128 MiB reusable
+  texture pool with observable allocation statistics.
+- Large blur radii use adaptive downsampling, a separable 13-tap Gaussian, and
+  bilinear upsampling.
+- Backdrops are recomposed with the original target outside their rounded mask;
+  unrelated text therefore stays at full resolution.
+- Drop shadows are masked outside the border box and inset shadows inside it.
+- Brightness, contrast, saturation, hue rotation, opacity, color matrices,
+  destination-aware blend modes, backdrop blur, and refraction share one GPU
+  pipeline.
+
+## Custom WGSL ABI v1
+
+`SurfaceRenderer::register_effect_shader` validates and caches source once. The
+source defines only this function:
+
+```wgsl
+fn argui_effect(
+    uv: vec2<f32>,
+    source: vec4<f32>,
+    backdrop: vec4<f32>,
+) -> vec4<f32> {
+    return mix(source, backdrop, params.data.x);
+}
+```
+
+The wrapper supplies both textures, a linear sampler, viewport and layer
+geometry, four values in `params.data`, and twenty more in `params.matrix`. Naga
+rejects malformed WGSL. Missing shader IDs and parameter overflow return
+structured errors rather than becoming silent no-ops.
+
+## Follow-up optimization order
+
+1. Crop offscreen targets to conservative layer bounds instead of viewport size.
+2. Fuse adjacent color filters into one matrix pass.
+3. Expose application-level shader registration and custom-effect expansion for
+   outer effects such as animated border fire.
+4. Add deterministic GPU pixel tests on CI adapters that support them.
+5. Profile native and browser scenes before selecting further special cases.
 
 ## Acceptance checks for every step
 
@@ -91,6 +107,5 @@ a reusable per-frame data arena.
 - Texture-pool memory is bounded and observable.
 - All repository quality and coverage gates continue to pass.
 
-This milestone comes after the retained interaction foundation. Its primitives
-can land incrementally: group opacity and masks do not need to wait for backdrop
-filters or custom shaders.
+The shared showcase exercises native/WASM backdrop glass, refraction, rounded
+masking, and a continuously animated colored glow from one Rust UI tree.

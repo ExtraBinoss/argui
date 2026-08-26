@@ -22,16 +22,20 @@ pub(crate) fn build_batches(
     batches.clear();
     let mut quad = 0;
     for command in display_list.commands() {
-        let (kind, instances) = match command {
+        let draw = match command {
             DisplayCommand::Quad(_) => {
                 let instances = quad..quad + 1;
                 quad += 1;
-                (DrawKind::Quad, instances)
+                Some((DrawKind::Quad, instances))
             }
-            DisplayCommand::Text(block) => (
+            DisplayCommand::Text(block) => Some((
                 DrawKind::Text,
                 text_ranges.get(*block).cloned().unwrap_or(0..0),
-            ),
+            )),
+            DisplayCommand::BeginLayer(_) | DisplayCommand::EndLayer => None,
+        };
+        let Some((kind, instances)) = draw else {
+            continue;
         };
         if instances.start >= instances.end {
             continue;
