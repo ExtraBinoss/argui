@@ -8,5 +8,4 @@ Read `docs/code_quality.md` before changing code.
 - Put integration tests in `tests/`, mirroring paths under `src/`.
 - Add dependencies only to the crate that uses them.
 - Keep the renderer/runtime independent from any future DSL.
-- Run `./scripts/quality.sh`; nothing passes below 80% on any coverage metric.
-
+- Run `./scripts/quality.sh`; nothing passes below 85% on any coverage metric.

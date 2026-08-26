@@ -1,5 +1,5 @@
 use argui_core::Point;
-use argui_platform::{ButtonState, PlatformEvent, PointerButton, ScrollDelta};
+use argui_platform::{ButtonState, ImeInput, PlatformEvent, PointerButton, ScrollDelta};
 
 #[test]
 fn only_surface_changes_request_a_frame() {
@@ -32,6 +32,7 @@ fn only_surface_changes_request_a_frame() {
         !PlatformEvent::PointerScrolled(ScrollDelta::Lines(Point::new(0.0, -1.0)))
             .requires_redraw()
     );
+    assert!(!PlatformEvent::Ime(ImeInput::Enabled).requires_redraw());
 }
 
 #[test]

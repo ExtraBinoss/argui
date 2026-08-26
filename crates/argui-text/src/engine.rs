@@ -12,8 +12,9 @@ use crate::{
 };
 
 pub struct TextEngine {
-    fonts: FontSystem,
+    pub(crate) fonts: FontSystem,
     rasterizer: SwashCache,
+    pub(crate) input_buffers: Vec<crate::input::InputBuffer>,
 }
 
 impl Default for TextEngine {
@@ -21,6 +22,7 @@ impl Default for TextEngine {
         Self {
             fonts: FontSystem::new(),
             rasterizer: SwashCache::new(),
+            input_buffers: Vec::new(),
         }
     }
 }
@@ -51,6 +53,7 @@ impl TextEngine {
         Self {
             fonts: FontSystem::new_with_locale_and_db("en-US".into(), database),
             rasterizer: SwashCache::new(),
+            input_buffers: Vec::new(),
         }
     }
 
@@ -153,7 +156,7 @@ impl TextEngine {
     }
 }
 
-fn family(value: &FontFamily) -> Family<'_> {
+pub(crate) fn family(value: &FontFamily) -> Family<'_> {
     match value {
         FontFamily::SansSerif => Family::SansSerif,
         FontFamily::Serif => Family::Serif,

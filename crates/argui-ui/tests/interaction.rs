@@ -100,6 +100,23 @@ fn duplicate_keys_never_duplicate_node_ids() {
 }
 
 #[test]
+fn tab_focus_wraps_in_both_directions() {
+    let mut tree = UiTree::new(Element::row([interactive("first"), interactive("second")]));
+    let first = tree.node_id_at(1).unwrap();
+    let second = tree.node_id_at(2).unwrap();
+    let regions = [region_at(first, 10.0, true), region_at(second, 100.0, true)];
+
+    tree.focus_next(&regions, false);
+    assert_eq!(tree.focused_node(), Some(first));
+    tree.focus_next(&regions, false);
+    assert_eq!(tree.focused_node(), Some(second));
+    tree.focus_next(&regions, false);
+    assert_eq!(tree.focused_node(), Some(first));
+    tree.focus_next(&regions, true);
+    assert_eq!(tree.focused_node(), Some(second));
+}
+
+#[test]
 fn release_over_the_captured_target_emits_a_click() {
     let mut tree = UiTree::new(interactive("open"));
     let node = tree.node_id_at(0).unwrap();

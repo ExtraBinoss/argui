@@ -38,6 +38,8 @@ pub enum PlatformEvent {
         state: ButtonState,
     },
     PointerScrolled(ScrollDelta),
+    Keyboard(KeyInput),
+    Ime(ImeInput),
     Focused(bool),
     RedrawRequested,
     CloseRequested,
@@ -58,4 +60,4 @@ impl PlatformEvent {
         matches!(self, Self::CloseRequested | Self::WindowCreationFailed(_))
     }
 }
-pub use argui_core::ScrollDelta;
+pub use argui_core::{ImeInput, Key, KeyInput, KeyState, Modifiers, ScrollDelta};

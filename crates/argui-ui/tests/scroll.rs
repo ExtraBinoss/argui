@@ -120,4 +120,53 @@ fn scrollbar_ignores_track_outside_the_effective_clip() {
         tree.scrollbar_pressed(Point::new(100.0, 100.0), &[scroll])
             .is_none()
     );
+    assert!(scroll.contains(Point::new(40.0, 40.0)));
+    scroll.clip = Rect::new(Point::new(100.0, 100.0), Size::new(20.0, 20.0));
+    assert!(!scroll.contains(Point::new(40.0, 40.0)));
+}
+
+#[test]
+fn scrollbar_track_clicks_reuse_offsets_and_degenerate_tracks_do_no_work() {
+    let mut tree = UiTree::new(Element::container([]).keyed("scroll"));
+    let node = tree.node_id_at(0).unwrap();
+    let style = ScrollbarStyle::new(QuadStyle::default(), QuadStyle::default());
+    let mut scroll = region(node, ScrollConfig::default(), 1_000.0);
+    scroll.scrollbar = Some(ScrollbarRegion {
+        track: scroll.bounds,
+        thumb: Rect::new(Point::default(), Size::new(200.0, 40.0)),
+        style,
+    });
+
+    let first = tree
+        .scrollbar_pressed(Point::new(100.0, 100.0), &[scroll])
+        .unwrap();
+    assert!(first.scroll_changed);
+    let second = tree
+        .scrollbar_dragged(Point::new(100.0, 120.0), &[scroll])
+        .unwrap();
+    assert!(second.scroll_changed);
+    tree.scrollbar_released();
+
+    let mut no_travel = scroll;
+    no_travel.scrollbar = Some(ScrollbarRegion {
+        track: no_travel.bounds,
+        thumb: no_travel.bounds,
+        style,
+    });
+    assert!(
+        !tree
+            .scrollbar_pressed(Point::new(20.0, 20.0), &[no_travel])
+            .unwrap()
+            .scroll_changed
+    );
+    tree.scrollbar_released();
+
+    let mut no_range = scroll;
+    no_range.max_offset.y = 0.0;
+    assert!(
+        !tree
+            .scrollbar_pressed(Point::new(20.0, 20.0), &[no_range])
+            .unwrap()
+            .scroll_changed
+    );
 }

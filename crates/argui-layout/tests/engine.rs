@@ -1,10 +1,10 @@
-use argui_core::{Point, ScrollDelta, Size};
+use argui_core::{Point, ScrollDelta, Size, TextPosition};
 use argui_layout::LayoutEngine;
 use argui_paint::{CornerRadii, DisplayCommand, PaintStyle, QuadStyle};
 use argui_text::{TextEngine, TextStyle};
 use argui_ui::{
     Button, ButtonStyle, Color, Edges, Element, Inset, Interaction, Length, ScrollConfig,
-    ScrollbarStyle, UiTree, Wrap,
+    ScrollbarStyle, TextInput, TextInputStyle, UiTree, Wrap,
 };
 
 const NOTO_SANS: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
@@ -294,6 +294,130 @@ fn scrollbar_is_regular_paint_with_geometry_from_the_scroll_state() {
     layout.apply_scroll(&ui, &mut output).unwrap();
     let moved = output.scroll_regions[0].scrollbar.unwrap();
     assert!(moved.thumb.origin.y > initial.thumb.origin.y);
+}
+
+#[test]
+fn focused_text_inputs_emit_cosmic_caret_selection_and_hit_geometry() {
+    let input = TextInput::new(
+        "field",
+        "Hello مرحباً 👋🏽",
+        "hint",
+        TextInputStyle::new(
+            PaintStyle::new(QuadStyle::solid(Color::rgb(0.1, 0.1, 0.1))),
+            TextStyle {
+                font_size: 18.0,
+                line_height: 24.0,
+                ..TextStyle::default()
+            },
+        ),
+    )
+    .build();
+    let mut ui = UiTree::new(input);
+    let mut layout = LayoutEngine::new();
+    let mut text = text_engine();
+    let initial = layout
+        .compute(&mut ui, &mut text, Size::new(280.0, 60.0))
+        .unwrap();
+    ui.pointer_moved(Point::new(20.0, 20.0), &initial.hit_regions);
+    ui.primary_pressed(&initial.hit_regions);
+    let node = ui.focused_node().unwrap();
+    ui.move_text_cursor(node, 0, false);
+    ui.move_text_cursor(node, 5, true);
+    let output = layout
+        .compute(&mut ui, &mut text, Size::new(280.0, 60.0))
+        .unwrap();
+    let region = &output.text_inputs[0];
+
+    assert!(region.caret.is_some());
+    assert!(!region.selection.is_empty());
+    assert!(region.stops.len() > 5);
+    assert!(region.hit_index(Point::new(20.0, 20.0)).is_some());
+    assert!(region.hit_index(Point::new(-20.0, -20.0)).is_none());
+    let start = region
+        .stops
+        .iter()
+        .find(|stop| stop.position.index == 0)
+        .unwrap()
+        .position;
+    let right = region.visual_neighbor(start, false, false);
+    assert_ne!(right, start);
+    assert_eq!(region.visual_neighbor(right, true, false), start);
+    assert_ne!(region.visual_neighbor(start, false, true), start);
+    let missing = TextPosition::new(usize::MAX, Default::default());
+    assert_eq!(region.visual_neighbor(missing, true, false), missing);
+    let mut unfocused = region.clone();
+    unfocused.caret = None;
+    assert_eq!(unfocused.visual_neighbor(missing, true, false), missing);
+    let mut clipped = region.clone();
+    clipped.clip = argui_core::Rect::new(Point::new(200.0, 0.0), Size::new(80.0, 60.0));
+    assert!(clipped.hit_index(Point::new(20.0, 20.0)).is_none());
+    assert!(output.display_list.quad_count() >= 3);
+}
+
+#[test]
+fn scrolling_repositions_text_input_hit_geometry_without_reshaping() {
+    let input = TextInput::new(
+        "field",
+        "Editable",
+        "hint",
+        TextInputStyle::new(PaintStyle::default(), TextStyle::default()),
+    )
+    .build()
+    .height(Length::Px(40.0))
+    .shrink(0.0);
+    let root = Element::column([
+        Element::container([]).height(Length::Px(40.0)).shrink(0.0),
+        input,
+    ])
+    .height(Length::Px(60.0))
+    .scrollable(ScrollConfig::default());
+    let mut ui = UiTree::new(root);
+    let mut layout = LayoutEngine::new();
+    let mut text = text_engine();
+    let mut output = layout
+        .compute(&mut ui, &mut text, Size::new(240.0, 60.0))
+        .unwrap();
+    let before = output.text_inputs[0].bounds.origin;
+
+    ui.scroll(
+        Point::new(10.0, 10.0),
+        ScrollDelta::Pixels(Point::new(0.0, -20.0)),
+        &output.scroll_regions,
+    );
+    layout.apply_scroll(&ui, &mut output).unwrap();
+    assert_eq!(output.text_inputs[0].bounds.origin.y, before.y - 20.0);
+}
+
+#[test]
+fn caret_and_selection_updates_skip_taffy_and_prepared_text_rebuilds() {
+    let input = TextInput::new(
+        "field",
+        "Latin العربية Latin",
+        "hint",
+        TextInputStyle::new(PaintStyle::default(), TextStyle::default()),
+    )
+    .build();
+    let mut ui = UiTree::new(Element::column([Element::text("Label"), input]));
+    let mut layout = LayoutEngine::new();
+    let mut text = text_engine();
+    let mut output = layout
+        .compute(&mut ui, &mut text, Size::new(300.0, 50.0))
+        .unwrap();
+    let node = ui.node_id_at(2).unwrap();
+    let content = output.text.clone();
+
+    let update = ui.move_text_cursor(node, 5, true);
+    assert!(update.text_input_changed);
+    assert!(!update.layout_changed);
+    layout.update_text_inputs(&ui, &mut text, &mut output);
+
+    assert_eq!(output.text.blocks()[1].text, content.blocks()[1].text);
+    assert!(!output.text_inputs[0].selection.is_empty());
+
+    let mut missing_region = output.clone();
+    missing_region.text_inputs.clear();
+    layout.update_text_inputs(&ui, &mut text, &mut missing_region);
+    assert!(missing_region.text_inputs.is_empty());
 }
 
 #[test]

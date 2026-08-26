@@ -1,20 +1,13 @@
-use argui_core::{Point, ScrollDelta};
-use argui_paint::{Border, ClipBehavior, Color, CornerRadii, Fill, PaintStyle, QuadStyle};
-use argui_text::TextStyle;
+use argui_core::{ImeInput, KeyInput, Point, ScrollDelta, TextPosition};
+use argui_paint::QuadStyle;
 
 use crate::interaction::{InteractionState, RawUpdate};
 use crate::scroll::ScrollState;
+use crate::text_input::{TextInputState, TextInputStates};
 use crate::{
-    Align, Direction, Edges, HitRegion, Inset, Interaction, InteractionUpdate, Justify,
-    LayoutStyle, Length, NodeId, Position, ScrollConfig, ScrollRegion, UiEvent, UiEventKind,
-    VisualState, Wrap, identity,
+    Element, ElementKind, HitRegion, Interaction, InteractionUpdate, NodeId, ScrollRegion, UiEvent,
+    UiEventKind, VisualState, identity,
 };
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum ElementKind {
-    Container,
-    Text { content: String, style: TextStyle },
-}
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum TreeUpdate {
@@ -25,224 +18,13 @@ pub enum TreeUpdate {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Element {
-    pub key: Option<String>,
-    pub kind: ElementKind,
-    pub style: LayoutStyle,
-    pub paint: PaintStyle,
-    pub interaction: Option<Interaction>,
-    pub scroll: Option<ScrollConfig>,
-    pub z_index: i32,
-    pub children: Vec<Self>,
-}
-
-impl Element {
-    #[must_use]
-    pub fn container(children: impl IntoIterator<Item = Self>) -> Self {
-        Self {
-            key: None,
-            kind: ElementKind::Container,
-            style: LayoutStyle::default(),
-            paint: PaintStyle::default(),
-            interaction: None,
-            scroll: None,
-            z_index: 0,
-            children: children.into_iter().collect(),
-        }
-    }
-
-    #[must_use]
-    pub fn row(children: impl IntoIterator<Item = Self>) -> Self {
-        Self::container(children).direction(Direction::Row)
-    }
-
-    #[must_use]
-    pub fn column(children: impl IntoIterator<Item = Self>) -> Self {
-        Self::container(children)
-    }
-
-    #[must_use]
-    pub fn text(value: impl Into<String>) -> Self {
-        Self {
-            key: None,
-            kind: ElementKind::Text {
-                content: value.into(),
-                style: TextStyle::default(),
-            },
-            style: LayoutStyle::default(),
-            paint: PaintStyle::default(),
-            interaction: None,
-            scroll: None,
-            z_index: 0,
-            children: Vec::new(),
-        }
-    }
-
-    #[must_use]
-    pub fn keyed(mut self, key: impl Into<String>) -> Self {
-        self.key = Some(key.into());
-        self
-    }
-
-    #[must_use]
-    pub fn text_style(mut self, style: TextStyle) -> Self {
-        if let ElementKind::Text {
-            style: text_style, ..
-        } = &mut self.kind
-        {
-            *text_style = style;
-        }
-        self
-    }
-
-    #[must_use]
-    pub fn layout_style(mut self, style: LayoutStyle) -> Self {
-        self.style = style;
-        self
-    }
-
-    #[must_use]
-    pub const fn paint_style(mut self, style: PaintStyle) -> Self {
-        self.paint = style;
-        self
-    }
-
-    #[must_use]
-    pub const fn fill(mut self, fill: Fill) -> Self {
-        self.paint.quad.background = Some(fill);
-        self
-    }
-
-    #[must_use]
-    pub const fn width(mut self, width: Length) -> Self {
-        self.style.width = width;
-        self
-    }
-
-    #[must_use]
-    pub const fn height(mut self, height: Length) -> Self {
-        self.style.height = height;
-        self
-    }
-
-    #[must_use]
-    pub const fn direction(mut self, direction: Direction) -> Self {
-        self.style.direction = direction;
-        self
-    }
-
-    #[must_use]
-    pub const fn wrap(mut self, wrap: Wrap) -> Self {
-        self.style.wrap = wrap;
-        self
-    }
-
-    #[must_use]
-    pub const fn align(mut self, align: Align) -> Self {
-        self.style.align = align;
-        self
-    }
-
-    #[must_use]
-    pub const fn justify(mut self, justify: Justify) -> Self {
-        self.style.justify = justify;
-        self
-    }
-
-    #[must_use]
-    pub const fn position(mut self, position: Position) -> Self {
-        self.style.position = position;
-        self
-    }
-
-    #[must_use]
-    pub const fn absolute(mut self, inset: Inset) -> Self {
-        self.style.position = Position::Absolute;
-        self.style.inset = inset;
-        self
-    }
-
-    #[must_use]
-    pub const fn padding(mut self, padding: Edges) -> Self {
-        self.style.padding = padding;
-        self
-    }
-
-    #[must_use]
-    pub const fn gap(mut self, gap: f32) -> Self {
-        self.style.gap = gap;
-        self
-    }
-
-    #[must_use]
-    pub const fn grow(mut self, grow: f32) -> Self {
-        self.style.grow = grow;
-        self
-    }
-
-    #[must_use]
-    pub const fn shrink(mut self, shrink: f32) -> Self {
-        self.style.shrink = shrink;
-        self
-    }
-
-    #[must_use]
-    pub const fn background(mut self, color: Color) -> Self {
-        self = self.fill(Fill::Solid(color));
-        self
-    }
-
-    #[must_use]
-    pub const fn border(mut self, border: Border) -> Self {
-        self.paint.quad.border = Some(border);
-        self
-    }
-
-    #[must_use]
-    pub const fn radius(mut self, radii: CornerRadii) -> Self {
-        self.paint.quad.radii = radii;
-        self
-    }
-
-    #[must_use]
-    pub const fn paint_opacity(mut self, opacity: f32) -> Self {
-        self.paint.quad.opacity = opacity;
-        self
-    }
-
-    #[must_use]
-    pub const fn clip(mut self, clip: ClipBehavior) -> Self {
-        self.paint.clip = clip;
-        self
-    }
-
-    #[must_use]
-    pub const fn interaction(mut self, interaction: Interaction) -> Self {
-        self.interaction = Some(interaction);
-        self
-    }
-
-    #[must_use]
-    pub const fn scrollable(mut self, config: ScrollConfig) -> Self {
-        self.scroll = Some(config);
-        self.paint.clip = ClipBehavior::Bounds;
-        self
-    }
-
-    #[must_use]
-    pub const fn z_index(mut self, z_index: i32) -> Self {
-        self.z_index = z_index;
-        self
-    }
-}
-
-#[derive(Clone, Debug, PartialEq)]
 pub struct UiTree {
     root: Element,
     node_ids: Vec<NodeId>,
     next_node_id: u64,
     interaction: InteractionState,
     scroll: ScrollState,
+    text_inputs: TextInputStates,
     revision: u64,
     layout_dirty: bool,
 }
@@ -252,15 +34,18 @@ impl UiTree {
     pub fn new(root: Element) -> Self {
         let mut next_node_id = 1;
         let node_ids = identity::initial_ids(&root, &mut next_node_id);
-        Self {
+        let mut tree = Self {
             root,
             node_ids,
             next_node_id,
             interaction: InteractionState::default(),
             scroll: ScrollState::default(),
+            text_inputs: TextInputStates::default(),
             revision: 0,
             layout_dirty: true,
-        }
+        };
+        tree.sync_text_inputs();
+        tree
     }
 
     #[must_use]
@@ -297,6 +82,7 @@ impl UiTree {
                 self.root = root;
                 self.interaction.retain(&self.node_ids);
                 self.scroll.retain(&self.node_ids);
+                self.sync_text_inputs();
                 self.revision = self.revision.wrapping_add(1);
                 self.layout_dirty = true;
             }
@@ -319,12 +105,58 @@ impl UiTree {
     }
 
     #[must_use]
+    pub const fn focused_node(&self) -> Option<NodeId> {
+        self.interaction.focused()
+    }
+
+    #[must_use]
     pub fn resolved_quad(&self, node: NodeId, element: &Element) -> QuadStyle {
         element
             .interaction
             .map_or(element.paint.quad, |interaction| {
                 interaction.resolve(element.paint.quad, self.visual_state(node))
             })
+    }
+
+    #[must_use]
+    pub fn text_input_value(&self, node: NodeId) -> Option<&str> {
+        self.text_inputs.get(node).map(TextInputState::value)
+    }
+
+    #[must_use]
+    pub fn text_input_display(&self, node: NodeId) -> Option<String> {
+        self.text_inputs.get(node).map(TextInputState::display)
+    }
+
+    #[must_use]
+    pub fn text_input_cursor(&self, node: NodeId) -> Option<usize> {
+        self.text_inputs
+            .get(node)
+            .map(TextInputState::display_cursor)
+    }
+
+    #[must_use]
+    pub fn text_input_position(&self, node: NodeId) -> Option<TextPosition> {
+        self.text_inputs
+            .get(node)
+            .map(TextInputState::display_position)
+    }
+
+    #[must_use]
+    pub fn text_input_selection(&self, node: NodeId) -> Option<(usize, usize)> {
+        self.text_inputs
+            .get(node)
+            .and_then(TextInputState::selection)
+    }
+
+    #[must_use]
+    pub fn text_input_selection_positions(
+        &self,
+        node: NodeId,
+    ) -> Option<(TextPosition, TextPosition)> {
+        self.text_inputs
+            .get(node)
+            .and_then(TextInputState::selection_positions)
     }
 
     pub fn pointer_moved(&mut self, point: Point, regions: &[HitRegion]) -> InteractionUpdate {
@@ -350,6 +182,119 @@ impl UiTree {
     pub fn window_blurred(&mut self) -> InteractionUpdate {
         let update = self.interaction.window_blurred();
         self.decorate(update)
+    }
+
+    pub fn focus_next(&mut self, regions: &[HitRegion], backwards: bool) -> InteractionUpdate {
+        let update = self.interaction.focus_next(regions, backwards);
+        self.decorate(update)
+    }
+
+    pub fn key_input(&mut self, input: &KeyInput) -> InteractionUpdate {
+        let Some(node) = self.interaction.focused() else {
+            return InteractionUpdate::default();
+        };
+        let Some(state) = self.text_inputs.get_mut(node) else {
+            return InteractionUpdate::default();
+        };
+        let result = state.key(input);
+        self.text_input_update(node, result)
+    }
+
+    pub fn ime_input(&mut self, input: ImeInput) -> InteractionUpdate {
+        let Some(node) = self.interaction.focused() else {
+            return InteractionUpdate::default();
+        };
+        let Some(state) = self.text_inputs.get_mut(node) else {
+            return InteractionUpdate::default();
+        };
+        let result = state.ime(input);
+        self.text_input_update(node, result)
+    }
+
+    pub fn paste_text(&mut self, text: &str) -> InteractionUpdate {
+        let Some(node) = self.interaction.focused() else {
+            return InteractionUpdate::default();
+        };
+        let Some(state) = self.text_inputs.get_mut(node) else {
+            return InteractionUpdate::default();
+        };
+        let result = state.paste(text);
+        self.text_input_update(node, result)
+    }
+
+    pub fn place_text_cursor(
+        &mut self,
+        node: NodeId,
+        index: usize,
+        extend: bool,
+    ) -> InteractionUpdate {
+        let Some(result) = self.text_inputs.place(node, index, extend) else {
+            return InteractionUpdate::default();
+        };
+        self.text_input_update(node, result)
+    }
+
+    pub fn place_text_position(
+        &mut self,
+        node: NodeId,
+        position: TextPosition,
+        extend: bool,
+    ) -> InteractionUpdate {
+        let Some(result) = self.text_inputs.place_position(node, position, extend) else {
+            return InteractionUpdate::default();
+        };
+        self.text_input_update(node, result)
+    }
+
+    pub fn drag_text_cursor(&mut self, node: NodeId, index: usize) -> InteractionUpdate {
+        let Some(result) = self.text_inputs.drag(node, index) else {
+            return InteractionUpdate::default();
+        };
+        self.text_input_update(node, result)
+    }
+
+    pub fn drag_text_position(
+        &mut self,
+        node: NodeId,
+        position: TextPosition,
+    ) -> InteractionUpdate {
+        let Some(result) = self.text_inputs.drag_position(node, position) else {
+            return InteractionUpdate::default();
+        };
+        self.text_input_update(node, result)
+    }
+
+    pub fn move_text_cursor(
+        &mut self,
+        node: NodeId,
+        index: usize,
+        extend: bool,
+    ) -> InteractionUpdate {
+        let Some(result) = self.text_inputs.move_to(node, index, extend) else {
+            return InteractionUpdate::default();
+        };
+        self.text_input_update(node, result)
+    }
+
+    pub fn move_text_position(
+        &mut self,
+        node: NodeId,
+        position: TextPosition,
+        extend: bool,
+    ) -> InteractionUpdate {
+        let Some(result) = self.text_inputs.move_to_position(node, position, extend) else {
+            return InteractionUpdate::default();
+        };
+        self.text_input_update(node, result)
+    }
+
+    #[must_use]
+    pub const fn text_cursor_dragging(&self) -> bool {
+        self.text_inputs.dragging()
+    }
+
+    pub fn release_text_cursor(&mut self) -> bool {
+        self.text_inputs.release()
     }
 
     #[must_use]
@@ -419,23 +364,67 @@ impl UiTree {
             }],
             paint_changed: true,
             scroll_changed: true,
+            ..InteractionUpdate::default()
         }
     }
 
     fn decorate(&self, raw: RawUpdate) -> InteractionUpdate {
+        let text_input_changed = raw.events[..raw.count]
+            .iter()
+            .flatten()
+            .any(|(target, kind)| {
+                matches!(kind, UiEventKind::Focused | UiEventKind::Blurred)
+                    && self.text_inputs.get(*target).is_some()
+            });
         let events = raw.events[..raw.count]
             .iter()
             .flatten()
             .map(|(target, kind)| UiEvent {
                 target: *target,
                 key: self.key_for(*target).map(ToOwned::to_owned),
-                kind: *kind,
+                kind: kind.clone(),
             })
             .collect();
         InteractionUpdate {
             events,
             paint_changed: raw.paint_changed,
             scroll_changed: false,
+            text_input_changed,
+            ..InteractionUpdate::default()
+        }
+    }
+
+    fn text_input_update(
+        &self,
+        node: NodeId,
+        result: crate::text_input::EditResult,
+    ) -> InteractionUpdate {
+        let value = self
+            .text_inputs
+            .get(node)
+            .map_or_else(String::new, |state| state.value().to_owned());
+        let mut events = Vec::with_capacity(2);
+        if result.changed {
+            events.push(UiEvent {
+                target: node,
+                key: self.key_for(node).map(ToOwned::to_owned),
+                kind: UiEventKind::TextChanged(value.clone()),
+            });
+        }
+        if result.submitted {
+            events.push(UiEvent {
+                target: node,
+                key: self.key_for(node).map(ToOwned::to_owned),
+                kind: UiEventKind::Submitted(value),
+            });
+        }
+        InteractionUpdate {
+            events,
+            paint_changed: result.layout,
+            layout_changed: result.reshape,
+            text_input_changed: result.layout,
+            clipboard: result.clipboard,
+            ..InteractionUpdate::default()
         }
     }
 
@@ -446,6 +435,29 @@ impl UiTree {
             .position(|candidate| *candidate == node)?;
         nth_element(&self.root, index)?.key.as_deref()
     }
+
+    fn sync_text_inputs(&mut self) {
+        let inputs = flattened(&self.root)
+            .into_iter()
+            .zip(self.node_ids.iter().copied())
+            .filter_map(|(element, node)| match &element.kind {
+                ElementKind::TextInput { initial_value, .. } => Some((node, initial_value.clone())),
+                _ => None,
+            });
+        self.text_inputs.sync(inputs);
+    }
+}
+
+fn flattened(root: &Element) -> Vec<&Element> {
+    fn visit<'a>(element: &'a Element, output: &mut Vec<&'a Element>) {
+        output.push(element);
+        for child in &element.children {
+            visit(child, output);
+        }
+    }
+    let mut output = Vec::new();
+    visit(root, &mut output);
+    output
 }
 
 fn nth_element(root: &Element, target: usize) -> Option<&Element> {

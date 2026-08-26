@@ -5,7 +5,8 @@ use argui_runtime::{UiApp, ViewUpdate};
 use argui_text::{TextColor, TextEngine, TextStyle, TextWrap};
 use argui_ui::{
     Align, Button, ButtonStyle, Edges, Element, Inset, Interaction, Length, ScrollConfig,
-    ScrollPolarity, ScrollbarStyle, UiEvent, UiEventKind, VirtualList, Wrap,
+    ScrollPolarity, ScrollbarStyle, TextInput, TextInputStyle, UiEvent, UiEventKind, VirtualList,
+    Wrap,
 };
 
 #[derive(Default)]
@@ -45,6 +46,18 @@ impl UiApp for StateShowcase {
                 400,
                 TextWrap::Word,
             )),
+            text_input(
+                "message",
+                "Hello · مرحباً · שלום · 👋🏽",
+                "Type in any language…",
+                accent,
+            ),
+            text_input(
+                "long-message",
+                "This deliberately long editable line proves that the caret remains visible while the text scrolls horizontally.",
+                "Long single-line input",
+                accent,
+            ),
             Element::row([
                 button("increment", "Increment", accent),
                 button("theme", "Toggle paint", accent),
@@ -195,6 +208,7 @@ pub fn text_engine() -> TextEngine {
             include_bytes!("../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf").as_slice(),
             include_bytes!("../../argui-web-demo/assets/fonts/NotoSansArabic.ttf").as_slice(),
             include_bytes!("../../argui-web-demo/assets/fonts/NotoSansHebrew.ttf").as_slice(),
+            include_bytes!("../../argui-web-demo/assets/fonts/NotoEmoji-Regular.ttf").as_slice(),
             include_bytes!("../../argui-web-demo/assets/fonts/FiraMono-Medium.ttf").as_slice(),
         ],
         "Noto Sans",
@@ -232,6 +246,29 @@ fn button(key: &str, label: &str, accent: Color) -> Element {
         .hovered(active)
         .pressed(active.opacity(0.72))
         .focused(rest.border(Border::all(2.0, accent))),
+    )
+    .build()
+}
+
+fn text_input(key: &str, value: &str, placeholder: &str, accent: Color) -> Element {
+    let [red, green, blue, _] = accent.as_array();
+    let radius = CornerRadii::all(11.0);
+    let rest = QuadStyle::solid(Color::rgb(0.035, 0.05, 0.075))
+        .border(Border::all(1.0, Color::rgb(0.20, 0.27, 0.36)))
+        .radius(radius);
+    let active = rest.border(Border::all(1.5, accent));
+    TextInput::new(
+        key,
+        value,
+        placeholder,
+        TextInputStyle::new(
+            PaintStyle::new(rest).clip(ClipBehavior::Bounds),
+            text_style(17.0, TextColor::WHITE, 400, TextWrap::None),
+        )
+        .hovered(active)
+        .focused(active)
+        .selection(Color::rgba(red, green, blue, 0.38))
+        .caret(accent),
     )
     .build()
 }

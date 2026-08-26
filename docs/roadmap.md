@@ -8,16 +8,18 @@ check before the next feature starts.
    redraw events. Verify zero continuous redraw while idle.
 2. **WGPU surface — implemented.** Select an adapter, configure/reconfigure the surface, clear,
    and present on native and web. Recover cleanly from lost/outdated surfaces.
-3. **Text — rendering implemented, editing pending.** Shape bidi/fallback text
+3. **Text — rendering and single-line editing implemented.** Shape bidi/fallback text
    with `cosmic-text`; use a bounded reusable glyph atlas, one instanced batch,
-   and per-block clipping. Add cursor geometry, selection, IME, clipboard, and
-   copy/paste behavior around it next.
+   and per-block clipping. Caret geometry, grapheme-safe selection/editing, IME,
+   and native/web clipboard behavior share that shaped representation. Add
+   multiline editing and richer composition decoration next. See
+   [text input](text_input.md).
 4. **Retained state and interaction — foundation implemented.** Persistent keyed elements,
    stable reconciled `NodeId`s, revision tracking, clipped reverse-order hit
    testing, hover/press/focus state, pointer capture, UI events, and paint-only
    invalidation are present. `UiApp` now updates plain Rust state and rebuilds a
-   view classified as no work, repaint, or relayout. Add reusable local component
-   state, keyboard focus traversal, touch, and accessibility integration.
+   view classified as no work, repaint, or relayout. Keyboard focus traversal is
+   present. Add reusable local component state, touch, and accessibility integration.
 5. **Layout — responsive foundation implemented.** A small renderer-independent
    style model maps to `taffy`; Cosmic Text performs constrained intrinsic
    measurement and native/web viewport changes share one reflow path. Add
@@ -30,9 +32,9 @@ check before the next feature starts.
    composes layout, paint, text, and interaction. Retained nested scroll regions,
    configurable wheel polarity, fast geometry translation, stable z-index,
    absolute overlays, draggable frame-coalesced scrollbars, and fixed-row virtual
-   lists share native and web code. Add text input, variable-row virtualization,
-   reusable state ownership, focus traps, and accessibility nodes. See the
-   [scroll model](scroll.md).
+   lists and a composed single-line `TextInput` share native and web code. Add
+   variable-row virtualization, reusable state ownership, focus traps, controlled
+   inputs, and accessibility nodes. See the [scroll model](scroll.md).
 8. **Layers and effects.** Follow the staged [effects plan](effects.md): declarative
    layer commands in `argui-paint`, a render graph and bounded texture pool in
    `argui-render`, then group opacity, masks, shadows, filters, destination-aware

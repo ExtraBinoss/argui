@@ -1,0 +1,350 @@
+use argui_core::{
+    CaretAffinity, ImeInput, Key, KeyInput, KeyState, Modifiers, Point, Rect, Size, TextPosition,
+};
+use argui_paint::{PaintStyle, QuadStyle};
+use argui_text::TextStyle;
+use argui_ui::{ClipboardRequest, HitRegion, TextInput, TextInputStyle, UiEventKind, UiTree};
+
+fn tree(value: &str) -> (UiTree, HitRegion) {
+    let input = TextInput::new(
+        "field",
+        value,
+        "placeholder",
+        TextInputStyle::new(PaintStyle::default(), TextStyle::default()),
+    )
+    .build();
+    let tree = UiTree::new(input);
+    let node = tree.node_id_at(0).unwrap();
+    let bounds = Rect::new(Point::default(), Size::new(300.0, 40.0));
+    (
+        tree,
+        HitRegion {
+            node,
+            bounds,
+            clip: bounds,
+            focusable: true,
+        },
+    )
+}
+
+fn key(key: Key, text: Option<&str>, modifiers: Modifiers) -> KeyInput {
+    KeyInput {
+        key,
+        state: KeyState::Pressed,
+        modifiers,
+        repeat: false,
+        text: text.map(ToOwned::to_owned),
+    }
+}
+
+fn focus(tree: &mut UiTree, region: HitRegion) {
+    tree.pointer_moved(Point::new(10.0, 10.0), &[region]);
+    tree.primary_pressed(&[region]);
+}
+
+#[test]
+fn editing_respects_graphemes_selection_and_clipboard_requests() {
+    let (mut tree, region) = tree("A👋🏽");
+    focus(&mut tree, region);
+    let node = region.node;
+
+    let deleted = tree.key_input(&key(Key::Backspace, None, Modifiers::default()));
+    assert_eq!(tree.text_input_value(node), Some("A"));
+    assert!(matches!(
+        &deleted.events[0].kind,
+        UiEventKind::TextChanged(value) if value == "A"
+    ));
+
+    let command = Modifiers {
+        control: true,
+        ..Modifiers::default()
+    };
+    tree.key_input(&key(Key::Character("a".into()), Some("a"), command));
+    let copied = tree.key_input(&key(Key::Character("c".into()), Some("c"), command));
+    assert_eq!(copied.clipboard, Some(ClipboardRequest::Write("A".into())));
+    let cut = tree.key_input(&key(Key::Character("x".into()), Some("x"), command));
+    assert!(cut.layout_changed);
+    assert_eq!(tree.text_input_value(node), Some(""));
+
+    let paste = tree.key_input(&key(Key::Character("v".into()), Some("v"), command));
+    assert_eq!(paste.clipboard, Some(ClipboardRequest::Read));
+    tree.paste_text("é");
+    assert_eq!(tree.text_input_value(node), Some("é"));
+}
+
+#[test]
+fn ime_preedit_is_visible_but_only_commit_changes_the_value() {
+    let (mut tree, region) = tree("");
+    focus(&mut tree, region);
+    let node = region.node;
+
+    let preedit = tree.ime_input(ImeInput::Preedit {
+        text: "é".into(),
+        cursor: Some((0, 3)),
+    });
+    assert!(preedit.layout_changed);
+    assert_eq!(tree.text_input_display(node).as_deref(), Some("é"));
+    assert_eq!(tree.text_input_value(node), Some(""));
+
+    let commit = tree.ime_input(ImeInput::Commit("é".into()));
+    assert!(matches!(
+        &commit.events[0].kind,
+        UiEventKind::TextChanged(value) if value == "é"
+    ));
+    assert_eq!(tree.text_input_value(node), Some("é"));
+}
+
+#[test]
+fn text_input_style_remains_composed_from_existing_primitives() {
+    let style = TextInputStyle::new(PaintStyle::new(QuadStyle::default()), TextStyle::default());
+    let input = TextInput::new("field", "", "hint", style).build();
+    assert!(input.interaction.unwrap().focusable);
+    assert!(input.children.is_empty());
+}
+
+#[test]
+fn navigation_delete_submit_and_escape_cover_editor_edges() {
+    let (mut tree, region) = tree("one two");
+    focus(&mut tree, region);
+    let node = region.node;
+    let shift = Modifiers {
+        shift: true,
+        ..Modifiers::default()
+    };
+    tree.key_input(&key(Key::Home, None, Modifiers::default()));
+    tree.key_input(&key(Key::ArrowRight, None, shift));
+    assert_eq!(tree.text_input_selection(node), Some((0, 1)));
+    tree.key_input(&key(Key::Escape, None, Modifiers::default()));
+    assert_eq!(tree.text_input_selection(node), None);
+
+    tree.key_input(&key(Key::End, None, Modifiers::default()));
+    assert!(
+        !tree
+            .key_input(&key(Key::Delete, None, Modifiers::default()))
+            .layout_changed
+    );
+    tree.key_input(&key(Key::Home, None, Modifiers::default()));
+    assert!(
+        !tree
+            .key_input(&key(Key::Backspace, None, Modifiers::default()))
+            .layout_changed
+    );
+    let inserted = tree.key_input(&key(
+        Key::Character("é".into()),
+        Some("é"),
+        Modifiers::default(),
+    ));
+    assert!(inserted.layout_changed);
+    let submitted = tree.key_input(&key(Key::Enter, None, Modifiers::default()));
+    assert!(matches!(
+        &submitted.events[0].kind,
+        UiEventKind::Submitted(value) if value.starts_with('é')
+    ));
+
+    let alt = Modifiers {
+        alt: true,
+        ..Modifiers::default()
+    };
+    let before = tree.text_input_value(node).unwrap().to_owned();
+    tree.key_input(&key(Key::Character("x".into()), Some("x"), alt));
+    assert_eq!(tree.text_input_value(node), Some(before.as_str()));
+}
+
+#[test]
+fn word_motion_pointer_drag_and_state_retention_are_explicit() {
+    let (mut tree, region) = tree("one two three");
+    focus(&mut tree, region);
+    let node = region.node;
+    let command = Modifiers {
+        control: true,
+        ..Modifiers::default()
+    };
+    tree.key_input(&key(Key::ArrowLeft, None, command));
+    tree.key_input(&key(Key::ArrowRight, None, command));
+
+    tree.place_text_cursor(node, 0, false);
+    assert!(tree.text_cursor_dragging());
+    tree.drag_text_cursor(node, 3);
+    assert_eq!(tree.text_input_selection(node), Some((0, 3)));
+    assert!(tree.release_text_cursor());
+    assert!(!tree.release_text_cursor());
+    assert!(!tree.drag_text_cursor(node, 6).layout_changed);
+    tree.move_text_cursor(node, 7, false);
+    assert_eq!(tree.text_input_selection(node), None);
+
+    tree.update(argui_ui::Element::container([]));
+    assert_eq!(tree.text_input_value(node), None);
+    assert!(!tree.text_cursor_dragging());
+}
+
+#[test]
+fn unfocused_released_and_empty_ime_inputs_do_no_work() {
+    let (mut tree, region) = tree("");
+    let released = KeyInput {
+        state: KeyState::Released,
+        ..key(Key::Character("a".into()), Some("a"), Modifiers::default())
+    };
+    assert!(!tree.key_input(&released).layout_changed);
+    assert!(!tree.paste_text("x").layout_changed);
+    assert!(!tree.ime_input(ImeInput::Enabled).layout_changed);
+
+    focus(&mut tree, region);
+    let command = Modifiers {
+        control: true,
+        ..Modifiers::default()
+    };
+    assert_eq!(
+        tree.key_input(&key(Key::Character("c".into()), Some("c"), command))
+            .clipboard,
+        None
+    );
+    assert!(
+        !tree
+            .key_input(&key(Key::Character("x".into()), Some("x"), command))
+            .layout_changed
+    );
+    assert_eq!(
+        tree.key_input(&key(Key::Character("z".into()), Some("z"), command))
+            .clipboard,
+        None
+    );
+    assert!(!tree.paste_text("").layout_changed);
+    assert!(
+        !tree
+            .key_input(&key(Key::ArrowDown, None, Modifiers::default()))
+            .layout_changed
+    );
+    assert!(!tree.ime_input(ImeInput::Enabled).layout_changed);
+    assert!(
+        !tree
+            .ime_input(ImeInput::Preedit {
+                text: String::new(),
+                cursor: None,
+            })
+            .layout_changed
+    );
+    assert!(
+        tree.ime_input(ImeInput::Commit(String::new()))
+            .events
+            .is_empty()
+    );
+    tree.ime_input(ImeInput::Preedit {
+        text: "abc".into(),
+        cursor: Some((0, 2)),
+    });
+    assert!(tree.ime_input(ImeInput::Disabled).layout_changed);
+}
+
+#[test]
+fn reverse_selection_real_delete_and_default_ime_cursor_cover_boundaries() {
+    let (mut tree, region) = tree("abc");
+    focus(&mut tree, region);
+    let node = region.node;
+
+    tree.place_text_cursor(node, 3, false);
+    tree.drag_text_cursor(node, 1);
+    assert_eq!(tree.text_input_selection(node), Some((1, 3)));
+    tree.key_input(&key(Key::Delete, None, Modifiers::default()));
+    assert_eq!(tree.text_input_value(node), Some("a"));
+
+    tree.key_input(&key(Key::Home, None, Modifiers::default()));
+    tree.key_input(&key(Key::Delete, None, Modifiers::default()));
+    assert_eq!(tree.text_input_value(node), Some(""));
+
+    tree.ime_input(ImeInput::Preedit {
+        text: "é".into(),
+        cursor: None,
+    });
+    assert_eq!(tree.text_input_display(node).as_deref(), Some("é"));
+}
+
+#[test]
+fn modifier_and_selection_paths_keep_editing_deterministic() {
+    let (mut tree, region) = tree("one two");
+    focus(&mut tree, region);
+    let node = region.node;
+    let alt = Modifiers {
+        alt: true,
+        ..Modifiers::default()
+    };
+    let shift = Modifiers {
+        shift: true,
+        ..Modifiers::default()
+    };
+    let command = Modifiers {
+        control: true,
+        ..Modifiers::default()
+    };
+
+    tree.key_input(&key(Key::Home, None, Modifiers::default()));
+    tree.key_input(&key(Key::ArrowRight, None, alt));
+    tree.key_input(&key(Key::ArrowLeft, None, alt));
+    tree.key_input(&key(Key::ArrowRight, None, shift));
+    tree.key_input(&key(Key::ArrowRight, None, shift));
+    assert_eq!(tree.text_input_selection(node), Some((0, 2)));
+    tree.key_input(&key(Key::Backspace, None, Modifiers::default()));
+    assert_eq!(tree.text_input_value(node), Some("e two"));
+
+    assert!(
+        !tree
+            .key_input(&key(Key::Home, None, command))
+            .layout_changed
+    );
+    assert!(
+        !tree
+            .key_input(&key(
+                Key::Character(String::new()),
+                Some(""),
+                Modifiers::default()
+            ))
+            .layout_changed
+    );
+}
+
+#[test]
+fn rebuilding_the_same_field_preserves_retained_input_state() {
+    let (mut tree, region) = tree("seed");
+    focus(&mut tree, region);
+    let node = region.node;
+    tree.paste_text(" value");
+
+    let replacement = TextInput::new(
+        "field",
+        "ignored initial value",
+        "new placeholder",
+        TextInputStyle::new(PaintStyle::default(), TextStyle::default()),
+    )
+    .build();
+    tree.update(replacement);
+
+    assert_eq!(tree.text_input_value(node), Some("seed value"));
+}
+
+#[test]
+fn visual_positions_preserve_affinity_across_pointer_and_keyboard_updates() {
+    let (mut tree, region) = tree("abc العربية xyz");
+    focus(&mut tree, region);
+    let node = region.node;
+    let after = TextPosition::new(4, CaretAffinity::After);
+    let before = TextPosition::new(4, CaretAffinity::Before);
+
+    tree.place_text_position(node, after, false);
+    assert_eq!(tree.text_input_position(node), Some(after));
+    tree.drag_text_position(node, before);
+    assert_eq!(tree.text_input_position(node), Some(before));
+    tree.move_text_position(node, after, true);
+    assert_eq!(tree.text_input_position(node), Some(after));
+
+    tree.update(argui_ui::Element::container([]));
+    assert!(
+        !tree
+            .place_text_position(node, before, false)
+            .text_input_changed
+    );
+    assert!(!tree.drag_text_position(node, before).text_input_changed);
+    assert!(
+        !tree
+            .move_text_position(node, before, false)
+            .text_input_changed
+    );
+}

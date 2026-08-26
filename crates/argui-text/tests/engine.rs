@@ -4,6 +4,7 @@ use argui_text::{FontFamily, TextBlock, TextEngine, TextScene, TextStyle, TextWr
 const NOTO_SANS: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
 const NOTO_ARABIC: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSansArabic.ttf");
 const NOTO_HEBREW: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSansHebrew.ttf");
+const NOTO_EMOJI: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoEmoji-Regular.ttf");
 
 fn bounds(x: f32, y: f32, width: f32, height: f32) -> Rect {
     Rect::new(Point::new(x, y), Size::new(width, height))
@@ -91,4 +92,25 @@ fn prepared_glyphs_reposition_without_reshaping() {
     assert_eq!(prepared.glyphs[0].key, before.key);
     assert_eq!(prepared.glyphs[0].y, before.y - 30);
     assert_eq!(prepared.glyphs[0].clip, [0.0, 0.0, 400.0, 200.0]);
+}
+
+#[test]
+fn embedded_emoji_fallback_rasterizes_without_system_fonts() {
+    let mut engine = TextEngine::from_embedded_fonts(
+        [NOTO_SANS, NOTO_EMOJI],
+        "Noto Sans",
+        "Noto Sans",
+        "Noto Sans",
+    );
+    let scene = TextScene::new().with(TextBlock::new("👋🏽 🎉", bounds(0.0, 0.0, 120.0, 30.0)));
+    let prepared = engine.prepare(&scene, 1.0);
+
+    assert!(!prepared.glyphs.is_empty());
+    let visible = prepared
+        .glyphs
+        .iter()
+        .filter_map(|glyph| engine.rasterize(glyph.key))
+        .filter(|image| image.width > 0 && image.height > 0)
+        .count();
+    assert!(visible >= 2);
 }

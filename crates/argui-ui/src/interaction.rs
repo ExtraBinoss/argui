@@ -100,7 +100,7 @@ impl HitRegion {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum UiEventKind {
     PointerEntered,
     PointerLeft,
@@ -111,6 +111,8 @@ pub enum UiEventKind {
     Scrolled { delta: Point, offset: Point },
     Focused,
     Blurred,
+    TextChanged(String),
+    Submitted(String),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -125,9 +127,12 @@ pub struct InteractionUpdate {
     pub events: Vec<UiEvent>,
     pub paint_changed: bool,
     pub scroll_changed: bool,
+    pub layout_changed: bool,
+    pub text_input_changed: bool,
+    pub clipboard: Option<crate::ClipboardRequest>,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct RawUpdate {
     pub events: [Option<(NodeId, UiEventKind)>; 5],
     pub count: usize,
@@ -150,6 +155,9 @@ pub(crate) struct InteractionState {
 }
 
 impl InteractionState {
+    pub const fn focused(&self) -> Option<NodeId> {
+        self.focused
+    }
     pub fn visual_state(&self, node: NodeId) -> VisualState {
         if self.pressed == Some(node) {
             VisualState::Pressed
@@ -222,6 +230,38 @@ impl InteractionState {
             }
         }
         update.paint_changed = self.pressed.take().is_some();
+        update
+    }
+
+    pub fn focus_next(&mut self, regions: &[HitRegion], backwards: bool) -> RawUpdate {
+        let focusable = regions
+            .iter()
+            .filter(|region| region.focusable)
+            .map(|region| region.node)
+            .collect::<Vec<_>>();
+        if focusable.is_empty() {
+            return RawUpdate::default();
+        }
+        let current = self
+            .focused
+            .and_then(|node| focusable.iter().position(|candidate| *candidate == node));
+        let index = match (current, backwards) {
+            (Some(0), true) | (None, true) => focusable.len() - 1,
+            (Some(index), true) => index - 1,
+            (Some(index), false) => (index + 1) % focusable.len(),
+            (None, false) => 0,
+        };
+        let next = focusable[index];
+        let mut update = RawUpdate::default();
+        if self.focused == Some(next) {
+            return update;
+        }
+        if let Some(previous) = self.focused.replace(next) {
+            update.push(previous, UiEventKind::Blurred);
+        }
+        self.focused = Some(next);
+        update.push(next, UiEventKind::Focused);
+        update.paint_changed = true;
         update
     }
 

@@ -10,3 +10,9 @@ pub enum RuntimeEvent {
     RendererFailed(String),
     LayoutFailed(String),
 }
+
+#[derive(Clone, Debug)]
+pub(crate) enum UserEvent {
+    #[cfg(target_arch = "wasm32")]
+    ClipboardText(String),
+}

@@ -1,21 +1,22 @@
-use std::{cell::RefCell, rc::Rc, sync::Arc};
-
+use crate::translate::{
+    button_state, ime_input, key_input, modifiers_state, pointer_button, scroll_delta,
+};
+use crate::{RuntimeError, RuntimeEvent, UiApp, ViewUpdate, event::UserEvent};
 use argui_core::{Point, Size};
 use argui_layout::{LayoutEngine, LayoutOutput};
 use argui_platform::{
-    ButtonState, PlatformError, PlatformEvent, PointerButton, ScrollDelta, WindowConfig,
+    ButtonState, Modifiers, PlatformError, PlatformEvent, PointerButton, ScrollDelta, WindowConfig,
 };
 use argui_render::{RenderStatus, RendererConfig, SurfaceRenderer};
 use argui_text::{PreparedText, TextEngine, TextScene};
 use argui_ui::{InteractionUpdate, TreeUpdate, UiTree};
+use std::{cell::RefCell, rc::Rc, sync::Arc};
 use winit::{
     application::ApplicationHandler,
-    event::{ElementState, MouseButton, MouseScrollDelta, WindowEvent},
-    event_loop::ActiveEventLoop,
+    event::WindowEvent,
+    event_loop::{ActiveEventLoop, EventLoopProxy},
     window::{Window, WindowId},
 };
-
-use crate::{RuntimeError, RuntimeEvent, UiApp, ViewUpdate};
 
 enum RendererState {
     Loading,
@@ -30,16 +31,21 @@ pub(crate) struct Application {
     window: Option<Arc<Window>>,
     renderer: Rc<RefCell<RendererState>>,
     renderer_announced: bool,
-    text_engine: TextEngine,
+    pub(super) text_engine: TextEngine,
     text_scene: Option<TextScene>,
-    ui_tree: Option<UiTree>,
+    pub(super) ui_tree: Option<UiTree>,
     model: Option<Box<dyn UiApp>>,
-    ui_layout: Option<LayoutOutput>,
-    layout_engine: LayoutEngine,
-    prepared_text: Option<PreparedText>,
+    pub(super) ui_layout: Option<LayoutOutput>,
+    pub(super) layout_engine: LayoutEngine,
+    pub(super) prepared_text: Option<PreparedText>,
     viewport: Size,
     scale_factor: f32,
     pointer: Option<Point>,
+    modifiers: Modifiers,
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(super) clipboard: argui_platform::Clipboard,
+    #[cfg(target_arch = "wasm32")]
+    pub(super) event_proxy: Option<EventLoopProxy<UserEvent>>,
     pending_scrollbar_drag: Option<Point>,
     pub(crate) fatal_error: Option<RuntimeError>,
     on_event: Box<dyn FnMut(RuntimeEvent)>,
@@ -72,11 +78,24 @@ impl Application {
             viewport: Size::default(),
             scale_factor: 1.0,
             pointer: None,
+            modifiers: Modifiers::default(),
+            #[cfg(not(target_arch = "wasm32"))]
+            clipboard: argui_platform::Clipboard::new(),
+            #[cfg(target_arch = "wasm32")]
+            event_proxy: None,
             pending_scrollbar_drag: None,
             fatal_error: None,
             on_event: Box::new(on_event),
         }
     }
+
+    #[cfg(target_arch = "wasm32")]
+    pub(crate) fn set_event_proxy(&mut self, proxy: EventLoopProxy<UserEvent>) {
+        self.event_proxy = Some(proxy);
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) fn set_event_proxy(&mut self, _proxy: EventLoopProxy<UserEvent>) {}
 
     fn prepare_text(&mut self) -> Result<(), RuntimeError> {
         if let Some(ui) = &mut self.ui_tree {
@@ -131,12 +150,13 @@ impl Application {
         true
     }
 
-    fn apply_ui_update(
+    pub(super) fn apply_ui_update(
         &mut self,
         update: InteractionUpdate,
         window: &Window,
         event_loop: &ActiveEventLoop,
     ) {
+        let clipboard = update.clipboard.clone();
         let mut rebuild = false;
         for event in update.events {
             if let Some(model) = &mut self.model {
@@ -155,6 +175,8 @@ impl Application {
         };
         let redraw = match tree_update {
             TreeUpdate::Layout => self.prepare_or_exit(event_loop),
+            _ if update.layout_changed => self.prepare_or_exit(event_loop),
+            _ if update.text_input_changed => self.refresh_text_inputs(),
             _ if update.scroll_changed => self.scroll_or_exit(event_loop),
             TreeUpdate::Paint => {
                 self.repaint();
@@ -171,6 +193,9 @@ impl Application {
         }
         if redraw {
             window.request_redraw();
+        }
+        if let Some(request) = clipboard {
+            self.clipboard_request(request, window, event_loop);
         }
     }
 
@@ -191,6 +216,14 @@ impl Application {
         if ui.scrollbar_dragging() {
             self.pending_scrollbar_drag = Some(point);
             window.request_redraw();
+            return;
+        }
+        if ui.text_cursor_dragging()
+            && let Some(node) = ui.focused_node()
+            && let Some(region) = layout.text_inputs.iter().find(|region| region.node == node)
+        {
+            let update = ui.drag_text_position(node, region.closest_position(point));
+            self.apply_ui_update(update, window, event_loop);
             return;
         }
         let blocked = layout
@@ -258,23 +291,45 @@ impl Application {
         if state == ButtonState::Released {
             self.flush_scrollbar_drag(window, event_loop);
         }
-        let (Some(ui), Some(layout)) = (&mut self.ui_tree, &self.ui_layout) else {
+        let Some(layout) = &self.ui_layout else {
             return;
         };
+        let placement = self.pointer.and_then(|point| {
+            layout.text_inputs.iter().rev().find_map(|region| {
+                region
+                    .hit_position(point)
+                    .map(|position| (region.node, position))
+            })
+        });
+        let Some(ui) = &mut self.ui_tree else {
+            return;
+        };
+        if state == ButtonState::Pressed
+            && let Some(point) = self.pointer
+            && let Some(update) = ui.scrollbar_pressed(point, &layout.scroll_regions)
+        {
+            self.apply_ui_update(update, window, event_loop);
+            return;
+        }
+        if state == ButtonState::Released && ui.scrollbar_released() {
+            return;
+        }
         let update = match state {
-            ButtonState::Pressed => {
-                if let Some(point) = self.pointer
-                    && let Some(update) = ui.scrollbar_pressed(point, &layout.scroll_regions)
-                {
-                    update
-                } else {
-                    ui.primary_pressed(&layout.hit_regions)
-                }
+            ButtonState::Pressed => ui.primary_pressed(&layout.hit_regions),
+            ButtonState::Released => {
+                ui.release_text_cursor();
+                ui.primary_released()
             }
-            ButtonState::Released if ui.scrollbar_released() => Default::default(),
-            ButtonState::Released => ui.primary_released(),
         };
         self.apply_ui_update(update, window, event_loop);
+        if state == ButtonState::Pressed
+            && let Some((node, position)) = placement
+            && let Some(ui) = &mut self.ui_tree
+        {
+            let update = ui.place_text_position(node, position, self.modifiers.shift);
+            self.apply_ui_update(update, window, event_loop);
+        }
+        self.update_ime(window);
     }
 
     fn window_focus(&mut self, focused: bool, window: &Window, event_loop: &ActiveEventLoop) {
@@ -385,7 +440,7 @@ impl Application {
 }
 
 #[cfg_attr(coverage_nightly, coverage(off))]
-impl ApplicationHandler for Application {
+impl ApplicationHandler<UserEvent> for Application {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         if self.window.is_some() {
             return;
@@ -419,6 +474,28 @@ impl ApplicationHandler for Application {
 
     fn suspended(&mut self, _event_loop: &ActiveEventLoop) {
         (self.on_event)(RuntimeEvent::Platform(PlatformEvent::Suspended));
+    }
+
+    fn user_event(&mut self, event_loop: &ActiveEventLoop, event: UserEvent) {
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let _ = event_loop;
+            match event {}
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            let Some(window) = self.window.as_ref().map(Arc::clone) else {
+                return;
+            };
+            match event {
+                UserEvent::ClipboardText(text) => {
+                    if let Some(ui) = &mut self.ui_tree {
+                        let update = ui.paste_text(&text);
+                        self.apply_ui_update(update, &window, event_loop);
+                    }
+                }
+            }
+        }
     }
 
     fn window_event(
@@ -487,6 +564,20 @@ impl ApplicationHandler for Application {
                 self.pointer_scrolled(delta, &window, event_loop);
                 PlatformEvent::PointerScrolled(delta)
             }
+            WindowEvent::ModifiersChanged(modifiers) => {
+                self.modifiers = modifiers_state(modifiers.state());
+                return;
+            }
+            WindowEvent::KeyboardInput { event, .. } => {
+                let input = key_input(event, self.modifiers);
+                self.keyboard_input(&input, &window, event_loop);
+                PlatformEvent::Keyboard(input)
+            }
+            WindowEvent::Ime(ime) => {
+                let input = ime_input(ime);
+                self.ime_input(input.clone(), &window, event_loop);
+                PlatformEvent::Ime(input)
+            }
             WindowEvent::Focused(focused) => {
                 self.window_focus(focused, &window, event_loop);
                 PlatformEvent::Focused(focused)
@@ -498,7 +589,6 @@ impl ApplicationHandler for Application {
             }
             _ => return,
         };
-
         if platform_event.requires_redraw() {
             window.request_redraw();
         }
@@ -506,33 +596,5 @@ impl ApplicationHandler for Application {
             event_loop.exit();
         }
         (self.on_event)(RuntimeEvent::Platform(platform_event));
-    }
-}
-
-fn scroll_delta(delta: MouseScrollDelta, scale_factor: f32) -> ScrollDelta {
-    match delta {
-        MouseScrollDelta::LineDelta(x, y) => ScrollDelta::Lines(Point::new(x, y)),
-        MouseScrollDelta::PixelDelta(position) => ScrollDelta::Pixels(Point::new(
-            position.x as f32 / scale_factor,
-            position.y as f32 / scale_factor,
-        )),
-    }
-}
-
-const fn button_state(state: ElementState) -> ButtonState {
-    match state {
-        ElementState::Pressed => ButtonState::Pressed,
-        ElementState::Released => ButtonState::Released,
-    }
-}
-
-const fn pointer_button(button: MouseButton) -> PointerButton {
-    match button {
-        MouseButton::Left => PointerButton::Primary,
-        MouseButton::Right => PointerButton::Secondary,
-        MouseButton::Middle => PointerButton::Middle,
-        MouseButton::Back => PointerButton::Back,
-        MouseButton::Forward => PointerButton::Forward,
-        MouseButton::Other(value) => PointerButton::Other(value),
     }
 }

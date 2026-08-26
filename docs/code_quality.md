@@ -8,7 +8,7 @@ pass unless every check succeeds.
 - Every tracked Rust file, including tests, examples, and build scripts, is at
   most 600 physical lines. Split a file when a responsibility becomes distinct;
   never split it merely to evade the limit.
-- Workspace coverage must be at least 80% independently for lines, functions,
+- Workspace coverage must be at least 85% independently for lines, functions,
   LLVM regions, and branches.
 - Formatting and Clippy warnings fail the check.
 - `unsafe` is denied until a concrete, reviewed need is documented.

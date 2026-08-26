@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use argui_core::{Point, Rect, Size};
 use argui_paint::{Border, ClipBehavior, Color, DisplayList, Fill, Quad};
 use argui_text::{TextBlock, TextEngine, TextScene};
@@ -11,7 +13,7 @@ use taffy::{
     geometry::{Rect as TaffyRect, Size as TaffySize},
 };
 
-use crate::{LayoutError, scroll};
+use crate::{LayoutError, TextInputRegion, input, scroll};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct LayoutNode {
@@ -29,6 +31,7 @@ pub struct LayoutOutput {
     pub nodes: Vec<LayoutNode>,
     pub hit_regions: Vec<HitRegion>,
     pub scroll_regions: Vec<ScrollRegion>,
+    pub text_inputs: Vec<TextInputRegion>,
     pub display_list: DisplayList,
     pub text: TextScene,
 }
@@ -97,11 +100,14 @@ impl LayoutEngine {
                         let Some(index) = context.as_deref().copied() else {
                             return TaffySize::ZERO;
                         };
-                        let ElementKind::Text { content, style } = &elements[index].kind else {
+                        let Some(node) = ui.node_id_at(index) else {
+                            return TaffySize::ZERO;
+                        };
+                        let Some((content, style)) = text_content(ui, node, elements[index]) else {
                             return TaffySize::ZERO;
                         };
                         let width = known.width.or_else(|| available.width.into_option());
-                        let measured = text_engine.measure(content, style, width);
+                        let measured = text_engine.measure(&content, style, width);
                         TaffySize {
                             width: known.width.unwrap_or(measured.width),
                             height: known.height.unwrap_or(measured.height),
@@ -120,6 +126,7 @@ impl LayoutEngine {
             root,
             &elements,
             ui,
+            text_engine,
             Placement {
                 layout_parent: Point::default(),
                 translation: Point::default(),
@@ -194,11 +201,31 @@ impl LayoutEngine {
                     clip,
                 });
             }
+            let text_input = output
+                .text_inputs
+                .iter()
+                .find(|region| region.node == node.node);
+            if let Some(region) = text_input {
+                input::paint_selection(region, &mut output.display_list);
+            }
             if let Some(text_index) = node.text_index {
                 output.display_list.push_text(text_index);
             }
+            if let Some(region) = text_input {
+                input::paint_caret(region, &mut output.display_list);
+            }
         }
         scroll::paint(&output.scroll_regions, &mut output.display_list);
+    }
+
+    pub fn update_text_inputs(
+        &self,
+        ui: &UiTree,
+        text_engine: &mut TextEngine,
+        output: &mut LayoutOutput,
+    ) {
+        input::update(ui, text_engine, output);
+        self.repaint(ui, output);
     }
 
     fn rebuild(&mut self, ui: &UiTree) -> Result<(), LayoutError> {
@@ -228,7 +255,9 @@ fn build_node(
         .collect::<Result<Vec<_>, _>>()?;
     let style = taffy_style(&element.style);
     let id = match element.kind {
-        ElementKind::Text { .. } => tree.new_leaf_with_context(style, index)?,
+        ElementKind::Text { .. } | ElementKind::TextInput { .. } => {
+            tree.new_leaf_with_context(style, index)?
+        }
         ElementKind::Container => {
             let child_ids = children.iter().map(|child| child.id).collect::<Vec<_>>();
             tree.new_with_children(style, &child_ids)?
@@ -247,6 +276,7 @@ fn collect_layout(
     node: &NodeMap,
     elements: &[&Element],
     ui: &UiTree,
+    text_engine: &mut TextEngine,
     placement: Placement,
     output: &mut LayoutOutput,
 ) -> Result<(), LayoutError> {
@@ -266,7 +296,7 @@ fn collect_layout(
     );
     let element = elements[node.index];
     let mut text_index = None;
-    if let ElementKind::Text { content, style } = &element.kind {
+    if let Some((content, style)) = text_content(ui, node.node, element) {
         let text_bounds = Rect::new(
             Point::new(
                 origin.x + layout.padding.left,
@@ -285,6 +315,21 @@ fn collect_layout(
             let mut block = TextBlock::new(content, text_bounds);
             block.clip = text_clip;
             block.style = style.clone();
+            if let Some((region, scroll_x)) = input::prepare(
+                ui,
+                node.node,
+                element,
+                text_engine,
+                input::InputPlacement {
+                    text: text_bounds,
+                    hit: bounds,
+                    clip: text_clip,
+                    scroll_x: 0.0,
+                },
+            ) {
+                block.bounds.origin.x -= scroll_x;
+                output.text_inputs.push(region);
+            }
             output.text.push(block);
             text_index = Some(output.text.blocks().len() - 1);
         }
@@ -325,6 +370,7 @@ fn collect_layout(
             child,
             elements,
             ui,
+            text_engine,
             Placement {
                 layout_parent: layout_origin,
                 translation: child_translation,
@@ -345,8 +391,8 @@ fn apply_scroll_layout(
     clip: Option<Rect>,
     output: &mut LayoutOutput,
 ) -> Result<(), LayoutError> {
-    let layout = tree.layout(node.id)?;
     let layout_bounds = output.nodes[node.index].layout_bounds;
+    let previous_bounds = output.nodes[node.index].bounds;
     let bounds = Rect::new(
         Point::new(
             layout_bounds.origin.x - translation.x,
@@ -360,15 +406,24 @@ fn apply_scroll_layout(
     output.nodes[node.index].clip = clip;
     if let Some(text_index) = text_index {
         let block = &mut output.text.blocks_mut()[text_index];
-        block.bounds.origin = Point::new(
-            bounds.origin.x + layout.padding.left,
-            bounds.origin.y + layout.padding.top,
+        let delta = Point::new(
+            bounds.origin.x - previous_bounds.origin.x,
+            bounds.origin.y - previous_bounds.origin.y,
         );
+        block.bounds.origin.x += delta.x;
+        block.bounds.origin.y += delta.y;
         block.clip = match element.paint.clip {
             ClipBehavior::None => clip,
             ClipBehavior::Bounds => clip.and_then(|clip| clip.intersection(bounds)),
         }
         .unwrap_or_default();
+        if let Some(region) = output
+            .text_inputs
+            .iter_mut()
+            .find(|region| region.node == node.node)
+        {
+            region.translate(delta, block.clip);
+        }
     }
     let child_clip = match element.paint.clip {
         ClipBehavior::None => clip,
@@ -418,6 +473,30 @@ fn content_size(tree: &TaffyTree<usize>, node: &NodeMap) -> Result<Size, LayoutE
     Ok(size)
 }
 
+fn text_content<'a>(
+    ui: &'a UiTree,
+    node: UiNodeId,
+    element: &'a Element,
+) -> Option<(Cow<'a, str>, &'a argui_text::TextStyle)> {
+    match &element.kind {
+        ElementKind::Text { content, style } => Some((Cow::Borrowed(content), style)),
+        ElementKind::TextInput {
+            placeholder,
+            text,
+            placeholder_text,
+            ..
+        } => {
+            let value = ui.text_input_display(node)?;
+            if value.is_empty() {
+                Some((Cow::Borrowed(placeholder), placeholder_text))
+            } else {
+                Some((Cow::Owned(value), text))
+            }
+        }
+        ElementKind::Container => None,
+    }
+}
+
 fn collect_paint_order(node: &NodeMap, elements: &[&Element], output: &mut Vec<usize>) {
     output.push(node.index);
     let mut children = node.children.iter().collect::<Vec<_>>();
@@ -427,7 +506,7 @@ fn collect_paint_order(node: &NodeMap, elements: &[&Element], output: &mut Vec<u
     }
 }
 
-fn flattened(root: &Element) -> Vec<&Element> {
+pub(crate) fn flattened(root: &Element) -> Vec<&Element> {
     fn visit<'a>(element: &'a Element, output: &mut Vec<&'a Element>) {
         output.push(element);
         for child in &element.children {

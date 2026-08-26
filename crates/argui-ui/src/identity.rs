@@ -84,6 +84,7 @@ fn compatible(old: &Element, new: &Element) -> bool {
             (&old.kind, &new.kind),
             (ElementKind::Container, ElementKind::Container)
                 | (ElementKind::Text { .. }, ElementKind::Text { .. })
+                | (ElementKind::TextInput { .. }, ElementKind::TextInput { .. })
         )
 }
 

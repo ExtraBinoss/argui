@@ -2,10 +2,13 @@
 //! Composition root connecting platform events to rendering and, later, the UI tree.
 
 mod app;
+mod clipboard;
 mod error;
 mod event;
+mod input;
 mod launch;
 mod model;
+mod translate;
 
 pub use error::RuntimeError;
 pub use event::RuntimeEvent;

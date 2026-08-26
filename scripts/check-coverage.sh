@@ -4,7 +4,7 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 summary="$(mktemp)"
 trap 'rm -f "$summary"' EXIT
-minimum=80
+minimum=85
 
 command -v jq >/dev/null || {
   echo "error: jq is required to enforce all coverage metrics" >&2
@@ -26,4 +26,3 @@ jq -e --argjson minimum "$minimum" '
   echo "error: every coverage metric must be at least $minimum%" >&2
   exit 1
 }
-

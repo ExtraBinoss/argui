@@ -9,6 +9,7 @@ license.workspace = true
 argui-core.workspace = true
 argui-paint.workspace = true
 argui-text.workspace = true
+unicode-segmentation.workspace = true
 
 [lints]
 workspace = true

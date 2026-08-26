@@ -3,7 +3,11 @@
 mod color;
 mod geometry;
 mod input;
+mod keyboard;
+mod text;
 
 pub use color::Color;
 pub use geometry::{Point, Rect, Size};
 pub use input::ScrollDelta;
+pub use keyboard::{ImeInput, Key, KeyInput, KeyState, Modifiers};
+pub use text::{CaretAffinity, TextPosition};

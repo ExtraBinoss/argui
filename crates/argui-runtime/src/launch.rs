@@ -4,7 +4,7 @@ use argui_text::{TextEngine, TextScene};
 use argui_ui::UiTree;
 use winit::event_loop::{ControlFlow, EventLoop};
 
-use crate::{RuntimeError, RuntimeEvent, UiApp, app::Application};
+use crate::{RuntimeError, RuntimeEvent, UiApp, app::Application, event::UserEvent};
 
 #[cfg_attr(coverage_nightly, coverage(off))]
 pub fn run(
@@ -113,7 +113,10 @@ pub fn run_app_with_text_engine(
 
 #[cfg(not(target_arch = "wasm32"))]
 fn launch(mut application: Application) -> Result<(), RuntimeError> {
-    let event_loop = EventLoop::new().map_err(PlatformError::from)?;
+    let event_loop = EventLoop::<UserEvent>::with_user_event()
+        .build()
+        .map_err(PlatformError::from)?;
+    application.set_event_proxy(event_loop.create_proxy());
     event_loop.set_control_flow(ControlFlow::Wait);
     event_loop
         .run_app(&mut application)
@@ -122,10 +125,13 @@ fn launch(mut application: Application) -> Result<(), RuntimeError> {
 }
 
 #[cfg(target_arch = "wasm32")]
-fn launch(application: Application) -> Result<(), RuntimeError> {
+fn launch(mut application: Application) -> Result<(), RuntimeError> {
     use winit::platform::web::EventLoopExtWebSys;
 
-    let event_loop = EventLoop::new().map_err(PlatformError::from)?;
+    let event_loop = EventLoop::<UserEvent>::with_user_event()
+        .build()
+        .map_err(PlatformError::from)?;
+    application.set_event_proxy(event_loop.create_proxy());
     event_loop.set_control_flow(ControlFlow::Wait);
     event_loop.spawn_app(application);
     Ok(())
