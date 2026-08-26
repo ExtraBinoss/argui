@@ -39,6 +39,33 @@ pub enum Justify {
     SpaceBetween,
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum Position {
+    #[default]
+    Relative,
+    Absolute,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Inset {
+    pub left: Length,
+    pub right: Length,
+    pub top: Length,
+    pub bottom: Length,
+}
+
+impl Inset {
+    #[must_use]
+    pub const fn top_right(top: f32, right: f32) -> Self {
+        Self {
+            left: Length::Auto,
+            right: Length::Px(right),
+            top: Length::Px(top),
+            bottom: Length::Auto,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Edges {
     pub left: f32,
@@ -81,6 +108,8 @@ pub struct LayoutStyle {
     pub wrap: Wrap,
     pub align: Align,
     pub justify: Justify,
+    pub position: Position,
+    pub inset: Inset,
     pub padding: Edges,
     pub gap: f32,
     pub grow: f32,
@@ -100,6 +129,8 @@ impl Default for LayoutStyle {
             wrap: Wrap::NoWrap,
             align: Align::Stretch,
             justify: Justify::Start,
+            position: Position::Relative,
+            inset: Inset::default(),
             padding: Edges::default(),
             gap: 0.0,
             grow: 0.0,

@@ -5,5 +5,5 @@ mod event;
 mod window;
 
 pub use error::PlatformError;
-pub use event::{ButtonState, PlatformEvent, PointerButton};
+pub use event::{ButtonState, PlatformEvent, PointerButton, ScrollDelta};
 pub use window::WindowConfig;

@@ -1,4 +1,5 @@
-use argui_platform::{ButtonState, PlatformEvent, PointerButton};
+use argui_core::Point;
+use argui_platform::{ButtonState, PlatformEvent, PointerButton, ScrollDelta};
 
 #[test]
 fn only_surface_changes_request_a_frame() {
@@ -26,6 +27,10 @@ fn only_surface_changes_request_a_frame() {
             state: ButtonState::Pressed,
         }
         .requires_redraw()
+    );
+    assert!(
+        !PlatformEvent::PointerScrolled(ScrollDelta::Lines(Point::new(0.0, -1.0)))
+            .requires_redraw()
     );
 }
 

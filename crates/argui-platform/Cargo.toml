@@ -6,8 +6,8 @@ rust-version.workspace = true
 license.workspace = true
 
 [dependencies]
+argui-core.workspace = true
 winit.workspace = true
 
 [lints]
 workspace = true
-

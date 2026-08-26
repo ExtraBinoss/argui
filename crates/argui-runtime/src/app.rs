@@ -2,13 +2,15 @@ use std::{cell::RefCell, rc::Rc, sync::Arc};
 
 use argui_core::{Point, Size};
 use argui_layout::{LayoutEngine, LayoutOutput};
-use argui_platform::{ButtonState, PlatformError, PlatformEvent, PointerButton, WindowConfig};
+use argui_platform::{
+    ButtonState, PlatformError, PlatformEvent, PointerButton, ScrollDelta, WindowConfig,
+};
 use argui_render::{RenderStatus, RendererConfig, SurfaceRenderer};
 use argui_text::{PreparedText, TextEngine, TextScene};
 use argui_ui::{InteractionUpdate, TreeUpdate, UiTree};
 use winit::{
     application::ApplicationHandler,
-    event::{ElementState, MouseButton, WindowEvent},
+    event::{ElementState, MouseButton, MouseScrollDelta, WindowEvent},
     event_loop::ActiveEventLoop,
     window::{Window, WindowId},
 };
@@ -37,6 +39,8 @@ pub(crate) struct Application {
     prepared_text: Option<PreparedText>,
     viewport: Size,
     scale_factor: f32,
+    pointer: Option<Point>,
+    pending_scrollbar_drag: Option<Point>,
     pub(crate) fatal_error: Option<RuntimeError>,
     on_event: Box<dyn FnMut(RuntimeEvent)>,
 }
@@ -67,6 +71,8 @@ impl Application {
             prepared_text: None,
             viewport: Size::default(),
             scale_factor: 1.0,
+            pointer: None,
+            pending_scrollbar_drag: None,
             fatal_error: None,
             on_event: Box::new(on_event),
         }
@@ -106,6 +112,25 @@ impl Application {
         true
     }
 
+    fn scroll_or_exit(&mut self, event_loop: &ActiveEventLoop) -> bool {
+        let result = match (&self.ui_tree, &mut self.ui_layout) {
+            (Some(ui), Some(layout)) => self.layout_engine.apply_scroll(ui, layout),
+            _ => return false,
+        };
+        if let Err(error) = result {
+            (self.on_event)(RuntimeEvent::LayoutFailed(error.to_string()));
+            self.fatal_error = Some(error.into());
+            event_loop.exit();
+            return false;
+        }
+        if let (Some(prepared), Some(layout)) = (&mut self.prepared_text, &self.ui_layout) {
+            for (index, block) in layout.text.blocks().iter().enumerate() {
+                prepared.reposition_block(index, block.bounds.origin, block.clip);
+            }
+        }
+        true
+    }
+
     fn apply_ui_update(
         &mut self,
         update: InteractionUpdate,
@@ -130,6 +155,7 @@ impl Application {
         };
         let redraw = match tree_update {
             TreeUpdate::Layout => self.prepare_or_exit(event_loop),
+            _ if update.scroll_changed => self.scroll_or_exit(event_loop),
             TreeUpdate::Paint => {
                 self.repaint();
                 true
@@ -155,21 +181,72 @@ impl Application {
     }
 
     fn pointer_moved(&mut self, point: Point, window: &Window, event_loop: &ActiveEventLoop) {
+        self.pointer = Some(point);
         let Some(layout) = &self.ui_layout else {
             return;
         };
         let Some(ui) = &mut self.ui_tree else {
             return;
         };
-        let update = ui.pointer_moved(point, &layout.hit_regions);
+        if ui.scrollbar_dragging() {
+            self.pending_scrollbar_drag = Some(point);
+            window.request_redraw();
+            return;
+        }
+        let blocked = layout
+            .scroll_regions
+            .iter()
+            .rev()
+            .any(|region| region.scrollbar_contains(point));
+        let hit_regions = if blocked {
+            &[]
+        } else {
+            layout.hit_regions.as_slice()
+        };
+        let update = ui.pointer_moved(point, hit_regions);
         self.apply_ui_update(update, window, event_loop);
     }
 
+    fn flush_scrollbar_drag(&mut self, window: &Window, event_loop: &ActiveEventLoop) {
+        let Some(point) = self.pending_scrollbar_drag.take() else {
+            return;
+        };
+        let (Some(layout), Some(ui)) = (&self.ui_layout, &mut self.ui_tree) else {
+            return;
+        };
+        if let Some(update) = ui.scrollbar_dragged(point, &layout.scroll_regions) {
+            self.apply_ui_update(update, window, event_loop);
+        }
+    }
+
     fn pointer_left(&mut self, window: &Window, event_loop: &ActiveEventLoop) {
+        self.flush_scrollbar_drag(window, event_loop);
+        self.pointer = None;
         if let Some(ui) = &mut self.ui_tree {
+            ui.scrollbar_released();
             let update = ui.pointer_left();
             self.apply_ui_update(update, window, event_loop);
         }
+    }
+
+    fn pointer_scrolled(
+        &mut self,
+        delta: ScrollDelta,
+        window: &Window,
+        event_loop: &ActiveEventLoop,
+    ) {
+        let (Some(point), Some(layout), Some(ui)) =
+            (self.pointer, &self.ui_layout, &mut self.ui_tree)
+        else {
+            return;
+        };
+        let update = ui.scroll(point, delta, &layout.scroll_regions);
+        self.apply_ui_update(update, window, event_loop);
+        let hover = match (&self.ui_layout, &mut self.ui_tree) {
+            (Some(layout), Some(ui)) => ui.pointer_moved(point, &layout.hit_regions),
+            _ => return,
+        };
+        self.apply_ui_update(hover, window, event_loop);
     }
 
     fn primary_button(
@@ -178,23 +255,34 @@ impl Application {
         window: &Window,
         event_loop: &ActiveEventLoop,
     ) {
-        let Some(ui) = &mut self.ui_tree else {
+        if state == ButtonState::Released {
+            self.flush_scrollbar_drag(window, event_loop);
+        }
+        let (Some(ui), Some(layout)) = (&mut self.ui_tree, &self.ui_layout) else {
             return;
         };
         let update = match state {
             ButtonState::Pressed => {
-                let Some(layout) = &self.ui_layout else {
-                    return;
-                };
-                ui.primary_pressed(&layout.hit_regions)
+                if let Some(point) = self.pointer
+                    && let Some(update) = ui.scrollbar_pressed(point, &layout.scroll_regions)
+                {
+                    update
+                } else {
+                    ui.primary_pressed(&layout.hit_regions)
+                }
             }
+            ButtonState::Released if ui.scrollbar_released() => Default::default(),
             ButtonState::Released => ui.primary_released(),
         };
         self.apply_ui_update(update, window, event_loop);
     }
 
     fn window_focus(&mut self, focused: bool, window: &Window, event_loop: &ActiveEventLoop) {
+        if !focused {
+            self.flush_scrollbar_drag(window, event_loop);
+        }
         if !focused && let Some(ui) = &mut self.ui_tree {
+            ui.scrollbar_released();
             let update = ui.window_blurred();
             self.apply_ui_update(update, window, event_loop);
         }
@@ -394,11 +482,17 @@ impl ApplicationHandler for Application {
                 }
                 PlatformEvent::PointerButton { button, state }
             }
+            WindowEvent::MouseWheel { delta, .. } => {
+                let delta = scroll_delta(delta, self.scale_factor);
+                self.pointer_scrolled(delta, &window, event_loop);
+                PlatformEvent::PointerScrolled(delta)
+            }
             WindowEvent::Focused(focused) => {
                 self.window_focus(focused, &window, event_loop);
                 PlatformEvent::Focused(focused)
             }
             WindowEvent::RedrawRequested => {
+                self.flush_scrollbar_drag(&window, event_loop);
                 self.render(event_loop);
                 PlatformEvent::RedrawRequested
             }
@@ -412,6 +506,16 @@ impl ApplicationHandler for Application {
             event_loop.exit();
         }
         (self.on_event)(RuntimeEvent::Platform(platform_event));
+    }
+}
+
+fn scroll_delta(delta: MouseScrollDelta, scale_factor: f32) -> ScrollDelta {
+    match delta {
+        MouseScrollDelta::LineDelta(x, y) => ScrollDelta::Lines(Point::new(x, y)),
+        MouseScrollDelta::PixelDelta(position) => ScrollDelta::Pixels(Point::new(
+            position.x as f32 / scale_factor,
+            position.y as f32 / scale_factor,
+        )),
     }
 }
 

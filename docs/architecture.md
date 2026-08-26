@@ -102,3 +102,11 @@ An application implements this boundary once for every target. Native and WASM
 need different executable entry symbols, but those launchers contain no view,
 style, state, or business logic. A future project generator can own these static
 entrypoint files completely.
+
+## Scroll and stacking
+
+Scroll input keeps line and pixel units distinct until the target container
+applies its policy. Offsets live beside interaction state in `argui-ui`; Taffy
+geometry remains unchanged while layout output, prepared glyphs, clips, and hit
+regions are translated. Stable sibling `z_index` ordering drives both painting
+and reverse hit testing. See [scroll, stacking, and virtual lists](scroll.md).

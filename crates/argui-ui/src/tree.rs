@@ -1,11 +1,13 @@
-use argui_core::Point;
+use argui_core::{Point, ScrollDelta};
 use argui_paint::{Border, ClipBehavior, Color, CornerRadii, Fill, PaintStyle, QuadStyle};
 use argui_text::TextStyle;
 
 use crate::interaction::{InteractionState, RawUpdate};
+use crate::scroll::ScrollState;
 use crate::{
-    Align, Direction, Edges, HitRegion, Interaction, InteractionUpdate, Justify, LayoutStyle,
-    Length, NodeId, UiEvent, VisualState, Wrap, identity,
+    Align, Direction, Edges, HitRegion, Inset, Interaction, InteractionUpdate, Justify,
+    LayoutStyle, Length, NodeId, Position, ScrollConfig, ScrollRegion, UiEvent, UiEventKind,
+    VisualState, Wrap, identity,
 };
 
 #[derive(Clone, Debug, PartialEq)]
@@ -29,6 +31,8 @@ pub struct Element {
     pub style: LayoutStyle,
     pub paint: PaintStyle,
     pub interaction: Option<Interaction>,
+    pub scroll: Option<ScrollConfig>,
+    pub z_index: i32,
     pub children: Vec<Self>,
 }
 
@@ -41,6 +45,8 @@ impl Element {
             style: LayoutStyle::default(),
             paint: PaintStyle::default(),
             interaction: None,
+            scroll: None,
+            z_index: 0,
             children: children.into_iter().collect(),
         }
     }
@@ -66,6 +72,8 @@ impl Element {
             style: LayoutStyle::default(),
             paint: PaintStyle::default(),
             interaction: None,
+            scroll: None,
+            z_index: 0,
             children: Vec::new(),
         }
     }
@@ -142,6 +150,19 @@ impl Element {
     }
 
     #[must_use]
+    pub const fn position(mut self, position: Position) -> Self {
+        self.style.position = position;
+        self
+    }
+
+    #[must_use]
+    pub const fn absolute(mut self, inset: Inset) -> Self {
+        self.style.position = Position::Absolute;
+        self.style.inset = inset;
+        self
+    }
+
+    #[must_use]
     pub const fn padding(mut self, padding: Edges) -> Self {
         self.style.padding = padding;
         self
@@ -200,6 +221,19 @@ impl Element {
         self.interaction = Some(interaction);
         self
     }
+
+    #[must_use]
+    pub const fn scrollable(mut self, config: ScrollConfig) -> Self {
+        self.scroll = Some(config);
+        self.paint.clip = ClipBehavior::Bounds;
+        self
+    }
+
+    #[must_use]
+    pub const fn z_index(mut self, z_index: i32) -> Self {
+        self.z_index = z_index;
+        self
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -208,6 +242,7 @@ pub struct UiTree {
     node_ids: Vec<NodeId>,
     next_node_id: u64,
     interaction: InteractionState,
+    scroll: ScrollState,
     revision: u64,
     layout_dirty: bool,
 }
@@ -222,6 +257,7 @@ impl UiTree {
             node_ids,
             next_node_id,
             interaction: InteractionState::default(),
+            scroll: ScrollState::default(),
             revision: 0,
             layout_dirty: true,
         }
@@ -260,6 +296,7 @@ impl UiTree {
                 );
                 self.root = root;
                 self.interaction.retain(&self.node_ids);
+                self.scroll.retain(&self.node_ids);
                 self.revision = self.revision.wrapping_add(1);
                 self.layout_dirty = true;
             }
@@ -315,6 +352,76 @@ impl UiTree {
         self.decorate(update)
     }
 
+    #[must_use]
+    pub fn scroll_offset(&self, node: NodeId) -> Point {
+        self.scroll.offset(node)
+    }
+
+    pub fn scroll(
+        &mut self,
+        point: Point,
+        delta: ScrollDelta,
+        regions: &[ScrollRegion],
+    ) -> InteractionUpdate {
+        let Some(change) = self.scroll.scroll(point, delta, regions) else {
+            return InteractionUpdate::default();
+        };
+        self.scroll_update(change)
+    }
+
+    pub fn scrollbar_pressed(
+        &mut self,
+        point: Point,
+        regions: &[ScrollRegion],
+    ) -> Option<InteractionUpdate> {
+        self.scroll.scrollbar_pressed(point, regions).map(|change| {
+            change.map_or_else(InteractionUpdate::default, |change| {
+                self.scroll_update(change)
+            })
+        })
+    }
+
+    pub fn scrollbar_dragged(
+        &mut self,
+        point: Point,
+        regions: &[ScrollRegion],
+    ) -> Option<InteractionUpdate> {
+        if !self.scroll.dragging() {
+            return None;
+        }
+        Some(
+            self.scroll
+                .scrollbar_dragged(point, regions)
+                .map_or_else(InteractionUpdate::default, |change| {
+                    self.scroll_update(change)
+                }),
+        )
+    }
+
+    pub fn scrollbar_released(&mut self) -> bool {
+        self.scroll.scrollbar_released()
+    }
+
+    #[must_use]
+    pub fn scrollbar_dragging(&self) -> bool {
+        self.scroll.dragging()
+    }
+
+    fn scroll_update(&self, change: crate::scroll::ScrollChange) -> InteractionUpdate {
+        InteractionUpdate {
+            events: vec![UiEvent {
+                target: change.node,
+                key: self.key_for(change.node).map(ToOwned::to_owned),
+                kind: UiEventKind::Scrolled {
+                    delta: change.delta,
+                    offset: change.offset,
+                },
+            }],
+            paint_changed: true,
+            scroll_changed: true,
+        }
+    }
+
     fn decorate(&self, raw: RawUpdate) -> InteractionUpdate {
         let events = raw.events[..raw.count]
             .iter()
@@ -328,6 +435,7 @@ impl UiTree {
         InteractionUpdate {
             events,
             paint_changed: raw.paint_changed,
+            scroll_changed: false,
         }
     }
 
@@ -362,6 +470,7 @@ fn classify_update(old: &Element, new: &Element) -> TreeUpdate {
         || old.kind != new.kind
         || old.style != new.style
         || old.paint.clip != new.paint.clip
+        || old.scroll.is_some() != new.scroll.is_some()
         || interaction_geometry(old.interaction) != interaction_geometry(new.interaction)
         || old.children.len() != new.children.len()
     {

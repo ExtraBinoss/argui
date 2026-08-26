@@ -37,6 +37,7 @@ pub enum PlatformEvent {
         button: PointerButton,
         state: ButtonState,
     },
+    PointerScrolled(ScrollDelta),
     Focused(bool),
     RedrawRequested,
     CloseRequested,
@@ -57,3 +58,4 @@ impl PlatformEvent {
         matches!(self, Self::CloseRequested | Self::WindowCreationFailed(_))
     }
 }
+pub use argui_core::ScrollDelta;

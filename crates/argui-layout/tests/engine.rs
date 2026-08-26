@@ -1,8 +1,11 @@
-use argui_core::{Point, Size};
+use argui_core::{Point, ScrollDelta, Size};
 use argui_layout::LayoutEngine;
-use argui_paint::{DisplayCommand, PaintStyle, QuadStyle};
+use argui_paint::{CornerRadii, DisplayCommand, PaintStyle, QuadStyle};
 use argui_text::{TextEngine, TextStyle};
-use argui_ui::{Button, ButtonStyle, Color, Edges, Element, Interaction, Length, UiTree, Wrap};
+use argui_ui::{
+    Button, ButtonStyle, Color, Edges, Element, Inset, Interaction, Length, ScrollConfig,
+    ScrollbarStyle, UiTree, Wrap,
+};
 
 const NOTO_SANS: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
 
@@ -212,4 +215,143 @@ fn percent_child_stays_inside_padded_parent() {
         panel.origin.x + panel.size.width <= root.origin.x + root.size.width - 42.0,
         "{root:?} {panel:?}"
     );
+}
+
+#[test]
+fn scroll_translates_geometry_without_rebuilding_taffy() {
+    let root = Element::column([
+        Element::text("First row")
+            .height(Length::Px(100.0))
+            .shrink(0.0),
+        Element::text("Overscan row")
+            .height(Length::Px(200.0))
+            .shrink(0.0),
+    ])
+    .keyed("scroll")
+    .width(Length::Px(200.0))
+    .height(Length::Px(100.0))
+    .scrollable(ScrollConfig::default());
+    let mut ui = UiTree::new(root);
+    let mut layout = LayoutEngine::new();
+    let mut text = text_engine();
+    let mut output = layout
+        .compute(&mut ui, &mut text, Size::new(200.0, 100.0))
+        .unwrap();
+    let revision = ui.revision();
+    let before = output.nodes[1].bounds;
+    assert_eq!(output.text.blocks().len(), 2);
+
+    let update = ui.scroll(
+        Point::new(10.0, 10.0),
+        ScrollDelta::Lines(Point::new(0.0, -1.0)),
+        &output.scroll_regions,
+    );
+    assert!(update.scroll_changed);
+    layout.apply_scroll(&ui, &mut output).unwrap();
+
+    assert_eq!(ui.revision(), revision);
+    assert_eq!(output.nodes[1].bounds.origin.y, before.origin.y - 40.0);
+    assert_eq!(output.text.blocks()[0].bounds.origin.y, -40.0);
+    assert_eq!(output.text.blocks()[1].bounds.origin.y, 60.0);
+    assert_eq!(output.text.blocks()[0].clip.size.height, 100.0);
+}
+
+#[test]
+fn scrollbar_is_regular_paint_with_geometry_from_the_scroll_state() {
+    let style = ScrollbarStyle::new(
+        QuadStyle::solid(Color::rgb(0.0, 0.0, 0.0)).radius(CornerRadii::all(4.0)),
+        QuadStyle::solid(Color::WHITE).radius(CornerRadii::all(4.0)),
+    )
+    .width(8.0)
+    .inset(4.0)
+    .min_thumb(20.0);
+    let root = Element::column([
+        Element::container([]).height(Length::Px(100.0)).shrink(0.0),
+        Element::container([]).height(Length::Px(200.0)).shrink(0.0),
+    ])
+    .keyed("scroll")
+    .width(Length::Px(200.0))
+    .height(Length::Px(100.0))
+    .scrollable(ScrollConfig::default().scrollbar(style));
+    let mut ui = UiTree::new(root);
+    let mut layout = LayoutEngine::new();
+    let mut text = text_engine();
+    let mut output = layout
+        .compute(&mut ui, &mut text, Size::new(200.0, 100.0))
+        .unwrap();
+    let initial = output.scroll_regions[0].scrollbar.unwrap();
+
+    assert_eq!(initial.track.size, Size::new(8.0, 92.0));
+    assert_eq!(initial.track.origin, Point::new(188.0, 4.0));
+    assert!(initial.thumb.size.height > 20.0);
+    assert_eq!(output.display_list.quad_count(), 2);
+
+    ui.scroll(
+        Point::new(10.0, 10.0),
+        ScrollDelta::Pixels(Point::new(0.0, -100.0)),
+        &output.scroll_regions,
+    );
+    layout.apply_scroll(&ui, &mut output).unwrap();
+    let moved = output.scroll_regions[0].scrollbar.unwrap();
+    assert!(moved.thumb.origin.y > initial.thumb.origin.y);
+}
+
+#[test]
+fn sibling_z_index_controls_paint_and_hit_test_order() {
+    let child = |color, z| {
+        Element::container([])
+            .background(color)
+            .width(Length::Px(80.0))
+            .height(Length::Px(20.0))
+            .shrink(0.0)
+            .interaction(Interaction::default())
+            .z_index(z)
+    };
+    let low = Color::rgb(0.1, 0.2, 0.3);
+    let high = Color::rgb(0.8, 0.7, 0.6);
+    let mut ui = UiTree::new(
+        Element::column([child(high, 4), child(low, -2)])
+            .width(Length::Px(100.0))
+            .height(Length::Px(100.0)),
+    );
+    let mut layout = LayoutEngine::new();
+    let mut text = text_engine();
+    let output = layout
+        .compute(&mut ui, &mut text, Size::new(200.0, 100.0))
+        .unwrap();
+
+    assert!(matches!(
+        output.display_list.commands()[0],
+        DisplayCommand::Quad(quad) if quad.background == low
+    ));
+    assert_eq!(
+        output.hit_regions.last().unwrap().node,
+        ui.node_id_at(1).unwrap()
+    );
+}
+
+#[test]
+fn absolute_overlays_do_not_participate_in_flex_flow() {
+    let mut ui = UiTree::new(
+        Element::column([
+            Element::container([])
+                .width(Length::Px(80.0))
+                .height(Length::Px(30.0)),
+            Element::container([])
+                .width(Length::Px(50.0))
+                .height(Length::Px(20.0))
+                .absolute(Inset::top_right(5.0, 7.0))
+                .z_index(10),
+        ])
+        .width(Length::Px(200.0))
+        .height(Length::Px(100.0)),
+    );
+    let mut layout = LayoutEngine::new();
+    let mut text = text_engine();
+    let output = layout
+        .compute(&mut ui, &mut text, Size::new(200.0, 100.0))
+        .unwrap();
+
+    assert_eq!(output.nodes[1].bounds.origin, Point::default());
+    assert_eq!(output.nodes[2].bounds.origin, Point::new(143.0, 5.0));
 }

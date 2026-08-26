@@ -125,4 +125,8 @@ impl TextScene {
     pub fn blocks(&self) -> &[TextBlock] {
         &self.blocks
     }
+
+    pub fn blocks_mut(&mut self) -> &mut [TextBlock] {
+        &mut self.blocks
+    }
 }

@@ -12,7 +12,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         RendererConfig::default(),
         text_engine(),
         StateShowcase::default(),
-        |event| println!("{event:?}"),
+        |_| {},
     )?;
     Ok(())
 }

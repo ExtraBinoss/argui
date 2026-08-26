@@ -108,6 +108,7 @@ pub enum UiEventKind {
     Pressed,
     Released,
     Clicked,
+    Scrolled { delta: Point, offset: Point },
     Focused,
     Blurred,
 }
@@ -123,6 +124,7 @@ pub struct UiEvent {
 pub struct InteractionUpdate {
     pub events: Vec<UiEvent>,
     pub paint_changed: bool,
+    pub scroll_changed: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]

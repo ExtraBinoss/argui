@@ -112,6 +112,7 @@ dependencies = [
 name = "argui-platform"
 version = "0.1.0"
 dependencies = [
+ "argui-core",
  "winit",
 ]
 
@@ -145,6 +146,7 @@ dependencies = [
 name = "argui-showcase"
 version = "0.1.0"
 dependencies = [
+ "argui-core",
  "argui-paint",
  "argui-runtime",
  "argui-text",

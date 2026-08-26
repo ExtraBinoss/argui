@@ -26,9 +26,13 @@ check before the next feature starts.
    per-side borders, per-corner radii, primitive opacity, nested rectangular
    clipping, analytic GPU antialiasing, and compatible-command batching work on
    native and web. Gradients, images, transforms, and shadows extend this layer.
-7. **Widgets — composition started.** `Button` composes a container, text,
-   interaction, layout, and paint without renderer-specific code. Add input,
-   scroll, overlays, reusable state ownership, and accessibility nodes.
+7. **Widgets — interaction, scroll, and overlays implemented.** `Button`
+   composes layout, paint, text, and interaction. Retained nested scroll regions,
+   configurable wheel polarity, fast geometry translation, stable z-index,
+   absolute overlays, draggable frame-coalesced scrollbars, and fixed-row virtual
+   lists share native and web code. Add text input, variable-row virtualization,
+   reusable state ownership, focus traps, and accessibility nodes. See the
+   [scroll model](scroll.md).
 8. **Layers and effects.** Follow the staged [effects plan](effects.md): declarative
    layer commands in `argui-paint`, a render graph and bounded texture pool in
    `argui-render`, then group opacity, masks, shadows, filters, destination-aware

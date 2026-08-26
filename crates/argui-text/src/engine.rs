@@ -80,6 +80,7 @@ impl TextEngine {
     pub fn prepare(&mut self, scene: &TextScene, scale_factor: f32) -> PreparedText {
         let mut prepared = PreparedText {
             blocks: scene.blocks().len(),
+            scale_factor,
             ..PreparedText::default()
         };
         for (block_index, block) in scene.blocks().iter().enumerate() {
@@ -123,6 +124,10 @@ impl TextEngine {
                         y: glyph.y,
                         color: block.style.color.as_array(),
                         clip,
+                        local: [
+                            glyph.x - offset_x.round() as i32,
+                            glyph.y - offset_y.round() as i32,
+                        ],
                     });
                 }
             }

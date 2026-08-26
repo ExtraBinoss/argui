@@ -3,7 +3,7 @@ use argui_paint::{Border, ClipBehavior, Color, DisplayList, Fill, Quad};
 use argui_text::{TextBlock, TextEngine, TextScene};
 use argui_ui::{
     Align, Direction, Edges, Element, ElementKind, HitRegion, Justify, LayoutStyle, Length,
-    NodeId as UiNodeId, UiTree, Wrap,
+    NodeId as UiNodeId, Position, ScrollRegion, UiTree, Wrap,
 };
 use taffy::{
     AlignItems, AvailableSpace, Dimension, FlexDirection, FlexWrap, JustifyContent,
@@ -11,21 +11,24 @@ use taffy::{
     geometry::{Rect as TaffyRect, Size as TaffySize},
 };
 
-use crate::LayoutError;
+use crate::{LayoutError, scroll};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct LayoutNode {
     pub index: usize,
     pub node: UiNodeId,
     pub bounds: Rect,
+    pub layout_bounds: Rect,
     pub clip: Option<Rect>,
     pub text_index: Option<usize>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct LayoutOutput {
+    pub viewport: Rect,
     pub nodes: Vec<LayoutNode>,
     pub hit_regions: Vec<HitRegion>,
+    pub scroll_regions: Vec<ScrollRegion>,
     pub display_list: DisplayList,
     pub text: TextScene,
 }
@@ -36,6 +39,13 @@ struct NodeMap {
     node: UiNodeId,
     id: NodeId,
     children: Vec<Self>,
+}
+
+#[derive(Clone, Copy)]
+struct Placement {
+    layout_parent: Point,
+    translation: Point,
+    clip: Option<Rect>,
 }
 
 #[derive(Debug)]
@@ -101,13 +111,20 @@ impl LayoutEngine {
             },
         )?;
 
-        let mut output = LayoutOutput::default();
+        let mut output = LayoutOutput {
+            viewport: Rect::new(Point::default(), viewport),
+            ..LayoutOutput::default()
+        };
         collect_layout(
             &self.tree,
             root,
             &elements,
-            Point::default(),
-            Some(Rect::new(Point::default(), viewport)),
+            ui,
+            Placement {
+                layout_parent: Point::default(),
+                translation: Point::default(),
+                clip: Some(Rect::new(Point::default(), viewport)),
+            },
             &mut output,
         )?;
         self.repaint(ui, &mut output);
@@ -115,11 +132,52 @@ impl LayoutEngine {
         Ok(output)
     }
 
+    pub fn apply_scroll(&self, ui: &UiTree, output: &mut LayoutOutput) -> Result<(), LayoutError> {
+        let elements = flattened(ui.root());
+        let root = self.root.as_ref().ok_or(LayoutError::MissingRoot)?;
+        output.scroll_regions.clear();
+        apply_scroll_layout(
+            &self.tree,
+            root,
+            &elements,
+            ui,
+            Point::default(),
+            Some(output.viewport),
+            output,
+        )?;
+        self.repaint(ui, output);
+        Ok(())
+    }
+
     pub fn repaint(&self, ui: &UiTree, output: &mut LayoutOutput) {
         let elements = flattened(ui.root());
         output.display_list.clear();
-        for node in &output.nodes {
+        output.hit_regions.clear();
+        for region in &mut output.scroll_regions {
+            if let Some(node) = output.nodes.iter().find(|node| node.node == region.node)
+                && let Some(config) = elements[node.index].scroll
+            {
+                region.config = config;
+            }
+        }
+        let mut order = Vec::with_capacity(output.nodes.len());
+        if let Some(root) = &self.root {
+            collect_paint_order(root, &elements, &mut order);
+        }
+        for index in order {
+            let node = &output.nodes[index];
             let element = elements[node.index];
+            if let Some(interaction) = element.interaction
+                && interaction.enabled
+                && let Some(clip) = node.clip.and_then(|clip| clip.intersection(node.bounds))
+            {
+                output.hit_regions.push(HitRegion {
+                    node: node.node,
+                    bounds: node.bounds,
+                    clip,
+                    focusable: interaction.focusable,
+                });
+            }
             let style = ui.resolved_quad(node.node, element);
             if style.is_visible()
                 && let Some(clip) = node.clip.and_then(|clip| clip.intersection(node.bounds))
@@ -140,6 +198,7 @@ impl LayoutEngine {
                 output.display_list.push_text(text_index);
             }
         }
+        scroll::paint(&output.scroll_regions, &mut output.display_list);
     }
 
     fn rebuild(&mut self, ui: &UiTree) -> Result<(), LayoutError> {
@@ -187,25 +246,25 @@ fn collect_layout(
     tree: &TaffyTree<usize>,
     node: &NodeMap,
     elements: &[&Element],
-    parent: Point,
-    clip: Option<Rect>,
+    ui: &UiTree,
+    placement: Placement,
     output: &mut LayoutOutput,
 ) -> Result<(), LayoutError> {
     let layout = tree.layout(node.id)?;
-    let origin = Point::new(parent.x + layout.location.x, parent.y + layout.location.y);
+    let layout_origin = Point::new(
+        placement.layout_parent.x + layout.location.x,
+        placement.layout_parent.y + layout.location.y,
+    );
+    let origin = Point::new(
+        layout_origin.x - placement.translation.x,
+        layout_origin.y - placement.translation.y,
+    );
     let bounds = Rect::new(origin, Size::new(layout.size.width, layout.size.height));
+    let layout_bounds = Rect::new(
+        layout_origin,
+        Size::new(layout.size.width, layout.size.height),
+    );
     let element = elements[node.index];
-    if let Some(interaction) = element.interaction
-        && interaction.enabled
-        && let Some(region_clip) = clip.and_then(|clip| clip.intersection(bounds))
-    {
-        output.hit_regions.push(HitRegion {
-            node: node.node,
-            bounds,
-            clip: region_clip,
-            focusable: interaction.focusable,
-        });
-    }
     let mut text_index = None;
     if let ElementKind::Text { content, style } = &element.kind {
         let text_bounds = Rect::new(
@@ -219,12 +278,10 @@ fn collect_layout(
             ),
         );
         let text_clip = match element.paint.clip {
-            ClipBehavior::None => clip,
-            ClipBehavior::Bounds => clip.and_then(|clip| clip.intersection(bounds)),
+            ClipBehavior::None => placement.clip,
+            ClipBehavior::Bounds => placement.clip.and_then(|clip| clip.intersection(bounds)),
         };
-        if let Some(text_clip) = text_clip
-            && text_clip.intersection(text_bounds).is_some()
-        {
+        if let Some(text_clip) = text_clip {
             let mut block = TextBlock::new(content, text_bounds);
             block.clip = text_clip;
             block.style = style.clone();
@@ -236,17 +293,138 @@ fn collect_layout(
         index: node.index,
         node: node.node,
         bounds,
-        clip,
+        layout_bounds,
+        clip: placement.clip,
         text_index,
     });
+    let child_clip = match element.paint.clip {
+        ClipBehavior::None => placement.clip,
+        ClipBehavior::Bounds => placement.clip.and_then(|clip| clip.intersection(bounds)),
+    };
+    if let Some(config) = element.scroll
+        && let Some(region_clip) = placement.clip.and_then(|clip| clip.intersection(bounds))
+    {
+        let content = content_size(tree, node)?;
+        output.scroll_regions.push(scroll::region(
+            node.node,
+            bounds,
+            region_clip,
+            content,
+            config,
+            ui.scroll_offset(node.node),
+        ));
+    }
+    let scroll = ui.scroll_offset(node.node);
+    let child_translation = Point::new(
+        placement.translation.x + scroll.x,
+        placement.translation.y + scroll.y,
+    );
+    for child in &node.children {
+        collect_layout(
+            tree,
+            child,
+            elements,
+            ui,
+            Placement {
+                layout_parent: layout_origin,
+                translation: child_translation,
+                clip: child_clip,
+            },
+            output,
+        )?;
+    }
+    Ok(())
+}
+
+fn apply_scroll_layout(
+    tree: &TaffyTree<usize>,
+    node: &NodeMap,
+    elements: &[&Element],
+    ui: &UiTree,
+    translation: Point,
+    clip: Option<Rect>,
+    output: &mut LayoutOutput,
+) -> Result<(), LayoutError> {
+    let layout = tree.layout(node.id)?;
+    let layout_bounds = output.nodes[node.index].layout_bounds;
+    let bounds = Rect::new(
+        Point::new(
+            layout_bounds.origin.x - translation.x,
+            layout_bounds.origin.y - translation.y,
+        ),
+        layout_bounds.size,
+    );
+    let element = elements[node.index];
+    let text_index = output.nodes[node.index].text_index;
+    output.nodes[node.index].bounds = bounds;
+    output.nodes[node.index].clip = clip;
+    if let Some(text_index) = text_index {
+        let block = &mut output.text.blocks_mut()[text_index];
+        block.bounds.origin = Point::new(
+            bounds.origin.x + layout.padding.left,
+            bounds.origin.y + layout.padding.top,
+        );
+        block.clip = match element.paint.clip {
+            ClipBehavior::None => clip,
+            ClipBehavior::Bounds => clip.and_then(|clip| clip.intersection(bounds)),
+        }
+        .unwrap_or_default();
+    }
     let child_clip = match element.paint.clip {
         ClipBehavior::None => clip,
         ClipBehavior::Bounds => clip.and_then(|clip| clip.intersection(bounds)),
     };
+    if let Some(config) = element.scroll
+        && let Some(region_clip) = clip.and_then(|clip| clip.intersection(bounds))
+    {
+        let content = content_size(tree, node)?;
+        output.scroll_regions.push(scroll::region(
+            node.node,
+            bounds,
+            region_clip,
+            content,
+            config,
+            ui.scroll_offset(node.node),
+        ));
+    }
+    let scroll = ui.scroll_offset(node.node);
+    let child_translation = Point::new(translation.x + scroll.x, translation.y + scroll.y);
     for child in &node.children {
-        collect_layout(tree, child, elements, origin, child_clip, output)?;
+        apply_scroll_layout(
+            tree,
+            child,
+            elements,
+            ui,
+            child_translation,
+            child_clip,
+            output,
+        )?;
     }
     Ok(())
+}
+
+fn content_size(tree: &TaffyTree<usize>, node: &NodeMap) -> Result<Size, LayoutError> {
+    let layout = tree.layout(node.id)?;
+    let mut size = Size::new(layout.size.width, layout.size.height);
+    for child in &node.children {
+        let child_layout = tree.layout(child.id)?;
+        size.width = size
+            .width
+            .max(child_layout.location.x + child_layout.size.width + layout.padding.right);
+        size.height = size
+            .height
+            .max(child_layout.location.y + child_layout.size.height + layout.padding.bottom);
+    }
+    Ok(size)
+}
+
+fn collect_paint_order(node: &NodeMap, elements: &[&Element], output: &mut Vec<usize>) {
+    output.push(node.index);
+    let mut children = node.children.iter().collect::<Vec<_>>();
+    children.sort_by_key(|child| elements[child.index].z_index);
+    for child in children {
+        collect_paint_order(child, elements, output);
+    }
 }
 
 fn flattened(root: &Element) -> Vec<&Element> {
@@ -296,6 +474,16 @@ fn taffy_style(style: &LayoutStyle) -> Style {
             Justify::End => JustifyContent::END,
             Justify::SpaceBetween => JustifyContent::SPACE_BETWEEN,
         }),
+        position: match style.position {
+            Position::Relative => taffy::Position::Relative,
+            Position::Absolute => taffy::Position::Absolute,
+        },
+        inset: TaffyRect {
+            left: min_max_dimension(style.inset.left),
+            right: min_max_dimension(style.inset.right),
+            top: min_max_dimension(style.inset.top),
+            bottom: min_max_dimension(style.inset.bottom),
+        },
         padding: padding(style.padding),
         gap: TaffySize {
             width: LengthPercentage::length(style.gap),

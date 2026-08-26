@@ -12,5 +12,8 @@ argui-runtime.workspace = true
 argui-text.workspace = true
 argui-ui.workspace = true
 
+[dev-dependencies]
+argui-core.workspace = true
+
 [lints]
 workspace = true

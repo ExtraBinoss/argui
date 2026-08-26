@@ -76,3 +76,19 @@ fn no_wrap_labels_keep_their_intrinsic_width() {
     assert!(unwrapped_size.width > 55.0);
     assert_eq!(unwrapped_size.height, unwrapped.line_height);
 }
+
+#[test]
+fn prepared_glyphs_reposition_without_reshaping() {
+    let mut engine =
+        TextEngine::from_embedded_fonts([NOTO_SANS], "Noto Sans", "Noto Sans", "Noto Sans");
+    let scene = TextScene::new().with(TextBlock::new("Scroll", bounds(10.0, 20.0, 100.0, 30.0)));
+    let mut prepared = engine.prepare(&scene, 2.0);
+    let before = prepared.glyphs[0];
+    let clip = bounds(0.0, 0.0, 200.0, 100.0);
+
+    prepared.reposition_block(0, Point::new(10.0, 5.0), clip);
+
+    assert_eq!(prepared.glyphs[0].key, before.key);
+    assert_eq!(prepared.glyphs[0].y, before.y - 30);
+    assert_eq!(prepared.glyphs[0].clip, [0.0, 0.0, 400.0, 200.0]);
+}
