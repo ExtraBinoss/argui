@@ -19,6 +19,10 @@ fn renderer_errors_keep_actionable_context() {
         "the adapter cannot present to this surface"
     );
     assert_eq!(
+        RendererError::GlyphAtlasFull.to_string(),
+        "the bounded glyph atlas is full"
+    );
+    assert_eq!(
         RendererError::Validation.to_string(),
         "surface validation failed"
     );

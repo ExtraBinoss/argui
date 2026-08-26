@@ -6,6 +6,7 @@ pub enum RendererError {
     AdapterRequest(String),
     DeviceRequest(String),
     UnsupportedSurface,
+    GlyphAtlasFull,
     Validation,
 }
 
@@ -20,6 +21,7 @@ impl fmt::Display for RendererError {
             Self::UnsupportedSurface => {
                 formatter.write_str("the adapter cannot present to this surface")
             }
+            Self::GlyphAtlasFull => formatter.write_str("the bounded glyph atlas is full"),
             Self::Validation => formatter.write_str("surface validation failed"),
         }
     }

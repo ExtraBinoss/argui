@@ -1,14 +1,17 @@
 [package]
-name = "argui-render"
+name = "argui-web-demo"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-argui-text.workspace = true
-bytemuck.workspace = true
-wgpu.workspace = true
+argui = { path = "../argui" }
+wasm-bindgen.workspace = true
 
 [lints]
 workspace = true

@@ -1,4 +1,6 @@
-use winit::{dpi::LogicalSize, window::WindowAttributes};
+#[cfg(not(target_arch = "wasm32"))]
+use winit::dpi::LogicalSize;
+use winit::window::WindowAttributes;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct WindowConfig {
@@ -30,7 +32,6 @@ impl WindowConfig {
     pub fn into_attributes(self) -> WindowAttributes {
         let attributes = WindowAttributes::default()
             .with_title(self.title)
-            .with_inner_size(LogicalSize::new(self.width, self.height))
             .with_decorations(self.decorations)
             .with_resizable(self.resizable)
             .with_transparent(self.transparent);
@@ -43,6 +44,6 @@ impl WindowConfig {
         }
 
         #[cfg(not(target_arch = "wasm32"))]
-        attributes
+        attributes.with_inner_size(LogicalSize::new(self.width, self.height))
     }
 }

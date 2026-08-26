@@ -1,11 +1,13 @@
 use std::{error::Error, fmt};
 
+use argui_layout::LayoutError;
 use argui_platform::PlatformError;
 use argui_render::RendererError;
 
 #[derive(Debug)]
 pub enum RuntimeError {
     Platform(PlatformError),
+    Layout(LayoutError),
     Renderer(RendererError),
 }
 
@@ -13,6 +15,7 @@ impl fmt::Display for RuntimeError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Platform(error) => error.fmt(formatter),
+            Self::Layout(error) => error.fmt(formatter),
             Self::Renderer(error) => error.fmt(formatter),
         }
     }
@@ -22,8 +25,15 @@ impl Error for RuntimeError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::Platform(error) => Some(error),
+            Self::Layout(error) => Some(error),
             Self::Renderer(error) => Some(error),
         }
+    }
+}
+
+impl From<LayoutError> for RuntimeError {
+    fn from(error: LayoutError) -> Self {
+        Self::Layout(error)
     }
 }
 

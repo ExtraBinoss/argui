@@ -4,6 +4,7 @@
 mod config;
 mod error;
 mod surface;
+mod text;
 
 pub use config::RendererConfig;
 pub use error::RendererError;

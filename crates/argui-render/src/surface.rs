@@ -1,9 +1,10 @@
+use argui_text::{PreparedText, TextEngine};
 use wgpu::{
     CurrentSurfaceTexture, LoadOp, Operations, RenderPassColorAttachment, RenderPassDescriptor,
     StoreOp, SurfaceTarget,
 };
 
-use crate::{RendererConfig, RendererError};
+use crate::{RendererConfig, RendererError, text::TextGpu};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RenderStatus {
@@ -20,6 +21,7 @@ pub struct SurfaceRenderer {
     queue: wgpu::Queue,
     surface_config: wgpu::SurfaceConfiguration,
     renderer_config: RendererConfig,
+    text: TextGpu,
 }
 
 impl SurfaceRenderer {
@@ -55,6 +57,7 @@ impl SurfaceRenderer {
             .ok_or(RendererError::UnsupportedSurface)?;
         surface_config.present_mode = renderer_config.present_mode;
         surface.configure(&device, &surface_config);
+        let text = TextGpu::new(&device, surface_config.format);
 
         Ok(Self {
             instance,
@@ -63,6 +66,7 @@ impl SurfaceRenderer {
             queue,
             surface_config,
             renderer_config,
+            text,
         })
     }
 
@@ -91,7 +95,24 @@ impl SurfaceRenderer {
     }
 
     #[cfg_attr(coverage_nightly, coverage(off))]
-    pub fn render(&self) -> Result<RenderStatus, RendererError> {
+    pub fn render(&mut self) -> Result<RenderStatus, RendererError> {
+        self.render_frame(None)
+    }
+
+    #[cfg_attr(coverage_nightly, coverage(off))]
+    pub fn render_text(
+        &mut self,
+        engine: &mut TextEngine,
+        text: &PreparedText,
+    ) -> Result<RenderStatus, RendererError> {
+        self.render_frame(Some((engine, text)))
+    }
+
+    #[cfg_attr(coverage_nightly, coverage(off))]
+    fn render_frame(
+        &mut self,
+        text: Option<(&mut TextEngine, &PreparedText)>,
+    ) -> Result<RenderStatus, RendererError> {
         let (frame, status) = match self.surface.get_current_texture() {
             CurrentSurfaceTexture::Success(frame) => (frame, RenderStatus::Presented),
             CurrentSurfaceTexture::Suboptimal(frame) => (frame, RenderStatus::Reconfigure),
@@ -103,6 +124,20 @@ impl SurfaceRenderer {
             CurrentSurfaceTexture::Validation => return Err(RendererError::Validation),
         };
 
+        let instance_count = if let Some((engine, text)) = text {
+            self.text.prepare(
+                &self.device,
+                &self.queue,
+                engine,
+                text,
+                [
+                    self.surface_config.width as f32,
+                    self.surface_config.height as f32,
+                ],
+            )?
+        } else {
+            0
+        };
         let view = frame.texture.create_view(&Default::default());
         let attachment = Some(RenderPassColorAttachment {
             view: &view,
@@ -115,11 +150,12 @@ impl SurfaceRenderer {
         });
         let mut encoder = self.device.create_command_encoder(&Default::default());
         {
-            let _pass = encoder.begin_render_pass(&RenderPassDescriptor {
+            let mut pass = encoder.begin_render_pass(&RenderPassDescriptor {
                 label: Some("argui-clear-pass"),
                 color_attachments: &[attachment],
                 ..Default::default()
             });
+            self.text.draw(&mut pass, instance_count);
         }
         self.queue.submit([encoder.finish()]);
         self.queue.present(frame);

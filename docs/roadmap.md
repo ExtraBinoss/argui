@@ -8,13 +8,18 @@ check before the next feature starts.
    redraw events. Verify zero continuous redraw while idle.
 2. **WGPU surface — implemented.** Select an adapter, configure/reconfigure the surface, clear,
    and present on native and web. Recover cleanly from lost/outdated surfaces.
-3. **Text.** Shape bidi/fallback text with `cosmic-text`; implement a reusable
-   glyph atlas, batching, clipping, cursor geometry, selection, IME, clipboard,
-   and copy/paste behavior around it.
-4. **Retained tree.** Stable identities, reconciliation, explicit dirty flags,
-   hit testing, focus, pointer capture, and a compact display list.
-5. **Layout.** Map a small public style model to `taffy`; cache intrinsic text
-   measurement and invalidate only affected ancestors.
+3. **Text — rendering implemented, editing pending.** Shape bidi/fallback text
+   with `cosmic-text`; use a bounded reusable glyph atlas, one instanced batch,
+   and per-block clipping. Add cursor geometry, selection, IME, clipboard, and
+   copy/paste behavior around it next.
+4. **Retained tree — foundation implemented.** Persistent keyed elements,
+   revision tracking, and explicit layout invalidation are present. Add keyed
+   reconciliation, per-node state, hit testing, focus, pointer capture, and a
+   compact display list with the first interactive widgets.
+5. **Layout — responsive foundation implemented.** A small renderer-independent
+   style model maps to `taffy`; Cosmic Text performs constrained intrinsic
+   measurement and native/web viewport changes share one reflow path. Add
+   per-subtree invalidation and intrinsic measurement caching as the tree grows.
 6. **Widgets.** Compose primitives into text, containers, buttons, input, scroll,
    overlays, and accessibility nodes without renderer-specific widget code.
 7. **Layers and effects.** Stacking contexts, z-index, clips, transforms, opacity,

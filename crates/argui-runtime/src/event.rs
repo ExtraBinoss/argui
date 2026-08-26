@@ -5,4 +5,5 @@ pub enum RuntimeEvent {
     Platform(PlatformEvent),
     RendererReady,
     RendererFailed(String),
+    LayoutFailed(String),
 }

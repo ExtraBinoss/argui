@@ -1,7 +1,11 @@
 use std::{cell::RefCell, rc::Rc, sync::Arc};
 
+use argui_core::Size;
+use argui_layout::{LayoutEngine, LayoutOutput};
 use argui_platform::{PlatformError, PlatformEvent, WindowConfig};
 use argui_render::{RenderStatus, RendererConfig, SurfaceRenderer};
+use argui_text::{PreparedText, TextEngine, TextScene};
+use argui_ui::UiTree;
 use winit::{
     application::ApplicationHandler,
     event::WindowEvent,
@@ -24,6 +28,14 @@ struct Application {
     window: Option<Arc<Window>>,
     renderer: Rc<RefCell<RendererState>>,
     renderer_announced: bool,
+    text_engine: TextEngine,
+    text_scene: Option<TextScene>,
+    ui_tree: Option<UiTree>,
+    ui_layout: Option<LayoutOutput>,
+    layout_engine: LayoutEngine,
+    prepared_text: Option<PreparedText>,
+    viewport: Size,
+    scale_factor: f32,
     fatal_error: Option<RuntimeError>,
     on_event: Box<dyn FnMut(RuntimeEvent)>,
 }
@@ -33,6 +45,9 @@ impl Application {
     fn new(
         window_config: WindowConfig,
         renderer_config: RendererConfig,
+        text_engine: TextEngine,
+        text_scene: Option<TextScene>,
+        ui_tree: Option<UiTree>,
         on_event: impl FnMut(RuntimeEvent) + 'static,
     ) -> Self {
         Self {
@@ -41,9 +56,51 @@ impl Application {
             window: None,
             renderer: Rc::new(RefCell::new(RendererState::Loading)),
             renderer_announced: false,
+            text_engine,
+            text_scene,
+            ui_tree,
+            ui_layout: None,
+            layout_engine: LayoutEngine::new(),
+            prepared_text: None,
+            viewport: Size::default(),
+            scale_factor: 1.0,
             fatal_error: None,
             on_event: Box::new(on_event),
         }
+    }
+
+    fn prepare_text(&mut self) -> Result<(), RuntimeError> {
+        if let Some(ui) = &mut self.ui_tree {
+            self.ui_layout = Some(self.layout_engine.compute(
+                ui,
+                &mut self.text_engine,
+                self.viewport,
+            )?);
+        }
+        let scene = self
+            .ui_layout
+            .as_ref()
+            .map(|layout| &layout.text)
+            .or(self.text_scene.as_ref());
+        self.prepared_text = scene.map(|scene| self.text_engine.prepare(scene, self.scale_factor));
+        Ok(())
+    }
+
+    fn update_viewport(&mut self, width: u32, height: u32) {
+        self.viewport = Size::new(
+            width as f32 / self.scale_factor,
+            height as f32 / self.scale_factor,
+        );
+    }
+
+    fn prepare_or_exit(&mut self, event_loop: &ActiveEventLoop) -> bool {
+        if let Err(error) = self.prepare_text() {
+            (self.on_event)(RuntimeEvent::LayoutFailed(error.to_string()));
+            self.fatal_error = Some(error);
+            event_loop.exit();
+            return false;
+        }
+        true
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -75,8 +132,12 @@ impl Application {
         let config = self.renderer_config;
 
         wasm_bindgen_futures::spawn_local(async move {
-            let result =
+            let mut result =
                 SurfaceRenderer::new(Arc::clone(&window), size.width, size.height, config).await;
+            if let Ok(renderer) = &mut result {
+                let current_size = window.inner_size();
+                renderer.resize(current_size.width, current_size.height);
+            }
             *renderer.borrow_mut() = match result {
                 Ok(renderer) => RendererState::Ready(Box::new(renderer)),
                 Err(error) => RendererState::Failed(error.to_string()),
@@ -107,7 +168,11 @@ impl Application {
             self.renderer_announced = true;
         }
 
-        let result = match renderer.render() {
+        let rendered = match self.prepared_text.as_ref() {
+            Some(text) => renderer.render_text(&mut self.text_engine, text),
+            None => renderer.render(),
+        };
+        let result = match rendered {
             Ok(RenderStatus::Presented | RenderStatus::Skipped) => Ok(()),
             Ok(RenderStatus::Reconfigure) => {
                 let size = window.inner_size();
@@ -138,6 +203,11 @@ impl ApplicationHandler for Application {
             Ok(window) => {
                 let window = Arc::new(window);
                 let size = window.inner_size();
+                self.scale_factor = window.scale_factor() as f32;
+                self.update_viewport(size.width, size.height);
+                if !self.prepare_or_exit(event_loop) {
+                    return;
+                }
                 (self.on_event)(RuntimeEvent::Platform(PlatformEvent::Opened {
                     width: size.width,
                     height: size.height,
@@ -179,12 +249,22 @@ impl ApplicationHandler for Application {
                 if let RendererState::Ready(renderer) = &mut *self.renderer.borrow_mut() {
                     renderer.resize(size.width, size.height);
                 }
+                self.update_viewport(size.width, size.height);
+                if !self.prepare_or_exit(event_loop) {
+                    return;
+                }
                 PlatformEvent::Resized {
                     width: size.width,
                     height: size.height,
                 }
             }
             WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
+                self.scale_factor = scale_factor as f32;
+                let size = window.inner_size();
+                self.update_viewport(size.width, size.height);
+                if !self.prepare_or_exit(event_loop) {
+                    return;
+                }
                 PlatformEvent::ScaleFactorChanged(scale_factor)
             }
             WindowEvent::RedrawRequested => {
@@ -211,9 +291,92 @@ pub fn run(
     renderer_config: RendererConfig,
     on_event: impl FnMut(RuntimeEvent) + 'static,
 ) -> Result<(), RuntimeError> {
+    run_application(Application::new(
+        window_config,
+        renderer_config,
+        TextEngine::new(),
+        None,
+        None,
+        on_event,
+    ))
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[cfg_attr(coverage_nightly, coverage(off))]
+pub fn run_with_text(
+    window_config: WindowConfig,
+    renderer_config: RendererConfig,
+    scene: TextScene,
+    on_event: impl FnMut(RuntimeEvent) + 'static,
+) -> Result<(), RuntimeError> {
+    run_with_text_engine(
+        window_config,
+        renderer_config,
+        TextEngine::new(),
+        scene,
+        on_event,
+    )
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[cfg_attr(coverage_nightly, coverage(off))]
+pub fn run_with_text_engine(
+    window_config: WindowConfig,
+    renderer_config: RendererConfig,
+    text_engine: TextEngine,
+    scene: TextScene,
+    on_event: impl FnMut(RuntimeEvent) + 'static,
+) -> Result<(), RuntimeError> {
+    run_application(Application::new(
+        window_config,
+        renderer_config,
+        text_engine,
+        Some(scene),
+        None,
+        on_event,
+    ))
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[cfg_attr(coverage_nightly, coverage(off))]
+pub fn run_ui(
+    window_config: WindowConfig,
+    renderer_config: RendererConfig,
+    ui: UiTree,
+    on_event: impl FnMut(RuntimeEvent) + 'static,
+) -> Result<(), RuntimeError> {
+    run_ui_with_text_engine(
+        window_config,
+        renderer_config,
+        TextEngine::new(),
+        ui,
+        on_event,
+    )
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[cfg_attr(coverage_nightly, coverage(off))]
+pub fn run_ui_with_text_engine(
+    window_config: WindowConfig,
+    renderer_config: RendererConfig,
+    text_engine: TextEngine,
+    ui: UiTree,
+    on_event: impl FnMut(RuntimeEvent) + 'static,
+) -> Result<(), RuntimeError> {
+    run_application(Application::new(
+        window_config,
+        renderer_config,
+        text_engine,
+        None,
+        Some(ui),
+        on_event,
+    ))
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn run_application(mut application: Application) -> Result<(), RuntimeError> {
     let event_loop = EventLoop::new().map_err(PlatformError::from)?;
     event_loop.set_control_flow(ControlFlow::Wait);
-    let mut application = Application::new(window_config, renderer_config, on_event);
     event_loop
         .run_app(&mut application)
         .map_err(PlatformError::from)?;
@@ -231,6 +394,95 @@ pub fn run(
 
     let event_loop = EventLoop::new().map_err(PlatformError::from)?;
     event_loop.set_control_flow(ControlFlow::Wait);
-    event_loop.spawn_app(Application::new(window_config, renderer_config, on_event));
+    event_loop.spawn_app(Application::new(
+        window_config,
+        renderer_config,
+        TextEngine::new(),
+        None,
+        None,
+        on_event,
+    ));
+    Ok(())
+}
+
+#[cfg(target_arch = "wasm32")]
+#[cfg_attr(coverage_nightly, coverage(off))]
+pub fn run_with_text(
+    window_config: WindowConfig,
+    renderer_config: RendererConfig,
+    scene: TextScene,
+    on_event: impl FnMut(RuntimeEvent) + 'static,
+) -> Result<(), RuntimeError> {
+    run_with_text_engine(
+        window_config,
+        renderer_config,
+        TextEngine::new(),
+        scene,
+        on_event,
+    )
+}
+
+#[cfg(target_arch = "wasm32")]
+#[cfg_attr(coverage_nightly, coverage(off))]
+pub fn run_with_text_engine(
+    window_config: WindowConfig,
+    renderer_config: RendererConfig,
+    text_engine: TextEngine,
+    scene: TextScene,
+    on_event: impl FnMut(RuntimeEvent) + 'static,
+) -> Result<(), RuntimeError> {
+    use winit::platform::web::EventLoopExtWebSys;
+
+    let event_loop = EventLoop::new().map_err(PlatformError::from)?;
+    event_loop.set_control_flow(ControlFlow::Wait);
+    event_loop.spawn_app(Application::new(
+        window_config,
+        renderer_config,
+        text_engine,
+        Some(scene),
+        None,
+        on_event,
+    ));
+    Ok(())
+}
+
+#[cfg(target_arch = "wasm32")]
+#[cfg_attr(coverage_nightly, coverage(off))]
+pub fn run_ui(
+    window_config: WindowConfig,
+    renderer_config: RendererConfig,
+    ui: UiTree,
+    on_event: impl FnMut(RuntimeEvent) + 'static,
+) -> Result<(), RuntimeError> {
+    run_ui_with_text_engine(
+        window_config,
+        renderer_config,
+        TextEngine::new(),
+        ui,
+        on_event,
+    )
+}
+
+#[cfg(target_arch = "wasm32")]
+#[cfg_attr(coverage_nightly, coverage(off))]
+pub fn run_ui_with_text_engine(
+    window_config: WindowConfig,
+    renderer_config: RendererConfig,
+    text_engine: TextEngine,
+    ui: UiTree,
+    on_event: impl FnMut(RuntimeEvent) + 'static,
+) -> Result<(), RuntimeError> {
+    use winit::platform::web::EventLoopExtWebSys;
+
+    let event_loop = EventLoop::new().map_err(PlatformError::from)?;
+    event_loop.set_control_flow(ControlFlow::Wait);
+    event_loop.spawn_app(Application::new(
+        window_config,
+        renderer_config,
+        text_engine,
+        None,
+        Some(ui),
+        on_event,
+    ));
     Ok(())
 }

@@ -12,4 +12,15 @@ runtime, and a WGPU surface presenting on native and web. See
 cargo test --workspace
 ./scripts/quality.sh
 cargo run -p argui --example window
+cargo run -p argui --example text
+cargo run -p argui --example layout
+./scripts/serve-web.sh
 ```
+
+The web demo embeds its own fonts because browsers do not expose system font
+files to WASM. Argui itself ships no mandatory font; each application supplies
+the assets and generic-family mapping it wants.
+
+The `layout` example uses the retained `UiTree` API. Taffy computes logical
+rectangles from the current viewport and Cosmic Text supplies intrinsic text
+measurement, so native-window and browser resizing share the same reflow path.

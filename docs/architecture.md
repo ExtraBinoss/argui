@@ -41,6 +41,11 @@ Text shaping is not text editing. Selection, copy/paste commands, IME compositio
 and undo belong to UI/platform code around the text engine. This avoids rejecting
 `cosmic-text` for a responsibility it does not claim to own.
 
+Fonts are application resources. Native applications may use the system-backed
+`TextEngine::new()`. Sandboxed targets can create an isolated engine with
+`TextEngine::from_embedded_fonts(...)` and pass it to the runtime. The library
+does not force a font, a download, or an application bundle-size cost.
+
 ## DSL seam
 
 `argui-ui::Element` is the lowering target. A future `argui-dsl` crate can parse
@@ -52,3 +57,11 @@ That makes the DSL optional, replaceable, testable without a GPU, and unable to
 leak syntax concerns into rendering. The initial `Element` is intentionally tiny;
 styles, events, and components are added only when their runtime representation
 is understood.
+
+## Retained layout flow
+
+`argui-ui::UiTree` owns the persistent element description, a revision, and an
+explicit layout-dirty flag. `argui-layout::LayoutEngine` rebuilds its Taffy tree
+only when that revision changes; viewport or DPI changes reuse it. Text leaves
+are measured by Cosmic Text under Taffy's width constraint, then lowered to a
+`TextScene`. No layout or shaping work runs while the event loop is idle.

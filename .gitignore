@@ -2,4 +2,4 @@
 *.profraw
 lcov.info
 coverage/
-
+/web/pkg/
