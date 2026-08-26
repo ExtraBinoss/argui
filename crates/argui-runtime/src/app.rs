@@ -5,15 +5,15 @@ use argui_layout::{LayoutEngine, LayoutOutput};
 use argui_platform::{ButtonState, PlatformError, PlatformEvent, PointerButton, WindowConfig};
 use argui_render::{RenderStatus, RendererConfig, SurfaceRenderer};
 use argui_text::{PreparedText, TextEngine, TextScene};
-use argui_ui::{InteractionUpdate, UiTree};
+use argui_ui::{InteractionUpdate, TreeUpdate, UiTree};
 use winit::{
     application::ApplicationHandler,
     event::{ElementState, MouseButton, WindowEvent},
-    event_loop::{ActiveEventLoop, ControlFlow, EventLoop},
+    event_loop::ActiveEventLoop,
     window::{Window, WindowId},
 };
 
-use crate::{RuntimeError, RuntimeEvent};
+use crate::{RuntimeError, RuntimeEvent, UiApp, ViewUpdate};
 
 enum RendererState {
     Loading,
@@ -22,7 +22,7 @@ enum RendererState {
     Failed(String),
 }
 
-struct Application {
+pub(crate) struct Application {
     window_config: WindowConfig,
     renderer_config: RendererConfig,
     window: Option<Arc<Window>>,
@@ -31,23 +31,25 @@ struct Application {
     text_engine: TextEngine,
     text_scene: Option<TextScene>,
     ui_tree: Option<UiTree>,
+    model: Option<Box<dyn UiApp>>,
     ui_layout: Option<LayoutOutput>,
     layout_engine: LayoutEngine,
     prepared_text: Option<PreparedText>,
     viewport: Size,
     scale_factor: f32,
-    fatal_error: Option<RuntimeError>,
+    pub(crate) fatal_error: Option<RuntimeError>,
     on_event: Box<dyn FnMut(RuntimeEvent)>,
 }
 
 #[cfg_attr(coverage_nightly, coverage(off))]
 impl Application {
-    fn new(
+    pub(crate) fn new(
         window_config: WindowConfig,
         renderer_config: RendererConfig,
         text_engine: TextEngine,
         text_scene: Option<TextScene>,
         ui_tree: Option<UiTree>,
+        model: Option<Box<dyn UiApp>>,
         on_event: impl FnMut(RuntimeEvent) + 'static,
     ) -> Self {
         Self {
@@ -59,6 +61,7 @@ impl Application {
             text_engine,
             text_scene,
             ui_tree,
+            model,
             ui_layout: None,
             layout_engine: LayoutEngine::new(),
             prepared_text: None,
@@ -103,19 +106,55 @@ impl Application {
         true
     }
 
-    fn apply_ui_update(&mut self, update: InteractionUpdate, window: &Window) {
-        if update.paint_changed
-            && let (Some(ui), Some(layout)) = (&self.ui_tree, &mut self.ui_layout)
-        {
-            self.layout_engine.repaint(ui, layout);
-            window.request_redraw();
-        }
+    fn apply_ui_update(
+        &mut self,
+        update: InteractionUpdate,
+        window: &Window,
+        event_loop: &ActiveEventLoop,
+    ) {
+        let mut rebuild = false;
         for event in update.events {
+            if let Some(model) = &mut self.model {
+                rebuild |= model.update(&event) == ViewUpdate::Rebuild;
+            }
             (self.on_event)(RuntimeEvent::Ui(event));
+        }
+        let tree_update = if rebuild {
+            let root = self.model.as_ref().map(|model| model.view());
+            match (root, &mut self.ui_tree) {
+                (Some(root), Some(tree)) => tree.update(root),
+                _ => TreeUpdate::None,
+            }
+        } else {
+            TreeUpdate::None
+        };
+        let redraw = match tree_update {
+            TreeUpdate::Layout => self.prepare_or_exit(event_loop),
+            TreeUpdate::Paint => {
+                self.repaint();
+                true
+            }
+            TreeUpdate::None if update.paint_changed => {
+                self.repaint();
+                true
+            }
+            TreeUpdate::None => false,
+        };
+        if tree_update != TreeUpdate::None {
+            (self.on_event)(RuntimeEvent::ViewUpdated(tree_update));
+        }
+        if redraw {
+            window.request_redraw();
         }
     }
 
-    fn pointer_moved(&mut self, point: Point, window: &Window) {
+    fn repaint(&mut self) {
+        if let (Some(ui), Some(layout)) = (&self.ui_tree, &mut self.ui_layout) {
+            self.layout_engine.repaint(ui, layout);
+        }
+    }
+
+    fn pointer_moved(&mut self, point: Point, window: &Window, event_loop: &ActiveEventLoop) {
         let Some(layout) = &self.ui_layout else {
             return;
         };
@@ -123,17 +162,22 @@ impl Application {
             return;
         };
         let update = ui.pointer_moved(point, &layout.hit_regions);
-        self.apply_ui_update(update, window);
+        self.apply_ui_update(update, window, event_loop);
     }
 
-    fn pointer_left(&mut self, window: &Window) {
+    fn pointer_left(&mut self, window: &Window, event_loop: &ActiveEventLoop) {
         if let Some(ui) = &mut self.ui_tree {
             let update = ui.pointer_left();
-            self.apply_ui_update(update, window);
+            self.apply_ui_update(update, window, event_loop);
         }
     }
 
-    fn primary_button(&mut self, state: ButtonState, window: &Window) {
+    fn primary_button(
+        &mut self,
+        state: ButtonState,
+        window: &Window,
+        event_loop: &ActiveEventLoop,
+    ) {
         let Some(ui) = &mut self.ui_tree else {
             return;
         };
@@ -146,13 +190,13 @@ impl Application {
             }
             ButtonState::Released => ui.primary_released(),
         };
-        self.apply_ui_update(update, window);
+        self.apply_ui_update(update, window, event_loop);
     }
 
-    fn window_focus(&mut self, focused: bool, window: &Window) {
+    fn window_focus(&mut self, focused: bool, window: &Window, event_loop: &ActiveEventLoop) {
         if !focused && let Some(ui) = &mut self.ui_tree {
             let update = ui.window_blurred();
-            self.apply_ui_update(update, window);
+            self.apply_ui_update(update, window, event_loop);
         }
     }
 
@@ -331,7 +375,7 @@ impl ApplicationHandler for Application {
                     position.x as f32 / self.scale_factor,
                     position.y as f32 / self.scale_factor,
                 );
-                self.pointer_moved(point, &window);
+                self.pointer_moved(point, &window, event_loop);
                 PlatformEvent::PointerMoved {
                     x: point.x,
                     y: point.y,
@@ -339,19 +383,19 @@ impl ApplicationHandler for Application {
             }
             WindowEvent::CursorEntered { .. } => PlatformEvent::PointerEntered,
             WindowEvent::CursorLeft { .. } => {
-                self.pointer_left(&window);
+                self.pointer_left(&window, event_loop);
                 PlatformEvent::PointerLeft
             }
             WindowEvent::MouseInput { state, button, .. } => {
                 let state = button_state(state);
                 let button = pointer_button(button);
                 if button == PointerButton::Primary {
-                    self.primary_button(state, &window);
+                    self.primary_button(state, &window, event_loop);
                 }
                 PlatformEvent::PointerButton { button, state }
             }
             WindowEvent::Focused(focused) => {
-                self.window_focus(focused, &window);
+                self.window_focus(focused, &window, event_loop);
                 PlatformEvent::Focused(focused)
             }
             WindowEvent::RedrawRequested => {
@@ -387,207 +431,4 @@ const fn pointer_button(button: MouseButton) -> PointerButton {
         MouseButton::Forward => PointerButton::Forward,
         MouseButton::Other(value) => PointerButton::Other(value),
     }
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-#[cfg_attr(coverage_nightly, coverage(off))]
-pub fn run(
-    window_config: WindowConfig,
-    renderer_config: RendererConfig,
-    on_event: impl FnMut(RuntimeEvent) + 'static,
-) -> Result<(), RuntimeError> {
-    run_application(Application::new(
-        window_config,
-        renderer_config,
-        TextEngine::new(),
-        None,
-        None,
-        on_event,
-    ))
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-#[cfg_attr(coverage_nightly, coverage(off))]
-pub fn run_with_text(
-    window_config: WindowConfig,
-    renderer_config: RendererConfig,
-    scene: TextScene,
-    on_event: impl FnMut(RuntimeEvent) + 'static,
-) -> Result<(), RuntimeError> {
-    run_with_text_engine(
-        window_config,
-        renderer_config,
-        TextEngine::new(),
-        scene,
-        on_event,
-    )
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-#[cfg_attr(coverage_nightly, coverage(off))]
-pub fn run_with_text_engine(
-    window_config: WindowConfig,
-    renderer_config: RendererConfig,
-    text_engine: TextEngine,
-    scene: TextScene,
-    on_event: impl FnMut(RuntimeEvent) + 'static,
-) -> Result<(), RuntimeError> {
-    run_application(Application::new(
-        window_config,
-        renderer_config,
-        text_engine,
-        Some(scene),
-        None,
-        on_event,
-    ))
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-#[cfg_attr(coverage_nightly, coverage(off))]
-pub fn run_ui(
-    window_config: WindowConfig,
-    renderer_config: RendererConfig,
-    ui: UiTree,
-    on_event: impl FnMut(RuntimeEvent) + 'static,
-) -> Result<(), RuntimeError> {
-    run_ui_with_text_engine(
-        window_config,
-        renderer_config,
-        TextEngine::new(),
-        ui,
-        on_event,
-    )
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-#[cfg_attr(coverage_nightly, coverage(off))]
-pub fn run_ui_with_text_engine(
-    window_config: WindowConfig,
-    renderer_config: RendererConfig,
-    text_engine: TextEngine,
-    ui: UiTree,
-    on_event: impl FnMut(RuntimeEvent) + 'static,
-) -> Result<(), RuntimeError> {
-    run_application(Application::new(
-        window_config,
-        renderer_config,
-        text_engine,
-        None,
-        Some(ui),
-        on_event,
-    ))
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-fn run_application(mut application: Application) -> Result<(), RuntimeError> {
-    let event_loop = EventLoop::new().map_err(PlatformError::from)?;
-    event_loop.set_control_flow(ControlFlow::Wait);
-    event_loop
-        .run_app(&mut application)
-        .map_err(PlatformError::from)?;
-    application.fatal_error.map_or(Ok(()), Err)
-}
-
-#[cfg(target_arch = "wasm32")]
-#[cfg_attr(coverage_nightly, coverage(off))]
-pub fn run(
-    window_config: WindowConfig,
-    renderer_config: RendererConfig,
-    on_event: impl FnMut(RuntimeEvent) + 'static,
-) -> Result<(), RuntimeError> {
-    use winit::platform::web::EventLoopExtWebSys;
-
-    let event_loop = EventLoop::new().map_err(PlatformError::from)?;
-    event_loop.set_control_flow(ControlFlow::Wait);
-    event_loop.spawn_app(Application::new(
-        window_config,
-        renderer_config,
-        TextEngine::new(),
-        None,
-        None,
-        on_event,
-    ));
-    Ok(())
-}
-
-#[cfg(target_arch = "wasm32")]
-#[cfg_attr(coverage_nightly, coverage(off))]
-pub fn run_with_text(
-    window_config: WindowConfig,
-    renderer_config: RendererConfig,
-    scene: TextScene,
-    on_event: impl FnMut(RuntimeEvent) + 'static,
-) -> Result<(), RuntimeError> {
-    run_with_text_engine(
-        window_config,
-        renderer_config,
-        TextEngine::new(),
-        scene,
-        on_event,
-    )
-}
-
-#[cfg(target_arch = "wasm32")]
-#[cfg_attr(coverage_nightly, coverage(off))]
-pub fn run_with_text_engine(
-    window_config: WindowConfig,
-    renderer_config: RendererConfig,
-    text_engine: TextEngine,
-    scene: TextScene,
-    on_event: impl FnMut(RuntimeEvent) + 'static,
-) -> Result<(), RuntimeError> {
-    use winit::platform::web::EventLoopExtWebSys;
-
-    let event_loop = EventLoop::new().map_err(PlatformError::from)?;
-    event_loop.set_control_flow(ControlFlow::Wait);
-    event_loop.spawn_app(Application::new(
-        window_config,
-        renderer_config,
-        text_engine,
-        Some(scene),
-        None,
-        on_event,
-    ));
-    Ok(())
-}
-
-#[cfg(target_arch = "wasm32")]
-#[cfg_attr(coverage_nightly, coverage(off))]
-pub fn run_ui(
-    window_config: WindowConfig,
-    renderer_config: RendererConfig,
-    ui: UiTree,
-    on_event: impl FnMut(RuntimeEvent) + 'static,
-) -> Result<(), RuntimeError> {
-    run_ui_with_text_engine(
-        window_config,
-        renderer_config,
-        TextEngine::new(),
-        ui,
-        on_event,
-    )
-}
-
-#[cfg(target_arch = "wasm32")]
-#[cfg_attr(coverage_nightly, coverage(off))]
-pub fn run_ui_with_text_engine(
-    window_config: WindowConfig,
-    renderer_config: RendererConfig,
-    text_engine: TextEngine,
-    ui: UiTree,
-    on_event: impl FnMut(RuntimeEvent) + 'static,
-) -> Result<(), RuntimeError> {
-    use winit::platform::web::EventLoopExtWebSys;
-
-    let event_loop = EventLoop::new().map_err(PlatformError::from)?;
-    event_loop.set_control_flow(ControlFlow::Wait);
-    event_loop.spawn_app(Application::new(
-        window_config,
-        renderer_config,
-        text_engine,
-        None,
-        Some(ui),
-        on_event,
-    ));
-    Ok(())
 }

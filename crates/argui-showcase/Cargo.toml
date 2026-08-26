@@ -1,22 +1,16 @@
 [package]
-name = "argui"
+name = "argui-showcase"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+publish = false
 
 [dependencies]
-argui-core.workspace = true
-argui-layout.workspace = true
 argui-paint.workspace = true
-argui-platform.workspace = true
-argui-render.workspace = true
 argui-runtime.workspace = true
 argui-text.workspace = true
 argui-ui.workspace = true
-
-[dev-dependencies]
-argui-showcase.workspace = true
 
 [lints]
 workspace = true

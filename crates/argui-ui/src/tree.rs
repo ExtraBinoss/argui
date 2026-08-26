@@ -14,6 +14,14 @@ pub enum ElementKind {
     Text { content: String, style: TextStyle },
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum TreeUpdate {
+    #[default]
+    None,
+    Paint,
+    Layout,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Element {
     pub key: Option<String>,
@@ -235,16 +243,28 @@ impl UiTree {
     }
 
     pub fn replace(&mut self, root: Element) -> bool {
-        if self.root == root {
-            return false;
+        self.update(root) != TreeUpdate::None
+    }
+
+    pub fn update(&mut self, root: Element) -> TreeUpdate {
+        let update = classify_update(&self.root, &root);
+        match update {
+            TreeUpdate::None => return update,
+            TreeUpdate::Paint => self.root = root,
+            TreeUpdate::Layout => {
+                self.node_ids = identity::reconcile_ids(
+                    &self.root,
+                    &self.node_ids,
+                    &root,
+                    &mut self.next_node_id,
+                );
+                self.root = root;
+                self.interaction.retain(&self.node_ids);
+                self.revision = self.revision.wrapping_add(1);
+                self.layout_dirty = true;
+            }
         }
-        self.node_ids =
-            identity::reconcile_ids(&self.root, &self.node_ids, &root, &mut self.next_node_id);
-        self.root = root;
-        self.interaction.retain(&self.node_ids);
-        self.revision = self.revision.wrapping_add(1);
-        self.layout_dirty = true;
-        true
+        update
     }
 
     pub fn mark_layout_clean(&mut self) {
@@ -332,4 +352,33 @@ fn nth_element(root: &Element, target: usize) -> Option<&Element> {
             .find_map(|child| visit(child, target, cursor))
     }
     visit(root, target, &mut 0)
+}
+
+fn classify_update(old: &Element, new: &Element) -> TreeUpdate {
+    if old == new {
+        return TreeUpdate::None;
+    }
+    if old.key != new.key
+        || old.kind != new.kind
+        || old.style != new.style
+        || old.paint.clip != new.paint.clip
+        || interaction_geometry(old.interaction) != interaction_geometry(new.interaction)
+        || old.children.len() != new.children.len()
+    {
+        return TreeUpdate::Layout;
+    }
+    if old
+        .children
+        .iter()
+        .zip(&new.children)
+        .any(|(old, new)| classify_update(old, new) == TreeUpdate::Layout)
+    {
+        TreeUpdate::Layout
+    } else {
+        TreeUpdate::Paint
+    }
+}
+
+fn interaction_geometry(interaction: Option<Interaction>) -> Option<(bool, bool)> {
+    interaction.map(|interaction| (interaction.enabled, interaction.focusable))
 }

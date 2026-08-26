@@ -40,6 +40,8 @@ collaboration. `argui-core` contains dependency-light shared primitives, and
 - `argui-ui`: retained elements, reconciliation, widget state, focus, hit testing,
   and animation scheduling.
 - `argui`: deliberate re-exports; application code should start here.
+- `argui-showcase`: non-published example application shared unchanged by the
+  native and WASM launchers; it is not part of the framework dependency graph.
 
 Text shaping is not text editing. Selection, copy/paste commands, IME composition,
 and undo belong to UI/platform code around the text engine. This avoids rejecting
@@ -86,3 +88,17 @@ Hover, press, and focus select a `QuadStyle`, which excludes layout and clipping
 The layout engine can therefore rebuild only the display list for these state
 changes. Taffy geometry and shaped Cosmic Text remain untouched. See the
 [interaction model](interaction.md) for the event and invalidation contract.
+
+## Application state flow
+
+`argui-runtime::UiApp` connects plain Rust state to the retained tree. Its
+`update` method consumes UI events and its `view` method returns the same
+`Element` representation available to Rust builders and the future DSL.
+`UiTree` compares rebuilt descriptions and selects no work, paint-only work, or
+layout work while keyed reconciliation preserves stable identities. See the
+[application state model](state.md).
+
+An application implements this boundary once for every target. Native and WASM
+need different executable entry symbols, but those launchers contain no view,
+style, state, or business logic. A future project generator can own these static
+entrypoint files completely.

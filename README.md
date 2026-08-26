@@ -14,12 +14,15 @@ cargo test --workspace
 cargo run -p argui --example window
 cargo run -p argui --example text
 cargo run -p argui --example layout
+cargo run -p argui --example state
 ./scripts/serve-web.sh
 ```
 
-The web demo embeds its own fonts because browsers do not expose system font
-files to WASM. Argui itself ships no mandatory font; each application supplies
-the assets and generic-family mapping it wants.
+The native `state` example and the web build launch the same `StateShowcase`
+Rust application from `argui-showcase`; only their tiny platform entrypoints
+differ. Its fonts are embedded because browsers do not expose system font files
+to WASM. Argui itself ships no mandatory font; each application supplies the
+assets and generic-family mapping it wants.
 
 The `layout` example uses the retained `UiTree` API. Taffy computes logical
 rectangles from the current viewport and Cosmic Text supplies intrinsic text

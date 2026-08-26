@@ -12,11 +12,12 @@ check before the next feature starts.
    with `cosmic-text`; use a bounded reusable glyph atlas, one instanced batch,
    and per-block clipping. Add cursor geometry, selection, IME, clipboard, and
    copy/paste behavior around it next.
-4. **Retained interaction — foundation implemented.** Persistent keyed elements,
+4. **Retained state and interaction — foundation implemented.** Persistent keyed elements,
    stable reconciled `NodeId`s, revision tracking, clipped reverse-order hit
    testing, hover/press/focus state, pointer capture, UI events, and paint-only
-   invalidation are present. Add arbitrary per-node widget state, keyboard focus
-   traversal, touch, and accessibility integration.
+   invalidation are present. `UiApp` now updates plain Rust state and rebuilds a
+   view classified as no work, repaint, or relayout. Add reusable local component
+   state, keyboard focus traversal, touch, and accessibility integration.
 5. **Layout — responsive foundation implemented.** A small renderer-independent
    style model maps to `taffy`; Cosmic Text performs constrained intrinsic
    measurement and native/web viewport changes share one reflow path. Add

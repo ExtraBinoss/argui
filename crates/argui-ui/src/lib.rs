@@ -14,5 +14,5 @@ pub use interaction::{
     VisualState,
 };
 pub use style::{Align, Direction, Edges, Justify, LayoutStyle, Length, Wrap};
-pub use tree::{Element, ElementKind, UiTree};
+pub use tree::{Element, ElementKind, TreeUpdate, UiTree};
 pub use widget::{Button, ButtonStyle};

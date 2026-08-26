@@ -2,7 +2,7 @@ use argui_paint::DisplayList;
 use argui_text::{PreparedText, TextEngine};
 use wgpu::{
     CurrentSurfaceTexture, LoadOp, Operations, RenderPassColorAttachment, RenderPassDescriptor,
-    StoreOp, SurfaceTarget,
+    StoreOp, SurfaceTarget, TextureFormat, TextureViewDescriptor,
 };
 
 use crate::{
@@ -40,6 +40,7 @@ pub struct SurfaceRenderer {
     device: wgpu::Device,
     queue: wgpu::Queue,
     surface_config: wgpu::SurfaceConfiguration,
+    target_format: TextureFormat,
     renderer_config: RendererConfig,
     batches: Vec<DrawBatch>,
     quad: QuadGpu,
@@ -78,9 +79,13 @@ impl SurfaceRenderer {
             .get_default_config(&adapter, width.max(1), height.max(1))
             .ok_or(RendererError::UnsupportedSurface)?;
         surface_config.present_mode = renderer_config.present_mode;
+        let target_format = srgb_target(surface_config.format);
+        if target_format != surface_config.format {
+            surface_config.view_formats.push(target_format);
+        }
         surface.configure(&device, &surface_config);
-        let quad = QuadGpu::new(&device, surface_config.format);
-        let text = TextGpu::new(&device, surface_config.format);
+        let quad = QuadGpu::new(&device, target_format);
+        let text = TextGpu::new(&device, target_format);
 
         Ok(Self {
             instance,
@@ -88,6 +93,7 @@ impl SurfaceRenderer {
             device,
             queue,
             surface_config,
+            target_format,
             renderer_config,
             batches: Vec::new(),
             quad,
@@ -200,7 +206,10 @@ impl SurfaceRenderer {
                 build_batches(display_list, draw.ranges(), &mut self.batches);
             }
         }
-        let view = frame.texture.create_view(&Default::default());
+        let view = frame.texture.create_view(&TextureViewDescriptor {
+            format: Some(self.target_format),
+            ..Default::default()
+        });
         let attachment = Some(RenderPassColorAttachment {
             view: &view,
             depth_slice: None,
@@ -238,14 +247,34 @@ const fn drawable_size(width: u32, height: u32) -> Option<(u32, u32)> {
     }
 }
 
+fn srgb_target(format: TextureFormat) -> TextureFormat {
+    format.add_srgb_suffix()
+}
+
 #[cfg(test)]
 mod tests {
-    use super::drawable_size;
+    use super::{drawable_size, srgb_target};
 
     #[test]
     fn zero_sized_surfaces_are_not_configured() {
         assert_eq!(drawable_size(800, 600), Some((800, 600)));
         assert_eq!(drawable_size(0, 600), None);
         assert_eq!(drawable_size(800, 0), None);
+    }
+
+    #[test]
+    fn presentation_uses_an_srgb_view_when_the_surface_has_one() {
+        assert_eq!(
+            srgb_target(wgpu::TextureFormat::Bgra8Unorm),
+            wgpu::TextureFormat::Bgra8UnormSrgb
+        );
+        assert_eq!(
+            srgb_target(wgpu::TextureFormat::Rgba8UnormSrgb),
+            wgpu::TextureFormat::Rgba8UnormSrgb
+        );
+        assert_eq!(
+            srgb_target(wgpu::TextureFormat::Rgba16Float),
+            wgpu::TextureFormat::Rgba16Float
+        );
     }
 }

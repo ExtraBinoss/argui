@@ -81,6 +81,7 @@ dependencies = [
  "argui-platform",
  "argui-render",
  "argui-runtime",
+ "argui-showcase",
  "argui-text",
  "argui-ui",
 ]
@@ -141,6 +142,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "argui-showcase"
+version = "0.1.0"
+dependencies = [
+ "argui-paint",
+ "argui-runtime",
+ "argui-text",
+ "argui-ui",
+]
+
+[[package]]
 name = "argui-text"
 version = "0.1.0"
 dependencies = [
@@ -162,6 +173,7 @@ name = "argui-web-demo"
 version = "0.1.0"
 dependencies = [
  "argui",
+ "argui-showcase",
  "wasm-bindgen",
 ]
 

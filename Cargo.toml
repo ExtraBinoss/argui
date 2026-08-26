@@ -14,6 +14,7 @@ argui-layout = { path = "crates/argui-layout" }
 argui-paint = { path = "crates/argui-paint" }
 argui-platform = { path = "crates/argui-platform" }
 argui-render = { path = "crates/argui-render" }
+argui-showcase = { path = "crates/argui-showcase" }
 argui-runtime = { path = "crates/argui-runtime" }
 argui-text = { path = "crates/argui-text" }
 argui-ui = { path = "crates/argui-ui" }

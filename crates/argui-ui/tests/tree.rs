@@ -1,6 +1,7 @@
 use argui_text::TextStyle;
 use argui_ui::{
-    Border, ClipBehavior, Color, CornerRadii, Direction, Element, ElementKind, Length, UiTree,
+    Border, ClipBehavior, Color, CornerRadii, Direction, Element, ElementKind, Length, TreeUpdate,
+    UiTree,
 };
 
 #[test]
@@ -30,5 +31,31 @@ fn rust_builders_form_the_future_dsl_lowering_target() {
     assert!(!tree.replace(root));
     assert!(tree.replace(Element::text("changed")));
     assert_eq!(tree.revision(), 1);
+    assert!(tree.layout_dirty());
+}
+
+#[test]
+fn tree_updates_distinguish_paint_from_layout() {
+    let base = Element::container([])
+        .keyed("panel")
+        .background(Color::rgb(0.1, 0.2, 0.3));
+    let mut tree = UiTree::new(base.clone());
+    tree.mark_layout_clean();
+    let revision = tree.revision();
+    let node = tree.node_id_at(0);
+
+    assert_eq!(
+        tree.update(base.clone().background(Color::rgb(0.3, 0.2, 0.1))),
+        TreeUpdate::Paint
+    );
+    assert_eq!(tree.revision(), revision);
+    assert_eq!(tree.node_id_at(0), node);
+    assert!(!tree.layout_dirty());
+
+    assert_eq!(
+        tree.update(base.width(Length::Px(200.0))),
+        TreeUpdate::Layout
+    );
+    assert!(tree.revision() > revision);
     assert!(tree.layout_dirty());
 }

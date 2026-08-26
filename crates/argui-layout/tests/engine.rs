@@ -147,3 +147,69 @@ fn taffy_layout_uses_real_text_measurement_and_viewport_constraints() {
     assert_eq!(wide.display_list.quad_count(), 1);
     assert_eq!(wide.display_list.commands().len(), 2);
 }
+
+#[test]
+fn percent_child_stays_inside_padded_parent() {
+    let button = |label| {
+        Element::text(label)
+            .text_style(TextStyle {
+                font_size: 17.0,
+                line_height: 21.25,
+                ..TextStyle::default()
+            })
+            .padding(Edges::symmetric(20.0, 10.0))
+            .shrink(0.0)
+    };
+    let panel = Element::column([
+        Element::text("State updates: 10").text_style(TextStyle {
+            font_size: 42.0,
+            line_height: 52.5,
+            ..TextStyle::default()
+        }),
+        Element::text(
+            "Clicks mutate plain Rust state. The rebuilt tree decides whether it needs no work, a repaint, or a new layout.",
+        )
+        .text_style(TextStyle {
+            font_size: 19.0,
+            line_height: 23.75,
+            ..TextStyle::default()
+        }),
+        Element::row([
+            button("Increment"),
+            button("Toggle paint"),
+            button("Reorder keys"),
+        ])
+        .wrap(Wrap::Wrap)
+        .gap(12.0),
+        Element::row([
+            Element::text("Stable alpha")
+                .padding(Edges::symmetric(12.0, 7.0)),
+            Element::text("Stable beta")
+                .padding(Edges::symmetric(12.0, 7.0)),
+        ])
+        .wrap(Wrap::Wrap)
+        .gap(10.0),
+    ])
+        .width(Length::Percent(1.0))
+        .padding(Edges::all(30.0))
+        .gap(22.0);
+    let mut ui = UiTree::new(
+        Element::column([panel])
+            .width(Length::Percent(1.0))
+            .height(Length::Percent(1.0))
+            .align(argui_ui::Align::Center)
+            .padding(Edges::symmetric(42.0, 36.0)),
+    );
+    let mut layout = LayoutEngine::new();
+    let mut text = text_engine();
+    let output = layout
+        .compute(&mut ui, &mut text, Size::new(485.6, 464.0))
+        .unwrap();
+    let root = output.nodes[0].bounds;
+    let panel = output.nodes[1].bounds;
+    assert!(panel.origin.x >= root.origin.x + 42.0, "{root:?} {panel:?}");
+    assert!(
+        panel.origin.x + panel.size.width <= root.origin.x + root.size.width - 42.0,
+        "{root:?} {panel:?}"
+    );
+}
