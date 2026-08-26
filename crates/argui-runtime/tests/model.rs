@@ -1,3 +1,4 @@
+use argui_animation::{Duration, Frame, Time};
 use argui_runtime::{UiApp, ViewUpdate};
 use argui_ui::{Element, UiEvent, UiEventKind, UiTree};
 
@@ -37,5 +38,13 @@ fn apps_rebuild_only_when_their_state_changes() {
     assert_eq!(app.update(&clicked), ViewUpdate::Rebuild);
     assert!(
         matches!(app.view().kind, argui_ui::ElementKind::Text { content, .. } if content == "1")
+    );
+    assert!(!app.wants_animation_frame());
+    assert_eq!(
+        app.animation_frame(Frame {
+            now: Time::ZERO,
+            elapsed: Duration::ZERO,
+        }),
+        ViewUpdate::None
     );
 }

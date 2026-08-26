@@ -1,3 +1,4 @@
+use argui_animation::{Duration, Frame, Time};
 use argui_core::{Point, Rect, ScrollDelta, Size};
 use argui_runtime::{UiApp, ViewUpdate};
 use argui_showcase::{StateShowcase, text_engine};
@@ -102,4 +103,40 @@ fn virtual_scroll_rebuilds_only_when_the_visible_window_changes() {
         &regions,
     );
     assert_eq!(app.update(&sub_row.events[0]), ViewUpdate::None);
+}
+
+#[test]
+fn shared_animation_activates_samples_and_returns_to_idle() {
+    let mut app = StateShowcase::default();
+    assert!(!app.wants_animation_frame());
+    assert_eq!(click(&mut app, "animation-play"), ViewUpdate::None);
+    assert!(app.wants_animation_frame());
+
+    assert_eq!(
+        app.animation_frame(Frame {
+            now: Time::ZERO,
+            elapsed: Duration::ZERO,
+        }),
+        ViewUpdate::Rebuild
+    );
+    assert!(app.wants_animation_frame());
+    let _ = app.animation_frame(Frame {
+        now: Time::from_nanos(3_000_000_000),
+        elapsed: Duration::from_secs(3),
+    });
+    assert!(!app.wants_animation_frame());
+
+    assert_eq!(click(&mut app, "animation-reverse"), ViewUpdate::None);
+    assert!(app.wants_animation_frame());
+    let _ = app.animation_frame(Frame {
+        now: Time::from_nanos(4_000_000_000),
+        elapsed: Duration::from_secs(1),
+    });
+    assert!(app.wants_animation_frame());
+    assert_eq!(click(&mut app, "animation-pause"), ViewUpdate::None);
+    let _ = app.animation_frame(Frame {
+        now: Time::from_nanos(4_100_000_000),
+        elapsed: Duration::from_millis(100),
+    });
+    assert!(!app.wants_animation_frame());
 }

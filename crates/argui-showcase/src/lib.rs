@@ -1,5 +1,9 @@
 //! One showcase shared by native and WebAssembly launchers.
 
+use argui_animation::{
+    CubicBezier, Direction, Duration, Easing, FillMode, Frame, Iterations, Keyframe, Keyframes,
+    PlaybackState, Timeline, Timing,
+};
 use argui_paint::{Border, ClipBehavior, Color, CornerRadii, PaintStyle, QuadStyle};
 use argui_runtime::{UiApp, ViewUpdate};
 use argui_text::{TextColor, TextEngine, TextStyle, TextWrap};
@@ -9,13 +13,40 @@ use argui_ui::{
     Wrap,
 };
 
-#[derive(Default)]
 pub struct StateShowcase {
     count: u32,
     warm: bool,
     reversed: bool,
     inverted_scroll: bool,
     virtual_offset: f32,
+    animated_color: Color,
+    animation: Timeline<Color>,
+    animation_command: Option<AnimationCommand>,
+}
+
+#[derive(Clone, Copy)]
+enum AnimationCommand {
+    Restart,
+    PauseOrResume,
+    Reverse,
+    Finish,
+    Cancel,
+}
+
+impl Default for StateShowcase {
+    fn default() -> Self {
+        let animated_color = Color::rgb(0.20, 0.68, 0.94);
+        Self {
+            count: 0,
+            warm: false,
+            reversed: false,
+            inverted_scroll: false,
+            virtual_offset: 0.0,
+            animated_color,
+            animation: animation_timeline(animated_color),
+            animation_command: None,
+        }
+    }
 }
 
 impl UiApp for StateShowcase {
@@ -76,6 +107,7 @@ impl UiApp for StateShowcase {
             .gap(12.0)
             .align(Align::Center),
             Element::row(items).wrap(Wrap::Wrap).gap(10.0),
+            self.animation_demo(accent),
             self.virtual_list(accent),
             Element::text("OVERLAY · z-index 100")
                 .text_style(text_style(
@@ -129,13 +161,110 @@ impl UiApp for StateShowcase {
             Some("theme") => self.warm = !self.warm,
             Some("reorder") => self.reversed = !self.reversed,
             Some("polarity") => self.inverted_scroll = !self.inverted_scroll,
+            Some("animation-play") => {
+                self.animation_command = Some(AnimationCommand::Restart);
+                return ViewUpdate::None;
+            }
+            Some("animation-pause") => {
+                self.animation_command = Some(AnimationCommand::PauseOrResume);
+                return ViewUpdate::None;
+            }
+            Some("animation-reverse") => {
+                self.animation_command = Some(AnimationCommand::Reverse);
+                return ViewUpdate::None;
+            }
+            Some("animation-finish") => {
+                self.animation_command = Some(AnimationCommand::Finish);
+                return ViewUpdate::None;
+            }
+            Some("animation-cancel") => {
+                self.animation_command = Some(AnimationCommand::Cancel);
+                return ViewUpdate::None;
+            }
             _ => return ViewUpdate::None,
         }
         ViewUpdate::Rebuild
     }
+
+    fn animation_frame(&mut self, frame: Frame) -> ViewUpdate {
+        if let Some(command) = self.animation_command.take() {
+            match command {
+                AnimationCommand::Restart => self.animation.restart(frame.now),
+                AnimationCommand::PauseOrResume
+                    if self.animation.state() == PlaybackState::Paused =>
+                {
+                    self.animation.resume(frame.now);
+                }
+                AnimationCommand::PauseOrResume => self.animation.pause(frame.now),
+                AnimationCommand::Reverse => self.animation.reverse(frame.now),
+                AnimationCommand::Finish => self.animation.finish(),
+                AnimationCommand::Cancel => self.animation.cancel(),
+            }
+        }
+        let sample = self.animation.sample(frame.now);
+        let color = sample.value.unwrap_or_else(|| self.accent());
+        let changed = color != self.animated_color || sample.events != Default::default();
+        self.animated_color = color;
+        if changed {
+            ViewUpdate::Rebuild
+        } else {
+            ViewUpdate::None
+        }
+    }
+
+    fn wants_animation_frame(&self) -> bool {
+        self.animation_command.is_some() || self.animation.needs_frame()
+    }
 }
 
 impl StateShowcase {
+    fn animation_demo(&self, accent: Color) -> Element {
+        let status = match self.animation.state() {
+            PlaybackState::Idle => "idle",
+            PlaybackState::Running => "running",
+            PlaybackState::Paused => "paused",
+            PlaybackState::Finished => "finished",
+            PlaybackState::Canceled => "canceled",
+        };
+        Element::column([
+            Element::row([
+                Element::text(format!("Typed keyframes · {status}")).text_style(text_style(
+                    17.0,
+                    TextColor::WHITE,
+                    650,
+                    TextWrap::None,
+                )),
+                Element::container([])
+                    .width(Length::Px(46.0))
+                    .height(Length::Px(22.0))
+                    .background(self.animated_color)
+                    .radius(CornerRadii::all(11.0)),
+            ])
+            .wrap(Wrap::Wrap)
+            .gap(12.0)
+            .align(Align::Center),
+            Element::container([])
+                .height(Length::Px(68.0))
+                .width(Length::Percent(1.0))
+                .background(self.animated_color)
+                .border(Border::all(1.5, accent))
+                .radius(CornerRadii::all(18.0)),
+            Element::row([
+                button("animation-play", "Restart", accent),
+                button("animation-pause", "Pause / resume", accent),
+                button("animation-reverse", "Reverse", accent),
+                button("animation-finish", "Finish", accent),
+                button("animation-cancel", "Cancel", accent),
+            ])
+            .wrap(Wrap::Wrap)
+            .gap(10.0),
+        ])
+        .gap(12.0)
+        .padding(Edges::all(16.0))
+        .background(Color::rgb(0.045, 0.06, 0.09))
+        .radius(CornerRadii::all(14.0))
+    }
+
     fn virtual_list_config(&self) -> VirtualList {
         let polarity = if self.inverted_scroll {
             ScrollPolarity::Inverted
@@ -199,6 +328,26 @@ impl StateShowcase {
             .border(Border::all(1.0, Color::rgb(0.18, 0.24, 0.32)))
             .radius(CornerRadii::all(12.0))
     }
+}
+
+fn animation_timeline(initial: Color) -> Timeline<Color> {
+    let ease =
+        CubicBezier::new(0.22, 1.0, 0.36, 1.0).expect("the showcase uses a valid cubic Bezier");
+    let frames = Keyframes::new(vec![
+        Keyframe::new(0.0, initial).easing(Easing::CubicBezier(ease)),
+        Keyframe::new(0.38, Color::rgb(0.62, 0.32, 0.96)).easing(Easing::CubicBezier(ease)),
+        Keyframe::new(0.72, Color::rgb(0.98, 0.48, 0.18)).easing(Easing::CubicBezier(ease)),
+        Keyframe::new(1.0, Color::rgb(0.24, 0.84, 0.55)),
+    ])
+    .expect("the showcase keyframes are sorted and complete");
+    Timeline::new(
+        frames,
+        Timing::new(Duration::from_millis(1_400))
+            .iterations(Iterations::Finite(2.0))
+            .direction(Direction::Alternate)
+            .fill(FillMode::Forwards),
+    )
+    .expect("the showcase timing is valid")
 }
 
 #[must_use]

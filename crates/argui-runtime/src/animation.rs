@@ -1,26 +1,90 @@
-use argui_animation::{Clock, Scheduler, Time};
+use crate::{RuntimeEvent, UiApp, ViewUpdate, app::Application};
+use argui_animation::{AnimationId, Clock, Frame, Scheduler, Time};
 use std::time::Instant;
+use winit::{event_loop::ActiveEventLoop, window::Window};
 
 pub(super) struct RuntimeAnimations {
     clock: MonotonicClock,
     scheduler: Scheduler,
+    model_animation: Option<AnimationId>,
 }
 
 impl RuntimeAnimations {
-    pub(super) fn new() -> Self {
-        Self {
+    pub(super) fn new(model: Option<&dyn UiApp>) -> Self {
+        let mut animations = Self {
             clock: MonotonicClock::new(),
             scheduler: Scheduler::default(),
+            model_animation: None,
+        };
+        animations.sync(model.is_some_and(UiApp::wants_animation_frame));
+        animations
+    }
+
+    pub(super) fn sync(&mut self, active: bool) -> bool {
+        match (active, self.model_animation) {
+            (true, None) => {
+                self.model_animation = Some(self.scheduler.start());
+                true
+            }
+            (false, Some(id)) => {
+                self.scheduler.stop(id);
+                self.model_animation = None;
+                true
+            }
+            _ => false,
         }
     }
 
-    /// Samples time only when active work exists and reports whether to redraw.
-    pub(super) fn advance_if_active(&mut self) -> bool {
+    /// Samples the platform clock only when active work exists.
+    pub(super) fn frame(&mut self) -> Option<Frame> {
         if !self.scheduler.needs_frame() {
-            return false;
+            return None;
         }
-        let _ = self.scheduler.frame(self.clock.now());
-        self.scheduler.needs_frame()
+        self.scheduler.frame(self.clock.now())
+    }
+}
+
+impl Application {
+    pub(super) fn sync_model_animation(&mut self) -> bool {
+        let active = self
+            .model
+            .as_ref()
+            .is_some_and(|model| model.wants_animation_frame());
+        self.animations.sync(active)
+    }
+
+    #[cfg_attr(coverage_nightly, coverage(off))]
+    pub(super) fn animate(&mut self, window: &Window, event_loop: &ActiveEventLoop) {
+        let Some(frame) = self.animations.frame() else {
+            return;
+        };
+        let rebuild = self
+            .model
+            .as_mut()
+            .is_some_and(|model| model.animation_frame(frame) == ViewUpdate::Rebuild);
+        let tree_update = if rebuild {
+            let root = self.model.as_ref().map(|model| model.view());
+            match (root, &mut self.ui_tree) {
+                (Some(root), Some(tree)) => tree.update(root),
+                _ => argui_ui::TreeUpdate::None,
+            }
+        } else {
+            argui_ui::TreeUpdate::None
+        };
+        match tree_update {
+            argui_ui::TreeUpdate::Layout => {
+                self.prepare_or_exit(event_loop);
+            }
+            argui_ui::TreeUpdate::Paint => self.repaint(),
+            argui_ui::TreeUpdate::None => {}
+        }
+        if tree_update != argui_ui::TreeUpdate::None {
+            (self.on_event)(RuntimeEvent::ViewUpdated(tree_update));
+        }
+        self.sync_model_animation();
+        if self.animations.scheduler.needs_frame() {
+            window.request_redraw();
+        }
     }
 }
 
@@ -39,5 +103,46 @@ impl MonotonicClock {
 impl Clock for MonotonicClock {
     fn now(&self) -> Time {
         Time::from_nanos(u64::try_from(self.origin.elapsed().as_nanos()).unwrap_or(u64::MAX))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::RuntimeAnimations;
+    use crate::{UiApp, ViewUpdate};
+    use argui_ui::{Element, UiEvent};
+
+    struct Animated(bool);
+
+    impl UiApp for Animated {
+        fn view(&self) -> Element {
+            Element::container([])
+        }
+
+        fn update(&mut self, _event: &UiEvent) -> ViewUpdate {
+            ViewUpdate::None
+        }
+
+        fn wants_animation_frame(&self) -> bool {
+            self.0
+        }
+    }
+
+    #[test]
+    fn clock_is_sampled_only_while_model_work_is_active() {
+        let idle = Animated(false);
+        let mut animations = RuntimeAnimations::new(Some(&idle));
+        assert!(animations.frame().is_none());
+        assert!(animations.sync(true));
+        assert!(animations.frame().is_some());
+        assert!(!animations.sync(true));
+        assert!(animations.sync(false));
+        assert!(animations.frame().is_none());
+        assert!(!animations.sync(false));
+    }
+
+    #[test]
+    fn absent_models_start_idle() {
+        assert!(RuntimeAnimations::new(None).frame().is_none());
     }
 }

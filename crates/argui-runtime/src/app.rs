@@ -36,7 +36,8 @@ pub(crate) struct Application {
     pub(super) text_engine: TextEngine,
     text_scene: Option<TextScene>,
     pub(super) ui_tree: Option<UiTree>,
-    model: Option<Box<dyn UiApp>>,
+    pub(super) animations: RuntimeAnimations,
+    pub(super) model: Option<Box<dyn UiApp>>,
     pub(super) ui_layout: Option<LayoutOutput>,
     pub(super) layout_engine: LayoutEngine,
     pub(super) prepared_text: Option<PreparedText>,
@@ -49,9 +50,8 @@ pub(crate) struct Application {
     #[cfg(target_arch = "wasm32")]
     pub(super) event_proxy: Option<winit::event_loop::EventLoopProxy<UserEvent>>,
     pending_scrollbar_drag: Option<Point>,
-    animations: RuntimeAnimations,
     pub(crate) fatal_error: Option<RuntimeError>,
-    on_event: Box<dyn FnMut(RuntimeEvent)>,
+    pub(super) on_event: Box<dyn FnMut(RuntimeEvent)>,
 }
 
 #[cfg_attr(coverage_nightly, coverage(off))]
@@ -74,6 +74,7 @@ impl Application {
             text_engine,
             text_scene,
             ui_tree,
+            animations: RuntimeAnimations::new(model.as_deref()),
             model,
             ui_layout: None,
             layout_engine: LayoutEngine::new(),
@@ -87,7 +88,6 @@ impl Application {
             #[cfg(target_arch = "wasm32")]
             event_proxy: None,
             pending_scrollbar_drag: None,
-            animations: RuntimeAnimations::new(),
             fatal_error: None,
             on_event: Box::new(on_event),
         }
@@ -117,7 +117,7 @@ impl Application {
         );
     }
 
-    fn prepare_or_exit(&mut self, event_loop: &ActiveEventLoop) -> bool {
+    pub(super) fn prepare_or_exit(&mut self, event_loop: &ActiveEventLoop) -> bool {
         if let Err(error) = self.prepare_text() {
             (self.on_event)(RuntimeEvent::LayoutFailed(error.to_string()));
             self.fatal_error = Some(error);
@@ -160,6 +160,7 @@ impl Application {
             }
             (self.on_event)(RuntimeEvent::Ui(event));
         }
+        let animation_changed = self.sync_model_animation();
         let tree_update = if rebuild {
             let root = self.model.as_ref().map(|model| model.view());
             match (root, &mut self.ui_tree) {
@@ -182,7 +183,7 @@ impl Application {
                 self.repaint();
                 true
             }
-            TreeUpdate::None => false,
+            TreeUpdate::None => animation_changed,
         };
         if tree_update != TreeUpdate::None {
             (self.on_event)(RuntimeEvent::ViewUpdated(tree_update));
@@ -195,7 +196,7 @@ impl Application {
         }
     }
 
-    fn repaint(&mut self) {
+    pub(super) fn repaint(&mut self) {
         if let (Some(ui), Some(layout)) = (&self.ui_tree, &mut self.ui_layout) {
             self.layout_engine.repaint(ui, layout);
         }
@@ -580,10 +581,8 @@ impl ApplicationHandler<UserEvent> for Application {
             }
             WindowEvent::RedrawRequested => {
                 self.flush_scrollbar_drag(&window, event_loop);
+                self.animate(&window, event_loop);
                 self.render(event_loop);
-                if self.animations.advance_if_active() {
-                    window.request_redraw();
-                }
                 PlatformEvent::RedrawRequested
             }
             _ => return,

@@ -74,12 +74,23 @@ future DSL. The DSL will lower into the same typed declarations as Rust code.
 - Connect native and WASM monotonic clocks in `argui-runtime`.
 - Prove zero redraw while idle and exact deterministic sampling in tests.
 
-### 2. Timelines and keyframes
+### 2. Timelines and keyframes — implemented
 
 - Add keyframes, property tracks, timing parameters, fill/direction/iteration
   behavior, playback controls, and lifecycle events.
 - Implement linear, Bézier, steps, and piecewise-linear easing.
 - Support interruption and retargeting without discontinuities.
+
+The public API is available from `argui::animation`. A `Timeline<T>` owns typed
+`Keyframes<T>` and a `Timing`; it can play, pause, resume, reverse, seek,
+restart, finish, cancel, change playback rate, or retarget from its currently
+presented value. Custom easing closures remain platform-independent.
+
+`UiApp::wants_animation_frame` activates runtime scheduling and
+`UiApp::animation_frame` receives the one shared `Frame` sampled for that
+presentation. Returning to an inactive timeline removes it from the compact
+scheduler immediately. The state showcase exercises this exact path on native
+and WASM without separate UI code.
 
 ### 3. Transitions and orchestration
 
