@@ -1,12 +1,14 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
 use argui::{
-    paint::{Border, ClipBehavior, Color, CornerRadii},
+    paint::{Border, ClipBehavior, Color, CornerRadii, PaintStyle, QuadStyle},
     platform::WindowConfig,
     render::RendererConfig,
-    runtime::run_ui_with_text_engine,
+    runtime::{RuntimeEvent, run_ui_with_text_engine},
     text::{FontFamily, TextColor, TextEngine, TextStyle},
-    ui::{Align, Edges, Element, LayoutStyle, Length, UiTree},
+    ui::{
+        Align, Button, ButtonStyle, Edges, Element, LayoutStyle, Length, UiEventKind, UiTree, Wrap,
+    },
 };
 use wasm_bindgen::prelude::*;
 
@@ -14,6 +16,32 @@ use wasm_bindgen::prelude::*;
 extern "C" {
     #[wasm_bindgen(js_namespace = console)]
     fn log(message: &str);
+}
+
+fn button(key: &str, label: &str, accent: Color) -> Element {
+    let radius = CornerRadii::all(12.0);
+    let rest = QuadStyle::solid(Color::rgb(0.10, 0.14, 0.20))
+        .border(Border::all(1.0, Color::rgb(0.24, 0.32, 0.44)))
+        .radius(radius);
+    let hovered = QuadStyle::solid(Color::rgb(0.14, 0.22, 0.30))
+        .border(Border::all(1.0, accent))
+        .radius(radius);
+    let pressed = QuadStyle::solid(accent)
+        .border(Border::all(1.0, accent))
+        .radius(radius)
+        .opacity(0.82);
+    Button::new(
+        key,
+        label,
+        ButtonStyle::new(
+            PaintStyle::new(rest),
+            text_style(17.0, TextColor::WHITE, 600),
+        )
+        .hovered(hovered)
+        .pressed(pressed)
+        .focused(rest.border(Border::all(2.0, accent))),
+    )
+    .build()
 }
 
 fn text_style(size: f32, color: TextColor, weight: u16) -> TextStyle {
@@ -46,6 +74,14 @@ fn ui() -> UiTree {
                 .background(Color::rgb(0.08, 0.22, 0.16))
                 .border(Border::all(1.0, Color::rgb(0.18, 0.5, 0.34)))
                 .radius(CornerRadii::all(10.0)),
+            Element::row([
+                button("web-primary", "Primary", Color::rgb(0.15, 0.62, 0.92)),
+                button("web-confirm", "Confirm", Color::rgb(0.22, 0.72, 0.46)),
+                button("web-danger", "Delete", Color::rgb(0.92, 0.30, 0.36)),
+            ])
+            .wrap(Wrap::Wrap)
+            .gap(12.0)
+            .align(Align::Center),
             Element::text("Unicode: café · العربية · שלום")
                 .text_style(text_style(30.0, TextColor::rgb(1.0, 0.72, 0.38), 500)),
             Element::text("resize(browser) -> same_tree.new_layout()")
@@ -96,7 +132,14 @@ pub fn start() -> Result<(), JsValue> {
         RendererConfig::default(),
         text_engine,
         ui(),
-        |event| log(&format!("Argui: {event:?}")),
+        |event| {
+            if let RuntimeEvent::Ui(ui) = &event
+                && ui.kind == UiEventKind::Clicked
+            {
+                log(&format!("Argui clicked: {:?}", ui.key));
+            }
+            log(&format!("Argui: {event:?}"));
+        },
     )
     .map_err(|error| JsValue::from_str(&error.to_string()))
 }

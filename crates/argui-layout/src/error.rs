@@ -4,6 +4,7 @@ use std::{error::Error, fmt};
 pub enum LayoutError {
     Taffy(taffy::TaffyError),
     MissingRoot,
+    MissingNodeIdentity(usize),
 }
 
 impl fmt::Display for LayoutError {
@@ -11,6 +12,9 @@ impl fmt::Display for LayoutError {
         match self {
             Self::Taffy(error) => write!(formatter, "layout failed: {error}"),
             Self::MissingRoot => formatter.write_str("layout tree has no root"),
+            Self::MissingNodeIdentity(index) => {
+                write!(formatter, "UI node {index} has no stable identity")
+            }
         }
     }
 }
@@ -19,7 +23,7 @@ impl Error for LayoutError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::Taffy(error) => Some(error),
-            Self::MissingRoot => None,
+            Self::MissingRoot | Self::MissingNodeIdentity(_) => None,
         }
     }
 }

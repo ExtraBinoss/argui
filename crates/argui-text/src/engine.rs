@@ -8,6 +8,7 @@ use cosmic_text::{
 
 use crate::{
     FontFamily, GlyphContent, GlyphImage, GlyphKey, PreparedGlyph, PreparedText, TextScene,
+    TextWrap,
 };
 
 pub struct TextEngine {
@@ -62,7 +63,7 @@ impl TextEngine {
         let metrics = Metrics::new(style.font_size, style.line_height);
         let mut buffer = Buffer::new(&mut self.fonts, metrics);
         buffer.set_size(width, None);
-        buffer.set_wrap(Wrap::WordOrGlyph);
+        buffer.set_wrap(wrap(style.wrap));
         let family = family(&style.family);
         let attrs = Attrs::new().family(family).weight(Weight(style.weight));
         buffer.set_text(text, &attrs, Shaping::Advanced, None);
@@ -88,7 +89,7 @@ impl TextEngine {
                 Some(block.bounds.size.width),
                 Some(block.bounds.size.height),
             );
-            buffer.set_wrap(Wrap::WordOrGlyph);
+            buffer.set_wrap(wrap(block.style.wrap));
 
             let family = family(&block.style.family);
             let attrs = Attrs::new()
@@ -153,5 +154,14 @@ fn family(value: &FontFamily) -> Family<'_> {
         FontFamily::Serif => Family::Serif,
         FontFamily::Monospace => Family::Monospace,
         FontFamily::Named(name) => Family::Name(name),
+    }
+}
+
+const fn wrap(value: TextWrap) -> Wrap {
+    match value {
+        TextWrap::None => Wrap::None,
+        TextWrap::Glyph => Wrap::Glyph,
+        TextWrap::Word => Wrap::Word,
+        TextWrap::WordOrGlyph => Wrap::WordOrGlyph,
     }
 }

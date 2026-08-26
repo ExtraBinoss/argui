@@ -1,3 +1,19 @@
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ButtonState {
+    Pressed,
+    Released,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PointerButton {
+    Primary,
+    Secondary,
+    Middle,
+    Back,
+    Forward,
+    Other(u16),
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum PlatformEvent {
     Opened {
@@ -11,6 +27,17 @@ pub enum PlatformEvent {
         height: u32,
     },
     ScaleFactorChanged(f64),
+    PointerMoved {
+        x: f32,
+        y: f32,
+    },
+    PointerEntered,
+    PointerLeft,
+    PointerButton {
+        button: PointerButton,
+        state: ButtonState,
+    },
+    Focused(bool),
     RedrawRequested,
     CloseRequested,
     WindowCreationFailed(String),

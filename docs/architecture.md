@@ -74,3 +74,15 @@ Painting preserves tree order across primitive types. Consecutive compatible
 commands are batched, but a later quad is never moved behind earlier text merely
 to reduce draw calls. The WGPU quad pipeline uses one reusable instance buffer;
 rounded corners, asymmetric borders, clipping, and antialiasing stay in WGSL.
+
+## Interaction flow
+
+Winit pointer and focus events are translated by `argui-platform`; the runtime
+normalizes coordinates and dispatches them through `argui-ui`. Stable node IDs,
+clipped reverse-order hit testing, focus, and pointer capture remain independent
+from WGPU. Application events include the stable ID and optional element key.
+
+Hover, press, and focus select a `QuadStyle`, which excludes layout and clipping.
+The layout engine can therefore rebuild only the display list for these state
+changes. Taffy geometry and shaped Cosmic Text remain untouched. See the
+[interaction model](interaction.md) for the event and invalidation contract.

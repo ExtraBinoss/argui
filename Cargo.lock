@@ -152,6 +152,7 @@ dependencies = [
 name = "argui-ui"
 version = "0.1.0"
 dependencies = [
+ "argui-core",
  "argui-paint",
  "argui-text",
 ]

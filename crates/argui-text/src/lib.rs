@@ -6,4 +6,4 @@ mod style;
 
 pub use engine::TextEngine;
 pub use layout::{GlyphContent, GlyphImage, GlyphKey, PreparedGlyph, PreparedText};
-pub use style::{FontFamily, TextBlock, TextColor, TextScene, TextStyle};
+pub use style::{FontFamily, TextBlock, TextColor, TextScene, TextStyle, TextWrap};

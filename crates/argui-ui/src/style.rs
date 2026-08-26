@@ -14,6 +14,14 @@ pub enum Direction {
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum Wrap {
+    #[default]
+    NoWrap,
+    Wrap,
+    Reverse,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum Align {
     Start,
     Center,
@@ -70,11 +78,13 @@ pub struct LayoutStyle {
     pub max_width: Length,
     pub max_height: Length,
     pub direction: Direction,
+    pub wrap: Wrap,
     pub align: Align,
     pub justify: Justify,
     pub padding: Edges,
     pub gap: f32,
     pub grow: f32,
+    pub shrink: f32,
 }
 
 impl Default for LayoutStyle {
@@ -87,11 +97,13 @@ impl Default for LayoutStyle {
             max_width: Length::Auto,
             max_height: Length::Auto,
             direction: Direction::Column,
+            wrap: Wrap::NoWrap,
             align: Align::Stretch,
             justify: Justify::Start,
             padding: Edges::default(),
             gap: 0.0,
             grow: 0.0,
+            shrink: 1.0,
         }
     }
 }

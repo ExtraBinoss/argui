@@ -11,6 +11,15 @@ pub enum FontFamily {
     Named(String),
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum TextWrap {
+    None,
+    Glyph,
+    Word,
+    #[default]
+    WordOrGlyph,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct TextStyle {
     pub font_size: f32,
@@ -18,6 +27,7 @@ pub struct TextStyle {
     pub color: TextColor,
     pub family: FontFamily,
     pub weight: u16,
+    pub wrap: TextWrap,
 }
 
 impl Default for TextStyle {
@@ -28,6 +38,7 @@ impl Default for TextStyle {
             color: TextColor::WHITE,
             family: FontFamily::SansSerif,
             weight: 400,
+            wrap: TextWrap::WordOrGlyph,
         }
     }
 }

@@ -1,4 +1,4 @@
-use argui_platform::PlatformEvent;
+use argui_platform::{ButtonState, PlatformEvent, PointerButton};
 
 #[test]
 fn only_surface_changes_request_a_frame() {
@@ -20,6 +20,13 @@ fn only_surface_changes_request_a_frame() {
     assert!(PlatformEvent::ScaleFactorChanged(2.0).requires_redraw());
     assert!(!PlatformEvent::RedrawRequested.requires_redraw());
     assert!(!PlatformEvent::Suspended.requires_redraw());
+    assert!(
+        !PlatformEvent::PointerButton {
+            button: PointerButton::Primary,
+            state: ButtonState::Pressed,
+        }
+        .requires_redraw()
+    );
 }
 
 #[test]

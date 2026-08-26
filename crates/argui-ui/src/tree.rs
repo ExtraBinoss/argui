@@ -1,7 +1,12 @@
-use argui_paint::{Border, ClipBehavior, Color, CornerRadii, Fill, PaintStyle};
+use argui_core::Point;
+use argui_paint::{Border, ClipBehavior, Color, CornerRadii, Fill, PaintStyle, QuadStyle};
 use argui_text::TextStyle;
 
-use crate::{Align, Direction, Edges, Justify, LayoutStyle, Length};
+use crate::interaction::{InteractionState, RawUpdate};
+use crate::{
+    Align, Direction, Edges, HitRegion, Interaction, InteractionUpdate, Justify, LayoutStyle,
+    Length, NodeId, UiEvent, VisualState, Wrap, identity,
+};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ElementKind {
@@ -15,6 +20,7 @@ pub struct Element {
     pub kind: ElementKind,
     pub style: LayoutStyle,
     pub paint: PaintStyle,
+    pub interaction: Option<Interaction>,
     pub children: Vec<Self>,
 }
 
@@ -26,6 +32,7 @@ impl Element {
             kind: ElementKind::Container,
             style: LayoutStyle::default(),
             paint: PaintStyle::default(),
+            interaction: None,
             children: children.into_iter().collect(),
         }
     }
@@ -50,6 +57,7 @@ impl Element {
             },
             style: LayoutStyle::default(),
             paint: PaintStyle::default(),
+            interaction: None,
             children: Vec::new(),
         }
     }
@@ -85,7 +93,7 @@ impl Element {
 
     #[must_use]
     pub const fn fill(mut self, fill: Fill) -> Self {
-        self.paint.background = Some(fill);
+        self.paint.quad.background = Some(fill);
         self
     }
 
@@ -104,6 +112,12 @@ impl Element {
     #[must_use]
     pub const fn direction(mut self, direction: Direction) -> Self {
         self.style.direction = direction;
+        self
+    }
+
+    #[must_use]
+    pub const fn wrap(mut self, wrap: Wrap) -> Self {
+        self.style.wrap = wrap;
         self
     }
 
@@ -138,6 +152,12 @@ impl Element {
     }
 
     #[must_use]
+    pub const fn shrink(mut self, shrink: f32) -> Self {
+        self.style.shrink = shrink;
+        self
+    }
+
+    #[must_use]
     pub const fn background(mut self, color: Color) -> Self {
         self = self.fill(Fill::Solid(color));
         self
@@ -145,19 +165,19 @@ impl Element {
 
     #[must_use]
     pub const fn border(mut self, border: Border) -> Self {
-        self.paint.border = Some(border);
+        self.paint.quad.border = Some(border);
         self
     }
 
     #[must_use]
     pub const fn radius(mut self, radii: CornerRadii) -> Self {
-        self.paint.radii = radii;
+        self.paint.quad.radii = radii;
         self
     }
 
     #[must_use]
     pub const fn paint_opacity(mut self, opacity: f32) -> Self {
-        self.paint.opacity = opacity;
+        self.paint.quad.opacity = opacity;
         self
     }
 
@@ -166,20 +186,34 @@ impl Element {
         self.paint.clip = clip;
         self
     }
+
+    #[must_use]
+    pub const fn interaction(mut self, interaction: Interaction) -> Self {
+        self.interaction = Some(interaction);
+        self
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct UiTree {
     root: Element,
+    node_ids: Vec<NodeId>,
+    next_node_id: u64,
+    interaction: InteractionState,
     revision: u64,
     layout_dirty: bool,
 }
 
 impl UiTree {
     #[must_use]
-    pub const fn new(root: Element) -> Self {
+    pub fn new(root: Element) -> Self {
+        let mut next_node_id = 1;
+        let node_ids = identity::initial_ids(&root, &mut next_node_id);
         Self {
             root,
+            node_ids,
+            next_node_id,
+            interaction: InteractionState::default(),
             revision: 0,
             layout_dirty: true,
         }
@@ -204,7 +238,10 @@ impl UiTree {
         if self.root == root {
             return false;
         }
+        self.node_ids =
+            identity::reconcile_ids(&self.root, &self.node_ids, &root, &mut self.next_node_id);
         self.root = root;
+        self.interaction.retain(&self.node_ids);
         self.revision = self.revision.wrapping_add(1);
         self.layout_dirty = true;
         true
@@ -213,4 +250,86 @@ impl UiTree {
     pub fn mark_layout_clean(&mut self) {
         self.layout_dirty = false;
     }
+
+    #[must_use]
+    pub fn node_id_at(&self, index: usize) -> Option<NodeId> {
+        self.node_ids.get(index).copied()
+    }
+
+    #[must_use]
+    pub fn visual_state(&self, node: NodeId) -> VisualState {
+        self.interaction.visual_state(node)
+    }
+
+    #[must_use]
+    pub fn resolved_quad(&self, node: NodeId, element: &Element) -> QuadStyle {
+        element
+            .interaction
+            .map_or(element.paint.quad, |interaction| {
+                interaction.resolve(element.paint.quad, self.visual_state(node))
+            })
+    }
+
+    pub fn pointer_moved(&mut self, point: Point, regions: &[HitRegion]) -> InteractionUpdate {
+        let update = self.interaction.pointer_moved(point, regions);
+        self.decorate(update)
+    }
+
+    pub fn pointer_left(&mut self) -> InteractionUpdate {
+        let update = self.interaction.pointer_left();
+        self.decorate(update)
+    }
+
+    pub fn primary_pressed(&mut self, regions: &[HitRegion]) -> InteractionUpdate {
+        let update = self.interaction.primary_pressed(regions);
+        self.decorate(update)
+    }
+
+    pub fn primary_released(&mut self) -> InteractionUpdate {
+        let update = self.interaction.primary_released();
+        self.decorate(update)
+    }
+
+    pub fn window_blurred(&mut self) -> InteractionUpdate {
+        let update = self.interaction.window_blurred();
+        self.decorate(update)
+    }
+
+    fn decorate(&self, raw: RawUpdate) -> InteractionUpdate {
+        let events = raw.events[..raw.count]
+            .iter()
+            .flatten()
+            .map(|(target, kind)| UiEvent {
+                target: *target,
+                key: self.key_for(*target).map(ToOwned::to_owned),
+                kind: *kind,
+            })
+            .collect();
+        InteractionUpdate {
+            events,
+            paint_changed: raw.paint_changed,
+        }
+    }
+
+    fn key_for(&self, node: NodeId) -> Option<&str> {
+        let index = self
+            .node_ids
+            .iter()
+            .position(|candidate| *candidate == node)?;
+        nth_element(&self.root, index)?.key.as_deref()
+    }
+}
+
+fn nth_element(root: &Element, target: usize) -> Option<&Element> {
+    fn visit<'a>(element: &'a Element, target: usize, cursor: &mut usize) -> Option<&'a Element> {
+        if *cursor == target {
+            return Some(element);
+        }
+        *cursor += 1;
+        element
+            .children
+            .iter()
+            .find_map(|child| visit(child, target, cursor))
+    }
+    visit(root, target, &mut 0)
 }

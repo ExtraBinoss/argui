@@ -30,6 +30,11 @@ impl DisplayList {
         self.commands.push(DisplayCommand::Text(block));
     }
 
+    pub fn clear(&mut self) {
+        self.commands.clear();
+        self.quad_count = 0;
+    }
+
     #[must_use]
     pub fn commands(&self) -> &[DisplayCommand] {
         &self.commands

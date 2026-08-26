@@ -84,21 +84,69 @@ pub enum ClipBehavior {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct PaintStyle {
+pub struct QuadStyle {
     pub background: Option<Fill>,
     pub border: Option<Border>,
     pub radii: CornerRadii,
     pub opacity: f32,
+}
+
+impl Default for QuadStyle {
+    fn default() -> Self {
+        Self {
+            background: None,
+            border: None,
+            radii: CornerRadii::all(0.0),
+            opacity: 1.0,
+        }
+    }
+}
+
+impl QuadStyle {
+    #[must_use]
+    pub const fn solid(color: Color) -> Self {
+        Self {
+            background: Some(Fill::Solid(color)),
+            border: None,
+            radii: CornerRadii::all(0.0),
+            opacity: 1.0,
+        }
+    }
+
+    #[must_use]
+    pub const fn border(mut self, border: Border) -> Self {
+        self.border = Some(border);
+        self
+    }
+
+    #[must_use]
+    pub const fn radius(mut self, radii: CornerRadii) -> Self {
+        self.radii = radii;
+        self
+    }
+
+    #[must_use]
+    pub const fn opacity(mut self, opacity: f32) -> Self {
+        self.opacity = opacity;
+        self
+    }
+
+    #[must_use]
+    pub const fn is_visible(self) -> bool {
+        self.background.is_some() || self.border.is_some()
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PaintStyle {
+    pub quad: QuadStyle,
     pub clip: ClipBehavior,
 }
 
 impl Default for PaintStyle {
     fn default() -> Self {
         Self {
-            background: None,
-            border: None,
-            radii: CornerRadii::default(),
-            opacity: 1.0,
+            quad: QuadStyle::default(),
             clip: ClipBehavior::None,
         }
     }
@@ -106,8 +154,22 @@ impl Default for PaintStyle {
 
 impl PaintStyle {
     #[must_use]
+    pub const fn new(quad: QuadStyle) -> Self {
+        Self {
+            quad,
+            clip: ClipBehavior::None,
+        }
+    }
+
+    #[must_use]
+    pub const fn clip(mut self, clip: ClipBehavior) -> Self {
+        self.clip = clip;
+        self
+    }
+
+    #[must_use]
     pub const fn is_visible(self) -> bool {
-        self.background.is_some() || self.border.is_some()
+        self.quad.is_visible()
     }
 }
 

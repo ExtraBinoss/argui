@@ -2,11 +2,12 @@ use argui_core::{Point, Rect, Size};
 use argui_paint::{Border, ClipBehavior, Color, DisplayList, Fill, Quad};
 use argui_text::{TextBlock, TextEngine, TextScene};
 use argui_ui::{
-    Align, Direction, Edges, Element, ElementKind, Justify, LayoutStyle, Length, UiTree,
+    Align, Direction, Edges, Element, ElementKind, HitRegion, Justify, LayoutStyle, Length,
+    NodeId as UiNodeId, UiTree, Wrap,
 };
 use taffy::{
-    AlignItems, AvailableSpace, Dimension, FlexDirection, JustifyContent, LengthPercentage,
-    LengthPercentageAuto, NodeId, Style, TaffyTree, compute_leaf_layout,
+    AlignItems, AvailableSpace, Dimension, FlexDirection, FlexWrap, JustifyContent,
+    LengthPercentage, LengthPercentageAuto, NodeId, Style, TaffyTree, compute_leaf_layout,
     geometry::{Rect as TaffyRect, Size as TaffySize},
 };
 
@@ -15,12 +16,16 @@ use crate::LayoutError;
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct LayoutNode {
     pub index: usize,
+    pub node: UiNodeId,
     pub bounds: Rect,
+    pub clip: Option<Rect>,
+    pub text_index: Option<usize>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct LayoutOutput {
     pub nodes: Vec<LayoutNode>,
+    pub hit_regions: Vec<HitRegion>,
     pub display_list: DisplayList,
     pub text: TextScene,
 }
@@ -28,6 +33,7 @@ pub struct LayoutOutput {
 #[derive(Debug)]
 struct NodeMap {
     index: usize,
+    node: UiNodeId,
     id: NodeId,
     children: Vec<Self>,
 }
@@ -104,14 +110,42 @@ impl LayoutEngine {
             Some(Rect::new(Point::default(), viewport)),
             &mut output,
         )?;
+        self.repaint(ui, &mut output);
         ui.mark_layout_clean();
         Ok(output)
+    }
+
+    pub fn repaint(&self, ui: &UiTree, output: &mut LayoutOutput) {
+        let elements = flattened(ui.root());
+        output.display_list.clear();
+        for node in &output.nodes {
+            let element = elements[node.index];
+            let style = ui.resolved_quad(node.node, element);
+            if style.is_visible()
+                && let Some(clip) = node.clip.and_then(|clip| clip.intersection(node.bounds))
+            {
+                output.display_list.push_quad(Quad {
+                    bounds: node.bounds,
+                    background: match style.background {
+                        Some(Fill::Solid(color)) => color,
+                        None => Color::TRANSPARENT,
+                    },
+                    border: style.border.unwrap_or(Border::all(0.0, Color::TRANSPARENT)),
+                    radii: style.radii,
+                    opacity: style.opacity,
+                    clip,
+                });
+            }
+            if let Some(text_index) = node.text_index {
+                output.display_list.push_text(text_index);
+            }
+        }
     }
 
     fn rebuild(&mut self, ui: &UiTree) -> Result<(), LayoutError> {
         self.tree = TaffyTree::new();
         let mut next_index = 0;
-        self.root = Some(build_node(&mut self.tree, ui.root(), &mut next_index)?);
+        self.root = Some(build_node(&mut self.tree, ui, ui.root(), &mut next_index)?);
         self.revision = Some(ui.revision());
         Ok(())
     }
@@ -119,15 +153,19 @@ impl LayoutEngine {
 
 fn build_node(
     tree: &mut TaffyTree<usize>,
+    ui: &UiTree,
     element: &Element,
     next_index: &mut usize,
 ) -> Result<NodeMap, LayoutError> {
     let index = *next_index;
     *next_index += 1;
+    let node = ui
+        .node_id_at(index)
+        .ok_or(LayoutError::MissingNodeIdentity(index))?;
     let children = element
         .children
         .iter()
-        .map(|child| build_node(tree, child, next_index))
+        .map(|child| build_node(tree, ui, child, next_index))
         .collect::<Result<Vec<_>, _>>()?;
     let style = taffy_style(&element.style);
     let id = match element.kind {
@@ -139,6 +177,7 @@ fn build_node(
     };
     Ok(NodeMap {
         index,
+        node,
         id,
         children,
     })
@@ -155,29 +194,19 @@ fn collect_layout(
     let layout = tree.layout(node.id)?;
     let origin = Point::new(parent.x + layout.location.x, parent.y + layout.location.y);
     let bounds = Rect::new(origin, Size::new(layout.size.width, layout.size.height));
-    output.nodes.push(LayoutNode {
-        index: node.index,
-        bounds,
-    });
     let element = elements[node.index];
-    if element.paint.is_visible()
-        && let Some(clip) = clip.and_then(|clip| clip.intersection(bounds))
+    if let Some(interaction) = element.interaction
+        && interaction.enabled
+        && let Some(region_clip) = clip.and_then(|clip| clip.intersection(bounds))
     {
-        output.display_list.push_quad(Quad {
+        output.hit_regions.push(HitRegion {
+            node: node.node,
             bounds,
-            background: match element.paint.background {
-                Some(Fill::Solid(color)) => color,
-                None => Color::TRANSPARENT,
-            },
-            border: element
-                .paint
-                .border
-                .unwrap_or(Border::all(0.0, Color::TRANSPARENT)),
-            radii: element.paint.radii,
-            opacity: element.paint.opacity,
-            clip,
+            clip: region_clip,
+            focusable: interaction.focusable,
         });
     }
+    let mut text_index = None;
     if let ElementKind::Text { content, style } = &element.kind {
         let text_bounds = Rect::new(
             Point::new(
@@ -189,16 +218,27 @@ fn collect_layout(
                 (layout.size.height - layout.padding.top - layout.padding.bottom).max(0.0),
             ),
         );
-        if let Some(text_clip) = clip.and_then(|clip| clip.intersection(text_bounds)) {
+        let text_clip = match element.paint.clip {
+            ClipBehavior::None => clip,
+            ClipBehavior::Bounds => clip.and_then(|clip| clip.intersection(bounds)),
+        };
+        if let Some(text_clip) = text_clip
+            && text_clip.intersection(text_bounds).is_some()
+        {
             let mut block = TextBlock::new(content, text_bounds);
             block.clip = text_clip;
             block.style = style.clone();
             output.text.push(block);
-            output
-                .display_list
-                .push_text(output.text.blocks().len() - 1);
+            text_index = Some(output.text.blocks().len() - 1);
         }
     }
+    output.nodes.push(LayoutNode {
+        index: node.index,
+        node: node.node,
+        bounds,
+        clip,
+        text_index,
+    });
     let child_clip = match element.paint.clip {
         ClipBehavior::None => clip,
         ClipBehavior::Bounds => clip.and_then(|clip| clip.intersection(bounds)),
@@ -239,6 +279,11 @@ fn taffy_style(style: &LayoutStyle) -> Style {
             Direction::Row => FlexDirection::Row,
             Direction::Column => FlexDirection::Column,
         },
+        flex_wrap: match style.wrap {
+            Wrap::NoWrap => FlexWrap::NoWrap,
+            Wrap::Wrap => FlexWrap::Wrap,
+            Wrap::Reverse => FlexWrap::WrapReverse,
+        },
         align_items: Some(match style.align {
             Align::Start => AlignItems::START,
             Align::Center => AlignItems::CENTER,
@@ -257,6 +302,7 @@ fn taffy_style(style: &LayoutStyle) -> Style {
             height: LengthPercentage::length(style.gap),
         },
         flex_grow: style.grow,
+        flex_shrink: style.shrink,
         ..Style::default()
     }
 }

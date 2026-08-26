@@ -1,14 +1,14 @@
 use std::{cell::RefCell, rc::Rc, sync::Arc};
 
-use argui_core::Size;
+use argui_core::{Point, Size};
 use argui_layout::{LayoutEngine, LayoutOutput};
-use argui_platform::{PlatformError, PlatformEvent, WindowConfig};
+use argui_platform::{ButtonState, PlatformError, PlatformEvent, PointerButton, WindowConfig};
 use argui_render::{RenderStatus, RendererConfig, SurfaceRenderer};
 use argui_text::{PreparedText, TextEngine, TextScene};
-use argui_ui::UiTree;
+use argui_ui::{InteractionUpdate, UiTree};
 use winit::{
     application::ApplicationHandler,
-    event::WindowEvent,
+    event::{ElementState, MouseButton, WindowEvent},
     event_loop::{ActiveEventLoop, ControlFlow, EventLoop},
     window::{Window, WindowId},
 };
@@ -101,6 +101,59 @@ impl Application {
             return false;
         }
         true
+    }
+
+    fn apply_ui_update(&mut self, update: InteractionUpdate, window: &Window) {
+        if update.paint_changed
+            && let (Some(ui), Some(layout)) = (&self.ui_tree, &mut self.ui_layout)
+        {
+            self.layout_engine.repaint(ui, layout);
+            window.request_redraw();
+        }
+        for event in update.events {
+            (self.on_event)(RuntimeEvent::Ui(event));
+        }
+    }
+
+    fn pointer_moved(&mut self, point: Point, window: &Window) {
+        let Some(layout) = &self.ui_layout else {
+            return;
+        };
+        let Some(ui) = &mut self.ui_tree else {
+            return;
+        };
+        let update = ui.pointer_moved(point, &layout.hit_regions);
+        self.apply_ui_update(update, window);
+    }
+
+    fn pointer_left(&mut self, window: &Window) {
+        if let Some(ui) = &mut self.ui_tree {
+            let update = ui.pointer_left();
+            self.apply_ui_update(update, window);
+        }
+    }
+
+    fn primary_button(&mut self, state: ButtonState, window: &Window) {
+        let Some(ui) = &mut self.ui_tree else {
+            return;
+        };
+        let update = match state {
+            ButtonState::Pressed => {
+                let Some(layout) = &self.ui_layout else {
+                    return;
+                };
+                ui.primary_pressed(&layout.hit_regions)
+            }
+            ButtonState::Released => ui.primary_released(),
+        };
+        self.apply_ui_update(update, window);
+    }
+
+    fn window_focus(&mut self, focused: bool, window: &Window) {
+        if !focused && let Some(ui) = &mut self.ui_tree {
+            let update = ui.window_blurred();
+            self.apply_ui_update(update, window);
+        }
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -273,6 +326,34 @@ impl ApplicationHandler for Application {
                 }
                 PlatformEvent::ScaleFactorChanged(scale_factor)
             }
+            WindowEvent::CursorMoved { position, .. } => {
+                let point = Point::new(
+                    position.x as f32 / self.scale_factor,
+                    position.y as f32 / self.scale_factor,
+                );
+                self.pointer_moved(point, &window);
+                PlatformEvent::PointerMoved {
+                    x: point.x,
+                    y: point.y,
+                }
+            }
+            WindowEvent::CursorEntered { .. } => PlatformEvent::PointerEntered,
+            WindowEvent::CursorLeft { .. } => {
+                self.pointer_left(&window);
+                PlatformEvent::PointerLeft
+            }
+            WindowEvent::MouseInput { state, button, .. } => {
+                let state = button_state(state);
+                let button = pointer_button(button);
+                if button == PointerButton::Primary {
+                    self.primary_button(state, &window);
+                }
+                PlatformEvent::PointerButton { button, state }
+            }
+            WindowEvent::Focused(focused) => {
+                self.window_focus(focused, &window);
+                PlatformEvent::Focused(focused)
+            }
             WindowEvent::RedrawRequested => {
                 self.render(event_loop);
                 PlatformEvent::RedrawRequested
@@ -287,6 +368,24 @@ impl ApplicationHandler for Application {
             event_loop.exit();
         }
         (self.on_event)(RuntimeEvent::Platform(platform_event));
+    }
+}
+
+const fn button_state(state: ElementState) -> ButtonState {
+    match state {
+        ElementState::Pressed => ButtonState::Pressed,
+        ElementState::Released => ButtonState::Released,
+    }
+}
+
+const fn pointer_button(button: MouseButton) -> PointerButton {
+    match button {
+        MouseButton::Left => PointerButton::Primary,
+        MouseButton::Right => PointerButton::Secondary,
+        MouseButton::Middle => PointerButton::Middle,
+        MouseButton::Back => PointerButton::Back,
+        MouseButton::Forward => PointerButton::Forward,
+        MouseButton::Other(value) => PointerButton::Other(value),
     }
 }
 

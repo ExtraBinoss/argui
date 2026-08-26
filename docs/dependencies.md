@@ -30,6 +30,10 @@ a crate until code actually uses them. This keeps each crate manifest truthful.
 `argui-paint` adds no third-party dependency. It contains plain display data;
 only `argui-render` knows how WGPU turns that data into pixels.
 
+`argui-ui` depends directly only on Argui's core, paint, and text descriptions.
+Stable identity, hit testing, interaction state, and composed widgets do not
+pull Winit, WGPU, or Taffy into the UI crate.
+
 ## Setup
 
 Cargo installs library dependencies automatically:

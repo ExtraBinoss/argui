@@ -12,10 +12,11 @@ check before the next feature starts.
    with `cosmic-text`; use a bounded reusable glyph atlas, one instanced batch,
    and per-block clipping. Add cursor geometry, selection, IME, clipboard, and
    copy/paste behavior around it next.
-4. **Retained tree — foundation implemented.** Persistent keyed elements,
-   revision tracking, and explicit layout invalidation are present. Add keyed
-   reconciliation, per-node state, hit testing, focus, pointer capture, and a
-   compact display list with the first interactive widgets.
+4. **Retained interaction — foundation implemented.** Persistent keyed elements,
+   stable reconciled `NodeId`s, revision tracking, clipped reverse-order hit
+   testing, hover/press/focus state, pointer capture, UI events, and paint-only
+   invalidation are present. Add arbitrary per-node widget state, keyboard focus
+   traversal, touch, and accessibility integration.
 5. **Layout — responsive foundation implemented.** A small renderer-independent
    style model maps to `taffy`; Cosmic Text performs constrained intrinsic
    measurement and native/web viewport changes share one reflow path. Add
@@ -24,8 +25,9 @@ check before the next feature starts.
    per-side borders, per-corner radii, primitive opacity, nested rectangular
    clipping, analytic GPU antialiasing, and compatible-command batching work on
    native and web. Gradients, images, transforms, and shadows extend this layer.
-7. **Widgets.** Compose primitives into text, containers, buttons, input, scroll,
-   overlays, and accessibility nodes without renderer-specific widget code.
+7. **Widgets — composition started.** `Button` composes a container, text,
+   interaction, layout, and paint without renderer-specific code. Add input,
+   scroll, overlays, reusable state ownership, and accessibility nodes.
 8. **Layers and effects.** Follow the staged [effects plan](effects.md): declarative
    layer commands in `argui-paint`, a render graph and bounded texture pool in
    `argui-render`, then group opacity, masks, shadows, filters, destination-aware

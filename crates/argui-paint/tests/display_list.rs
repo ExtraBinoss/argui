@@ -21,4 +21,8 @@ fn display_lists_preserve_cross_primitive_order() {
         list.commands(),
         &[DisplayCommand::Quad(quad), DisplayCommand::Text(3)]
     );
+
+    list.clear();
+    assert_eq!(list.quad_count(), 0);
+    assert!(list.commands().is_empty());
 }
