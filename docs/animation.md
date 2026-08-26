@@ -92,11 +92,31 @@ presentation. Returning to an inactive timeline removes it from the compact
 scheduler immediately. The state showcase exercises this exact path on native
 and WASM without separate UI code.
 
-### 3. Transitions and orchestration
+### 3. Transitions and orchestration — implemented
 
 - Add ergonomic implicit transitions on composed UI elements.
 - Add sequence, parallel, dependency, and stagger orchestration.
 - Add replace/add/accumulate composition with deterministic priority rules.
+
+`Element::transition` currently interpolates the complete paint quad retained by
+its stable `NodeId`: background, opacity, per-side border widths and color, and
+per-corner radii. A target changed during playback starts again from the value
+actually presented in the previous frame. These transitions repaint without
+running Taffy or reshaping text.
+
+`Schedule`, `ScheduleBuilder`, and `Cue` describe serial, parallel, dependent,
+and staggered timing without owning widget or renderer state. Typed
+`Contribution<T>` values resolve replace, add, and accumulate composition in a
+stable `(priority, order)` order. Transform, layout, and effect properties will
+reuse these primitives in their dedicated delivery stages.
+
+```rust
+use argui::{animation::Duration, ui::Transition};
+
+let panel = Element::container([])
+    .background(target_color)
+    .transition(Transition::new(Duration::from_millis(240)));
+```
 
 ### 4. Physics
 

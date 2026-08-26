@@ -45,12 +45,16 @@ impl RuntimeAnimations {
 }
 
 impl Application {
-    pub(super) fn sync_model_animation(&mut self) -> bool {
-        let active = self
+    pub(super) fn sync_animations(&mut self) -> bool {
+        let model_active = self
             .model
             .as_ref()
             .is_some_and(|model| model.wants_animation_frame());
-        self.animations.sync(active)
+        let tree_active = self
+            .ui_tree
+            .as_ref()
+            .is_some_and(argui_ui::UiTree::wants_animation_frame);
+        self.animations.sync(model_active || tree_active)
     }
 
     #[cfg_attr(coverage_nightly, coverage(off))]
@@ -71,17 +75,22 @@ impl Application {
         } else {
             argui_ui::TreeUpdate::None
         };
+        let paint_animated = self
+            .ui_tree
+            .as_mut()
+            .is_some_and(|tree| tree.advance_animations(frame.now));
         match tree_update {
             argui_ui::TreeUpdate::Layout => {
                 self.prepare_or_exit(event_loop);
             }
             argui_ui::TreeUpdate::Paint => self.repaint(),
+            argui_ui::TreeUpdate::None if paint_animated => self.repaint(),
             argui_ui::TreeUpdate::None => {}
         }
         if tree_update != argui_ui::TreeUpdate::None {
             (self.on_event)(RuntimeEvent::ViewUpdated(tree_update));
         }
-        self.sync_model_animation();
+        self.sync_animations();
         if self.animations.scheduler.needs_frame() {
             window.request_redraw();
         }

@@ -9,13 +9,14 @@ use argui_runtime::{UiApp, ViewUpdate};
 use argui_text::{TextColor, TextEngine, TextStyle, TextWrap};
 use argui_ui::{
     Align, Button, ButtonStyle, Edges, Element, Inset, Interaction, Length, ScrollConfig,
-    ScrollPolarity, ScrollbarStyle, TextInput, TextInputStyle, UiEvent, UiEventKind, VirtualList,
-    Wrap,
+    ScrollPolarity, ScrollbarStyle, TextInput, TextInputStyle, Transition, UiEvent, UiEventKind,
+    VirtualList, Wrap,
 };
 
 pub struct StateShowcase {
     count: u32,
     warm: bool,
+    transitioned: bool,
     reversed: bool,
     inverted_scroll: bool,
     virtual_offset: f32,
@@ -39,6 +40,7 @@ impl Default for StateShowcase {
         Self {
             count: 0,
             warm: false,
+            transitioned: false,
             reversed: false,
             inverted_scroll: false,
             virtual_offset: 0.0,
@@ -92,6 +94,7 @@ impl UiApp for StateShowcase {
             Element::row([
                 button("increment", "Increment", accent),
                 button("theme", "Toggle paint", accent),
+                button("transition", "Implicit transition", accent),
                 button("reorder", "Reorder keys", accent),
                 button(
                     "polarity",
@@ -124,13 +127,16 @@ impl UiApp for StateShowcase {
         ])
         .padding(Edges::all(30.0))
         .gap(22.0)
-        .background(if self.warm {
+        .background(if self.transitioned {
+            Color::rgb(0.12, 0.18, 0.28)
+        } else if self.warm {
             Color::rgb(0.16, 0.09, 0.07)
         } else {
             Color::rgb(0.06, 0.08, 0.12)
         })
         .border(Border::all(1.5, accent))
         .radius(CornerRadii::all(22.0))
+        .transition(paint_transition())
         .clip(ClipBehavior::Bounds)
         .shrink(0.0)])
         .keyed("page-scroll")
@@ -159,6 +165,7 @@ impl UiApp for StateShowcase {
         match event.key.as_deref() {
             Some("increment") => self.count += 1,
             Some("theme") => self.warm = !self.warm,
+            Some("transition") => self.transitioned = !self.transitioned,
             Some("reorder") => self.reversed = !self.reversed,
             Some("polarity") => self.inverted_scroll = !self.inverted_scroll,
             Some("animation-play") => {
@@ -348,6 +355,12 @@ fn animation_timeline(initial: Color) -> Timeline<Color> {
             .fill(FillMode::Forwards),
     )
     .expect("the showcase timing is valid")
+}
+
+fn paint_transition() -> Transition {
+    Transition::new(Duration::from_millis(420)).easing(Easing::CubicBezier(
+        CubicBezier::new(0.22, 1.0, 0.36, 1.0).expect("the showcase uses a valid transition curve"),
+    ))
 }
 
 #[must_use]

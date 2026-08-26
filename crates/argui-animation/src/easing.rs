@@ -63,6 +63,19 @@ impl fmt::Debug for Easing {
     }
 }
 
+impl PartialEq for Easing {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Linear, Self::Linear) => true,
+            (Self::CubicBezier(left), Self::CubicBezier(right)) => left == right,
+            (Self::Steps(left), Self::Steps(right)) => left == right,
+            (Self::PiecewiseLinear(left), Self::PiecewiseLinear(right)) => left == right,
+            (Self::Custom(left), Self::Custom(right)) => Arc::ptr_eq(left, right),
+            _ => false,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct CubicBezier {
     x1: f32,

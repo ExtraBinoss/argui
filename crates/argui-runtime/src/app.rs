@@ -160,7 +160,6 @@ impl Application {
             }
             (self.on_event)(RuntimeEvent::Ui(event));
         }
-        let animation_changed = self.sync_model_animation();
         let tree_update = if rebuild {
             let root = self.model.as_ref().map(|model| model.view());
             match (root, &mut self.ui_tree) {
@@ -170,6 +169,7 @@ impl Application {
         } else {
             TreeUpdate::None
         };
+        let animation_changed = self.sync_animations();
         let redraw = match tree_update {
             TreeUpdate::Layout => self.prepare_or_exit(event_loop),
             _ if update.layout_changed => self.prepare_or_exit(event_loop),

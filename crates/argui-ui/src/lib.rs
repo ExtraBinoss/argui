@@ -6,6 +6,7 @@ mod interaction;
 mod scroll;
 mod style;
 mod text_input;
+mod transition;
 mod tree;
 mod virtual_list;
 mod widget;
@@ -23,6 +24,7 @@ pub use scroll::{
 };
 pub use style::{Align, Direction, Edges, Inset, Justify, LayoutStyle, Length, Position, Wrap};
 pub use text_input::{ClipboardRequest, TextInput, TextInputStyle};
+pub use transition::Transition;
 pub use tree::{TreeUpdate, UiTree};
 pub use virtual_list::{VirtualList, VirtualWindow};
 pub use widget::{Button, ButtonStyle};

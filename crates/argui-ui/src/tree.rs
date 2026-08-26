@@ -4,6 +4,7 @@ use argui_paint::QuadStyle;
 use crate::interaction::{InteractionState, RawUpdate};
 use crate::scroll::ScrollState;
 use crate::text_input::{TextInputState, TextInputStates};
+use crate::transition::PaintTransitions;
 use crate::{
     Element, ElementKind, HitRegion, Interaction, InteractionUpdate, NodeId, ScrollRegion, UiEvent,
     UiEventKind, VisualState, identity,
@@ -17,7 +18,7 @@ pub enum TreeUpdate {
     Layout,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct UiTree {
     root: Element,
     node_ids: Vec<NodeId>,
@@ -25,6 +26,7 @@ pub struct UiTree {
     interaction: InteractionState,
     scroll: ScrollState,
     text_inputs: TextInputStates,
+    transitions: PaintTransitions,
     revision: u64,
     layout_dirty: bool,
 }
@@ -41,6 +43,7 @@ impl UiTree {
             interaction: InteractionState::default(),
             scroll: ScrollState::default(),
             text_inputs: TextInputStates::default(),
+            transitions: PaintTransitions::default(),
             revision: 0,
             layout_dirty: true,
         };
@@ -71,14 +74,21 @@ impl UiTree {
         let update = classify_update(&self.root, &root);
         match update {
             TreeUpdate::None => return update,
-            TreeUpdate::Paint => self.root = root,
+            TreeUpdate::Paint => {
+                self.transitions
+                    .sync(&self.root, &self.node_ids, &root, &self.node_ids);
+                self.root = root;
+            }
             TreeUpdate::Layout => {
-                self.node_ids = identity::reconcile_ids(
+                let node_ids = identity::reconcile_ids(
                     &self.root,
                     &self.node_ids,
                     &root,
                     &mut self.next_node_id,
                 );
+                self.transitions
+                    .sync(&self.root, &self.node_ids, &root, &node_ids);
+                self.node_ids = node_ids;
                 self.root = root;
                 self.interaction.retain(&self.node_ids);
                 self.scroll.retain(&self.node_ids);
@@ -111,11 +121,19 @@ impl UiTree {
 
     #[must_use]
     pub fn resolved_quad(&self, node: NodeId, element: &Element) -> QuadStyle {
-        element
-            .interaction
-            .map_or(element.paint.quad, |interaction| {
-                interaction.resolve(element.paint.quad, self.visual_state(node))
-            })
+        let base = self.transitions.resolve(node, element.paint.quad);
+        element.interaction.map_or(base, |interaction| {
+            interaction.resolve(base, self.visual_state(node))
+        })
+    }
+
+    pub fn advance_animations(&mut self, now: argui_animation::Time) -> bool {
+        self.transitions.advance(now)
+    }
+
+    #[must_use]
+    pub fn wants_animation_frame(&self) -> bool {
+        self.transitions.needs_frame()
     }
 
     #[must_use]

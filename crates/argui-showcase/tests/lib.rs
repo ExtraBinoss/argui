@@ -140,3 +140,15 @@ fn shared_animation_activates_samples_and_returns_to_idle() {
     });
     assert!(!app.wants_animation_frame());
 }
+
+#[test]
+fn implicit_paint_transition_is_retained_outside_the_app_model() {
+    let mut app = StateShowcase::default();
+    let mut tree = UiTree::new(app.view());
+    assert_eq!(click(&mut app, "transition"), ViewUpdate::Rebuild);
+    assert_eq!(tree.update(app.view()), argui_ui::TreeUpdate::Paint);
+    assert!(tree.wants_animation_frame());
+    tree.advance_animations(Time::ZERO);
+    tree.advance_animations(Time::from_nanos(500_000_000));
+    assert!(!tree.wants_animation_frame());
+}

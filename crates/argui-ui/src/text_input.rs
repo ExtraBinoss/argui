@@ -109,6 +109,7 @@ impl TextInput {
             style: self.style.layout,
             paint: self.style.paint,
             interaction: Some(interaction),
+            transition: None,
             scroll: None,
             z_index: 0,
             children: Vec::new(),

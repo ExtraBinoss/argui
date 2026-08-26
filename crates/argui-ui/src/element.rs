@@ -30,6 +30,7 @@ pub struct Element {
     pub style: LayoutStyle,
     pub paint: PaintStyle,
     pub interaction: Option<Interaction>,
+    pub transition: Option<crate::Transition>,
     pub scroll: Option<ScrollConfig>,
     pub z_index: i32,
     pub children: Vec<Self>,
@@ -44,6 +45,7 @@ impl Element {
             style: LayoutStyle::default(),
             paint: PaintStyle::default(),
             interaction: None,
+            transition: None,
             scroll: None,
             z_index: 0,
             children: children.into_iter().collect(),
@@ -71,6 +73,7 @@ impl Element {
             style: LayoutStyle::default(),
             paint: PaintStyle::default(),
             interaction: None,
+            transition: None,
             scroll: None,
             z_index: 0,
             children: Vec::new(),
@@ -218,6 +221,12 @@ impl Element {
     #[must_use]
     pub const fn interaction(mut self, interaction: Interaction) -> Self {
         self.interaction = Some(interaction);
+        self
+    }
+
+    #[must_use]
+    pub fn transition(mut self, transition: crate::Transition) -> Self {
+        self.transition = Some(transition);
         self
     }
 
