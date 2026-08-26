@@ -1,0 +1,16 @@
+[package]
+name = "argui-text"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+cosmic-text = { workspace = true, features = ["std", "swash", "fontconfig"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+cosmic-text = { workspace = true, features = ["std", "swash", "wasm-web"] }
+
+[lints]
+workspace = true
+

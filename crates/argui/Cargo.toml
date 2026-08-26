@@ -1,0 +1,18 @@
+[package]
+name = "argui"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+argui-core.workspace = true
+argui-layout.workspace = true
+argui-platform.workspace = true
+argui-render.workspace = true
+argui-runtime.workspace = true
+argui-text.workspace = true
+argui-ui.workspace = true
+
+[lints]
+workspace = true
