@@ -1,6 +1,7 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 //! Composition root connecting platform events to rendering and, later, the UI tree.
 
+mod animation;
 mod app;
 mod clipboard;
 mod error;

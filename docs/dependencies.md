@@ -30,6 +30,9 @@ be replaced independently by every application.
 Planned dependencies remain centralized in the workspace but are not attached to
 a crate until code actually uses them. This keeps each crate manifest truthful.
 
+`argui-animation` has no third-party dependency; it only uses `argui-core` types
+and the Rust standard library.
+
 `argui-paint` adds no third-party dependency. It contains plain display data;
 only `argui-render` knows how WGPU turns that data into pixels.
 

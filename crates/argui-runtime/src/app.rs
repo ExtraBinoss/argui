@@ -1,7 +1,9 @@
 use crate::translate::{
     button_state, ime_input, key_input, modifiers_state, pointer_button, scroll_delta,
 };
-use crate::{RuntimeError, RuntimeEvent, UiApp, ViewUpdate, event::UserEvent};
+use crate::{
+    RuntimeError, RuntimeEvent, UiApp, ViewUpdate, animation::RuntimeAnimations, event::UserEvent,
+};
 use argui_core::{Point, Size};
 use argui_layout::{LayoutEngine, LayoutOutput};
 use argui_platform::{
@@ -14,7 +16,7 @@ use std::{cell::RefCell, rc::Rc, sync::Arc};
 use winit::{
     application::ApplicationHandler,
     event::WindowEvent,
-    event_loop::{ActiveEventLoop, EventLoopProxy},
+    event_loop::ActiveEventLoop,
     window::{Window, WindowId},
 };
 
@@ -45,8 +47,9 @@ pub(crate) struct Application {
     #[cfg(not(target_arch = "wasm32"))]
     pub(super) clipboard: argui_platform::Clipboard,
     #[cfg(target_arch = "wasm32")]
-    pub(super) event_proxy: Option<EventLoopProxy<UserEvent>>,
+    pub(super) event_proxy: Option<winit::event_loop::EventLoopProxy<UserEvent>>,
     pending_scrollbar_drag: Option<Point>,
+    animations: RuntimeAnimations,
     pub(crate) fatal_error: Option<RuntimeError>,
     on_event: Box<dyn FnMut(RuntimeEvent)>,
 }
@@ -84,18 +87,11 @@ impl Application {
             #[cfg(target_arch = "wasm32")]
             event_proxy: None,
             pending_scrollbar_drag: None,
+            animations: RuntimeAnimations::new(),
             fatal_error: None,
             on_event: Box::new(on_event),
         }
     }
-
-    #[cfg(target_arch = "wasm32")]
-    pub(crate) fn set_event_proxy(&mut self, proxy: EventLoopProxy<UserEvent>) {
-        self.event_proxy = Some(proxy);
-    }
-
-    #[cfg(not(target_arch = "wasm32"))]
-    pub(crate) fn set_event_proxy(&mut self, _proxy: EventLoopProxy<UserEvent>) {}
 
     fn prepare_text(&mut self) -> Result<(), RuntimeError> {
         if let Some(ui) = &mut self.ui_tree {
@@ -585,6 +581,9 @@ impl ApplicationHandler<UserEvent> for Application {
             WindowEvent::RedrawRequested => {
                 self.flush_scrollbar_drag(&window, event_loop);
                 self.render(event_loop);
+                if self.animations.advance_if_active() {
+                    window.request_redraw();
+                }
                 PlatformEvent::RedrawRequested
             }
             _ => return,

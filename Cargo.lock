@@ -93,6 +93,7 @@ dependencies = [
 name = "argui"
 version = "0.1.0"
 dependencies = [
+ "argui-animation",
  "argui-core",
  "argui-layout",
  "argui-paint",
@@ -102,6 +103,13 @@ dependencies = [
  "argui-showcase",
  "argui-text",
  "argui-ui",
+]
+
+[[package]]
+name = "argui-animation"
+version = "0.1.0"
+dependencies = [
+ "argui-core",
 ]
 
 [[package]]
@@ -152,6 +160,7 @@ dependencies = [
 name = "argui-runtime"
 version = "0.1.0"
 dependencies = [
+ "argui-animation",
  "argui-core",
  "argui-layout",
  "argui-platform",

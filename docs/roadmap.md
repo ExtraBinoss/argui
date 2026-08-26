@@ -40,8 +40,11 @@ check before the next feature starts.
    `argui-render`, then group opacity, masks, shadows, filters, destination-aware
    blend modes, backdrop filters, and a stable custom-WGSL ABI. Allocate layers
    only when their semantics require them.
-9. **Animation.** Typed transitions, keyframes, spring/timeline scheduling, and
-   separation of paint-only animation from layout-invalidating animation.
+9. **Animation — clock/scheduler foundation implemented.** Follow the staged
+   [animation plan](animation.md): typed transitions, complete keyframe
+   timelines, playback control, orchestration, springs/inertia, transforms,
+   layout transitions, caret/scroll consumers, and shader parameters. The
+   scheduler performs no work and requests no frames while idle.
 10. **Optional DSL.** A separate parser/compiler lowering into the same public UI
    tree used by Rust builders. No runtime or renderer dependency on the DSL.
 

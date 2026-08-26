@@ -1,5 +1,6 @@
 //! The small public facade for Argui.
 
+pub use argui_animation as animation;
 pub use argui_core as core;
 pub use argui_layout as layout;
 pub use argui_paint as paint;

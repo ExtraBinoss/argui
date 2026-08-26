@@ -9,6 +9,7 @@ rust-version = "1.89"
 license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
+argui-animation = { path = "crates/argui-animation" }
 argui-core = { path = "crates/argui-core" }
 argui-layout = { path = "crates/argui-layout" }
 argui-paint = { path = "crates/argui-paint" }
