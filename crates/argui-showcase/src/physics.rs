@@ -1,0 +1,120 @@
+use argui_animation::{DecayConfig, Inertia, InertiaConfig, InertiaState, Spring, SpringConfig};
+use argui_paint::{Border, Color, CornerRadii};
+use argui_text::{TextColor, TextWrap};
+use argui_ui::{Edges, Element, Length, Wrap};
+
+use super::{StateShowcase, button, text_style};
+
+#[derive(Clone, Copy, Default)]
+pub(super) enum PhysicsMode {
+    #[default]
+    Spring,
+    Inertia,
+}
+
+#[derive(Clone, Copy)]
+pub(super) enum PhysicsCommand {
+    RetargetSpring,
+    LaunchInertia,
+}
+
+impl StateShowcase {
+    pub(super) fn apply_physics_command(&mut self) -> bool {
+        let Some(command) = self.physics_command.take() else {
+            return false;
+        };
+        match command {
+            PhysicsCommand::RetargetSpring => {
+                if !matches!(self.physics_mode, PhysicsMode::Spring) {
+                    self.spring = Spring::new(
+                        self.physics_value,
+                        self.physics_value,
+                        self.inertia.velocity(),
+                        showcase_spring_config(),
+                    )
+                    .expect("the showcase spring configuration is valid");
+                }
+                let target = if self.spring.target() < 0.5 { 1.0 } else { 0.0 };
+                self.spring.retarget(target);
+                self.physics_mode = PhysicsMode::Spring;
+            }
+            PhysicsCommand::LaunchInertia => {
+                let velocity = if self.physics_value < 0.5 { 4.5 } else { -4.5 };
+                self.inertia.launch(self.physics_value, velocity);
+                self.physics_mode = PhysicsMode::Inertia;
+            }
+        }
+        true
+    }
+
+    pub(super) fn physics_demo(&self, accent: Color) -> Element {
+        let normalized = self.physics_value.clamp(0.0, 1.0);
+        let color = Color::rgb(
+            0.18 + normalized * 0.68,
+            0.72 - normalized * 0.32,
+            0.92 - normalized * 0.58,
+        );
+        let state = match self.physics_mode {
+            PhysicsMode::Spring if self.spring.is_active() => "spring moving",
+            PhysicsMode::Spring => "spring settled",
+            PhysicsMode::Inertia if self.inertia.state() == InertiaState::Decaying => "decaying",
+            PhysicsMode::Inertia if self.inertia.state() == InertiaState::Bouncing => "bouncing",
+            PhysicsMode::Inertia => "inertia settled",
+        };
+        Element::column([
+            Element::text(format!("Physics · {state}")).text_style(text_style(
+                17.0,
+                TextColor::WHITE,
+                650,
+                TextWrap::None,
+            )),
+            Element::container([])
+                .height(Length::Px(68.0))
+                .width(Length::Percent(1.0))
+                .background(color)
+                .border(Border::all(1.5, accent))
+                .radius(CornerRadii::all(10.0 + normalized * 24.0)),
+            Element::row([
+                button("physics-spring", "Spring retarget", accent),
+                button("physics-inertia", "Launch inertia", accent),
+            ])
+            .wrap(Wrap::Wrap)
+            .gap(10.0),
+        ])
+        .gap(12.0)
+        .padding(Edges::all(16.0))
+        .background(Color::rgb(0.045, 0.06, 0.09))
+        .radius(CornerRadii::all(14.0))
+    }
+}
+
+pub(super) fn showcase_spring_config() -> SpringConfig {
+    SpringConfig {
+        stiffness: 150.0,
+        damping: 12.0,
+        rest_speed: 0.002,
+        rest_delta: 0.002,
+        ..SpringConfig::default()
+    }
+}
+
+pub(super) fn showcase_spring() -> Spring<f32> {
+    Spring::new(0.0, 0.0, 0.0, showcase_spring_config())
+        .expect("the showcase spring configuration is valid")
+}
+
+pub(super) fn showcase_inertia() -> Inertia {
+    Inertia::new(
+        0.0,
+        0.0,
+        InertiaConfig {
+            decay: DecayConfig {
+                rate: 3.2,
+                rest_speed: 0.002,
+            },
+            bounds: Some((0.0, 1.0)),
+            ..InertiaConfig::default()
+        },
+    )
+    .expect("the showcase inertia configuration is valid")
+}

@@ -152,3 +152,42 @@ fn implicit_paint_transition_is_retained_outside_the_app_model() {
     tree.advance_animations(Time::from_nanos(500_000_000));
     assert!(!tree.wants_animation_frame());
 }
+
+#[test]
+fn spring_retarget_and_bounded_inertia_return_the_scheduler_to_idle() {
+    let mut app = StateShowcase::default();
+    assert_eq!(click(&mut app, "physics-spring"), ViewUpdate::None);
+    assert!(app.wants_animation_frame());
+    let mut now = 0_u64;
+    let _ = app.animation_frame(Frame {
+        now: Time::ZERO,
+        elapsed: Duration::ZERO,
+    });
+    for step in 0..1_000 {
+        now += 16_000_000;
+        if step == 4 {
+            assert_eq!(click(&mut app, "physics-spring"), ViewUpdate::None);
+        }
+        let _ = app.animation_frame(Frame {
+            now: Time::from_nanos(now),
+            elapsed: Duration::from_millis(16),
+        });
+        if !app.wants_animation_frame() {
+            break;
+        }
+    }
+    assert!(!app.wants_animation_frame());
+
+    assert_eq!(click(&mut app, "physics-inertia"), ViewUpdate::None);
+    for _ in 0..1_000 {
+        now += 16_000_000;
+        let _ = app.animation_frame(Frame {
+            now: Time::from_nanos(now),
+            elapsed: Duration::from_millis(16),
+        });
+        if !app.wants_animation_frame() {
+            break;
+        }
+    }
+    assert!(!app.wants_animation_frame());
+}

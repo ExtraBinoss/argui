@@ -1,8 +1,10 @@
 //! One showcase shared by native and WebAssembly launchers.
 
+mod physics;
+
 use argui_animation::{
-    CubicBezier, Direction, Duration, Easing, FillMode, Frame, Iterations, Keyframe, Keyframes,
-    PlaybackState, Timeline, Timing,
+    CubicBezier, Direction, Duration, Easing, FillMode, Frame, Inertia, Iterations, Keyframe,
+    Keyframes, PlaybackState, Spring, Timeline, Timing,
 };
 use argui_paint::{Border, ClipBehavior, Color, CornerRadii, PaintStyle, QuadStyle};
 use argui_runtime::{UiApp, ViewUpdate};
@@ -12,6 +14,7 @@ use argui_ui::{
     ScrollPolarity, ScrollbarStyle, TextInput, TextInputStyle, Transition, UiEvent, UiEventKind,
     VirtualList, Wrap,
 };
+use physics::{PhysicsCommand, PhysicsMode, showcase_inertia, showcase_spring};
 
 pub struct StateShowcase {
     count: u32,
@@ -23,6 +26,11 @@ pub struct StateShowcase {
     animated_color: Color,
     animation: Timeline<Color>,
     animation_command: Option<AnimationCommand>,
+    spring: Spring<f32>,
+    inertia: Inertia,
+    physics_mode: PhysicsMode,
+    physics_command: Option<PhysicsCommand>,
+    physics_value: f32,
 }
 
 #[derive(Clone, Copy)]
@@ -47,6 +55,11 @@ impl Default for StateShowcase {
             animated_color,
             animation: animation_timeline(animated_color),
             animation_command: None,
+            spring: showcase_spring(),
+            inertia: showcase_inertia(),
+            physics_mode: PhysicsMode::default(),
+            physics_command: None,
+            physics_value: 0.0,
         }
     }
 }
@@ -111,6 +124,7 @@ impl UiApp for StateShowcase {
             .align(Align::Center),
             Element::row(items).wrap(Wrap::Wrap).gap(10.0),
             self.animation_demo(accent),
+            self.physics_demo(accent),
             self.virtual_list(accent),
             Element::text("OVERLAY · z-index 100")
                 .text_style(text_style(
@@ -188,12 +202,31 @@ impl UiApp for StateShowcase {
                 self.animation_command = Some(AnimationCommand::Cancel);
                 return ViewUpdate::None;
             }
+            Some("physics-spring") => {
+                self.physics_command = Some(PhysicsCommand::RetargetSpring);
+                return ViewUpdate::None;
+            }
+            Some("physics-inertia") => {
+                self.physics_command = Some(PhysicsCommand::LaunchInertia);
+                return ViewUpdate::None;
+            }
             _ => return ViewUpdate::None,
         }
         ViewUpdate::Rebuild
     }
 
     fn animation_frame(&mut self, frame: Frame) -> ViewUpdate {
+        let physics_command = self.apply_physics_command();
+        let physics_changed = match self.physics_mode {
+            PhysicsMode::Spring => self.spring.advance(frame.elapsed),
+            PhysicsMode::Inertia => self.inertia.advance(frame.elapsed),
+        };
+        if physics_command || physics_changed {
+            self.physics_value = match self.physics_mode {
+                PhysicsMode::Spring => self.spring.value(),
+                PhysicsMode::Inertia => self.inertia.value(),
+            };
+        }
         if let Some(command) = self.animation_command.take() {
             match command {
                 AnimationCommand::Restart => self.animation.restart(frame.now),
@@ -212,7 +245,7 @@ impl UiApp for StateShowcase {
         let color = sample.value.unwrap_or_else(|| self.accent());
         let changed = color != self.animated_color || sample.events != Default::default();
         self.animated_color = color;
-        if changed {
+        if changed || physics_command || physics_changed {
             ViewUpdate::Rebuild
         } else {
             ViewUpdate::None
@@ -220,7 +253,14 @@ impl UiApp for StateShowcase {
     }
 
     fn wants_animation_frame(&self) -> bool {
-        self.animation_command.is_some() || self.animation.needs_frame()
+        let physics_active = match self.physics_mode {
+            PhysicsMode::Spring => self.spring.is_active(),
+            PhysicsMode::Inertia => self.inertia.is_active(),
+        };
+        self.animation_command.is_some()
+            || self.animation.needs_frame()
+            || self.physics_command.is_some()
+            || physics_active
     }
 }
 

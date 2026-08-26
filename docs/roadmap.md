@@ -40,12 +40,12 @@ check before the next feature starts.
    `argui-render`, then group opacity, masks, shadows, filters, destination-aware
    blend modes, backdrop filters, and a stable custom-WGSL ABI. Allocate layers
    only when their semantics require them.
-9. **Animation — transitions and orchestration implemented.** Follow the staged
-   [animation plan](animation.md): physics is next, followed by transforms,
-   layout transitions, caret/scroll consumers, and shader parameters. Typed
-   keyframes, implicit paint transitions, sequence/parallel/dependency/stagger
-   schedules, deterministic composition, playback control, retargeting, and
-   idle-aware runtime scheduling already share one native/WASM implementation.
+9. **Animation — physics implemented.** Follow the staged
+   [animation plan](animation.md): paint transforms are next, followed by layout
+   transitions, caret/scroll consumers, and shader parameters. Typed keyframes,
+   implicit paint transitions, orchestration, deterministic composition,
+   analytical springs, decay, bounded inertia, velocity-preserving retargeting,
+   and idle-aware scheduling already share one native/WASM implementation.
 10. **Optional DSL.** A separate parser/compiler lowering into the same public UI
    tree used by Rust builders. No runtime or renderer dependency on the DSL.
 

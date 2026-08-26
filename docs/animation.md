@@ -118,11 +118,23 @@ let panel = Element::container([])
     .transition(Transition::new(Duration::from_millis(240)));
 ```
 
-### 4. Physics
+### 4. Physics — implemented
 
 - Add springs, decay, inertia, velocity preservation, and bounded settling.
 - Use the same physics for interactive controls and optional scroll momentum.
 - Stop frame requests immediately after the configured rest thresholds.
+
+`Spring<T>` supports scalar, color, point, size, and rectangle motion through
+`MotionValue`. It solves underdamped, critically damped, and overdamped systems
+analytically, so a long frame remains stable and temporal partitioning does not
+change the trajectory. Retargeting preserves the current velocity.
+
+`Decay<T>` integrates exponential velocity decay. Scalar `Inertia` uses that
+decay until it crosses an optional bound, then creates a bounce spring from the
+same presented value and velocity. Configurable rest-speed and rest-distance
+thresholds snap the final value and immediately remove the physics consumer
+from frame scheduling. The same inertia is ready for the scroll consumer stage;
+it is not coupled to scroll direction or platform events.
 
 ### 5. Paint and transforms
 
