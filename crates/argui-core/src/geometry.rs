@@ -43,4 +43,14 @@ impl Rect {
             && point.x <= self.origin.x + self.size.width
             && point.y <= self.origin.y + self.size.height
     }
+
+    #[must_use]
+    pub fn intersection(self, other: Self) -> Option<Self> {
+        let left = self.origin.x.max(other.origin.x);
+        let top = self.origin.y.max(other.origin.y);
+        let right = (self.origin.x + self.size.width).min(other.origin.x + other.size.width);
+        let bottom = (self.origin.y + self.size.height).min(other.origin.y + other.size.height);
+        (right > left && bottom > top)
+            .then(|| Self::new(Point::new(left, top), Size::new(right - left, bottom - top)))
+    }
 }

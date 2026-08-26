@@ -11,6 +11,8 @@ Rust builders or future DSL
        /           \
 layout            text
        \           /
+          paint
+            |
         argui-runtime
         /           \
   platform       render
@@ -27,6 +29,8 @@ collaboration. `argui-core` contains dependency-light shared primitives, and
 - `argui-platform`: `winit` window lifecycle, input, IME, clipboard hooks, and
   native/web surface handles.
 - `argui-layout`: the narrow adapter from UI style/tree data to `taffy`.
+- `argui-paint`: renderer-independent fills, borders, corner radii, clips, and
+  the ordered display list shared by native and web.
 - `argui-text`: shaping, bidi, fallback, line breaking, cursor geometry, and
   glyph preparation through `cosmic-text`.
 - `argui-render`: WGPU resources, batching, atlases, clips, layers, filters, and
@@ -65,3 +69,8 @@ explicit layout-dirty flag. `argui-layout::LayoutEngine` rebuilds its Taffy tree
 only when that revision changes; viewport or DPI changes reuse it. Text leaves
 are measured by Cosmic Text under Taffy's width constraint, then lowered to a
 `TextScene`. No layout or shaping work runs while the event loop is idle.
+
+Painting preserves tree order across primitive types. Consecutive compatible
+commands are batched, but a later quad is never moved behind earlier text merely
+to reduce draw calls. The WGPU quad pipeline uses one reusable instance buffer;
+rounded corners, asymmetric borders, clipping, and antialiasing stay in WGSL.

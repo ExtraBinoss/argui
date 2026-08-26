@@ -1,4 +1,5 @@
 use argui::{
+    paint::{Border, ClipBehavior, Color, CornerRadii},
     platform::WindowConfig,
     render::RendererConfig,
     runtime::run_ui,
@@ -30,6 +31,12 @@ fn showcase() -> UiTree {
                 "This text is measured by Cosmic Text and constrained by Taffy. Resize the window: the line wrapping and every logical rectangle are recomputed from the same retained Rust tree.",
             )
             .text_style(text_style(22.0, TextColor::WHITE, 400)),
+            Element::text("GPU INSTANCED · ZERO WEBVIEW")
+                .text_style(text_style(14.0, TextColor::rgb(0.7, 0.95, 0.78), 700))
+                .padding(Edges::symmetric(12.0, 7.0))
+                .background(Color::rgb(0.08, 0.22, 0.16))
+                .border(Border::all(1.0, Color::rgb(0.18, 0.5, 0.34)))
+                .radius(CornerRadii::all(10.0)),
             Element::text("retained tree  →  Taffy  →  Cosmic Text  →  WGPU")
                 .text_style(TextStyle {
                     family: FontFamily::Monospace,
@@ -37,7 +44,12 @@ fn showcase() -> UiTree {
                 }),
         ])
         .layout_style(panel_style)
-        .gap(24.0)])
+        .padding(Edges::all(30.0))
+        .gap(24.0)
+        .background(Color::rgb(0.075, 0.095, 0.135))
+        .border(Border::all(1.5, Color::rgb(0.18, 0.28, 0.4)))
+        .radius(CornerRadii::all(22.0))
+        .clip(ClipBehavior::Bounds)])
         .width(Length::Percent(1.0))
         .height(Length::Percent(1.0))
         .align(Align::Center)

@@ -1,26 +1,6 @@
 use argui_core::Rect;
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct TextColor([f32; 4]);
-
-impl TextColor {
-    pub const WHITE: Self = Self::rgb(1.0, 1.0, 1.0);
-
-    #[must_use]
-    pub const fn rgb(red: f32, green: f32, blue: f32) -> Self {
-        Self([red, green, blue, 1.0])
-    }
-
-    #[must_use]
-    pub const fn rgba(red: f32, green: f32, blue: f32, alpha: f32) -> Self {
-        Self([red, green, blue, alpha])
-    }
-
-    #[must_use]
-    pub const fn as_array(self) -> [f32; 4] {
-        self.0
-    }
-}
+pub use argui_core::Color as TextColor;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub enum FontFamily {
@@ -56,6 +36,7 @@ impl Default for TextStyle {
 pub struct TextBlock {
     pub text: String,
     pub bounds: Rect,
+    pub clip: Rect,
     pub style: TextStyle,
 }
 
@@ -65,6 +46,7 @@ impl TextBlock {
         Self {
             text: text.into(),
             bounds,
+            clip: bounds,
             style: TextStyle::default(),
         }
     }
@@ -97,6 +79,12 @@ impl TextBlock {
     #[must_use]
     pub const fn weight(mut self, weight: u16) -> Self {
         self.style.weight = weight;
+        self
+    }
+
+    #[must_use]
+    pub const fn clip(mut self, clip: Rect) -> Self {
+        self.clip = clip;
         self
     }
 }

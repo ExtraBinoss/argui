@@ -168,9 +168,15 @@ impl Application {
             self.renderer_announced = true;
         }
 
-        let rendered = match self.prepared_text.as_ref() {
-            Some(text) => renderer.render_text(&mut self.text_engine, text),
-            None => renderer.render(),
+        let rendered = match (self.prepared_text.as_ref(), self.ui_layout.as_ref()) {
+            (Some(text), Some(layout)) => renderer.render_ui(
+                &mut self.text_engine,
+                text,
+                &layout.display_list,
+                self.scale_factor,
+            ),
+            (Some(text), None) => renderer.render_text(&mut self.text_engine, text),
+            (None, _) => renderer.render(),
         };
         let result = match rendered {
             Ok(RenderStatus::Presented | RenderStatus::Skipped) => Ok(()),

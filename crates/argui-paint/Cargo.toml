@@ -1,5 +1,5 @@
 [package]
-name = "argui-layout"
+name = "argui-paint"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -7,10 +7,6 @@ license.workspace = true
 
 [dependencies]
 argui-core.workspace = true
-argui-paint.workspace = true
-argui-text.workspace = true
-argui-ui.workspace = true
-taffy.workspace = true
 
 [lints]
 workspace = true

@@ -11,6 +11,7 @@ license = "MIT OR Apache-2.0"
 [workspace.dependencies]
 argui-core = { path = "crates/argui-core" }
 argui-layout = { path = "crates/argui-layout" }
+argui-paint = { path = "crates/argui-paint" }
 argui-platform = { path = "crates/argui-platform" }
 argui-render = { path = "crates/argui-render" }
 argui-runtime = { path = "crates/argui-runtime" }

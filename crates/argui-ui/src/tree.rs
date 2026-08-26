@@ -1,3 +1,4 @@
+use argui_paint::{Border, ClipBehavior, Color, CornerRadii, Fill, PaintStyle};
 use argui_text::TextStyle;
 
 use crate::{Align, Direction, Edges, Justify, LayoutStyle, Length};
@@ -13,6 +14,7 @@ pub struct Element {
     pub key: Option<String>,
     pub kind: ElementKind,
     pub style: LayoutStyle,
+    pub paint: PaintStyle,
     pub children: Vec<Self>,
 }
 
@@ -23,6 +25,7 @@ impl Element {
             key: None,
             kind: ElementKind::Container,
             style: LayoutStyle::default(),
+            paint: PaintStyle::default(),
             children: children.into_iter().collect(),
         }
     }
@@ -46,6 +49,7 @@ impl Element {
                 style: TextStyle::default(),
             },
             style: LayoutStyle::default(),
+            paint: PaintStyle::default(),
             children: Vec::new(),
         }
     }
@@ -70,6 +74,18 @@ impl Element {
     #[must_use]
     pub fn layout_style(mut self, style: LayoutStyle) -> Self {
         self.style = style;
+        self
+    }
+
+    #[must_use]
+    pub const fn paint_style(mut self, style: PaintStyle) -> Self {
+        self.paint = style;
+        self
+    }
+
+    #[must_use]
+    pub const fn fill(mut self, fill: Fill) -> Self {
+        self.paint.background = Some(fill);
         self
     }
 
@@ -118,6 +134,36 @@ impl Element {
     #[must_use]
     pub const fn grow(mut self, grow: f32) -> Self {
         self.style.grow = grow;
+        self
+    }
+
+    #[must_use]
+    pub const fn background(mut self, color: Color) -> Self {
+        self = self.fill(Fill::Solid(color));
+        self
+    }
+
+    #[must_use]
+    pub const fn border(mut self, border: Border) -> Self {
+        self.paint.border = Some(border);
+        self
+    }
+
+    #[must_use]
+    pub const fn radius(mut self, radii: CornerRadii) -> Self {
+        self.paint.radii = radii;
+        self
+    }
+
+    #[must_use]
+    pub const fn paint_opacity(mut self, opacity: f32) -> Self {
+        self.paint.opacity = opacity;
+        self
+    }
+
+    #[must_use]
+    pub const fn clip(mut self, clip: ClipBehavior) -> Self {
+        self.paint.clip = clip;
         self
     }
 }

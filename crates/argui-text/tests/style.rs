@@ -10,7 +10,8 @@ fn text_builders_keep_layout_ready_style() {
         .line_height(32.0)
         .color(color)
         .family(FontFamily::Named("Inter".into()))
-        .weight(700);
+        .weight(700)
+        .clip(Rect::new(Point::new(8.0, 12.0), Size::new(80.0, 20.0)));
 
     assert_eq!(block.text, "Argui");
     assert_eq!(block.bounds, bounds);
@@ -19,6 +20,7 @@ fn text_builders_keep_layout_ready_style() {
     assert_eq!(block.style.color.as_array(), [0.1, 0.2, 0.3, 0.4]);
     assert_eq!(block.style.family, FontFamily::Named("Inter".into()));
     assert_eq!(block.style.weight, 700);
+    assert_eq!(block.clip.origin, Point::new(8.0, 12.0));
     assert_eq!(
         TextColor::rgb(0.1, 0.2, 0.3).as_array(),
         [0.1, 0.2, 0.3, 1.0]

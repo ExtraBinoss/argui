@@ -1,4 +1,5 @@
 use argui_core::{Point, Rect, Size};
+use argui_paint::{Border, ClipBehavior, Color, DisplayList, Fill, Quad};
 use argui_text::{TextBlock, TextEngine, TextScene};
 use argui_ui::{
     Align, Direction, Edges, Element, ElementKind, Justify, LayoutStyle, Length, UiTree,
@@ -20,6 +21,7 @@ pub struct LayoutNode {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct LayoutOutput {
     pub nodes: Vec<LayoutNode>,
+    pub display_list: DisplayList,
     pub text: TextScene,
 }
 
@@ -94,7 +96,14 @@ impl LayoutEngine {
         )?;
 
         let mut output = LayoutOutput::default();
-        collect_layout(&self.tree, root, &elements, Point::default(), &mut output)?;
+        collect_layout(
+            &self.tree,
+            root,
+            &elements,
+            Point::default(),
+            Some(Rect::new(Point::default(), viewport)),
+            &mut output,
+        )?;
         ui.mark_layout_clean();
         Ok(output)
     }
@@ -140,6 +149,7 @@ fn collect_layout(
     node: &NodeMap,
     elements: &[&Element],
     parent: Point,
+    clip: Option<Rect>,
     output: &mut LayoutOutput,
 ) -> Result<(), LayoutError> {
     let layout = tree.layout(node.id)?;
@@ -149,13 +159,52 @@ fn collect_layout(
         index: node.index,
         bounds,
     });
-    if let ElementKind::Text { content, style } = &elements[node.index].kind {
-        let mut block = TextBlock::new(content, bounds);
-        block.style = style.clone();
-        output.text.push(block);
+    let element = elements[node.index];
+    if element.paint.is_visible()
+        && let Some(clip) = clip.and_then(|clip| clip.intersection(bounds))
+    {
+        output.display_list.push_quad(Quad {
+            bounds,
+            background: match element.paint.background {
+                Some(Fill::Solid(color)) => color,
+                None => Color::TRANSPARENT,
+            },
+            border: element
+                .paint
+                .border
+                .unwrap_or(Border::all(0.0, Color::TRANSPARENT)),
+            radii: element.paint.radii,
+            opacity: element.paint.opacity,
+            clip,
+        });
     }
+    if let ElementKind::Text { content, style } = &element.kind {
+        let text_bounds = Rect::new(
+            Point::new(
+                origin.x + layout.padding.left,
+                origin.y + layout.padding.top,
+            ),
+            Size::new(
+                (layout.size.width - layout.padding.left - layout.padding.right).max(0.0),
+                (layout.size.height - layout.padding.top - layout.padding.bottom).max(0.0),
+            ),
+        );
+        if let Some(text_clip) = clip.and_then(|clip| clip.intersection(text_bounds)) {
+            let mut block = TextBlock::new(content, text_bounds);
+            block.clip = text_clip;
+            block.style = style.clone();
+            output.text.push(block);
+            output
+                .display_list
+                .push_text(output.text.blocks().len() - 1);
+        }
+    }
+    let child_clip = match element.paint.clip {
+        ClipBehavior::None => clip,
+        ClipBehavior::Bounds => clip.and_then(|clip| clip.intersection(bounds)),
+    };
     for child in &node.children {
-        collect_layout(tree, child, elements, origin, output)?;
+        collect_layout(tree, child, elements, origin, child_clip, output)?;
     }
     Ok(())
 }

@@ -1,7 +1,7 @@
 use argui_core::Size;
 use argui_layout::LayoutEngine;
 use argui_text::{TextEngine, TextStyle};
-use argui_ui::{Edges, Element, Length, UiTree};
+use argui_ui::{Color, Edges, Element, Length, UiTree};
 
 const NOTO_SANS: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
 
@@ -21,7 +21,8 @@ fn taffy_layout_uses_real_text_measurement_and_viewport_constraints() {
     })])
     .width(Length::Percent(1.0))
     .height(Length::Percent(1.0))
-    .padding(Edges::all(20.0));
+    .padding(Edges::all(20.0))
+    .background(Color::rgb(0.1, 0.2, 0.3));
     let mut ui = UiTree::new(root);
     let mut layout = LayoutEngine::new();
     let mut text = text_engine();
@@ -38,4 +39,6 @@ fn taffy_layout_uses_real_text_measurement_and_viewport_constraints() {
     assert!(narrow.text.blocks()[0].bounds.size.width < wide.text.blocks()[0].bounds.size.width);
     assert!(narrow.text.blocks()[0].bounds.size.height > wide.text.blocks()[0].bounds.size.height);
     assert!(!ui.layout_dirty());
+    assert_eq!(wide.display_list.quad_count(), 1);
+    assert_eq!(wide.display_list.commands().len(), 2);
 }

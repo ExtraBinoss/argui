@@ -77,7 +77,10 @@ impl TextEngine {
     }
 
     pub fn prepare(&mut self, scene: &TextScene, scale_factor: f32) -> PreparedText {
-        let mut prepared = PreparedText::default();
+        let mut prepared = PreparedText {
+            blocks: scene.blocks().len(),
+            ..PreparedText::default()
+        };
         for (block_index, block) in scene.blocks().iter().enumerate() {
             let metrics = Metrics::new(block.style.font_size, block.style.line_height);
             let mut buffer = Buffer::new(&mut self.fonts, metrics);
@@ -97,10 +100,10 @@ impl TextEngine {
             let offset_x = block.bounds.origin.x * scale_factor;
             let offset_y = block.bounds.origin.y * scale_factor;
             let clip = [
-                offset_x,
-                offset_y,
-                (block.bounds.origin.x + block.bounds.size.width) * scale_factor,
-                (block.bounds.origin.y + block.bounds.size.height) * scale_factor,
+                block.clip.origin.x * scale_factor,
+                block.clip.origin.y * scale_factor,
+                (block.clip.origin.x + block.clip.size.width) * scale_factor,
+                (block.clip.origin.y + block.clip.size.height) * scale_factor,
             ];
             for run in buffer.layout_runs() {
                 for glyph in run.glyphs {

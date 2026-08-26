@@ -3,5 +3,6 @@
 mod style;
 mod tree;
 
+pub use argui_paint::{Border, BorderWidths, ClipBehavior, Color, CornerRadii, Fill, PaintStyle};
 pub use style::{Align, Direction, Edges, Justify, LayoutStyle, Length};
 pub use tree::{Element, ElementKind, UiTree};

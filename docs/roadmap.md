@@ -20,14 +20,20 @@ check before the next feature starts.
    style model maps to `taffy`; Cosmic Text performs constrained intrinsic
    measurement and native/web viewport changes share one reflow path. Add
    per-subtree invalidation and intrinsic measurement caching as the tree grows.
-6. **Widgets.** Compose primitives into text, containers, buttons, input, scroll,
+6. **Paint primitives — implemented.** Ordered quads and text, solid fills,
+   per-side borders, per-corner radii, primitive opacity, nested rectangular
+   clipping, analytic GPU antialiasing, and compatible-command batching work on
+   native and web. Gradients, images, transforms, and shadows extend this layer.
+7. **Widgets.** Compose primitives into text, containers, buttons, input, scroll,
    overlays, and accessibility nodes without renderer-specific widget code.
-7. **Layers and effects.** Stacking contexts, z-index, clips, transforms, opacity,
-   shadows, filters, and backdrop filters. Reuse off-screen textures with bounded
-   pools and allocate layers only when semantics require them.
-8. **Animation.** Typed transitions, keyframes, spring/timeline scheduling, and
+8. **Layers and effects.** Follow the staged [effects plan](effects.md): declarative
+   layer commands in `argui-paint`, a render graph and bounded texture pool in
+   `argui-render`, then group opacity, masks, shadows, filters, destination-aware
+   blend modes, backdrop filters, and a stable custom-WGSL ABI. Allocate layers
+   only when their semantics require them.
+9. **Animation.** Typed transitions, keyframes, spring/timeline scheduling, and
    separation of paint-only animation from layout-invalidating animation.
-9. **Optional DSL.** A separate parser/compiler lowering into the same public UI
+10. **Optional DSL.** A separate parser/compiler lowering into the same public UI
    tree used by Rust builders. No runtime or renderer dependency on the DSL.
 
 The first useful milestone is steps 1–3: a configurable window rendering correct,

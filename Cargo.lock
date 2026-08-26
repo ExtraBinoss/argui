@@ -77,6 +77,7 @@ version = "0.1.0"
 dependencies = [
  "argui-core",
  "argui-layout",
+ "argui-paint",
  "argui-platform",
  "argui-render",
  "argui-runtime",
@@ -93,9 +94,17 @@ name = "argui-layout"
 version = "0.1.0"
 dependencies = [
  "argui-core",
+ "argui-paint",
  "argui-text",
  "argui-ui",
  "taffy",
+]
+
+[[package]]
+name = "argui-paint"
+version = "0.1.0"
+dependencies = [
+ "argui-core",
 ]
 
 [[package]]
@@ -109,6 +118,8 @@ dependencies = [
 name = "argui-render"
 version = "0.1.0"
 dependencies = [
+ "argui-core",
+ "argui-paint",
  "argui-text",
  "bytemuck",
  "wgpu",
@@ -141,6 +152,7 @@ dependencies = [
 name = "argui-ui"
 version = "0.1.0"
 dependencies = [
+ "argui-paint",
  "argui-text",
 ]
 

@@ -16,6 +16,7 @@ pub struct PreparedGlyph {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct PreparedText {
+    pub blocks: usize,
     pub glyphs: Vec<PreparedGlyph>,
 }
 

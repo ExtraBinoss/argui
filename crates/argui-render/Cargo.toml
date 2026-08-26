@@ -6,9 +6,13 @@ rust-version.workspace = true
 license.workspace = true
 
 [dependencies]
+argui-paint.workspace = true
 argui-text.workspace = true
 bytemuck.workspace = true
 wgpu.workspace = true
+
+[dev-dependencies]
+argui-core.workspace = true
 
 [lints]
 workspace = true

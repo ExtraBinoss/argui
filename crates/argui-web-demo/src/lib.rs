@@ -1,6 +1,7 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
 use argui::{
+    paint::{Border, ClipBehavior, Color, CornerRadii},
     platform::WindowConfig,
     render::RendererConfig,
     runtime::run_ui_with_text_engine,
@@ -39,6 +40,12 @@ fn ui() -> UiTree {
                 "One retained Rust tree, responsive Taffy layout, Cosmic Text and WGPU — no WebView, no TypeScript UI.",
             )
             .text_style(text_style(22.0, TextColor::WHITE, 400)),
+            Element::text("GPU INSTANCED · ZERO WEBVIEW")
+                .text_style(text_style(14.0, TextColor::rgb(0.7, 0.95, 0.78), 700))
+                .padding(Edges::symmetric(12.0, 7.0))
+                .background(Color::rgb(0.08, 0.22, 0.16))
+                .border(Border::all(1.0, Color::rgb(0.18, 0.5, 0.34)))
+                .radius(CornerRadii::all(10.0)),
             Element::text("Unicode: café · العربية · שלום")
                 .text_style(text_style(30.0, TextColor::rgb(1.0, 0.72, 0.38), 500)),
             Element::text("resize(browser) -> same_tree.new_layout()")
@@ -48,7 +55,17 @@ fn ui() -> UiTree {
                 }),
         ])
         .layout_style(panel)
-        .gap(24.0)])
+        .padding(Edges::all(30.0))
+        .gap(24.0)
+        .background(Color::rgb(0.075, 0.095, 0.135))
+        .border(Border::all(1.5, Color::rgb(0.18, 0.28, 0.4)))
+        .radius(CornerRadii {
+            top_left: 28.0,
+            top_right: 12.0,
+            bottom_right: 28.0,
+            bottom_left: 12.0,
+        })
+        .clip(ClipBehavior::Bounds)])
         .width(Length::Percent(1.0))
         .height(Length::Percent(1.0))
         .align(Align::Center)
