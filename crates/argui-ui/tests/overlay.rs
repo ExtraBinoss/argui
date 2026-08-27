@@ -53,3 +53,23 @@ fn transient_tiny_viewports_and_external_anchors_never_invert_clamp_bounds() {
     assert_eq!(placed.bounds, rect(0.0, 0.0, 0.0, 0.0));
     assert_eq!(placed.max_size, Size::new(0.0, 0.0));
 }
+
+#[test]
+fn subpixel_viewports_tolerate_a_one_ulp_inverted_interval() {
+    let viewport = rect(13.641_06, 0.0, 428.0, 500.0);
+    let placed = OverlayPlacement::new(PlacementSide::Bottom)
+        .gap(12.0)
+        .margin(14.0)
+        .place(
+            viewport,
+            rect(120.0, 100.0, 80.0, 30.0),
+            Size::new(400.0, 100.0),
+        );
+
+    assert!(placed.bounds.origin.x.is_finite());
+    assert!(placed.bounds.origin.x >= viewport.origin.x + 14.0);
+    assert!(
+        placed.bounds.origin.x + placed.bounds.size.width
+            <= viewport.origin.x + viewport.size.width - 14.0 + f32::EPSILON * 512.0
+    );
+}

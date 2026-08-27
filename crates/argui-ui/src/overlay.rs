@@ -119,8 +119,8 @@ impl OverlayPlacement {
         );
         let origin = origin(side, self.align, anchor, size, self.gap);
         let origin = Point::new(
-            origin.x.clamp(inner.origin.x, right(inner) - size.width),
-            origin.y.clamp(inner.origin.y, bottom(inner) - size.height),
+            clamp_axis(origin.x, inner.origin.x, right(inner) - size.width),
+            clamp_axis(origin.y, inner.origin.y, bottom(inner) - size.height),
         );
         PlacedOverlay {
             side,
@@ -206,6 +206,13 @@ fn align_axis(origin: f32, anchor: f32, overlay: f32, align: OverlayAlign) -> f3
         OverlayAlign::Center => origin + (anchor - overlay) * 0.5,
         OverlayAlign::End => origin + anchor - overlay,
     }
+}
+
+fn clamp_axis(value: f32, minimum: f32, maximum: f32) -> f32 {
+    // Reassociating `(origin + size) - size` can land a few ULPs below
+    // `origin`. `f32::clamp` treats that harmless rounding error as an invalid
+    // interval and panics, so collapse a transiently inverted interval first.
+    value.max(minimum).min(maximum.max(minimum))
 }
 
 fn inset_rect(rect: Rect, margin: f32) -> Rect {
