@@ -1,6 +1,6 @@
 use argui_core::{Point, Rect, ScrollDelta, Size, TextPosition};
 use argui_layout::LayoutEngine;
-use argui_paint::{CornerRadii, DisplayCommand, PaintStyle, QuadStyle};
+use argui_paint::{CornerRadii, DisplayCommand, LayerStyle, PaintStyle, QuadStyle};
 use argui_text::{TextEngine, TextStyle};
 use argui_ui::{
     Button, ButtonStyle, Color, Edges, Element, Inset, Interaction, Length, ScrollConfig,
@@ -37,8 +37,8 @@ fn interaction_repaint_reuses_layout_and_shaped_text() {
     assert!(output.text.blocks()[0].clip.size.width > output.text.blocks()[0].bounds.size.width);
     assert_ne!(output.display_list.commands()[0], base);
     assert!(matches!(
-        output.display_list.commands()[0],
-        DisplayCommand::Quad(quad) if quad.background == Color::WHITE
+        &output.display_list.commands()[0],
+        DisplayCommand::Quad(quad) if quad.background == Some(argui_paint::Fill::Solid(Color::WHITE))
     ));
 }
 
@@ -275,19 +275,30 @@ fn scrollbar_is_regular_paint_with_geometry_from_the_scroll_state() {
     .keyed("scroll")
     .width(Length::Px(200.0))
     .height(Length::Px(100.0))
-    .scrollable(ScrollConfig::default().scrollbar(style));
+    .scrollable(ScrollConfig::default().scrollbar(style))
+    .layer(LayerStyle::new(Default::default()).opacity(0.8));
     let mut ui = UiTree::new(root);
     let mut layout = LayoutEngine::new();
     let mut text = text_engine();
     let mut output = layout
         .compute(&mut ui, &mut text, Size::new(200.0, 100.0))
         .unwrap();
-    let initial = output.scroll_regions[0].scrollbar.unwrap();
+    let initial = output.scroll_regions[0].scrollbar.as_ref().unwrap();
 
     assert_eq!(initial.track.size, Size::new(8.0, 92.0));
     assert_eq!(initial.track.origin, Point::new(188.0, 4.0));
     assert!(initial.thumb.size.height > 20.0);
+    let initial_thumb_y = initial.thumb.origin.y;
     assert_eq!(output.display_list.quad_count(), 2);
+    assert!(matches!(
+        output.display_list.commands(),
+        [
+            DisplayCommand::BeginLayer(_),
+            DisplayCommand::Quad(_),
+            DisplayCommand::Quad(_),
+            DisplayCommand::EndLayer
+        ]
+    ));
 
     ui.scroll(
         Point::new(10.0, 10.0),
@@ -295,8 +306,8 @@ fn scrollbar_is_regular_paint_with_geometry_from_the_scroll_state() {
         &output.scroll_regions,
     );
     layout.apply_scroll(&ui, &mut output).unwrap();
-    let moved = output.scroll_regions[0].scrollbar.unwrap();
-    assert!(moved.thumb.origin.y > initial.thumb.origin.y);
+    let moved = output.scroll_regions[0].scrollbar.as_ref().unwrap();
+    assert!(moved.thumb.origin.y > initial_thumb_y);
 }
 
 #[test]
@@ -448,8 +459,8 @@ fn sibling_z_index_controls_paint_and_hit_test_order() {
         .unwrap();
 
     assert!(matches!(
-        output.display_list.commands()[0],
-        DisplayCommand::Quad(quad) if quad.background == low
+        &output.display_list.commands()[0],
+        DisplayCommand::Quad(quad) if quad.background == Some(argui_paint::Fill::Solid(low))
     ));
     assert_eq!(
         output.hit_regions.last().unwrap().node,

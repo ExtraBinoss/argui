@@ -1,4 +1,4 @@
-use argui_core::{Color, Point, Rect, Size};
+use argui_core::{Color, Point, Rect, Size, Transform2D};
 use std::fmt;
 
 pub trait MotionValue: Copy + PartialEq {
@@ -136,6 +136,52 @@ impl MotionValue for Color {
             .map(|channel| f64::from(channel).powi(2))
             .sum::<f64>()
             .sqrt()
+    }
+}
+
+impl MotionValue for Transform2D {
+    fn zero() -> Self {
+        Self {
+            translation: Point::default(),
+            scale: Point::default(),
+            rotation: 0.0,
+            skew: Point::default(),
+        }
+    }
+
+    fn add(self, other: Self) -> Self {
+        Self {
+            translation: self.translation.add(other.translation),
+            scale: self.scale.add(other.scale),
+            rotation: self.rotation + other.rotation,
+            skew: self.skew.add(other.skew),
+        }
+    }
+
+    fn subtract(self, other: Self) -> Self {
+        Self {
+            translation: self.translation.subtract(other.translation),
+            scale: self.scale.subtract(other.scale),
+            rotation: self.rotation - other.rotation,
+            skew: self.skew.subtract(other.skew),
+        }
+    }
+
+    fn scale(self, factor: f64) -> Self {
+        Self {
+            translation: self.translation.scale(factor),
+            scale: self.scale.scale(factor),
+            rotation: self.rotation * factor as f32,
+            skew: self.skew.scale(factor),
+        }
+    }
+
+    fn magnitude(self) -> f64 {
+        self.translation
+            .magnitude()
+            .hypot(self.scale.magnitude())
+            .hypot(f64::from(self.rotation))
+            .hypot(self.skew.magnitude())
     }
 }
 

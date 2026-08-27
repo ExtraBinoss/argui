@@ -3,11 +3,23 @@ mod pipeline;
 use argui_core::Rect;
 use argui_paint::{BlendMode, LayerMask};
 
+use crate::target::PixelRegion;
+
+pub(crate) use pipeline::validated_custom_source;
 pub(crate) use pipeline::{EffectDraw, EffectGpu, EffectUniform};
 
-pub(crate) fn uniform(viewport: [f32; 2], bounds: Rect) -> EffectUniform {
+pub(crate) fn uniform(
+    viewport: [f32; 2],
+    target: PixelRegion,
+    source: PixelRegion,
+    backdrop: PixelRegion,
+    bounds: Rect,
+) -> EffectUniform {
     EffectUniform {
         viewport,
+        target: target.as_f32(),
+        source: source.as_f32(),
+        backdrop: backdrop.as_f32(),
         bounds: [
             bounds.origin.x,
             bounds.origin.y,

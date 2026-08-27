@@ -1,54 +1,104 @@
-# Build roadmap
+# Remaining roadmap
 
-Each step ends with tests, the quality gate, native profiling, and a WASM compile
-check before the next feature starts.
+Argui already has the native/WASM foundation: `winit`, WGPU surfaces, retained
+state, Taffy layout, Cosmic Text shaping and editing, interaction, clipping,
+scroll, fixed-row virtualization, animations and physics, transforms, arbitrary
+linear/radial gradients, bounded image textures, scoped GPU layers, custom
+WGSL, and optional effect presets.
 
-1. **Window shell — implemented.** Open one `winit` window/canvas. Configure title, size,
-   decorations, resizing, and transparency; translate close, resize, scale, and
-   redraw events. Verify zero continuous redraw while idle.
-2. **WGPU surface — implemented.** Select an adapter, configure/reconfigure the surface, clear,
-   and present on native and web. Recover cleanly from lost/outdated surfaces.
-3. **Text — rendering and single-line editing implemented.** Shape bidi/fallback text
-   with `cosmic-text`; use a bounded reusable glyph atlas, one instanced batch,
-   and per-block clipping. Caret geometry, grapheme-safe selection/editing, IME,
-   and native/web clipboard behavior share that shaped representation. Add
-   multiline editing and richer composition decoration next. See
-   [text input](text_input.md).
-4. **Retained state and interaction — foundation implemented.** Persistent keyed elements,
-   stable reconciled `NodeId`s, revision tracking, clipped reverse-order hit
-   testing, hover/press/focus state, pointer capture, UI events, and paint-only
-   invalidation are present. `UiApp` now updates plain Rust state and rebuilds a
-   view classified as no work, repaint, or relayout. Keyboard focus traversal is
-   present. Add reusable local component state, touch, and accessibility integration.
-5. **Layout — responsive foundation implemented.** A small renderer-independent
-   style model maps to `taffy`; Cosmic Text performs constrained intrinsic
-   measurement and native/web viewport changes share one reflow path. Add
-   per-subtree invalidation and intrinsic measurement caching as the tree grows.
-6. **Paint primitives — implemented.** Ordered quads and text, solid fills,
-   per-side borders, per-corner radii, primitive opacity, nested rectangular
-   clipping, analytic GPU antialiasing, and compatible-command batching work on
-   native and web. Gradients, images, transforms, and shadows extend this layer.
-7. **Widgets — interaction, scroll, and overlays implemented.** `Button`
-   composes layout, paint, text, and interaction. Retained nested scroll regions,
-   configurable wheel polarity, fast geometry translation, stable z-index,
-   absolute overlays, draggable frame-coalesced scrollbars, and fixed-row virtual
-   lists and a composed single-line `TextInput` share native and web code. Add
-   variable-row virtualization, reusable state ownership, focus traps, controlled
-   inputs, and accessibility nodes. See the [scroll model](scroll.md).
-8. **Layers and effects — implemented.** Declarative nested layers, a render
-   graph, bounded texture pool, blend modes, Gaussian blur, drop/inset shadows,
-   color and backdrop filters, refraction, rounded masks, and validated cached
-   custom WGSL work on the shared native/WASM path. See the remaining
-   optimization and high-level registration work in the [effects guide](effects.md).
-9. **Animation — physics implemented.** Follow the staged
-   [animation plan](animation.md): paint transforms are next, followed by layout
-   transitions, caret/scroll consumers, and shader parameters. Typed keyframes,
-   implicit paint transitions, orchestration, deterministic composition,
-   analytical springs, decay, bounded inertia, velocity-preserving retargeting,
-   and idle-aware scheduling already share one native/WASM implementation.
-10. **Optional DSL.** A separate parser/compiler lowering into the same public UI
-   tree used by Rust builders. No runtime or renderer dependency on the DSL.
+This document tracks only unfinished product work. Detailed invariants stay in
+their dedicated documents and completed milestones are not repeated here.
 
-The first useful milestone is steps 1–3: a configurable window rendering correct,
-selectable text on native and web. It validates the riskiest seams before growing
-the widget system.
+## 0. Integrated DevTools — foundation implemented
+
+- Implemented: optional `argui-inspect` protocol, reusable `DevtoolsHost<A>`,
+  resizable bottom dock, virtualized searchable Elements tree, stable selection,
+  bounds highlight, reversible typed style switches, bounded frame timeline,
+  CPU stages, effect passes, offscreen pixels and texture-pool diagnostics.
+- Next: expand/collapse and picker mode; richer authored/resolved style editors;
+  per-node/effect cost ranking; optional GPU timestamps; trace export/import;
+  keyboard and accessibility hardening.
+- The controller/frontend split already keeps a later detached native window
+  independent from runtime and renderer internals.
+
+Done when the current popover stall can be isolated from the dock without
+console logs, and disabled DevTools preserve the existing idle fast path.
+
+## 1. Text and form controls
+
+- Add multiline editing, selection, vertical caret navigation, scrolling, and
+  richer IME composition decoration.
+- Add controlled text-input values without losing retained selection or IME
+  state.
+- Build textarea, checkbox, slider, menu/select, and reusable modal/popover
+  behavior from existing primitives.
+- Add focus traps, focus restoration, and keyboard navigation for overlays.
+
+Done when complex text remains grapheme-safe and bidi-correct, and every control
+shares one behavior on native and web.
+
+## 2. Retained state and large-tree performance
+
+- Add reusable component-local state ownership keyed by stable identity.
+- Invalidate layout and paint per subtree instead of rebuilding global outputs.
+- Cache intrinsic text and widget measurements with explicit invalidation.
+- Extend virtual lists to variable row heights while keeping bounded work and
+  memory for million-item data sets.
+
+Done when profiling demonstrates work proportional to the changed/visible
+subtree rather than total tree size.
+
+## 3. Input and accessibility
+
+- Normalize touch, multitouch, and gesture input without imposing a gesture
+  policy on applications.
+- Emit semantic accessibility nodes, roles, labels, values, actions, and focus
+  updates for native accessibility APIs and the browser target.
+- Verify keyboard-only, screen-reader, reduced-motion, and high-contrast paths.
+
+Done when composed widgets expose semantics without renderer knowledge and the
+same Rust tree drives native and browser accessibility.
+
+## 4. Animation ergonomics
+
+- Bind typed animation values directly to transforms, layout properties,
+  scroll, caret presentation, and effect parameters.
+- Add concise declarations for animated custom-effect parameters while keeping
+  raw `Timeline<T>`, spring, decay, and inertia APIs available.
+- Define interruption and composition behavior for property-level animations.
+
+The engine, scheduler, keyframes, orchestration, implicit paint transitions,
+springs, decay, and inertia are already implemented. This step is API wiring,
+not another timing engine.
+
+## 5. GPU hardening
+
+- Add optional GPU timestamp queries where adapters expose them.
+- Add deterministic golden images for transforms, gradients, rounded masks,
+  liquid glass, refraction, shadows, and custom outer effects.
+- Profile representative native and browser scenes before adding more fused or
+  specialized pipelines.
+- Tune cropped targets, texture-pool limits, and effect quality from measured
+  GPU time and memory rather than guesses.
+
+## 6. Optional DSL — last
+
+- Build a separate parser/compiler that lowers into the same public `Element`,
+  layout, scoped-effect, and animation APIs used by Rust builders.
+- Keep parsing, diagnostics, hot reload, and tooling outside the runtime and
+  renderer crates.
+- Ensure every DSL feature has an equivalent direct Rust representation.
+
+The DSL starts only after the underlying Rust APIs for transforms, widgets,
+state, and accessibility are stable enough to avoid encoding temporary designs.
+
+## Acceptance gate
+
+Every roadmap item must:
+
+- behave through the same application tree on native and WASM;
+- preserve the idle/no-effect fast paths;
+- include focused CPU tests and GPU tests where pixels matter;
+- keep every Rust file below 600 lines;
+- pass `./scripts/quality.sh` with at least 85% branches, functions, lines, and
+  regions.

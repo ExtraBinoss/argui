@@ -1,0 +1,14 @@
+[package]
+name = "argui-image"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+argui-paint.workspace = true
+image.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

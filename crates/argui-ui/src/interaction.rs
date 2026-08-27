@@ -1,5 +1,5 @@
-use argui_core::{Point, Rect};
-use argui_paint::QuadStyle;
+use argui_core::{Affine2D, Point, Rect};
+use argui_paint::{ClipChain, QuadStyle};
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct NodeId(u64);
@@ -24,14 +24,14 @@ pub enum VisualState {
     Focused,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct InteractionStyles {
     pub hovered: Option<QuadStyle>,
     pub pressed: Option<QuadStyle>,
     pub focused: Option<QuadStyle>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Interaction {
     pub enabled: bool,
     pub focusable: bool,
@@ -50,53 +50,78 @@ impl Default for Interaction {
 
 impl Interaction {
     #[must_use]
+    pub const fn enabled(mut self, enabled: bool) -> Self {
+        self.enabled = enabled;
+        self
+    }
+
+    /// Creates a non-focusable hit target useful for popovers and other
+    /// surfaces that must occlude pointer input behind them.
+    #[must_use]
+    pub const fn blocker() -> Self {
+        Self {
+            enabled: true,
+            focusable: false,
+            styles: InteractionStyles {
+                hovered: None,
+                pressed: None,
+                focused: None,
+            },
+        }
+    }
+
+    #[must_use]
     pub const fn focusable(mut self, focusable: bool) -> Self {
         self.focusable = focusable;
         self
     }
 
     #[must_use]
-    pub const fn hovered(mut self, style: QuadStyle) -> Self {
+    pub fn hovered(mut self, style: QuadStyle) -> Self {
         self.styles.hovered = Some(style);
         self
     }
 
     #[must_use]
-    pub const fn pressed(mut self, style: QuadStyle) -> Self {
+    pub fn pressed(mut self, style: QuadStyle) -> Self {
         self.styles.pressed = Some(style);
         self
     }
 
     #[must_use]
-    pub const fn focused(mut self, style: QuadStyle) -> Self {
+    pub fn focused(mut self, style: QuadStyle) -> Self {
         self.styles.focused = Some(style);
         self
     }
 
     #[must_use]
-    pub fn resolve(self, base: QuadStyle, state: VisualState) -> QuadStyle {
+    pub fn resolve(&self, base: QuadStyle, state: VisualState) -> QuadStyle {
         match state {
-            VisualState::Pressed => self.styles.pressed,
-            VisualState::Hovered => self.styles.hovered,
-            VisualState::Focused => self.styles.focused,
+            VisualState::Pressed => self.styles.pressed.clone(),
+            VisualState::Hovered => self.styles.hovered.clone(),
+            VisualState::Focused => self.styles.focused.clone(),
             VisualState::Rest => None,
         }
         .unwrap_or(base)
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct HitRegion {
     pub node: NodeId,
     pub bounds: Rect,
-    pub clip: Rect,
+    pub transform: Affine2D,
+    pub clips: ClipChain,
     pub focusable: bool,
 }
 
 impl HitRegion {
     #[must_use]
-    pub fn contains(self, point: Point) -> bool {
-        self.bounds.contains(point) && self.clip.contains(point)
+    pub fn contains(&self, point: Point) -> bool {
+        self.transform
+            .inverse()
+            .is_some_and(|inverse| self.bounds.contains(inverse.transform_point(point)))
+            && self.clips.contains(point)
     }
 }
 
@@ -296,10 +321,6 @@ impl InteractionState {
     }
 }
 
-fn hit_test(regions: &[HitRegion], point: Point) -> Option<HitRegion> {
-    regions
-        .iter()
-        .rev()
-        .copied()
-        .find(|region| region.contains(point))
+fn hit_test(regions: &[HitRegion], point: Point) -> Option<&HitRegion> {
+    regions.iter().rev().find(|region| region.contains(point))
 }

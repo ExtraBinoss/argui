@@ -1,5 +1,6 @@
 //! Text shaping and font-system boundary.
 
+mod cache;
 mod engine;
 mod input;
 mod layout;

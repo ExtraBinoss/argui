@@ -1,5 +1,5 @@
-use argui_core::{Point, Rect, Size};
-use argui_paint::{Border, Color, DisplayList, Fill, Quad, QuadStyle};
+use argui_core::{Affine2D, Point, Rect, Size};
+use argui_paint::{Border, ClipChain, ClipRegion, Color, DisplayList, Quad, QuadStyle};
 use argui_ui::{NodeId, ScrollConfig, ScrollRegion, ScrollbarRegion};
 
 pub(crate) fn region(
@@ -14,36 +14,40 @@ pub(crate) fn region(
         (content.width - bounds.size.width).max(0.0),
         (content.height - bounds.size.height).max(0.0),
     );
+    let scrollbar = config
+        .scrollbar
+        .clone()
+        .and_then(|style| vertical_bar(bounds, max_offset.y, offset.y, style));
     ScrollRegion {
         node,
         bounds,
         clip,
+        transform: Affine2D::IDENTITY,
+        clips: ClipChain::from_regions([ClipRegion::new(clip, Affine2D::IDENTITY)]),
         max_offset,
         config,
-        scrollbar: config
-            .scrollbar
-            .and_then(|style| vertical_bar(bounds, max_offset.y, offset.y, style)),
+        scrollbar,
     }
 }
 
-pub(crate) fn paint(regions: &[ScrollRegion], display_list: &mut DisplayList) {
-    for region in regions {
-        let Some(scrollbar) = region.scrollbar else {
-            continue;
-        };
-        push_quad(
-            display_list,
-            scrollbar.track,
-            region.clip,
-            scrollbar.style.track,
-        );
-        push_quad(
-            display_list,
-            scrollbar.thumb,
-            region.clip,
-            scrollbar.style.thumb,
-        );
-    }
+pub(crate) fn paint(region: &ScrollRegion, display_list: &mut DisplayList) {
+    let Some(scrollbar) = region.scrollbar.as_ref() else {
+        return;
+    };
+    push_quad(
+        display_list,
+        scrollbar.track,
+        &region.clips,
+        region.transform,
+        scrollbar.style.track.clone(),
+    );
+    push_quad(
+        display_list,
+        scrollbar.thumb,
+        &region.clips,
+        region.transform,
+        scrollbar.style.thumb.clone(),
+    );
 }
 
 fn vertical_bar(
@@ -85,19 +89,23 @@ fn vertical_bar(
     })
 }
 
-fn push_quad(display_list: &mut DisplayList, bounds: Rect, clip: Rect, style: QuadStyle) {
-    if !style.is_visible() || clip.intersection(bounds).is_none() {
+fn push_quad(
+    display_list: &mut DisplayList,
+    bounds: Rect,
+    clips: &ClipChain,
+    transform: Affine2D,
+    style: QuadStyle,
+) {
+    if !style.is_visible() {
         return;
     }
     display_list.push_quad(Quad {
         bounds,
-        background: match style.background {
-            Some(Fill::Solid(color)) => color,
-            None => Color::TRANSPARENT,
-        },
+        background: style.background,
         border: style.border.unwrap_or(Border::all(0.0, Color::TRANSPARENT)),
         radii: style.radii,
         opacity: style.opacity,
-        clip,
+        transform,
+        clips: clips.clone(),
     });
 }

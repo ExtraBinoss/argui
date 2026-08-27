@@ -1,5 +1,6 @@
-use crate::{RuntimeEvent, UiApp, ViewUpdate, app::Application};
+use crate::{AnimationProfile, RuntimeEvent, UiApp, ViewUpdate, app::Application};
 use argui_animation::{AnimationId, Clock, Frame, Scheduler, Time};
+use argui_inspect::{FrameRecord, Invalidation};
 use std::time::Instant;
 use winit::{event_loop::ActiveEventLoop, window::Window};
 
@@ -62,12 +63,15 @@ impl Application {
         let Some(frame) = self.animations.frame() else {
             return;
         };
+        let model_started = Instant::now();
         let rebuild = self
             .model
             .as_mut()
             .is_some_and(|model| model.animation_frame(frame) == ViewUpdate::Rebuild);
+        let model_time = model_started.elapsed();
+        let tree_started = Instant::now();
         let tree_update = if rebuild {
-            let root = self.model.as_ref().map(|model| model.view());
+            let root = self.inspected_view();
             match (root, &mut self.ui_tree) {
                 (Some(root), Some(tree)) => tree.update(root),
                 _ => argui_ui::TreeUpdate::None,
@@ -75,6 +79,8 @@ impl Application {
         } else {
             argui_ui::TreeUpdate::None
         };
+        let tree_time = tree_started.elapsed();
+        let paint_started = Instant::now();
         let paint_animated = self
             .ui_tree
             .as_mut()
@@ -87,8 +93,32 @@ impl Application {
             argui_ui::TreeUpdate::None if paint_animated => self.repaint(),
             argui_ui::TreeUpdate::None => {}
         }
+        let paint_time = paint_started.elapsed();
+        if let Some(inspector) = &self.inspector {
+            inspector.record_ui(FrameRecord {
+                interval: frame.elapsed.into(),
+                model: model_time,
+                tree: tree_time,
+                paint: paint_time,
+                update: match tree_update {
+                    argui_ui::TreeUpdate::None => Invalidation::None,
+                    argui_ui::TreeUpdate::Paint => Invalidation::Paint,
+                    argui_ui::TreeUpdate::Layout => Invalidation::Layout,
+                },
+                ..FrameRecord::default()
+            });
+        }
         if tree_update != argui_ui::TreeUpdate::None {
             (self.on_event)(RuntimeEvent::ViewUpdated(tree_update));
+        }
+        if self.renderer_config.profiling {
+            (self.on_event)(RuntimeEvent::AnimationProfile(AnimationProfile {
+                frame_interval: frame.elapsed.into(),
+                model_time,
+                tree_time,
+                paint_time,
+                tree_update,
+            }));
         }
         self.sync_animations();
         if self.animations.scheduler.needs_frame() {

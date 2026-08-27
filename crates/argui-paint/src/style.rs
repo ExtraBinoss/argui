@@ -1,8 +1,12 @@
-use argui_core::{Color, Rect};
+use argui_core::{Affine2D, Color, Rect};
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+use crate::{ClipChain, ImageFit, ImageId, ImageSampling, LinearGradient, RadialGradient};
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum Fill {
     Solid(Color),
+    Linear(LinearGradient),
+    Radial(RadialGradient),
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -93,7 +97,7 @@ pub enum ClipBehavior {
     Bounds,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct QuadStyle {
     pub background: Option<Fill>,
     pub border: Option<Border>,
@@ -142,12 +146,12 @@ impl QuadStyle {
     }
 
     #[must_use]
-    pub const fn is_visible(self) -> bool {
+    pub const fn is_visible(&self) -> bool {
         self.background.is_some() || self.border.is_some()
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct PaintStyle {
     pub quad: QuadStyle,
     pub clip: ClipBehavior,
@@ -178,17 +182,30 @@ impl PaintStyle {
     }
 
     #[must_use]
-    pub const fn is_visible(self) -> bool {
+    pub const fn is_visible(&self) -> bool {
         self.quad.is_visible()
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Quad {
     pub bounds: Rect,
-    pub background: Color,
+    pub background: Option<Fill>,
     pub border: Border,
     pub radii: CornerRadii,
     pub opacity: f32,
-    pub clip: Rect,
+    pub transform: Affine2D,
+    pub clips: ClipChain,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ImagePrimitive {
+    pub bounds: Rect,
+    pub image: ImageId,
+    pub fit: ImageFit,
+    pub sampling: ImageSampling,
+    pub opacity: f32,
+    pub radii: CornerRadii,
+    pub transform: Affine2D,
+    pub clips: ClipChain,
 }

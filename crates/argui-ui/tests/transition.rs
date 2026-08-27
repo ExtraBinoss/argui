@@ -1,5 +1,9 @@
 use argui_animation::{CubicBezier, Duration, Easing, Time};
-use argui_ui::{Border, Color, CornerRadii, Element, Fill, Transition, TreeUpdate, UiTree};
+use argui_core::Point;
+use argui_ui::{
+    Border, Color, CornerRadii, Element, Fill, GradientStop, LinearGradient, RadialGradient,
+    Transition, TreeUpdate, UiTree,
+};
 
 fn panel(color: Color, radius: f32, opacity: f32) -> Element {
     Element::container([])
@@ -19,6 +23,7 @@ fn background(tree: &UiTree) -> Color {
     let node = tree.node_id_at(0).unwrap();
     match tree.resolved_quad(node, tree.root()).background.unwrap() {
         Fill::Solid(color) => color,
+        Fill::Linear(_) | Fill::Radial(_) => panic!("test panel must remain solid"),
     }
 }
 
@@ -95,4 +100,109 @@ fn zero_duration_and_removed_specs_apply_immediately() {
 
     tree.update(Element::container([]).keyed("panel").background(red));
     assert_eq!(background(&tree), red);
+}
+
+fn gradient_panel(fill: Fill) -> Element {
+    Element::container([])
+        .keyed("gradient")
+        .fill(fill)
+        .transition(Transition::new(Duration::from_millis(100)))
+}
+
+fn gradient_stops(first: Color, last: Color) -> [GradientStop; 2] {
+    [GradientStop::new(0.0, first), GradientStop::new(1.0, last)]
+}
+
+#[test]
+fn matching_linear_and_radial_gradients_interpolate_without_becoming_solid() {
+    let red = Color::rgb(1.0, 0.0, 0.0);
+    let blue = Color::rgb(0.0, 0.0, 1.0);
+    let green = Color::rgb(0.0, 1.0, 0.0);
+    let linear = |start, end, first, last| {
+        Fill::Linear(LinearGradient::new(start, end, gradient_stops(first, last)).unwrap())
+    };
+    let mut tree = UiTree::new(gradient_panel(linear(
+        Point::default(),
+        Point::new(1.0, 0.0),
+        red,
+        blue,
+    )));
+    tree.update(gradient_panel(linear(
+        Point::new(0.2, 0.2),
+        Point::new(0.8, 1.0),
+        green,
+        red,
+    )));
+    tree.advance_animations(Time::ZERO);
+    tree.advance_animations(Time::from_nanos(50_000_000));
+    let node = tree.node_id_at(0).unwrap();
+    let Fill::Linear(linear) = tree.resolved_quad(node, tree.root()).background.unwrap() else {
+        panic!("linear gradients must stay gradients");
+    };
+    assert_eq!(linear.start, Point::new(0.1, 0.1));
+    assert_eq!(linear.stops.as_slice()[0].color, Color::rgb(0.5, 0.5, 0.0));
+
+    let radial = |center, radius, first, last| {
+        Fill::Radial(RadialGradient::new(center, radius, gradient_stops(first, last)).unwrap())
+    };
+    let mut tree = UiTree::new(gradient_panel(radial(
+        Point::default(),
+        Point::new(0.5, 0.5),
+        red,
+        blue,
+    )));
+    tree.update(gradient_panel(radial(
+        Point::new(1.0, 1.0),
+        Point::new(1.0, 1.0),
+        blue,
+        green,
+    )));
+    tree.advance_animations(Time::ZERO);
+    tree.advance_animations(Time::from_nanos(50_000_000));
+    let node = tree.node_id_at(0).unwrap();
+    let Fill::Radial(radial) = tree.resolved_quad(node, tree.root()).background.unwrap() else {
+        panic!("radial gradients must stay gradients");
+    };
+    assert_eq!(radial.center, Point::new(0.5, 0.5));
+    assert_eq!(radial.radius, Point::new(0.75, 0.75));
+}
+
+#[test]
+fn incompatible_gradients_crossfade_from_their_first_color() {
+    let red = Color::rgb(1.0, 0.0, 0.0);
+    let blue = Color::rgb(0.0, 0.0, 1.0);
+    let base = Fill::Linear(
+        LinearGradient::new(
+            Point::default(),
+            Point::new(1.0, 0.0),
+            gradient_stops(red, blue),
+        )
+        .unwrap(),
+    );
+    let target = Fill::Radial(
+        RadialGradient::new(
+            Point::new(0.5, 0.5),
+            Point::new(1.0, 1.0),
+            gradient_stops(blue, red),
+        )
+        .unwrap(),
+    );
+    let mut tree = UiTree::new(gradient_panel(base));
+    tree.update(gradient_panel(target));
+    tree.advance_animations(Time::ZERO);
+    tree.advance_animations(Time::from_nanos(50_000_000));
+    let node = tree.node_id_at(0).unwrap();
+    assert_eq!(
+        tree.resolved_quad(node, tree.root()).background,
+        Some(Fill::Solid(Color::rgb(0.5, 0.0, 0.5)))
+    );
+
+    tree.update(
+        Element::container([])
+            .keyed("gradient")
+            .transition(Transition::new(Duration::from_millis(100))),
+    );
+    tree.advance_animations(Time::from_nanos(50_000_000));
+    tree.advance_animations(Time::from_nanos(150_000_000));
+    assert!(tree.resolved_quad(node, tree.root()).background.is_none());
 }

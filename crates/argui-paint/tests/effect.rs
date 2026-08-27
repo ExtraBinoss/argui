@@ -1,6 +1,7 @@
 use argui_core::{Color, Point, Rect, Size};
 use argui_paint::{
-    BlendMode, DisplayList, DisplayListError, Filter, LayerMask, LayerStyle, Shadow,
+    BlendMode, CustomEffect, DisplayList, DisplayListError, Filter, LayerMask, LayerStyle,
+    ShaderEffectId, Shadow,
 };
 
 fn bounds() -> Rect {
@@ -72,6 +73,28 @@ fn every_layer_feature_independently_requests_offscreen_rendering() {
             .requires_offscreen()
     );
     assert!(plain.mask(LayerMask::Bounds).requires_offscreen());
+
+    let outer = LayerStyle::new(bounds()).filter(Filter::Custom(
+        CustomEffect::new(ShaderEffectId(4), []).expansion(12.0),
+    ));
+    assert_eq!(outer.foreground_expansion(), 12.0);
+    assert_eq!(outer.foreground_bounds().origin, Point::new(8.0, 18.0));
+    assert_eq!(outer.scaled(2.0).foreground_expansion(), 24.0);
+}
+
+#[test]
+fn custom_effect_pixel_parameters_follow_dpi_without_scaling_unitless_values() {
+    let effect = Filter::Custom(
+        CustomEffect::new(ShaderEffectId(8), [0.5, 12.0])
+            .pixel_parameter(1)
+            .expansion(8.0),
+    );
+    let Filter::Custom(scaled) = effect.scaled(2.0) else {
+        panic!("expected a custom effect");
+    };
+    assert_eq!(scaled.parameters, [0.5, 24.0]);
+    assert_eq!(scaled.expansion, 16.0);
+    assert_eq!(scaled.pixel_parameters, 1 << 1);
 }
 
 #[test]

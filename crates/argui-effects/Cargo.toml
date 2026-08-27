@@ -1,0 +1,13 @@
+[package]
+name = "argui-effects"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+argui-paint.workspace = true
+argui-render.workspace = true
+
+[lints]
+workspace = true

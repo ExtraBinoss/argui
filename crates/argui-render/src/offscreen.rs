@@ -46,6 +46,8 @@ impl TexturePool {
     pub fn begin_frame(&mut self) {
         self.frame = self.frame.wrapping_add(1);
         self.reused = 0;
+        self.entries
+            .retain(|entry| self.frame.wrapping_sub(entry.last_frame) <= 2);
         for entry in &mut self.entries {
             entry.used = false;
         }
@@ -93,7 +95,7 @@ impl TexturePool {
             view_formats: &[],
         });
         let view = texture.create_view(&TextureViewDescriptor::default());
-        let bytes = u64::from(width) * u64::from(height) * 4;
+        let bytes = texture_bytes(self.format, width, height);
         self.entries.push(Entry {
             texture,
             view,
@@ -133,14 +135,23 @@ fn size_class(size: u32) -> u32 {
     size.max(1)
 }
 
+fn texture_bytes(format: TextureFormat, width: u32, height: u32) -> u64 {
+    u64::from(width) * u64::from(height) * u64::from(format.block_copy_size(None).unwrap_or(4))
+}
+
 #[cfg(test)]
 mod tests {
-    use super::size_class;
+    use super::{size_class, texture_bytes};
 
     #[test]
     fn offscreen_dimensions_preserve_exact_viewport_pixels() {
         assert_eq!(size_class(0), 1);
         assert_eq!(size_class(1), 1);
         assert_eq!(size_class(801), 801);
+        assert_eq!(texture_bytes(wgpu::TextureFormat::Rgba8Unorm, 10, 20), 800);
+        assert_eq!(
+            texture_bytes(wgpu::TextureFormat::Rgba16Float, 10, 20),
+            1_600
+        );
     }
 }

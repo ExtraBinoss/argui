@@ -2,6 +2,9 @@ struct Params {
     viewport: vec2<f32>,
     mode: u32,
     blend: u32,
+    target_region: vec4<f32>,
+    source: vec4<f32>,
+    backdrop: vec4<f32>,
     bounds: vec4<f32>,
     radii: vec4<f32>,
     color: vec4<f32>,
@@ -48,8 +51,29 @@ fn blend_rgb(source: vec3<f32>, backdrop: vec3<f32>, mode: u32) -> vec3<f32> {
     return source;
 }
 
-fn mask_coverage(uv: vec2<f32>) -> f32 {
-    let pixel = params.viewport * uv;
+fn global_pixel(uv: vec2<f32>) -> vec2<f32> {
+    return params.target_region.xy + uv * params.target_region.zw;
+}
+
+fn region_uv(pixel: vec2<f32>, region: vec4<f32>) -> vec2<f32> {
+    return (pixel - region.xy) / region.zw;
+}
+
+fn in_region(pixel: vec2<f32>, region: vec4<f32>) -> bool {
+    return all(pixel >= region.xy) && all(pixel < region.xy + region.zw);
+}
+
+fn sample_source(pixel: vec2<f32>) -> vec4<f32> {
+    if !in_region(pixel, params.source) { return vec4<f32>(0.0); }
+    return textureSample(source_texture, linear_sampler, region_uv(pixel, params.source));
+}
+
+fn sample_backdrop(pixel: vec2<f32>) -> vec4<f32> {
+    if !in_region(pixel, params.backdrop) { return vec4<f32>(0.0); }
+    return textureSample(backdrop_texture, linear_sampler, region_uv(pixel, params.backdrop));
+}
+
+fn mask_coverage(pixel: vec2<f32>) -> f32 {
     let center = params.bounds.xy + params.bounds.zw * 0.5;
     let local = pixel - center;
     let radius = select(
@@ -63,16 +87,17 @@ fn mask_coverage(uv: vec2<f32>) -> f32 {
     return clamp(0.5 - distance / max(fwidth(distance), 0.001), 0.0, 1.0);
 }
 
-fn composite(source: vec4<f32>, backdrop: vec4<f32>, uv: vec2<f32>) -> vec4<f32> {
-    let alpha = source.a * params.data.x * mask_coverage(uv);
+fn composite(source: vec4<f32>, backdrop: vec4<f32>, pixel: vec2<f32>) -> vec4<f32> {
+    let alpha = source.a * params.data.x * mask_coverage(pixel);
     let straight_source = source.rgb / max(source.a, 0.00001);
     let mixed = blend_rgb(straight_source, backdrop.rgb, params.blend);
     return vec4<f32>(mix(backdrop.rgb, mixed, alpha), alpha + backdrop.a * (1.0 - alpha));
 }
 
-fn sample_blur(uv: vec2<f32>, axis: vec2<f32>) -> vec4<f32> {
+fn sample_blur(pixel: vec2<f32>, axis: vec2<f32>) -> vec4<f32> {
     let source_size = vec2<f32>(textureDimensions(source_texture));
-    let step = axis * max(params.data.x / 3.0, 0.5) / source_size;
+    let step = axis * max(params.data.x, 0.0) / source_size;
+    let uv = region_uv(pixel, params.source);
     let weights = array<f32, 7>(
         0.137023, 0.129618, 0.109719, 0.083108, 0.056331, 0.034167, 0.018544
     );
@@ -87,39 +112,13 @@ fn sample_blur(uv: vec2<f32>, axis: vec2<f32>) -> vec4<f32> {
 
 @fragment
 fn fs_main(input: VertexOut) -> @location(0) vec4<f32> {
-    let original = textureSample(source_texture, linear_sampler, input.uv);
+    let pixel = global_pixel(input.uv);
+    let original = sample_source(pixel);
     var source = original;
-    let backdrop = textureSample(backdrop_texture, linear_sampler, input.uv);
-    if params.mode == 0u { return composite(source, backdrop, input.uv); }
-    if params.mode == 1u { source = sample_blur(input.uv, vec2<f32>(1.0, 0.0)); }
-    if params.mode == 2u { source = sample_blur(input.uv, vec2<f32>(0.0, 1.0)); }
-    if params.mode == 3u { source = vec4<f32>(source.rgb * params.data.x, source.a); }
-    if params.mode == 4u {
-        source = vec4<f32>((source.rgb - 0.5) * params.data.x + 0.5, source.a);
-    }
-    if params.mode == 5u {
-        let luminance = dot(source.rgb, vec3<f32>(0.2126, 0.7152, 0.0722));
-        source = vec4<f32>(mix(vec3<f32>(luminance), source.rgb, params.data.x), source.a);
-    }
-    if params.mode == 6u {
-        let angle = params.data.x;
-        let cosine = cos(angle);
-        let sine = sin(angle);
-        let weights = vec3<f32>(0.213, 0.715, 0.072);
-        let rotated = source.rgb * mat3x3<f32>(
-            weights.x + cosine * (1.0 - weights.x) + sine * -weights.x,
-            weights.x + cosine * -weights.x + sine * 0.143,
-            weights.x + cosine * -weights.x + sine * -(1.0 - weights.x),
-            weights.y + cosine * -weights.y + sine * -weights.y,
-            weights.y + cosine * (1.0 - weights.y) + sine * 0.140,
-            weights.y + cosine * -weights.y + sine * weights.y,
-            weights.z + cosine * -weights.z + sine * (1.0 - weights.z),
-            weights.z + cosine * -weights.z + sine * -0.283,
-            weights.z + cosine * (1.0 - weights.z) + sine * weights.z
-        );
-        source = vec4<f32>(rotated, source.a);
-    }
-    if params.mode == 7u { source *= params.data.x; }
+    let backdrop = sample_backdrop(pixel);
+    if params.mode == 0u { return composite(source, backdrop, pixel); }
+    if params.mode == 1u { source = sample_blur(pixel, vec2<f32>(1.0, 0.0)); }
+    if params.mode == 2u { source = sample_blur(pixel, vec2<f32>(0.0, 1.0)); }
     if params.mode == 8u {
         source = vec4<f32>(
             dot(source, params.matrix[0]) + params.matrix[4].x,
@@ -129,23 +128,14 @@ fn fs_main(input: VertexOut) -> @location(0) vec4<f32> {
         );
     }
     if params.mode == 9u {
-        let center = (params.bounds.xy + params.bounds.zw * 0.5) / params.viewport;
-        let direction = input.uv - center;
-        let warped = input.uv - direction * params.data.x * 0.08;
-        let shift = direction * params.data.y * 0.01;
-        source = vec4<f32>(
-            textureSample(backdrop_texture, linear_sampler, warped + shift).r,
-            textureSample(backdrop_texture, linear_sampler, warped).g,
-            textureSample(backdrop_texture, linear_sampler, warped - shift).b,
-            1.0
-        );
+        source = refracted_backdrop(pixel);
     }
     if params.mode == 10u || params.mode == 11u {
-        let offset_uv = input.uv - params.data.yz / params.viewport;
-        var alpha = textureSample(source_texture, linear_sampler, offset_uv).a;
+        let offset_pixel = pixel - params.data.yz;
+        var alpha = sample_source(offset_pixel).a;
         if params.mode == 11u { alpha = 1.0 - alpha; }
         let spread_alpha = clamp(alpha * (1.0 + max(params.data.w, 0.0) * 0.08), 0.0, 1.0);
-        let box_coverage = mask_coverage(input.uv);
+        let box_coverage = mask_coverage(pixel);
         let placement = select(1.0 - box_coverage, box_coverage, params.mode == 11u);
         let shadow_alpha = params.color.a * spread_alpha * placement;
         let shadow = vec4<f32>(params.color.rgb * shadow_alpha, shadow_alpha);
@@ -155,8 +145,8 @@ fn fs_main(input: VertexOut) -> @location(0) vec4<f32> {
         );
     }
     if params.mode == 12u {
-        return mix(backdrop, source, mask_coverage(input.uv));
+        return mix(backdrop, source, mask_coverage(pixel) * clamp(params.data.x, 0.0, 1.0));
     }
     if params.mode == 99u { return source; }
-    return mix(original, source, mask_coverage(input.uv));
+    return mix(original, source, mask_coverage(pixel));
 }

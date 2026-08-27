@@ -1,11 +1,13 @@
 use std::ops::Range;
 
-use argui_paint::{DisplayCommand, DisplayList};
+use argui_paint::{DisplayCommand, DisplayList, ImageId, ImageSampling, VectorId};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum DrawKind {
     Quad,
     Text,
+    Image(ImageId, ImageSampling),
+    Vector(VectorId),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -21,6 +23,8 @@ pub(crate) fn build_batches(
 ) {
     batches.clear();
     let mut quad = 0;
+    let mut image = 0;
+    let mut vector = 0;
     for command in display_list.commands() {
         let draw = match command {
             DisplayCommand::Quad(_) => {
@@ -28,10 +32,20 @@ pub(crate) fn build_batches(
                 quad += 1;
                 Some((DrawKind::Quad, instances))
             }
-            DisplayCommand::Text(block) => Some((
+            DisplayCommand::Text { block, .. } => Some((
                 DrawKind::Text,
                 text_ranges.get(*block).cloned().unwrap_or(0..0),
             )),
+            DisplayCommand::Image(item) => {
+                let instances = image..image + 1;
+                image += 1;
+                Some((DrawKind::Image(item.image, item.sampling), instances))
+            }
+            DisplayCommand::Vector(item) => {
+                let instances = vector..vector + 1;
+                vector += 1;
+                Some((DrawKind::Vector(item.vector), instances))
+            }
             DisplayCommand::BeginLayer(_) | DisplayCommand::EndLayer => None,
         };
         let Some((kind, instances)) = draw else {
@@ -53,7 +67,10 @@ pub(crate) fn build_batches(
 
 #[cfg(test)]
 mod tests {
-    use argui_paint::{Border, Color, CornerRadii, DisplayList, Quad};
+    use argui_core::{Affine2D, Rect};
+    use argui_paint::{
+        Border, ClipChain, Color, CornerRadii, DisplayList, Fill, Quad, VectorId, VectorPrimitive,
+    };
 
     use super::{DrawBatch, DrawKind, build_batches};
 
@@ -61,11 +78,12 @@ mod tests {
         let bounds = Default::default();
         Quad {
             bounds,
-            background: Color::WHITE,
+            background: Some(Fill::Solid(Color::WHITE)),
             border: Border::all(0.0, Color::TRANSPARENT),
             radii: CornerRadii::default(),
             opacity: 1.0,
-            clip: bounds,
+            transform: Affine2D::IDENTITY,
+            clips: ClipChain::default(),
         }
     }
 
@@ -77,6 +95,16 @@ mod tests {
         list.push_text(0);
         list.push_text(1);
         list.push_quad(quad());
+        for id in [7, 7, 8] {
+            list.push_vector(VectorPrimitive {
+                vector: VectorId(id),
+                bounds: Rect::default(),
+                progress: 0.0,
+                opacity: 1.0,
+                transform: Affine2D::IDENTITY,
+                clips: ClipChain::default(),
+            });
+        }
 
         let mut batches = Vec::new();
         build_batches(&list, &[0..4, 4..7], &mut batches);
@@ -93,6 +121,14 @@ mod tests {
                 },
                 DrawBatch {
                     kind: DrawKind::Quad,
+                    instances: 2..3,
+                },
+                DrawBatch {
+                    kind: DrawKind::Vector(VectorId(7)),
+                    instances: 0..2,
+                },
+                DrawBatch {
+                    kind: DrawKind::Vector(VectorId(8)),
                     instances: 2..3,
                 },
             ]

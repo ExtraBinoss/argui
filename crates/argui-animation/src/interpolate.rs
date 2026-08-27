@@ -1,4 +1,4 @@
-use argui_core::{Color, Point, Rect, Size};
+use argui_core::{Color, Point, Rect, Size, Transform2D, TransformOrigin};
 
 /// Produces a value between two typed endpoints.
 pub trait Interpolate: Sized {
@@ -54,6 +54,26 @@ impl Interpolate for Rect {
         Self::new(
             self.origin.interpolate(target.origin, progress),
             self.size.interpolate(target.size, progress),
+        )
+    }
+}
+
+impl Interpolate for Transform2D {
+    fn interpolate(self, target: Self, progress: f32) -> Self {
+        Self {
+            translation: self.translation.interpolate(target.translation, progress),
+            scale: self.scale.interpolate(target.scale, progress),
+            rotation: self.rotation.interpolate(target.rotation, progress),
+            skew: self.skew.interpolate(target.skew, progress),
+        }
+    }
+}
+
+impl Interpolate for TransformOrigin {
+    fn interpolate(self, target: Self, progress: f32) -> Self {
+        Self::new(
+            self.x.interpolate(target.x, progress),
+            self.y.interpolate(target.y, progress),
         )
     }
 }

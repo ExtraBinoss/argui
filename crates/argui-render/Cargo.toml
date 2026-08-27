@@ -12,6 +12,10 @@ argui-text.workspace = true
 bytemuck.workspace = true
 naga.workspace = true
 wgpu.workspace = true
+web-time.workspace = true
+
+[dev-dependencies]
+pollster.workspace = true
 
 [lints]
 workspace = true

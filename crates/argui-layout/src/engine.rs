@@ -1,5 +1,5 @@
 use argui_core::{Point, Rect, Size};
-use argui_paint::{Border, ClipBehavior, Color, DisplayList, Fill, Quad};
+use argui_paint::{ClipBehavior, DisplayList};
 use argui_text::{TextBlock, TextEngine, TextScene};
 use argui_ui::{
     Align, Direction, Edges, Element, ElementKind, HitRegion, Justify, LayoutStyle, Length,
@@ -11,7 +11,7 @@ use taffy::{
     geometry::{Rect as TaffyRect, Size as TaffySize},
 };
 
-use crate::{LayoutError, TextInputRegion, input, scroll};
+use crate::{LayoutError, TextInputRegion, input, paint, scroll};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct LayoutNode {
@@ -35,11 +35,11 @@ pub struct LayoutOutput {
 }
 
 #[derive(Debug)]
-struct NodeMap {
-    index: usize,
+pub(crate) struct NodeMap {
+    pub(crate) index: usize,
     node: UiNodeId,
     id: NodeId,
-    children: Vec<Self>,
+    pub(crate) children: Vec<Self>,
 }
 
 #[derive(Clone, Copy)]
@@ -157,75 +157,7 @@ impl LayoutEngine {
     }
 
     pub fn repaint(&self, ui: &UiTree, output: &mut LayoutOutput) {
-        let elements = flattened(ui.root());
-        output.display_list.clear();
-        output.hit_regions.clear();
-        for region in &mut output.scroll_regions {
-            if let Some(node) = output.nodes.iter().find(|node| node.node == region.node)
-                && let Some(config) = elements[node.index].scroll
-            {
-                region.config = config;
-            }
-        }
-        let mut order = Vec::with_capacity(output.nodes.len());
-        if let Some(root) = &self.root {
-            collect_paint_order(root, &elements, &mut order);
-        }
-        for (index, entering) in order {
-            let node = &output.nodes[index];
-            let element = elements[node.index];
-            if !entering {
-                if element.layer.is_some() {
-                    output.display_list.end_layer();
-                }
-                continue;
-            }
-            if let Some(mut layer) = element.layer.clone() {
-                layer.bounds = node.bounds;
-                output.display_list.begin_layer(layer);
-            }
-            if let Some(interaction) = element.interaction
-                && interaction.enabled
-                && let Some(clip) = node.clip.and_then(|clip| clip.intersection(node.bounds))
-            {
-                output.hit_regions.push(HitRegion {
-                    node: node.node,
-                    bounds: node.bounds,
-                    clip,
-                    focusable: interaction.focusable,
-                });
-            }
-            let style = ui.resolved_quad(node.node, element);
-            if style.is_visible()
-                && let Some(clip) = node.clip.and_then(|clip| clip.intersection(node.bounds))
-            {
-                output.display_list.push_quad(Quad {
-                    bounds: node.bounds,
-                    background: match style.background {
-                        Some(Fill::Solid(color)) => color,
-                        None => Color::TRANSPARENT,
-                    },
-                    border: style.border.unwrap_or(Border::all(0.0, Color::TRANSPARENT)),
-                    radii: style.radii,
-                    opacity: style.opacity,
-                    clip,
-                });
-            }
-            let text_input = output
-                .text_inputs
-                .iter()
-                .find(|region| region.node == node.node);
-            if let Some(region) = text_input {
-                input::paint_selection(region, &mut output.display_list);
-            }
-            if let Some(text_index) = node.text_index {
-                output.display_list.push_text(text_index);
-            }
-            if let Some(region) = text_input {
-                input::paint_caret(region, &mut output.display_list);
-            }
-        }
-        scroll::paint(&output.scroll_regions, &mut output.display_list);
+        paint::repaint(self.root.as_ref(), ui, output);
     }
 
     pub fn update_text_inputs(
@@ -265,9 +197,10 @@ fn build_node(
         .collect::<Result<Vec<_>, _>>()?;
     let style = taffy_style(&element.style);
     let id = match element.kind {
-        ElementKind::Text { .. } | ElementKind::TextInput { .. } => {
-            tree.new_leaf_with_context(style, index)?
-        }
+        ElementKind::Text { .. }
+        | ElementKind::TextInput { .. }
+        | ElementKind::Image { .. }
+        | ElementKind::Vector { .. } => tree.new_leaf_with_context(style, index)?,
         ElementKind::Container => {
             let child_ids = children.iter().map(|child| child.id).collect::<Vec<_>>();
             tree.new_with_children(style, &child_ids)?
@@ -355,7 +288,7 @@ fn collect_layout(
         ClipBehavior::None => placement.clip,
         ClipBehavior::Bounds => placement.clip.and_then(|clip| clip.intersection(bounds)),
     };
-    if let Some(config) = element.scroll
+    if let Some(config) = element.scroll.clone()
         && let Some(region_clip) = placement.clip.and_then(|clip| clip.intersection(bounds))
     {
         let content = content_size(tree, node)?;
@@ -438,7 +371,7 @@ fn apply_scroll_layout(
         ClipBehavior::None => clip,
         ClipBehavior::Bounds => clip.and_then(|clip| clip.intersection(bounds)),
     };
-    if let Some(config) = element.scroll
+    if let Some(config) = element.scroll.clone()
         && let Some(region_clip) = clip.and_then(|clip| clip.intersection(bounds))
     {
         let content = content_size(tree, node)?;
@@ -480,16 +413,6 @@ fn content_size(tree: &TaffyTree<usize>, node: &NodeMap) -> Result<Size, LayoutE
             .max(child_layout.location.y + child_layout.size.height + layout.padding.bottom);
     }
     Ok(size)
-}
-
-fn collect_paint_order(node: &NodeMap, elements: &[&Element], output: &mut Vec<(usize, bool)>) {
-    output.push((node.index, true));
-    let mut children = node.children.iter().collect::<Vec<_>>();
-    children.sort_by_key(|child| elements[child.index].z_index);
-    for child in children {
-        collect_paint_order(child, elements, output);
-    }
-    output.push((node.index, false));
 }
 
 pub(crate) fn flattened(root: &Element) -> Vec<&Element> {

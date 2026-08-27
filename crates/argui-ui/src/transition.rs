@@ -1,7 +1,11 @@
 use argui_animation::{
     Duration, Easing, FillMode, Interpolate, Keyframe, Keyframes, Time, Timeline, Timing,
 };
-use argui_paint::{Border, BorderWidths, Color, CornerRadii, Fill, QuadStyle};
+use argui_core::Transform2D;
+use argui_paint::{
+    Border, BorderWidths, Color, CornerRadii, Fill, GradientStop, GradientStops, LinearGradient,
+    QuadStyle, RadialGradient,
+};
 
 use crate::{Element, NodeId};
 
@@ -44,8 +48,11 @@ pub(crate) struct PaintTransitions {
 struct Entry {
     node: NodeId,
     displayed: QuadStyle,
+    displayed_transform: Transform2D,
     from: QuadStyle,
+    from_transform: Transform2D,
     target: QuadStyle,
+    target_transform: Transform2D,
     pending: Option<Transition>,
     timeline: Option<Timeline<f32>>,
 }
@@ -67,23 +74,40 @@ impl PaintTransitions {
             let Some(old_index) = old_ids.iter().position(|candidate| *candidate == node) else {
                 continue;
             };
-            let old_style = old[old_index].paint.quad;
-            if old_style != new.paint.quad {
-                self.queue(node, old_style, new.paint.quad, transition);
+            let old_style = old[old_index].paint.quad.clone();
+            if old_style != new.paint.quad || old[old_index].transform != new.transform {
+                self.queue(
+                    node,
+                    old_style,
+                    old[old_index].transform,
+                    new.paint.quad.clone(),
+                    new.transform,
+                    transition,
+                );
             }
         }
         self.entries.retain(|entry| new_ids.contains(&entry.node));
     }
 
-    fn queue(&mut self, node: NodeId, old: QuadStyle, target: QuadStyle, transition: Transition) {
+    fn queue(
+        &mut self,
+        node: NodeId,
+        old: QuadStyle,
+        old_transform: Transform2D,
+        target: QuadStyle,
+        target_transform: Transform2D,
+        transition: Transition,
+    ) {
         if transition.duration == Duration::ZERO {
             self.remove(node);
             return;
         }
         if let Some(entry) = self.entries.iter_mut().find(|entry| entry.node == node) {
-            if entry.target != target {
-                entry.from = entry.displayed;
+            if entry.target != target || entry.target_transform != target_transform {
+                entry.from = entry.displayed.clone();
+                entry.from_transform = entry.displayed_transform;
                 entry.target = target;
+                entry.target_transform = target_transform;
                 entry.pending = Some(transition);
                 entry.timeline = None;
             }
@@ -91,9 +115,12 @@ impl PaintTransitions {
         }
         self.entries.push(Entry {
             node,
-            displayed: old,
+            displayed: old.clone(),
+            displayed_transform: old_transform,
             from: old,
+            from_transform: old_transform,
             target,
+            target_transform,
             pending: Some(transition),
             timeline: None,
         });
@@ -110,9 +137,15 @@ impl PaintTransitions {
                 continue;
             };
             if let Some(progress) = timeline.sample(now).value {
-                let displayed = interpolate_quad(entry.from, entry.target, progress);
+                let displayed =
+                    interpolate_quad(entry.from.clone(), entry.target.clone(), progress);
                 changed |= displayed != entry.displayed;
                 entry.displayed = displayed;
+                let displayed_transform = entry
+                    .from_transform
+                    .interpolate(entry.target_transform, progress);
+                changed |= displayed_transform != entry.displayed_transform;
+                entry.displayed_transform = displayed_transform;
             }
         }
         self.entries.retain(|entry| {
@@ -125,7 +158,14 @@ impl PaintTransitions {
         self.entries
             .iter()
             .find(|entry| entry.node == node)
-            .map_or(target, |entry| entry.displayed)
+            .map_or(target, |entry| entry.displayed.clone())
+    }
+
+    pub(crate) fn resolve_transform(&self, node: NodeId, target: Transform2D) -> Transform2D {
+        self.entries
+            .iter()
+            .find(|entry| entry.node == node)
+            .map_or(target, |entry| entry.displayed_transform)
     }
 
     pub(crate) fn needs_frame(&self) -> bool {
@@ -184,13 +224,59 @@ fn interpolate_fill(from: Option<Fill>, target: Option<Fill>, progress: f32) -> 
     if from.is_none() && target.is_none() {
         return None;
     }
-    let from = from.map_or(Color::TRANSPARENT, solid_color);
-    let target_color = target.map_or(Color::TRANSPARENT, solid_color);
+    if from == target {
+        return from;
+    }
+    if let (Some(from), Some(target)) = (&from, &target)
+        && let Some(fill) = interpolate_gradient(from, target, progress)
+    {
+        return Some(fill);
+    }
+    let from = from.as_ref().map_or(Color::TRANSPARENT, solid_color);
+    let target_color = target.as_ref().map_or(Color::TRANSPARENT, solid_color);
     if progress >= 1.0 && target.is_none() {
         None
     } else {
         Some(Fill::Solid(from.interpolate(target_color, progress)))
     }
+}
+
+fn interpolate_gradient(from: &Fill, target: &Fill, progress: f32) -> Option<Fill> {
+    match (from, target) {
+        (Fill::Linear(from), Fill::Linear(target)) => Some(Fill::Linear(LinearGradient {
+            start: from.start.interpolate(target.start, progress),
+            end: from.end.interpolate(target.end, progress),
+            stops: interpolate_stops(&from.stops, &target.stops, progress)?,
+        })),
+        (Fill::Radial(from), Fill::Radial(target)) => Some(Fill::Radial(RadialGradient {
+            center: from.center.interpolate(target.center, progress),
+            radius: from.radius.interpolate(target.radius, progress),
+            stops: interpolate_stops(&from.stops, &target.stops, progress)?,
+        })),
+        _ => None,
+    }
+}
+
+fn interpolate_stops(
+    from: &GradientStops,
+    target: &GradientStops,
+    progress: f32,
+) -> Option<GradientStops> {
+    if from.len() != target.len() {
+        return None;
+    }
+    let stops = from
+        .as_slice()
+        .iter()
+        .zip(target.as_slice())
+        .map(|(from, target)| {
+            GradientStop::new(
+                from.offset.interpolate(target.offset, progress),
+                from.color.interpolate(target.color, progress),
+            )
+        })
+        .collect();
+    GradientStops::from_vec(stops).ok()
 }
 
 fn interpolate_border(
@@ -230,9 +316,11 @@ fn interpolate_border(
     }
 }
 
-fn solid_color(fill: Fill) -> Color {
+fn solid_color(fill: &Fill) -> Color {
     match fill {
-        Fill::Solid(color) => color,
+        Fill::Solid(color) => *color,
+        Fill::Linear(gradient) => gradient.stops.as_slice()[0].color,
+        Fill::Radial(gradient) => gradient.stops.as_slice()[0].color,
     }
 }
 

@@ -39,6 +39,11 @@ collaboration. `argui-core` contains dependency-light shared primitives, and
   layout, text, and renderer. It owns scheduling but none of their algorithms.
 - `argui-ui`: retained elements, reconciliation, widget state, focus, hit testing,
   and animation scheduling.
+- `argui-inspect`: renderer-independent tree snapshots, reversible typed style
+  overrides, and bounded frame records.
+- `argui-devtools`: an optional `UiApp` wrapper whose dock, virtualized tree,
+  controls, and highlights are ordinary Argui elements. Engine crates never
+  depend on this frontend.
 - `argui`: deliberate re-exports; application code should start here.
 - `argui-showcase`: non-published example application shared unchanged by the
   native and WASM launchers; it is not part of the framework dependency graph.
@@ -97,6 +102,12 @@ changes. Taffy geometry and shaped Cosmic Text remain untouched. See the
 `UiTree` compares rebuilt descriptions and selects no work, paint-only work, or
 layout work while keyed reconciliation preserves stable identities. See the
 [application state model](state.md).
+
+`DevtoolsHost<A>` decorates any `UiApp` without changing `A`. It gives the
+application the remaining docked viewport, delegates its assets, shaders,
+events and animation lifecycle, and attaches an `InspectorHandle` to the
+runtime. This is also the transport seam for a future detached window: the
+inspection protocol contains no `Element`, WGPU resource, or platform handle.
 
 An application implements this boundary once for every target. Native and WASM
 need different executable entry symbols, but those launchers contain no view,

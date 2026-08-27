@@ -28,7 +28,9 @@ fn paint_styles_are_explicit_and_theme_free() {
         .opacity(0.5);
     assert_eq!(built.border, Some(border));
     assert_eq!(
-        PaintStyle::new(built).clip(ClipBehavior::Bounds).quad,
+        PaintStyle::new(built.clone())
+            .clip(ClipBehavior::Bounds)
+            .quad,
         built
     );
 }

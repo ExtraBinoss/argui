@@ -3,6 +3,7 @@
 mod engine;
 mod error;
 mod input;
+mod paint;
 mod scroll;
 mod text;
 

@@ -85,6 +85,8 @@ fn compatible(old: &Element, new: &Element) -> bool {
             (ElementKind::Container, ElementKind::Container)
                 | (ElementKind::Text { .. }, ElementKind::Text { .. })
                 | (ElementKind::TextInput { .. }, ElementKind::TextInput { .. })
+                | (ElementKind::Image { .. }, ElementKind::Image { .. })
+                | (ElementKind::Vector { .. }, ElementKind::Vector { .. })
         )
 }
 

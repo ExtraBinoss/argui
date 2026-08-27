@@ -15,7 +15,8 @@ pass unless every check succeeds.
 
 Coverage is a floor, not a reason to write low-value tests. Test public behavior,
 edge cases, invalidation, event translation, layout results, and rendering data.
-GPU image tests will use deterministic off-screen targets once rendering exists.
+GPU image tests use deterministic off-screen targets and skip only when no
+headless adapter is available.
 
 `#[coverage(off)]` is reserved for the smallest OS/GPU callback or launch
 boundary that requires a real display or graphics driver. Deterministic policy

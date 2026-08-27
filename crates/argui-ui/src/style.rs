@@ -56,6 +56,16 @@ pub struct Inset {
 
 impl Inset {
     #[must_use]
+    pub const fn top_left(top: f32, left: f32) -> Self {
+        Self {
+            left: Length::Px(left),
+            right: Length::Auto,
+            top: Length::Px(top),
+            bottom: Length::Auto,
+        }
+    }
+
+    #[must_use]
     pub const fn top_right(top: f32, right: f32) -> Self {
         Self {
             left: Length::Auto,

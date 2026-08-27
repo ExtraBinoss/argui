@@ -11,10 +11,11 @@ mod launch;
 mod model;
 mod translate;
 
+pub use argui_render::EffectShader;
 pub use error::RuntimeError;
-pub use event::RuntimeEvent;
+pub use event::{AnimationProfile, RuntimeEvent};
 pub use launch::{
     run, run_app, run_app_with_text_engine, run_ui, run_ui_with_text_engine, run_with_text,
     run_with_text_engine,
 };
-pub use model::{UiApp, ViewUpdate};
+pub use model::{LayoutBounds, LayoutSnapshot, ScrollRequest, UiApp, ViewUpdate};

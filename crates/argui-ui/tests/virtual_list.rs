@@ -21,3 +21,11 @@ fn visible_windows_stay_stable_inside_a_scroll_chunk() {
     assert_eq!(list.window(0.0).range, list.window(8.0 * 36.0).range);
     assert_ne!(list.window(0.0).range, list.window(9.0 * 36.0).range);
 }
+
+#[test]
+fn bounded_lists_can_retain_every_row_for_paint_only_scrolling() {
+    let list = VirtualList::new(109, 28.0, 236.0).overscan(109);
+
+    assert_eq!(list.window(0.0).range, 0..109);
+    assert_eq!(list.window(2_816.0).range, 0..109);
+}

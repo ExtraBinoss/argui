@@ -1,0 +1,26 @@
+[package]
+name = "argui-devtools"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+argui-animation.workspace = true
+argui-core.workspace = true
+argui-inspect.workspace = true
+argui-paint.workspace = true
+argui-render.workspace = true
+argui-runtime.workspace = true
+argui-text.workspace = true
+argui-ui.workspace = true
+argui-vector.workspace = true
+icondata_core.workspace = true
+icondata_tb.workspace = true
+
+[dev-dependencies]
+argui-layout.workspace = true
+argui-showcase.workspace = true
+
+[lints]
+workspace = true

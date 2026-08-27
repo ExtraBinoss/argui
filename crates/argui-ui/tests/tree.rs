@@ -1,7 +1,7 @@
 use argui_text::TextStyle;
 use argui_ui::{
-    Border, ClipBehavior, Color, CornerRadii, Direction, Element, ElementKind, Length, TreeUpdate,
-    UiTree,
+    Border, ClipBehavior, Color, CornerRadii, Direction, Element, ElementKind, Interaction,
+    LayerStyle, Length, TreeUpdate, UiTree, VectorId,
 };
 
 #[test]
@@ -35,6 +35,31 @@ fn rust_builders_form_the_future_dsl_lowering_target() {
 }
 
 #[test]
+fn vector_builder_keeps_a_gpu_morph_progress_value() {
+    let element = Element::vector(VectorId(9)).vector_progress(0.75);
+    assert_eq!(
+        element.kind,
+        ElementKind::Vector {
+            vector: VectorId(9),
+            progress: 0.75,
+        }
+    );
+}
+
+#[test]
+fn vector_morph_progress_is_a_paint_only_update() {
+    let mut tree = UiTree::new(Element::vector(VectorId(9)).vector_progress(0.0));
+    let node = tree.node_id_at(0);
+    tree.mark_layout_clean();
+    assert_eq!(
+        tree.update(Element::vector(VectorId(9)).vector_progress(0.5)),
+        TreeUpdate::Paint
+    );
+    assert_eq!(tree.node_id_at(0), node);
+    assert!(!tree.layout_dirty());
+}
+
+#[test]
 fn tree_updates_distinguish_paint_from_layout() {
     let base = Element::container([])
         .keyed("panel")
@@ -53,9 +78,28 @@ fn tree_updates_distinguish_paint_from_layout() {
     assert!(!tree.layout_dirty());
 
     assert_eq!(
+        tree.update(
+            base.clone()
+                .text_effect(LayerStyle::new(Default::default()).opacity(0.7))
+        ),
+        TreeUpdate::Paint
+    );
+    assert_eq!(tree.revision(), revision);
+
+    assert_eq!(
         tree.update(base.width(Length::Px(200.0))),
         TreeUpdate::Layout
     );
     assert!(tree.revision() > revision);
     assert!(tree.layout_dirty());
+}
+
+#[test]
+fn enabling_retained_interaction_only_requires_repaint() {
+    let mut tree =
+        UiTree::new(Element::container([]).interaction(Interaction::blocker().enabled(false)));
+    assert_eq!(
+        tree.update(Element::container([]).interaction(Interaction::blocker())),
+        TreeUpdate::Paint
+    );
 }

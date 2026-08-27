@@ -1,5 +1,5 @@
-use argui_core::{Point, Rect, ScrollDelta};
-use argui_paint::QuadStyle;
+use argui_core::{Affine2D, Point, Rect, ScrollDelta};
+use argui_paint::{ClipChain, QuadStyle};
 
 use crate::NodeId;
 
@@ -18,10 +18,19 @@ pub enum ScrollPolarity {
     Inverted,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum ScrollChaining {
+    #[default]
+    Auto,
+    Contain,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct ScrollConfig {
+    pub enabled: bool,
     pub axes: ScrollAxes,
     pub polarity: ScrollPolarity,
+    pub chaining: ScrollChaining,
     pub line_size: f32,
     pub multiplier: f32,
     pub scrollbar: Option<ScrollbarStyle>,
@@ -30,8 +39,10 @@ pub struct ScrollConfig {
 impl Default for ScrollConfig {
     fn default() -> Self {
         Self {
+            enabled: true,
             axes: ScrollAxes::Vertical,
             polarity: ScrollPolarity::Normal,
+            chaining: ScrollChaining::Auto,
             line_size: 40.0,
             multiplier: 1.0,
             scrollbar: None,
@@ -41,6 +52,12 @@ impl Default for ScrollConfig {
 
 impl ScrollConfig {
     #[must_use]
+    pub const fn enabled(mut self, enabled: bool) -> Self {
+        self.enabled = enabled;
+        self
+    }
+
+    #[must_use]
     pub const fn axes(mut self, axes: ScrollAxes) -> Self {
         self.axes = axes;
         self
@@ -49,6 +66,12 @@ impl ScrollConfig {
     #[must_use]
     pub const fn polarity(mut self, polarity: ScrollPolarity) -> Self {
         self.polarity = polarity;
+        self
+    }
+
+    #[must_use]
+    pub const fn chaining(mut self, chaining: ScrollChaining) -> Self {
+        self.chaining = chaining;
         self
     }
 
@@ -65,12 +88,12 @@ impl ScrollConfig {
     }
 
     #[must_use]
-    pub const fn scrollbar(mut self, scrollbar: ScrollbarStyle) -> Self {
+    pub fn scrollbar(mut self, scrollbar: ScrollbarStyle) -> Self {
         self.scrollbar = Some(scrollbar);
         self
     }
 
-    fn logical_delta(self, delta: ScrollDelta) -> Point {
+    fn logical_delta(&self, delta: ScrollDelta) -> Point {
         let mut delta = match delta {
             ScrollDelta::Lines(point) => {
                 Point::new(point.x * self.line_size, point.y * self.line_size)
@@ -92,7 +115,7 @@ impl ScrollConfig {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ScrollbarStyle {
     pub width: f32,
     pub inset: f32,
@@ -132,18 +155,20 @@ impl ScrollbarStyle {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ScrollbarRegion {
     pub track: Rect,
     pub thumb: Rect,
     pub style: ScrollbarStyle,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ScrollRegion {
     pub node: NodeId,
     pub bounds: Rect,
     pub clip: Rect,
+    pub transform: Affine2D,
+    pub clips: ClipChain,
     pub max_offset: Point,
     pub config: ScrollConfig,
     pub scrollbar: Option<ScrollbarRegion>,
@@ -151,16 +176,27 @@ pub struct ScrollRegion {
 
 impl ScrollRegion {
     #[must_use]
-    pub fn contains(self, point: Point) -> bool {
-        self.bounds.contains(point) && self.clip.contains(point)
+    pub fn contains(&self, point: Point) -> bool {
+        self.local_point(point)
+            .is_some_and(|local| self.bounds.contains(local) && self.clip.contains(local))
+            && self.clips.contains(point)
     }
 
     #[must_use]
-    pub fn scrollbar_contains(self, point: Point) -> bool {
-        self.clip.contains(point)
-            && self
-                .scrollbar
-                .is_some_and(|scrollbar| scrollbar.track.contains(point))
+    pub fn scrollbar_contains(&self, point: Point) -> bool {
+        self.clips.contains(point)
+            && self.scrollbar.as_ref().is_some_and(|scrollbar| {
+                self.local_point(point).is_some_and(|local| {
+                    self.clip.contains(local) && scrollbar.track.contains(local)
+                })
+            })
+    }
+
+    #[must_use]
+    pub fn local_point(&self, point: Point) -> Option<Point> {
+        self.transform
+            .inverse()
+            .map(|inverse| inverse.transform_point(point))
     }
 }
 
@@ -169,6 +205,12 @@ pub(crate) struct ScrollChange {
     pub node: NodeId,
     pub delta: Point,
     pub offset: Point,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) enum ScrollOutcome {
+    Changed(ScrollChange),
+    Consumed,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -195,13 +237,33 @@ impl ScrollState {
             .unwrap_or_default()
     }
 
+    pub fn set_offset(&mut self, node: NodeId, offset: Point) -> bool {
+        let offset = Point::new(offset.x.max(0.0), offset.y.max(0.0));
+        if let Some((_, stored)) = self
+            .offsets
+            .iter_mut()
+            .find(|(candidate, _)| *candidate == node)
+        {
+            if *stored == offset {
+                return false;
+            }
+            *stored = offset;
+        } else {
+            self.offsets.push((node, offset));
+        }
+        true
+    }
+
     pub fn scroll(
         &mut self,
         point: Point,
         delta: ScrollDelta,
         regions: &[ScrollRegion],
-    ) -> Option<ScrollChange> {
+    ) -> Option<ScrollOutcome> {
         for region in regions.iter().rev().filter(|region| region.contains(point)) {
+            if !region.config.enabled {
+                continue;
+            }
             let requested = region.config.logical_delta(delta);
             let previous = self.offset(region.node);
             let offset = Point::new(
@@ -210,6 +272,9 @@ impl ScrollState {
             );
             let applied = Point::new(offset.x - previous.x, offset.y - previous.y);
             if applied == Point::default() {
+                if region.config.chaining == ScrollChaining::Contain {
+                    return Some(ScrollOutcome::Consumed);
+                }
                 continue;
             }
             if let Some((_, stored)) = self
@@ -221,11 +286,11 @@ impl ScrollState {
             } else {
                 self.offsets.push((region.node, offset));
             }
-            return Some(ScrollChange {
+            return Some(ScrollOutcome::Changed(ScrollChange {
                 node: region.node,
                 delta: applied,
                 offset,
-            });
+            }));
         }
         None
     }
@@ -236,10 +301,21 @@ impl ScrollState {
         regions: &[ScrollRegion],
     ) -> Option<Option<ScrollChange>> {
         for region in regions.iter().rev() {
-            let Some(scrollbar) = region.scrollbar else {
+            if !region.config.enabled {
+                continue;
+            }
+            let Some(scrollbar) = region.scrollbar.as_ref() else {
                 continue;
             };
-            if !region.clip.contains(point) || !scrollbar.track.contains(point) {
+            let Some(point) = region.local_point(point) else {
+                continue;
+            };
+            if !region.clip.contains(point)
+                || !region
+                    .clips
+                    .contains(region.transform.transform_point(point))
+                || !scrollbar.track.contains(point)
+            {
                 continue;
             }
             let grab = if scrollbar.thumb.contains(point) {
@@ -272,7 +348,8 @@ impl ScrollState {
     fn drag_to(&mut self, point: Point, regions: &[ScrollRegion]) -> Option<ScrollChange> {
         let drag = self.drag?;
         let region = regions.iter().find(|region| region.node == drag.node)?;
-        let scrollbar = region.scrollbar?;
+        let scrollbar = region.scrollbar.as_ref()?;
+        let point = region.local_point(point)?;
         let travel = scrollbar.track.size.height - scrollbar.thumb.size.height;
         if travel <= 0.0 || region.max_offset.y <= 0.0 {
             return None;

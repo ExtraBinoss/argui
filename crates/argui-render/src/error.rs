@@ -11,6 +11,10 @@ pub enum RendererError {
     InvalidShader(String),
     MissingShader(u64),
     TooManyEffectParameters { provided: usize, maximum: usize },
+    MissingImage(u64),
+    MissingVector(u64),
+    ImageCacheFull { requested: usize, capacity: usize },
+    TooManyGradientStops { provided: usize, capacity: usize },
     Validation,
 }
 
@@ -34,6 +38,19 @@ impl fmt::Display for RendererError {
             Self::TooManyEffectParameters { provided, maximum } => write!(
                 formatter,
                 "custom effect has {provided} parameters but the ABI supports {maximum}"
+            ),
+            Self::MissingImage(id) => write!(formatter, "image {id} is not registered"),
+            Self::MissingVector(id) => write!(formatter, "vector {id} is not registered"),
+            Self::ImageCacheFull {
+                requested,
+                capacity,
+            } => write!(
+                formatter,
+                "image needs {requested} bytes but the GPU image cache allows {capacity}"
+            ),
+            Self::TooManyGradientStops { provided, capacity } => write!(
+                formatter,
+                "display list has {provided} gradient stops but the frame budget allows {capacity}"
             ),
             Self::Validation => formatter.write_str("surface validation failed"),
         }

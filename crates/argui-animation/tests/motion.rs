@@ -1,5 +1,5 @@
 use argui_animation::{MotionValue, PhysicsError};
-use argui_core::{Color, Point, Rect, Size};
+use argui_core::{Color, Point, Rect, Size, Transform2D};
 
 #[test]
 fn motion_values_provide_vector_arithmetic_and_magnitude() {
@@ -18,6 +18,16 @@ fn motion_values_provide_vector_arithmetic_and_magnitude() {
     assert_eq!(color.subtract(color), Color::TRANSPARENT);
     assert_eq!(color.add(color), Color::rgba(0.8, 0.6, 0.4, 0.2));
     assert_eq!(Color::rgba(1.0, 0.0, 0.0, 0.0).magnitude(), 1.0);
+}
+
+#[test]
+fn transforms_are_spring_values_with_component_velocity() {
+    let start = Transform2D::IDENTITY.translate(2.0, 3.0).rotate(0.2);
+    let target = Transform2D::IDENTITY.scale(2.0, 0.5).skew(0.1, 0.0);
+    let delta = start.subtract(target);
+    assert_eq!(target.add(delta), start);
+    assert!(delta.magnitude() > 1.0);
+    assert_eq!(Transform2D::zero().scale, Point::default());
 }
 
 #[test]

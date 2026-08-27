@@ -8,13 +8,16 @@ publish = false
 
 [dependencies]
 argui-animation.workspace = true
+argui-core.workspace = true
+argui-effects.workspace = true
+argui-image.workspace = true
 argui-paint.workspace = true
 argui-runtime.workspace = true
 argui-text.workspace = true
 argui-ui.workspace = true
 
 [dev-dependencies]
-argui-core.workspace = true
+argui-layout.workspace = true
 
 [lints]
 workspace = true

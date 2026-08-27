@@ -1,5 +1,5 @@
-use argui_core::{Point, Rect, Size};
-use argui_paint::{Color, QuadStyle};
+use argui_core::{Affine2D, Point, Rect, Size};
+use argui_paint::{ClipChain, ClipRegion, Color, QuadStyle};
 use argui_ui::{Element, HitRegion, Interaction, UiEventKind, UiTree, VisualState};
 
 fn interactive(key: &str) -> Element {
@@ -23,7 +23,11 @@ fn region_at(node: argui_ui::NodeId, x: f32, focusable: bool) -> HitRegion {
     HitRegion {
         node,
         bounds: Rect::new(Point::new(x, 10.0), Size::new(80.0, 40.0)),
-        clip: Rect::new(Point::new(x + 10.0, 10.0), Size::new(70.0, 40.0)),
+        transform: Affine2D::IDENTITY,
+        clips: ClipChain::from_regions([ClipRegion::new(
+            Rect::new(Point::new(x + 10.0, 10.0), Size::new(70.0, 40.0)),
+            Affine2D::IDENTITY,
+        )]),
         focusable,
     }
 }
@@ -131,6 +135,29 @@ fn release_over_the_captured_target_emits_a_click() {
             .iter()
             .any(|event| event.kind == UiEventKind::Clicked)
     );
+}
+
+#[test]
+fn blocker_regions_occlude_interactions_behind_overlays() {
+    let mut tree = UiTree::new(Element::row([
+        interactive("behind"),
+        Element::container([])
+            .keyed("overlay")
+            .interaction(Interaction::blocker()),
+    ]));
+    let behind = tree.node_id_at(1).unwrap();
+    let overlay = tree.node_id_at(2).unwrap();
+    let regions = [
+        region_at(behind, 10.0, true),
+        region_at(overlay, 10.0, false),
+    ];
+
+    let update = tree.pointer_moved(Point::new(30.0, 20.0), &regions);
+    assert_eq!(update.events[0].target, overlay);
+    assert_eq!(update.events[0].key.as_deref(), Some("overlay"));
+    assert_eq!(tree.visual_state(behind), VisualState::Rest);
+    assert_eq!(tree.visual_state(overlay), VisualState::Hovered);
+    assert!(!Interaction::blocker().focusable);
 }
 
 #[test]

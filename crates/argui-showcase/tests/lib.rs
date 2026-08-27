@@ -1,6 +1,9 @@
 use argui_animation::{Duration, Frame, Time};
-use argui_core::{Point, Rect, ScrollDelta, Size};
-use argui_runtime::{UiApp, ViewUpdate};
+use argui_core::{Affine2D, Point, Rect, ScrollDelta, Size};
+use argui_effects::{ANIMATED_GRADIENT_ID, LIQUID_GLASS_ID, WORLEY_BORDER_FIRE_ID};
+use argui_layout::LayoutEngine;
+use argui_paint::{ClipChain, ClipRegion};
+use argui_runtime::{LayoutBounds, LayoutSnapshot, UiApp, ViewUpdate};
 use argui_showcase::{StateShowcase, text_engine};
 use argui_text::TextStyle;
 use argui_ui::{HitRegion, ScrollConfig, ScrollRegion, UiEvent, UiEventKind, UiTree};
@@ -29,7 +32,8 @@ fn events_for(app: &StateShowcase, key: &str) -> Vec<UiEvent> {
     let regions = [HitRegion {
         node,
         bounds,
-        clip: bounds,
+        transform: Affine2D::IDENTITY,
+        clips: ClipChain::from_regions([ClipRegion::new(bounds, Affine2D::IDENTITY)]),
         focusable: true,
     }];
     let mut events = tree.pointer_moved(Point::new(10.0, 10.0), &regions).events;
@@ -53,6 +57,15 @@ fn shared_showcase_builds_one_tree_and_embeds_its_fonts() {
 
     assert_eq!(app.view().children.len(), 1);
     assert!(text.measure("Argui", &TextStyle::default(), None).width > 0.0);
+    let shader_ids: Vec<_> = app
+        .effect_shaders()
+        .iter()
+        .map(|shader| shader.id)
+        .collect();
+    assert_eq!(
+        shader_ids,
+        [WORLEY_BORDER_FIRE_ID, LIQUID_GLASS_ID, ANIMATED_GRADIENT_ID]
+    );
 }
 
 #[test]
@@ -79,6 +92,8 @@ fn virtual_scroll_rebuilds_only_when_the_visible_window_changes() {
         node,
         bounds,
         clip: bounds,
+        transform: Affine2D::IDENTITY,
+        clips: ClipChain::from_regions([ClipRegion::new(bounds, Affine2D::IDENTITY)]),
         max_offset: Point::new(0.0, 1_000.0),
         config: ScrollConfig::default().line_size(36.0),
         scrollbar: None,
@@ -214,5 +229,175 @@ fn effects_popover_is_composed_and_only_animates_while_open() {
         ViewUpdate::Rebuild
     );
     assert_eq!(click(&mut app, "popover-close"), ViewUpdate::Rebuild);
+    assert!(app.wants_animation_frame());
+    let mut now = 700_000_000;
+    for _ in 0..120 {
+        now += 16_000_000;
+        let _ = app.animation_frame(Frame {
+            now: Time::from_nanos(now),
+            elapsed: Duration::from_millis(16),
+        });
+        if !app.wants_animation_frame() {
+            break;
+        }
+    }
     assert!(!app.wants_animation_frame());
+    assert!(
+        node_index_optional(&app.view(), "effects-popover").is_some(),
+        "the dormant popover stays retained to avoid layout work on its next opening"
+    );
+}
+
+#[test]
+fn effects_popover_scroll_repaints_a_valid_clipped_scene() {
+    let mut app = StateShowcase::default();
+    assert_eq!(click(&mut app, "popover-toggle"), ViewUpdate::Rebuild);
+    let _ = app.animation_frame(Frame {
+        now: Time::from_nanos(700_000_000),
+        elapsed: Duration::from_millis(700),
+    });
+
+    let mut tree = UiTree::new(app.view());
+    let mut layout = LayoutEngine::new();
+    let viewport = Size::new(1_100.0, 700.0);
+    let mut output = layout
+        .compute(&mut tree, &mut text_engine(), viewport)
+        .unwrap();
+    let snapshot = LayoutSnapshot {
+        viewport: output.viewport,
+        nodes: output
+            .nodes
+            .iter()
+            .map(|node| LayoutBounds {
+                node: node.node,
+                key: tree.key(node.node).map(str::to_owned),
+                bounds: node.bounds,
+            })
+            .collect(),
+    };
+    assert_eq!(app.layout_changed(&snapshot), ViewUpdate::Rebuild);
+    assert_ne!(tree.update(app.view()), argui_ui::TreeUpdate::None);
+    output = layout
+        .compute(&mut tree, &mut text_engine(), viewport)
+        .unwrap();
+
+    let popover = output
+        .scroll_regions
+        .iter()
+        .find(|region| tree.key(region.node) == Some("effects-popover"))
+        .cloned()
+        .expect("the constrained popover is scrollable");
+    let point = Point::new(
+        popover.bounds.origin.x + 20.0,
+        popover.bounds.origin.y + 40.0,
+    );
+    let update = tree.scroll(
+        point,
+        ScrollDelta::Pixels(Point::new(0.0, -80.0)),
+        &output.scroll_regions,
+    );
+    assert!(update.scroll_changed);
+    layout.apply_scroll(&tree, &mut output).unwrap();
+    output.display_list.validate().unwrap();
+    assert!(
+        output
+            .text
+            .blocks()
+            .iter()
+            .any(|block| block.clip.size.width > 0.0 && block.clip.size.height > 0.0)
+    );
+}
+
+#[test]
+fn delayed_tooltip_appears_only_after_hover_delay() {
+    let mut app = StateShowcase::default();
+    let entered = events_for(&app, "tooltip-anchor")
+        .into_iter()
+        .find(|event| event.kind == UiEventKind::PointerEntered)
+        .unwrap();
+    assert_eq!(app.update(&entered), ViewUpdate::None);
+    assert!(app.wants_animation_frame());
+    assert!(node_index_optional(&app.view(), "delayed-tooltip").is_none());
+
+    assert_eq!(
+        app.animation_frame(Frame {
+            now: Time::from_nanos(500_000_000),
+            elapsed: Duration::from_millis(500),
+        }),
+        ViewUpdate::Rebuild
+    );
+    assert!(node_index_optional(&app.view(), "delayed-tooltip").is_some());
+    let left = UiEvent {
+        kind: UiEventKind::PointerLeft,
+        ..entered
+    };
+    assert_eq!(app.update(&left), ViewUpdate::Rebuild);
+    assert!(node_index_optional(&app.view(), "delayed-tooltip").is_none());
+}
+
+#[test]
+fn overlay_layout_uses_keyed_bounds_and_stabilizes_after_one_rebuild() {
+    let mut app = StateShowcase::default();
+    assert_eq!(
+        app.layout_changed(&LayoutSnapshot::default()),
+        ViewUpdate::None
+    );
+    let root = app.view();
+    let tree = UiTree::new(root.clone());
+    let keyed = |key: &str, bounds: Rect| LayoutBounds {
+        node: tree.node_id_at(node_index(&root, key)).unwrap(),
+        key: Some(key.into()),
+        bounds,
+    };
+    let snapshot = LayoutSnapshot {
+        viewport: Rect::new(Point::default(), Size::new(500.0, 400.0)),
+        nodes: vec![
+            keyed(
+                "popover-anchor",
+                Rect::new(Point::new(20.0, 300.0), Size::new(460.0, 50.0)),
+            ),
+            keyed(
+                "popover-toggle",
+                Rect::new(Point::new(220.0, 310.0), Size::new(180.0, 36.0)),
+            ),
+            keyed(
+                "tooltip-anchor",
+                Rect::new(Point::new(405.0, 310.0), Size::new(70.0, 36.0)),
+            ),
+        ],
+    };
+
+    assert_eq!(app.layout_changed(&snapshot), ViewUpdate::Rebuild);
+    assert_eq!(app.layout_changed(&snapshot), ViewUpdate::None);
+    assert_eq!(click(&mut app, "popover-toggle"), ViewUpdate::Rebuild);
+    let view = app.view();
+    let popover = element_by_key(&view, "effects-popover").unwrap();
+    assert!(popover.interaction.is_some());
+    assert!(popover.scroll.is_some());
+    assert!(matches!(popover.style.height, argui_ui::Length::Px(height) if height <= 284.0));
+}
+
+fn node_index_optional(root: &argui_ui::Element, key: &str) -> Option<usize> {
+    fn visit(element: &argui_ui::Element, key: &str, index: &mut usize) -> Option<usize> {
+        let current = *index;
+        *index += 1;
+        if element.key.as_deref() == Some(key) {
+            return Some(current);
+        }
+        element
+            .children
+            .iter()
+            .find_map(|child| visit(child, key, index))
+    }
+    visit(root, key, &mut 0)
+}
+
+fn element_by_key<'a>(element: &'a argui_ui::Element, key: &str) -> Option<&'a argui_ui::Element> {
+    if element.key.as_deref() == Some(key) {
+        return Some(element);
+    }
+    element
+        .children
+        .iter()
+        .find_map(|child| element_by_key(child, key))
 }

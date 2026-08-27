@@ -10,7 +10,7 @@ pub struct VirtualWindow {
     pub total: f32,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct VirtualList {
     pub item_count: usize,
     pub item_extent: f32,
@@ -28,8 +28,10 @@ impl VirtualList {
             viewport_extent,
             overscan: 3,
             scroll: ScrollConfig {
+                enabled: true,
                 axes: crate::ScrollAxes::Vertical,
                 polarity: crate::ScrollPolarity::Normal,
+                chaining: crate::ScrollChaining::Auto,
                 line_size: item_extent,
                 multiplier: 1.0,
                 scrollbar: None,
@@ -44,13 +46,13 @@ impl VirtualList {
     }
 
     #[must_use]
-    pub const fn scroll_config(mut self, scroll: ScrollConfig) -> Self {
+    pub fn scroll_config(mut self, scroll: ScrollConfig) -> Self {
         self.scroll = scroll;
         self
     }
 
     #[must_use]
-    pub fn window(self, offset: f32) -> VirtualWindow {
+    pub fn window(&self, offset: f32) -> VirtualWindow {
         let extent = self.item_extent.max(f32::EPSILON);
         let total = extent * self.item_count as f32;
         let offset = offset.clamp(0.0, (total - self.viewport_extent).max(0.0));

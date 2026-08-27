@@ -1,6 +1,16 @@
 use argui_platform::PlatformEvent;
+use argui_render::RenderProfile;
 use argui_ui::{TreeUpdate, UiEvent};
 use winit::event_loop::EventLoopProxy;
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct AnimationProfile {
+    pub frame_interval: std::time::Duration,
+    pub model_time: std::time::Duration,
+    pub tree_time: std::time::Duration,
+    pub paint_time: std::time::Duration,
+    pub tree_update: TreeUpdate,
+}
 
 use crate::app::Application;
 
@@ -10,6 +20,8 @@ pub enum RuntimeEvent {
     Ui(UiEvent),
     ViewUpdated(TreeUpdate),
     RendererReady,
+    RenderProfile(RenderProfile),
+    AnimationProfile(AnimationProfile),
     RendererFailed(String),
     LayoutFailed(String),
 }

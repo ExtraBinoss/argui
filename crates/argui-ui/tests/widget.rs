@@ -9,7 +9,8 @@ fn button_is_only_a_composed_interactive_element() {
     let element = Button::new(
         "save",
         "Save",
-        ButtonStyle::new(PaintStyle::new(resting), TextStyle::default()).hovered(hovered),
+        ButtonStyle::new(PaintStyle::new(resting.clone()), TextStyle::default())
+            .hovered(hovered.clone()),
     )
     .build();
 

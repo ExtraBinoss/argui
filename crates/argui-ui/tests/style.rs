@@ -25,3 +25,12 @@ fn layout_builders_expose_a_small_dsl_ready_style() {
     assert_eq!(element.style.grow, 1.0);
     assert_eq!(element.style.shrink, 0.0);
 }
+
+#[test]
+fn explicit_zero_minimums_allow_nested_scroll_hosts_to_shrink() {
+    let element = Element::container([])
+        .min_width(Length::Px(0.0))
+        .min_height(Length::Px(0.0));
+    assert_eq!(element.style.min_width, Length::Px(0.0));
+    assert_eq!(element.style.min_height, Length::Px(0.0));
+}

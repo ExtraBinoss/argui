@@ -31,8 +31,8 @@ impl TextInputStyle {
                 shrink: 0.0,
                 ..LayoutStyle::default()
             },
-            hovered: paint.quad,
-            focused: paint.quad,
+            hovered: paint.quad.clone(),
+            focused: paint.quad.clone(),
             paint,
             text,
             placeholder,
@@ -42,13 +42,13 @@ impl TextInputStyle {
     }
 
     #[must_use]
-    pub const fn hovered(mut self, style: QuadStyle) -> Self {
+    pub fn hovered(mut self, style: QuadStyle) -> Self {
         self.hovered = style;
         self
     }
 
     #[must_use]
-    pub const fn focused(mut self, style: QuadStyle) -> Self {
+    pub fn focused(mut self, style: QuadStyle) -> Self {
         self.focused = style;
         self
     }
@@ -97,6 +97,7 @@ impl TextInput {
             .hovered(self.style.hovered)
             .focused(self.style.focused);
         Element {
+            inspectable: true,
             key: Some(self.key),
             kind: ElementKind::TextInput {
                 initial_value: self.initial_value,
@@ -108,9 +109,12 @@ impl TextInput {
             },
             style: self.style.layout,
             paint: self.style.paint,
+            transform: argui_core::Transform2D::IDENTITY,
+            transform_origin: argui_core::TransformOrigin::CENTER,
             interaction: Some(interaction),
             transition: None,
             layer: None,
+            effects: Vec::new(),
             scroll: None,
             z_index: 0,
             children: Vec::new(),

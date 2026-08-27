@@ -1,5 +1,5 @@
-use argui_core::{Color, Point, Rect, TextPosition};
-use argui_paint::{Border, DisplayList, Quad};
+use argui_core::{Affine2D, Color, Point, Rect, TextPosition};
+use argui_paint::{Border, ClipChain, DisplayList, Fill, Quad};
 use argui_text::{CaretStop, TextEngine};
 use argui_ui::{Element, ElementKind, NodeId, UiTree};
 
@@ -213,27 +213,44 @@ pub(crate) fn update(ui: &UiTree, engine: &mut TextEngine, output: &mut crate::L
     }
 }
 
-pub(crate) fn paint_selection(region: &TextInputRegion, output: &mut DisplayList) {
+pub(crate) fn paint_selection(
+    region: &TextInputRegion,
+    output: &mut DisplayList,
+    transform: Affine2D,
+    clips: &ClipChain,
+) {
     for bounds in &region.selection {
-        push_quad(output, *bounds, region.clip, region.selection_color);
+        push_quad(output, *bounds, region.selection_color, transform, clips);
     }
 }
 
-pub(crate) fn paint_caret(region: &TextInputRegion, output: &mut DisplayList) {
+pub(crate) fn paint_caret(
+    region: &TextInputRegion,
+    output: &mut DisplayList,
+    transform: Affine2D,
+    clips: &ClipChain,
+) {
     if let Some(bounds) = region.caret {
-        push_quad(output, bounds, region.clip, region.caret_color);
+        push_quad(output, bounds, region.caret_color, transform, clips);
     }
 }
 
-fn push_quad(output: &mut DisplayList, bounds: Rect, clip: Rect, color: Color) {
-    if clip.intersection(bounds).is_some() {
+fn push_quad(
+    output: &mut DisplayList,
+    bounds: Rect,
+    color: Color,
+    transform: Affine2D,
+    clips: &ClipChain,
+) {
+    if !clips.regions().is_empty() {
         output.push_quad(Quad {
             bounds,
-            background: color,
+            background: Some(Fill::Solid(color)),
             border: Border::all(0.0, Color::TRANSPARENT),
             radii: Default::default(),
             opacity: 1.0,
-            clip,
+            transform,
+            clips: clips.clone(),
         });
     }
 }

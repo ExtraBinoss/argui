@@ -1,6 +1,7 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
 use argui::{platform::WindowConfig, render::RendererConfig, runtime::run_app_with_text_engine};
+use argui_devtools::DevtoolsHost;
 use argui_showcase::{StateShowcase, text_engine};
 use wasm_bindgen::prelude::*;
 
@@ -14,7 +15,7 @@ pub fn start() -> Result<(), JsValue> {
         },
         RendererConfig::default(),
         text_engine(),
-        StateShowcase::default(),
+        DevtoolsHost::new(StateShowcase::default()),
         |_| {},
     )
     .map_err(|error| JsValue::from_str(&error.to_string()))

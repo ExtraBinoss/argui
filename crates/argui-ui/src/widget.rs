@@ -25,9 +25,9 @@ impl ButtonStyle {
                 shrink: 0.0,
                 ..LayoutStyle::default()
             },
-            hovered: paint.quad,
-            pressed: paint.quad,
-            focused: paint.quad,
+            hovered: paint.quad.clone(),
+            pressed: paint.quad.clone(),
+            focused: paint.quad.clone(),
             paint,
             label,
         }
@@ -40,19 +40,19 @@ impl ButtonStyle {
     }
 
     #[must_use]
-    pub const fn hovered(mut self, style: QuadStyle) -> Self {
+    pub fn hovered(mut self, style: QuadStyle) -> Self {
         self.hovered = style;
         self
     }
 
     #[must_use]
-    pub const fn pressed(mut self, style: QuadStyle) -> Self {
+    pub fn pressed(mut self, style: QuadStyle) -> Self {
         self.pressed = style;
         self
     }
 
     #[must_use]
-    pub const fn focused(mut self, style: QuadStyle) -> Self {
+    pub fn focused(mut self, style: QuadStyle) -> Self {
         self.focused = style;
         self
     }

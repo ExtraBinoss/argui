@@ -1,7 +1,8 @@
 use argui_core::{
-    CaretAffinity, ImeInput, Key, KeyInput, KeyState, Modifiers, Point, Rect, Size, TextPosition,
+    Affine2D, CaretAffinity, ImeInput, Key, KeyInput, KeyState, Modifiers, Point, Rect, Size,
+    TextPosition,
 };
-use argui_paint::{PaintStyle, QuadStyle};
+use argui_paint::{ClipChain, ClipRegion, PaintStyle, QuadStyle};
 use argui_text::TextStyle;
 use argui_ui::{ClipboardRequest, HitRegion, TextInput, TextInputStyle, UiEventKind, UiTree};
 
@@ -21,7 +22,8 @@ fn tree(value: &str) -> (UiTree, HitRegion) {
         HitRegion {
             node,
             bounds,
-            clip: bounds,
+            transform: Affine2D::IDENTITY,
+            clips: ClipChain::from_regions([ClipRegion::new(bounds, Affine2D::IDENTITY)]),
             focusable: true,
         },
     )
@@ -37,15 +39,15 @@ fn key(key: Key, text: Option<&str>, modifiers: Modifiers) -> KeyInput {
     }
 }
 
-fn focus(tree: &mut UiTree, region: HitRegion) {
-    tree.pointer_moved(Point::new(10.0, 10.0), &[region]);
-    tree.primary_pressed(&[region]);
+fn focus(tree: &mut UiTree, region: &HitRegion) {
+    tree.pointer_moved(Point::new(10.0, 10.0), std::slice::from_ref(region));
+    tree.primary_pressed(std::slice::from_ref(region));
 }
 
 #[test]
 fn editing_respects_graphemes_selection_and_clipboard_requests() {
     let (mut tree, region) = tree("A👋🏽");
-    focus(&mut tree, region);
+    focus(&mut tree, &region);
     let node = region.node;
 
     let deleted = tree.key_input(&key(Key::Backspace, None, Modifiers::default()));
@@ -75,7 +77,7 @@ fn editing_respects_graphemes_selection_and_clipboard_requests() {
 #[test]
 fn ime_preedit_is_visible_but_only_commit_changes_the_value() {
     let (mut tree, region) = tree("");
-    focus(&mut tree, region);
+    focus(&mut tree, &region);
     let node = region.node;
 
     let preedit = tree.ime_input(ImeInput::Preedit {
@@ -105,7 +107,7 @@ fn text_input_style_remains_composed_from_existing_primitives() {
 #[test]
 fn navigation_delete_submit_and_escape_cover_editor_edges() {
     let (mut tree, region) = tree("one two");
-    focus(&mut tree, region);
+    focus(&mut tree, &region);
     let node = region.node;
     let shift = Modifiers {
         shift: true,
@@ -153,7 +155,7 @@ fn navigation_delete_submit_and_escape_cover_editor_edges() {
 #[test]
 fn word_motion_pointer_drag_and_state_retention_are_explicit() {
     let (mut tree, region) = tree("one two three");
-    focus(&mut tree, region);
+    focus(&mut tree, &region);
     let node = region.node;
     let command = Modifiers {
         control: true,
@@ -188,7 +190,7 @@ fn unfocused_released_and_empty_ime_inputs_do_no_work() {
     assert!(!tree.paste_text("x").layout_changed);
     assert!(!tree.ime_input(ImeInput::Enabled).layout_changed);
 
-    focus(&mut tree, region);
+    focus(&mut tree, &region);
     let command = Modifiers {
         control: true,
         ..Modifiers::default()
@@ -238,7 +240,7 @@ fn unfocused_released_and_empty_ime_inputs_do_no_work() {
 #[test]
 fn reverse_selection_real_delete_and_default_ime_cursor_cover_boundaries() {
     let (mut tree, region) = tree("abc");
-    focus(&mut tree, region);
+    focus(&mut tree, &region);
     let node = region.node;
 
     tree.place_text_cursor(node, 3, false);
@@ -261,7 +263,7 @@ fn reverse_selection_real_delete_and_default_ime_cursor_cover_boundaries() {
 #[test]
 fn modifier_and_selection_paths_keep_editing_deterministic() {
     let (mut tree, region) = tree("one two");
-    focus(&mut tree, region);
+    focus(&mut tree, &region);
     let node = region.node;
     let alt = Modifiers {
         alt: true,
@@ -304,7 +306,7 @@ fn modifier_and_selection_paths_keep_editing_deterministic() {
 #[test]
 fn rebuilding_the_same_field_preserves_retained_input_state() {
     let (mut tree, region) = tree("seed");
-    focus(&mut tree, region);
+    focus(&mut tree, &region);
     let node = region.node;
     tree.paste_text(" value");
 
@@ -323,7 +325,7 @@ fn rebuilding_the_same_field_preserves_retained_input_state() {
 #[test]
 fn visual_positions_preserve_affinity_across_pointer_and_keyboard_updates() {
     let (mut tree, region) = tree("abc العربية xyz");
-    focus(&mut tree, region);
+    focus(&mut tree, &region);
     let node = region.node;
     let after = TextPosition::new(4, CaretAffinity::After);
     let before = TextPosition::new(4, CaretAffinity::Before);

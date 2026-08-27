@@ -1,11 +1,19 @@
 use core::fmt;
 
-use crate::{LayerStyle, Quad};
+use argui_core::Affine2D;
+
+use crate::{ClipChain, ImagePrimitive, LayerStyle, Quad, VectorPrimitive};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum DisplayCommand {
     Quad(Quad),
-    Text(usize),
+    Image(ImagePrimitive),
+    Vector(VectorPrimitive),
+    Text {
+        block: usize,
+        transform: Affine2D,
+        clips: ClipChain,
+    },
     BeginLayer(LayerStyle),
     EndLayer,
 }
@@ -54,8 +62,24 @@ impl DisplayList {
         self.quad_count += 1;
     }
 
+    pub fn push_image(&mut self, image: ImagePrimitive) {
+        self.commands.push(DisplayCommand::Image(image));
+    }
+
+    pub fn push_vector(&mut self, vector: VectorPrimitive) {
+        self.commands.push(DisplayCommand::Vector(vector));
+    }
+
     pub fn push_text(&mut self, block: usize) {
-        self.commands.push(DisplayCommand::Text(block));
+        self.push_text_transformed(block, Affine2D::IDENTITY, ClipChain::default());
+    }
+
+    pub fn push_text_transformed(&mut self, block: usize, transform: Affine2D, clips: ClipChain) {
+        self.commands.push(DisplayCommand::Text {
+            block,
+            transform,
+            clips,
+        });
     }
 
     pub fn begin_layer(&mut self, style: LayerStyle) {
@@ -90,7 +114,10 @@ impl DisplayList {
                     return Err(DisplayListError::UnexpectedLayerEnd { command });
                 }
                 DisplayCommand::EndLayer => depth -= 1,
-                DisplayCommand::Quad(_) | DisplayCommand::Text(_) => {}
+                DisplayCommand::Quad(_)
+                | DisplayCommand::Image(_)
+                | DisplayCommand::Vector(_)
+                | DisplayCommand::Text { .. } => {}
             }
         }
         if depth == 0 {

@@ -29,7 +29,7 @@ fn button(key: &str, label: &str, accent: Color) -> Element {
         .border(Border::all(1.0, accent))
         .radius(radius)
         .opacity(0.82);
-    let focused = rest.border(Border::all(2.0, accent));
+    let focused = rest.clone().border(Border::all(2.0, accent));
     Button::new(
         key,
         label,

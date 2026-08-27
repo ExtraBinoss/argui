@@ -6,8 +6,8 @@ use crate::scroll::ScrollState;
 use crate::text_input::{TextInputState, TextInputStates};
 use crate::transition::PaintTransitions;
 use crate::{
-    Element, ElementKind, HitRegion, Interaction, InteractionUpdate, NodeId, ScrollRegion, UiEvent,
-    UiEventKind, VisualState, identity,
+    Element, ElementKind, HitRegion, InteractionUpdate, NodeId, ScrollRegion, UiEvent, UiEventKind,
+    VisualState, identity,
 };
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -54,6 +54,11 @@ impl UiTree {
     #[must_use]
     pub const fn root(&self) -> &Element {
         &self.root
+    }
+
+    #[must_use]
+    pub fn node_ids(&self) -> &[NodeId] {
+        &self.node_ids
     }
 
     #[must_use]
@@ -110,6 +115,11 @@ impl UiTree {
     }
 
     #[must_use]
+    pub fn key(&self, node: NodeId) -> Option<&str> {
+        self.key_for(node)
+    }
+
+    #[must_use]
     pub fn visual_state(&self, node: NodeId) -> VisualState {
         self.interaction.visual_state(node)
     }
@@ -121,10 +131,18 @@ impl UiTree {
 
     #[must_use]
     pub fn resolved_quad(&self, node: NodeId, element: &Element) -> QuadStyle {
-        let base = self.transitions.resolve(node, element.paint.quad);
-        element.interaction.map_or(base, |interaction| {
-            interaction.resolve(base, self.visual_state(node))
-        })
+        let base = self.transitions.resolve(node, element.paint.quad.clone());
+        element
+            .interaction
+            .as_ref()
+            .map_or(base.clone(), |interaction| {
+                interaction.resolve(base, self.visual_state(node))
+            })
+    }
+
+    #[must_use]
+    pub fn resolved_transform(&self, node: NodeId, element: &Element) -> argui_core::Transform2D {
+        self.transitions.resolve_transform(node, element.transform)
     }
 
     pub fn advance_animations(&mut self, now: argui_animation::Time) -> bool {
@@ -320,16 +338,23 @@ impl UiTree {
         self.scroll.offset(node)
     }
 
+    pub fn set_scroll_offset(&mut self, node: NodeId, offset: Point) -> bool {
+        self.scroll.set_offset(node, offset)
+    }
+
     pub fn scroll(
         &mut self,
         point: Point,
         delta: ScrollDelta,
         regions: &[ScrollRegion],
     ) -> InteractionUpdate {
-        let Some(change) = self.scroll.scroll(point, delta, regions) else {
+        let Some(outcome) = self.scroll.scroll(point, delta, regions) else {
             return InteractionUpdate::default();
         };
-        self.scroll_update(change)
+        match outcome {
+            crate::scroll::ScrollOutcome::Changed(change) => self.scroll_update(change),
+            crate::scroll::ScrollOutcome::Consumed => InteractionUpdate::default(),
+        }
     }
 
     pub fn scrollbar_pressed(
@@ -497,11 +522,10 @@ fn classify_update(old: &Element, new: &Element) -> TreeUpdate {
         return TreeUpdate::None;
     }
     if old.key != new.key
-        || old.kind != new.kind
+        || kind_changes_layout(&old.kind, &new.kind)
         || old.style != new.style
         || old.paint.clip != new.paint.clip
         || old.scroll.is_some() != new.scroll.is_some()
-        || interaction_geometry(old.interaction) != interaction_geometry(new.interaction)
         || old.children.len() != new.children.len()
     {
         return TreeUpdate::Layout;
@@ -518,6 +542,13 @@ fn classify_update(old: &Element, new: &Element) -> TreeUpdate {
     }
 }
 
-fn interaction_geometry(interaction: Option<Interaction>) -> Option<(bool, bool)> {
-    interaction.map(|interaction| (interaction.enabled, interaction.focusable))
+fn kind_changes_layout(old: &ElementKind, new: &ElementKind) -> bool {
+    match (old, new) {
+        (ElementKind::Container, ElementKind::Container)
+        | (ElementKind::Image { .. }, ElementKind::Image { .. })
+        | (ElementKind::Vector { .. }, ElementKind::Vector { .. }) => false,
+        (ElementKind::Text { .. }, ElementKind::Text { .. })
+        | (ElementKind::TextInput { .. }, ElementKind::TextInput { .. }) => old != new,
+        _ => true,
+    }
 }

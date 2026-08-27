@@ -22,6 +22,6 @@ pub(super) fn content<'a>(
                 Some((Cow::Owned(value), text))
             }
         }
-        ElementKind::Container => None,
+        ElementKind::Container | ElementKind::Image { .. } | ElementKind::Vector { .. } => None,
     }
 }

@@ -1,22 +1,25 @@
 //! One showcase shared by native and WebAssembly launchers.
 
+mod list;
 mod physics;
 mod popover;
+mod visual;
 
 use argui_animation::{
     CubicBezier, Direction, Duration, Easing, FillMode, Frame, Inertia, Iterations, Keyframe,
     Keyframes, PlaybackState, Spring, Timeline, Timing,
 };
-use argui_paint::{Border, ClipBehavior, Color, CornerRadii, PaintStyle, QuadStyle};
-use argui_runtime::{UiApp, ViewUpdate};
+use argui_core::Rect;
+use argui_paint::{Border, ClipBehavior, Color, CornerRadii, ImageAsset, PaintStyle, QuadStyle};
+use argui_runtime::{EffectShader, LayoutSnapshot, UiApp, ViewUpdate};
 use argui_text::{TextColor, TextEngine, TextStyle, TextWrap};
 use argui_ui::{
-    Align, Button, ButtonStyle, Edges, Element, Inset, Interaction, Length, ScrollConfig,
-    ScrollPolarity, ScrollbarStyle, TextInput, TextInputStyle, Transition, UiEvent, UiEventKind,
-    VirtualList, Wrap,
+    Align, Button, ButtonStyle, Edges, Element, Inset, Length, PlacedOverlay, ScrollConfig,
+    TextInput, TextInputStyle, Transition, UiEvent, UiEventKind, Wrap,
 };
 use physics::{PhysicsCommand, PhysicsMode, showcase_inertia, showcase_spring};
-use popover::shadow_timeline;
+use popover::{popover_spring, shadow_timeline};
+use visual::ShowcaseImages;
 
 pub struct StateShowcase {
     count: u32,
@@ -34,8 +37,18 @@ pub struct StateShowcase {
     physics_command: Option<PhysicsCommand>,
     physics_value: f32,
     popover_open: bool,
+    popover_motion: Spring<f32>,
+    popover_progress: f32,
+    popover_placement: Option<PlacedOverlay>,
+    tooltip_hovered: bool,
+    tooltip_visible: bool,
+    tooltip_delay: f32,
+    tooltip_placement: Option<PlacedOverlay>,
+    overlay_container: Rect,
     shadow_color: Color,
+    effect_phase: f32,
     shadow_animation: Timeline<Color>,
+    images: ShowcaseImages,
 }
 
 #[derive(Clone, Copy)]
@@ -67,13 +80,31 @@ impl Default for StateShowcase {
             physics_command: None,
             physics_value: 0.0,
             popover_open: false,
+            popover_motion: popover_spring(),
+            popover_progress: 0.0,
+            popover_placement: None,
+            tooltip_hovered: false,
+            tooltip_visible: false,
+            tooltip_delay: 0.0,
+            tooltip_placement: None,
+            overlay_container: Rect::default(),
             shadow_color,
+            effect_phase: 0.0,
             shadow_animation: shadow_timeline(shadow_color),
+            images: ShowcaseImages::embedded(),
         }
     }
 }
 
 impl UiApp for StateShowcase {
+    fn effect_shaders(&self) -> &'static [EffectShader] {
+        popover::EFFECT_SHADERS
+    }
+
+    fn image_assets(&self) -> Vec<ImageAsset> {
+        self.images.assets().to_vec()
+    }
+
     fn view(&self) -> Element {
         let accent = if self.warm {
             Color::rgb(0.96, 0.52, 0.26)
@@ -134,6 +165,7 @@ impl UiApp for StateShowcase {
             Element::row(items).wrap(Wrap::Wrap).gap(10.0),
             self.animation_demo(accent),
             self.physics_demo(accent),
+            self.visual_primitives(accent),
             self.popover_demo(accent),
             self.virtual_list(accent),
             Element::text("OVERLAY · z-index 100")
@@ -170,6 +202,14 @@ impl UiApp for StateShowcase {
         .padding(Edges::symmetric(20.0, 24.0))
     }
 
+    fn layout_changed(&mut self, layout: &LayoutSnapshot) -> ViewUpdate {
+        if self.update_overlay_layout(layout) {
+            ViewUpdate::Rebuild
+        } else {
+            ViewUpdate::None
+        }
+    }
+
     fn update(&mut self, event: &UiEvent) -> ViewUpdate {
         if let UiEventKind::Scrolled { offset, .. } = event.kind
             && event.key.as_deref() == Some("million-list")
@@ -183,6 +223,23 @@ impl UiApp for StateShowcase {
                 ViewUpdate::Rebuild
             };
         }
+        if event.key.as_deref() == Some("tooltip-anchor") {
+            match event.kind {
+                UiEventKind::PointerEntered => {
+                    self.tooltip_hovered = true;
+                    self.tooltip_delay = 0.0;
+                }
+                UiEventKind::PointerLeft => {
+                    self.tooltip_hovered = false;
+                    self.tooltip_delay = 0.0;
+                    if self.tooltip_visible {
+                        self.tooltip_visible = false;
+                        return ViewUpdate::Rebuild;
+                    }
+                }
+                _ => {}
+            }
+        }
         if event.kind != UiEventKind::Clicked {
             return ViewUpdate::None;
         }
@@ -194,12 +251,15 @@ impl UiApp for StateShowcase {
             Some("polarity") => self.inverted_scroll = !self.inverted_scroll,
             Some("popover-toggle") => {
                 self.popover_open = !self.popover_open;
+                self.popover_motion
+                    .retarget(if self.popover_open { 1.0 } else { 0.0 });
                 if !self.popover_open {
                     self.shadow_animation.cancel();
                 }
             }
             Some("popover-close") => {
                 self.popover_open = false;
+                self.popover_motion.retarget(0.0);
                 self.shadow_animation.cancel();
             }
             Some("animation-play") => {
@@ -236,6 +296,21 @@ impl UiApp for StateShowcase {
     }
 
     fn animation_frame(&mut self, frame: Frame) -> ViewUpdate {
+        let popover_changed = self.popover_motion.advance(frame.elapsed);
+        if popover_changed {
+            self.popover_progress = self.popover_motion.value().clamp(0.0, 1.0);
+        }
+        let tooltip_changed = if self.tooltip_hovered && !self.tooltip_visible {
+            self.tooltip_delay += frame.elapsed.as_secs_f64() as f32;
+            if self.tooltip_delay >= 0.45 {
+                self.tooltip_visible = true;
+                true
+            } else {
+                false
+            }
+        } else {
+            false
+        };
         if self.popover_open
             && matches!(
                 self.shadow_animation.state(),
@@ -248,6 +323,10 @@ impl UiApp for StateShowcase {
         let next_shadow = shadow_sample.value.unwrap_or(self.shadow_color);
         let shadow_changed = next_shadow != self.shadow_color;
         self.shadow_color = next_shadow;
+        if self.popover_open {
+            self.effect_phase =
+                (self.effect_phase + frame.elapsed.as_secs_f64() as f32 * 4.0) % 1_000.0;
+        }
         let physics_command = self.apply_physics_command();
         let physics_changed = match self.physics_mode {
             PhysicsMode::Spring => self.spring.advance(frame.elapsed),
@@ -277,7 +356,13 @@ impl UiApp for StateShowcase {
         let color = sample.value.unwrap_or_else(|| self.accent());
         let changed = color != self.animated_color || sample.events != Default::default();
         self.animated_color = color;
-        if changed || shadow_changed || physics_command || physics_changed {
+        if changed
+            || shadow_changed
+            || physics_command
+            || physics_changed
+            || popover_changed
+            || tooltip_changed
+        {
             ViewUpdate::Rebuild
         } else {
             ViewUpdate::None
@@ -293,7 +378,9 @@ impl UiApp for StateShowcase {
             || self.animation.needs_frame()
             || self.physics_command.is_some()
             || physics_active
+            || self.popover_motion.is_active()
             || self.popover_open
+            || (self.tooltip_hovered && !self.tooltip_visible)
     }
 }
 
@@ -345,68 +432,12 @@ impl StateShowcase {
         .radius(CornerRadii::all(14.0))
     }
 
-    fn virtual_list_config(&self) -> VirtualList {
-        let polarity = if self.inverted_scroll {
-            ScrollPolarity::Inverted
-        } else {
-            ScrollPolarity::Normal
-        };
-        VirtualList::new(1_000_000, 36.0, 260.0)
-            .overscan(3)
-            .scroll_config(
-                ScrollConfig::default()
-                    .polarity(polarity)
-                    .line_size(36.0)
-                    .scrollbar(self.scrollbar_style(self.accent())),
-            )
-    }
-
     fn accent(&self) -> Color {
         if self.warm {
             Color::rgb(0.96, 0.52, 0.26)
         } else {
             Color::rgb(0.20, 0.68, 0.94)
         }
-    }
-
-    fn scrollbar_style(&self, accent: Color) -> ScrollbarStyle {
-        ScrollbarStyle::new(
-            QuadStyle::solid(Color::rgba(0.12, 0.16, 0.22, 0.72)).radius(CornerRadii::all(5.0)),
-            QuadStyle::solid(accent).radius(CornerRadii::all(5.0)),
-        )
-        .width(10.0)
-        .inset(5.0)
-        .min_thumb(30.0)
-    }
-
-    fn virtual_list(&self, accent: Color) -> Element {
-        self.virtual_list_config()
-            .build("million-list", self.virtual_offset, |index| {
-                let background = if index % 2 == 0 {
-                    Color::rgb(0.075, 0.10, 0.15)
-                } else {
-                    Color::rgb(0.06, 0.08, 0.12)
-                };
-                Element::text(format!("Row #{index:07} / 1,000,000"))
-                    .keyed(format!("row-{index}"))
-                    .text_style(text_style(
-                        15.0,
-                        TextColor::rgb(0.78, 0.84, 0.92),
-                        500,
-                        TextWrap::None,
-                    ))
-                    .padding(Edges::symmetric(12.0, 8.0))
-                    .background(background)
-                    .interaction(
-                        Interaction::default().hovered(
-                            QuadStyle::solid(Color::rgb(0.12, 0.18, 0.25))
-                                .border(Border::all(1.0, accent)),
-                        ),
-                    )
-            })
-            .background(Color::rgb(0.035, 0.045, 0.065))
-            .border(Border::all(1.0, Color::rgb(0.18, 0.24, 0.32)))
-            .radius(CornerRadii::all(12.0))
     }
 }
 
@@ -475,10 +506,10 @@ fn button(key: &str, label: &str, accent: Color) -> Element {
         key,
         label,
         ButtonStyle::new(
-            PaintStyle::new(rest),
+            PaintStyle::new(rest.clone()),
             text_style(17.0, TextColor::WHITE, 600, TextWrap::None),
         )
-        .hovered(active)
+        .hovered(active.clone())
         .pressed(active.opacity(0.72))
         .focused(rest.border(Border::all(2.0, accent))),
     )
@@ -491,7 +522,7 @@ fn text_input(key: &str, value: &str, placeholder: &str, accent: Color) -> Eleme
     let rest = QuadStyle::solid(Color::rgb(0.035, 0.05, 0.075))
         .border(Border::all(1.0, Color::rgb(0.20, 0.27, 0.36)))
         .radius(radius);
-    let active = rest.border(Border::all(1.5, accent));
+    let active = rest.clone().border(Border::all(1.5, accent));
     TextInput::new(
         key,
         value,
@@ -500,7 +531,7 @@ fn text_input(key: &str, value: &str, placeholder: &str, accent: Color) -> Eleme
             PaintStyle::new(rest).clip(ClipBehavior::Bounds),
             text_style(17.0, TextColor::WHITE, 400, TextWrap::None),
         )
-        .hovered(active)
+        .hovered(active.clone())
         .focused(active)
         .selection(Color::rgba(red, green, blue, 0.38))
         .caret(accent),

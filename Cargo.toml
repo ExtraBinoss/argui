@@ -11,7 +11,11 @@ license = "MIT OR Apache-2.0"
 [workspace.dependencies]
 argui-animation = { path = "crates/argui-animation" }
 argui-core = { path = "crates/argui-core" }
+argui-devtools = { path = "crates/argui-devtools" }
+argui-effects = { path = "crates/argui-effects" }
 argui-layout = { path = "crates/argui-layout" }
+argui-image = { path = "crates/argui-image" }
+argui-inspect = { path = "crates/argui-inspect" }
 argui-paint = { path = "crates/argui-paint" }
 argui-platform = { path = "crates/argui-platform" }
 argui-render = { path = "crates/argui-render" }
@@ -19,6 +23,7 @@ argui-showcase = { path = "crates/argui-showcase" }
 argui-runtime = { path = "crates/argui-runtime" }
 argui-text = { path = "crates/argui-text" }
 argui-ui = { path = "crates/argui-ui" }
+argui-vector = { path = "crates/argui-vector" }
 
 bytemuck = { version = "=1.25.2", features = ["derive"] }
 arboard = { version = "=3.6.1", default-features = false, features = ["wayland-data-control"] }
@@ -33,7 +38,14 @@ winit = "=0.30.13"
 wasm-bindgen-futures = "=0.4.77"
 wasm-bindgen = "=0.2.127"
 web-sys = "=0.3.104"
+web-time = "=1.1.0"
 unicode-segmentation = "=1.13.3"
+image = { version = "=0.25.10", default-features = false, features = ["png", "jpeg"] }
+lyon_path = "=1.0.19"
+lyon_tessellation = "=1.0.20"
+usvg = { version = "=0.48.1", default-features = false }
+icondata_core = "=0.1.0"
+icondata_tb = "=0.1.0"
 
 [workspace.lints.rust]
 unsafe_code = "deny"

@@ -9,6 +9,8 @@ pub struct ShaderEffectId(pub u64);
 pub struct CustomEffect {
     pub shader: ShaderEffectId,
     pub parameters: Vec<f32>,
+    pub expansion: f32,
+    pub pixel_parameters: u32,
 }
 
 impl CustomEffect {
@@ -17,7 +19,24 @@ impl CustomEffect {
         Self {
             shader,
             parameters: parameters.into(),
+            expansion: 0.0,
+            pixel_parameters: 0,
         }
+    }
+
+    #[must_use]
+    pub fn expansion(mut self, pixels: f32) -> Self {
+        self.expansion = pixels.max(0.0);
+        self
+    }
+
+    /// Marks one parameter as a logical-pixel value that follows DPI scaling.
+    #[must_use]
+    pub fn pixel_parameter(mut self, index: usize) -> Self {
+        if index < 24 {
+            self.pixel_parameters |= 1 << index;
+        }
+        self
     }
 }
 
@@ -63,6 +82,7 @@ impl Filter {
     pub fn expansion(&self) -> f32 {
         match self {
             Self::Blur(radius) => radius.max(0.0) * 3.0,
+            Self::Custom(effect) => effect.expansion,
             _ => 0.0,
         }
     }
@@ -71,6 +91,23 @@ impl Filter {
     pub fn scaled(&self, factor: f32) -> Self {
         match self {
             Self::Blur(radius) => Self::Blur(radius * factor),
+            Self::Custom(effect) => Self::Custom(CustomEffect {
+                shader: effect.shader,
+                parameters: effect
+                    .parameters
+                    .iter()
+                    .enumerate()
+                    .map(|(index, value)| {
+                        if effect.pixel_parameters & (1 << index) != 0 {
+                            value * factor
+                        } else {
+                            *value
+                        }
+                    })
+                    .collect(),
+                expansion: effect.expansion * factor,
+                pixel_parameters: effect.pixel_parameters,
+            }),
             other => other.clone(),
         }
     }
@@ -216,7 +253,7 @@ impl LayerStyle {
 
     #[must_use]
     pub fn expanded_bounds(&self) -> Rect {
-        let mut expansion = self.filters.iter().map(Filter::expansion).sum::<f32>();
+        let mut expansion = self.foreground_expansion();
         for shadow in &self.shadows {
             expansion = expansion.max(
                 shadow.blur.max(0.0) * 3.0
@@ -234,6 +271,16 @@ impl LayerStyle {
                 self.bounds.size.height + expansion * 2.0,
             ),
         )
+    }
+
+    #[must_use]
+    pub fn foreground_expansion(&self) -> f32 {
+        self.filters.iter().map(Filter::expansion).sum()
+    }
+
+    #[must_use]
+    pub fn foreground_bounds(&self) -> Rect {
+        outset(self.bounds, self.foreground_expansion())
     }
 
     #[must_use]
@@ -267,4 +314,14 @@ impl LayerStyle {
         }
         scaled
     }
+}
+
+fn outset(rect: Rect, amount: f32) -> Rect {
+    Rect::new(
+        Point::new(rect.origin.x - amount, rect.origin.y - amount),
+        Size::new(
+            rect.size.width + amount * 2.0,
+            rect.size.height + amount * 2.0,
+        ),
+    )
 }

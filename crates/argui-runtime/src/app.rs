@@ -2,16 +2,19 @@ use crate::translate::{
     button_state, ime_input, key_input, modifiers_state, pointer_button, scroll_delta,
 };
 use crate::{
-    RuntimeError, RuntimeEvent, UiApp, ViewUpdate, animation::RuntimeAnimations, event::UserEvent,
+    LayoutBounds, LayoutSnapshot, RuntimeError, RuntimeEvent, UiApp, ViewUpdate,
+    animation::RuntimeAnimations, event::UserEvent,
 };
 use argui_core::{Point, Size};
+use argui_inspect::InspectorHandle;
 use argui_layout::{LayoutEngine, LayoutOutput};
+use argui_paint::{ImageAsset, VectorAsset};
 use argui_platform::{
     ButtonState, Modifiers, PlatformError, PlatformEvent, PointerButton, ScrollDelta, WindowConfig,
 };
-use argui_render::{RenderStatus, RendererConfig, SurfaceRenderer};
+use argui_render::{EffectShader, RendererConfig, SurfaceRenderer};
 use argui_text::{PreparedText, TextEngine, TextScene};
-use argui_ui::{InteractionUpdate, TreeUpdate, UiTree};
+use argui_ui::{InteractionUpdate, UiTree};
 use std::{cell::RefCell, rc::Rc, sync::Arc};
 use winit::{
     application::ApplicationHandler,
@@ -19,6 +22,11 @@ use winit::{
     event_loop::ActiveEventLoop,
     window::{Window, WindowId},
 };
+
+mod frame;
+mod inspect;
+mod renderer;
+mod scroll;
 
 enum RendererState {
     Loading,
@@ -29,10 +37,14 @@ enum RendererState {
 
 pub(crate) struct Application {
     window_config: WindowConfig,
-    renderer_config: RendererConfig,
+    pub(super) renderer_config: RendererConfig,
     window: Option<Arc<Window>>,
     renderer: Rc<RefCell<RendererState>>,
     renderer_announced: bool,
+    effect_shaders: Vec<EffectShader>,
+    image_assets: Vec<ImageAsset>,
+    vector_assets: Vec<VectorAsset>,
+    pub(super) inspector: Option<InspectorHandle>,
     pub(super) text_engine: TextEngine,
     text_scene: Option<TextScene>,
     pub(super) ui_tree: Option<UiTree>,
@@ -50,6 +62,9 @@ pub(crate) struct Application {
     #[cfg(target_arch = "wasm32")]
     pub(super) event_proxy: Option<winit::event_loop::EventLoopProxy<UserEvent>>,
     pending_scrollbar_drag: Option<Point>,
+    pending_pointer_scroll: Option<ScrollDelta>,
+    scroll_inertia: scroll::ScrollInertia,
+    pending_ui_frame: frame::PendingUiFrame,
     pub(crate) fatal_error: Option<RuntimeError>,
     pub(super) on_event: Box<dyn FnMut(RuntimeEvent)>,
 }
@@ -65,12 +80,34 @@ impl Application {
         model: Option<Box<dyn UiApp>>,
         on_event: impl FnMut(RuntimeEvent) + 'static,
     ) -> Self {
+        let inspector = model.as_deref().and_then(UiApp::inspector);
+        let renderer_config = RendererConfig {
+            profiling: renderer_config.profiling || inspector.is_some(),
+            ..renderer_config
+        };
+        let effect_shaders = model
+            .as_deref()
+            .map(UiApp::effect_shaders)
+            .unwrap_or_default()
+            .to_vec();
+        let image_assets = model
+            .as_deref()
+            .map(UiApp::image_assets)
+            .unwrap_or_default();
+        let vector_assets = model
+            .as_deref()
+            .map(UiApp::vector_assets)
+            .unwrap_or_default();
         Self {
             window_config,
             renderer_config,
             window: None,
             renderer: Rc::new(RefCell::new(RendererState::Loading)),
             renderer_announced: false,
+            effect_shaders,
+            image_assets,
+            vector_assets,
+            inspector,
             text_engine,
             text_scene,
             ui_tree,
@@ -88,18 +125,44 @@ impl Application {
             #[cfg(target_arch = "wasm32")]
             event_proxy: None,
             pending_scrollbar_drag: None,
+            pending_pointer_scroll: None,
+            scroll_inertia: scroll::ScrollInertia::default(),
+            pending_ui_frame: frame::PendingUiFrame::default(),
             fatal_error: None,
             on_event: Box::new(on_event),
         }
     }
 
     fn prepare_text(&mut self) -> Result<(), RuntimeError> {
-        if let Some(ui) = &mut self.ui_tree {
-            self.ui_layout = Some(self.layout_engine.compute(
-                ui,
-                &mut self.text_engine,
-                self.viewport,
-            )?);
+        if let Some(layout) = self.compute_ui_layout()? {
+            let snapshot = LayoutSnapshot {
+                viewport: layout.viewport,
+                nodes: layout
+                    .nodes
+                    .iter()
+                    .map(|node| LayoutBounds {
+                        node: node.node,
+                        key: self
+                            .ui_tree
+                            .as_ref()
+                            .and_then(|ui| ui.key(node.node))
+                            .map(ToOwned::to_owned),
+                        bounds: node.bounds,
+                    })
+                    .collect(),
+            };
+            self.ui_layout = Some(layout);
+            let rebuild = self
+                .model
+                .as_mut()
+                .is_some_and(|model| model.layout_changed(&snapshot) == ViewUpdate::Rebuild);
+            if rebuild && let Some(root) = self.inspected_view() {
+                if let Some(ui) = &mut self.ui_tree {
+                    ui.update(root);
+                }
+                self.ui_layout = self.compute_ui_layout()?;
+            }
+            self.publish_inspection();
         }
         let scene = self
             .ui_layout
@@ -108,6 +171,16 @@ impl Application {
             .or(self.text_scene.as_ref());
         self.prepared_text = scene.map(|scene| self.text_engine.prepare(scene, self.scale_factor));
         Ok(())
+    }
+
+    fn compute_ui_layout(&mut self) -> Result<Option<LayoutOutput>, RuntimeError> {
+        let Some(ui) = &mut self.ui_tree else {
+            return Ok(None);
+        };
+        self.layout_engine
+            .compute(ui, &mut self.text_engine, self.viewport)
+            .map(Some)
+            .map_err(Into::into)
     }
 
     fn update_viewport(&mut self, width: u32, height: u32) {
@@ -127,68 +200,34 @@ impl Application {
         true
     }
 
-    fn scroll_or_exit(&mut self, event_loop: &ActiveEventLoop) -> bool {
-        let result = match (&self.ui_tree, &mut self.ui_layout) {
-            (Some(ui), Some(layout)) => self.layout_engine.apply_scroll(ui, layout),
-            _ => return false,
-        };
-        if let Err(error) = result {
-            (self.on_event)(RuntimeEvent::LayoutFailed(error.to_string()));
-            self.fatal_error = Some(error.into());
-            event_loop.exit();
-            return false;
-        }
-        if let (Some(prepared), Some(layout)) = (&mut self.prepared_text, &self.ui_layout) {
-            for (index, block) in layout.text.blocks().iter().enumerate() {
-                prepared.reposition_block(index, block.bounds.origin, block.clip);
-            }
-        }
-        true
-    }
-
     pub(super) fn apply_ui_update(
         &mut self,
         update: InteractionUpdate,
         window: &Window,
         event_loop: &ActiveEventLoop,
     ) {
-        let clipboard = update.clipboard.clone();
+        let mut clipboard = update.clipboard.clone();
         let mut rebuild = false;
-        for event in update.events {
+        for event in &update.events {
             if let Some(model) = &mut self.model {
-                rebuild |= model.update(&event) == ViewUpdate::Rebuild;
+                rebuild |= model.update(event) == ViewUpdate::Rebuild;
             }
-            (self.on_event)(RuntimeEvent::Ui(event));
+            (self.on_event)(RuntimeEvent::Ui(event.clone()));
         }
-        let tree_update = if rebuild {
-            let root = self.model.as_ref().map(|model| model.view());
-            match (root, &mut self.ui_tree) {
-                (Some(root), Some(tree)) => tree.update(root),
-                _ => TreeUpdate::None,
-            }
-        } else {
-            TreeUpdate::None
-        };
+        if clipboard.is_none() {
+            clipboard = self
+                .model
+                .as_mut()
+                .and_then(|model| model.take_clipboard_request());
+        }
         let animation_changed = self.sync_animations();
-        let redraw = match tree_update {
-            TreeUpdate::Layout => self.prepare_or_exit(event_loop),
-            _ if update.layout_changed => self.prepare_or_exit(event_loop),
-            _ if update.text_input_changed => self.refresh_text_inputs(),
-            _ if update.scroll_changed => self.scroll_or_exit(event_loop),
-            TreeUpdate::Paint => {
-                self.repaint();
-                true
-            }
-            TreeUpdate::None if update.paint_changed => {
-                self.repaint();
-                true
-            }
-            TreeUpdate::None => animation_changed,
-        };
-        if tree_update != TreeUpdate::None {
-            (self.on_event)(RuntimeEvent::ViewUpdated(tree_update));
-        }
-        if redraw {
+        self.pending_ui_frame.merge(&update, rebuild);
+        let scroll_request = self
+            .model
+            .as_mut()
+            .and_then(|model| model.take_scroll_request());
+        self.pending_ui_frame.request_scroll(scroll_request);
+        if self.pending_ui_frame.needs_frame() || animation_changed {
             window.request_redraw();
         }
         if let Some(request) = clipboard {
@@ -200,6 +239,7 @@ impl Application {
         if let (Some(ui), Some(layout)) = (&self.ui_tree, &mut self.ui_layout) {
             self.layout_engine.repaint(ui, layout);
         }
+        self.publish_inspection();
     }
 
     fn pointer_moved(&mut self, point: Point, window: &Window, event_loop: &ActiveEventLoop) {
@@ -219,7 +259,8 @@ impl Application {
             && let Some(node) = ui.focused_node()
             && let Some(region) = layout.text_inputs.iter().find(|region| region.node == node)
         {
-            let update = ui.drag_text_position(node, region.closest_position(point));
+            let local = local_point(layout, node, point).unwrap_or(point);
+            let update = ui.drag_text_position(node, region.closest_position(local));
             self.apply_ui_update(update, window, event_loop);
             return;
         }
@@ -250,6 +291,8 @@ impl Application {
     }
 
     fn pointer_left(&mut self, window: &Window, event_loop: &ActiveEventLoop) {
+        self.scroll_inertia.cancel();
+        self.flush_pointer_scroll(window, event_loop);
         self.flush_scrollbar_drag(window, event_loop);
         self.pointer = None;
         if let Some(ui) = &mut self.ui_tree {
@@ -259,32 +302,14 @@ impl Application {
         }
     }
 
-    fn pointer_scrolled(
-        &mut self,
-        delta: ScrollDelta,
-        window: &Window,
-        event_loop: &ActiveEventLoop,
-    ) {
-        let (Some(point), Some(layout), Some(ui)) =
-            (self.pointer, &self.ui_layout, &mut self.ui_tree)
-        else {
-            return;
-        };
-        let update = ui.scroll(point, delta, &layout.scroll_regions);
-        self.apply_ui_update(update, window, event_loop);
-        let hover = match (&self.ui_layout, &mut self.ui_tree) {
-            (Some(layout), Some(ui)) => ui.pointer_moved(point, &layout.hit_regions),
-            _ => return,
-        };
-        self.apply_ui_update(hover, window, event_loop);
-    }
-
     fn primary_button(
         &mut self,
         state: ButtonState,
         window: &Window,
         event_loop: &ActiveEventLoop,
     ) {
+        self.scroll_inertia.cancel();
+        self.flush_pointer_scroll(window, event_loop);
         if state == ButtonState::Released {
             self.flush_scrollbar_drag(window, event_loop);
         }
@@ -293,6 +318,7 @@ impl Application {
         };
         let placement = self.pointer.and_then(|point| {
             layout.text_inputs.iter().rev().find_map(|region| {
+                let point = local_point(layout, region.node, point).unwrap_or(point);
                 region
                     .hit_position(point)
                     .map(|position| (region.node, position))
@@ -331,6 +357,8 @@ impl Application {
 
     fn window_focus(&mut self, focused: bool, window: &Window, event_loop: &ActiveEventLoop) {
         if !focused {
+            self.scroll_inertia.cancel();
+            self.flush_pointer_scroll(window, event_loop);
             self.flush_scrollbar_drag(window, event_loop);
         }
         if !focused && let Some(ui) = &mut self.ui_tree {
@@ -339,101 +367,15 @@ impl Application {
             self.apply_ui_update(update, window, event_loop);
         }
     }
+}
 
-    #[cfg(not(target_arch = "wasm32"))]
-    fn initialize_renderer(&mut self, window: &Arc<Window>, event_loop: &ActiveEventLoop) {
-        let size = window.inner_size();
-        match pollster::block_on(SurfaceRenderer::new(
-            Arc::clone(window),
-            size.width,
-            size.height,
-            self.renderer_config,
-        )) {
-            Ok(renderer) => {
-                *self.renderer.borrow_mut() = RendererState::Ready(Box::new(renderer));
-                window.request_redraw();
-            }
-            Err(error) => {
-                (self.on_event)(RuntimeEvent::RendererFailed(error.to_string()));
-                self.fatal_error = Some(error.into());
-                event_loop.exit();
-            }
-        }
-    }
-
-    #[cfg(target_arch = "wasm32")]
-    fn initialize_renderer(&mut self, window: &Arc<Window>, _event_loop: &ActiveEventLoop) {
-        let size = window.inner_size();
-        let window = Arc::clone(window);
-        let renderer = Rc::clone(&self.renderer);
-        let config = self.renderer_config;
-
-        wasm_bindgen_futures::spawn_local(async move {
-            let mut result =
-                SurfaceRenderer::new(Arc::clone(&window), size.width, size.height, config).await;
-            if let Ok(renderer) = &mut result {
-                let current_size = window.inner_size();
-                renderer.resize(current_size.width, current_size.height);
-            }
-            *renderer.borrow_mut() = match result {
-                Ok(renderer) => RendererState::Ready(Box::new(renderer)),
-                Err(error) => RendererState::Failed(error.to_string()),
-            };
-            window.request_redraw();
-        });
-    }
-
-    fn render(&mut self, event_loop: &ActiveEventLoop) {
-        let Some(window) = self.window.as_ref().map(Arc::clone) else {
-            return;
-        };
-        let mut state = self.renderer.borrow_mut();
-
-        #[cfg(target_arch = "wasm32")]
-        {
-            if let RendererState::Failed(message) = &*state {
-                (self.on_event)(RuntimeEvent::RendererFailed(message.clone()));
-                event_loop.exit();
-                return;
-            }
-        }
-        let RendererState::Ready(renderer) = &mut *state else {
-            return;
-        };
-        if !self.renderer_announced {
-            (self.on_event)(RuntimeEvent::RendererReady);
-            self.renderer_announced = true;
-        }
-
-        let rendered = match (self.prepared_text.as_ref(), self.ui_layout.as_ref()) {
-            (Some(text), Some(layout)) => renderer.render_ui(
-                &mut self.text_engine,
-                text,
-                &layout.display_list,
-                self.scale_factor,
-            ),
-            (Some(text), None) => renderer.render_text(&mut self.text_engine, text),
-            (None, _) => renderer.render(),
-        };
-        let result = match rendered {
-            Ok(RenderStatus::Presented | RenderStatus::Skipped) => Ok(()),
-            Ok(RenderStatus::Reconfigure) => {
-                let size = window.inner_size();
-                renderer.resize(size.width, size.height);
-                window.request_redraw();
-                Ok(())
-            }
-            Ok(RenderStatus::RecreateSurface) => renderer
-                .recreate_surface(Arc::clone(&window))
-                .inspect(|()| window.request_redraw()),
-            Err(error) => Err(error),
-        };
-        if let Err(error) = result {
-            (self.on_event)(RuntimeEvent::RendererFailed(error.to_string()));
-            self.fatal_error = Some(error.into());
-            event_loop.exit();
-        }
-    }
+fn local_point(layout: &LayoutOutput, node: argui_ui::NodeId, point: Point) -> Option<Point> {
+    layout
+        .hit_regions
+        .iter()
+        .find(|region| region.node == node)
+        .and_then(|region| region.transform.inverse())
+        .map(|inverse| inverse.transform_point(point))
 }
 
 #[cfg_attr(coverage_nightly, coverage(off))]
@@ -556,9 +498,9 @@ impl ApplicationHandler<UserEvent> for Application {
                 }
                 PlatformEvent::PointerButton { button, state }
             }
-            WindowEvent::MouseWheel { delta, .. } => {
+            WindowEvent::MouseWheel { delta, phase, .. } => {
                 let delta = scroll_delta(delta, self.scale_factor);
-                self.pointer_scrolled(delta, &window, event_loop);
+                self.queue_pointer_scroll(delta, phase, &window, event_loop);
                 PlatformEvent::PointerScrolled(delta)
             }
             WindowEvent::ModifiersChanged(modifiers) => {
@@ -580,7 +522,10 @@ impl ApplicationHandler<UserEvent> for Application {
                 PlatformEvent::Focused(focused)
             }
             WindowEvent::RedrawRequested => {
+                self.advance_pointer_inertia(&window);
+                self.flush_pointer_scroll(&window, event_loop);
                 self.flush_scrollbar_drag(&window, event_loop);
+                self.flush_ui_frame(event_loop);
                 self.animate(&window, event_loop);
                 self.render(event_loop);
                 PlatformEvent::RedrawRequested
