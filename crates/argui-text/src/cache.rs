@@ -1,35 +1,38 @@
-use std::collections::VecDeque;
+use std::{
+    collections::{HashMap, VecDeque},
+    sync::Arc,
+};
 
 use argui_core::Size;
 
-use crate::{GlyphKey, TextBlock, TextStyle};
+use crate::{FontFamily, GlyphKey, TextBlock, TextStyle, TextWrap};
 
 const CACHE_CAPACITY: usize = 512;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub(crate) struct MeasureKey {
     text: String,
-    style: TextStyle,
-    width: Option<f32>,
+    style: StyleKey,
+    width: Option<u32>,
 }
 
 impl MeasureKey {
     pub(crate) fn new(text: &str, style: &TextStyle, width: Option<f32>) -> Self {
         Self {
             text: text.to_owned(),
-            style: style.clone(),
-            width,
+            style: StyleKey::new(style),
+            width: width.map(f32::to_bits),
         }
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub(crate) struct ShapeKey {
     text: String,
-    style: TextStyle,
-    size: Size,
-    scale_factor: f32,
-    subpixel_origin: [f32; 2],
+    style: StyleKey,
+    size: [u32; 2],
+    scale_factor: u32,
+    subpixel_origin: [u32; 2],
 }
 
 impl ShapeKey {
@@ -40,15 +43,42 @@ impl ShapeKey {
         ];
         Self {
             text: block.text.clone(),
-            style: block.style.clone(),
-            size: block.bounds.size,
-            scale_factor,
-            subpixel_origin: [pixel[0] - pixel[0].round(), pixel[1] - pixel[1].round()],
+            style: StyleKey::new(&block.style),
+            size: [
+                block.bounds.size.width.to_bits(),
+                block.bounds.size.height.to_bits(),
+            ],
+            scale_factor: scale_factor.to_bits(),
+            subpixel_origin: [
+                (pixel[0] - pixel[0].round()).to_bits(),
+                (pixel[1] - pixel[1].round()).to_bits(),
+            ],
         }
     }
 
-    pub(crate) const fn subpixel_origin(&self) -> [f32; 2] {
-        self.subpixel_origin
+    pub(crate) fn subpixel_origin(&self) -> [f32; 2] {
+        self.subpixel_origin.map(f32::from_bits)
+    }
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+struct StyleKey {
+    font_size: u32,
+    line_height: u32,
+    family: FontFamily,
+    weight: u16,
+    wrap: TextWrap,
+}
+
+impl StyleKey {
+    fn new(style: &TextStyle) -> Self {
+        Self {
+            font_size: style.font_size.to_bits(),
+            line_height: style.line_height.to_bits(),
+            family: style.family.clone(),
+            weight: style.weight,
+            wrap: style.wrap,
+        }
     }
 }
 
@@ -63,42 +93,68 @@ pub(crate) struct CachedGlyph {
 
 #[derive(Default)]
 pub(crate) struct TextCache {
-    measurements: VecDeque<(MeasureKey, Size)>,
-    shapes: VecDeque<(ShapeKey, Vec<CachedGlyph>)>,
+    measurements: HashMap<MeasureKey, Size>,
+    measurement_order: VecDeque<MeasureKey>,
+    shapes: HashMap<ShapeKey, Arc<[CachedGlyph]>>,
+    shape_order: VecDeque<ShapeKey>,
 }
 
 impl TextCache {
     pub(crate) fn measurement(&self, key: &MeasureKey) -> Option<Size> {
-        self.measurements
-            .iter()
-            .find_map(|(candidate, size)| (candidate == key).then_some(*size))
+        self.measurements.get(key).copied()
     }
 
     pub(crate) fn insert_measurement(&mut self, key: MeasureKey, size: Size) {
-        insert_bounded(&mut self.measurements, (key, size));
+        insert_bounded(
+            &mut self.measurements,
+            &mut self.measurement_order,
+            key,
+            size,
+        );
     }
 
-    pub(crate) fn shape(&self, key: &ShapeKey) -> Option<Vec<CachedGlyph>> {
-        self.shapes
-            .iter()
-            .find_map(|(candidate, glyphs)| (candidate == key).then(|| glyphs.clone()))
+    pub(crate) fn shape(&self, key: &ShapeKey) -> Option<Arc<[CachedGlyph]>> {
+        self.shapes.get(key).cloned()
     }
 
-    pub(crate) fn insert_shape(&mut self, key: ShapeKey, glyphs: Vec<CachedGlyph>) {
-        insert_bounded(&mut self.shapes, (key, glyphs));
+    pub(crate) fn insert_shape(
+        &mut self,
+        key: ShapeKey,
+        glyphs: Vec<CachedGlyph>,
+    ) -> Arc<[CachedGlyph]> {
+        let glyphs = Arc::from(glyphs);
+        insert_bounded(
+            &mut self.shapes,
+            &mut self.shape_order,
+            key,
+            Arc::clone(&glyphs),
+        );
+        glyphs
     }
 
     pub(crate) fn clear(&mut self) {
         self.measurements.clear();
+        self.measurement_order.clear();
         self.shapes.clear();
+        self.shape_order.clear();
     }
 }
 
-fn insert_bounded<T>(entries: &mut VecDeque<T>, value: T) {
-    if entries.len() == CACHE_CAPACITY {
-        entries.pop_front();
+fn insert_bounded<K, V>(entries: &mut HashMap<K, V>, order: &mut VecDeque<K>, key: K, value: V)
+where
+    K: Clone + Eq + std::hash::Hash,
+{
+    if let std::collections::hash_map::Entry::Occupied(mut entry) = entries.entry(key.clone()) {
+        entry.insert(value);
+        return;
     }
-    entries.push_back(value);
+    if entries.len() == CACHE_CAPACITY
+        && let Some(oldest) = order.pop_front()
+    {
+        entries.remove(&oldest);
+    }
+    order.push_back(key.clone());
+    entries.insert(key, value);
 }
 
 #[cfg(test)]

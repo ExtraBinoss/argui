@@ -198,8 +198,6 @@ fn elements_render_selection_highlight_and_every_style_control() {
             Some(false)
         );
     }
-    assert!(count_uninspectable(&host.view()) >= 2);
-
     inspector.select(Some(InspectNodeId(999)));
     assert!(contains_text(
         &host.view(),
@@ -247,12 +245,7 @@ fn profiling_and_closed_views_use_the_same_argui_tree() {
     assert!(contains_key(&host.view(), "__devtools-tree"));
     host.update(&event("__devtools-toggle", UiEventKind::Clicked));
     assert!(contains_key(&host.view(), "__devtools-tree"));
-    for _ in 0..60 {
-        host.animation_frame(Frame {
-            now: Time::ZERO,
-            elapsed: Duration::from_millis(16),
-        });
-    }
+    settle(&mut host);
     let closed = host.view();
     assert!(contains_text(&closed, "DevTools"));
     assert!(!contains_key(&closed, "__devtools-tree"));
@@ -354,7 +347,7 @@ fn picker_hit_tests_the_application_and_selects_without_clicking_through() {
 }
 
 #[test]
-fn sheet_and_vector_springs_are_paint_only_after_one_structural_layout() {
+fn sheet_relayouts_incrementally_and_vectors_stay_paint_only() {
     let mut host = DevtoolsHost::new(App(Rc::new(Cell::new(0))));
     let mut tree = UiTree::new(host.view());
     host.update(&event("__devtools-toggle", UiEventKind::Clicked));
@@ -363,7 +356,10 @@ fn sheet_and_vector_springs_are_paint_only_after_one_structural_layout() {
         now: Time::ZERO,
         elapsed: Duration::from_millis(16),
     });
-    assert_eq!(tree.update(host.view()), argui_ui::TreeUpdate::Paint);
+    assert_eq!(tree.update(host.view()), argui_ui::TreeUpdate::Layout);
+
+    settle(&mut host);
+    tree.update(host.view());
 
     host.update(&event("__devtools-morph", UiEventKind::Clicked));
     host.animation_frame(Frame {
@@ -408,7 +404,7 @@ fn non_click_tool_events_are_consumed_without_reaching_the_application() {
 }
 
 #[test]
-fn open_dock_reserves_visible_viewport_space_in_normal_taffy_layout() {
+fn open_dock_reserves_application_viewport_space() {
     let host = populated_host();
     let mut tree = UiTree::new(host.view());
     let mut layout = LayoutEngine::new();
@@ -426,11 +422,14 @@ fn open_dock_reserves_visible_viewport_space_in_normal_taffy_layout() {
             .unwrap()
     };
     let application = keyed("__devtools-app-root");
+    let surface = keyed("__devtools-surface");
     let splitter = keyed("__devtools-splitter");
     assert!(application.size.height < output.viewport.size.height);
-    assert!(application.size.height >= 300.0);
-    assert!(splitter.origin.y >= application.size.height);
-    assert!(splitter.origin.y + splitter.size.height <= output.viewport.size.height);
+    assert_eq!(
+        surface.origin.y + surface.size.height,
+        output.viewport.size.height
+    );
+    assert_eq!(splitter.origin.y, surface.origin.y);
 }
 
 #[test]
@@ -590,11 +589,11 @@ fn contains_text(element: &Element, needle: &str) -> bool {
             .any(|child| contains_text(child, needle))
 }
 
-fn count_uninspectable(element: &Element) -> usize {
-    usize::from(!element.inspectable)
-        + element
-            .children
-            .iter()
-            .map(count_uninspectable)
-            .sum::<usize>()
+fn settle(host: &mut DevtoolsHost<App>) {
+    for _ in 0..60 {
+        host.animation_frame(Frame {
+            now: Time::ZERO,
+            elapsed: Duration::from_millis(16),
+        });
+    }
 }

@@ -37,8 +37,10 @@ pub struct LayoutOutput {
 #[derive(Debug)]
 pub(crate) struct NodeMap {
     pub(crate) index: usize,
-    node: UiNodeId,
-    id: NodeId,
+    pub(crate) node: UiNodeId,
+    pub(crate) id: NodeId,
+    pub(crate) kind: ElementKind,
+    pub(crate) style: LayoutStyle,
     pub(crate) children: Vec<Self>,
 }
 
@@ -79,7 +81,7 @@ impl LayoutEngine {
         viewport: Size,
     ) -> Result<LayoutOutput, LayoutError> {
         if self.revision != Some(ui.revision()) {
-            self.rebuild(ui)?;
+            self.sync_or_rebuild(ui)?;
         }
         let elements = flattened(ui.root());
         let root = self.root.as_ref().ok_or(LayoutError::MissingRoot)?;
@@ -177,6 +179,15 @@ impl LayoutEngine {
         self.revision = Some(ui.revision());
         Ok(())
     }
+
+    fn sync_or_rebuild(&mut self, ui: &UiTree) -> Result<(), LayoutError> {
+        let Some(root) = self.root.take() else {
+            return self.rebuild(ui);
+        };
+        self.root = Some(crate::reconcile::sync(&mut self.tree, root, ui)?);
+        self.revision = Some(ui.revision());
+        Ok(())
+    }
 }
 
 fn build_node(
@@ -210,6 +221,8 @@ fn build_node(
         index,
         node,
         id,
+        kind: element.kind.clone(),
+        style: element.style.clone(),
         children,
     })
 }
@@ -427,7 +440,7 @@ pub(crate) fn flattened(root: &Element) -> Vec<&Element> {
     output
 }
 
-fn taffy_style(style: &LayoutStyle) -> Style {
+pub(crate) fn taffy_style(style: &LayoutStyle) -> Style {
     Style {
         size: TaffySize {
             width: dimension(style.width),
@@ -505,5 +518,82 @@ const fn padding(edges: Edges) -> TaffyRect<LengthPercentage> {
         right: LengthPercentage::length(edges.right),
         top: LengthPercentage::length(edges.top),
         bottom: LengthPercentage::length(edges.bottom),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn stable_topology_updates_taffy_in_place() {
+        let root = |height| Element::container([]).height(Length::Px(height));
+        let mut ui = UiTree::new(root(100.0));
+        let mut engine = LayoutEngine::new();
+        let mut text = TextEngine::new();
+        engine
+            .compute(&mut ui, &mut text, Size::new(400.0, 300.0))
+            .unwrap();
+        let taffy_root = engine.root.as_ref().unwrap().id;
+        ui.update(root(180.0));
+        engine
+            .compute(&mut ui, &mut text, Size::new(400.0, 300.0))
+            .unwrap();
+        assert_eq!(engine.root.as_ref().unwrap().id, taffy_root);
+    }
+
+    #[test]
+    fn structural_updates_preserve_unchanged_taffy_branches() {
+        let root = |key: &str| {
+            Element::column([
+                Element::text("stable").keyed("stable"),
+                Element::text(key).keyed(key),
+            ])
+        };
+        let mut ui = UiTree::new(root("first"));
+        let mut engine = LayoutEngine::new();
+        let mut text = TextEngine::new();
+        engine
+            .compute(&mut ui, &mut text, Size::new(400.0, 300.0))
+            .unwrap();
+        let stable = engine.root.as_ref().unwrap().children[0].id;
+        let replaced = engine.root.as_ref().unwrap().children[1].id;
+
+        ui.update(root("second"));
+        engine
+            .compute(&mut ui, &mut text, Size::new(400.0, 300.0))
+            .unwrap();
+
+        assert_eq!(engine.root.as_ref().unwrap().children[0].id, stable);
+        assert_ne!(engine.root.as_ref().unwrap().children[1].id, replaced);
+        assert_eq!(engine.tree.total_node_count(), 3);
+    }
+
+    #[test]
+    fn virtual_windows_recycle_only_their_changed_rows() {
+        let list = |offset| {
+            argui_ui::VirtualList::new(1_000_000, 36.0, 260.0).build(
+                "million-list",
+                offset,
+                |index| Element::text(index.to_string()).keyed(format!("row-{index}")),
+            )
+        };
+        let mut ui = UiTree::new(list(0.0));
+        let mut engine = LayoutEngine::new();
+        let mut text = TextEngine::new();
+        engine
+            .compute(&mut ui, &mut text, Size::new(400.0, 300.0))
+            .unwrap();
+        let scroll = engine.root.as_ref().unwrap().id;
+        let spacer = engine.root.as_ref().unwrap().children[0].children[0].id;
+
+        ui.update(list(20_000.0));
+        engine
+            .compute(&mut ui, &mut text, Size::new(400.0, 300.0))
+            .unwrap();
+
+        let root = engine.root.as_ref().unwrap();
+        assert_eq!(root.id, scroll);
+        assert_eq!(root.children[0].children[0].id, spacer);
     }
 }

@@ -102,8 +102,7 @@ impl TextEngine {
                 glyphs
             } else {
                 let glyphs = self.shape_block(block, scale_factor, key.subpixel_origin());
-                self.cache.insert_shape(key, glyphs.clone());
-                glyphs
+                self.cache.insert_shape(key, glyphs)
             };
             append_glyphs(&mut prepared, block_index, block, scale_factor, &glyphs);
         }

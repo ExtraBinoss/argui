@@ -46,8 +46,6 @@ impl TexturePool {
     pub fn begin_frame(&mut self) {
         self.frame = self.frame.wrapping_add(1);
         self.reused = 0;
-        self.entries
-            .retain(|entry| self.frame.wrapping_sub(entry.last_frame) <= 2);
         for entry in &mut self.entries {
             entry.used = false;
         }

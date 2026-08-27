@@ -4,6 +4,7 @@ mod engine;
 mod error;
 mod input;
 mod paint;
+mod reconcile;
 mod scroll;
 mod text;
 

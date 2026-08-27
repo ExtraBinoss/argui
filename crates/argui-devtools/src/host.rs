@@ -90,11 +90,21 @@ impl<A> DevtoolsHost<A> {
         let key = event.key.as_deref()?;
         if key == "__devtools-splitter" {
             match event.kind {
-                UiEventKind::Pressed => self.dragging_splitter = true,
-                UiEventKind::Released => self.dragging_splitter = false,
+                UiEventKind::Pressed => {
+                    self.dragging_splitter = true;
+                    return Some(ViewUpdate::None);
+                }
+                UiEventKind::Released => {
+                    self.dragging_splitter = false;
+                    return Some(ViewUpdate::None);
+                }
                 UiEventKind::PointerMoved(Point { y, .. }) if self.dragging_splitter => {
-                    self.dock_height = (self.viewport.size.height - y).clamp(180.0, 620.0);
-                    return Some(ViewUpdate::Rebuild);
+                    let height = (self.viewport.size.height - y).clamp(180.0, 620.0);
+                    if self.dock_height != height {
+                        self.dock_height = height;
+                        return Some(ViewUpdate::Rebuild);
+                    }
+                    return Some(ViewUpdate::None);
                 }
                 _ => {}
             }

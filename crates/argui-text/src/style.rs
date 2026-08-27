@@ -2,7 +2,7 @@ use argui_core::Rect;
 
 pub use argui_core::Color as TextColor;
 
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 pub enum FontFamily {
     #[default]
     SansSerif,
@@ -11,7 +11,7 @@ pub enum FontFamily {
     Named(String),
 }
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub enum TextWrap {
     None,
     Glyph,

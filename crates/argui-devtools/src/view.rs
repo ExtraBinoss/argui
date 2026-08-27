@@ -31,8 +31,7 @@ pub(crate) fn host<A: UiApp>(tools: &DevtoolsHost<A>) -> Element {
     .clip(ClipBehavior::Bounds);
     let mut children = vec![application];
     if tools.open || tools.sheet_progress > 0.001 {
-        children.push(splitter());
-        children.push(dock(tools, tools.dock_height));
+        children.push(dock_surface(tools));
     } else {
         children.push(
             toggle_button(false)
@@ -49,6 +48,23 @@ pub(crate) fn host<A: UiApp>(tools: &DevtoolsHost<A>) -> Element {
     Element::column(children)
         .width(Length::Percent(1.0))
         .height(Length::Percent(1.0))
+        .clip(ClipBehavior::Bounds)
+}
+
+fn dock_surface<A: UiApp>(tools: &DevtoolsHost<A>) -> Element {
+    let height = tools.dock_height + 6.0;
+    let surface = Element::column([splitter(), dock(tools, tools.dock_height)])
+        .keyed("__devtools-surface-content")
+        .width(Length::Percent(1.0))
+        .height(Length::Px(height))
+        .shrink(0.0);
+    Element::container([surface])
+        .keyed("__devtools-surface")
+        .width(Length::Percent(1.0))
+        .height(Length::Px(height * tools.sheet_progress))
+        .shrink(0.0)
+        .clip(ClipBehavior::Bounds)
+        .inspectable(false)
 }
 
 fn splitter() -> Element {
@@ -76,7 +92,6 @@ fn dock<A: UiApp>(tools: &DevtoolsHost<A>, height: f32) -> Element {
         .background(BG)
         .border(Border::all(1.0, LINE))
         .clip(ClipBehavior::Bounds)
-        .transform(Transform2D::IDENTITY.translate(0.0, (1.0 - tools.sheet_progress) * height))
         .inspectable(false)
 }
 
