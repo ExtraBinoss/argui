@@ -9,6 +9,7 @@ use argui_ui::{ClipboardRequest, Element, NodeId, UiEvent};
 pub enum ViewUpdate {
     #[default]
     None,
+    Paint,
     Rebuild,
 }
 

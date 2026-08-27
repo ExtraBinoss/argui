@@ -3,7 +3,7 @@ use argui_core::{Affine2D, Point, Rect, ScrollDelta, Size};
 use argui_effects::{ANIMATED_GRADIENT_ID, LIQUID_GLASS_ID, WORLEY_BORDER_FIRE_ID};
 use argui_layout::LayoutEngine;
 use argui_paint::{ClipChain, ClipRegion};
-use argui_runtime::{LayoutBounds, LayoutSnapshot, UiApp, ViewUpdate};
+use argui_runtime::{LayoutSnapshot, UiApp, ViewUpdate};
 use argui_showcase::{StateShowcase, text_engine};
 use argui_text::TextStyle;
 use argui_ui::{HitRegion, ScrollConfig, ScrollRegion, UiEvent, UiEventKind, UiTree};
@@ -210,7 +210,9 @@ fn spring_retarget_and_bounded_inertia_return_the_scheduler_to_idle() {
 #[test]
 fn effects_popover_is_composed_and_only_animates_while_open() {
     let mut app = StateShowcase::default();
+    let mut retained = UiTree::new(app.view());
     assert_eq!(click(&mut app, "popover-toggle"), ViewUpdate::Rebuild);
+    assert_eq!(retained.update(app.view()), argui_ui::TreeUpdate::None);
     assert!(app.wants_animation_frame());
     assert!(node_index(&app.view(), "effects-popover") > 0);
 
@@ -263,24 +265,6 @@ fn effects_popover_scroll_repaints_a_valid_clipped_scene() {
     let mut output = layout
         .compute(&mut tree, &mut text_engine(), viewport)
         .unwrap();
-    let snapshot = LayoutSnapshot {
-        viewport: output.viewport,
-        nodes: output
-            .nodes
-            .iter()
-            .map(|node| LayoutBounds {
-                node: node.node,
-                key: tree.key(node.node).map(str::to_owned),
-                bounds: node.bounds,
-            })
-            .collect(),
-    };
-    assert_eq!(app.layout_changed(&snapshot), ViewUpdate::Rebuild);
-    assert_ne!(tree.update(app.view()), argui_ui::TreeUpdate::None);
-    output = layout
-        .compute(&mut tree, &mut text_engine(), viewport)
-        .unwrap();
-
     let popover = output
         .scroll_regions
         .iter()
@@ -336,45 +320,40 @@ fn delayed_tooltip_appears_only_after_hover_delay() {
 }
 
 #[test]
-fn overlay_layout_uses_keyed_bounds_and_stabilizes_after_one_rebuild() {
+fn overlay_layout_is_resolved_by_the_layout_engine_without_a_model_rebuild() {
     let mut app = StateShowcase::default();
     assert_eq!(
         app.layout_changed(&LayoutSnapshot::default()),
         ViewUpdate::None
     );
-    let root = app.view();
-    let tree = UiTree::new(root.clone());
-    let keyed = |key: &str, bounds: Rect| LayoutBounds {
-        node: tree.node_id_at(node_index(&root, key)).unwrap(),
-        key: Some(key.into()),
-        bounds,
-    };
-    let snapshot = LayoutSnapshot {
-        viewport: Rect::new(Point::default(), Size::new(500.0, 400.0)),
-        nodes: vec![
-            keyed(
-                "popover-anchor",
-                Rect::new(Point::new(20.0, 300.0), Size::new(460.0, 50.0)),
-            ),
-            keyed(
-                "popover-toggle",
-                Rect::new(Point::new(220.0, 310.0), Size::new(180.0, 36.0)),
-            ),
-            keyed(
-                "tooltip-anchor",
-                Rect::new(Point::new(405.0, 310.0), Size::new(70.0, 36.0)),
-            ),
-        ],
-    };
-
-    assert_eq!(app.layout_changed(&snapshot), ViewUpdate::Rebuild);
-    assert_eq!(app.layout_changed(&snapshot), ViewUpdate::None);
     assert_eq!(click(&mut app, "popover-toggle"), ViewUpdate::Rebuild);
     let view = app.view();
     let popover = element_by_key(&view, "effects-popover").unwrap();
     assert!(popover.interaction.is_some());
     assert!(popover.scroll.is_some());
-    assert!(matches!(popover.style.height, argui_ui::Length::Px(height) if height <= 284.0));
+    assert!(matches!(popover.style.height, argui_ui::Length::Px(430.0)));
+
+    let mut tree = UiTree::new(view);
+    let mut layout = LayoutEngine::new();
+    let output = layout
+        .compute(&mut tree, &mut text_engine(), Size::new(500.0, 400.0))
+        .unwrap();
+    let bounds = |key: &str| {
+        output
+            .nodes
+            .iter()
+            .find(|node| tree.key(node.node) == Some(key))
+            .map(|node| node.bounds)
+            .unwrap()
+    };
+    let anchor = bounds("popover-toggle");
+    let placed = bounds("effects-popover");
+    assert!(placed.origin.y + placed.size.height <= output.viewport.size.height - 14.0);
+    assert!(placed.origin.y + placed.size.height <= anchor.origin.y - 12.0);
+    assert_eq!(
+        app.layout_changed(&LayoutSnapshot::default()),
+        ViewUpdate::None
+    );
 }
 
 fn node_index_optional(root: &argui_ui::Element, key: &str) -> Option<usize> {

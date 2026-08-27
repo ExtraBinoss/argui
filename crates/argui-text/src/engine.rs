@@ -74,7 +74,14 @@ impl TextEngine {
         }
         let metrics = Metrics::new(style.font_size, style.line_height);
         let mut buffer = Buffer::new(&mut self.fonts, metrics);
-        buffer.set_size(width, None);
+        buffer.set_size(
+            if style.wrap == TextWrap::None {
+                None
+            } else {
+                width
+            },
+            None,
+        );
         buffer.set_wrap(wrap(style.wrap));
         let family = family(&style.family);
         let attrs = Attrs::new().family(family).weight(Weight(style.weight));
@@ -118,7 +125,7 @@ impl TextEngine {
         let metrics = Metrics::new(block.style.font_size, block.style.line_height);
         let mut buffer = Buffer::new(&mut self.fonts, metrics);
         buffer.set_size(
-            Some(block.bounds.size.width),
+            (block.style.wrap != TextWrap::None).then_some(block.bounds.size.width),
             Some(block.bounds.size.height),
         );
         buffer.set_wrap(wrap(block.style.wrap));

@@ -94,6 +94,7 @@ impl SurfaceRenderer {
             .get_default_config(&adapter, width.max(1), height.max(1))
             .ok_or(RendererError::UnsupportedSurface)?;
         surface_config.present_mode = renderer_config.present_mode;
+        surface_config.desired_maximum_frame_latency = renderer_config.maximum_frame_latency;
         let target_format = srgb_target(surface_config.format);
         if target_format != surface_config.format {
             surface_config.view_formats.push(target_format);
@@ -134,6 +135,9 @@ impl SurfaceRenderer {
         let Some((width, height)) = drawable_size(width, height) else {
             return false;
         };
+        if self.surface_config.width == width && self.surface_config.height == height {
+            return false;
+        }
         self.surface_config.width = width;
         self.surface_config.height = height;
         self.surface.configure(&self.device, &self.surface_config);
@@ -155,7 +159,14 @@ impl SurfaceRenderer {
 
     #[cfg_attr(coverage_nightly, coverage(off))]
     pub fn render(&mut self) -> Result<RenderStatus, RendererError> {
-        self.render_frame(FrameContent::None)
+        self.render_frame(FrameContent::None, || {})
+    }
+
+    pub fn render_notified(
+        &mut self,
+        notify: impl FnOnce(),
+    ) -> Result<RenderStatus, RendererError> {
+        self.render_frame(FrameContent::None, notify)
     }
 
     #[cfg_attr(coverage_nightly, coverage(off))]
@@ -164,7 +175,16 @@ impl SurfaceRenderer {
         engine: &mut TextEngine,
         text: &PreparedText,
     ) -> Result<RenderStatus, RendererError> {
-        self.render_frame(FrameContent::Text { engine, text })
+        self.render_frame(FrameContent::Text { engine, text }, || {})
+    }
+
+    pub fn render_text_notified(
+        &mut self,
+        engine: &mut TextEngine,
+        text: &PreparedText,
+        notify: impl FnOnce(),
+    ) -> Result<RenderStatus, RendererError> {
+        self.render_frame(FrameContent::Text { engine, text }, notify)
     }
 
     #[cfg_attr(coverage_nightly, coverage(off))]
@@ -175,12 +195,34 @@ impl SurfaceRenderer {
         display_list: &DisplayList,
         scale_factor: f32,
     ) -> Result<RenderStatus, RendererError> {
-        self.render_frame(FrameContent::Ui {
-            engine,
-            text,
-            display_list,
-            scale_factor,
-        })
+        self.render_frame(
+            FrameContent::Ui {
+                engine,
+                text,
+                display_list,
+                scale_factor,
+            },
+            || {},
+        )
+    }
+
+    pub fn render_ui_notified(
+        &mut self,
+        engine: &mut TextEngine,
+        text: &PreparedText,
+        display_list: &DisplayList,
+        scale_factor: f32,
+        notify: impl FnOnce(),
+    ) -> Result<RenderStatus, RendererError> {
+        self.render_frame(
+            FrameContent::Ui {
+                engine,
+                text,
+                display_list,
+                scale_factor,
+            },
+            notify,
+        )
     }
 
     #[must_use]
@@ -210,7 +252,11 @@ impl SurfaceRenderer {
     }
 
     #[cfg_attr(coverage_nightly, coverage(off))]
-    fn render_frame(&mut self, content: FrameContent<'_>) -> Result<RenderStatus, RendererError> {
+    fn render_frame(
+        &mut self,
+        content: FrameContent<'_>,
+        notify: impl FnOnce(),
+    ) -> Result<RenderStatus, RendererError> {
         let (frame, status) = match self.surface.get_current_texture() {
             CurrentSurfaceTexture::Success(frame) => (frame, RenderStatus::Presented),
             CurrentSurfaceTexture::Suboptimal(frame) => (frame, RenderStatus::Reconfigure),
@@ -292,6 +338,7 @@ impl SurfaceRenderer {
             && graph.needs_offscreen_root()
         {
             self.render_effect_graph(&mut encoder, &view, &graph, viewport);
+            notify();
             self.queue.submit([encoder.finish()]);
             self.finish_profile(profiler, viewport, graph_stats);
             self.queue.present(frame);
@@ -332,6 +379,7 @@ impl SurfaceRenderer {
                 }
             }
         }
+        notify();
         self.queue.submit([encoder.finish()]);
         self.finish_profile(profiler, viewport, graph_stats);
         self.queue.present(frame);

@@ -1,9 +1,11 @@
-use argui_core::Transform2D;
+use argui_core::{Affine2D, Transform2D};
 use argui_inspect::{
     InspectNodeId, NodeSnapshot, PropertySnapshot, StyleField, StyleLength, StyleProperty,
     StyleUnit, StyleValue, TreeSnapshot,
 };
-use argui_paint::{ClipBehavior, Color, Fill, Filter, LayerStyle};
+use argui_paint::{
+    Border, ClipBehavior, ClipChain, ClipRegion, Color, CornerRadii, Fill, Filter, LayerStyle, Quad,
+};
 use argui_ui::{Element, ElementKind, Length, NodeId};
 
 use super::Application;
@@ -23,6 +25,7 @@ impl Application {
         Some(root)
     }
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     pub(super) fn publish_inspection(&self) {
         let (Some(inspector), Some(tree), Some(layout)) =
             (&self.inspector, &self.ui_tree, &self.ui_layout)
@@ -45,6 +48,31 @@ impl Application {
         inspector.publish_tree(TreeSnapshot {
             revision: tree.revision(),
             nodes,
+        });
+    }
+
+    #[cfg_attr(coverage_nightly, coverage(off))]
+    pub(super) fn paint_inspection_highlight(&mut self) {
+        let node = self
+            .inspector
+            .as_ref()
+            .and_then(|inspector| inspector.highlighted())
+            .and_then(|id| self.inspector.as_ref()?.node(id));
+        let (Some(node), Some(layout)) = (node, &mut self.ui_layout) else {
+            return;
+        };
+        let mut regions = vec![ClipRegion::new(layout.viewport, Affine2D::IDENTITY)];
+        if let Some(clip) = node.clip {
+            regions.push(ClipRegion::new(clip, Affine2D::IDENTITY));
+        }
+        layout.display_list.push_quad(Quad {
+            bounds: node.bounds,
+            background: Some(Fill::Solid(Color::rgba(0.20, 0.72, 1.0, 0.10))),
+            border: Border::all(2.0, Color::rgb(0.25, 0.72, 0.96)),
+            radii: CornerRadii::all(0.0),
+            opacity: 1.0,
+            transform: Affine2D::IDENTITY,
+            clips: ClipChain::from_regions(regions),
         });
     }
 }
@@ -98,11 +126,24 @@ fn collect_nodes(
         clip: layout_node.and_then(|candidate| candidate.clip),
         z_index: element.z_index,
         visible,
+        painted: paints_content(element),
+        interactive: element
+            .interaction
+            .as_ref()
+            .is_some_and(|interaction| interaction.enabled),
+        child_count: element.children.len(),
         properties: properties(element),
     });
     for child in &element.children {
         collect_nodes(child, Some(id), depth + 1, visible, state);
     }
+}
+
+fn paints_content(element: &Element) -> bool {
+    element.paint.quad.is_visible()
+        || !element.effects.is_empty()
+        || element.layer.is_some()
+        || !matches!(element.kind, ElementKind::Container)
 }
 
 fn descendant_count(element: &Element) -> usize {

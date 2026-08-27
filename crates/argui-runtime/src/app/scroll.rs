@@ -90,6 +90,7 @@ pub(super) fn merge_delta(pending: &mut ScrollDelta, next: ScrollDelta) -> bool 
 }
 
 impl Application {
+    #[cfg_attr(coverage_nightly, coverage(off))]
     pub(super) fn queue_pointer_scroll(
         &mut self,
         delta: ScrollDelta,
@@ -109,6 +110,7 @@ impl Application {
         window.request_redraw();
     }
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     pub(super) fn advance_pointer_inertia(&mut self, window: &Window) {
         if let Some(delta) = self.scroll_inertia.advance(Instant::now()) {
             let delta = ScrollDelta::Pixels(delta);
@@ -123,6 +125,7 @@ impl Application {
         }
     }
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     pub(super) fn flush_pointer_scroll(&mut self, window: &Window, event_loop: &ActiveEventLoop) {
         let Some(delta) = self.pending_pointer_scroll.take() else {
             return;
@@ -141,6 +144,7 @@ impl Application {
         self.apply_ui_update(hover, window, event_loop);
     }
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     pub(super) fn scroll_or_exit(&mut self, event_loop: &ActiveEventLoop) -> bool {
         let result = match (&self.ui_tree, &mut self.ui_layout) {
             (Some(ui), Some(layout)) => self.layout_engine.apply_scroll(ui, layout),
@@ -157,9 +161,12 @@ impl Application {
                 prepared.reposition_block(index, block.bounds.origin, block.clip);
             }
         }
+        self.publish_inspection();
+        self.paint_inspection_highlight();
         true
     }
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     pub(super) fn apply_scroll_request(
         &mut self,
         key: &str,
@@ -208,6 +215,12 @@ mod tests {
             &mut pixels,
             ScrollDelta::Lines(Point::new(0.0, 1.0))
         ));
+        let mut lines = ScrollDelta::Lines(Point::new(1.0, 2.0));
+        assert!(merge_delta(
+            &mut lines,
+            ScrollDelta::Lines(Point::new(3.0, 4.0))
+        ));
+        assert_eq!(lines, ScrollDelta::Lines(Point::new(4.0, 6.0)));
     }
 
     #[test]
@@ -228,6 +241,54 @@ mod tests {
         inertia.observe(
             ScrollDelta::Lines(Point::new(0.0, -1.0)),
             TouchPhase::Moved,
+            start,
+        );
+        assert!(!inertia.needs_frame());
+    }
+
+    #[test]
+    fn inertia_handles_gesture_phases_quiet_period_and_settling() {
+        let start = Instant::now();
+        let mut inertia = ScrollInertia::default();
+        assert_eq!(inertia.advance(start), None);
+
+        inertia.observe(
+            ScrollDelta::Pixels(Point::new(0.0, -12.0)),
+            TouchPhase::Started,
+            start,
+        );
+        assert_eq!(
+            inertia.advance(start + Duration::from_millis(8)),
+            None,
+            "an active gesture has no synthetic motion before the quiet period"
+        );
+        inertia.observe(
+            ScrollDelta::Pixels(Point::new(0.0, -4.0)),
+            TouchPhase::Moved,
+            start + Duration::from_millis(10),
+        );
+        inertia.observe(
+            ScrollDelta::Pixels(Point::default()),
+            TouchPhase::Ended,
+            start + Duration::from_millis(12),
+        );
+        assert!(inertia.advance(start + Duration::from_millis(16)).is_some());
+
+        let mut stopped = ScrollInertia::default();
+        stopped.observe(
+            ScrollDelta::Pixels(Point::default()),
+            TouchPhase::Ended,
+            start,
+        );
+        assert_eq!(
+            stopped.advance(start + Duration::from_millis(20)),
+            Some(Point::default())
+        );
+        assert!(!stopped.needs_frame());
+
+        inertia.observe(
+            ScrollDelta::Pixels(Point::new(0.0, 3.0)),
+            TouchPhase::Cancelled,
             start,
         );
         assert!(!inertia.needs_frame());

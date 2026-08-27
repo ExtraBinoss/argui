@@ -64,6 +64,7 @@ fn transformed_clip_chains_require_every_region() {
 
     assert!(chain.contains(Point::new(15.0, 10.0)));
     assert!(!chain.contains(Point::new(5.0, 10.0)));
+    assert!(!chain.is_empty());
     assert_eq!(chain.regions().len(), 2);
     assert_eq!(
         chain
@@ -72,4 +73,10 @@ fn transformed_clip_chains_require_every_region() {
             .len(),
         3
     );
+    let empty = chain.appended(ClipRegion::new(
+        Rect::new(Point::default(), Size::new(20.0, 0.0)),
+        Affine2D::IDENTITY,
+    ));
+    assert!(empty.is_empty());
+    assert!(!empty.contains(Point::new(15.0, 10.0)));
 }

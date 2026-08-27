@@ -25,6 +25,8 @@ pub struct DevtoolsHost<A> {
     pub(crate) app_viewport: Rect,
     pub(crate) picking: bool,
     pub(crate) picker_hovered: Option<InspectNodeId>,
+    picker_point: Option<Point>,
+    last_pick_point: Option<Point>,
     pub(crate) tree_offset: f32,
     pub(crate) profiling_offset: f32,
     pub(crate) profile_frames: Vec<FrameRecord>,
@@ -55,6 +57,8 @@ impl<A> DevtoolsHost<A> {
             app_viewport: Rect::default(),
             picking: false,
             picker_hovered: None,
+            picker_point: None,
+            last_pick_point: None,
             tree_offset: 0.0,
             profiling_offset: 0.0,
             profile_frames: Vec::new(),
@@ -113,26 +117,45 @@ impl<A> DevtoolsHost<A> {
         if key == "__devtools-picker-surface" {
             return Some(match event.kind {
                 UiEventKind::PointerMoved(point) => {
-                    let hovered = self.inspector.hit_test(point, self.app_viewport);
+                    let stack = self.inspector.hit_stack(point, self.app_viewport);
+                    let cycle = self.last_pick_point.is_some_and(|last| {
+                        (last.x - point.x).abs() <= 2.0 && (last.y - point.y).abs() <= 2.0
+                    });
+                    let index = if cycle {
+                        self.inspector
+                            .selected()
+                            .and_then(|selected| stack.iter().position(|node| *node == selected))
+                            .map_or(0, |index| (index + 1) % stack.len().max(1))
+                    } else {
+                        0
+                    };
+                    let hovered = stack.get(index).copied();
+                    self.picker_point = Some(point);
                     if self.picker_hovered == hovered {
                         ViewUpdate::None
                     } else {
                         self.picker_hovered = hovered;
-                        ViewUpdate::Rebuild
+                        self.inspector.set_hovered(hovered);
+                        ViewUpdate::Paint
                     }
                 }
                 UiEventKind::PointerLeft => {
                     self.picker_hovered = None;
-                    ViewUpdate::Rebuild
+                    self.picker_point = None;
+                    self.inspector.set_hovered(None);
+                    ViewUpdate::Paint
                 }
                 UiEventKind::Clicked => {
                     let selected = self.picker_hovered;
                     self.inspector.select(selected);
+                    self.last_pick_point = self.picker_point;
                     if let Some(node) = selected {
                         self.reveal_tree_node(node);
                     }
                     self.picking = false;
                     self.picker_hovered = None;
+                    self.picker_point = None;
+                    self.inspector.set_hovered(None);
                     self.tab = Tab::Elements;
                     ViewUpdate::Rebuild
                 }
@@ -208,12 +231,16 @@ impl<A> DevtoolsHost<A> {
                 self.open = !self.open;
                 self.picking = false;
                 self.picker_hovered = None;
+                self.picker_point = None;
+                self.inspector.set_hovered(None);
                 self.sheet_motion
                     .retarget(if self.open { 1.0 } else { 0.0 });
             }
             "__devtools-picker" => {
                 self.picking = !self.picking;
                 self.picker_hovered = None;
+                self.picker_point = None;
+                self.inspector.set_hovered(None);
                 self.tab = Tab::Elements;
             }
             "__devtools-elements" => self.tab = Tab::Elements,
@@ -341,6 +368,8 @@ impl<A: UiApp> UiApp for DevtoolsHost<A> {
         }
         if sheet || sections || morph || app == ViewUpdate::Rebuild {
             ViewUpdate::Rebuild
+        } else if app == ViewUpdate::Paint {
+            ViewUpdate::Paint
         } else {
             ViewUpdate::None
         }

@@ -3,7 +3,7 @@ use std::sync::Arc;
 #[cfg(target_arch = "wasm32")]
 use std::rc::Rc;
 
-use argui_inspect::FrameRecord;
+use argui_inspect::{FrameRecord, Invalidation};
 use argui_render::{EffectShader, RenderStatus, SurfaceRenderer};
 use winit::{event_loop::ActiveEventLoop, window::Window};
 
@@ -109,15 +109,37 @@ impl Application {
             self.renderer_announced = true;
         }
 
+        if let Some(inspector) = &self.inspector {
+            inspector.record_ui(self.frame_record);
+        }
+        if self.renderer_config.profiling {
+            (self.on_event)(RuntimeEvent::AnimationProfile(crate::AnimationProfile {
+                frame_interval: self.frame_record.interval,
+                model_time: self.frame_record.model,
+                tree_time: self.frame_record.tree + self.frame_record.layout,
+                paint_time: self.frame_record.paint + self.frame_record.surface,
+                tree_update: match self.frame_record.update {
+                    Invalidation::None => argui_ui::TreeUpdate::None,
+                    Invalidation::Paint => argui_ui::TreeUpdate::Paint,
+                    Invalidation::Layout => argui_ui::TreeUpdate::Layout,
+                },
+            }));
+        }
+
         let rendered = match (self.prepared_text.as_ref(), self.ui_layout.as_ref()) {
-            (Some(text), Some(layout)) => renderer.render_ui(
+            (Some(text), Some(layout)) => renderer.render_ui_notified(
                 &mut self.text_engine,
                 text,
                 &layout.display_list,
                 self.scale_factor,
+                || window.pre_present_notify(),
             ),
-            (Some(text), None) => renderer.render_text(&mut self.text_engine, text),
-            (None, _) => renderer.render(),
+            (Some(text), None) => {
+                renderer.render_text_notified(&mut self.text_engine, text, || {
+                    window.pre_present_notify()
+                })
+            }
+            (None, _) => renderer.render_notified(|| window.pre_present_notify()),
         };
         let result = match rendered {
             Ok(RenderStatus::Presented | RenderStatus::Skipped) => {

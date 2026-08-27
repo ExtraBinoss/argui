@@ -53,3 +53,12 @@ unexpected_cfgs = { level = "warn", check-cfg = ["cfg(coverage_nightly)"] }
 
 [workspace.lints.clippy]
 all = "warn"
+
+# Keep `cargo run` debuggable while compiling the hot UI pipeline enough to
+# make interactive performance representative of the engine rather than LLVM's
+# unoptimized code generation.
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 2

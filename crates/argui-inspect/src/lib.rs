@@ -173,6 +173,9 @@ pub struct NodeSnapshot {
     pub clip: Option<Rect>,
     pub z_index: i32,
     pub visible: bool,
+    pub painted: bool,
+    pub interactive: bool,
+    pub child_count: usize,
     pub properties: Vec<PropertySnapshot>,
 }
 
@@ -186,9 +189,12 @@ pub struct TreeSnapshot {
 pub struct FrameRecord {
     pub interval: Duration,
     pub model: Duration,
+    pub surface: Duration,
     pub tree: Duration,
+    pub layout: Duration,
     pub paint: Duration,
     pub render_cpu: Duration,
+    pub resize_events: u32,
     pub update: Invalidation,
     pub layers: usize,
     pub passes: usize,
@@ -201,7 +207,7 @@ pub struct FrameRecord {
 impl FrameRecord {
     #[must_use]
     pub fn total_cpu(self) -> Duration {
-        self.model + self.tree + self.paint + self.render_cpu
+        self.model + self.surface + self.tree + self.layout + self.paint + self.render_cpu
     }
 }
 
@@ -219,6 +225,7 @@ struct InspectorState {
     frames: VecDeque<FrameRecord>,
     capacity: usize,
     selected: Option<InspectNodeId>,
+    hovered: Option<InspectNodeId>,
     overrides: Vec<StyleOverride>,
     paused: bool,
 }
@@ -242,6 +249,7 @@ impl InspectorHandle {
             frames: VecDeque::with_capacity(capacity),
             capacity,
             selected: None,
+            hovered: None,
             overrides: Vec::new(),
             paused: false,
         })))
@@ -321,16 +329,33 @@ impl InspectorHandle {
         self.0.borrow().selected
     }
 
+    pub fn set_hovered(&self, node: Option<InspectNodeId>) {
+        self.0.borrow_mut().hovered = node;
+    }
+
+    #[must_use]
+    pub fn highlighted(&self) -> Option<InspectNodeId> {
+        let state = self.0.borrow();
+        state.hovered.or(state.selected)
+    }
+
     /// Returns the visually foremost inspected node containing `point`.
     /// Later nodes win equal stacking levels, matching retained paint order;
     /// deeper nodes win inside the same branch.
     #[must_use]
     pub fn hit_test(&self, point: Point, viewport: Rect) -> Option<InspectNodeId> {
+        self.hit_stack(point, viewport).into_iter().next()
+    }
+
+    /// Returns every inspected node under `point`, ordered from the most useful
+    /// visual target to structural fallbacks.
+    #[must_use]
+    pub fn hit_stack(&self, point: Point, viewport: Rect) -> Vec<InspectNodeId> {
         if !viewport.contains(point) {
-            return None;
+            return Vec::new();
         }
-        self.0
-            .borrow()
+        let state = self.0.borrow();
+        let mut nodes = state
             .tree
             .nodes
             .iter()
@@ -340,8 +365,17 @@ impl InspectorHandle {
                     && node.bounds.contains(point)
                     && node.clip.is_none_or(|clip| clip.contains(point))
             })
-            .max_by_key(|(order, node)| (node.z_index, node.depth, *order))
-            .map(|(_, node)| node.id)
+            .collect::<Vec<_>>();
+        nodes.sort_by_key(|(order, node)| {
+            (
+                node.painted || node.interactive,
+                node.z_index,
+                node.child_count != 0,
+                node.depth,
+                *order,
+            )
+        });
+        nodes.into_iter().rev().map(|(_, node)| node.id).collect()
     }
 
     pub fn toggle(&self, node: InspectNodeId, property: StyleProperty) -> bool {

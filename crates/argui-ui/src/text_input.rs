@@ -116,6 +116,7 @@ impl TextInput {
             layer: None,
             effects: Vec::new(),
             scroll: None,
+            overlay: None,
             z_index: 0,
             children: Vec::new(),
         }

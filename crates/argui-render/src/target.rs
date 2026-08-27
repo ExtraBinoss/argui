@@ -77,6 +77,7 @@ pub(crate) struct TextureTarget {
     pub texture: usize,
     pub region: PixelRegion,
     pub extent: [u32; 2],
+    pub allocation: [u32; 2],
 }
 
 impl TextureTarget {
@@ -85,7 +86,31 @@ impl TextureTarget {
             texture,
             region,
             extent,
+            allocation: extent,
         }
+    }
+
+    pub const fn with_allocation(
+        texture: usize,
+        region: PixelRegion,
+        extent: [u32; 2],
+        allocation: [u32; 2],
+    ) -> Self {
+        Self {
+            texture,
+            region,
+            extent,
+            allocation,
+        }
+    }
+
+    pub fn uv_rect(self) -> [f32; 4] {
+        [
+            0.0,
+            0.0,
+            self.extent[0] as f32 / self.allocation[0].max(1) as f32,
+            self.extent[1] as f32 / self.allocation[1].max(1) as f32,
+        ]
     }
 
     pub fn viewport_for(self, output: PixelRegion) -> [f32; 4] {
@@ -152,5 +177,7 @@ mod tests {
         };
         assert_eq!(target.viewport_for(output), [10.0, 10.0, 20.0, 10.0]);
         assert_eq!(region.as_rect().origin, Point::new(100.0, 50.0));
+        let allocated = TextureTarget::with_allocation(0, region, [100, 50], [128, 64]);
+        assert_eq!(allocated.uv_rect(), [0.0, 0.0, 0.78125, 0.78125]);
     }
 }

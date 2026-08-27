@@ -26,7 +26,7 @@ pub use interaction::{
     HitRegion, Interaction, InteractionStyles, InteractionUpdate, NodeId, UiEvent, UiEventKind,
     VisualState,
 };
-pub use overlay::{OverlayAlign, OverlayPlacement, PlacedOverlay, PlacementSide};
+pub use overlay::{OverlayAlign, OverlayAnchor, OverlayPlacement, PlacedOverlay, PlacementSide};
 pub use scroll::{
     ScrollAxes, ScrollChaining, ScrollConfig, ScrollPolarity, ScrollRegion, ScrollbarRegion,
     ScrollbarStyle,

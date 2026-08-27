@@ -74,7 +74,7 @@ impl SurfaceRenderer {
         self.clear_target(encoder, root, self.renderer_config.wgpu_clear_color());
         self.render_effect_nodes(encoder, &graph.roots, root, viewport);
         clear_view(encoder, surface, self.renderer_config.wgpu_clear_color());
-        let mut params = uniform(viewport, region, root.region, root.region, region.as_rect());
+        let mut params = uniform(viewport, region, root, root, region.as_rect());
         params.mode = 99;
         params.data[0] = 1.0;
         self.effect.draw(
@@ -169,6 +169,15 @@ impl SurfaceRenderer {
             color_attachments: &[attachment],
             ..Default::default()
         });
+        pass.set_viewport(
+            0.0,
+            0.0,
+            target.extent[0] as f32,
+            target.extent[1] as f32,
+            0.0,
+            1.0,
+        );
+        pass.set_scissor_rect(0, 0, target.extent[0], target.extent[1]);
         for node in nodes {
             let EffectNode::Draw(batch) = node else {
                 continue;
@@ -290,13 +299,7 @@ impl SurfaceRenderer {
         let extent = pass.extent.unwrap_or(source.region.size);
         let target = self.acquire_target(source.region, extent);
         self.clear_target(encoder, target, wgpu::Color::TRANSPARENT);
-        let mut params = uniform(
-            viewport,
-            target.region,
-            source.region,
-            source.region,
-            pass.bounds,
-        );
+        let mut params = uniform(viewport, target.region, source, source, pass.bounds);
         params.mode = pass.mode;
         params.data = pass.data;
         if let Some(matrix) = pass.matrix {
@@ -340,13 +343,7 @@ impl SurfaceRenderer {
         } else {
             let merged = self.acquire_target(region, region.size);
             self.clear_target(encoder, merged, wgpu::Color::TRANSPARENT);
-            let mut params = uniform(
-                viewport,
-                region,
-                filtered.region,
-                snapshot.region,
-                style.bounds,
-            );
+            let mut params = uniform(viewport, region, filtered, snapshot, style.bounds);
             params.mode = 12;
             params.data[0] = style.opacity.clamp(0.0, 1.0);
             params.radii = layer_radii(style.mask);
@@ -373,13 +370,7 @@ impl SurfaceRenderer {
             );
             let shadowed = self.acquire_target(region, region.size);
             self.clear_target(encoder, shadowed, wgpu::Color::TRANSPARENT);
-            let mut params = uniform(
-                viewport,
-                region,
-                blurred.region,
-                backdrop.region,
-                style.bounds,
-            );
+            let mut params = uniform(viewport, region, blurred, backdrop, style.bounds);
             params.mode = if shadow.inset { 11 } else { 10 };
             params.color = shadow.color.as_array();
             params.color[3] *= style.opacity.clamp(0.0, 1.0);
@@ -402,8 +393,8 @@ impl SurfaceRenderer {
         let mut params = uniform(
             viewport,
             region,
-            foreground.region,
-            backdrop.region,
+            foreground,
+            backdrop,
             style.foreground_bounds(),
         );
         params.blend = blend_mode(style.blend_mode);
@@ -475,7 +466,7 @@ impl SurfaceRenderer {
 
     fn acquire_target(&mut self, region: PixelRegion, extent: [u32; 2]) -> TextureTarget {
         let texture = self.offscreen.acquire(&self.device, extent[0], extent[1]);
-        TextureTarget::new(texture, region, extent)
+        TextureTarget::with_allocation(texture, region, extent, self.offscreen.extent(texture))
     }
 
     fn clear_target(

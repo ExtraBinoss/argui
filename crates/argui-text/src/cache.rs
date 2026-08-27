@@ -21,7 +21,11 @@ impl MeasureKey {
         Self {
             text: text.to_owned(),
             style: StyleKey::new(style),
-            width: width.map(f32::to_bits),
+            width: if style.wrap == TextWrap::None {
+                None
+            } else {
+                width.map(f32::to_bits)
+            },
         }
     }
 }
@@ -45,7 +49,11 @@ impl ShapeKey {
             text: block.text.clone(),
             style: StyleKey::new(&block.style),
             size: [
-                block.bounds.size.width.to_bits(),
+                if block.style.wrap == TextWrap::None {
+                    0
+                } else {
+                    block.bounds.size.width.to_bits()
+                },
                 block.bounds.size.height.to_bits(),
             ],
             scale_factor: scale_factor.to_bits(),
@@ -159,9 +167,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{CACHE_CAPACITY, MeasureKey, TextCache};
-    use crate::TextStyle;
-    use argui_core::Size;
+    use super::{CACHE_CAPACITY, MeasureKey, ShapeKey, TextCache};
+    use crate::{TextBlock, TextStyle, TextWrap};
+    use argui_core::{Point, Rect, Size};
 
     #[test]
     fn cache_hits_and_stays_bounded() {
@@ -187,5 +195,27 @@ mod tests {
         );
         cache.clear();
         assert!(cache.measurements.is_empty());
+    }
+
+    #[test]
+    fn unwrapped_text_cache_keys_ignore_width_changes() {
+        let style = TextStyle {
+            wrap: TextWrap::None,
+            ..TextStyle::default()
+        };
+        assert_eq!(
+            MeasureKey::new("fixed", &style, Some(100.0)),
+            MeasureKey::new("fixed", &style, Some(900.0))
+        );
+        let block = |width| {
+            let mut block =
+                TextBlock::new("fixed", Rect::new(Point::default(), Size::new(width, 24.0)));
+            block.style = style.clone();
+            block
+        };
+        assert_eq!(
+            ShapeKey::new(&block(100.0), 1.0),
+            ShapeKey::new(&block(900.0), 1.0)
+        );
     }
 }

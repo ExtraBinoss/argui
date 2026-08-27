@@ -50,6 +50,7 @@ pub struct Element {
     pub layer: Option<LayerStyle>,
     pub effects: Vec<ScopedEffect>,
     pub scroll: Option<ScrollConfig>,
+    pub overlay: Option<crate::OverlayAnchor>,
     pub z_index: i32,
     pub children: Vec<Self>,
 }
@@ -70,6 +71,7 @@ impl Element {
             layer: None,
             effects: Vec::new(),
             scroll: None,
+            overlay: None,
             z_index: 0,
             children: children.into_iter().collect(),
         }
@@ -103,6 +105,7 @@ impl Element {
             layer: None,
             effects: Vec::new(),
             scroll: None,
+            overlay: None,
             z_index: 0,
             children: Vec::new(),
         }
@@ -276,6 +279,18 @@ impl Element {
     pub const fn absolute(mut self, inset: Inset) -> Self {
         self.style.position = Position::Absolute;
         self.style.inset = inset;
+        self
+    }
+
+    #[must_use]
+    pub fn anchored_to(
+        mut self,
+        key: impl Into<String>,
+        placement: crate::OverlayPlacement,
+    ) -> Self {
+        self.style.position = Position::Absolute;
+        self.style.inset = Inset::default();
+        self.overlay = Some(crate::OverlayAnchor::new(key, placement));
         self
     }
 

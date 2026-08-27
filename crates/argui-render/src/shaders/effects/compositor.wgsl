@@ -5,6 +5,8 @@ struct Params {
     target_region: vec4<f32>,
     source: vec4<f32>,
     backdrop: vec4<f32>,
+    source_uv: vec4<f32>,
+    backdrop_uv: vec4<f32>,
     bounds: vec4<f32>,
     radii: vec4<f32>,
     color: vec4<f32>,
@@ -59,18 +61,22 @@ fn region_uv(pixel: vec2<f32>, region: vec4<f32>) -> vec2<f32> {
     return (pixel - region.xy) / region.zw;
 }
 
+fn allocated_uv(pixel: vec2<f32>, region: vec4<f32>, allocation: vec4<f32>) -> vec2<f32> {
+    return allocation.xy + region_uv(pixel, region) * allocation.zw;
+}
+
 fn in_region(pixel: vec2<f32>, region: vec4<f32>) -> bool {
     return all(pixel >= region.xy) && all(pixel < region.xy + region.zw);
 }
 
 fn sample_source(pixel: vec2<f32>) -> vec4<f32> {
     if !in_region(pixel, params.source) { return vec4<f32>(0.0); }
-    return textureSample(source_texture, linear_sampler, region_uv(pixel, params.source));
+    return textureSample(source_texture, linear_sampler, allocated_uv(pixel, params.source, params.source_uv));
 }
 
 fn sample_backdrop(pixel: vec2<f32>) -> vec4<f32> {
     if !in_region(pixel, params.backdrop) { return vec4<f32>(0.0); }
-    return textureSample(backdrop_texture, linear_sampler, region_uv(pixel, params.backdrop));
+    return textureSample(backdrop_texture, linear_sampler, allocated_uv(pixel, params.backdrop, params.backdrop_uv));
 }
 
 fn mask_coverage(pixel: vec2<f32>) -> f32 {
@@ -97,7 +103,7 @@ fn composite(source: vec4<f32>, backdrop: vec4<f32>, pixel: vec2<f32>) -> vec4<f
 fn sample_blur(pixel: vec2<f32>, axis: vec2<f32>) -> vec4<f32> {
     let source_size = vec2<f32>(textureDimensions(source_texture));
     let step = axis * max(params.data.x, 0.0) / source_size;
-    let uv = region_uv(pixel, params.source);
+    let uv = allocated_uv(pixel, params.source, params.source_uv);
     let weights = array<f32, 7>(
         0.137023, 0.129618, 0.109719, 0.083108, 0.056331, 0.034167, 0.018544
     );

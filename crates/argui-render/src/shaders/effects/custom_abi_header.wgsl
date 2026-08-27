@@ -5,6 +5,8 @@ struct Params {
     target_region: vec4<f32>,
     source: vec4<f32>,
     backdrop: vec4<f32>,
+    source_uv: vec4<f32>,
+    backdrop_uv: vec4<f32>,
     bounds: vec4<f32>,
     radii: vec4<f32>,
     color: vec4<f32>,
@@ -41,18 +43,22 @@ fn effect_region_uv(pixel: vec2<f32>, region: vec4<f32>) -> vec2<f32> {
     return (pixel - region.xy) / region.zw;
 }
 
+fn effect_allocated_uv(pixel: vec2<f32>, region: vec4<f32>, allocation: vec4<f32>) -> vec2<f32> {
+    return allocation.xy + effect_region_uv(pixel, region) * allocation.zw;
+}
+
 fn effect_in_region(pixel: vec2<f32>, region: vec4<f32>) -> bool {
     return all(pixel >= region.xy) && all(pixel < region.xy + region.zw);
 }
 
 fn source_at(pixel: vec2<f32>) -> vec4<f32> {
     if !effect_in_region(pixel, params.source) { return vec4<f32>(0.0); }
-    return textureSample(source_texture, linear_sampler, effect_region_uv(pixel, params.source));
+    return textureSample(source_texture, linear_sampler, effect_allocated_uv(pixel, params.source, params.source_uv));
 }
 
 fn backdrop_at(pixel: vec2<f32>) -> vec4<f32> {
     if !effect_in_region(pixel, params.backdrop) { return vec4<f32>(0.0); }
-    return textureSample(backdrop_texture, linear_sampler, effect_region_uv(pixel, params.backdrop));
+    return textureSample(backdrop_texture, linear_sampler, effect_allocated_uv(pixel, params.backdrop, params.backdrop_uv));
 }
 
 fn layer_rounded_distance(pixel: vec2<f32>) -> f32 {

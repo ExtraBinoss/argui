@@ -1,10 +1,16 @@
 use argui_core::{Color, Point, Rect, Size, Transform2D};
 use argui_inspect::{InspectNodeId, InspectorHandle, StyleProperty, StyleValue};
 use argui_layout::{LayoutNode, LayoutOutput};
-use argui_paint::{Border, ClipBehavior, LayerStyle};
-use argui_ui::{EffectScope, Element, Length, UiTree};
+use argui_paint::{
+    Border, ClipBehavior, CustomEffect, Fill, Filter, GradientStop, LayerStyle, LinearGradient,
+    RadialGradient, Refraction, ShaderEffectId, Shadow,
+};
+use argui_ui::{EffectScope, Element, Interaction, Length, UiTree};
 
-use super::{CollectState, apply_tree_overrides, collect_nodes, descendant_count, properties};
+use super::{
+    CollectState, apply_property_value, apply_tree_overrides, collect_nodes, descendant_count,
+    properties, property_value,
+};
 
 fn fully_styled() -> Element {
     Element::container([])
@@ -99,4 +105,154 @@ fn snapshots_skip_uninspectable_subtrees_without_losing_siblings() {
     assert_eq!(snapshots[1].key.as_deref(), Some("visible-image"));
     assert_eq!(snapshots[1].bounds, layout.nodes[0].bounds);
     assert_eq!(snapshots[2].kind, "text");
+}
+
+#[test]
+fn inspector_serializes_and_applies_every_filter_parameter() {
+    let filters = vec![
+        Filter::Blur(1.0),
+        Filter::Brightness(1.0),
+        Filter::Contrast(1.0),
+        Filter::Saturation(1.0),
+        Filter::HueRotate(1.0),
+        Filter::Opacity(1.0),
+        Filter::ColorMatrix([1.0; 20]),
+        Filter::Refraction(Refraction {
+            strength: 1.0,
+            chromatic_aberration: 1.0,
+            edge: 1.0,
+        }),
+        Filter::Custom(CustomEffect::new(ShaderEffectId(7), [1.0, 1.0])),
+    ];
+    let mut element = Element::container([]).layer(
+        filters
+            .iter()
+            .cloned()
+            .fold(LayerStyle::new(Rect::default()), LayerStyle::filter)
+            .backdrop(Filter::Blur(1.0))
+            .shadow(Shadow::drop([1.0, 1.0], 1.0, Color::rgb(0.1, 0.2, 0.3)).spread(1.0)),
+    );
+    let StyleValue::Parameters(mut fields) = property_value(&element, StyleProperty::Layer) else {
+        panic!("layer properties stay numeric and editable");
+    };
+    assert!(fields.len() > 40);
+    for field in &mut fields {
+        field.value = 2.0;
+    }
+    apply_property_value(
+        &mut element,
+        StyleProperty::Layer,
+        &StyleValue::Parameters(fields),
+    );
+    let layer = element.layer.as_ref().unwrap();
+    assert_eq!(layer.opacity, 2.0);
+    assert!(matches!(layer.filters[0], Filter::Blur(2.0)));
+    assert_eq!(layer.filters[6], Filter::ColorMatrix([2.0; 20]));
+    assert!(matches!(
+        layer.filters[7],
+        Filter::Refraction(value)
+            if value.strength == 2.0
+                && value.chromatic_aberration == 2.0
+                && value.edge == 2.0
+    ));
+    assert!(matches!(
+        &layer.filters[8],
+        Filter::Custom(value) if value.parameters == [2.0, 2.0]
+    ));
+    assert_eq!(layer.shadows[0].offset, [2.0, 2.0]);
+}
+
+#[test]
+fn inspector_describes_gradient_and_absent_paints_and_clamps_lengths() {
+    let stops = [
+        GradientStop::new(0.0, Color::rgb(0.0, 0.0, 0.0)),
+        GradientStop::new(1.0, Color::WHITE),
+    ];
+    let linear = LinearGradient::new(Point::default(), Point::new(1.0, 0.0), stops).unwrap();
+    let radial = RadialGradient::new(Point::default(), Point::new(1.0, 1.0), stops).unwrap();
+    let mut element = Element::container([]);
+    assert_eq!(
+        property_value(&element, StyleProperty::Background),
+        StyleValue::Summary("none".into())
+    );
+    element.paint.quad.background = Some(Fill::Linear(linear));
+    assert!(matches!(
+        property_value(&element, StyleProperty::Background),
+        StyleValue::Summary(value) if value.contains("linear")
+    ));
+    element.paint.quad.background = Some(Fill::Radial(radial));
+    assert!(matches!(
+        property_value(&element, StyleProperty::Background),
+        StyleValue::Summary(value) if value.contains("radial")
+    ));
+
+    apply_property_value(
+        &mut element,
+        StyleProperty::Width,
+        &StyleValue::Length(argui_inspect::StyleLength {
+            value: -4.0,
+            unit: argui_inspect::StyleUnit::Px,
+        }),
+    );
+    apply_property_value(
+        &mut element,
+        StyleProperty::Height,
+        &StyleValue::Length(argui_inspect::StyleLength {
+            value: 0.5,
+            unit: argui_inspect::StyleUnit::Percent,
+        }),
+    );
+    assert_eq!(element.style.width, Length::Px(0.0));
+    assert_eq!(element.style.height, Length::Percent(0.5));
+}
+
+#[test]
+fn snapshots_distinguish_visual_interactive_and_hidden_structure() {
+    let root = Element::container([
+        Element::container([]).keyed("empty"),
+        Element::container([])
+            .keyed("painted")
+            .background(Color::WHITE),
+        Element::container([])
+            .keyed("effect")
+            .effect(EffectScope::Content, LayerStyle::new(Rect::default())),
+        Element::container([])
+            .keyed("layer")
+            .layer(LayerStyle::new(Rect::default())),
+        Element::container([])
+            .keyed("interactive")
+            .interaction(Interaction::default()),
+        Element::container([Element::text("This text is deliberately longer than fifty-two characters so its summary is shortened")])
+            .keyed("hidden-parent")
+            .layer(LayerStyle::new(Rect::default()).opacity(0.0)),
+    ]);
+    let tree = UiTree::new(root);
+    let mut snapshots = Vec::new();
+    collect_nodes(
+        tree.root(),
+        None,
+        0,
+        true,
+        &mut CollectState {
+            ids: tree.node_ids(),
+            layout: &LayoutOutput::default(),
+            output: &mut snapshots,
+            cursor: 0,
+        },
+    );
+    let find = |key: &str| {
+        snapshots
+            .iter()
+            .find(|node| node.key.as_deref() == Some(key))
+            .unwrap()
+    };
+    assert!(!find("empty").painted);
+    assert!(find("painted").painted);
+    assert!(find("effect").painted);
+    assert!(find("layer").painted);
+    assert!(find("interactive").interactive);
+    assert!(!find("hidden-parent").visible);
+    let text = snapshots.last().unwrap();
+    assert!(!text.visible);
+    assert!(text.summary.as_ref().unwrap().ends_with('…'));
 }

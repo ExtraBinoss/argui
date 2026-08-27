@@ -526,6 +526,7 @@ fn classify_update(old: &Element, new: &Element) -> TreeUpdate {
         || old.style != new.style
         || old.paint.clip != new.paint.clip
         || old.scroll.is_some() != new.scroll.is_some()
+        || old.overlay != new.overlay
         || old.children.len() != new.children.len()
     {
         return TreeUpdate::Layout;

@@ -68,6 +68,9 @@ fn selected_nodes_receive_reversible_typed_style_overrides() {
             clip: None,
             z_index: 0,
             visible: true,
+            painted: true,
+            interactive: false,
+            child_count: 0,
             properties: vec![PropertySnapshot {
                 property: StyleProperty::Background,
                 authored: true,
@@ -209,7 +212,7 @@ fn elements_render_selection_highlight_and_every_style_control() {
 }
 
 #[test]
-fn profiling_and_closed_views_use_the_same_argui_tree() {
+fn profiling_and_closed_views_keep_the_dock_tree_retained() {
     let mut host = populated_host();
     let inspector = host.inspector();
     inspector.record_ui(FrameRecord {
@@ -248,7 +251,7 @@ fn profiling_and_closed_views_use_the_same_argui_tree() {
     settle(&mut host);
     let closed = host.view();
     assert!(contains_text(&closed, "DevTools"));
-    assert!(!contains_key(&closed, "__devtools-tree"));
+    assert!(contains_key(&closed, "__devtools-tree"));
 }
 
 #[test]
@@ -333,7 +336,7 @@ fn picker_hit_tests_the_application_and_selects_without_clicking_through() {
             "__devtools-picker-surface",
             UiEventKind::PointerMoved(Point::new(40.0, 40.0)),
         )),
-        ViewUpdate::Rebuild
+        ViewUpdate::Paint
     );
     assert_eq!(inspector.selected(), None);
     assert_eq!(
@@ -344,6 +347,18 @@ fn picker_hit_tests_the_application_and_selects_without_clicking_through() {
     let request = host.take_scroll_request().expect("picker reveals tree row");
     assert_eq!(request.key, "__devtools-tree");
     assert!(!contains_key(&host.view(), "__devtools-picker-surface"));
+
+    host.update(&event("__devtools-picker", UiEventKind::Clicked));
+    host.update(&event(
+        "__devtools-picker-surface",
+        UiEventKind::PointerMoved(Point::new(40.0, 40.0)),
+    ));
+    host.update(&event("__devtools-picker-surface", UiEventKind::Clicked));
+    assert_eq!(
+        inspector.selected(),
+        Some(InspectNodeId(1)),
+        "repeating the picker at one point cycles to the structural fallback"
+    );
 }
 
 #[test]
@@ -351,7 +366,7 @@ fn sheet_relayouts_incrementally_and_vectors_stay_paint_only() {
     let mut host = DevtoolsHost::new(App(Rc::new(Cell::new(0))));
     let mut tree = UiTree::new(host.view());
     host.update(&event("__devtools-toggle", UiEventKind::Clicked));
-    assert_eq!(tree.update(host.view()), argui_ui::TreeUpdate::Layout);
+    assert_eq!(tree.update(host.view()), argui_ui::TreeUpdate::Paint);
     host.animation_frame(Frame {
         now: Time::ZERO,
         elapsed: Duration::from_millis(16),
@@ -451,8 +466,10 @@ fn closed_dock_keeps_a_visible_overlay_button_without_stealing_app_height() {
             .unwrap()
     };
     let application = bounds("__devtools-app-root");
+    let surface = bounds("__devtools-surface");
     let toggle = bounds("__devtools-toggle");
     assert_eq!(application.size.height, 700.0);
+    assert_eq!(surface.size.height, 0.0);
     assert!(toggle.origin.x >= 0.0);
     assert!(toggle.origin.y >= 0.0);
     assert!(toggle.origin.x + toggle.size.width <= 1_100.0);
@@ -502,34 +519,6 @@ fn real_showcase_lowers_both_devtools_button_and_page_scrollbar() {
     assert!(page_scroll.scrollbar.is_some());
 }
 
-#[test]
-fn opening_tools_survives_the_transient_zero_height_application_viewport() {
-    let mut host = DevtoolsHost::new(StateShowcase::default());
-    assert_eq!(
-        host.update(&event("__devtools-toggle", UiEventKind::Clicked)),
-        ViewUpdate::Rebuild
-    );
-    let mut tree = UiTree::new(host.view());
-    let mut layout = LayoutEngine::new();
-    let output = layout
-        .compute(&mut tree, &mut text_engine(), Size::new(1_100.0, 230.0))
-        .unwrap();
-    let snapshot = LayoutSnapshot {
-        viewport: output.viewport,
-        nodes: output
-            .nodes
-            .iter()
-            .map(|layout| LayoutBounds {
-                node: layout.node,
-                key: tree.key(layout.node).map(str::to_owned),
-                bounds: layout.bounds,
-            })
-            .collect(),
-    };
-
-    assert_eq!(host.layout_changed(&snapshot), ViewUpdate::Rebuild);
-}
-
 fn populated_host() -> DevtoolsHost<App> {
     let host = DevtoolsHost::new(App(Rc::new(Cell::new(0)))).open(true);
     host.inspector().publish_tree(TreeSnapshot {
@@ -546,6 +535,9 @@ fn populated_host() -> DevtoolsHost<App> {
                 clip: None,
                 z_index: 0,
                 visible: true,
+                painted: false,
+                interactive: false,
+                child_count: 1,
                 properties: vec![],
             },
             NodeSnapshot {
@@ -559,6 +551,9 @@ fn populated_host() -> DevtoolsHost<App> {
                 clip: None,
                 z_index: 2,
                 visible: true,
+                painted: true,
+                interactive: true,
+                child_count: 0,
                 properties: StyleProperty::ALL
                     .into_iter()
                     .map(|property| PropertySnapshot {

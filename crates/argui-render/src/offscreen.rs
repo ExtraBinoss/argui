@@ -115,6 +115,10 @@ impl TexturePool {
         &self.entries[index].view
     }
 
+    pub fn extent(&self, index: usize) -> [u32; 2] {
+        [self.entries[index].width, self.entries[index].height]
+    }
+
     pub fn stats(&self) -> TexturePoolStats {
         TexturePoolStats {
             textures: self.entries.len(),
@@ -130,7 +134,8 @@ impl TexturePool {
 }
 
 fn size_class(size: u32) -> u32 {
-    size.max(1)
+    const TILE: u32 = 64;
+    size.max(1).div_ceil(TILE).saturating_mul(TILE)
 }
 
 fn texture_bytes(format: TextureFormat, width: u32, height: u32) -> u64 {
@@ -142,10 +147,12 @@ mod tests {
     use super::{size_class, texture_bytes};
 
     #[test]
-    fn offscreen_dimensions_preserve_exact_viewport_pixels() {
-        assert_eq!(size_class(0), 1);
-        assert_eq!(size_class(1), 1);
-        assert_eq!(size_class(801), 801);
+    fn offscreen_dimensions_reuse_nearby_allocation_classes() {
+        assert_eq!(size_class(0), 64);
+        assert_eq!(size_class(1), 64);
+        assert_eq!(size_class(64), 64);
+        assert_eq!(size_class(65), 128);
+        assert_eq!(size_class(801), 832);
         assert_eq!(texture_bytes(wgpu::TextureFormat::Rgba8Unorm, 10, 20), 800);
         assert_eq!(
             texture_bytes(wgpu::TextureFormat::Rgba16Float, 10, 20),

@@ -21,6 +21,7 @@ struct BlockVisual {
 
 #[derive(Clone, Copy)]
 struct PreparedVisual {
+    active: bool,
     transform: Affine2D,
     clip_start: u32,
     clip_count: u32,
@@ -121,11 +122,14 @@ impl TextGpu {
         let mut clips = Vec::new();
         let prepared = prepare_visuals(text, visuals, scale_factor, &mut clips);
         for glyph in &text.glyphs {
+            let visual = prepared[glyph.block];
+            if !visual.active {
+                continue;
+            }
             let Some(entry) = self.atlas.get_or_insert(queue, engine, glyph.key)? else {
                 continue;
             };
             let instance = instances.len() as u32;
-            let visual = prepared[glyph.block];
             instances.push(GlyphInstance::new(
                 *glyph,
                 entry,
@@ -190,25 +194,26 @@ fn prepare_visuals(
     (0..text.blocks)
         .map(|block| {
             let start = clips.len() as u32;
-            let transform = visuals
+            let visual = visuals
                 .and_then(|items| items.get(block))
-                .and_then(Option::as_ref)
-                .map_or(Affine2D::IDENTITY, |visual| {
-                    clips.extend(
-                        visual
-                            .clips
-                            .regions()
-                            .iter()
-                            .filter_map(|clip| TextClip::new(*clip, scale_factor)),
-                    );
-                    visual.transform.scaled(scale_factor)
-                });
+                .and_then(Option::as_ref);
+            let transform = visual.map_or(Affine2D::IDENTITY, |visual| {
+                clips.extend(
+                    visual
+                        .clips
+                        .regions()
+                        .iter()
+                        .filter_map(|clip| TextClip::new(*clip, scale_factor)),
+                );
+                visual.transform.scaled(scale_factor)
+            });
             if clips.len() as u32 == start
                 && let Some(glyph) = text.glyphs.iter().find(|glyph| glyph.block == block)
             {
                 clips.push(TextClip::physical(glyph.clip));
             }
             PreparedVisual {
+                active: visuals.is_none() || visual.is_some(),
                 transform,
                 clip_start: start,
                 clip_count: clips.len() as u32 - start,
@@ -261,12 +266,15 @@ mod tests {
         let mut clips = Vec::new();
         let prepared = prepare_visuals(&text, Some(&visuals), 2.0, &mut clips);
         assert_eq!(clips.len(), 1);
+        assert!(!prepared[0].active);
+        assert!(prepared[1].active);
         assert_eq!(prepared[0].clip_count, 0);
         assert_eq!(prepared[1].clip_count, 1);
         assert_eq!(prepared[1].transform.translation, Point::new(8.0, 10.0));
 
         clips.clear();
         let fallback = prepare_visuals(&text, None, 1.0, &mut clips);
+        assert!(fallback.iter().all(|visual| visual.active));
         assert!(fallback.iter().all(|visual| visual.clip_count == 0));
         assert!(clips.is_empty());
     }

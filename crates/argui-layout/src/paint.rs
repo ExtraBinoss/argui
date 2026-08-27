@@ -40,8 +40,22 @@ fn paint_node(
     output: &mut LayoutOutput,
     parent: &PaintContext,
 ) {
+    if parent.clips.is_empty() {
+        return;
+    }
     let node = output.nodes[map.index];
     let element = elements[node.index];
+    let portal;
+    let parent = if element.overlay.is_some() {
+        let clip = node.clip.unwrap_or(output.viewport);
+        portal = PaintContext {
+            transform: Affine2D::IDENTITY,
+            clips: ClipChain::from_regions([ClipRegion::new(clip, Affine2D::IDENTITY)]),
+        };
+        &portal
+    } else {
+        parent
+    };
     let transform = parent.transform
         * ui.resolved_transform(node.node, element)
             .affine(node.bounds, element.transform_origin);

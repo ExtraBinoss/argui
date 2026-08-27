@@ -3,8 +3,9 @@ use argui_layout::LayoutEngine;
 use argui_paint::{CornerRadii, DisplayCommand, LayerStyle, PaintStyle, QuadStyle};
 use argui_text::{TextEngine, TextStyle};
 use argui_ui::{
-    Button, ButtonStyle, Color, Edges, Element, Inset, Interaction, Length, ScrollConfig,
-    ScrollbarStyle, TextInput, TextInputStyle, UiTree, Wrap,
+    Button, ButtonStyle, Color, Edges, Element, Inset, Interaction, Length, OverlayAlign,
+    OverlayPlacement, PlacementSide, ScrollConfig, ScrollbarStyle, TextInput, TextInputStyle,
+    UiTree, Wrap,
 };
 
 const NOTO_SANS: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
@@ -257,6 +258,78 @@ fn scroll_translates_geometry_without_rebuilding_taffy() {
     assert_eq!(output.text.blocks()[1].bounds.origin.y, 60.0);
     assert_eq!(output.text.blocks()[1].clip.size.height, 40.0);
     assert_eq!(output.text.blocks()[0].clip.size.height, 100.0);
+}
+
+#[test]
+fn anchored_overlay_follows_a_scrolling_anchor_without_relayout() {
+    let anchor = Element::container([])
+        .keyed("anchor")
+        .width(Length::Px(80.0))
+        .height(Length::Px(30.0))
+        .shrink(0.0);
+    let overlay = Element::container([])
+        .keyed("overlay")
+        .width(Length::Px(120.0))
+        .height(Length::Px(60.0))
+        .background(Color::WHITE)
+        .anchored_to(
+            "anchor",
+            OverlayPlacement::new(PlacementSide::Bottom)
+                .align(OverlayAlign::Start)
+                .gap(6.0)
+                .margin(0.0),
+        );
+    let mut ui = UiTree::new(
+        Element::column([
+            Element::container([]).height(Length::Px(100.0)).shrink(0.0),
+            anchor,
+            overlay,
+            Element::container([]).height(Length::Px(200.0)).shrink(0.0),
+        ])
+        .keyed("scroll")
+        .width(Length::Px(240.0))
+        .height(Length::Px(240.0))
+        .scrollable(ScrollConfig::default()),
+    );
+    let mut layout = LayoutEngine::new();
+    let mut text = text_engine();
+    let mut output = layout
+        .compute(&mut ui, &mut text, Size::new(240.0, 240.0))
+        .unwrap();
+    let revision = ui.revision();
+    let anchor_node = ui.node_id_at(2).unwrap();
+    let overlay_node = ui.node_id_at(3).unwrap();
+    let before_anchor = output.nodes[2].bounds;
+    let before_overlay = output.nodes[3].bounds;
+    assert_eq!(before_overlay.origin.x, before_anchor.origin.x);
+    assert_eq!(before_overlay.origin.y, before_anchor.origin.y + 36.0);
+    assert_eq!(output.nodes[3].clip, Some(output.viewport));
+
+    let update = ui.scroll(
+        Point::new(20.0, 20.0),
+        ScrollDelta::Pixels(Point::new(0.0, -40.0)),
+        &output.scroll_regions,
+    );
+    assert!(update.scroll_changed);
+    layout.apply_scroll(&ui, &mut output).unwrap();
+
+    let anchor_after = output
+        .nodes
+        .iter()
+        .find(|node| node.node == anchor_node)
+        .unwrap()
+        .bounds;
+    let overlay_after = output
+        .nodes
+        .iter()
+        .find(|node| node.node == overlay_node)
+        .unwrap()
+        .bounds;
+    assert_eq!(ui.revision(), revision);
+    assert_eq!(anchor_after.origin.y, before_anchor.origin.y - 40.0);
+    assert_eq!(overlay_after.origin.y, anchor_after.origin.y + 36.0);
+    assert_eq!(overlay_after.origin.y, before_overlay.origin.y - 40.0);
+    output.display_list.validate().unwrap();
 }
 
 #[test]

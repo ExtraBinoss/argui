@@ -15,7 +15,7 @@ use argui_platform::{
 use argui_render::{EffectShader, RendererConfig, SurfaceRenderer};
 use argui_text::{PreparedText, TextEngine, TextScene};
 use argui_ui::{InteractionUpdate, UiTree};
-use std::{cell::RefCell, rc::Rc, sync::Arc};
+use std::{cell::RefCell, rc::Rc, sync::Arc, time::Instant};
 use winit::{
     application::ApplicationHandler,
     event::WindowEvent,
@@ -64,7 +64,10 @@ pub(crate) struct Application {
     pending_scrollbar_drag: Option<Point>,
     pending_pointer_scroll: Option<ScrollDelta>,
     scroll_inertia: scroll::ScrollInertia,
-    pending_ui_frame: frame::PendingUiFrame,
+    pending_window_frame: frame::PendingWindowFrame,
+    pub(super) pending_ui_frame: frame::PendingUiFrame,
+    pub(super) frame_record: argui_inspect::FrameRecord,
+    pub(super) last_redraw: Option<Instant>,
     pub(crate) fatal_error: Option<RuntimeError>,
     pub(super) on_event: Box<dyn FnMut(RuntimeEvent)>,
 }
@@ -127,7 +130,10 @@ impl Application {
             pending_scrollbar_drag: None,
             pending_pointer_scroll: None,
             scroll_inertia: scroll::ScrollInertia::default(),
+            pending_window_frame: frame::PendingWindowFrame::default(),
             pending_ui_frame: frame::PendingUiFrame::default(),
+            frame_record: argui_inspect::FrameRecord::default(),
+            last_redraw: None,
             fatal_error: None,
             on_event: Box::new(on_event),
         }
@@ -163,6 +169,7 @@ impl Application {
                 self.ui_layout = self.compute_ui_layout()?;
             }
             self.publish_inspection();
+            self.paint_inspection_highlight();
         }
         let scene = self
             .ui_layout
@@ -202,7 +209,7 @@ impl Application {
 
     pub(super) fn apply_ui_update(
         &mut self,
-        update: InteractionUpdate,
+        mut update: InteractionUpdate,
         window: &Window,
         event_loop: &ActiveEventLoop,
     ) {
@@ -210,7 +217,11 @@ impl Application {
         let mut rebuild = false;
         for event in &update.events {
             if let Some(model) = &mut self.model {
-                rebuild |= model.update(event) == ViewUpdate::Rebuild;
+                match model.update(event) {
+                    ViewUpdate::None => {}
+                    ViewUpdate::Paint => update.paint_changed = true,
+                    ViewUpdate::Rebuild => rebuild = true,
+                }
             }
             (self.on_event)(RuntimeEvent::Ui(event.clone()));
         }
@@ -240,6 +251,7 @@ impl Application {
             self.layout_engine.repaint(ui, layout);
         }
         self.publish_inspection();
+        self.paint_inspection_highlight();
     }
 
     fn pointer_moved(&mut self, point: Point, window: &Window, event_loop: &ActiveEventLoop) {
@@ -453,25 +465,19 @@ impl ApplicationHandler<UserEvent> for Application {
         let platform_event = match event {
             WindowEvent::CloseRequested => PlatformEvent::CloseRequested,
             WindowEvent::Resized(size) => {
-                if let RendererState::Ready(renderer) = &mut *self.renderer.borrow_mut() {
-                    renderer.resize(size.width, size.height);
-                }
-                self.update_viewport(size.width, size.height);
-                if !self.prepare_or_exit(event_loop) {
-                    return;
-                }
+                self.pending_window_frame.resize(size.width, size.height);
                 PlatformEvent::Resized {
                     width: size.width,
                     height: size.height,
                 }
             }
             WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
-                self.scale_factor = scale_factor as f32;
                 let size = window.inner_size();
-                self.update_viewport(size.width, size.height);
-                if !self.prepare_or_exit(event_loop) {
-                    return;
-                }
+                self.pending_window_frame.scale_factor(
+                    scale_factor as f32,
+                    size.width,
+                    size.height,
+                );
                 PlatformEvent::ScaleFactorChanged(scale_factor)
             }
             WindowEvent::CursorMoved { position, .. } => {
@@ -522,11 +528,13 @@ impl ApplicationHandler<UserEvent> for Application {
                 PlatformEvent::Focused(focused)
             }
             WindowEvent::RedrawRequested => {
+                self.begin_frame_profile();
                 self.advance_pointer_inertia(&window);
                 self.flush_pointer_scroll(&window, event_loop);
                 self.flush_scrollbar_drag(&window, event_loop);
-                self.flush_ui_frame(event_loop);
                 self.animate(&window, event_loop);
+                self.flush_window_frame();
+                self.flush_ui_frame(event_loop);
                 self.render(event_loop);
                 PlatformEvent::RedrawRequested
             }

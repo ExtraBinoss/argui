@@ -256,7 +256,14 @@ impl ClipChain {
     }
 
     #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.0
+            .iter()
+            .any(|region| region.bounds.size.width <= 0.0 || region.bounds.size.height <= 0.0)
+    }
+
+    #[must_use]
     pub fn contains(&self, point: Point) -> bool {
-        self.0.iter().all(|clip| clip.contains(point))
+        !self.is_empty() && self.0.iter().all(|clip| clip.contains(point))
     }
 }

@@ -18,6 +18,9 @@ fn node(id: u64, parent: Option<u64>, depth: usize, bounds: Rect, z_index: i32) 
         clip: None,
         z_index,
         visible: true,
+        painted: false,
+        interactive: false,
+        child_count: 0,
         properties: Vec::new(),
     }
 }
@@ -86,12 +89,14 @@ fn style_labels_and_frame_totals_are_complete() {
     );
     let frame = FrameRecord {
         model: Duration::from_millis(1),
+        surface: Duration::from_millis(2),
         tree: Duration::from_millis(2),
+        layout: Duration::from_millis(3),
         paint: Duration::from_millis(3),
         render_cpu: Duration::from_millis(4),
         ..FrameRecord::default()
     };
-    assert_eq!(frame.total_cpu(), Duration::from_millis(10));
+    assert_eq!(frame.total_cpu(), Duration::from_millis(15));
 }
 
 #[test]
@@ -154,6 +159,24 @@ fn inspection_hit_testing_prefers_frontmost_deep_nodes_inside_the_viewport() {
 }
 
 #[test]
+fn inspection_hit_testing_prefers_visual_nodes_over_empty_structure() {
+    let inspector = InspectorHandle::default();
+    let bounds = Rect::new(Point::new(10.0, 10.0), Size::new(100.0, 80.0));
+    let mut painted = node(1, None, 1, bounds, 0);
+    painted.painted = true;
+    let empty = node(2, None, 5, bounds, 0);
+    inspector.publish_tree(TreeSnapshot {
+        revision: 1,
+        nodes: vec![painted, empty],
+    });
+
+    assert_eq!(
+        inspector.hit_stack(Point::new(20.0, 20.0), bounds),
+        vec![InspectNodeId(1), InspectNodeId(2)]
+    );
+}
+
+#[test]
 fn snapshots_and_render_metrics_share_one_bounded_record() {
     let inspector = InspectorHandle::new(1);
     let tree = TreeSnapshot {
@@ -169,6 +192,9 @@ fn snapshots_and_render_metrics_share_one_bounded_record() {
             clip: None,
             z_index: 7,
             visible: true,
+            painted: true,
+            interactive: false,
+            child_count: 1,
             properties: vec![PropertySnapshot {
                 property: StyleProperty::Width,
                 authored: true,
@@ -231,4 +257,77 @@ fn empty_paused_and_zero_capacity_histories_are_safe() {
     disabled.record_ui(FrameRecord::default());
     disabled.record_render(FrameRecord::default());
     assert!(disabled.frames().is_empty());
+}
+
+#[test]
+fn every_style_value_exposes_edits_and_summaries_consistently() {
+    let mut auto = StyleValue::Length(StyleLength::default());
+    assert!(auto.fields().is_empty());
+    assert!(!auto.set_field(0, 10.0));
+    assert_eq!(auto.summary(), "auto");
+
+    let mut pixels = StyleValue::Length(StyleLength {
+        value: 12.0,
+        unit: StyleUnit::Px,
+    });
+    assert_eq!(pixels.fields()[0].label, "px");
+    assert!(pixels.set_field(0, 18.0));
+    assert!(!pixels.set_field(1, 20.0));
+    assert_eq!(pixels.summary(), "18.00px");
+
+    let mut percent = StyleValue::Length(StyleLength {
+        value: 0.25,
+        unit: StyleUnit::Percent,
+    });
+    assert_eq!(percent.fields()[0].value, 25.0);
+    assert!(percent.set_field(0, 75.0));
+    assert_eq!(percent.summary(), "75.00%");
+
+    let mut number = StyleValue::Number(1.0);
+    assert_eq!(number.fields()[0].label, "value");
+    assert!(number.set_field(0, 2.5));
+    assert!(!number.set_field(1, 4.0));
+    assert_eq!(number.summary(), "2.500");
+
+    let mut color = StyleValue::Color([0.0, 0.25, 0.5, 1.0]);
+    assert_eq!(color.fields().len(), 4);
+    assert!(color.set_field(0, -2.0));
+    assert!(color.set_field(3, 4.0));
+    assert!(!color.set_field(4, 0.0));
+    assert_eq!(color.summary(), "rgba(0.000, 0.250, 0.500, 1.000)");
+
+    let mut parameters = StyleValue::Parameters(vec![argui_inspect::StyleField {
+        label: "blur".into(),
+        value: 3.0,
+    }]);
+    assert_eq!(parameters.fields().len(), 1);
+    assert!(parameters.set_field(0, 5.0));
+    assert!(!parameters.set_field(1, 5.0));
+    assert_eq!(parameters.summary(), "1 parameters");
+
+    for value in [
+        StyleValue::Choice("bounds".into()),
+        StyleValue::Summary("none".into()),
+    ] {
+        assert!(value.fields().is_empty());
+        assert_eq!(
+            value.summary(),
+            if matches!(value, StyleValue::Choice(_)) {
+                "bounds"
+            } else {
+                "none"
+            }
+        );
+    }
+}
+
+#[test]
+fn hovered_highlight_temporarily_takes_priority_over_selection() {
+    let inspector = InspectorHandle::default();
+    inspector.select(Some(InspectNodeId(1)));
+    assert_eq!(inspector.highlighted(), Some(InspectNodeId(1)));
+    inspector.set_hovered(Some(InspectNodeId(2)));
+    assert_eq!(inspector.highlighted(), Some(InspectNodeId(2)));
+    inspector.set_hovered(None);
+    assert_eq!(inspector.highlighted(), Some(InspectNodeId(1)));
 }

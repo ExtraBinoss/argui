@@ -2,6 +2,7 @@
 pub struct RendererConfig {
     pub power_preference: wgpu::PowerPreference,
     pub present_mode: wgpu::PresentMode,
+    pub maximum_frame_latency: u32,
     pub clear_color: [f64; 4],
     pub profiling: bool,
     pub image_cache_bytes: usize,
@@ -13,6 +14,7 @@ impl Default for RendererConfig {
         Self {
             power_preference: wgpu::PowerPreference::HighPerformance,
             present_mode: wgpu::PresentMode::AutoVsync,
+            maximum_frame_latency: 2,
             clear_color: [0.055, 0.065, 0.09, 1.0],
             profiling: false,
             image_cache_bytes: 64 * 1024 * 1024,
@@ -22,6 +24,18 @@ impl Default for RendererConfig {
 }
 
 impl RendererConfig {
+    #[must_use]
+    pub const fn maximum_frame_latency(mut self, frames: u32) -> Self {
+        self.maximum_frame_latency = if frames < 1 {
+            1
+        } else if frames > 3 {
+            3
+        } else {
+            frames
+        };
+        self
+    }
+
     #[must_use]
     pub const fn profiling(mut self, enabled: bool) -> Self {
         self.profiling = enabled;

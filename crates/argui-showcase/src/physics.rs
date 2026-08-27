@@ -135,3 +135,55 @@ pub(super) fn showcase_inertia() -> Inertia {
     )
     .expect("the showcase inertia configuration is valid")
 }
+
+#[cfg(test)]
+mod tests {
+    use argui_ui::ElementKind;
+
+    use super::{PhysicsCommand, PhysicsMode, showcase_inertia};
+    use crate::StateShowcase;
+
+    fn state_label(showcase: &StateShowcase) -> String {
+        let demo = showcase.physics_demo(argui_paint::Color::WHITE);
+        match &demo.children[0].kind {
+            ElementKind::Text { content, .. } => content.clone(),
+            _ => panic!("physics state is rendered as text"),
+        }
+    }
+
+    #[test]
+    fn physics_commands_cover_retargeting_and_both_inertia_directions() {
+        let mut showcase = StateShowcase::default();
+        assert!(!showcase.apply_physics_command());
+
+        showcase.physics_command = Some(PhysicsCommand::RetargetSpring);
+        assert!(showcase.apply_physics_command());
+        assert_eq!(showcase.spring.target(), 1.0);
+
+        showcase.physics_command = Some(PhysicsCommand::RetargetSpring);
+        assert!(showcase.apply_physics_command());
+        assert_eq!(showcase.spring.target(), 0.0);
+
+        showcase.physics_mode = PhysicsMode::Inertia;
+        showcase.physics_command = Some(PhysicsCommand::RetargetSpring);
+        assert!(showcase.apply_physics_command());
+        assert_eq!(showcase.spring.target(), 1.0);
+
+        showcase.physics_value = 0.25;
+        showcase.physics_command = Some(PhysicsCommand::LaunchInertia);
+        assert!(showcase.apply_physics_command());
+        assert!(showcase.inertia.velocity() > 0.0);
+        assert!(state_label(&showcase).contains("decaying"));
+
+        showcase.inertia.launch(-0.1, 0.0);
+        assert!(state_label(&showcase).contains("bouncing"));
+
+        showcase.inertia = showcase_inertia();
+        assert!(state_label(&showcase).contains("inertia settled"));
+
+        showcase.physics_value = 0.75;
+        showcase.physics_command = Some(PhysicsCommand::LaunchInertia);
+        assert!(showcase.apply_physics_command());
+        assert!(showcase.inertia.velocity() < 0.0);
+    }
+}

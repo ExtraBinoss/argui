@@ -9,13 +9,12 @@ use argui_animation::{
     CubicBezier, Direction, Duration, Easing, FillMode, Frame, Inertia, Iterations, Keyframe,
     Keyframes, PlaybackState, Spring, Timeline, Timing,
 };
-use argui_core::Rect;
 use argui_paint::{Border, ClipBehavior, Color, CornerRadii, ImageAsset, PaintStyle, QuadStyle};
-use argui_runtime::{EffectShader, LayoutSnapshot, UiApp, ViewUpdate};
+use argui_runtime::{EffectShader, UiApp, ViewUpdate};
 use argui_text::{TextColor, TextEngine, TextStyle, TextWrap};
 use argui_ui::{
-    Align, Button, ButtonStyle, Edges, Element, Inset, Length, PlacedOverlay, ScrollConfig,
-    TextInput, TextInputStyle, Transition, UiEvent, UiEventKind, Wrap,
+    Align, Button, ButtonStyle, Edges, Element, Inset, Length, ScrollConfig, TextInput,
+    TextInputStyle, Transition, UiEvent, UiEventKind, Wrap,
 };
 use physics::{PhysicsCommand, PhysicsMode, showcase_inertia, showcase_spring};
 use popover::{popover_spring, shadow_timeline};
@@ -39,12 +38,9 @@ pub struct StateShowcase {
     popover_open: bool,
     popover_motion: Spring<f32>,
     popover_progress: f32,
-    popover_placement: Option<PlacedOverlay>,
     tooltip_hovered: bool,
     tooltip_visible: bool,
     tooltip_delay: f32,
-    tooltip_placement: Option<PlacedOverlay>,
-    overlay_container: Rect,
     shadow_color: Color,
     effect_phase: f32,
     shadow_animation: Timeline<Color>,
@@ -82,12 +78,9 @@ impl Default for StateShowcase {
             popover_open: false,
             popover_motion: popover_spring(),
             popover_progress: 0.0,
-            popover_placement: None,
             tooltip_hovered: false,
             tooltip_visible: false,
             tooltip_delay: 0.0,
-            tooltip_placement: None,
-            overlay_container: Rect::default(),
             shadow_color,
             effect_phase: 0.0,
             shadow_animation: shadow_timeline(shadow_color),
@@ -200,14 +193,6 @@ impl UiApp for StateShowcase {
         .height(Length::Percent(1.0))
         .scrollable(ScrollConfig::default().scrollbar(self.scrollbar_style(accent)))
         .padding(Edges::symmetric(20.0, 24.0))
-    }
-
-    fn layout_changed(&mut self, layout: &LayoutSnapshot) -> ViewUpdate {
-        if self.update_overlay_layout(layout) {
-            ViewUpdate::Rebuild
-        } else {
-            ViewUpdate::None
-        }
     }
 
     fn update(&mut self, event: &UiEvent) -> ViewUpdate {

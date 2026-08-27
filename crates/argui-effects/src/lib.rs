@@ -206,32 +206,31 @@ impl LiquidGlass {
 
 #[cfg(test)]
 mod tests {
-    use argui_paint::Filter;
+    use argui_paint::{CustomEffect, Filter};
 
     use super::{AnimatedGradient, LiquidGlass, SHADERS, WorleyBorderFire};
+
+    fn custom(filter: Filter) -> CustomEffect {
+        match filter {
+            Filter::Custom(effect) => effect,
+            _ => panic!("preset must lower to a custom effect"),
+        }
+    }
 
     #[test]
     fn presets_are_registered_and_lower_to_custom_filters() {
         assert_eq!(SHADERS.len(), 3);
-        let Filter::Custom(fire) = WorleyBorderFire::new(2.0).filter() else {
-            panic!("expected custom fire");
-        };
+        let fire = custom(WorleyBorderFire::new(2.0).filter());
         assert_eq!(fire.parameters, [2.0, 0.92, 13.0, 30.0]);
         assert_eq!(fire.expansion, 30.0);
 
-        let Filter::Custom(glass) = LiquidGlass::new().filter() else {
-            panic!("expected custom glass");
-        };
+        let glass = custom(LiquidGlass::new().filter());
         assert_eq!(glass.parameters, [8.0, 1.25, 3.0, 0.22, 18.0, 1.0]);
-        let Filter::Custom(saturated) = LiquidGlass::new().saturation(1.35).filter() else {
-            panic!("expected custom glass");
-        };
+        let saturated = custom(LiquidGlass::new().saturation(1.35).filter());
         assert_eq!(saturated.parameters[5], 1.35);
         assert_eq!(glass.pixel_parameters, 0b1_0111);
 
-        let Filter::Custom(gradient) = AnimatedGradient::new(1.0).filter() else {
-            panic!("expected custom gradient");
-        };
+        let gradient = custom(AnimatedGradient::new(1.0).filter());
         assert_eq!(gradient.parameters, [1.0, 1.4, 1.0]);
 
         for shader in SHADERS {

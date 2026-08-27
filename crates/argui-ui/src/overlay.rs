@@ -2,6 +2,22 @@ use argui_core::{Point, Rect, Size};
 
 use crate::Inset;
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct OverlayAnchor {
+    pub key: String,
+    pub placement: OverlayPlacement,
+}
+
+impl OverlayAnchor {
+    #[must_use]
+    pub fn new(key: impl Into<String>, placement: OverlayPlacement) -> Self {
+        Self {
+            key: key.into(),
+            placement,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum PlacementSide {
     Top,

@@ -1,6 +1,7 @@
-use argui_core::{Rect, Transform2D, TransformOrigin};
 use argui_inspect::{FrameRecord, NodeSnapshot};
-use argui_paint::{Border, ClipBehavior, Color, CornerRadii, PaintStyle, QuadStyle, VectorId};
+use argui_paint::{
+    Border, ClipBehavior, Color, CornerRadii, LayerStyle, PaintStyle, QuadStyle, VectorId,
+};
 use argui_runtime::UiApp;
 use argui_text::{TextColor, TextStyle, TextWrap};
 use argui_ui::{
@@ -29,19 +30,16 @@ pub(crate) fn host<A: UiApp>(tools: &DevtoolsHost<A>) -> Element {
     .shrink(1.0)
     .min_height(Length::Px(0.0))
     .clip(ClipBehavior::Bounds);
-    let mut children = vec![application];
+    let mut toggle = toggle_button(false)
+        .absolute(Inset::top_left(14.0, 14.0))
+        .z_index(30_000);
     if tools.open || tools.sheet_progress > 0.001 {
-        children.push(dock_surface(tools));
-    } else {
-        children.push(
-            toggle_button(false)
-                .absolute(Inset::top_left(14.0, 14.0))
-                .z_index(30_000),
-        );
+        if let Some(interaction) = &mut toggle.interaction {
+            interaction.enabled = false;
+        }
+        toggle = toggle.layer(LayerStyle::new(Default::default()).opacity(0.0));
     }
-    if let Some(highlight) = selection_highlight(tools) {
-        children.push(highlight);
-    }
+    let mut children = vec![application, toggle, dock_surface(tools)];
     if tools.picking {
         children.push(picker_surface(tools));
     }
@@ -362,9 +360,11 @@ fn frame_bar(frame: FrameRecord) -> Element {
 fn details(frame: FrameRecord) -> Element {
     Element::column([
         metric(format!(
-            "model {:.2} · tree {:.2} · paint {:.2} · render {:.2} ms",
+            "model {:.2} · surface {:.2} · tree {:.2} · layout {:.2} · paint {:.2} · render {:.2} ms",
             millis(frame.model),
+            millis(frame.surface),
             millis(frame.tree),
+            millis(frame.layout),
             millis(frame.paint),
             millis(frame.render_cpu)
         )),
@@ -373,73 +373,11 @@ fn details(frame: FrameRecord) -> Element {
             frame.update, frame.layers, frame.offscreen_pixels
         )),
         metric(format!(
-            "textures {} · reused this frame {}",
-            frame.textures, frame.reused_textures
+            "textures {} · reused {} · resize events {}",
+            frame.textures, frame.reused_textures, frame.resize_events
         )),
     ])
     .gap(8.0)
-}
-
-fn selection_highlight<A>(tools: &DevtoolsHost<A>) -> Option<Element> {
-    let selected = tools
-        .picker_hovered
-        .filter(|_| tools.picking)
-        .or_else(|| tools.inspector.selected());
-    let bounds = selected
-        .and_then(|selected| tools.inspector.node(selected))
-        .map_or_else(Rect::default, |node| node.bounds);
-    if selected.is_none() && !tools.picking {
-        return None;
-    }
-    let x = bounds.origin.x;
-    let y = bounds.origin.y;
-    let width = bounds.size.width.max(0.0);
-    let height = bounds.size.height.max(0.0);
-    Some(
-        Element::container([
-            highlight_piece(
-                Color::rgba(0.2, 0.72, 1.0, 0.10),
-                Transform2D::IDENTITY.translate(x, y).scale(width, height),
-            ),
-            highlight_piece(
-                ACCENT,
-                Transform2D::IDENTITY.translate(x, y).scale(width, 2.0),
-            ),
-            highlight_piece(
-                ACCENT,
-                Transform2D::IDENTITY
-                    .translate(x, y + (height - 2.0).max(0.0))
-                    .scale(width, 2.0),
-            ),
-            highlight_piece(
-                ACCENT,
-                Transform2D::IDENTITY.translate(x, y).scale(2.0, height),
-            ),
-            highlight_piece(
-                ACCENT,
-                Transform2D::IDENTITY
-                    .translate(x + (width - 2.0).max(0.0), y)
-                    .scale(2.0, height),
-            ),
-        ])
-        .keyed("__devtools-selection-highlight")
-        .absolute(Inset::top_left(0.0, 0.0))
-        .width(Length::Px(1.0))
-        .height(Length::Px(1.0))
-        .z_index(20_000)
-        .inspectable(false),
-    )
-}
-
-fn highlight_piece(color: Color, transform: Transform2D) -> Element {
-    Element::container([])
-        .absolute(Inset::top_left(0.0, 0.0))
-        .width(Length::Px(1.0))
-        .height(Length::Px(1.0))
-        .background(color)
-        .transform(transform)
-        .transform_origin(TransformOrigin::TOP_LEFT)
-        .inspectable(false)
 }
 
 fn toggle_button(open: bool) -> Element {
