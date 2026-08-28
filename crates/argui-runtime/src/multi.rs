@@ -16,8 +16,8 @@ use winit::{
 };
 
 use crate::{
-    AppCommand, AppEvent, AppModel, AppUpdate, LayoutSnapshot, RuntimeError, RuntimeEvent,
-    ScrollRequest, UiApp, ViewUpdate, app::Application, event::UserEvent,
+    AppCommand, AppEvent, AppModel, AppUpdate, Context, Entity, LayoutSnapshot, Render,
+    RuntimeError, RuntimeEvent, ViewUpdate, app::Application, event::UserEvent,
 };
 
 type SharedModel = Rc<RefCell<Box<dyn AppModel>>>;
@@ -124,7 +124,7 @@ impl MultiApplication {
             self.initial_text_engine.take().unwrap_or_default(),
             None,
             Some(UiTree::new(root)),
-            Some(Box::new(adapter)),
+            Some(Entity::new(adapter).erase()),
             callback,
         )
         .identified(self.config.identity.clone(), key.clone())
@@ -438,32 +438,38 @@ impl WindowModel {
     }
 }
 
-impl UiApp for WindowModel {
-    fn view(&self) -> Element {
+impl Render for WindowModel {
+    fn render(&mut self, _cx: &mut Context<Self>) -> Element {
         self.view()
             .unwrap_or_else(|| Element::container(Vec::<Element>::new()))
     }
 
-    fn update(&mut self, event: &argui_ui::UiEvent) -> ViewUpdate {
+    fn event(&mut self, event: &argui_ui::UiEvent, cx: &mut Context<Self>) {
         let update = self.model.borrow_mut().update(&AppEvent::Ui {
             window: self.key.clone(),
             event: event.clone(),
         });
-        self.record(update)
+        request_update(cx, self.record(update));
+        if let Some(request) = self.model.borrow_mut().take_clipboard_request(&self.key) {
+            cx.write_clipboard(request);
+        }
+        if let Some(request) = self.model.borrow_mut().take_scroll_request(&self.key) {
+            cx.scroll_to(request.key, request.offset);
+        }
     }
 
-    fn animation_frame(&mut self, frame: argui_animation::Frame) -> ViewUpdate {
+    fn animation_frame(&mut self, frame: argui_animation::Frame, cx: &mut Context<Self>) {
         let update = self.model.borrow_mut().animation_frame(&self.key, frame);
-        self.record(update)
+        request_update(cx, self.record(update));
     }
 
     fn wants_animation_frame(&self) -> bool {
         self.model.borrow().wants_animation_frame(&self.key)
     }
 
-    fn layout_changed(&mut self, layout: &LayoutSnapshot) -> ViewUpdate {
+    fn layout_changed(&mut self, layout: &LayoutSnapshot, cx: &mut Context<Self>) {
         let update = self.model.borrow_mut().layout_changed(&self.key, layout);
-        self.record(update)
+        request_update(cx, self.record(update));
     }
 
     fn effect_shaders(&self) -> &'static [argui_render::EffectShader] {
@@ -481,13 +487,13 @@ impl UiApp for WindowModel {
     fn inspector(&self) -> Option<argui_inspect::InspectorHandle> {
         self.model.borrow().inspector(&self.key)
     }
+}
 
-    fn take_clipboard_request(&mut self) -> Option<argui_ui::ClipboardRequest> {
-        self.model.borrow_mut().take_clipboard_request(&self.key)
-    }
-
-    fn take_scroll_request(&mut self) -> Option<ScrollRequest> {
-        self.model.borrow_mut().take_scroll_request(&self.key)
+fn request_update<T: Render>(cx: &mut Context<T>, update: ViewUpdate) {
+    match update {
+        ViewUpdate::None => {}
+        ViewUpdate::Paint => cx.request_paint(),
+        ViewUpdate::Rebuild => cx.notify(),
     }
 }
 

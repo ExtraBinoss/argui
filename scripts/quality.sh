@@ -6,6 +6,7 @@ cd "$repo_root"
 
 ./scripts/check-rust-size.sh
 ./scripts/check-test-layout.sh
+./scripts/check-source-hygiene.sh
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo check --workspace --all-targets --target wasm32-unknown-unknown

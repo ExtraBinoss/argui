@@ -1,5 +1,5 @@
 use crate::{
-    LayoutBounds, LayoutSnapshot, RuntimeError, RuntimeEvent, UiApp, ViewUpdate,
+    AnyEntity, LayoutBounds, LayoutSnapshot, RuntimeError, RuntimeEvent, ViewUpdate,
     animation::RuntimeAnimations,
 };
 use argui_core::{Point, Size};
@@ -10,7 +10,8 @@ use argui_platform::{ApplicationIdentity, ButtonState, Modifiers, ScrollDelta, W
 use argui_render::{EffectShader, RendererConfig, RendererDevice, SurfaceRenderer};
 use argui_text::{PreparedText, TextEngine, TextScene};
 use argui_ui::{InteractionUpdate, UiTree};
-use std::{cell::RefCell, rc::Rc, sync::Arc, time::Instant};
+use std::{cell::RefCell, rc::Rc, sync::Arc};
+use web_time::Instant;
 use winit::{
     event_loop::ActiveEventLoop,
     window::{Window, WindowId},
@@ -48,7 +49,7 @@ pub(crate) struct Application {
     text_scene: Option<TextScene>,
     pub(super) ui_tree: Option<UiTree>,
     pub(super) animations: RuntimeAnimations,
-    pub(super) model: Option<Box<dyn UiApp>>,
+    pub(super) model: Option<AnyEntity>,
     pub(super) ui_layout: Option<LayoutOutput>,
     pub(super) layout_engine: LayoutEngine,
     pub(super) prepared_text: Option<PreparedText>,
@@ -80,26 +81,26 @@ impl Application {
         text_engine: TextEngine,
         text_scene: Option<TextScene>,
         ui_tree: Option<UiTree>,
-        model: Option<Box<dyn UiApp>>,
+        model: Option<AnyEntity>,
         on_event: impl FnMut(RuntimeEvent) + 'static,
     ) -> Self {
-        let inspector = model.as_deref().and_then(UiApp::inspector);
+        let inspector = model.as_ref().and_then(AnyEntity::inspector);
         let renderer_config = RendererConfig {
             profiling: renderer_config.profiling || inspector.is_some(),
             ..renderer_config
         };
         let effect_shaders = model
-            .as_deref()
-            .map(UiApp::effect_shaders)
+            .as_ref()
+            .map(AnyEntity::effect_shaders)
             .unwrap_or_default()
             .to_vec();
         let image_assets = model
-            .as_deref()
-            .map(UiApp::image_assets)
+            .as_ref()
+            .map(AnyEntity::image_assets)
             .unwrap_or_default();
         let vector_assets = model
-            .as_deref()
-            .map(UiApp::vector_assets)
+            .as_ref()
+            .map(AnyEntity::vector_assets)
             .unwrap_or_default();
         Self {
             window_config,
@@ -118,7 +119,7 @@ impl Application {
             text_engine,
             text_scene,
             ui_tree,
-            animations: RuntimeAnimations::new(model.as_deref()),
+            animations: RuntimeAnimations::new(model.as_ref()),
             model,
             ui_layout: None,
             layout_engine: LayoutEngine::new(),
@@ -201,10 +202,10 @@ impl Application {
                     .collect(),
             };
             self.ui_layout = Some(layout);
-            let rebuild = self
-                .model
-                .as_mut()
-                .is_some_and(|model| model.layout_changed(&snapshot) == ViewUpdate::Rebuild);
+            let rebuild = self.model.as_ref().is_some_and(|model| {
+                model.layout_changed(&snapshot);
+                model.take_effects().update == ViewUpdate::Rebuild
+            });
             if rebuild && let Some(root) = self.inspected_view() {
                 if let Some(ui) = &mut self.ui_tree {
                     ui.update(root);
@@ -257,29 +258,28 @@ impl Application {
         event_loop: &ActiveEventLoop,
     ) {
         let mut clipboard = update.clipboard.clone();
+        let mut scroll_request = None;
         let mut rebuild = false;
         for event in &update.events {
-            if let Some(model) = &mut self.model {
-                match model.update(event) {
+            if let Some(model) = &self.model {
+                model.event(event);
+                let effects = model.take_effects();
+                match effects.update {
                     ViewUpdate::None => {}
                     ViewUpdate::Paint => update.paint_changed = true,
                     ViewUpdate::Rebuild => rebuild = true,
                 }
+                if effects.clipboard.is_some() {
+                    clipboard = effects.clipboard;
+                }
+                if effects.scroll.is_some() {
+                    scroll_request = effects.scroll;
+                }
             }
             (self.on_event)(RuntimeEvent::Ui(event.clone()));
         }
-        if clipboard.is_none() {
-            clipboard = self
-                .model
-                .as_mut()
-                .and_then(|model| model.take_clipboard_request());
-        }
         let animation_changed = self.sync_animations();
         self.pending_ui_frame.merge(&update, rebuild);
-        let scroll_request = self
-            .model
-            .as_mut()
-            .and_then(|model| model.take_scroll_request());
         self.pending_ui_frame.request_scroll(scroll_request);
         if self.pending_ui_frame.needs_frame() || animation_changed {
             window.request_redraw();

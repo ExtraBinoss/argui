@@ -12,6 +12,11 @@ pass unless every check succeeds.
   LLVM regions, and branches.
 - Formatting and Clippy warnings fail the check.
 - `unsafe` is denied until a concrete, reviewed need is documented.
+- Migration shims, backward-compatibility layers, deprecated APIs, and legacy
+  entry points are forbidden. Replace callers and keep one current path.
+- Incomplete-code markers and stubs (`TODO`, `FIXME`, placeholder comments,
+  `todo!`, or `unimplemented!`) are forbidden. A text input's user-visible
+  placeholder is a real UI feature and is not an incomplete-code marker.
 
 Coverage is a floor, not a reason to write low-value tests. Test public behavior,
 edge cases, invalidation, event translation, layout results, and rendering data.
@@ -60,6 +65,7 @@ unbounded caches, and abstractions created for hypothetical future work.
 ```sh
 ./scripts/check-rust-size.sh
 ./scripts/check-test-layout.sh
+./scripts/check-source-hygiene.sh
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo check --workspace --all-targets --target wasm32-unknown-unknown

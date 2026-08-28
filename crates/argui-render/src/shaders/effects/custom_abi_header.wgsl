@@ -53,12 +53,12 @@ fn effect_in_region(pixel: vec2<f32>, region: vec4<f32>) -> bool {
 
 fn source_at(pixel: vec2<f32>) -> vec4<f32> {
     if !effect_in_region(pixel, params.source) { return vec4<f32>(0.0); }
-    return textureSample(source_texture, linear_sampler, effect_allocated_uv(pixel, params.source, params.source_uv));
+    return textureSampleLevel(source_texture, linear_sampler, effect_allocated_uv(pixel, params.source, params.source_uv), 0.0);
 }
 
 fn backdrop_at(pixel: vec2<f32>) -> vec4<f32> {
     if !effect_in_region(pixel, params.backdrop) { return vec4<f32>(0.0); }
-    return textureSample(backdrop_texture, linear_sampler, effect_allocated_uv(pixel, params.backdrop, params.backdrop_uv));
+    return textureSampleLevel(backdrop_texture, linear_sampler, effect_allocated_uv(pixel, params.backdrop, params.backdrop_uv), 0.0);
 }
 
 fn layer_rounded_distance(pixel: vec2<f32>) -> f32 {

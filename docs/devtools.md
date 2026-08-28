@@ -125,7 +125,7 @@ cost attribution, and zero records when inspection is detached.
 
 ### 2. Dock host
 
-- Create `argui-devtools` and a `DevtoolsHost<A>` wrapper around any `UiApp`.
+- Create `argui-devtools` and a `DevtoolsHost<A>` wrapper around any `Render` component.
 - Compose application viewport, splitter and dock with normal Argui layout.
 - Implement open/close, resizing, minimum sizes and keyboard toggle.
 - Keep native and WASM launch code unchanged apart from opting into the wrapper.

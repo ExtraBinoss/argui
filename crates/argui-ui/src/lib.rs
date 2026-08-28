@@ -36,6 +36,6 @@ pub use scroll::{
 pub use style::{Align, Direction, Edges, Inset, Justify, LayoutStyle, Length, Position, Wrap};
 pub use text_input::{ClipboardRequest, TextInput, TextInputStyle};
 pub use transition::Transition;
-pub use tree::{TreeUpdate, UiTree};
-pub use virtual_list::{VirtualList, VirtualWindow};
+pub use tree::{TreeUpdate, TreeUpdateStats, UiTree};
+pub use virtual_list::{MeasurementUpdate, VariableList, VirtualList, VirtualWindow};
 pub use widget::{Button, ButtonStyle};

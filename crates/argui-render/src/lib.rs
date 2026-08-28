@@ -15,6 +15,7 @@ mod shader;
 mod surface;
 mod target;
 mod text;
+mod upload;
 mod vector;
 
 pub use config::RendererConfig;

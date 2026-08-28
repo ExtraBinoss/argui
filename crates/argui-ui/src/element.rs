@@ -4,6 +4,10 @@ use argui_paint::{
     PaintStyle, VectorId,
 };
 use argui_text::TextStyle;
+use std::{
+    ops::{Deref, DerefMut},
+    sync::Arc,
+};
 
 use crate::{
     Align, Direction, Edges, EffectScope, Inset, Interaction, Justify, LayoutStyle, Length,
@@ -36,8 +40,11 @@ pub enum ElementKind {
     },
 }
 
+#[derive(Clone, Debug)]
+pub struct Element(Arc<ElementNode>);
+
 #[derive(Clone, Debug, PartialEq)]
-pub struct Element {
+pub struct ElementNode {
     pub inspectable: bool,
     pub key: Option<String>,
     pub kind: ElementKind,
@@ -52,13 +59,33 @@ pub struct Element {
     pub scroll: Option<ScrollConfig>,
     pub overlay: Option<crate::OverlayAnchor>,
     pub z_index: i32,
-    pub children: Vec<Self>,
+    pub children: Vec<Element>,
+}
+
+impl PartialEq for Element {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0) || self.0 == other.0
+    }
+}
+
+impl Deref for Element {
+    type Target = ElementNode;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for Element {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        Arc::make_mut(&mut self.0)
+    }
 }
 
 impl Element {
     #[must_use]
     pub fn container(children: impl IntoIterator<Item = Self>) -> Self {
-        Self {
+        Self(Arc::new(ElementNode {
             inspectable: true,
             key: None,
             kind: ElementKind::Container,
@@ -74,7 +101,7 @@ impl Element {
             overlay: None,
             z_index: 0,
             children: children.into_iter().collect(),
-        }
+        }))
     }
 
     #[must_use]
@@ -89,7 +116,7 @@ impl Element {
 
     #[must_use]
     pub fn text(value: impl Into<String>) -> Self {
-        Self {
+        Self(Arc::new(ElementNode {
             inspectable: true,
             key: None,
             kind: ElementKind::Text {
@@ -108,7 +135,13 @@ impl Element {
             overlay: None,
             z_index: 0,
             children: Vec::new(),
-        }
+        }))
+    }
+
+    /// Returns true when both values share the same retained subtree.
+    #[must_use]
+    pub fn ptr_eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
     }
 
     #[must_use]
@@ -133,7 +166,7 @@ impl Element {
     }
 
     #[must_use]
-    pub const fn vector_progress(mut self, progress: f32) -> Self {
+    pub fn vector_progress(mut self, progress: f32) -> Self {
         if let ElementKind::Vector {
             progress: value, ..
         } = &mut self.kind
@@ -144,7 +177,7 @@ impl Element {
     }
 
     #[must_use]
-    pub const fn image_fit(mut self, fit: ImageFit) -> Self {
+    pub fn image_fit(mut self, fit: ImageFit) -> Self {
         if let ElementKind::Image { fit: value, .. } = &mut self.kind {
             *value = fit;
         }
@@ -152,7 +185,7 @@ impl Element {
     }
 
     #[must_use]
-    pub const fn image_sampling(mut self, sampling: ImageSampling) -> Self {
+    pub fn image_sampling(mut self, sampling: ImageSampling) -> Self {
         if let ElementKind::Image {
             sampling: value, ..
         } = &mut self.kind
@@ -163,13 +196,13 @@ impl Element {
     }
 
     #[must_use]
-    pub const fn transform(mut self, transform: Transform2D) -> Self {
+    pub fn transform(mut self, transform: Transform2D) -> Self {
         self.transform = transform;
         self
     }
 
     #[must_use]
-    pub const fn transform_origin(mut self, origin: TransformOrigin) -> Self {
+    pub fn transform_origin(mut self, origin: TransformOrigin) -> Self {
         self.transform_origin = origin;
         self
     }
@@ -181,7 +214,7 @@ impl Element {
     }
 
     #[must_use]
-    pub const fn inspectable(mut self, inspectable: bool) -> Self {
+    pub fn inspectable(mut self, inspectable: bool) -> Self {
         self.inspectable = inspectable;
         self
     }
@@ -216,67 +249,67 @@ impl Element {
     }
 
     #[must_use]
-    pub const fn width(mut self, width: Length) -> Self {
+    pub fn width(mut self, width: Length) -> Self {
         self.style.width = width;
         self
     }
 
     #[must_use]
-    pub const fn height(mut self, height: Length) -> Self {
+    pub fn height(mut self, height: Length) -> Self {
         self.style.height = height;
         self
     }
 
     #[must_use]
-    pub const fn min_width(mut self, width: Length) -> Self {
+    pub fn min_width(mut self, width: Length) -> Self {
         self.style.min_width = width;
         self
     }
 
     #[must_use]
-    pub const fn min_height(mut self, height: Length) -> Self {
+    pub fn min_height(mut self, height: Length) -> Self {
         self.style.min_height = height;
         self
     }
 
     #[must_use]
-    pub const fn max_width(mut self, width: Length) -> Self {
+    pub fn max_width(mut self, width: Length) -> Self {
         self.style.max_width = width;
         self
     }
 
     #[must_use]
-    pub const fn direction(mut self, direction: Direction) -> Self {
+    pub fn direction(mut self, direction: Direction) -> Self {
         self.style.direction = direction;
         self
     }
 
     #[must_use]
-    pub const fn wrap(mut self, wrap: Wrap) -> Self {
+    pub fn wrap(mut self, wrap: Wrap) -> Self {
         self.style.wrap = wrap;
         self
     }
 
     #[must_use]
-    pub const fn align(mut self, align: Align) -> Self {
+    pub fn align(mut self, align: Align) -> Self {
         self.style.align = align;
         self
     }
 
     #[must_use]
-    pub const fn justify(mut self, justify: Justify) -> Self {
+    pub fn justify(mut self, justify: Justify) -> Self {
         self.style.justify = justify;
         self
     }
 
     #[must_use]
-    pub const fn position(mut self, position: Position) -> Self {
+    pub fn position(mut self, position: Position) -> Self {
         self.style.position = position;
         self
     }
 
     #[must_use]
-    pub const fn absolute(mut self, inset: Inset) -> Self {
+    pub fn absolute(mut self, inset: Inset) -> Self {
         self.style.position = Position::Absolute;
         self.style.inset = inset;
         self
@@ -295,25 +328,25 @@ impl Element {
     }
 
     #[must_use]
-    pub const fn padding(mut self, padding: Edges) -> Self {
+    pub fn padding(mut self, padding: Edges) -> Self {
         self.style.padding = padding;
         self
     }
 
     #[must_use]
-    pub const fn gap(mut self, gap: f32) -> Self {
+    pub fn gap(mut self, gap: f32) -> Self {
         self.style.gap = gap;
         self
     }
 
     #[must_use]
-    pub const fn grow(mut self, grow: f32) -> Self {
+    pub fn grow(mut self, grow: f32) -> Self {
         self.style.grow = grow;
         self
     }
 
     #[must_use]
-    pub const fn shrink(mut self, shrink: f32) -> Self {
+    pub fn shrink(mut self, shrink: f32) -> Self {
         self.style.shrink = shrink;
         self
     }
@@ -325,25 +358,25 @@ impl Element {
     }
 
     #[must_use]
-    pub const fn border(mut self, border: Border) -> Self {
+    pub fn border(mut self, border: Border) -> Self {
         self.paint.quad.border = Some(border);
         self
     }
 
     #[must_use]
-    pub const fn radius(mut self, radii: CornerRadii) -> Self {
+    pub fn radius(mut self, radii: CornerRadii) -> Self {
         self.paint.quad.radii = radii;
         self
     }
 
     #[must_use]
-    pub const fn paint_opacity(mut self, opacity: f32) -> Self {
+    pub fn paint_opacity(mut self, opacity: f32) -> Self {
         self.paint.quad.opacity = opacity;
         self
     }
 
     #[must_use]
-    pub const fn clip(mut self, clip: ClipBehavior) -> Self {
+    pub fn clip(mut self, clip: ClipBehavior) -> Self {
         self.paint.clip = clip;
         self
     }
@@ -405,7 +438,7 @@ impl Element {
     }
 
     #[must_use]
-    pub const fn z_index(mut self, z_index: i32) -> Self {
+    pub fn z_index(mut self, z_index: i32) -> Self {
         self.z_index = z_index;
         self
     }

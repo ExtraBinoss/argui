@@ -186,6 +186,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "argui-perf-showcase"
+version = "0.1.0"
+dependencies = [
+ "argui",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "argui-platform"
 version = "0.1.0"
 dependencies = [
@@ -230,6 +238,7 @@ dependencies = [
  "argui-ui",
  "pollster",
  "wasm-bindgen-futures",
+ "web-time",
  "winit",
 ]
 

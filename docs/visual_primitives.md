@@ -44,7 +44,7 @@ another decoder, an asset pack, or generated content.
 
 `argui_image::ImageLibrary::insert` generates an opaque handle and stores the
 decoded asset, so application code never invents numeric IDs. Applications
-return the library assets once from `UiApp::image_assets`; both native and WASM
+return the library assets once from `Render::image_assets`; both native and WASM
 launchers register them automatically. `Element::image` supports
 `Fill`, `Contain`, and `Cover`, linear or nearest sampling, rounded corners,
 nested clipping, opacity, transforms, overlays, and effect layers.

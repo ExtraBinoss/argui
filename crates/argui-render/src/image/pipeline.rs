@@ -115,6 +115,8 @@ pub(super) struct ImagePipeline {
     clips: wgpu::Buffer,
     instance_capacity: usize,
     clip_capacity: usize,
+    previous_instances: Vec<ImageInstance>,
+    previous_clips: Vec<ImageClip>,
     next_viewport: u64,
 }
 
@@ -218,6 +220,8 @@ impl ImagePipeline {
             clips,
             instance_capacity: 1,
             clip_capacity: 1,
+            previous_instances: Vec::new(),
+            previous_clips: Vec::new(),
             next_viewport: 0,
         }
     }
@@ -260,7 +264,8 @@ impl ImagePipeline {
         instances: &[ImageInstance],
         clips: &[ImageClip],
     ) {
-        if instances.len() > self.instance_capacity {
+        let instances_reallocated = instances.len() > self.instance_capacity;
+        if instances_reallocated {
             self.instance_capacity = instances.len().next_power_of_two();
             self.instances = buffer(
                 device,
@@ -269,7 +274,8 @@ impl ImagePipeline {
                 wgpu::BufferUsages::VERTEX,
             );
         }
-        if clips.len() > self.clip_capacity {
+        let clips_reallocated = clips.len() > self.clip_capacity;
+        if clips_reallocated {
             self.clip_capacity = clips.len().next_power_of_two();
             self.clips = buffer(
                 device,
@@ -279,12 +285,20 @@ impl ImagePipeline {
             );
             self.scene_group = scene_group(device, &self.scene_layout, &self.viewport, &self.clips);
         }
-        if !instances.is_empty() {
-            queue.write_buffer(&self.instances, 0, bytemuck::cast_slice(instances));
-        }
-        if !clips.is_empty() {
-            queue.write_buffer(&self.clips, 0, bytemuck::cast_slice(clips));
-        }
+        crate::upload::write_changed(
+            queue,
+            &self.instances,
+            instances,
+            &mut self.previous_instances,
+            instances_reallocated,
+        );
+        crate::upload::write_changed(
+            queue,
+            &self.clips,
+            clips,
+            &mut self.previous_clips,
+            clips_reallocated,
+        );
     }
 
     pub fn begin_frame(&mut self) {

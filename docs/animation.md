@@ -86,8 +86,8 @@ The public API is available from `argui::animation`. A `Timeline<T>` owns typed
 restart, finish, cancel, change playback rate, or retarget from its currently
 presented value. Custom easing closures remain platform-independent.
 
-`UiApp::wants_animation_frame` activates runtime scheduling and
-`UiApp::animation_frame` receives the one shared `Frame` sampled for that
+`Render::wants_animation_frame` activates runtime scheduling and
+`Render::animation_frame` receives the one shared `Frame` sampled for that
 presentation. Returning to an inactive timeline removes it from the compact
 scheduler immediately. The state showcase exercises this exact path on native
 and WASM without separate UI code.

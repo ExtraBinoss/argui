@@ -95,6 +95,25 @@ impl DisplayList {
         self.quad_count = 0;
     }
 
+    pub fn extend(&mut self, commands: impl IntoIterator<Item = DisplayCommand>) {
+        for command in commands {
+            if matches!(command, DisplayCommand::Quad(_)) {
+                self.quad_count += 1;
+            }
+            self.commands.push(command);
+        }
+    }
+
+    #[must_use]
+    pub const fn len(&self) -> usize {
+        self.commands.len()
+    }
+
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        self.commands.is_empty()
+    }
+
     #[must_use]
     pub fn commands(&self) -> &[DisplayCommand] {
         &self.commands

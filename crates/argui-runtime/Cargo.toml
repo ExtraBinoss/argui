@@ -19,6 +19,7 @@ argui-platform.workspace = true
 argui-render.workspace = true
 argui-text.workspace = true
 argui-ui.workspace = true
+web-time.workspace = true
 winit.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]

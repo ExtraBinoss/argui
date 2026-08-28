@@ -1,6 +1,5 @@
 use argui_inspect::{InspectNodeId, NodeSnapshot, PropertySnapshot, StyleProperty};
 use argui_paint::{Color, CornerRadii, PaintStyle, QuadStyle, VectorId};
-use argui_runtime::UiApp;
 use argui_text::{TextColor, TextStyle, TextWrap};
 use argui_ui::{
     Align, Button, ButtonStyle, Edges, Element, Interaction, LayoutStyle, Length, ScrollConfig,
@@ -15,7 +14,7 @@ const TEXT: TextColor = TextColor::rgb(0.85, 0.89, 0.95);
 const MUTED: TextColor = TextColor::rgb(0.55, 0.62, 0.72);
 const ACCENT: Color = Color::rgb(0.25, 0.72, 0.96);
 
-pub(crate) fn sidebar<A: UiApp>(
+pub(crate) fn sidebar<A>(
     selected: Option<InspectNodeId>,
     nodes: &[NodeSnapshot],
     tools: &DevtoolsHost<A>,
@@ -79,7 +78,7 @@ pub(crate) fn sidebar<A: UiApp>(
         .scrollable(ScrollConfig::default().scrollbar(scrollbar()))
 }
 
-fn property_editor<A: UiApp>(
+fn property_editor<A>(
     node: InspectNodeId,
     snapshot: &PropertySnapshot,
     tools: &DevtoolsHost<A>,

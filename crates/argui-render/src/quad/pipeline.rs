@@ -142,6 +142,9 @@ pub(super) struct QuadPipeline {
     instance_capacity: usize,
     clip_capacity: usize,
     gradient_capacity: usize,
+    previous_instances: Vec<QuadInstance>,
+    previous_clips: Vec<ClipInstance>,
+    previous_gradients: Vec<GradientStopInstance>,
     next_viewport: u64,
 }
 
@@ -234,6 +237,9 @@ impl QuadPipeline {
             instance_capacity: 1,
             clip_capacity: 1,
             gradient_capacity: 1,
+            previous_instances: Vec::new(),
+            previous_clips: Vec::new(),
+            previous_gradients: Vec::new(),
             next_viewport: 0,
         }
     }
@@ -247,6 +253,9 @@ impl QuadPipeline {
         gradients: &[GradientStopInstance],
     ) {
         let mut changed = false;
+        let mut instances_reallocated = false;
+        let mut clips_reallocated = false;
+        let mut gradients_reallocated = false;
         if instances.len() > self.instance_capacity {
             self.instance_capacity = instances.len().next_power_of_two();
             self.instance_buffer = storage_buffer::<QuadInstance>(
@@ -255,12 +264,14 @@ impl QuadPipeline {
                 self.instance_capacity,
             );
             changed = true;
+            instances_reallocated = true;
         }
         if clips.len() > self.clip_capacity {
             self.clip_capacity = clips.len().next_power_of_two();
             self.clip_buffer =
                 storage_buffer::<ClipInstance>(device, "argui-quad-clips", self.clip_capacity);
             changed = true;
+            clips_reallocated = true;
         }
         if gradients.len() > self.gradient_capacity {
             self.gradient_capacity = gradients.len().next_power_of_two();
@@ -270,6 +281,7 @@ impl QuadPipeline {
                 self.gradient_capacity,
             );
             changed = true;
+            gradients_reallocated = true;
         }
         if changed {
             self.bind_group = bind_group(
@@ -281,15 +293,27 @@ impl QuadPipeline {
                 &self.gradient_buffer,
             );
         }
-        if !instances.is_empty() {
-            queue.write_buffer(&self.instance_buffer, 0, bytemuck::cast_slice(instances));
-        }
-        if !clips.is_empty() {
-            queue.write_buffer(&self.clip_buffer, 0, bytemuck::cast_slice(clips));
-        }
-        if !gradients.is_empty() {
-            queue.write_buffer(&self.gradient_buffer, 0, bytemuck::cast_slice(gradients));
-        }
+        write_changed(
+            queue,
+            &self.instance_buffer,
+            instances,
+            &mut self.previous_instances,
+            instances_reallocated,
+        );
+        write_changed(
+            queue,
+            &self.clip_buffer,
+            clips,
+            &mut self.previous_clips,
+            clips_reallocated,
+        );
+        write_changed(
+            queue,
+            &self.gradient_buffer,
+            gradients,
+            &mut self.previous_gradients,
+            gradients_reallocated,
+        );
     }
 
     pub fn begin_frame(&mut self) {
@@ -324,6 +348,48 @@ impl QuadPipeline {
         pass.set_bind_group(0, &self.bind_group, &[viewport_offset]);
         pass.draw(0..6, instances);
     }
+}
+
+#[cfg_attr(coverage_nightly, coverage(off))]
+fn write_changed<T: Pod + Copy>(
+    queue: &wgpu::Queue,
+    buffer: &wgpu::Buffer,
+    values: &[T],
+    previous: &mut Vec<T>,
+    reallocated: bool,
+) {
+    if values.is_empty() {
+        previous.clear();
+        return;
+    }
+    let current_bytes: &[u8] = bytemuck::cast_slice(values);
+    let previous_bytes: &[u8] = bytemuck::cast_slice(previous.as_slice());
+    let item_size = size_of::<T>();
+    let (start, end) = if reallocated || values.len() != previous.len() {
+        (0, values.len())
+    } else {
+        let first = current_bytes
+            .chunks_exact(item_size)
+            .zip(previous_bytes.chunks_exact(item_size))
+            .position(|(current, old)| current != old);
+        let Some(first) = first else {
+            return;
+        };
+        let suffix = current_bytes
+            .chunks_exact(item_size)
+            .rev()
+            .zip(previous_bytes.chunks_exact(item_size).rev())
+            .take_while(|(current, old)| current == old)
+            .count();
+        (first, values.len() - suffix)
+    };
+    queue.write_buffer(
+        buffer,
+        (start * item_size) as u64,
+        bytemuck::cast_slice(&values[start..end]),
+    );
+    previous.clear();
+    previous.extend_from_slice(values);
 }
 
 fn buffer_layout(

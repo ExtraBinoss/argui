@@ -18,6 +18,7 @@ cargo run -p argui --example window
 cargo run -p argui --example text
 cargo run -p argui --example layout
 cargo run -p argui --example state
+cargo run -p argui-perf-showcase --example perf
 ./scripts/serve-web.sh
 ```
 
@@ -25,7 +26,7 @@ The native `state` example and the web build launch the same `StateShowcase`
 Rust application from `argui-showcase`; only their tiny platform entrypoints
 differ. Both wrap it in the optional `DevtoolsHost`, whose resizable Elements
 and Profiling dock is itself composed from normal Argui widgets. Applications
-that do not want inspection simply launch their `UiApp` directly. Its fonts are
+that do not want inspection simply launch their `Render` component directly. Its fonts are
 embedded because browsers do not expose system font files
 to WASM. Argui itself ships no mandatory font; each application supplies the
 assets and generic-family mapping it wants.

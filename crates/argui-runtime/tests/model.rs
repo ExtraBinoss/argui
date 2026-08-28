@@ -1,22 +1,20 @@
 use argui_animation::{Duration, Frame, Time};
 use argui_core::{Point, Rect, Size};
-use argui_runtime::{LayoutBounds, LayoutSnapshot, UiApp, ViewUpdate};
+use argui_runtime::{Context, LayoutBounds, LayoutSnapshot, Render, ViewUpdate};
 use argui_ui::{Element, UiEvent, UiEventKind, UiTree};
 
 #[derive(Default)]
 struct Counter(u32);
 
-impl UiApp for Counter {
-    fn view(&self) -> Element {
+impl Render for Counter {
+    fn render(&mut self, _cx: &mut Context<Self>) -> Element {
         Element::text(self.0.to_string())
     }
 
-    fn update(&mut self, event: &UiEvent) -> ViewUpdate {
+    fn event(&mut self, event: &UiEvent, cx: &mut Context<Self>) {
         if event.kind == UiEventKind::Clicked {
             self.0 += 1;
-            ViewUpdate::Rebuild
-        } else {
-            ViewUpdate::None
+            cx.notify();
         }
     }
 }
@@ -35,19 +33,26 @@ fn apps_rebuild_only_when_their_state_changes() {
         ..moved.clone()
     };
 
-    assert_eq!(app.update(&moved), ViewUpdate::None);
-    assert_eq!(app.update(&clicked), ViewUpdate::Rebuild);
+    let mut cx = Context::default();
+    app.event(&moved, &mut cx);
+    assert_eq!(cx.view_update(), ViewUpdate::None);
+    let mut cx = Context::default();
+    app.event(&clicked, &mut cx);
+    assert_eq!(cx.view_update(), ViewUpdate::Rebuild);
     assert!(
-        matches!(app.view().kind, argui_ui::ElementKind::Text { content, .. } if content == "1")
+        matches!(&app.render(&mut Context::default()).kind, argui_ui::ElementKind::Text { content, .. } if content == "1")
     );
-    assert!(!app.wants_animation_frame());
-    assert_eq!(
-        app.animation_frame(Frame {
+    assert!(!Render::wants_animation_frame(&app));
+    let mut cx = Context::default();
+    Render::animation_frame(
+        &mut app,
+        Frame {
             now: Time::ZERO,
             elapsed: Duration::ZERO,
-        }),
-        ViewUpdate::None
+        },
+        &mut cx,
     );
+    assert_eq!(cx.view_update(), ViewUpdate::None);
 }
 
 #[test]
@@ -67,8 +72,8 @@ fn layout_snapshots_expose_viewport_and_keyed_logical_bounds() {
     assert_eq!(snapshot.bounds("anchor"), Some(bounds));
     assert_eq!(snapshot.bounds("missing"), None);
     assert_eq!(snapshot.viewport_size(), Size::new(640.0, 480.0));
-    assert_eq!(
-        Counter::default().layout_changed(&snapshot),
-        ViewUpdate::None
-    );
+    let mut app = Counter::default();
+    let mut cx = Context::default();
+    app.layout_changed(&snapshot, &mut cx);
+    assert_eq!(cx.view_update(), ViewUpdate::None);
 }

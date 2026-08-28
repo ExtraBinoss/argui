@@ -343,6 +343,17 @@ fn argui_effect(uv: vec2<f32>, source: vec4<f32>, backdrop: vec4<f32>) -> vec4<f
         .unwrap();
     }
 
+    #[test]
+    fn effect_helpers_do_not_use_implicit_derivatives() {
+        for source in [
+            include_str!("../shaders/effects/compositor.wgsl"),
+            include_str!("../shaders/effects/custom_abi_header.wgsl"),
+            include_str!("../shaders/effects/custom_abi_footer.wgsl"),
+        ] {
+            assert!(!source.contains("textureSample("));
+        }
+    }
+
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
     fn headless_gpu_color_matrix_produces_deterministic_pixels_when_available() {

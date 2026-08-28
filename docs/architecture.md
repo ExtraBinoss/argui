@@ -41,7 +41,7 @@ collaboration. `argui-core` contains dependency-light shared primitives, and
   and animation scheduling.
 - `argui-inspect`: renderer-independent tree snapshots, reversible typed style
   overrides, and bounded frame records.
-- `argui-devtools`: an optional `UiApp` wrapper whose dock, virtualized tree,
+- `argui-devtools`: an optional application wrapper whose dock, virtualized tree,
   controls, and highlights are ordinary Argui elements. Engine crates never
   depend on this frontend.
 - `argui`: deliberate re-exports; application code should start here.
@@ -96,14 +96,14 @@ changes. Taffy geometry and shaped Cosmic Text remain untouched. See the
 
 ## Application state flow
 
-`argui-runtime::UiApp` connects plain Rust state to the retained tree. Its
-`update` method consumes UI events and its `view` method returns the same
-`Element` representation available to Rust builders and the future DSL.
-`UiTree` compares rebuilt descriptions and selects no work, paint-only work, or
-layout work while keyed reconciliation preserves stable identities. See the
+`argui-runtime::Render`, `Context<T>`, and `Entity<T>` connect component-local
+Rust state to the retained tree. Clean entities return their exact cached COW
+subtree; a notification rebuilds only the entity and its ancestor composition
+path. `UiTree` uses pointer equality to skip shared descendants, and keyed
+reconciliation preserves stable identities in linear sibling work. See the
 [application state model](state.md).
 
-`DevtoolsHost<A>` decorates any `UiApp` without changing `A`. It gives the
+`DevtoolsHost<A>` decorates the retained application boundary without changing `A`. It gives the
 application the remaining docked viewport, delegates its assets, shaders,
 events and animation lifecycle, and attaches an `InspectorHandle` to the
 runtime. This is also the transport seam for a future detached window: the
@@ -119,6 +119,21 @@ entrypoint files completely.
 layout, scroll, and surface state, and all surfaces reuse the same WGPU device.
 The optional tray and Web favicon consume the same immutable application icon
 set and never add work to a frame.
+
+## Retained performance path
+
+`Element` is a copy-on-write `Arc` node. Taffy `NodeMap`s retain the exact
+element and subtree length, allowing layout reconciliation to jump over an
+unchanged branch in constant time. Quad uploads compare stable POD ranges and
+write only the changed interval through WGPU, identically on Vulkan, Metal,
+DX12, and WebGPU.
+
+`VirtualList` handles fixed rows. `VariableList` maintains measured extents in
+a Fenwick prefix tree, finds visible rows in `O(log n)`, and corrects the scroll
+offset to preserve the current top anchor when earlier measurements change.
+Run `cargo run -p argui-perf-showcase --example perf` for the native million-row
+and component-isolation labs; the crate's `cdylib` entry runs the same labs on
+WASM without DevTools instrumentation.
 
 ## Scroll and stacking
 

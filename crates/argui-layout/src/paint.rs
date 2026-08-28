@@ -3,23 +3,59 @@ use argui_paint::{
     Border, ClipChain, ClipRegion, Color, DisplayList, ImagePrimitive, LayerStyle, Quad, QuadStyle,
     VectorPrimitive,
 };
-use argui_ui::{EffectScope, Element, ElementKind, HitRegion, UiTree};
+use argui_ui::{EffectScope, Element, ElementKind, HitRegion, NodeId, UiTree};
+use std::collections::HashMap;
 
 use crate::{LayoutNode, LayoutOutput, engine::NodeMap, input, scroll};
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 struct PaintContext {
     transform: Affine2D,
     clips: ClipChain,
 }
 
-pub(crate) fn repaint(root: Option<&NodeMap>, ui: &UiTree, output: &mut LayoutOutput) {
+#[derive(Clone, Debug)]
+struct ScrollPaintUpdate {
+    node: NodeId,
+    transform: Affine2D,
+    clips: ClipChain,
+}
+
+#[derive(Clone, Debug)]
+struct CachedFragment {
+    element: Element,
+    node: LayoutNode,
+    parent: PaintContext,
+    commands: Vec<argui_paint::DisplayCommand>,
+    hit_regions: Vec<HitRegion>,
+    scroll_updates: Vec<ScrollPaintUpdate>,
+    cacheable: bool,
+}
+
+#[derive(Default, Debug)]
+pub(crate) struct PaintCache {
+    fragments: HashMap<NodeId, CachedFragment>,
+    pub(crate) visited: usize,
+    pub(crate) reused: usize,
+    pub(crate) reused_commands: usize,
+}
+
+pub(crate) fn repaint(
+    root: Option<&NodeMap>,
+    ui: &UiTree,
+    output: &mut LayoutOutput,
+    cache: &mut PaintCache,
+) {
     let elements = crate::engine::flattened(ui.root());
     output.display_list.clear();
     output.hit_regions.clear();
+    cache.visited = 0;
+    cache.reused = 0;
+    cache.reused_commands = 0;
     sync_scroll_config(&elements, output);
     let clips = ClipChain::from_regions([ClipRegion::new(output.viewport, Affine2D::IDENTITY)]);
     if let Some(root) = root {
+        let mut scroll_updates = Vec::new();
         paint_node(
             root,
             &elements,
@@ -29,8 +65,15 @@ pub(crate) fn repaint(root: Option<&NodeMap>, ui: &UiTree, output: &mut LayoutOu
                 transform: Affine2D::IDENTITY,
                 clips,
             },
+            cache,
+            &mut scroll_updates,
         );
     }
+    output.paint_stats = crate::PaintStats {
+        visited_subtrees: cache.visited,
+        reused_subtrees: cache.reused,
+        reused_commands: cache.reused_commands,
+    };
 }
 
 fn paint_node(
@@ -39,12 +82,34 @@ fn paint_node(
     ui: &UiTree,
     output: &mut LayoutOutput,
     parent: &PaintContext,
-) {
+    cache: &mut PaintCache,
+    scroll_updates: &mut Vec<ScrollPaintUpdate>,
+) -> bool {
+    cache.visited += 1;
     if parent.clips.is_empty() {
-        return;
+        return true;
     }
     let node = output.nodes[map.index];
     let element = elements[node.index];
+    if let Some(fragment) = cache.fragments.get(&node.node)
+        && fragment.cacheable
+        && fragment.element.ptr_eq(element)
+        && fragment.node == node
+        && fragment.parent == *parent
+    {
+        output.display_list.extend(fragment.commands.clone());
+        output.hit_regions.extend(fragment.hit_regions.clone());
+        for update in &fragment.scroll_updates {
+            apply_scroll_update(output, update);
+            scroll_updates.push(update.clone());
+        }
+        cache.reused += 1;
+        cache.reused_commands += fragment.commands.len();
+        return true;
+    }
+    let command_start = output.display_list.len();
+    let hit_start = output.hit_regions.len();
+    let scroll_start = scroll_updates.len();
     let portal;
     let parent = if element.overlay.is_some() {
         let clip = node.clip.unwrap_or(output.viewport);
@@ -84,11 +149,28 @@ fn paint_node(
     {
         region.transform = transform;
         region.clips = child_context.clips.clone();
+        scroll_updates.push(ScrollPaintUpdate {
+            node: node.node,
+            transform,
+            clips: child_context.clips.clone(),
+        });
     }
     let mut children = map.children.iter().collect::<Vec<_>>();
     children.sort_by_key(|child| elements[child.index].z_index);
+    let mut cacheable = element.interaction.is_none()
+        && element.transition.is_none()
+        && !matches!(element.kind, ElementKind::TextInput { .. })
+        && element.scroll.is_none();
     for child in children {
-        paint_node(child, elements, ui, output, &child_context);
+        cacheable &= paint_node(
+            child,
+            elements,
+            ui,
+            output,
+            &child_context,
+            cache,
+            scroll_updates,
+        );
     }
     if let Some(region) = output
         .scroll_regions
@@ -99,6 +181,41 @@ fn paint_node(
         scroll::paint(&region, &mut output.display_list);
     }
     paint_exit(element, &mut output.display_list);
+    if cacheable {
+        remove_descendant_fragments(map, cache);
+        cache.fragments.insert(
+            node.node,
+            CachedFragment {
+                element: element.clone(),
+                node,
+                parent: parent.clone(),
+                commands: output.display_list.commands()[command_start..].to_vec(),
+                hit_regions: output.hit_regions[hit_start..].to_vec(),
+                scroll_updates: scroll_updates[scroll_start..].to_vec(),
+                cacheable,
+            },
+        );
+    } else {
+        cache.fragments.remove(&node.node);
+    }
+    cacheable
+}
+
+fn remove_descendant_fragments(map: &NodeMap, cache: &mut PaintCache) {
+    for child in &map.children {
+        cache.fragments.remove(&child.node);
+    }
+}
+
+fn apply_scroll_update(output: &mut LayoutOutput, update: &ScrollPaintUpdate) {
+    if let Some(region) = output
+        .scroll_regions
+        .iter_mut()
+        .find(|region| region.node == update.node)
+    {
+        region.transform = update.transform;
+        region.clips = update.clips.clone();
+    }
 }
 
 fn paint_enter(

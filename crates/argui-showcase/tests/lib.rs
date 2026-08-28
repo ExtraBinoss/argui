@@ -3,7 +3,7 @@ use argui_core::{Affine2D, Point, Rect, ScrollDelta, Size};
 use argui_effects::{ANIMATED_GRADIENT_ID, LIQUID_GLASS_ID, WORLEY_BORDER_FIRE_ID};
 use argui_layout::LayoutEngine;
 use argui_paint::{ClipChain, ClipRegion};
-use argui_runtime::{LayoutSnapshot, UiApp, ViewUpdate};
+use argui_runtime::{LayoutSnapshot, ViewUpdate};
 use argui_showcase::{StateShowcase, text_engine};
 use argui_text::TextStyle;
 use argui_ui::{CursorIcon, HitRegion, ScrollConfig, ScrollRegion, UiEvent, UiEventKind, UiTree};

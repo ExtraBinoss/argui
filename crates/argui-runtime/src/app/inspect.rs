@@ -8,11 +8,13 @@ use argui_paint::{
 };
 use argui_ui::{Element, ElementKind, Length, NodeId};
 
+use crate::AnyEntity;
+
 use super::Application;
 
 impl Application {
     pub(crate) fn inspected_view(&self) -> Option<Element> {
-        let mut root = self.model.as_ref().map(|model| model.view())?;
+        let mut root = self.model.as_ref().map(AnyEntity::render)?;
         let Some(inspector) = &self.inspector else {
             return Some(root);
         };

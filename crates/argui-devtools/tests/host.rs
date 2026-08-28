@@ -8,21 +8,21 @@ use argui_inspect::{
     StyleValue, TreeSnapshot,
 };
 use argui_layout::LayoutEngine;
-use argui_runtime::{LayoutBounds, LayoutSnapshot, UiApp, ViewUpdate};
+use argui_runtime::{Context, LayoutBounds, LayoutSnapshot, Render, ViewUpdate};
 use argui_showcase::{StateShowcase, text_engine};
 use argui_text::TextEngine;
 use argui_ui::{Element, UiEvent, UiEventKind, UiTree};
 
 struct App(Rc<Cell<usize>>);
 
-impl UiApp for App {
-    fn view(&self) -> Element {
+impl Render for App {
+    fn render(&mut self, _cx: &mut Context<Self>) -> Element {
         Element::text("application").keyed("app-content")
     }
 
-    fn update(&mut self, _event: &UiEvent) -> ViewUpdate {
+    fn event(&mut self, _event: &UiEvent, cx: &mut Context<Self>) {
         self.0.set(self.0.get() + 1);
-        ViewUpdate::Rebuild
+        cx.notify();
     }
 }
 
@@ -292,7 +292,7 @@ fn host_animation_and_layout_delegation_keep_the_app_viewport_explicit() {
     assert!(host.effect_shaders().is_empty());
     assert!(host.image_assets().is_empty());
     assert_eq!(host.vector_assets().len(), 3);
-    assert!(UiApp::inspector(&host).is_some());
+    assert!(Render::inspector(&host).is_some());
 }
 
 #[test]
@@ -420,7 +420,7 @@ fn non_click_tool_events_are_consumed_without_reaching_the_application() {
 
 #[test]
 fn open_dock_reserves_application_viewport_space() {
-    let host = populated_host();
+    let mut host = populated_host();
     let mut tree = UiTree::new(host.view());
     let mut layout = LayoutEngine::new();
     let output = layout
@@ -449,7 +449,7 @@ fn open_dock_reserves_application_viewport_space() {
 
 #[test]
 fn closed_dock_keeps_a_visible_overlay_button_without_stealing_app_height() {
-    let host = DevtoolsHost::new(App(Rc::new(Cell::new(0))));
+    let mut host = DevtoolsHost::new(App(Rc::new(Cell::new(0))));
     let mut tree = UiTree::new(host.view());
     let mut layout = LayoutEngine::new();
     let output = layout
@@ -478,7 +478,7 @@ fn closed_dock_keeps_a_visible_overlay_button_without_stealing_app_height() {
 
 #[test]
 fn real_showcase_lowers_both_devtools_button_and_page_scrollbar() {
-    let host = DevtoolsHost::new(StateShowcase::default());
+    let mut host = DevtoolsHost::new(StateShowcase::default());
     let mut tree = UiTree::new(host.view());
     let toggle = tree
         .node_ids()

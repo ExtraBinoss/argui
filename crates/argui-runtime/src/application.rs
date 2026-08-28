@@ -5,7 +5,7 @@ use argui_platform::{PlatformEvent, TrayConfig, TrayEvent, WindowKey, WindowSpec
 use argui_render::EffectShader;
 use argui_ui::{ClipboardRequest, Element, UiEvent};
 
-use crate::{LayoutSnapshot, ScrollRequest, UiApp, ViewUpdate};
+use crate::{Entity, LayoutSnapshot, Render, ScrollRequest, ViewUpdate};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum AppEvent {
@@ -144,69 +144,105 @@ pub trait AppModel: 'static {
     }
 }
 
-pub(crate) struct SingleWindowModel<A> {
-    app: A,
+pub(crate) struct SingleWindowModel<A: Render> {
+    app: Entity<A>,
+    clipboard: std::cell::RefCell<Option<ClipboardRequest>>,
+    scroll: std::cell::RefCell<Option<ScrollRequest>>,
+    animation_requested: std::cell::Cell<bool>,
 }
 
-impl<A> SingleWindowModel<A> {
-    pub(crate) const fn new(app: A) -> Self {
-        Self { app }
+impl<A: Render> SingleWindowModel<A> {
+    pub(crate) fn new(app: A) -> Self {
+        Self {
+            app: Entity::new(app),
+            clipboard: std::cell::RefCell::new(None),
+            scroll: std::cell::RefCell::new(None),
+            animation_requested: std::cell::Cell::new(false),
+        }
+    }
+
+    fn drain_effects(&self, window: &WindowKey) -> AppUpdate {
+        let effects = self.app.take_effects();
+        if effects.clipboard.is_some() {
+            *self.clipboard.borrow_mut() = effects.clipboard;
+        }
+        if effects.scroll.is_some() {
+            *self.scroll.borrow_mut() = effects.scroll;
+        }
+        self.animation_requested
+            .set(self.animation_requested.get() || effects.animation_frame);
+        AppUpdate {
+            windows: (effects.update != ViewUpdate::None)
+                .then(|| WindowInvalidation {
+                    window: window.clone(),
+                    update: effects.update,
+                })
+                .into_iter()
+                .collect(),
+            commands: effects.commands,
+            tray_changed: false,
+        }
     }
 }
 
-impl<A: UiApp> AppModel for SingleWindowModel<A> {
+impl<A: Render> AppModel for SingleWindowModel<A> {
     fn view(&self, window: &WindowKey) -> Option<Element> {
-        (window.as_str() == WindowKey::MAIN_VALUE).then(|| self.app.view())
+        (window.as_str() == WindowKey::MAIN_VALUE).then(|| self.app.render())
     }
 
     fn update(&mut self, event: &AppEvent) -> AppUpdate {
         match event {
             AppEvent::Ui { window, event } if window.as_str() == WindowKey::MAIN_VALUE => {
-                AppUpdate::none().window(window.clone(), self.app.update(event))
+                self.app.event(event);
+                self.drain_effects(window)
             }
             _ => AppUpdate::none(),
         }
     }
 
     fn animation_frame(&mut self, window: &WindowKey, frame: Frame) -> AppUpdate {
-        AppUpdate::none().window(window.clone(), self.app.animation_frame(frame))
+        self.animation_requested.set(false);
+        self.app.animation_frame(frame);
+        self.drain_effects(window)
     }
 
     fn wants_animation_frame(&self, window: &WindowKey) -> bool {
-        window.as_str() == WindowKey::MAIN_VALUE && self.app.wants_animation_frame()
+        window.as_str() == WindowKey::MAIN_VALUE
+            && (self.animation_requested.get() || self.app.wants_frame())
     }
 
     fn layout_changed(&mut self, window: &WindowKey, layout: &LayoutSnapshot) -> AppUpdate {
-        AppUpdate::none().window(window.clone(), self.app.layout_changed(layout))
+        self.app.layout_changed(layout);
+        self.drain_effects(window)
     }
 
     fn effect_shaders(&self) -> &'static [EffectShader] {
-        self.app.effect_shaders()
+        self.app.read(Render::effect_shaders)
     }
 
     fn image_assets(&self) -> Vec<ImageAsset> {
-        self.app.image_assets()
+        self.app.read(Render::image_assets)
     }
 
     fn vector_assets(&self) -> Vec<VectorAsset> {
-        self.app.vector_assets()
+        self.app.read(Render::vector_assets)
     }
 
     fn inspector(&self, window: &WindowKey) -> Option<InspectorHandle> {
         (window.as_str() == WindowKey::MAIN_VALUE)
-            .then(|| self.app.inspector())
+            .then(|| self.app.read(Render::inspector))
             .flatten()
     }
 
     fn take_clipboard_request(&mut self, window: &WindowKey) -> Option<ClipboardRequest> {
         (window.as_str() == WindowKey::MAIN_VALUE)
-            .then(|| self.app.take_clipboard_request())
+            .then(|| self.clipboard.borrow_mut().take())
             .flatten()
     }
 
     fn take_scroll_request(&mut self, window: &WindowKey) -> Option<ScrollRequest> {
         (window.as_str() == WindowKey::MAIN_VALUE)
-            .then(|| self.app.take_scroll_request())
+            .then(|| self.scroll.borrow_mut().take())
             .flatten()
     }
 }

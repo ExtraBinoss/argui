@@ -44,6 +44,26 @@ fn interaction_repaint_reuses_layout_and_shaped_text() {
 }
 
 #[test]
+fn unchanged_static_subtree_reuses_its_retained_paint_fragment() {
+    let mut ui = UiTree::new(Element::column((0..5_000).map(|index| {
+        Element::text(format!("row {index}")).background(Color::rgb(0.1, 0.2, 0.3))
+    })));
+    let mut layout = LayoutEngine::new();
+    let mut text = text_engine();
+    let mut output = layout
+        .compute(&mut ui, &mut text, Size::new(800.0, 50_000.0))
+        .unwrap();
+    let commands = output.display_list.clone();
+
+    layout.repaint(&ui, &mut output);
+
+    assert_eq!(output.display_list, commands);
+    assert_eq!(output.paint_stats.visited_subtrees, 1);
+    assert_eq!(output.paint_stats.reused_subtrees, 1);
+    assert!(output.paint_stats.reused_commands >= 10_000);
+}
+
+#[test]
 fn wrapped_rows_move_whole_items_instead_of_clipping_them() {
     let item = || {
         Element::container([])

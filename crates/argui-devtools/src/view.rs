@@ -2,7 +2,6 @@ use argui_inspect::{FrameRecord, NodeSnapshot};
 use argui_paint::{
     Border, ClipBehavior, Color, CornerRadii, LayerStyle, PaintStyle, QuadStyle, VectorId,
 };
-use argui_runtime::UiApp;
 use argui_text::{TextColor, TextStyle, TextWrap};
 use argui_ui::{
     Align, Button, ButtonStyle, Edges, Element, Inset, Interaction, LayoutStyle, Length,
@@ -18,10 +17,8 @@ const TEXT: TextColor = TextColor::rgb(0.85, 0.89, 0.95);
 const ACCENT: Color = Color::rgb(0.25, 0.72, 0.96);
 const RETAINED_TREE_LIMIT: usize = 512;
 
-pub(crate) fn host<A: UiApp>(tools: &DevtoolsHost<A>) -> Element {
-    let application = Element::container([tools
-        .app
-        .view()
+pub(crate) fn host<A>(tools: &DevtoolsHost<A>, app: Element) -> Element {
+    let application = Element::container([app
         .width(Length::Percent(1.0))
         .height(Length::Percent(1.0))
         .min_height(Length::Px(0.0))])
@@ -49,7 +46,7 @@ pub(crate) fn host<A: UiApp>(tools: &DevtoolsHost<A>) -> Element {
         .clip(ClipBehavior::Bounds)
 }
 
-fn dock_surface<A: UiApp>(tools: &DevtoolsHost<A>) -> Element {
+fn dock_surface<A>(tools: &DevtoolsHost<A>) -> Element {
     let height = tools.dock_height + 6.0;
     let surface = Element::column([splitter(), dock(tools, tools.dock_height)])
         .keyed("__devtools-surface-content")
@@ -80,7 +77,7 @@ fn splitter() -> Element {
         .inspectable(false)
 }
 
-fn dock<A: UiApp>(tools: &DevtoolsHost<A>, height: f32) -> Element {
+fn dock<A>(tools: &DevtoolsHost<A>, height: f32) -> Element {
     let body = match tools.tab {
         Tab::Elements => elements_tab(tools),
         Tab::Profiling => profiling_tab(tools),
@@ -163,7 +160,7 @@ fn morph_button<A>(tools: &DevtoolsHost<A>) -> Element {
     .interaction(Interaction::default().hovered(QuadStyle::solid(Color::rgb(0.15, 0.20, 0.27))))
 }
 
-fn elements_tab<A: UiApp>(tools: &DevtoolsHost<A>) -> Element {
+fn elements_tab<A>(tools: &DevtoolsHost<A>) -> Element {
     tools.inspector.with_tree(|snapshot| {
         let selected = tools.inspector.selected();
         let viewport = (tools.dock_height - 84.0).max(80.0);

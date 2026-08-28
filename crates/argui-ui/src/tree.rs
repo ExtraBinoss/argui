@@ -18,6 +18,13 @@ pub enum TreeUpdate {
     Layout,
 }
 
+/// Deterministic work counters for the latest retained-tree update.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct TreeUpdateStats {
+    pub visited: usize,
+    pub shared_subtrees: usize,
+}
+
 #[derive(Clone, Debug)]
 pub struct UiTree {
     root: Element,
@@ -29,6 +36,7 @@ pub struct UiTree {
     transitions: PaintTransitions,
     revision: u64,
     layout_dirty: bool,
+    update_stats: TreeUpdateStats,
 }
 
 impl UiTree {
@@ -46,6 +54,7 @@ impl UiTree {
             transitions: PaintTransitions::default(),
             revision: 0,
             layout_dirty: true,
+            update_stats: TreeUpdateStats::default(),
         };
         tree.sync_text_inputs();
         tree
@@ -71,12 +80,19 @@ impl UiTree {
         self.layout_dirty
     }
 
+    #[must_use]
+    pub const fn update_stats(&self) -> TreeUpdateStats {
+        self.update_stats
+    }
+
     pub fn replace(&mut self, root: Element) -> bool {
         self.update(root) != TreeUpdate::None
     }
 
     pub fn update(&mut self, root: Element) -> TreeUpdate {
-        let update = classify_update(&self.root, &root);
+        let mut stats = TreeUpdateStats::default();
+        let update = classify_update(&self.root, &root, &mut stats);
+        self.update_stats = stats;
         match update {
             TreeUpdate::None => return update,
             TreeUpdate::Paint => {
@@ -517,7 +533,12 @@ fn nth_element(root: &Element, target: usize) -> Option<&Element> {
     visit(root, target, &mut 0)
 }
 
-fn classify_update(old: &Element, new: &Element) -> TreeUpdate {
+fn classify_update(old: &Element, new: &Element, stats: &mut TreeUpdateStats) -> TreeUpdate {
+    stats.visited += 1;
+    if old.ptr_eq(new) {
+        stats.shared_subtrees += 1;
+        return TreeUpdate::None;
+    }
     if old == new {
         return TreeUpdate::None;
     }
@@ -535,7 +556,7 @@ fn classify_update(old: &Element, new: &Element) -> TreeUpdate {
         .children
         .iter()
         .zip(&new.children)
-        .any(|(old, new)| classify_update(old, new) == TreeUpdate::Layout)
+        .any(|(old, new)| classify_update(old, new, stats) == TreeUpdate::Layout)
     {
         TreeUpdate::Layout
     } else {

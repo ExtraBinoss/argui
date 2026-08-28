@@ -39,11 +39,13 @@ shares one behavior on native and web.
 
 ## 2. Retained state and large-tree performance
 
-- Add reusable component-local state ownership keyed by stable identity.
-- Invalidate layout and paint per subtree instead of rebuilding global outputs.
-- Cache intrinsic text and widget measurements with explicit invalidation.
-- Extend virtual lists to variable row heights while keeping bounded work and
+- [x] Add reusable component-local state ownership keyed by stable identity.
+- [x] Skip shared COW subtrees during tree and Taffy reconciliation.
+- [x] Retain static paint fragments per subtree and patch GPU buffers by changed ranges.
+- [x] Cache intrinsic text measurements with explicit invalidation.
+- [x] Extend virtual lists to variable row heights while keeping bounded work and
   memory for million-item data sets.
+- [x] Add deterministic complexity tests and a native/WASM performance showcase.
 
 Done when profiling demonstrates work proportional to the changed/visible
 subtree rather than total tree size.

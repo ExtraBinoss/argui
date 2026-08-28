@@ -1,4 +1,5 @@
 use crate::{Element, ElementKind, NodeId};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 #[derive(Debug)]
 struct Existing<'a> {
@@ -57,22 +58,25 @@ fn reconcile_node(
     let reusable = old.filter(|candidate| compatible(candidate.element, new));
     ids.push(reusable.map_or_else(|| allocate(next), |existing| existing.id));
 
-    let mut used = Vec::new();
+    let mut keyed = HashMap::<&str, VecDeque<&Existing<'_>>>::new();
+    if let Some(parent) = reusable {
+        for existing in &parent.children {
+            if let Some(key) = existing.element.key.as_deref() {
+                keyed.entry(key).or_default().push_back(existing);
+            }
+        }
+    }
+    let mut used = HashSet::new();
     for (index, child) in new.children.iter().enumerate() {
-        let candidate = reusable
-            .and_then(|parent| match &child.key {
-                Some(key) => parent
-                    .children
-                    .iter()
-                    .find(|existing| existing.element.key.as_ref() == Some(key)),
-                None => parent
-                    .children
-                    .get(index)
-                    .filter(|existing| existing.element.key.is_none()),
-            })
-            .filter(|existing| !used.contains(&existing.id));
+        let candidate = match child.key.as_deref() {
+            Some(key) => keyed.get_mut(key).and_then(VecDeque::pop_front),
+            None => reusable
+                .and_then(|parent| parent.children.get(index))
+                .filter(|existing| existing.element.key.is_none()),
+        }
+        .filter(|existing| !used.contains(&existing.id));
         if let Some(existing) = candidate {
-            used.push(existing.id);
+            used.insert(existing.id);
         }
         reconcile_node(candidate, child, next, ids);
     }

@@ -17,7 +17,7 @@ fn button_is_only_a_composed_interactive_element() {
     assert_eq!(element.key.as_deref(), Some("save"));
     assert_eq!(element.paint.quad, resting);
     assert_eq!(element.style.shrink, 0.0);
-    let interaction = element.interaction.unwrap();
+    let interaction = element.interaction.as_ref().unwrap();
     assert_eq!(interaction.cursor, CursorIcon::Pointer);
     assert_eq!(interaction.styles.hovered, Some(hovered));
     assert_eq!(element.children.len(), 1);

@@ -4,7 +4,7 @@
 and tessellates their fills and strokes with Lyon once, when the application
 creates its immutable assets. It never rasterizes SVG into a bitmap.
 
-The resulting `VectorAsset` is registered through `UiApp::vector_assets` and
+The resulting `VectorAsset` is registered through `Render::vector_assets` and
 uploaded once. `Element::vector(id)` then emits a renderer-independent vector
 command. `argui-render` draws its vertex and index buffers directly with WGPU,
 using the same transforms, clipping, z-order, layers and effects as every other

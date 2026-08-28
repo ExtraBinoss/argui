@@ -3,7 +3,7 @@ use argui_core::{Point, Rect};
 use argui_inspect::{FrameRecord, InspectNodeId, InspectorHandle, StyleProperty};
 use argui_paint::{ImageAsset, VectorAsset};
 use argui_render::EffectShader;
-use argui_runtime::{LayoutSnapshot, ScrollRequest, UiApp, ViewUpdate};
+use argui_runtime::{Context, LayoutSnapshot, Render, ScrollRequest, ViewUpdate};
 use argui_ui::{ClipboardRequest, Element, UiEvent, UiEventKind};
 
 use crate::{icons::DevtoolsIcons, view};
@@ -339,18 +339,29 @@ impl<A> DevtoolsHost<A> {
     }
 }
 
-impl<A: UiApp> UiApp for DevtoolsHost<A> {
-    fn view(&self) -> Element {
-        view::host(self)
+impl<A: Render> DevtoolsHost<A> {
+    pub fn view(&mut self) -> Element {
+        let mut cx = Context::default();
+        let app = self.app.render(&mut cx);
+        view::host(self, app)
     }
 
-    fn update(&mut self, event: &UiEvent) -> ViewUpdate {
-        self.update_tools(event)
-            .unwrap_or_else(|| self.app.update(event))
+    pub fn update(&mut self, event: &UiEvent) -> ViewUpdate {
+        if let Some(update) = self.update_tools(event) {
+            return update;
+        }
+        let mut cx = Context::default();
+        self.app.event(event, &mut cx);
+        cx.view_update()
     }
 
-    fn animation_frame(&mut self, frame: Frame) -> ViewUpdate {
-        let app = self.app.animation_frame(frame);
+    pub fn animation_frame(&mut self, frame: Frame) -> ViewUpdate {
+        let mut cx = Context::default();
+        self.app.animation_frame(frame, &mut cx);
+        self.advance_animations(frame, cx.view_update())
+    }
+
+    fn advance_animations(&mut self, frame: Frame, app: ViewUpdate) -> ViewUpdate {
         let sheet = self.sheet_motion.advance(frame.elapsed);
         if sheet {
             self.sheet_progress = self.sheet_motion.value().clamp(0.0, 1.0);
@@ -375,51 +386,122 @@ impl<A: UiApp> UiApp for DevtoolsHost<A> {
         }
     }
 
-    fn wants_animation_frame(&self) -> bool {
+    pub fn wants_animation_frame(&self) -> bool {
         self.sheet_motion.is_active()
             || self.section_motion.iter().any(Spring::is_active)
             || self.morph_motion.is_active()
             || self.app.wants_animation_frame()
     }
 
-    fn layout_changed(&mut self, layout: &LayoutSnapshot) -> ViewUpdate {
+    pub fn layout_changed(&mut self, layout: &LayoutSnapshot) -> ViewUpdate {
         self.viewport = layout.viewport;
         let mut application = layout.clone();
         if let Some(bounds) = layout.bounds("__devtools-app-root") {
             application.viewport = bounds;
         }
         self.app_viewport = application.viewport;
-        self.app.layout_changed(&application)
+        let mut cx = Context::default();
+        self.app.layout_changed(&application, &mut cx);
+        cx.view_update()
     }
 
-    fn effect_shaders(&self) -> &'static [EffectShader] {
-        self.app.effect_shaders()
+    pub fn effect_shaders(&self) -> &'static [EffectShader] {
+        Render::effect_shaders(&self.app)
     }
 
-    fn image_assets(&self) -> Vec<ImageAsset> {
-        self.app.image_assets()
+    pub fn image_assets(&self) -> Vec<ImageAsset> {
+        Render::image_assets(&self.app)
     }
 
-    fn vector_assets(&self) -> Vec<VectorAsset> {
-        let mut assets = self.app.vector_assets();
+    pub fn vector_assets(&self) -> Vec<VectorAsset> {
+        let mut assets = Render::vector_assets(&self.app);
         assets.extend_from_slice(self.icons.assets());
         assets
     }
 
-    fn inspector(&self) -> Option<InspectorHandle> {
+    pub fn runtime_inspector(&self) -> Option<InspectorHandle> {
         Some(self.inspector.clone())
     }
 
-    fn take_clipboard_request(&mut self) -> Option<ClipboardRequest> {
-        self.clipboard
-            .take()
-            .or_else(|| self.app.take_clipboard_request())
+    pub fn take_clipboard_request(&mut self) -> Option<ClipboardRequest> {
+        self.clipboard.take()
     }
 
-    fn take_scroll_request(&mut self) -> Option<ScrollRequest> {
-        self.pending_scroll
-            .take()
-            .or_else(|| self.app.take_scroll_request())
+    pub fn take_scroll_request(&mut self) -> Option<ScrollRequest> {
+        self.pending_scroll.take()
+    }
+}
+
+impl<A: Render> Render for DevtoolsHost<A> {
+    fn render(&mut self, cx: &mut Context<Self>) -> Element {
+        let mut app_cx = Context::default();
+        let app = self.app.render(&mut app_cx);
+        cx.propagate(app_cx);
+        view::host(self, app)
+    }
+
+    fn event(&mut self, event: &UiEvent, cx: &mut Context<Self>) {
+        if let Some(update) = self.update_tools(event) {
+            request_update(cx, update);
+        } else {
+            let mut app_cx = Context::default();
+            self.app.event(event, &mut app_cx);
+            cx.propagate(app_cx);
+        }
+        if let Some(request) = self.clipboard.take() {
+            cx.write_clipboard(request);
+        }
+        if let Some(request) = self.pending_scroll.take() {
+            cx.scroll_to(request.key, request.offset);
+        }
+    }
+
+    fn animation_frame(&mut self, frame: Frame, cx: &mut Context<Self>) {
+        let mut app_cx = Context::default();
+        self.app.animation_frame(frame, &mut app_cx);
+        let update = self.advance_animations(frame, app_cx.view_update());
+        cx.propagate(app_cx);
+        request_update(cx, update);
+    }
+
+    fn wants_animation_frame(&self) -> bool {
+        DevtoolsHost::wants_animation_frame(self)
+    }
+
+    fn layout_changed(&mut self, layout: &LayoutSnapshot, cx: &mut Context<Self>) {
+        self.viewport = layout.viewport;
+        let mut application = layout.clone();
+        if let Some(bounds) = layout.bounds("__devtools-app-root") {
+            application.viewport = bounds;
+        }
+        self.app_viewport = application.viewport;
+        let mut app_cx = Context::default();
+        self.app.layout_changed(&application, &mut app_cx);
+        cx.propagate(app_cx);
+    }
+
+    fn effect_shaders(&self) -> &'static [EffectShader] {
+        DevtoolsHost::effect_shaders(self)
+    }
+
+    fn image_assets(&self) -> Vec<ImageAsset> {
+        DevtoolsHost::image_assets(self)
+    }
+
+    fn vector_assets(&self) -> Vec<VectorAsset> {
+        DevtoolsHost::vector_assets(self)
+    }
+
+    fn inspector(&self) -> Option<InspectorHandle> {
+        self.runtime_inspector()
+    }
+}
+
+fn request_update<T: Render>(cx: &mut Context<T>, update: ViewUpdate) {
+    match update {
+        ViewUpdate::None => {}
+        ViewUpdate::Paint => cx.request_paint(),
+        ViewUpdate::Rebuild => cx.notify(),
     }
 }
 

@@ -5,6 +5,8 @@ mod animation;
 mod app;
 mod application;
 mod clipboard;
+#[cfg(test)]
+mod entity_tests;
 mod error;
 mod event;
 mod input;
@@ -21,4 +23,7 @@ pub use launch::{
     run, run_app, run_app_with_text_engine, run_application, run_application_with_text_engine,
     run_ui, run_ui_with_text_engine, run_with_text, run_with_text_engine,
 };
-pub use model::{LayoutBounds, LayoutSnapshot, ScrollRequest, UiApp, ViewUpdate};
+pub use model::{
+    AnyEntity, Context, Entity, LayoutBounds, LayoutSnapshot, Render, ScrollRequest, ViewUpdate,
+    WeakEntity,
+};

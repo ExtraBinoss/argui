@@ -5,7 +5,7 @@ use argui_ui::UiTree;
 use winit::event_loop::{ControlFlow, EventLoop};
 
 use crate::{
-    AppModel, RuntimeError, RuntimeEvent, UiApp, app::Application, application::SingleWindowModel,
+    AppModel, Render, RuntimeError, RuntimeEvent, app::Application, application::SingleWindowModel,
     event::UserEvent, multi::MultiApplication,
 };
 
@@ -113,29 +113,24 @@ pub fn run_ui_with_text_engine(
 
 #[cfg_attr(coverage_nightly, coverage(off))]
 pub fn run_app(
-    config: impl Into<ApplicationConfig>,
+    config: ApplicationConfig,
     renderer: RendererConfig,
-    app: impl UiApp,
+    app: impl Render,
     on_event: impl FnMut(RuntimeEvent) + 'static,
 ) -> Result<(), RuntimeError> {
-    run_application(
-        config.into(),
-        renderer,
-        SingleWindowModel::new(app),
-        on_event,
-    )
+    run_application(config, renderer, SingleWindowModel::new(app), on_event)
 }
 
 #[cfg_attr(coverage_nightly, coverage(off))]
 pub fn run_app_with_text_engine(
-    config: impl Into<ApplicationConfig>,
+    config: ApplicationConfig,
     renderer: RendererConfig,
     text_engine: TextEngine,
-    app: impl UiApp,
+    app: impl Render,
     on_event: impl FnMut(RuntimeEvent) + 'static,
 ) -> Result<(), RuntimeError> {
     run_application_with_text_engine(
-        config.into(),
+        config,
         renderer,
         text_engine,
         SingleWindowModel::new(app),

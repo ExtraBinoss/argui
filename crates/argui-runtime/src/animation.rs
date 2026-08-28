@@ -1,7 +1,7 @@
-use crate::{UiApp, ViewUpdate, app::Application};
+use crate::{AnyEntity, ViewUpdate, app::Application};
 use argui_animation::{AnimationId, Clock, Frame, Scheduler, Time};
 use argui_ui::InteractionUpdate;
-use std::time::Instant;
+use web_time::Instant;
 use winit::{event_loop::ActiveEventLoop, window::Window};
 
 pub(super) struct RuntimeAnimations {
@@ -11,13 +11,13 @@ pub(super) struct RuntimeAnimations {
 }
 
 impl RuntimeAnimations {
-    pub(super) fn new(model: Option<&dyn UiApp>) -> Self {
+    pub(super) fn new(model: Option<&AnyEntity>) -> Self {
         let mut animations = Self {
             clock: MonotonicClock::new(),
             scheduler: Scheduler::default(),
             model_animation: None,
         };
-        animations.sync(model.is_some_and(UiApp::wants_animation_frame));
+        animations.sync(model.is_some_and(AnyEntity::wants_frame));
         animations
     }
 
@@ -47,10 +47,7 @@ impl RuntimeAnimations {
 
 impl Application {
     pub(super) fn sync_animations(&mut self) -> bool {
-        let model_active = self
-            .model
-            .as_ref()
-            .is_some_and(|model| model.wants_animation_frame());
+        let model_active = self.model.as_ref().is_some_and(AnyEntity::wants_frame);
         let tree_active = self
             .ui_tree
             .as_ref()
@@ -64,10 +61,10 @@ impl Application {
             return;
         };
         let model_started = Instant::now();
-        let model_update = self
-            .model
-            .as_mut()
-            .map_or(ViewUpdate::None, |model| model.animation_frame(frame));
+        let model_update = self.model.as_ref().map_or(ViewUpdate::None, |model| {
+            model.animation_frame(frame);
+            model.take_effects().update
+        });
         let rebuild = model_update == ViewUpdate::Rebuild;
         let model_time = model_started.elapsed();
         let paint_started = Instant::now();
@@ -113,18 +110,14 @@ impl Clock for MonotonicClock {
 #[cfg(test)]
 mod tests {
     use super::RuntimeAnimations;
-    use crate::{UiApp, ViewUpdate};
-    use argui_ui::{Element, UiEvent};
+    use crate::{Context, Entity, Render};
+    use argui_ui::Element;
 
     struct Animated(bool);
 
-    impl UiApp for Animated {
-        fn view(&self) -> Element {
+    impl Render for Animated {
+        fn render(&mut self, _cx: &mut Context<Self>) -> Element {
             Element::container([])
-        }
-
-        fn update(&mut self, _event: &UiEvent) -> ViewUpdate {
-            ViewUpdate::None
         }
 
         fn wants_animation_frame(&self) -> bool {
@@ -134,7 +127,7 @@ mod tests {
 
     #[test]
     fn clock_is_sampled_only_while_model_work_is_active() {
-        let idle = Animated(false);
+        let idle = Entity::new(Animated(false)).erase();
         let mut animations = RuntimeAnimations::new(Some(&idle));
         assert!(animations.frame().is_none());
         assert!(animations.sync(true));

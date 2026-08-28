@@ -103,3 +103,30 @@ fn enabling_retained_interaction_only_requires_repaint() {
         TreeUpdate::Paint
     );
 }
+
+#[test]
+fn cloned_subtree_is_classified_in_constant_work() {
+    let subtree = Element::column((0..10_000).map(|index| Element::text(index.to_string())));
+    let root = Element::column([subtree]);
+    let mut tree = UiTree::new(root.clone());
+
+    assert_eq!(tree.update(root), TreeUpdate::None);
+    assert_eq!(tree.update_stats().visited, 1);
+    assert_eq!(tree.update_stats().shared_subtrees, 1);
+}
+
+#[test]
+fn one_changed_branch_skips_large_shared_siblings() {
+    let large = Element::column((0..20_000).map(|index| Element::text(index.to_string())));
+    let root = Element::row([large.clone(), Element::text("old")]);
+    let mut tree = UiTree::new(root);
+    let changed = Element::row([large, Element::text("new")]);
+
+    assert_eq!(tree.update(changed), TreeUpdate::Layout);
+    assert!(
+        tree.update_stats().visited <= 3,
+        "{:?}",
+        tree.update_stats()
+    );
+    assert_eq!(tree.update_stats().shared_subtrees, 1);
+}

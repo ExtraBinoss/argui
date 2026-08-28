@@ -9,6 +9,6 @@ mod reconcile;
 mod scroll;
 mod text;
 
-pub use engine::{LayoutEngine, LayoutNode, LayoutOutput};
+pub use engine::{LayoutEngine, LayoutNode, LayoutOutput, PaintStats};
 pub use error::LayoutError;
 pub use input::TextInputRegion;

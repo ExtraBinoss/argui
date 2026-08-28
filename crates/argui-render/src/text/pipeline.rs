@@ -117,6 +117,8 @@ pub(super) struct TextPipeline {
     clip_buffer: wgpu::Buffer,
     instance_capacity: usize,
     clip_capacity: usize,
+    previous_instances: Vec<GlyphInstance>,
+    previous_clips: Vec<TextClip>,
     next_viewport: u64,
 }
 
@@ -255,6 +257,8 @@ impl TextPipeline {
             clip_buffer,
             instance_capacity,
             clip_capacity,
+            previous_instances: Vec::new(),
+            previous_clips: Vec::new(),
             next_viewport: 0,
         }
     }
@@ -267,12 +271,14 @@ impl TextPipeline {
         clips: &[TextClip],
     ) {
         let mut rebuild = false;
-        if instances.len() > self.instance_capacity {
+        let instances_reallocated = instances.len() > self.instance_capacity;
+        if instances_reallocated {
             self.instance_capacity = instances.len().next_power_of_two();
             self.instance_buffer = create_instance_buffer(device, self.instance_capacity);
             rebuild = true;
         }
-        if clips.len() > self.clip_capacity {
+        let clips_reallocated = clips.len() > self.clip_capacity;
+        if clips_reallocated {
             self.clip_capacity = clips.len().next_power_of_two();
             self.clip_buffer = create_clip_buffer(device, self.clip_capacity);
             rebuild = true;
@@ -287,12 +293,20 @@ impl TextPipeline {
                 &self.clip_buffer,
             );
         }
-        if !instances.is_empty() {
-            queue.write_buffer(&self.instance_buffer, 0, bytemuck::cast_slice(instances));
-        }
-        if !clips.is_empty() {
-            queue.write_buffer(&self.clip_buffer, 0, bytemuck::cast_slice(clips));
-        }
+        crate::upload::write_changed(
+            queue,
+            &self.instance_buffer,
+            instances,
+            &mut self.previous_instances,
+            instances_reallocated,
+        );
+        crate::upload::write_changed(
+            queue,
+            &self.clip_buffer,
+            clips,
+            &mut self.previous_clips,
+            clips_reallocated,
+        );
     }
 
     pub fn begin_frame(&mut self) {

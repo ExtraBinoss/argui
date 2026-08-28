@@ -1,5 +1,6 @@
 use argui_core::{Point, ScrollDelta};
-use std::time::{Duration, Instant};
+use std::time::Duration;
+use web_time::Instant;
 use winit::{event::TouchPhase, event_loop::ActiveEventLoop, window::Window};
 
 use crate::{RuntimeError, RuntimeEvent, app::Application};
@@ -196,7 +197,8 @@ impl Application {
 
 #[cfg(test)]
 mod tests {
-    use std::time::{Duration, Instant};
+    use std::time::Duration;
+    use web_time::Instant;
 
     use argui_core::{Point, ScrollDelta};
     use winit::event::TouchPhase;

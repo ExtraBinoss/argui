@@ -114,12 +114,14 @@ const SHADERS: &[EffectShader] = &[
     EffectShader::new(FIRE, include_str!("border_fire.wgsl")),
 ];
 
-impl UiApp for App {
+impl Render for App {
+    fn render(&mut self, _cx: &mut Context<Self>) -> Element {
+        // application tree
+    }
+
     fn effect_shaders(&self) -> &'static [EffectShader] {
         SHADERS
     }
-
-    // view/update omitted
 }
 
 let fire = Filter::Custom(

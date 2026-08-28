@@ -99,30 +99,20 @@ impl TextInput {
             .cursor(CursorIcon::Text)
             .hovered(self.style.hovered)
             .focused(self.style.focused);
-        Element {
-            inspectable: true,
-            key: Some(self.key),
-            kind: ElementKind::TextInput {
-                initial_value: self.initial_value,
-                placeholder: self.placeholder,
-                text: self.style.text,
-                placeholder_text: self.style.placeholder,
-                selection: self.style.selection,
-                caret: self.style.caret,
-            },
-            style: self.style.layout,
-            paint: self.style.paint,
-            transform: argui_core::Transform2D::IDENTITY,
-            transform_origin: argui_core::TransformOrigin::CENTER,
-            interaction: Some(interaction),
-            transition: None,
-            layer: None,
-            effects: Vec::new(),
-            scroll: None,
-            overlay: None,
-            z_index: 0,
-            children: Vec::new(),
-        }
+        let mut element = Element::container([]);
+        element.key = Some(self.key);
+        element.kind = ElementKind::TextInput {
+            initial_value: self.initial_value,
+            placeholder: self.placeholder,
+            text: self.style.text,
+            placeholder_text: self.style.placeholder,
+            selection: self.style.selection,
+            caret: self.style.caret,
+        };
+        element.style = self.style.layout;
+        element.paint = self.style.paint;
+        element.interaction = Some(interaction);
+        element
     }
 }
 

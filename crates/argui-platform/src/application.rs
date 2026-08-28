@@ -49,23 +49,6 @@ impl ApplicationConfig {
         }
         Ok(())
     }
-
-    #[must_use]
-    pub fn legacy(window: crate::WindowConfig) -> Self {
-        let display_name = if window.title.is_empty() {
-            "Argui".to_owned()
-        } else {
-            window.title.clone()
-        };
-        let identity = ApplicationIdentity::development(display_name);
-        Self::new(identity, window)
-    }
-}
-
-impl From<crate::WindowConfig> for ApplicationConfig {
-    fn from(window: crate::WindowConfig) -> Self {
-        Self::legacy(window)
-    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

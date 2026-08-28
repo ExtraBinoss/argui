@@ -10,7 +10,7 @@ use argui_animation::{
     Keyframes, PlaybackState, Spring, Timeline, Timing,
 };
 use argui_paint::{Border, ClipBehavior, Color, CornerRadii, ImageAsset, PaintStyle, QuadStyle};
-use argui_runtime::{EffectShader, UiApp, ViewUpdate};
+use argui_runtime::{Context, EffectShader, Render, ViewUpdate};
 use argui_text::{TextColor, TextEngine, TextStyle, TextWrap};
 use argui_ui::{
     Align, Button, ButtonStyle, Edges, Element, Inset, Length, ScrollConfig, TextInput,
@@ -89,16 +89,16 @@ impl Default for StateShowcase {
     }
 }
 
-impl UiApp for StateShowcase {
-    fn effect_shaders(&self) -> &'static [EffectShader] {
+impl StateShowcase {
+    pub fn effect_shaders(&self) -> &'static [EffectShader] {
         popover::EFFECT_SHADERS
     }
 
-    fn image_assets(&self) -> Vec<ImageAsset> {
+    pub fn image_assets(&self) -> Vec<ImageAsset> {
         self.images.assets().to_vec()
     }
 
-    fn view(&self) -> Element {
+    pub fn view(&self) -> Element {
         let accent = if self.warm {
             Color::rgb(0.96, 0.52, 0.26)
         } else {
@@ -195,7 +195,7 @@ impl UiApp for StateShowcase {
         .padding(Edges::symmetric(20.0, 24.0))
     }
 
-    fn update(&mut self, event: &UiEvent) -> ViewUpdate {
+    pub fn update(&mut self, event: &UiEvent) -> ViewUpdate {
         if let UiEventKind::Scrolled { offset, .. } = event.kind
             && event.key.as_deref() == Some("million-list")
         {
@@ -280,7 +280,7 @@ impl UiApp for StateShowcase {
         ViewUpdate::Rebuild
     }
 
-    fn animation_frame(&mut self, frame: Frame) -> ViewUpdate {
+    pub fn animation_frame(&mut self, frame: Frame) -> ViewUpdate {
         let popover_changed = self.popover_motion.advance(frame.elapsed);
         if popover_changed {
             self.popover_progress = self.popover_motion.value().clamp(0.0, 1.0);
@@ -354,7 +354,7 @@ impl UiApp for StateShowcase {
         }
     }
 
-    fn wants_animation_frame(&self) -> bool {
+    pub fn wants_animation_frame(&self) -> bool {
         let physics_active = match self.physics_mode {
             PhysicsMode::Spring => self.spring.is_active(),
             PhysicsMode::Inertia => self.inertia.is_active(),
@@ -366,6 +366,44 @@ impl UiApp for StateShowcase {
             || self.popover_motion.is_active()
             || self.popover_open
             || (self.tooltip_hovered && !self.tooltip_visible)
+    }
+
+    pub fn layout_changed(&mut self, _layout: &argui_runtime::LayoutSnapshot) -> ViewUpdate {
+        ViewUpdate::None
+    }
+}
+
+impl Render for StateShowcase {
+    fn render(&mut self, _cx: &mut Context<Self>) -> Element {
+        self.view()
+    }
+
+    fn event(&mut self, event: &UiEvent, cx: &mut Context<Self>) {
+        request_update(cx, self.update(event));
+    }
+
+    fn animation_frame(&mut self, frame: Frame, cx: &mut Context<Self>) {
+        request_update(cx, StateShowcase::animation_frame(self, frame));
+    }
+
+    fn wants_animation_frame(&self) -> bool {
+        StateShowcase::wants_animation_frame(self)
+    }
+
+    fn effect_shaders(&self) -> &'static [EffectShader] {
+        StateShowcase::effect_shaders(self)
+    }
+
+    fn image_assets(&self) -> Vec<ImageAsset> {
+        StateShowcase::image_assets(self)
+    }
+}
+
+fn request_update<T: Render>(cx: &mut Context<T>, update: ViewUpdate) {
+    match update {
+        ViewUpdate::None => {}
+        ViewUpdate::Paint => cx.request_paint(),
+        ViewUpdate::Rebuild => cx.notify(),
     }
 }
 

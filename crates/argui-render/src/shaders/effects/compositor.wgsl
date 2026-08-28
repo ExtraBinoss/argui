@@ -71,12 +71,12 @@ fn in_region(pixel: vec2<f32>, region: vec4<f32>) -> bool {
 
 fn sample_source(pixel: vec2<f32>) -> vec4<f32> {
     if !in_region(pixel, params.source) { return vec4<f32>(0.0); }
-    return textureSample(source_texture, linear_sampler, allocated_uv(pixel, params.source, params.source_uv));
+    return textureSampleLevel(source_texture, linear_sampler, allocated_uv(pixel, params.source, params.source_uv), 0.0);
 }
 
 fn sample_backdrop(pixel: vec2<f32>) -> vec4<f32> {
     if !in_region(pixel, params.backdrop) { return vec4<f32>(0.0); }
-    return textureSample(backdrop_texture, linear_sampler, allocated_uv(pixel, params.backdrop, params.backdrop_uv));
+    return textureSampleLevel(backdrop_texture, linear_sampler, allocated_uv(pixel, params.backdrop, params.backdrop_uv), 0.0);
 }
 
 fn mask_coverage(pixel: vec2<f32>) -> f32 {
@@ -107,11 +107,11 @@ fn sample_blur(pixel: vec2<f32>, axis: vec2<f32>) -> vec4<f32> {
     let weights = array<f32, 7>(
         0.137023, 0.129618, 0.109719, 0.083108, 0.056331, 0.034167, 0.018544
     );
-    var color = textureSample(source_texture, linear_sampler, uv) * weights[0];
+    var color = textureSampleLevel(source_texture, linear_sampler, uv, 0.0) * weights[0];
     for (var tap = 1u; tap < 7u; tap += 1u) {
         let offset = step * f32(tap);
-        color += textureSample(source_texture, linear_sampler, uv + offset) * weights[tap];
-        color += textureSample(source_texture, linear_sampler, uv - offset) * weights[tap];
+        color += textureSampleLevel(source_texture, linear_sampler, uv + offset, 0.0) * weights[tap];
+        color += textureSampleLevel(source_texture, linear_sampler, uv - offset, 0.0) * weights[tap];
     }
     return color;
 }

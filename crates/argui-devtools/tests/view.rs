@@ -1,7 +1,7 @@
 use argui_core::Size;
 use argui_devtools::DevtoolsHost;
 use argui_layout::LayoutEngine;
-use argui_runtime::{LayoutBounds, LayoutSnapshot, UiApp, ViewUpdate};
+use argui_runtime::{LayoutBounds, LayoutSnapshot, ViewUpdate};
 use argui_showcase::{StateShowcase, text_engine};
 use argui_ui::{Element, UiEvent, UiEventKind, UiTree};
 

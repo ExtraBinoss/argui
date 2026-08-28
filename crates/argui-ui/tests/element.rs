@@ -37,8 +37,8 @@ fn media_and_text_specific_builders_only_change_matching_elements() {
         ..TextStyle::default()
     };
     assert!(matches!(
-        Element::text("styled").text_style(style.clone()).kind,
-        ElementKind::Text { style: value, .. } if value == style
+        &Element::text("styled").text_style(style.clone()).kind,
+        ElementKind::Text { style: value, .. } if *value == style
     ));
     assert!(matches!(
         Element::container([]).text_style(style).kind,

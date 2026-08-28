@@ -32,6 +32,14 @@ pub struct LayoutOutput {
     pub text_inputs: Vec<TextInputRegion>,
     pub display_list: DisplayList,
     pub text: TextScene,
+    pub paint_stats: PaintStats,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct PaintStats {
+    pub visited_subtrees: usize,
+    pub reused_subtrees: usize,
+    pub reused_commands: usize,
 }
 
 #[derive(Debug)]
@@ -41,6 +49,8 @@ pub(crate) struct NodeMap {
     pub(crate) id: NodeId,
     pub(crate) kind: ElementKind,
     pub(crate) style: LayoutStyle,
+    pub(crate) element: Element,
+    pub(crate) subtree_len: usize,
     pub(crate) children: Vec<Self>,
 }
 
@@ -56,6 +66,7 @@ pub struct LayoutEngine {
     tree: TaffyTree<usize>,
     root: Option<NodeMap>,
     revision: Option<u64>,
+    paint_cache: paint::PaintCache,
 }
 
 impl Default for LayoutEngine {
@@ -64,6 +75,7 @@ impl Default for LayoutEngine {
             tree: TaffyTree::new(),
             root: None,
             revision: None,
+            paint_cache: paint::PaintCache::default(),
         }
     }
 }
@@ -142,7 +154,11 @@ impl LayoutEngine {
         Ok(output)
     }
 
-    pub fn apply_scroll(&self, ui: &UiTree, output: &mut LayoutOutput) -> Result<(), LayoutError> {
+    pub fn apply_scroll(
+        &mut self,
+        ui: &UiTree,
+        output: &mut LayoutOutput,
+    ) -> Result<(), LayoutError> {
         let elements = flattened(ui.root());
         let root = self.root.as_ref().ok_or(LayoutError::MissingRoot)?;
         output.scroll_regions.clear();
@@ -160,12 +176,12 @@ impl LayoutEngine {
         Ok(())
     }
 
-    pub fn repaint(&self, ui: &UiTree, output: &mut LayoutOutput) {
-        paint::repaint(self.root.as_ref(), ui, output);
+    pub fn repaint(&mut self, ui: &UiTree, output: &mut LayoutOutput) {
+        paint::repaint(self.root.as_ref(), ui, output, &mut self.paint_cache);
     }
 
     pub fn update_text_inputs(
-        &self,
+        &mut self,
         ui: &UiTree,
         text_engine: &mut TextEngine,
         output: &mut LayoutOutput,
@@ -225,6 +241,11 @@ fn build_node(
         id,
         kind: element.kind.clone(),
         style: element.style.clone(),
+        element: element.clone(),
+        subtree_len: 1 + children
+            .iter()
+            .map(|child| child.subtree_len)
+            .sum::<usize>(),
         children,
     })
 }
