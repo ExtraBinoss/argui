@@ -5,6 +5,10 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 
+[features]
+default = []
+tray = ["argui-platform/tray", "argui-runtime/tray"]
+
 [dependencies]
 argui-animation.workspace = true
 argui-core.workspace = true

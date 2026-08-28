@@ -43,10 +43,11 @@ impl Application {
                 let Some(proxy) = self.event_proxy.clone() else {
                     return;
                 };
+                let window = self.window_key.clone();
                 wasm_bindgen_futures::spawn_local(async move {
                     let mut clipboard = Clipboard::new();
                     if let Ok(text) = clipboard.read_text().await {
-                        let _ = proxy.send_event(UserEvent::ClipboardText(text));
+                        let _ = proxy.send_event(UserEvent::ClipboardText { window, text });
                     }
                 });
             }

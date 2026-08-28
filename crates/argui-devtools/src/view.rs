@@ -73,6 +73,7 @@ fn splitter() -> Element {
         .background(ACCENT)
         .interaction(
             Interaction::default()
+                .cursor(argui_ui::CursorIcon::NsResize)
                 .hovered(QuadStyle::solid(Color::rgb(0.45, 0.84, 1.0)))
                 .pressed(QuadStyle::solid(Color::WHITE)),
         )

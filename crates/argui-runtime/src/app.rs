@@ -1,30 +1,25 @@
-use crate::translate::{
-    button_state, ime_input, key_input, modifiers_state, pointer_button, scroll_delta,
-};
 use crate::{
     LayoutBounds, LayoutSnapshot, RuntimeError, RuntimeEvent, UiApp, ViewUpdate,
-    animation::RuntimeAnimations, event::UserEvent,
+    animation::RuntimeAnimations,
 };
 use argui_core::{Point, Size};
 use argui_inspect::InspectorHandle;
 use argui_layout::{LayoutEngine, LayoutOutput};
 use argui_paint::{ImageAsset, VectorAsset};
-use argui_platform::{
-    ButtonState, Modifiers, PlatformError, PlatformEvent, PointerButton, ScrollDelta, WindowConfig,
-};
-use argui_render::{EffectShader, RendererConfig, SurfaceRenderer};
+use argui_platform::{ApplicationIdentity, ButtonState, Modifiers, ScrollDelta, WindowConfig};
+use argui_render::{EffectShader, RendererConfig, RendererDevice, SurfaceRenderer};
 use argui_text::{PreparedText, TextEngine, TextScene};
 use argui_ui::{InteractionUpdate, UiTree};
 use std::{cell::RefCell, rc::Rc, sync::Arc, time::Instant};
 use winit::{
-    application::ApplicationHandler,
-    event::WindowEvent,
     event_loop::ActiveEventLoop,
     window::{Window, WindowId},
 };
 
+mod cursor;
 mod frame;
 mod inspect;
+mod lifecycle;
 mod renderer;
 mod scroll;
 
@@ -37,9 +32,13 @@ enum RendererState {
 
 pub(crate) struct Application {
     window_config: WindowConfig,
+    identity: Option<ApplicationIdentity>,
+    pub(crate) window_key: argui_platform::WindowKey,
+    exit_on_close: bool,
     pub(super) renderer_config: RendererConfig,
     window: Option<Arc<Window>>,
     renderer: Rc<RefCell<RendererState>>,
+    renderer_device: Rc<RefCell<Option<RendererDevice>>>,
     renderer_announced: bool,
     effect_shaders: Vec<EffectShader>,
     image_assets: Vec<ImageAsset>,
@@ -56,11 +55,12 @@ pub(crate) struct Application {
     viewport: Size,
     scale_factor: f32,
     pointer: Option<Point>,
+    last_cursor: argui_ui::CursorIcon,
     modifiers: Modifiers,
     #[cfg(not(target_arch = "wasm32"))]
     pub(super) clipboard: argui_platform::Clipboard,
     #[cfg(target_arch = "wasm32")]
-    pub(super) event_proxy: Option<winit::event_loop::EventLoopProxy<UserEvent>>,
+    pub(super) event_proxy: Option<winit::event_loop::EventLoopProxy<crate::event::UserEvent>>,
     pending_scrollbar_drag: Option<Point>,
     pending_pointer_scroll: Option<ScrollDelta>,
     scroll_inertia: scroll::ScrollInertia,
@@ -103,9 +103,13 @@ impl Application {
             .unwrap_or_default();
         Self {
             window_config,
+            identity: None,
+            window_key: argui_platform::WindowKey::main(),
+            exit_on_close: true,
             renderer_config,
             window: None,
             renderer: Rc::new(RefCell::new(RendererState::Loading)),
+            renderer_device: Rc::new(RefCell::new(None)),
             renderer_announced: false,
             effect_shaders,
             image_assets,
@@ -122,6 +126,7 @@ impl Application {
             viewport: Size::default(),
             scale_factor: 1.0,
             pointer: None,
+            last_cursor: argui_ui::CursorIcon::Default,
             modifiers: Modifiers::default(),
             #[cfg(not(target_arch = "wasm32"))]
             clipboard: argui_platform::Clipboard::new(),
@@ -136,6 +141,44 @@ impl Application {
             last_redraw: None,
             fatal_error: None,
             on_event: Box::new(on_event),
+        }
+    }
+
+    pub(crate) fn identified(
+        mut self,
+        identity: ApplicationIdentity,
+        window_key: argui_platform::WindowKey,
+    ) -> Self {
+        self.identity = Some(identity);
+        self.window_key = window_key;
+        self.exit_on_close = false;
+        self
+    }
+
+    pub(crate) fn shared_renderer_device(
+        mut self,
+        renderer_device: Rc<RefCell<Option<RendererDevice>>>,
+    ) -> Self {
+        self.renderer_device = renderer_device;
+        self
+    }
+
+    pub(crate) fn window_id(&self) -> Option<WindowId> {
+        self.window.as_deref().map(Window::id)
+    }
+
+    pub(crate) fn window(&self) -> Option<&Window> {
+        self.window.as_deref()
+    }
+
+    pub(crate) fn invalidate(&mut self, update: ViewUpdate) {
+        match update {
+            ViewUpdate::None => return,
+            ViewUpdate::Paint => self.pending_ui_frame.request_paint(),
+            ViewUpdate::Rebuild => self.pending_ui_frame.request_rebuild(),
+        }
+        if let Some(window) = &self.window {
+            window.request_redraw();
         }
     }
 
@@ -256,6 +299,7 @@ impl Application {
 
     fn pointer_moved(&mut self, point: Point, window: &Window, event_loop: &ActiveEventLoop) {
         self.pointer = Some(point);
+        self.refresh_cursor(window);
         let Some(layout) = &self.ui_layout else {
             return;
         };
@@ -307,6 +351,7 @@ impl Application {
         self.flush_pointer_scroll(window, event_loop);
         self.flush_scrollbar_drag(window, event_loop);
         self.pointer = None;
+        self.refresh_cursor(window);
         if let Some(ui) = &mut self.ui_tree {
             ui.scrollbar_released();
             let update = ui.pointer_left();
@@ -388,164 +433,4 @@ fn local_point(layout: &LayoutOutput, node: argui_ui::NodeId, point: Point) -> O
         .find(|region| region.node == node)
         .and_then(|region| region.transform.inverse())
         .map(|inverse| inverse.transform_point(point))
-}
-
-#[cfg_attr(coverage_nightly, coverage(off))]
-impl ApplicationHandler<UserEvent> for Application {
-    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        if self.window.is_some() {
-            return;
-        }
-        match event_loop.create_window(self.window_config.clone().into_attributes()) {
-            Ok(window) => {
-                let window = Arc::new(window);
-                let size = window.inner_size();
-                self.scale_factor = window.scale_factor() as f32;
-                self.update_viewport(size.width, size.height);
-                if !self.prepare_or_exit(event_loop) {
-                    return;
-                }
-                (self.on_event)(RuntimeEvent::Platform(PlatformEvent::Opened {
-                    width: size.width,
-                    height: size.height,
-                    scale_factor: window.scale_factor(),
-                }));
-                self.initialize_renderer(&window, event_loop);
-                self.window = Some(window);
-            }
-            Err(error) => {
-                (self.on_event)(RuntimeEvent::Platform(PlatformEvent::WindowCreationFailed(
-                    error.to_string(),
-                )));
-                self.fatal_error = Some(PlatformError::from(error).into());
-                event_loop.exit();
-            }
-        }
-    }
-
-    fn suspended(&mut self, _event_loop: &ActiveEventLoop) {
-        (self.on_event)(RuntimeEvent::Platform(PlatformEvent::Suspended));
-    }
-
-    fn user_event(&mut self, event_loop: &ActiveEventLoop, event: UserEvent) {
-        #[cfg(not(target_arch = "wasm32"))]
-        {
-            let _ = event_loop;
-            match event {}
-        }
-        #[cfg(target_arch = "wasm32")]
-        {
-            let Some(window) = self.window.as_ref().map(Arc::clone) else {
-                return;
-            };
-            match event {
-                UserEvent::ClipboardText(text) => {
-                    if let Some(ui) = &mut self.ui_tree {
-                        let update = ui.paste_text(&text);
-                        self.apply_ui_update(update, &window, event_loop);
-                    }
-                }
-            }
-        }
-    }
-
-    fn window_event(
-        &mut self,
-        event_loop: &ActiveEventLoop,
-        window_id: WindowId,
-        event: WindowEvent,
-    ) {
-        let Some(window) = self.window.as_ref().map(Arc::clone) else {
-            return;
-        };
-        if window.id() != window_id {
-            return;
-        }
-
-        let platform_event = match event {
-            WindowEvent::CloseRequested => PlatformEvent::CloseRequested,
-            WindowEvent::Resized(size) => {
-                self.pending_window_frame.resize(size.width, size.height);
-                PlatformEvent::Resized {
-                    width: size.width,
-                    height: size.height,
-                }
-            }
-            WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
-                let size = window.inner_size();
-                self.pending_window_frame.scale_factor(
-                    scale_factor as f32,
-                    size.width,
-                    size.height,
-                );
-                PlatformEvent::ScaleFactorChanged(scale_factor)
-            }
-            WindowEvent::CursorMoved { position, .. } => {
-                let point = Point::new(
-                    position.x as f32 / self.scale_factor,
-                    position.y as f32 / self.scale_factor,
-                );
-                self.pointer_moved(point, &window, event_loop);
-                PlatformEvent::PointerMoved {
-                    x: point.x,
-                    y: point.y,
-                }
-            }
-            WindowEvent::CursorEntered { .. } => PlatformEvent::PointerEntered,
-            WindowEvent::CursorLeft { .. } => {
-                self.pointer_left(&window, event_loop);
-                PlatformEvent::PointerLeft
-            }
-            WindowEvent::MouseInput { state, button, .. } => {
-                let state = button_state(state);
-                let button = pointer_button(button);
-                if button == PointerButton::Primary {
-                    self.primary_button(state, &window, event_loop);
-                }
-                PlatformEvent::PointerButton { button, state }
-            }
-            WindowEvent::MouseWheel { delta, phase, .. } => {
-                let delta = scroll_delta(delta, self.scale_factor);
-                self.queue_pointer_scroll(delta, phase, &window, event_loop);
-                PlatformEvent::PointerScrolled(delta)
-            }
-            WindowEvent::ModifiersChanged(modifiers) => {
-                self.modifiers = modifiers_state(modifiers.state());
-                return;
-            }
-            WindowEvent::KeyboardInput { event, .. } => {
-                let input = key_input(event, self.modifiers);
-                self.keyboard_input(&input, &window, event_loop);
-                PlatformEvent::Keyboard(input)
-            }
-            WindowEvent::Ime(ime) => {
-                let input = ime_input(ime);
-                self.ime_input(input.clone(), &window, event_loop);
-                PlatformEvent::Ime(input)
-            }
-            WindowEvent::Focused(focused) => {
-                self.window_focus(focused, &window, event_loop);
-                PlatformEvent::Focused(focused)
-            }
-            WindowEvent::RedrawRequested => {
-                self.begin_frame_profile();
-                self.advance_pointer_inertia(&window);
-                self.flush_pointer_scroll(&window, event_loop);
-                self.flush_scrollbar_drag(&window, event_loop);
-                self.animate(&window, event_loop);
-                self.flush_window_frame();
-                self.flush_ui_frame(event_loop);
-                self.render(event_loop);
-                PlatformEvent::RedrawRequested
-            }
-            _ => return,
-        };
-        if platform_event.requires_redraw() {
-            window.request_redraw();
-        }
-        if platform_event.closes_window() {
-            event_loop.exit();
-        }
-        (self.on_event)(RuntimeEvent::Platform(platform_event));
-    }
 }

@@ -11,6 +11,10 @@ or a deliberate maintenance change should update them one at a time.
 | `cosmic-text` | 0.19.0 | `argui-text` | Shaping, bidi, fallback, line breaking, raster data |
 | `unicode-segmentation` | 1.13.3 | `argui-text`, `argui-ui` | Grapheme-safe caret stops and editing |
 | `arboard` | 3.6.1 | `argui-platform` native | Lazy native clipboard, including Wayland data control |
+| `image` | 0.25.10 | `argui-image`, `argui-platform` | UI image decoding and one-time application-icon PNG conversion |
+| `ksni` | 0.3.6 | `argui-platform` Linux `tray` feature | Pure-Rust StatusNotifierItem tray service |
+| `tray-icon` | 0.24.2 | `argui-platform` Windows/macOS `tray` feature | Native notification-area icon and menu |
+| `base64` | 0.22.1 | `argui-platform` web | Inline browser favicon URLs |
 | `web-sys` | 0.3.104 | `argui-platform` web | Browser clipboard boundary |
 | `pollster` | 1.0.1 | `argui-runtime` native | Resolve one-time GPU initialization |
 | `wasm-bindgen-futures` | 0.4.77 | `argui-runtime` web | Non-blocking GPU initialization in the browser |
@@ -32,6 +36,9 @@ a crate until code actually uses them. This keeps each crate manifest truthful.
 
 `argui-animation` has no third-party dependency; it only uses `argui-core` types
 and the Rust standard library.
+
+Tray dependencies are target-specific and feature-gated. Applications that do
+not enable `tray` do not compile or ship them.
 
 `argui-paint` adds no third-party dependency. It contains plain display data;
 only `argui-render` knows how WGPU turns that data into pixels.

@@ -1,7 +1,7 @@
 use argui_paint::{PaintStyle, QuadStyle};
 use argui_text::{TextStyle, TextWrap};
 
-use crate::{Align, Edges, Element, Interaction, LayoutStyle, Length};
+use crate::{Align, CursorIcon, Edges, Element, Interaction, LayoutStyle, Length};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ButtonStyle {
@@ -79,6 +79,7 @@ impl Button {
     pub fn build(self) -> Element {
         let interaction = Interaction::default()
             .focusable(true)
+            .cursor(CursorIcon::Pointer)
             .hovered(self.style.hovered)
             .pressed(self.style.pressed)
             .focused(self.style.focused);

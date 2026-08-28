@@ -20,13 +20,31 @@ impl Application {
         event_loop: &ActiveEventLoop,
     ) {
         let size = window.inner_size();
-        match pollster::block_on(SurfaceRenderer::new(
-            Arc::clone(window),
-            size.width,
-            size.height,
-            self.renderer_config,
-        )) {
+        let shared = self.renderer_device.borrow().clone();
+        let renderer = shared.map_or_else(
+            || {
+                pollster::block_on(SurfaceRenderer::new(
+                    Arc::clone(window),
+                    size.width,
+                    size.height,
+                    self.renderer_config,
+                ))
+            },
+            |device| {
+                pollster::block_on(SurfaceRenderer::new_with_device(
+                    Arc::clone(window),
+                    size.width,
+                    size.height,
+                    self.renderer_config,
+                    device,
+                ))
+            },
+        );
+        match renderer {
             Ok(mut renderer) => {
+                if self.renderer_device.borrow().is_none() {
+                    *self.renderer_device.borrow_mut() = Some(renderer.device_handle());
+                }
                 if let Err(error) = register_effect_shaders(&mut renderer, &self.effect_shaders) {
                     (self.on_event)(RuntimeEvent::RendererFailed(error.to_string()));
                     self.fatal_error = Some(error.into());
@@ -60,16 +78,31 @@ impl Application {
         let size = window.inner_size();
         let window = Arc::clone(window);
         let renderer = Rc::clone(&self.renderer);
+        let renderer_device = Rc::clone(&self.renderer_device);
         let config = self.renderer_config;
         let effect_shaders = self.effect_shaders.clone();
         let image_assets = self.image_assets.clone();
         let vector_assets = self.vector_assets.clone();
 
         wasm_bindgen_futures::spawn_local(async move {
-            let result =
-                SurfaceRenderer::new(Arc::clone(&window), size.width, size.height, config).await;
+            let shared = renderer_device.borrow().clone();
+            let result = if let Some(device) = shared {
+                SurfaceRenderer::new_with_device(
+                    Arc::clone(&window),
+                    size.width,
+                    size.height,
+                    config,
+                    device,
+                )
+                .await
+            } else {
+                SurfaceRenderer::new(Arc::clone(&window), size.width, size.height, config).await
+            };
             let result = match result {
                 Ok(mut surface) => {
+                    if renderer_device.borrow().is_none() {
+                        *renderer_device.borrow_mut() = Some(surface.device_handle());
+                    }
                     let current_size = window.inner_size();
                     surface.resize(current_size.width, current_size.height);
                     register_effect_shaders(&mut surface, &effect_shaders)

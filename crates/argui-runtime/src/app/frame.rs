@@ -70,6 +70,14 @@ impl PendingUiFrame {
         self.layout = true;
     }
 
+    pub(super) fn request_paint(&mut self) {
+        self.paint = true;
+    }
+
+    pub(super) fn request_rebuild(&mut self) {
+        self.rebuild = true;
+    }
+
     pub(super) fn needs_frame(&self) -> bool {
         self.rebuild
             || self.layout

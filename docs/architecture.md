@@ -27,7 +27,7 @@ collaboration. `argui-core` contains dependency-light shared primitives, and
 
 - `argui-core`: stable geometry and shared IDs/events as they become necessary.
 - `argui-platform`: `winit` window lifecycle, input, IME, clipboard hooks, and
-  native/web surface handles.
+  native/web surface handles, application identity, and optional native tray.
 - `argui-layout`: the narrow adapter from UI style/tree data to `taffy`.
 - `argui-paint`: renderer-independent fills, borders, corner radii, clips, and
   the ordered display list shared by native and web.
@@ -113,6 +113,12 @@ An application implements this boundary once for every target. Native and WASM
 need different executable entry symbols, but those launchers contain no view,
 style, state, or business logic. A future project generator can own these static
 entrypoint files completely.
+
+`AppModel` extends the same retained boundary to several windows. A stable
+`WindowKey` routes events and invalidations, each window keeps independent UI,
+layout, scroll, and surface state, and all surfaces reuse the same WGPU device.
+The optional tray and Web favicon consume the same immutable application icon
+set and never add work to a frame.
 
 ## Scroll and stacking
 

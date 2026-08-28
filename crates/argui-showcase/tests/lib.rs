@@ -6,7 +6,7 @@ use argui_paint::{ClipChain, ClipRegion};
 use argui_runtime::{LayoutSnapshot, UiApp, ViewUpdate};
 use argui_showcase::{StateShowcase, text_engine};
 use argui_text::TextStyle;
-use argui_ui::{HitRegion, ScrollConfig, ScrollRegion, UiEvent, UiEventKind, UiTree};
+use argui_ui::{CursorIcon, HitRegion, ScrollConfig, ScrollRegion, UiEvent, UiEventKind, UiTree};
 
 fn node_index(root: &argui_ui::Element, key: &str) -> usize {
     fn visit(element: &argui_ui::Element, key: &str, index: &mut usize) -> Option<usize> {
@@ -35,6 +35,7 @@ fn events_for(app: &StateShowcase, key: &str) -> Vec<UiEvent> {
         transform: Affine2D::IDENTITY,
         clips: ClipChain::from_regions([ClipRegion::new(bounds, Affine2D::IDENTITY)]),
         focusable: true,
+        cursor: CursorIcon::Auto,
     }];
     let mut events = tree.pointer_moved(Point::new(10.0, 10.0), &regions).events;
     events.extend(tree.primary_pressed(&regions).events);

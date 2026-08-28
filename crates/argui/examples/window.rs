@@ -13,6 +13,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         resizable: true,
         transparent: false,
         append_to_document: true,
+        ..WindowConfig::default()
     };
 
     run(config, RendererConfig::default(), |event| {

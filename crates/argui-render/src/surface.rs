@@ -1,5 +1,6 @@
 use argui_paint::{DisplayList, ImageAsset, ShaderEffectId, VectorAsset};
 use argui_text::{PreparedText, TextEngine};
+use std::sync::Arc;
 use wgpu::{
     CurrentSurfaceTexture, LoadOp, Operations, RenderPassColorAttachment, RenderPassDescriptor,
     StoreOp, SurfaceTarget, TextureFormat, TextureViewDescriptor,
@@ -43,7 +44,18 @@ pub enum RenderStatus {
     Skipped,
 }
 
+#[derive(Clone)]
+pub struct RendererDevice(Arc<RendererDeviceInner>);
+
+struct RendererDeviceInner {
+    instance: wgpu::Instance,
+    adapter: wgpu::Adapter,
+    device: wgpu::Device,
+    queue: wgpu::Queue,
+}
+
 pub struct SurfaceRenderer {
+    device_handle: RendererDevice,
     instance: wgpu::Instance,
     surface: wgpu::Surface<'static>,
     device: wgpu::Device,
@@ -90,6 +102,77 @@ impl SurfaceRenderer {
             })
             .await
             .map_err(|error| RendererError::DeviceRequest(error.to_string()))?;
+        let device_handle = RendererDevice(Arc::new(RendererDeviceInner {
+            instance: instance.clone(),
+            adapter,
+            device,
+            queue,
+        }));
+        Self::from_existing_device(
+            instance,
+            surface,
+            device_handle,
+            width,
+            height,
+            renderer_config,
+        )
+    }
+
+    #[cfg_attr(coverage_nightly, coverage(off))]
+    pub async fn new_with_device(
+        target: impl Into<SurfaceTarget<'static>>,
+        width: u32,
+        height: u32,
+        renderer_config: RendererConfig,
+        device_handle: RendererDevice,
+    ) -> Result<Self, RendererError> {
+        let instance = device_handle.0.instance.clone();
+        let surface = instance
+            .create_surface(target)
+            .map_err(|error| RendererError::SurfaceCreation(error.to_string()))?;
+        Self::from_existing_device(
+            instance,
+            surface,
+            device_handle,
+            width,
+            height,
+            renderer_config,
+        )
+    }
+
+    fn from_existing_device(
+        instance: wgpu::Instance,
+        surface: wgpu::Surface<'static>,
+        device_handle: RendererDevice,
+        width: u32,
+        height: u32,
+        renderer_config: RendererConfig,
+    ) -> Result<Self, RendererError> {
+        Self::finish_new(
+            instance,
+            surface,
+            device_handle.0.adapter.clone(),
+            device_handle.0.device.clone(),
+            device_handle.0.queue.clone(),
+            device_handle,
+            width,
+            height,
+            renderer_config,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn finish_new(
+        instance: wgpu::Instance,
+        surface: wgpu::Surface<'static>,
+        adapter: wgpu::Adapter,
+        device: wgpu::Device,
+        queue: wgpu::Queue,
+        device_handle: RendererDevice,
+        width: u32,
+        height: u32,
+        renderer_config: RendererConfig,
+    ) -> Result<Self, RendererError> {
         let mut surface_config = surface
             .get_default_config(&adapter, width.max(1), height.max(1))
             .ok_or(RendererError::UnsupportedSurface)?;
@@ -112,6 +195,7 @@ impl SurfaceRenderer {
         let offscreen = TexturePool::new(target_format, 128 * 1024 * 1024);
 
         Ok(Self {
+            device_handle,
             instance,
             surface,
             device,
@@ -128,6 +212,11 @@ impl SurfaceRenderer {
             offscreen,
             last_profile: RenderProfile::default(),
         })
+    }
+
+    #[must_use]
+    pub fn device_handle(&self) -> RendererDevice {
+        self.device_handle.clone()
     }
 
     #[cfg_attr(coverage_nightly, coverage(off))]

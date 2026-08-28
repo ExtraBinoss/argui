@@ -3,7 +3,8 @@ use argui_layout::LayoutEngine;
 use argui_paint::{Border, ClipBehavior, Color, DisplayCommand, ImageFit, LayerStyle, VectorId};
 use argui_text::TextEngine;
 use argui_ui::{
-    CornerRadii, Element, ImageId, Interaction, Length, Transform2D, TransformOrigin, UiTree,
+    CornerRadii, CursorIcon, Element, ImageId, Interaction, Length, Transform2D, TransformOrigin,
+    UiTree,
 };
 
 const NOTO_SANS: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
@@ -102,7 +103,11 @@ fn transformed_images_share_exact_clips_layers_and_hit_geometry() {
         .image_fit(ImageFit::Contain)
         .width(Length::Px(80.0))
         .height(Length::Px(40.0))
-        .interaction(Interaction::default().focusable(true))
+        .interaction(
+            Interaction::default()
+                .focusable(true)
+                .cursor(CursorIcon::Crosshair),
+        )
         .transform(Transform2D::IDENTITY.translate(20.0, 10.0).rotate(0.1))
         .transform_origin(TransformOrigin::TOP_LEFT)
         .layer(effect());
@@ -130,6 +135,7 @@ fn transformed_images_share_exact_clips_layers_and_hit_geometry() {
     assert_eq!(image.fit, ImageFit::Contain);
     assert_eq!(image.clips.regions().len(), 2);
     let hit = &output.hit_regions[0];
+    assert_eq!(hit.cursor, CursorIcon::Crosshair);
     let visual_point = image.transform.transform_point(Point::new(10.0, 10.0));
     assert!(hit.contains(visual_point));
     assert!(!hit.contains(Point::new(190.0, 110.0)));

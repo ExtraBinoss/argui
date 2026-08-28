@@ -23,4 +23,4 @@ pub use error::RendererError;
 pub use offscreen::TexturePoolStats;
 pub use profile::RenderProfile;
 pub use shader::EffectShader;
-pub use surface::{RenderStatus, SurfaceRenderer};
+pub use surface::{RenderStatus, RendererDevice, SurfaceRenderer};

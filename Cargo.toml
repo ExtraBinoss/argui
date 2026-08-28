@@ -9,6 +9,7 @@ rust-version = "1.89"
 license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
+argui = { path = "crates/argui" }
 argui-animation = { path = "crates/argui-animation" }
 argui-core = { path = "crates/argui-core" }
 argui-devtools = { path = "crates/argui-devtools" }
@@ -27,6 +28,7 @@ argui-vector = { path = "crates/argui-vector" }
 
 bytemuck = { version = "=1.25.2", features = ["derive"] }
 arboard = { version = "=3.6.1", default-features = false, features = ["wayland-data-control"] }
+base64 = "=0.22.1"
 cosmic-text = { version = "=0.19.0", default-features = false }
 naga = { version = "=30.0.1", features = ["wgsl-in"] }
 pollster = "=1.0.1"
@@ -41,6 +43,9 @@ web-sys = "=0.3.104"
 web-time = "=1.1.0"
 unicode-segmentation = "=1.13.3"
 image = { version = "=0.25.10", default-features = false, features = ["png", "jpeg"] }
+ksni = { version = "=0.3.6", default-features = false, features = ["async-io", "blocking"] }
+tray-icon = { version = "=0.24.2", default-features = false }
+winresource = "=0.1.31"
 lyon_path = "=1.0.19"
 lyon_tessellation = "=1.0.20"
 usvg = { version = "=0.48.1", default-features = false }

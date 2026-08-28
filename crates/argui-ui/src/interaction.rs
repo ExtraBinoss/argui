@@ -1,6 +1,8 @@
 use argui_core::{Affine2D, Point, Rect};
 use argui_paint::{ClipChain, QuadStyle};
 
+use crate::CursorIcon;
+
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct NodeId(u64);
 
@@ -35,6 +37,7 @@ pub struct InteractionStyles {
 pub struct Interaction {
     pub enabled: bool,
     pub focusable: bool,
+    pub cursor: CursorIcon,
     pub styles: InteractionStyles,
 }
 
@@ -43,6 +46,7 @@ impl Default for Interaction {
         Self {
             enabled: true,
             focusable: false,
+            cursor: CursorIcon::Auto,
             styles: InteractionStyles::default(),
         }
     }
@@ -62,6 +66,7 @@ impl Interaction {
         Self {
             enabled: true,
             focusable: false,
+            cursor: CursorIcon::Auto,
             styles: InteractionStyles {
                 hovered: None,
                 pressed: None,
@@ -73,6 +78,12 @@ impl Interaction {
     #[must_use]
     pub const fn focusable(mut self, focusable: bool) -> Self {
         self.focusable = focusable;
+        self
+    }
+
+    #[must_use]
+    pub const fn cursor(mut self, cursor: CursorIcon) -> Self {
+        self.cursor = cursor;
         self
     }
 
@@ -113,6 +124,7 @@ pub struct HitRegion {
     pub transform: Affine2D,
     pub clips: ClipChain,
     pub focusable: bool,
+    pub cursor: CursorIcon,
 }
 
 impl HitRegion {

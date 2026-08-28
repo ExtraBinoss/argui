@@ -1,6 +1,6 @@
 use argui_core::{Affine2D, Point, Rect, Size};
 use argui_paint::{ClipChain, ClipRegion, Color, QuadStyle};
-use argui_ui::{Element, HitRegion, Interaction, UiEventKind, UiTree, VisualState};
+use argui_ui::{CursorIcon, Element, HitRegion, Interaction, UiEventKind, UiTree, VisualState};
 
 fn interactive(key: &str) -> Element {
     Element::container([])
@@ -29,7 +29,18 @@ fn region_at(node: argui_ui::NodeId, x: f32, focusable: bool) -> HitRegion {
             Affine2D::IDENTITY,
         )]),
         focusable,
+        cursor: CursorIcon::Auto,
     }
+}
+
+#[test]
+fn interactions_expose_explicit_platform_cursors() {
+    assert_eq!(Interaction::default().cursor, CursorIcon::Auto);
+    assert_eq!(
+        Interaction::default().cursor(CursorIcon::Grab).cursor,
+        CursorIcon::Grab
+    );
+    assert_eq!(Interaction::blocker().cursor, CursorIcon::Auto);
 }
 
 #[test]

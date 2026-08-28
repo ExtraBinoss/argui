@@ -4,7 +4,9 @@ use argui_core::{
 };
 use argui_paint::{ClipChain, ClipRegion, PaintStyle, QuadStyle};
 use argui_text::TextStyle;
-use argui_ui::{ClipboardRequest, HitRegion, TextInput, TextInputStyle, UiEventKind, UiTree};
+use argui_ui::{
+    ClipboardRequest, CursorIcon, HitRegion, TextInput, TextInputStyle, UiEventKind, UiTree,
+};
 
 fn tree(value: &str) -> (UiTree, HitRegion) {
     let input = TextInput::new(
@@ -25,6 +27,7 @@ fn tree(value: &str) -> (UiTree, HitRegion) {
             transform: Affine2D::IDENTITY,
             clips: ClipChain::from_regions([ClipRegion::new(bounds, Affine2D::IDENTITY)]),
             focusable: true,
+            cursor: CursorIcon::Text,
         },
     )
 }
@@ -100,7 +103,9 @@ fn ime_preedit_is_visible_but_only_commit_changes_the_value() {
 fn text_input_style_remains_composed_from_existing_primitives() {
     let style = TextInputStyle::new(PaintStyle::new(QuadStyle::default()), TextStyle::default());
     let input = TextInput::new("field", "", "hint", style).build();
-    assert!(input.interaction.unwrap().focusable);
+    let interaction = input.interaction.unwrap();
+    assert!(interaction.focusable);
+    assert_eq!(interaction.cursor, CursorIcon::Text);
     assert!(input.children.is_empty());
 }
 

@@ -1,10 +1,40 @@
-use argui_platform::{PlatformError, WindowConfig};
+use argui_platform::{ApplicationConfig, PlatformError, WindowConfig};
 use argui_render::RendererConfig;
 use argui_text::{TextEngine, TextScene};
 use argui_ui::UiTree;
 use winit::event_loop::{ControlFlow, EventLoop};
 
-use crate::{RuntimeError, RuntimeEvent, UiApp, app::Application, event::UserEvent};
+use crate::{
+    AppModel, RuntimeError, RuntimeEvent, UiApp, app::Application, application::SingleWindowModel,
+    event::UserEvent, multi::MultiApplication,
+};
+
+#[cfg_attr(coverage_nightly, coverage(off))]
+pub fn run_application(
+    config: ApplicationConfig,
+    renderer: RendererConfig,
+    app: impl AppModel,
+    on_event: impl FnMut(RuntimeEvent) + 'static,
+) -> Result<(), RuntimeError> {
+    launch_multi(MultiApplication::new(config, renderer, app, on_event)?)
+}
+
+#[cfg_attr(coverage_nightly, coverage(off))]
+pub fn run_application_with_text_engine(
+    config: ApplicationConfig,
+    renderer: RendererConfig,
+    text_engine: TextEngine,
+    app: impl AppModel,
+    on_event: impl FnMut(RuntimeEvent) + 'static,
+) -> Result<(), RuntimeError> {
+    launch_multi(MultiApplication::new_with_text_engine(
+        config,
+        renderer,
+        Some(text_engine),
+        app,
+        on_event,
+    )?)
+}
 
 #[cfg_attr(coverage_nightly, coverage(off))]
 pub fn run(
@@ -83,32 +113,34 @@ pub fn run_ui_with_text_engine(
 
 #[cfg_attr(coverage_nightly, coverage(off))]
 pub fn run_app(
-    window: WindowConfig,
+    config: impl Into<ApplicationConfig>,
     renderer: RendererConfig,
     app: impl UiApp,
     on_event: impl FnMut(RuntimeEvent) + 'static,
 ) -> Result<(), RuntimeError> {
-    run_app_with_text_engine(window, renderer, TextEngine::new(), app, on_event)
+    run_application(
+        config.into(),
+        renderer,
+        SingleWindowModel::new(app),
+        on_event,
+    )
 }
 
 #[cfg_attr(coverage_nightly, coverage(off))]
 pub fn run_app_with_text_engine(
-    window: WindowConfig,
+    config: impl Into<ApplicationConfig>,
     renderer: RendererConfig,
     text_engine: TextEngine,
     app: impl UiApp,
     on_event: impl FnMut(RuntimeEvent) + 'static,
 ) -> Result<(), RuntimeError> {
-    let ui = UiTree::new(app.view());
-    launch(Application::new(
-        window,
+    run_application_with_text_engine(
+        config.into(),
         renderer,
         text_engine,
-        None,
-        Some(ui),
-        Some(Box::new(app)),
+        SingleWindowModel::new(app),
         on_event,
-    ))
+    )
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -124,8 +156,34 @@ fn launch(mut application: Application) -> Result<(), RuntimeError> {
     application.fatal_error.map_or(Ok(()), Err)
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+fn launch_multi(mut application: MultiApplication) -> Result<(), RuntimeError> {
+    let event_loop = EventLoop::<UserEvent>::with_user_event()
+        .build()
+        .map_err(PlatformError::from)?;
+    application.set_event_proxy(event_loop.create_proxy());
+    event_loop.set_control_flow(ControlFlow::Wait);
+    event_loop
+        .run_app(&mut application)
+        .map_err(PlatformError::from)?;
+    application.fatal_error.map_or(Ok(()), Err)
+}
+
 #[cfg(target_arch = "wasm32")]
 fn launch(mut application: Application) -> Result<(), RuntimeError> {
+    use winit::platform::web::EventLoopExtWebSys;
+
+    let event_loop = EventLoop::<UserEvent>::with_user_event()
+        .build()
+        .map_err(PlatformError::from)?;
+    application.set_event_proxy(event_loop.create_proxy());
+    event_loop.set_control_flow(ControlFlow::Wait);
+    event_loop.spawn_app(application);
+    Ok(())
+}
+
+#[cfg(target_arch = "wasm32")]
+fn launch_multi(mut application: MultiApplication) -> Result<(), RuntimeError> {
     use winit::platform::web::EventLoopExtWebSys;
 
     let event_loop = EventLoop::<UserEvent>::with_user_event()

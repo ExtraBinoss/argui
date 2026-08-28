@@ -1,20 +1,43 @@
 use argui::{
     devtools::DevtoolsHost,
-    platform::WindowConfig,
+    platform::{
+        AppIcon, ApplicationConfig, ApplicationId, ApplicationIdentity, IconSet, TrayAction,
+        TrayConfig, TrayItemId, TrayMenuItem, WindowConfig,
+    },
     render::RendererConfig,
-    runtime::{RuntimeEvent, run_app_with_text_engine},
+    runtime::{RuntimeEvent, WindowRuntimeEvent, run_app_with_text_engine},
 };
 use argui_showcase::{StateShowcase, text_engine};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let profiling = std::env::var_os("ARGUI_PROFILE").is_some();
+    let icons = IconSet::single(AppIcon::from_png(include_bytes!(
+        "assets/astra-icon-256.png"
+    ))?);
     run_app_with_text_engine(
-        WindowConfig {
-            title: "Argui state showcase".into(),
-            width: 1050.0,
-            height: 680.0,
-            ..WindowConfig::default()
-        },
+        ApplicationConfig::new(
+            ApplicationIdentity::new(
+                ApplicationId::new("dev.argui.state")?,
+                "Argui state showcase",
+                icons,
+            ),
+            WindowConfig {
+                title: "Argui state showcase".into(),
+                width: 1050.0,
+                height: 680.0,
+                ..WindowConfig::default()
+            },
+        )
+        .with_tray(TrayConfig {
+            tooltip: Some("Argui state showcase".into()),
+            menu: vec![TrayMenuItem::Action {
+                id: TrayItemId::new("quit"),
+                label: "Quit Argui".into(),
+                enabled: true,
+                action: TrayAction::Quit,
+            }],
+            ..TrayConfig::default()
+        }),
         RendererConfig::default().profiling(profiling),
         text_engine(),
         DevtoolsHost::new(StateShowcase::default()),
@@ -29,7 +52,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 fn log_profile(event: RuntimeEvent) {
     match event {
-        RuntimeEvent::AnimationProfile(profile) => eprintln!(
+        RuntimeEvent::AnimationProfile(profile)
+        | RuntimeEvent::Window {
+            event: WindowRuntimeEvent::AnimationProfile(profile),
+            ..
+        } => eprintln!(
             "[argui][ui] frame={:.2}ms model={:.2}ms tree={:.2}ms paint={:.2}ms update={:?}",
             profile.frame_interval.as_secs_f64() * 1_000.0,
             profile.model_time.as_secs_f64() * 1_000.0,
@@ -37,7 +64,11 @@ fn log_profile(event: RuntimeEvent) {
             profile.paint_time.as_secs_f64() * 1_000.0,
             profile.tree_update,
         ),
-        RuntimeEvent::RenderProfile(profile) => eprintln!(
+        RuntimeEvent::RenderProfile(profile)
+        | RuntimeEvent::Window {
+            event: WindowRuntimeEvent::RenderProfile(profile),
+            ..
+        } => eprintln!(
             "[argui][gpu] cpu={:.2}ms layers={}/{} passes={} pixels={} textures={} reused={} memory={:.1}MiB",
             profile.cpu_time.as_secs_f64() * 1_000.0,
             profile.effects.offscreen_layers,

@@ -3,7 +3,9 @@ use argui_paint::{Color, PaintStyle, QuadStyle};
 use argui_text::{TextColor, TextStyle, TextWrap};
 use unicode_segmentation::UnicodeSegmentation;
 
-use crate::{Align, Edges, Element, ElementKind, Interaction, LayoutStyle, Length, NodeId};
+use crate::{
+    Align, CursorIcon, Edges, Element, ElementKind, Interaction, LayoutStyle, Length, NodeId,
+};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct TextInputStyle {
@@ -94,6 +96,7 @@ impl TextInput {
     pub fn build(self) -> Element {
         let interaction = Interaction::default()
             .focusable(true)
+            .cursor(CursorIcon::Text)
             .hovered(self.style.hovered)
             .focused(self.style.focused);
         Element {

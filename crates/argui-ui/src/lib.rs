@@ -1,5 +1,6 @@
 //! Retained UI description consumed by the runtime and produced by Rust or a DSL.
 
+mod cursor;
 mod effect;
 mod element;
 mod identity;
@@ -20,6 +21,7 @@ pub use argui_paint::{
     LinearGradient, PaintStyle, QuadStyle, RadialGradient, Refraction, ShaderEffectId, Shadow,
     VectorAsset, VectorId,
 };
+pub use cursor::CursorIcon;
 pub use effect::{EffectScope, ScopedEffect};
 pub use element::{Element, ElementKind};
 pub use interaction::{

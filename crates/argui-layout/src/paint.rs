@@ -345,6 +345,7 @@ fn push_hit_region(
             transform: context.transform,
             clips: context.clips.clone(),
             focusable: interaction.focusable,
+            cursor: interaction.cursor,
         });
     }
 }
