@@ -275,6 +275,11 @@ fn apply_attributes(
     set_bool(element, "aria-required", node.semantics.state.required)?;
     set_bool(element, "aria-readonly", node.semantics.state.read_only)?;
     set_bool(element, "aria-invalid", node.semantics.state.invalid)?;
+    set_optional(
+        element,
+        "aria-modal",
+        node.semantics.state.modal.then_some("true"),
+    )?;
     set_optional_bool(element, "aria-checked", node.semantics.state.checked)?;
     set_optional_bool(element, "aria-expanded", node.semantics.state.expanded)?;
     for attribute in [

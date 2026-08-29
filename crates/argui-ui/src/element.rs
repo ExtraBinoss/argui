@@ -61,6 +61,7 @@ pub struct ElementNode {
     pub effects: Vec<ScopedEffect>,
     pub scroll: Option<ScrollConfig>,
     pub overlay: Option<crate::OverlayAnchor>,
+    pub focus_scope: Option<crate::FocusScope>,
     pub z_index: i32,
     pub children: Vec<Element>,
 }
@@ -104,6 +105,7 @@ impl Element {
             effects: Vec::new(),
             scroll: None,
             overlay: None,
+            focus_scope: None,
             z_index: 0,
             children: children.into_iter().collect(),
         }))
@@ -140,6 +142,7 @@ impl Element {
             effects: Vec::new(),
             scroll: None,
             overlay: None,
+            focus_scope: None,
             z_index: 0,
             children: Vec::new(),
         }))
@@ -331,6 +334,12 @@ impl Element {
         self.style.position = Position::Absolute;
         self.style.inset = Inset::default();
         self.overlay = Some(crate::OverlayAnchor::new(key, placement));
+        self
+    }
+
+    #[must_use]
+    pub fn focus_scope(mut self, scope: crate::FocusScope) -> Self {
+        self.focus_scope = Some(scope);
         self
     }
 

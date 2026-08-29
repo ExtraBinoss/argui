@@ -77,6 +77,7 @@ pub struct SemanticState {
     pub required: bool,
     pub read_only: bool,
     pub invalid: bool,
+    pub modal: bool,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -117,6 +118,7 @@ impl Semantics {
                 required: false,
                 read_only: false,
                 invalid: false,
+                modal: false,
             },
             actions: Vec::new(),
             live: LiveRegion::Off,

@@ -85,17 +85,6 @@ pub(super) fn animation_timeline(initial: Color) -> Timeline<Color> {
     .expect("the showcase timing is valid")
 }
 
-pub(super) fn effect_phase_timeline() -> Timeline<f32> {
-    Timeline::new(
-        Keyframes::new(vec![Keyframe::new(0.0, 0.0), Keyframe::new(1.0, 1.0)])
-            .expect("effect phase keyframes are complete"),
-        Timing::new(Duration::from_secs(1))
-            .iterations(Iterations::Infinite)
-            .fill(FillMode::Both),
-    )
-    .expect("effect phase timing is valid")
-}
-
 pub(super) fn motion_tween() -> Tween {
     Tween::new(Duration::from_millis(420)).easing(Easing::CubicBezier(
         CubicBezier::new(0.22, 1.0, 0.36, 1.0).expect("the showcase uses a valid motion curve"),

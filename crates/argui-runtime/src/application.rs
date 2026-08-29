@@ -2,7 +2,7 @@ use argui_animation::Frame;
 use argui_inspect::InspectorHandle;
 use argui_paint::{ImageAsset, VectorAsset};
 use argui_platform::{PlatformEvent, TrayConfig, TrayEvent, WindowKey, WindowSpec};
-use argui_ui::{ClipboardRequest, Element, UiEvent};
+use argui_ui::{ClipboardRequest, Element, FocusRequest, UiEvent};
 
 use crate::{Entity, LayoutSnapshot, Render, ScrollRequest, ViewUpdate};
 
@@ -137,12 +137,17 @@ pub trait AppModel: 'static {
     fn take_scroll_request(&mut self, _window: &WindowKey) -> Option<ScrollRequest> {
         None
     }
+
+    fn take_focus_request(&mut self, _window: &WindowKey) -> Option<FocusRequest> {
+        None
+    }
 }
 
 pub(crate) struct SingleWindowModel<A: Render> {
     app: Entity<A>,
     clipboard: std::cell::RefCell<Option<ClipboardRequest>>,
     scroll: std::cell::RefCell<Option<ScrollRequest>>,
+    focus: std::cell::RefCell<Option<FocusRequest>>,
     animation_requested: std::cell::Cell<bool>,
 }
 
@@ -152,6 +157,7 @@ impl<A: Render> SingleWindowModel<A> {
             app: Entity::new(app),
             clipboard: std::cell::RefCell::new(None),
             scroll: std::cell::RefCell::new(None),
+            focus: std::cell::RefCell::new(None),
             animation_requested: std::cell::Cell::new(false),
         }
     }
@@ -163,6 +169,9 @@ impl<A: Render> SingleWindowModel<A> {
         }
         if effects.scroll.is_some() {
             *self.scroll.borrow_mut() = effects.scroll;
+        }
+        if effects.focus.is_some() {
+            *self.focus.borrow_mut() = effects.focus;
         }
         self.animation_requested
             .set(self.animation_requested.get() || effects.animation_frame);
@@ -234,6 +243,12 @@ impl<A: Render> AppModel for SingleWindowModel<A> {
     fn take_scroll_request(&mut self, window: &WindowKey) -> Option<ScrollRequest> {
         (window.as_str() == WindowKey::MAIN_VALUE)
             .then(|| self.scroll.borrow_mut().take())
+            .flatten()
+    }
+
+    fn take_focus_request(&mut self, window: &WindowKey) -> Option<FocusRequest> {
+        (window.as_str() == WindowKey::MAIN_VALUE)
+            .then(|| self.focus.borrow_mut().take())
             .flatten()
     }
 }

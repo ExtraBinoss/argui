@@ -32,15 +32,14 @@ impl Application {
         let (Some(layout), Some(ui)) = (&self.ui_layout, &mut self.ui_tree) else {
             return;
         };
-        let update = if input.state == KeyState::Pressed && input.key == Key::Tab {
-            ui.focus_next(&layout.hit_regions, input.modifiers.shift)
-        } else if input.state == KeyState::Pressed
+        let update = if input.state == KeyState::Pressed
             && matches!(input.key, Key::ArrowLeft | Key::ArrowRight)
             && let Some(node) = ui.focused_node()
             && let Some(position) = ui.text_input_position(node)
             && let Some(region) = layout.text_inputs.iter().find(|region| region.node == node)
         {
-            ui.move_text_position(
+            let mut update = ui.keyboard_event(input, &layout.hit_regions);
+            update.merge(ui.move_text_position(
                 node,
                 region.visual_neighbor(
                     position,
@@ -48,9 +47,10 @@ impl Application {
                     input.modifiers.command() || input.modifiers.alt,
                 ),
                 input.modifiers.shift,
-            )
+            ));
+            update
         } else {
-            ui.key_input(input)
+            ui.key_input(input, &layout.hit_regions)
         };
         self.apply_ui_update(update, window, event_loop);
         self.update_ime(window);

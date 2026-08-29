@@ -2,8 +2,8 @@ use argui_core::{Affine2D, Point, Rect, Size};
 use argui_paint::{ClipChain, PaintStyle};
 use argui_text::TextStyle;
 use argui_ui::{
-    Button, ButtonStyle, CursorIcon, Element, GestureSet, HitRegion, Interaction, Role,
-    SemanticAction, SemanticValue, Semantics, TextInput, TextInputStyle, TreeUpdate, UiTree,
+    Button, ButtonStyle, CursorIcon, Element, FocusRequest, GestureSet, HitRegion, Interaction,
+    Role, SemanticAction, SemanticValue, Semantics, TextInput, TextInputStyle, TreeUpdate, UiTree,
 };
 
 #[test]
@@ -68,7 +68,7 @@ fn focus_falls_back_to_the_root_when_a_focused_node_is_semantically_hidden() {
         cursor: CursorIcon::Auto,
         gestures: GestureSet::NONE,
     };
-    tree.focus_node(child_id, &[region]);
+    tree.sync_focus(&[region], Some(FocusRequest::Focus(child_id.into())));
     tree.update(Element::column([child.semantic_hidden(true)]));
 
     let semantic_tree = tree.semantic_tree(&[], 1.0);

@@ -2,8 +2,8 @@ use argui_paint::{PaintStyle, QuadStyle};
 use argui_text::{TextStyle, TextWrap};
 
 use crate::{
-    Align, CursorIcon, Edges, Element, GestureSet, Interaction, LayoutStyle, Length, Role,
-    SemanticAction, Semantics,
+    Align, CursorIcon, Edges, Element, GestureSet, Interaction, KeyboardActivation, LayoutStyle,
+    Length, Role, SemanticAction, Semantics,
 };
 
 #[derive(Clone, Debug, PartialEq)]
@@ -84,6 +84,7 @@ impl Button {
             .focusable(true)
             .cursor(CursorIcon::Pointer)
             .gestures(GestureSet::NONE.tap())
+            .keyboard_activation(KeyboardActivation::EnterOrSpace)
             .hovered(self.style.hovered)
             .pressed(self.style.pressed)
             .focused(self.style.focused);

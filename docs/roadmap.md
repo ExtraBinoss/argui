@@ -35,7 +35,6 @@ console logs, and disabled DevTools preserve the existing idle fast path.
   state.
 - Build textarea, checkbox, slider, menu/select, and reusable modal/popover
   behavior from existing primitives.
-- Add focus traps, focus restoration, and keyboard navigation for overlays.
 
 Done when complex text remains grapheme-safe and bidi-correct, and every control
 shares one behavior on native and web.
@@ -61,6 +60,10 @@ subtree rather than total tree size.
   updates through AccessKit on native targets and real DOM controls on Web.
 - [x] Detect reduced motion and high contrast, support explicit application
   overrides, and keep semantic-only updates off the GPU and layout paths.
+- [x] Route raw keyboard input to every focused control, synthesize accessible
+  button activation, and retain exact focus across window transitions.
+- [x] Support declarative restoring, trapped, and modal focus scopes plus
+  post-layout imperative focus requests.
 - Next: platform screen-reader audits and automated browser accessibility tests.
 
 Done when composed widgets expose semantics without renderer knowledge and the

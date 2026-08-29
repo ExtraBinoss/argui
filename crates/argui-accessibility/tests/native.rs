@@ -108,6 +108,7 @@ fn rich_nodes_lower_every_value_state_and_relation() {
             required: true,
             read_only: true,
             invalid: true,
+            modal: true,
         })
         .live(LiveRegion::Assertive)
         .orientation(Orientation::Horizontal)
@@ -180,6 +181,7 @@ fn rich_nodes_lower_every_value_state_and_relation() {
     assert_eq!(node.max_numeric_value(), Some(100.0));
     assert_eq!(node.numeric_value_step(), Some(2.0));
     assert!(node.is_disabled());
+    assert!(node.is_modal());
     assert_eq!(node.is_selected(), Some(true));
     assert_eq!(node.level(), Some(3));
     assert_eq!(node.position_in_set(), Some(2));

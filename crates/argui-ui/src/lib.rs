@@ -4,6 +4,7 @@ mod binding;
 mod cursor;
 mod effect;
 mod element;
+mod focus;
 mod gesture;
 mod identity;
 mod interaction;
@@ -33,10 +34,11 @@ pub use binding::{BindingImpact, MotionProperty, PropertyBinding, property};
 pub use cursor::CursorIcon;
 pub use effect::{EffectScope, ScopedEffect};
 pub use element::{Element, ElementKind};
+pub use focus::{FocusContainment, FocusRequest, FocusScope, FocusTarget, InitialFocus};
 pub use gesture::{GestureArena, GestureEvent, GestureKind, GesturePhase, GestureSet};
 pub use interaction::{
-    HitRegion, Interaction, InteractionStyles, InteractionUpdate, NodeId, UiEvent, UiEventKind,
-    VisualState,
+    HitRegion, Interaction, InteractionStyles, InteractionUpdate, KeyboardActivation, NodeId,
+    UiEvent, UiEventKind, VisualState,
 };
 pub use overlay::{OverlayAlign, OverlayAnchor, OverlayPlacement, PlacedOverlay, PlacementSide};
 pub use scroll::{

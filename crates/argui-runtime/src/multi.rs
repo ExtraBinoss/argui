@@ -478,6 +478,12 @@ impl Render for WindowModel {
         if let Some(request) = self.model.borrow_mut().take_scroll_request(&self.key) {
             cx.scroll_to(request.key, request.offset);
         }
+        if let Some(request) = self.model.borrow_mut().take_focus_request(&self.key) {
+            match request {
+                argui_ui::FocusRequest::Focus(target) => cx.request_focus(target),
+                argui_ui::FocusRequest::Clear => cx.clear_focus(),
+            }
+        }
     }
 
     fn animation_frame(&mut self, frame: argui_animation::Frame, cx: &mut Context<Self>) {

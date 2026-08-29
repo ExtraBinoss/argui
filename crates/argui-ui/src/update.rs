@@ -36,7 +36,10 @@ pub(crate) fn classify_update(
         TreeUpdate::Paint
     } else if binding_update != TreeUpdate::None {
         binding_update
-    } else if old.semantics != new.semantics || old.semantic_hidden != new.semantic_hidden {
+    } else if old.semantics != new.semantics
+        || old.semantic_hidden != new.semantic_hidden
+        || old.focus_scope != new.focus_scope
+    {
         TreeUpdate::Semantics
     } else {
         TreeUpdate::None

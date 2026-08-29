@@ -25,7 +25,30 @@ and hit-test data together.
 Primary-button presses capture their target until release. A release over the
 captured target emits `Clicked`; a release outside emits only `Released`.
 Focusable controls receive focus on press, and losing window focus clears hover,
-press, capture, and focus safely.
+press, capture, and focus safely. The runtime restores the exact retained focus
+when the window becomes active again.
+
+## Keyboard and focus
+
+Every physical key transition reaches the focused node as
+`UiEventKind::KeyInput`, including modifiers and repeat state. Tab and
+Shift-Tab traverse the current scope. Buttons synthesize `Pressed`, `Clicked`
+and `Released` from Enter; Space retains the pressed visual until key release
+and cancels activation if focus or window ownership changes. Text editing runs
+after raw dispatch, so applications can observe Escape, arrows, Home/End and
+the edited value without platform-specific handlers.
+
+`Element::focus_scope` declares focus ownership around a retained subtree.
+`FocusScope::restoring` remembers the previous target,
+`FocusScope::trapped` additionally wraps Tab traversal, and
+`FocusScope::modal` also removes background nodes from the active semantic
+tree. Initial focus may select the first focusable descendant or one exact
+stable key. Nested scopes restore in stack order.
+
+Application state can request the same operation imperatively with
+`Context::request_focus(NodeId | key)` or `Context::clear_focus()`. Requests are
+resolved after layout against enabled focus regions; missing, duplicate, or
+out-of-scope targets perform no implicit fallback.
 
 ## Paint-only state changes
 

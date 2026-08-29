@@ -49,7 +49,7 @@ fn collect(
 ) {
     let node_id = tree.node_ids()[*index];
     *index += 1;
-    if element.semantic_hidden {
+    if element.semantic_hidden || !tree.semantic_focus_visible(node_id) {
         *index += descendant_count(element);
         return;
     }
@@ -98,6 +98,12 @@ fn resolved_semantics(
             .interaction
             .as_ref()
             .is_some_and(|interaction| !interaction.enabled);
+        semantics.state.modal = tree.active_modal_scope() == Some(node);
+        return Some(semantics);
+    }
+    if tree.active_modal_scope() == Some(node) {
+        let mut semantics = Semantics::new(Role::Dialog);
+        semantics.state.modal = true;
         return Some(semantics);
     }
     match &element.kind {

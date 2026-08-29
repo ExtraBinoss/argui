@@ -17,6 +17,11 @@ become ordinary `UiEvent`s. The browser adapter maintains real HTML controls
 beside each canvas, patches only changed semantic nodes, and routes focus,
 clicks and edited values into the same action path.
 
+Modal focus scopes publish an AccessKit modal node on native targets and
+`aria-modal` on Web. While a modal is mounted, the semantic snapshot contains
+only the window, the ancestor path to that modal, and its subtree, so hidden
+background controls cannot receive assistive-technology focus.
+
 ## Pointer and gesture contract
 
 `PointerEvent` is shared by mouse, touch and pen. It preserves contact identity,
@@ -42,7 +47,8 @@ The final change retains its exact paint, scroll, or layout invalidation class.
 High contrast is delivered to the application so its theme can choose the
 appropriate palette.
 
-Run the combined keyboard, screen-reader and multitouch laboratory with:
+Run the combined keyboard, modal-focus, screen-reader and multitouch laboratory
+with:
 
 ```sh
 cargo run -p argui --example accessibility

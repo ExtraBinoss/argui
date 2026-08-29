@@ -3,7 +3,7 @@ use argui_accessibility::{
 };
 use argui_core::{Point, Rect, Size};
 use argui_layout::LayoutOutput;
-use argui_ui::{InteractionUpdate, UiEvent, UiEventKind};
+use argui_ui::{FocusRequest, InteractionUpdate, UiEvent, UiEventKind};
 use winit::{event_loop::ActiveEventLoop, window::Window};
 
 #[cfg(target_arch = "wasm32")]
@@ -72,9 +72,16 @@ fn accessibility_action_update(
         .iter()
         .copied()
         .find(|node| node.get() == request.target.get())?;
-    if request.action == SemanticAction::Focus {
+    if matches!(request.action, SemanticAction::Focus | SemanticAction::Blur) {
         return Some(layout.map_or_else(InteractionUpdate::default, |layout| {
-            ui.focus_node(target, &layout.hit_regions)
+            ui.sync_focus(
+                &layout.hit_regions,
+                Some(if request.action == SemanticAction::Focus {
+                    FocusRequest::Focus(target.into())
+                } else {
+                    FocusRequest::Clear
+                }),
+            )
         }));
     }
     Some(InteractionUpdate {

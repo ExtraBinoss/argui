@@ -1,13 +1,14 @@
 use argui::{
     accessibility::{Role, SemanticAction, SemanticValue, Semantics},
+    core::{Key, KeyState},
     paint::{Border, Color, CornerRadii, PaintStyle, QuadStyle},
-    platform::{PlatformEvent, WindowConfig},
+    platform::{ApplicationConfig, ApplicationIdentity, PlatformEvent, WindowConfig},
     render::RendererConfig,
-    runtime::{RuntimeEvent, run_ui},
+    runtime::{Context, Render, RuntimeEvent, run_app},
     text::{TextColor, TextStyle},
     ui::{
-        Align, Button, ButtonStyle, Edges, Element, GestureSet, Interaction, Length, TextInput,
-        TextInputStyle, UiEventKind, UiTree,
+        Align, Button, ButtonStyle, Edges, Element, FocusScope, GestureSet, InitialFocus,
+        Interaction, Length, TextInput, TextInputStyle, UiEvent, UiEventKind,
     },
 };
 
@@ -29,13 +30,13 @@ fn panel() -> PaintStyle {
     )
 }
 
-fn button() -> Element {
+fn button(key: &str, label: &str) -> Element {
     let rest = QuadStyle::solid(Color::rgb(0.10, 0.25, 0.38))
         .border(Border::all(1.0, Color::rgb(0.25, 0.75, 0.95)))
         .radius(CornerRadii::all(10.0));
     Button::new(
-        "announce",
-        "Accessible action",
+        key,
+        label,
         ButtonStyle::new(
             PaintStyle::new(rest.clone()),
             text_style(17.0, TextColor::WHITE, 650),
@@ -103,9 +104,8 @@ fn gesture_surface() -> Element {
     )
 }
 
-fn showcase() -> UiTree {
-    UiTree::new(
-        Element::column([Element::column([
+fn showcase(dialog_open: bool) -> Element {
+    let mut content = vec![Element::column([
             Element::text("Accessibility and touch")
                 .text_style(text_style(
                     38.0,
@@ -122,51 +122,116 @@ fn showcase() -> UiTree {
             )
             .text_style(text_style(17.0, TextColor::WHITE, 450)),
             input(),
-            button(),
+            button("announce", "Accessible action"),
+            button("open-dialog", "Open modal dialog"),
             gesture_surface(),
         ])
         .width(Length::Percent(1.0))
         .max_width(Length::Px(720.0))
         .padding(Edges::all(28.0))
         .gap(18.0)
-        .paint_style(panel())])
+        .paint_style(panel())];
+    if dialog_open {
+        content.push(
+            Element::column([
+                Element::text("Keyboard focus is trapped here").text_style(text_style(
+                    22.0,
+                    TextColor::WHITE,
+                    700,
+                )),
+                Element::text("Tab cycles inside. Escape or the button closes and restores focus.")
+                    .text_style(text_style(16.0, TextColor::WHITE, 450)),
+                button("dismiss-dialog", "Dismiss dialog"),
+            ])
+            .keyed("modal-dialog")
+            .width(Length::Px(460.0))
+            .padding(Edges::all(24.0))
+            .gap(16.0)
+            .paint_style(panel())
+            .z_index(100)
+            .focus_scope(FocusScope::modal(InitialFocus::Target(
+                "dismiss-dialog".into(),
+            )))
+            .semantics(Semantics::new(Role::Dialog).label("Focus demonstration")),
+        );
+    }
+    Element::column(content)
         .width(Length::Percent(1.0))
         .height(Length::Percent(1.0))
         .align(Align::Center)
-        .padding(Edges::all(32.0)),
-    )
+        .padding(Edges::all(32.0))
+}
+
+#[derive(Default)]
+struct AccessibilityDemo {
+    dialog_open: bool,
+}
+
+impl Render for AccessibilityDemo {
+    fn render(&mut self, _cx: &mut Context<Self>) -> Element {
+        showcase(self.dialog_open)
+    }
+
+    fn event(&mut self, event: &UiEvent, cx: &mut Context<Self>) {
+        let close_from_escape = matches!(
+            &event.kind,
+            UiEventKind::KeyInput(input)
+                if input.key == Key::Escape
+                    && input.state == KeyState::Pressed
+                    && !input.repeat
+                    && self.dialog_open
+        );
+        match (event.key.as_deref(), &event.kind) {
+            (Some("open-dialog"), UiEventKind::Clicked) => {
+                self.dialog_open = true;
+                cx.notify();
+            }
+            (Some("dismiss-dialog"), UiEventKind::Clicked) if self.dialog_open => {
+                self.dialog_open = false;
+                cx.notify();
+            }
+            _ if close_from_escape => {
+                self.dialog_open = false;
+                cx.notify();
+            }
+            _ => {}
+        }
+        if matches!(
+            event.kind,
+            UiEventKind::Gesture(_)
+                | UiEventKind::SemanticAction { .. }
+                | UiEventKind::Clicked
+                | UiEventKind::TextChanged(_)
+                | UiEventKind::KeyInput(_)
+        ) {
+            println!(
+                "{}: {:?}",
+                event.key.as_deref().unwrap_or("semantic"),
+                event.kind
+            );
+        }
+    }
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    run_ui(
-        WindowConfig {
-            title: "Argui accessibility and touch".into(),
-            width: 900.0,
-            height: 720.0,
-            ..WindowConfig::default()
-        },
+    run_app(
+        ApplicationConfig::new(
+            ApplicationIdentity::development("Argui accessibility and touch"),
+            WindowConfig {
+                title: "Argui accessibility and touch".into(),
+                width: 900.0,
+                height: 720.0,
+                ..WindowConfig::default()
+            },
+        ),
         RendererConfig::default(),
-        showcase(),
-        |event| match event {
-            RuntimeEvent::Ui(event)
-                if matches!(
-                    event.kind,
-                    UiEventKind::Gesture(_)
-                        | UiEventKind::SemanticAction { .. }
-                        | UiEventKind::Clicked
-                        | UiEventKind::TextChanged(_)
-                ) =>
+        AccessibilityDemo::default(),
+        |event| {
+            if let RuntimeEvent::Platform(PlatformEvent::AccessibilityPreferences(preferences)) =
+                event
             {
-                println!(
-                    "{}: {:?}",
-                    event.key.as_deref().unwrap_or("semantic"),
-                    event.kind
-                );
-            }
-            RuntimeEvent::Platform(PlatformEvent::AccessibilityPreferences(preferences)) => {
                 println!("system accessibility: {preferences:?}");
             }
-            _ => {}
         },
     )?;
     Ok(())

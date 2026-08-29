@@ -3,7 +3,7 @@ use argui_animation::Frame;
 use argui_core::{Point, Rect, Size};
 use argui_inspect::InspectorHandle;
 use argui_paint::{ImageAsset, VectorAsset};
-use argui_ui::{ClipboardRequest, Element, NodeId, UiEvent};
+use argui_ui::{ClipboardRequest, Element, FocusRequest, FocusTarget, NodeId, UiEvent};
 use std::{
     any::Any,
     cell::{Cell, RefCell},
@@ -62,6 +62,7 @@ pub(crate) struct ContextEffects {
     pub(crate) propagation_stopped: bool,
     pub(crate) clipboard: Option<ClipboardRequest>,
     pub(crate) scroll: Option<ScrollRequest>,
+    pub(crate) focus: Option<FocusRequest>,
     pub(crate) commands: Vec<AppCommand>,
     children: Vec<AnyEntity>,
 }
@@ -119,6 +120,16 @@ impl<T: Render> Context<T> {
         self.request_paint();
     }
 
+    pub fn request_focus(&mut self, target: impl Into<FocusTarget>) {
+        self.effects.focus = Some(FocusRequest::Focus(target.into()));
+        self.request_paint();
+    }
+
+    pub fn clear_focus(&mut self) {
+        self.effects.focus = Some(FocusRequest::Clear);
+        self.request_paint();
+    }
+
     pub fn command(&mut self, command: AppCommand) {
         self.effects.commands.push(command);
     }
@@ -157,6 +168,9 @@ impl<T: Render> Context<T> {
         }
         if child.effects.scroll.is_some() {
             self.effects.scroll = child.effects.scroll;
+        }
+        if child.effects.focus.is_some() {
+            self.effects.focus = child.effects.focus;
         }
         self.effects.commands.append(&mut child.effects.commands);
         self.effects.children.append(&mut child.effects.children);
@@ -464,6 +478,9 @@ fn merge_effects(target: &mut ContextEffects, mut source: ContextEffects) {
     }
     if source.scroll.is_some() {
         target.scroll = source.scroll.take();
+    }
+    if source.focus.is_some() {
+        target.focus = source.focus.take();
     }
     target.commands.append(&mut source.commands);
 }

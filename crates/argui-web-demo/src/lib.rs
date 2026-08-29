@@ -25,9 +25,7 @@ pub fn start() -> Result<(), JsValue> {
                 ..WindowConfig::default()
             },
         ),
-        RendererConfig::default().effects(
-            argui_effects::registry().map_err(|error| JsValue::from_str(&error.to_string()))?,
-        ),
+        RendererConfig::default(),
         text_engine(),
         DevtoolsHost::new(StateShowcase::default()),
         |_| {},

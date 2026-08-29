@@ -1,5 +1,5 @@
 use argui_core::{
-    ImeInput, KeyInput, Point, PointerEvent, PointerKind, PointerPhase, ScrollDelta, TextPosition,
+    ImeInput, Point, PointerEvent, PointerKind, PointerPhase, ScrollDelta, TextPosition,
 };
 
 use crate::interaction::{InteractionState, RawUpdate};
@@ -13,8 +13,10 @@ use crate::{
 };
 
 mod animation;
+mod focus;
 mod resolve;
 use animation::AnimationRegistry;
+use focus::FocusRegistry;
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum TreeUpdate {
@@ -39,6 +41,7 @@ pub struct UiTree {
     node_ids: Vec<NodeId>,
     next_node_id: u64,
     interaction: InteractionState,
+    focus: FocusRegistry,
     gestures: GestureArena,
     scroll: ScrollState,
     text_inputs: TextInputStates,
@@ -55,11 +58,13 @@ impl UiTree {
         let mut next_node_id = 1;
         let node_ids = identity::initial_ids(&root, &mut next_node_id);
         let animations = AnimationRegistry::new(&root);
+        let focus = FocusRegistry::new(&root, &node_ids);
         let mut tree = Self {
             root,
             node_ids,
             next_node_id,
             interaction: InteractionState::default(),
+            focus,
             gestures: GestureArena::default(),
             scroll: ScrollState::default(),
             text_inputs: TextInputStates::default(),
@@ -106,11 +111,15 @@ impl UiTree {
         let mut stats = TreeUpdateStats::default();
         let update = classify_update(&self.root, &root, &mut stats);
         self.update_stats = stats;
+        let focused_before = self.interaction.focused();
+        let focused_key = focused_before.and_then(|node| self.key_for(node).map(ToOwned::to_owned));
         match update {
             TreeUpdate::None => return update,
             TreeUpdate::Semantics => {
                 self.root = root;
                 self.sync_animation_registry();
+                self.focus
+                    .sync(&self.root, &self.node_ids, focused_before, None);
             }
             TreeUpdate::Paint | TreeUpdate::Scroll => {
                 self.root = root;
@@ -131,6 +140,15 @@ impl UiTree {
                 self.sync_text_inputs();
                 self.revision = self.revision.wrapping_add(1);
                 self.layout_dirty = true;
+                let removed_focus = focused_before
+                    .filter(|node| !self.node_ids.contains(node))
+                    .map(|target| UiEvent {
+                        target,
+                        key: focused_key,
+                        kind: UiEventKind::Blurred,
+                    });
+                self.focus
+                    .sync(&self.root, &self.node_ids, focused_before, removed_focus);
             }
         }
         update
@@ -261,17 +279,13 @@ impl UiTree {
         self.decorate(update)
     }
 
-    pub fn primary_pressed(&mut self, regions: &[HitRegion]) -> InteractionUpdate {
-        let update = self.interaction.primary_pressed(regions);
-        self.decorate(update)
-    }
-
     pub fn primary_released(&mut self) -> InteractionUpdate {
         let update = self.interaction.primary_released();
         self.decorate(update)
     }
 
     pub fn window_blurred(&mut self) -> InteractionUpdate {
+        self.suspend_focus();
         let update = self.interaction.window_blurred();
         let mut update = self.decorate(update);
         update.events.extend(
@@ -285,27 +299,6 @@ impl UiTree {
                 }),
         );
         update
-    }
-
-    pub fn focus_next(&mut self, regions: &[HitRegion], backwards: bool) -> InteractionUpdate {
-        let update = self.interaction.focus_next(regions, backwards);
-        self.decorate(update)
-    }
-
-    pub fn focus_node(&mut self, node: NodeId, regions: &[HitRegion]) -> InteractionUpdate {
-        let update = self.interaction.focus_node(node, regions);
-        self.decorate(update)
-    }
-
-    pub fn key_input(&mut self, input: &KeyInput) -> InteractionUpdate {
-        let Some(node) = self.interaction.focused() else {
-            return InteractionUpdate::default();
-        };
-        let Some(state) = self.text_inputs.get_mut(node) else {
-            return InteractionUpdate::default();
-        };
-        let result = state.key(input);
-        self.text_input_update(node, result)
     }
 
     pub fn ime_input(&mut self, input: ImeInput) -> InteractionUpdate {

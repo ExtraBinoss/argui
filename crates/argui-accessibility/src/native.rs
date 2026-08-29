@@ -138,6 +138,9 @@ fn lower_node(node: &SemanticNode) -> (NodeId, Node) {
     if node.semantics.state.invalid {
         output.set_invalid(accesskit::Invalid::True);
     }
+    if node.semantics.state.modal {
+        output.set_modal();
+    }
     match node.semantics.live {
         LiveRegion::Off => {}
         LiveRegion::Polite => output.set_live(Live::Polite),

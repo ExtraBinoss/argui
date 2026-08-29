@@ -2,7 +2,7 @@ use web_time::Instant;
 use winit::event_loop::ActiveEventLoop;
 
 use argui_inspect::Invalidation;
-use argui_ui::{InteractionUpdate, TreeUpdate};
+use argui_ui::{FocusRequest, InteractionUpdate, TreeUpdate};
 
 use crate::{RuntimeEvent, ScrollRequest, app::Application};
 
@@ -49,6 +49,7 @@ pub(crate) struct PendingUiFrame {
     scroll: bool,
     paint: bool,
     scroll_request: Option<ScrollRequest>,
+    focus_request: Option<FocusRequest>,
 }
 
 impl PendingUiFrame {
@@ -63,6 +64,12 @@ impl PendingUiFrame {
     pub(super) fn request_scroll(&mut self, request: Option<ScrollRequest>) {
         if request.is_some() {
             self.scroll_request = request;
+        }
+    }
+
+    pub(super) fn request_focus(&mut self, request: Option<FocusRequest>) {
+        if request.is_some() {
+            self.focus_request = request;
         }
     }
 
@@ -89,6 +96,7 @@ impl PendingUiFrame {
             || self.scroll
             || self.paint
             || self.scroll_request.is_some()
+            || self.focus_request.is_some()
     }
 }
 
@@ -198,6 +206,16 @@ impl Application {
         if let Some(request) = pending.scroll_request {
             self.apply_scroll_request(&request.key, request.offset, event_loop);
         }
+        let focus_update = match (&mut self.ui_tree, &self.ui_layout) {
+            (Some(ui), Some(layout)) => ui.sync_focus(&layout.hit_regions, pending.focus_request),
+            _ => InteractionUpdate::default(),
+        };
+        if (!focus_update.events.is_empty() || focus_update.paint_changed)
+            && let Some(window) = self.window.clone()
+        {
+            self.apply_ui_update(focus_update, &window, event_loop);
+            self.update_ime(&window);
+        }
         if tree_update != TreeUpdate::None {
             (self.on_event)(RuntimeEvent::ViewUpdated(tree_update));
         }
@@ -209,7 +227,7 @@ impl Application {
 #[cfg(test)]
 mod tests {
     use argui_core::Point;
-    use argui_ui::InteractionUpdate;
+    use argui_ui::{FocusRequest, InteractionUpdate};
 
     use crate::ScrollRequest;
 
@@ -234,6 +252,8 @@ mod tests {
         let mut pending = PendingUiFrame::default();
         assert!(!pending.needs_frame());
         pending.request_scroll(None);
+        assert!(!pending.needs_frame());
+        pending.request_focus(None);
         assert!(!pending.needs_frame());
 
         let updates = [
@@ -268,6 +288,7 @@ mod tests {
             key: "tree".into(),
             offset: Point::new(0.0, 80.0),
         }));
+        pending.request_focus(Some(FocusRequest::Clear));
         pending.request_layout();
         assert!(pending.needs_frame());
     }

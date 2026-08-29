@@ -6,9 +6,9 @@ mod physics;
 mod popover;
 mod visual;
 
-use animation::{animation_timeline, effect_phase_timeline, motion_tween};
+use animation::{animation_timeline, motion_tween};
 use argui_animation::{Duration, Frame, Inertia, Motion, PlaybackState, Spring, Timeline};
-use argui_core::Transform2D;
+use argui_core::{Key, KeyState, Transform2D};
 use argui_paint::{Border, ClipBehavior, Color, CornerRadii, ImageAsset, PaintStyle, QuadStyle};
 use argui_runtime::{Context, Render, ViewUpdate};
 use argui_text::{TextColor, TextEngine, TextStyle, TextWrap};
@@ -48,9 +48,7 @@ pub struct StateShowcase {
     tooltip_hovered: bool,
     tooltip_visible: bool,
     tooltip_delay: f32,
-    shadow_color: Color,
-    effect_phase: Motion<f32>,
-    shadow_animation: Timeline<Color>,
+    shadow_motion: Motion<Color>,
     images: ShowcaseImages,
 }
 
@@ -66,9 +64,9 @@ enum AnimationCommand {
 impl Default for StateShowcase {
     fn default() -> Self {
         let animated_color = Color::rgb(0.20, 0.68, 0.94);
-        let shadow_color = Color::rgb(0.28, 0.72, 1.0);
-        let effect_phase = Motion::new(0.0);
-        effect_phase.play(effect_phase_timeline());
+        let shadow_color = Color::rgba(0.28, 0.72, 1.0, 0.28);
+        let shadow_motion = Motion::new(shadow_color);
+        shadow_motion.play(shadow_timeline(shadow_color));
         Self {
             count: 0,
             warm: false,
@@ -97,9 +95,7 @@ impl Default for StateShowcase {
             tooltip_hovered: false,
             tooltip_visible: false,
             tooltip_delay: 0.0,
-            shadow_color,
-            effect_phase,
-            shadow_animation: shadow_timeline(shadow_color),
+            shadow_motion,
             images: ShowcaseImages::embedded(),
         }
     }
@@ -202,6 +198,18 @@ impl StateShowcase {
     }
 
     pub fn update(&mut self, event: &UiEvent) -> ViewUpdate {
+        if matches!(
+            &event.kind,
+            UiEventKind::KeyInput(input)
+                if input.key == Key::Escape
+                    && input.state == KeyState::Pressed
+                    && !input.repeat
+                    && self.popover_open
+        ) {
+            self.popover_open = false;
+            self.popover_motion.retarget(0.0);
+            return ViewUpdate::None;
+        }
         if let UiEventKind::Scrolled { offset, .. } = event.kind
             && event.key.as_deref() == Some("million-list")
         {
@@ -319,13 +327,6 @@ impl StateShowcase {
         } else {
             false
         };
-        if self.popover_open && self.shadow_animation.state() == PlaybackState::Idle {
-            self.shadow_animation.restart(frame.now);
-        }
-        let shadow_sample = self.shadow_animation.sample(frame.now);
-        let next_shadow = shadow_sample.value.unwrap_or(self.shadow_color);
-        let shadow_changed = next_shadow != self.shadow_color;
-        self.shadow_color = next_shadow;
         let animation_state_before = self.animation.state();
         let physics_state_before = self.physics_status();
         self.apply_physics_command();
@@ -371,12 +372,7 @@ impl StateShowcase {
         }
         let animation_state_changed = animation_state_before != self.animation.state();
         let physics_state_changed = physics_state_before != self.physics_status();
-        if shadow_changed
-            || animation_state_changed
-            || physics_state_changed
-            || popover_changed
-            || tooltip_changed
-        {
+        if animation_state_changed || physics_state_changed || popover_changed || tooltip_changed {
             ViewUpdate::Rebuild
         } else if animation_changed || physics_changed {
             ViewUpdate::Paint

@@ -1,8 +1,7 @@
 use argui_animation::{Duration, Frame, Time};
 use argui_core::{Affine2D, Point, Rect, ScrollDelta, Size};
-use argui_effects::{ANIMATED_GRADIENT_ID, LIQUID_GLASS_ID, WORLEY_BORDER_FIRE_ID};
 use argui_layout::LayoutEngine;
-use argui_paint::{ClipChain, ClipRegion, Fill};
+use argui_paint::{ClipChain, ClipRegion, Fill, Filter};
 use argui_runtime::{LayoutSnapshot, ViewUpdate};
 use argui_showcase::{StateShowcase, text_engine};
 use argui_text::TextStyle;
@@ -79,16 +78,6 @@ fn shared_showcase_builds_one_tree_and_embeds_its_fonts() {
 
     assert_eq!(app.view().children.len(), 1);
     assert!(text.measure("Argui", &TextStyle::default(), None).width > 0.0);
-    let shader_ids: Vec<_> = argui_effects::registry()
-        .unwrap()
-        .definitions()
-        .iter()
-        .map(|definition| definition.id)
-        .collect();
-    assert_eq!(
-        shader_ids,
-        [WORLEY_BORDER_FIRE_ID, LIQUID_GLASS_ID, ANIMATED_GRADIENT_ID]
-    );
 }
 
 #[test]
@@ -335,6 +324,18 @@ fn effects_popover_is_composed_and_only_animates_while_open() {
     assert_eq!(retained.update(app.view()), argui_ui::TreeUpdate::Layout);
     assert!(app.wants_animation_frame());
     assert!(node_index(&app.view(), "effects-popover") > 0);
+    let view = app.view();
+    let popover = element_by_key(&view, "effects-popover").unwrap();
+    let layer = popover.layer.as_ref().unwrap();
+    let [Filter::Blur(entry_blur)] = layer.filters.as_slice() else {
+        panic!("the popover uses exactly one animated entry blur");
+    };
+    assert!((0.0..5.0).contains(entry_blur));
+    assert_eq!(layer.backdrop_filters, [Filter::Blur(14.0)]);
+    assert_eq!(layer.opacity, 1.0);
+    assert_eq!(layer.shadows.len(), 1);
+    assert_eq!(layer.shadows[0].color.as_array()[3], 0.28);
+    assert_eq!(popover.bindings.len(), 1);
 
     assert_eq!(
         app.animation_frame(Frame {

@@ -24,7 +24,6 @@ argui-ui.workspace = true
 argui-vector.workspace = true
 
 [dev-dependencies]
-argui-effects = { workspace = true, features = ["artistic"] }
 argui-showcase.workspace = true
 
 [lints]

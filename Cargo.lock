@@ -211,7 +211,6 @@ dependencies = [
  "argui-animation",
  "argui-core",
  "argui-devtools",
- "argui-effects",
  "argui-layout",
  "argui-paint",
  "argui-platform",
@@ -379,7 +378,6 @@ version = "0.1.0"
 dependencies = [
  "argui-animation",
  "argui-core",
- "argui-effects",
  "argui-image",
  "argui-layout",
  "argui-paint",
@@ -436,7 +434,6 @@ version = "0.1.0"
 dependencies = [
  "argui",
  "argui-devtools",
- "argui-effects",
  "argui-showcase",
  "wasm-bindgen",
 ]

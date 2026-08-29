@@ -283,6 +283,7 @@ impl Application {
     ) {
         let mut clipboard = update.clipboard.clone();
         let mut scroll_request = None;
+        let mut focus_request = None;
         let mut rebuild = false;
         for event in &update.events {
             if let Some(model) = &self.model {
@@ -299,12 +300,16 @@ impl Application {
                 if effects.scroll.is_some() {
                     scroll_request = effects.scroll;
                 }
+                if effects.focus.is_some() {
+                    focus_request = effects.focus;
+                }
             }
             (self.on_event)(RuntimeEvent::Ui(event.clone()));
         }
         let animation_changed = self.sync_animations();
         self.pending_ui_frame.merge(&update, rebuild);
         self.pending_ui_frame.request_scroll(scroll_request);
+        self.pending_ui_frame.request_focus(focus_request);
         if self.pending_ui_frame.needs_frame() || animation_changed {
             window.request_redraw();
         }
@@ -503,6 +508,11 @@ impl Application {
             ui.scrollbar_released();
             let update = ui.window_blurred();
             self.apply_ui_update(update, window, event_loop);
+        }
+        if focused && let (Some(ui), Some(layout)) = (&mut self.ui_tree, &self.ui_layout) {
+            let update = ui.window_focused(&layout.hit_regions);
+            self.apply_ui_update(update, window, event_loop);
+            self.update_ime(window);
         }
     }
 }

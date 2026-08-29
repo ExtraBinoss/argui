@@ -1,4 +1,4 @@
-use argui_core::{Affine2D, Point, Rect};
+use argui_core::{Affine2D, KeyInput, Point, Rect};
 use argui_paint::{ClipChain, QuadStyle};
 
 use crate::{CursorIcon, GestureSet};
@@ -26,6 +26,14 @@ pub enum VisualState {
     Focused,
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum KeyboardActivation {
+    #[default]
+    None,
+    Enter,
+    EnterOrSpace,
+}
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct InteractionStyles {
     pub hovered: Option<QuadStyle>,
@@ -40,6 +48,7 @@ pub struct Interaction {
     pub cursor: CursorIcon,
     pub styles: InteractionStyles,
     pub gestures: GestureSet,
+    pub keyboard_activation: KeyboardActivation,
 }
 
 impl Default for Interaction {
@@ -50,6 +59,7 @@ impl Default for Interaction {
             cursor: CursorIcon::Auto,
             styles: InteractionStyles::default(),
             gestures: GestureSet::NONE,
+            keyboard_activation: KeyboardActivation::None,
         }
     }
 }
@@ -75,6 +85,7 @@ impl Interaction {
                 focused: None,
             },
             gestures: GestureSet::NONE,
+            keyboard_activation: KeyboardActivation::None,
         }
     }
 
@@ -93,6 +104,12 @@ impl Interaction {
     #[must_use]
     pub const fn gestures(mut self, gestures: GestureSet) -> Self {
         self.gestures = gestures;
+        self
+    }
+
+    #[must_use]
+    pub const fn keyboard_activation(mut self, activation: KeyboardActivation) -> Self {
+        self.keyboard_activation = activation;
         self
     }
 
@@ -155,6 +172,7 @@ pub enum UiEventKind {
     Pressed,
     Released,
     Clicked,
+    KeyInput(KeyInput),
     Scrolled {
         delta: Point,
         offset: Point,
@@ -218,6 +236,7 @@ impl RawUpdate {
 pub(crate) struct InteractionState {
     hovered: Option<NodeId>,
     pressed: Option<NodeId>,
+    keyboard_pressed: Option<NodeId>,
     focused: Option<NodeId>,
     captured: Option<NodeId>,
 }
@@ -227,7 +246,7 @@ impl InteractionState {
         self.focused
     }
     pub fn visual_state(&self, node: NodeId) -> VisualState {
-        if self.pressed == Some(node) {
+        if self.pressed == Some(node) || self.keyboard_pressed == Some(node) {
             VisualState::Pressed
         } else if self.hovered == Some(node) {
             VisualState::Hovered
@@ -280,6 +299,7 @@ impl InteractionState {
             .is_some_and(|region| region.focusable)
             && self.focused != Some(target)
         {
+            self.release_keyboard(&mut update, false);
             if let Some(previous) = self.focused.replace(target) {
                 update.push(previous, UiEventKind::Blurred);
             }
@@ -333,6 +353,7 @@ impl InteractionState {
         if self.focused == Some(next) {
             return update;
         }
+        self.release_keyboard(&mut update, false);
         if let Some(previous) = self.focused.replace(next) {
             update.push(previous, UiEventKind::Blurred);
         }
@@ -351,11 +372,45 @@ impl InteractionState {
             return RawUpdate::default();
         }
         let mut update = RawUpdate::default();
+        self.release_keyboard(&mut update, false);
         if let Some(previous) = self.focused.replace(node) {
             update.push(previous, UiEventKind::Blurred);
         }
         update.push(node, UiEventKind::Focused);
         update.paint_changed = true;
+        update
+    }
+
+    pub fn clear_focus(&mut self) -> RawUpdate {
+        let mut update = RawUpdate::default();
+        self.release_keyboard(&mut update, false);
+        if let Some(target) = self.focused.take() {
+            update.push(target, UiEventKind::Blurred);
+            update.paint_changed = true;
+        }
+        update
+    }
+
+    pub fn keyboard_pressed(&mut self, node: NodeId) -> RawUpdate {
+        let mut update = RawUpdate::default();
+        if self.keyboard_pressed.replace(node) != Some(node) {
+            update.push(node, UiEventKind::Pressed);
+            update.paint_changed = true;
+        }
+        update
+    }
+
+    pub fn keyboard_released(&mut self, activate: bool) -> RawUpdate {
+        let mut update = RawUpdate::default();
+        self.release_keyboard(&mut update, activate);
+        update
+    }
+
+    pub fn keyboard_clicked(&mut self, node: NodeId) -> RawUpdate {
+        let mut update = RawUpdate::default();
+        update.push(node, UiEventKind::Pressed);
+        update.push(node, UiEventKind::Clicked);
+        update.push(node, UiEventKind::Released);
         update
     }
 
@@ -365,6 +420,7 @@ impl InteractionState {
             update.push(target, UiEventKind::Released);
             update.paint_changed = true;
         }
+        self.release_keyboard(&mut update, false);
         self.captured = None;
         if let Some(target) = self.focused.take() {
             update.push(target, UiEventKind::Blurred);
@@ -381,11 +437,24 @@ impl InteractionState {
         if !exists(self.pressed) {
             self.pressed = None;
         }
+        if !exists(self.keyboard_pressed) {
+            self.keyboard_pressed = None;
+        }
         if !exists(self.focused) {
             self.focused = None;
         }
         if !exists(self.captured) {
             self.captured = None;
+        }
+    }
+
+    fn release_keyboard(&mut self, update: &mut RawUpdate, activate: bool) {
+        if let Some(target) = self.keyboard_pressed.take() {
+            update.push(target, UiEventKind::Released);
+            if activate && self.focused == Some(target) {
+                update.push(target, UiEventKind::Clicked);
+            }
+            update.paint_changed = true;
         }
     }
 }

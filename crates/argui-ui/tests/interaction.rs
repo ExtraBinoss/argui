@@ -1,5 +1,6 @@
 use argui_core::{
-    Affine2D, Point, PointerButton, PointerEvent, PointerId, PointerKind, PointerPhase, Rect, Size,
+    Affine2D, Key, KeyInput, KeyState, Modifiers, Point, PointerButton, PointerEvent, PointerId,
+    PointerKind, PointerPhase, Rect, Size,
 };
 use argui_paint::{ClipChain, ClipRegion, Color, QuadStyle};
 use argui_ui::{
@@ -127,13 +128,23 @@ fn tab_focus_wraps_in_both_directions() {
     let second = tree.node_id_at(2).unwrap();
     let regions = [region_at(first, 10.0, true), region_at(second, 100.0, true)];
 
-    tree.focus_next(&regions, false);
+    let tab = |shift| KeyInput {
+        key: Key::Tab,
+        state: KeyState::Pressed,
+        text: None,
+        repeat: false,
+        modifiers: Modifiers {
+            shift,
+            ..Modifiers::default()
+        },
+    };
+    tree.key_input(&tab(false), &regions);
     assert_eq!(tree.focused_node(), Some(first));
-    tree.focus_next(&regions, false);
+    tree.key_input(&tab(false), &regions);
     assert_eq!(tree.focused_node(), Some(second));
-    tree.focus_next(&regions, false);
+    tree.key_input(&tab(false), &regions);
     assert_eq!(tree.focused_node(), Some(first));
-    tree.focus_next(&regions, true);
+    tree.key_input(&tab(true), &regions);
     assert_eq!(tree.focused_node(), Some(second));
 }
 
