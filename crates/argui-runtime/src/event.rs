@@ -63,20 +63,34 @@ impl RuntimeEvent {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub(crate) enum UserEvent {
+    Preferences {
+        window: WindowKey,
+        preferences: argui_platform::AccessibilityPreferences,
+    },
     #[cfg(target_arch = "wasm32")]
     ClipboardText { window: WindowKey, text: String },
+    #[cfg(target_arch = "wasm32")]
+    Accessibility {
+        window: WindowKey,
+        request: argui_accessibility::SemanticRequest,
+    },
+    #[cfg(not(target_arch = "wasm32"))]
+    AccessKit(accesskit_winit::Event),
     #[cfg(all(feature = "tray", not(target_arch = "wasm32")))]
     Tray(TrayEvent),
 }
 
 impl Application {
-    #[cfg(target_arch = "wasm32")]
     pub(crate) fn set_event_proxy(&mut self, proxy: EventLoopProxy<UserEvent>) {
         self.event_proxy = Some(proxy);
     }
+}
 
-    #[cfg(not(target_arch = "wasm32"))]
-    pub(crate) fn set_event_proxy(&mut self, _proxy: EventLoopProxy<UserEvent>) {}
+#[cfg(not(target_arch = "wasm32"))]
+impl From<accesskit_winit::Event> for UserEvent {
+    fn from(event: accesskit_winit::Event) -> Self {
+        Self::AccessKit(event)
+    }
 }

@@ -6,6 +6,7 @@ rust-version.workspace = true
 license.workspace = true
 
 [dependencies]
+argui-accessibility.workspace = true
 argui-animation.workspace = true
 argui-core.workspace = true
 argui-paint.workspace = true

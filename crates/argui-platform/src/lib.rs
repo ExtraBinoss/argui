@@ -8,23 +8,27 @@ mod event;
 mod identity;
 #[cfg(all(feature = "tray", not(target_arch = "wasm32")))]
 mod native_tray;
+mod preferences;
 mod tray;
 #[cfg(target_arch = "wasm32")]
 mod web_identity;
 mod window;
 
 pub use application::{ApplicationConfig, ApplicationConfigError};
+pub use argui_core::{PointerButton, PointerEvent, PointerId, PointerKind, PointerPhase};
 pub use clipboard::{Clipboard, ClipboardError};
 pub use error::PlatformError;
 pub use event::{
-    ButtonState, ImeInput, Key, KeyInput, KeyState, Modifiers, PlatformEvent, PointerButton,
-    ScrollDelta,
+    ButtonState, ImeInput, Key, KeyInput, KeyState, Modifiers, PlatformEvent, ScrollDelta,
 };
 pub use identity::{
     AppIcon, AppIconError, ApplicationId, ApplicationIdError, ApplicationIdentity, IconSet,
 };
 #[cfg(all(feature = "tray", not(target_arch = "wasm32")))]
 pub use native_tray::{NativeTray, TrayEventHandler};
+pub use preferences::{
+    AccessibilityOverrides, AccessibilityPreferences, PreferenceSource, ResolvedPreference,
+};
 pub use tray::{
     TrayAction, TrayConfig, TrayConfigError, TrayEvent, TrayItemId, TrayMenuItem, TrayPointerButton,
 };

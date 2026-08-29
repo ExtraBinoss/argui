@@ -1,7 +1,10 @@
 use argui_paint::{PaintStyle, QuadStyle};
 use argui_text::{TextStyle, TextWrap};
 
-use crate::{Align, CursorIcon, Edges, Element, Interaction, LayoutStyle, Length};
+use crate::{
+    Align, CursorIcon, Edges, Element, GestureSet, Interaction, LayoutStyle, Length, Role,
+    SemanticAction, Semantics,
+};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ButtonStyle {
@@ -80,13 +83,21 @@ impl Button {
         let interaction = Interaction::default()
             .focusable(true)
             .cursor(CursorIcon::Pointer)
+            .gestures(GestureSet::NONE.tap())
             .hovered(self.style.hovered)
             .pressed(self.style.pressed)
             .focused(self.style.focused);
-        Element::container([Element::text(self.label).text_style(self.style.label)])
-            .keyed(self.key)
-            .layout_style(self.style.layout)
-            .paint_style(self.style.paint)
-            .interaction(interaction)
+        let semantics = Semantics::new(Role::Button)
+            .label(self.label.clone())
+            .action(SemanticAction::Click)
+            .action(SemanticAction::Focus);
+        Element::container([Element::text(self.label)
+            .text_style(self.style.label)
+            .semantic_hidden(true)])
+        .keyed(self.key)
+        .layout_style(self.style.layout)
+        .paint_style(self.style.paint)
+        .interaction(interaction)
+        .semantics(semantics)
     }
 }

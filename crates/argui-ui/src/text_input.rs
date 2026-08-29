@@ -4,7 +4,8 @@ use argui_text::{TextColor, TextStyle, TextWrap};
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::{
-    Align, CursorIcon, Edges, Element, ElementKind, Interaction, LayoutStyle, Length, NodeId,
+    Align, CursorIcon, Edges, Element, ElementKind, GestureSet, Interaction, LayoutStyle, Length,
+    NodeId, Role, SemanticAction, SemanticValue, Semantics,
 };
 
 #[derive(Clone, Debug, PartialEq)]
@@ -97,9 +98,15 @@ impl TextInput {
         let interaction = Interaction::default()
             .focusable(true)
             .cursor(CursorIcon::Text)
+            .gestures(GestureSet::NONE.tap().pan())
             .hovered(self.style.hovered)
             .focused(self.style.focused);
-        let mut element = Element::container([]);
+        let semantics = Semantics::new(Role::TextInput)
+            .label(self.placeholder.clone())
+            .value(SemanticValue::Text(self.initial_value.clone()))
+            .action(SemanticAction::Focus)
+            .action(SemanticAction::SetValue);
+        let mut element = Element::container([]).semantics(semantics);
         element.key = Some(self.key);
         element.kind = ElementKind::TextInput {
             initial_value: self.initial_value,

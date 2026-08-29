@@ -1,0 +1,35 @@
+[package]
+name = "argui-accessibility"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+argui-core.workspace = true
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+accesskit.workspace = true
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen.workspace = true
+web-sys = { workspace = true, features = [
+    "CssStyleDeclaration",
+    "Document",
+    "DomRect",
+    "Element",
+    "Event",
+    "EventTarget",
+    "HtmlCanvasElement",
+    "HtmlElement",
+    "HtmlInputElement",
+    "KeyboardEvent",
+    "Node",
+    "Window",
+] }
+
+[dev-dependencies]
+accesskit_consumer.workspace = true
+
+[lints]
+workspace = true

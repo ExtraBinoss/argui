@@ -1,7 +1,7 @@
 use argui_core::{Affine2D, Point, Rect};
 use argui_paint::{ClipChain, QuadStyle};
 
-use crate::CursorIcon;
+use crate::{CursorIcon, GestureSet};
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct NodeId(u64);
@@ -39,6 +39,7 @@ pub struct Interaction {
     pub focusable: bool,
     pub cursor: CursorIcon,
     pub styles: InteractionStyles,
+    pub gestures: GestureSet,
 }
 
 impl Default for Interaction {
@@ -48,6 +49,7 @@ impl Default for Interaction {
             focusable: false,
             cursor: CursorIcon::Auto,
             styles: InteractionStyles::default(),
+            gestures: GestureSet::NONE,
         }
     }
 }
@@ -72,6 +74,7 @@ impl Interaction {
                 pressed: None,
                 focused: None,
             },
+            gestures: GestureSet::NONE,
         }
     }
 
@@ -84,6 +87,12 @@ impl Interaction {
     #[must_use]
     pub const fn cursor(mut self, cursor: CursorIcon) -> Self {
         self.cursor = cursor;
+        self
+    }
+
+    #[must_use]
+    pub const fn gestures(mut self, gestures: GestureSet) -> Self {
+        self.gestures = gestures;
         self
     }
 
@@ -125,6 +134,7 @@ pub struct HitRegion {
     pub clips: ClipChain,
     pub focusable: bool,
     pub cursor: CursorIcon,
+    pub gestures: GestureSet,
 }
 
 impl HitRegion {
@@ -145,11 +155,19 @@ pub enum UiEventKind {
     Pressed,
     Released,
     Clicked,
-    Scrolled { delta: Point, offset: Point },
+    Scrolled {
+        delta: Point,
+        offset: Point,
+    },
     Focused,
     Blurred,
     TextChanged(String),
     Submitted(String),
+    Gesture(crate::GestureEvent),
+    SemanticAction {
+        action: crate::SemanticAction,
+        value: Option<crate::SemanticValue>,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -167,6 +185,19 @@ pub struct InteractionUpdate {
     pub layout_changed: bool,
     pub text_input_changed: bool,
     pub clipboard: Option<crate::ClipboardRequest>,
+}
+
+impl InteractionUpdate {
+    pub fn merge(&mut self, other: Self) {
+        self.events.extend(other.events);
+        self.paint_changed |= other.paint_changed;
+        self.scroll_changed |= other.scroll_changed;
+        self.layout_changed |= other.layout_changed;
+        self.text_input_changed |= other.text_input_changed;
+        if other.clipboard.is_some() {
+            self.clipboard = other.clipboard;
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -270,6 +301,15 @@ impl InteractionState {
         update
     }
 
+    pub fn primary_cancelled(&mut self) -> RawUpdate {
+        let mut update = RawUpdate::default();
+        if let Some(target) = self.captured.take() {
+            update.push(target, UiEventKind::Released);
+        }
+        update.paint_changed = self.pressed.take().is_some();
+        update
+    }
+
     pub fn focus_next(&mut self, regions: &[HitRegion], backwards: bool) -> RawUpdate {
         let focusable = regions
             .iter()
@@ -298,6 +338,23 @@ impl InteractionState {
         }
         self.focused = Some(next);
         update.push(next, UiEventKind::Focused);
+        update.paint_changed = true;
+        update
+    }
+
+    pub fn focus_node(&mut self, node: NodeId, regions: &[HitRegion]) -> RawUpdate {
+        if !regions
+            .iter()
+            .any(|region| region.node == node && region.focusable)
+            || self.focused == Some(node)
+        {
+            return RawUpdate::default();
+        }
+        let mut update = RawUpdate::default();
+        if let Some(previous) = self.focused.replace(node) {
+            update.push(previous, UiEventKind::Blurred);
+        }
+        update.push(node, UiEventKind::Focused);
         update.paint_changed = true;
         update
     }

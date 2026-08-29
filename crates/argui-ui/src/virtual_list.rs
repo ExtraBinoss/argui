@@ -103,6 +103,7 @@ fn spacer(height: f32) -> Element {
     Element::container([])
         .height(Length::Px(height))
         .shrink(0.0)
+        .semantic_hidden(true)
 }
 
 /// A virtual list whose rows can report their real height after layout.

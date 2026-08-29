@@ -26,6 +26,8 @@ collaboration. `argui-core` contains dependency-light shared primitives, and
 ## Crate boundaries
 
 - `argui-core`: stable geometry and shared IDs/events as they become necessary.
+- `argui-accessibility`: renderer-independent semantics, incremental tree
+  patches, AccessKit lowering, and the browser semantic DOM adapter.
 - `argui-platform`: `winit` window lifecycle, input, IME, clipboard hooks, and
   native/web surface handles, application identity, and optional native tray.
 - `argui-layout`: the narrow adapter from UI style/tree data to `taffy`.
@@ -88,6 +90,11 @@ Winit pointer and focus events are translated by `argui-platform`; the runtime
 normalizes coordinates and dispatches them through `argui-ui`. Stable node IDs,
 clipped reverse-order hit testing, focus, and pointer capture remain independent
 from WGPU. Application events include the stable ID and optional element key.
+
+Semantic nodes reuse those stable IDs. Native AccessKit and the browser DOM are
+updated from semantic diffs after UI dispatch; semantic-only mutations never
+invalidate Taffy or paint. Pointer contacts use one mouse/touch/pen event schema,
+and the UI gesture arena remains independent from both platform and renderer.
 
 Hover, press, and focus select a `QuadStyle`, which excludes layout and clipping.
 The layout engine can therefore rebuild only the display list for these state

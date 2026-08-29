@@ -1,7 +1,7 @@
 use argui_text::TextStyle;
 use argui_ui::{
     Border, ClipBehavior, Color, CornerRadii, Direction, Element, ElementKind, Interaction,
-    LayerStyle, Length, TreeUpdate, UiTree, VectorId,
+    LayerStyle, Length, Role, ScrollConfig, Semantics, TreeUpdate, UiTree, VectorId,
 };
 
 #[test]
@@ -129,4 +129,51 @@ fn one_changed_branch_skips_large_shared_siblings() {
         tree.update_stats()
     );
     assert_eq!(tree.update_stats().shared_subtrees, 1);
+}
+
+#[test]
+fn update_classification_covers_empty_semantic_visual_and_structural_paths() {
+    let base = Element::container([]);
+    let mut tree = UiTree::new(base.clone());
+    let mut equal_copy = base.clone();
+    equal_copy.inspectable = true;
+    assert_eq!(tree.update(equal_copy), TreeUpdate::None);
+    assert_eq!(
+        tree.update(base.clone().semantics(Semantics::new(Role::Group))),
+        TreeUpdate::Semantics
+    );
+    assert_eq!(
+        tree.update(base.clone().semantic_hidden(true)),
+        TreeUpdate::Semantics
+    );
+    assert_eq!(
+        tree.update(base.clone().background(Color::WHITE)),
+        TreeUpdate::Paint
+    );
+    assert_eq!(
+        tree.update(base.clone().clip(ClipBehavior::Bounds)),
+        TreeUpdate::Layout
+    );
+    assert_eq!(
+        tree.update(base.clone().scrollable(ScrollConfig::default())),
+        TreeUpdate::Layout
+    );
+    assert_eq!(
+        tree.update(Element::image(argui_ui::ImageId(1))),
+        TreeUpdate::Layout
+    );
+    assert_eq!(
+        UiTree::new(Element::text("old")).update(Element::text("new")),
+        TreeUpdate::Layout
+    );
+    assert_eq!(
+        UiTree::new(Element::image(argui_ui::ImageId(1)))
+            .update(Element::image(argui_ui::ImageId(2))),
+        TreeUpdate::Paint
+    );
+    assert_eq!(
+        UiTree::new(Element::container([Element::text("old")]))
+            .update(Element::container([Element::text("new")])),
+        TreeUpdate::Layout
+    );
 }

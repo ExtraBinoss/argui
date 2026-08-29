@@ -128,6 +128,8 @@ impl MultiApplication {
             callback,
         )
         .identified(self.config.identity.clone(), key.clone())
+        .initially_visible(spec.visible)
+        .accessibility_overrides(self.config.accessibility)
         .shared_renderer_device(Rc::clone(&self.renderer_device));
         if let Some(proxy) = &self.event_proxy {
             runtime.set_event_proxy(proxy.clone());
@@ -136,11 +138,6 @@ impl MultiApplication {
         let Some(window_id) = runtime.window_id() else {
             return;
         };
-        if !spec.visible
-            && let Some(window) = runtime.window()
-        {
-            window.set_visible(false);
-        }
         #[cfg(target_arch = "wasm32")]
         if let Some(window) = runtime.window()
             && let Err(error) = argui_platform::attach_web_canvas(
@@ -149,6 +146,10 @@ impl MultiApplication {
                 spec.window.web_parent_id.as_deref(),
             )
         {
+            self.emit(RuntimeEvent::CommandFailed(error));
+        }
+        #[cfg(target_arch = "wasm32")]
+        if let Err(error) = runtime.initialize_web_accessibility() {
             self.emit(RuntimeEvent::CommandFailed(error));
         }
         self.by_winit.insert(window_id, key.clone());
@@ -332,10 +333,31 @@ impl ApplicationHandler<UserEvent> for MultiApplication {
     fn user_event(&mut self, event_loop: &ActiveEventLoop, event: UserEvent) {
         let _ = event_loop;
         match event {
+            UserEvent::Preferences { ref window, .. } => {
+                if let Some(entry) = self.windows.get_mut(window) {
+                    entry.runtime.user_event(event_loop, event);
+                }
+            }
             #[cfg(target_arch = "wasm32")]
             UserEvent::ClipboardText { ref window, .. } => {
                 if let Some(entry) = self.windows.get_mut(window) {
                     entry.runtime.user_event(event_loop, event);
+                }
+            }
+            #[cfg(target_arch = "wasm32")]
+            UserEvent::Accessibility { ref window, .. } => {
+                if let Some(entry) = self.windows.get_mut(window) {
+                    entry.runtime.user_event(event_loop, event);
+                }
+            }
+            #[cfg(not(target_arch = "wasm32"))]
+            UserEvent::AccessKit(event) => {
+                if let Some(key) = self.by_winit.get(&event.window_id).cloned()
+                    && let Some(entry) = self.windows.get_mut(&key)
+                {
+                    entry
+                        .runtime
+                        .user_event(event_loop, UserEvent::AccessKit(event));
                 }
             }
             #[cfg(all(feature = "tray", not(target_arch = "wasm32")))]

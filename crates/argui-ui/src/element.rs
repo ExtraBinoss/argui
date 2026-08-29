@@ -1,3 +1,4 @@
+use argui_accessibility::Semantics;
 use argui_core::{Transform2D, TransformOrigin};
 use argui_paint::{
     Border, ClipBehavior, Color, CornerRadii, Fill, ImageFit, ImageId, ImageSampling, LayerStyle,
@@ -53,6 +54,8 @@ pub struct ElementNode {
     pub transform: Transform2D,
     pub transform_origin: TransformOrigin,
     pub interaction: Option<Interaction>,
+    pub semantics: Option<Semantics>,
+    pub semantic_hidden: bool,
     pub transition: Option<crate::Transition>,
     pub layer: Option<LayerStyle>,
     pub effects: Vec<ScopedEffect>,
@@ -94,6 +97,8 @@ impl Element {
             transform: Transform2D::IDENTITY,
             transform_origin: TransformOrigin::CENTER,
             interaction: None,
+            semantics: None,
+            semantic_hidden: false,
             transition: None,
             layer: None,
             effects: Vec::new(),
@@ -128,6 +133,8 @@ impl Element {
             transform: Transform2D::IDENTITY,
             transform_origin: TransformOrigin::CENTER,
             interaction: None,
+            semantics: None,
+            semantic_hidden: false,
             transition: None,
             layer: None,
             effects: Vec::new(),
@@ -384,6 +391,18 @@ impl Element {
     #[must_use]
     pub fn interaction(mut self, interaction: Interaction) -> Self {
         self.interaction = Some(interaction);
+        self
+    }
+
+    #[must_use]
+    pub fn semantics(mut self, semantics: Semantics) -> Self {
+        self.semantics = Some(semantics);
+        self
+    }
+
+    #[must_use]
+    pub fn semantic_hidden(mut self, hidden: bool) -> Self {
+        self.semantic_hidden = hidden;
         self
     }
 

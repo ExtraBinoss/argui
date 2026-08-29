@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use argui_core::Point;
+use argui_core::{Point, PointerEvent, PointerId, PointerKind, PointerPhase};
 use argui_platform::{PlatformError, PlatformEvent, PointerButton};
 use winit::{
     application::ApplicationHandler, event::WindowEvent, event_loop::ActiveEventLoop,
@@ -11,7 +11,8 @@ use crate::{
     RuntimeEvent,
     event::UserEvent,
     translate::{
-        button_state, ime_input, key_input, modifiers_state, pointer_button, scroll_delta,
+        button_state, ime_input, key_input, modifiers_state, pointer_button, pointer_button_mask,
+        pointer_phase, scroll_delta,
     },
 };
 
@@ -31,6 +32,8 @@ impl ApplicationHandler<UserEvent> for Application {
                     .into_attributes_with_identity(identity)
             },
         );
+        #[cfg(not(target_arch = "wasm32"))]
+        let attributes = attributes.with_visible(false);
         match event_loop.create_window(attributes) {
             Ok(window) => {
                 let window = Arc::new(window);
@@ -40,13 +43,23 @@ impl ApplicationHandler<UserEvent> for Application {
                 if !self.prepare_or_exit(event_loop) {
                     return;
                 }
+                #[cfg(not(target_arch = "wasm32"))]
+                self.initialize_accessibility(event_loop, &window);
                 (self.on_event)(RuntimeEvent::Platform(PlatformEvent::Opened {
                     width: size.width,
                     height: size.height,
                     scale_factor: window.scale_factor(),
                 }));
                 self.initialize_renderer(&window, event_loop);
+                window.set_visible(self.initial_visible);
                 self.window = Some(window);
+                self.initialize_preferences();
+                #[cfg(target_arch = "wasm32")]
+                if self.exit_on_close
+                    && let Err(error) = self.initialize_web_accessibility()
+                {
+                    (self.on_event)(RuntimeEvent::CommandFailed(error));
+                }
             }
             Err(error) => {
                 (self.on_event)(RuntimeEvent::Platform(PlatformEvent::WindowCreationFailed(
@@ -63,10 +76,26 @@ impl ApplicationHandler<UserEvent> for Application {
     }
 
     fn user_event(&mut self, event_loop: &ActiveEventLoop, event: UserEvent) {
+        if let UserEvent::Preferences {
+            window,
+            preferences,
+        } = &event
+        {
+            if *window == self.window_key {
+                self.apply_preferences(*preferences);
+            }
+            return;
+        }
         #[cfg(not(target_arch = "wasm32"))]
         {
-            let _ = event_loop;
             match event {
+                UserEvent::Preferences { .. } => {}
+                UserEvent::AccessKit(event) => {
+                    let Some(window) = self.window.as_ref().map(Arc::clone) else {
+                        return;
+                    };
+                    self.accessibility_event(event, &window, event_loop);
+                }
                 #[cfg(feature = "tray")]
                 UserEvent::Tray(_) => {}
             }
@@ -77,6 +106,7 @@ impl ApplicationHandler<UserEvent> for Application {
                 return;
             };
             match event {
+                UserEvent::Preferences { .. } => {}
                 UserEvent::ClipboardText {
                     window: window_key,
                     text,
@@ -87,6 +117,14 @@ impl ApplicationHandler<UserEvent> for Application {
                     if let Some(ui) = &mut self.ui_tree {
                         let update = ui.paste_text(&text);
                         self.apply_ui_update(update, &window, event_loop);
+                    }
+                }
+                UserEvent::Accessibility {
+                    window: window_key,
+                    request,
+                } => {
+                    if window_key == self.window_key {
+                        self.web_accessibility_action(request, &window, event_loop);
                     }
                 }
             }
@@ -104,6 +142,10 @@ impl ApplicationHandler<UserEvent> for Application {
         };
         if window.id() != window_id {
             return;
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(adapter) = &mut self.accessibility {
+            adapter.process_event(&window, &event);
         }
         let platform_event = match event {
             WindowEvent::CloseRequested => PlatformEvent::CloseRequested,
@@ -129,23 +171,70 @@ impl ApplicationHandler<UserEvent> for Application {
                     position.y as f32 / self.scale_factor,
                 );
                 self.pointer_moved(point, &window, event_loop);
-                PlatformEvent::PointerMoved {
-                    x: point.x,
-                    y: point.y,
-                }
+                PlatformEvent::Pointer(PointerEvent {
+                    buttons: self.pointer_buttons,
+                    timestamp: self.input_epoch.elapsed(),
+                    ..PointerEvent::mouse(PointerPhase::Moved, point)
+                })
             }
-            WindowEvent::CursorEntered { .. } => PlatformEvent::PointerEntered,
+            WindowEvent::CursorEntered { .. } => PlatformEvent::Pointer(PointerEvent {
+                buttons: self.pointer_buttons,
+                timestamp: self.input_epoch.elapsed(),
+                ..PointerEvent::mouse(PointerPhase::Entered, self.pointer.unwrap_or_default())
+            }),
             WindowEvent::CursorLeft { .. } => {
+                let point = self.pointer.unwrap_or_default();
                 self.pointer_left(&window, event_loop);
-                PlatformEvent::PointerLeft
+                PlatformEvent::Pointer(PointerEvent {
+                    buttons: self.pointer_buttons,
+                    timestamp: self.input_epoch.elapsed(),
+                    ..PointerEvent::mouse(PointerPhase::Left, point)
+                })
             }
             WindowEvent::MouseInput { state, button, .. } => {
                 let state = button_state(state);
                 let button = pointer_button(button);
+                let mask = pointer_button_mask(button);
+                match state {
+                    argui_platform::ButtonState::Pressed => self.pointer_buttons |= mask,
+                    argui_platform::ButtonState::Released => self.pointer_buttons &= !mask,
+                }
                 if button == PointerButton::Primary {
                     self.primary_button(state, &window, event_loop);
                 }
-                PlatformEvent::PointerButton { button, state }
+                PlatformEvent::Pointer(PointerEvent {
+                    phase: if state == argui_platform::ButtonState::Pressed {
+                        PointerPhase::Pressed
+                    } else {
+                        PointerPhase::Released
+                    },
+                    button: Some(button),
+                    buttons: self.pointer_buttons,
+                    timestamp: self.input_epoch.elapsed(),
+                    ..PointerEvent::mouse(PointerPhase::Moved, self.pointer.unwrap_or_default())
+                })
+            }
+            WindowEvent::Touch(touch) => {
+                let point = Point::new(
+                    touch.location.x as f32 / self.scale_factor,
+                    touch.location.y as f32 / self.scale_factor,
+                );
+                let event = PointerEvent {
+                    id: PointerId::new(touch.id.saturating_add(1)),
+                    kind: PointerKind::Touch,
+                    phase: pointer_phase(touch.phase),
+                    position: point,
+                    button: Some(PointerButton::Primary),
+                    buttons: u16::from(!matches!(
+                        touch.phase,
+                        winit::event::TouchPhase::Ended | winit::event::TouchPhase::Cancelled
+                    )),
+                    pressure: touch.force.map(|force| force.normalized() as f32),
+                    primary: false,
+                    timestamp: self.input_epoch.elapsed(),
+                };
+                let event = self.touch_pointer(event, &window, event_loop);
+                PlatformEvent::Pointer(event)
             }
             WindowEvent::MouseWheel { delta, phase, .. } => {
                 let delta = scroll_delta(delta, self.scale_factor);

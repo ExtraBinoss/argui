@@ -1,19 +1,24 @@
-use argui_core::{ImeInput, KeyInput, Point, ScrollDelta, TextPosition};
+use argui_core::{
+    ImeInput, KeyInput, Point, PointerEvent, PointerKind, PointerPhase, ScrollDelta, TextPosition,
+};
 use argui_paint::QuadStyle;
 
 use crate::interaction::{InteractionState, RawUpdate};
 use crate::scroll::ScrollState;
 use crate::text_input::{TextInputState, TextInputStates};
 use crate::transition::PaintTransitions;
+use crate::traversal::{flattened, nth_element};
+use crate::update::classify_update;
 use crate::{
-    Element, ElementKind, HitRegion, InteractionUpdate, NodeId, ScrollRegion, UiEvent, UiEventKind,
-    VisualState, identity,
+    Element, ElementKind, GestureArena, HitRegion, InteractionUpdate, NodeId, ScrollRegion,
+    UiEvent, UiEventKind, VisualState, identity,
 };
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum TreeUpdate {
     #[default]
     None,
+    Semantics,
     Paint,
     Layout,
 }
@@ -31,6 +36,7 @@ pub struct UiTree {
     node_ids: Vec<NodeId>,
     next_node_id: u64,
     interaction: InteractionState,
+    gestures: GestureArena,
     scroll: ScrollState,
     text_inputs: TextInputStates,
     transitions: PaintTransitions,
@@ -49,6 +55,7 @@ impl UiTree {
             node_ids,
             next_node_id,
             interaction: InteractionState::default(),
+            gestures: GestureArena::default(),
             scroll: ScrollState::default(),
             text_inputs: TextInputStates::default(),
             transitions: PaintTransitions::default(),
@@ -95,6 +102,9 @@ impl UiTree {
         self.update_stats = stats;
         match update {
             TreeUpdate::None => return update,
+            TreeUpdate::Semantics => {
+                self.root = root;
+            }
             TreeUpdate::Paint => {
                 self.transitions
                     .sync(&self.root, &self.node_ids, &root, &self.node_ids);
@@ -165,6 +175,10 @@ impl UiTree {
         self.transitions.advance(now)
     }
 
+    pub fn set_reduced_motion(&mut self, reduced: bool) -> bool {
+        self.transitions.set_reduced_motion(reduced)
+    }
+
     #[must_use]
     pub fn wants_animation_frame(&self) -> bool {
         self.transitions.needs_frame()
@@ -216,6 +230,51 @@ impl UiTree {
         self.decorate(update)
     }
 
+    pub fn pointer_event(
+        &mut self,
+        event: PointerEvent,
+        regions: &[HitRegion],
+    ) -> InteractionUpdate {
+        let hit = regions
+            .iter()
+            .rev()
+            .find(|region| region.contains(event.position))
+            .map(|region| (region.node, region.gestures));
+        let gestures = self.gestures.update(event, hit);
+        let mut update = if event.kind == PointerKind::Touch && !event.primary {
+            InteractionUpdate::default()
+        } else {
+            match event.phase {
+                PointerPhase::Entered | PointerPhase::Moved => {
+                    self.pointer_moved(event.position, regions)
+                }
+                PointerPhase::Pressed => {
+                    let mut moved = self.pointer_moved(event.position, regions);
+                    moved.merge(self.primary_pressed(regions));
+                    moved
+                }
+                PointerPhase::Released => {
+                    let mut moved = self.pointer_moved(event.position, regions);
+                    moved.merge(self.primary_released());
+                    moved
+                }
+                PointerPhase::Left => self.pointer_left(),
+                PointerPhase::Cancelled => {
+                    let update = self.interaction.primary_cancelled();
+                    self.decorate(update)
+                }
+            }
+        };
+        update
+            .events
+            .extend(gestures.into_iter().map(|gesture| UiEvent {
+                target: gesture.target,
+                key: self.key_for(gesture.target).map(ToOwned::to_owned),
+                kind: UiEventKind::Gesture(gesture),
+            }));
+        update
+    }
+
     pub fn pointer_left(&mut self) -> InteractionUpdate {
         let update = self.interaction.pointer_left();
         self.decorate(update)
@@ -233,11 +292,27 @@ impl UiTree {
 
     pub fn window_blurred(&mut self) -> InteractionUpdate {
         let update = self.interaction.window_blurred();
-        self.decorate(update)
+        let mut update = self.decorate(update);
+        update.events.extend(
+            self.gestures
+                .cancel_all()
+                .into_iter()
+                .map(|gesture| UiEvent {
+                    target: gesture.target,
+                    key: self.key_for(gesture.target).map(ToOwned::to_owned),
+                    kind: UiEventKind::Gesture(gesture),
+                }),
+        );
+        update
     }
 
     pub fn focus_next(&mut self, regions: &[HitRegion], backwards: bool) -> InteractionUpdate {
         let update = self.interaction.focus_next(regions, backwards);
+        self.decorate(update)
+    }
+
+    pub fn focus_node(&mut self, node: NodeId, regions: &[HitRegion]) -> InteractionUpdate {
+        let update = self.interaction.focus_node(node, regions);
         self.decorate(update)
     }
 
@@ -504,73 +579,5 @@ impl UiTree {
                 _ => None,
             });
         self.text_inputs.sync(inputs);
-    }
-}
-
-fn flattened(root: &Element) -> Vec<&Element> {
-    fn visit<'a>(element: &'a Element, output: &mut Vec<&'a Element>) {
-        output.push(element);
-        for child in &element.children {
-            visit(child, output);
-        }
-    }
-    let mut output = Vec::new();
-    visit(root, &mut output);
-    output
-}
-
-fn nth_element(root: &Element, target: usize) -> Option<&Element> {
-    fn visit<'a>(element: &'a Element, target: usize, cursor: &mut usize) -> Option<&'a Element> {
-        if *cursor == target {
-            return Some(element);
-        }
-        *cursor += 1;
-        element
-            .children
-            .iter()
-            .find_map(|child| visit(child, target, cursor))
-    }
-    visit(root, target, &mut 0)
-}
-
-fn classify_update(old: &Element, new: &Element, stats: &mut TreeUpdateStats) -> TreeUpdate {
-    stats.visited += 1;
-    if old.ptr_eq(new) {
-        stats.shared_subtrees += 1;
-        return TreeUpdate::None;
-    }
-    if old == new {
-        return TreeUpdate::None;
-    }
-    if old.key != new.key
-        || kind_changes_layout(&old.kind, &new.kind)
-        || old.style != new.style
-        || old.paint.clip != new.paint.clip
-        || old.scroll.is_some() != new.scroll.is_some()
-        || old.overlay != new.overlay
-        || old.children.len() != new.children.len()
-    {
-        return TreeUpdate::Layout;
-    }
-    if old
-        .children
-        .iter()
-        .zip(&new.children)
-        .any(|(old, new)| classify_update(old, new, stats) == TreeUpdate::Layout)
-    {
-        TreeUpdate::Layout
-    } else {
-        TreeUpdate::Paint
-    }
-}
-
-fn kind_changes_layout(old: &ElementKind, new: &ElementKind) -> bool {
-    match (old, new) {
-        (ElementKind::Container, ElementKind::Container)
-        | (ElementKind::Image { .. }, ElementKind::Image { .. })
-        | (ElementKind::Vector { .. }, ElementKind::Vector { .. }) => false,
-        (ElementKind::Text { .. }, ElementKind::Text { .. })
-        | (ElementKind::TextInput { .. }, ElementKind::TextInput { .. }) => old != new,
-        _ => true,
     }
 }

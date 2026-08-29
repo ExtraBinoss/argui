@@ -116,7 +116,12 @@ fn scoped_callbacks_route_only_platform_events_through_the_model() {
 
     scoped(RuntimeEvent::RendererReady);
     assert!(pending.borrow().is_empty());
-    scoped(RuntimeEvent::Platform(PlatformEvent::PointerEntered));
+    scoped(RuntimeEvent::Platform(PlatformEvent::Pointer(
+        argui_platform::PointerEvent::mouse(
+            argui_platform::PointerPhase::Entered,
+            argui_core::Point::default(),
+        ),
+    )));
     assert_eq!(pending.borrow().len(), 1);
     assert_eq!(received.borrow().len(), 2);
 }

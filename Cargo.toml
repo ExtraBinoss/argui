@@ -10,6 +10,7 @@ license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
 argui = { path = "crates/argui" }
+argui-accessibility = { path = "crates/argui-accessibility" }
 argui-animation = { path = "crates/argui-animation" }
 argui-core = { path = "crates/argui-core" }
 argui-devtools = { path = "crates/argui-devtools" }
@@ -53,6 +54,12 @@ lyon_tessellation = "=1.0.20"
 usvg = { version = "=0.48.1", default-features = false }
 icondata_core = "=0.1.0"
 icondata_tb = "=0.1.0"
+accesskit = "=0.24.1"
+accesskit_consumer = "=0.38.0"
+accesskit_winit = "=0.33.2"
+ashpd = { version = "=0.13.13", default-features = false, features = ["async-io", "settings"] }
+windows = "=0.62.2"
+objc2-app-kit = { version = "=0.3.2", default-features = false, features = ["NSAccessibility", "NSWorkspace"] }
 
 [workspace.lints.rust]
 unsafe_code = "deny"

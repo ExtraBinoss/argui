@@ -167,6 +167,7 @@ impl Application {
                 self.repaint();
                 self.frame_record.paint += started.elapsed();
             }
+            TreeUpdate::Semantics => {}
             TreeUpdate::None if pending.paint => {
                 let started = Instant::now();
                 self.repaint();
@@ -177,6 +178,7 @@ impl Application {
         self.frame_record.update = match tree_update {
             TreeUpdate::Layout => Invalidation::Layout,
             TreeUpdate::Paint => Invalidation::Paint,
+            TreeUpdate::Semantics => Invalidation::None,
             TreeUpdate::None if pending.layout => Invalidation::Layout,
             TreeUpdate::None if pending.text_input || pending.scroll || pending.paint => {
                 Invalidation::Paint
@@ -189,6 +191,7 @@ impl Application {
         if tree_update != TreeUpdate::None {
             (self.on_event)(RuntimeEvent::ViewUpdated(tree_update));
         }
+        self.sync_accessibility();
         tree_update
     }
 }

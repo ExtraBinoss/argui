@@ -10,6 +10,7 @@ default = []
 tray = ["argui-platform/tray"]
 
 [dependencies]
+argui-accessibility.workspace = true
 argui-inspect.workspace = true
 argui-animation.workspace = true
 argui-core.workspace = true
@@ -23,6 +24,8 @@ web-time.workspace = true
 winit.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+accesskit.workspace = true
+accesskit_winit.workspace = true
 pollster.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]

@@ -53,13 +53,15 @@ shares one behavior on native and web.
 Done when profiling demonstrates work proportional to the changed/visible
 subtree rather than total tree size.
 
-## 3. Input and accessibility
+## 3. Input and accessibility — foundation implemented
 
-- Normalize touch, multitouch, and gesture input without imposing a gesture
-  policy on applications.
-- Emit semantic accessibility nodes, roles, labels, values, actions, and focus
-  updates for native accessibility APIs and the browser target.
-- Verify keyboard-only, screen-reader, reduced-motion, and high-contrast paths.
+- [x] Normalize mouse, touch and pen into stable pointer events with multitouch
+  identity and an opt-in tap/pan/pinch/rotation gesture arena.
+- [x] Emit incremental semantic nodes, roles, labels, values, actions and focus
+  updates through AccessKit on native targets and real DOM controls on Web.
+- [x] Detect reduced motion and high contrast, support explicit application
+  overrides, and keep semantic-only updates off the GPU and layout paths.
+- Next: platform screen-reader audits and automated browser accessibility tests.
 
 Done when composed widgets expose semantics without renderer knowledge and the
 same Rust tree drives native and browser accessibility.

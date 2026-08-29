@@ -6,6 +6,11 @@ or a deliberate maintenance change should update them one at a time.
 | Crate | Version | Owner | Purpose |
 |---|---:|---|---|
 | `winit` | 0.30.13 | `argui-platform` | Native windows, web canvas lifecycle, events |
+| `accesskit` | 0.24.1 | `argui-accessibility` | Native semantic tree and action schema |
+| `accesskit-winit` | 0.33.2 | `argui-runtime` native | Native window accessibility adapters |
+| `ashpd` | 0.13.13 | `argui-platform` Linux | Reduced-motion and contrast portal settings |
+| `windows` | 0.62.2 | `argui-platform` Windows | Native accessibility display preferences |
+| `objc2-app-kit` | 0.3.2 | `argui-platform` macOS | Native accessibility display preferences |
 | `wgpu` | 30.0.1 | `argui-render` | Native GPU and WebGPU/WebGL backends |
 | `taffy` | 0.14.0 | `argui-layout` | Flex, grid, and block layout algorithms |
 | `cosmic-text` | 0.19.0 | `argui-text` | Shaping, bidi, fallback, line breaking, raster data |
@@ -15,7 +20,7 @@ or a deliberate maintenance change should update them one at a time.
 | `ksni` | 0.3.6 | `argui-platform` Linux `tray` feature | Pure-Rust StatusNotifierItem tray service |
 | `tray-icon` | 0.24.2 | `argui-platform` Windows/macOS `tray` feature | Native notification-area icon and menu |
 | `base64` | 0.22.1 | `argui-platform` web | Inline browser favicon URLs |
-| `web-sys` | 0.3.104 | `argui-platform` web | Browser clipboard boundary |
+| `web-sys` | 0.3.104 | platform/accessibility/runtime web | Browser lifecycle, clipboard, semantic DOM and media queries |
 | `pollster` | 1.0.1 | `argui-runtime` native | Resolve one-time GPU initialization |
 | `wasm-bindgen-futures` | 0.4.77 | `argui-runtime` web | Non-blocking GPU initialization in the browser |
 | `bytemuck` | 1.25.2 | `argui-render` | Checked POD data for GPU buffers |
@@ -43,9 +48,9 @@ not enable `tray` do not compile or ship them.
 `argui-paint` adds no third-party dependency. It contains plain display data;
 only `argui-render` knows how WGPU turns that data into pixels.
 
-`argui-ui` depends directly only on Argui's core, paint, and text descriptions.
-Stable identity, hit testing, interaction state, and composed widgets do not
-pull Winit, WGPU, or Taffy into the UI crate.
+`argui-ui` depends directly only on Argui's core, accessibility, paint, and text
+descriptions. Stable identity, hit testing, interaction state, semantics and
+composed widgets do not pull Winit, WGPU, or Taffy into the UI crate.
 
 ## Setup
 

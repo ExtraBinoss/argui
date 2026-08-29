@@ -10,6 +10,7 @@ default = []
 tray = ["argui-platform/tray", "argui-runtime/tray"]
 
 [dependencies]
+argui-accessibility.workspace = true
 argui-animation.workspace = true
 argui-core.workspace = true
 argui-devtools.workspace = true

@@ -42,6 +42,7 @@ impl Transition {
 #[derive(Clone, Debug, Default)]
 pub(crate) struct PaintTransitions {
     entries: Vec<Entry>,
+    reduced_motion: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -58,6 +59,15 @@ struct Entry {
 }
 
 impl PaintTransitions {
+    pub(crate) fn set_reduced_motion(&mut self, reduced: bool) -> bool {
+        self.reduced_motion = reduced;
+        let changed = reduced && !self.entries.is_empty();
+        if changed {
+            self.entries.clear();
+        }
+        changed
+    }
+
     pub(crate) fn sync(
         &mut self,
         old_root: &Element,
@@ -65,6 +75,10 @@ impl PaintTransitions {
         new_root: &Element,
         new_ids: &[NodeId],
     ) {
+        if self.reduced_motion {
+            self.entries.clear();
+            return;
+        }
         let old = flattened(old_root);
         for (new, node) in flattened(new_root).into_iter().zip(new_ids.iter().copied()) {
             let Some(transition) = new.transition.clone() else {

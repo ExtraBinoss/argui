@@ -87,6 +87,27 @@ pub(crate) const fn pointer_button(button: MouseButton) -> PointerButton {
     }
 }
 
+pub(crate) const fn pointer_button_mask(button: PointerButton) -> u16 {
+    match button {
+        PointerButton::Primary => 1,
+        PointerButton::Secondary => 2,
+        PointerButton::Middle => 4,
+        PointerButton::Back => 8,
+        PointerButton::Forward => 16,
+        PointerButton::Other(value) if value < 11 => 1 << (value + 5),
+        PointerButton::Other(_) => 0,
+    }
+}
+
+pub(crate) const fn pointer_phase(phase: winit::event::TouchPhase) -> argui_core::PointerPhase {
+    match phase {
+        winit::event::TouchPhase::Started => argui_core::PointerPhase::Pressed,
+        winit::event::TouchPhase::Moved => argui_core::PointerPhase::Moved,
+        winit::event::TouchPhase::Ended => argui_core::PointerPhase::Released,
+        winit::event::TouchPhase::Cancelled => argui_core::PointerPhase::Cancelled,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use winit::{dpi::PhysicalPosition, keyboard::ModifiersState};

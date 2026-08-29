@@ -28,6 +28,7 @@ fn tree(value: &str) -> (UiTree, HitRegion) {
             clips: ClipChain::from_regions([ClipRegion::new(bounds, Affine2D::IDENTITY)]),
             focusable: true,
             cursor: CursorIcon::Text,
+            gestures: argui_ui::GestureSet::NONE,
         },
     )
 }

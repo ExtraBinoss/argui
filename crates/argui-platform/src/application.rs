@@ -1,12 +1,13 @@
 use std::collections::HashSet;
 
-use crate::{ApplicationIdentity, TrayConfig, WindowKey, WindowSpec};
+use crate::{AccessibilityOverrides, ApplicationIdentity, TrayConfig, WindowKey, WindowSpec};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ApplicationConfig {
     pub identity: ApplicationIdentity,
     pub windows: Vec<WindowSpec>,
     pub tray: Option<TrayConfig>,
+    pub accessibility: AccessibilityOverrides,
 }
 
 impl ApplicationConfig {
@@ -16,6 +17,7 @@ impl ApplicationConfig {
             identity,
             windows: vec![WindowSpec::new(WindowKey::main(), main_window)],
             tray: None,
+            accessibility: AccessibilityOverrides::default(),
         }
     }
 
@@ -28,6 +30,12 @@ impl ApplicationConfig {
     #[must_use]
     pub fn with_tray(mut self, tray: TrayConfig) -> Self {
         self.tray = Some(tray);
+        self
+    }
+
+    #[must_use]
+    pub const fn with_accessibility(mut self, accessibility: AccessibilityOverrides) -> Self {
+        self.accessibility = accessibility;
         self
     }
 

@@ -481,6 +481,7 @@ fn push_hit_region(
             clips: context.clips.clone(),
             focusable: interaction.focusable,
             cursor: interaction.cursor,
+            gestures: interaction.gestures,
         });
     }
 }

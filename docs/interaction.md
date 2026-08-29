@@ -42,5 +42,9 @@ ink is clipped by explicit ancestor clips rather than its exact advance box,
 which preserves glyph overhangs at the final character. The renderer still
 receives only quads and text commands.
 
-Keyboard traversal, arbitrary per-widget state, accessibility nodes, touch,
-scrolling, text editing, IME, and rounded hit masks remain separate milestones.
+Mouse, touch and pen share one `PointerEvent` representation. Touch contacts
+retain stable IDs and pressure, and only the primary contact mutates hover,
+press and scroll state. Every contact still enters the opt-in gesture arena so
+pinch and rotation can be recognized simultaneously. See
+[accessibility and touch](accessibility.md) for the semantic and gesture
+contracts.

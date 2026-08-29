@@ -1,6 +1,11 @@
-use argui_core::{Affine2D, Point, Rect, Size};
+use argui_core::{
+    Affine2D, Point, PointerButton, PointerEvent, PointerId, PointerKind, PointerPhase, Rect, Size,
+};
 use argui_paint::{ClipChain, ClipRegion, Color, QuadStyle};
-use argui_ui::{CursorIcon, Element, HitRegion, Interaction, UiEventKind, UiTree, VisualState};
+use argui_ui::{
+    ClipboardRequest, CursorIcon, Element, HitRegion, Interaction, InteractionUpdate, UiEventKind,
+    UiTree, VisualState,
+};
 
 fn interactive(key: &str) -> Element {
     Element::container([])
@@ -30,6 +35,7 @@ fn region_at(node: argui_ui::NodeId, x: f32, focusable: bool) -> HitRegion {
         )]),
         focusable,
         cursor: CursorIcon::Auto,
+        gestures: argui_ui::GestureSet::NONE,
     }
 }
 
@@ -169,6 +175,81 @@ fn blocker_regions_occlude_interactions_behind_overlays() {
     assert_eq!(tree.visual_state(behind), VisualState::Rest);
     assert_eq!(tree.visual_state(overlay), VisualState::Hovered);
     assert!(!Interaction::blocker().focusable);
+}
+
+#[test]
+fn interaction_updates_merge_every_dirty_signal_and_latest_clipboard_request() {
+    let mut update = InteractionUpdate {
+        paint_changed: true,
+        clipboard: Some(ClipboardRequest::Read),
+        ..InteractionUpdate::default()
+    };
+    update.merge(InteractionUpdate {
+        scroll_changed: true,
+        layout_changed: true,
+        text_input_changed: true,
+        clipboard: Some(ClipboardRequest::Write("value".into())),
+        ..InteractionUpdate::default()
+    });
+    update.merge(InteractionUpdate::default());
+
+    assert!(update.paint_changed);
+    assert!(update.scroll_changed);
+    assert!(update.layout_changed);
+    assert!(update.text_input_changed);
+    assert_eq!(
+        update.clipboard,
+        Some(ClipboardRequest::Write("value".into()))
+    );
+}
+
+#[test]
+fn secondary_touches_do_not_replace_primary_interaction_capture() {
+    let mut tree = UiTree::new(interactive("touch"));
+    let node = tree.node_id_at(0).unwrap();
+    let regions = [region(node)];
+    let touch = |id, phase, primary| PointerEvent {
+        id: PointerId::new(id),
+        kind: PointerKind::Touch,
+        phase,
+        position: Point::new(30.0, 20.0),
+        button: Some(PointerButton::Primary),
+        buttons: 1,
+        pressure: None,
+        primary,
+        timestamp: std::time::Duration::ZERO,
+    };
+
+    let pressed = tree.pointer_event(touch(1, PointerPhase::Pressed, true), &regions);
+    assert!(
+        pressed
+            .events
+            .iter()
+            .any(|event| event.kind == UiEventKind::Pressed)
+    );
+    assert!(
+        tree.pointer_event(touch(2, PointerPhase::Pressed, false), &regions)
+            .events
+            .is_empty()
+    );
+    let cancelled = tree.pointer_event(touch(1, PointerPhase::Cancelled, true), &regions);
+    assert!(
+        cancelled
+            .events
+            .iter()
+            .any(|event| event.kind == UiEventKind::Released)
+    );
+    assert!(
+        cancelled
+            .events
+            .iter()
+            .all(|event| event.kind != UiEventKind::Clicked)
+    );
+    assert!(
+        tree.pointer_event(touch(1, PointerPhase::Cancelled, true), &regions)
+            .events
+            .is_empty()
+    );
 }
 
 #[test]

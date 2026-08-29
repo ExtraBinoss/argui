@@ -101,6 +101,7 @@ mod tests {
             clips: ClipChain::default(),
             focusable: false,
             cursor,
+            gestures: argui_ui::GestureSet::NONE,
         }
     }
 

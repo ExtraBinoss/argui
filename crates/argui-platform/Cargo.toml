@@ -18,7 +18,15 @@ winit.workspace = true
 arboard.workspace = true
 
 [target.'cfg(target_os = "linux")'.dependencies]
+ashpd.workspace = true
 ksni = { workspace = true, optional = true }
+pollster.workspace = true
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { workspace = true, features = ["UI_ViewManagement"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2-app-kit.workspace = true
 
 [target.'cfg(any(target_os = "windows", target_os = "macos"))'.dependencies]
 tray-icon = { workspace = true, optional = true }
@@ -27,7 +35,7 @@ tray-icon = { workspace = true, optional = true }
 base64.workspace = true
 wasm-bindgen.workspace = true
 wasm-bindgen-futures.workspace = true
-web-sys = { workspace = true, features = ["Clipboard", "Document", "Element", "HtmlCanvasElement", "HtmlHeadElement", "Navigator", "Node", "NodeList", "Window"] }
+web-sys = { workspace = true, features = ["Clipboard", "Document", "Element", "HtmlCanvasElement", "HtmlHeadElement", "MediaQueryList", "Navigator", "Node", "NodeList", "Window"] }
 
 [lints]
 workspace = true

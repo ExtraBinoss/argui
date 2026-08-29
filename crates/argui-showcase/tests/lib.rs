@@ -36,6 +36,7 @@ fn events_for(app: &StateShowcase, key: &str) -> Vec<UiEvent> {
         clips: ClipChain::from_regions([ClipRegion::new(bounds, Affine2D::IDENTITY)]),
         focusable: true,
         cursor: CursorIcon::Auto,
+        gestures: argui_ui::GestureSet::NONE,
     }];
     let mut events = tree.pointer_moved(Point::new(10.0, 10.0), &regions).events;
     events.extend(tree.primary_pressed(&regions).events);
