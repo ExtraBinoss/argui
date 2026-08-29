@@ -25,7 +25,7 @@ fn argui_effect(
 ) -> vec4<f32> {
     let pixel = global_pixel(uv);
     let distance = layer_rounded_distance(pixel);
-    let edge_width = max(params.matrix[0].x, 1.0);
+    let edge_width = max(argui_param_f32(4u), 1.0);
 
     // The layer target can include an outer-effect expansion (for example a
     // glow or border fire). Liquid glass is clipped to the actual layer, so do
@@ -36,9 +36,9 @@ fn argui_effect(
 
     let edge = 1.0 - smoothstep(-edge_width, 0.0, distance);
     let normal = glass_normal(pixel);
-    let warped = pixel - normal * params.data.x * edge * edge;
-    let blurred = glass_blur(warped, max(params.data.z, 0.0));
-    let chroma = normal * params.data.y * edge;
+    let warped = pixel - normal * argui_param_f32(0u) * edge * edge;
+    let blurred = glass_blur(warped, max(argui_param_f32(2u), 0.0));
+    let chroma = normal * argui_param_f32(1u) * edge;
     let glass = vec4<f32>(
         source_at(warped + chroma).r,
         blurred.g,
@@ -46,9 +46,9 @@ fn argui_effect(
         blurred.a
     );
     let local = (pixel - params.bounds.xy) / params.bounds.zw;
-    let light = edge * smoothstep(0.9, 0.1, local.y) * max(params.data.w, 0.0);
+    let light = edge * smoothstep(0.9, 0.1, local.y) * max(argui_param_f32(3u), 0.0);
     let luminance = dot(glass.rgb, vec3<f32>(0.2126, 0.7152, 0.0722));
-    let saturated = mix(vec3<f32>(luminance), glass.rgb, max(params.matrix[0].y, 0.0));
+    let saturated = mix(vec3<f32>(luminance), glass.rgb, max(argui_param_f32(5u), 0.0));
     let lit = clamp(saturated + vec3<f32>(light), vec3<f32>(0.0), vec3<f32>(1.0));
     return vec4<f32>(lit, glass.a);
 }

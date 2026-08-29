@@ -16,10 +16,10 @@ mod widget;
 
 pub use argui_core::{Transform2D, TransformOrigin};
 pub use argui_paint::{
-    BlendMode, Border, BorderWidths, ClipBehavior, Color, CornerRadii, CustomEffect, Fill, Filter,
-    GradientStop, ImageAsset, ImageFit, ImageId, ImageSampling, LayerMask, LayerStyle,
-    LinearGradient, PaintStyle, QuadStyle, RadialGradient, Refraction, ShaderEffectId, Shadow,
-    VectorAsset, VectorId,
+    BlendMode, Border, BorderWidths, ClipBehavior, Color, CornerRadii, EffectArgument, EffectId,
+    EffectInstance, EffectValue, Fill, Filter, GradientStop, ImageAsset, ImageFit, ImageId,
+    ImageSampling, LayerMask, LayerStyle, LinearGradient, PaintStyle, ProfileDomain, QuadStyle,
+    RadialGradient, Refraction, RenderObjectId, Shadow, VectorAsset, VectorId,
 };
 pub use cursor::CursorIcon;
 pub use effect::{EffectScope, ScopedEffect};

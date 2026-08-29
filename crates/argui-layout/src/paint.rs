@@ -1,7 +1,7 @@
 use argui_core::{Affine2D, Rect};
 use argui_paint::{
-    Border, ClipChain, ClipRegion, Color, DisplayList, ImagePrimitive, LayerStyle, Quad, QuadStyle,
-    VectorPrimitive,
+    Border, ClipChain, ClipRegion, Color, DisplayList, ImagePrimitive, LayerStyle, ProfileDomain,
+    Quad, QuadStyle, RenderObjectId, VectorPrimitive,
 };
 use argui_ui::{EffectScope, Element, ElementKind, HitRegion, NodeId, UiTree};
 use std::collections::HashMap;
@@ -227,19 +227,21 @@ fn paint_enter(
 ) {
     let visual_bounds = context.transform.transform_rect(node.bounds);
     if let Some(layer) = element.layer.clone() {
-        begin_layer(&mut output.display_list, layer, visual_bounds);
+        begin_layer(&mut output.display_list, layer, visual_bounds, node.node);
     }
     begin_scope(
         &mut output.display_list,
         element,
         EffectScope::WholeElement,
         visual_bounds,
+        node.node,
     );
     push_hit_region(element, node, output, context);
     push_quad(
         ui.resolved_quad(node.node, element),
         element,
         node.bounds,
+        node.node,
         output,
         context,
     );
@@ -250,6 +252,7 @@ fn paint_enter(
         element,
         EffectScope::Content,
         visual_bounds,
+        node.node,
     );
 
     let content_clips = if element.paint.clip == argui_paint::ClipBehavior::Bounds {
@@ -277,6 +280,7 @@ fn paint_enter(
             element,
             EffectScope::Text,
             visual_bounds,
+            node.node,
         );
         output.display_list.push_text_transformed(
             text_index,
@@ -310,6 +314,7 @@ fn push_quad(
     style: QuadStyle,
     element: &Element,
     bounds: Rect,
+    node: NodeId,
     output: &mut LayoutOutput,
     context: &PaintContext,
 ) {
@@ -330,6 +335,7 @@ fn push_quad(
             element,
             bounds,
             EffectScope::Background,
+            node,
             output,
             context,
         );
@@ -343,6 +349,7 @@ fn push_quad(
             element,
             bounds,
             EffectScope::Border,
+            node,
             output,
             context,
         );
@@ -354,11 +361,18 @@ fn push_scoped_quad(
     element: &Element,
     bounds: Rect,
     scope: EffectScope,
+    node: NodeId,
     output: &mut LayoutOutput,
     context: &PaintContext,
 ) {
     let visual_bounds = context.transform.transform_rect(bounds);
-    let layers = begin_scope(&mut output.display_list, element, scope, visual_bounds);
+    let layers = begin_scope(
+        &mut output.display_list,
+        element,
+        scope,
+        visual_bounds,
+        node,
+    );
     output.display_list.push_quad(quad(style, bounds, context));
     end_layers(&mut output.display_list, layers);
 }
@@ -415,6 +429,7 @@ fn begin_scope(
     element: &Element,
     scope: EffectScope,
     bounds: Rect,
+    node: NodeId,
 ) -> usize {
     let effects = element
         .effects
@@ -422,14 +437,17 @@ fn begin_scope(
         .filter(|effect| effect.scope == scope);
     let mut count = 0;
     for effect in effects {
-        begin_layer(display_list, effect.layer.clone(), bounds);
+        begin_layer(display_list, effect.layer.clone(), bounds, node);
         count += 1;
     }
     count
 }
 
-fn begin_layer(display_list: &mut DisplayList, mut layer: LayerStyle, bounds: Rect) {
+fn begin_layer(display_list: &mut DisplayList, mut layer: LayerStyle, bounds: Rect, node: NodeId) {
     layer.bounds = bounds;
+    if layer.profile.is_none() {
+        layer.profile = Some(RenderObjectId::new(ProfileDomain::Ui, node.get()));
+    }
     display_list.begin_layer(layer);
 }
 

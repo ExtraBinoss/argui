@@ -5,6 +5,14 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 
+[features]
+default = []
+blur = []
+shadow = []
+color = []
+refraction = []
+artistic = []
+
 [dependencies]
 argui-paint.workspace = true
 argui-render.workspace = true

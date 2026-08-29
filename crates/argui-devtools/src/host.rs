@@ -2,7 +2,6 @@ use argui_animation::{Frame, Spring, SpringConfig};
 use argui_core::{Point, Rect};
 use argui_inspect::{FrameRecord, InspectNodeId, InspectorHandle, StyleProperty};
 use argui_paint::{ImageAsset, VectorAsset};
-use argui_render::EffectShader;
 use argui_runtime::{Context, LayoutSnapshot, Render, ScrollRequest, ViewUpdate};
 use argui_ui::{ClipboardRequest, Element, UiEvent, UiEventKind};
 
@@ -30,6 +29,7 @@ pub struct DevtoolsHost<A> {
     pub(crate) tree_offset: f32,
     pub(crate) profiling_offset: f32,
     pub(crate) profile_frames: Vec<FrameRecord>,
+    profile_refresh: argui_animation::Duration,
     pub(crate) search: String,
     pub(crate) sections: [bool; 3],
     pub(crate) section_progress: [f32; 3],
@@ -47,9 +47,11 @@ pub struct DevtoolsHost<A> {
 impl<A> DevtoolsHost<A> {
     #[must_use]
     pub fn new(app: A) -> Self {
+        let inspector = InspectorHandle::default();
+        inspector.set_recording(false);
         Self {
             app,
-            inspector: InspectorHandle::default(),
+            inspector,
             open: false,
             tab: Tab::Elements,
             dock_height: 320.0,
@@ -62,6 +64,7 @@ impl<A> DevtoolsHost<A> {
             tree_offset: 0.0,
             profiling_offset: 0.0,
             profile_frames: Vec::new(),
+            profile_refresh: argui_animation::Duration::ZERO,
             search: String::new(),
             sections: [true, true, true],
             section_progress: [1.0; 3],
@@ -80,6 +83,7 @@ impl<A> DevtoolsHost<A> {
     #[must_use]
     pub fn open(mut self, open: bool) -> Self {
         self.open = open;
+        self.inspector.set_recording(open);
         self.sheet_progress = if open { 1.0 } else { 0.0 };
         self.sheet_motion = sheet_spring(self.sheet_progress);
         self
@@ -229,6 +233,7 @@ impl<A> DevtoolsHost<A> {
         match key {
             "__devtools-toggle" => {
                 self.open = !self.open;
+                self.inspector.set_recording(self.open);
                 self.picking = false;
                 self.picker_hovered = None;
                 self.picker_point = None;
@@ -256,7 +261,9 @@ impl<A> DevtoolsHost<A> {
             "__devtools-refresh" => self.profile_frames = self.inspector.frames(),
             "__devtools-reset" => self.inspector.clear_overrides(),
             "__devtools-copy" => {
-                self.clipboard = Some(ClipboardRequest::Write(self.inspector.trace_text()));
+                if let Ok(trace) = self.inspector.trace_json() {
+                    self.clipboard = Some(ClipboardRequest::Write(trace));
+                }
             }
             "__devtools-morph" => {
                 let target = f32::from(self.morph_motion.target() < 0.5);
@@ -362,6 +369,15 @@ impl<A: Render> DevtoolsHost<A> {
     }
 
     fn advance_animations(&mut self, frame: Frame, app: ViewUpdate) -> ViewUpdate {
+        let mut profile = false;
+        if self.open && self.tab == Tab::Profiling && !self.inspector.paused() {
+            self.profile_refresh += frame.elapsed;
+            if self.profile_refresh >= argui_animation::Duration::from_millis(100) {
+                self.profile_refresh = argui_animation::Duration::ZERO;
+                self.profile_frames = self.inspector.frames();
+                profile = true;
+            }
+        }
         let sheet = self.sheet_motion.advance(frame.elapsed);
         if sheet {
             self.sheet_progress = self.sheet_motion.value().clamp(0.0, 1.0);
@@ -377,7 +393,7 @@ impl<A: Render> DevtoolsHost<A> {
         if morph {
             self.morph_progress = self.morph_motion.value().clamp(0.0, 1.0);
         }
-        if sheet || sections || morph || app == ViewUpdate::Rebuild {
+        if sheet || sections || morph || profile || app == ViewUpdate::Rebuild {
             ViewUpdate::Rebuild
         } else if app == ViewUpdate::Paint {
             ViewUpdate::Paint
@@ -390,6 +406,7 @@ impl<A: Render> DevtoolsHost<A> {
         self.sheet_motion.is_active()
             || self.section_motion.iter().any(Spring::is_active)
             || self.morph_motion.is_active()
+            || (self.open && self.tab == Tab::Profiling && !self.inspector.paused())
             || self.app.wants_animation_frame()
     }
 
@@ -403,10 +420,6 @@ impl<A: Render> DevtoolsHost<A> {
         let mut cx = Context::default();
         self.app.layout_changed(&application, &mut cx);
         cx.view_update()
-    }
-
-    pub fn effect_shaders(&self) -> &'static [EffectShader] {
-        Render::effect_shaders(&self.app)
     }
 
     pub fn image_assets(&self) -> Vec<ImageAsset> {
@@ -478,10 +491,6 @@ impl<A: Render> Render for DevtoolsHost<A> {
         let mut app_cx = Context::default();
         self.app.layout_changed(&application, &mut app_cx);
         cx.propagate(app_cx);
-    }
-
-    fn effect_shaders(&self) -> &'static [EffectShader] {
-        DevtoolsHost::effect_shaders(self)
     }
 
     fn image_assets(&self) -> Vec<ImageAsset> {

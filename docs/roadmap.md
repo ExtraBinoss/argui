@@ -15,9 +15,12 @@ their dedicated documents and completed milestones are not repeated here.
   resizable bottom dock, virtualized searchable Elements tree, stable selection,
   bounds highlight, reversible typed style switches, bounded frame timeline,
   CPU stages, effect passes, offscreen pixels and texture-pool diagnostics.
-- Next: expand/collapse and picker mode; richer authored/resolved style editors;
-  per-node/effect cost ranking; optional GPU timestamps; trace export/import;
-  keyboard and accessibility hardening.
+- Implemented: picker mode, per-pass GPU timestamps, chronological GPU
+  waterfall, expensive-pass ranking, adapter capabilities, strict
+  `argui-gpu-trace-v1` export/import, regional damage counters and retained
+  static-layer reuse.
+- Next: expand/collapse; richer authored/resolved style editors; keyboard and
+  accessibility hardening; detached native window transport.
 - The controller/frontend split already keeps a later detached native window
   independent from runtime and renderer internals.
 
@@ -75,13 +78,17 @@ not another timing engine.
 
 ## 5. GPU hardening
 
-- Add optional GPU timestamp queries where adapters expose them.
+- [x] Add non-blocking GPU timestamp queries where adapters expose them.
+- [x] Correlate CPU stages, GPU passes, stable layer identities, processed
+  pixels, offscreen memory and damage in one bounded frame history.
+- [x] Add an explicit typed effect registry with opt-in preset families,
+  multi-pass shaders and adapter-bounded parameter storage.
+- [x] Add static offscreen-layer reuse and quality-controlled spatial-effect
+  downsampling without changing the default rendering quality.
 - Add deterministic golden images for transforms, gradients, rounded masks,
   liquid glass, refraction, shadows, and custom outer effects.
-- Profile representative native and browser scenes before adding more fused or
-  specialized pipelines.
-- Tune cropped targets, texture-pool limits, and effect quality from measured
-  GPU time and memory rather than guesses.
+- Record comparable state/performance-showcase traces on Linux, Windows, macOS
+  and WebGPU before changing pass fusion or quality defaults.
 
 ## 6. Optional DSL — last
 

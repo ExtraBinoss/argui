@@ -1,11 +1,11 @@
-use argui_paint::{CustomEffect, Filter, Refraction};
+use argui_paint::{EffectInstance, Filter, Refraction};
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum PlannedFilter {
     Blur(f32),
     ColorMatrix([f32; 20]),
     Refraction(Refraction),
-    Custom(CustomEffect),
+    Effect(EffectInstance),
 }
 
 pub(crate) fn plan_filters(filters: &[Filter]) -> Vec<PlannedFilter> {
@@ -23,7 +23,7 @@ pub(crate) fn plan_filters(filters: &[Filter]) -> Vec<PlannedFilter> {
         planned.push(match filter {
             Filter::Blur(radius) => PlannedFilter::Blur(*radius),
             Filter::Refraction(value) => PlannedFilter::Refraction(*value),
-            Filter::Custom(effect) => PlannedFilter::Custom(effect.clone()),
+            Filter::Effect(effect) => PlannedFilter::Effect(effect.clone()),
             Filter::Brightness(_)
             | Filter::Contrast(_)
             | Filter::Saturation(_)
@@ -55,7 +55,7 @@ fn color_matrix(filter: &Filter) -> Option<[f32; 20]> {
         Filter::HueRotate(angle) => Some(hue_rotation(*angle)),
         Filter::Opacity(value) => Some(diagonal([1.0, 1.0, 1.0, *value])),
         Filter::ColorMatrix(matrix) => Some(*matrix),
-        Filter::Blur(_) | Filter::Refraction(_) | Filter::Custom(_) => None,
+        Filter::Blur(_) | Filter::Refraction(_) | Filter::Effect(_) => None,
     }
 }
 
@@ -142,13 +142,16 @@ fn compose(after: [f32; 20], before: [f32; 20]) -> [f32; 20] {
 
 #[cfg(test)]
 mod tests {
-    use argui_paint::{CustomEffect, Filter, Refraction, ShaderEffectId};
+    use argui_paint::{EffectId, EffectInstance, EffectValue, Filter, Refraction};
 
     use super::{PlannedFilter, plan_filters};
 
     #[test]
     fn adjacent_color_operations_fuse_but_spatial_effects_keep_order() {
-        let custom = CustomEffect::new(ShaderEffectId(3), [0.5]);
+        let custom = EffectInstance::new(
+            EffectId::new("test.effect"),
+            [("amount", EffectValue::F32(0.5))],
+        );
         let planned = plan_filters(&[
             Filter::Brightness(0.8),
             Filter::Contrast(1.2),
@@ -156,14 +159,14 @@ mod tests {
             Filter::Saturation(0.5),
             Filter::Opacity(0.7),
             Filter::Refraction(Refraction::new(0.1)),
-            Filter::Custom(custom.clone()),
+            Filter::Effect(custom.clone()),
         ]);
         assert_eq!(planned.len(), 5);
         assert!(matches!(planned[0], PlannedFilter::ColorMatrix(_)));
         assert_eq!(planned[1], PlannedFilter::Blur(6.0));
         assert!(matches!(planned[2], PlannedFilter::ColorMatrix(_)));
         assert_eq!(planned[3], PlannedFilter::Refraction(Refraction::new(0.1)));
-        assert_eq!(planned[4], PlannedFilter::Custom(custom));
+        assert_eq!(planned[4], PlannedFilter::Effect(custom));
     }
 
     #[test]

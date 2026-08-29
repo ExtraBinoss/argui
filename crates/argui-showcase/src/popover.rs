@@ -2,9 +2,8 @@ use argui_animation::{
     Duration, FillMode, Iterations, Keyframe, Keyframes, Spring, SpringConfig, Timeline, Timing,
 };
 use argui_core::Transform2D;
-use argui_effects::{self as effects, AnimatedGradient, LiquidGlass, WorleyBorderFire};
+use argui_effects::{AnimatedGradient, LiquidGlass, WorleyBorderFire};
 use argui_paint::{Border, Color, CornerRadii, Filter, LayerMask, LayerStyle, Shadow};
-use argui_runtime::EffectShader;
 use argui_text::{TextColor, TextWrap};
 use argui_ui::{
     Edges, Element, Interaction, Length, OverlayAlign, OverlayPlacement, PlacementSide,
@@ -12,8 +11,6 @@ use argui_ui::{
 };
 
 use super::{StateShowcase, button, chip, text_style};
-
-pub(super) const EFFECT_SHADERS: &[EffectShader] = effects::SHADERS;
 
 pub(super) fn popover_spring() -> Spring<f32> {
     Spring::new(

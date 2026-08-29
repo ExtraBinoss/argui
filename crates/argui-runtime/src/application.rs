@@ -2,7 +2,6 @@ use argui_animation::Frame;
 use argui_inspect::InspectorHandle;
 use argui_paint::{ImageAsset, VectorAsset};
 use argui_platform::{PlatformEvent, TrayConfig, TrayEvent, WindowKey, WindowSpec};
-use argui_render::EffectShader;
 use argui_ui::{ClipboardRequest, Element, UiEvent};
 
 use crate::{Entity, LayoutSnapshot, Render, ScrollRequest, ViewUpdate};
@@ -119,10 +118,6 @@ pub trait AppModel: 'static {
         None
     }
 
-    fn effect_shaders(&self) -> &'static [EffectShader] {
-        &[]
-    }
-
     fn image_assets(&self) -> Vec<ImageAsset> {
         Vec::new()
     }
@@ -214,10 +209,6 @@ impl<A: Render> AppModel for SingleWindowModel<A> {
     fn layout_changed(&mut self, window: &WindowKey, layout: &LayoutSnapshot) -> AppUpdate {
         self.app.layout_changed(layout);
         self.drain_effects(window)
-    }
-
-    fn effect_shaders(&self) -> &'static [EffectShader] {
-        self.app.read(Render::effect_shaders)
     }
 
     fn image_assets(&self) -> Vec<ImageAsset> {

@@ -12,6 +12,7 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 argui = { path = "../argui" }
 argui-devtools.workspace = true
+argui-effects = { workspace = true, features = ["artistic"] }
 argui-showcase.workspace = true
 wasm-bindgen.workspace = true
 

@@ -43,12 +43,13 @@ impl TexturePool {
         }
     }
 
-    pub fn begin_frame(&mut self) {
+    pub fn begin_frame(&mut self) -> bool {
         self.frame = self.frame.wrapping_add(1);
         self.reused = 0;
         for entry in &mut self.entries {
             entry.used = false;
         }
+        let mut evicted = false;
         while self.allocated_bytes() > self.budget && self.entries.len() > 1 {
             let oldest = self
                 .entries
@@ -58,7 +59,9 @@ impl TexturePool {
                 .map(|(index, _)| index)
                 .unwrap_or(0);
             self.entries.swap_remove(oldest);
+            evicted = true;
         }
+        evicted
     }
 
     pub fn acquire(&mut self, device: &wgpu::Device, width: u32, height: u32) -> usize {
@@ -105,6 +108,18 @@ impl TexturePool {
         });
         self.peak = self.peak.max(self.allocated_bytes());
         self.entries.len() - 1
+    }
+
+    pub fn retain(&mut self, index: usize) -> bool {
+        let Some(entry) = self.entries.get_mut(index) else {
+            return false;
+        };
+        if entry.used {
+            return false;
+        }
+        entry.used = true;
+        entry.last_frame = self.frame;
+        true
     }
 
     pub fn texture(&self, index: usize) -> &Texture {

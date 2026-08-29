@@ -2,6 +2,11 @@ use std::{cell::RefCell, collections::VecDeque, rc::Rc, time::Duration};
 
 use argui_core::{Point, Rect};
 
+mod trace;
+
+use trace::TraceDocument;
+pub use trace::{TRACE_VERSION, TraceError};
+
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct InspectNodeId(pub u64);
 
@@ -185,7 +190,41 @@ pub struct TreeSnapshot {
     pub nodes: Vec<NodeSnapshot>,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct AdapterRecord {
+    pub name: String,
+    pub vendor: u32,
+    pub device: u32,
+    pub device_type: String,
+    pub driver: String,
+    pub driver_info: String,
+    pub backend: String,
+    pub features: String,
+    pub timestamp_queries: bool,
+    pub max_texture_dimension_2d: u32,
+    pub max_buffer_size: u64,
+    pub max_storage_buffer_binding_size: u64,
+    pub max_bind_groups: u32,
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct GpuPassRecord {
+    pub label: String,
+    pub start: Duration,
+    pub duration: Duration,
+    pub pixels: u64,
+    pub object_domain: Option<String>,
+    pub object_id: Option<u64>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct GpuFrameRecord {
+    pub sequence: u64,
+    pub total: Duration,
+    pub passes: Vec<GpuPassRecord>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct FrameRecord {
     pub interval: Duration,
     pub model: Duration,
@@ -199,14 +238,18 @@ pub struct FrameRecord {
     pub layers: usize,
     pub passes: usize,
     pub offscreen_pixels: u64,
+    pub cached_layers: usize,
+    pub damaged_pixels: u64,
     pub textures: usize,
     pub reused_textures: usize,
     pub texture_bytes: u64,
+    pub adapter: AdapterRecord,
+    pub gpu: Option<GpuFrameRecord>,
 }
 
 impl FrameRecord {
     #[must_use]
-    pub fn total_cpu(self) -> Duration {
+    pub fn total_cpu(&self) -> Duration {
         self.model + self.surface + self.tree + self.layout + self.paint + self.render_cpu
     }
 }
@@ -228,6 +271,7 @@ struct InspectorState {
     hovered: Option<InspectNodeId>,
     overrides: Vec<StyleOverride>,
     paused: bool,
+    recording: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -252,6 +296,7 @@ impl InspectorHandle {
             hovered: None,
             overrides: Vec::new(),
             paused: false,
+            recording: true,
         })))
     }
 
@@ -275,7 +320,7 @@ impl InspectorHandle {
 
     pub fn record_ui(&self, record: FrameRecord) {
         let mut state = self.0.borrow_mut();
-        if state.paused || state.capacity == 0 {
+        if state.paused || !state.recording || state.capacity == 0 {
             return;
         }
         if state.frames.len() == state.capacity {
@@ -286,7 +331,7 @@ impl InspectorHandle {
 
     pub fn record_render(&self, record: FrameRecord) {
         let mut state = self.0.borrow_mut();
-        if state.paused || state.capacity == 0 {
+        if state.paused || !state.recording || state.capacity == 0 {
             return;
         }
         if let Some(frame) = state.frames.back_mut() {
@@ -294,9 +339,13 @@ impl InspectorHandle {
             frame.layers = record.layers;
             frame.passes = record.passes;
             frame.offscreen_pixels = record.offscreen_pixels;
+            frame.cached_layers = record.cached_layers;
+            frame.damaged_pixels = record.damaged_pixels;
             frame.textures = record.textures;
             frame.reused_textures = record.reused_textures;
             frame.texture_bytes = record.texture_bytes;
+            frame.adapter = record.adapter;
+            frame.gpu = record.gpu;
         } else {
             state.frames.push_back(record);
         }
@@ -304,7 +353,7 @@ impl InspectorHandle {
 
     #[must_use]
     pub fn frames(&self) -> Vec<FrameRecord> {
-        self.0.borrow().frames.iter().copied().collect()
+        self.0.borrow().frames.iter().cloned().collect()
     }
 
     pub fn clear_frames(&self) {
@@ -318,6 +367,16 @@ impl InspectorHandle {
     #[must_use]
     pub fn paused(&self) -> bool {
         self.0.borrow().paused
+    }
+
+    pub fn set_recording(&self, recording: bool) {
+        self.0.borrow_mut().recording = recording;
+    }
+
+    #[must_use]
+    pub fn recording(&self) -> bool {
+        let state = self.0.borrow();
+        state.recording && !state.paused
     }
 
     pub fn select(&self, node: Option<InspectNodeId>) {
@@ -447,34 +506,27 @@ impl InspectorHandle {
         self.0.borrow_mut().overrides.clear();
     }
 
-    #[must_use]
-    pub fn trace_text(&self) -> String {
+    pub fn trace_json(&self) -> Result<String, TraceError> {
         let state = self.0.borrow();
-        let mut output = String::from("argui-profile-v1\n");
-        output.push_str(&format!(
-            "tree revision={} nodes={} selected={:?}\n",
+        serde_json::to_string_pretty(&TraceDocument::capture(
             state.tree.revision,
             state.tree.nodes.len(),
-            state.selected.map(|id| id.0)
-        ));
-        for (index, frame) in state.frames.iter().enumerate() {
-            output.push_str(&format!(
-                "frame {index}: interval={:.3}ms model={:.3}ms tree={:.3}ms paint={:.3}ms render={:.3}ms invalidation={:?} layers={} passes={} offscreen_px={} textures={} reused={} bytes={}\n",
-                frame.interval.as_secs_f64() * 1_000.0,
-                frame.model.as_secs_f64() * 1_000.0,
-                frame.tree.as_secs_f64() * 1_000.0,
-                frame.paint.as_secs_f64() * 1_000.0,
-                frame.render_cpu.as_secs_f64() * 1_000.0,
-                frame.update,
-                frame.layers,
-                frame.passes,
-                frame.offscreen_pixels,
-                frame.textures,
-                frame.reused_textures,
-                frame.texture_bytes,
-            ));
-        }
-        output
+            state.selected,
+            &state.frames,
+        ))
+        .map_err(|error| TraceError::InvalidJson(error.to_string()))
+    }
+
+    pub fn import_trace_json(&self, json: &str) -> Result<(), TraceError> {
+        let document: TraceDocument = serde_json::from_str(json)
+            .map_err(|error| TraceError::InvalidJson(error.to_string()))?;
+        document.validate_version()?;
+        let mut state = self.0.borrow_mut();
+        let (revision, selected, frames) = document.into_records();
+        state.frames = frames.into();
+        state.tree.revision = revision;
+        state.selected = selected;
+        Ok(())
     }
 }
 

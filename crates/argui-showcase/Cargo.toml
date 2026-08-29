@@ -9,7 +9,7 @@ publish = false
 [dependencies]
 argui-animation.workspace = true
 argui-core.workspace = true
-argui-effects.workspace = true
+argui-effects = { workspace = true, features = ["artistic"] }
 argui-image.workspace = true
 argui-paint.workspace = true
 argui-runtime.workspace = true

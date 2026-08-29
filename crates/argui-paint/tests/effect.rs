@@ -1,7 +1,7 @@
 use argui_core::{Color, Point, Rect, Size};
 use argui_paint::{
-    BlendMode, CustomEffect, DisplayList, DisplayListError, Filter, LayerMask, LayerStyle,
-    ShaderEffectId, Shadow,
+    BlendMode, CornerRadii, DisplayList, DisplayListError, EffectArgument, EffectId,
+    EffectInstance, EffectValue, Filter, LayerMask, LayerStyle, Shadow,
 };
 
 fn bounds() -> Rect {
@@ -32,6 +32,13 @@ fn effect_layers_are_explicit_and_compute_conservative_bounds() {
     assert_eq!(scaled.bounds.size, Size::new(150.0, 75.0));
     assert!(matches!(scaled.filters[0], Filter::Blur(6.0)));
     assert_eq!(scaled.shadows[0].offset, [30.0, -3.0]);
+    assert_eq!(
+        LayerStyle::new(bounds())
+            .mask(LayerMask::Rounded(CornerRadii::all(3.0)))
+            .scaled(2.0)
+            .mask,
+        LayerMask::Rounded(CornerRadii::all(6.0))
+    );
 
     let glow = Shadow::glow(20.0, Color::WHITE)
         .blur(24.0)
@@ -74,8 +81,9 @@ fn every_layer_feature_independently_requests_offscreen_rendering() {
     );
     assert!(plain.mask(LayerMask::Bounds).requires_offscreen());
 
-    let outer = LayerStyle::new(bounds()).filter(Filter::Custom(
-        CustomEffect::new(ShaderEffectId(4), []).expansion(12.0),
+    let outer = LayerStyle::new(bounds()).filter(Filter::Effect(
+        EffectInstance::new(EffectId::new("test.outer"), Vec::<EffectArgument>::new())
+            .expansion(12.0),
     ));
     assert_eq!(outer.foreground_expansion(), 12.0);
     assert_eq!(outer.foreground_bounds().origin, Point::new(8.0, 18.0));
@@ -83,18 +91,23 @@ fn every_layer_feature_independently_requests_offscreen_rendering() {
 }
 
 #[test]
-fn custom_effect_pixel_parameters_follow_dpi_without_scaling_unitless_values() {
-    let effect = Filter::Custom(
-        CustomEffect::new(ShaderEffectId(8), [0.5, 12.0])
-            .pixel_parameter(1)
-            .expansion(8.0),
+fn effect_pixel_parameters_follow_dpi_without_scaling_unitless_values() {
+    let effect = Filter::Effect(
+        EffectInstance::new(
+            EffectId::new("test.scaled"),
+            [
+                ("unitless", EffectValue::F32(0.5)),
+                ("radius", EffectValue::LogicalPixels(12.0)),
+            ],
+        )
+        .expansion(8.0),
     );
-    let Filter::Custom(scaled) = effect.scaled(2.0) else {
-        panic!("expected a custom effect");
+    let Filter::Effect(scaled) = effect.scaled(2.0) else {
+        panic!("expected an effect instance");
     };
-    assert_eq!(scaled.parameters, [0.5, 24.0]);
+    assert_eq!(scaled.parameters[0].value, EffectValue::F32(0.5));
+    assert_eq!(scaled.parameters[1].value, EffectValue::LogicalPixels(24.0));
     assert_eq!(scaled.expansion, 16.0);
-    assert_eq!(scaled.pixel_parameters, 1 << 1);
 }
 
 #[test]

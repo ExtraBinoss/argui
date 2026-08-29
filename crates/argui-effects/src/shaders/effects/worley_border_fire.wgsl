@@ -62,7 +62,7 @@ fn argui_effect(
 ) -> vec4<f32> {
     let pixel = global_pixel(uv);
     let signed_distance = layer_rounded_distance(pixel);
-    let expansion = max(params.data.w, 1.0);
+    let expansion = max(argui_param_f32(3u), 1.0);
 
     // The fire is an outer-border effect. Most fragments belong either to the
     // layer content or to the transparent area beyond its expansion. Avoid the
@@ -75,12 +75,12 @@ fn argui_effect(
     let outside = smoothstep(-0.8, 0.8, signed_distance);
     let edge_fade = 1.0 - smoothstep(1.0, expansion, signed_distance);
     let metric = (pixel - params.bounds.xy) / min(params.bounds.z, params.bounds.w);
-    let flow = metric * max(params.data.z, 0.1);
-    let turbulence = clamp(worley_fbm(flow, params.data.x) * 1.14, 0.0, 1.0);
+    let flow = metric * max(argui_param_f32(2u), 0.1);
+    let turbulence = clamp(worley_fbm(flow, argui_param_f32(0u)) * 1.14, 0.0, 1.0);
     let radial_heat = pow(max(edge_fade, 0.0), 0.7);
     let heat = smoothstep(0.18, 0.92, turbulence * radial_heat + radial_heat * 0.28);
     let alpha = outside * edge_fade * smoothstep(0.08, 0.46, heat)
-        * clamp(params.data.y, 0.0, 1.0);
+        * clamp(argui_param_f32(1u), 0.0, 1.0);
     let fire = vec4<f32>(fire_palette(heat) * alpha, alpha);
     return fire + source * (1.0 - fire.a);
 }

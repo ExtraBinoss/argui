@@ -9,12 +9,27 @@ pub enum RendererError {
     GlyphAtlasFull,
     InvalidDisplayList(String),
     InvalidShader(String),
-    MissingShader(u64),
-    TooManyEffectParameters { provided: usize, maximum: usize },
+    MissingEffect(&'static str),
+    DuplicateEffect(&'static str),
+    InvalidEffectDefinition(String),
+    InvalidEffectParameters {
+        effect: &'static str,
+        message: String,
+    },
+    EffectParametersTooLarge {
+        provided: usize,
+        maximum: usize,
+    },
     MissingImage(u64),
     MissingVector(u64),
-    ImageCacheFull { requested: usize, capacity: usize },
-    TooManyGradientStops { provided: usize, capacity: usize },
+    ImageCacheFull {
+        requested: usize,
+        capacity: usize,
+    },
+    TooManyGradientStops {
+        provided: usize,
+        capacity: usize,
+    },
     Validation,
 }
 
@@ -34,10 +49,20 @@ impl fmt::Display for RendererError {
                 write!(formatter, "invalid display list: {message}")
             }
             Self::InvalidShader(message) => write!(formatter, "invalid effect shader: {message}"),
-            Self::MissingShader(id) => write!(formatter, "effect shader {id} is not registered"),
-            Self::TooManyEffectParameters { provided, maximum } => write!(
+            Self::MissingEffect(id) => write!(formatter, "effect '{id}' is not registered"),
+            Self::DuplicateEffect(id) => write!(formatter, "effect '{id}' is registered twice"),
+            Self::InvalidEffectDefinition(message) => {
+                write!(formatter, "invalid effect definition: {message}")
+            }
+            Self::InvalidEffectParameters { effect, message } => {
+                write!(
+                    formatter,
+                    "invalid parameters for effect '{effect}': {message}"
+                )
+            }
+            Self::EffectParametersTooLarge { provided, maximum } => write!(
                 formatter,
-                "custom effect has {provided} parameters but the ABI supports {maximum}"
+                "effect parameters need {provided} bytes but this adapter allows {maximum}"
             ),
             Self::MissingImage(id) => write!(formatter, "image {id} is not registered"),
             Self::MissingVector(id) => write!(formatter, "vector {id} is not registered"),

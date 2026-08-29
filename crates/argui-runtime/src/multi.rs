@@ -120,7 +120,7 @@ impl MultiApplication {
         );
         let mut runtime = Application::new(
             spec.window.clone(),
-            self.renderer_config,
+            self.renderer_config.clone(),
             self.initial_text_engine.take().unwrap_or_default(),
             None,
             Some(UiTree::new(root)),
@@ -470,10 +470,6 @@ impl Render for WindowModel {
     fn layout_changed(&mut self, layout: &LayoutSnapshot, cx: &mut Context<Self>) {
         let update = self.model.borrow_mut().layout_changed(&self.key, layout);
         request_update(cx, self.record(update));
-    }
-
-    fn effect_shaders(&self) -> &'static [argui_render::EffectShader] {
-        self.model.borrow().effect_shaders()
     }
 
     fn image_assets(&self) -> Vec<argui_paint::ImageAsset> {

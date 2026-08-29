@@ -16,7 +16,6 @@ mod multi;
 mod translate;
 
 pub use application::{AppCommand, AppEvent, AppModel, AppUpdate, WindowInvalidation};
-pub use argui_render::EffectShader;
 pub use error::RuntimeError;
 pub use event::{AnimationProfile, RuntimeEvent, WindowRuntimeEvent};
 pub use launch::{

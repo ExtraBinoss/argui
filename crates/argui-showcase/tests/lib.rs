@@ -58,10 +58,11 @@ fn shared_showcase_builds_one_tree_and_embeds_its_fonts() {
 
     assert_eq!(app.view().children.len(), 1);
     assert!(text.measure("Argui", &TextStyle::default(), None).width > 0.0);
-    let shader_ids: Vec<_> = app
-        .effect_shaders()
+    let shader_ids: Vec<_> = argui_effects::registry()
+        .unwrap()
+        .definitions()
         .iter()
-        .map(|shader| shader.id)
+        .map(|definition| definition.id)
         .collect();
     assert_eq!(
         shader_ids,

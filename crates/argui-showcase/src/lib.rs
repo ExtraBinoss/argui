@@ -10,7 +10,7 @@ use argui_animation::{
     Keyframes, PlaybackState, Spring, Timeline, Timing,
 };
 use argui_paint::{Border, ClipBehavior, Color, CornerRadii, ImageAsset, PaintStyle, QuadStyle};
-use argui_runtime::{Context, EffectShader, Render, ViewUpdate};
+use argui_runtime::{Context, Render, ViewUpdate};
 use argui_text::{TextColor, TextEngine, TextStyle, TextWrap};
 use argui_ui::{
     Align, Button, ButtonStyle, Edges, Element, Inset, Length, ScrollConfig, TextInput,
@@ -90,10 +90,6 @@ impl Default for StateShowcase {
 }
 
 impl StateShowcase {
-    pub fn effect_shaders(&self) -> &'static [EffectShader] {
-        popover::EFFECT_SHADERS
-    }
-
     pub fn image_assets(&self) -> Vec<ImageAsset> {
         self.images.assets().to_vec()
     }
@@ -388,10 +384,6 @@ impl Render for StateShowcase {
 
     fn wants_animation_frame(&self) -> bool {
         StateShowcase::wants_animation_frame(self)
-    }
-
-    fn effect_shaders(&self) -> &'static [EffectShader] {
-        StateShowcase::effect_shaders(self)
     }
 
     fn image_assets(&self) -> Vec<ImageAsset> {

@@ -1,7 +1,7 @@
 use argui_core::{Affine2D, Transform2D};
 use argui_inspect::{
-    InspectNodeId, NodeSnapshot, PropertySnapshot, StyleField, StyleLength, StyleProperty,
-    StyleUnit, StyleValue, TreeSnapshot,
+    InspectNodeId, NodeSnapshot, StyleField, StyleLength, StyleProperty, StyleUnit, StyleValue,
+    TreeSnapshot,
 };
 use argui_paint::{
     Border, ClipBehavior, ClipChain, ClipRegion, Color, CornerRadii, Fill, Filter, LayerStyle, Quad,
@@ -12,7 +12,14 @@ use crate::AnyEntity;
 
 use super::Application;
 
+mod values;
+
+use values::properties;
+#[cfg(test)]
+use values::property_value;
+
 impl Application {
+    #[cfg_attr(coverage_nightly, coverage(off))]
     pub(crate) fn inspected_view(&self) -> Option<Element> {
         let mut root = self.model.as_ref().map(AnyEntity::render)?;
         let Some(inspector) = &self.inspector else {
@@ -195,177 +202,6 @@ fn short(value: &str) -> String {
     output
 }
 
-fn properties(element: &Element) -> Vec<PropertySnapshot> {
-    StyleProperty::ALL
-        .into_iter()
-        .map(|property| {
-            let authored = match property {
-                StyleProperty::Background => element.paint.quad.background.is_some(),
-                StyleProperty::Border => element.paint.quad.border.is_some(),
-                StyleProperty::Opacity => element.paint.quad.opacity != 1.0,
-                StyleProperty::Clip => element.paint.clip != ClipBehavior::None,
-                StyleProperty::Transform => element.transform != Transform2D::IDENTITY,
-                StyleProperty::Layer => element.layer.is_some(),
-                StyleProperty::Effects => !element.effects.is_empty(),
-                StyleProperty::Width => element.style.width != Length::Auto,
-                StyleProperty::Height => element.style.height != Length::Auto,
-            };
-            PropertySnapshot {
-                property,
-                authored,
-                value: property_value(element, property),
-            }
-        })
-        .collect()
-}
-
-fn property_value(element: &Element, property: StyleProperty) -> StyleValue {
-    match property {
-        StyleProperty::Background => match &element.paint.quad.background {
-            Some(Fill::Solid(color)) => StyleValue::Color(color.as_array()),
-            Some(Fill::Linear(gradient)) => {
-                StyleValue::Summary(format!("linear gradient · {} stops", gradient.stops.len()))
-            }
-            Some(Fill::Radial(gradient)) => {
-                StyleValue::Summary(format!("radial gradient · {} stops", gradient.stops.len()))
-            }
-            None => StyleValue::Summary("none".into()),
-        },
-        StyleProperty::Border => element.paint.quad.border.map_or_else(
-            || StyleValue::Summary("none".into()),
-            |border| {
-                let [left, right, top, bottom] = border.widths.as_array();
-                let [red, green, blue, alpha] = border.color.as_array();
-                StyleValue::Parameters(fields([
-                    ("left", left),
-                    ("right", right),
-                    ("top", top),
-                    ("bottom", bottom),
-                    ("red", red),
-                    ("green", green),
-                    ("blue", blue),
-                    ("alpha", alpha),
-                ]))
-            },
-        ),
-        StyleProperty::Opacity => StyleValue::Number(element.paint.quad.opacity),
-        StyleProperty::Clip => StyleValue::Choice(format!("{:?}", element.paint.clip)),
-        StyleProperty::Transform => {
-            let transform = element.transform;
-            StyleValue::Parameters(fields([
-                ("translate x", transform.translation.x),
-                ("translate y", transform.translation.y),
-                ("scale x", transform.scale.x),
-                ("scale y", transform.scale.y),
-                ("rotation", transform.rotation),
-                ("skew x", transform.skew.x),
-                ("skew y", transform.skew.y),
-            ]))
-        }
-        StyleProperty::Layer => element.layer.as_ref().map_or_else(
-            || StyleValue::Summary("none".into()),
-            |layer| StyleValue::Parameters(layer_fields("", layer)),
-        ),
-        StyleProperty::Effects => {
-            let mut output = Vec::new();
-            for (index, effect) in element.effects.iter().enumerate() {
-                output.extend(layer_fields(&format!("effect {index} · "), &effect.layer));
-            }
-            if output.is_empty() {
-                StyleValue::Summary("none".into())
-            } else {
-                StyleValue::Parameters(output)
-            }
-        }
-        StyleProperty::Width => StyleValue::Length(length_value(element.style.width)),
-        StyleProperty::Height => StyleValue::Length(length_value(element.style.height)),
-    }
-}
-
-fn length_value(length: Length) -> StyleLength {
-    match length {
-        Length::Auto => StyleLength::default(),
-        Length::Px(value) => StyleLength {
-            value,
-            unit: StyleUnit::Px,
-        },
-        Length::Percent(value) => StyleLength {
-            value,
-            unit: StyleUnit::Percent,
-        },
-    }
-}
-
-fn fields<const N: usize>(values: [(&str, f32); N]) -> Vec<StyleField> {
-    values
-        .into_iter()
-        .map(|(label, value)| StyleField {
-            label: label.into(),
-            value,
-        })
-        .collect()
-}
-
-fn layer_fields(prefix: &str, layer: &LayerStyle) -> Vec<StyleField> {
-    let mut output = vec![StyleField {
-        label: format!("{prefix}opacity"),
-        value: layer.opacity,
-    }];
-    for (index, filter) in layer.filters.iter().enumerate() {
-        filter_fields(&format!("{prefix}filter {index} · "), filter, &mut output);
-    }
-    for (index, filter) in layer.backdrop_filters.iter().enumerate() {
-        filter_fields(&format!("{prefix}backdrop {index} · "), filter, &mut output);
-    }
-    for (index, shadow) in layer.shadows.iter().enumerate() {
-        let shadow_prefix = format!("{prefix}shadow {index} · ");
-        let [red, green, blue, alpha] = shadow.color.as_array();
-        output.extend(fields([
-            (&format!("{shadow_prefix}offset x"), shadow.offset[0]),
-            (&format!("{shadow_prefix}offset y"), shadow.offset[1]),
-            (&format!("{shadow_prefix}blur"), shadow.blur),
-            (&format!("{shadow_prefix}spread"), shadow.spread),
-            (&format!("{shadow_prefix}red"), red),
-            (&format!("{shadow_prefix}green"), green),
-            (&format!("{shadow_prefix}blue"), blue),
-            (&format!("{shadow_prefix}alpha"), alpha),
-        ]));
-    }
-    output
-}
-
-fn filter_fields(prefix: &str, filter: &Filter, output: &mut Vec<StyleField>) {
-    let mut push = |label: &str, value| {
-        output.push(StyleField {
-            label: format!("{prefix}{label}"),
-            value,
-        });
-    };
-    match filter {
-        Filter::Blur(value) => push("blur", *value),
-        Filter::Brightness(value) => push("brightness", *value),
-        Filter::Contrast(value) => push("contrast", *value),
-        Filter::Saturation(value) => push("saturation", *value),
-        Filter::HueRotate(value) => push("hue", *value),
-        Filter::Opacity(value) => push("opacity", *value),
-        Filter::ColorMatrix(values) => {
-            for (index, value) in values.iter().enumerate() {
-                push(&format!("matrix {index}"), *value);
-            }
-        }
-        Filter::Refraction(value) => {
-            push("strength", value.strength);
-            push("chromatic aberration", value.chromatic_aberration);
-            push("edge", value.edge);
-        }
-        Filter::Custom(effect) => {
-            for (index, value) in effect.parameters.iter().enumerate() {
-                push(&format!("custom {index}"), *value);
-            }
-        }
-    }
-}
-
 fn apply_overrides(
     element: &mut Element,
     node: NodeId,
@@ -541,13 +377,59 @@ fn apply_filter_fields(
                 current.edge = value;
             }
         }
-        Filter::Custom(current) => {
-            for (index, parameter) in current.parameters.iter_mut().enumerate() {
-                if let Some(value) = value(&format!("custom {index}")) {
-                    *parameter = value;
-                }
+        Filter::Effect(current) => {
+            for argument in &mut current.parameters {
+                apply_effect_value(
+                    &format!("effect {}", argument.name),
+                    &mut argument.value,
+                    &value,
+                );
             }
         }
+    }
+}
+
+fn apply_effect_value(
+    label: &str,
+    target: &mut argui_ui::EffectValue,
+    value: &impl Fn(&str) -> Option<f32>,
+) {
+    use argui_ui::EffectValue;
+    match target {
+        EffectValue::F32(current) | EffectValue::LogicalPixels(current) => {
+            set_filter_value(current, value(label));
+        }
+        EffectValue::I32(current) => {
+            if let Some(next) = value(label) {
+                *current = next.round() as i32;
+            }
+        }
+        EffectValue::U32(current) => {
+            if let Some(next) = value(label) {
+                *current = next.max(0.0).round() as u32;
+            }
+        }
+        EffectValue::Bool(current) => {
+            if let Some(next) = value(label) {
+                *current = next >= 0.5;
+            }
+        }
+        EffectValue::Vec2(values) => apply_components(label, values, value),
+        EffectValue::Vec3(values) => apply_components(label, values, value),
+        EffectValue::Vec4(values) => apply_components(label, values, value),
+        EffectValue::Mat3(values) => apply_components(label, values, value),
+        EffectValue::Mat4(values) => apply_components(label, values, value),
+        EffectValue::Color(color) => {
+            let mut components = color.as_array();
+            apply_components(label, &mut components, value);
+            *color = Color::rgba(components[0], components[1], components[2], components[3]);
+        }
+    }
+}
+
+fn apply_components(label: &str, values: &mut [f32], value: &impl Fn(&str) -> Option<f32>) {
+    for (component, current) in values.iter_mut().enumerate() {
+        set_filter_value(current, value(&format!("{label} {component}")));
     }
 }
 

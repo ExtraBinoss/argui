@@ -1,11 +1,12 @@
 use std::{collections::HashMap, mem::size_of};
 
-use argui_paint::ShaderEffectId;
+use argui_paint::EffectId;
 use bytemuck::{Pod, Zeroable};
 use wgpu::util::DeviceExt;
 
 use crate::{
     RendererError,
+    gpu_profile::GpuFrameCapture,
     target::{PixelRegion, TextureTarget},
 };
 
@@ -58,11 +59,14 @@ impl Default for EffectUniform {
 
 pub(crate) struct EffectGpu {
     pipeline: wgpu::RenderPipeline,
-    custom: HashMap<ShaderEffectId, wgpu::RenderPipeline>,
+    custom: HashMap<(EffectId, usize), wgpu::RenderPipeline>,
     layout: wgpu::BindGroupLayout,
     format: wgpu::TextureFormat,
     sampler: wgpu::Sampler,
     uniforms: wgpu::Buffer,
+    parameters: wgpu::Buffer,
+    parameter_stride: u64,
+    parameter_binding_size: u64,
     next_slot: u64,
 }
 
@@ -74,12 +78,23 @@ pub(crate) struct EffectDraw<'a> {
     pub source: &'a wgpu::TextureView,
     pub backdrop: &'a wgpu::TextureView,
     pub uniform: EffectUniform,
-    pub shader: Option<ShaderEffectId>,
+    pub shader: Option<(EffectId, usize)>,
+    pub parameters: &'a [u32],
+    pub profiler: Option<&'a GpuFrameCapture>,
+    pub profile_label: &'a str,
+    pub profile_object: Option<argui_paint::RenderObjectId>,
 }
 
 #[cfg_attr(coverage_nightly, coverage(off))]
 impl EffectGpu {
-    pub fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
+    pub fn new(
+        device: &wgpu::Device,
+        format: wgpu::TextureFormat,
+        maximum_parameter_words: usize,
+    ) -> Self {
+        let parameter_binding_size = (maximum_parameter_words.max(1) * size_of::<u32>()) as u64;
+        let alignment = u64::from(device.limits().min_storage_buffer_offset_alignment.max(1));
+        let parameter_stride = parameter_binding_size.div_ceil(alignment) * alignment;
         let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("argui-effect-layout"),
             entries: &[
@@ -89,6 +104,16 @@ impl EffectGpu {
                     binding: 2,
                     visibility: wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 4,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: true,
+                        min_binding_size: wgpu::BufferSize::new(parameter_binding_size),
+                    },
                     count: None,
                 },
                 wgpu::BindGroupLayoutEntry {
@@ -119,6 +144,12 @@ impl EffectGpu {
             contents: &vec![0; (UNIFORM_STRIDE * UNIFORM_CAPACITY) as usize],
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
+        let parameters = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("argui-effect-parameters"),
+            size: parameter_stride * UNIFORM_CAPACITY,
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
         Self {
             pipeline,
             custom: HashMap::new(),
@@ -126,6 +157,9 @@ impl EffectGpu {
             format,
             sampler,
             uniforms,
+            parameters,
+            parameter_stride,
+            parameter_binding_size,
             next_slot: 0,
         }
     }
@@ -137,7 +171,8 @@ impl EffectGpu {
     pub fn register(
         &mut self,
         device: &wgpu::Device,
-        id: ShaderEffectId,
+        id: EffectId,
+        pass: usize,
         source: &str,
     ) -> Result<(), RendererError> {
         let source = validated_custom_source(source)?;
@@ -146,14 +181,14 @@ impl EffectGpu {
             source: wgpu::ShaderSource::Wgsl(source.into()),
         });
         self.custom.insert(
-            id,
+            (id, pass),
             create_pipeline(device, self.format, &self.layout, &shader),
         );
         Ok(())
     }
 
-    pub fn contains(&self, id: ShaderEffectId) -> bool {
-        self.custom.contains_key(&id)
+    pub fn contains(&self, id: EffectId) -> bool {
+        self.custom.keys().any(|(candidate, _)| *candidate == id)
     }
 
     pub fn draw(
@@ -166,7 +201,15 @@ impl EffectGpu {
         let slot = self.next_slot % UNIFORM_CAPACITY;
         self.next_slot += 1;
         let offset = slot * UNIFORM_STRIDE;
+        let parameter_offset = slot * self.parameter_stride;
         queue.write_buffer(&self.uniforms, offset, bytemuck::bytes_of(&draw.uniform));
+        if !draw.parameters.is_empty() {
+            queue.write_buffer(
+                &self.parameters,
+                parameter_offset,
+                bytemuck::cast_slice(draw.parameters),
+            );
+        }
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("argui-effect-bind-group"),
             layout: &self.layout,
@@ -174,6 +217,14 @@ impl EffectGpu {
                 wgpu::BindGroupEntry {
                     binding: 0,
                     resource: wgpu::BindingResource::TextureView(draw.source),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 4,
+                    resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                        buffer: &self.parameters,
+                        offset: 0,
+                        size: wgpu::BufferSize::new(self.parameter_binding_size),
+                    }),
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
@@ -202,9 +253,17 @@ impl EffectGpu {
                 store: wgpu::StoreOp::Store,
             },
         });
+        let timestamp_writes = draw.profiler.and_then(|profiler| {
+            profiler.timestamp_writes(
+                draw.profile_label,
+                draw.profile_object,
+                u64::from(draw.output_region.size[0]) * u64::from(draw.output_region.size[1]),
+            )
+        });
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("argui-effect-pass"),
             color_attachments: &[attachment],
+            timestamp_writes,
             ..Default::default()
         });
         let viewport = TextureTarget::new(0, draw.target_region, draw.target_extent)
@@ -221,7 +280,7 @@ impl EffectGpu {
                 .and_then(|id| self.custom.get(&id))
                 .unwrap_or(&self.pipeline),
         );
-        pass.set_bind_group(0, &bind_group, &[offset as u32]);
+        pass.set_bind_group(0, &bind_group, &[offset as u32, parameter_offset as u32]);
         pass.draw(0..3, 0..1);
     }
 }
@@ -401,7 +460,7 @@ fn argui_effect(uv: vec2<f32>, source: vec4<f32>, backdrop: vec4<f32>) -> vec4<f
             );
             let source_view = source.create_view(&Default::default());
             let target_view = target.create_view(&Default::default());
-            let mut gpu = EffectGpu::new(&device, descriptor.format);
+            let mut gpu = EffectGpu::new(&device, descriptor.format, 1);
             let mut encoder = device.create_command_encoder(&Default::default());
             let region = PixelRegion::viewport(1, 1);
             let mut uniform = EffectUniform {
@@ -429,6 +488,10 @@ fn argui_effect(uv: vec2<f32>, source: vec4<f32>, backdrop: vec4<f32>) -> vec4<f
                     backdrop: &source_view,
                     uniform,
                     shader: None,
+                    parameters: &[],
+                    profiler: None,
+                    profile_label: "test.effect",
+                    profile_object: None,
                 },
             );
             let readback = device.create_buffer(&wgpu::BufferDescriptor {

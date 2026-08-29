@@ -105,9 +105,11 @@ The summary ranks costs by total time, peak time, pixels, allocations and
 invalidation count. CPU timings must not be labelled GPU time; unsupported GPU
 timestamps are displayed as unavailable.
 
-Recording defaults to a fixed ring, initially 300 frames. Pause freezes the
-history, clear releases it, and export writes a versioned data-only trace. WASM
-export uses a browser download; native export uses a caller-selected path.
+Recording uses a fixed ring of 300 frames and is active only while the dock is
+open and not paused. Pause freezes the history, clear releases it, and export
+writes strict `argui-gpu-trace-v1` JSON. Unknown versions, fields and enum
+values are rejected during import. The same data-only document can be compared
+across Linux, Windows, macOS and WebGPU without platform-specific parsing.
 
 ## Build sequence
 

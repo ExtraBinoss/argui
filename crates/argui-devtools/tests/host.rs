@@ -137,7 +137,8 @@ fn dock_controls_cover_filter_scroll_pause_clear_and_resize() {
     host.update(&event("__devtools-copy", UiEventKind::Clicked));
     assert!(matches!(
         host.take_clipboard_request(),
-        Some(argui_ui::ClipboardRequest::Write(trace)) if trace.contains("argui-profile-v1")
+        Some(argui_ui::ClipboardRequest::Write(trace))
+            if trace.contains("argui-gpu-trace-v1")
     ));
     assert_eq!(host.take_clipboard_request(), None);
     host.update(&event("__devtools-section-0", UiEventKind::Clicked));
@@ -289,7 +290,6 @@ fn host_animation_and_layout_delegation_keep_the_app_viewport_explicit() {
         }),
         ViewUpdate::None
     );
-    assert!(host.effect_shaders().is_empty());
     assert!(host.image_assets().is_empty());
     assert_eq!(host.vector_assets().len(), 3);
     assert!(Render::inspector(&host).is_some());

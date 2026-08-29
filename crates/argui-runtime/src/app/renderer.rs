@@ -3,8 +3,8 @@ use std::sync::Arc;
 #[cfg(target_arch = "wasm32")]
 use std::rc::Rc;
 
-use argui_inspect::{FrameRecord, Invalidation};
-use argui_render::{EffectShader, RenderStatus, SurfaceRenderer};
+use argui_inspect::{AdapterRecord, FrameRecord, GpuFrameRecord, GpuPassRecord, Invalidation};
+use argui_render::{AdapterProfile, GpuFrameProfile, RenderStatus, SurfaceRenderer};
 use winit::{event_loop::ActiveEventLoop, window::Window};
 
 use crate::{RuntimeEvent, app::Application};
@@ -27,7 +27,7 @@ impl Application {
                     Arc::clone(window),
                     size.width,
                     size.height,
-                    self.renderer_config,
+                    self.renderer_config.clone(),
                 ))
             },
             |device| {
@@ -35,7 +35,7 @@ impl Application {
                     Arc::clone(window),
                     size.width,
                     size.height,
-                    self.renderer_config,
+                    self.renderer_config.clone(),
                     device,
                 ))
             },
@@ -44,12 +44,6 @@ impl Application {
             Ok(mut renderer) => {
                 if self.renderer_device.borrow().is_none() {
                     *self.renderer_device.borrow_mut() = Some(renderer.device_handle());
-                }
-                if let Err(error) = register_effect_shaders(&mut renderer, &self.effect_shaders) {
-                    (self.on_event)(RuntimeEvent::RendererFailed(error.to_string()));
-                    self.fatal_error = Some(error.into());
-                    event_loop.exit();
-                    return;
                 }
                 if let Err(error) = register_images(&mut renderer, &self.image_assets) {
                     (self.on_event)(RuntimeEvent::RendererFailed(error.to_string()));
@@ -79,8 +73,7 @@ impl Application {
         let window = Arc::clone(window);
         let renderer = Rc::clone(&self.renderer);
         let renderer_device = Rc::clone(&self.renderer_device);
-        let config = self.renderer_config;
-        let effect_shaders = self.effect_shaders.clone();
+        let config = self.renderer_config.clone();
         let image_assets = self.image_assets.clone();
         let vector_assets = self.vector_assets.clone();
 
@@ -105,12 +98,10 @@ impl Application {
                     }
                     let current_size = window.inner_size();
                     surface.resize(current_size.width, current_size.height);
-                    register_effect_shaders(&mut surface, &effect_shaders)
-                        .and_then(|()| register_images(&mut surface, &image_assets))
-                        .map(|()| {
-                            register_vectors(&mut surface, &vector_assets);
-                            surface
-                        })
+                    register_images(&mut surface, &image_assets).map(|()| {
+                        register_vectors(&mut surface, &vector_assets);
+                        surface
+                    })
                 }
                 Err(error) => Err(error),
             };
@@ -142,8 +133,13 @@ impl Application {
             self.renderer_announced = true;
         }
 
+        renderer.set_profiling_active(self.inspector.as_ref().map_or(
+            self.renderer_config.profiling,
+            argui_inspect::InspectorHandle::recording,
+        ));
+
         if let Some(inspector) = &self.inspector {
-            inspector.record_ui(self.frame_record);
+            inspector.record_ui(self.frame_record.clone());
         }
         if self.renderer_config.profiling {
             (self.on_event)(RuntimeEvent::AnimationProfile(crate::AnimationProfile {
@@ -183,14 +179,20 @@ impl Application {
                         layers: profile.effects.offscreen_layers,
                         passes: profile.effects.filter_passes,
                         offscreen_pixels: profile.effects.offscreen_pixels,
+                        cached_layers: profile.effects.cached_layers,
+                        damaged_pixels: profile.effects.damaged_pixels,
                         textures: profile.texture_pool.textures,
                         reused_textures: profile.texture_pool.reused_this_frame,
                         texture_bytes: profile.texture_pool.allocated_bytes,
+                        adapter: adapter_record(&profile.adapter),
+                        gpu: profile.gpu.as_ref().map(gpu_record),
                         ..FrameRecord::default()
                     });
                 }
                 if self.renderer_config.profiling {
-                    (self.on_event)(RuntimeEvent::RenderProfile(renderer.last_profile()));
+                    (self.on_event)(RuntimeEvent::RenderProfile(Box::new(
+                        renderer.last_profile(),
+                    )));
                 }
                 Ok(())
             }
@@ -213,6 +215,43 @@ impl Application {
     }
 }
 
+fn adapter_record(profile: &AdapterProfile) -> AdapterRecord {
+    AdapterRecord {
+        name: profile.name.clone(),
+        vendor: profile.vendor,
+        device: profile.device,
+        device_type: profile.device_type.clone(),
+        driver: profile.driver.clone(),
+        driver_info: profile.driver_info.clone(),
+        backend: profile.backend.clone(),
+        features: profile.features.clone(),
+        timestamp_queries: profile.timestamp_queries,
+        max_texture_dimension_2d: profile.max_texture_dimension_2d,
+        max_buffer_size: profile.max_buffer_size,
+        max_storage_buffer_binding_size: profile.max_storage_buffer_binding_size,
+        max_bind_groups: profile.max_bind_groups,
+    }
+}
+
+fn gpu_record(profile: &GpuFrameProfile) -> GpuFrameRecord {
+    GpuFrameRecord {
+        sequence: profile.frame,
+        total: profile.total,
+        passes: profile
+            .passes
+            .iter()
+            .map(|pass| GpuPassRecord {
+                label: pass.label.clone(),
+                start: pass.start,
+                duration: pass.duration,
+                pixels: pass.pixels,
+                object_domain: pass.object.map(|object| format!("{:?}", object.domain)),
+                object_id: pass.object.map(|object| object.value),
+            })
+            .collect(),
+    }
+}
+
 fn register_vectors(renderer: &mut SurfaceRenderer, assets: &[argui_paint::VectorAsset]) {
     for asset in assets {
         renderer.register_vector(asset);
@@ -225,16 +264,6 @@ fn register_images(
 ) -> Result<(), argui_render::RendererError> {
     for image in images {
         renderer.register_image(image)?;
-    }
-    Ok(())
-}
-
-fn register_effect_shaders(
-    renderer: &mut SurfaceRenderer,
-    shaders: &[EffectShader],
-) -> Result<(), argui_render::RendererError> {
-    for shader in shaders {
-        renderer.register_effect_shader(shader.id, shader.wgsl)?;
     }
     Ok(())
 }

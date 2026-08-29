@@ -1,19 +1,19 @@
 use std::ops::Range;
 
 use argui_paint::{
-    CustomEffect, DisplayCommand, DisplayList, DisplayListError, Filter, LayerStyle,
+    DisplayCommand, DisplayList, DisplayListError, EffectInstance, Filter, LayerStyle,
 };
 
 use crate::batch::{DrawBatch, DrawKind};
 use crate::{effect_plan::plan_filters, target::PixelRegion};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) enum EffectNode {
     Draw(DrawBatch),
     Layer(EffectLayer),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) struct EffectLayer {
     pub style: LayerStyle,
     pub children: Vec<EffectNode>,
@@ -32,6 +32,8 @@ pub struct EffectGraphStats {
     pub draw_batches: usize,
     pub filter_passes: usize,
     pub offscreen_pixels: u64,
+    pub cached_layers: usize,
+    pub damaged_pixels: u64,
 }
 
 impl EffectGraph {
@@ -136,8 +138,8 @@ impl EffectGraph {
         self.stats().offscreen_layers != 0
     }
 
-    pub fn custom_effects(&self) -> Vec<&CustomEffect> {
-        fn visit<'a>(nodes: &'a [EffectNode], effects: &mut Vec<&'a CustomEffect>) {
+    pub fn effects(&self) -> Vec<&EffectInstance> {
+        fn visit<'a>(nodes: &'a [EffectNode], effects: &mut Vec<&'a EffectInstance>) {
             for node in nodes {
                 if let EffectNode::Layer(layer) = node {
                     for filter in layer
@@ -146,7 +148,7 @@ impl EffectGraph {
                         .iter()
                         .chain(&layer.style.backdrop_filters)
                     {
-                        if let Filter::Custom(effect) = filter {
+                        if let Filter::Effect(effect) = filter {
                             effects.push(effect);
                         }
                     }
@@ -190,7 +192,7 @@ fn push_node(roots: &mut Vec<EffectNode>, stack: &mut [EffectLayer], node: Effec
 #[cfg(test)]
 mod tests {
     use argui_core::{Point, Rect, Size};
-    use argui_paint::{CustomEffect, Filter, LayerStyle, ShaderEffectId};
+    use argui_paint::{EffectId, EffectInstance, EffectValue, Filter, LayerStyle};
 
     use super::{EffectGraph, EffectNode};
 
@@ -219,25 +221,31 @@ mod tests {
     #[test]
     fn graph_skips_empty_draws_and_collects_nested_custom_effects() {
         let bounds = Rect::new(Point::default(), Size::new(100.0, 100.0));
-        let foreground = CustomEffect::new(ShaderEffectId(7), [0.25]);
-        let backdrop = CustomEffect::new(ShaderEffectId(9), [0.75]);
+        let foreground = EffectInstance::new(
+            EffectId::new("test.foreground"),
+            [("amount", EffectValue::F32(0.25))],
+        );
+        let backdrop = EffectInstance::new(
+            EffectId::new("test.backdrop"),
+            [("amount", EffectValue::F32(0.75))],
+        );
         let mut list = argui_paint::DisplayList::new();
         list.push_text(0);
         list.push_text(1);
-        list.begin_layer(LayerStyle::new(bounds).filter(Filter::Custom(foreground.clone())));
-        list.begin_layer(LayerStyle::new(bounds).backdrop(Filter::Custom(backdrop.clone())));
+        list.begin_layer(LayerStyle::new(bounds).filter(Filter::Effect(foreground.clone())));
+        list.begin_layer(LayerStyle::new(bounds).backdrop(Filter::Effect(backdrop.clone())));
         list.push_text(2);
         list.end_layer();
         list.end_layer();
 
         let graph = EffectGraph::build(&list, &[0..2, 2..4, 0..0], [800.0, 600.0], 1.0).unwrap();
         assert_eq!(graph.stats().draw_batches, 1);
-        assert_eq!(graph.custom_effects(), vec![&foreground, &backdrop]);
+        assert_eq!(graph.effects(), vec![&foreground, &backdrop]);
 
         let plain =
             EffectGraph::build(&argui_paint::DisplayList::new(), &[], [800.0, 600.0], 1.0).unwrap();
         assert!(!plain.needs_offscreen_root());
-        assert!(plain.custom_effects().is_empty());
+        assert!(plain.effects().is_empty());
     }
 
     #[test]

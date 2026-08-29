@@ -35,15 +35,15 @@ fn renderer_errors_keep_actionable_context() {
         "invalid effect shader: bad WGSL"
     );
     assert_eq!(
-        RendererError::MissingShader(42).to_string(),
-        "effect shader 42 is not registered"
+        RendererError::MissingEffect("test.effect").to_string(),
+        "effect 'test.effect' is not registered"
     );
     assert_eq!(
-        RendererError::TooManyEffectParameters {
+        RendererError::EffectParametersTooLarge {
             provided: 25,
             maximum: 24,
         }
         .to_string(),
-        "custom effect has 25 parameters but the ABI supports 24"
+        "effect parameters need 25 bytes but this adapter allows 24"
     );
 }

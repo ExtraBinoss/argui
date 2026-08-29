@@ -2,8 +2,9 @@ use std::time::Duration;
 
 use argui_core::{Point, Rect, Size};
 use argui_inspect::{
-    FrameRecord, InspectNodeId, InspectorHandle, NodeSnapshot, PropertySnapshot, StyleLength,
-    StyleProperty, StyleUnit, StyleValue, TreeSnapshot,
+    AdapterRecord, FrameRecord, GpuFrameRecord, GpuPassRecord, InspectNodeId, InspectorHandle,
+    Invalidation, NodeSnapshot, PropertySnapshot, StyleLength, StyleProperty, StyleUnit,
+    StyleValue, TreeSnapshot,
 };
 
 fn node(id: u64, parent: Option<u64>, depth: usize, bounds: Rect, z_index: i32) -> NodeSnapshot {
@@ -222,7 +223,7 @@ fn snapshots_and_render_metrics_share_one_bounded_record() {
         texture_bytes: 8,
         ..FrameRecord::default()
     });
-    let frame = inspector.frames()[0];
+    let frame = inspector.frames()[0].clone();
     assert_eq!(frame.model, Duration::from_millis(1));
     assert_eq!(frame.render_cpu, Duration::from_millis(2));
     assert_eq!(frame.layers, 3);
@@ -330,4 +331,70 @@ fn hovered_highlight_temporarily_takes_priority_over_selection() {
     assert_eq!(inspector.highlighted(), Some(InspectNodeId(2)));
     inspector.set_hovered(None);
     assert_eq!(inspector.highlighted(), Some(InspectNodeId(1)));
+}
+
+#[test]
+fn gpu_trace_round_trip_preserves_strict_timeline_data() {
+    let inspector = InspectorHandle::default();
+    inspector.publish_tree(TreeSnapshot {
+        revision: 42,
+        nodes: vec![node(
+            9,
+            None,
+            0,
+            Rect::new(Point::default(), Size::new(100.0, 80.0)),
+            0,
+        )],
+    });
+    inspector.select(Some(InspectNodeId(9)));
+    inspector.record_ui(FrameRecord {
+        update: Invalidation::Paint,
+        adapter: AdapterRecord {
+            name: "Test GPU".into(),
+            backend: "Vulkan".into(),
+            features: "TIMESTAMP_QUERY".into(),
+            timestamp_queries: true,
+            ..AdapterRecord::default()
+        },
+        gpu: Some(GpuFrameRecord {
+            sequence: 7,
+            total: Duration::from_nanos(800),
+            passes: vec![GpuPassRecord {
+                label: "effect.test.main".into(),
+                start: Duration::from_nanos(100),
+                duration: Duration::from_nanos(300),
+                pixels: 4096,
+                object_domain: Some("Ui".into()),
+                object_id: Some(9),
+            }],
+        }),
+        ..FrameRecord::default()
+    });
+
+    let json = inspector.trace_json().unwrap();
+    let imported = InspectorHandle::default();
+    imported.import_trace_json(&json).unwrap();
+    let frame = imported.frames().pop().unwrap();
+    let pass = &frame.gpu.unwrap().passes[0];
+    assert_eq!(frame.update, Invalidation::Paint);
+    assert_eq!(frame.adapter.features, "TIMESTAMP_QUERY");
+    assert_eq!(pass.start, Duration::from_nanos(100));
+    assert_eq!(pass.duration, Duration::from_nanos(300));
+    assert_eq!(imported.selected(), Some(InspectNodeId(9)));
+}
+
+#[test]
+fn gpu_trace_rejects_unknown_versions_fields_and_enum_values() {
+    let inspector = InspectorHandle::default();
+    inspector.record_ui(FrameRecord::default());
+    let json = inspector.trace_json().unwrap();
+
+    let wrong_version = json.replace("argui-gpu-trace-v1", "argui-gpu-trace-v2");
+    assert!(inspector.import_trace_json(&wrong_version).is_err());
+
+    let unknown_field = json.replacen("{", "{\"unknown\":true,", 1);
+    assert!(inspector.import_trace_json(&unknown_field).is_err());
+
+    let invalid_invalidation = json.replacen("\"none\"", "\"invalid\"", 1);
+    assert!(inspector.import_trace_json(&invalid_invalidation).is_err());
 }

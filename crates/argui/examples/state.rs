@@ -38,7 +38,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }],
             ..TrayConfig::default()
         }),
-        RendererConfig::default().profiling(profiling),
+        RendererConfig::default()
+            .profiling(profiling)
+            .effects(argui_effects::registry()?),
         text_engine(),
         DevtoolsHost::new(StateShowcase::default()),
         move |event| {

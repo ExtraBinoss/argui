@@ -14,6 +14,7 @@ const BG: Color = Color::rgb(0.055, 0.065, 0.085);
 const PANEL: Color = Color::rgb(0.075, 0.09, 0.12);
 const LINE: Color = Color::rgb(0.18, 0.22, 0.29);
 const TEXT: TextColor = TextColor::rgb(0.85, 0.89, 0.95);
+const MUTED: TextColor = TextColor::rgb(0.55, 0.62, 0.72);
 const ACCENT: Color = Color::rgb(0.25, 0.72, 0.96);
 const RETAINED_TREE_LIMIT: usize = 512;
 
@@ -251,13 +252,8 @@ fn tree_row(node: &NodeSnapshot, selected: bool) -> Element {
 
 fn profiling_tab<A>(tools: &DevtoolsHost<A>) -> Element {
     let frames = &tools.profile_frames;
-    let latest = frames.last().copied().unwrap_or_default();
-    let bars = frames
-        .iter()
-        .rev()
-        .take(60)
-        .rev()
-        .map(|frame| frame_bar(*frame));
+    let latest = frames.last().cloned().unwrap_or_default();
+    let bars = frames.iter().rev().take(60).rev().map(frame_bar);
     Element::column([
         Element::row([
             small_button(
@@ -274,6 +270,10 @@ fn profiling_tab<A>(tools: &DevtoolsHost<A>) -> Element {
             icon_label_button("__devtools-copy", tools.icons.copy, "Copy trace"),
             metric(format!("frame {:.2} ms", millis(latest.interval))),
             metric(format!("CPU {:.2} ms", millis(latest.total_cpu()))),
+            metric(format!(
+                "GPU {:.2} ms",
+                latest.gpu.as_ref().map_or(0.0, |gpu| millis(gpu.total))
+            )),
             metric(format!("{} passes", latest.passes)),
             metric(format!(
                 "{:.1} MiB",
@@ -288,7 +288,8 @@ fn profiling_tab<A>(tools: &DevtoolsHost<A>) -> Element {
             .gap(2.0)
             .padding(Edges::all(8.0))
             .background(PANEL),
-        details(latest),
+        details(&latest),
+        gpu_waterfall(&latest),
         profiling_list(frames, tools.profiling_offset),
     ])
     .padding(Edges::all(12.0))
@@ -296,9 +297,9 @@ fn profiling_tab<A>(tools: &DevtoolsHost<A>) -> Element {
 }
 
 fn profiling_list(frames: &[FrameRecord], offset: f32) -> Element {
-    let ordered = frames.iter().rev().copied().collect::<Vec<_>>();
+    let ordered = frames.iter().rev().cloned().collect::<Vec<_>>();
     profiling_list_config(ordered.len()).build("__devtools-frames", offset, |index| {
-        let frame = ordered[index];
+        let frame = &ordered[index];
         Element::text(format!(
             "#{:03}  {:>6.2} ms · CPU {:>6.2} · {:?} · {} passes · {:.1} MiB",
             frames.len().saturating_sub(index),
@@ -340,7 +341,7 @@ fn icon_element(icon: VectorId, size: f32) -> Element {
         .shrink(0.0)
 }
 
-fn frame_bar(frame: FrameRecord) -> Element {
+fn frame_bar(frame: &FrameRecord) -> Element {
     let milliseconds = millis(frame.interval).max(millis(frame.total_cpu()));
     let missed = milliseconds > 18.0;
     Element::container([])
@@ -355,7 +356,7 @@ fn frame_bar(frame: FrameRecord) -> Element {
         .radius(CornerRadii::all(2.0))
 }
 
-fn details(frame: FrameRecord) -> Element {
+fn details(frame: &FrameRecord) -> Element {
     Element::column([
         metric(format!(
             "model {:.2} · surface {:.2} · tree {:.2} · layout {:.2} · paint {:.2} · render {:.2} ms",
@@ -367,15 +368,88 @@ fn details(frame: FrameRecord) -> Element {
             millis(frame.render_cpu)
         )),
         metric(format!(
-            "invalidation {:?} · layers {} · offscreen {} px",
-            frame.update, frame.layers, frame.offscreen_pixels
+            "invalidation {:?} · layers {} · cached {} · offscreen {} px · damaged {} px",
+            frame.update,
+            frame.layers,
+            frame.cached_layers,
+            frame.offscreen_pixels,
+            frame.damaged_pixels,
         )),
         metric(format!(
             "textures {} · reused {} · resize events {}",
             frame.textures, frame.reused_textures, frame.resize_events
         )),
+        metric(format!(
+            "adapter {} · {} · timestamps {} · features {}",
+            frame.adapter.name,
+            frame.adapter.backend,
+            if frame.adapter.timestamp_queries {
+                "on"
+            } else {
+                "unavailable"
+            },
+            frame.adapter.features,
+        )),
     ])
     .gap(8.0)
+}
+
+fn gpu_waterfall(frame: &FrameRecord) -> Element {
+    let Some(gpu) = &frame.gpu else {
+        return metric(if frame.adapter.timestamp_queries {
+            "GPU results pending".into()
+        } else {
+            "GPU timestamps unavailable on this adapter".into()
+        });
+    };
+    let total = gpu.total.as_secs_f64().max(f64::EPSILON);
+    let timeline = gpu.passes.iter().take(12).map(|pass| {
+        let start = (pass.start.as_secs_f64() / total).clamp(0.0, 1.0);
+        let duration = (pass.duration.as_secs_f64() / total).clamp(0.0, 1.0 - start);
+        Element::column([
+            Element::row([
+                Element::text(pass.label.clone())
+                    .text_style(text(11.0, TEXT))
+                    .grow(1.0),
+                Element::text(format!(
+                    "{:.3} ms · {} px",
+                    millis(pass.duration),
+                    pass.pixels
+                ))
+                .text_style(text(11.0, TEXT)),
+            ]),
+            Element::row([
+                Element::container([]).width(Length::Percent(start as f32)),
+                Element::container([])
+                    .height(Length::Px(4.0))
+                    .width(Length::Percent(duration.max(0.002) as f32))
+                    .background(ACCENT)
+                    .radius(CornerRadii::all(2.0)),
+            ]),
+        ])
+        .gap(3.0)
+    });
+    let mut ranked = gpu.passes.iter().collect::<Vec<_>>();
+    ranked.sort_by_key(|pass| std::cmp::Reverse(pass.duration));
+    let ranking = ranked.into_iter().take(6).enumerate().map(|(index, pass)| {
+        metric(format!(
+            "{}. {} · {:.3} ms · {} px",
+            index + 1,
+            pass.label,
+            millis(pass.duration),
+            pass.pixels
+        ))
+    });
+    Element::column(
+        [Element::text("GPU timeline").text_style(text(11.0, MUTED))]
+            .into_iter()
+            .chain(timeline)
+            .chain([Element::text("Most expensive passes").text_style(text(11.0, MUTED))])
+            .chain(ranking),
+    )
+    .padding(Edges::all(8.0))
+    .gap(7.0)
+    .background(PANEL)
 }
 
 fn toggle_button(open: bool) -> Element {

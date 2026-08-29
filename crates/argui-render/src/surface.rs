@@ -1,6 +1,6 @@
-use argui_paint::{DisplayList, ImageAsset, ShaderEffectId, VectorAsset};
+use argui_paint::{DisplayList, ImageAsset, VectorAsset};
 use argui_text::{PreparedText, TextEngine};
-use std::sync::Arc;
+use std::{collections::HashMap, mem::size_of, sync::Arc};
 use wgpu::{
     CurrentSurfaceTexture, LoadOp, Operations, RenderPassColorAttachment, RenderPassDescriptor,
     StoreOp, SurfaceTarget, TextureFormat, TextureViewDescriptor,
@@ -11,6 +11,7 @@ use crate::{
     batch::{DrawBatch, DrawKind, build_batches},
     effect::EffectGpu,
     effect_graph::EffectGraph,
+    gpu_profile::GpuProfiler,
     image::ImageGpu,
     offscreen::{TexturePool, TexturePoolStats},
     profile::FrameProfiler,
@@ -20,6 +21,7 @@ use crate::{
     vector::VectorGpu,
 };
 
+mod composite;
 mod effects;
 
 enum FrameContent<'a> {
@@ -70,7 +72,10 @@ pub struct SurfaceRenderer {
     vector: VectorGpu,
     effect: EffectGpu,
     offscreen: TexturePool,
+    gpu_profiler: GpuProfiler,
     last_profile: RenderProfile,
+    profiling_active: bool,
+    layer_cache: HashMap<argui_paint::RenderObjectId, effects::CachedLayer>,
 }
 
 #[cfg_attr(coverage_nightly, coverage(off))]
@@ -94,9 +99,17 @@ impl SurfaceRenderer {
             })
             .await
             .map_err(|error| RendererError::AdapterRequest(error.to_string()))?;
+        let required_features = if renderer_config.profiling
+            && adapter.features().contains(wgpu::Features::TIMESTAMP_QUERY)
+        {
+            wgpu::Features::TIMESTAMP_QUERY
+        } else {
+            wgpu::Features::empty()
+        };
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
                 label: Some("argui-device"),
+                required_features,
                 memory_hints: wgpu::MemoryHints::MemoryUsage,
                 ..Default::default()
             })
@@ -191,9 +204,31 @@ impl SurfaceRenderer {
         let text = TextGpu::new(&device, target_format);
         let image = ImageGpu::new(&device, target_format, renderer_config.image_cache_bytes);
         let vector = VectorGpu::new(&device, target_format);
-        let effect = EffectGpu::new(&device, target_format);
+        let maximum_parameter_words = renderer_config
+            .effects
+            .definitions()
+            .iter()
+            .map(crate::EffectDefinition::parameter_words)
+            .max()
+            .unwrap_or(1);
+        let maximum_storage_bytes = device.limits().max_storage_buffer_binding_size as usize;
+        let parameter_bytes = maximum_parameter_words * size_of::<u32>();
+        if parameter_bytes > maximum_storage_bytes {
+            return Err(RendererError::EffectParametersTooLarge {
+                provided: parameter_bytes,
+                maximum: maximum_storage_bytes,
+            });
+        }
+        let mut effect = EffectGpu::new(&device, target_format, maximum_parameter_words);
+        for definition in renderer_config.effects.definitions() {
+            for (pass_index, pass) in definition.passes.iter().enumerate() {
+                effect.register(&device, definition.id, pass_index, pass.wgsl)?;
+            }
+        }
         let offscreen = TexturePool::new(target_format, 128 * 1024 * 1024);
+        let gpu_profiler = GpuProfiler::new(&adapter, &device, &queue, renderer_config.profiling);
 
+        let profiling_active = renderer_config.profiling;
         Ok(Self {
             device_handle,
             instance,
@@ -210,7 +245,10 @@ impl SurfaceRenderer {
             vector,
             effect,
             offscreen,
+            gpu_profiler,
             last_profile: RenderProfile::default(),
+            profiling_active,
+            layer_cache: HashMap::new(),
         })
     }
 
@@ -230,6 +268,7 @@ impl SurfaceRenderer {
         self.surface_config.width = width;
         self.surface_config.height = height;
         self.surface.configure(&self.device, &self.surface_config);
+        self.layer_cache.clear();
         true
     }
 
@@ -243,6 +282,7 @@ impl SurfaceRenderer {
             .create_surface(target)
             .map_err(|error| RendererError::SurfaceCreation(error.to_string()))?;
         self.surface.configure(&self.device, &self.surface_config);
+        self.layer_cache.clear();
         Ok(())
     }
 
@@ -320,16 +360,12 @@ impl SurfaceRenderer {
     }
 
     #[must_use]
-    pub const fn last_profile(&self) -> RenderProfile {
-        self.last_profile
+    pub fn last_profile(&self) -> RenderProfile {
+        self.last_profile.clone()
     }
 
-    pub fn register_effect_shader(
-        &mut self,
-        id: ShaderEffectId,
-        wgsl: &str,
-    ) -> Result<(), RendererError> {
-        self.effect.register(&self.device, id, wgsl)
+    pub fn set_profiling_active(&mut self, active: bool) {
+        self.profiling_active = self.renderer_config.profiling && active;
     }
 
     pub fn register_image(&mut self, asset: &ImageAsset) -> Result<(), RendererError> {
@@ -361,7 +397,8 @@ impl SurfaceRenderer {
             self.surface_config.width as f32,
             self.surface_config.height as f32,
         ];
-        let profiler = FrameProfiler::start(self.renderer_config.profiling);
+        let profiler = FrameProfiler::start(self.profiling_active);
+        let gpu_capture = self.gpu_profiler.begin_frame(self.profiling_active);
         let mut graph_stats = EffectGraphStats::default();
         let mut effect_graph = None;
         match content {
@@ -400,8 +437,9 @@ impl SurfaceRenderer {
                 build_batches(display_list, draw.ranges(), &mut self.batches);
                 let graph = EffectGraph::build(display_list, draw.ranges(), viewport, scale_factor)
                     .map_err(|error| RendererError::InvalidDisplayList(error.to_string()))?;
-                self.validate_custom_effects(&graph)?;
+                let additional_effect_passes = self.validate_custom_effects(&graph)?;
                 graph_stats = graph.stats();
+                graph_stats.filter_passes += additional_effect_passes;
                 effect_graph = Some(graph);
             }
         }
@@ -426,9 +464,21 @@ impl SurfaceRenderer {
         if let Some(graph) = effect_graph
             && graph.needs_offscreen_root()
         {
-            self.render_effect_graph(&mut encoder, &view, &graph, viewport);
+            let (cached_layers, damaged_pixels) = self.render_effect_graph(
+                &mut encoder,
+                &view,
+                &graph,
+                viewport,
+                gpu_capture.as_ref(),
+            );
+            graph_stats.cached_layers = cached_layers;
+            graph_stats.damaged_pixels = damaged_pixels;
             notify();
+            if let Some(capture) = gpu_capture {
+                capture.finish(&mut encoder);
+            }
             self.queue.submit([encoder.finish()]);
+            let _ = self.device.poll(wgpu::PollType::Poll);
             self.finish_profile(profiler, viewport, graph_stats);
             self.queue.present(frame);
             return Ok(status);
@@ -439,9 +489,17 @@ impl SurfaceRenderer {
         let image_offset = self.image.target_offset(&self.queue, target.as_f32());
         let vector_offset = self.vector.target_offset(&self.queue, target.as_f32());
         {
+            let timestamp_writes = gpu_capture.as_ref().and_then(|capture| {
+                capture.timestamp_writes(
+                    "surface.main",
+                    None,
+                    u64::from(target.size[0]) * u64::from(target.size[1]),
+                )
+            });
             let mut pass = encoder.begin_render_pass(&RenderPassDescriptor {
                 label: Some("argui-clear-pass"),
                 color_attachments: &[attachment],
+                timestamp_writes,
                 ..Default::default()
             });
             for batch in &self.batches {
@@ -469,7 +527,11 @@ impl SurfaceRenderer {
             }
         }
         notify();
+        if let Some(capture) = gpu_capture {
+            capture.finish(&mut encoder);
+        }
         self.queue.submit([encoder.finish()]);
+        let _ = self.device.poll(wgpu::PollType::Poll);
         self.finish_profile(profiler, viewport, graph_stats);
         self.queue.present(frame);
         Ok(status)
@@ -486,6 +548,8 @@ impl SurfaceRenderer {
             self.batches.len(),
             effects,
             self.offscreen.stats(),
+            self.gpu_profiler.adapter().clone(),
+            self.gpu_profiler.take_latest(),
         ) {
             self.last_profile = profile;
         }

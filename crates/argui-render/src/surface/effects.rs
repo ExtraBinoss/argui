@@ -1,63 +1,89 @@
 use argui_core::Rect;
-use argui_paint::{Filter, LayerMask, LayerStyle, ShaderEffectId};
+use argui_paint::{EffectId, Filter, LayerMask};
 use wgpu::{LoadOp, Operations, RenderPassColorAttachment, RenderPassDescriptor, StoreOp};
 
 use crate::{
     RendererError,
     batch::DrawKind,
-    effect::{EffectDraw, EffectUniform, blend_mode, layer_radii, uniform},
+    effect::{EffectDraw, EffectUniform, layer_radii, uniform},
     effect_graph::{EffectGraph, EffectNode},
     effect_plan::{PlannedFilter, plan_filters},
+    gpu_profile::GpuFrameCapture,
     target::{PixelRegion, TextureTarget},
 };
 
 use super::SurfaceRenderer;
+
+#[derive(Clone, Debug)]
+pub(super) struct CachedLayer {
+    layer: crate::effect_graph::EffectLayer,
+    target: TextureTarget,
+}
+
+#[derive(Default)]
+struct CacheFrameStats {
+    hits: usize,
+    damaged_pixels: u64,
+    used: std::collections::HashSet<argui_paint::RenderObjectId>,
+}
 
 struct EffectPass {
     mode: u32,
     data: [f32; 4],
     matrix: Option<[f32; 20]>,
     bounds: Rect,
-    shader: Option<ShaderEffectId>,
+    shader: Option<(EffectId, usize)>,
+    parameters: Vec<u32>,
     extent: Option<[u32; 2]>,
     radii: [f32; 4],
+    label: String,
+    object: Option<argui_paint::RenderObjectId>,
 }
 
 #[derive(Clone, Copy)]
-struct EffectSources {
-    source: TextureTarget,
-    backdrop: TextureTarget,
+pub(super) struct EffectSources {
+    pub(super) source: TextureTarget,
+    pub(super) backdrop: TextureTarget,
 }
 
 impl EffectPass {
-    const fn new(mode: u32, data: [f32; 4], bounds: Rect) -> Self {
+    fn new(mode: u32, data: [f32; 4], bounds: Rect) -> Self {
         Self {
             mode,
             data,
             matrix: None,
             bounds,
             shader: None,
+            parameters: Vec::new(),
             extent: None,
             radii: [0.0; 4],
+            label: built_in_label(mode).into(),
+            object: None,
         }
     }
 }
 
 #[cfg_attr(coverage_nightly, coverage(off))]
+#[allow(clippy::too_many_arguments)]
 impl SurfaceRenderer {
-    pub(super) fn validate_custom_effects(&self, graph: &EffectGraph) -> Result<(), RendererError> {
-        for effect in graph.custom_effects() {
-            if effect.parameters.len() > 24 {
-                return Err(RendererError::TooManyEffectParameters {
-                    provided: effect.parameters.len(),
-                    maximum: 24,
-                });
-            }
-            if !self.effect.contains(effect.shader) {
-                return Err(RendererError::MissingShader(effect.shader.0));
+    pub(super) fn validate_custom_effects(
+        &self,
+        graph: &EffectGraph,
+    ) -> Result<usize, RendererError> {
+        let mut additional_passes = 0;
+        for effect in graph.effects() {
+            let definition = self
+                .renderer_config
+                .effects
+                .get(effect.id)
+                .ok_or(RendererError::MissingEffect(effect.id.0))?;
+            definition.validate_instance(effect)?;
+            additional_passes += definition.passes.len().saturating_sub(1);
+            if !self.effect.contains(effect.id) {
+                return Err(RendererError::MissingEffect(effect.id.0));
             }
         }
-        Ok(())
+        Ok(additional_passes)
     }
 
     pub(super) fn render_effect_graph(
@@ -66,13 +92,27 @@ impl SurfaceRenderer {
         surface: &wgpu::TextureView,
         graph: &EffectGraph,
         viewport: [f32; 2],
-    ) {
-        self.offscreen.begin_frame();
+        profiler: Option<&GpuFrameCapture>,
+    ) -> (usize, u64) {
+        if self.offscreen.begin_frame() {
+            self.layer_cache.clear();
+        }
+        self.layer_cache
+            .retain(|_, cached| self.offscreen.retain(cached.target.texture));
         self.effect.begin_frame();
+        let mut cache_stats = CacheFrameStats::default();
         let region = PixelRegion::viewport(viewport[0] as u32, viewport[1] as u32);
         let root = self.acquire_target(region, region.size);
         self.clear_target(encoder, root, self.renderer_config.wgpu_clear_color());
-        self.render_effect_nodes(encoder, &graph.roots, root, viewport);
+        self.render_effect_nodes(
+            encoder,
+            &graph.roots,
+            root,
+            viewport,
+            profiler,
+            None,
+            &mut cache_stats,
+        );
         clear_view(encoder, surface, self.renderer_config.wgpu_clear_color());
         let mut params = uniform(viewport, region, root, root, region.as_rect());
         params.mode = 99;
@@ -90,8 +130,15 @@ impl SurfaceRenderer {
                 backdrop: self.offscreen.view(root.texture),
                 uniform: params,
                 shader: None,
+                parameters: &[],
+                profiler,
+                profile_label: "composite.present",
+                profile_object: None,
             },
         );
+        self.layer_cache
+            .retain(|profile, _| cache_stats.used.contains(profile));
+        (cache_stats.hits, cache_stats.damaged_pixels)
     }
 
     fn render_effect_nodes(
@@ -100,6 +147,9 @@ impl SurfaceRenderer {
         nodes: &[EffectNode],
         target: TextureTarget,
         viewport: [f32; 2],
+        profiler: Option<&GpuFrameCapture>,
+        owner: Option<argui_paint::RenderObjectId>,
+        cache_stats: &mut CacheFrameStats,
     ) {
         let mut index = 0;
         while index < nodes.len() {
@@ -110,27 +160,69 @@ impl SurfaceRenderer {
                     while index < nodes.len() && matches!(nodes[index], EffectNode::Draw(_)) {
                         index += 1;
                     }
-                    self.draw_offscreen(encoder, target, &nodes[start..index]);
+                    self.draw_offscreen(encoder, target, &nodes[start..index], profiler, owner);
                 }
                 EffectNode::Layer(layer) if layer.style.opacity <= 0.0 => {}
                 EffectNode::Layer(layer) if !layer.style.requires_offscreen() => {
-                    self.render_effect_nodes(encoder, &layer.children, target, viewport);
+                    self.render_effect_nodes(
+                        encoder,
+                        &layer.children,
+                        target,
+                        viewport,
+                        profiler,
+                        layer.style.profile,
+                        cache_stats,
+                    );
                 }
                 EffectNode::Layer(layer) => {
                     let Some(region) = layer.region else {
                         continue;
                     };
-                    let layer_target = self.acquire_target(region, region.size);
-                    self.clear_target(encoder, layer_target, wgpu::Color::TRANSPARENT);
-                    self.render_effect_nodes(encoder, &layer.children, layer_target, viewport);
-                    let foreground = self.apply_filters(
-                        encoder,
-                        layer_target,
-                        &layer.style.filters,
-                        viewport,
-                        layer.style.bounds,
-                        layer.style.mask,
-                    );
+                    let cached = layer.style.profile.and_then(|profile| {
+                        cache_stats.used.insert(profile);
+                        self.layer_cache
+                            .get(&profile)
+                            .filter(|cached| cached.layer == *layer)
+                            .map(|cached| cached.target)
+                    });
+                    let foreground = if let Some(cached) = cached {
+                        cache_stats.hits += 1;
+                        cached
+                    } else {
+                        cache_stats.damaged_pixels +=
+                            u64::from(region.size[0]) * u64::from(region.size[1]);
+                        let layer_target = self.acquire_target(region, region.size);
+                        self.clear_target(encoder, layer_target, wgpu::Color::TRANSPARENT);
+                        self.render_effect_nodes(
+                            encoder,
+                            &layer.children,
+                            layer_target,
+                            viewport,
+                            profiler,
+                            layer.style.profile,
+                            cache_stats,
+                        );
+                        let foreground = self.apply_filters(
+                            encoder,
+                            layer_target,
+                            &layer.style.filters,
+                            viewport,
+                            layer.style.bounds,
+                            layer.style.mask,
+                            profiler,
+                            layer.style.profile,
+                        );
+                        if let Some(profile) = layer.style.profile {
+                            self.layer_cache.insert(
+                                profile,
+                                CachedLayer {
+                                    layer: layer.clone(),
+                                    target: foreground,
+                                },
+                            );
+                        }
+                        foreground
+                    };
                     self.composite_layer(
                         encoder,
                         target,
@@ -138,6 +230,7 @@ impl SurfaceRenderer {
                         &layer.style,
                         viewport,
                         region,
+                        profiler,
                     );
                 }
             }
@@ -149,6 +242,8 @@ impl SurfaceRenderer {
         encoder: &mut wgpu::CommandEncoder,
         target: TextureTarget,
         nodes: &[EffectNode],
+        profiler: Option<&GpuFrameCapture>,
+        owner: Option<argui_paint::RenderObjectId>,
     ) {
         let region = target.region.as_f32();
         let quad_offset = self.quad.target_offset(&self.queue, region);
@@ -164,9 +259,17 @@ impl SurfaceRenderer {
                 store: StoreOp::Store,
             },
         });
+        let timestamp_writes = profiler.and_then(|profiler| {
+            profiler.timestamp_writes(
+                "layer.content",
+                owner,
+                u64::from(target.region.size[0]) * u64::from(target.region.size[1]),
+            )
+        });
         let mut pass = encoder.begin_render_pass(&RenderPassDescriptor {
             label: Some("argui-layer-content"),
             color_attachments: &[attachment],
+            timestamp_writes,
             ..Default::default()
         });
         pass.set_viewport(
@@ -204,7 +307,7 @@ impl SurfaceRenderer {
         }
     }
 
-    fn apply_filters(
+    pub(super) fn apply_filters(
         &mut self,
         encoder: &mut wgpu::CommandEncoder,
         source: TextureTarget,
@@ -212,79 +315,121 @@ impl SurfaceRenderer {
         viewport: [f32; 2],
         bounds: Rect,
         mask: LayerMask,
+        profiler: Option<&GpuFrameCapture>,
+        object: Option<argui_paint::RenderObjectId>,
     ) -> TextureTarget {
         let mut current = source;
         for filter in plan_filters(filters) {
             current = match filter {
                 PlannedFilter::Blur(radius) => {
-                    self.apply_blur(encoder, current, radius, viewport, bounds)
+                    self.apply_blur(encoder, current, radius, viewport, bounds, profiler, object)
                 }
                 PlannedFilter::ColorMatrix(matrix) => {
                     let mut pass = EffectPass::new(8, [0.0; 4], bounds);
                     pass.matrix = Some(matrix);
-                    self.effect_pass(encoder, current, viewport, pass)
+                    pass.object = object;
+                    self.effect_pass(encoder, current, viewport, pass, profiler)
                 }
-                PlannedFilter::Refraction(value) => self.effect_pass(
-                    encoder,
-                    current,
-                    viewport,
-                    EffectPass::new(
+                PlannedFilter::Refraction(value) => {
+                    let mut pass = EffectPass::new(
                         9,
                         [value.strength, value.chromatic_aberration, value.edge, 0.0],
                         bounds,
-                    ),
-                ),
-                PlannedFilter::Custom(effect) => {
-                    let mut values = [0.0; 24];
-                    values[..effect.parameters.len()].copy_from_slice(&effect.parameters);
-                    let mut pass = EffectPass::new(
-                        99,
-                        values[..4].try_into().expect("four custom parameters"),
-                        bounds,
                     );
-                    pass.matrix = Some(values[4..].try_into().expect("twenty custom parameters"));
-                    pass.shader = Some(effect.shader);
-                    pass.radii = layer_radii(mask);
-                    self.effect_pass(encoder, current, viewport, pass)
+                    let divisor = self
+                        .renderer_config
+                        .effect_quality
+                        .settings()
+                        .spatial_effect_divisor
+                        .max(1);
+                    if divisor > 1 {
+                        pass.extent = Some([
+                            (current.region.size[0] / divisor).max(1),
+                            (current.region.size[1] / divisor).max(1),
+                        ]);
+                    }
+                    pass.object = object;
+                    self.effect_pass(encoder, current, viewport, pass, profiler)
+                }
+                PlannedFilter::Effect(effect) => {
+                    let parameters = effect.packed_words();
+                    let passes = self
+                        .renderer_config
+                        .effects
+                        .get(effect.id)
+                        .expect("validated effect registry")
+                        .passes;
+                    for (pass_index, definition) in passes.iter().enumerate() {
+                        let mut pass = EffectPass::new(99, [0.0; 4], bounds);
+                        pass.shader = Some((effect.id, pass_index));
+                        pass.parameters.clone_from(&parameters);
+                        pass.radii = layer_radii(mask);
+                        pass.label = format!("effect.{}.{}", effect.id.0, definition.name);
+                        pass.object = object;
+                        let divisor = definition
+                            .scale_divisor
+                            .saturating_mul(
+                                self.renderer_config
+                                    .effect_quality
+                                    .settings()
+                                    .spatial_effect_divisor,
+                            )
+                            .max(1);
+                        if divisor > 1 {
+                            pass.extent = Some([
+                                (current.region.size[0] / divisor).max(1),
+                                (current.region.size[1] / divisor).max(1),
+                            ]);
+                        }
+                        current = self.effect_pass(encoder, current, viewport, pass, profiler);
+                    }
+                    current
                 }
             };
         }
         current
     }
 
-    fn apply_blur(
+    pub(super) fn apply_blur(
         &mut self,
         encoder: &mut wgpu::CommandEncoder,
         mut current: TextureTarget,
         radius: f32,
         viewport: [f32; 2],
         bounds: Rect,
+        profiler: Option<&GpuFrameCapture>,
+        object: Option<argui_paint::RenderObjectId>,
     ) -> TextureTarget {
         if radius <= 0.01 {
             return current;
         }
-        let downsample = blur_downsample(radius);
+        let downsample = blur_downsample(
+            radius,
+            self.renderer_config
+                .effect_quality
+                .settings()
+                .blur_downsample_bias,
+        );
         if downsample > 1 {
             let mut pass = EffectPass::new(99, [0.0; 4], bounds);
             pass.extent = Some([
                 (current.region.size[0] / downsample).max(1),
                 (current.region.size[1] / downsample).max(1),
             ]);
-            current = self.effect_pass(encoder, current, viewport, pass);
+            pass.object = object;
+            current = self.effect_pass(encoder, current, viewport, pass, profiler);
         }
         let sample_radius = radius / downsample as f32 * 0.35;
         for mode in [1, 2] {
             let mut pass = EffectPass::new(mode, [sample_radius, 0.0, 0.0, 0.0], bounds);
             pass.extent = Some(current.extent);
-            current = self.effect_pass(encoder, current, viewport, pass);
+            pass.object = object;
+            current = self.effect_pass(encoder, current, viewport, pass, profiler);
         }
         if downsample > 1 {
-            current = self.effect_pass(
-                encoder,
-                current,
-                viewport,
-                EffectPass::new(99, [0.0; 4], bounds),
-            );
+            let mut pass = EffectPass::new(99, [0.0; 4], bounds);
+            pass.object = object;
+            current = self.effect_pass(encoder, current, viewport, pass, profiler);
         }
         current
     }
@@ -295,6 +440,7 @@ impl SurfaceRenderer {
         source: TextureTarget,
         viewport: [f32; 2],
         pass: EffectPass,
+        profiler: Option<&GpuFrameCapture>,
     ) -> TextureTarget {
         let extent = pass.extent.unwrap_or(source.region.size);
         let target = self.acquire_target(source.region, extent);
@@ -316,111 +462,26 @@ impl SurfaceRenderer {
             },
             params,
             pass.shader,
+            &pass.parameters,
+            profiler,
+            &pass.label,
+            pass.object,
         );
         target
     }
 
-    fn composite_layer(
-        &mut self,
-        encoder: &mut wgpu::CommandEncoder,
-        target: TextureTarget,
-        foreground: TextureTarget,
-        style: &LayerStyle,
-        viewport: [f32; 2],
-        region: PixelRegion,
-    ) {
-        let snapshot = self.snapshot(encoder, target, region);
-        let filtered = self.apply_filters(
-            encoder,
-            snapshot,
-            &style.backdrop_filters,
-            viewport,
-            style.bounds,
-            style.mask,
-        );
-        let mut backdrop = if style.backdrop_filters.is_empty() {
-            snapshot
-        } else {
-            let merged = self.acquire_target(region, region.size);
-            self.clear_target(encoder, merged, wgpu::Color::TRANSPARENT);
-            let mut params = uniform(viewport, region, filtered, snapshot, style.bounds);
-            params.mode = 12;
-            params.data[0] = style.opacity.clamp(0.0, 1.0);
-            params.radii = layer_radii(style.mask);
-            self.draw_effect(
-                encoder,
-                merged,
-                region,
-                EffectSources {
-                    source: filtered,
-                    backdrop: snapshot,
-                },
-                params,
-                None,
-            );
-            merged
-        };
-        for shadow in &style.shadows {
-            let blurred = self.apply_blur(
-                encoder,
-                foreground,
-                shadow.blur,
-                viewport,
-                style.expanded_bounds(),
-            );
-            let shadowed = self.acquire_target(region, region.size);
-            self.clear_target(encoder, shadowed, wgpu::Color::TRANSPARENT);
-            let mut params = uniform(viewport, region, blurred, backdrop, style.bounds);
-            params.mode = if shadow.inset { 11 } else { 10 };
-            params.color = shadow.color.as_array();
-            params.color[3] *= style.opacity.clamp(0.0, 1.0);
-            params.data = [1.0, shadow.offset[0], shadow.offset[1], shadow.spread];
-            params.radii = layer_radii(style.mask);
-            self.draw_effect(
-                encoder,
-                shadowed,
-                region,
-                EffectSources {
-                    source: blurred,
-                    backdrop,
-                },
-                params,
-                None,
-            );
-            backdrop = shadowed;
-        }
-        let expansion = style.foreground_expansion();
-        let mut params = uniform(
-            viewport,
-            region,
-            foreground,
-            backdrop,
-            style.foreground_bounds(),
-        );
-        params.blend = blend_mode(style.blend_mode);
-        params.data[0] = style.opacity;
-        params.radii = expanded_radii(style.mask, expansion);
-        self.draw_effect(
-            encoder,
-            target,
-            region,
-            EffectSources {
-                source: foreground,
-                backdrop,
-            },
-            params,
-            None,
-        );
-    }
-
-    fn draw_effect(
+    pub(super) fn draw_effect(
         &mut self,
         encoder: &mut wgpu::CommandEncoder,
         target: TextureTarget,
         output: PixelRegion,
         sources: EffectSources,
         params: EffectUniform,
-        shader: Option<ShaderEffectId>,
+        shader: Option<(EffectId, usize)>,
+        parameters: &[u32],
+        profiler: Option<&GpuFrameCapture>,
+        label: &str,
+        object: Option<argui_paint::RenderObjectId>,
     ) {
         self.effect.draw(
             &self.device,
@@ -435,41 +496,24 @@ impl SurfaceRenderer {
                 backdrop: self.offscreen.view(sources.backdrop.texture),
                 uniform: params,
                 shader,
+                parameters,
+                profiler,
+                profile_label: label,
+                profile_object: object,
             },
         );
     }
 
-    fn snapshot(
+    pub(super) fn acquire_target(
         &mut self,
-        encoder: &mut wgpu::CommandEncoder,
-        source: TextureTarget,
         region: PixelRegion,
+        extent: [u32; 2],
     ) -> TextureTarget {
-        let target = self.acquire_target(region, region.size);
-        let mut source_copy = self.offscreen.texture(source.texture).as_image_copy();
-        source_copy.origin = wgpu::Origin3d {
-            x: region.origin[0] - source.region.origin[0],
-            y: region.origin[1] - source.region.origin[1],
-            z: 0,
-        };
-        encoder.copy_texture_to_texture(
-            source_copy,
-            self.offscreen.texture(target.texture).as_image_copy(),
-            wgpu::Extent3d {
-                width: region.size[0],
-                height: region.size[1],
-                depth_or_array_layers: 1,
-            },
-        );
-        target
-    }
-
-    fn acquire_target(&mut self, region: PixelRegion, extent: [u32; 2]) -> TextureTarget {
         let texture = self.offscreen.acquire(&self.device, extent[0], extent[1]);
         TextureTarget::with_allocation(texture, region, extent, self.offscreen.extent(texture))
     }
 
-    fn clear_target(
+    pub(super) fn clear_target(
         &self,
         encoder: &mut wgpu::CommandEncoder,
         target: TextureTarget,
@@ -496,40 +540,40 @@ fn clear_view(encoder: &mut wgpu::CommandEncoder, view: &wgpu::TextureView, colo
     }));
 }
 
-fn expanded_radii(mask: LayerMask, expansion: f32) -> [f32; 4] {
-    match mask {
-        LayerMask::Rounded(radii) => radii.as_array().map(|radius| radius + expansion),
-        LayerMask::None | LayerMask::Bounds => [0.0; 4],
-    }
-}
-
-fn blur_downsample(radius: f32) -> u32 {
-    if radius >= 12.0 {
+fn blur_downsample(radius: f32, bias: u32) -> u32 {
+    let base = if radius >= 12.0 {
         4
     } else if radius >= 6.0 {
         2
     } else {
         1
+    };
+    base * bias.max(1)
+}
+
+const fn built_in_label(mode: u32) -> &'static str {
+    match mode {
+        1 => "effect.blur-horizontal",
+        2 => "effect.blur-vertical",
+        8 => "effect.color-matrix",
+        9 => "effect.refraction",
+        10 => "composite.drop-shadow",
+        11 => "composite.inset-shadow",
+        12 => "composite.backdrop",
+        _ => "composite.copy",
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use argui_paint::{CornerRadii, LayerMask};
-
-    use super::{blur_downsample, expanded_radii};
+    use super::blur_downsample;
 
     #[test]
     fn blur_sampling_and_outer_radii_have_explicit_thresholds() {
-        assert_eq!(blur_downsample(5.9), 1);
-        assert_eq!(blur_downsample(6.0), 2);
-        assert_eq!(blur_downsample(11.9), 2);
-        assert_eq!(blur_downsample(12.0), 4);
-        assert_eq!(expanded_radii(LayerMask::None, 5.0), [0.0; 4]);
-        assert_eq!(expanded_radii(LayerMask::Bounds, 5.0), [0.0; 4]);
-        assert_eq!(
-            expanded_radii(LayerMask::Rounded(CornerRadii::all(4.0)), 5.0),
-            [9.0; 4]
-        );
+        assert_eq!(blur_downsample(5.9, 1), 1);
+        assert_eq!(blur_downsample(6.0, 1), 2);
+        assert_eq!(blur_downsample(11.9, 1), 2);
+        assert_eq!(blur_downsample(12.0, 1), 4);
+        assert_eq!(blur_downsample(12.0, 2), 8);
     }
 }

@@ -7,7 +7,7 @@ use argui_inspect::InspectorHandle;
 use argui_layout::{LayoutEngine, LayoutOutput};
 use argui_paint::{ImageAsset, VectorAsset};
 use argui_platform::{ApplicationIdentity, ButtonState, Modifiers, ScrollDelta, WindowConfig};
-use argui_render::{EffectShader, RendererConfig, RendererDevice, SurfaceRenderer};
+use argui_render::{RendererConfig, RendererDevice, SurfaceRenderer};
 use argui_text::{PreparedText, TextEngine, TextScene};
 use argui_ui::{InteractionUpdate, UiTree};
 use std::{cell::RefCell, rc::Rc, sync::Arc};
@@ -41,7 +41,6 @@ pub(crate) struct Application {
     renderer: Rc<RefCell<RendererState>>,
     renderer_device: Rc<RefCell<Option<RendererDevice>>>,
     renderer_announced: bool,
-    effect_shaders: Vec<EffectShader>,
     image_assets: Vec<ImageAsset>,
     vector_assets: Vec<VectorAsset>,
     pub(super) inspector: Option<InspectorHandle>,
@@ -89,11 +88,6 @@ impl Application {
             profiling: renderer_config.profiling || inspector.is_some(),
             ..renderer_config
         };
-        let effect_shaders = model
-            .as_ref()
-            .map(AnyEntity::effect_shaders)
-            .unwrap_or_default()
-            .to_vec();
         let image_assets = model
             .as_ref()
             .map(AnyEntity::image_assets)
@@ -112,7 +106,6 @@ impl Application {
             renderer: Rc::new(RefCell::new(RendererState::Loading)),
             renderer_device: Rc::new(RefCell::new(None)),
             renderer_announced: false,
-            effect_shaders,
             image_assets,
             vector_assets,
             inspector,

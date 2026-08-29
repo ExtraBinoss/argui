@@ -258,7 +258,6 @@ fn erased_entities_forward_the_complete_retained_surface() {
     erased.layout_changed(&LayoutSnapshot::default());
     assert!(first.ptr_eq(&erased.render()));
 
-    assert!(erased.effect_shaders().is_empty());
     assert!(erased.image_assets().is_empty());
     assert!(erased.vector_assets().is_empty());
     assert!(erased.inspector().is_none());

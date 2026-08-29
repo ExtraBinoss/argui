@@ -2,14 +2,14 @@ use argui_core::{Color, Point, Rect, Size, Transform2D};
 use argui_inspect::{InspectNodeId, InspectorHandle, StyleProperty, StyleValue};
 use argui_layout::{LayoutNode, LayoutOutput};
 use argui_paint::{
-    Border, ClipBehavior, CustomEffect, Fill, Filter, GradientStop, LayerStyle, LinearGradient,
-    RadialGradient, Refraction, ShaderEffectId, Shadow,
+    Border, ClipBehavior, EffectId, EffectInstance, EffectValue, Fill, Filter, GradientStop,
+    LayerStyle, LinearGradient, RadialGradient, Refraction, Shadow,
 };
-use argui_ui::{EffectScope, Element, Interaction, Length, UiTree};
+use argui_ui::{EffectScope, Element, ElementKind, Interaction, Length, UiTree};
 
 use super::{
-    CollectState, apply_property_value, apply_tree_overrides, collect_nodes, descendant_count,
-    properties, property_value,
+    CollectState, apply_effect_value, apply_property_value, apply_tree_overrides, collect_nodes,
+    descendant_count, properties, property_value,
 };
 
 fn fully_styled() -> Element {
@@ -122,7 +122,22 @@ fn inspector_serializes_and_applies_every_filter_parameter() {
             chromatic_aberration: 1.0,
             edge: 1.0,
         }),
-        Filter::Custom(CustomEffect::new(ShaderEffectId(7), [1.0, 1.0])),
+        Filter::Effect(EffectInstance::new(
+            EffectId::new("test.inspect"),
+            [
+                ("float", EffectValue::F32(1.0)),
+                ("pixels", EffectValue::LogicalPixels(1.0)),
+                ("signed", EffectValue::I32(1)),
+                ("unsigned", EffectValue::U32(1)),
+                ("boolean", EffectValue::Bool(false)),
+                ("vec2", EffectValue::Vec2([1.0; 2])),
+                ("vec3", EffectValue::Vec3([1.0; 3])),
+                ("vec4", EffectValue::Vec4([1.0; 4])),
+                ("mat3", EffectValue::Mat3([1.0; 9])),
+                ("mat4", EffectValue::Mat4([1.0; 16])),
+                ("color", EffectValue::Color(Color::WHITE)),
+            ],
+        )),
     ];
     let mut element = Element::container([]).layer(
         filters
@@ -157,9 +172,27 @@ fn inspector_serializes_and_applies_every_filter_parameter() {
     ));
     assert!(matches!(
         &layer.filters[8],
-        Filter::Custom(value) if value.parameters == [2.0, 2.0]
+        Filter::Effect(value)
+            if value.parameters[0].value == EffectValue::F32(2.0)
+                && value.parameters[1].value == EffectValue::LogicalPixels(2.0)
+                && value.parameters[2].value == EffectValue::I32(2)
+                && value.parameters[3].value == EffectValue::U32(2)
+                && value.parameters[4].value == EffectValue::Bool(true)
+                && value.parameters[5].value == EffectValue::Vec2([2.0; 2])
+                && value.parameters[6].value == EffectValue::Vec3([2.0; 3])
+                && value.parameters[7].value == EffectValue::Vec4([2.0; 4])
+                && value.parameters[8].value == EffectValue::Mat3([2.0; 9])
+                && value.parameters[9].value == EffectValue::Mat4([2.0; 16])
+                && value.parameters[10].value == EffectValue::Color(Color::rgba(2.0, 2.0, 2.0, 2.0))
     ));
     assert_eq!(layer.shadows[0].offset, [2.0, 2.0]);
+
+    let mut boolean = EffectValue::Bool(true);
+    apply_effect_value("boolean", &mut boolean, &|_| Some(0.0));
+    assert_eq!(boolean, EffectValue::Bool(false));
+    let mut signed = EffectValue::I32(3);
+    apply_effect_value("signed", &mut signed, &|_| None);
+    assert_eq!(signed, EffectValue::I32(3));
 }
 
 #[test]
@@ -204,6 +237,47 @@ fn inspector_describes_gradient_and_absent_paints_and_clamps_lengths() {
     );
     assert_eq!(element.style.width, Length::Px(0.0));
     assert_eq!(element.style.height, Length::Percent(0.5));
+}
+
+#[test]
+fn primitive_and_optional_property_edits_cover_present_and_absent_targets() {
+    let mut element = fully_styled();
+    apply_property_value(
+        &mut element,
+        StyleProperty::Background,
+        &StyleValue::Color([0.1, 0.2, 0.3, 0.4]),
+    );
+    assert_eq!(
+        element.paint.quad.background,
+        Some(Fill::Solid(Color::rgba(0.1, 0.2, 0.3, 0.4)))
+    );
+
+    let border = property_value(&element, StyleProperty::Border);
+    apply_property_value(&mut element, StyleProperty::Border, &border);
+    assert!(element.paint.quad.border.is_some());
+    let mut without_border = Element::container([]);
+    apply_property_value(&mut without_border, StyleProperty::Border, &border);
+    assert!(without_border.paint.quad.border.is_none());
+
+    apply_property_value(
+        &mut element,
+        StyleProperty::Opacity,
+        &StyleValue::Number(2.0),
+    );
+    assert_eq!(element.paint.quad.opacity, 1.0);
+
+    let layer = property_value(&element, StyleProperty::Layer);
+    apply_property_value(&mut element, StyleProperty::Layer, &layer);
+    apply_property_value(&mut without_border, StyleProperty::Layer, &layer);
+    assert!(without_border.layer.is_none());
+
+    let effects = property_value(&element, StyleProperty::Effects);
+    apply_property_value(&mut element, StyleProperty::Effects, &effects);
+    apply_property_value(
+        &mut element,
+        StyleProperty::Clip,
+        &StyleValue::Summary("ignored".into()),
+    );
 }
 
 #[test]
@@ -255,4 +329,69 @@ fn snapshots_distinguish_visual_interactive_and_hidden_structure() {
     let text = snapshots.last().unwrap();
     assert!(!text.visible);
     assert!(text.summary.as_ref().unwrap().ends_with('…'));
+}
+
+#[test]
+fn snapshots_cover_every_media_summary_and_empty_identity_input() {
+    let text_input = |initial_value: &str| {
+        let mut element = Element::container([]);
+        element.kind = ElementKind::TextInput {
+            initial_value: initial_value.into(),
+            placeholder: "placeholder".into(),
+            text: argui_text::TextStyle::default(),
+            placeholder_text: argui_text::TextStyle::default(),
+            selection: Color::WHITE,
+            caret: Color::WHITE,
+        };
+        element
+    };
+    let root = Element::container([
+        text_input(""),
+        text_input("value"),
+        Element::vector(argui_paint::VectorId(8)).vector_progress(0.25),
+    ]);
+    let tree = UiTree::new(root);
+    let mut snapshots = Vec::new();
+    collect_nodes(
+        tree.root(),
+        None,
+        0,
+        true,
+        &mut CollectState {
+            ids: tree.node_ids(),
+            layout: &LayoutOutput::default(),
+            output: &mut snapshots,
+            cursor: 0,
+        },
+    );
+    assert_eq!(snapshots[1].kind, "text-input");
+    assert_eq!(snapshots[1].summary.as_deref(), Some("placeholder"));
+    assert_eq!(snapshots[2].summary.as_deref(), Some("value"));
+    assert_eq!(snapshots[3].kind, "vector");
+    assert!(snapshots[3].summary.as_ref().unwrap().contains("morph"));
+
+    let mut none = Vec::new();
+    collect_nodes(
+        &Element::container([]),
+        None,
+        0,
+        true,
+        &mut CollectState {
+            ids: &[],
+            layout: &LayoutOutput::default(),
+            output: &mut none,
+            cursor: 0,
+        },
+    );
+    assert!(none.is_empty());
+
+    let inspector = InspectorHandle::default();
+    let mut override_tree = Element::container([Element::container([])]);
+    apply_tree_overrides(&mut override_tree, &[], &inspector, &mut 0);
+    apply_property_value(
+        &mut override_tree,
+        StyleProperty::Width,
+        &StyleValue::Length(argui_inspect::StyleLength::default()),
+    );
+    assert_eq!(override_tree.style.width, Length::Auto);
 }

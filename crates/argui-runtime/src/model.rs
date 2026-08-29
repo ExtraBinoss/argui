@@ -3,7 +3,6 @@ use argui_animation::Frame;
 use argui_core::{Point, Rect, Size};
 use argui_inspect::InspectorHandle;
 use argui_paint::{ImageAsset, VectorAsset};
-use argui_render::EffectShader;
 use argui_ui::{ClipboardRequest, Element, NodeId, UiEvent};
 use std::{
     any::Any,
@@ -50,7 +49,6 @@ pub struct AnyEntity {
     frame: Rc<dyn Fn(Frame) -> ContextEffects>,
     layout: Rc<dyn Fn(&LayoutSnapshot) -> ContextEffects>,
     keys: Rc<dyn Fn(&str) -> bool>,
-    effect_shaders: Rc<dyn Fn() -> &'static [EffectShader]>,
     image_assets: Rc<dyn Fn() -> Vec<ImageAsset>>,
     vector_assets: Rc<dyn Fn() -> Vec<VectorAsset>>,
     inspector: Rc<dyn Fn() -> Option<InspectorHandle>>,
@@ -192,10 +190,6 @@ pub trait Render: 'static {
     {
     }
 
-    fn effect_shaders(&self) -> &'static [EffectShader] {
-        &[]
-    }
-
     fn image_assets(&self) -> Vec<ImageAsset> {
         Vec::new()
     }
@@ -237,7 +231,6 @@ impl<T: Render> Entity<T> {
         let frame = self.clone();
         let layout = self.clone();
         let keys = self.clone();
-        let effect_shaders = self.clone();
         let image_assets = self.clone();
         let vector_assets = self.clone();
         let inspector = self.clone();
@@ -251,7 +244,6 @@ impl<T: Render> Entity<T> {
             frame: Rc::new(move |value| frame.dispatch_frame(value)),
             layout: Rc::new(move |snapshot| layout.dispatch_layout(snapshot)),
             keys: Rc::new(move |key| keys.0.keys.borrow().contains(key)),
-            effect_shaders: Rc::new(move || effect_shaders.read(Render::effect_shaders)),
             image_assets: Rc::new(move || image_assets.read(Render::image_assets)),
             vector_assets: Rc::new(move || vector_assets.read(Render::vector_assets)),
             inspector: Rc::new(move || inspector.read(Render::inspector)),
@@ -436,10 +428,6 @@ impl AnyEntity {
 
     pub(crate) fn wants_frame(&self) -> bool {
         (self.wants_frame)()
-    }
-
-    pub(crate) fn effect_shaders(&self) -> &'static [EffectShader] {
-        (self.effect_shaders)()
     }
 
     pub(crate) fn image_assets(&self) -> Vec<ImageAsset> {

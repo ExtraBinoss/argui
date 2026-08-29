@@ -19,6 +19,28 @@ struct Params {
 @group(0) @binding(2) var linear_sampler: sampler;
 @group(0) @binding(3) var<uniform> params: Params;
 
+struct EffectParameters {
+    words: array<u32>,
+};
+
+@group(0) @binding(4) var<storage, read> effect_parameters: EffectParameters;
+
+fn argui_param_f32(index: u32) -> f32 {
+    return bitcast<f32>(effect_parameters.words[index]);
+}
+
+fn argui_param_i32(index: u32) -> i32 {
+    return bitcast<i32>(effect_parameters.words[index]);
+}
+
+fn argui_param_u32(index: u32) -> u32 {
+    return effect_parameters.words[index];
+}
+
+fn argui_param_bool(index: u32) -> bool {
+    return effect_parameters.words[index] != 0u;
+}
+
 struct VertexOut {
     @builtin(position) position: vec4<f32>,
     @location(0) uv: vec2<f32>,

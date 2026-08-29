@@ -134,4 +134,18 @@ mod tests {
             ]
         );
     }
+
+    #[test]
+    fn layers_and_missing_text_ranges_do_not_create_empty_batches() {
+        let mut list = DisplayList::new();
+        list.begin_layer(argui_paint::LayerStyle::new(Rect::default()));
+        list.push_text(9);
+        list.end_layer();
+        let mut batches = vec![DrawBatch {
+            kind: DrawKind::Quad,
+            instances: 0..1,
+        }];
+        build_batches(&list, &[], &mut batches);
+        assert!(batches.is_empty());
+    }
 }

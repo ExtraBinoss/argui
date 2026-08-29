@@ -2,25 +2,117 @@ use argui_core::{Color, Point, Rect, Size};
 
 use crate::CornerRadii;
 
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
-pub struct ShaderEffectId(pub u64);
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct CustomEffect {
-    pub shader: ShaderEffectId,
-    pub parameters: Vec<f32>,
-    pub expansion: f32,
-    pub pixel_parameters: u32,
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum ProfileDomain {
+    Ui,
+    Overlay,
+    Engine,
 }
 
-impl CustomEffect {
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct RenderObjectId {
+    pub domain: ProfileDomain,
+    pub value: u64,
+}
+
+impl RenderObjectId {
     #[must_use]
-    pub fn new(shader: ShaderEffectId, parameters: impl Into<Vec<f32>>) -> Self {
+    pub const fn new(domain: ProfileDomain, value: u64) -> Self {
+        Self { domain, value }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct EffectId(pub &'static str);
+
+impl EffectId {
+    #[must_use]
+    pub const fn new(namespaced_name: &'static str) -> Self {
+        Self(namespaced_name)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum EffectValue {
+    F32(f32),
+    I32(i32),
+    U32(u32),
+    Bool(bool),
+    Vec2([f32; 2]),
+    Vec3([f32; 3]),
+    Vec4([f32; 4]),
+    Mat3([f32; 9]),
+    Mat4([f32; 16]),
+    Color(Color),
+    LogicalPixels(f32),
+}
+
+impl EffectValue {
+    #[must_use]
+    pub fn scaled(&self, factor: f32) -> Self {
+        match self {
+            Self::LogicalPixels(value) => Self::LogicalPixels(value * factor),
+            value => value.clone(),
+        }
+    }
+
+    pub fn write_words(&self, words: &mut Vec<u32>) {
+        match self {
+            Self::F32(value) | Self::LogicalPixels(value) => words.push(value.to_bits()),
+            Self::I32(value) => words.push(*value as u32),
+            Self::U32(value) => words.push(*value),
+            Self::Bool(value) => words.push(u32::from(*value)),
+            Self::Vec2(values) => write_f32_words(words, values),
+            Self::Vec3(values) => write_f32_words(words, values),
+            Self::Vec4(values) => write_f32_words(words, values),
+            Self::Color(value) => write_f32_words(words, &value.as_array()),
+            Self::Mat3(values) => write_f32_words(words, values),
+            Self::Mat4(values) => write_f32_words(words, values),
+        }
+    }
+}
+
+fn write_f32_words(words: &mut Vec<u32>, values: &[f32]) {
+    words.extend(values.iter().map(|value| value.to_bits()));
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct EffectArgument {
+    pub name: &'static str,
+    pub value: EffectValue,
+}
+
+impl EffectArgument {
+    #[must_use]
+    pub const fn new(name: &'static str, value: EffectValue) -> Self {
+        Self { name, value }
+    }
+}
+
+impl From<(&'static str, EffectValue)> for EffectArgument {
+    fn from((name, value): (&'static str, EffectValue)) -> Self {
+        Self::new(name, value)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct EffectInstance {
+    pub id: EffectId,
+    pub parameters: Vec<EffectArgument>,
+    pub expansion: f32,
+}
+
+impl EffectInstance {
+    #[must_use]
+    pub fn new<I, A>(id: EffectId, parameters: I) -> Self
+    where
+        I: IntoIterator<Item = A>,
+        A: Into<EffectArgument>,
+    {
         Self {
-            shader,
-            parameters: parameters.into(),
+            id,
+            parameters: parameters.into_iter().map(Into::into).collect(),
             expansion: 0.0,
-            pixel_parameters: 0,
         }
     }
 
@@ -30,13 +122,13 @@ impl CustomEffect {
         self
     }
 
-    /// Marks one parameter as a logical-pixel value that follows DPI scaling.
     #[must_use]
-    pub fn pixel_parameter(mut self, index: usize) -> Self {
-        if index < 24 {
-            self.pixel_parameters |= 1 << index;
+    pub fn packed_words(&self) -> Vec<u32> {
+        let mut words = Vec::new();
+        for parameter in &self.parameters {
+            parameter.value.write_words(&mut words);
         }
-        self
+        words
     }
 }
 
@@ -74,7 +166,7 @@ pub enum Filter {
     Opacity(f32),
     ColorMatrix([f32; 20]),
     Refraction(Refraction),
-    Custom(CustomEffect),
+    Effect(EffectInstance),
 }
 
 impl Filter {
@@ -82,7 +174,7 @@ impl Filter {
     pub fn expansion(&self) -> f32 {
         match self {
             Self::Blur(radius) => radius.max(0.0) * 3.0,
-            Self::Custom(effect) => effect.expansion,
+            Self::Effect(effect) => effect.expansion,
             _ => 0.0,
         }
     }
@@ -91,22 +183,17 @@ impl Filter {
     pub fn scaled(&self, factor: f32) -> Self {
         match self {
             Self::Blur(radius) => Self::Blur(radius * factor),
-            Self::Custom(effect) => Self::Custom(CustomEffect {
-                shader: effect.shader,
+            Self::Effect(effect) => Self::Effect(EffectInstance {
+                id: effect.id,
                 parameters: effect
                     .parameters
                     .iter()
-                    .enumerate()
-                    .map(|(index, value)| {
-                        if effect.pixel_parameters & (1 << index) != 0 {
-                            value * factor
-                        } else {
-                            *value
-                        }
+                    .map(|argument| EffectArgument {
+                        name: argument.name,
+                        value: argument.value.scaled(factor),
                     })
                     .collect(),
                 expansion: effect.expansion * factor,
-                pixel_parameters: effect.pixel_parameters,
             }),
             other => other.clone(),
         }
@@ -189,6 +276,7 @@ pub struct LayerStyle {
     pub backdrop_filters: Vec<Filter>,
     pub shadows: Vec<Shadow>,
     pub mask: LayerMask,
+    pub profile: Option<RenderObjectId>,
 }
 
 impl LayerStyle {
@@ -202,6 +290,7 @@ impl LayerStyle {
             backdrop_filters: Vec::new(),
             shadows: Vec::new(),
             mask: LayerMask::None,
+            profile: None,
         }
     }
 
@@ -238,6 +327,12 @@ impl LayerStyle {
     #[must_use]
     pub const fn mask(mut self, mask: LayerMask) -> Self {
         self.mask = mask;
+        self
+    }
+
+    #[must_use]
+    pub const fn profile(mut self, profile: RenderObjectId) -> Self {
+        self.profile = Some(profile);
         self
     }
 

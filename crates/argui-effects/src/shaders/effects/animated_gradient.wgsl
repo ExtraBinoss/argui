@@ -14,10 +14,10 @@ fn argui_effect(
     let pixel = global_pixel(uv);
     let local = (pixel - params.bounds.xy) / max(params.bounds.zw, vec2<f32>(1.0));
     let wave = 0.5 + 0.5 * sin(
-        (local.x + local.y * 0.35) * 6.2831853 * max(params.data.y, 0.01)
-            - params.data.x
+        (local.x + local.y * 0.35) * 6.2831853 * max(argui_param_f32(1u), 0.01)
+            - argui_param_f32(0u)
     );
     let original = source.rgb / max(source.a, 0.0001);
-    let color = mix(original, gradient_palette(wave), clamp(params.data.z, 0.0, 1.0));
+    let color = mix(original, gradient_palette(wave), clamp(argui_param_f32(2u), 0.0, 1.0));
     return vec4<f32>(color * source.a, source.a);
 }
