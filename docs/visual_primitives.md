@@ -12,8 +12,9 @@ quads, text, images, exact nested clips, effect layers, and hit testing. They
 run after Taffy layout, so animating a transform never recomputes layout.
 
 The type implements `Interpolate` and `MotionValue`. It therefore works with
-typed keyframes, implicit transitions, springs, decay, and velocity-preserving
-spring retargeting without a transform-specific timing engine.
+typed keyframes, property-bound motions, springs, decay, and
+velocity-preserving spring retargeting without a transform-specific timing
+engine.
 
 ## Gradients
 
@@ -32,8 +33,9 @@ let fill = Fill::Linear(LinearGradient::with_stops(
 There is no fixed per-gradient stop count. Stops are stored in shared immutable
 memory on the CPU and packed into one storage buffer per frame. The total is
 bounded by `RendererConfig::gradient_stop_capacity` (65,536 by default), so an
-application can raise or lower the explicit GPU-memory/work budget. Gradients
-with matching topology interpolate as gradients during implicit transitions.
+application can raise or lower the explicit GPU-memory/work budget. Gradient
+geometry and individual stops can bind to typed motions without rebuilding the
+element tree.
 
 ## Images
 

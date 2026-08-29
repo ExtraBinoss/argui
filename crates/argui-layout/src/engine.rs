@@ -67,6 +67,7 @@ pub struct LayoutEngine {
     root: Option<NodeMap>,
     revision: Option<u64>,
     paint_cache: paint::PaintCache,
+    nodes_by_index: Vec<NodeId>,
 }
 
 impl Default for LayoutEngine {
@@ -76,6 +77,7 @@ impl Default for LayoutEngine {
             root: None,
             revision: None,
             paint_cache: paint::PaintCache::default(),
+            nodes_by_index: Vec::new(),
         }
     }
 }
@@ -94,6 +96,16 @@ impl LayoutEngine {
     ) -> Result<LayoutOutput, LayoutError> {
         if self.revision != Some(ui.revision()) {
             self.sync_or_rebuild(ui)?;
+        }
+        for index in ui.layout_animation_indices() {
+            let Some(id) = self.nodes_by_index.get(*index).copied() else {
+                return Err(LayoutError::MissingNodeIdentity(*index));
+            };
+            let Some(element) = ui.element_at(*index) else {
+                return Err(LayoutError::MissingNodeIdentity(*index));
+            };
+            let style = ui.resolved_layout_style(element);
+            self.tree.set_style(id, taffy_style(&style))?;
         }
         let elements = flattened(ui.root());
         let root = self.root.as_ref().ok_or(LayoutError::MissingRoot)?;
@@ -194,6 +206,7 @@ impl LayoutEngine {
         self.tree = TaffyTree::new();
         let mut next_index = 0;
         self.root = Some(build_node(&mut self.tree, ui, ui.root(), &mut next_index)?);
+        self.rebuild_node_index();
         self.revision = Some(ui.revision());
         Ok(())
     }
@@ -203,8 +216,16 @@ impl LayoutEngine {
             return self.rebuild(ui);
         };
         self.root = Some(crate::reconcile::sync(&mut self.tree, root, ui)?);
+        self.rebuild_node_index();
         self.revision = Some(ui.revision());
         Ok(())
+    }
+
+    fn rebuild_node_index(&mut self) {
+        self.nodes_by_index.clear();
+        if let Some(root) = &self.root {
+            collect_node_ids(root, &mut self.nodes_by_index);
+        }
     }
 }
 
@@ -224,7 +245,8 @@ fn build_node(
         .iter()
         .map(|child| build_node(tree, ui, child, next_index))
         .collect::<Result<Vec<_>, _>>()?;
-    let style = taffy_style(&element.style);
+    let resolved_style = ui.resolved_layout_style(element);
+    let style = taffy_style(&resolved_style);
     let id = match element.kind {
         ElementKind::Text { .. }
         | ElementKind::TextInput { .. }
@@ -240,7 +262,7 @@ fn build_node(
         node,
         id,
         kind: element.kind.clone(),
-        style: element.style.clone(),
+        style: resolved_style,
         element: element.clone(),
         subtree_len: 1 + children
             .iter()
@@ -248,6 +270,17 @@ fn build_node(
             .sum::<usize>(),
         children,
     })
+}
+
+fn collect_node_ids(node: &NodeMap, output: &mut Vec<NodeId>) {
+    if output.len() == node.index {
+        output.push(node.id);
+    } else if let Some(slot) = output.get_mut(node.index) {
+        *slot = node.id;
+    }
+    for child in &node.children {
+        collect_node_ids(child, output);
+    }
 }
 
 fn collect_layout(

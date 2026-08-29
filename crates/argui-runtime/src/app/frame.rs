@@ -70,6 +70,10 @@ impl PendingUiFrame {
         self.layout = true;
     }
 
+    pub(super) fn request_scroll_update(&mut self) {
+        self.scroll = true;
+    }
+
     pub(super) fn request_paint(&mut self) {
         self.paint = true;
     }
@@ -167,6 +171,11 @@ impl Application {
                 self.repaint();
                 self.frame_record.paint += started.elapsed();
             }
+            TreeUpdate::Scroll => {
+                let started = Instant::now();
+                self.scroll_or_exit(event_loop);
+                self.frame_record.paint += started.elapsed();
+            }
             TreeUpdate::Semantics => {}
             TreeUpdate::None if pending.paint => {
                 let started = Instant::now();
@@ -178,6 +187,7 @@ impl Application {
         self.frame_record.update = match tree_update {
             TreeUpdate::Layout => Invalidation::Layout,
             TreeUpdate::Paint => Invalidation::Paint,
+            TreeUpdate::Scroll => Invalidation::Paint,
             TreeUpdate::Semantics => Invalidation::None,
             TreeUpdate::None if pending.layout => Invalidation::Layout,
             TreeUpdate::None if pending.text_input || pending.scroll || pending.paint => {

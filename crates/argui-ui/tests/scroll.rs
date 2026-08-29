@@ -1,8 +1,9 @@
+use argui_animation::{Duration, Motion, MotionState, Time, Tween};
 use argui_core::{Affine2D, Point, Rect, ScrollDelta, Size};
 use argui_paint::{ClipChain, ClipRegion};
 use argui_ui::{
     Color, Element, QuadStyle, ScrollChaining, ScrollConfig, ScrollPolarity, ScrollRegion,
-    ScrollbarRegion, ScrollbarStyle, UiEventKind, UiTree,
+    ScrollbarRegion, ScrollbarStyle, TreeUpdate, UiEventKind, UiTree, property,
 };
 
 fn region(node: argui_ui::NodeId, config: ScrollConfig, max_y: f32) -> ScrollRegion {
@@ -216,4 +217,39 @@ fn scrollbar_track_clicks_reuse_offsets_and_degenerate_tracks_do_no_work() {
             .unwrap()
             .scroll_changed
     );
+}
+
+#[test]
+fn direct_scroll_input_takes_over_from_a_scroll_motion() {
+    let offset = Motion::new(Point::default());
+    let mut tree = UiTree::new(
+        Element::container([])
+            .scrollable(ScrollConfig::default())
+            .bind(property::Scroll, offset.clone()),
+    );
+    let node = tree.node_id_at(0).unwrap();
+    let regions = [region(node, ScrollConfig::default(), 100.0)];
+    offset.animate_to(
+        Point::new(0.0, 60.0),
+        Tween::new(Duration::from_millis(100)),
+    );
+    assert_eq!(
+        tree.advance_animations(Time::from_nanos(1)),
+        TreeUpdate::None
+    );
+    assert_eq!(
+        tree.advance_animations(Time::from_nanos(50_000_001)),
+        TreeUpdate::Scroll
+    );
+    assert!((tree.scroll_offset(node).y - 30.0).abs() < 0.001);
+
+    let update = tree.scroll(
+        Point::new(10.0, 10.0),
+        ScrollDelta::Lines(Point::new(0.0, -1.0)),
+        &regions,
+    );
+    assert!(update.scroll_changed);
+    assert_eq!(offset.state(), MotionState::Idle);
+    assert_eq!(offset.value(), Point::new(0.0, 40.0));
+    assert_eq!(tree.scroll_offset(node), Point::new(0.0, 40.0));
 }

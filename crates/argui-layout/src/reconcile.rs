@@ -36,12 +36,16 @@ fn reconcile_node(
 
     *cursor += 1;
     let previous = previous.filter(|previous| previous.node == node);
+    let resolved_style = ui.resolved_layout_style(element);
     let (id, previous_children) = match previous {
         Some(previous) => {
-            let id = reuse_node(tree, &previous, element, index)?;
+            let id = reuse_node(tree, &previous, element, &resolved_style, index)?;
             (id, previous.children)
         }
-        None => (create_node(tree, element, index)?, Vec::new()),
+        None => (
+            create_node(tree, element, &resolved_style, index)?,
+            Vec::new(),
+        ),
     };
     let previous_ids = previous_children
         .iter()
@@ -80,7 +84,7 @@ fn reconcile_node(
         node,
         id,
         kind: element.kind.clone(),
-        style: element.style.clone(),
+        style: resolved_style,
         element: element.clone(),
         subtree_len,
         children,
@@ -91,10 +95,11 @@ fn reuse_node(
     tree: &mut TaffyTree<usize>,
     previous: &NodeMap,
     element: &Element,
+    style: &argui_ui::LayoutStyle,
     index: usize,
 ) -> Result<NodeId, LayoutError> {
-    if previous.style != element.style {
-        tree.set_style(previous.id, taffy_style(&element.style))?;
+    if previous.style != *style {
+        tree.set_style(previous.id, taffy_style(style))?;
     }
     if previous.index != index && !matches!(element.kind, ElementKind::Container) {
         tree.set_node_context(previous.id, Some(index))?;
@@ -108,9 +113,10 @@ fn reuse_node(
 fn create_node(
     tree: &mut TaffyTree<usize>,
     element: &Element,
+    style: &argui_ui::LayoutStyle,
     index: usize,
 ) -> Result<NodeId, LayoutError> {
-    let style = taffy_style(&element.style);
+    let style = taffy_style(style);
     match element.kind {
         ElementKind::Container => tree.new_leaf(style).map_err(Into::into),
         _ => tree.new_leaf_with_context(style, index).map_err(Into::into),

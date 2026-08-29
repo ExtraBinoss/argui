@@ -2,7 +2,7 @@ use argui_animation::{Duration, Frame, Time};
 use argui_core::{Affine2D, Point, Rect, ScrollDelta, Size};
 use argui_effects::{ANIMATED_GRADIENT_ID, LIQUID_GLASS_ID, WORLEY_BORDER_FIRE_ID};
 use argui_layout::LayoutEngine;
-use argui_paint::{ClipChain, ClipRegion};
+use argui_paint::{ClipChain, ClipRegion, Fill};
 use argui_runtime::{LayoutSnapshot, ViewUpdate};
 use argui_showcase::{StateShowcase, text_engine};
 use argui_text::TextStyle;
@@ -50,6 +50,26 @@ fn click(app: &mut StateShowcase, key: &str) -> ViewUpdate {
         .find(|event| event.kind == UiEventKind::Clicked)
         .unwrap();
     app.update(&event)
+}
+
+fn open_popover(app: &mut StateShowcase) {
+    assert_eq!(click(app, "popover-toggle"), ViewUpdate::None);
+    assert!(node_index_optional(&app.view(), "effects-popover").is_none());
+    assert_eq!(
+        app.animation_frame(Frame {
+            now: Time::ZERO,
+            elapsed: Duration::ZERO,
+        }),
+        ViewUpdate::None
+    );
+    assert_eq!(
+        app.animation_frame(Frame {
+            now: Time::from_nanos(16_000_000),
+            elapsed: Duration::from_millis(16),
+        }),
+        ViewUpdate::Rebuild
+    );
+    assert!(node_index_optional(&app.view(), "effects-popover").is_some());
 }
 
 #[test]
@@ -138,9 +158,17 @@ fn shared_animation_activates_samples_and_returns_to_idle() {
         ViewUpdate::Rebuild
     );
     assert!(app.wants_animation_frame());
+    assert_eq!(
+        app.animation_frame(Frame {
+            now: Time::from_nanos(16_000_000),
+            elapsed: Duration::from_millis(16),
+        }),
+        ViewUpdate::Paint,
+        "keyframe sampling must not rebuild the retained showcase"
+    );
     let _ = app.animation_frame(Frame {
         now: Time::from_nanos(3_000_000_000),
-        elapsed: Duration::from_secs(3),
+        elapsed: Duration::from_millis(2_984),
     });
     assert!(!app.wants_animation_frame());
 
@@ -160,10 +188,10 @@ fn shared_animation_activates_samples_and_returns_to_idle() {
 }
 
 #[test]
-fn implicit_paint_transition_is_retained_outside_the_app_model() {
+fn property_motion_is_retained_outside_the_app_model() {
     let mut app = StateShowcase::default();
     let mut tree = UiTree::new(app.view());
-    assert_eq!(click(&mut app, "transition"), ViewUpdate::Rebuild);
+    assert_eq!(click(&mut app, "motion"), ViewUpdate::Rebuild);
     assert_eq!(tree.update(app.view()), argui_ui::TreeUpdate::Paint);
     assert!(tree.wants_animation_frame());
     tree.advance_animations(Time::ZERO);
@@ -177,10 +205,22 @@ fn spring_retarget_and_bounded_inertia_return_the_scheduler_to_idle() {
     assert_eq!(click(&mut app, "physics-spring"), ViewUpdate::None);
     assert!(app.wants_animation_frame());
     let mut now = 0_u64;
-    let _ = app.animation_frame(Frame {
-        now: Time::ZERO,
-        elapsed: Duration::ZERO,
-    });
+    assert_eq!(
+        app.animation_frame(Frame {
+            now: Time::ZERO,
+            elapsed: Duration::ZERO,
+        }),
+        ViewUpdate::Rebuild
+    );
+    now += 16_000_000;
+    assert_eq!(
+        app.animation_frame(Frame {
+            now: Time::from_nanos(now),
+            elapsed: Duration::from_millis(16),
+        }),
+        ViewUpdate::Paint,
+        "physics sampling must only update retained paint properties"
+    );
     for step in 0..1_000 {
         now += 16_000_000;
         if step == 4 {
@@ -211,29 +251,99 @@ fn spring_retarget_and_bounded_inertia_return_the_scheduler_to_idle() {
 }
 
 #[test]
-fn effects_popover_is_composed_and_only_animates_while_open() {
+fn held_inertia_is_powered_until_release_then_decays() {
     let mut app = StateShowcase::default();
-    let mut retained = UiTree::new(app.view());
-    assert_eq!(click(&mut app, "popover-toggle"), ViewUpdate::Rebuild);
-    assert_eq!(retained.update(app.view()), argui_ui::TreeUpdate::None);
-    assert!(app.wants_animation_frame());
-    assert!(node_index(&app.view(), "effects-popover") > 0);
+    let events = events_for(&app, "physics-inertia");
+    let pressed = events
+        .iter()
+        .find(|event| event.kind == UiEventKind::Pressed)
+        .unwrap();
+    let released = events
+        .iter()
+        .find(|event| event.kind == UiEventKind::Released)
+        .unwrap();
 
+    assert_eq!(app.update(pressed), ViewUpdate::Rebuild);
+    assert!(app.wants_animation_frame());
+    for step in 1..=90 {
+        let _ = app.animation_frame(Frame {
+            now: Time::from_nanos(step * 16_000_000),
+            elapsed: Duration::from_millis(16),
+        });
+    }
+    assert!(
+        app.wants_animation_frame(),
+        "holding keeps powering inertia"
+    );
+
+    assert_eq!(app.update(released), ViewUpdate::Rebuild);
+    assert!(
+        app.wants_animation_frame(),
+        "release preserves the outgoing velocity"
+    );
+    for step in 91..=1_090 {
+        let _ = app.animation_frame(Frame {
+            now: Time::from_nanos(step * 16_000_000),
+            elapsed: Duration::from_millis(16),
+        });
+        if !app.wants_animation_frame() {
+            break;
+        }
+    }
+    assert!(!app.wants_animation_frame());
+}
+
+#[test]
+fn a_stalled_frame_cannot_teleport_the_physics_visual() {
+    let mut app = StateShowcase::default();
+    assert_eq!(click(&mut app, "physics-spring"), ViewUpdate::None);
     assert_eq!(
         app.animation_frame(Frame {
             now: Time::ZERO,
             elapsed: Duration::ZERO,
         }),
-        ViewUpdate::None
+        ViewUpdate::Rebuild
     );
     assert_eq!(
         app.animation_frame(Frame {
+            now: Time::from_nanos(500_000_000),
+            elapsed: Duration::from_millis(500),
+        }),
+        ViewUpdate::Paint
+    );
+
+    let view = app.view();
+    let index = node_index(&view, "physics-visual");
+    let tree = UiTree::new(view.clone());
+    let element = element_by_key(&view, "physics-visual").unwrap();
+    let quad = tree.resolved_quad(tree.node_id_at(index).unwrap(), element);
+    let Some(Fill::Solid(color)) = quad.background else {
+        panic!("the physics visual uses a solid animated fill");
+    };
+    assert!(
+        color.as_array()[0] < 0.4,
+        "a long presentation stall must advance physics by one bounded visual step"
+    );
+}
+
+#[test]
+fn effects_popover_is_composed_and_only_animates_while_open() {
+    let mut app = StateShowcase::default();
+    assert!(node_index_optional(&app.view(), "effects-popover").is_none());
+    let mut retained = UiTree::new(app.view());
+    open_popover(&mut app);
+    assert_eq!(retained.update(app.view()), argui_ui::TreeUpdate::Layout);
+    assert!(app.wants_animation_frame());
+    assert!(node_index(&app.view(), "effects-popover") > 0);
+
+    assert_eq!(
+        app.animation_frame(Frame {
             now: Time::from_nanos(700_000_000),
-            elapsed: Duration::from_millis(700),
+            elapsed: Duration::from_millis(684),
         }),
         ViewUpdate::Rebuild
     );
-    assert_eq!(click(&mut app, "popover-close"), ViewUpdate::Rebuild);
+    assert_eq!(click(&mut app, "popover-close"), ViewUpdate::None);
     assert!(app.wants_animation_frame());
     let mut now = 700_000_000;
     for _ in 0..120 {
@@ -248,18 +358,18 @@ fn effects_popover_is_composed_and_only_animates_while_open() {
     }
     assert!(!app.wants_animation_frame());
     assert!(
-        node_index_optional(&app.view(), "effects-popover").is_some(),
-        "the dormant popover stays retained to avoid layout work on its next opening"
+        node_index_optional(&app.view(), "effects-popover").is_none(),
+        "a fully closed popover must leave the painted and interactive scene"
     );
 }
 
 #[test]
 fn effects_popover_scroll_repaints_a_valid_clipped_scene() {
     let mut app = StateShowcase::default();
-    assert_eq!(click(&mut app, "popover-toggle"), ViewUpdate::Rebuild);
+    open_popover(&mut app);
     let _ = app.animation_frame(Frame {
         now: Time::from_nanos(700_000_000),
-        elapsed: Duration::from_millis(700),
+        elapsed: Duration::from_millis(684),
     });
 
     let mut tree = UiTree::new(app.view());
@@ -329,7 +439,7 @@ fn overlay_layout_is_resolved_by_the_layout_engine_without_a_model_rebuild() {
         app.layout_changed(&LayoutSnapshot::default()),
         ViewUpdate::None
     );
-    assert_eq!(click(&mut app, "popover-toggle"), ViewUpdate::Rebuild);
+    open_popover(&mut app);
     let view = app.view();
     let popover = element_by_key(&view, "effects-popover").unwrap();
     assert!(popover.interaction.is_some());

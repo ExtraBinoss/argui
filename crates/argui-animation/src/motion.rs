@@ -42,6 +42,40 @@ macro_rules! scalar_motion {
 scalar_motion!(f32);
 scalar_motion!(f64);
 
+impl<const N: usize> MotionValue for [f32; N] {
+    fn zero() -> Self {
+        [0.0; N]
+    }
+
+    fn add(mut self, other: Self) -> Self {
+        for (value, other) in self.iter_mut().zip(other) {
+            *value += other;
+        }
+        self
+    }
+
+    fn subtract(mut self, other: Self) -> Self {
+        for (value, other) in self.iter_mut().zip(other) {
+            *value -= other;
+        }
+        self
+    }
+
+    fn scale(mut self, factor: f64) -> Self {
+        for value in &mut self {
+            *value *= factor as f32;
+        }
+        self
+    }
+
+    fn magnitude(self) -> f64 {
+        self.into_iter()
+            .map(|value| f64::from(value).powi(2))
+            .sum::<f64>()
+            .sqrt()
+    }
+}
+
 impl MotionValue for Point {
     fn zero() -> Self {
         Self::default()

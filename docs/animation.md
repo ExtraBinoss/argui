@@ -28,7 +28,7 @@ future DSL. The DSL will lower into the same typed declarations as Rust code.
 
 ## Feature scope
 
-- Explicit timelines and implicit property transitions.
+- Explicit timelines and retained typed property motions.
 - Typed keyframes with offsets, per-keyframe easing, and optional holds.
 - Duration, delay, end delay, playback rate, pause, resume, reverse, seek,
   restart, finish, and cancel.
@@ -92,30 +92,41 @@ presentation. Returning to an inactive timeline removes it from the compact
 scheduler immediately. The state showcase exercises this exact path on native
 and WASM without separate UI code.
 
-### 3. Transitions and orchestration — implemented
+### 3. Property motions and orchestration — implemented
 
-- Add ergonomic implicit transitions on composed UI elements.
+- Bind retained typed motions to composed UI elements.
 - Add sequence, parallel, dependency, and stagger orchestration.
 - Add replace/add/accumulate composition with deterministic priority rules.
 
-`Element::transition` currently interpolates the complete paint quad retained by
-its stable `NodeId`: background, opacity, per-side border widths and color, and
-per-corner radii. A target changed during playback starts again from the value
-actually presented in the previous frame. These transitions repaint without
-running Taffy or reshaping text.
+`Motion<T>` owns the presented value, target, driver and lifecycle independently
+from application rebuilds. `Element::bind` is the single attachment API; typed
+property markers select transforms, paint components, layout dimensions,
+scroll offsets, layer/shadow values, gradient geometry/stops, or registered
+effect parameters. A target changed during playback starts again from the
+currently presented value, while spring retargeting preserves velocity.
+
+The UI tree builds one compact registry when it reconciles. A shared motion is
+advanced once even when several properties consume it, static trees allocate no
+per-frame animation work, and each changed track emits its exact paint, scroll,
+or layout invalidation class.
 
 `Schedule`, `ScheduleBuilder`, and `Cue` describe serial, parallel, dependent,
 and staggered timing without owning widget or renderer state. Typed
 `Contribution<T>` values resolve replace, add, and accumulate composition in a
-stable `(priority, order)` order. Transform, layout, and effect properties will
-reuse these primitives in their dedicated delivery stages.
+stable `(priority, order)` order. Transform, layout, paint, scroll, and effect
+properties reuse these primitives.
 
 ```rust
-use argui::{animation::Duration, ui::Transition};
+use argui::{
+    animation::{Duration, Motion, Tween},
+    ui::{Element, property},
+};
 
+let opacity = Motion::new(1.0_f32);
+opacity.animate_to(0.4, Tween::new(Duration::from_millis(240)));
 let panel = Element::container([])
     .background(target_color)
-    .transition(Transition::new(Duration::from_millis(240)));
+    .bind(property::Opacity, opacity);
 ```
 
 ### 4. Physics — implemented
@@ -136,19 +147,21 @@ thresholds snap the final value and immediately remove the physics consumer
 from frame scheduling. The same inertia is ready for the scroll consumer stage;
 it is not coupled to scroll direction or platform events.
 
-### 5. Paint and transforms
+### 5. Paint and transforms — implemented
 
 - Animate colors, opacity, borders, radii, and transform components through the
   paint-only path.
 - Add transform-aware painting, clipping, and hit testing.
 - Batch compatible animated primitives exactly like static primitives.
 
-### 6. Layout transitions
+### 6. Layout properties — implemented
 
 - Animate explicit layout properties with scoped Taffy invalidation.
-- Add before/after geometry transitions for reorders, insertion, removal, and
-  responsive state changes.
 - Keep hit testing synchronized with the presented geometry.
+
+Before/after geometry animation for reorders, insertion, and removal remains a
+separate future feature; explicit animated layout properties already update
+their existing Taffy nodes without rebuilding the retained tree.
 
 ### 7. Built-in consumers
 
@@ -157,16 +170,16 @@ it is not coupled to scroll direction or platform events.
 - Expose reduced-motion behavior as application policy rather than a theme
   assumption.
 
-### 8. Effects and shader parameters
+### 8. Effects and shader parameters — implemented
 
-- Connect timelines to layer opacity, filters, backdrop effects, and registered
+- Connect motions to layer opacity, shadows, masks, and registered
   custom-effect uniforms.
 - Preserve the effects boundary: `argui-paint` describes values and
   `argui-render` executes the necessary WGPU passes.
 
 ### 9. Showcase and profiling
 
-- Use one shared Rust showcase on native and WASM for keyframes, transitions,
+- Use one shared Rust showcase on native and WASM for keyframes, motions,
   springs, interruption, layout changes, scroll, caret, and shader parameters.
 - Measure frame CPU time, allocations, active/idle redraws, GPU passes, and
   steady-state memory.

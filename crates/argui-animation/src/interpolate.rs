@@ -18,6 +18,15 @@ impl Interpolate for f64 {
     }
 }
 
+impl<const N: usize> Interpolate for [f32; N] {
+    fn interpolate(mut self, target: Self, progress: f32) -> Self {
+        for (value, target) in self.iter_mut().zip(target) {
+            *value = value.interpolate(target, progress);
+        }
+        self
+    }
+}
+
 impl Interpolate for Color {
     fn interpolate(self, target: Self, progress: f32) -> Self {
         let from = self.as_array();

@@ -1,9 +1,7 @@
 use argui_animation::{DecayConfig, Inertia, InertiaConfig, InertiaState, Spring, SpringConfig};
-use argui_paint::{
-    BlendMode, Border, Color, CornerRadii, Filter, LayerMask, LayerStyle, Refraction, Shadow,
-};
+use argui_paint::{Border, Color, CornerRadii};
 use argui_text::{TextColor, TextWrap};
-use argui_ui::{Edges, Element, Length, Wrap};
+use argui_ui::{Edges, Element, Length, Wrap, property};
 
 use super::{StateShowcase, button, text_style};
 
@@ -27,6 +25,7 @@ impl StateShowcase {
         };
         match command {
             PhysicsCommand::RetargetSpring => {
+                self.inertia_held = false;
                 if !matches!(self.physics_mode, PhysicsMode::Spring) {
                     self.spring = Spring::new(
                         self.physics_value,
@@ -41,7 +40,15 @@ impl StateShowcase {
                 self.physics_mode = PhysicsMode::Spring;
             }
             PhysicsCommand::LaunchInertia => {
-                let velocity = if self.physics_value < 0.5 { 4.5 } else { -4.5 };
+                let velocity = if matches!(self.physics_mode, PhysicsMode::Inertia)
+                    && self.inertia.velocity().abs() > 0.002
+                {
+                    self.inertia.velocity()
+                } else if self.physics_value < 0.5 {
+                    4.5
+                } else {
+                    -4.5
+                };
                 self.inertia.launch(self.physics_value, velocity);
                 self.physics_mode = PhysicsMode::Inertia;
             }
@@ -49,20 +56,39 @@ impl StateShowcase {
         true
     }
 
+    pub(super) fn hold_inertia(&mut self) {
+        if self.inertia_held {
+            return;
+        }
+        self.inertia_hold_velocity = if self.physics_value < 0.5 { 1.6 } else { -1.6 };
+        self.inertia
+            .launch(self.physics_value, self.inertia_hold_velocity);
+        self.physics_mode = PhysicsMode::Inertia;
+        self.inertia_held = true;
+    }
+
+    pub(super) fn release_inertia(&mut self) {
+        self.inertia_held = false;
+    }
+
+    pub(super) fn advance_held_inertia(&mut self, elapsed: argui_animation::Duration) -> bool {
+        let previous = self.physics_value;
+        let mut next = previous + self.inertia_hold_velocity * elapsed.as_secs_f64() as f32;
+        if next >= 1.0 {
+            next = 1.0;
+            self.inertia_hold_velocity = -self.inertia_hold_velocity.abs();
+        } else if next <= 0.0 {
+            next = 0.0;
+            self.inertia_hold_velocity = self.inertia_hold_velocity.abs();
+        }
+        self.inertia.launch(next, self.inertia_hold_velocity);
+        next != previous
+    }
+
     pub(super) fn physics_demo(&self, accent: Color) -> Element {
         let normalized = self.physics_value.clamp(0.0, 1.0);
-        let color = Color::rgb(
-            0.18 + normalized * 0.68,
-            0.72 - normalized * 0.32,
-            0.92 - normalized * 0.58,
-        );
-        let state = match self.physics_mode {
-            PhysicsMode::Spring if self.spring.is_active() => "spring moving",
-            PhysicsMode::Spring => "spring settled",
-            PhysicsMode::Inertia if self.inertia.state() == InertiaState::Decaying => "decaying",
-            PhysicsMode::Inertia if self.inertia.state() == InertiaState::Bouncing => "bouncing",
-            PhysicsMode::Inertia => "inertia settled",
-        };
+        let color = physics_color(normalized);
+        let state = self.physics_status();
         Element::column([
             Element::text(format!("Physics · {state}")).text_style(text_style(
                 17.0,
@@ -71,11 +97,14 @@ impl StateShowcase {
                 TextWrap::None,
             )),
             Element::container([])
+                .keyed("physics-visual")
                 .height(Length::Px(68.0))
                 .width(Length::Percent(1.0))
                 .background(color)
+                .bind(property::BackgroundColor, self.physics_color.clone())
                 .border(Border::all(1.5, accent))
-                .radius(CornerRadii::all(10.0 + normalized * 24.0)),
+                .radius(CornerRadii::all(10.0 + normalized * 24.0))
+                .bind(property::CornerRadii, self.physics_radii.clone()),
             Element::row([
                 button("physics-spring", "Spring retarget", accent),
                 button("physics-inertia", "Launch inertia", accent),
@@ -87,22 +116,31 @@ impl StateShowcase {
         .padding(Edges::all(16.0))
         .background(Color::rgba(0.045, 0.06, 0.09, 0.78))
         .radius(CornerRadii::all(14.0))
-        .layer(
-            LayerStyle::new(Default::default())
-                .blend(BlendMode::Normal)
-                .backdrop(Filter::Blur(7.0))
-                .backdrop(Filter::Saturation(1.25))
-                .backdrop(Filter::Refraction(
-                    Refraction::new(0.12).chromatic_aberration(0.08),
-                ))
-                .shadow(Shadow::drop(
-                    [0.0, 12.0],
-                    14.0,
-                    Color::rgba(0.0, 0.0, 0.0, 0.35),
-                ))
-                .mask(LayerMask::Rounded(CornerRadii::all(14.0))),
-        )
     }
+
+    pub(super) fn physics_status(&self) -> &'static str {
+        match self.physics_mode {
+            PhysicsMode::Spring if self.spring.is_active() => "spring moving",
+            PhysicsMode::Spring => "spring settled",
+            PhysicsMode::Inertia if self.inertia_held => "inertia held",
+            PhysicsMode::Inertia if self.inertia.state() == InertiaState::Decaying => "decaying",
+            PhysicsMode::Inertia if self.inertia.state() == InertiaState::Bouncing => "bouncing",
+            PhysicsMode::Inertia => "inertia settled",
+        }
+    }
+}
+
+pub(super) fn physics_color(value: f32) -> Color {
+    let normalized = value.clamp(0.0, 1.0);
+    Color::rgb(
+        0.18 + normalized * 0.68,
+        0.72 - normalized * 0.32,
+        0.92 - normalized * 0.58,
+    )
+}
+
+pub(super) fn physics_radii(value: f32) -> [f32; 4] {
+    [10.0 + value.clamp(0.0, 1.0) * 24.0; 4]
 }
 
 pub(super) fn showcase_spring_config() -> SpringConfig {

@@ -6,7 +6,9 @@ use argui_paint::{
 use argui_text::{TextColor, TextWrap};
 use argui_ui::{Edges, Element, Length, Transform2D, TransformOrigin, Wrap};
 
-use super::{StateShowcase, paint_transition, text_style};
+use argui_ui::property;
+
+use super::{StateShowcase, text_style};
 
 pub(super) struct ShowcaseImages {
     library: argui_image::ImageLibrary,
@@ -48,15 +50,6 @@ impl StateShowcase {
             ],
         )
         .expect("showcase gradient is valid");
-        let motion = if self.transitioned {
-            Transform2D::IDENTITY
-                .translate(18.0, -3.0)
-                .scale(1.05, 0.94)
-                .rotate(0.12)
-                .skew(0.05, 0.0)
-        } else {
-            Transform2D::IDENTITY.rotate(-0.055)
-        };
         Element::column([
             Element::text("Transforms, gradients and images")
                 .text_style(text_style(18.0, TextColor::WHITE, 650, TextWrap::Word)),
@@ -72,9 +65,9 @@ impl StateShowcase {
                 .height(Length::Px(92.0))
                 .fill(Fill::Linear(linear))
                 .radius(CornerRadii::all(18.0))
-                .transform(motion)
-                .transform_origin(TransformOrigin::new(0.2, 0.8))
-                .transition(paint_transition()),
+                .transform(self.visual_target())
+                .bind(property::Transform, self.visual_motion.clone())
+                .transform_origin(TransformOrigin::new(0.2, 0.8)),
                 Element::container([])
                     .width(Length::Px(170.0))
                     .height(Length::Px(92.0))

@@ -2,12 +2,15 @@ use argui_animation::{
     Duration, FillMode, Iterations, Keyframe, Keyframes, Spring, SpringConfig, Timeline, Timing,
 };
 use argui_core::Transform2D;
-use argui_effects::{AnimatedGradient, LiquidGlass, WorleyBorderFire};
+use argui_effects::{
+    ANIMATED_GRADIENT_ID, AnimatedGradient, LIQUID_GLASS_ID, LiquidGlass, WORLEY_BORDER_FIRE_ID,
+    WorleyBorderFire,
+};
 use argui_paint::{Border, Color, CornerRadii, Filter, LayerMask, LayerStyle, Shadow};
 use argui_text::{TextColor, TextWrap};
 use argui_ui::{
     Edges, Element, Interaction, Length, OverlayAlign, OverlayPlacement, PlacementSide,
-    ScrollChaining, ScrollConfig, Wrap,
+    ScrollChaining, ScrollConfig, Wrap, property,
 };
 
 use super::{StateShowcase, button, chip, text_style};
@@ -38,7 +41,9 @@ impl StateShowcase {
             .wrap(Wrap::Wrap)
             .gap(10.0),
         ];
-        children.push(self.popover_content(accent));
+        if self.popover_progress > 0.0 {
+            children.push(self.popover_content(accent));
+        }
         if self.tooltip_visible {
             children.push(self.tooltip_content());
         }
@@ -60,7 +65,11 @@ impl StateShowcase {
                 ))
                 .text_effect(
                     LayerStyle::new(Default::default())
-                        .filter(AnimatedGradient::new(self.effect_phase).filter()),
+                        .filter(AnimatedGradient::new(0.0).filter()),
+                )
+                .bind(
+                    property::effect_f32(ANIMATED_GRADIENT_ID, "phase"),
+                    self.effect_phase.clone(),
                 ),
             Element::text(
                 "A real composed overlay: nested clipping, backdrop blur, refraction and a continuously animated shadow.",
@@ -129,6 +138,14 @@ impl StateShowcase {
             )
             .transform(entry_transform(PlacementSide::Bottom, progress))
             .layer(self.popover_layer(progress))
+            .bind(
+                property::effect_f32(WORLEY_BORDER_FIRE_ID, "phase"),
+                self.effect_phase.clone(),
+            )
+            .bind(
+                property::effect_f32(LIQUID_GLASS_ID, "highlight"),
+                self.effect_phase.clone(),
+            )
     }
 
     fn tooltip_content(&self) -> Element {
@@ -154,7 +171,7 @@ impl StateShowcase {
         let [red, green, blue, _] = self.shadow_color.as_array();
         LayerStyle::new(Default::default())
             .opacity(progress)
-            .filter(WorleyBorderFire::new(self.effect_phase).filter())
+            .filter(WorleyBorderFire::new(0.0).filter())
             .filter(Filter::Blur((1.0 - progress) * 5.0))
             .backdrop(
                 LiquidGlass::new()

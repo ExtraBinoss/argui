@@ -1,4 +1,6 @@
 use super::*;
+use argui_animation::{Duration, Motion, Time, Tween};
+use argui_ui::{TreeUpdate, property};
 
 #[test]
 fn stable_topology_updates_taffy_in_place() {
@@ -14,6 +16,38 @@ fn stable_topology_updates_taffy_in_place() {
     engine
         .compute(&mut ui, &mut text, Size::new(400.0, 300.0))
         .unwrap();
+    assert_eq!(engine.root.as_ref().unwrap().id, taffy_root);
+}
+
+#[test]
+fn bound_layout_motion_updates_taffy_without_tree_reconciliation() {
+    let width = Motion::new(100.0_f32);
+    let mut ui = UiTree::new(
+        Element::container([])
+            .height(Length::Px(40.0))
+            .bind(property::WidthPx, width.clone()),
+    );
+    let mut engine = LayoutEngine::new();
+    let mut text = TextEngine::new();
+    let first = engine
+        .compute(&mut ui, &mut text, Size::new(400.0, 300.0))
+        .unwrap();
+    let taffy_root = engine.root.as_ref().unwrap().id;
+    let revision = ui.revision();
+    assert_eq!(first.nodes[0].layout_bounds.size.width, 100.0);
+
+    width.animate_to(200.0, Tween::new(Duration::from_millis(100)));
+    assert_eq!(ui.advance_animations(Time::from_nanos(1)), TreeUpdate::None);
+    assert_eq!(
+        ui.advance_animations(Time::from_nanos(50_000_001)),
+        TreeUpdate::Layout
+    );
+    let second = engine
+        .compute(&mut ui, &mut text, Size::new(400.0, 300.0))
+        .unwrap();
+
+    assert!((second.nodes[0].layout_bounds.size.width - 150.0).abs() < 0.001);
+    assert_eq!(ui.revision(), revision);
     assert_eq!(engine.root.as_ref().unwrap().id, taffy_root);
 }
 

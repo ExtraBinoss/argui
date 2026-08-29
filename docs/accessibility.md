@@ -36,9 +36,11 @@ available to the gesture arena.
 `AccessibilityPreferences` reports reduced motion and high contrast with the
 source of each value. Application overrides win over system values. Native
 detection runs outside startup and frame processing; Web uses media queries.
-Reduced motion disables implicit paint transitions while leaving explicit
-application state and rendering deterministic. High contrast is delivered to
-the application so its theme can choose the appropriate palette.
+Reduced motion finishes active property motions at their typed target and keeps
+future motions from running across frames while the preference remains active.
+The final change retains its exact paint, scroll, or layout invalidation class.
+High contrast is delivered to the application so its theme can choose the
+appropriate palette.
 
 Run the combined keyboard, screen-reader and multitouch laboratory with:
 

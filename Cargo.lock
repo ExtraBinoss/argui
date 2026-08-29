@@ -294,6 +294,7 @@ dependencies = [
 name = "argui-layout"
 version = "0.1.0"
 dependencies = [
+ "argui-animation",
  "argui-core",
  "argui-paint",
  "argui-text",

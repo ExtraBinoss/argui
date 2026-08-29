@@ -12,5 +12,8 @@ argui-text.workspace = true
 argui-ui.workspace = true
 taffy.workspace = true
 
+[dev-dependencies]
+argui-animation.workspace = true
+
 [lints]
 workspace = true

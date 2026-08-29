@@ -206,6 +206,15 @@ impl<T> Timeline<T> {
 }
 
 impl<T: Clone + Interpolate> Timeline<T> {
+    pub(crate) fn terminal_value(&self) -> T {
+        let progress = if self.playback_rate >= 0.0 {
+            self.final_progress()
+        } else {
+            self.directed_progress(0.0, 0)
+        };
+        self.keyframes.sample(progress)
+    }
+
     pub fn retarget(
         &mut self,
         target: T,

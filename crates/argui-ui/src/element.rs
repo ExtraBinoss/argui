@@ -12,7 +12,7 @@ use std::{
 
 use crate::{
     Align, Direction, Edges, EffectScope, Inset, Interaction, Justify, LayoutStyle, Length,
-    Position, ScopedEffect, ScrollConfig, Wrap,
+    MotionProperty, Position, PropertyBinding, ScopedEffect, ScrollConfig, Wrap,
 };
 
 #[derive(Clone, Debug, PartialEq)]
@@ -56,7 +56,7 @@ pub struct ElementNode {
     pub interaction: Option<Interaction>,
     pub semantics: Option<Semantics>,
     pub semantic_hidden: bool,
-    pub transition: Option<crate::Transition>,
+    pub bindings: Vec<PropertyBinding>,
     pub layer: Option<LayerStyle>,
     pub effects: Vec<ScopedEffect>,
     pub scroll: Option<ScrollConfig>,
@@ -99,7 +99,7 @@ impl Element {
             interaction: None,
             semantics: None,
             semantic_hidden: false,
-            transition: None,
+            bindings: Vec::new(),
             layer: None,
             effects: Vec::new(),
             scroll: None,
@@ -135,7 +135,7 @@ impl Element {
             interaction: None,
             semantics: None,
             semantic_hidden: false,
-            transition: None,
+            bindings: Vec::new(),
             layer: None,
             effects: Vec::new(),
             scroll: None,
@@ -407,8 +407,16 @@ impl Element {
     }
 
     #[must_use]
-    pub fn transition(mut self, transition: crate::Transition) -> Self {
-        self.transition = Some(transition);
+    pub fn bind<P>(
+        mut self,
+        property: P,
+        binding: impl Into<argui_animation::MotionBinding<P::Value>>,
+    ) -> Self
+    where
+        P: MotionProperty,
+    {
+        self.bindings.push(property.into_binding(binding.into()));
+        crate::binding::sort_bindings(&mut self.bindings);
         self
     }
 

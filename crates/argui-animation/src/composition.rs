@@ -1,4 +1,4 @@
-use argui_core::{Color, Point, Rect, Size};
+use argui_core::{Color, Point, Rect, Size, Transform2D};
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum Composition {
@@ -72,6 +72,22 @@ impl Compose for f64 {
     }
 }
 
+impl<const N: usize> Compose for [f32; N] {
+    fn add(mut self, contribution: Self) -> Self {
+        for (value, contribution) in self.iter_mut().zip(contribution) {
+            *value += contribution;
+        }
+        self
+    }
+
+    fn scale(mut self, factor: f32) -> Self {
+        for value in &mut self {
+            *value *= factor;
+        }
+        self
+    }
+}
+
 impl Compose for Color {
     fn add(self, contribution: Self) -> Self {
         let left = self.as_array();
@@ -128,5 +144,25 @@ impl Compose for Rect {
 
     fn scale(self, factor: f32) -> Self {
         Self::new(self.origin.scale(factor), self.size.scale(factor))
+    }
+}
+
+impl Compose for Transform2D {
+    fn add(self, contribution: Self) -> Self {
+        Self {
+            translation: self.translation.add(contribution.translation),
+            scale: self.scale.add(contribution.scale),
+            rotation: self.rotation + contribution.rotation,
+            skew: self.skew.add(contribution.skew),
+        }
+    }
+
+    fn scale(self, factor: f32) -> Self {
+        Self {
+            translation: self.translation.scale(factor),
+            scale: self.scale.scale(factor),
+            rotation: self.rotation * factor,
+            skew: self.skew.scale(factor),
+        }
     }
 }

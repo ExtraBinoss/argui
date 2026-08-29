@@ -66,17 +66,19 @@ subtree rather than total tree size.
 Done when composed widgets expose semantics without renderer knowledge and the
 same Rust tree drives native and browser accessibility.
 
-## 4. Animation ergonomics
+## 4. Animation ergonomics — implemented
 
-- Bind typed animation values directly to transforms, layout properties,
+- [x] Bind typed animation values directly to transforms, paint, layout,
   scroll, caret presentation, and effect parameters.
-- Add concise declarations for animated custom-effect parameters while keeping
+- [x] Add concise declarations for animated custom-effect parameters while keeping
   raw `Timeline<T>`, spring, decay, and inertia APIs available.
-- Define interruption and composition behavior for property-level animations.
+- [x] Define interruption and composition behavior for property-level animations.
 
-The engine, scheduler, keyframes, orchestration, implicit paint transitions,
-springs, decay, and inertia are already implemented. This step is API wiring,
-not another timing engine.
+`Motion<T>` is retained independently from application rebuilds. One generic
+`Element::bind` accepts typed property markers, and the active registry
+deduplicates shared motions while preserving paint, scroll, and incremental
+layout invalidation. Retargeting starts at the presented value; springs retain
+velocity; replace/add/accumulate composition has stable priority ordering.
 
 ## 5. GPU hardening
 

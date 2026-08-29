@@ -1,0 +1,126 @@
+use crate::{BindingImpact, Element, PropertyBinding, TreeUpdate, traversal::flattened};
+
+use super::UiTree;
+
+#[derive(Clone, Debug)]
+pub(super) struct AnimationRegistry {
+    entries: Vec<AnimationEntry>,
+    layout_indices: Vec<usize>,
+}
+
+#[derive(Clone, Debug)]
+struct AnimationEntry {
+    binding: PropertyBinding,
+    impact: BindingImpact,
+}
+
+impl AnimationRegistry {
+    pub(super) fn new(root: &Element) -> Self {
+        let mut entries = Vec::<AnimationEntry>::new();
+        let mut layout_indices = Vec::new();
+        for (index, element) in flattened(root).into_iter().enumerate() {
+            for binding in &element.bindings {
+                let identity = binding.track().identity();
+                if let Some(existing) = entries
+                    .iter_mut()
+                    .find(|entry| entry.binding.track().identity() == identity)
+                {
+                    existing.impact = strongest_impact(existing.impact, binding.impact());
+                } else {
+                    entries.push(AnimationEntry {
+                        binding: binding.clone(),
+                        impact: binding.impact(),
+                    });
+                }
+                if binding.impact() == BindingImpact::Layout && !layout_indices.contains(&index) {
+                    layout_indices.push(index);
+                }
+            }
+        }
+        Self {
+            entries,
+            layout_indices,
+        }
+    }
+
+    fn advance(&self, now: argui_animation::Time) -> TreeUpdate {
+        self.entries.iter().fold(TreeUpdate::None, |update, entry| {
+            if entry.binding.track().advance(now) {
+                strongest_tree_update(update, entry.impact)
+            } else {
+                update
+            }
+        })
+    }
+
+    fn finish_active(&self) -> TreeUpdate {
+        let mut update = TreeUpdate::None;
+        for entry in &self.entries {
+            let track = entry.binding.track();
+            if track.is_active() {
+                track.finish();
+                update = strongest_tree_update(update, entry.impact);
+            }
+        }
+        update
+    }
+}
+
+impl UiTree {
+    pub fn advance_animations(&mut self, now: argui_animation::Time) -> TreeUpdate {
+        if self.reduced_motion {
+            self.animations.finish_active()
+        } else {
+            self.animations.advance(now)
+        }
+    }
+
+    pub fn set_reduced_motion(&mut self, reduced: bool) -> TreeUpdate {
+        self.reduced_motion = reduced;
+        if reduced {
+            self.animations.finish_active()
+        } else {
+            TreeUpdate::None
+        }
+    }
+
+    #[must_use]
+    pub fn wants_animation_frame(&self) -> bool {
+        self.animations
+            .entries
+            .iter()
+            .any(|entry| entry.binding.track().is_active())
+    }
+
+    #[must_use]
+    pub fn animation_count(&self) -> usize {
+        self.animations.entries.len()
+    }
+
+    #[must_use]
+    pub fn layout_animation_indices(&self) -> &[usize] {
+        &self.animations.layout_indices
+    }
+}
+
+fn strongest_tree_update(current: TreeUpdate, impact: BindingImpact) -> TreeUpdate {
+    let next = match impact {
+        BindingImpact::Paint => TreeUpdate::Paint,
+        BindingImpact::Scroll => TreeUpdate::Scroll,
+        BindingImpact::Layout => TreeUpdate::Layout,
+    };
+    match (current, next) {
+        (TreeUpdate::Layout, _) | (_, TreeUpdate::Layout) => TreeUpdate::Layout,
+        (TreeUpdate::Scroll, _) | (_, TreeUpdate::Scroll) => TreeUpdate::Scroll,
+        (TreeUpdate::Paint, _) | (_, TreeUpdate::Paint) => TreeUpdate::Paint,
+        _ => TreeUpdate::None,
+    }
+}
+
+const fn strongest_impact(left: BindingImpact, right: BindingImpact) -> BindingImpact {
+    match (left, right) {
+        (BindingImpact::Layout, _) | (_, BindingImpact::Layout) => BindingImpact::Layout,
+        (BindingImpact::Scroll, _) | (_, BindingImpact::Scroll) => BindingImpact::Scroll,
+        _ => BindingImpact::Paint,
+    }
+}

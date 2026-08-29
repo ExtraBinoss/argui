@@ -158,7 +158,7 @@ fn paint_node(
     let mut children = map.children.iter().collect::<Vec<_>>();
     children.sort_by_key(|child| elements[child.index].z_index);
     let mut cacheable = element.interaction.is_none()
-        && element.transition.is_none()
+        && element.bindings.is_empty()
         && !matches!(element.kind, ElementKind::TextInput { .. })
         && element.scroll.is_none();
     for child in children {
@@ -227,9 +227,15 @@ fn paint_enter(
 ) {
     let visual_bounds = context.transform.transform_rect(node.bounds);
     if let Some(layer) = element.layer.clone() {
-        begin_layer(&mut output.display_list, layer, visual_bounds, node.node);
+        begin_layer(
+            &mut output.display_list,
+            ui.resolved_layer(element, &layer),
+            visual_bounds,
+            node.node,
+        );
     }
     begin_scope(
+        ui,
         &mut output.display_list,
         element,
         EffectScope::WholeElement,
@@ -238,16 +244,17 @@ fn paint_enter(
     );
     push_hit_region(element, node, output, context);
     push_quad(
+        ui,
         ui.resolved_quad(node.node, element),
         element,
-        node.bounds,
-        node.node,
+        node,
         output,
         context,
     );
-    push_image(element, node.bounds, output, context);
-    push_vector(element, node.bounds, output, context);
+    push_image(ui, element, node, output, context);
+    push_vector(ui, element, node, output, context);
     begin_scope(
+        ui,
         &mut output.display_list,
         element,
         EffectScope::Content,
@@ -276,6 +283,7 @@ fn paint_enter(
     }
     if let Some(text_index) = node.text_index {
         let layers = begin_scope(
+            ui,
             &mut output.display_list,
             element,
             EffectScope::Text,
@@ -311,10 +319,10 @@ fn paint_exit(element: &Element, display_list: &mut DisplayList) {
 }
 
 fn push_quad(
+    ui: &UiTree,
     style: QuadStyle,
     element: &Element,
-    bounds: Rect,
-    node: NodeId,
+    node: LayoutNode,
     output: &mut LayoutOutput,
     context: &PaintContext,
 ) {
@@ -322,34 +330,36 @@ fn push_quad(
         || scope_count(element, EffectScope::Border) != 0;
     if !split {
         if style.is_visible() {
-            output.display_list.push_quad(quad(style, bounds, context));
+            output
+                .display_list
+                .push_quad(quad(style, node.bounds, context));
         }
         return;
     }
     if style.background.is_some() {
         push_scoped_quad(
+            ui,
             QuadStyle {
                 border: None,
                 ..style
             },
             element,
-            bounds,
-            EffectScope::Background,
             node,
+            EffectScope::Background,
             output,
             context,
         );
     }
     if style.border.is_some() {
         push_scoped_quad(
+            ui,
             QuadStyle {
                 background: None,
                 ..style
             },
             element,
-            bounds,
-            EffectScope::Border,
             node,
+            EffectScope::Border,
             output,
             context,
         );
@@ -357,23 +367,26 @@ fn push_quad(
 }
 
 fn push_scoped_quad(
+    ui: &UiTree,
     style: QuadStyle,
     element: &Element,
-    bounds: Rect,
+    node: LayoutNode,
     scope: EffectScope,
-    node: NodeId,
     output: &mut LayoutOutput,
     context: &PaintContext,
 ) {
-    let visual_bounds = context.transform.transform_rect(bounds);
+    let visual_bounds = context.transform.transform_rect(node.bounds);
     let layers = begin_scope(
+        ui,
         &mut output.display_list,
         element,
         scope,
         visual_bounds,
-        node,
+        node.node,
     );
-    output.display_list.push_quad(quad(style, bounds, context));
+    output
+        .display_list
+        .push_quad(quad(style, node.bounds, context));
     end_layers(&mut output.display_list, layers);
 }
 
@@ -389,7 +402,13 @@ fn quad(style: QuadStyle, bounds: Rect, context: &PaintContext) -> Quad {
     }
 }
 
-fn push_image(element: &Element, bounds: Rect, output: &mut LayoutOutput, context: &PaintContext) {
+fn push_image(
+    ui: &UiTree,
+    element: &Element,
+    node: LayoutNode,
+    output: &mut LayoutOutput,
+    context: &PaintContext,
+) {
     let ElementKind::Image {
         image,
         fit,
@@ -399,32 +418,39 @@ fn push_image(element: &Element, bounds: Rect, output: &mut LayoutOutput, contex
         return;
     };
     output.display_list.push_image(ImagePrimitive {
-        bounds,
+        bounds: node.bounds,
         image,
         fit,
         sampling,
-        opacity: element.paint.quad.opacity,
-        radii: element.paint.quad.radii,
+        opacity: ui.resolved_quad(node.node, element).opacity,
+        radii: ui.resolved_quad(node.node, element).radii,
         transform: context.transform,
         clips: context.clips.clone(),
     });
 }
 
-fn push_vector(element: &Element, bounds: Rect, output: &mut LayoutOutput, context: &PaintContext) {
+fn push_vector(
+    ui: &UiTree,
+    element: &Element,
+    node: LayoutNode,
+    output: &mut LayoutOutput,
+    context: &PaintContext,
+) {
     let ElementKind::Vector { vector, progress } = element.kind else {
         return;
     };
     output.display_list.push_vector(VectorPrimitive {
         vector,
-        bounds,
+        bounds: node.bounds,
         progress,
-        opacity: element.paint.quad.opacity,
+        opacity: ui.resolved_quad(node.node, element).opacity,
         transform: context.transform,
         clips: context.clips.clone(),
     });
 }
 
 fn begin_scope(
+    ui: &UiTree,
     display_list: &mut DisplayList,
     element: &Element,
     scope: EffectScope,
@@ -437,7 +463,12 @@ fn begin_scope(
         .filter(|effect| effect.scope == scope);
     let mut count = 0;
     for effect in effects {
-        begin_layer(display_list, effect.layer.clone(), bounds, node);
+        begin_layer(
+            display_list,
+            ui.resolved_layer(element, &effect.layer),
+            bounds,
+            node,
+        );
         count += 1;
     }
     count

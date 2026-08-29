@@ -1,5 +1,6 @@
 //! Retained UI description consumed by the runtime and produced by Rust or a DSL.
 
+mod binding;
 mod cursor;
 mod effect;
 mod element;
@@ -11,7 +12,6 @@ mod scroll;
 mod semantics;
 mod style;
 mod text_input;
-mod transition;
 mod traversal;
 mod tree;
 mod update;
@@ -21,6 +21,7 @@ mod widget;
 pub use argui_accessibility::{
     LiveRegion, Orientation, Role, SemanticAction, SemanticState, SemanticValue, Semantics,
 };
+pub use argui_animation::{Motion, MotionBinding, MotionState, Tween};
 pub use argui_core::{Transform2D, TransformOrigin};
 pub use argui_paint::{
     BlendMode, Border, BorderWidths, ClipBehavior, Color, CornerRadii, EffectArgument, EffectId,
@@ -28,6 +29,7 @@ pub use argui_paint::{
     ImageSampling, LayerMask, LayerStyle, LinearGradient, PaintStyle, ProfileDomain, QuadStyle,
     RadialGradient, Refraction, RenderObjectId, Shadow, VectorAsset, VectorId,
 };
+pub use binding::{BindingImpact, MotionProperty, PropertyBinding, property};
 pub use cursor::CursorIcon;
 pub use effect::{EffectScope, ScopedEffect};
 pub use element::{Element, ElementKind};
@@ -43,7 +45,6 @@ pub use scroll::{
 };
 pub use style::{Align, Direction, Edges, Inset, Justify, LayoutStyle, Length, Position, Wrap};
 pub use text_input::{ClipboardRequest, TextInput, TextInputStyle};
-pub use transition::Transition;
 pub use tree::{TreeUpdate, TreeUpdateStats, UiTree};
 pub use virtual_list::{MeasurementUpdate, VariableList, VirtualList, VirtualWindow};
 pub use widget::{Button, ButtonStyle};

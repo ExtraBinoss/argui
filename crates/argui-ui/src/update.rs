@@ -1,4 +1,4 @@
-use crate::{Element, ElementKind, TreeUpdate, TreeUpdateStats};
+use crate::{BindingImpact, Element, ElementKind, TreeUpdate, TreeUpdateStats};
 
 pub(crate) fn classify_update(
     old: &Element,
@@ -13,6 +13,7 @@ pub(crate) fn classify_update(
     if old == new {
         return TreeUpdate::None;
     }
+    let binding_update = binding_update(old, new);
     if old.key != new.key
         || kind_changes_layout(&old.kind, &new.kind)
         || old.style != new.style
@@ -20,6 +21,7 @@ pub(crate) fn classify_update(
         || old.scroll.is_some() != new.scroll.is_some()
         || old.overlay != new.overlay
         || old.children.len() != new.children.len()
+        || binding_update == TreeUpdate::Layout
     {
         return TreeUpdate::Layout;
     }
@@ -30,19 +32,16 @@ pub(crate) fn classify_update(
         .map(|(old, new)| classify_update(old, new, stats))
         .max_by_key(|update| update_priority(*update))
         .unwrap_or(TreeUpdate::None);
-    if children == TreeUpdate::Layout {
-        return TreeUpdate::Layout;
-    }
-    if visual_changed(old, new) {
+    let local = if visual_changed(old, new) {
         TreeUpdate::Paint
-    } else if old.semantics != new.semantics
-        || old.semantic_hidden != new.semantic_hidden
-        || children == TreeUpdate::Semantics
-    {
+    } else if binding_update != TreeUpdate::None {
+        binding_update
+    } else if old.semantics != new.semantics || old.semantic_hidden != new.semantic_hidden {
         TreeUpdate::Semantics
     } else {
-        children
-    }
+        TreeUpdate::None
+    };
+    strongest_update(children, local)
 }
 
 const fn update_priority(update: TreeUpdate) -> u8 {
@@ -50,7 +49,8 @@ const fn update_priority(update: TreeUpdate) -> u8 {
         TreeUpdate::None => 0,
         TreeUpdate::Semantics => 1,
         TreeUpdate::Paint => 2,
-        TreeUpdate::Layout => 3,
+        TreeUpdate::Scroll => 3,
+        TreeUpdate::Layout => 4,
     }
 }
 
@@ -61,11 +61,35 @@ fn visual_changed(old: &Element, new: &Element) -> bool {
         || old.transform != new.transform
         || old.transform_origin != new.transform_origin
         || old.interaction != new.interaction
-        || old.transition != new.transition
         || old.layer != new.layer
         || old.effects != new.effects
         || old.scroll != new.scroll
         || old.z_index != new.z_index
+}
+
+fn binding_update(old: &Element, new: &Element) -> TreeUpdate {
+    if old.bindings == new.bindings {
+        return TreeUpdate::None;
+    }
+    old.bindings
+        .iter()
+        .chain(&new.bindings)
+        .fold(TreeUpdate::None, |update, binding| {
+            let next = match binding.impact() {
+                BindingImpact::Paint => TreeUpdate::Paint,
+                BindingImpact::Scroll => TreeUpdate::Scroll,
+                BindingImpact::Layout => TreeUpdate::Layout,
+            };
+            strongest_update(update, next)
+        })
+}
+
+fn strongest_update(left: TreeUpdate, right: TreeUpdate) -> TreeUpdate {
+    if update_priority(left) >= update_priority(right) {
+        left
+    } else {
+        right
+    }
 }
 
 fn kind_changes_layout(old: &ElementKind, new: &ElementKind) -> bool {

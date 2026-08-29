@@ -1,12 +1,10 @@
 use argui_core::{
     ImeInput, KeyInput, Point, PointerEvent, PointerKind, PointerPhase, ScrollDelta, TextPosition,
 };
-use argui_paint::QuadStyle;
 
 use crate::interaction::{InteractionState, RawUpdate};
 use crate::scroll::ScrollState;
 use crate::text_input::{TextInputState, TextInputStates};
-use crate::transition::PaintTransitions;
 use crate::traversal::{flattened, nth_element};
 use crate::update::classify_update;
 use crate::{
@@ -14,12 +12,17 @@ use crate::{
     UiEvent, UiEventKind, VisualState, identity,
 };
 
+mod animation;
+mod resolve;
+use animation::AnimationRegistry;
+
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum TreeUpdate {
     #[default]
     None,
     Semantics,
     Paint,
+    Scroll,
     Layout,
 }
 
@@ -39,10 +42,11 @@ pub struct UiTree {
     gestures: GestureArena,
     scroll: ScrollState,
     text_inputs: TextInputStates,
-    transitions: PaintTransitions,
     revision: u64,
     layout_dirty: bool,
     update_stats: TreeUpdateStats,
+    animations: AnimationRegistry,
+    reduced_motion: bool,
 }
 
 impl UiTree {
@@ -50,6 +54,7 @@ impl UiTree {
     pub fn new(root: Element) -> Self {
         let mut next_node_id = 1;
         let node_ids = identity::initial_ids(&root, &mut next_node_id);
+        let animations = AnimationRegistry::new(&root);
         let mut tree = Self {
             root,
             node_ids,
@@ -58,10 +63,11 @@ impl UiTree {
             gestures: GestureArena::default(),
             scroll: ScrollState::default(),
             text_inputs: TextInputStates::default(),
-            transitions: PaintTransitions::default(),
             revision: 0,
             layout_dirty: true,
             update_stats: TreeUpdateStats::default(),
+            animations,
+            reduced_motion: false,
         };
         tree.sync_text_inputs();
         tree
@@ -104,11 +110,11 @@ impl UiTree {
             TreeUpdate::None => return update,
             TreeUpdate::Semantics => {
                 self.root = root;
+                self.sync_animation_registry();
             }
-            TreeUpdate::Paint => {
-                self.transitions
-                    .sync(&self.root, &self.node_ids, &root, &self.node_ids);
+            TreeUpdate::Paint | TreeUpdate::Scroll => {
                 self.root = root;
+                self.sync_animation_registry();
             }
             TreeUpdate::Layout => {
                 let node_ids = identity::reconcile_ids(
@@ -117,10 +123,9 @@ impl UiTree {
                     &root,
                     &mut self.next_node_id,
                 );
-                self.transitions
-                    .sync(&self.root, &self.node_ids, &root, &node_ids);
                 self.node_ids = node_ids;
                 self.root = root;
+                self.sync_animation_registry();
                 self.interaction.retain(&self.node_ids);
                 self.scroll.retain(&self.node_ids);
                 self.sync_text_inputs();
@@ -156,32 +161,8 @@ impl UiTree {
     }
 
     #[must_use]
-    pub fn resolved_quad(&self, node: NodeId, element: &Element) -> QuadStyle {
-        let base = self.transitions.resolve(node, element.paint.quad.clone());
-        element
-            .interaction
-            .as_ref()
-            .map_or(base.clone(), |interaction| {
-                interaction.resolve(base, self.visual_state(node))
-            })
-    }
-
-    #[must_use]
-    pub fn resolved_transform(&self, node: NodeId, element: &Element) -> argui_core::Transform2D {
-        self.transitions.resolve_transform(node, element.transform)
-    }
-
-    pub fn advance_animations(&mut self, now: argui_animation::Time) -> bool {
-        self.transitions.advance(now)
-    }
-
-    pub fn set_reduced_motion(&mut self, reduced: bool) -> bool {
-        self.transitions.set_reduced_motion(reduced)
-    }
-
-    #[must_use]
-    pub fn wants_animation_frame(&self) -> bool {
-        self.transitions.needs_frame()
+    pub fn element_at(&self, index: usize) -> Option<&Element> {
+        nth_element(&self.root, index)
     }
 
     #[must_use]
@@ -426,11 +407,18 @@ impl UiTree {
 
     #[must_use]
     pub fn scroll_offset(&self, node: NodeId) -> Point {
-        self.scroll.offset(node)
+        let base = self.scroll.offset(node);
+        self.element_for(node).map_or(base, |element| {
+            crate::binding::resolved_scroll(&element.bindings, base)
+        })
     }
 
     pub fn set_scroll_offset(&mut self, node: NodeId, offset: Point) -> bool {
-        self.scroll.set_offset(node, offset)
+        let changed = self.scroll.set_offset(node, offset);
+        if changed {
+            self.sync_scroll_motion(node, offset);
+        }
+        changed
     }
 
     pub fn scroll(
@@ -443,7 +431,10 @@ impl UiTree {
             return InteractionUpdate::default();
         };
         match outcome {
-            crate::scroll::ScrollOutcome::Changed(change) => self.scroll_update(change),
+            crate::scroll::ScrollOutcome::Changed(change) => {
+                self.sync_scroll_motion(change.node, change.offset);
+                self.scroll_update(change)
+            }
             crate::scroll::ScrollOutcome::Consumed => InteractionUpdate::default(),
         }
     }
@@ -453,11 +444,11 @@ impl UiTree {
         point: Point,
         regions: &[ScrollRegion],
     ) -> Option<InteractionUpdate> {
-        self.scroll.scrollbar_pressed(point, regions).map(|change| {
-            change.map_or_else(InteractionUpdate::default, |change| {
-                self.scroll_update(change)
-            })
-        })
+        let change = self.scroll.scrollbar_pressed(point, regions)?;
+        Some(change.map_or_else(InteractionUpdate::default, |change| {
+            self.sync_scroll_motion(change.node, change.offset);
+            self.scroll_update(change)
+        }))
     }
 
     pub fn scrollbar_dragged(
@@ -468,13 +459,11 @@ impl UiTree {
         if !self.scroll.dragging() {
             return None;
         }
-        Some(
-            self.scroll
-                .scrollbar_dragged(point, regions)
-                .map_or_else(InteractionUpdate::default, |change| {
-                    self.scroll_update(change)
-                }),
-        )
+        let change = self.scroll.scrollbar_dragged(point, regions);
+        Some(change.map_or_else(InteractionUpdate::default, |change| {
+            self.sync_scroll_motion(change.node, change.offset);
+            self.scroll_update(change)
+        }))
     }
 
     pub fn scrollbar_released(&mut self) -> bool {
@@ -579,5 +568,28 @@ impl UiTree {
                 _ => None,
             });
         self.text_inputs.sync(inputs);
+    }
+
+    fn sync_animation_registry(&mut self) {
+        self.animations = AnimationRegistry::new(&self.root);
+    }
+
+    fn element_for(&self, node: NodeId) -> Option<&Element> {
+        let index = self
+            .node_ids
+            .iter()
+            .position(|candidate| *candidate == node)?;
+        nth_element(&self.root, index)
+    }
+
+    fn sync_scroll_motion(&self, node: NodeId, offset: Point) {
+        let Some(element) = self.element_for(node) else {
+            return;
+        };
+        for binding in &element.bindings {
+            if let crate::PropertyBinding::Scroll(binding) = binding {
+                binding.motion.set(offset);
+            }
+        }
     }
 }

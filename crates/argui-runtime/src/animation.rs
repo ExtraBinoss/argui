@@ -1,6 +1,6 @@
 use crate::{AnyEntity, ViewUpdate, app::Application};
 use argui_animation::{AnimationId, Clock, Frame, Scheduler, Time};
-use argui_ui::InteractionUpdate;
+use argui_ui::{InteractionUpdate, TreeUpdate};
 use web_time::Instant;
 use winit::{event_loop::ActiveEventLoop, window::Window};
 
@@ -68,16 +68,19 @@ impl Application {
         let rebuild = model_update == ViewUpdate::Rebuild;
         let model_time = model_started.elapsed();
         let paint_started = Instant::now();
-        let paint_animated = self
+        let tree_animation = self
             .ui_tree
             .as_mut()
-            .is_some_and(|tree| tree.advance_animations(frame.now));
+            .map_or(TreeUpdate::None, |tree| tree.advance_animations(frame.now));
         let paint_time = paint_started.elapsed();
         self.frame_record.model += model_time;
         self.frame_record.paint += paint_time;
         self.pending_ui_frame.merge(
             &InteractionUpdate {
-                paint_changed: paint_animated || model_update == ViewUpdate::Paint,
+                paint_changed: tree_animation == TreeUpdate::Paint
+                    || model_update == ViewUpdate::Paint,
+                layout_changed: tree_animation == TreeUpdate::Layout,
+                scroll_changed: tree_animation == TreeUpdate::Scroll,
                 ..InteractionUpdate::default()
             },
             rebuild,

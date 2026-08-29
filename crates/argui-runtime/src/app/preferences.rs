@@ -1,4 +1,5 @@
 use argui_platform::{AccessibilityOverrides, AccessibilityPreferences, PlatformEvent};
+use argui_ui::TreeUpdate;
 
 use crate::RuntimeEvent;
 
@@ -43,12 +44,14 @@ impl Application {
             return;
         }
         self.preferences = preferences;
-        let paint_changed = self
-            .ui_tree
-            .as_mut()
-            .is_some_and(|tree| tree.set_reduced_motion(preferences.reduced_motion.enabled));
-        if paint_changed {
-            self.pending_ui_frame.request_paint();
+        let animation_update = self.ui_tree.as_mut().map_or(TreeUpdate::None, |tree| {
+            tree.set_reduced_motion(preferences.reduced_motion.enabled)
+        });
+        match animation_update {
+            TreeUpdate::Layout => self.pending_ui_frame.request_layout(),
+            TreeUpdate::Scroll => self.pending_ui_frame.request_scroll_update(),
+            TreeUpdate::Paint => self.pending_ui_frame.request_paint(),
+            TreeUpdate::None | TreeUpdate::Semantics => {}
         }
         if let Some(window) = &self.window {
             window.request_redraw();

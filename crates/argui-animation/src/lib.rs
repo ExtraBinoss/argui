@@ -2,6 +2,7 @@
 
 mod clock;
 mod composition;
+mod controller;
 mod decay;
 mod easing;
 mod inertia;
@@ -16,6 +17,7 @@ mod timing;
 
 pub use clock::{Clock, ManualClock};
 pub use composition::{Compose, Composition, Contribution, compose};
+pub use controller::{Motion, MotionBinding, MotionState, MotionTrack, Tween};
 pub use decay::{Decay, DecayConfig};
 pub use easing::{CubicBezier, Easing, EasingError, LinearStop, StepPosition, Steps};
 pub use inertia::{Inertia, InertiaConfig, InertiaState};
