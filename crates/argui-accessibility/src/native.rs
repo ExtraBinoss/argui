@@ -178,6 +178,7 @@ const fn lower_role(role: Role) -> AccessRole {
         Role::RadioButton => AccessRole::RadioButton,
         Role::Switch => AccessRole::Switch,
         Role::TextInput => AccessRole::TextInput,
+        Role::TextArea => AccessRole::MultilineTextInput,
         Role::SearchInput => AccessRole::SearchInput,
         Role::List => AccessRole::List,
         Role::ListItem => AccessRole::ListItem,

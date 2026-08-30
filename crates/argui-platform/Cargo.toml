@@ -19,6 +19,7 @@ arboard.workspace = true
 
 [target.'cfg(target_os = "linux")'.dependencies]
 ashpd.workspace = true
+futures-util.workspace = true
 ksni = { workspace = true, optional = true }
 pollster.workspace = true
 

@@ -4,17 +4,19 @@ mod animation;
 mod list;
 mod physics;
 mod popover;
+mod theme;
 mod visual;
 
 use animation::{animation_timeline, motion_tween};
 use argui_animation::{Duration, Frame, Inertia, Motion, PlaybackState, Spring, Timeline};
-use argui_core::{Key, KeyState, Transform2D};
-use argui_paint::{Border, ClipBehavior, Color, CornerRadii, ImageAsset, PaintStyle, QuadStyle};
-use argui_runtime::{Context, Render, ViewUpdate};
+use argui_core::{Key, KeyState, Size, Transform2D};
+use argui_paint::{Border, ClipBehavior, Color, CornerRadii, ImageAsset, VectorAsset};
+use argui_runtime::{Context, Render, ThemeRequest, ViewUpdate, WindowEnvironment};
 use argui_text::{TextColor, TextEngine, TextStyle, TextWrap};
+use argui_theme::{ThemeMode, WidgetAssets, WidgetTheme, shadcn};
 use argui_ui::{
-    Align, Button, ButtonStyle, Edges, Element, Inset, Length, ScrollConfig, TextInput,
-    TextInputStyle, UiEvent, UiEventKind, Wrap, property,
+    Align, Button, Edges, Element, Inset, Length, ResizeConfig, ResizeState, ScrollConfig, UiEvent,
+    UiEventKind, Wrap,
 };
 use physics::{PhysicsCommand, PhysicsMode, showcase_inertia, showcase_spring};
 use popover::{popover_spring, shadow_timeline};
@@ -22,9 +24,7 @@ use visual::ShowcaseImages;
 
 pub struct StateShowcase {
     count: u32,
-    warm: bool,
     motion_shifted: bool,
-    surface_motion: Motion<Color>,
     visual_motion: Motion<Transform2D>,
     reversed: bool,
     inverted_scroll: bool,
@@ -50,6 +50,14 @@ pub struct StateShowcase {
     tooltip_delay: f32,
     shadow_motion: Motion<Color>,
     images: ShowcaseImages,
+    theme_mode: ThemeMode,
+    primary_index: usize,
+    light_assets: WidgetAssets,
+    dark_assets: WidgetAssets,
+    message: String,
+    long_message: String,
+    notes: String,
+    editor_size: ResizeState,
 }
 
 #[derive(Clone, Copy)]
@@ -63,15 +71,13 @@ enum AnimationCommand {
 
 impl Default for StateShowcase {
     fn default() -> Self {
-        let animated_color = Color::rgb(0.20, 0.68, 0.94);
+        let animated_color = PRIMARIES[0].1;
         let shadow_color = Color::rgba(0.28, 0.72, 1.0, 0.28);
         let shadow_motion = Motion::new(shadow_color);
         shadow_motion.play(shadow_timeline(shadow_color));
         Self {
             count: 0,
-            warm: false,
             motion_shifted: false,
-            surface_motion: Motion::new(Color::rgb(0.06, 0.08, 0.12)),
             visual_motion: Motion::new(Transform2D::IDENTITY.rotate(-0.055)),
             reversed: false,
             inverted_scroll: false,
@@ -97,6 +103,14 @@ impl Default for StateShowcase {
             tooltip_delay: 0.0,
             shadow_motion,
             images: ShowcaseImages::embedded(),
+            theme_mode: ThemeMode::System,
+            primary_index: 0,
+            light_assets: WidgetAssets::embedded(Color::rgb(0.38, 0.42, 0.50)),
+            dark_assets: WidgetAssets::embedded(Color::rgb(0.64, 0.69, 0.76)),
+            message: "Hello · مرحباً · שלום · 👋🏽".into(),
+            long_message: "This deliberately long editable line proves that the caret remains visible while the text scrolls horizontally.".into(),
+            notes: "A controlled, wrapping text area. Resize it from the bottom-right handle.".into(),
+            editor_size: ResizeState::new(Size::new(560.0, 180.0)),
         }
     }
 }
@@ -106,21 +120,37 @@ impl StateShowcase {
         self.images.assets().to_vec()
     }
 
-    pub fn view(&self) -> Element {
-        let accent = if self.warm {
-            Color::rgb(0.96, 0.52, 0.26)
-        } else {
-            Color::rgb(0.20, 0.68, 0.94)
+    pub fn vector_assets(&self) -> Vec<VectorAsset> {
+        self.light_assets
+            .assets()
+            .iter()
+            .chain(self.dark_assets.assets())
+            .cloned()
+            .collect()
+    }
+
+    pub fn view(&self, environment: WindowEnvironment) -> Element {
+        let themes = shadcn(environment.primary);
+        let widgets = themes.resolve(environment.color_scheme);
+        let assets = match environment.color_scheme {
+            argui_core::ColorScheme::Light => &self.light_assets,
+            argui_core::ColorScheme::Dark => &self.dark_assets,
         };
         let items = if self.reversed {
-            vec![chip("beta", "Stable beta"), chip("alpha", "Stable alpha")]
+            vec![
+                chip("beta", "Stable beta", widgets),
+                chip("alpha", "Stable alpha", widgets),
+            ]
         } else {
-            vec![chip("alpha", "Stable alpha"), chip("beta", "Stable beta")]
+            vec![
+                chip("alpha", "Stable alpha", widgets),
+                chip("beta", "Stable beta", widgets),
+            ]
         };
         Element::column([Element::column([
             Element::text(format!("State updates: {}", self.count)).text_style(text_style(
                 38.0,
-                TextColor::WHITE,
+                widgets.foreground,
                 700,
                 TextWrap::Word,
             )),
@@ -129,27 +159,29 @@ impl StateShowcase {
             )
             .text_style(text_style(
                 19.0,
-                TextColor::rgb(0.78, 0.84, 0.92),
+                widgets.muted_foreground,
                 400,
                 TextWrap::Word,
             )),
-            text_input(
-                "message",
-                "Hello · مرحباً · שלום · 👋🏽",
-                "Type in any language…",
-                accent,
-            ),
-            text_input(
+            theme::text_input("message", &self.message, "Type in any language…", widgets),
+            theme::text_input(
                 "long-message",
-                "This deliberately long editable line proves that the caret remains visible while the text scrolls horizontally.",
+                &self.long_message,
                 "Long single-line input",
-                accent,
+                widgets,
             ),
+            theme::editor(widgets, assets, self.editor_size.size(), &self.notes),
             Element::row([
-                button("increment", "Increment", accent),
-                button("theme", "Toggle paint", accent),
-                button("motion", "Motion binding", accent),
-                button("reorder", "Reorder keys", accent),
+                button("increment", "Increment", widgets, true),
+                button("theme", theme::label(self.theme_mode), widgets, false),
+                button(
+                    "primary",
+                    primary_label(self.primary_index),
+                    widgets,
+                    false,
+                ),
+                button("motion", "Motion binding", widgets, false),
+                button("reorder", "Reorder keys", widgets, false),
                 button(
                     "polarity",
                     if self.inverted_scroll {
@@ -157,47 +189,68 @@ impl StateShowcase {
                     } else {
                         "Scroll: normal"
                     },
-                    accent,
+                    widgets,
+                    false,
                 ),
             ])
             .wrap(Wrap::Wrap)
             .gap(12.0)
             .align(Align::Center),
             Element::row(items).wrap(Wrap::Wrap).gap(10.0),
-            self.animation_demo(accent),
-            self.physics_demo(accent),
-            self.visual_primitives(accent),
-            self.popover_demo(accent),
-            self.virtual_list(accent),
+            self.animation_demo(widgets),
+            self.physics_demo(widgets),
+            self.visual_primitives(widgets),
+            self.popover_demo(widgets),
+            self.virtual_list(widgets),
             Element::text("OVERLAY · z-index 100")
                 .text_style(text_style(
                     13.0,
-                    TextColor::rgb(0.05, 0.08, 0.12),
+                    widgets.primary_foreground,
                     700,
                     TextWrap::None,
                 ))
                 .padding(Edges::symmetric(11.0, 7.0))
-                .background(accent)
+                .background(widgets.primary)
                 .radius(CornerRadii::all(9.0))
                 .absolute(Inset::top_right(14.0, 14.0))
                 .z_index(100),
         ])
         .padding(Edges::all(30.0))
         .gap(22.0)
-        .background(self.surface_target())
-        .bind(property::BackgroundColor, self.surface_motion.clone())
-        .border(Border::all(1.5, accent))
-        .radius(CornerRadii::all(22.0))
+        .background(widgets.card)
+        .border(Border::all(1.0, widgets.border))
+        .radius(CornerRadii::all(12.0))
         .clip(ClipBehavior::Bounds)
         .shrink(0.0)])
         .keyed("page-scroll")
         .width(Length::Percent(1.0))
         .height(Length::Percent(1.0))
-        .scrollable(ScrollConfig::default().scrollbar(self.scrollbar_style(accent)))
+        .background(widgets.background)
+        .scrollable(ScrollConfig::default().scrollbar(self.scrollbar_style(widgets)))
         .padding(Edges::symmetric(20.0, 24.0))
     }
 
     pub fn update(&mut self, event: &UiEvent) -> ViewUpdate {
+        if self
+            .editor_size
+            .update(
+                event,
+                "notes-resize",
+                ResizeConfig::new(Size::new(280.0, 120.0), Size::new(900.0, 520.0)),
+            )
+            .is_some()
+        {
+            return ViewUpdate::Rebuild;
+        }
+        if let UiEventKind::TextChanged(value) = &event.kind {
+            match event.key.as_deref() {
+                Some("message") => self.message.clone_from(value),
+                Some("long-message") => self.long_message.clone_from(value),
+                Some("notes") => self.notes.clone_from(value),
+                _ => return ViewUpdate::None,
+            }
+            return ViewUpdate::Rebuild;
+        }
         if matches!(
             &event.kind,
             UiEventKind::KeyInput(input)
@@ -258,9 +311,13 @@ impl StateShowcase {
         match event.key.as_deref() {
             Some("increment") => self.count += 1,
             Some("theme") => {
-                self.warm = !self.warm;
-                self.retarget_showcase_motions();
+                self.theme_mode = match self.theme_mode {
+                    ThemeMode::System => ThemeMode::Light,
+                    ThemeMode::Light => ThemeMode::Dark,
+                    ThemeMode::Dark => ThemeMode::System,
+                };
             }
+            Some("primary") => self.primary_index = (self.primary_index + 1) % PRIMARIES.len(),
             Some("motion") => {
                 self.motion_shifted = !self.motion_shifted;
                 self.retarget_showcase_motions();
@@ -401,12 +458,18 @@ impl StateShowcase {
 }
 
 impl Render for StateShowcase {
-    fn render(&mut self, _cx: &mut Context<Self>) -> Element {
-        self.view()
+    fn render(&mut self, cx: &mut Context<Self>) -> Element {
+        self.view(cx.environment())
     }
 
     fn event(&mut self, event: &UiEvent, cx: &mut Context<Self>) {
-        request_update(cx, self.update(event));
+        let update = self.update(event);
+        if matches!(event.key.as_deref(), Some("theme" | "primary"))
+            && event.kind == UiEventKind::Clicked
+        {
+            cx.set_theme(self.theme_request());
+        }
+        request_update(cx, update);
     }
 
     fn animation_frame(&mut self, frame: Frame, cx: &mut Context<Self>) {
@@ -420,6 +483,10 @@ impl Render for StateShowcase {
     fn image_assets(&self) -> Vec<ImageAsset> {
         StateShowcase::image_assets(self)
     }
+
+    fn vector_assets(&self) -> Vec<VectorAsset> {
+        StateShowcase::vector_assets(self)
+    }
 }
 
 fn request_update<T: Render>(cx: &mut Context<T>, update: ViewUpdate) {
@@ -432,20 +499,17 @@ fn request_update<T: Render>(cx: &mut Context<T>, update: ViewUpdate) {
 
 impl StateShowcase {
     fn accent(&self) -> Color {
-        if self.warm {
-            Color::rgb(0.96, 0.52, 0.26)
-        } else {
-            Color::rgb(0.20, 0.68, 0.94)
-        }
+        PRIMARIES[self.primary_index].1
     }
 
-    fn surface_target(&self) -> Color {
-        if self.motion_shifted {
-            Color::rgb(0.12, 0.18, 0.28)
-        } else if self.warm {
-            Color::rgb(0.16, 0.09, 0.07)
-        } else {
-            Color::rgb(0.06, 0.08, 0.12)
+    fn theme_request(&self) -> ThemeRequest {
+        ThemeRequest {
+            color_scheme: match self.theme_mode {
+                ThemeMode::Light => Some(argui_core::ColorScheme::Light),
+                ThemeMode::Dark => Some(argui_core::ColorScheme::Dark),
+                ThemeMode::System => None,
+            },
+            primary: Some(self.accent()),
         }
     }
 
@@ -462,8 +526,6 @@ impl StateShowcase {
     }
 
     fn retarget_showcase_motions(&self) {
-        self.surface_motion
-            .animate_to(self.surface_target(), motion_tween());
         self.visual_motion
             .animate_to(self.visual_target(), motion_tween());
     }
@@ -496,62 +558,38 @@ fn text_style(size: f32, color: TextColor, weight: u16, wrap: TextWrap) -> TextS
     }
 }
 
-fn button(key: &str, label: &str, accent: Color) -> Element {
-    let radius = CornerRadii::all(12.0);
-    let rest = QuadStyle::solid(Color::rgb(0.10, 0.14, 0.20))
-        .border(Border::all(1.0, Color::rgb(0.28, 0.36, 0.48)))
-        .radius(radius);
-    let active = QuadStyle::solid(Color::rgb(0.14, 0.22, 0.30))
-        .border(Border::all(1.0, accent))
-        .radius(radius);
+fn button(key: &str, label: &str, widgets: &WidgetTheme, primary: bool) -> Element {
     Button::new(
         key,
         label,
-        ButtonStyle::new(
-            PaintStyle::new(rest.clone()),
-            text_style(17.0, TextColor::WHITE, 600, TextWrap::None),
-        )
-        .hovered(active.clone())
-        .pressed(active.opacity(0.72))
-        .focused(rest.border(Border::all(2.0, accent))),
+        if primary {
+            widgets.button.clone()
+        } else {
+            widgets.outline_button.clone()
+        },
     )
     .build()
 }
 
-fn text_input(key: &str, value: &str, placeholder: &str, accent: Color) -> Element {
-    let [red, green, blue, _] = accent.as_array();
-    let radius = CornerRadii::all(11.0);
-    let rest = QuadStyle::solid(Color::rgb(0.035, 0.05, 0.075))
-        .border(Border::all(1.0, Color::rgb(0.20, 0.27, 0.36)))
-        .radius(radius);
-    let active = rest.clone().border(Border::all(1.5, accent));
-    TextInput::new(
-        key,
-        value,
-        placeholder,
-        TextInputStyle::new(
-            PaintStyle::new(rest).clip(ClipBehavior::Bounds),
-            text_style(17.0, TextColor::WHITE, 400, TextWrap::None),
-        )
-        .hovered(active.clone())
-        .focused(active)
-        .selection(Color::rgba(red, green, blue, 0.38))
-        .caret(accent),
-    )
-    .build()
-}
-
-fn chip(key: &str, label: &str) -> Element {
+fn chip(key: &str, label: &str, widgets: &WidgetTheme) -> Element {
     Element::text(label)
         .keyed(key)
-        .text_style(text_style(
-            15.0,
-            TextColor::rgb(0.66, 0.88, 0.72),
-            600,
-            TextWrap::None,
-        ))
+        .text_style(text_style(15.0, widgets.foreground, 600, TextWrap::None))
         .padding(Edges::symmetric(12.0, 7.0))
         .shrink(0.0)
-        .background(Color::rgb(0.08, 0.20, 0.14))
-        .radius(CornerRadii::all(9.0))
+        .background(widgets.muted)
+        .border(Border::all(1.0, widgets.border))
+        .radius(CornerRadii::all(7.0))
+}
+
+const PRIMARIES: [(&str, Color); 5] = [
+    ("Primary: blue", Color::rgb(0.10, 0.45, 0.91)),
+    ("Primary: violet", Color::rgb(0.49, 0.23, 0.93)),
+    ("Primary: rose", Color::rgb(0.88, 0.11, 0.28)),
+    ("Primary: orange", Color::rgb(0.92, 0.35, 0.05)),
+    ("Primary: emerald", Color::rgb(0.02, 0.59, 0.41)),
+];
+
+fn primary_label(index: usize) -> &'static str {
+    PRIMARIES[index].0
 }

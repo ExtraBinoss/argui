@@ -3,7 +3,8 @@ use argui_animation::{
 };
 use argui_core::Transform2D;
 use argui_paint::{Border, Color, CornerRadii, Filter, LayerMask, LayerStyle, Shadow};
-use argui_text::{TextColor, TextWrap};
+use argui_text::TextWrap;
+use argui_theme::WidgetTheme;
 use argui_ui::{
     Edges, Element, FocusScope, InitialFocus, Interaction, Length, OverlayAlign, OverlayPlacement,
     PlacementSide, ScrollChaining, ScrollConfig, Wrap, property,
@@ -28,20 +29,20 @@ pub(super) fn popover_spring() -> Spring<f32> {
 }
 
 impl StateShowcase {
-    pub(super) fn popover_demo(&self, accent: Color) -> Element {
+    pub(super) fn popover_demo(&self, widgets: &WidgetTheme) -> Element {
         let mut children = vec![
             Element::row([
-                button("popover-toggle", "Effects popover", accent),
-                button("tooltip-anchor", "Hover for tooltip", accent),
+                button("popover-toggle", "Effects popover", widgets, false),
+                button("tooltip-anchor", "Hover for tooltip", widgets, false),
             ])
             .wrap(Wrap::Wrap)
             .gap(10.0),
         ];
         if self.popover_progress > 0.0 {
-            children.push(self.popover_content(accent));
+            children.push(self.popover_content(widgets));
         }
         if self.tooltip_visible {
-            children.push(self.tooltip_content());
+            children.push(self.tooltip_content(widgets));
         }
         Element::container(children)
             .keyed("popover-anchor")
@@ -49,13 +50,13 @@ impl StateShowcase {
             .z_index(400)
     }
 
-    fn popover_content(&self, accent: Color) -> Element {
+    fn popover_content(&self, widgets: &WidgetTheme) -> Element {
         let progress = self.popover_progress.clamp(0.0, 1.0);
         let content = Element::column([
             Element::text("GPU effects popover")
                 .text_style(text_style(
                     22.0,
-                    TextColor::WHITE,
+                    widgets.foreground,
                     700,
                     TextWrap::Word,
                 )),
@@ -64,20 +65,20 @@ impl StateShowcase {
             )
             .text_style(text_style(
                 15.0,
-                TextColor::rgb(0.82, 0.88, 0.96),
+                widgets.muted_foreground,
                 400,
                 TextWrap::Word,
             )),
             Element::row([
-                chip("popover-native", "Native WGPU"),
-                chip("popover-wasm", "Same WASM tree"),
+                chip("popover-native", "Native WGPU", widgets),
+                chip("popover-wasm", "Same WASM tree", widgets),
             ])
             .wrap(Wrap::Wrap)
             .gap(8.0),
             Element::text("Scrollable content constrained by the available viewport space.")
                 .text_style(text_style(
                     14.0,
-                    TextColor::rgb(0.76, 0.84, 0.94),
+                    widgets.muted_foreground,
                     500,
                     TextWrap::Word,
                 )),
@@ -85,20 +86,20 @@ impl StateShowcase {
                 Element::text(format!("Popover row {:02} · retained and clipped", index + 1))
                     .padding(Edges::symmetric(10.0, 7.0))
                     .background(if index % 2 == 0 {
-                        Color::rgba(0.12, 0.18, 0.28, 0.72)
+                        widgets.muted
                     } else {
-                        Color::rgba(0.08, 0.12, 0.20, 0.72)
+                        widgets.card
                     })
                     .radius(CornerRadii::all(8.0))
                     .text_style(text_style(
                         13.0,
-                        TextColor::rgb(0.82, 0.88, 0.96),
+                        widgets.foreground,
                         400,
                         TextWrap::Word,
                     ))
             }))
             .gap(5.0),
-            button("popover-close", "Done", accent),
+            button("popover-close", "Done", widgets, true),
         ]);
         content
             .keyed("effects-popover")
@@ -109,8 +110,8 @@ impl StateShowcase {
             .height(Length::Px(430.0))
             .padding(Edges::all(20.0))
             .gap(14.0)
-            .background(Color::rgba(0.055, 0.075, 0.115, 0.72))
-            .border(Border::all(1.0, Color::rgba(0.7, 0.88, 1.0, 0.62)))
+            .background(widgets.card)
+            .border(Border::all(1.0, widgets.border))
             .radius(CornerRadii::all(20.0))
             .anchored_to(
                 "popover-toggle",
@@ -125,23 +126,23 @@ impl StateShowcase {
                 ScrollConfig::default()
                     .enabled(progress > 0.0)
                     .chaining(ScrollChaining::Contain)
-                    .scrollbar(self.scrollbar_style(accent)),
+                    .scrollbar(self.scrollbar_style(widgets)),
             )
             .transform(entry_transform(PlacementSide::Bottom, progress))
             .layer(self.popover_layer(progress))
             .bind(property::shadow_color(0), self.shadow_motion.clone())
     }
 
-    fn tooltip_content(&self) -> Element {
+    fn tooltip_content(&self, widgets: &WidgetTheme) -> Element {
         Element::text("Placed automatically after a 450 ms delay")
             .keyed("delayed-tooltip")
             .width(Length::Px(250.0))
             .height(Length::Px(54.0))
             .padding(Edges::symmetric(11.0, 8.0))
-            .background(Color::rgba(0.025, 0.035, 0.06, 0.96))
-            .border(Border::all(1.0, Color::rgba(0.6, 0.82, 1.0, 0.5)))
+            .background(widgets.card)
+            .border(Border::all(1.0, widgets.border))
             .radius(CornerRadii::all(9.0))
-            .text_style(text_style(13.0, TextColor::WHITE, 550, TextWrap::Word))
+            .text_style(text_style(13.0, widgets.foreground, 550, TextWrap::Word))
             .anchored_to(
                 "tooltip-anchor",
                 OverlayPlacement::new(PlacementSide::Top)

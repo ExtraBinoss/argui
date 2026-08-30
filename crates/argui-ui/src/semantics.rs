@@ -89,7 +89,7 @@ fn resolved_semantics(
     is_root: bool,
 ) -> Option<Semantics> {
     if let Some(mut semantics) = element.semantics.clone() {
-        if matches!(element.kind, ElementKind::TextInput { .. })
+        if matches!(element.kind, ElementKind::TextEditor { .. })
             && let Some(value) = tree.text_input_value(node)
         {
             semantics.value = Some(SemanticValue::Text(value.to_owned()));
@@ -108,16 +108,21 @@ fn resolved_semantics(
     }
     match &element.kind {
         ElementKind::Text { content, .. } => Some(Semantics::new(Role::Text).label(content)),
-        ElementKind::TextInput {
+        ElementKind::TextEditor {
             placeholder,
-            initial_value,
+            value,
+            multiline,
             ..
         } => Some(
-            Semantics::new(Role::TextInput)
-                .label(placeholder)
-                .value(SemanticValue::Text(initial_value.clone()))
-                .action(SemanticAction::Focus)
-                .action(SemanticAction::SetValue),
+            Semantics::new(if *multiline {
+                Role::TextArea
+            } else {
+                Role::TextInput
+            })
+            .label(placeholder)
+            .value(SemanticValue::Text(value.clone()))
+            .action(SemanticAction::Focus)
+            .action(SemanticAction::SetValue),
         ),
         _ if is_root => Some(Semantics::new(Role::Window)),
         _ => None,

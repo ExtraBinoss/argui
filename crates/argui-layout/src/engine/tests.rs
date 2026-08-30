@@ -1,6 +1,6 @@
 use super::*;
 use argui_animation::{Duration, Motion, Time, Tween};
-use argui_ui::{TreeUpdate, property};
+use argui_ui::{Length, TreeUpdate, property};
 
 #[test]
 fn stable_topology_updates_taffy_in_place() {

@@ -3,10 +3,13 @@ use std::{cell::Cell, rc::Rc};
 use argui_ui::{Element, ElementKind, FocusRequest, FocusTarget, UiEvent, UiEventKind, UiTree};
 
 use argui_animation::{Duration, Frame, Time};
-use argui_core::{Point, Rect, Size};
+use argui_core::{Color, ColorScheme, Point, Rect, Size};
 use argui_ui::ClipboardRequest;
 
-use crate::{AppCommand, Context, Entity, LayoutBounds, LayoutSnapshot, Render};
+use crate::{
+    AppCommand, Context, Entity, LayoutBounds, LayoutSnapshot, Render, ThemeRequest,
+    WindowEnvironment,
+};
 
 struct Counted {
     renders: Rc<Cell<u32>>,
@@ -198,6 +201,8 @@ fn context_bubbles_commands_clipboard_scroll_and_frame_requests() {
 #[test]
 fn contexts_create_entities_and_propagate_nested_effects() {
     let mut parent = Context::<Effects>::default();
+    let direct_child: Context<Counted> = parent.child_context();
+    assert_eq!(direct_child.environment(), parent.environment());
     let child = parent.new_entity(Counted {
         renders: Rc::new(Cell::new(0)),
     });
@@ -213,6 +218,10 @@ fn contexts_create_entities_and_propagate_nested_effects() {
     nested.scroll_to("nested-target", Point::new(8.0, 13.0));
     nested.request_focus("nested-target");
     nested.clear_focus();
+    nested.set_theme(ThemeRequest {
+        color_scheme: Some(ColorScheme::Dark),
+        primary: Some(Color::rgb(0.8, 0.2, 0.4)),
+    });
     nested.command(AppCommand::Quit);
     parent.propagate(nested);
     parent.propagate(Context::<Effects>::default());
@@ -226,6 +235,13 @@ fn contexts_create_entities_and_propagate_nested_effects() {
     );
     assert_eq!(parent.effects.scroll.unwrap().key, "nested-target");
     assert_eq!(parent.effects.focus, Some(FocusRequest::Clear));
+    assert_eq!(
+        parent.effects.theme,
+        Some(ThemeRequest {
+            color_scheme: Some(ColorScheme::Dark),
+            primary: Some(Color::rgb(0.8, 0.2, 0.4)),
+        })
+    );
 }
 
 struct ErasedSurface {
@@ -254,7 +270,7 @@ fn erased_entities_forward_the_complete_retained_surface() {
         layouts: layouts.clone(),
     });
     let erased = entity.erase();
-    let first = erased.render();
+    let first = erased.render(WindowEnvironment::default());
 
     let mut unmatched = event();
     unmatched.key = Some("absent".into());
@@ -264,7 +280,7 @@ fn erased_entities_forward_the_complete_retained_surface() {
         elapsed: Duration::ZERO,
     });
     erased.layout_changed(&LayoutSnapshot::default());
-    assert!(first.ptr_eq(&erased.render()));
+    assert!(first.ptr_eq(&erased.render(WindowEnvironment::default())));
 
     assert!(erased.image_assets().is_empty());
     assert!(erased.vector_assets().is_empty());
@@ -274,7 +290,7 @@ fn erased_entities_forward_the_complete_retained_surface() {
     entity.update(|state, _| state.rebuild_on_layout = true);
     erased.layout_changed(&LayoutSnapshot::default());
     assert_eq!(layouts.get(), 2);
-    assert!(!first.ptr_eq(&erased.render()));
+    assert!(!first.ptr_eq(&erased.render(WindowEnvironment::default())));
     assert_eq!(erased.take_effects().update, crate::ViewUpdate::Rebuild);
 }
 
@@ -355,4 +371,36 @@ fn animation_frames_reach_retained_children() {
         elapsed: Duration::ZERO,
     });
     assert_eq!(frames.get(), 1);
+}
+
+#[test]
+fn environment_changes_rebuild_only_reading_subtrees() {
+    struct EnvironmentReader {
+        renders: Rc<Cell<u32>>,
+        reads: bool,
+    }
+    impl Render for EnvironmentReader {
+        fn render(&mut self, cx: &mut Context<Self>) -> Element {
+            self.renders.set(self.renders.get() + 1);
+            if self.reads {
+                Element::text(format!("{:?}", cx.environment().color_scheme))
+            } else {
+                Element::text("static")
+            }
+        }
+    }
+    let dark = WindowEnvironment {
+        color_scheme: ColorScheme::Dark,
+        ..WindowEnvironment::default()
+    };
+    for (reads, expected) in [(false, 1), (true, 2)] {
+        let renders = Rc::new(Cell::new(0));
+        let entity = Entity::new(EnvironmentReader {
+            renders: renders.clone(),
+            reads,
+        });
+        let _ = entity.render_in(WindowEnvironment::default());
+        let _ = entity.render_in(dark);
+        assert_eq!(renders.get(), expected);
+    }
 }

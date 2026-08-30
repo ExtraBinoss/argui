@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use argui_ui::{Element, ElementKind, UiTree};
 use taffy::{NodeId, TaffyTree};
 
-use crate::{LayoutError, engine::NodeMap, engine::taffy_style};
+use crate::{LayoutError, engine::NodeMap, style::taffy_style};
 
 pub(crate) fn sync(
     tree: &mut TaffyTree<usize>,
@@ -136,6 +136,9 @@ fn intrinsic_measure_changed(old: &ElementKind, new: &ElementKind) -> bool {
         && matches!(
             (old, new),
             (ElementKind::Text { .. }, ElementKind::Text { .. })
-                | (ElementKind::TextInput { .. }, ElementKind::TextInput { .. })
+                | (
+                    ElementKind::TextEditor { .. },
+                    ElementKind::TextEditor { .. }
+                )
         )
 }

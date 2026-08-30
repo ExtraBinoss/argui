@@ -7,6 +7,7 @@ mod overlay;
 mod paint;
 mod reconcile;
 mod scroll;
+mod style;
 mod text;
 
 pub use engine::{LayoutEngine, LayoutNode, LayoutOutput, PaintStats};

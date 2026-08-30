@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 
 use wasm_bindgen::{JsCast, JsValue, closure::Closure};
-use web_sys::{Element, Event, HtmlCanvasElement, HtmlElement, HtmlInputElement, KeyboardEvent};
+use web_sys::{
+    Element, Event, HtmlCanvasElement, HtmlElement, HtmlInputElement, HtmlTextAreaElement,
+    KeyboardEvent,
+};
 
 use crate::{
     LiveRegion, Role, SemanticAction, SemanticNode, SemanticNodeId, SemanticPatch, SemanticRequest,
@@ -196,15 +199,25 @@ fn handlers(
         output.push(handler);
     }
     if actions.contains(&SemanticAction::SetValue)
-        && let Some(input) = element.dyn_ref::<HtmlInputElement>()
+        && (element.dyn_ref::<HtmlInputElement>().is_some()
+            || element.dyn_ref::<HtmlTextAreaElement>().is_some())
     {
         let callback = std::rc::Rc::clone(&callback);
-        let input = input.clone();
+        let control = element.clone();
         let handler = Closure::new(move |_event: Event| {
+            let value = control
+                .dyn_ref::<HtmlInputElement>()
+                .map(HtmlInputElement::value)
+                .or_else(|| {
+                    control
+                        .dyn_ref::<HtmlTextAreaElement>()
+                        .map(HtmlTextAreaElement::value)
+                })
+                .unwrap_or_default();
             callback(SemanticRequest {
                 target: id,
                 action: SemanticAction::SetValue,
-                value: Some(SemanticValue::Text(input.value())),
+                value: Some(SemanticValue::Text(value)),
             });
         });
         element.add_event_listener_with_callback("input", handler.as_ref().unchecked_ref())?;
@@ -295,6 +308,10 @@ fn apply_attributes(
             if let Some(input) = element.dyn_ref::<HtmlInputElement>() {
                 if input.value() != *value {
                     input.set_value(value);
+                }
+            } else if let Some(textarea) = element.dyn_ref::<HtmlTextAreaElement>() {
+                if textarea.value() != *value {
+                    textarea.set_value(value);
                 }
             } else {
                 element.set_attribute("aria-valuetext", value)?;
@@ -397,6 +414,7 @@ const fn html_tag(role: Role) -> &'static str {
     match role {
         Role::Button => "button",
         Role::TextInput | Role::SearchInput => "input",
+        Role::TextArea => "textarea",
         Role::Link => "a",
         Role::List => "ul",
         Role::ListItem => "li",
@@ -420,6 +438,7 @@ const fn aria_role(role: Role) -> &'static str {
         Role::RadioButton => "radio",
         Role::Switch => "switch",
         Role::TextInput => "textbox",
+        Role::TextArea => "textbox",
         Role::SearchInput => "searchbox",
         Role::List => "list",
         Role::ListItem => "listitem",

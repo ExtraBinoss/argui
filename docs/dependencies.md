@@ -8,7 +8,8 @@ or a deliberate maintenance change should update them one at a time.
 | `winit` | 0.30.13 | `argui-platform` | Native windows, web canvas lifecycle, events |
 | `accesskit` | 0.24.1 | `argui-accessibility` | Native semantic tree and action schema |
 | `accesskit-winit` | 0.33.2 | `argui-runtime` native | Native window accessibility adapters |
-| `ashpd` | 0.13.13 | `argui-platform` Linux | Reduced-motion and contrast portal settings |
+| `ashpd` | 0.13.13 | `argui-platform` Linux | Color-scheme, reduced-motion and contrast portal settings |
+| `futures-util` | 0.3.31 | `argui-platform` Linux | Stream live portal preference changes |
 | `windows` | 0.62.2 | `argui-platform` Windows | Native accessibility display preferences |
 | `objc2-app-kit` | 0.3.2 | `argui-platform` macOS | Native accessibility display preferences |
 | `wgpu` | 30.0.1 | `argui-render` | Native GPU and WebGPU/WebGL backends |

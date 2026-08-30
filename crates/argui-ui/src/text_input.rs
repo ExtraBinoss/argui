@@ -1,127 +1,7 @@
 use argui_core::{CaretAffinity, ImeInput, Key, KeyInput, KeyState, TextPosition};
-use argui_paint::{Color, PaintStyle, QuadStyle};
-use argui_text::{TextColor, TextStyle, TextWrap};
 use unicode_segmentation::UnicodeSegmentation;
 
-use crate::{
-    Align, CursorIcon, Edges, Element, ElementKind, GestureSet, Interaction, LayoutStyle, Length,
-    NodeId, Role, SemanticAction, SemanticValue, Semantics,
-};
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct TextInputStyle {
-    pub layout: LayoutStyle,
-    pub paint: PaintStyle,
-    pub hovered: QuadStyle,
-    pub focused: QuadStyle,
-    pub text: TextStyle,
-    pub placeholder: TextStyle,
-    pub selection: Color,
-    pub caret: Color,
-}
-
-impl TextInputStyle {
-    #[must_use]
-    pub fn new(paint: PaintStyle, mut text: TextStyle) -> Self {
-        text.wrap = TextWrap::None;
-        let mut placeholder = text.clone();
-        placeholder.color = TextColor::rgba(0.55, 0.60, 0.68, 1.0);
-        Self {
-            layout: LayoutStyle {
-                width: Length::Percent(1.0),
-                padding: Edges::symmetric(13.0, 10.0),
-                align: Align::Center,
-                shrink: 0.0,
-                ..LayoutStyle::default()
-            },
-            hovered: paint.quad.clone(),
-            focused: paint.quad.clone(),
-            paint,
-            text,
-            placeholder,
-            selection: Color::rgba(0.20, 0.68, 0.94, 0.38),
-            caret: Color::WHITE,
-        }
-    }
-
-    #[must_use]
-    pub fn hovered(mut self, style: QuadStyle) -> Self {
-        self.hovered = style;
-        self
-    }
-
-    #[must_use]
-    pub fn focused(mut self, style: QuadStyle) -> Self {
-        self.focused = style;
-        self
-    }
-
-    #[must_use]
-    pub const fn selection(mut self, color: Color) -> Self {
-        self.selection = color;
-        self
-    }
-
-    #[must_use]
-    pub const fn caret(mut self, color: Color) -> Self {
-        self.caret = color;
-        self
-    }
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct TextInput {
-    key: String,
-    initial_value: String,
-    placeholder: String,
-    style: TextInputStyle,
-}
-
-impl TextInput {
-    #[must_use]
-    pub fn new(
-        key: impl Into<String>,
-        initial_value: impl Into<String>,
-        placeholder: impl Into<String>,
-        style: TextInputStyle,
-    ) -> Self {
-        Self {
-            key: key.into(),
-            initial_value: initial_value.into(),
-            placeholder: placeholder.into(),
-            style,
-        }
-    }
-
-    #[must_use]
-    pub fn build(self) -> Element {
-        let interaction = Interaction::default()
-            .focusable(true)
-            .cursor(CursorIcon::Text)
-            .gestures(GestureSet::NONE.tap().pan())
-            .hovered(self.style.hovered)
-            .focused(self.style.focused);
-        let semantics = Semantics::new(Role::TextInput)
-            .label(self.placeholder.clone())
-            .value(SemanticValue::Text(self.initial_value.clone()))
-            .action(SemanticAction::Focus)
-            .action(SemanticAction::SetValue);
-        let mut element = Element::container([]).semantics(semantics);
-        element.key = Some(self.key);
-        element.kind = ElementKind::TextInput {
-            initial_value: self.initial_value,
-            placeholder: self.placeholder,
-            text: self.style.text,
-            placeholder_text: self.style.placeholder,
-            selection: self.style.selection,
-            caret: self.style.caret,
-        };
-        element.style = self.style.layout;
-        element.paint = self.style.paint;
-        element.interaction = Some(interaction);
-        element
-    }
-}
+use crate::NodeId;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct TextInputState {
@@ -130,6 +10,8 @@ pub(crate) struct TextInputState {
     affinity: CaretAffinity,
     anchor: Option<TextPosition>,
     preedit: Option<Preedit>,
+    multiline: bool,
+    reveal_cursor: bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -154,17 +36,39 @@ pub(crate) struct EditResult {
 }
 
 impl TextInputState {
-    pub fn new(value: String) -> Self {
+    pub fn new(value: String, multiline: bool) -> Self {
         let cursor = value.len();
         Self {
             value,
             cursor,
+            multiline,
+            reveal_cursor: true,
             ..Self::default()
         }
     }
 
     pub fn value(&self) -> &str {
         &self.value
+    }
+
+    pub fn sync(&mut self, value: &str, multiline: bool) {
+        self.multiline = multiline;
+        if self.value == value {
+            return;
+        }
+        self.value.clear();
+        self.value.push_str(value);
+        self.cursor = grapheme_boundary(&self.value, self.cursor.min(self.value.len()));
+        self.anchor = self.anchor.and_then(|anchor| {
+            (anchor.index <= self.value.len()).then(|| {
+                TextPosition::new(
+                    grapheme_boundary(&self.value, anchor.index),
+                    anchor.affinity,
+                )
+            })
+        });
+        self.preedit = None;
+        self.reveal_cursor = true;
     }
 
     pub fn display_cursor(&self) -> usize {
@@ -223,15 +127,27 @@ impl TextInputState {
             }
             Key::ArrowLeft => self.move_to(previous_grapheme(&self.value, self.cursor)),
             Key::ArrowRight => self.move_to(next_grapheme(&self.value, self.cursor)),
-            Key::Home => self.move_to(0),
-            Key::End => self.move_to(self.value.len()),
+            Key::Home => self.move_to(if self.multiline && !command {
+                line_start(&self.value, self.cursor)
+            } else {
+                0
+            }),
+            Key::End => self.move_to(if self.multiline && !command {
+                line_end(&self.value, self.cursor)
+            } else {
+                self.value.len()
+            }),
             Key::Backspace => result.changed = self.backspace(),
             Key::Delete => result.changed = self.delete(),
+            Key::Enter if self.multiline && !command => {
+                self.insert("\n");
+                result.changed = true;
+            }
             Key::Enter => result.submitted = true,
             Key::Escape => self.anchor = None,
             _ if !input.modifiers.alt => {
                 if let Some(text) = input.text.as_deref().filter(|text| !text.is_empty()) {
-                    self.insert(text);
+                    self.insert_input(text);
                     result.changed = true;
                 }
             }
@@ -269,7 +185,7 @@ impl TextInputState {
             }
             ImeInput::Commit(text) => {
                 self.preedit = None;
-                self.insert(&text);
+                self.insert_input(&text);
                 return EditResult {
                     changed: !text.is_empty(),
                     layout: !text.is_empty(),
@@ -288,7 +204,7 @@ impl TextInputState {
     }
 
     pub fn paste(&mut self, text: &str) -> EditResult {
-        self.insert(text);
+        self.insert_input(text);
         EditResult {
             changed: !text.is_empty(),
             layout: !text.is_empty(),
@@ -353,6 +269,15 @@ impl TextInputState {
         self.cursor += text.len();
         self.affinity = CaretAffinity::Before;
         self.anchor = None;
+    }
+
+    fn insert_input(&mut self, text: &str) {
+        if self.multiline {
+            self.insert(text);
+        } else {
+            let single_line = text.replace(['\r', '\n'], "");
+            self.insert(&single_line);
+        }
     }
 
     fn backspace(&mut self) -> bool {
@@ -428,16 +353,35 @@ impl TextInputStates {
             .find_map(|(id, state)| (*id == node).then_some(state))
     }
 
-    pub fn sync(&mut self, inputs: impl IntoIterator<Item = (NodeId, String)>) {
+    pub fn should_reveal_cursor(&self, node: NodeId) -> bool {
+        self.get(node).is_some_and(|state| state.reveal_cursor)
+    }
+
+    pub fn request_cursor_reveal(&mut self, node: NodeId) {
+        if let Some(state) = self.get_mut(node) {
+            state.reveal_cursor = true;
+        }
+    }
+
+    pub fn clear_cursor_reveals(&mut self) {
+        for (_, state) in &mut self.states {
+            state.reveal_cursor = false;
+        }
+    }
+
+    pub fn sync(&mut self, inputs: impl IntoIterator<Item = (NodeId, String, bool)>) {
         let inputs = inputs.into_iter().collect::<Vec<_>>();
         self.states
-            .retain(|(node, _)| inputs.iter().any(|(id, _)| id == node));
+            .retain(|(node, _)| inputs.iter().any(|(id, _, _)| id == node));
         if self.drag.is_some_and(|node| self.get(node).is_none()) {
             self.drag = None;
         }
-        for (node, value) in inputs {
-            if self.get(node).is_none() {
-                self.states.push((node, TextInputState::new(value)));
+        for (node, value, multiline) in inputs {
+            if let Some(state) = self.get_mut(node) {
+                state.sync(&value, multiline);
+            } else {
+                self.states
+                    .push((node, TextInputState::new(value, multiline)));
             }
         }
     }
@@ -538,4 +482,22 @@ fn char_boundary(value: &str, index: usize) -> usize {
         .rev()
         .find(|candidate| value.is_char_boundary(*candidate))
         .unwrap_or(0)
+}
+
+fn grapheme_boundary(value: &str, index: usize) -> usize {
+    value[..char_boundary(value, index)]
+        .grapheme_indices(true)
+        .next_back()
+        .map_or(0, |(boundary, grapheme)| boundary + grapheme.len())
+        .min(index)
+}
+
+fn line_start(value: &str, cursor: usize) -> usize {
+    value[..cursor].rfind('\n').map_or(0, |index| index + 1)
+}
+
+fn line_end(value: &str, cursor: usize) -> usize {
+    value[cursor..]
+        .find('\n')
+        .map_or(value.len(), |index| cursor + index)
 }

@@ -39,6 +39,14 @@ impl ApplicationHandler<UserEvent> for Application {
                 let window = Arc::new(window);
                 let size = window.inner_size();
                 self.scale_factor = window.scale_factor() as f32;
+                if self.preference_overrides.color_scheme.is_none()
+                    && let Some(theme) = window.theme()
+                {
+                    self.environment.color_scheme = match theme {
+                        winit::window::Theme::Light => argui_core::ColorScheme::Light,
+                        winit::window::Theme::Dark => argui_core::ColorScheme::Dark,
+                    };
+                }
                 self.update_viewport(size.width, size.height);
                 if !self.prepare_or_exit(event_loop) {
                     return;
@@ -258,6 +266,26 @@ impl ApplicationHandler<UserEvent> for Application {
             WindowEvent::Focused(focused) => {
                 self.window_focus(focused, &window, event_loop);
                 PlatformEvent::Focused(focused)
+            }
+            WindowEvent::ThemeChanged(theme) => {
+                let scheme = match theme {
+                    winit::window::Theme::Light => argui_core::ColorScheme::Light,
+                    winit::window::Theme::Dark => argui_core::ColorScheme::Dark,
+                };
+                if self.preference_overrides.color_scheme.is_none() {
+                    self.apply_color_scheme(scheme);
+                }
+                PlatformEvent::PreferencesChanged(argui_platform::SystemPreferences {
+                    color_scheme: argui_platform::ResolvedPreference {
+                        value: self.preference_overrides.color_scheme.unwrap_or(scheme),
+                        source: if self.preference_overrides.color_scheme.is_some() {
+                            argui_platform::PreferenceSource::Override
+                        } else {
+                            argui_platform::PreferenceSource::System
+                        },
+                    },
+                    ..self.preferences
+                })
             }
             WindowEvent::RedrawRequested => {
                 self.begin_frame_profile();

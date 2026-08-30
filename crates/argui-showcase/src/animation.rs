@@ -3,13 +3,14 @@ use argui_animation::{
     PlaybackState, Timeline, Timing, Tween,
 };
 use argui_paint::{Border, Color, CornerRadii};
-use argui_text::{TextColor, TextWrap};
+use argui_text::TextWrap;
+use argui_theme::WidgetTheme;
 use argui_ui::{Align, Edges, Element, Length, Wrap, property};
 
 use crate::{StateShowcase, button, text_style};
 
 impl StateShowcase {
-    pub(super) fn animation_demo(&self, accent: Color) -> Element {
+    pub(super) fn animation_demo(&self, widgets: &WidgetTheme) -> Element {
         let status = match self.animation.state() {
             PlaybackState::Idle => "idle",
             PlaybackState::Running => "running",
@@ -21,7 +22,7 @@ impl StateShowcase {
             Element::row([
                 Element::text(format!("Typed keyframes · {status}")).text_style(text_style(
                     17.0,
-                    TextColor::WHITE,
+                    widgets.foreground,
                     650,
                     TextWrap::None,
                 )),
@@ -46,22 +47,23 @@ impl StateShowcase {
                     property::BackgroundColor,
                     self.animated_color_motion.clone(),
                 )
-                .border(Border::all(1.5, accent))
+                .border(Border::all(1.0, widgets.border))
                 .radius(CornerRadii::all(18.0)),
             Element::row([
-                button("animation-play", "Restart", accent),
-                button("animation-pause", "Pause / resume", accent),
-                button("animation-reverse", "Reverse", accent),
-                button("animation-finish", "Finish", accent),
-                button("animation-cancel", "Cancel", accent),
+                button("animation-play", "Restart", widgets, false),
+                button("animation-pause", "Pause / resume", widgets, false),
+                button("animation-reverse", "Reverse", widgets, false),
+                button("animation-finish", "Finish", widgets, false),
+                button("animation-cancel", "Cancel", widgets, false),
             ])
             .wrap(Wrap::Wrap)
             .gap(10.0),
         ])
         .gap(12.0)
         .padding(Edges::all(16.0))
-        .background(Color::rgb(0.045, 0.06, 0.09))
-        .radius(CornerRadii::all(14.0))
+        .background(widgets.card)
+        .border(Border::all(1.0, widgets.border))
+        .radius(CornerRadii::all(10.0))
     }
 }
 

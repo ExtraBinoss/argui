@@ -1,3 +1,5 @@
+use argui_core::ColorScheme;
+
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum PreferenceSource {
     Override,
@@ -7,56 +9,94 @@ pub enum PreferenceSource {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct ResolvedPreference {
-    pub enabled: bool,
+pub struct ResolvedPreference<T> {
+    pub value: T,
     pub source: PreferenceSource,
 }
 
-impl Default for ResolvedPreference {
+impl<T: Default> Default for ResolvedPreference<T> {
     fn default() -> Self {
         Self {
-            enabled: false,
+            value: T::default(),
             source: PreferenceSource::Default,
         }
     }
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub struct AccessibilityOverrides {
+pub struct PreferenceOverrides {
+    pub color_scheme: Option<ColorScheme>,
     pub reduced_motion: Option<bool>,
     pub high_contrast: Option<bool>,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub struct AccessibilityPreferences {
-    pub reduced_motion: ResolvedPreference,
-    pub high_contrast: ResolvedPreference,
+pub struct SystemPreferences {
+    pub color_scheme: ResolvedPreference<ColorScheme>,
+    pub reduced_motion: ResolvedPreference<bool>,
+    pub high_contrast: ResolvedPreference<bool>,
 }
 
-impl AccessibilityPreferences {
+impl SystemPreferences {
     #[must_use]
-    pub fn detect(overrides: AccessibilityOverrides) -> Self {
-        let system = if overrides.reduced_motion.is_some() && overrides.high_contrast.is_some() {
-            (None, None)
-        } else {
-            system_preferences()
-        };
+    pub fn detect(overrides: PreferenceOverrides) -> Self {
+        let system = system_preferences();
         Self {
-            reduced_motion: resolve(overrides.reduced_motion, system.0),
-            high_contrast: resolve(overrides.high_contrast, system.1),
+            color_scheme: resolve(overrides.color_scheme, system.0),
+            reduced_motion: resolve(overrides.reduced_motion, system.1),
+            high_contrast: resolve(overrides.high_contrast, system.2),
+        }
+    }
+
+    /// Publishes the current preferences and subsequent native system changes.
+    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg_attr(coverage_nightly, coverage(off))]
+    pub fn watch(overrides: PreferenceOverrides, mut publish: impl FnMut(Self) + Send + 'static) {
+        let current = Self::detect(overrides);
+        publish(current);
+        #[cfg(target_os = "linux")]
+        if overrides.color_scheme.is_none() {
+            use ashpd::desktop::settings::{ColorScheme as PortalScheme, Settings};
+            use futures_util::StreamExt;
+
+            let mut current = current;
+            pollster::block_on(async move {
+                let Ok(settings) = Settings::new().await else {
+                    return;
+                };
+                let Ok(mut changes) = settings.receive_color_scheme_changed().await else {
+                    return;
+                };
+                while let Some(scheme) = changes.next().await {
+                    let value = match scheme {
+                        PortalScheme::PreferDark => ColorScheme::Dark,
+                        PortalScheme::PreferLight | PortalScheme::NoPreference => {
+                            ColorScheme::Light
+                        }
+                    };
+                    current.color_scheme = ResolvedPreference {
+                        value,
+                        source: PreferenceSource::System,
+                    };
+                    publish(current);
+                }
+            });
         }
     }
 }
 
-fn resolve(override_value: Option<bool>, system: Option<bool>) -> ResolvedPreference {
-    if let Some(enabled) = override_value {
+fn resolve<T: Copy + Default>(
+    override_value: Option<T>,
+    system: Option<T>,
+) -> ResolvedPreference<T> {
+    if let Some(value) = override_value {
         ResolvedPreference {
-            enabled,
+            value,
             source: PreferenceSource::Override,
         }
-    } else if let Some(enabled) = system {
+    } else if let Some(value) = system {
         ResolvedPreference {
-            enabled,
+            value,
             source: PreferenceSource::System,
         }
     } else {
@@ -65,13 +105,25 @@ fn resolve(override_value: Option<bool>, system: Option<bool>) -> ResolvedPrefer
 }
 
 #[cfg(target_os = "linux")]
-fn system_preferences() -> (Option<bool>, Option<bool>) {
-    use ashpd::desktop::settings::{Contrast, ReducedMotion, Settings};
+#[cfg_attr(coverage_nightly, coverage(off))]
+fn system_preferences() -> (Option<ColorScheme>, Option<bool>, Option<bool>) {
+    use ashpd::desktop::settings::{
+        ColorScheme as PortalScheme, Contrast, ReducedMotion, Settings,
+    };
 
     pollster::block_on(async {
         let Ok(settings) = Settings::new().await else {
-            return (None, None);
+            return (None, None, None);
         };
+        let scheme = settings
+            .color_scheme()
+            .await
+            .ok()
+            .and_then(|value| match value {
+                PortalScheme::PreferDark => Some(ColorScheme::Dark),
+                PortalScheme::PreferLight => Some(ColorScheme::Light),
+                PortalScheme::NoPreference => None,
+            });
         let motion = settings
             .reduced_motion()
             .await
@@ -82,12 +134,12 @@ fn system_preferences() -> (Option<bool>, Option<bool>) {
             .await
             .ok()
             .map(|value| value == Contrast::High);
-        (motion, contrast)
+        (scheme, motion, contrast)
     })
 }
 
 #[cfg(target_os = "windows")]
-fn system_preferences() -> (Option<bool>, Option<bool>) {
+fn system_preferences() -> (Option<ColorScheme>, Option<bool>, Option<bool>) {
     use windows::UI::ViewManagement::{AccessibilitySettings, UISettings};
 
     let motion = UISettings::new()
@@ -97,22 +149,23 @@ fn system_preferences() -> (Option<bool>, Option<bool>) {
     let contrast = AccessibilitySettings::new()
         .and_then(|settings| settings.HighContrast())
         .ok();
-    (motion, contrast)
+    (None, motion, contrast)
 }
 
 #[cfg(target_os = "macos")]
-fn system_preferences() -> (Option<bool>, Option<bool>) {
+fn system_preferences() -> (Option<ColorScheme>, Option<bool>, Option<bool>) {
     let workspace = objc2_app_kit::NSWorkspace::sharedWorkspace();
     (
+        None,
         Some(workspace.accessibilityDisplayShouldReduceMotion()),
         Some(workspace.accessibilityDisplayShouldIncreaseContrast()),
     )
 }
 
 #[cfg(target_arch = "wasm32")]
-fn system_preferences() -> (Option<bool>, Option<bool>) {
+fn system_preferences() -> (Option<ColorScheme>, Option<bool>, Option<bool>) {
     let Some(window) = web_sys::window() else {
-        return (None, None);
+        return (None, None, None);
     };
     let query = |value: &str| {
         window
@@ -122,6 +175,13 @@ fn system_preferences() -> (Option<bool>, Option<bool>) {
             .map(|media| media.matches())
     };
     (
+        query("(prefers-color-scheme: dark)").map(|dark| {
+            if dark {
+                ColorScheme::Dark
+            } else {
+                ColorScheme::Light
+            }
+        }),
         query("(prefers-reduced-motion: reduce)"),
         query("(prefers-contrast: more)"),
     )
@@ -133,8 +193,8 @@ fn system_preferences() -> (Option<bool>, Option<bool>) {
     target_os = "macos",
     target_arch = "wasm32"
 )))]
-fn system_preferences() -> (Option<bool>, Option<bool>) {
-    (None, None)
+fn system_preferences() -> (Option<ColorScheme>, Option<bool>, Option<bool>) {
+    (None, None, None)
 }
 
 #[cfg(test)]
@@ -143,17 +203,14 @@ mod tests {
 
     #[test]
     fn overrides_have_priority_and_report_their_source() {
-        let preferences = AccessibilityPreferences::detect(AccessibilityOverrides {
+        let preferences = SystemPreferences::detect(PreferenceOverrides {
+            color_scheme: Some(ColorScheme::Dark),
             reduced_motion: Some(true),
             high_contrast: Some(false),
         });
-        assert_eq!(
-            preferences.reduced_motion,
-            ResolvedPreference {
-                enabled: true,
-                source: PreferenceSource::Override,
-            }
-        );
+        assert_eq!(preferences.color_scheme.value, ColorScheme::Dark);
+        assert_eq!(preferences.color_scheme.source, PreferenceSource::Override);
+        assert!(preferences.reduced_motion.value);
         assert_eq!(preferences.high_contrast.source, PreferenceSource::Override);
     }
 
@@ -162,11 +219,11 @@ mod tests {
         assert_eq!(
             resolve(None, Some(true)),
             ResolvedPreference {
-                enabled: true,
+                value: true,
                 source: PreferenceSource::System,
             }
         );
-        assert_eq!(resolve(None, None), ResolvedPreference::default());
+        assert_eq!(resolve::<bool>(None, None), ResolvedPreference::default());
         assert_eq!(
             resolve(Some(false), Some(true)).source,
             PreferenceSource::Override

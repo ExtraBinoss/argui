@@ -4,7 +4,9 @@ use argui_paint::{ImageAsset, VectorAsset};
 use argui_platform::{PlatformEvent, TrayConfig, TrayEvent, WindowKey, WindowSpec};
 use argui_ui::{ClipboardRequest, Element, FocusRequest, UiEvent};
 
-use crate::{Entity, LayoutSnapshot, Render, ScrollRequest, ViewUpdate};
+use crate::{
+    Entity, LayoutSnapshot, Render, ScrollRequest, ThemeRequest, ViewUpdate, WindowEnvironment,
+};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum AppEvent {
@@ -97,7 +99,7 @@ fn strongest(left: ViewUpdate, right: ViewUpdate) -> ViewUpdate {
 }
 
 pub trait AppModel: 'static {
-    fn view(&self, window: &WindowKey) -> Option<Element>;
+    fn view(&self, window: &WindowKey, environment: WindowEnvironment) -> Option<Element>;
 
     fn update(&mut self, event: &AppEvent) -> AppUpdate;
 
@@ -141,6 +143,10 @@ pub trait AppModel: 'static {
     fn take_focus_request(&mut self, _window: &WindowKey) -> Option<FocusRequest> {
         None
     }
+
+    fn take_theme_request(&mut self, _window: &WindowKey) -> Option<ThemeRequest> {
+        None
+    }
 }
 
 pub(crate) struct SingleWindowModel<A: Render> {
@@ -148,6 +154,7 @@ pub(crate) struct SingleWindowModel<A: Render> {
     clipboard: std::cell::RefCell<Option<ClipboardRequest>>,
     scroll: std::cell::RefCell<Option<ScrollRequest>>,
     focus: std::cell::RefCell<Option<FocusRequest>>,
+    theme: std::cell::RefCell<Option<ThemeRequest>>,
     animation_requested: std::cell::Cell<bool>,
 }
 
@@ -158,6 +165,7 @@ impl<A: Render> SingleWindowModel<A> {
             clipboard: std::cell::RefCell::new(None),
             scroll: std::cell::RefCell::new(None),
             focus: std::cell::RefCell::new(None),
+            theme: std::cell::RefCell::new(None),
             animation_requested: std::cell::Cell::new(false),
         }
     }
@@ -172,6 +180,9 @@ impl<A: Render> SingleWindowModel<A> {
         }
         if effects.focus.is_some() {
             *self.focus.borrow_mut() = effects.focus;
+        }
+        if effects.theme.is_some() {
+            *self.theme.borrow_mut() = effects.theme;
         }
         self.animation_requested
             .set(self.animation_requested.get() || effects.animation_frame);
@@ -190,8 +201,8 @@ impl<A: Render> SingleWindowModel<A> {
 }
 
 impl<A: Render> AppModel for SingleWindowModel<A> {
-    fn view(&self, window: &WindowKey) -> Option<Element> {
-        (window.as_str() == WindowKey::MAIN_VALUE).then(|| self.app.render())
+    fn view(&self, window: &WindowKey, environment: WindowEnvironment) -> Option<Element> {
+        (window.as_str() == WindowKey::MAIN_VALUE).then(|| self.app.render_in(environment))
     }
 
     fn update(&mut self, event: &AppEvent) -> AppUpdate {
@@ -250,5 +261,61 @@ impl<A: Render> AppModel for SingleWindowModel<A> {
         (window.as_str() == WindowKey::MAIN_VALUE)
             .then(|| self.focus.borrow_mut().take())
             .flatten()
+    }
+
+    fn take_theme_request(&mut self, window: &WindowKey) -> Option<ThemeRequest> {
+        (window.as_str() == WindowKey::MAIN_VALUE)
+            .then(|| self.theme.borrow_mut().take())
+            .flatten()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use argui_core::{Color, ColorScheme, Point};
+    use argui_ui::{ClipboardRequest, Element, UiEvent, UiEventKind, UiTree};
+
+    use super::{AppEvent, AppModel, SingleWindowModel};
+    use crate::{Context, Render, ThemeRequest};
+
+    struct ThemedApp;
+
+    impl Render for ThemedApp {
+        fn render(&mut self, _cx: &mut Context<Self>) -> Element {
+            Element::container([]).keyed("theme")
+        }
+
+        fn event(&mut self, _event: &UiEvent, cx: &mut Context<Self>) {
+            cx.write_clipboard(ClipboardRequest::Write("theme".into()));
+            cx.scroll_to("theme", Point::new(1.0, 2.0));
+            cx.request_focus("theme");
+            cx.request_animation_frame();
+            cx.set_theme(ThemeRequest {
+                color_scheme: Some(ColorScheme::Dark),
+                primary: Some(Color::rgb(0.8, 0.2, 0.4)),
+            });
+        }
+    }
+
+    #[test]
+    fn single_window_models_forward_theme_requests_to_the_runtime() {
+        let window = argui_platform::WindowKey::main();
+        let mut model = SingleWindowModel::new(ThemedApp);
+        let tree = UiTree::new(Element::container([]));
+        model.update(&AppEvent::Ui {
+            window: window.clone(),
+            event: UiEvent {
+                target: tree.node_ids()[0],
+                key: Some("theme".into()),
+                kind: UiEventKind::Clicked,
+            },
+        });
+        let _ = model.take_theme_request(&argui_platform::WindowKey::new("secondary"));
+        let _ = model.take_clipboard_request(&window);
+        let _ = model.take_scroll_request(&window);
+        let _ = model.take_focus_request(&window);
+        let _ = model.wants_animation_frame(&window);
+        let _ = model.take_theme_request(&window);
+        let _ = model.take_theme_request(&window);
     }
 }

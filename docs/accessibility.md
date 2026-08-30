@@ -38,7 +38,7 @@ available to the gesture arena.
 
 ## System preferences
 
-`AccessibilityPreferences` reports reduced motion and high contrast with the
+`SystemPreferences` reports color scheme, reduced motion, and high contrast with the
 source of each value. Application overrides win over system values. Native
 detection runs outside startup and frame processing; Web uses media queries.
 Reduced motion finishes active property motions at their typed target and keeps

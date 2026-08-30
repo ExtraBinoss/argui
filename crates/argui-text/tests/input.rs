@@ -1,5 +1,5 @@
-use argui_core::{Size, TextPosition};
-use argui_text::{TextEngine, TextStyle, TextWrap};
+use argui_core::{Point, Size, TextPosition};
+use argui_text::{CaretScroll, TextEngine, TextInputScroll, TextStyle, TextWrap};
 
 const NOTO_SANS: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
 const NOTO_ARABIC: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSansArabic.ttf");
@@ -20,6 +20,10 @@ fn pos(index: usize) -> TextPosition {
     }
 }
 
+fn reveal(offset: Point) -> TextInputScroll {
+    TextInputScroll::new(offset, CaretScroll::Reveal)
+}
+
 #[test]
 fn cosmic_input_geometry_handles_bidi_selection_and_overflow() {
     let value = "Hello مرحباً with a deliberately long suffix";
@@ -35,7 +39,7 @@ fn cosmic_input_geometry_handles_bidi_selection_and_overflow() {
         Size::new(120.0, 28.0),
         pos(value.len()),
         Some((pos(0), pos("Hello".len()))),
-        0.0,
+        reveal(Point::default()),
     );
 
     assert!(layout.scroll_x > 0.0);
@@ -63,7 +67,7 @@ fn horizontal_scroll_moves_only_when_the_caret_leaves_the_viewport() {
         Size::new(80.0, 24.0),
         pos(value.len()),
         None,
-        0.0,
+        reveal(Point::default()),
     );
     assert!(end.scroll_x > 0.0);
 
@@ -73,7 +77,7 @@ fn horizontal_scroll_moves_only_when_the_caret_leaves_the_viewport() {
         Size::new(80.0, 24.0),
         pos(value.len() - 1),
         None,
-        end.scroll_x,
+        reveal(Point::new(end.scroll_x, end.scroll_y)),
     );
     assert_eq!(nearby.scroll_x, end.scroll_x);
 
@@ -83,9 +87,39 @@ fn horizontal_scroll_moves_only_when_the_caret_leaves_the_viewport() {
         Size::new(80.0, 24.0),
         pos(0),
         None,
-        end.scroll_x,
+        reveal(Point::new(end.scroll_x, end.scroll_y)),
     );
     assert_eq!(start.scroll_x, 0.0);
+}
+
+#[test]
+fn preserved_scroll_ignores_the_caret_and_only_clamps_to_new_content_bounds() {
+    let value = "A deliberately long editable value";
+    let style = TextStyle {
+        wrap: TextWrap::None,
+        ..TextStyle::default()
+    };
+    let mut engine = engine();
+    let preserved = engine.input_layout(
+        value,
+        &style,
+        Size::new(100.0, 24.0),
+        pos(value.len()),
+        None,
+        TextInputScroll::new(Point::new(10.0, 0.0), CaretScroll::Preserve),
+    );
+    assert_eq!(preserved.scroll_x, 10.0);
+
+    let clamped = engine.input_layout(
+        value,
+        &style,
+        Size::new(100.0, 24.0),
+        pos(value.len()),
+        None,
+        TextInputScroll::new(Point::new(f32::MAX, 0.0), CaretScroll::Preserve),
+    );
+    assert!(clamped.scroll_x.is_finite());
+    assert!(clamped.scroll_x < f32::MAX);
 }
 
 #[test]
@@ -102,7 +136,7 @@ fn mixed_bidi_selection_keeps_valid_visual_spans() {
         Size::new(400.0, 24.0),
         pos(2),
         Some((pos(2), pos("abc العربية".len()))),
-        0.0,
+        reveal(Point::default()),
     );
 
     assert!(!layout.selection.is_empty());
@@ -122,12 +156,25 @@ fn mixed_bidi_selection_keeps_valid_visual_spans() {
 
     for index in 0..10 {
         let viewport = Size::new(400.0 + index as f32, 24.0);
-        let cached = engine.input_layout(value, &style, viewport, pos(0), None, 0.0);
+        let cached = engine.input_layout(
+            value,
+            &style,
+            viewport,
+            pos(0),
+            None,
+            reveal(Point::default()),
+        );
         assert!(!cached.stops.is_empty());
     }
 
-    let inside_codepoint =
-        engine.input_layout("é", &style, Size::new(40.0, 24.0), pos(1), None, 0.0);
+    let inside_codepoint = engine.input_layout(
+        "é",
+        &style,
+        Size::new(40.0, 24.0),
+        pos(1),
+        None,
+        reveal(Point::default()),
+    );
     assert_eq!(inside_codepoint.caret.origin.x, 0.0);
 }
 
@@ -138,7 +185,14 @@ fn combining_marks_emit_one_visual_stop_per_position() {
         wrap: TextWrap::None,
         ..TextStyle::default()
     };
-    let layout = engine().input_layout(value, &style, Size::new(500.0, 24.0), pos(0), None, 0.0);
+    let layout = engine().input_layout(
+        value,
+        &style,
+        Size::new(500.0, 24.0),
+        pos(0),
+        None,
+        reveal(Point::default()),
+    );
 
     assert!(layout.stops.iter().enumerate().all(|(index, stop)| {
         layout.stops[index + 1..]
@@ -157,7 +211,14 @@ fn dragging_across_marked_arabic_grows_selection_monotonically() {
     let start = value.find('م').unwrap();
     let end = start + "مرحباً".len();
     let mut engine = engine();
-    let base = engine.input_layout(value, &style, Size::new(500.0, 24.0), pos(start), None, 0.0);
+    let base = engine.input_layout(
+        value,
+        &style,
+        Size::new(500.0, 24.0),
+        pos(start),
+        None,
+        reveal(Point::default()),
+    );
     let mut positions = base
         .stops
         .iter()
@@ -181,7 +242,7 @@ fn dragging_across_marked_arabic_grows_selection_monotonically() {
             Size::new(500.0, 24.0),
             stop.position,
             Some((anchor, stop.position)),
-            0.0,
+            reveal(Point::default()),
         );
         let width = selection
             .selection
@@ -201,7 +262,14 @@ fn left_to_right_drag_never_selects_a_later_visual_run_first() {
         ..TextStyle::default()
     };
     let mut engine = engine();
-    let base = engine.input_layout(value, &style, Size::new(500.0, 24.0), pos(0), None, 0.0);
+    let base = engine.input_layout(
+        value,
+        &style,
+        Size::new(500.0, 24.0),
+        pos(0),
+        None,
+        reveal(Point::default()),
+    );
     let anchor = base.stops.first().unwrap();
     let mut previous_right = anchor.point.x;
 
@@ -215,11 +283,68 @@ fn left_to_right_drag_never_selects_a_later_visual_run_first() {
             Size::new(500.0, 24.0),
             stop.position,
             Some((anchor.position, stop.position)),
-            0.0,
+            reveal(Point::default()),
         );
         let rect = selection.selection[0];
         assert!((rect.origin.x - anchor.point.x).abs() < 0.01);
         assert!(rect.origin.x + rect.size.width + 0.01 >= previous_right);
         previous_right = stop.point.x;
     }
+}
+
+#[test]
+fn multiline_layout_wraps_and_keeps_the_caret_vertically_visible() {
+    let value = "first line wraps across the narrow viewport\nsecond line\nthird line";
+    let style = TextStyle {
+        font_size: 16.0,
+        line_height: 20.0,
+        wrap: TextWrap::WordOrGlyph,
+        ..TextStyle::default()
+    };
+    let layout = engine().input_layout(
+        value,
+        &style,
+        Size::new(120.0, 42.0),
+        pos(value.len()),
+        Some((pos(0), pos(value.len()))),
+        reveal(Point::default()),
+    );
+    assert!(layout.scroll_y > 0.0);
+    assert!(layout.caret.origin.y + layout.caret.size.height <= 44.0);
+    assert!(layout.selection.len() >= 2);
+    assert!(
+        layout
+            .stops
+            .windows(2)
+            .all(|pair| pair[0].point.y <= pair[1].point.y + 0.01)
+    );
+}
+
+#[test]
+fn empty_multiline_runs_keep_a_real_caret_stop_and_scroll_position() {
+    let value = "start\n\n\n\n\n";
+    let style = TextStyle {
+        font_size: 16.0,
+        line_height: 20.0,
+        wrap: TextWrap::WordOrGlyph,
+        ..TextStyle::default()
+    };
+    let layout = engine().input_layout(
+        value,
+        &style,
+        Size::new(120.0, 42.0),
+        pos(value.len()),
+        None,
+        reveal(Point::default()),
+    );
+
+    assert!(layout.scroll_y > 0.0);
+    assert!(layout.caret.origin.y > 0.0);
+    assert!(layout.caret.origin.y + layout.caret.size.height <= 42.0);
+    assert!(
+        layout
+            .stops
+            .iter()
+            .any(|stop| stop.position == pos(value.len()))
+    );
 }

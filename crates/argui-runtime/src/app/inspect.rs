@@ -8,8 +8,6 @@ use argui_paint::{
 };
 use argui_ui::{Element, ElementKind, Length, NodeId};
 
-use crate::AnyEntity;
-
 use super::Application;
 
 mod values;
@@ -21,7 +19,10 @@ use values::property_value;
 impl Application {
     #[cfg_attr(coverage_nightly, coverage(off))]
     pub(crate) fn inspected_view(&self) -> Option<Element> {
-        let mut root = self.model.as_ref().map(AnyEntity::render)?;
+        let mut root = self
+            .model
+            .as_ref()
+            .map(|model| model.render(self.environment))?;
         let Some(inspector) = &self.inspector else {
             return Some(root);
         };
@@ -167,7 +168,13 @@ fn kind_name(kind: &ElementKind) -> &'static str {
     match kind {
         ElementKind::Container => "container",
         ElementKind::Text { .. } => "text",
-        ElementKind::TextInput { .. } => "text-input",
+        ElementKind::TextEditor { multiline, .. } => {
+            if *multiline {
+                "text-area"
+            } else {
+                "text-input"
+            }
+        }
         ElementKind::Image { .. } => "image",
         ElementKind::Vector { .. } => "vector",
     }
@@ -177,15 +184,9 @@ fn summary(kind: &ElementKind, children: usize) -> Option<String> {
     match kind {
         ElementKind::Container => Some(format!("{children} children")),
         ElementKind::Text { content, .. } => Some(short(content)),
-        ElementKind::TextInput {
-            initial_value,
-            placeholder,
-            ..
-        } => Some(short(if initial_value.is_empty() {
-            placeholder
-        } else {
-            initial_value
-        })),
+        ElementKind::TextEditor {
+            value, placeholder, ..
+        } => Some(short(if value.is_empty() { placeholder } else { value })),
         ElementKind::Image { image, fit, .. } => Some(format!("id={} · {fit:?}", image.0)),
         ElementKind::Vector { vector, progress } => {
             Some(format!("id={} · morph {progress:.2}", vector.0))

@@ -10,7 +10,7 @@ use crate::app::Application;
 #[cfg_attr(coverage_nightly, coverage(off))]
 impl Application {
     pub(super) fn refresh_text_inputs(&mut self) -> bool {
-        let (Some(ui), Some(layout)) = (&self.ui_tree, &mut self.ui_layout) else {
+        let (Some(ui), Some(layout)) = (&mut self.ui_tree, &mut self.ui_layout) else {
             return false;
         };
         self.layout_engine
@@ -33,21 +33,27 @@ impl Application {
             return;
         };
         let update = if input.state == KeyState::Pressed
-            && matches!(input.key, Key::ArrowLeft | Key::ArrowRight)
+            && matches!(
+                input.key,
+                Key::ArrowLeft | Key::ArrowRight | Key::ArrowUp | Key::ArrowDown
+            )
             && let Some(node) = ui.focused_node()
             && let Some(position) = ui.text_input_position(node)
             && let Some(region) = layout.text_inputs.iter().find(|region| region.node == node)
         {
             let mut update = ui.keyboard_event(input, &layout.hit_regions);
-            update.merge(ui.move_text_position(
-                node,
-                region.visual_neighbor(
+            let position = match input.key {
+                Key::ArrowLeft | Key::ArrowRight => region.visual_neighbor(
                     position,
                     input.key == Key::ArrowLeft,
                     input.modifiers.command() || input.modifiers.alt,
                 ),
-                input.modifiers.shift,
-            ));
+                Key::ArrowUp | Key::ArrowDown => {
+                    region.vertical_neighbor(position, input.key == Key::ArrowUp)
+                }
+                _ => position,
+            };
+            update.merge(ui.move_text_position(node, position, input.modifiers.shift));
             update
         } else {
             ui.key_input(input, &layout.hit_regions)

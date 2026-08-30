@@ -12,7 +12,7 @@ use argui_ui::Element;
 struct TestModel;
 
 impl AppModel for TestModel {
-    fn view(&self, _window: &WindowKey) -> Option<Element> {
+    fn view(&self, _window: &WindowKey, _environment: crate::WindowEnvironment) -> Option<Element> {
         Some(Element::container(Vec::<Element>::new()))
     }
 

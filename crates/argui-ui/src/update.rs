@@ -101,7 +101,7 @@ fn kind_changes_layout(old: &ElementKind, new: &ElementKind) -> bool {
         | (ElementKind::Image { .. }, ElementKind::Image { .. })
         | (ElementKind::Vector { .. }, ElementKind::Vector { .. }) => false,
         (ElementKind::Text { .. }, ElementKind::Text { .. })
-        | (ElementKind::TextInput { .. }, ElementKind::TextInput { .. }) => old != new,
+        | (ElementKind::TextEditor { .. }, ElementKind::TextEditor { .. }) => old != new,
         _ => true,
     }
 }

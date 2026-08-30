@@ -1,6 +1,7 @@
 use argui_animation::{DecayConfig, Inertia, InertiaConfig, InertiaState, Spring, SpringConfig};
 use argui_paint::{Border, Color, CornerRadii};
-use argui_text::{TextColor, TextWrap};
+use argui_text::TextWrap;
+use argui_theme::WidgetTheme;
 use argui_ui::{Edges, Element, Length, Wrap, property};
 
 use super::{StateShowcase, button, text_style};
@@ -85,14 +86,14 @@ impl StateShowcase {
         next != previous
     }
 
-    pub(super) fn physics_demo(&self, accent: Color) -> Element {
+    pub(super) fn physics_demo(&self, widgets: &WidgetTheme) -> Element {
         let normalized = self.physics_value.clamp(0.0, 1.0);
         let color = physics_color(normalized);
         let state = self.physics_status();
         Element::column([
             Element::text(format!("Physics · {state}")).text_style(text_style(
                 17.0,
-                TextColor::WHITE,
+                widgets.foreground,
                 650,
                 TextWrap::None,
             )),
@@ -102,20 +103,21 @@ impl StateShowcase {
                 .width(Length::Percent(1.0))
                 .background(color)
                 .bind(property::BackgroundColor, self.physics_color.clone())
-                .border(Border::all(1.5, accent))
+                .border(Border::all(1.0, widgets.border))
                 .radius(CornerRadii::all(10.0 + normalized * 24.0))
                 .bind(property::CornerRadii, self.physics_radii.clone()),
             Element::row([
-                button("physics-spring", "Spring retarget", accent),
-                button("physics-inertia", "Launch inertia", accent),
+                button("physics-spring", "Spring retarget", widgets, false),
+                button("physics-inertia", "Launch inertia", widgets, false),
             ])
             .wrap(Wrap::Wrap)
             .gap(10.0),
         ])
         .gap(12.0)
         .padding(Edges::all(16.0))
-        .background(Color::rgba(0.045, 0.06, 0.09, 0.78))
-        .radius(CornerRadii::all(14.0))
+        .background(widgets.card)
+        .border(Border::all(1.0, widgets.border))
+        .radius(CornerRadii::all(10.0))
     }
 
     pub(super) fn physics_status(&self) -> &'static str {
@@ -182,7 +184,8 @@ mod tests {
     use crate::StateShowcase;
 
     fn state_label(showcase: &StateShowcase) -> String {
-        let demo = showcase.physics_demo(argui_paint::Color::WHITE);
+        let themes = argui_theme::shadcn(argui_paint::Color::WHITE);
+        let demo = showcase.physics_demo(themes.resolve(argui_core::ColorScheme::Dark));
         match &demo.children[0].kind {
             ElementKind::Text { content, .. } => content.clone(),
             _ => panic!("physics state is rendered as text"),

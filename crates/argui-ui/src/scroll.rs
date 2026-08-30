@@ -1,7 +1,7 @@
 use argui_core::{Affine2D, Point, Rect, ScrollDelta};
 use argui_paint::{ClipChain, QuadStyle};
 
-use crate::NodeId;
+use crate::{Edges, HitRegion, NodeId};
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum ScrollAxes {
@@ -118,7 +118,7 @@ impl ScrollConfig {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ScrollbarStyle {
     pub width: f32,
-    pub inset: f32,
+    pub insets: Edges,
     pub min_thumb: f32,
     pub track: QuadStyle,
     pub thumb: QuadStyle,
@@ -129,7 +129,7 @@ impl ScrollbarStyle {
     pub const fn new(track: QuadStyle, thumb: QuadStyle) -> Self {
         Self {
             width: 10.0,
-            inset: 4.0,
+            insets: Edges::all(4.0),
             min_thumb: 28.0,
             track,
             thumb,
@@ -143,8 +143,8 @@ impl ScrollbarStyle {
     }
 
     #[must_use]
-    pub const fn inset(mut self, inset: f32) -> Self {
-        self.inset = inset;
+    pub const fn insets(mut self, insets: Edges) -> Self {
+        self.insets = insets;
         self
     }
 
@@ -172,6 +172,28 @@ pub struct ScrollRegion {
     pub max_offset: Point,
     pub config: ScrollConfig,
     pub scrollbar: Option<ScrollbarRegion>,
+    pub interaction_order: usize,
+}
+
+#[must_use]
+pub fn scrollbar_at<'a>(
+    point: Point,
+    scroll_regions: &'a [ScrollRegion],
+    hit_regions: &[HitRegion],
+) -> Option<&'a ScrollRegion> {
+    let scrollbar = scroll_regions
+        .iter()
+        .filter(|region| region.config.enabled && region.scrollbar_contains(point))
+        .max_by_key(|region| region.interaction_order)?;
+    let top_hit = hit_regions
+        .iter()
+        .enumerate()
+        .rev()
+        .find(|(_, region)| region.contains(point))
+        .map(|(index, _)| index);
+    top_hit
+        .is_none_or(|index| index < scrollbar.interaction_order)
+        .then_some(scrollbar)
 }
 
 impl ScrollRegion {
@@ -300,36 +322,22 @@ impl ScrollState {
         point: Point,
         regions: &[ScrollRegion],
     ) -> Option<Option<ScrollChange>> {
-        for region in regions.iter().rev() {
-            if !region.config.enabled {
-                continue;
-            }
-            let Some(scrollbar) = region.scrollbar.as_ref() else {
-                continue;
-            };
-            let Some(point) = region.local_point(point) else {
-                continue;
-            };
-            if !region.clip.contains(point)
-                || !region
-                    .clips
-                    .contains(region.transform.transform_point(point))
-                || !scrollbar.track.contains(point)
-            {
-                continue;
-            }
-            let grab = if scrollbar.thumb.contains(point) {
-                point.y - scrollbar.thumb.origin.y
-            } else {
-                scrollbar.thumb.size.height * 0.5
-            };
-            self.drag = Some(ScrollDrag {
-                node: region.node,
-                grab,
-            });
-            return Some(self.drag_to(point, regions));
-        }
-        None
+        let region = regions
+            .iter()
+            .filter(|region| region.config.enabled && region.scrollbar_contains(point))
+            .max_by_key(|region| region.interaction_order)?;
+        let scrollbar = region.scrollbar.as_ref()?;
+        let local = region.local_point(point)?;
+        let grab = if scrollbar.thumb.contains(local) {
+            local.y - scrollbar.thumb.origin.y
+        } else {
+            scrollbar.thumb.size.height * 0.5
+        };
+        self.drag = Some(ScrollDrag {
+            node: region.node,
+            grab,
+        });
+        Some(self.drag_to(point, regions))
     }
 
     pub fn scrollbar_dragged(

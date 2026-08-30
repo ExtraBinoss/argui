@@ -1,0 +1,18 @@
+[package]
+name = "argui-theme"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+argui-core.workspace = true
+argui-paint.workspace = true
+argui-text.workspace = true
+argui-ui.workspace = true
+argui-vector.workspace = true
+icondata_core.workspace = true
+icondata_tb.workspace = true
+
+[lints]
+workspace = true

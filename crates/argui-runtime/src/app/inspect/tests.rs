@@ -335,9 +335,10 @@ fn snapshots_distinguish_visual_interactive_and_hidden_structure() {
 fn snapshots_cover_every_media_summary_and_empty_identity_input() {
     let text_input = |initial_value: &str| {
         let mut element = Element::container([]);
-        element.kind = ElementKind::TextInput {
-            initial_value: initial_value.into(),
+        element.kind = ElementKind::TextEditor {
+            value: initial_value.into(),
             placeholder: "placeholder".into(),
+            multiline: false,
             text: argui_text::TextStyle::default(),
             placeholder_text: argui_text::TextStyle::default(),
             selection: Color::WHITE,

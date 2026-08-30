@@ -227,9 +227,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         RendererConfig::default(),
         AccessibilityDemo::default(),
         |event| {
-            if let RuntimeEvent::Platform(PlatformEvent::AccessibilityPreferences(preferences)) =
-                event
-            {
+            if let RuntimeEvent::Platform(PlatformEvent::PreferencesChanged(preferences)) = event {
                 println!("system accessibility: {preferences:?}");
             }
         },

@@ -13,6 +13,7 @@ argui-image.workspace = true
 argui-paint.workspace = true
 argui-runtime.workspace = true
 argui-text.workspace = true
+argui-theme.workspace = true
 argui-ui.workspace = true
 
 [dev-dependencies]

@@ -350,7 +350,9 @@ impl<A: Render> DevtoolsHost<A> {
     pub fn view(&mut self) -> Element {
         let mut cx = Context::default();
         let app = self.app.render(&mut cx);
-        view::host(self, app)
+        let environment = cx.environment();
+        let themes = argui_theme::shadcn(environment.primary);
+        view::host(self, app, themes.resolve(environment.color_scheme))
     }
 
     pub fn update(&mut self, event: &UiEvent) -> ViewUpdate {
@@ -447,17 +449,19 @@ impl<A: Render> DevtoolsHost<A> {
 
 impl<A: Render> Render for DevtoolsHost<A> {
     fn render(&mut self, cx: &mut Context<Self>) -> Element {
-        let mut app_cx = Context::default();
+        let environment = cx.environment();
+        let mut app_cx = cx.child_context();
         let app = self.app.render(&mut app_cx);
         cx.propagate(app_cx);
-        view::host(self, app)
+        let themes = argui_theme::shadcn(environment.primary);
+        view::host(self, app, themes.resolve(environment.color_scheme))
     }
 
     fn event(&mut self, event: &UiEvent, cx: &mut Context<Self>) {
         if let Some(update) = self.update_tools(event) {
             request_update(cx, update);
         } else {
-            let mut app_cx = Context::default();
+            let mut app_cx = cx.child_context();
             self.app.event(event, &mut app_cx);
             cx.propagate(app_cx);
         }
@@ -470,7 +474,7 @@ impl<A: Render> Render for DevtoolsHost<A> {
     }
 
     fn animation_frame(&mut self, frame: Frame, cx: &mut Context<Self>) {
-        let mut app_cx = Context::default();
+        let mut app_cx = cx.child_context();
         self.app.animation_frame(frame, &mut app_cx);
         let update = self.advance_animations(frame, app_cx.view_update());
         cx.propagate(app_cx);
@@ -488,7 +492,7 @@ impl<A: Render> Render for DevtoolsHost<A> {
             application.viewport = bounds;
         }
         self.app_viewport = application.viewport;
-        let mut app_cx = Context::default();
+        let mut app_cx = cx.child_context();
         self.app.layout_changed(&application, &mut app_cx);
         cx.propagate(app_cx);
     }

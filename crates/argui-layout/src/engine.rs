@@ -2,16 +2,11 @@ use argui_core::{Point, Rect, Size};
 use argui_paint::{ClipBehavior, DisplayList};
 use argui_text::{TextBlock, TextEngine, TextScene};
 use argui_ui::{
-    Align, Direction, Edges, Element, ElementKind, HitRegion, Justify, LayoutStyle, Length,
-    NodeId as UiNodeId, Position, ScrollRegion, UiTree, Wrap,
+    Element, ElementKind, HitRegion, LayoutStyle, NodeId as UiNodeId, ScrollRegion, UiTree,
 };
-use taffy::{
-    AlignItems, AvailableSpace, Dimension, FlexDirection, FlexWrap, JustifyContent,
-    LengthPercentage, LengthPercentageAuto, NodeId, Style, TaffyTree, compute_leaf_layout,
-    geometry::{Rect as TaffyRect, Size as TaffySize},
-};
+use taffy::{AvailableSpace, NodeId, TaffyTree, compute_leaf_layout, geometry::Size as TaffySize};
 
-use crate::{LayoutError, TextInputRegion, input, paint, scroll};
+use crate::{LayoutError, TextInputRegion, input, paint, scroll, style::taffy_style};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct LayoutNode {
@@ -161,6 +156,11 @@ impl LayoutEngine {
             &mut output,
         )?;
         crate::overlay::resolve(&self.tree, root, &elements, ui, &mut output)?;
+        drop(elements);
+        for region in &output.text_inputs {
+            ui.set_scroll_offset(region.node, Point::new(region.scroll_x, region.scroll_y));
+        }
+        ui.mark_text_input_layout_clean();
         self.repaint(ui, &mut output);
         ui.mark_layout_clean();
         Ok(output)
@@ -194,7 +194,7 @@ impl LayoutEngine {
 
     pub fn update_text_inputs(
         &mut self,
-        ui: &UiTree,
+        ui: &mut UiTree,
         text_engine: &mut TextEngine,
         output: &mut LayoutOutput,
     ) {
@@ -249,7 +249,7 @@ fn build_node(
     let style = taffy_style(&resolved_style);
     let id = match element.kind {
         ElementKind::Text { .. }
-        | ElementKind::TextInput { .. }
+        | ElementKind::TextEditor { .. }
         | ElementKind::Image { .. }
         | ElementKind::Vector { .. } => tree.new_leaf_with_context(style, index)?,
         ElementKind::Container => {
@@ -308,6 +308,7 @@ fn collect_layout(
     );
     let element = elements[node.index];
     let mut text_index = None;
+    let mut text_scroll = None;
     if let Some((content, style)) = crate::text::content(ui, node.node, element) {
         let text_bounds = Rect::new(
             Point::new(
@@ -327,7 +328,7 @@ fn collect_layout(
         let mut block = TextBlock::new(content, text_bounds);
         block.clip = text_clip;
         block.style = style.clone();
-        if let Some((region, scroll_x)) = input::prepare(
+        if let Some((region, scroll)) = input::prepare(
             ui,
             node.node,
             element,
@@ -336,10 +337,14 @@ fn collect_layout(
                 text: text_bounds,
                 hit: bounds,
                 clip: text_clip,
-                scroll_x: 0.0,
+                scroll_x: ui.scroll_offset(node.node).x,
+                scroll_y: ui.scroll_offset(node.node).y,
             },
         ) {
-            block.bounds.origin.x -= scroll_x;
+            block.bounds.origin.x -= scroll.x;
+            block.bounds.origin.y -= scroll.y;
+            block.bounds.size.height = block.bounds.size.height.max(region.content_size.height);
+            text_scroll = Some((region.scroll_content_size(), scroll));
             output.text_inputs.push(region);
         }
         output.text.push(block);
@@ -360,14 +365,17 @@ fn collect_layout(
     if let Some(config) = element.scroll.clone()
         && let Some(region_clip) = placement.clip.and_then(|clip| clip.intersection(bounds))
     {
-        let content = content_size(tree, node)?;
+        let (content, offset) = match text_scroll {
+            Some(metrics) => metrics,
+            None => (content_size(tree, node)?, ui.scroll_offset(node.node)),
+        };
         output.scroll_regions.push(scroll::region(
             node.node,
             bounds,
             region_clip,
             content,
             config,
-            ui.scroll_offset(node.node),
+            offset,
         ));
     }
     let scroll = ui.scroll_offset(node.node);
@@ -416,25 +424,34 @@ fn apply_scroll_layout(
     output.nodes[node.index].bounds = bounds;
     output.nodes[node.index].clip = clip;
     if let Some(text_index) = text_index {
-        let block = &mut output.text.blocks_mut()[text_index];
         let delta = Point::new(
             bounds.origin.x - previous_bounds.origin.x,
             bounds.origin.y - previous_bounds.origin.y,
         );
-        block.bounds.origin.x += delta.x;
-        block.bounds.origin.y += delta.y;
-        block.clip = match element.paint.clip {
+        let text_clip = match element.paint.clip {
             ClipBehavior::None => clip,
             ClipBehavior::Bounds => clip.and_then(|clip| clip.intersection(bounds)),
         }
         .unwrap_or_default();
+        let mut content_delta = Point::default();
         if let Some(region) = output
             .text_inputs
             .iter_mut()
             .find(|region| region.node == node.node)
         {
-            region.translate(delta, block.clip);
+            region.translate(delta, text_clip);
+            if matches!(element.kind, ElementKind::TextEditor { .. }) {
+                let offset = ui.scroll_offset(node.node);
+                content_delta = Point::new(region.scroll_x - offset.x, region.scroll_y - offset.y);
+                region.scroll_to(offset);
+            }
         }
+        let block = &mut output.text.blocks_mut()[text_index];
+        block.bounds.origin.x += delta.x;
+        block.bounds.origin.y += delta.y;
+        block.bounds.origin.x += content_delta.x;
+        block.bounds.origin.y += content_delta.y;
+        block.clip = text_clip;
     }
     let child_clip = match element.paint.clip {
         ClipBehavior::None => clip,
@@ -443,14 +460,26 @@ fn apply_scroll_layout(
     if let Some(config) = element.scroll.clone()
         && let Some(region_clip) = clip.and_then(|clip| clip.intersection(bounds))
     {
-        let content = content_size(tree, node)?;
+        let (content, offset) = output
+            .text_inputs
+            .iter()
+            .find(|region| region.node == node.node)
+            .map_or_else(
+                || content_size(tree, node).map(|content| (content, ui.scroll_offset(node.node))),
+                |region| {
+                    Ok((
+                        region.scroll_content_size(),
+                        Point::new(region.scroll_x, region.scroll_y),
+                    ))
+                },
+            )?;
         output.scroll_regions.push(scroll::region(
             node.node,
             bounds,
             region_clip,
             content,
             config,
-            ui.scroll_offset(node.node),
+            offset,
         ));
     }
     let scroll = ui.scroll_offset(node.node);
@@ -494,87 +523,6 @@ pub(crate) fn flattened(root: &Element) -> Vec<&Element> {
     let mut output = Vec::new();
     visit(root, &mut output);
     output
-}
-
-pub(crate) fn taffy_style(style: &LayoutStyle) -> Style {
-    Style {
-        size: TaffySize {
-            width: dimension(style.width),
-            height: dimension(style.height),
-        },
-        min_size: TaffySize {
-            width: min_max_dimension(style.min_width),
-            height: min_max_dimension(style.min_height),
-        },
-        max_size: TaffySize {
-            width: min_max_dimension(style.max_width),
-            height: min_max_dimension(style.max_height),
-        },
-        flex_direction: match style.direction {
-            Direction::Row => FlexDirection::Row,
-            Direction::Column => FlexDirection::Column,
-        },
-        flex_wrap: match style.wrap {
-            Wrap::NoWrap => FlexWrap::NoWrap,
-            Wrap::Wrap => FlexWrap::Wrap,
-            Wrap::Reverse => FlexWrap::WrapReverse,
-        },
-        align_items: Some(match style.align {
-            Align::Start => AlignItems::START,
-            Align::Center => AlignItems::CENTER,
-            Align::End => AlignItems::END,
-            Align::Stretch => AlignItems::STRETCH,
-        }),
-        justify_content: Some(match style.justify {
-            Justify::Start => JustifyContent::START,
-            Justify::Center => JustifyContent::CENTER,
-            Justify::End => JustifyContent::END,
-            Justify::SpaceBetween => JustifyContent::SPACE_BETWEEN,
-        }),
-        position: match style.position {
-            Position::Relative => taffy::Position::Relative,
-            Position::Absolute => taffy::Position::Absolute,
-        },
-        inset: TaffyRect {
-            left: min_max_dimension(style.inset.left),
-            right: min_max_dimension(style.inset.right),
-            top: min_max_dimension(style.inset.top),
-            bottom: min_max_dimension(style.inset.bottom),
-        },
-        padding: padding(style.padding),
-        gap: TaffySize {
-            width: LengthPercentage::length(style.gap),
-            height: LengthPercentage::length(style.gap),
-        },
-        flex_grow: style.grow,
-        flex_shrink: style.shrink,
-        ..Style::default()
-    }
-}
-
-const fn dimension(value: Length) -> Dimension {
-    match value {
-        Length::Auto => Dimension::auto(),
-        Length::Px(value) => Dimension::length(value),
-        Length::Percent(value) => Dimension::percent(value),
-    }
-}
-
-const fn min_max_dimension(value: Length) -> LengthPercentageAuto {
-    match value {
-        Length::Auto => LengthPercentageAuto::auto(),
-        Length::Px(value) => LengthPercentageAuto::length(value),
-        Length::Percent(value) => LengthPercentageAuto::percent(value),
-    }
-}
-
-const fn padding(edges: Edges) -> TaffyRect<LengthPercentage> {
-    TaffyRect {
-        left: LengthPercentage::length(edges.left),
-        right: LengthPercentage::length(edges.right),
-        top: LengthPercentage::length(edges.top),
-        bottom: LengthPercentage::length(edges.bottom),
-    }
 }
 
 #[cfg(test)]

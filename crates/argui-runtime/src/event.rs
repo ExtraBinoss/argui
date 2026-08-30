@@ -67,7 +67,7 @@ impl RuntimeEvent {
 pub(crate) enum UserEvent {
     Preferences {
         window: WindowKey,
-        preferences: argui_platform::AccessibilityPreferences,
+        preferences: argui_platform::SystemPreferences,
     },
     #[cfg(target_arch = "wasm32")]
     ClipboardText { window: WindowKey, text: String },

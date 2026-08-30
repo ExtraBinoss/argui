@@ -1,19 +1,22 @@
 use argui_core::{Affine2D, Color, Point, Rect, TextPosition};
 use argui_paint::{Border, ClipChain, DisplayList, Fill, Quad};
-use argui_text::{CaretStop, TextEngine};
+use argui_text::{CaretScroll, CaretStop, TextEngine, TextInputScroll};
 use argui_ui::{Element, ElementKind, NodeId, UiTree};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct TextInputRegion {
     pub node: NodeId,
     pub bounds: Rect,
+    pub viewport: Rect,
     pub clip: Rect,
     pub stops: Vec<CaretStop>,
     pub selection: Vec<Rect>,
     pub caret: Option<Rect>,
     pub selection_color: Color,
     pub caret_color: Color,
+    pub content_size: argui_core::Size,
     pub scroll_x: f32,
+    pub scroll_y: f32,
 }
 
 #[derive(Clone, Copy)]
@@ -22,6 +25,7 @@ pub(crate) struct InputPlacement {
     pub hit: Rect,
     pub clip: Rect,
     pub scroll_x: f32,
+    pub scroll_y: f32,
 }
 
 impl TextInputRegion {
@@ -38,9 +42,29 @@ impl TextInputRegion {
 
     #[must_use]
     pub fn closest_position(&self, point: Point) -> TextPosition {
+        let Some(line_y) = self
+            .stops
+            .iter()
+            .filter(|stop| stop.point.y <= point.y)
+            .map(|stop| stop.point.y)
+            .max_by(f32::total_cmp)
+            .or_else(|| {
+                self.stops
+                    .iter()
+                    .map(|stop| stop.point.y)
+                    .min_by(f32::total_cmp)
+            })
+        else {
+            return TextPosition::default();
+        };
         self.stops
             .iter()
-            .min_by(|a, b| distance(a.point, point).total_cmp(&distance(b.point, point)))
+            .filter(|stop| (stop.point.y - line_y).abs() < 0.01)
+            .min_by(|a, b| {
+                (a.point.x - point.x)
+                    .abs()
+                    .total_cmp(&(b.point.x - point.x).abs())
+            })
             .map_or(TextPosition::default(), |stop| stop.position)
     }
 
@@ -77,13 +101,58 @@ impl TextInputRegion {
         self.stops
             .iter()
             .filter(|stop| {
+                let same_line = (stop.point.y - current.point.y).abs() < 0.01;
                 let direction = if left {
                     stop.point.x < current.point.x
                 } else {
                     stop.point.x > current.point.x
                 };
-                direction && (!by_word || stop.word_boundary)
+                same_line && direction && (!by_word || stop.word_boundary)
             })
+            .min_by(|a, b| {
+                (a.point.x - current.point.x)
+                    .abs()
+                    .total_cmp(&(b.point.x - current.point.x).abs())
+            })
+            .map_or(position, |stop| stop.position)
+    }
+
+    #[must_use]
+    pub fn vertical_neighbor(&self, position: TextPosition, up: bool) -> TextPosition {
+        let Some(current) = self
+            .stops
+            .iter()
+            .find(|stop| stop.position == position)
+            .or_else(|| {
+                self.stops
+                    .iter()
+                    .find(|stop| stop.position.index == position.index)
+            })
+        else {
+            return position;
+        };
+        let line_y = self
+            .stops
+            .iter()
+            .filter(|stop| {
+                if up {
+                    stop.point.y < current.point.y - 0.01
+                } else {
+                    stop.point.y > current.point.y + 0.01
+                }
+            })
+            .map(|stop| stop.point.y)
+            .min_by(|a, b| {
+                (a - current.point.y)
+                    .abs()
+                    .total_cmp(&(b - current.point.y).abs())
+            });
+        let Some(line_y) = line_y else {
+            return position;
+        };
+        self.stops
+            .iter()
+            .filter(|stop| (stop.point.y - line_y).abs() < 0.01)
             .min_by(|a, b| {
                 (a.point.x - current.point.x)
                     .abs()
@@ -94,7 +163,19 @@ impl TextInputRegion {
 
     pub(crate) fn translate(&mut self, delta: Point, clip: Rect) {
         self.bounds.origin = add(self.bounds.origin, delta);
+        self.viewport.origin = add(self.viewport.origin, delta);
         self.clip = clip;
+        self.translate_content(delta);
+    }
+
+    pub(crate) fn scroll_to(&mut self, offset: Point) {
+        let delta = Point::new(self.scroll_x - offset.x, self.scroll_y - offset.y);
+        self.scroll_x = offset.x;
+        self.scroll_y = offset.y;
+        self.translate_content(delta);
+    }
+
+    fn translate_content(&mut self, delta: Point) {
         for stop in &mut self.stops {
             stop.point = add(stop.point, delta);
         }
@@ -105,6 +186,13 @@ impl TextInputRegion {
             caret.origin = add(caret.origin, delta);
         }
     }
+
+    pub(crate) fn scroll_content_size(&self) -> argui_core::Size {
+        argui_core::Size::new(
+            self.content_size.width + self.bounds.size.width - self.viewport.size.width,
+            self.content_size.height + self.bounds.size.height - self.viewport.size.height,
+        )
+    }
 }
 
 pub(crate) fn prepare(
@@ -113,8 +201,8 @@ pub(crate) fn prepare(
     element: &Element,
     engine: &mut TextEngine,
     placement: InputPlacement,
-) -> Option<(TextInputRegion, f32)> {
-    let ElementKind::TextInput {
+) -> Option<(TextInputRegion, Point)> {
+    let ElementKind::TextEditor {
         text,
         selection,
         caret,
@@ -131,7 +219,14 @@ pub(crate) fn prepare(
         placement.text.size,
         cursor,
         ui.text_input_selection_positions(node),
-        placement.scroll_x,
+        TextInputScroll::new(
+            Point::new(placement.scroll_x, placement.scroll_y),
+            if ui.text_input_should_reveal_cursor(node) {
+                CaretScroll::Reveal
+            } else {
+                CaretScroll::Preserve
+            },
+        ),
     );
     let origin = placement.text.origin;
     let stops = layout
@@ -157,26 +252,30 @@ pub(crate) fn prepare(
         TextInputRegion {
             node,
             bounds: placement.hit,
+            viewport: placement.text,
             clip: placement.clip,
             stops,
             selection: selection_rects,
             caret: (ui.focused_node() == Some(node)).then_some(caret_rect),
             selection_color: *selection,
             caret_color: *caret,
+            content_size: layout.content_size,
             scroll_x: layout.scroll_x,
+            scroll_y: layout.scroll_y,
         },
-        layout.scroll_x,
+        Point::new(layout.scroll_x, layout.scroll_y),
     ))
 }
 
-pub(crate) fn update(ui: &UiTree, engine: &mut TextEngine, output: &mut crate::LayoutOutput) {
+pub(crate) fn update(ui: &mut UiTree, engine: &mut TextEngine, output: &mut crate::LayoutOutput) {
     let elements = crate::engine::flattened(ui.root());
+    let mut offsets = Vec::new();
     for node in &output.nodes {
         let Some(text_index) = node.text_index else {
             continue;
         };
         let element = elements[node.index];
-        if !matches!(element.kind, ElementKind::TextInput { .. }) {
+        if !matches!(element.kind, ElementKind::TextEditor { .. }) {
             continue;
         }
         let Some(region_index) = output
@@ -187,15 +286,17 @@ pub(crate) fn update(ui: &UiTree, engine: &mut TextEngine, output: &mut crate::L
             continue;
         };
         let previous_scroll_x = output.text_inputs[region_index].scroll_x;
+        let previous_scroll_y = output.text_inputs[region_index].scroll_y;
+        let viewport_size = output.text_inputs[region_index].viewport.size;
         let block = &mut output.text.blocks_mut()[text_index];
         let text_bounds = Rect::new(
             Point::new(
                 block.bounds.origin.x + previous_scroll_x,
-                block.bounds.origin.y,
+                block.bounds.origin.y + previous_scroll_y,
             ),
-            block.bounds.size,
+            viewport_size,
         );
-        if let Some((region, scroll_x)) = prepare(
+        if let Some((region, scroll)) = prepare(
             ui,
             node.node,
             element,
@@ -204,13 +305,42 @@ pub(crate) fn update(ui: &UiTree, engine: &mut TextEngine, output: &mut crate::L
                 text: text_bounds,
                 hit: node.bounds,
                 clip: block.clip,
-                scroll_x: previous_scroll_x,
+                scroll_x: ui.scroll_offset(node.node).x,
+                scroll_y: ui.scroll_offset(node.node).y,
             },
         ) {
-            block.bounds.origin.x = text_bounds.origin.x - scroll_x;
+            block.bounds.origin.x = text_bounds.origin.x - scroll.x;
+            block.bounds.origin.y = text_bounds.origin.y - scroll.y;
+            block.bounds.size.height = text_bounds.size.height.max(region.content_size.height);
+            if let Some(config) = element.scroll.clone() {
+                let content = region.scroll_content_size();
+                let refreshed = crate::scroll::region(
+                    node.node,
+                    node.bounds,
+                    region.clip,
+                    content,
+                    config,
+                    scroll,
+                );
+                if let Some(current) = output
+                    .scroll_regions
+                    .iter_mut()
+                    .find(|current| current.node == node.node)
+                {
+                    current.max_offset = refreshed.max_offset;
+                    current.config = refreshed.config;
+                    current.scrollbar = refreshed.scrollbar;
+                }
+            }
+            offsets.push((node.node, scroll));
             output.text_inputs[region_index] = region;
         }
     }
+    drop(elements);
+    for (node, offset) in offsets {
+        ui.set_scroll_offset(node, offset);
+    }
+    ui.mark_text_input_layout_clean();
 }
 
 pub(crate) fn paint_selection(
@@ -253,10 +383,6 @@ fn push_quad(
             clips: clips.clone(),
         });
     }
-}
-
-fn distance(a: Point, b: Point) -> f32 {
-    (a.x - b.x).abs() + (a.y - b.y).abs()
 }
 
 const fn add(a: Point, b: Point) -> Point {

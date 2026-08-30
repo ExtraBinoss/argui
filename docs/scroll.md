@@ -19,10 +19,16 @@ elements use Taffy's layout without contributing to flex flow, which is the
 basic overlay mechanism. Portals and focus trapping will build on this ordering
 rather than creating a renderer-specific widget.
 
-`VirtualList` currently targets fixed-height rows. It computes a visible range
-plus bounded overscan and represents the unseen space with two lightweight
-spacers. A logical list of one million rows therefore creates only tens of
-elements. Wheel movement uses the translation path inside a stable overscan
-chunk; crossing a chunk boundary rebuilds only the bounded visible window. Variable-height rows,
-scrollbar thumbs, anchor correction, and programmatic `scroll_to` are later
-extensions of the same range model.
+Scrollbar tracks use four independent `Edges` insets. Composite widgets can
+therefore reserve any side for resize handles, inline actions, or overlapping
+chrome without changing the scroll viewport. Hit testing records the track's
+actual position in paint order, so a later sibling painted above it owns the
+overlap while the remaining track stays interactive.
+
+`VirtualList` supports fixed and measured variable-height rows. It computes a
+visible range plus bounded overscan and represents unseen space with two
+lightweight spacers. A logical list of one million rows therefore creates only
+tens of elements. Wheel movement uses the translation path inside a stable
+overscan chunk; crossing a chunk boundary rebuilds only the bounded visible
+window. Scrollbar track/thumb input, anchor correction after measurements, and
+programmatic scroll requests all update the same retained offset.

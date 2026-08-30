@@ -4,6 +4,7 @@ use argui_paint::{
     ImageId, LinearGradient, RadialGradient,
 };
 use argui_text::{TextColor, TextWrap};
+use argui_theme::WidgetTheme;
 use argui_ui::{Edges, Element, Length, Transform2D, TransformOrigin, Wrap};
 
 use argui_ui::property;
@@ -34,7 +35,8 @@ impl ShowcaseImages {
 }
 
 impl StateShowcase {
-    pub(super) fn visual_primitives(&self, accent: Color) -> Element {
+    pub(super) fn visual_primitives(&self, widgets: &WidgetTheme) -> Element {
+        let accent = widgets.primary;
         let linear = LinearGradient::with_stops(
             Point::new(0.0, 0.0),
             Point::new(1.0, 1.0),
@@ -52,7 +54,7 @@ impl StateShowcase {
         .expect("showcase gradient is valid");
         Element::column([
             Element::text("Transforms, gradients and images")
-                .text_style(text_style(18.0, TextColor::WHITE, 650, TextWrap::Word)),
+                .text_style(text_style(18.0, widgets.foreground, 650, TextWrap::Word)),
             Element::row([
                 Element::container([Element::text("linear · 12 stops").text_style(text_style(
                     15.0,
@@ -93,16 +95,17 @@ impl StateShowcase {
             )
             .text_style(text_style(
                 14.0,
-                TextColor::rgb(0.72, 0.80, 0.90),
+                widgets.muted_foreground,
                 400,
                 TextWrap::Word,
             )),
         ])
         .gap(12.0)
         .padding(Edges::all(16.0))
-        .background(Color::rgb(0.045, 0.06, 0.09))
+        .background(widgets.card)
+        .border(argui_paint::Border::all(1.0, widgets.border))
         .clip(ClipBehavior::Bounds)
-        .radius(CornerRadii::all(14.0))
+        .radius(CornerRadii::all(10.0))
     }
 }
 

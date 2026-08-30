@@ -40,19 +40,14 @@ fn short_stationary_contacts_resolve_as_taps() {
 }
 
 #[test]
-fn pans_start_after_the_threshold_and_report_velocity() {
+fn pan_only_gestures_start_immediately_and_report_velocity() {
     let node = target();
     let mut arena = GestureArena::default();
     arena.update(
         touch(1, PointerPhase::Pressed, 0.0, 0.0, 0),
         Some((node, GestureSet::NONE.pan())),
     );
-    assert!(
-        arena
-            .update(touch(1, PointerPhase::Moved, 4.0, 0.0, 10), None)
-            .is_empty()
-    );
-    let started = arena.update(touch(1, PointerPhase::Moved, 12.0, 0.0, 20), None);
+    let started = arena.update(touch(1, PointerPhase::Moved, 4.0, 0.0, 10), None);
     let ended = arena.update(touch(1, PointerPhase::Released, 20.0, 0.0, 30), None);
 
     assert_eq!(started[0].phase, GesturePhase::Started);
@@ -62,9 +57,27 @@ fn pans_start_after_the_threshold_and_report_velocity() {
     else {
         panic!("expected pan");
     };
-    assert_eq!(total, Point::new(12.0, 0.0));
+    assert_eq!(total, Point::new(4.0, 0.0));
     assert!(velocity.x > 0.0);
     assert_eq!(ended[0].phase, GesturePhase::Ended);
+}
+
+#[test]
+fn tap_and_pan_gestures_keep_a_drag_threshold() {
+    let node = target();
+    let mut arena = GestureArena::default();
+    arena.update(
+        touch(1, PointerPhase::Pressed, 0.0, 0.0, 0),
+        Some((node, GestureSet::NONE.tap().pan())),
+    );
+    assert!(
+        arena
+            .update(touch(1, PointerPhase::Moved, 4.0, 0.0, 10), None)
+            .is_empty()
+    );
+    let started = arena.update(touch(1, PointerPhase::Moved, 12.0, 0.0, 20), None);
+    assert_eq!(started[0].phase, GesturePhase::Started);
+    assert!(matches!(started[0].kind, GestureKind::Pan { .. }));
 }
 
 #[test]
@@ -145,7 +158,7 @@ fn unrelated_and_cancelled_contacts_produce_no_tap() {
 }
 
 #[test]
-fn active_pans_change_cancel_and_keep_bounded_velocity_history() {
+fn active_pans_survive_pointer_leave_and_cancel_only_explicitly() {
     let node = target();
     let mut arena = GestureArena::default();
     arena.update(
@@ -164,7 +177,22 @@ fn active_pans_change_cancel_and_keep_bounded_velocity_history() {
         );
         assert_eq!(events[0].phase, GesturePhase::Changed);
     }
-    let cancelled = arena.update(touch(1, PointerPhase::Left, 17.0, 0.0, 340), None);
+    assert!(
+        arena
+            .update(touch(1, PointerPhase::Left, 17.0, 0.0, 340), None)
+            .is_empty()
+    );
+    let resumed = arena.update(touch(1, PointerPhase::Moved, 18.0, 0.0, 360), None);
+    assert_eq!(resumed[0].phase, GesturePhase::Changed);
+    let ended = arena.update(touch(1, PointerPhase::Released, 18.0, 0.0, 380), None);
+    assert_eq!(ended[0].phase, GesturePhase::Ended);
+
+    arena.update(
+        touch(1, PointerPhase::Pressed, 0.0, 0.0, 400),
+        Some((node, GestureSet::NONE.pan())),
+    );
+    arena.update(touch(1, PointerPhase::Moved, 9.0, 0.0, 410), None);
+    let cancelled = arena.update(touch(1, PointerPhase::Cancelled, 9.0, 0.0, 420), None);
     assert_eq!(cancelled[0].phase, GesturePhase::Cancelled);
 }
 

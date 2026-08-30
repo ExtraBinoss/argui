@@ -1,11 +1,20 @@
 use argui_animation::{Duration, Frame, Time};
-use argui_core::{Affine2D, Point, Rect, ScrollDelta, Size};
+use argui_core::{
+    Affine2D, ColorScheme, Key, KeyInput, KeyState, Modifiers, Point, Rect, ScrollDelta, Size,
+};
 use argui_layout::LayoutEngine;
 use argui_paint::{ClipChain, ClipRegion, Fill, Filter};
-use argui_runtime::{LayoutSnapshot, ViewUpdate};
+use argui_runtime::{Context, Entity, LayoutSnapshot, Render, ViewUpdate};
 use argui_showcase::{StateShowcase, text_engine};
 use argui_text::TextStyle;
-use argui_ui::{CursorIcon, HitRegion, ScrollConfig, ScrollRegion, UiEvent, UiEventKind, UiTree};
+use argui_ui::{
+    CursorIcon, GestureEvent, GestureKind, GesturePhase, HitRegion, ScrollConfig, ScrollRegion,
+    UiEvent, UiEventKind, UiTree,
+};
+
+fn render_view(app: &StateShowcase) -> argui_ui::Element {
+    app.view(argui_runtime::WindowEnvironment::default())
+}
 
 fn node_index(root: &argui_ui::Element, key: &str) -> usize {
     fn visit(element: &argui_ui::Element, key: &str, index: &mut usize) -> Option<usize> {
@@ -23,7 +32,7 @@ fn node_index(root: &argui_ui::Element, key: &str) -> usize {
 }
 
 fn events_for(app: &StateShowcase, key: &str) -> Vec<UiEvent> {
-    let root = app.view();
+    let root = render_view(app);
     let index = node_index(&root, key);
     let mut tree = UiTree::new(root);
     let node = tree.node_id_at(index).unwrap();
@@ -43,6 +52,31 @@ fn events_for(app: &StateShowcase, key: &str) -> Vec<UiEvent> {
     events
 }
 
+fn keyed_event(app: &StateShowcase, key: &str, kind: UiEventKind) -> UiEvent {
+    let root = render_view(app);
+    let index = node_index(&root, key);
+    let tree = UiTree::new(root);
+    UiEvent {
+        target: tree.node_id_at(index).unwrap(),
+        key: Some(key.into()),
+        kind,
+    }
+}
+
+fn key_input(app: &StateShowcase, key: Key, state: KeyState, repeat: bool) -> UiEvent {
+    keyed_event(
+        app,
+        "effects-popover",
+        UiEventKind::KeyInput(KeyInput {
+            key,
+            state,
+            modifiers: Modifiers::default(),
+            repeat,
+            text: None,
+        }),
+    )
+}
+
 fn click(app: &mut StateShowcase, key: &str) -> ViewUpdate {
     let event = events_for(app, key)
         .into_iter()
@@ -53,7 +87,7 @@ fn click(app: &mut StateShowcase, key: &str) -> ViewUpdate {
 
 fn open_popover(app: &mut StateShowcase) {
     assert_eq!(click(app, "popover-toggle"), ViewUpdate::None);
-    assert!(node_index_optional(&app.view(), "effects-popover").is_none());
+    assert!(node_index_optional(&render_view(app), "effects-popover").is_none());
     assert_eq!(
         app.animation_frame(Frame {
             now: Time::ZERO,
@@ -68,18 +102,25 @@ fn open_popover(app: &mut StateShowcase) {
         }),
         ViewUpdate::Rebuild
     );
-    assert!(node_index_optional(&app.view(), "effects-popover").is_some());
+    assert!(node_index_optional(&render_view(app), "effects-popover").is_some());
 }
-
 #[test]
 fn shared_showcase_builds_one_tree_and_embeds_its_fonts() {
     let app = StateShowcase::default();
     let mut text = text_engine();
 
-    assert_eq!(app.view().children.len(), 1);
+    assert_eq!(render_view(&app).children.len(), 1);
+    assert_eq!(
+        app.view(argui_runtime::WindowEnvironment {
+            color_scheme: ColorScheme::Dark,
+            ..argui_runtime::WindowEnvironment::default()
+        })
+        .children
+        .len(),
+        1
+    );
     assert!(text.measure("Argui", &TextStyle::default(), None).width > 0.0);
 }
-
 #[test]
 fn every_showcase_control_rebuilds_the_single_shared_app() {
     let mut app = StateShowcase::default();
@@ -89,13 +130,60 @@ fn every_showcase_control_rebuilds_the_single_shared_app() {
     for key in ["increment", "theme", "reorder", "polarity"] {
         assert_eq!(click(&mut app, key), ViewUpdate::Rebuild);
     }
-    assert_eq!(app.view().children.len(), 1);
+    assert_eq!(render_view(&app).children.len(), 1);
+}
+
+#[test]
+fn theme_editors_and_resize_are_fully_controlled_by_showcase_state() {
+    let mut app = StateShowcase::default();
+    for _ in 0..3 {
+        assert_eq!(click(&mut app, "theme"), ViewUpdate::Rebuild);
+    }
+    for _ in 0..5 {
+        assert_eq!(click(&mut app, "primary"), ViewUpdate::Rebuild);
+    }
+    let theme_event = keyed_event(&app, "theme", UiEventKind::Clicked);
+    let primary_event = keyed_event(&app, "primary", UiEventKind::Clicked);
+    let unrelated = keyed_event(&app, "increment", UiEventKind::Clicked);
+    let entity = Entity::new(app);
+    entity.update(|showcase, cx: &mut Context<StateShowcase>| {
+        Render::event(showcase, &theme_event, cx);
+        Render::event(showcase, &primary_event, cx);
+        Render::event(showcase, &unrelated, cx);
+    });
+    let mut app = StateShowcase::default();
+    for (key, value) in [
+        ("message", "short"),
+        ("long-message", "a longer controlled line"),
+        ("notes", "multiple\ncontrolled\nlines"),
+    ] {
+        let event = keyed_event(&app, key, UiEventKind::TextChanged(value.into()));
+        assert_eq!(app.update(&event), ViewUpdate::Rebuild);
+    }
+    let unknown = UiEvent {
+        target: UiTree::new(render_view(&app)).node_ids()[0],
+        key: Some("unknown-editor".into()),
+        kind: UiEventKind::TextChanged("ignored".into()),
+    };
+    assert_eq!(app.update(&unknown), ViewUpdate::None);
+
+    let mut resize = keyed_event(&app, "notes-resize", UiEventKind::Clicked);
+    resize.kind = UiEventKind::Gesture(GestureEvent {
+        target: resize.target,
+        phase: GesturePhase::Changed,
+        kind: GestureKind::Pan {
+            delta: Point::new(48.0, 32.0),
+            total: Point::new(48.0, 32.0),
+            velocity: Point::default(),
+        },
+    });
+    assert_eq!(app.update(&resize), ViewUpdate::Rebuild);
 }
 
 #[test]
 fn virtual_scroll_rebuilds_only_when_the_visible_window_changes() {
     let mut app = StateShowcase::default();
-    let root = app.view();
+    let root = render_view(&app);
     let index = node_index(&root, "million-list");
     let mut tree = UiTree::new(root);
     let node = tree.node_id_at(index).unwrap();
@@ -109,8 +197,8 @@ fn virtual_scroll_rebuilds_only_when_the_visible_window_changes() {
         max_offset: Point::new(0.0, 1_000.0),
         config: ScrollConfig::default().line_size(36.0),
         scrollbar: None,
+        interaction_order: 0,
     }];
-
     for step in 1..=9 {
         let update = tree.scroll(
             Point::new(10.0, 10.0),
@@ -179,9 +267,9 @@ fn shared_animation_activates_samples_and_returns_to_idle() {
 #[test]
 fn property_motion_is_retained_outside_the_app_model() {
     let mut app = StateShowcase::default();
-    let mut tree = UiTree::new(app.view());
+    let mut tree = UiTree::new(render_view(&app));
     assert_eq!(click(&mut app, "motion"), ViewUpdate::Rebuild);
-    assert_eq!(tree.update(app.view()), argui_ui::TreeUpdate::Paint);
+    assert_eq!(tree.update(render_view(&app)), argui_ui::TreeUpdate::Paint);
     assert!(tree.wants_animation_frame());
     tree.advance_animations(Time::ZERO);
     tree.advance_animations(Time::from_nanos(500_000_000));
@@ -301,7 +389,7 @@ fn a_stalled_frame_cannot_teleport_the_physics_visual() {
         ViewUpdate::Paint
     );
 
-    let view = app.view();
+    let view = render_view(&app);
     let index = node_index(&view, "physics-visual");
     let tree = UiTree::new(view.clone());
     let element = element_by_key(&view, "physics-visual").unwrap();
@@ -318,13 +406,16 @@ fn a_stalled_frame_cannot_teleport_the_physics_visual() {
 #[test]
 fn effects_popover_is_composed_and_only_animates_while_open() {
     let mut app = StateShowcase::default();
-    assert!(node_index_optional(&app.view(), "effects-popover").is_none());
-    let mut retained = UiTree::new(app.view());
+    assert!(node_index_optional(&render_view(&app), "effects-popover").is_none());
+    let mut retained = UiTree::new(render_view(&app));
     open_popover(&mut app);
-    assert_eq!(retained.update(app.view()), argui_ui::TreeUpdate::Layout);
+    assert_eq!(
+        retained.update(render_view(&app)),
+        argui_ui::TreeUpdate::Layout
+    );
     assert!(app.wants_animation_frame());
-    assert!(node_index(&app.view(), "effects-popover") > 0);
-    let view = app.view();
+    assert!(node_index(&render_view(&app), "effects-popover") > 0);
+    let view = render_view(&app);
     let popover = element_by_key(&view, "effects-popover").unwrap();
     let layer = popover.layer.as_ref().unwrap();
     let [Filter::Blur(entry_blur)] = layer.filters.as_slice() else {
@@ -336,6 +427,13 @@ fn effects_popover_is_composed_and_only_animates_while_open() {
     assert_eq!(layer.shadows.len(), 1);
     assert_eq!(layer.shadows[0].color.as_array()[3], 0.28);
     assert_eq!(popover.bindings.len(), 1);
+    for input in [
+        key_input(&app, Key::Enter, KeyState::Pressed, false),
+        key_input(&app, Key::Escape, KeyState::Released, false),
+        key_input(&app, Key::Escape, KeyState::Pressed, true),
+    ] {
+        assert_eq!(app.update(&input), ViewUpdate::None);
+    }
 
     assert_eq!(
         app.animation_frame(Frame {
@@ -359,9 +457,13 @@ fn effects_popover_is_composed_and_only_animates_while_open() {
     }
     assert!(!app.wants_animation_frame());
     assert!(
-        node_index_optional(&app.view(), "effects-popover").is_none(),
+        node_index_optional(&render_view(&app), "effects-popover").is_none(),
         "a fully closed popover must leave the painted and interactive scene"
     );
+    open_popover(&mut app);
+    let escape = key_input(&app, Key::Escape, KeyState::Pressed, false);
+    assert_eq!(app.update(&escape), ViewUpdate::None);
+    assert!(app.wants_animation_frame());
 }
 
 #[test]
@@ -373,7 +475,7 @@ fn effects_popover_scroll_repaints_a_valid_clipped_scene() {
         elapsed: Duration::from_millis(684),
     });
 
-    let mut tree = UiTree::new(app.view());
+    let mut tree = UiTree::new(render_view(&app));
     let mut layout = LayoutEngine::new();
     let viewport = Size::new(1_100.0, 700.0);
     let mut output = layout
@@ -409,13 +511,15 @@ fn effects_popover_scroll_repaints_a_valid_clipped_scene() {
 #[test]
 fn delayed_tooltip_appears_only_after_hover_delay() {
     let mut app = StateShowcase::default();
+    let idle_leave = keyed_event(&app, "tooltip-anchor", UiEventKind::PointerLeft);
+    assert_eq!(app.update(&idle_leave), ViewUpdate::None);
     let entered = events_for(&app, "tooltip-anchor")
         .into_iter()
         .find(|event| event.kind == UiEventKind::PointerEntered)
         .unwrap();
     assert_eq!(app.update(&entered), ViewUpdate::None);
     assert!(app.wants_animation_frame());
-    assert!(node_index_optional(&app.view(), "delayed-tooltip").is_none());
+    assert!(node_index_optional(&render_view(&app), "delayed-tooltip").is_none());
 
     assert_eq!(
         app.animation_frame(Frame {
@@ -424,13 +528,13 @@ fn delayed_tooltip_appears_only_after_hover_delay() {
         }),
         ViewUpdate::Rebuild
     );
-    assert!(node_index_optional(&app.view(), "delayed-tooltip").is_some());
+    assert!(node_index_optional(&render_view(&app), "delayed-tooltip").is_some());
     let left = UiEvent {
         kind: UiEventKind::PointerLeft,
         ..entered
     };
     assert_eq!(app.update(&left), ViewUpdate::Rebuild);
-    assert!(node_index_optional(&app.view(), "delayed-tooltip").is_none());
+    assert!(node_index_optional(&render_view(&app), "delayed-tooltip").is_none());
 }
 
 #[test]
@@ -441,7 +545,7 @@ fn overlay_layout_is_resolved_by_the_layout_engine_without_a_model_rebuild() {
         ViewUpdate::None
     );
     open_popover(&mut app);
-    let view = app.view();
+    let view = render_view(&app);
     let popover = element_by_key(&view, "effects-popover").unwrap();
     assert!(popover.interaction.is_some());
     assert!(popover.scroll.is_some());

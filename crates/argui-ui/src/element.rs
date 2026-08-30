@@ -22,9 +22,10 @@ pub enum ElementKind {
         content: String,
         style: TextStyle,
     },
-    TextInput {
-        initial_value: String,
+    TextEditor {
+        value: String,
         placeholder: String,
+        multiline: bool,
         text: TextStyle,
         placeholder_text: TextStyle,
         selection: Color,

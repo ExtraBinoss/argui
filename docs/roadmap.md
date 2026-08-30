@@ -29,12 +29,14 @@ console logs, and disabled DevTools preserve the existing idle fast path.
 
 ## 1. Text and form controls
 
-- Add multiline editing, selection, vertical caret navigation, scrolling, and
-  richer IME composition decoration.
-- Add controlled text-input values without losing retained selection or IME
-  state.
-- Build textarea, checkbox, slider, menu/select, and reusable modal/popover
-  behavior from existing primitives.
+- [x] Add controlled single-line and multiline editing, selection, vertical
+  caret navigation, wrapping, scrolling, clipboard, IME and submission policy.
+- [x] Add generic resizable content with typed phases, axis/min/max constraints,
+  pointer capture, OS cursor and a standard Tabler GPU handle.
+- [x] Add typed Light/Dark/System themes and live per-window platform
+  preferences without renderer coupling.
+- Build checkbox, slider, menu/select, and reusable modal/popover behavior from
+  existing primitives.
 
 Done when complex text remains grapheme-safe and bidi-correct, and every control
 shares one behavior on native and web.

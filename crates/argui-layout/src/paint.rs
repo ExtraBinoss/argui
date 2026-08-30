@@ -19,6 +19,7 @@ struct ScrollPaintUpdate {
     node: NodeId,
     transform: Affine2D,
     clips: ClipChain,
+    interaction_order: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -153,13 +154,14 @@ fn paint_node(
             node: node.node,
             transform,
             clips: child_context.clips.clone(),
+            interaction_order: 0,
         });
     }
     let mut children = map.children.iter().collect::<Vec<_>>();
     children.sort_by_key(|child| elements[child.index].z_index);
     let mut cacheable = element.interaction.is_none()
         && element.bindings.is_empty()
-        && !matches!(element.kind, ElementKind::TextInput { .. })
+        && !matches!(element.kind, ElementKind::TextEditor { .. })
         && element.scroll.is_none();
     for child in children {
         cacheable &= paint_node(
@@ -172,13 +174,21 @@ fn paint_node(
             scroll_updates,
         );
     }
+    let interaction_order = output.hit_regions.len();
     if let Some(region) = output
         .scroll_regions
-        .iter()
+        .iter_mut()
         .find(|region| region.node == node.node)
-        .cloned()
     {
-        scroll::paint(&region, &mut output.display_list);
+        region.interaction_order = interaction_order;
+        if let Some(update) = scroll_updates
+            .iter_mut()
+            .rev()
+            .find(|update| update.node == node.node)
+        {
+            update.interaction_order = interaction_order;
+        }
+        scroll::paint(region, &mut output.display_list);
     }
     paint_exit(element, &mut output.display_list);
     if cacheable {
@@ -215,6 +225,7 @@ fn apply_scroll_update(output: &mut LayoutOutput, update: &ScrollPaintUpdate) {
     {
         region.transform = update.transform;
         region.clips = update.clips.clone();
+        region.interaction_order = update.interaction_order;
     }
 }
 

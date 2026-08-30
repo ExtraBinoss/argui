@@ -25,7 +25,29 @@ pub struct TextInputLayout {
     pub caret: Rect,
     pub selection: Vec<Rect>,
     pub stops: Vec<CaretStop>,
+    pub content_size: Size,
     pub scroll_x: f32,
+    pub scroll_y: f32,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum CaretScroll {
+    Preserve,
+    #[default]
+    Reveal,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct TextInputScroll {
+    pub offset: Point,
+    pub caret: CaretScroll,
+}
+
+impl TextInputScroll {
+    #[must_use]
+    pub const fn new(offset: Point, caret: CaretScroll) -> Self {
+        Self { offset, caret }
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -45,7 +67,7 @@ impl TextEngine {
         viewport: Size,
         cursor: TextPosition,
         selection: Option<(TextPosition, TextPosition)>,
-        previous_scroll_x: f32,
+        scroll: TextInputScroll,
     ) -> TextInputLayout {
         let cache_index = self
             .input_buffers
@@ -78,21 +100,44 @@ impl TextEngine {
             .layout_runs()
             .map(|run| run.line_w)
             .fold(0.0_f32, f32::max);
-        let scroll_x = visible_scroll(previous_scroll_x, caret_x, viewport.width, content_width);
+        let content_height = buffer
+            .layout_runs()
+            .map(|run| run.line_top + run.line_height)
+            .fold(style.line_height, f32::max);
+        let scroll_x = resolved_scroll(
+            scroll.caret,
+            scroll.offset.x,
+            caret_x,
+            2.0,
+            viewport.width,
+            content_width,
+        );
+        let scroll_y = resolved_scroll(
+            scroll.caret,
+            scroll.offset.y,
+            caret_y,
+            style.line_height,
+            viewport.height,
+            content_height,
+        );
         let caret = Rect::new(
-            Point::new(caret_x - scroll_x, caret_y),
+            Point::new(caret_x - scroll_x, caret_y - scroll_y),
             Size::new(1.5, style.line_height),
         );
-        let selection = selection
-            .and_then(|(anchor, focus)| {
-                visual_selection_rect(buffer, &raw_stops, anchor, focus, scroll_x)
-            })
-            .into_iter()
-            .collect();
+        let selection = selection.map_or_else(Vec::new, |(anchor, focus)| {
+            visual_selection_rects(
+                buffer,
+                &raw_stops,
+                anchor,
+                focus,
+                Point::new(scroll_x, scroll_y),
+            )
+        });
         let stops = raw_stops
             .into_iter()
             .map(|mut stop| {
                 stop.point.x -= scroll_x;
+                stop.point.y -= scroll_y;
                 stop
             })
             .collect();
@@ -100,7 +145,9 @@ impl TextEngine {
             caret,
             selection,
             stops,
+            content_size: Size::new(content_width, content_height),
             scroll_x,
+            scroll_y,
         }
     }
 }
@@ -111,9 +158,26 @@ fn caret_stops(buffer: &Buffer, text: &str) -> Vec<CaretStop> {
         .flat_map(|(index, word)| [index, index + word.len()])
         .collect::<Vec<_>>();
     boundaries.extend([0, text.len()]);
+    let mut line_offsets = vec![0];
+    for (index, character) in text.char_indices() {
+        if character == '\n' {
+            line_offsets.push(index + 1);
+        }
+    }
     let mut stops = Vec::new();
     for run in buffer.layout_runs() {
-        for visual in visual_clusters(&run) {
+        let base = line_offsets.get(run.line_i).copied().unwrap_or_default();
+        let visuals = visual_clusters(&run);
+        if visuals.is_empty() {
+            push_stop(
+                &mut stops,
+                TextPosition::new(base, CaretAffinity::Before),
+                0.0,
+                run.line_top,
+                &boundaries,
+            );
+        }
+        for visual in visuals {
             let cluster = &run.text[visual.start..visual.end];
             let graphemes = cluster.grapheme_indices(true).collect::<Vec<_>>();
             let count = graphemes.len().max(1) as f32;
@@ -126,7 +190,7 @@ fn caret_stops(buffer: &Buffer, text: &str) -> Vec<CaretStop> {
                 };
                 push_stop(
                     &mut stops,
-                    TextPosition::new(visual.start + offset, CaretAffinity::After),
+                    TextPosition::new(base + visual.start + offset, CaretAffinity::After),
                     x,
                     run.line_top,
                     &boundaries,
@@ -134,12 +198,12 @@ fn caret_stops(buffer: &Buffer, text: &str) -> Vec<CaretStop> {
             }
             let (position, x) = if visual.rtl {
                 (
-                    TextPosition::new(visual.end, CaretAffinity::Before),
+                    TextPosition::new(base + visual.end, CaretAffinity::Before),
                     visual.left,
                 )
             } else {
                 (
-                    TextPosition::new(visual.end, CaretAffinity::Before),
+                    TextPosition::new(base + visual.end, CaretAffinity::Before),
                     visual.right,
                 )
             };
@@ -153,7 +217,12 @@ fn caret_stops(buffer: &Buffer, text: &str) -> Vec<CaretStop> {
             word_boundary: true,
         });
     }
-    stops.sort_by(|a, b| a.point.x.total_cmp(&b.point.x));
+    stops.sort_by(|a, b| {
+        a.point
+            .y
+            .total_cmp(&b.point.y)
+            .then_with(|| a.point.x.total_cmp(&b.point.x))
+    });
     stops
 }
 
@@ -209,8 +278,16 @@ impl InputBuffer {
     ) -> Self {
         let metrics = Metrics::new(style.font_size, style.line_height);
         let mut buffer = Buffer::new(fonts, metrics);
-        buffer.set_size(Some(viewport.width), Some(viewport.height));
-        buffer.set_wrap(cosmic_text::Wrap::None);
+        buffer.set_size(
+            Some(viewport.width),
+            (style.wrap == crate::TextWrap::None).then_some(viewport.height),
+        );
+        buffer.set_wrap(match style.wrap {
+            crate::TextWrap::None => cosmic_text::Wrap::None,
+            crate::TextWrap::Glyph => cosmic_text::Wrap::Glyph,
+            crate::TextWrap::Word => cosmic_text::Wrap::Word,
+            crate::TextWrap::WordOrGlyph => cosmic_text::Wrap::WordOrGlyph,
+        });
         let attrs = Attrs::new()
             .family(engine::family(&style.family))
             .weight(Weight(style.weight));
@@ -229,36 +306,75 @@ impl InputBuffer {
     }
 }
 
-fn visible_scroll(previous: f32, caret: f32, viewport: f32, content: f32) -> f32 {
+fn visible_scroll(previous: f32, caret: f32, extent: f32, viewport: f32, content: f32) -> f32 {
     let maximum = (content - viewport).max(0.0);
     let previous = previous.clamp(0.0, maximum);
     if caret < previous {
         caret.clamp(0.0, maximum)
-    } else if caret + 2.0 > previous + viewport {
-        (caret - viewport + 2.0).clamp(0.0, maximum)
+    } else if caret + extent > previous + viewport {
+        (caret - viewport + extent).clamp(0.0, maximum)
     } else {
         previous
     }
 }
 
-fn visual_selection_rect(
+fn resolved_scroll(
+    policy: CaretScroll,
+    previous: f32,
+    caret: f32,
+    extent: f32,
+    viewport: f32,
+    content: f32,
+) -> f32 {
+    let maximum = (content - viewport).max(0.0);
+    match policy {
+        CaretScroll::Preserve => previous.clamp(0.0, maximum),
+        CaretScroll::Reveal => visible_scroll(previous, caret, extent, viewport, content),
+    }
+}
+
+fn visual_selection_rects(
     buffer: &Buffer,
     stops: &[CaretStop],
     anchor: TextPosition,
     focus: TextPosition,
-    scroll_x: f32,
-) -> Option<Rect> {
-    let anchor = find_stop(stops, anchor)?;
-    let focus = find_stop(stops, focus)?;
-    let left = anchor.point.x.min(focus.point.x);
-    let right = anchor.point.x.max(focus.point.x);
-    let run = buffer.layout_runs().next()?;
-    (right > left).then(|| {
-        Rect::new(
-            Point::new(left - scroll_x, run.line_top),
-            Size::new(right - left, run.line_height),
-        )
-    })
+    scroll: Point,
+) -> Vec<Rect> {
+    let (Some(anchor), Some(focus)) = (find_stop(stops, anchor), find_stop(stops, focus)) else {
+        return Vec::new();
+    };
+    let (start, end) = if anchor.position.index <= focus.position.index {
+        (anchor.position.index, focus.position.index)
+    } else {
+        (focus.position.index, anchor.position.index)
+    };
+    buffer
+        .layout_runs()
+        .filter_map(|run| {
+            let selected = stops
+                .iter()
+                .filter(|stop| {
+                    (stop.point.y - run.line_top).abs() < 0.01
+                        && stop.position.index >= start
+                        && stop.position.index <= end
+                })
+                .collect::<Vec<_>>();
+            let left = selected
+                .iter()
+                .map(|stop| stop.point.x)
+                .min_by(f32::total_cmp)?;
+            let right = selected
+                .iter()
+                .map(|stop| stop.point.x)
+                .max_by(f32::total_cmp)?;
+            (right > left).then(|| {
+                Rect::new(
+                    Point::new(left - scroll.x, run.line_top - scroll.y),
+                    Size::new(right - left, run.line_height),
+                )
+            })
+        })
+        .collect()
 }
 
 fn find_stop(stops: &[CaretStop], position: TextPosition) -> Option<&CaretStop> {

@@ -359,7 +359,7 @@ fn scrollbar_is_regular_paint_with_geometry_from_the_scroll_state() {
         QuadStyle::solid(Color::WHITE).radius(CornerRadii::all(4.0)),
     )
     .width(8.0)
-    .inset(4.0)
+    .insets(argui_ui::Edges::all(4.0))
     .min_thumb(20.0);
     let root = Element::column([
         Element::container([]).height(Length::Px(100.0)).shrink(0.0),
@@ -516,14 +516,14 @@ fn caret_and_selection_updates_skip_taffy_and_prepared_text_rebuilds() {
     let update = ui.move_text_cursor(node, 5, true);
     assert!(update.text_input_changed);
     assert!(!update.layout_changed);
-    layout.update_text_inputs(&ui, &mut text, &mut output);
+    layout.update_text_inputs(&mut ui, &mut text, &mut output);
 
     assert_eq!(output.text.blocks()[1].text, content.blocks()[1].text);
     assert!(!output.text_inputs[0].selection.is_empty());
 
     let mut missing_region = output.clone();
     missing_region.text_inputs.clear();
-    layout.update_text_inputs(&ui, &mut text, &mut missing_region);
+    layout.update_text_inputs(&mut ui, &mut text, &mut missing_region);
     assert!(missing_region.text_inputs.is_empty());
 }
 

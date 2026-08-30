@@ -27,6 +27,7 @@ pub(crate) fn region(
         max_offset,
         config,
         scrollbar,
+        interaction_order: 0,
     }
 }
 
@@ -59,16 +60,22 @@ fn vertical_bar(
     if max_offset <= 0.0 {
         return None;
     }
-    let inset = style.inset.max(0.0);
-    let width = style.width.max(0.0).min(bounds.size.width);
-    let track_height = (bounds.size.height - inset * 2.0).max(0.0);
+    let insets = argui_ui::Edges {
+        top: style.insets.top.max(0.0),
+        right: style.insets.right.max(0.0),
+        bottom: style.insets.bottom.max(0.0),
+        left: style.insets.left.max(0.0),
+    };
+    let available_width = (bounds.size.width - insets.left - insets.right).max(0.0);
+    let width = style.width.max(0.0).min(available_width);
+    let track_height = (bounds.size.height - insets.top - insets.bottom).max(0.0);
     if width == 0.0 || track_height == 0.0 {
         return None;
     }
     let track = Rect::new(
         Point::new(
-            bounds.origin.x + bounds.size.width - inset - width,
-            bounds.origin.y + inset,
+            bounds.origin.x + bounds.size.width - insets.right - width,
+            bounds.origin.y + insets.top,
         ),
         Size::new(width, track_height),
     );

@@ -1,5 +1,5 @@
 use argui_core::Point;
-use argui_ui::{CursorIcon, HitRegion};
+use argui_ui::{CursorIcon, HitRegion, scrollbar_at};
 use winit::{window::CursorIcon as WinitCursorIcon, window::Window};
 
 use super::Application;
@@ -11,12 +11,7 @@ impl Application {
             let Some(layout) = &self.ui_layout else {
                 return CursorIcon::Default;
             };
-            if layout
-                .scroll_regions
-                .iter()
-                .rev()
-                .any(|region| region.scrollbar_contains(point))
-            {
+            if scrollbar_at(point, &layout.scroll_regions, &layout.hit_regions).is_some() {
                 CursorIcon::Default
             } else {
                 cursor_at(&layout.hit_regions, point)

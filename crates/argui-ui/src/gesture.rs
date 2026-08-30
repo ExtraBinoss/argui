@@ -116,8 +116,8 @@ impl GestureArena {
             PointerPhase::Pressed => self.pressed(event, hit),
             PointerPhase::Moved => self.moved(event),
             PointerPhase::Released => self.released(event, false),
-            PointerPhase::Cancelled | PointerPhase::Left => self.released(event, true),
-            PointerPhase::Entered => Vec::new(),
+            PointerPhase::Cancelled => self.released(event, true),
+            PointerPhase::Entered | PointerPhase::Left => Vec::new(),
         }
     }
 
@@ -197,7 +197,12 @@ impl GestureArena {
             return update_pair(pair, &self.contacts);
         }
         let total = difference(event.position, contact.start);
-        if !contact.gestures.contains(GestureSet::PAN) || magnitude(total) < 8.0 {
+        let threshold = if contact.gestures.contains(GestureSet::TAP) {
+            8.0
+        } else {
+            0.0
+        };
+        if !contact.gestures.contains(GestureSet::PAN) || magnitude(total) <= threshold {
             return Vec::new();
         }
         let phase = if contact.pan_started {

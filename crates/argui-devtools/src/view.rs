@@ -3,6 +3,7 @@ use argui_paint::{
     Border, ClipBehavior, Color, CornerRadii, LayerStyle, PaintStyle, QuadStyle, VectorId,
 };
 use argui_text::{TextColor, TextStyle, TextWrap};
+use argui_theme::WidgetTheme;
 use argui_ui::{
     Align, Button, ButtonStyle, Edges, Element, Inset, Interaction, LayoutStyle, Length,
     ScrollConfig, ScrollbarStyle, TextInput, TextInputStyle, VirtualList,
@@ -10,15 +11,9 @@ use argui_ui::{
 
 use crate::host::{DevtoolsHost, Tab};
 
-const BG: Color = Color::rgb(0.055, 0.065, 0.085);
-const PANEL: Color = Color::rgb(0.075, 0.09, 0.12);
-const LINE: Color = Color::rgb(0.18, 0.22, 0.29);
-const TEXT: TextColor = TextColor::rgb(0.85, 0.89, 0.95);
-const MUTED: TextColor = TextColor::rgb(0.55, 0.62, 0.72);
-const ACCENT: Color = Color::rgb(0.25, 0.72, 0.96);
 const RETAINED_TREE_LIMIT: usize = 512;
 
-pub(crate) fn host<A>(tools: &DevtoolsHost<A>, app: Element) -> Element {
+pub(crate) fn host<A>(tools: &DevtoolsHost<A>, app: Element, theme: &WidgetTheme) -> Element {
     let application = Element::container([app
         .width(Length::Percent(1.0))
         .height(Length::Percent(1.0))
@@ -28,7 +23,7 @@ pub(crate) fn host<A>(tools: &DevtoolsHost<A>, app: Element) -> Element {
     .shrink(1.0)
     .min_height(Length::Px(0.0))
     .clip(ClipBehavior::Bounds);
-    let mut toggle = toggle_button(false)
+    let mut toggle = toggle_button(false, theme)
         .absolute(Inset::top_left(14.0, 14.0))
         .z_index(30_000);
     if tools.open || tools.sheet_progress > 0.001 {
@@ -37,7 +32,7 @@ pub(crate) fn host<A>(tools: &DevtoolsHost<A>, app: Element) -> Element {
         }
         toggle = toggle.layer(LayerStyle::new(Default::default()).opacity(0.0));
     }
-    let mut children = vec![application, toggle, dock_surface(tools)];
+    let mut children = vec![application, toggle, dock_surface(tools, theme)];
     if tools.picking {
         children.push(picker_surface(tools));
     }
@@ -47,9 +42,9 @@ pub(crate) fn host<A>(tools: &DevtoolsHost<A>, app: Element) -> Element {
         .clip(ClipBehavior::Bounds)
 }
 
-fn dock_surface<A>(tools: &DevtoolsHost<A>) -> Element {
+fn dock_surface<A>(tools: &DevtoolsHost<A>, theme: &WidgetTheme) -> Element {
     let height = tools.dock_height + 6.0;
-    let surface = Element::column([splitter(), dock(tools, tools.dock_height)])
+    let surface = Element::column([splitter(theme), dock(tools, tools.dock_height, theme)])
         .keyed("__devtools-surface-content")
         .width(Length::Percent(1.0))
         .height(Length::Px(height))
@@ -63,60 +58,62 @@ fn dock_surface<A>(tools: &DevtoolsHost<A>) -> Element {
         .inspectable(false)
 }
 
-fn splitter() -> Element {
+fn splitter(theme: &WidgetTheme) -> Element {
     Element::container([])
         .keyed("__devtools-splitter")
         .height(Length::Px(6.0))
         .shrink(0.0)
-        .background(ACCENT)
+        .background(theme.primary)
         .interaction(
             Interaction::default()
                 .cursor(argui_ui::CursorIcon::NsResize)
-                .hovered(QuadStyle::solid(Color::rgb(0.45, 0.84, 1.0)))
-                .pressed(QuadStyle::solid(Color::WHITE)),
+                .hovered(QuadStyle::solid(theme.primary))
+                .pressed(QuadStyle::solid(theme.foreground)),
         )
         .inspectable(false)
 }
 
-fn dock<A>(tools: &DevtoolsHost<A>, height: f32) -> Element {
+fn dock<A>(tools: &DevtoolsHost<A>, height: f32, theme: &WidgetTheme) -> Element {
     let body = match tools.tab {
-        Tab::Elements => elements_tab(tools),
-        Tab::Profiling => profiling_tab(tools),
+        Tab::Elements => elements_tab(tools, theme),
+        Tab::Profiling => profiling_tab(tools, theme),
     };
-    Element::column([toolbar(tools), body.grow(1.0).shrink(1.0)])
+    Element::column([toolbar(tools, theme), body.grow(1.0).shrink(1.0)])
         .height(Length::Px(height))
         .shrink(0.0)
-        .background(BG)
-        .border(Border::all(1.0, LINE))
+        .background(theme.background)
+        .border(Border::all(1.0, theme.border))
         .clip(ClipBehavior::Bounds)
         .inspectable(false)
 }
 
-fn toolbar<A>(tools: &DevtoolsHost<A>) -> Element {
+fn toolbar<A>(tools: &DevtoolsHost<A>, theme: &WidgetTheme) -> Element {
     Element::row([
-        toggle_button(true),
+        toggle_button(true, theme),
         tab_button(
             "__devtools-elements",
             "Elements",
             tools.tab == Tab::Elements,
+            theme,
         ),
         tab_button(
             "__devtools-profiling",
             "Profiling",
             tools.tab == Tab::Profiling,
+            theme,
         ),
-        picker_button(tools),
-        morph_button(tools),
+        picker_button(tools, theme),
+        morph_button(tools, theme),
     ])
     .height(Length::Px(42.0))
     .shrink(0.0)
     .gap(6.0)
     .padding(Edges::symmetric(8.0, 6.0))
-    .background(PANEL)
+    .background(theme.card)
     .align(Align::Center)
 }
 
-fn picker_button<A>(tools: &DevtoolsHost<A>) -> Element {
+fn picker_button<A>(tools: &DevtoolsHost<A>, theme: &WidgetTheme) -> Element {
     icon_label_button(
         "__devtools-picker",
         tools.icons.target,
@@ -125,11 +122,12 @@ fn picker_button<A>(tools: &DevtoolsHost<A>) -> Element {
         } else {
             "Select"
         },
+        theme,
     )
     .background(if tools.picking {
-        Color::rgb(0.12, 0.32, 0.46)
+        theme.primary
     } else {
-        Color::rgb(0.10, 0.12, 0.16)
+        theme.muted
     })
 }
 
@@ -147,21 +145,21 @@ fn picker_surface<A>(tools: &DevtoolsHost<A>) -> Element {
         .inspectable(false)
 }
 
-fn morph_button<A>(tools: &DevtoolsHost<A>) -> Element {
+fn morph_button<A>(tools: &DevtoolsHost<A>, theme: &WidgetTheme) -> Element {
     Element::row([
         icon_element(tools.icons.chevron, 20.0).vector_progress(tools.morph_progress),
-        Element::text("GPU morph").text_style(text(12.0, TEXT)),
+        Element::text("GPU morph").text_style(text(12.0, theme.foreground)),
     ])
     .keyed("__devtools-morph")
     .height(Length::Px(30.0))
     .padding(Edges::symmetric(8.0, 4.0))
     .gap(5.0)
     .align(Align::Center)
-    .background(BG)
-    .interaction(Interaction::default().hovered(QuadStyle::solid(Color::rgb(0.15, 0.20, 0.27))))
+    .background(theme.background)
+    .interaction(Interaction::default().hovered(QuadStyle::solid(theme.muted)))
 }
 
-fn elements_tab<A>(tools: &DevtoolsHost<A>) -> Element {
+fn elements_tab<A>(tools: &DevtoolsHost<A>, theme: &WidgetTheme) -> Element {
     tools.inspector.with_tree(|snapshot| {
         let selected = tools.inspector.selected();
         let viewport = (tools.dock_height - 84.0).max(80.0);
@@ -182,7 +180,7 @@ fn elements_tab<A>(tools: &DevtoolsHost<A>) -> Element {
             tools.tree_offset,
             |index| {
                 let node = &snapshot.nodes[filtered.as_ref().map_or(index, |items| items[index])];
-                tree_row(node, selected == Some(node.id))
+                tree_row(node, selected == Some(node.id), theme)
             },
         );
         let search = TextInput::new(
@@ -190,12 +188,10 @@ fn elements_tab<A>(tools: &DevtoolsHost<A>) -> Element {
             &tools.search,
             "Filter elements…",
             TextInputStyle::new(
-                PaintStyle::new(
-                    QuadStyle::solid(Color::rgb(0.045, 0.055, 0.075)).radius(CornerRadii::all(5.0)),
-                ),
-                text(12.0, TEXT),
+                PaintStyle::new(QuadStyle::solid(theme.card).radius(CornerRadii::all(5.0))),
+                text(12.0, theme.foreground),
             )
-            .focused(QuadStyle::solid(Color::rgb(0.08, 0.16, 0.22))),
+            .focused(QuadStyle::solid(theme.muted)),
         )
         .build();
         Element::row([
@@ -204,7 +200,7 @@ fn elements_tab<A>(tools: &DevtoolsHost<A>) -> Element {
                 .shrink(1.0)
                 .padding(Edges::all(6.0))
                 .gap(6.0),
-            crate::style::sidebar(selected, &snapshot.nodes, tools),
+            crate::style::sidebar(selected, &snapshot.nodes, tools, theme),
         ])
         .height(Length::Percent(1.0))
     })
@@ -229,7 +225,7 @@ pub(crate) fn matches_query(node: &NodeSnapshot, query: &str) -> bool {
             .is_some_and(|key| key.to_lowercase().contains(query))
 }
 
-fn tree_row(node: &NodeSnapshot, selected: bool) -> Element {
+fn tree_row(node: &NodeSnapshot, selected: bool, theme: &WidgetTheme) -> Element {
     let identity = node
         .key
         .as_deref()
@@ -241,19 +237,31 @@ fn tree_row(node: &NodeSnapshot, selected: bool) -> Element {
         .keyed(format!("__devtools-node-{}", node.id.0))
         .padding(Edges::symmetric(8.0, 4.0))
         .background(if selected {
-            Color::rgb(0.12, 0.32, 0.46)
+            theme.primary
         } else {
-            BG
+            theme.background
         })
-        .border(Border::all(0.5, LINE))
-        .text_style(text(13.0, if selected { TextColor::WHITE } else { TEXT }))
-        .interaction(Interaction::default().hovered(QuadStyle::solid(Color::rgb(0.11, 0.15, 0.21))))
+        .border(Border::all(0.5, theme.border))
+        .text_style(text(
+            13.0,
+            if selected {
+                theme.primary_foreground
+            } else {
+                theme.foreground
+            },
+        ))
+        .interaction(Interaction::default().hovered(QuadStyle::solid(theme.muted)))
 }
 
-fn profiling_tab<A>(tools: &DevtoolsHost<A>) -> Element {
+fn profiling_tab<A>(tools: &DevtoolsHost<A>, theme: &WidgetTheme) -> Element {
     let frames = &tools.profile_frames;
     let latest = frames.last().cloned().unwrap_or_default();
-    let bars = frames.iter().rev().take(60).rev().map(frame_bar);
+    let bars = frames
+        .iter()
+        .rev()
+        .take(60)
+        .rev()
+        .map(|frame| frame_bar(frame, theme));
     Element::column([
         Element::row([
             small_button(
@@ -264,21 +272,25 @@ fn profiling_tab<A>(tools: &DevtoolsHost<A>) -> Element {
                     "Pause"
                 },
                 tools.inspector.paused(),
+                theme,
             ),
-            small_button("__devtools-clear", "Clear", false),
-            small_button("__devtools-refresh", "Refresh", false),
-            icon_label_button("__devtools-copy", tools.icons.copy, "Copy trace"),
-            metric(format!("frame {:.2} ms", millis(latest.interval))),
-            metric(format!("CPU {:.2} ms", millis(latest.total_cpu()))),
-            metric(format!(
-                "GPU {:.2} ms",
-                latest.gpu.as_ref().map_or(0.0, |gpu| millis(gpu.total))
-            )),
-            metric(format!("{} passes", latest.passes)),
-            metric(format!(
-                "{:.1} MiB",
-                latest.texture_bytes as f64 / 1_048_576.0
-            )),
+            small_button("__devtools-clear", "Clear", false, theme),
+            small_button("__devtools-refresh", "Refresh", false, theme),
+            icon_label_button("__devtools-copy", tools.icons.copy, "Copy trace", theme),
+            metric(format!("frame {:.2} ms", millis(latest.interval)), theme),
+            metric(format!("CPU {:.2} ms", millis(latest.total_cpu())), theme),
+            metric(
+                format!(
+                    "GPU {:.2} ms",
+                    latest.gpu.as_ref().map_or(0.0, |gpu| millis(gpu.total))
+                ),
+                theme,
+            ),
+            metric(format!("{} passes", latest.passes), theme),
+            metric(
+                format!("{:.1} MiB", latest.texture_bytes as f64 / 1_048_576.0),
+                theme,
+            ),
         ])
         .wrap(argui_ui::Wrap::Wrap)
         .gap(8.0),
@@ -287,16 +299,16 @@ fn profiling_tab<A>(tools: &DevtoolsHost<A>) -> Element {
             .align(Align::End)
             .gap(2.0)
             .padding(Edges::all(8.0))
-            .background(PANEL),
-        details(&latest),
-        gpu_waterfall(&latest),
-        profiling_list(frames, tools.profiling_offset),
+            .background(theme.card),
+        details(&latest, theme),
+        gpu_waterfall(&latest, theme),
+        profiling_list(frames, tools.profiling_offset, theme),
     ])
     .padding(Edges::all(12.0))
     .gap(12.0)
 }
 
-fn profiling_list(frames: &[FrameRecord], offset: f32) -> Element {
+fn profiling_list(frames: &[FrameRecord], offset: f32, theme: &WidgetTheme) -> Element {
     let ordered = frames.iter().rev().cloned().collect::<Vec<_>>();
     profiling_list_config(ordered.len()).build("__devtools-frames", offset, |index| {
         let frame = &ordered[index];
@@ -310,8 +322,12 @@ fn profiling_list(frames: &[FrameRecord], offset: f32) -> Element {
             frame.texture_bytes as f64 / 1_048_576.0,
         ))
         .padding(Edges::symmetric(7.0, 3.0))
-        .background(if index % 2 == 0 { PANEL } else { BG })
-        .text_style(text(11.0, TEXT))
+        .background(if index % 2 == 0 {
+            theme.card
+        } else {
+            theme.background
+        })
+        .text_style(text(11.0, theme.foreground))
     })
 }
 
@@ -320,18 +336,18 @@ pub(crate) fn profiling_list_config(item_count: usize) -> VirtualList {
         .scroll_config(ScrollConfig::default().scrollbar(scrollbar()))
 }
 
-fn icon_label_button(key: &str, icon: VectorId, label: &str) -> Element {
+fn icon_label_button(key: &str, icon: VectorId, label: &str, theme: &WidgetTheme) -> Element {
     Element::row([
         icon_element(icon, 16.0),
-        Element::text(label).text_style(text(12.0, TEXT)),
+        Element::text(label).text_style(text(12.0, theme.foreground)),
     ])
     .keyed(key)
     .align(Align::Center)
     .gap(6.0)
     .padding(Edges::symmetric(9.0, 6.0))
-    .background(Color::rgb(0.10, 0.12, 0.16))
+    .background(theme.muted)
     .radius(CornerRadii::all(5.0))
-    .interaction(Interaction::default().hovered(QuadStyle::solid(Color::rgb(0.16, 0.22, 0.30))))
+    .interaction(Interaction::default().hovered(QuadStyle::solid(theme.muted)))
 }
 
 fn icon_element(icon: VectorId, size: f32) -> Element {
@@ -341,7 +357,7 @@ fn icon_element(icon: VectorId, size: f32) -> Element {
         .shrink(0.0)
 }
 
-fn frame_bar(frame: &FrameRecord) -> Element {
+fn frame_bar(frame: &FrameRecord, theme: &WidgetTheme) -> Element {
     let milliseconds = millis(frame.interval).max(millis(frame.total_cpu()));
     let missed = milliseconds > 18.0;
     Element::container([])
@@ -351,12 +367,12 @@ fn frame_bar(frame: &FrameRecord) -> Element {
         .background(if missed {
             Color::rgb(1.0, 0.28, 0.24)
         } else {
-            ACCENT
+            theme.primary
         })
         .radius(CornerRadii::all(2.0))
 }
 
-fn details(frame: &FrameRecord) -> Element {
+fn details(frame: &FrameRecord, theme: &WidgetTheme) -> Element {
     Element::column([
         metric(format!(
             "model {:.2} · surface {:.2} · tree {:.2} · layout {:.2} · paint {:.2} · render {:.2} ms",
@@ -366,7 +382,7 @@ fn details(frame: &FrameRecord) -> Element {
             millis(frame.layout),
             millis(frame.paint),
             millis(frame.render_cpu)
-        )),
+        ), theme),
         metric(format!(
             "invalidation {:?} · layers {} · cached {} · offscreen {} px · damaged {} px",
             frame.update,
@@ -374,11 +390,11 @@ fn details(frame: &FrameRecord) -> Element {
             frame.cached_layers,
             frame.offscreen_pixels,
             frame.damaged_pixels,
-        )),
+        ), theme),
         metric(format!(
             "textures {} · reused {} · resize events {}",
             frame.textures, frame.reused_textures, frame.resize_events
-        )),
+        ), theme),
         metric(format!(
             "adapter {} · {} · timestamps {} · features {}",
             frame.adapter.name,
@@ -389,18 +405,21 @@ fn details(frame: &FrameRecord) -> Element {
                 "unavailable"
             },
             frame.adapter.features,
-        )),
+        ), theme),
     ])
     .gap(8.0)
 }
 
-fn gpu_waterfall(frame: &FrameRecord) -> Element {
+fn gpu_waterfall(frame: &FrameRecord, theme: &WidgetTheme) -> Element {
     let Some(gpu) = &frame.gpu else {
-        return metric(if frame.adapter.timestamp_queries {
-            "GPU results pending".into()
-        } else {
-            "GPU timestamps unavailable on this adapter".into()
-        });
+        return metric(
+            if frame.adapter.timestamp_queries {
+                "GPU results pending".into()
+            } else {
+                "GPU timestamps unavailable on this adapter".into()
+            },
+            theme,
+        );
     };
     let total = gpu.total.as_secs_f64().max(f64::EPSILON);
     let timeline = gpu.passes.iter().take(12).map(|pass| {
@@ -409,21 +428,21 @@ fn gpu_waterfall(frame: &FrameRecord) -> Element {
         Element::column([
             Element::row([
                 Element::text(pass.label.clone())
-                    .text_style(text(11.0, TEXT))
+                    .text_style(text(11.0, theme.foreground))
                     .grow(1.0),
                 Element::text(format!(
                     "{:.3} ms · {} px",
                     millis(pass.duration),
                     pass.pixels
                 ))
-                .text_style(text(11.0, TEXT)),
+                .text_style(text(11.0, theme.foreground)),
             ]),
             Element::row([
                 Element::container([]).width(Length::Percent(start as f32)),
                 Element::container([])
                     .height(Length::Px(4.0))
                     .width(Length::Percent(duration.max(0.002) as f32))
-                    .background(ACCENT)
+                    .background(theme.primary)
                     .radius(CornerRadii::all(2.0)),
             ]),
         ])
@@ -432,44 +451,48 @@ fn gpu_waterfall(frame: &FrameRecord) -> Element {
     let mut ranked = gpu.passes.iter().collect::<Vec<_>>();
     ranked.sort_by_key(|pass| std::cmp::Reverse(pass.duration));
     let ranking = ranked.into_iter().take(6).enumerate().map(|(index, pass)| {
-        metric(format!(
-            "{}. {} · {:.3} ms · {} px",
-            index + 1,
-            pass.label,
-            millis(pass.duration),
-            pass.pixels
-        ))
+        metric(
+            format!(
+                "{}. {} · {:.3} ms · {} px",
+                index + 1,
+                pass.label,
+                millis(pass.duration),
+                pass.pixels
+            ),
+            theme,
+        )
     });
     Element::column(
-        [Element::text("GPU timeline").text_style(text(11.0, MUTED))]
+        [Element::text("GPU timeline").text_style(text(11.0, theme.muted_foreground))]
             .into_iter()
             .chain(timeline)
-            .chain([Element::text("Most expensive passes").text_style(text(11.0, MUTED))])
+            .chain([Element::text("Most expensive passes")
+                .text_style(text(11.0, theme.muted_foreground))])
             .chain(ranking),
     )
     .padding(Edges::all(8.0))
     .gap(7.0)
-    .background(PANEL)
+    .background(theme.card)
 }
 
-fn toggle_button(open: bool) -> Element {
+fn toggle_button(open: bool, theme: &WidgetTheme) -> Element {
     if open {
-        small_button("__devtools-toggle", "×", true).inspectable(false)
+        small_button("__devtools-toggle", "×", true, theme).inspectable(false)
     } else {
         Button::new(
             "__devtools-toggle",
             "DevTools",
             ButtonStyle::new(
-                PaintStyle::new(QuadStyle::solid(ACCENT)),
-                text(13.0, TextColor::rgb(0.02, 0.05, 0.08)),
+                PaintStyle::new(QuadStyle::solid(theme.primary)),
+                text(13.0, theme.primary_foreground),
             )
             .layout(LayoutStyle {
                 padding: Edges::symmetric(14.0, 8.0),
                 shrink: 0.0,
                 ..LayoutStyle::default()
             })
-            .hovered(QuadStyle::solid(Color::rgb(0.48, 0.86, 1.0)))
-            .pressed(QuadStyle::solid(Color::WHITE)),
+            .hovered(QuadStyle::solid(theme.primary))
+            .pressed(QuadStyle::solid(theme.foreground)),
         )
         .build()
         .radius(CornerRadii::all(7.0))
@@ -477,34 +500,40 @@ fn toggle_button(open: bool) -> Element {
     }
 }
 
-fn tab_button(key: &str, label: &str, active: bool) -> Element {
-    small_button(key, label, active)
+fn tab_button(key: &str, label: &str, active: bool, theme: &WidgetTheme) -> Element {
+    small_button(key, label, active, theme)
 }
 
-fn small_button(key: &str, label: &str, active: bool) -> Element {
-    let base = if active {
-        Color::rgb(0.12, 0.32, 0.46)
-    } else {
-        Color::rgb(0.10, 0.12, 0.16)
-    };
+fn small_button(key: &str, label: &str, active: bool, theme: &WidgetTheme) -> Element {
+    let base = if active { theme.primary } else { theme.muted };
     Button::new(
         key,
         label,
-        ButtonStyle::new(PaintStyle::new(QuadStyle::solid(base)), text(12.0, TEXT))
-            .layout(LayoutStyle {
-                padding: Edges::symmetric(10.0, 6.0),
-                shrink: 0.0,
-                ..LayoutStyle::default()
-            })
-            .hovered(QuadStyle::solid(Color::rgb(0.16, 0.22, 0.30)))
-            .pressed(QuadStyle::solid(ACCENT)),
+        ButtonStyle::new(
+            PaintStyle::new(QuadStyle::solid(base)),
+            text(
+                12.0,
+                if active {
+                    theme.primary_foreground
+                } else {
+                    theme.foreground
+                },
+            ),
+        )
+        .layout(LayoutStyle {
+            padding: Edges::symmetric(10.0, 6.0),
+            shrink: 0.0,
+            ..LayoutStyle::default()
+        })
+        .hovered(QuadStyle::solid(theme.muted))
+        .pressed(QuadStyle::solid(theme.primary)),
     )
     .build()
     .radius(CornerRadii::all(5.0))
 }
 
-fn metric(label: String) -> Element {
-    Element::text(label).text_style(text(12.0, TEXT))
+fn metric(label: String, theme: &WidgetTheme) -> Element {
+    Element::text(label).text_style(text(12.0, theme.foreground))
 }
 
 fn text(size: f32, color: TextColor) -> TextStyle {
@@ -522,7 +551,7 @@ fn scrollbar() -> ScrollbarStyle {
         QuadStyle::solid(Color::rgb(0.30, 0.38, 0.48)).radius(CornerRadii::all(4.0)),
     )
     .width(8.0)
-    .inset(3.0)
+    .insets(argui_ui::Edges::all(3.0))
 }
 
 fn millis(duration: std::time::Duration) -> f64 {

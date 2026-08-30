@@ -17,7 +17,7 @@ pub enum PlatformEvent {
         height: u32,
     },
     ScaleFactorChanged(f64),
-    AccessibilityPreferences(crate::AccessibilityPreferences),
+    PreferencesChanged(crate::SystemPreferences),
     Pointer(PointerEvent),
     PointerScrolled(ScrollDelta),
     Keyboard(KeyInput),

@@ -13,6 +13,7 @@ pub enum Role {
     RadioButton,
     Switch,
     TextInput,
+    TextArea,
     SearchInput,
     List,
     ListItem,

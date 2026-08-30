@@ -27,7 +27,7 @@ pub use identity::{
 #[cfg(all(feature = "tray", not(target_arch = "wasm32")))]
 pub use native_tray::{NativeTray, TrayEventHandler};
 pub use preferences::{
-    AccessibilityOverrides, AccessibilityPreferences, PreferenceSource, ResolvedPreference,
+    PreferenceOverrides, PreferenceSource, ResolvedPreference, SystemPreferences,
 };
 pub use tray::{
     TrayAction, TrayConfig, TrayConfigError, TrayEvent, TrayItemId, TrayMenuItem, TrayPointerButton,

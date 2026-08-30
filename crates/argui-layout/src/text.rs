@@ -9,7 +9,7 @@ pub(super) fn content<'a>(
 ) -> Option<(Cow<'a, str>, &'a argui_text::TextStyle)> {
     match &element.kind {
         ElementKind::Text { content, style } => Some((Cow::Borrowed(content), style)),
-        ElementKind::TextInput {
+        ElementKind::TextEditor {
             placeholder,
             text,
             placeholder_text,

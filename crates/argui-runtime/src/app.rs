@@ -39,8 +39,10 @@ pub(crate) struct Application {
     pub(crate) window_key: argui_platform::WindowKey,
     exit_on_close: bool,
     initial_visible: bool,
-    accessibility_overrides: argui_platform::AccessibilityOverrides,
-    preferences: argui_platform::AccessibilityPreferences,
+    preference_overrides: argui_platform::PreferenceOverrides,
+    preferences: argui_platform::SystemPreferences,
+    theme_request: crate::ThemeRequest,
+    environment: crate::WindowEnvironment,
     pub(super) renderer_config: RendererConfig,
     window: Option<Arc<Window>>,
     #[cfg(not(target_arch = "wasm32"))]
@@ -116,8 +118,10 @@ impl Application {
             window_key: argui_platform::WindowKey::main(),
             exit_on_close: true,
             initial_visible: true,
-            accessibility_overrides: argui_platform::AccessibilityOverrides::default(),
-            preferences: argui_platform::AccessibilityPreferences::default(),
+            preference_overrides: argui_platform::PreferenceOverrides::default(),
+            preferences: argui_platform::SystemPreferences::default(),
+            theme_request: crate::ThemeRequest::default(),
+            environment: crate::WindowEnvironment::default(),
             renderer_config,
             window: None,
             #[cfg(not(target_arch = "wasm32"))]
@@ -284,6 +288,7 @@ impl Application {
         let mut clipboard = update.clipboard.clone();
         let mut scroll_request = None;
         let mut focus_request = None;
+        let mut theme_request = None;
         let mut rebuild = false;
         for event in &update.events {
             if let Some(model) = &self.model {
@@ -303,10 +308,17 @@ impl Application {
                 if effects.focus.is_some() {
                     focus_request = effects.focus;
                 }
+                if effects.theme.is_some() {
+                    theme_request = effects.theme;
+                }
             }
             (self.on_event)(RuntimeEvent::Ui(event.clone()));
         }
         let animation_changed = self.sync_animations();
+        if let Some(request) = theme_request {
+            self.apply_theme_request(request);
+            rebuild = true;
+        }
         self.pending_ui_frame.merge(&update, rebuild);
         self.pending_ui_frame.request_scroll(scroll_request);
         self.pending_ui_frame.request_focus(focus_request);
@@ -349,17 +361,21 @@ impl Application {
             self.apply_ui_update(update, window, event_loop);
             return;
         }
-        let blocked = layout
-            .scroll_regions
-            .iter()
-            .rev()
-            .any(|region| region.scrollbar_contains(point));
+        let blocked =
+            argui_ui::scrollbar_at(point, &layout.scroll_regions, &layout.hit_regions).is_some();
         let hit_regions = if blocked {
             &[]
         } else {
             layout.hit_regions.as_slice()
         };
-        let update = ui.pointer_moved(point, hit_regions);
+        let update = ui.pointer_event(
+            PointerEvent {
+                buttons: self.pointer_buttons,
+                timestamp: self.input_epoch.elapsed(),
+                ..PointerEvent::mouse(PointerPhase::Moved, point)
+            },
+            hit_regions,
+        );
         self.apply_ui_update(update, window, event_loop);
     }
 
@@ -436,11 +452,18 @@ impl Application {
         self.scroll_inertia.cancel();
         self.flush_pointer_scroll(window, event_loop);
         self.flush_scrollbar_drag(window, event_loop);
+        let point = self.pointer.unwrap_or_default();
         self.pointer = None;
         self.refresh_cursor(window);
         if let Some(ui) = &mut self.ui_tree {
-            ui.scrollbar_released();
-            let update = ui.pointer_left();
+            let update = ui.pointer_event(
+                PointerEvent {
+                    buttons: self.pointer_buttons,
+                    timestamp: self.input_epoch.elapsed(),
+                    ..PointerEvent::mouse(PointerPhase::Left, point)
+                },
+                &[],
+            );
             self.apply_ui_update(update, window, event_loop);
         }
     }
@@ -460,7 +483,16 @@ impl Application {
             return;
         };
         let placement = self.pointer.and_then(|point| {
+            let target = layout
+                .hit_regions
+                .iter()
+                .rev()
+                .find(|region| region.contains(point))?
+                .node;
             layout.text_inputs.iter().rev().find_map(|region| {
+                if region.node != target {
+                    return None;
+                }
                 let point = local_point(layout, region.node, point).unwrap_or(point);
                 region
                     .hit_position(point)
@@ -472,7 +504,9 @@ impl Application {
         };
         if state == ButtonState::Pressed
             && let Some(point) = self.pointer
-            && let Some(update) = ui.scrollbar_pressed(point, &layout.scroll_regions)
+            && let Some(region) =
+                argui_ui::scrollbar_at(point, &layout.scroll_regions, &layout.hit_regions)
+            && let Some(update) = ui.scrollbar_pressed(point, std::slice::from_ref(region))
         {
             self.apply_ui_update(update, window, event_loop);
             return;
@@ -480,13 +514,23 @@ impl Application {
         if state == ButtonState::Released && ui.scrollbar_released() {
             return;
         }
-        let update = match state {
-            ButtonState::Pressed => ui.primary_pressed(&layout.hit_regions),
-            ButtonState::Released => {
-                ui.release_text_cursor();
-                ui.primary_released()
-            }
+        if state == ButtonState::Released {
+            ui.release_text_cursor();
+        }
+        let phase = match state {
+            ButtonState::Pressed => PointerPhase::Pressed,
+            ButtonState::Released => PointerPhase::Released,
         };
+        let point = self.pointer.unwrap_or_default();
+        let update = ui.pointer_event(
+            PointerEvent {
+                button: Some(argui_core::PointerButton::Primary),
+                buttons: self.pointer_buttons,
+                timestamp: self.input_epoch.elapsed(),
+                ..PointerEvent::mouse(phase, point)
+            },
+            &layout.hit_regions,
+        );
         self.apply_ui_update(update, window, event_loop);
         if state == ButtonState::Pressed
             && let Some((node, position)) = placement

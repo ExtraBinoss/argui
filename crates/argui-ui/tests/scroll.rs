@@ -2,8 +2,9 @@ use argui_animation::{Duration, Motion, MotionState, Time, Tween};
 use argui_core::{Affine2D, Point, Rect, ScrollDelta, Size};
 use argui_paint::{ClipChain, ClipRegion};
 use argui_ui::{
-    Color, Element, QuadStyle, ScrollChaining, ScrollConfig, ScrollPolarity, ScrollRegion,
-    ScrollbarRegion, ScrollbarStyle, TreeUpdate, UiEventKind, UiTree, property,
+    Color, CursorIcon, Element, GestureSet, HitRegion, QuadStyle, ScrollChaining, ScrollConfig,
+    ScrollPolarity, ScrollRegion, ScrollbarRegion, ScrollbarStyle, TreeUpdate, UiEventKind, UiTree,
+    property, scrollbar_at,
 };
 
 fn region(node: argui_ui::NodeId, config: ScrollConfig, max_y: f32) -> ScrollRegion {
@@ -17,6 +18,19 @@ fn region(node: argui_ui::NodeId, config: ScrollConfig, max_y: f32) -> ScrollReg
         max_offset: Point::new(0.0, max_y),
         config,
         scrollbar: None,
+        interaction_order: 0,
+    }
+}
+
+fn hit_region(node: argui_ui::NodeId, bounds: Rect) -> HitRegion {
+    HitRegion {
+        node,
+        bounds,
+        transform: Affine2D::IDENTITY,
+        clips: ClipChain::from_regions([ClipRegion::new(bounds, Affine2D::IDENTITY)]),
+        focusable: false,
+        cursor: CursorIcon::Default,
+        gestures: GestureSet::NONE,
     }
 }
 
@@ -147,6 +161,44 @@ fn scrollbar_track_and_thumb_drive_the_retained_offset() {
     assert_eq!(tree.scroll_offset(node), Point::new(0.0, 1_000.0));
     assert!(tree.scrollbar_released());
     assert!(!tree.scrollbar_released());
+}
+
+#[test]
+fn scrollbar_hit_testing_follows_paint_order() {
+    let tree = UiTree::new(Element::column([
+        Element::container([]),
+        Element::container([]),
+    ]));
+    let scroll_node = tree.node_id_at(1).unwrap();
+    let overlay_node = tree.node_id_at(2).unwrap();
+    let mut scroll = region(scroll_node, ScrollConfig::default(), 100.0);
+    let style = ScrollbarStyle::new(QuadStyle::default(), QuadStyle::default());
+    scroll.scrollbar = Some(ScrollbarRegion {
+        track: scroll.bounds,
+        thumb: scroll.bounds,
+        style,
+    });
+    scroll.interaction_order = 1;
+    let point = Point::new(20.0, 20.0);
+    let scroll_hit = hit_region(scroll_node, scroll.bounds);
+
+    assert_eq!(
+        scrollbar_at(
+            point,
+            std::slice::from_ref(&scroll),
+            std::slice::from_ref(&scroll_hit),
+        )
+        .map(|region| region.node),
+        Some(scroll_node)
+    );
+    assert!(
+        scrollbar_at(
+            point,
+            std::slice::from_ref(&scroll),
+            &[scroll_hit, hit_region(overlay_node, scroll.bounds)],
+        )
+        .is_none()
+    );
 }
 
 #[test]

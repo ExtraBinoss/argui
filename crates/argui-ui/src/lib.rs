@@ -9,9 +9,11 @@ mod gesture;
 mod identity;
 mod interaction;
 mod overlay;
+mod resize;
 mod scroll;
 mod semantics;
 mod style;
+mod text_editor;
 mod text_input;
 mod traversal;
 mod tree;
@@ -41,12 +43,14 @@ pub use interaction::{
     UiEvent, UiEventKind, VisualState,
 };
 pub use overlay::{OverlayAlign, OverlayAnchor, OverlayPlacement, PlacedOverlay, PlacementSide};
+pub use resize::{Resizable, ResizeAxes, ResizeConfig, ResizeEvent, ResizeState};
 pub use scroll::{
     ScrollAxes, ScrollChaining, ScrollConfig, ScrollPolarity, ScrollRegion, ScrollbarRegion,
-    ScrollbarStyle,
+    ScrollbarStyle, scrollbar_at,
 };
 pub use style::{Align, Direction, Edges, Inset, Justify, LayoutStyle, Length, Position, Wrap};
-pub use text_input::{ClipboardRequest, TextInput, TextInputStyle};
+pub use text_editor::{TextArea, TextInput, TextInputStyle};
+pub use text_input::ClipboardRequest;
 pub use tree::{TreeUpdate, TreeUpdateStats, UiTree};
 pub use virtual_list::{MeasurementUpdate, VariableList, VirtualList, VirtualWindow};
 pub use widget::{Button, ButtonStyle};

@@ -110,7 +110,7 @@ impl MultiApplication {
             pending: Rc::clone(&self.pending),
         };
         let root = adapter
-            .view()
+            .view(crate::WindowEnvironment::default())
             .unwrap_or_else(|| Element::container(Vec::<Element>::new()));
         let callback = scoped_callback(
             key.clone(),
@@ -129,7 +129,7 @@ impl MultiApplication {
         )
         .identified(self.config.identity.clone(), key.clone())
         .initially_visible(spec.visible)
-        .accessibility_overrides(self.config.accessibility)
+        .preference_overrides(self.config.preferences)
         .shared_renderer_device(Rc::clone(&self.renderer_device));
         if let Some(proxy) = &self.event_proxy {
             runtime.set_event_proxy(proxy.clone());
@@ -432,8 +432,8 @@ struct WindowModel {
 }
 
 impl WindowModel {
-    fn view(&self) -> Option<Element> {
-        self.model.borrow().view(&self.key)
+    fn view(&self, environment: crate::WindowEnvironment) -> Option<Element> {
+        self.model.borrow().view(&self.key, environment)
     }
 
     fn record(&self, mut update: AppUpdate) -> ViewUpdate {
@@ -461,8 +461,8 @@ impl WindowModel {
 }
 
 impl Render for WindowModel {
-    fn render(&mut self, _cx: &mut Context<Self>) -> Element {
-        self.view()
+    fn render(&mut self, cx: &mut Context<Self>) -> Element {
+        self.view(cx.environment())
             .unwrap_or_else(|| Element::container(Vec::<Element>::new()))
     }
 
@@ -483,6 +483,9 @@ impl Render for WindowModel {
                 argui_ui::FocusRequest::Focus(target) => cx.request_focus(target),
                 argui_ui::FocusRequest::Clear => cx.clear_focus(),
             }
+        }
+        if let Some(request) = self.model.borrow_mut().take_theme_request(&self.key) {
+            cx.set_theme(request);
         }
     }
 

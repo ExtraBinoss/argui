@@ -77,7 +77,6 @@ impl UiTree {
         tree.sync_text_inputs();
         tree
     }
-
     #[must_use]
     pub const fn root(&self) -> &Element {
         &self.root
@@ -222,6 +221,14 @@ impl UiTree {
         self.text_inputs
             .get(node)
             .and_then(TextInputState::selection_positions)
+    }
+
+    #[must_use]
+    pub fn text_input_should_reveal_cursor(&self, node: NodeId) -> bool {
+        self.text_inputs.should_reveal_cursor(node)
+    }
+    pub fn mark_text_input_layout_clean(&mut self) {
+        self.text_inputs.clear_cursor_reveals();
     }
 
     pub fn pointer_moved(&mut self, point: Point, regions: &[HitRegion]) -> InteractionUpdate {
@@ -511,7 +518,7 @@ impl UiTree {
     }
 
     fn text_input_update(
-        &self,
+        &mut self,
         node: NodeId,
         result: crate::text_input::EditResult,
     ) -> InteractionUpdate {
@@ -533,6 +540,9 @@ impl UiTree {
                 key: self.key_for(node).map(ToOwned::to_owned),
                 kind: UiEventKind::Submitted(value),
             });
+        }
+        if result.layout {
+            self.text_inputs.request_cursor_reveal(node);
         }
         InteractionUpdate {
             events,
@@ -557,7 +567,9 @@ impl UiTree {
             .into_iter()
             .zip(self.node_ids.iter().copied())
             .filter_map(|(element, node)| match &element.kind {
-                ElementKind::TextInput { initial_value, .. } => Some((node, initial_value.clone())),
+                ElementKind::TextEditor {
+                    value, multiline, ..
+                } => Some((node, value.clone(), *multiline)),
                 _ => None,
             });
         self.text_inputs.sync(inputs);

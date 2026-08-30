@@ -7,6 +7,7 @@ mod application;
 mod clipboard;
 #[cfg(test)]
 mod entity_tests;
+mod environment;
 mod error;
 mod event;
 mod input;
@@ -16,6 +17,7 @@ mod multi;
 mod translate;
 
 pub use application::{AppCommand, AppEvent, AppModel, AppUpdate, WindowInvalidation};
+pub use environment::{ThemeRequest, WindowEnvironment};
 pub use error::RuntimeError;
 pub use event::{AnimationProfile, RuntimeEvent, WindowRuntimeEvent};
 pub use launch::{
