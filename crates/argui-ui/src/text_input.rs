@@ -11,6 +11,7 @@ pub(crate) struct TextInputState {
     anchor: Option<TextPosition>,
     preedit: Option<Preedit>,
     multiline: bool,
+    read_only: bool,
     reveal_cursor: bool,
 }
 
@@ -36,12 +37,13 @@ pub(crate) struct EditResult {
 }
 
 impl TextInputState {
-    pub fn new(value: String, multiline: bool) -> Self {
+    pub fn new(value: String, multiline: bool, read_only: bool) -> Self {
         let cursor = value.len();
         Self {
             value,
             cursor,
             multiline,
+            read_only,
             reveal_cursor: true,
             ..Self::default()
         }
@@ -51,8 +53,9 @@ impl TextInputState {
         &self.value
     }
 
-    pub fn sync(&mut self, value: &str, multiline: bool) {
+    pub fn sync(&mut self, value: &str, multiline: bool, read_only: bool) {
         self.multiline = multiline;
+        self.read_only = read_only;
         if self.value == value {
             return;
         }
@@ -137,15 +140,16 @@ impl TextInputState {
             } else {
                 self.value.len()
             }),
-            Key::Backspace => result.changed = self.backspace(),
-            Key::Delete => result.changed = self.delete(),
-            Key::Enter if self.multiline && !command => {
+            Key::Backspace if !self.read_only => result.changed = self.backspace(),
+            Key::Delete if !self.read_only => result.changed = self.delete(),
+            Key::Enter if self.multiline && !command && !self.read_only => {
                 self.insert("\n");
                 result.changed = true;
             }
+            Key::Enter if self.multiline && self.read_only => {}
             Key::Enter => result.submitted = true,
             Key::Escape => self.anchor = None,
-            _ if !input.modifiers.alt => {
+            _ if !self.read_only && !input.modifiers.alt => {
                 if let Some(text) = input.text.as_deref().filter(|text| !text.is_empty()) {
                     self.insert_input(text);
                     result.changed = true;
@@ -172,6 +176,9 @@ impl TextInputState {
     }
 
     pub fn ime(&mut self, input: ImeInput) -> EditResult {
+        if self.read_only {
+            return EditResult::default();
+        }
         let before = self.preedit.clone();
         match input {
             ImeInput::Preedit { text, cursor } => {
@@ -204,6 +211,9 @@ impl TextInputState {
     }
 
     pub fn paste(&mut self, text: &str) -> EditResult {
+        if self.read_only {
+            return EditResult::default();
+        }
         self.insert_input(text);
         EditResult {
             changed: !text.is_empty(),
@@ -241,6 +251,12 @@ impl TextInputState {
             },
             "x" => {
                 let clipboard = self.selected_text().map(ClipboardRequest::Write);
+                if self.read_only {
+                    return EditResult {
+                        clipboard,
+                        ..EditResult::default()
+                    };
+                }
                 let changed = clipboard.is_some() && self.delete_selection();
                 EditResult {
                     changed,
@@ -250,7 +266,7 @@ impl TextInputState {
                     ..EditResult::default()
                 }
             }
-            "v" => EditResult {
+            "v" if !self.read_only => EditResult {
                 clipboard: Some(ClipboardRequest::Read),
                 ..EditResult::default()
             },
@@ -369,19 +385,19 @@ impl TextInputStates {
         }
     }
 
-    pub fn sync(&mut self, inputs: impl IntoIterator<Item = (NodeId, String, bool)>) {
+    pub fn sync(&mut self, inputs: impl IntoIterator<Item = (NodeId, String, bool, bool)>) {
         let inputs = inputs.into_iter().collect::<Vec<_>>();
         self.states
-            .retain(|(node, _)| inputs.iter().any(|(id, _, _)| id == node));
+            .retain(|(node, _)| inputs.iter().any(|(id, _, _, _)| id == node));
         if self.drag.is_some_and(|node| self.get(node).is_none()) {
             self.drag = None;
         }
-        for (node, value, multiline) in inputs {
+        for (node, value, multiline, read_only) in inputs {
             if let Some(state) = self.get_mut(node) {
-                state.sync(&value, multiline);
+                state.sync(&value, multiline, read_only);
             } else {
                 self.states
-                    .push((node, TextInputState::new(value, multiline)));
+                    .push((node, TextInputState::new(value, multiline, read_only)));
             }
         }
     }

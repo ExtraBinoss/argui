@@ -2,19 +2,17 @@ use argui_core::{
     Affine2D, CaretAffinity, ImeInput, Key, KeyInput, KeyState, Modifiers, Point, Rect, Size,
     TextPosition,
 };
-use argui_paint::{ClipBehavior, ClipChain, ClipRegion, PaintStyle, QuadStyle};
+use argui_paint::{ClipChain, ClipRegion, PaintStyle, QuadStyle};
 use argui_text::TextStyle;
-use argui_ui::{
-    ClipboardRequest, CursorIcon, HitRegion, TextArea, TextInput, TextInputStyle, UiEventKind,
-    UiTree,
-};
+use argui_ui::{ClipboardRequest, CursorIcon, HitRegion, Overflow, UiEventKind, UiTree};
+use argui_widgets::{Input, InputStyle, TextArea};
 
 fn tree(value: &str) -> (UiTree, HitRegion) {
-    let input = TextInput::new(
+    let input = Input::new(
         "field",
         value,
         "placeholder",
-        TextInputStyle::new(PaintStyle::default(), TextStyle::default()),
+        InputStyle::new(PaintStyle::default(), TextStyle::default()),
     )
     .build();
     let tree = UiTree::new(input);
@@ -27,6 +25,35 @@ fn tree(value: &str) -> (UiTree, HitRegion) {
             bounds,
             transform: Affine2D::IDENTITY,
             clips: ClipChain::from_regions([ClipRegion::new(bounds, Affine2D::IDENTITY)]),
+            enabled: true,
+            focusable: true,
+            cursor: CursorIcon::Text,
+            gestures: argui_ui::GestureSet::NONE,
+            window_drag: None,
+        },
+    )
+}
+
+fn read_only_tree(value: &str) -> (UiTree, HitRegion) {
+    let input = Input::new(
+        "field",
+        value,
+        "placeholder",
+        InputStyle::new(PaintStyle::default(), TextStyle::default()),
+    )
+    .read_only(true)
+    .build();
+    let tree = UiTree::new(input);
+    let node = tree.node_id_at(0).unwrap();
+    let bounds = Rect::new(Point::default(), Size::new(300.0, 40.0));
+    (
+        tree,
+        HitRegion {
+            node,
+            bounds,
+            transform: Affine2D::IDENTITY,
+            clips: ClipChain::from_regions([ClipRegion::new(bounds, Affine2D::IDENTITY)]),
+            enabled: true,
             focusable: true,
             cursor: CursorIcon::Text,
             gestures: argui_ui::GestureSet::NONE,
@@ -104,12 +131,61 @@ fn ime_preedit_is_visible_but_only_commit_changes_the_value() {
 
 #[test]
 fn text_input_style_remains_composed_from_existing_primitives() {
-    let style = TextInputStyle::new(PaintStyle::new(QuadStyle::default()), TextStyle::default());
-    let input = TextInput::new("field", "", "hint", style).build();
+    let style = InputStyle::new(PaintStyle::new(QuadStyle::default()), TextStyle::default());
+    let input = Input::new("field", "", "hint", style).build();
     let interaction = input.interaction.as_ref().unwrap();
     assert!(interaction.focusable);
     assert_eq!(interaction.cursor, CursorIcon::Text);
     assert!(input.children.is_empty());
+}
+
+#[test]
+fn read_only_inputs_allow_navigation_selection_and_copy_without_mutation() {
+    let (mut tree, region) = read_only_tree("readonly");
+    focus(&mut tree, &region);
+    let node = region.node;
+    tree.edit_text_input(&key(Key::Home, None, Modifiers::default()));
+    tree.edit_text_input(&key(
+        Key::ArrowRight,
+        None,
+        Modifiers {
+            shift: true,
+            ..Modifiers::default()
+        },
+    ));
+    assert_eq!(tree.text_input_selection(node), Some((0, 1)));
+    let command = Modifiers {
+        control: true,
+        ..Modifiers::default()
+    };
+    assert_eq!(
+        tree.edit_text_input(&key(Key::Character("c".into()), Some("c"), command))
+            .clipboard,
+        Some(ClipboardRequest::Write("r".into()))
+    );
+    assert_eq!(
+        tree.edit_text_input(&key(Key::Character("x".into()), Some("x"), command))
+            .clipboard,
+        Some(ClipboardRequest::Write("r".into()))
+    );
+    assert_eq!(
+        tree.edit_text_input(&key(Key::Character("v".into()), Some("v"), command))
+            .clipboard,
+        None
+    );
+    tree.edit_text_input(&key(Key::Backspace, None, Modifiers::default()));
+    tree.edit_text_input(&key(
+        Key::Character("z".into()),
+        Some("z"),
+        Modifiers::default(),
+    ));
+    assert_eq!(tree.text_input_value(node), Some("readonly"));
+    assert!(!tree.paste_text("mutate").layout_changed);
+    assert!(
+        !tree
+            .ime_input(ImeInput::Commit("mutate".into()))
+            .layout_changed
+    );
 }
 
 #[test]
@@ -318,11 +394,11 @@ fn controlled_value_replaces_internal_state_only_when_it_differs() {
     let node = region.node;
     tree.paste_text(" value");
 
-    let replacement = TextInput::new(
+    let replacement = Input::new(
         "field",
         "ignored initial value",
         "new placeholder",
-        TextInputStyle::new(PaintStyle::default(), TextStyle::default()),
+        InputStyle::new(PaintStyle::default(), TextStyle::default()),
     )
     .build();
     tree.update(replacement);
@@ -330,11 +406,11 @@ fn controlled_value_replaces_internal_state_only_when_it_differs() {
     assert_eq!(tree.text_input_value(node), Some("ignored initial value"));
 
     tree.place_text_cursor(node, 7, false);
-    let same = TextInput::new(
+    let same = Input::new(
         "field",
         "ignored initial value",
         "same value",
-        TextInputStyle::new(PaintStyle::default(), TextStyle::default()),
+        InputStyle::new(PaintStyle::default(), TextStyle::default()),
     )
     .build();
     tree.update(same);
@@ -347,10 +423,11 @@ fn text_area_inserts_lines_and_command_enter_submits() {
         "notes",
         "first",
         "notes",
-        TextInputStyle::new(PaintStyle::default(), TextStyle::default()),
+        InputStyle::new(PaintStyle::default(), TextStyle::default()),
     )
     .build();
-    assert_eq!(area.paint.clip, ClipBehavior::Bounds);
+    assert_eq!(area.style.overflow.x, Overflow::Hidden);
+    assert_eq!(area.style.overflow.y, Overflow::Auto);
     assert!(area.scroll.is_some());
     let mut tree = UiTree::new(area);
     let node = tree.node_ids()[0];
@@ -360,6 +437,7 @@ fn text_area_inserts_lines_and_command_enter_submits() {
         bounds,
         transform: Affine2D::IDENTITY,
         clips: ClipChain::from_regions([ClipRegion::new(bounds, Affine2D::IDENTITY)]),
+        enabled: true,
         focusable: true,
         cursor: CursorIcon::Text,
         gestures: argui_ui::GestureSet::NONE,
@@ -386,7 +464,7 @@ fn text_area_inserts_lines_and_command_enter_submits() {
             "notes",
             "first\nsecond",
             "notes",
-            TextInputStyle::new(PaintStyle::default(), TextStyle::default()),
+            InputStyle::new(PaintStyle::default(), TextStyle::default()),
         )
         .build(),
     );

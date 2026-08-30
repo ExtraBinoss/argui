@@ -1,21 +1,20 @@
+use crate::{
+    AlignContent, AlignItems, AlignSelf, Dimension, Dimensions, Display, EffectScope,
+    FlexDirection, FlexWrap, Interaction, JustifyContent, JustifyItems, JustifySelf, LayoutStyle,
+    LengthPercentage, LengthPercentageAuto, MotionProperty, Position, PropertyBinding,
+    ScopedEffect, ScrollConfig, Sides, StateStyle, StyleTransition, VisualState, WritingDirection,
+};
 use argui_accessibility::Semantics;
 use argui_core::{Transform2D, TransformOrigin};
 use argui_paint::{
-    Border, ClipBehavior, Color, CornerRadii, Fill, ImageFit, ImageId, ImageSampling, LayerStyle,
-    PaintStyle, VectorId,
+    Border, Color, CornerRadii, Fill, ImageFit, ImageId, ImageSampling, LayerStyle, PaintStyle,
+    VectorId,
 };
 use argui_text::TextStyle;
 use std::{
     ops::{Deref, DerefMut},
-    sync::Arc,
+    rc::Rc,
 };
-
-use crate::{
-    Align, Direction, Edges, EffectScope, Inset, Interaction, Justify, LayoutStyle, Length,
-    MotionProperty, Position, PropertyBinding, ScopedEffect, ScrollConfig, StateStyle,
-    StyleTransition, VisualState, Wrap,
-};
-
 #[derive(Clone, Debug, PartialEq)]
 pub enum ElementKind {
     Container,
@@ -27,10 +26,11 @@ pub enum ElementKind {
         value: String,
         placeholder: String,
         multiline: bool,
+        read_only: bool,
         text: TextStyle,
         placeholder_text: TextStyle,
         selection: Color,
-        caret: Color,
+        caret: crate::CaretStyle,
     },
     Image {
         image: ImageId,
@@ -44,7 +44,7 @@ pub enum ElementKind {
 }
 
 #[derive(Clone, Debug)]
-pub struct Element(Arc<ElementNode>);
+pub struct Element(Rc<ElementNode>);
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ElementNode {
@@ -73,7 +73,7 @@ pub struct ElementNode {
 
 impl PartialEq for Element {
     fn eq(&self, other: &Self) -> bool {
-        Arc::ptr_eq(&self.0, &other.0) || self.0 == other.0
+        Rc::ptr_eq(&self.0, &other.0) || self.0 == other.0
     }
 }
 
@@ -87,14 +87,14 @@ impl Deref for Element {
 
 impl DerefMut for Element {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        Arc::make_mut(&mut self.0)
+        Rc::make_mut(&mut self.0)
     }
 }
 
 impl Element {
     #[must_use]
     pub fn container(children: impl IntoIterator<Item = Self>) -> Self {
-        Self(Arc::new(ElementNode {
+        Self(Rc::new(ElementNode {
             inspectable: true,
             key: None,
             kind: ElementKind::Container,
@@ -121,17 +121,32 @@ impl Element {
 
     #[must_use]
     pub fn row(children: impl IntoIterator<Item = Self>) -> Self {
-        Self::container(children).direction(Direction::Row)
+        let mut element = Self::container(children);
+        element.style.display = Display::Flex;
+        element.style.flex_direction = FlexDirection::Row;
+        element
     }
 
     #[must_use]
     pub fn column(children: impl IntoIterator<Item = Self>) -> Self {
-        Self::container(children)
+        let mut element = Self::container(children);
+        element.style.display = Display::Flex;
+        element.style.flex_direction = FlexDirection::Column;
+        element
+    }
+
+    #[must_use]
+    pub fn grid(children: impl IntoIterator<Item = Self>) -> Self {
+        let mut element = Self::container(children);
+        element.style.display = Display::Grid;
+        element.style.align_items = Some(AlignItems::STRETCH);
+        element.style.justify_items = Some(JustifyItems::STRETCH);
+        element
     }
 
     #[must_use]
     pub fn text(value: impl Into<String>) -> Self {
-        Self(Arc::new(ElementNode {
+        Self(Rc::new(ElementNode {
             inspectable: true,
             key: None,
             kind: ElementKind::Text {
@@ -162,7 +177,7 @@ impl Element {
     /// Returns true when both values share the same retained subtree.
     #[must_use]
     pub fn ptr_eq(&self, other: &Self) -> bool {
-        Arc::ptr_eq(&self.0, &other.0)
+        Rc::ptr_eq(&self.0, &other.0)
     }
 
     #[must_use]
@@ -275,56 +290,98 @@ impl Element {
     }
 
     #[must_use]
-    pub fn width(mut self, width: Length) -> Self {
-        self.style.width = width;
+    pub fn width(mut self, width: Dimension) -> Self {
+        self.style.size.width = width;
         self
     }
 
     #[must_use]
-    pub fn height(mut self, height: Length) -> Self {
-        self.style.height = height;
+    pub fn height(mut self, height: Dimension) -> Self {
+        self.style.size.height = height;
         self
     }
 
     #[must_use]
-    pub fn min_width(mut self, width: Length) -> Self {
-        self.style.min_width = width;
+    pub fn min_width(mut self, width: LengthPercentageAuto) -> Self {
+        self.style.min_size.width = width;
         self
     }
 
     #[must_use]
-    pub fn min_height(mut self, height: Length) -> Self {
-        self.style.min_height = height;
+    pub fn min_height(mut self, height: LengthPercentageAuto) -> Self {
+        self.style.min_size.height = height;
         self
     }
 
     #[must_use]
-    pub fn max_width(mut self, width: Length) -> Self {
-        self.style.max_width = width;
+    pub fn max_height(mut self, height: LengthPercentageAuto) -> Self {
+        self.style.max_size.height = height;
         self
     }
 
     #[must_use]
-    pub fn direction(mut self, direction: Direction) -> Self {
-        self.style.direction = direction;
+    pub fn max_width(mut self, width: LengthPercentageAuto) -> Self {
+        self.style.max_size.width = width;
         self
     }
 
     #[must_use]
-    pub fn wrap(mut self, wrap: Wrap) -> Self {
-        self.style.wrap = wrap;
+    pub fn display(mut self, display: Display) -> Self {
+        self.style.display = display;
         self
     }
 
     #[must_use]
-    pub fn align(mut self, align: Align) -> Self {
-        self.style.align = align;
+    pub fn writing_direction(mut self, direction: WritingDirection) -> Self {
+        self.style.writing_direction = direction;
         self
     }
 
     #[must_use]
-    pub fn justify(mut self, justify: Justify) -> Self {
-        self.style.justify = justify;
+    pub fn flex_direction(mut self, direction: FlexDirection) -> Self {
+        self.style.flex_direction = direction;
+        self
+    }
+
+    #[must_use]
+    pub fn flex_wrap(mut self, wrap: FlexWrap) -> Self {
+        self.style.flex_wrap = wrap;
+        self
+    }
+
+    #[must_use]
+    pub fn align_items(mut self, alignment: AlignItems) -> Self {
+        self.style.align_items = Some(alignment);
+        self
+    }
+
+    #[must_use]
+    pub fn align_self(mut self, alignment: AlignSelf) -> Self {
+        self.style.align_self = Some(alignment);
+        self
+    }
+
+    #[must_use]
+    pub fn justify_items(mut self, alignment: JustifyItems) -> Self {
+        self.style.justify_items = Some(alignment);
+        self
+    }
+
+    #[must_use]
+    pub fn justify_self(mut self, alignment: JustifySelf) -> Self {
+        self.style.justify_self = Some(alignment);
+        self
+    }
+
+    #[must_use]
+    pub fn align_content(mut self, alignment: AlignContent) -> Self {
+        self.style.align_content = Some(alignment);
+        self
+    }
+
+    #[must_use]
+    pub fn justify_content(mut self, alignment: JustifyContent) -> Self {
+        self.style.justify_content = Some(alignment);
         self
     }
 
@@ -335,7 +392,7 @@ impl Element {
     }
 
     #[must_use]
-    pub fn absolute(mut self, inset: Inset) -> Self {
+    pub fn absolute(mut self, inset: Sides<LengthPercentageAuto>) -> Self {
         self.style.position = Position::Absolute;
         self.style.inset = inset;
         self
@@ -348,7 +405,12 @@ impl Element {
         placement: crate::OverlayPlacement,
     ) -> Self {
         self.style.position = Position::Absolute;
-        self.style.inset = Inset::default();
+        self.style.inset = Sides {
+            left: LengthPercentageAuto::auto(),
+            right: LengthPercentageAuto::auto(),
+            top: LengthPercentageAuto::auto(),
+            bottom: LengthPercentageAuto::auto(),
+        };
         self.overlay = Some(crate::OverlayAnchor::new(key, placement));
         self
     }
@@ -360,26 +422,48 @@ impl Element {
     }
 
     #[must_use]
-    pub fn padding(mut self, padding: Edges) -> Self {
+    pub fn margin(mut self, margin: Sides<LengthPercentageAuto>) -> Self {
+        self.style.margin = margin;
+        self
+    }
+
+    #[must_use]
+    pub fn padding(mut self, padding: Sides<LengthPercentage>) -> Self {
         self.style.padding = padding;
         self
     }
 
     #[must_use]
     pub fn gap(mut self, gap: f32) -> Self {
-        self.style.gap = gap;
+        let gap = LengthPercentage::length(gap);
+        self.style.gap = Dimensions {
+            width: gap,
+            height: gap,
+        };
+        self
+    }
+
+    #[must_use]
+    pub fn row_gap(mut self, gap: f32) -> Self {
+        self.style.gap.height = LengthPercentage::length(gap);
+        self
+    }
+
+    #[must_use]
+    pub fn column_gap(mut self, gap: f32) -> Self {
+        self.style.gap.width = LengthPercentage::length(gap);
         self
     }
 
     #[must_use]
     pub fn grow(mut self, grow: f32) -> Self {
-        self.style.grow = grow;
+        self.style.flex_grow = grow;
         self
     }
 
     #[must_use]
     pub fn shrink(mut self, shrink: f32) -> Self {
-        self.style.shrink = shrink;
+        self.style.flex_shrink = shrink;
         self
     }
 
@@ -404,12 +488,6 @@ impl Element {
     #[must_use]
     pub fn paint_opacity(mut self, opacity: f32) -> Self {
         self.paint.quad.opacity = opacity;
-        self
-    }
-
-    #[must_use]
-    pub fn clip(mut self, clip: ClipBehavior) -> Self {
-        self.paint.clip = clip;
         self
     }
 
@@ -501,9 +579,11 @@ impl Element {
     }
 
     #[must_use]
-    pub fn scrollable(mut self, config: ScrollConfig) -> Self {
+    pub fn scroll_config(mut self, config: ScrollConfig) -> Self {
+        if let Some(scrollbar) = &config.scrollbar {
+            self.style.scrollbar_width = scrollbar.gutter_width();
+        }
         self.scroll = Some(config);
-        self.paint.clip = ClipBehavior::Bounds;
         self
     }
 

@@ -13,6 +13,7 @@ path = "src/main.rs"
 
 [dependencies]
 argui = { workspace = true, features = ["tray"] }
+argui-devtools.workspace = true
 argui-showcase.workspace = true
 
 [build-dependencies]

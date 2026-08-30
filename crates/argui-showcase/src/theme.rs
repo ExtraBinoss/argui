@@ -1,8 +1,30 @@
-use argui_core::Size;
+use argui_core::{Color, Size};
 use argui_paint::{Border, CornerRadii};
 use argui_text::{TextStyle, TextWrap};
-use argui_theme::{ThemeMode, WidgetAssets, WidgetTheme};
-use argui_ui::{Edges, Element, Length, Resizable, TextArea, TextInput};
+use argui_theme::ThemeMode;
+use argui_ui::{Element, LengthPercentageAuto, Resizable, Sides, auto, length, percent};
+use argui_widgets::{Input, TablerIcon, TextArea, WidgetAssets, WidgetTheme};
+
+pub(super) const PRIMARIES: [(&str, Color); 5] = [
+    ("Primary: blue", Color::rgb(0.10, 0.45, 0.91)),
+    ("Primary: violet", Color::rgb(0.49, 0.23, 0.93)),
+    ("Primary: rose", Color::rgb(0.88, 0.11, 0.28)),
+    ("Primary: orange", Color::rgb(0.92, 0.35, 0.05)),
+    ("Primary: emerald", Color::rgb(0.02, 0.59, 0.41)),
+];
+
+pub(super) fn primary_label(index: usize) -> &'static str {
+    PRIMARIES[index].0
+}
+
+pub(super) fn top_right(top: f32, right: f32) -> Sides<LengthPercentageAuto> {
+    Sides {
+        left: auto(),
+        right: length(right),
+        top: length(top),
+        bottom: auto(),
+    }
+}
 
 pub(super) fn text_input(
     key: &str,
@@ -10,7 +32,7 @@ pub(super) fn text_input(
     placeholder: &str,
     widgets: &WidgetTheme,
 ) -> Element {
-    TextInput::new(key, value, placeholder, widgets.text_input.clone()).build()
+    Input::new(key, value, placeholder, widgets.input.clone()).build()
 }
 
 pub(super) fn editor(
@@ -19,12 +41,12 @@ pub(super) fn editor(
     size: Size,
     value: &str,
 ) -> Element {
-    let mut style = widgets.text_input.clone();
-    style.layout.height = Length::Percent(1.0);
-    style.layout.padding = Edges::all(14.0);
-    let scrollbar = widgets.scrollbar.clone().insets(Edges {
+    let mut style = widgets.input.clone();
+    style.layout.size.height = percent(1.0);
+    style.layout.padding = Sides::length(14.0);
+    let scrollbar = widgets.scrollbar.clone().insets(Sides {
         bottom: 22.0,
-        ..Edges::all(4.0)
+        ..Sides::length(4.0)
     });
     let area = TextArea::new("notes", value, "Write notes…", style)
         .scrollbar(scrollbar)
@@ -38,10 +60,16 @@ pub(super) fn editor(
             wrap: TextWrap::None,
             ..TextStyle::default()
         }),
-        Resizable::new(size, area, "notes-resize", assets.resize_handle()).build(),
+        Resizable::new(
+            size,
+            area,
+            "notes-resize",
+            assets.icon(TablerIcon::Resize, 18.0),
+        )
+        .build(),
     ])
     .gap(10.0)
-    .padding(Edges::all(16.0))
+    .padding(Sides::length(16.0))
     .background(widgets.card)
     .border(Border::all(1.0, widgets.border))
     .radius(CornerRadii::all(10.0))

@@ -2,9 +2,10 @@ use argui_core::{Affine2D, Point, Rect, Size};
 use argui_paint::{ClipChain, PaintStyle};
 use argui_text::TextStyle;
 use argui_ui::{
-    Button, ButtonStyle, CursorIcon, Element, FocusRequest, GestureSet, HitRegion, Interaction,
-    Role, SemanticAction, SemanticValue, Semantics, TextInput, TextInputStyle, TreeUpdate, UiTree,
+    CursorIcon, Display, Element, FocusRequest, GestureSet, HitRegion, Interaction, Role,
+    SemanticAction, SemanticValue, Semantics, TreeUpdate, UiTree,
 };
+use argui_widgets::{Button, ButtonStyle, Input, InputStyle};
 
 #[test]
 fn semantic_changes_do_not_dirty_layout_or_paint() {
@@ -64,6 +65,7 @@ fn focus_falls_back_to_the_root_when_a_focused_node_is_semantically_hidden() {
         bounds: Rect::new(Point::default(), Size::new(100.0, 30.0)),
         transform: Affine2D::IDENTITY,
         clips: ClipChain::default(),
+        enabled: true,
         focusable: true,
         cursor: CursorIcon::Auto,
         gestures: GestureSet::NONE,
@@ -93,9 +95,26 @@ fn structural_containers_promote_semantic_descendants() {
 }
 
 #[test]
+fn display_none_removes_the_entire_semantic_subtree() {
+    let tree = UiTree::new(Element::column([
+        Element::container([Element::text("Invisible")])
+            .display(Display::None)
+            .semantics(Semantics::new(Role::Group).label("Hidden group")),
+        Element::text("Visible"),
+    ]));
+    let semantics = tree.semantic_tree(&[], 1.0);
+
+    assert_eq!(semantics.nodes.len(), 2);
+    assert_eq!(
+        semantics.nodes[1].semantics.label.as_deref(),
+        Some("Visible")
+    );
+}
+
+#[test]
 fn text_inputs_publish_retained_values_and_disabled_state() {
-    let style = TextInputStyle::new(PaintStyle::default(), TextStyle::default());
-    let input = TextInput::new("query", "Argui", "Search", style)
+    let style = InputStyle::new(PaintStyle::default(), TextStyle::default());
+    let input = Input::new("query", "Argui", "Search", style)
         .build()
         .interaction(Interaction::default().focusable(true).enabled(false));
     let tree = UiTree::new(input);

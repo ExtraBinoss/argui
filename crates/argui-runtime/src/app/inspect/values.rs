@@ -2,8 +2,8 @@ use argui_core::Transform2D;
 use argui_inspect::{
     PropertySnapshot, StyleField, StyleLength, StyleProperty, StyleUnit, StyleValue,
 };
-use argui_paint::{ClipBehavior, Fill, Filter, LayerStyle};
-use argui_ui::{Element, Length};
+use argui_paint::{Fill, Filter, LayerStyle};
+use argui_ui::{Dimension, Element, ExpandedDimension, Overflow};
 
 pub(super) fn properties(element: &Element) -> Vec<PropertySnapshot> {
     StyleProperty::ALL
@@ -21,12 +21,15 @@ fn authored(element: &Element, property: StyleProperty) -> bool {
         StyleProperty::Background => element.paint.quad.background.is_some(),
         StyleProperty::Border => element.paint.quad.border.is_some(),
         StyleProperty::Opacity => element.paint.quad.opacity != 1.0,
-        StyleProperty::Clip => element.paint.clip != ClipBehavior::None,
+        StyleProperty::Overflow => {
+            element.style.overflow.x != Overflow::Visible
+                || element.style.overflow.y != Overflow::Visible
+        }
         StyleProperty::Transform => element.transform != Transform2D::IDENTITY,
         StyleProperty::Layer => element.layer.is_some(),
         StyleProperty::Effects => !element.effects.is_empty(),
-        StyleProperty::Width => element.style.width != Length::Auto,
-        StyleProperty::Height => element.style.height != Length::Auto,
+        StyleProperty::Width => element.style.size.width != Dimension::auto(),
+        StyleProperty::Height => element.style.size.height != Dimension::auto(),
     }
 }
 
@@ -35,15 +38,18 @@ pub(super) fn property_value(element: &Element, property: StyleProperty) -> Styl
         StyleProperty::Background => background(element),
         StyleProperty::Border => border(element),
         StyleProperty::Opacity => StyleValue::Number(element.paint.quad.opacity),
-        StyleProperty::Clip => StyleValue::Choice(format!("{:?}", element.paint.clip)),
+        StyleProperty::Overflow => StyleValue::Choice(format!(
+            "x: {:?}, y: {:?}",
+            element.style.overflow.x, element.style.overflow.y
+        )),
         StyleProperty::Transform => transform(element),
         StyleProperty::Layer => element.layer.as_ref().map_or_else(
             || StyleValue::Summary("none".into()),
             |layer| StyleValue::Parameters(layer_fields("", layer)),
         ),
         StyleProperty::Effects => effects(element),
-        StyleProperty::Width => StyleValue::Length(length_value(element.style.width)),
-        StyleProperty::Height => StyleValue::Length(length_value(element.style.height)),
+        StyleProperty::Width => StyleValue::Length(length_value(element.style.size.width)),
+        StyleProperty::Height => StyleValue::Length(length_value(element.style.size.height)),
     }
 }
 
@@ -107,17 +113,18 @@ fn effects(element: &Element) -> StyleValue {
     }
 }
 
-fn length_value(length: Length) -> StyleLength {
-    match length {
-        Length::Auto => StyleLength::default(),
-        Length::Px(value) => StyleLength {
+fn length_value(length: Dimension) -> StyleLength {
+    match length.expand() {
+        ExpandedDimension::Auto => StyleLength::default(),
+        ExpandedDimension::Length(value) => StyleLength {
             value,
             unit: StyleUnit::Px,
         },
-        Length::Percent(value) => StyleLength {
+        ExpandedDimension::Percent(value) => StyleLength {
             value,
             unit: StyleUnit::Percent,
         },
+        _ => StyleLength::default(),
     }
 }
 

@@ -13,8 +13,7 @@ pub use effect::{
     LayerStyle, ProfileDomain, Refraction, RenderObjectId, Shadow,
 };
 pub use style::{
-    Border, BorderWidths, ClipBehavior, CornerRadii, Fill, ImagePrimitive, PaintStyle, Quad,
-    QuadStyle,
+    Border, BorderWidths, CornerRadii, Fill, ImagePrimitive, PaintStyle, Quad, QuadStyle,
 };
 pub use vector::{VectorAsset, VectorId, VectorPrimitive, VectorVertex};
 pub use visual::{

@@ -5,8 +5,8 @@ use argui_paint::{
     LayerMask, LayerStyle, LinearGradient, RadialGradient, Shadow,
 };
 use argui_ui::{
-    CursorIcon, Element, GestureSet, HitRegion, Interaction, Length, PropertyKey, StateStyle,
-    StyleTransition, TransitionDirection, TransitionRule, TreeUpdate, UiTree, VisualState,
+    CursorIcon, Element, GestureSet, HitRegion, Interaction, PropertyKey, StateStyle,
+    StyleTransition, TransitionDirection, TransitionRule, TreeUpdate, UiTree, VisualState, length,
     property,
 };
 
@@ -16,6 +16,7 @@ fn region(node: argui_ui::NodeId) -> HitRegion {
         bounds: Rect::new(Point::default(), Size::new(100.0, 40.0)),
         transform: Affine2D::IDENTITY,
         clips: ClipChain::default(),
+        enabled: true,
         focusable: true,
         cursor: CursorIcon::Pointer,
         gestures: GestureSet::NONE,
@@ -115,9 +116,41 @@ fn composed_and_inherited_states_keep_each_property() {
 }
 
 #[test]
+fn focus_overrides_hover_without_waiting_for_pointer_exit() {
+    let focused = Color::rgb(0.0, 0.4, 1.0);
+    let element = Element::container([])
+        .border(argui_paint::Border::all(1.0, black()))
+        .interaction(Interaction::default().focusable(true))
+        .state(
+            VisualState::Hovered,
+            StateStyle::new().set(property::BorderColor, Color::WHITE),
+        )
+        .state(
+            VisualState::Focused,
+            StateStyle::new().set(property::BorderColor, focused),
+        );
+    let mut tree = UiTree::new(element.clone());
+    let node = tree.node_ids()[0];
+    let regions = [region(node)];
+
+    tree.pointer_moved(Point::new(10.0, 10.0), &regions);
+    assert_eq!(
+        tree.resolved_quad(node, &element).border.unwrap().color,
+        Color::WHITE
+    );
+    tree.primary_pressed(&regions);
+    assert!(tree.visual_states(node).contains(VisualState::Hovered));
+    assert!(tree.visual_states(node).contains(VisualState::Focused));
+    assert_eq!(
+        tree.resolved_quad(node, &element).border.unwrap().color,
+        focused
+    );
+}
+
+#[test]
 fn layout_states_invalidate_layout_and_reduced_motion_snaps() {
     let element = Element::container([])
-        .width(Length::Px(100.0))
+        .width(length(100.0))
         .interaction(Interaction::default())
         .state(
             VisualState::Hovered,
@@ -130,8 +163,8 @@ fn layout_states_invalidate_layout_and_reduced_motion_snaps() {
     let update = tree.pointer_moved(Point::new(10.0, 10.0), &[region(node)]);
     assert!(update.layout_changed);
     assert_eq!(
-        tree.resolved_layout_style(node, &element).width,
-        Length::Px(200.0)
+        tree.resolved_layout_style(node, &element).size.width,
+        length(200.0)
     );
     assert!(!tree.wants_animation_frame());
 }

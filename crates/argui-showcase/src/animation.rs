@@ -4,8 +4,8 @@ use argui_animation::{
 };
 use argui_paint::{Border, Color, CornerRadii};
 use argui_text::TextWrap;
-use argui_theme::WidgetTheme;
-use argui_ui::{Align, Edges, Element, Length, Wrap, property};
+use argui_ui::{AlignItems, Element, FlexWrap, Sides, length, percent, property};
+use argui_widgets::WidgetTheme;
 
 use crate::{StateShowcase, button, text_style};
 
@@ -27,8 +27,8 @@ impl StateShowcase {
                     TextWrap::None,
                 )),
                 Element::container([])
-                    .width(Length::Px(46.0))
-                    .height(Length::Px(22.0))
+                    .width(length(46.0))
+                    .height(length(22.0))
                     .background(self.animated_color)
                     .bind(
                         property::BackgroundColor,
@@ -36,12 +36,12 @@ impl StateShowcase {
                     )
                     .radius(CornerRadii::all(11.0)),
             ])
-            .wrap(Wrap::Wrap)
+            .flex_wrap(FlexWrap::Wrap)
             .gap(12.0)
-            .align(Align::Center),
+            .align_items(AlignItems::CENTER),
             Element::container([])
-                .height(Length::Px(68.0))
-                .width(Length::Percent(1.0))
+                .height(length(68.0))
+                .width(percent(1.0))
                 .background(self.animated_color)
                 .bind(
                     property::BackgroundColor,
@@ -56,11 +56,11 @@ impl StateShowcase {
                 button("animation-finish", "Finish", widgets, false),
                 button("animation-cancel", "Cancel", widgets, false),
             ])
-            .wrap(Wrap::Wrap)
+            .flex_wrap(FlexWrap::Wrap)
             .gap(10.0),
         ])
         .gap(12.0)
-        .padding(Edges::all(16.0))
+        .padding(Sides::length(16.0))
         .background(widgets.card)
         .border(Border::all(1.0, widgets.border))
         .radius(CornerRadii::all(10.0))

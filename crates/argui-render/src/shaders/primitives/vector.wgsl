@@ -1,5 +1,5 @@
 struct Viewport { size: vec2<f32>, origin: vec2<f32> }
-struct Clip { inverse_a: vec4<f32>, inverse_b: vec4<f32>, bounds: vec4<f32> }
+struct Clip { inverse_a: vec4<f32>, inverse_b: vec4<f32>, bounds: vec4<f32>, radii: vec4<f32> }
 @group(0) @binding(0) var<uniform> viewport: Viewport;
 @group(0) @binding(1) var<storage, read> clips: array<Clip>;
 
@@ -9,6 +9,14 @@ struct Output {
     @location(1) @interpolate(flat) clip_meta: vec2<u32>,
     @location(2) barycentric: vec3<f32>,
     @location(3) @interpolate(flat) boundary: vec3<f32>,
+}
+
+fn rounded_distance(point: vec2<f32>, size: vec2<f32>, radii: vec4<f32>) -> f32 {
+    var radius = select(radii.z, radii.w, point.x < size.x * 0.5);
+    if point.y < size.y * 0.5 { radius = select(radii.y, radii.x, point.x < size.x * 0.5); }
+    radius = clamp(radius, 0.0, min(size.x, size.y) * 0.5);
+    let offset = abs(point - size * 0.5) - max(size * 0.5 - vec2(radius), vec2(0.0));
+    return length(max(offset, vec2(0.0))) + min(max(offset.x, offset.y), 0.0) - radius;
 }
 
 @vertex
@@ -39,14 +47,16 @@ fn vertex(
 @fragment
 fn fragment(input: Output) -> @location(0) vec4<f32> {
     let pixel = input.position.xy + viewport.origin;
+    var clip_coverage = 1.0;
     for (var offset = 0u; offset < input.clip_meta.y; offset++) {
         let clip = clips[input.clip_meta.x + offset];
         let local = vec2(
             clip.inverse_a.x * pixel.x + clip.inverse_a.z * pixel.y + clip.inverse_b.x,
             clip.inverse_a.y * pixel.x + clip.inverse_a.w * pixel.y + clip.inverse_b.y,
         );
-        if local.x < clip.bounds.x || local.y < clip.bounds.y ||
-           local.x >= clip.bounds.x + clip.bounds.z || local.y >= clip.bounds.y + clip.bounds.w { discard; }
+        let clip_distance = rounded_distance(local - clip.bounds.xy, clip.bounds.zw, clip.radii);
+        let clip_width = max(fwidth(clip_distance), 0.75);
+        clip_coverage *= 1.0 - smoothstep(-clip_width, clip_width, clip_distance);
     }
     let width = max(fwidth(input.barycentric), vec3(0.0001));
     let edge_distance = input.barycentric / width;
@@ -54,5 +64,5 @@ fn fragment(input: Output) -> @location(0) vec4<f32> {
     let boundary_distance = select(outside, edge_distance, input.boundary > vec3(0.5));
     let distance = min(boundary_distance.x, min(boundary_distance.y, boundary_distance.z));
     let coverage = clamp(distance + 0.5, 0.0, 1.0);
-    return vec4(input.color.rgb, input.color.a * coverage);
+    return vec4(input.color.rgb, input.color.a * coverage * clip_coverage);
 }

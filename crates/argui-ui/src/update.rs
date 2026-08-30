@@ -18,7 +18,6 @@ pub(crate) fn classify_update(
     if old.key != new.key
         || kind_changes_layout(&old.kind, &new.kind)
         || old.style != new.style
-        || old.paint.clip != new.paint.clip
         || old.scroll.is_some() != new.scroll.is_some()
         || old.overlay != new.overlay
         || old.children.len() != new.children.len()

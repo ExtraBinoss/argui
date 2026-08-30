@@ -40,6 +40,7 @@ fn region_at(node: argui_ui::NodeId, x: f32, focusable: bool) -> HitRegion {
             Rect::new(Point::new(x + 10.0, 10.0), Size::new(70.0, 40.0)),
             Affine2D::IDENTITY,
         )]),
+        enabled: true,
         focusable,
         cursor: CursorIcon::Auto,
         gestures: argui_ui::GestureSet::NONE,
@@ -193,6 +194,28 @@ fn blocker_regions_occlude_interactions_behind_overlays() {
     assert_eq!(tree.visual_states(behind), VisualStates::NONE);
     assert!(tree.visual_states(overlay).contains(VisualState::Hovered));
     assert!(!Interaction::blocker().focusable);
+}
+
+#[test]
+fn disabled_regions_occlude_controls_without_receiving_pointer_actions() {
+    let mut tree = UiTree::new(Element::row([
+        interactive("behind"),
+        interactive("disabled"),
+    ]));
+    let behind = tree.node_id_at(1).unwrap();
+    let disabled = tree.node_id_at(2).unwrap();
+    let mut disabled_region = region_at(disabled, 10.0, false);
+    disabled_region.enabled = false;
+    let regions = [region_at(behind, 10.0, true), disabled_region];
+
+    let moved = tree.pointer_moved(Point::new(30.0, 20.0), &regions);
+    let pressed = tree.primary_pressed(&regions);
+
+    assert!(moved.events.is_empty());
+    assert!(pressed.events.is_empty());
+    assert_eq!(tree.visual_states(behind), VisualStates::NONE);
+    assert_eq!(tree.visual_states(disabled), VisualStates::NONE);
+    assert_eq!(tree.focused_node(), None);
 }
 
 #[test]

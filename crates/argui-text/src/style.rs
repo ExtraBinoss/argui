@@ -1,4 +1,4 @@
-use argui_core::Rect;
+use argui_core::{Rect, Size};
 
 pub use argui_core::Color as TextColor;
 
@@ -20,6 +20,24 @@ pub enum TextWrap {
     WordOrGlyph,
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+pub enum TextAlign {
+    #[default]
+    Start,
+    End,
+    Left,
+    Right,
+    Center,
+    Justify,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct TextMeasurement {
+    pub size: Size,
+    pub first_baseline: Option<f32>,
+    pub last_baseline: Option<f32>,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct TextStyle {
     pub font_size: f32,
@@ -28,6 +46,7 @@ pub struct TextStyle {
     pub family: FontFamily,
     pub weight: u16,
     pub wrap: TextWrap,
+    pub align: TextAlign,
 }
 
 impl Default for TextStyle {
@@ -39,6 +58,7 @@ impl Default for TextStyle {
             family: FontFamily::SansSerif,
             weight: 400,
             wrap: TextWrap::WordOrGlyph,
+            align: TextAlign::Start,
         }
     }
 }
@@ -90,6 +110,12 @@ impl TextBlock {
     #[must_use]
     pub const fn weight(mut self, weight: u16) -> Self {
         self.style.weight = weight;
+        self
+    }
+
+    #[must_use]
+    pub const fn align(mut self, align: TextAlign) -> Self {
+        self.style.align = align;
         self
     }
 

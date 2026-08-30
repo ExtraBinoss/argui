@@ -1,10 +1,10 @@
 use argui_paint::{Border, Color, CornerRadii, QuadStyle};
 use argui_text::TextWrap;
-use argui_theme::WidgetTheme;
 use argui_ui::{
-    Edges, Element, Interaction, ScrollConfig, ScrollPolarity, ScrollbarPartStyle, ScrollbarStyle,
-    StateStyle, VirtualList, VisualState,
+    Element, Interaction, ScrollConfig, ScrollPolarity, ScrollbarPartStyle, ScrollbarStyle, Sides,
+    StateStyle, VirtualList, VisualState, sides,
 };
+use argui_widgets::WidgetTheme;
 
 use super::{StateShowcase, text_style};
 
@@ -34,7 +34,7 @@ impl StateShowcase {
             ScrollbarPartStyle::new(QuadStyle::solid(thumb).radius(CornerRadii::all(5.0))),
         )
         .width(10.0)
-        .insets(Edges::all(5.0))
+        .insets(Sides::length(5.0))
         .min_thumb(30.0)
     }
 
@@ -63,7 +63,7 @@ impl StateShowcase {
                 Element::text(format!("Row #{index:07} / 1,000,000"))
                     .keyed(format!("row-{index}"))
                     .text_style(text_style(15.0, widgets.foreground, 500, TextWrap::None))
-                    .padding(Edges::symmetric(12.0, 8.0))
+                    .padding(sides(12.0, 8.0))
                     .background(background)
                     .interaction(Interaction::default())
                     .state(

@@ -1,6 +1,6 @@
 use argui_core::{Point, Rect, Size};
 
-use crate::Inset;
+use crate::{LengthPercentageAuto, Sides};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct OverlayAnchor {
@@ -145,11 +145,13 @@ pub struct PlacedOverlay {
 
 impl PlacedOverlay {
     #[must_use]
-    pub fn inset_from(self, containing_block: Rect) -> Inset {
-        Inset::top_left(
-            self.bounds.origin.y - containing_block.origin.y,
-            self.bounds.origin.x - containing_block.origin.x,
-        )
+    pub fn inset_from(self, containing_block: Rect) -> Sides<LengthPercentageAuto> {
+        Sides {
+            left: LengthPercentageAuto::length(self.bounds.origin.x - containing_block.origin.x),
+            right: LengthPercentageAuto::auto(),
+            top: LengthPercentageAuto::length(self.bounds.origin.y - containing_block.origin.y),
+            bottom: LengthPercentageAuto::auto(),
+        }
     }
 }
 

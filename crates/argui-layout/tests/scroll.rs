@@ -4,8 +4,8 @@ use argui_layout::LayoutEngine;
 use argui_paint::{CornerRadii, DisplayCommand, LayerStyle, QuadStyle};
 use argui_text::TextEngine;
 use argui_ui::{
-    Color, Edges, Element, Length, ScrollConfig, ScrollbarPartStyle, ScrollbarStyle, StateStyle,
-    StyleTransition, Transition, UiTree, VisualState, property,
+    Axes, Color, Element, Overflow, ScrollConfig, ScrollbarPartStyle, ScrollbarStyle, Sides,
+    StateStyle, StyleTransition, Transition, UiTree, VisualState, length, property,
 };
 
 const NOTO_SANS: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
@@ -16,13 +16,17 @@ fn text_engine() -> TextEngine {
 
 fn content(scrollbar: ScrollbarStyle) -> Element {
     Element::column([
-        Element::container([]).height(Length::Px(100.0)).shrink(0.0),
-        Element::container([]).height(Length::Px(200.0)).shrink(0.0),
+        Element::container([]).height(length(100.0)).shrink(0.0),
+        Element::container([]).height(length(200.0)).shrink(0.0),
     ])
     .keyed("scroll")
-    .width(Length::Px(200.0))
-    .height(Length::Px(100.0))
-    .scrollable(ScrollConfig::default().scrollbar(scrollbar))
+    .width(length(200.0))
+    .height(length(100.0))
+    .overflow(Axes {
+        x: Overflow::Hidden,
+        y: Overflow::Auto,
+    })
+    .scroll_config(ScrollConfig::default().scrollbar(scrollbar))
     .layer(LayerStyle::new(Default::default()).opacity(0.8))
 }
 
@@ -35,7 +39,7 @@ fn scrollbar_is_regular_paint_with_geometry_from_the_scroll_state() {
         ScrollbarPartStyle::new(QuadStyle::solid(Color::WHITE).radius(CornerRadii::all(4.0))),
     )
     .width(8.0)
-    .insets(Edges::all(4.0))
+    .insets(Sides::length(4.0))
     .min_thumb(20.0);
     let mut ui = UiTree::new(content(style));
     let mut layout = LayoutEngine::new();

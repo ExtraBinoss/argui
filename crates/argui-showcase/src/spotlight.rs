@@ -1,14 +1,15 @@
 use argui_animation::{Duration, Frame};
 use argui_core::Color;
-use argui_paint::{Border, BorderWidths, ClipBehavior, CornerRadii, PaintStyle, QuadStyle};
+use argui_paint::{Border, BorderWidths, CornerRadii, PaintStyle, QuadStyle};
 use argui_platform::{PlatformEvent, WindowBackend, WindowCapabilities, WindowKey};
 use argui_runtime::{AppCommand, AppEvent, AppModel, AppUpdate, ViewUpdate, WindowEnvironment};
 use argui_text::TextStyle;
-use argui_theme::shadcn;
 use argui_ui::{
-    Align, Button, ButtonStyle, Edges, Element, FocusContainment, FocusScope, FocusTarget,
-    InitialFocus, Interaction, Length, UiEventKind, WindowDragBehavior,
+    AlignItems, Axes, Element, FocusContainment, FocusScope, FocusTarget, InitialFocus,
+    Interaction, JustifyContent, Overflow, Sides, UiEventKind, WindowDragBehavior, length, percent,
+    sides,
 };
+use argui_widgets::{Button, ButtonStyle, Input, shadcn};
 
 const SEARCH_KEY: &str = "spotlight-search";
 const PASSTHROUGH_TIME: Duration = Duration::from_secs(2);
@@ -94,37 +95,40 @@ impl SpotlightShowcase {
         let panel = Element::column([
             self.title_bar(theme),
             Element::column([
-                argui_ui::TextInput::new(
+                Input::new(
                     SEARCH_KEY,
                     &self.query,
                     "Search commands, files and settings",
-                    theme.text_input.clone(),
+                    theme.input.clone(),
                 )
                 .build(),
                 self.results(theme),
                 self.footer(theme),
             ])
-            .padding(Edges::all(18.0))
+            .padding(Sides::length(18.0))
             .gap(14.0)
             .grow(1.0),
         ])
-        .width(Length::Percent(1.0))
-        .height(Length::Percent(1.0))
+        .width(percent(1.0))
+        .height(percent(1.0))
         .background(theme.card)
         .border(Border::all(1.0, theme.border))
         .radius(CornerRadii::all(PANEL_RADIUS))
-        .clip(ClipBehavior::Bounds)
+        .overflow(Axes {
+            x: Overflow::Hidden,
+            y: Overflow::Hidden,
+        })
         .focus_scope(FocusScope {
             containment: FocusContainment::None,
             initial: Some(InitialFocus::Target(FocusTarget::from(SEARCH_KEY))),
             restore: false,
         });
         Element::container([panel])
-            .width(Length::Percent(1.0))
-            .height(Length::Percent(1.0))
+            .width(percent(1.0))
+            .height(percent(1.0))
     }
 
-    fn title_bar(&self, theme: &argui_theme::WidgetTheme) -> Element {
+    fn title_bar(&self, theme: &argui_widgets::WidgetTheme) -> Element {
         let title = Element::column([
             Element::text("Argui Spotlight").text_style(TextStyle {
                 color: theme.foreground,
@@ -147,10 +151,10 @@ impl SpotlightShowcase {
         ])
         .gap(8.0);
         Element::row([title, controls])
-            .height(Length::Px(58.0))
-            .padding(Edges::symmetric(18.0, 12.0))
-            .align(Align::Center)
-            .justify(argui_ui::Justify::SpaceBetween)
+            .height(length(58.0))
+            .padding(sides(18.0, 12.0))
+            .align_items(AlignItems::CENTER)
+            .justify_content(JustifyContent::SPACE_BETWEEN)
             .border(Border {
                 widths: BorderWidths {
                     bottom: 1.0,
@@ -163,7 +167,7 @@ impl SpotlightShowcase {
             )
     }
 
-    fn results(&self, theme: &argui_theme::WidgetTheme) -> Element {
+    fn results(&self, theme: &argui_widgets::WidgetTheme) -> Element {
         let query = self.query.trim().to_lowercase();
         let candidates = [
             ("Open command palette", "Navigation"),
@@ -182,12 +186,12 @@ impl SpotlightShowcase {
         Element::column(rows)
             .background(with_alpha(theme.muted, 0.62))
             .radius(CornerRadii::all(10.0))
-            .padding(Edges::all(6.0))
+            .padding(Sides::length(6.0))
             .gap(3.0)
             .grow(1.0)
     }
 
-    fn footer(&self, theme: &argui_theme::WidgetTheme) -> Element {
+    fn footer(&self, theme: &argui_widgets::WidgetTheme) -> Element {
         let active = self.passthrough_remaining.is_some();
         let status = if active {
             "Input passes through this overlay for two seconds"
@@ -212,8 +216,8 @@ impl SpotlightShowcase {
             )
             .build(),
         ])
-        .align(Align::Center)
-        .justify(argui_ui::Justify::SpaceBetween)
+        .align_items(AlignItems::CENTER)
+        .justify_content(JustifyContent::SPACE_BETWEEN)
     }
 
     fn backend_label(&self) -> String {
@@ -236,7 +240,7 @@ impl SpotlightShowcase {
     }
 }
 
-fn result_row(label: &str, category: &str, theme: &argui_theme::WidgetTheme) -> Element {
+fn result_row(label: &str, category: &str, theme: &argui_widgets::WidgetTheme) -> Element {
     Element::row([
         Element::text(label).text_style(TextStyle {
             color: theme.foreground,
@@ -252,16 +256,16 @@ fn result_row(label: &str, category: &str, theme: &argui_theme::WidgetTheme) -> 
             ..TextStyle::default()
         }),
     ])
-    .padding(Edges::symmetric(10.0, 9.0))
-    .align(Align::Center)
-    .justify(argui_ui::Justify::SpaceBetween)
+    .padding(sides(10.0, 9.0))
+    .align_items(AlignItems::CENTER)
+    .justify_content(JustifyContent::SPACE_BETWEEN)
 }
 
-fn compact_button(key: &str, label: &str, theme: &argui_theme::WidgetTheme) -> Element {
+fn compact_button(key: &str, label: &str, theme: &argui_widgets::WidgetTheme) -> Element {
     Button::new(key, label, compact_style(theme)).build()
 }
 
-fn compact_style(theme: &argui_theme::WidgetTheme) -> ButtonStyle {
+fn compact_style(theme: &argui_widgets::WidgetTheme) -> ButtonStyle {
     let mut style = ButtonStyle::new(
         PaintStyle::new(
             QuadStyle::solid(theme.card)
@@ -276,7 +280,7 @@ fn compact_style(theme: &argui_theme::WidgetTheme) -> ButtonStyle {
             ..TextStyle::default()
         },
     );
-    style.layout.padding = Edges::symmetric(10.0, 7.0);
+    style.layout.padding = sides(10.0, 7.0);
     style.hovered = argui_ui::StateStyle::from_quad(
         QuadStyle::solid(theme.muted).radius(CornerRadii::all(7.0)),
     );

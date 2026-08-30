@@ -2,6 +2,31 @@ use argui_core::{Affine2D, Point, Rect, Size};
 use argui_paint::{Border, ClipChain, ClipRegion, Color, DisplayList, Quad, QuadStyle};
 use argui_ui::{NodeId, ScrollConfig, ScrollRegion, ScrollbarRegion};
 
+use crate::engine::NodeMap;
+
+pub(crate) fn clipped(node: &NodeMap, parent: Option<Rect>, bounds: Rect) -> Option<Rect> {
+    if node.style.overflow.x.clips() || node.style.overflow.y.clips() {
+        parent.and_then(|clip| clip.intersection(bounds))
+    } else {
+        parent
+    }
+}
+
+pub(crate) fn config(node: &NodeMap, element: &argui_ui::Element) -> Option<ScrollConfig> {
+    let axes = match (
+        node.style.overflow.x.scrolls(),
+        node.style.overflow.y.scrolls(),
+    ) {
+        (false, false) => return None,
+        (true, false) => argui_ui::ScrollAxes::Horizontal,
+        (false, true) => argui_ui::ScrollAxes::Vertical,
+        (true, true) => argui_ui::ScrollAxes::Both,
+    };
+    let mut config = element.scroll.clone().unwrap_or_default();
+    config.axes = axes;
+    Some(config)
+}
+
 pub(crate) fn region(
     node: NodeId,
     bounds: Rect,
@@ -60,7 +85,7 @@ fn vertical_bar(
     if max_offset <= 0.0 {
         return None;
     }
-    let insets = argui_ui::Edges {
+    let insets = argui_ui::Sides {
         top: style.insets.top.max(0.0),
         right: style.insets.right.max(0.0),
         bottom: style.insets.bottom.max(0.0),

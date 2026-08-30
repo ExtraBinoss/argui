@@ -33,10 +33,7 @@ fn oversized_overlays_report_the_scrollable_maximum() {
     assert!(placed.bounds.size.height <= placed.max_size.height);
     assert!(placed.bounds.origin.x >= 30.0);
     assert!(placed.bounds.origin.y >= 20.0);
-    assert_eq!(
-        placed.inset_from(viewport).left,
-        argui_ui::Length::Px(170.0)
-    );
+    assert_eq!(placed.inset_from(viewport).left, argui_ui::length(170.0));
 }
 
 #[test]

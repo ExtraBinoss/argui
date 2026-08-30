@@ -7,10 +7,11 @@ use argui::{
     runtime::{Context, Render, RuntimeEvent, run_app},
     text::{TextColor, TextStyle},
     ui::{
-        Align, Button, ButtonStyle, Edges, Element, FocusScope, GestureSet, InitialFocus,
-        Interaction, Length, TextInput, TextInputStyle, UiEvent, UiEventKind,
+        AlignItems, Element, FocusScope, GestureSet, InitialFocus, Interaction, Sides, UiEvent,
+        UiEventKind, length, percent,
     },
 };
+use argui_widgets::{Button, ButtonStyle, Input, InputStyle};
 
 fn text_style(size: f32, color: TextColor, weight: u16) -> TextStyle {
     TextStyle {
@@ -52,11 +53,11 @@ fn input() -> Element {
     let rest = QuadStyle::solid(Color::rgb(0.055, 0.07, 0.10))
         .border(Border::all(1.0, Color::rgb(0.24, 0.34, 0.48)))
         .radius(CornerRadii::all(10.0));
-    TextInput::new(
+    Input::new(
         "name",
         "",
         "Your name",
-        TextInputStyle::new(
+        InputStyle::new(
             PaintStyle::new(rest.clone()),
             text_style(17.0, TextColor::WHITE, 450),
         )
@@ -79,8 +80,8 @@ fn gesture_surface() -> Element {
             .semantic_hidden(true),
     ])
     .keyed("gesture-surface")
-    .width(Length::Percent(1.0))
-    .padding(Edges::all(20.0))
+    .width(percent(1.0))
+    .padding(Sides::length(20.0))
     .gap(7.0)
     .paint_style(panel())
     .interaction(
@@ -126,9 +127,9 @@ fn showcase(dialog_open: bool) -> Element {
             button("open-dialog", "Open modal dialog"),
             gesture_surface(),
         ])
-        .width(Length::Percent(1.0))
-        .max_width(Length::Px(720.0))
-        .padding(Edges::all(28.0))
+        .width(percent(1.0))
+        .max_width(length(720.0))
+        .padding(Sides::length(28.0))
         .gap(18.0)
         .paint_style(panel())];
     if dialog_open {
@@ -144,8 +145,8 @@ fn showcase(dialog_open: bool) -> Element {
                 button("dismiss-dialog", "Dismiss dialog"),
             ])
             .keyed("modal-dialog")
-            .width(Length::Px(460.0))
-            .padding(Edges::all(24.0))
+            .width(length(460.0))
+            .padding(Sides::length(24.0))
             .gap(16.0)
             .paint_style(panel())
             .z_index(100)
@@ -156,10 +157,10 @@ fn showcase(dialog_open: bool) -> Element {
         );
     }
     Element::column(content)
-        .width(Length::Percent(1.0))
-        .height(Length::Percent(1.0))
-        .align(Align::Center)
-        .padding(Edges::all(32.0))
+        .width(percent(1.0))
+        .height(percent(1.0))
+        .align_items(AlignItems::CENTER)
+        .padding(Sides::length(32.0))
 }
 
 #[derive(Default)]

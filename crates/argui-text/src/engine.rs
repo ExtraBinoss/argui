@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use argui_core::Size;
 use cosmic_text::{
-    Attrs, Buffer, Family, FontSystem, Metrics, Shaping, SwashCache, SwashContent, Weight, Wrap,
-    fontdb,
+    Align, Attrs, Buffer, Family, FontSystem, Metrics, Shaping, SwashCache, SwashContent, Weight,
+    Wrap, fontdb,
 };
 
 use crate::{
@@ -68,9 +68,19 @@ impl TextEngine {
 
     #[must_use]
     pub fn measure(&mut self, text: &str, style: &crate::TextStyle, width: Option<f32>) -> Size {
+        self.measure_layout(text, style, width).size
+    }
+
+    #[must_use]
+    pub fn measure_layout(
+        &mut self,
+        text: &str,
+        style: &crate::TextStyle,
+        width: Option<f32>,
+    ) -> crate::TextMeasurement {
         let key = MeasureKey::new(text, style, width);
-        if let Some(size) = self.cache.measurement(&key) {
-            return size;
+        if let Some(measurement) = self.cache.measurement(&key) {
+            return measurement;
         }
         let metrics = Metrics::new(style.font_size, style.line_height);
         let mut buffer = Buffer::new(&mut self.fonts, metrics);
@@ -88,13 +98,15 @@ impl TextEngine {
         buffer.set_text(text, &attrs, Shaping::Advanced, None);
         buffer.shape_until_scroll(&mut self.fonts, false);
 
-        let mut measured = Size::default();
+        let mut measurement = crate::TextMeasurement::default();
         for run in buffer.layout_runs() {
-            measured.width = measured.width.max(run.line_w);
-            measured.height = measured.height.max(run.line_top + run.line_height);
+            measurement.size.width = measurement.size.width.max(run.line_w);
+            measurement.size.height = measurement.size.height.max(run.line_top + run.line_height);
+            measurement.first_baseline.get_or_insert(run.line_y);
+            measurement.last_baseline = Some(run.line_y);
         }
-        self.cache.insert_measurement(key, measured);
-        measured
+        self.cache.insert_measurement(key, measurement);
+        measurement
     }
 
     pub fn prepare(&mut self, scene: &TextScene, scale_factor: f32) -> PreparedText {
@@ -134,7 +146,12 @@ impl TextEngine {
         let attrs = Attrs::new()
             .family(family)
             .weight(Weight(block.style.weight));
-        buffer.set_text(&block.text, &attrs, Shaping::Advanced, None);
+        buffer.set_text(
+            &block.text,
+            &attrs,
+            Shaping::Advanced,
+            text_align(block.style.align),
+        );
         buffer.shape_until_scroll(&mut self.fonts, false);
 
         let mut glyphs = Vec::new();
@@ -175,6 +192,17 @@ impl TextEngine {
             content,
             data: image.data,
         })
+    }
+}
+
+pub(crate) const fn text_align(align: crate::TextAlign) -> Option<Align> {
+    match align {
+        crate::TextAlign::Start => None,
+        crate::TextAlign::End => Some(Align::End),
+        crate::TextAlign::Left => Some(Align::Left),
+        crate::TextAlign::Right => Some(Align::Right),
+        crate::TextAlign::Center => Some(Align::Center),
+        crate::TextAlign::Justify => Some(Align::Justified),
     }
 }
 

@@ -1,10 +1,10 @@
 use argui::{
-    paint::{Border, ClipBehavior, Color, CornerRadii},
+    paint::{Border, Color, CornerRadii},
     platform::WindowConfig,
     render::RendererConfig,
     runtime::run_ui,
     text::{FontFamily, TextColor, TextStyle},
-    ui::{Align, Edges, Element, LayoutStyle, Length, UiTree},
+    ui::{AlignItems, Axes, Element, LayoutStyle, Overflow, Sides, UiTree, length, percent, sides},
 };
 
 fn text_style(size: f32, color: TextColor, weight: u16) -> TextStyle {
@@ -18,11 +18,9 @@ fn text_style(size: f32, color: TextColor, weight: u16) -> TextStyle {
 }
 
 fn showcase() -> UiTree {
-    let panel_style = LayoutStyle {
-        width: Length::Percent(1.0),
-        max_width: Length::Px(820.0),
-        ..LayoutStyle::default()
-    };
+    let mut panel_style = LayoutStyle::default();
+    panel_style.size.width = percent(1.0);
+    panel_style.max_size.width = length(820.0);
     UiTree::new(
         Element::column([Element::column([
             Element::text("Argui responsive layout")
@@ -33,7 +31,7 @@ fn showcase() -> UiTree {
             .text_style(text_style(22.0, TextColor::WHITE, 400)),
             Element::text("GPU INSTANCED · ZERO WEBVIEW")
                 .text_style(text_style(14.0, TextColor::rgb(0.7, 0.95, 0.78), 700))
-                .padding(Edges::symmetric(12.0, 7.0))
+                .padding(sides(12.0, 7.0))
                 .background(Color::rgb(0.08, 0.22, 0.16))
                 .border(Border::all(1.0, Color::rgb(0.18, 0.5, 0.34)))
                 .radius(CornerRadii::all(10.0)),
@@ -44,16 +42,16 @@ fn showcase() -> UiTree {
                 }),
         ])
         .layout_style(panel_style)
-        .padding(Edges::all(30.0))
+        .padding(Sides::length(30.0))
         .gap(24.0)
         .background(Color::rgb(0.075, 0.095, 0.135))
         .border(Border::all(1.5, Color::rgb(0.18, 0.28, 0.4)))
         .radius(CornerRadii::all(22.0))
-        .clip(ClipBehavior::Bounds)])
-        .width(Length::Percent(1.0))
-        .height(Length::Percent(1.0))
-        .align(Align::Center)
-        .padding(Edges::symmetric(42.0, 36.0)),
+        .overflow(Axes { x: Overflow::Hidden, y: Overflow::Hidden })])
+        .width(percent(1.0))
+        .height(percent(1.0))
+        .align_items(AlignItems::CENTER)
+        .padding(sides(42.0, 36.0)),
     )
 }
 

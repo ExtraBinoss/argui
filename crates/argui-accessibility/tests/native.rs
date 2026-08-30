@@ -109,6 +109,7 @@ fn rich_nodes_lower_every_value_state_and_relation() {
             read_only: true,
             invalid: true,
             modal: true,
+            busy: true,
         })
         .live(LiveRegion::Assertive)
         .orientation(Orientation::Horizontal)

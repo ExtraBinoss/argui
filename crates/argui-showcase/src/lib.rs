@@ -12,16 +12,18 @@ mod visual;
 use animation::{animation_timeline, motion_tween};
 use argui_animation::{Duration, Frame, Inertia, Motion, PlaybackState, Spring, Timeline};
 use argui_core::{Key, KeyState, Size, Transform2D};
-use argui_paint::{Border, ClipBehavior, Color, CornerRadii, ImageAsset, VectorAsset};
+use argui_paint::{Border, Color, CornerRadii, ImageAsset, VectorAsset};
 use argui_runtime::{Context, Render, ThemeRequest, ViewUpdate, WindowEnvironment};
 use argui_text::{TextColor, TextEngine, TextStyle, TextWrap};
-use argui_theme::{ThemeMode, WidgetAssets, WidgetTheme, shadcn};
+use argui_theme::ThemeMode;
 use argui_ui::{
-    Align, Button, Edges, Element, Inset, Length, ResizeConfig, ResizeState, ScrollConfig, UiEvent,
-    UiEventKind, Wrap,
+    AlignItems, Axes, Element, FlexWrap, Overflow, ResizeConfig, ResizeState, ScrollConfig, Sides,
+    UiEvent, UiEventKind, percent, sides,
 };
+use argui_widgets::{Button, WidgetAssets, WidgetTheme, shadcn};
 use physics::{PhysicsCommand, PhysicsMode, showcase_inertia, showcase_spring};
 use popover::{popover_spring, shadow_timeline};
+use theme::{PRIMARIES, primary_label, top_right};
 use visual::ShowcaseImages;
 
 pub struct StateShowcase {
@@ -107,8 +109,8 @@ impl Default for StateShowcase {
             images: ShowcaseImages::embedded(),
             theme_mode: ThemeMode::System,
             primary_index: 0,
-            light_assets: WidgetAssets::embedded(Color::rgb(0.38, 0.42, 0.50)),
-            dark_assets: WidgetAssets::embedded(Color::rgb(0.64, 0.69, 0.76)),
+            light_assets: WidgetAssets::tabler(Color::rgb(0.38, 0.42, 0.50)),
+            dark_assets: WidgetAssets::tabler(Color::rgb(0.64, 0.69, 0.76)),
             message: "Hello · مرحباً · שלום · 👋🏽".into(),
             long_message: "This deliberately long editable line proves that the caret remains visible while the text scrolls horizontally.".into(),
             notes: "A controlled, wrapping text area. Resize it from the bottom-right handle.".into(),
@@ -195,10 +197,10 @@ impl StateShowcase {
                     false,
                 ),
             ])
-            .wrap(Wrap::Wrap)
+            .flex_wrap(FlexWrap::Wrap)
             .gap(12.0)
-            .align(Align::Center),
-            Element::row(items).wrap(Wrap::Wrap).gap(10.0),
+            .align_items(AlignItems::CENTER),
+            Element::row(items).flex_wrap(FlexWrap::Wrap).gap(10.0),
             self.animation_demo(widgets),
             self.physics_demo(widgets),
             self.visual_primitives(widgets),
@@ -212,25 +214,29 @@ impl StateShowcase {
                     700,
                     TextWrap::None,
                 ))
-                .padding(Edges::symmetric(11.0, 7.0))
+                .padding(sides(11.0, 7.0))
                 .background(widgets.primary)
                 .radius(CornerRadii::all(9.0))
-                .absolute(Inset::top_right(14.0, 14.0))
+                .absolute(top_right(14.0, 14.0))
                 .z_index(100),
         ])
-        .padding(Edges::all(30.0))
+        .padding(Sides::length(30.0))
         .gap(22.0)
         .background(widgets.card)
         .border(Border::all(1.0, widgets.border))
         .radius(CornerRadii::all(12.0))
-        .clip(ClipBehavior::Bounds)
+        .overflow(Axes { x: Overflow::Hidden, y: Overflow::Hidden })
         .shrink(0.0)])
         .keyed("page-scroll")
-        .width(Length::Percent(1.0))
-        .height(Length::Percent(1.0))
+        .width(percent(1.0))
+        .height(percent(1.0))
         .background(widgets.background)
-        .scrollable(ScrollConfig::default().scrollbar(self.scrollbar_style(widgets)))
-        .padding(Edges::symmetric(20.0, 24.0))
+        .overflow(Axes {
+            x: Overflow::Hidden,
+            y: Overflow::Auto,
+        })
+        .scroll_config(ScrollConfig::default().scrollbar(self.scrollbar_style(widgets)))
+        .padding(sides(20.0, 24.0))
     }
 
     pub fn update(&mut self, event: &UiEvent) -> ViewUpdate {
@@ -578,21 +584,9 @@ fn chip(key: &str, label: &str, widgets: &WidgetTheme) -> Element {
     Element::text(label)
         .keyed(key)
         .text_style(text_style(15.0, widgets.foreground, 600, TextWrap::None))
-        .padding(Edges::symmetric(12.0, 7.0))
+        .padding(sides(12.0, 7.0))
         .shrink(0.0)
         .background(widgets.muted)
         .border(Border::all(1.0, widgets.border))
         .radius(CornerRadii::all(7.0))
-}
-
-const PRIMARIES: [(&str, Color); 5] = [
-    ("Primary: blue", Color::rgb(0.10, 0.45, 0.91)),
-    ("Primary: violet", Color::rgb(0.49, 0.23, 0.93)),
-    ("Primary: rose", Color::rgb(0.88, 0.11, 0.28)),
-    ("Primary: orange", Color::rgb(0.92, 0.35, 0.05)),
-    ("Primary: emerald", Color::rgb(0.02, 0.59, 0.41)),
-];
-
-fn primary_label(index: usize) -> &'static str {
-    PRIMARIES[index].0
 }

@@ -3,3 +3,4 @@
 lcov.info
 coverage/
 /web/pkg/
+/web/widgets/pkg/

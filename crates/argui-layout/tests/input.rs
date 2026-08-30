@@ -6,9 +6,10 @@ use argui_layout::{LayoutEngine, TextInputRegion};
 use argui_paint::{PaintStyle, QuadStyle};
 use argui_text::{CaretStop, TextEngine, TextStyle};
 use argui_ui::{
-    Edges, Element, GestureKind, Length, Resizable, ScrollbarPartStyle, ScrollbarStyle, TextArea,
-    TextInputStyle, UiEventKind, UiTree, scrollbar_at,
+    Element, GestureKind, Resizable, ScrollbarPartStyle, ScrollbarStyle, Sides, UiEventKind,
+    UiTree, length, percent, scrollbar_at,
 };
+use argui_widgets::{InputStyle, TextArea};
 
 const NOTO_SANS: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
 
@@ -35,7 +36,7 @@ fn region(stops: Vec<CaretStop>) -> TextInputRegion {
         selection: Vec::new(),
         caret: Some(Rect::new(Point::new(10.0, 0.0), Size::new(1.0, 16.0))),
         selection_color: Color::TRANSPARENT,
-        caret_color: Color::WHITE,
+        caret_style: argui_ui::CaretStyle::default(),
         content_size: Size::new(100.0, 60.0),
         scroll_x: 0.0,
         scroll_y: 0.0,
@@ -123,14 +124,14 @@ fn text_area_shapes_and_clips_scrollable_content_with_a_live_scrollbar() {
         "notes",
         &value,
         "notes",
-        TextInputStyle::new(PaintStyle::default(), TextStyle::default()),
+        InputStyle::new(PaintStyle::default(), TextStyle::default()),
     )
     .scrollbar(
         ScrollbarStyle::new(
             ScrollbarPartStyle::new(QuadStyle::default()),
             ScrollbarPartStyle::new(QuadStyle::solid(Color::WHITE)),
         )
-        .insets(Edges {
+        .insets(Sides {
             left: 3.0,
             right: 5.0,
             top: 7.0,
@@ -138,7 +139,7 @@ fn text_area_shapes_and_clips_scrollable_content_with_a_live_scrollbar() {
         }),
     )
     .build()
-    .height(Length::Px(96.0));
+    .height(length(96.0));
     let mut ui = UiTree::new(area);
     let mut layout = LayoutEngine::new();
     let mut text = text_engine();
@@ -207,14 +208,14 @@ fn resizing_a_text_area_preserves_its_scroll_position() {
             "notes",
             &value,
             "notes",
-            TextInputStyle::new(PaintStyle::default(), TextStyle::default()),
+            InputStyle::new(PaintStyle::default(), TextStyle::default()),
         )
         .scrollbar(ScrollbarStyle::new(
             ScrollbarPartStyle::new(QuadStyle::default()),
             ScrollbarPartStyle::new(QuadStyle::solid(Color::WHITE)),
         ))
         .build()
-        .height(Length::Px(height))
+        .height(length(height))
     };
     let mut ui = UiTree::new(editor(96.0));
     let node = ui.node_id_at(0).unwrap();
@@ -241,8 +242,8 @@ fn a_resize_handle_painted_over_a_scrollbar_keeps_pointer_priority() {
         .map(|line| format!("line {line:02}"))
         .collect::<Vec<_>>()
         .join("\n");
-    let mut style = TextInputStyle::new(PaintStyle::default(), TextStyle::default());
-    style.layout.height = Length::Percent(1.0);
+    let mut style = InputStyle::new(PaintStyle::default(), TextStyle::default());
+    style.layout.size.height = percent(1.0);
     let area = TextArea::new("notes", value, "notes", style)
         .scrollbar(ScrollbarStyle::new(
             ScrollbarPartStyle::new(QuadStyle::default()),
@@ -250,8 +251,8 @@ fn a_resize_handle_painted_over_a_scrollbar_keeps_pointer_priority() {
         ))
         .build();
     let handle = Element::container([])
-        .width(Length::Px(18.0))
-        .height(Length::Px(18.0));
+        .width(length(18.0))
+        .height(length(18.0));
     let mut ui =
         UiTree::new(Resizable::new(Size::new(260.0, 96.0), area, "resize", handle).build());
     let handle = ui.node_id_at(2).unwrap();
@@ -318,10 +319,10 @@ fn repeated_newlines_keep_the_multiline_caret_visible_and_scroll_monotonic() {
             "notes",
             value,
             "notes",
-            TextInputStyle::new(PaintStyle::default(), TextStyle::default()),
+            InputStyle::new(PaintStyle::default(), TextStyle::default()),
         )
         .build()
-        .height(Length::Px(96.0))
+        .height(length(96.0))
     };
     let mut ui = UiTree::new(editor("start"));
     let node = ui.node_id_at(0).unwrap();

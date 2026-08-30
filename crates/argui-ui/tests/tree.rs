@@ -1,14 +1,14 @@
 use argui_text::TextStyle;
 use argui_ui::{
-    Border, ClipBehavior, Color, CornerRadii, Direction, Element, ElementKind, Interaction,
-    LayerStyle, Length, Role, ScrollConfig, Semantics, TreeUpdate, UiTree, VectorId,
+    Axes, Border, Color, CornerRadii, Element, ElementKind, FlexDirection, Interaction, LayerStyle,
+    Overflow, Role, ScrollConfig, Semantics, TreeUpdate, UiTree, VectorId, length, percent,
 };
 
 #[test]
 fn rust_builders_form_the_future_dsl_lowering_target() {
     let root = Element::row([Element::text("hello")
         .keyed("greeting")
-        .width(Length::Percent(0.5))
+        .width(percent(0.5))
         .text_style(TextStyle {
             weight: 700,
             ..TextStyle::default()
@@ -17,11 +17,14 @@ fn rust_builders_form_the_future_dsl_lowering_target() {
     .border(Border::all(2.0, Color::WHITE))
     .radius(CornerRadii::all(8.0))
     .paint_opacity(0.9)
-    .clip(ClipBehavior::Bounds);
+    .overflow(Axes {
+        x: Overflow::Hidden,
+        y: Overflow::Hidden,
+    });
     let mut tree = UiTree::new(root.clone());
 
     assert_eq!(tree.root().kind, ElementKind::Container);
-    assert_eq!(tree.root().style.direction, Direction::Row);
+    assert_eq!(tree.root().style.flex_direction, FlexDirection::Row);
     assert_eq!(tree.root().children.len(), 1);
     assert_eq!(tree.root().children[0].key.as_deref(), Some("greeting"));
     assert!(tree.root().paint.is_visible());
@@ -86,10 +89,7 @@ fn tree_updates_distinguish_paint_from_layout() {
     );
     assert_eq!(tree.revision(), revision);
 
-    assert_eq!(
-        tree.update(base.width(Length::Px(200.0))),
-        TreeUpdate::Layout
-    );
+    assert_eq!(tree.update(base.width(length(200.0))), TreeUpdate::Layout);
     assert!(tree.revision() > revision);
     assert!(tree.layout_dirty());
 }
@@ -151,11 +151,21 @@ fn update_classification_covers_empty_semantic_visual_and_structural_paths() {
         TreeUpdate::Paint
     );
     assert_eq!(
-        tree.update(base.clone().clip(ClipBehavior::Bounds)),
+        tree.update(base.clone().overflow(Axes {
+            x: Overflow::Hidden,
+            y: Overflow::Hidden
+        })),
         TreeUpdate::Layout
     );
     assert_eq!(
-        tree.update(base.clone().scrollable(ScrollConfig::default())),
+        tree.update(
+            base.clone()
+                .overflow(Axes {
+                    x: Overflow::Hidden,
+                    y: Overflow::Auto,
+                })
+                .scroll_config(ScrollConfig::default()),
+        ),
         TreeUpdate::Layout
     );
     assert_eq!(

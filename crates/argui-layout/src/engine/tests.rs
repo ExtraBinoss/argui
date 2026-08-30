@@ -1,10 +1,10 @@
 use super::*;
 use argui_animation::{Duration, Motion, Time, Tween};
-use argui_ui::{Length, TreeUpdate, property};
+use argui_ui::{TreeUpdate, length, property};
 
 #[test]
 fn stable_topology_updates_taffy_in_place() {
-    let root = |height| Element::container([]).height(Length::Px(height));
+    let root = |height| Element::container([]).height(length(height));
     let mut ui = UiTree::new(root(100.0));
     let mut engine = LayoutEngine::new();
     let mut text = TextEngine::new();
@@ -24,7 +24,7 @@ fn bound_layout_motion_updates_taffy_without_tree_reconciliation() {
     let width = Motion::new(100.0_f32);
     let mut ui = UiTree::new(
         Element::container([])
-            .height(Length::Px(40.0))
+            .height(length(40.0))
             .bind(property::WidthPx, width.clone()),
     );
     let mut engine = LayoutEngine::new();

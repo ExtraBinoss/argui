@@ -1,12 +1,12 @@
 use argui_animation::{Duration, Transition, Tween};
 use argui_core::{Color, Point, Transform2D};
 use argui_paint::{Border, CornerRadii, Fill, GradientStop, LinearGradient, PaintStyle, QuadStyle};
-use argui_theme::WidgetTheme;
 use argui_ui::{
-    Edges, Element, Interaction, KeyboardActivation, Length, PropertyKey, ScrollConfig,
-    ScrollbarPartStyle, ScrollbarStyle, StateStyle, StyleTransition, TransitionDirection,
-    TransitionRule, VisualState, Wrap, property,
+    Axes, Element, FlexWrap, Interaction, KeyboardActivation, Overflow, PropertyKey, ScrollConfig,
+    ScrollbarPartStyle, ScrollbarStyle, Sides, StateStyle, StyleTransition, TransitionDirection,
+    TransitionRule, VisualState, length, percent, property, sides,
 };
+use argui_widgets::WidgetTheme;
 
 use crate::text_style;
 
@@ -59,12 +59,12 @@ pub(crate) fn demo(theme: &WidgetTheme) -> Element {
                 theme,
             ),
         ])
-        .wrap(Wrap::Wrap)
+        .flex_wrap(FlexWrap::Wrap)
         .gap(14.0),
     ])
     .keyed("state-style-examples")
     .gap(12.0)
-    .padding(Edges::all(16.0))
+    .padding(Sides::length(16.0))
     .background(theme.card)
     .border(Border::all(1.0, theme.border))
     .radius(CornerRadii::all(10.0))
@@ -89,8 +89,8 @@ fn spring_surface(theme: &WidgetTheme) -> Element {
         .transition(StyleTransition::new(Transition::spring()));
     Element::container([label])
         .keyed("state-example-spring")
-        .width(Length::Percent(1.0))
-        .padding(Edges::symmetric(18.0, 14.0))
+        .width(percent(1.0))
+        .padding(sides(18.0, 14.0))
         .paint_style(PaintStyle::new(
             QuadStyle::solid(theme.primary)
                 .radius(CornerRadii::all(10.0))
@@ -138,8 +138,8 @@ fn directional_surface(theme: &WidgetTheme) -> Element {
             );
     Element::container([label("Fast in · slow out", theme.primary_foreground)])
         .keyed("state-example-directional")
-        .width(Length::Percent(1.0))
-        .padding(Edges::symmetric(18.0, 14.0))
+        .width(percent(1.0))
+        .padding(sides(18.0, 14.0))
         .background(theme.primary)
         .radius(CornerRadii::all(10.0))
         .interaction(interactive())
@@ -162,9 +162,9 @@ fn directional_surface(theme: &WidgetTheme) -> Element {
 fn layout_surface(theme: &WidgetTheme) -> Element {
     Element::container([label("Hover to grow", theme.primary_foreground)])
         .keyed("state-example-layout")
-        .width(Length::Px(164.0))
-        .height(Length::Px(54.0))
-        .padding(Edges::symmetric(14.0, 10.0))
+        .width(length(164.0))
+        .height(length(54.0))
+        .padding(sides(14.0, 10.0))
         .background(theme.primary)
         .radius(CornerRadii::all(10.0))
         .interaction(interactive())
@@ -198,9 +198,9 @@ fn gradient_surface(theme: &WidgetTheme) -> Element {
     .expect("showcase gradient is valid");
     Element::container([label("Animated gradient", Color::WHITE)])
         .keyed("state-example-gradient")
-        .width(Length::Percent(1.0))
-        .height(Length::Px(80.0))
-        .padding(Edges::all(14.0))
+        .width(percent(1.0))
+        .height(length(80.0))
+        .padding(Sides::length(14.0))
         .fill(Fill::Linear(gradient))
         .radius(CornerRadii::all(10.0))
         .interaction(interactive())
@@ -231,7 +231,7 @@ fn scrollbar_surface(theme: &WidgetTheme) -> Element {
                 argui_text::TextWrap::None,
             )),
         ])
-        .padding(Edges::symmetric(12.0, 9.0))
+        .padding(sides(12.0, 9.0))
         .background(theme.muted)
         .border(Border::all(1.0, theme.border))
         .radius(CornerRadii::all(8.0))
@@ -281,20 +281,24 @@ fn scrollbar_surface(theme: &WidgetTheme) -> Element {
             )))),
     )
     .width(10.0)
-    .insets(Edges::symmetric(5.0, 6.0))
+    .insets(sides(5.0, 6.0))
     .min_thumb(30.0);
     Element::column(rows)
         .keyed("state-example-scrollbar")
-        .width(Length::Percent(1.0))
-        .height(Length::Px(170.0))
-        .padding(Edges {
-            left: 4.0,
-            right: 20.0,
-            top: 4.0,
-            bottom: 4.0,
+        .width(percent(1.0))
+        .height(length(170.0))
+        .padding(Sides {
+            left: length(4.0),
+            right: length(20.0),
+            top: length(4.0),
+            bottom: length(4.0),
         })
         .gap(7.0)
-        .scrollable(ScrollConfig::default().scrollbar(scrollbar))
+        .overflow(Axes {
+            x: Overflow::Hidden,
+            y: Overflow::Auto,
+        })
+        .scroll_config(ScrollConfig::default().scrollbar(scrollbar))
 }
 
 fn example(title: &str, description: &str, content: Element, theme: &WidgetTheme) -> Element {
@@ -313,8 +317,8 @@ fn example(title: &str, description: &str, content: Element, theme: &WidgetTheme
         )),
         content,
     ])
-    .width(Length::Px(320.0))
-    .padding(Edges::all(14.0))
+    .width(length(320.0))
+    .padding(Sides::length(14.0))
     .gap(10.0)
     .background(theme.background)
     .border(Border::all(1.0, theme.border))

@@ -16,6 +16,7 @@ argui-text.workspace = true
 argui-theme.workspace = true
 argui-ui.workspace = true
 argui-vector.workspace = true
+argui-widgets.workspace = true
 icondata_core.workspace = true
 icondata_tb.workspace = true
 

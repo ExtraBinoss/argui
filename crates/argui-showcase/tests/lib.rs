@@ -14,7 +14,6 @@ use argui_ui::{
 fn render_view(app: &StateShowcase) -> argui_ui::Element {
     app.view(argui_runtime::WindowEnvironment::default())
 }
-
 fn node_index(root: &argui_ui::Element, key: &str) -> usize {
     fn visit(element: &argui_ui::Element, key: &str, index: &mut usize) -> Option<usize> {
         let current = *index;
@@ -41,6 +40,7 @@ fn events_for(app: &StateShowcase, key: &str) -> Vec<UiEvent> {
         bounds,
         transform: Affine2D::IDENTITY,
         clips: ClipChain::from_regions([ClipRegion::new(bounds, Affine2D::IDENTITY)]),
+        enabled: true,
         focusable: true,
         cursor: CursorIcon::Auto,
         gestures: argui_ui::GestureSet::NONE,
@@ -550,7 +550,7 @@ fn overlay_layout_is_resolved_by_the_layout_engine_without_a_model_rebuild() {
     let popover = element_by_key(&view, "effects-popover").unwrap();
     assert!(popover.interaction.is_some());
     assert!(popover.scroll.is_some());
-    assert!(matches!(popover.style.height, argui_ui::Length::Px(430.0)));
+    assert_eq!(popover.style.size.height, argui_ui::length(430.0));
 
     let mut tree = UiTree::new(view);
     let mut layout = LayoutEngine::new();

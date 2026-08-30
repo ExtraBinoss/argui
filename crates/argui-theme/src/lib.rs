@@ -2,12 +2,6 @@
 
 use argui_core::ColorScheme;
 
-mod assets;
-mod widgets;
-
-pub use assets::WidgetAssets;
-pub use widgets::{WidgetTheme, shadcn};
-
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub enum ThemeMode {
     Light,

@@ -1,14 +1,12 @@
 use argui_inspect::{FrameRecord, NodeSnapshot};
-use argui_paint::{
-    Border, ClipBehavior, Color, CornerRadii, LayerStyle, PaintStyle, QuadStyle, VectorId,
-};
+use argui_paint::{Border, Color, CornerRadii, LayerStyle, PaintStyle, QuadStyle, VectorId};
 use argui_text::{TextColor, TextStyle, TextWrap};
-use argui_theme::WidgetTheme;
 use argui_ui::{
-    Align, Button, ButtonStyle, Edges, Element, Inset, Interaction, LayoutStyle, Length,
-    ScrollConfig, ScrollbarPartStyle, ScrollbarStyle, StateStyle, TextInput, TextInputStyle,
-    VirtualList, VisualState, property,
+    AlignItems, Axes, Element, FlexWrap, Interaction, LayoutStyle, LengthPercentageAuto, Overflow,
+    ScrollConfig, ScrollbarPartStyle, ScrollbarStyle, Sides, StateStyle, VirtualList, VisualState,
+    auto, length, percent, property, sides,
 };
+use argui_widgets::{Button, ButtonStyle, Input, InputStyle, WidgetTheme};
 
 use crate::host::{DevtoolsHost, Tab};
 
@@ -16,16 +14,19 @@ const RETAINED_TREE_LIMIT: usize = 512;
 
 pub(crate) fn host<A>(tools: &DevtoolsHost<A>, app: Element, theme: &WidgetTheme) -> Element {
     let application = Element::container([app
-        .width(Length::Percent(1.0))
-        .height(Length::Percent(1.0))
-        .min_height(Length::Px(0.0))])
+        .width(percent(1.0))
+        .height(percent(1.0))
+        .min_height(length(0.0))])
     .keyed("__devtools-app-root")
     .grow(1.0)
     .shrink(1.0)
-    .min_height(Length::Px(0.0))
-    .clip(ClipBehavior::Bounds);
+    .min_height(length(0.0))
+    .overflow(Axes {
+        x: Overflow::Hidden,
+        y: Overflow::Hidden,
+    });
     let mut toggle = toggle_button(false, theme)
-        .absolute(Inset::top_left(14.0, 14.0))
+        .absolute(top_left(14.0, 14.0))
         .z_index(30_000);
     if tools.open || tools.sheet_progress > 0.001 {
         if let Some(interaction) = &mut toggle.interaction {
@@ -38,31 +39,37 @@ pub(crate) fn host<A>(tools: &DevtoolsHost<A>, app: Element, theme: &WidgetTheme
         children.push(picker_surface(tools));
     }
     Element::column(children)
-        .width(Length::Percent(1.0))
-        .height(Length::Percent(1.0))
-        .clip(ClipBehavior::Bounds)
+        .width(percent(1.0))
+        .height(percent(1.0))
+        .overflow(Axes {
+            x: Overflow::Hidden,
+            y: Overflow::Hidden,
+        })
 }
 
 fn dock_surface<A>(tools: &DevtoolsHost<A>, theme: &WidgetTheme) -> Element {
     let height = tools.dock_height + 6.0;
     let surface = Element::column([splitter(theme), dock(tools, tools.dock_height, theme)])
         .keyed("__devtools-surface-content")
-        .width(Length::Percent(1.0))
-        .height(Length::Px(height))
+        .width(percent(1.0))
+        .height(length(height))
         .shrink(0.0);
     Element::container([surface])
         .keyed("__devtools-surface")
-        .width(Length::Percent(1.0))
-        .height(Length::Px(height * tools.sheet_progress))
+        .width(percent(1.0))
+        .height(length(height * tools.sheet_progress))
         .shrink(0.0)
-        .clip(ClipBehavior::Bounds)
+        .overflow(Axes {
+            x: Overflow::Hidden,
+            y: Overflow::Hidden,
+        })
         .inspectable(false)
 }
 
 fn splitter(theme: &WidgetTheme) -> Element {
     Element::container([])
         .keyed("__devtools-splitter")
-        .height(Length::Px(6.0))
+        .height(length(6.0))
         .shrink(0.0)
         .background(theme.primary)
         .interaction(Interaction::default().cursor(argui_ui::CursorIcon::NsResize))
@@ -83,11 +90,14 @@ fn dock<A>(tools: &DevtoolsHost<A>, height: f32, theme: &WidgetTheme) -> Element
         Tab::Profiling => profiling_tab(tools, theme),
     };
     Element::column([toolbar(tools, theme), body.grow(1.0).shrink(1.0)])
-        .height(Length::Px(height))
+        .height(length(height))
         .shrink(0.0)
         .background(theme.background)
         .border(Border::all(1.0, theme.border))
-        .clip(ClipBehavior::Bounds)
+        .overflow(Axes {
+            x: Overflow::Hidden,
+            y: Overflow::Hidden,
+        })
         .inspectable(false)
 }
 
@@ -109,12 +119,12 @@ fn toolbar<A>(tools: &DevtoolsHost<A>, theme: &WidgetTheme) -> Element {
         picker_button(tools, theme),
         morph_button(tools, theme),
     ])
-    .height(Length::Px(42.0))
+    .height(length(42.0))
     .shrink(0.0)
     .gap(6.0)
-    .padding(Edges::symmetric(8.0, 6.0))
+    .padding(sides(8.0, 6.0))
     .background(theme.card)
-    .align(Align::Center)
+    .align_items(AlignItems::CENTER)
 }
 
 fn picker_button<A>(tools: &DevtoolsHost<A>, theme: &WidgetTheme) -> Element {
@@ -138,12 +148,12 @@ fn picker_button<A>(tools: &DevtoolsHost<A>, theme: &WidgetTheme) -> Element {
 fn picker_surface<A>(tools: &DevtoolsHost<A>) -> Element {
     Element::container([])
         .keyed("__devtools-picker-surface")
-        .absolute(Inset::top_left(
+        .absolute(top_left(
             tools.app_viewport.origin.y,
             tools.app_viewport.origin.x,
         ))
-        .width(Length::Px(tools.app_viewport.size.width.max(1.0)))
-        .height(Length::Px(tools.app_viewport.size.height.max(1.0)))
+        .width(length(tools.app_viewport.size.width.max(1.0)))
+        .height(length(tools.app_viewport.size.height.max(1.0)))
         .z_index(19_000)
         .interaction(Interaction::blocker())
         .inspectable(false)
@@ -155,10 +165,10 @@ fn morph_button<A>(tools: &DevtoolsHost<A>, theme: &WidgetTheme) -> Element {
         Element::text("GPU morph").text_style(text(12.0, theme.foreground)),
     ])
     .keyed("__devtools-morph")
-    .height(Length::Px(30.0))
-    .padding(Edges::symmetric(8.0, 4.0))
+    .height(length(30.0))
+    .padding(sides(8.0, 4.0))
     .gap(5.0)
-    .align(Align::Center)
+    .align_items(AlignItems::CENTER)
     .background(theme.background)
     .interaction(Interaction::default())
     .state(
@@ -191,11 +201,11 @@ fn elements_tab<A>(tools: &DevtoolsHost<A>, theme: &WidgetTheme) -> Element {
                 tree_row(node, selected == Some(node.id), theme)
             },
         );
-        let search = TextInput::new(
+        let search = Input::new(
             "__devtools-search",
             &tools.search,
             "Filter elements…",
-            TextInputStyle::new(
+            InputStyle::new(
                 PaintStyle::new(QuadStyle::solid(theme.card).radius(CornerRadii::all(5.0))),
                 text(12.0, theme.foreground),
             )
@@ -206,11 +216,11 @@ fn elements_tab<A>(tools: &DevtoolsHost<A>, theme: &WidgetTheme) -> Element {
             Element::column([search, list.grow(1.0).shrink(1.0)])
                 .grow(1.0)
                 .shrink(1.0)
-                .padding(Edges::all(6.0))
+                .padding(Sides::length(6.0))
                 .gap(6.0),
             crate::style::sidebar(selected, &snapshot.nodes, tools, theme),
         ])
-        .height(Length::Percent(1.0))
+        .height(percent(1.0))
     })
 }
 
@@ -243,7 +253,7 @@ fn tree_row(node: &NodeSnapshot, selected: bool, theme: &WidgetTheme) -> Element
     });
     Element::text(format!("{}{}", "  ".repeat(node.depth), label))
         .keyed(format!("__devtools-node-{}", node.id.0))
-        .padding(Edges::symmetric(8.0, 4.0))
+        .padding(sides(8.0, 4.0))
         .background(if selected {
             theme.primary
         } else {
@@ -304,19 +314,19 @@ fn profiling_tab<A>(tools: &DevtoolsHost<A>, theme: &WidgetTheme) -> Element {
                 theme,
             ),
         ])
-        .wrap(argui_ui::Wrap::Wrap)
+        .flex_wrap(FlexWrap::Wrap)
         .gap(8.0),
         Element::row(bars)
-            .height(Length::Px(110.0))
-            .align(Align::End)
+            .height(length(110.0))
+            .align_items(AlignItems::END)
             .gap(2.0)
-            .padding(Edges::all(8.0))
+            .padding(Sides::length(8.0))
             .background(theme.card),
         details(&latest, theme),
         gpu_waterfall(&latest, theme),
         profiling_list(frames, tools.profiling_offset, theme),
     ])
-    .padding(Edges::all(12.0))
+    .padding(Sides::length(12.0))
     .gap(12.0)
 }
 
@@ -333,7 +343,7 @@ fn profiling_list(frames: &[FrameRecord], offset: f32, theme: &WidgetTheme) -> E
             frame.passes,
             frame.texture_bytes as f64 / 1_048_576.0,
         ))
-        .padding(Edges::symmetric(7.0, 3.0))
+        .padding(sides(7.0, 3.0))
         .background(if index % 2 == 0 {
             theme.card
         } else {
@@ -354,9 +364,9 @@ fn icon_label_button(key: &str, icon: VectorId, label: &str, theme: &WidgetTheme
         Element::text(label).text_style(text(12.0, theme.foreground)),
     ])
     .keyed(key)
-    .align(Align::Center)
+    .align_items(AlignItems::CENTER)
     .gap(6.0)
-    .padding(Edges::symmetric(9.0, 6.0))
+    .padding(sides(9.0, 6.0))
     .background(theme.muted)
     .radius(CornerRadii::all(5.0))
     .interaction(Interaction::default())
@@ -368,8 +378,8 @@ fn icon_label_button(key: &str, icon: VectorId, label: &str, theme: &WidgetTheme
 
 fn icon_element(icon: VectorId, size: f32) -> Element {
     Element::vector(icon)
-        .width(Length::Px(size))
-        .height(Length::Px(size))
+        .width(length(size))
+        .height(length(size))
         .shrink(0.0)
 }
 
@@ -377,8 +387,8 @@ fn frame_bar(frame: &FrameRecord, theme: &WidgetTheme) -> Element {
     let milliseconds = millis(frame.interval).max(millis(frame.total_cpu()));
     let missed = milliseconds > 18.0;
     Element::container([])
-        .width(Length::Px(5.0))
-        .height(Length::Px((milliseconds * 3.0).clamp(2.0, 94.0) as f32))
+        .width(length(5.0))
+        .height(length((milliseconds * 3.0).clamp(2.0, 94.0) as f32))
         .shrink(0.0)
         .background(if missed {
             Color::rgb(1.0, 0.28, 0.24)
@@ -454,10 +464,10 @@ fn gpu_waterfall(frame: &FrameRecord, theme: &WidgetTheme) -> Element {
                 .text_style(text(11.0, theme.foreground)),
             ]),
             Element::row([
-                Element::container([]).width(Length::Percent(start as f32)),
+                Element::container([]).width(percent(start as f32)),
                 Element::container([])
-                    .height(Length::Px(4.0))
-                    .width(Length::Percent(duration.max(0.002) as f32))
+                    .height(length(4.0))
+                    .width(percent(duration.max(0.002) as f32))
                     .background(theme.primary)
                     .radius(CornerRadii::all(2.0)),
             ]),
@@ -486,7 +496,7 @@ fn gpu_waterfall(frame: &FrameRecord, theme: &WidgetTheme) -> Element {
                 .text_style(text(11.0, theme.muted_foreground))])
             .chain(ranking),
     )
-    .padding(Edges::all(8.0))
+    .padding(Sides::length(8.0))
     .gap(7.0)
     .background(theme.card)
 }
@@ -503,8 +513,8 @@ fn toggle_button(open: bool, theme: &WidgetTheme) -> Element {
                 text(13.0, theme.primary_foreground),
             )
             .layout(LayoutStyle {
-                padding: Edges::symmetric(14.0, 8.0),
-                shrink: 0.0,
+                padding: sides(14.0, 8.0),
+                flex_shrink: 0.0,
                 ..LayoutStyle::default()
             })
             .hovered(StateStyle::new().set(property::BackgroundColor, theme.primary))
@@ -536,8 +546,8 @@ fn small_button(key: &str, label: &str, active: bool, theme: &WidgetTheme) -> El
             ),
         )
         .layout(LayoutStyle {
-            padding: Edges::symmetric(10.0, 6.0),
-            shrink: 0.0,
+            padding: sides(10.0, 6.0),
+            flex_shrink: 0.0,
             ..LayoutStyle::default()
         })
         .hovered(StateStyle::new().set(property::BackgroundColor, theme.muted))
@@ -567,9 +577,18 @@ fn scrollbar() -> ScrollbarStyle {
         ),
     )
     .width(8.0)
-    .insets(argui_ui::Edges::all(3.0))
+    .insets(argui_ui::Sides::length(3.0))
 }
 
 fn millis(duration: std::time::Duration) -> f64 {
     duration.as_secs_f64() * 1_000.0
+}
+
+fn top_left(top: f32, left: f32) -> Sides<LengthPercentageAuto> {
+    Sides {
+        left: length(left),
+        right: auto(),
+        top: length(top),
+        bottom: auto(),
+    }
 }

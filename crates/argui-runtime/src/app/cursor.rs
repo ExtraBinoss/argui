@@ -94,6 +94,7 @@ mod tests {
             bounds: Rect::new(Point::default(), Size::new(40.0, 40.0)),
             transform: Affine2D::IDENTITY,
             clips: ClipChain::default(),
+            enabled: true,
             focusable: false,
             cursor,
             gestures: argui_ui::GestureSet::NONE,
@@ -115,6 +116,13 @@ mod tests {
         assert_eq!(
             cursor_at(&[region(CursorIcon::Auto)], Point::new(20.0, 20.0)),
             CursorIcon::Default
+        );
+
+        let mut disabled = region(CursorIcon::NotAllowed);
+        disabled.enabled = false;
+        assert_eq!(
+            cursor_at(&[disabled], Point::new(20.0, 20.0)),
+            CursorIcon::NotAllowed
         );
     }
 

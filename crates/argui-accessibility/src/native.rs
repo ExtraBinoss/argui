@@ -141,6 +141,9 @@ fn lower_node(node: &SemanticNode) -> (NodeId, Node) {
     if node.semantics.state.modal {
         output.set_modal();
     }
+    if node.semantics.state.busy {
+        output.set_busy();
+    }
     match node.semantics.live {
         LiveRegion::Off => {}
         LiveRegion::Polite => output.set_live(Live::Polite),

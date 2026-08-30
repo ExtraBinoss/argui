@@ -9,6 +9,7 @@ pub(super) struct ClipInstance {
     inverse_a: [f32; 4],
     inverse_b: [f32; 4],
     bounds: [f32; 4],
+    radii: [f32; 4],
 }
 
 impl ClipInstance {
@@ -23,6 +24,7 @@ impl ClipInstance {
                 clip.bounds.size.width * scale,
                 clip.bounds.size.height * scale,
             ],
+            radii: clip.radii.as_array().map(|radius| radius * scale),
         })
     }
 }

@@ -4,7 +4,10 @@ use argui::{
     paint::{Border, Color, CornerRadii},
     runtime::{Context, Entity, Render},
     text::{TextColor, TextStyle, TextWrap},
-    ui::{Edges, Element, Length, ScrollConfig, UiEvent, UiEventKind, VariableList, VirtualList},
+    ui::{
+        Axes, Element, Overflow, ScrollConfig, Sides, UiEvent, UiEventKind, VariableList,
+        VirtualList, percent, sides,
+    },
 };
 
 const ROWS: usize = 1_000_000;
@@ -49,12 +52,16 @@ impl Render for PerfShowcase {
             cx.entity(&self.fixed),
             cx.entity(&self.variable),
         ])
-        .padding(Edges::all(24.0))
+        .padding(Sides::length(24.0))
         .gap(18.0)
-        .width(Length::Percent(1.0))
-        .height(Length::Percent(1.0))
+        .width(percent(1.0))
+        .height(percent(1.0))
         .background(Color::rgb(0.035, 0.045, 0.065))
-        .scrollable(ScrollConfig::default())
+        .overflow(Axes {
+            x: Overflow::Hidden,
+            y: Overflow::Auto,
+        })
+        .scroll_config(ScrollConfig::default())
     }
 
     fn event(&mut self, event: &UiEvent, cx: &mut Context<Self>) {
@@ -127,7 +134,7 @@ impl Render for CounterLab {
             Element::text("Local retained state").text_style(text(19.0, TextColor::WHITE, 700)),
             Element::text(format!("value={} (only this entity changes)", self.value))
                 .keyed("perf-counter")
-                .padding(Edges::symmetric(14.0, 9.0))
+                .padding(sides(14.0, 9.0))
                 .background(Color::rgb(0.12, 0.36, 0.28))
                 .radius(CornerRadii::all(9.0)),
         ])
@@ -192,7 +199,7 @@ impl Render for VariableListLab {
                 .text_style(text(19.0, TextColor::WHITE, 700)),
             Element::text("Measure a visible row")
                 .keyed("perf-measure-variable")
-                .padding(Edges::symmetric(12.0, 8.0))
+                .padding(sides(12.0, 8.0))
                 .background(Color::rgb(0.20, 0.35, 0.58))
                 .radius(CornerRadii::all(8.0)),
             self.list.build("perf-million-variable", self.offset, row),
@@ -203,13 +210,13 @@ impl Render for VariableListLab {
 fn row(index: usize) -> Element {
     Element::text(format!("row {index:07}"))
         .keyed(format!("perf-row-{index}"))
-        .padding(Edges::symmetric(10.0, 4.0))
+        .padding(sides(10.0, 4.0))
         .text_style(text(14.0, TextColor::rgb(0.76, 0.82, 0.91), 500))
 }
 
 fn panel(children: impl IntoIterator<Item = Element>) -> Element {
     Element::column(children)
-        .padding(Edges::all(16.0))
+        .padding(Sides::length(16.0))
         .gap(10.0)
         .background(Color::rgb(0.07, 0.085, 0.12))
         .border(Border::all(1.0, Color::rgb(0.16, 0.20, 0.28)))

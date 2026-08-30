@@ -90,13 +90,6 @@ impl Border {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub enum ClipBehavior {
-    #[default]
-    None,
-    Bounds,
-}
-
 #[derive(Clone, Debug, PartialEq)]
 pub struct QuadStyle {
     pub background: Option<Fill>,
@@ -151,34 +144,15 @@ impl QuadStyle {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct PaintStyle {
     pub quad: QuadStyle,
-    pub clip: ClipBehavior,
-}
-
-impl Default for PaintStyle {
-    fn default() -> Self {
-        Self {
-            quad: QuadStyle::default(),
-            clip: ClipBehavior::None,
-        }
-    }
 }
 
 impl PaintStyle {
     #[must_use]
     pub const fn new(quad: QuadStyle) -> Self {
-        Self {
-            quad,
-            clip: ClipBehavior::None,
-        }
-    }
-
-    #[must_use]
-    pub const fn clip(mut self, clip: ClipBehavior) -> Self {
-        self.clip = clip;
-        self
+        Self { quad }
     }
 
     #[must_use]

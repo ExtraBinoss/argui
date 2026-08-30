@@ -1,7 +1,7 @@
 use argui_core::{Affine2D, Point, Rect, ScrollDelta};
 use argui_paint::{ClipChain, QuadStyle};
 
-use crate::{Edges, HitRegion, NodeId, StateStyle, StyleTransition, VisualState, VisualStates};
+use crate::{HitRegion, NodeId, Sides, StateStyle, StyleTransition, VisualState, VisualStates};
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum ScrollAxes {
@@ -118,7 +118,7 @@ impl ScrollConfig {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ScrollbarStyle {
     pub width: f32,
-    pub insets: Edges,
+    pub insets: Sides<f32>,
     pub min_thumb: f32,
     pub track: ScrollbarPartStyle,
     pub thumb: ScrollbarPartStyle,
@@ -129,7 +129,12 @@ impl ScrollbarStyle {
     pub const fn new(track: ScrollbarPartStyle, thumb: ScrollbarPartStyle) -> Self {
         Self {
             width: 10.0,
-            insets: Edges::all(4.0),
+            insets: Sides {
+                left: 4.0,
+                right: 4.0,
+                top: 4.0,
+                bottom: 4.0,
+            },
             min_thumb: 28.0,
             track,
             thumb,
@@ -143,7 +148,7 @@ impl ScrollbarStyle {
     }
 
     #[must_use]
-    pub const fn insets(mut self, insets: Edges) -> Self {
+    pub const fn insets(mut self, insets: Sides<f32>) -> Self {
         self.insets = insets;
         self
     }
@@ -152,6 +157,11 @@ impl ScrollbarStyle {
     pub const fn min_thumb(mut self, min_thumb: f32) -> Self {
         self.min_thumb = min_thumb;
         self
+    }
+
+    #[must_use]
+    pub fn gutter_width(&self) -> f32 {
+        (self.width + self.insets.right.max(self.insets.bottom)).max(0.0)
     }
 }
 

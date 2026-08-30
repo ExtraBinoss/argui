@@ -1,5 +1,6 @@
 //! Layout boundary backed by Taffy.
 
+mod assets;
 mod engine;
 mod error;
 mod input;

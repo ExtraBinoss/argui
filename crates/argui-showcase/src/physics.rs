@@ -1,8 +1,8 @@
 use argui_animation::{DecayConfig, Inertia, InertiaConfig, InertiaState, Spring, SpringConfig};
 use argui_paint::{Border, Color, CornerRadii};
 use argui_text::TextWrap;
-use argui_theme::WidgetTheme;
-use argui_ui::{Edges, Element, Length, Wrap, property};
+use argui_ui::{Element, FlexWrap, Sides, length, percent, property};
+use argui_widgets::WidgetTheme;
 
 use super::{StateShowcase, button, text_style};
 
@@ -99,8 +99,8 @@ impl StateShowcase {
             )),
             Element::container([])
                 .keyed("physics-visual")
-                .height(Length::Px(68.0))
-                .width(Length::Percent(1.0))
+                .height(length(68.0))
+                .width(percent(1.0))
                 .background(color)
                 .bind(property::BackgroundColor, self.physics_color.clone())
                 .border(Border::all(1.0, widgets.border))
@@ -110,11 +110,11 @@ impl StateShowcase {
                 button("physics-spring", "Spring retarget", widgets, false),
                 button("physics-inertia", "Launch inertia", widgets, false),
             ])
-            .wrap(Wrap::Wrap)
+            .flex_wrap(FlexWrap::Wrap)
             .gap(10.0),
         ])
         .gap(12.0)
-        .padding(Edges::all(16.0))
+        .padding(Sides::length(16.0))
         .background(widgets.card)
         .border(Border::all(1.0, widgets.border))
         .radius(CornerRadii::all(10.0))
@@ -184,7 +184,7 @@ mod tests {
     use crate::StateShowcase;
 
     fn state_label(showcase: &StateShowcase) -> String {
-        let themes = argui_theme::shadcn(argui_paint::Color::WHITE);
+        let themes = argui_widgets::shadcn(argui_paint::Color::WHITE);
         let demo = showcase.physics_demo(themes.resolve(argui_core::ColorScheme::Dark));
         match &demo.children[0].kind {
             ElementKind::Text { content, .. } => content.clone(),

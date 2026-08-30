@@ -19,6 +19,7 @@ fn region(node: argui_ui::NodeId, x: f32) -> HitRegion {
         bounds: Rect::new(Point::new(x, 0.0), Size::new(40.0, 30.0)),
         transform: Affine2D::IDENTITY,
         clips: ClipChain::default(),
+        enabled: true,
         focusable: true,
         cursor: CursorIcon::Auto,
         gestures: GestureSet::NONE,

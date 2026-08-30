@@ -9,6 +9,7 @@ pub(super) struct ImageClip {
     inverse_a: [f32; 4],
     inverse_b: [f32; 4],
     bounds: [f32; 4],
+    radii: [f32; 4],
 }
 
 #[repr(C)]
@@ -42,6 +43,7 @@ impl ImageInstance {
                     clip.bounds.size.width * scale,
                     clip.bounds.size.height * scale,
                 ],
+                radii: clip.radii.as_array().map(|radius| radius * scale),
             })
         }));
         let mut rect = [

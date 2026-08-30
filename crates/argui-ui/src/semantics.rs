@@ -5,7 +5,7 @@ use argui_accessibility::{
 };
 use argui_core::{Point, Rect, Size};
 
-use crate::{Element, ElementKind, NodeId, UiTree};
+use crate::{Display, Element, ElementKind, NodeId, UiTree};
 
 impl UiTree {
     /// Builds the renderer-independent accessibility snapshot from retained
@@ -49,7 +49,10 @@ fn collect(
 ) {
     let node_id = tree.node_ids()[*index];
     *index += 1;
-    if element.semantic_hidden || !tree.semantic_focus_visible(node_id) {
+    if element.semantic_hidden
+        || tree.resolved_layout_style(node_id, element).display == Display::None
+        || !tree.semantic_focus_visible(node_id)
+    {
         *index += descendant_count(element);
         return;
     }

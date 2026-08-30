@@ -3,20 +3,22 @@ use std::collections::HashMap;
 use argui_ui::{Element, ElementKind, UiTree};
 use taffy::{NodeId, TaffyTree};
 
-use crate::{LayoutError, engine::NodeMap, style::taffy_style};
+use crate::{LayoutError, assets::AssetMetrics, engine::NodeMap, style::taffy_style};
 
 pub(crate) fn sync(
     tree: &mut TaffyTree<usize>,
     root: NodeMap,
+    assets: &AssetMetrics,
     ui: &UiTree,
 ) -> Result<NodeMap, LayoutError> {
     let mut cursor = 0;
-    reconcile_node(tree, Some(root), ui, ui.root(), &mut cursor)
+    reconcile_node(tree, Some(root), assets, ui, ui.root(), &mut cursor)
 }
 
 fn reconcile_node(
     tree: &mut TaffyTree<usize>,
     previous: Option<NodeMap>,
+    assets: &AssetMetrics,
     ui: &UiTree,
     element: &Element,
     cursor: &mut usize,
@@ -36,7 +38,8 @@ fn reconcile_node(
 
     *cursor += 1;
     let previous = previous.filter(|previous| previous.node == node);
-    let resolved_style = ui.resolved_layout_style(node, element);
+    let resolved_style =
+        assets.layout_style(ui.resolved_layout_style(node, element), &element.kind);
     let (id, previous_children) = match previous {
         Some(previous) => {
             let id = reuse_node(tree, &previous, element, &resolved_style, index)?;
@@ -63,6 +66,7 @@ fn reconcile_node(
         children.push(reconcile_node(
             tree,
             retained.remove(&child_node),
+            assets,
             ui,
             child,
             cursor,

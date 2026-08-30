@@ -1,12 +1,11 @@
 use argui_inspect::{InspectNodeId, NodeSnapshot, PropertySnapshot, StyleProperty};
 use argui_paint::{CornerRadii, PaintStyle, QuadStyle, VectorId};
 use argui_text::{TextColor, TextStyle, TextWrap};
-use argui_theme::WidgetTheme;
 use argui_ui::{
-    Align, Button, ButtonStyle, Edges, Element, Interaction, LayoutStyle, Length, ScrollConfig,
-    ScrollbarPartStyle, ScrollbarStyle, StateStyle, TextInput, TextInputStyle, VisualState,
-    property,
+    AlignItems, Axes, Element, Interaction, LayoutStyle, Overflow, ScrollConfig,
+    ScrollbarPartStyle, ScrollbarStyle, Sides, StateStyle, VisualState, length, property, sides,
 };
+use argui_widgets::{Button, ButtonStyle, Input, InputStyle, WidgetTheme};
 
 use crate::host::DevtoolsHost;
 
@@ -18,8 +17,8 @@ pub(crate) fn sidebar<A>(
 ) -> Element {
     let Some(node) = selected.and_then(|id| nodes.iter().find(|node| node.id == id)) else {
         return Element::text("Select an element to inspect its styles")
-            .width(Length::Px(340.0))
-            .padding(Edges::all(16.0))
+            .width(length(340.0))
+            .padding(Sides::length(16.0))
             .background(theme.card)
             .text_style(text(13.0, theme.muted_foreground));
     };
@@ -36,7 +35,7 @@ pub(crate) fn sidebar<A>(
                 StyleProperty::Background,
                 StyleProperty::Border,
                 StyleProperty::Opacity,
-                StyleProperty::Clip,
+                StyleProperty::Overflow,
             ][..],
         ),
         (
@@ -70,11 +69,15 @@ pub(crate) fn sidebar<A>(
         }
     }
     Element::column(rows)
-        .width(Length::Px(340.0))
-        .padding(Edges::all(12.0))
+        .width(length(340.0))
+        .padding(Sides::length(12.0))
         .gap(7.0)
         .background(theme.card)
-        .scrollable(ScrollConfig::default().scrollbar(scrollbar(theme)))
+        .overflow(Axes {
+            x: Overflow::Hidden,
+            y: Overflow::Auto,
+        })
+        .scroll_config(ScrollConfig::default().scrollbar(scrollbar(theme)))
 }
 
 fn property_editor<A>(
@@ -102,7 +105,7 @@ fn property_editor<A>(
     if fields.is_empty() {
         rows.push(
             Element::text(value.summary())
-                .padding(Edges::symmetric(8.0, 4.0))
+                .padding(sides(8.0, 4.0))
                 .text_style(text(11.0, theme.muted_foreground)),
         );
     } else {
@@ -117,9 +120,9 @@ fn property_editor<A>(
                     theme,
                 ),
             ])
-            .align(Align::Center)
+            .align_items(AlignItems::CENTER)
             .gap(6.0)
-            .padding(Edges::symmetric(8.0, 2.0))
+            .padding(sides(8.0, 2.0))
         }));
     }
     Element::column(rows)
@@ -129,19 +132,19 @@ fn property_editor<A>(
 }
 
 fn number_input(key: &str, value: f32, theme: &WidgetTheme) -> Element {
-    TextInput::new(
+    Input::new(
         key,
         format_number(value),
         "0",
-        TextInputStyle::new(
+        InputStyle::new(
             PaintStyle::new(QuadStyle::solid(theme.card).radius(CornerRadii::all(4.0))),
             text(11.0, theme.foreground),
         )
         .focused(StateStyle::new().set(property::BackgroundColor, theme.muted)),
     )
     .build()
-    .width(Length::Px(92.0))
-    .padding(Edges::symmetric(7.0, 4.0))
+    .width(length(92.0))
+    .padding(sides(7.0, 4.0))
 }
 
 fn format_number(value: f32) -> String {
@@ -159,17 +162,17 @@ fn section_header(
 ) -> Element {
     Element::row([
         Element::vector(icon)
-            .width(Length::Px(18.0))
-            .height(Length::Px(18.0))
+            .width(length(18.0))
+            .height(length(18.0))
             .shrink(0.0)
             .vector_progress(progress),
         Element::text(label).text_style(text(12.0, theme.foreground)),
     ])
     .keyed(format!("__devtools-section-{index}"))
-    .height(Length::Px(29.0))
-    .align(Align::Center)
+    .height(length(29.0))
+    .align_items(AlignItems::CENTER)
     .gap(6.0)
-    .padding(Edges::symmetric(5.0, 4.0))
+    .padding(sides(5.0, 4.0))
     .background(if open { theme.muted } else { theme.background })
     .interaction(Interaction::default())
     .state(
@@ -195,8 +198,8 @@ fn button(key: &str, label: &str, active: bool, theme: &WidgetTheme) -> Element 
             ),
         )
         .layout(LayoutStyle {
-            padding: Edges::symmetric(10.0, 6.0),
-            shrink: 0.0,
+            padding: sides(10.0, 6.0),
+            flex_shrink: 0.0,
             ..LayoutStyle::default()
         })
         .hovered(StateStyle::new().set(property::BackgroundColor, theme.muted))
@@ -220,5 +223,5 @@ fn scrollbar(theme: &WidgetTheme) -> ScrollbarStyle {
         ScrollbarPartStyle::new(QuadStyle::solid(theme.primary).radius(CornerRadii::all(4.0))),
     )
     .width(8.0)
-    .insets(argui_ui::Edges::all(3.0))
+    .insets(argui_ui::Sides::length(3.0))
 }

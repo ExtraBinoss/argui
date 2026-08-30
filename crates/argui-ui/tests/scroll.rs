@@ -2,10 +2,10 @@ use argui_animation::{Duration, Motion, MotionState, Time, Tween};
 use argui_core::{Affine2D, Point, Rect, ScrollDelta, Size};
 use argui_paint::{ClipChain, ClipRegion};
 use argui_ui::{
-    Color, CursorIcon, Element, GestureSet, HitRegion, QuadStyle, ScrollChaining, ScrollConfig,
-    ScrollPolarity, ScrollRegion, ScrollbarPartStyle, ScrollbarRegion, ScrollbarStyle, StateStyle,
-    StyleTransition, Transition, TreeUpdate, UiEventKind, UiTree, VisualState, property,
-    scrollbar_at,
+    Axes, Color, CursorIcon, Element, GestureSet, HitRegion, Overflow, QuadStyle, ScrollChaining,
+    ScrollConfig, ScrollPolarity, ScrollRegion, ScrollbarPartStyle, ScrollbarRegion,
+    ScrollbarStyle, StateStyle, StyleTransition, Transition, TreeUpdate, UiEventKind, UiTree,
+    VisualState, property, scrollbar_at,
 };
 
 fn region(node: argui_ui::NodeId, config: ScrollConfig, max_y: f32) -> ScrollRegion {
@@ -29,6 +29,7 @@ fn hit_region(node: argui_ui::NodeId, bounds: Rect) -> HitRegion {
         bounds,
         transform: Affine2D::IDENTITY,
         clips: ClipChain::from_regions([ClipRegion::new(bounds, Affine2D::IDENTITY)]),
+        enabled: true,
         focusable: false,
         cursor: CursorIcon::Default,
         gestures: GestureSet::NONE,
@@ -41,7 +42,11 @@ fn scroll_polarity_is_explicit_and_offsets_are_clamped() {
     let mut tree = UiTree::new(
         Element::container([])
             .keyed("scroll")
-            .scrollable(ScrollConfig::default()),
+            .overflow(Axes {
+                x: Overflow::Hidden,
+                y: Overflow::Auto,
+            })
+            .scroll_config(ScrollConfig::default()),
     );
     let node = tree.node_id_at(0).unwrap();
     let normal = [region(node, ScrollConfig::default(), 100.0)];
@@ -187,7 +192,14 @@ fn scrollbar_parts_reuse_retained_state_transitions() {
             )))),
     );
     let config = ScrollConfig::default().scrollbar(style.clone());
-    let mut tree = UiTree::new(Element::container([]).scrollable(config.clone()));
+    let mut tree = UiTree::new(
+        Element::container([])
+            .overflow(Axes {
+                x: Overflow::Hidden,
+                y: Overflow::Auto,
+            })
+            .scroll_config(config.clone()),
+    );
     let node = tree.node_id_at(0).unwrap();
     let mut scroll = region(node, config.clone(), 1_000.0);
     scroll.scrollbar = Some(ScrollbarRegion {
@@ -342,7 +354,11 @@ fn direct_scroll_input_takes_over_from_a_scroll_motion() {
     let offset = Motion::new(Point::default());
     let mut tree = UiTree::new(
         Element::container([])
-            .scrollable(ScrollConfig::default())
+            .overflow(Axes {
+                x: Overflow::Hidden,
+                y: Overflow::Auto,
+            })
+            .scroll_config(ScrollConfig::default())
             .bind(property::Scroll, offset.clone()),
     );
     let node = tree.node_id_at(0).unwrap();

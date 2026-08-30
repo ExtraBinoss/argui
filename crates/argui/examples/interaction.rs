@@ -1,11 +1,14 @@
 use argui::{
-    paint::{Border, ClipBehavior, Color, CornerRadii, PaintStyle, QuadStyle},
+    paint::{Border, Color, CornerRadii, PaintStyle, QuadStyle},
     platform::WindowConfig,
     render::RendererConfig,
     runtime::{RuntimeEvent, run_ui},
     text::{TextColor, TextStyle},
-    ui::{Align, Button, ButtonStyle, Edges, Element, Length, UiEventKind, UiTree, Wrap},
+    ui::{
+        AlignItems, Axes, Element, FlexWrap, Overflow, Sides, UiEventKind, UiTree, percent, sides,
+    },
 };
+use argui_widgets::{Button, ButtonStyle};
 
 fn text_style(size: f32, color: TextColor, weight: u16) -> TextStyle {
     TextStyle {
@@ -58,23 +61,23 @@ fn showcase() -> UiTree {
                 button("confirm", "Confirm", Color::rgb(0.22, 0.72, 0.46)),
                 button("danger", "Delete", Color::rgb(0.92, 0.30, 0.36)),
             ])
-            .wrap(Wrap::Wrap)
+            .flex_wrap(FlexWrap::Wrap)
             .gap(12.0)
-            .align(Align::Center),
+            .align_items(AlignItems::CENTER),
             Element::text("The renderer only sees ordered quads and text.")
                 .text_style(text_style(15.0, TextColor::rgb(0.62, 0.72, 0.84), 500)),
         ])
-        .width(Length::Percent(1.0))
-        .padding(Edges::all(30.0))
+        .width(percent(1.0))
+        .padding(Sides::length(30.0))
         .gap(24.0)
         .background(Color::rgb(0.06, 0.08, 0.12))
         .border(Border::all(1.5, Color::rgb(0.18, 0.28, 0.40)))
         .radius(CornerRadii::all(22.0))
-        .clip(ClipBehavior::Bounds)])
-        .width(Length::Percent(1.0))
-        .height(Length::Percent(1.0))
-        .align(Align::Center)
-        .padding(Edges::symmetric(42.0, 36.0)),
+        .overflow(Axes { x: Overflow::Hidden, y: Overflow::Hidden })])
+        .width(percent(1.0))
+        .height(percent(1.0))
+        .align_items(AlignItems::CENTER)
+        .padding(sides(42.0, 36.0)),
     )
 }
 

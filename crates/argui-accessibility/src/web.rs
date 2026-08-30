@@ -288,6 +288,7 @@ fn apply_attributes(
     set_bool(element, "aria-required", node.semantics.state.required)?;
     set_bool(element, "aria-readonly", node.semantics.state.read_only)?;
     set_bool(element, "aria-invalid", node.semantics.state.invalid)?;
+    set_bool(element, "aria-busy", node.semantics.state.busy)?;
     set_optional(
         element,
         "aria-modal",

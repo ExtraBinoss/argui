@@ -1,8 +1,8 @@
 use argui_core::{Point, Size};
 
 use crate::{
-    CursorIcon, Element, GestureKind, GesturePhase, GestureSet, Inset, Interaction, LayoutStyle,
-    Length, Position, UiEvent, UiEventKind,
+    CursorIcon, Dimension, Element, GestureKind, GesturePhase, GestureSet, Interaction,
+    LayoutStyle, LengthPercentageAuto, Position, Sides, UiEvent, UiEventKind,
 };
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -146,14 +146,15 @@ impl Resizable {
 
     #[must_use]
     pub fn build(mut self) -> Element {
-        self.layout.width = Length::Px(self.size.width);
-        self.layout.height = Length::Px(self.size.height);
+        self.layout.size.width = Dimension::length(self.size.width);
+        self.layout.size.height = Dimension::length(self.size.height);
         self.layout.position = Position::Relative;
         self.handle.style.position = Position::Absolute;
-        self.handle.style.inset = Inset {
-            right: Length::Px(0.0),
-            bottom: Length::Px(0.0),
-            ..Inset::default()
+        self.handle.style.inset = Sides {
+            left: LengthPercentageAuto::auto(),
+            right: LengthPercentageAuto::length(0.0),
+            top: LengthPercentageAuto::auto(),
+            bottom: LengthPercentageAuto::length(0.0),
         };
         self.handle.key = Some(self.handle_key);
         self.handle.interaction = Some(

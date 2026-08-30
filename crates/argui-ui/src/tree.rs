@@ -46,6 +46,7 @@ pub struct UiTree {
     gestures: GestureArena,
     scroll: ScrollState,
     text_inputs: TextInputStates,
+    caret: crate::caret::CaretAnimator,
     revision: u64,
     layout_dirty: bool,
     update_stats: TreeUpdateStats,
@@ -70,6 +71,7 @@ impl UiTree {
             gestures: GestureArena::default(),
             scroll: ScrollState::default(),
             text_inputs: TextInputStates::default(),
+            caret: crate::caret::CaretAnimator::default(),
             revision: 0,
             layout_dirty: true,
             update_stats: TreeUpdateStats::default(),
@@ -235,6 +237,15 @@ impl UiTree {
         self.text_inputs.clear_cursor_reveals();
     }
 
+    #[must_use]
+    pub fn resolved_caret_frame(
+        &self,
+        node: NodeId,
+        style: &crate::CaretStyle,
+    ) -> crate::CaretFrame {
+        style.sample(self.caret.elapsed(node))
+    }
+
     pub fn pointer_moved(&mut self, point: Point, regions: &[HitRegion]) -> InteractionUpdate {
         let update = self.interaction.pointer_moved(point, regions);
         self.decorate(update)
@@ -249,6 +260,7 @@ impl UiTree {
             .iter()
             .rev()
             .find(|region| region.contains(event.position))
+            .filter(|region| region.enabled)
             .map(|region| (region.node, region.gestures));
         let gestures = self.gestures.update(event, hit);
         let mut update = if event.kind == PointerKind::Touch && !event.primary {
@@ -427,6 +439,9 @@ impl UiTree {
             })
             .collect();
         let transition_update = self.sync_transitions();
+        if text_input_changed {
+            self.caret.reset();
+        }
         InteractionUpdate {
             events,
             paint_changed: raw.paint_changed || transition_update == TreeUpdate::Paint,
@@ -463,6 +478,7 @@ impl UiTree {
         }
         if result.layout {
             self.text_inputs.request_cursor_reveal(node);
+            self.caret.reset();
         }
         InteractionUpdate {
             events,
@@ -488,8 +504,11 @@ impl UiTree {
             .zip(self.node_ids.iter().copied())
             .filter_map(|(element, node)| match &element.kind {
                 ElementKind::TextEditor {
-                    value, multiline, ..
-                } => Some((node, value.clone(), *multiline)),
+                    value,
+                    multiline,
+                    read_only,
+                    ..
+                } => Some((node, value.clone(), *multiline, *read_only)),
                 _ => None,
             });
         self.text_inputs.sync(inputs);
@@ -506,5 +525,18 @@ impl UiTree {
             .iter()
             .position(|candidate| *candidate == node)?;
         nth_element(&self.root, index)
+    }
+
+    fn focused_animated_caret(&self) -> Option<NodeId> {
+        let node = self.interaction.focused()?;
+        let element = self.element_for(node)?;
+        match &element.kind {
+            ElementKind::TextEditor { caret, .. }
+                if caret.is_animated() && !self.reduced_motion =>
+            {
+                Some(node)
+            }
+            _ => None,
+        }
     }
 }

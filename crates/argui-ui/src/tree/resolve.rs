@@ -23,7 +23,16 @@ impl UiTree {
     pub fn resolved_layout_style(&self, node: NodeId, element: &Element) -> LayoutStyle {
         let mut style = element.style.clone();
         super::transition::apply_layout(&self.transitions, node, &mut style);
-        crate::binding::resolved_layout(&element.bindings, &style)
+        let mut style = crate::binding::resolved_layout(&element.bindings, &style);
+        if let Some(border) = self.resolved_quad(node, element).border {
+            style.border = crate::Sides {
+                left: crate::LengthPercentage::length(border.widths.left),
+                right: crate::LengthPercentage::length(border.widths.right),
+                top: crate::LengthPercentage::length(border.widths.top),
+                bottom: crate::LengthPercentage::length(border.widths.bottom),
+            };
+        }
+        style
     }
 
     #[must_use]

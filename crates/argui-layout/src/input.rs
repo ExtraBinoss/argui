@@ -1,7 +1,7 @@
 use argui_core::{Affine2D, Color, Point, Rect, TextPosition};
-use argui_paint::{Border, ClipChain, DisplayList, Fill, Quad};
+use argui_paint::{Border, ClipChain, DisplayList, Fill, Quad, QuadStyle};
 use argui_text::{CaretScroll, CaretStop, TextEngine, TextInputScroll};
-use argui_ui::{Element, ElementKind, NodeId, UiTree};
+use argui_ui::{CaretStyle, Element, ElementKind, NodeId, UiTree};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct TextInputRegion {
@@ -13,7 +13,7 @@ pub struct TextInputRegion {
     pub selection: Vec<Rect>,
     pub caret: Option<Rect>,
     pub selection_color: Color,
-    pub caret_color: Color,
+    pub caret_style: CaretStyle,
     pub content_size: argui_core::Size,
     pub scroll_x: f32,
     pub scroll_y: f32,
@@ -258,7 +258,7 @@ pub(crate) fn prepare(
             selection: selection_rects,
             caret: (ui.focused_node() == Some(node)).then_some(caret_rect),
             selection_color: *selection,
-            caret_color: *caret,
+            caret_style: caret.clone(),
             content_size: layout.content_size,
             scroll_x: layout.scroll_x,
             scroll_y: layout.scroll_y,
@@ -312,7 +312,12 @@ pub(crate) fn update(ui: &mut UiTree, engine: &mut TextEngine, output: &mut crat
             block.bounds.origin.x = text_bounds.origin.x - scroll.x;
             block.bounds.origin.y = text_bounds.origin.y - scroll.y;
             block.bounds.size.height = text_bounds.size.height.max(region.content_size.height);
-            if let Some(config) = element.scroll.clone() {
+            if let Some(config) = output
+                .scroll_regions
+                .iter()
+                .find(|current| current.node == node.node)
+                .map(|current| current.config.clone())
+            {
                 let content = region.scroll_content_size();
                 let refreshed = crate::scroll::region(
                     node.node,
@@ -355,13 +360,112 @@ pub(crate) fn paint_selection(
 }
 
 pub(crate) fn paint_caret(
+    ui: &UiTree,
     region: &TextInputRegion,
     output: &mut DisplayList,
     transform: Affine2D,
     clips: &ClipChain,
 ) {
-    if let Some(bounds) = region.caret {
-        push_quad(output, bounds, region.caret_color, transform, clips);
+    let Some(line) = region.caret else {
+        return;
+    };
+    let frame = ui.resolved_caret_frame(region.node, &region.caret_style);
+    if frame.opacity <= 0.0 {
+        return;
+    }
+    let primitives = &region.caret_style.visual.primitives;
+    let Some(bounds) = visual_bounds(line, primitives) else {
+        return;
+    };
+    let transform = transform
+        * frame
+            .transform
+            .affine(bounds, argui_core::TransformOrigin::CENTER);
+    for primitive in primitives {
+        push_caret_quad(
+            output,
+            primitive.bounds(line),
+            &primitive.paint,
+            frame.tint,
+            frame.opacity,
+            transform,
+            clips,
+        );
+    }
+}
+
+fn visual_bounds(line: Rect, primitives: &[argui_ui::CaretPrimitive]) -> Option<Rect> {
+    let first = primitives.first()?.bounds(line);
+    let (mut left, mut top) = (first.origin.x, first.origin.y);
+    let (mut right, mut bottom) = (
+        first.origin.x + first.size.width,
+        first.origin.y + first.size.height,
+    );
+    for primitive in &primitives[1..] {
+        let bounds = primitive.bounds(line);
+        left = left.min(bounds.origin.x);
+        top = top.min(bounds.origin.y);
+        right = right.max(bounds.origin.x + bounds.size.width);
+        bottom = bottom.max(bounds.origin.y + bounds.size.height);
+    }
+    Some(Rect::new(
+        Point::new(left, top),
+        argui_core::Size::new(right - left, bottom - top),
+    ))
+}
+
+fn push_caret_quad(
+    output: &mut DisplayList,
+    bounds: Rect,
+    paint: &QuadStyle,
+    tint: Color,
+    opacity: f32,
+    transform: Affine2D,
+    clips: &ClipChain,
+) {
+    if clips.regions().is_empty() || bounds.size.width <= 0.0 || bounds.size.height <= 0.0 {
+        return;
+    }
+    let background = paint.background.as_ref().map(|fill| match fill {
+        Fill::Solid(color) => Fill::Solid(tinted(*color, tint)),
+        fill => fill.clone(),
+    });
+    let border = paint.border.map_or_else(
+        || Border::all(0.0, Color::TRANSPARENT),
+        |mut border| {
+            border.color = tinted(border.color, tint);
+            border
+        },
+    );
+    output.push_quad(Quad {
+        bounds,
+        background,
+        border,
+        radii: radius_for(bounds, paint.radii),
+        opacity: paint.opacity * opacity.clamp(0.0, 1.0),
+        transform,
+        clips: clips.clone(),
+    });
+}
+
+fn tinted(color: Color, tint: Color) -> Color {
+    let color = color.as_array();
+    let tint = tint.as_array();
+    Color::rgba(
+        color[0] * tint[0],
+        color[1] * tint[1],
+        color[2] * tint[2],
+        color[3] * tint[3],
+    )
+}
+
+fn radius_for(bounds: Rect, radii: argui_paint::CornerRadii) -> argui_paint::CornerRadii {
+    let maximum = bounds.size.width.min(bounds.size.height) * 0.5;
+    argui_paint::CornerRadii {
+        top_left: radii.top_left.min(maximum),
+        top_right: radii.top_right.min(maximum),
+        bottom_right: radii.bottom_right.min(maximum),
+        bottom_left: radii.bottom_left.min(maximum),
     }
 }
 

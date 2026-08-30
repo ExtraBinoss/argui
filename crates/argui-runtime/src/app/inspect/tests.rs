@@ -2,10 +2,10 @@ use argui_core::{Color, Point, Rect, Size, Transform2D};
 use argui_inspect::{InspectNodeId, InspectorHandle, StyleProperty, StyleValue};
 use argui_layout::{LayoutNode, LayoutOutput};
 use argui_paint::{
-    Border, ClipBehavior, EffectId, EffectInstance, EffectValue, Fill, Filter, GradientStop,
-    LayerStyle, LinearGradient, RadialGradient, Refraction, Shadow,
+    Border, EffectId, EffectInstance, EffectValue, Fill, Filter, GradientStop, LayerStyle,
+    LinearGradient, RadialGradient, Refraction, Shadow,
 };
-use argui_ui::{EffectScope, Element, ElementKind, Interaction, Length, UiTree};
+use argui_ui::{Axes, Dimension, EffectScope, Element, ElementKind, Interaction, Overflow, UiTree};
 
 use super::{
     CollectState, apply_effect_value, apply_property_value, apply_tree_overrides, collect_nodes,
@@ -17,12 +17,15 @@ fn fully_styled() -> Element {
         .background(Color::WHITE)
         .border(Border::all(1.0, Color::rgb(0.0, 0.0, 0.0)))
         .paint_opacity(0.5)
-        .clip(ClipBehavior::Bounds)
+        .overflow(Axes {
+            x: Overflow::Hidden,
+            y: Overflow::Hidden,
+        })
         .transform(Transform2D::IDENTITY.translate(2.0, 3.0))
         .layer(LayerStyle::new(Rect::default()))
         .effect(EffectScope::Content, LayerStyle::new(Rect::default()))
-        .width(Length::Px(10.0))
-        .height(Length::Px(20.0))
+        .width(Dimension::length(10.0))
+        .height(Dimension::length(20.0))
 }
 
 #[test]
@@ -235,8 +238,8 @@ fn inspector_describes_gradient_and_absent_paints_and_clamps_lengths() {
             unit: argui_inspect::StyleUnit::Percent,
         }),
     );
-    assert_eq!(element.style.width, Length::Px(0.0));
-    assert_eq!(element.style.height, Length::Percent(0.5));
+    assert_eq!(element.style.size.width, Dimension::length(0.0));
+    assert_eq!(element.style.size.height, Dimension::percent(0.5));
 }
 
 #[test]
@@ -275,7 +278,7 @@ fn primitive_and_optional_property_edits_cover_present_and_absent_targets() {
     apply_property_value(&mut element, StyleProperty::Effects, &effects);
     apply_property_value(
         &mut element,
-        StyleProperty::Clip,
+        StyleProperty::Overflow,
         &StyleValue::Summary("ignored".into()),
     );
 }
@@ -339,10 +342,11 @@ fn snapshots_cover_every_media_summary_and_empty_identity_input() {
             value: initial_value.into(),
             placeholder: "placeholder".into(),
             multiline: false,
+            read_only: false,
             text: argui_text::TextStyle::default(),
             placeholder_text: argui_text::TextStyle::default(),
             selection: Color::WHITE,
-            caret: Color::WHITE,
+            caret: argui_ui::CaretStyle::default(),
         };
         element
     };
@@ -394,5 +398,5 @@ fn snapshots_cover_every_media_summary_and_empty_identity_input() {
         StyleProperty::Width,
         &StyleValue::Length(argui_inspect::StyleLength::default()),
     );
-    assert_eq!(override_tree.style.width, Length::Auto);
+    assert_eq!(override_tree.style.size.width, Dimension::auto());
 }

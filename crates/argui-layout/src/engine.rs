@@ -1,12 +1,19 @@
+use crate::{
+    LayoutError, TextInputRegion,
+    assets::{AssetMetrics, resolve_intrinsic},
+    input, paint, scroll,
+    style::taffy_style,
+};
 use argui_core::{Point, Rect, Size};
-use argui_paint::{ClipBehavior, DisplayList};
+use argui_paint::{DisplayList, ImageAsset, VectorAsset};
 use argui_text::{TextBlock, TextEngine, TextScene};
 use argui_ui::{
     Element, ElementKind, HitRegion, LayoutStyle, NodeId as UiNodeId, ScrollRegion, UiTree,
 };
-use taffy::{AvailableSpace, NodeId, TaffyTree, compute_leaf_layout, geometry::Size as TaffySize};
-
-use crate::{LayoutError, TextInputRegion, input, paint, scroll, style::taffy_style};
+use taffy::{
+    AvailableSpace, NodeId, TaffyTree, compute_leaf_layout, geometry::Size as TaffySize,
+    tree::LayoutOutput as TaffyLayoutOutput,
+};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct LayoutNode {
@@ -63,6 +70,7 @@ pub struct LayoutEngine {
     revision: Option<u64>,
     paint_cache: paint::PaintCache,
     nodes_by_index: Vec<NodeId>,
+    assets: AssetMetrics,
 }
 
 impl Default for LayoutEngine {
@@ -73,6 +81,7 @@ impl Default for LayoutEngine {
             revision: None,
             paint_cache: paint::PaintCache::default(),
             nodes_by_index: Vec::new(),
+            assets: AssetMetrics::default(),
         }
     }
 }
@@ -81,6 +90,17 @@ impl LayoutEngine {
     #[must_use]
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn set_assets(&mut self, images: &[ImageAsset], vectors: &[VectorAsset]) {
+        if !self.assets.update(images, vectors) {
+            return;
+        }
+        if let Some(root) = &self.root {
+            self.tree
+                .mark_dirty(root.id)
+                .expect("the retained layout root belongs to its Taffy tree");
+        }
     }
 
     pub fn compute(
@@ -114,30 +134,53 @@ impl LayoutEngine {
                 height: AvailableSpace::Definite(viewport.height),
             },
             |inputs, _, context, style| {
-                compute_leaf_layout(
+                let index = context.as_deref().copied();
+                let intrinsic =
+                    index.and_then(|index| self.assets.intrinsic(&elements[index].kind));
+                let text = index.and_then(|index| {
+                    let node = ui.node_id_at(index)?;
+                    let (content, text_style) = crate::text::content(ui, node, elements[index])?;
+                    let width = inputs
+                        .known_dimensions
+                        .width
+                        .or_else(|| inputs.available_space.width.into_option());
+                    Some(text_engine.measure_layout(&content, text_style, width))
+                });
+                if index.is_some_and(|index| {
+                    matches!(
+                        elements[index].kind,
+                        ElementKind::Text { .. } | ElementKind::TextEditor { .. }
+                    )
+                }) {
+                    debug_assert!(
+                        text.is_some_and(|measurement| measurement.first_baseline.is_some())
+                    );
+                }
+                let baselines = text.map_or(taffy::tree::Baselines::NONE, |measurement| {
+                    taffy::tree::Baselines {
+                        first: measurement.first_baseline,
+                        last: measurement.last_baseline,
+                    }
+                });
+                let size = compute_leaf_layout(
                     inputs,
                     style,
                     |_, _| 0.0,
                     |known, available| {
-                        let Some(index) = context.as_deref().copied() else {
+                        if let Some(intrinsic) = intrinsic {
+                            return resolve_intrinsic(known, intrinsic);
+                        }
+                        let Some(measured) = text else {
                             return TaffySize::ZERO;
                         };
-                        let Some(node) = ui.node_id_at(index) else {
-                            return TaffySize::ZERO;
-                        };
-                        let Some((content, style)) =
-                            crate::text::content(ui, node, elements[index])
-                        else {
-                            return TaffySize::ZERO;
-                        };
-                        let width = known.width.or_else(|| available.width.into_option());
-                        let measured = text_engine.measure(&content, style, width);
+                        let _ = available;
                         TaffySize {
-                            width: known.width.unwrap_or(measured.width),
-                            height: known.height.unwrap_or(measured.height),
+                            width: known.width.unwrap_or(measured.size.width),
+                            height: known.height.unwrap_or(measured.size.height),
                         }
                     },
-                )
+                );
+                TaffyLayoutOutput { baselines, ..size }
             },
         )?;
 
@@ -208,7 +251,13 @@ impl LayoutEngine {
     fn rebuild(&mut self, ui: &UiTree) -> Result<(), LayoutError> {
         self.tree = TaffyTree::new();
         let mut next_index = 0;
-        self.root = Some(build_node(&mut self.tree, ui, ui.root(), &mut next_index)?);
+        self.root = Some(build_node(
+            &mut self.tree,
+            &self.assets,
+            ui,
+            ui.root(),
+            &mut next_index,
+        )?);
         self.rebuild_node_index();
         self.revision = Some(ui.revision());
         Ok(())
@@ -218,7 +267,12 @@ impl LayoutEngine {
         let Some(root) = self.root.take() else {
             return self.rebuild(ui);
         };
-        self.root = Some(crate::reconcile::sync(&mut self.tree, root, ui)?);
+        self.root = Some(crate::reconcile::sync(
+            &mut self.tree,
+            root,
+            &self.assets,
+            ui,
+        )?);
         self.rebuild_node_index();
         self.revision = Some(ui.revision());
         Ok(())
@@ -234,6 +288,7 @@ impl LayoutEngine {
 
 fn build_node(
     tree: &mut TaffyTree<usize>,
+    assets: &AssetMetrics,
     ui: &UiTree,
     element: &Element,
     next_index: &mut usize,
@@ -246,9 +301,10 @@ fn build_node(
     let children = element
         .children
         .iter()
-        .map(|child| build_node(tree, ui, child, next_index))
+        .map(|child| build_node(tree, assets, ui, child, next_index))
         .collect::<Result<Vec<_>, _>>()?;
-    let resolved_style = ui.resolved_layout_style(node, element);
+    let resolved_style =
+        assets.layout_style(ui.resolved_layout_style(node, element), &element.kind);
     let style = taffy_style(&resolved_style);
     let id = match element.kind {
         ElementKind::Text { .. }
@@ -315,18 +371,25 @@ fn collect_layout(
     if let Some((content, style)) = crate::text::content(ui, node.node, element) {
         let text_bounds = Rect::new(
             Point::new(
-                origin.x + layout.padding.left,
-                origin.y + layout.padding.top,
+                origin.x + layout.border.left + layout.padding.left,
+                origin.y + layout.border.top + layout.padding.top,
             ),
             Size::new(
-                (layout.size.width - layout.padding.left - layout.padding.right).max(0.0),
-                (layout.size.height - layout.padding.top - layout.padding.bottom).max(0.0),
+                (layout.size.width
+                    - layout.border.left
+                    - layout.border.right
+                    - layout.padding.left
+                    - layout.padding.right)
+                    .max(0.0),
+                (layout.size.height
+                    - layout.border.top
+                    - layout.border.bottom
+                    - layout.padding.top
+                    - layout.padding.bottom)
+                    .max(0.0),
             ),
         );
-        let text_clip = match element.paint.clip {
-            ClipBehavior::None => placement.clip,
-            ClipBehavior::Bounds => placement.clip.and_then(|clip| clip.intersection(bounds)),
-        };
+        let text_clip = scroll::clipped(node, placement.clip, bounds);
         let text_clip = text_clip.unwrap_or_default();
         let mut block = TextBlock::new(content, text_bounds);
         block.clip = text_clip;
@@ -361,11 +424,8 @@ fn collect_layout(
         clip: placement.clip,
         text_index,
     });
-    let child_clip = match element.paint.clip {
-        ClipBehavior::None => placement.clip,
-        ClipBehavior::Bounds => placement.clip.and_then(|clip| clip.intersection(bounds)),
-    };
-    if let Some(config) = element.scroll.clone()
+    let child_clip = scroll::clipped(node, placement.clip, bounds);
+    if let Some(config) = scroll::config(node, element)
         && let Some(region_clip) = placement.clip.and_then(|clip| clip.intersection(bounds))
     {
         let (content, offset) = match text_scroll {
@@ -431,11 +491,7 @@ fn apply_scroll_layout(
             bounds.origin.x - previous_bounds.origin.x,
             bounds.origin.y - previous_bounds.origin.y,
         );
-        let text_clip = match element.paint.clip {
-            ClipBehavior::None => clip,
-            ClipBehavior::Bounds => clip.and_then(|clip| clip.intersection(bounds)),
-        }
-        .unwrap_or_default();
+        let text_clip = scroll::clipped(node, clip, bounds).unwrap_or_default();
         let mut content_delta = Point::default();
         if let Some(region) = output
             .text_inputs
@@ -456,11 +512,8 @@ fn apply_scroll_layout(
         block.bounds.origin.y += content_delta.y;
         block.clip = text_clip;
     }
-    let child_clip = match element.paint.clip {
-        ClipBehavior::None => clip,
-        ClipBehavior::Bounds => clip.and_then(|clip| clip.intersection(bounds)),
-    };
-    if let Some(config) = element.scroll.clone()
+    let child_clip = scroll::clipped(node, clip, bounds);
+    if let Some(config) = scroll::config(node, element)
         && let Some(region_clip) = clip.and_then(|clip| clip.intersection(bounds))
     {
         let (content, offset) = output

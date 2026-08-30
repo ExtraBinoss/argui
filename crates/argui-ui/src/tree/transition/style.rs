@@ -1,8 +1,5 @@
 use argui_core::{Color, Point, Transform2D};
-use argui_paint::{
-    Border, BorderWidths, CornerRadii, Fill, GradientStop, GradientStops, LayerMask, LayerStyle,
-    QuadStyle,
-};
+use argui_paint::{Border, Fill, GradientStop, GradientStops, LayerMask, LayerStyle, QuadStyle};
 
 use crate::binding::layout::{layout_value, set_layout_value};
 use crate::binding::{GradientPointTarget, LayoutTarget};
@@ -14,6 +11,8 @@ use super::{NodeSpec, TransitionRegistry, TransitionTarget};
 mod effect;
 use effect::{apply_effect, effect_values};
 mod scrollbar;
+mod values;
+use values::{radii, widths_from_array};
 
 pub(super) fn collect_specs<'a>(
     element: &'a Element,
@@ -98,8 +97,8 @@ fn target_values(
 ) -> Vec<StatePropertyValue> {
     let mut values = base_values(element, scroll);
     for state in [
-        VisualState::Focused,
         VisualState::Hovered,
+        VisualState::Focused,
         VisualState::Pressed,
         VisualState::Disabled,
     ] {
@@ -318,7 +317,6 @@ fn value(key: PropertyKey, value: StateValue) -> StatePropertyValue {
 }
 
 fn layout_targets(style: &crate::LayoutStyle) -> Vec<LayoutTarget> {
-    use crate::Length::{Auto, Percent, Px};
     let mut values = vec![
         LayoutTarget::PaddingLeft,
         LayoutTarget::PaddingRight,
@@ -328,62 +326,93 @@ fn layout_targets(style: &crate::LayoutStyle) -> Vec<LayoutTarget> {
         LayoutTarget::Grow,
         LayoutTarget::Shrink,
     ];
-    let mut add = |length, px, percent| match length {
-        Px(_) => values.push(px),
-        Percent(_) => values.push(percent),
-        Auto => {}
-    };
-    add(
-        style.width,
+    add_dimension(
+        &mut values,
+        style.size.width,
         LayoutTarget::WidthPx,
         LayoutTarget::WidthPercent,
     );
-    add(
-        style.height,
+    add_dimension(
+        &mut values,
+        style.size.height,
         LayoutTarget::HeightPx,
         LayoutTarget::HeightPercent,
     );
-    add(
-        style.min_width,
+    add_auto_length(
+        &mut values,
+        style.min_size.width,
         LayoutTarget::MinWidthPx,
         LayoutTarget::MinWidthPercent,
     );
-    add(
-        style.min_height,
+    add_auto_length(
+        &mut values,
+        style.min_size.height,
         LayoutTarget::MinHeightPx,
         LayoutTarget::MinHeightPercent,
     );
-    add(
-        style.max_width,
+    add_auto_length(
+        &mut values,
+        style.max_size.width,
         LayoutTarget::MaxWidthPx,
         LayoutTarget::MaxWidthPercent,
     );
-    add(
-        style.max_height,
+    add_auto_length(
+        &mut values,
+        style.max_size.height,
         LayoutTarget::MaxHeightPx,
         LayoutTarget::MaxHeightPercent,
     );
-    add(
+    add_auto_length(
+        &mut values,
         style.inset.left,
         LayoutTarget::InsetLeftPx,
         LayoutTarget::InsetLeftPx,
     );
-    add(
+    add_auto_length(
+        &mut values,
         style.inset.right,
         LayoutTarget::InsetRightPx,
         LayoutTarget::InsetRightPx,
     );
-    add(
+    add_auto_length(
+        &mut values,
         style.inset.top,
         LayoutTarget::InsetTopPx,
         LayoutTarget::InsetTopPx,
     );
-    add(
+    add_auto_length(
+        &mut values,
         style.inset.bottom,
         LayoutTarget::InsetBottomPx,
         LayoutTarget::InsetBottomPx,
     );
     values
+}
+
+fn add_dimension(
+    values: &mut Vec<LayoutTarget>,
+    value: crate::Dimension,
+    pixels: LayoutTarget,
+    percent: LayoutTarget,
+) {
+    match value.expand() {
+        taffy::ExpandedDimension::Length(_) => values.push(pixels),
+        taffy::ExpandedDimension::Percent(_) => values.push(percent),
+        _ => {}
+    }
+}
+
+fn add_auto_length(
+    values: &mut Vec<LayoutTarget>,
+    value: crate::LengthPercentageAuto,
+    pixels: LayoutTarget,
+    percent: LayoutTarget,
+) {
+    match value.expand() {
+        taffy::ExpandedLengthPercentageAuto::Length(_) => values.push(pixels),
+        taffy::ExpandedLengthPercentageAuto::Percent(_) => values.push(percent),
+        _ => {}
+    }
 }
 
 pub(in crate::tree) fn apply_quad(
@@ -557,22 +586,4 @@ pub(in crate::tree) fn apply_layer(
             (key, value) => apply_effect(layer, key, &value),
         }
     });
-}
-
-const fn widths_from_array(value: [f32; 4]) -> BorderWidths {
-    BorderWidths {
-        left: value[0],
-        right: value[1],
-        top: value[2],
-        bottom: value[3],
-    }
-}
-
-const fn radii(value: [f32; 4]) -> CornerRadii {
-    CornerRadii {
-        top_left: value[0],
-        top_right: value[1],
-        bottom_right: value[2],
-        bottom_left: value[3],
-    }
 }

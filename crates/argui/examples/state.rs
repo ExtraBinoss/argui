@@ -1,5 +1,4 @@
 use argui::{
-    devtools::DevtoolsHost,
     platform::{
         AppIcon, ApplicationConfig, ApplicationId, ApplicationIdentity, IconSet, TrayAction,
         TrayConfig, TrayItemId, TrayMenuItem, WindowConfig,
@@ -7,6 +6,7 @@ use argui::{
     render::RendererConfig,
     runtime::{RuntimeEvent, WindowRuntimeEvent, run_app_with_text_engine},
 };
+use argui_devtools::DevtoolsHost;
 use argui_showcase::{StateShowcase, text_engine};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

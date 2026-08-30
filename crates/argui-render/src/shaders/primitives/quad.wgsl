@@ -1,5 +1,5 @@
 struct Viewport { size: vec2<f32>, origin: vec2<f32> }
-struct Clip { inverse_a: vec4<f32>, inverse_b: vec4<f32>, bounds: vec4<f32> }
+struct Clip { inverse_a: vec4<f32>, inverse_b: vec4<f32>, bounds: vec4<f32>, radii: vec4<f32> }
 struct Quad {
     rect: vec4<f32>, background: vec4<f32>, border_color: vec4<f32>, radii: vec4<f32>,
     border_widths: vec4<f32>, transform_a: vec4<f32>, transform_b: vec4<f32>,
@@ -90,11 +90,12 @@ fn fill_color(quad: Quad, local: vec2<f32>) -> vec4<f32> {
 fn fragment(input: VertexOutput) -> @location(0) vec4<f32> {
     let quad = quads[input.instance];
     let pixel = input.position.xy + viewport.origin;
+    var clip_coverage = 1.0;
     for (var offset = 0u; offset < quad.clip_meta.y; offset++) {
         let clip = clips[quad.clip_meta.x + offset];
         let local = transformed(clip.inverse_a, clip.inverse_b, pixel);
-        if local.x < clip.bounds.x || local.y < clip.bounds.y ||
-           local.x >= clip.bounds.x + clip.bounds.z || local.y >= clip.bounds.y + clip.bounds.w { discard; }
+        let distance = rounded_distance(local - clip.bounds.xy, clip.bounds.zw, clip.radii);
+        clip_coverage *= edge_coverage(distance);
     }
     let outer_distance = rounded_distance(input.local, quad.rect.zw, quad.radii);
     let outer_coverage = edge_coverage(outer_distance);
@@ -114,5 +115,5 @@ fn fragment(input: VertexOutput) -> @location(0) vec4<f32> {
     let color = (
         quad.border_color.rgb * border_alpha + fill.rgb * fill_alpha
     ) / max(alpha, 0.00001);
-    return vec4(color, alpha * quad.params.x);
+    return vec4(color, alpha * quad.params.x * clip_coverage);
 }

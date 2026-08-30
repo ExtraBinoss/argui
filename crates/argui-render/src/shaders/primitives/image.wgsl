@@ -1,5 +1,5 @@
 struct Viewport { size: vec2<f32>, origin: vec2<f32> }
-struct Clip { inverse_a: vec4<f32>, inverse_b: vec4<f32>, bounds: vec4<f32> }
+struct Clip { inverse_a: vec4<f32>, inverse_b: vec4<f32>, bounds: vec4<f32>, radii: vec4<f32> }
 @group(0) @binding(0) var<uniform> viewport: Viewport;
 @group(0) @binding(1) var<storage, read> clips: array<Clip>;
 @group(1) @binding(0) var source: texture_2d<f32>;
@@ -57,17 +57,19 @@ fn rounded_distance(point: vec2<f32>, size: vec2<f32>, radii: vec4<f32>) -> f32 
 @fragment
 fn fragment(input: Output) -> @location(0) vec4<f32> {
     let pixel = input.position.xy + viewport.origin;
+    var clip_coverage = 1.0;
     for (var offset = 0u; offset < input.clip_meta.y; offset++) {
         let clip = clips[input.clip_meta.x + offset];
         let local = vec2(
             clip.inverse_a.x * pixel.x + clip.inverse_a.z * pixel.y + clip.inverse_b.x,
             clip.inverse_a.y * pixel.x + clip.inverse_a.w * pixel.y + clip.inverse_b.y,
         );
-        if local.x < clip.bounds.x || local.y < clip.bounds.y ||
-           local.x >= clip.bounds.x + clip.bounds.z || local.y >= clip.bounds.y + clip.bounds.w { discard; }
+        let clip_distance = rounded_distance(local - clip.bounds.xy, clip.bounds.zw, clip.radii);
+        let clip_width = max(fwidth(clip_distance), 0.75);
+        clip_coverage *= 1.0 - smoothstep(-clip_width, clip_width, clip_distance);
     }
     let distance = rounded_distance(input.local, input.size, input.radii);
     let coverage = 1.0 - smoothstep(-max(fwidth(distance), 0.75), max(fwidth(distance), 0.75), distance);
     let color = textureSample(source, source_sampler, input.uv);
-    return vec4(color.rgb, color.a * input.opacity * coverage);
+    return vec4(color.rgb, color.a * input.opacity * coverage * clip_coverage);
 }

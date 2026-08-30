@@ -112,6 +112,7 @@ pub struct HitRegion {
     pub bounds: Rect,
     pub transform: Affine2D,
     pub clips: ClipChain,
+    pub enabled: bool,
     pub focusable: bool,
     pub cursor: CursorIcon,
     pub gestures: GestureSet,
@@ -224,7 +225,7 @@ impl InteractionState {
     }
 
     pub fn pointer_moved(&mut self, point: Point, regions: &[HitRegion]) -> RawUpdate {
-        let hit = hit_test(regions, point);
+        let hit = hit_test(regions, point).filter(|region| region.enabled);
         let mut update = RawUpdate::default();
         if hit.map(|region| region.node) != self.hovered {
             if let Some(previous) = self.hovered {

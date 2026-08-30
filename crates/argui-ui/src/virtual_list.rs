@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use crate::{Element, Length, ScrollConfig};
+use crate::{Axes, Dimension, Element, Overflow, ScrollConfig};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct VirtualWindow {
@@ -86,22 +86,26 @@ impl VirtualList {
         let window = self.window(offset);
         let mut children = Vec::with_capacity(window.range.len() + 2);
         children.push(spacer(window.before));
-        children.extend(
-            window
-                .range
-                .map(|index| item(index).height(Length::Px(self.item_extent)).shrink(0.0)),
-        );
+        children.extend(window.range.map(|index| {
+            item(index)
+                .height(Dimension::length(self.item_extent))
+                .shrink(0.0)
+        }));
         children.push(spacer(window.after));
         Element::column([Element::column(children).shrink(0.0)])
             .keyed(key)
-            .height(Length::Px(self.viewport_extent))
-            .scrollable(self.scroll)
+            .height(Dimension::length(self.viewport_extent))
+            .overflow(Axes {
+                x: Overflow::Hidden,
+                y: Overflow::Auto,
+            })
+            .scroll_config(self.scroll)
     }
 }
 
 fn spacer(height: f32) -> Element {
     Element::container([])
-        .height(Length::Px(height))
+        .height(Dimension::length(height))
         .shrink(0.0)
         .semantic_hidden(true)
 }
@@ -238,14 +242,18 @@ impl VariableList {
         children.push(spacer(window.before));
         children.extend(window.range.map(|index| {
             item(index)
-                .height(Length::Px(self.extents[index]))
+                .height(Dimension::length(self.extents[index]))
                 .shrink(0.0)
         }));
         children.push(spacer(window.after));
         Element::column([Element::column(children).shrink(0.0)])
             .keyed(key)
-            .height(Length::Px(self.viewport_extent))
-            .scrollable(self.scroll.clone())
+            .height(Dimension::length(self.viewport_extent))
+            .overflow(Axes {
+                x: Overflow::Hidden,
+                y: Overflow::Auto,
+            })
+            .scroll_config(self.scroll.clone())
     }
 
     #[must_use]

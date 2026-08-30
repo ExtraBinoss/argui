@@ -1,6 +1,6 @@
 use crate::{Easing, Interpolate, TimingError};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Keyframe<T> {
     pub offset: f32,
     pub value: T,
@@ -32,7 +32,7 @@ impl<T> Keyframe<T> {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Keyframes<T> {
     frames: Box<[Keyframe<T>]>,
 }

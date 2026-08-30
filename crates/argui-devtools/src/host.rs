@@ -351,7 +351,7 @@ impl<A: Render> DevtoolsHost<A> {
         let mut cx = Context::default();
         let app = self.app.render(&mut cx);
         let environment = cx.environment();
-        let themes = argui_theme::shadcn(environment.primary);
+        let themes = argui_widgets::shadcn(environment.primary);
         view::host(self, app, themes.resolve(environment.color_scheme))
     }
 
@@ -453,7 +453,7 @@ impl<A: Render> Render for DevtoolsHost<A> {
         let mut app_cx = cx.child_context();
         let app = self.app.render(&mut app_cx);
         cx.propagate(app_cx);
-        let themes = argui_theme::shadcn(environment.primary);
+        let themes = argui_widgets::shadcn(environment.primary);
         view::host(self, app, themes.resolve(environment.color_scheme))
     }
 

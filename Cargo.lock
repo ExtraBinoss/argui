@@ -221,6 +221,7 @@ dependencies = [
  "argui-theme",
  "argui-ui",
  "argui-vector",
+ "argui-widgets",
 ]
 
 [[package]]
@@ -261,6 +262,7 @@ dependencies = [
  "argui-theme",
  "argui-ui",
  "argui-vector",
+ "argui-widgets",
  "icondata_core",
  "icondata_tb",
 ]
@@ -300,6 +302,7 @@ dependencies = [
  "argui-paint",
  "argui-text",
  "argui-ui",
+ "argui-widgets",
  "taffy",
 ]
 
@@ -389,6 +392,7 @@ dependencies = [
  "argui-text",
  "argui-theme",
  "argui-ui",
+ "argui-widgets",
 ]
 
 [[package]]
@@ -396,6 +400,7 @@ name = "argui-state-app"
 version = "0.1.0"
 dependencies = [
  "argui",
+ "argui-devtools",
  "argui-showcase",
  "winresource",
 ]
@@ -414,12 +419,6 @@ name = "argui-theme"
 version = "0.1.0"
 dependencies = [
  "argui-core",
- "argui-paint",
- "argui-text",
- "argui-ui",
- "argui-vector",
- "icondata_core",
- "icondata_tb",
 ]
 
 [[package]]
@@ -431,6 +430,8 @@ dependencies = [
  "argui-core",
  "argui-paint",
  "argui-text",
+ "argui-widgets",
+ "taffy",
  "unicode-segmentation",
 ]
 
@@ -454,6 +455,32 @@ dependencies = [
  "argui-devtools",
  "argui-showcase",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "argui-widget-gallery"
+version = "0.1.0"
+dependencies = [
+ "argui",
+ "argui-effects",
+ "argui-image",
+ "wasm-bindgen",
+]
+
+[[package]]
+name = "argui-widgets"
+version = "0.1.0"
+dependencies = [
+ "argui-animation",
+ "argui-core",
+ "argui-paint",
+ "argui-runtime",
+ "argui-text",
+ "argui-theme",
+ "argui-ui",
+ "argui-vector",
+ "icondata_core",
+ "icondata_tb",
 ]
 
 [[package]]

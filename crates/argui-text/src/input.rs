@@ -291,7 +291,12 @@ impl InputBuffer {
         let attrs = Attrs::new()
             .family(engine::family(&style.family))
             .weight(Weight(style.weight));
-        buffer.set_text(text, &attrs, Shaping::Advanced, None);
+        buffer.set_text(
+            text,
+            &attrs,
+            Shaping::Advanced,
+            engine::text_align(style.align),
+        );
         buffer.shape_until_scroll(fonts, false);
         Self {
             text: text.to_owned(),

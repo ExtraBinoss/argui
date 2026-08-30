@@ -1,5 +1,5 @@
 use argui_core::{Affine2D, Point, Rect};
-use argui_paint::{ClipBehavior, ClipChain, ClipRegion};
+use argui_paint::{ClipChain, ClipRegion};
 use argui_ui::{Element, UiTree};
 use taffy::TaffyTree;
 
@@ -35,10 +35,10 @@ pub(crate) fn resolve(
             placed.bounds.origin.x - current.origin.x,
             placed.bounds.origin.y - current.origin.y,
         );
-        translate(map, elements, output, delta, viewport);
+        translate(map, output, delta, viewport);
         output.nodes[map.index].bounds.size = placed.bounds.size;
 
-        if let Some(config) = element.scroll.clone()
+        if let Some(config) = overlay_scroll_config(map, element)
             && let Some(clip) = viewport.intersection(output.nodes[map.index].bounds)
         {
             let content = super::engine::content_size(tree, map)?;
@@ -73,20 +73,13 @@ fn collect<'a>(map: &'a NodeMap, elements: &[&Element], output: &mut Vec<&'a Nod
     }
 }
 
-fn translate(
-    map: &NodeMap,
-    elements: &[&Element],
-    output: &mut LayoutOutput,
-    delta: Point,
-    incoming_clip: Rect,
-) {
-    let element = elements[map.index];
+fn translate(map: &NodeMap, output: &mut LayoutOutput, delta: Point, incoming_clip: Rect) {
     let node = &mut output.nodes[map.index];
     node.bounds.origin = add(node.bounds.origin, delta);
     node.clip = Some(incoming_clip);
     let bounds = node.bounds;
     let text_index = node.text_index;
-    let content_clip = if element.paint.clip == ClipBehavior::Bounds {
+    let content_clip = if map.style.overflow.x.clips() || map.style.overflow.y.clips() {
         incoming_clip.intersection(bounds).unwrap_or_default()
     } else {
         incoming_clip
@@ -116,14 +109,29 @@ fn translate(
             scrollbar.thumb.origin = add(scrollbar.thumb.origin, delta);
         }
     }
-    let child_clip = if element.paint.clip == ClipBehavior::Bounds {
+    let child_clip = if map.style.overflow.x.clips() || map.style.overflow.y.clips() {
         content_clip
     } else {
         incoming_clip
     };
     for child in &map.children {
-        translate(child, elements, output, delta, child_clip);
+        translate(child, output, delta, child_clip);
     }
+}
+
+fn overlay_scroll_config(map: &NodeMap, element: &Element) -> Option<argui_ui::ScrollConfig> {
+    let axes = match (
+        map.style.overflow.x.scrolls(),
+        map.style.overflow.y.scrolls(),
+    ) {
+        (false, false) => return None,
+        (true, false) => argui_ui::ScrollAxes::Horizontal,
+        (false, true) => argui_ui::ScrollAxes::Vertical,
+        (true, true) => argui_ui::ScrollAxes::Both,
+    };
+    let mut config = element.scroll.clone().unwrap_or_default();
+    config.axes = axes;
+    Some(config)
 }
 
 fn add(left: Point, right: Point) -> Point {

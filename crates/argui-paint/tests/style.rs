@@ -1,6 +1,4 @@
-use argui_paint::{
-    Border, BorderWidths, ClipBehavior, Color, CornerRadii, Fill, PaintStyle, QuadStyle,
-};
+use argui_paint::{Border, BorderWidths, Color, CornerRadii, Fill, PaintStyle, QuadStyle};
 
 #[test]
 fn paint_styles_are_explicit_and_theme_free() {
@@ -13,7 +11,6 @@ fn paint_styles_are_explicit_and_theme_free() {
             radii,
             opacity: 0.8,
         },
-        clip: ClipBehavior::Bounds,
     };
 
     assert!(style.is_visible());
@@ -27,10 +24,5 @@ fn paint_styles_are_explicit_and_theme_free() {
         .radius(radii)
         .opacity(0.5);
     assert_eq!(built.border, Some(border));
-    assert_eq!(
-        PaintStyle::new(built.clone())
-            .clip(ClipBehavior::Bounds)
-            .quad,
-        built
-    );
+    assert_eq!(PaintStyle::new(built.clone()).quad, built);
 }

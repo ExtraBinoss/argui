@@ -218,20 +218,59 @@ pub enum ImageSampling {
 pub struct ClipRegion {
     pub bounds: Rect,
     pub transform: Affine2D,
+    pub radii: crate::CornerRadii,
 }
 
 impl ClipRegion {
     #[must_use]
     pub const fn new(bounds: Rect, transform: Affine2D) -> Self {
-        Self { bounds, transform }
+        Self {
+            bounds,
+            transform,
+            radii: crate::CornerRadii::all(0.0),
+        }
+    }
+
+    #[must_use]
+    pub const fn rounded(bounds: Rect, transform: Affine2D, radii: crate::CornerRadii) -> Self {
+        Self {
+            bounds,
+            transform,
+            radii,
+        }
     }
 
     #[must_use]
     pub fn contains(self, point: Point) -> bool {
-        self.transform
-            .inverse()
-            .is_some_and(|inverse| self.bounds.contains(inverse.transform_point(point)))
+        self.transform.inverse().is_some_and(|inverse| {
+            let point = inverse.transform_point(point);
+            self.bounds.contains(point) && rounded_rect_contains(self.bounds, self.radii, point)
+        })
     }
+}
+
+fn rounded_rect_contains(bounds: Rect, radii: crate::CornerRadii, point: Point) -> bool {
+    let local = Point::new(point.x - bounds.origin.x, point.y - bounds.origin.y);
+    let width = bounds.size.width.max(0.0);
+    let height = bounds.size.height.max(0.0);
+    let radius = if local.y < height * 0.5 {
+        if local.x < width * 0.5 {
+            radii.top_left
+        } else {
+            radii.top_right
+        }
+    } else if local.x < width * 0.5 {
+        radii.bottom_left
+    } else {
+        radii.bottom_right
+    }
+    .clamp(0.0, width.min(height) * 0.5);
+    let center = Point::new(
+        local.x.clamp(radius, width - radius),
+        local.y.clamp(radius, height - radius),
+    );
+    let delta = Point::new(local.x - center.x, local.y - center.y);
+    delta.x * delta.x + delta.y * delta.y <= radius * radius
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]

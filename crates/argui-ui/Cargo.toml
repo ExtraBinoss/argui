@@ -11,7 +11,11 @@ argui-animation.workspace = true
 argui-core.workspace = true
 argui-paint.workspace = true
 argui-text.workspace = true
+taffy.workspace = true
 unicode-segmentation.workspace = true
+
+[dev-dependencies]
+argui-widgets.workspace = true
 
 [lints]
 workspace = true

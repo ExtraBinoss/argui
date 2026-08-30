@@ -1,9 +1,8 @@
 use argui_animation::{Duration, Frame, Time};
 use argui_core::ColorScheme;
-use argui_paint::ClipBehavior;
 use argui_platform::{PlatformEvent, WindowBackend, WindowKey};
 use argui_runtime::{AppCommand, AppEvent, AppModel, ViewUpdate, WindowEnvironment};
-use argui_ui::{Element, FocusTarget, InitialFocus, UiEvent, UiEventKind, UiTree};
+use argui_ui::{Element, FocusTarget, InitialFocus, Overflow, UiEvent, UiEventKind, UiTree};
 
 use argui_showcase::spotlight::SpotlightShowcase;
 
@@ -42,7 +41,8 @@ fn spotlight_starts_with_search_focus_and_a_native_drag_region() {
         .unwrap();
     let scope = root.children[0].focus_scope.as_ref().unwrap();
     let panel = &root.children[0];
-    assert_eq!(panel.paint.clip, ClipBehavior::Bounds);
+    assert_eq!(panel.style.overflow.x, Overflow::Hidden);
+    assert_eq!(panel.style.overflow.y, Overflow::Hidden);
     assert!(panel.layer.is_none());
     let panel_border = panel.paint.quad.border.unwrap();
     assert_eq!(panel_border.widths.as_array(), [1.0; 4]);

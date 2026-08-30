@@ -1,10 +1,10 @@
 use argui_core::{Point, Size};
 use argui_layout::LayoutEngine;
-use argui_paint::{Border, ClipBehavior, Color, DisplayCommand, ImageFit, LayerStyle, VectorId};
+use argui_paint::{Border, Color, DisplayCommand, ImageFit, LayerStyle, VectorId};
 use argui_text::TextEngine;
 use argui_ui::{
-    CornerRadii, CursorIcon, Element, ImageId, Interaction, Length, Transform2D, TransformOrigin,
-    UiTree,
+    Axes, CornerRadii, CursorIcon, Element, ImageId, Interaction, Overflow, Transform2D,
+    TransformOrigin, UiTree, length,
 };
 
 const NOTO_SANS: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
@@ -101,8 +101,8 @@ fn whole_and_content_scopes_nest_around_children_in_stable_order() {
 fn transformed_images_share_exact_clips_layers_and_hit_geometry() {
     let image = Element::image(ImageId(42))
         .image_fit(ImageFit::Contain)
-        .width(Length::Px(80.0))
-        .height(Length::Px(40.0))
+        .width(length(80.0))
+        .height(length(40.0))
         .interaction(
             Interaction::default()
                 .focusable(true)
@@ -112,9 +112,12 @@ fn transformed_images_share_exact_clips_layers_and_hit_geometry() {
         .transform_origin(TransformOrigin::TOP_LEFT)
         .layer(effect());
     let root = Element::container([image])
-        .width(Length::Px(100.0))
-        .height(Length::Px(80.0))
-        .clip(ClipBehavior::Bounds);
+        .width(length(100.0))
+        .height(length(80.0))
+        .overflow(Axes {
+            x: Overflow::Hidden,
+            y: Overflow::Hidden,
+        });
     let mut ui = UiTree::new(root);
     let output = LayoutEngine::new()
         .compute(&mut ui, &mut text_engine(), Size::new(200.0, 120.0))
@@ -142,17 +145,45 @@ fn transformed_images_share_exact_clips_layers_and_hit_geometry() {
 }
 
 #[test]
+fn disabled_interactions_keep_cursor_hit_geometry_but_reject_input() {
+    let root = Element::container([])
+        .width(length(120.0))
+        .height(length(40.0))
+        .interaction(
+            Interaction::default()
+                .enabled(false)
+                .focusable(true)
+                .cursor(CursorIcon::NotAllowed),
+        );
+    let mut ui = UiTree::new(root);
+    let output = LayoutEngine::new()
+        .compute(&mut ui, &mut text_engine(), Size::new(120.0, 40.0))
+        .unwrap();
+
+    assert!(matches!(
+        output.hit_regions.as_slice(),
+        [region]
+            if !region.enabled
+                && !region.focusable
+                && region.cursor == CursorIcon::NotAllowed
+    ));
+}
+
+#[test]
 fn vectors_lower_to_the_shared_clipped_transformed_display_list() {
     let vector = Element::vector(VectorId(7))
         .vector_progress(0.35)
         .paint_opacity(0.6)
-        .width(Length::Px(24.0))
-        .height(Length::Px(24.0));
+        .width(length(24.0))
+        .height(length(24.0));
     let mut ui = UiTree::new(
         Element::container([vector])
-            .width(Length::Px(40.0))
-            .height(Length::Px(40.0))
-            .clip(ClipBehavior::Bounds),
+            .width(length(40.0))
+            .height(length(40.0))
+            .overflow(Axes {
+                x: Overflow::Hidden,
+                y: Overflow::Hidden,
+            }),
     );
     let output = LayoutEngine::new()
         .compute(&mut ui, &mut text_engine(), Size::new(80.0, 80.0))

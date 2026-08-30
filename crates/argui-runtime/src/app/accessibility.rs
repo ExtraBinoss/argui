@@ -226,6 +226,7 @@ mod tests {
             bounds: Rect::new(Point::default(), Size::new(100.0, 40.0)),
             transform: Affine2D::IDENTITY,
             clips: ClipChain::default(),
+            enabled: true,
             focusable: true,
             cursor: CursorIcon::Auto,
             gestures: GestureSet::NONE,

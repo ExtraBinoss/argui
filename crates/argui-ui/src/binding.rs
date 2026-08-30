@@ -99,7 +99,7 @@ impl PropertyBinding {
     #[must_use]
     pub const fn impact(&self) -> BindingImpact {
         match self {
-            Self::Layout(..) => BindingImpact::Layout,
+            Self::Layout(..) | Self::BorderWidths(_) => BindingImpact::Layout,
             Self::Scroll(_) => BindingImpact::Scroll,
             _ => BindingImpact::Paint,
         }

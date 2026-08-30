@@ -80,7 +80,7 @@ fn style_labels_and_frame_totals_are_complete() {
             "background",
             "border",
             "opacity",
-            "clip",
+            "overflow",
             "transform",
             "layer",
             "effects",

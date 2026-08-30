@@ -8,12 +8,14 @@ license.workspace = true
 [features]
 default = []
 tray = ["argui-platform/tray", "argui-runtime/tray"]
+widgets = ["dep:argui-widgets"]
+devtools = ["widgets", "dep:argui-devtools"]
 
 [dependencies]
 argui-accessibility.workspace = true
 argui-animation.workspace = true
 argui-core.workspace = true
-argui-devtools.workspace = true
+argui-devtools = { workspace = true, optional = true }
 argui-layout.workspace = true
 argui-paint.workspace = true
 argui-platform.workspace = true
@@ -23,9 +25,12 @@ argui-text.workspace = true
 argui-theme.workspace = true
 argui-ui.workspace = true
 argui-vector.workspace = true
+argui-widgets = { workspace = true, optional = true }
 
 [dev-dependencies]
+argui-devtools.workspace = true
 argui-showcase.workspace = true
+argui-widgets.workspace = true
 
 [lints]
 workspace = true

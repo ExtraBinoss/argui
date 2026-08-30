@@ -1,7 +1,7 @@
 use argui_core::{Point, Size};
 use argui_ui::{
-    CursorIcon, Element, GestureEvent, GestureKind, GesturePhase, LayoutStyle, Length, ResizeAxes,
-    ResizeConfig, ResizeEvent, ResizeState, UiEvent, UiEventKind, UiTree,
+    CursorIcon, Element, GestureEvent, GestureKind, GesturePhase, LayoutStyle, ResizeAxes,
+    ResizeConfig, ResizeEvent, ResizeState, UiEvent, UiEventKind, UiTree, length,
 };
 
 fn event(phase: GesturePhase, total: Point) -> UiEvent {
@@ -117,22 +117,21 @@ fn first_pan_sample_resizes_without_waiting_for_another_pointer_event() {
 
 #[test]
 fn resizable_composes_arbitrary_content_and_handle() {
+    let mut layout = LayoutStyle::default();
+    layout.min_size.width = length(120.0);
     let element = argui_ui::Resizable::new(
         Size::new(240.0, 160.0),
         Element::text("editor"),
         "resize",
         Element::text("handle"),
     )
-    .layout(LayoutStyle {
-        min_width: Length::Px(120.0),
-        ..LayoutStyle::default()
-    })
+    .layout(layout)
     .build();
 
     assert_eq!(element.children.len(), 2);
-    assert_eq!(element.style.width, Length::Px(240.0));
-    assert_eq!(element.style.height, Length::Px(160.0));
-    assert_eq!(element.style.min_width, Length::Px(120.0));
+    assert_eq!(element.style.size.width, length(240.0));
+    assert_eq!(element.style.size.height, length(160.0));
+    assert_eq!(element.style.min_size.width, length(120.0));
     let handle = &element.children[1];
     assert_eq!(handle.key.as_deref(), Some("resize"));
     assert_eq!(

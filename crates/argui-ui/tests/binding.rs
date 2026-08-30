@@ -4,7 +4,7 @@ use argui_paint::{
     Border, CornerRadii, EffectArgument, EffectId, EffectInstance, EffectValue, Fill, Filter,
     GradientStop, LayerMask, LayerStyle, LinearGradient, RadialGradient, Shadow,
 };
-use argui_ui::{Element, Length, TreeUpdate, UiTree, property};
+use argui_ui::{Element, TreeUpdate, UiTree, length, percent, property};
 
 #[test]
 fn one_typed_bind_entry_resolves_each_property_family() {
@@ -13,7 +13,7 @@ fn one_typed_bind_entry_resolves_each_property_family() {
     let opacity = Motion::new(0.4_f32);
     let scroll = Motion::new(Point::new(0.0, 30.0));
     let element = Element::container([])
-        .width(Length::Px(10.0))
+        .width(length(10.0))
         .paint_opacity(1.0)
         .bind(property::Transform, transform)
         .bind(property::WidthPx, width)
@@ -25,8 +25,8 @@ fn one_typed_bind_entry_resolves_each_property_family() {
     assert_eq!(tree.resolved_transform(node, &element).translation.x, 4.0);
     assert_eq!(tree.resolved_quad(node, &element).opacity, 0.4);
     assert_eq!(
-        tree.resolved_layout_style(node, &element).width,
-        Length::Px(120.0)
+        tree.resolved_layout_style(node, &element).size.width,
+        length(120.0)
     );
     assert_eq!(tree.scroll_offset(node), Point::new(0.0, 30.0));
 }
@@ -181,28 +181,24 @@ fn every_layout_property_resolves_to_its_exact_typed_slot() {
     let tree = UiTree::new(element.clone());
     let style = tree.resolved_layout_style(tree.node_ids()[0], &element);
 
-    assert_eq!(style.width, Length::Percent(1.0));
-    assert_eq!(style.height, Length::Px(2.0));
-    assert_eq!(style.min_width, Length::Percent(3.0));
-    assert_eq!(style.min_height, Length::Px(4.0));
-    assert_eq!(style.max_width, Length::Percent(5.0));
-    assert_eq!(style.max_height, Length::Px(6.0));
-    assert_eq!(
-        [
-            style.padding.left,
-            style.padding.right,
-            style.padding.top,
-            style.padding.bottom,
-            style.gap,
-            style.grow,
-            style.shrink,
-        ],
-        [7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0]
-    );
-    assert_eq!(style.inset.left, Length::Px(14.0));
-    assert_eq!(style.inset.right, Length::Px(15.0));
-    assert_eq!(style.inset.top, Length::Px(16.0));
-    assert_eq!(style.inset.bottom, Length::Px(17.0));
+    assert_eq!(style.size.width, percent(1.0));
+    assert_eq!(style.size.height, length(2.0));
+    assert_eq!(style.min_size.width, percent(3.0));
+    assert_eq!(style.min_size.height, length(4.0));
+    assert_eq!(style.max_size.width, percent(5.0));
+    assert_eq!(style.max_size.height, length(6.0));
+    assert_eq!(style.padding.left, length(7.0));
+    assert_eq!(style.padding.right, length(8.0));
+    assert_eq!(style.padding.top, length(9.0));
+    assert_eq!(style.padding.bottom, length(10.0));
+    assert_eq!(style.gap.width, length(11.0));
+    assert_eq!(style.gap.height, length(11.0));
+    assert_eq!(style.flex_grow, 12.0);
+    assert_eq!(style.flex_shrink, 13.0);
+    assert_eq!(style.inset.left, length(14.0));
+    assert_eq!(style.inset.right, length(15.0));
+    assert_eq!(style.inset.top, length(16.0));
+    assert_eq!(style.inset.bottom, length(17.0));
 }
 
 #[test]

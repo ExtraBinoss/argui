@@ -1,87 +1,59 @@
-use argui_ui::{Align, Direction, Edges, Justify, LayoutStyle, Length, Position, Wrap};
-use taffy::{
-    AlignItems, Dimension, FlexDirection, FlexWrap, JustifyContent, LengthPercentage,
-    LengthPercentageAuto, Style,
-    geometry::{Rect, Size},
-};
+use argui_ui::{LayoutStyle, Overflow, ScrollbarGutter};
+use taffy::{Style, geometry::Point};
 
 pub(crate) fn taffy_style(style: &LayoutStyle) -> Style {
     Style {
-        size: Size {
-            width: dimension(style.width),
-            height: dimension(style.height),
+        display: style.display,
+        box_sizing: style.box_sizing,
+        direction: style.writing_direction,
+        overflow: Point {
+            x: overflow(style.overflow.x),
+            y: overflow(style.overflow.y),
         },
-        min_size: Size {
-            width: min_max_dimension(style.min_width),
-            height: min_max_dimension(style.min_height),
+        scrollbar_width: match style.scrollbar_gutter {
+            ScrollbarGutter::Auto => 0.0,
+            ScrollbarGutter::Stable => style.scrollbar_width.max(0.0),
         },
-        max_size: Size {
-            width: min_max_dimension(style.max_width),
-            height: min_max_dimension(style.max_height),
-        },
-        flex_direction: match style.direction {
-            Direction::Row => FlexDirection::Row,
-            Direction::Column => FlexDirection::Column,
-        },
-        flex_wrap: match style.wrap {
-            Wrap::NoWrap => FlexWrap::NoWrap,
-            Wrap::Wrap => FlexWrap::Wrap,
-            Wrap::Reverse => FlexWrap::WrapReverse,
-        },
-        align_items: Some(match style.align {
-            Align::Start => AlignItems::START,
-            Align::Center => AlignItems::CENTER,
-            Align::End => AlignItems::END,
-            Align::Stretch => AlignItems::STRETCH,
-        }),
-        justify_content: Some(match style.justify {
-            Justify::Start => JustifyContent::START,
-            Justify::Center => JustifyContent::CENTER,
-            Justify::End => JustifyContent::END,
-            Justify::SpaceBetween => JustifyContent::SPACE_BETWEEN,
-        }),
-        position: match style.position {
-            Position::Relative => taffy::Position::Relative,
-            Position::Absolute => taffy::Position::Absolute,
-        },
-        inset: Rect {
-            left: min_max_dimension(style.inset.left),
-            right: min_max_dimension(style.inset.right),
-            top: min_max_dimension(style.inset.top),
-            bottom: min_max_dimension(style.inset.bottom),
-        },
-        padding: padding(style.padding),
-        gap: Size {
-            width: LengthPercentage::length(style.gap),
-            height: LengthPercentage::length(style.gap),
-        },
-        flex_grow: style.grow,
-        flex_shrink: style.shrink,
+        position: style.position,
+        inset: style.inset,
+        size: style.size,
+        min_size: style.min_size,
+        max_size: style.max_size,
+        aspect_ratio: style.aspect_ratio,
+        margin: style.margin,
+        padding: style.padding,
+        border: style.border,
+        align_items: style.align_items,
+        align_self: style.align_self,
+        justify_items: style.justify_items,
+        justify_self: style.justify_self,
+        align_content: style.align_content,
+        justify_content: style.justify_content,
+        gap: style.gap,
+        flex_direction: style.flex_direction,
+        flex_wrap: style.flex_wrap,
+        flex_basis: style.flex_basis,
+        flex_grow: style.flex_grow,
+        flex_shrink: style.flex_shrink,
+        grid_template_rows: style.grid_template_rows.clone(),
+        grid_template_columns: style.grid_template_columns.clone(),
+        grid_auto_rows: style.grid_auto_rows.clone(),
+        grid_auto_columns: style.grid_auto_columns.clone(),
+        grid_auto_flow: style.grid_auto_flow,
+        grid_template_areas: style.grid_template_areas.clone(),
+        grid_template_column_names: style.grid_template_column_names.clone(),
+        grid_template_row_names: style.grid_template_row_names.clone(),
+        grid_row: style.grid_row.clone(),
+        grid_column: style.grid_column.clone(),
         ..Style::default()
     }
 }
 
-const fn dimension(value: Length) -> Dimension {
+const fn overflow(value: Overflow) -> taffy::Overflow {
     match value {
-        Length::Auto => Dimension::auto(),
-        Length::Px(value) => Dimension::length(value),
-        Length::Percent(value) => Dimension::percent(value),
-    }
-}
-
-const fn min_max_dimension(value: Length) -> LengthPercentageAuto {
-    match value {
-        Length::Auto => LengthPercentageAuto::auto(),
-        Length::Px(value) => LengthPercentageAuto::length(value),
-        Length::Percent(value) => LengthPercentageAuto::percent(value),
-    }
-}
-
-const fn padding(edges: Edges) -> Rect<LengthPercentage> {
-    Rect {
-        left: LengthPercentage::length(edges.left),
-        right: LengthPercentage::length(edges.right),
-        top: LengthPercentage::length(edges.top),
-        bottom: LengthPercentage::length(edges.bottom),
+        Overflow::Visible => taffy::Overflow::Visible,
+        Overflow::Clip => taffy::Overflow::Clip,
+        Overflow::Hidden => taffy::Overflow::Hidden,
+        Overflow::Auto | Overflow::Scroll => taffy::Overflow::Scroll,
     }
 }

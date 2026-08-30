@@ -1,11 +1,11 @@
 use argui_core::Point;
 use argui_paint::{
-    ClipBehavior, Color, CornerRadii, Fill, GradientStop, GradientStops, ImageAsset, ImageFit,
-    ImageId, LinearGradient, RadialGradient,
+    Color, CornerRadii, Fill, GradientStop, GradientStops, ImageAsset, ImageFit, ImageId,
+    LinearGradient, RadialGradient,
 };
 use argui_text::{TextColor, TextWrap};
-use argui_theme::WidgetTheme;
-use argui_ui::{Edges, Element, Length, Transform2D, TransformOrigin, Wrap};
+use argui_ui::{Axes, Element, FlexWrap, Overflow, Sides, Transform2D, TransformOrigin, length};
+use argui_widgets::WidgetTheme;
 
 use argui_ui::property;
 
@@ -62,34 +62,34 @@ impl StateShowcase {
                     650,
                     TextWrap::None,
                 ))])
-                .padding(Edges::all(14.0))
-                .width(Length::Px(210.0))
-                .height(Length::Px(92.0))
+                .padding(Sides::length(14.0))
+                .width(length(210.0))
+                .height(length(92.0))
                 .fill(Fill::Linear(linear))
                 .radius(CornerRadii::all(18.0))
                 .transform(self.visual_target())
                 .bind(property::Transform, self.visual_motion.clone())
                 .transform_origin(TransformOrigin::new(0.2, 0.8)),
                 Element::container([])
-                    .width(Length::Px(170.0))
-                    .height(Length::Px(92.0))
+                    .width(length(170.0))
+                    .height(length(92.0))
                     .fill(Fill::Radial(radial))
                     .radius(CornerRadii::all(18.0)),
                 Element::image(self.images.beam)
                     .image_fit(ImageFit::Contain)
-                    .width(Length::Px(170.0))
-                    .height(Length::Px(92.0))
+                    .width(length(170.0))
+                    .height(length(92.0))
                     .radius(CornerRadii::all(18.0))
                     .transform(Transform2D::IDENTITY.rotate(0.045)),
                 Element::image(self.images.pia)
                     .image_fit(ImageFit::Cover)
-                    .width(Length::Px(170.0))
-                    .height(Length::Px(92.0))
+                    .width(length(170.0))
+                    .height(length(92.0))
                     .radius(CornerRadii::all(18.0)),
             ])
-            .wrap(Wrap::Wrap)
+            .flex_wrap(FlexWrap::Wrap)
             .gap(22.0)
-            .padding(Edges::all(12.0)),
+            .padding(Sides::length(12.0)),
             Element::text(
                 "The same fills work on containers, buttons and composed widgets; transforms do not relayout Taffy.",
             )
@@ -102,10 +102,10 @@ impl StateShowcase {
         ])
         .keyed("visual-primitives")
         .gap(12.0)
-        .padding(Edges::all(16.0))
+        .padding(Sides::length(16.0))
         .background(widgets.card)
         .border(argui_paint::Border::all(1.0, widgets.border))
-        .clip(ClipBehavior::Bounds)
+        .overflow(Axes { x: Overflow::Hidden, y: Overflow::Hidden })
         .radius(CornerRadii::all(10.0))
     }
 }

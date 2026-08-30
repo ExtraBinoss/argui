@@ -3,9 +3,7 @@ use std::{
     sync::Arc,
 };
 
-use argui_core::Size;
-
-use crate::{FontFamily, GlyphKey, TextBlock, TextStyle, TextWrap};
+use crate::{FontFamily, GlyphKey, TextAlign, TextBlock, TextMeasurement, TextStyle, TextWrap};
 
 const CACHE_CAPACITY: usize = 512;
 
@@ -37,6 +35,7 @@ pub(crate) struct ShapeKey {
     size: [u32; 2],
     scale_factor: u32,
     subpixel_origin: [u32; 2],
+    align: TextAlign,
 }
 
 impl ShapeKey {
@@ -61,6 +60,7 @@ impl ShapeKey {
                 (pixel[0] - pixel[0].round()).to_bits(),
                 (pixel[1] - pixel[1].round()).to_bits(),
             ],
+            align: block.style.align,
         }
     }
 
@@ -101,23 +101,23 @@ pub(crate) struct CachedGlyph {
 
 #[derive(Default)]
 pub(crate) struct TextCache {
-    measurements: HashMap<MeasureKey, Size>,
+    measurements: HashMap<MeasureKey, TextMeasurement>,
     measurement_order: VecDeque<MeasureKey>,
     shapes: HashMap<ShapeKey, Arc<[CachedGlyph]>>,
     shape_order: VecDeque<ShapeKey>,
 }
 
 impl TextCache {
-    pub(crate) fn measurement(&self, key: &MeasureKey) -> Option<Size> {
+    pub(crate) fn measurement(&self, key: &MeasureKey) -> Option<TextMeasurement> {
         self.measurements.get(key).copied()
     }
 
-    pub(crate) fn insert_measurement(&mut self, key: MeasureKey, size: Size) {
+    pub(crate) fn insert_measurement(&mut self, key: MeasureKey, measurement: TextMeasurement) {
         insert_bounded(
             &mut self.measurements,
             &mut self.measurement_order,
             key,
-            size,
+            measurement,
         );
     }
 
@@ -168,7 +168,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::{CACHE_CAPACITY, MeasureKey, ShapeKey, TextCache};
-    use crate::{TextBlock, TextStyle, TextWrap};
+    use crate::{TextBlock, TextMeasurement, TextStyle, TextWrap};
     use argui_core::{Point, Rect, Size};
 
     #[test]
@@ -177,7 +177,10 @@ mod tests {
         for index in 0..=CACHE_CAPACITY {
             cache.insert_measurement(
                 MeasureKey::new(&index.to_string(), &TextStyle::default(), None),
-                Size::new(index as f32, 1.0),
+                TextMeasurement {
+                    size: Size::new(index as f32, 1.0),
+                    ..TextMeasurement::default()
+                },
             );
         }
         assert!(
@@ -191,7 +194,10 @@ mod tests {
                 &TextStyle::default(),
                 None
             )),
-            Some(Size::new(CACHE_CAPACITY as f32, 1.0))
+            Some(TextMeasurement {
+                size: Size::new(CACHE_CAPACITY as f32, 1.0),
+                ..TextMeasurement::default()
+            })
         );
         cache.clear();
         assert!(cache.measurements.is_empty());

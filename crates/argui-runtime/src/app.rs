@@ -114,6 +114,8 @@ impl Application {
             .as_ref()
             .map(AnyEntity::vector_assets)
             .unwrap_or_default();
+        let mut layout_engine = LayoutEngine::new();
+        layout_engine.set_assets(&image_assets, &vector_assets);
         Self {
             window_config,
             identity: None,
@@ -144,7 +146,7 @@ impl Application {
             animations: RuntimeAnimations::new(model.as_ref()),
             model,
             ui_layout: None,
-            layout_engine: LayoutEngine::new(),
+            layout_engine,
             prepared_text: None,
             viewport: Size::default(),
             scale_factor: 1.0,

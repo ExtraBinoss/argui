@@ -3,10 +3,11 @@ use argui_layout::LayoutEngine;
 use argui_paint::{DisplayCommand, PaintStyle, QuadStyle};
 use argui_text::{TextEngine, TextStyle};
 use argui_ui::{
-    Button, ButtonStyle, Color, Edges, Element, Inset, Interaction, Length, OverlayAlign,
-    OverlayPlacement, PlacementSide, ScrollConfig, StateStyle, TextInput, TextInputStyle, UiTree,
-    VisualState, WindowDragBehavior, Wrap,
+    AlignItems, Axes, Color, Element, FlexWrap, Interaction, LengthPercentageAuto, Overflow,
+    OverlayAlign, OverlayPlacement, PlacementSide, ScrollConfig, Sides, StateStyle, UiTree,
+    VisualState, WindowDragBehavior, auto, length, percent, sides,
 };
+use argui_widgets::{Button, ButtonStyle, Input, InputStyle};
 
 const NOTO_SANS: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
 
@@ -14,11 +15,20 @@ fn text_engine() -> TextEngine {
     TextEngine::from_embedded_fonts([NOTO_SANS], "Noto Sans", "Noto Sans", "Noto Sans")
 }
 
+fn top_right(top: f32, right: f32) -> Sides<LengthPercentageAuto> {
+    Sides {
+        left: auto(),
+        right: length(right),
+        top: length(top),
+        bottom: auto(),
+    }
+}
+
 #[test]
 fn interaction_repaint_reuses_layout_and_shaped_text() {
     let root = Element::text("Fast repaint")
         .keyed("button")
-        .padding(Edges::all(12.0))
+        .padding(Sides::length(12.0))
         .background(Color::rgb(0.0, 0.0, 0.0))
         .interaction(Interaction::default())
         .state(
@@ -71,13 +81,13 @@ fn unchanged_static_subtree_reuses_its_retained_paint_fragment() {
 fn wrapped_rows_move_whole_items_instead_of_clipping_them() {
     let item = || {
         Element::container([])
-            .width(Length::Px(80.0))
-            .height(Length::Px(30.0))
+            .width(length(80.0))
+            .height(length(30.0))
     };
     let mut ui = UiTree::new(
         Element::row([item(), item(), item()])
-            .width(Length::Percent(1.0))
-            .wrap(Wrap::Wrap)
+            .width(percent(1.0))
+            .flex_wrap(FlexWrap::Wrap)
             .gap(8.0),
     );
     let mut layout = LayoutEngine::new();
@@ -118,8 +128,8 @@ fn wrapped_button_labels_keep_every_glyph() {
             button("confirm", "Confirm"),
             button("delete", "Delete"),
         ])
-        .width(Length::Percent(1.0))
-        .wrap(Wrap::Wrap)
+        .width(percent(1.0))
+        .flex_wrap(FlexWrap::Wrap)
         .gap(12.0),
     );
     let mut layout = LayoutEngine::new();
@@ -152,9 +162,9 @@ fn taffy_layout_uses_real_text_measurement_and_viewport_constraints() {
         line_height: 25.0,
         ..TextStyle::default()
     })])
-    .width(Length::Percent(1.0))
-    .height(Length::Percent(1.0))
-    .padding(Edges::all(20.0))
+    .width(percent(1.0))
+    .height(percent(1.0))
+    .padding(Sides::length(20.0))
     .background(Color::rgb(0.1, 0.2, 0.3));
     let mut ui = UiTree::new(root);
     let mut layout = LayoutEngine::new();
@@ -185,7 +195,7 @@ fn percent_child_stays_inside_padded_parent() {
                 line_height: 21.25,
                 ..TextStyle::default()
             })
-            .padding(Edges::symmetric(20.0, 10.0))
+            .padding(sides(20.0, 10.0))
             .shrink(0.0)
     };
     let panel = Element::column([
@@ -207,26 +217,26 @@ fn percent_child_stays_inside_padded_parent() {
             button("Toggle paint"),
             button("Reorder keys"),
         ])
-        .wrap(Wrap::Wrap)
+        .flex_wrap(FlexWrap::Wrap)
         .gap(12.0),
         Element::row([
             Element::text("Stable alpha")
-                .padding(Edges::symmetric(12.0, 7.0)),
+                .padding(sides(12.0, 7.0)),
             Element::text("Stable beta")
-                .padding(Edges::symmetric(12.0, 7.0)),
+                .padding(sides(12.0, 7.0)),
         ])
-        .wrap(Wrap::Wrap)
+        .flex_wrap(FlexWrap::Wrap)
         .gap(10.0),
     ])
-        .width(Length::Percent(1.0))
-        .padding(Edges::all(30.0))
+        .width(percent(1.0))
+        .padding(Sides::length(30.0))
         .gap(22.0);
     let mut ui = UiTree::new(
         Element::column([panel])
-            .width(Length::Percent(1.0))
-            .height(Length::Percent(1.0))
-            .align(argui_ui::Align::Center)
-            .padding(Edges::symmetric(42.0, 36.0)),
+            .width(percent(1.0))
+            .height(percent(1.0))
+            .align_items(AlignItems::CENTER)
+            .padding(sides(42.0, 36.0)),
     );
     let mut layout = LayoutEngine::new();
     let mut text = text_engine();
@@ -245,18 +255,23 @@ fn percent_child_stays_inside_padded_parent() {
 #[test]
 fn scroll_translates_geometry_without_rebuilding_taffy() {
     let root = Element::column([
-        Element::text("First row")
-            .height(Length::Px(100.0))
-            .shrink(0.0),
+        Element::text("First row").height(length(100.0)).shrink(0.0),
         Element::text("Overscan row")
-            .height(Length::Px(200.0))
-            .clip(argui_paint::ClipBehavior::Bounds)
+            .height(length(200.0))
+            .overflow(Axes {
+                x: Overflow::Hidden,
+                y: Overflow::Hidden,
+            })
             .shrink(0.0),
     ])
     .keyed("scroll")
-    .width(Length::Px(200.0))
-    .height(Length::Px(100.0))
-    .scrollable(ScrollConfig::default());
+    .width(length(200.0))
+    .height(length(100.0))
+    .overflow(Axes {
+        x: Overflow::Hidden,
+        y: Overflow::Auto,
+    })
+    .scroll_config(ScrollConfig::default());
     let mut ui = UiTree::new(root);
     let mut layout = LayoutEngine::new();
     let mut text = text_engine();
@@ -288,13 +303,13 @@ fn scroll_translates_geometry_without_rebuilding_taffy() {
 fn anchored_overlay_follows_a_scrolling_anchor_without_relayout() {
     let anchor = Element::container([])
         .keyed("anchor")
-        .width(Length::Px(80.0))
-        .height(Length::Px(30.0))
+        .width(length(80.0))
+        .height(length(30.0))
         .shrink(0.0);
     let overlay = Element::container([])
         .keyed("overlay")
-        .width(Length::Px(120.0))
-        .height(Length::Px(60.0))
+        .width(length(120.0))
+        .height(length(60.0))
         .background(Color::WHITE)
         .anchored_to(
             "anchor",
@@ -305,15 +320,19 @@ fn anchored_overlay_follows_a_scrolling_anchor_without_relayout() {
         );
     let mut ui = UiTree::new(
         Element::column([
-            Element::container([]).height(Length::Px(100.0)).shrink(0.0),
+            Element::container([]).height(length(100.0)).shrink(0.0),
             anchor,
             overlay,
-            Element::container([]).height(Length::Px(200.0)).shrink(0.0),
+            Element::container([]).height(length(200.0)).shrink(0.0),
         ])
         .keyed("scroll")
-        .width(Length::Px(240.0))
-        .height(Length::Px(240.0))
-        .scrollable(ScrollConfig::default()),
+        .width(length(240.0))
+        .height(length(240.0))
+        .overflow(Axes {
+            x: Overflow::Hidden,
+            y: Overflow::Auto,
+        })
+        .scroll_config(ScrollConfig::default()),
     );
     let mut layout = LayoutEngine::new();
     let mut text = text_engine();
@@ -358,11 +377,11 @@ fn anchored_overlay_follows_a_scrolling_anchor_without_relayout() {
 
 #[test]
 fn focused_text_inputs_emit_cosmic_caret_selection_and_hit_geometry() {
-    let input = TextInput::new(
+    let input = Input::new(
         "field",
         "Hello مرحباً 👋🏽",
         "hint",
-        TextInputStyle::new(
+        InputStyle::new(
             PaintStyle::new(QuadStyle::solid(Color::rgb(0.1, 0.1, 0.1))),
             TextStyle {
                 font_size: 18.0,
@@ -416,21 +435,25 @@ fn focused_text_inputs_emit_cosmic_caret_selection_and_hit_geometry() {
 
 #[test]
 fn scrolling_repositions_text_input_hit_geometry_without_reshaping() {
-    let input = TextInput::new(
+    let input = Input::new(
         "field",
         "Editable",
         "hint",
-        TextInputStyle::new(PaintStyle::default(), TextStyle::default()),
+        InputStyle::new(PaintStyle::default(), TextStyle::default()),
     )
     .build()
-    .height(Length::Px(40.0))
+    .height(length(40.0))
     .shrink(0.0);
     let root = Element::column([
-        Element::container([]).height(Length::Px(40.0)).shrink(0.0),
+        Element::container([]).height(length(40.0)).shrink(0.0),
         input,
     ])
-    .height(Length::Px(60.0))
-    .scrollable(ScrollConfig::default());
+    .height(length(60.0))
+    .overflow(Axes {
+        x: Overflow::Hidden,
+        y: Overflow::Auto,
+    })
+    .scroll_config(ScrollConfig::default());
     let mut ui = UiTree::new(root);
     let mut layout = LayoutEngine::new();
     let mut text = text_engine();
@@ -450,11 +473,11 @@ fn scrolling_repositions_text_input_hit_geometry_without_reshaping() {
 
 #[test]
 fn caret_and_selection_updates_skip_taffy_and_prepared_text_rebuilds() {
-    let input = TextInput::new(
+    let input = Input::new(
         "field",
         "Latin العربية Latin",
         "hint",
-        TextInputStyle::new(PaintStyle::default(), TextStyle::default()),
+        InputStyle::new(PaintStyle::default(), TextStyle::default()),
     )
     .build();
     let mut ui = UiTree::new(Element::column([Element::text("Label"), input]));
@@ -485,8 +508,8 @@ fn sibling_z_index_controls_paint_and_hit_test_order() {
     let child = |color, z| {
         Element::container([])
             .background(color)
-            .width(Length::Px(80.0))
-            .height(Length::Px(20.0))
+            .width(length(80.0))
+            .height(length(20.0))
             .shrink(0.0)
             .interaction(Interaction::default())
             .z_index(z)
@@ -495,8 +518,8 @@ fn sibling_z_index_controls_paint_and_hit_test_order() {
     let high = Color::rgb(0.8, 0.7, 0.6);
     let mut ui = UiTree::new(
         Element::column([child(high, 4), child(low, -2)])
-            .width(Length::Px(100.0))
-            .height(Length::Px(100.0)),
+            .width(length(100.0))
+            .height(length(100.0)),
     );
     let mut layout = LayoutEngine::new();
     let mut text = text_engine();
@@ -517,11 +540,11 @@ fn sibling_z_index_controls_paint_and_hit_test_order() {
 #[test]
 fn window_drag_regions_preserve_interactive_child_priority() {
     let root = Element::row([Element::container([])
-        .width(Length::Px(80.0))
-        .height(Length::Px(40.0))
+        .width(length(80.0))
+        .height(length(40.0))
         .interaction(Interaction::default())])
-    .width(Length::Px(240.0))
-    .height(Length::Px(40.0))
+    .width(length(240.0))
+    .height(length(40.0))
     .interaction(Interaction::default().window_drag(WindowDragBehavior::MoveAndToggleMaximize));
     let mut ui = UiTree::new(root);
     let mut layout = LayoutEngine::new();
@@ -550,16 +573,16 @@ fn absolute_overlays_do_not_participate_in_flex_flow() {
     let mut ui = UiTree::new(
         Element::column([
             Element::container([])
-                .width(Length::Px(80.0))
-                .height(Length::Px(30.0)),
+                .width(length(80.0))
+                .height(length(30.0)),
             Element::container([])
-                .width(Length::Px(50.0))
-                .height(Length::Px(20.0))
-                .absolute(Inset::top_right(5.0, 7.0))
+                .width(length(50.0))
+                .height(length(20.0))
+                .absolute(top_right(5.0, 7.0))
                 .z_index(10),
         ])
-        .width(Length::Px(200.0))
-        .height(Length::Px(100.0)),
+        .width(length(200.0))
+        .height(length(100.0)),
     );
     let mut layout = LayoutEngine::new();
     let mut text = text_engine();

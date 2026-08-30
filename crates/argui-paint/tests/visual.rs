@@ -1,7 +1,7 @@
 use argui_core::{Affine2D, Color, Point, Rect, Size};
 use argui_paint::{
-    ClipChain, ClipRegion, GradientError, GradientStop, GradientStops, ImageAsset, ImageAssetError,
-    ImageId, LinearGradient, RadialGradient,
+    ClipChain, ClipRegion, CornerRadii, GradientError, GradientStop, GradientStops, ImageAsset,
+    ImageAssetError, ImageId, LinearGradient, RadialGradient,
 };
 
 fn stop(offset: f32) -> GradientStop {
@@ -79,4 +79,18 @@ fn transformed_clip_chains_require_every_region() {
     ));
     assert!(empty.is_empty());
     assert!(!empty.contains(Point::new(15.0, 10.0)));
+}
+
+#[test]
+fn rounded_transformed_clips_reject_points_outside_the_corner_curve() {
+    let bounds = Rect::new(Point::default(), Size::new(20.0, 20.0));
+    let clip = ClipRegion::rounded(
+        bounds,
+        Affine2D::translation(10.0, 5.0),
+        CornerRadii::all(8.0),
+    );
+
+    assert!(!clip.contains(Point::new(11.0, 6.0)));
+    assert!(clip.contains(Point::new(18.0, 6.0)));
+    assert!(clip.contains(Point::new(20.0, 15.0)));
 }

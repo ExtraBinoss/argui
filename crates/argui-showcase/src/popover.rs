@@ -4,11 +4,12 @@ use argui_animation::{
 use argui_core::Transform2D;
 use argui_paint::{Border, Color, CornerRadii, Filter, LayerMask, LayerStyle, Shadow};
 use argui_text::TextWrap;
-use argui_theme::WidgetTheme;
 use argui_ui::{
-    Edges, Element, FocusScope, InitialFocus, Interaction, Length, OverlayAlign, OverlayPlacement,
-    PlacementSide, ScrollChaining, ScrollConfig, Wrap, property,
+    Axes, Element, FlexWrap, FocusScope, InitialFocus, Interaction, Overflow, OverlayAlign,
+    OverlayPlacement, PlacementSide, ScrollChaining, ScrollConfig, Sides, length, percent,
+    property, sides,
 };
+use argui_widgets::WidgetTheme;
 
 use super::{StateShowcase, button, chip, text_style};
 
@@ -35,7 +36,7 @@ impl StateShowcase {
                 button("popover-toggle", "Effects popover", widgets, false),
                 button("tooltip-anchor", "Hover for tooltip", widgets, false),
             ])
-            .wrap(Wrap::Wrap)
+            .flex_wrap(FlexWrap::Wrap)
             .gap(10.0),
         ];
         if self.popover_progress > 0.0 {
@@ -46,7 +47,7 @@ impl StateShowcase {
         }
         Element::container(children)
             .keyed("popover-anchor")
-            .width(Length::Percent(1.0))
+            .width(percent(1.0))
             .z_index(400)
     }
 
@@ -73,7 +74,7 @@ impl StateShowcase {
                 chip("popover-native", "Native WGPU", widgets),
                 chip("popover-wasm", "Same WASM tree", widgets),
             ])
-            .wrap(Wrap::Wrap)
+            .flex_wrap(FlexWrap::Wrap)
             .gap(8.0),
             Element::text("Scrollable content constrained by the available viewport space.")
                 .text_style(text_style(
@@ -84,7 +85,7 @@ impl StateShowcase {
                 )),
             Element::column((0..12).map(|index| {
                 Element::text(format!("Popover row {:02} · retained and clipped", index + 1))
-                    .padding(Edges::symmetric(10.0, 7.0))
+                    .padding(sides(10.0, 7.0))
                     .background(if index % 2 == 0 {
                         widgets.muted
                     } else {
@@ -106,9 +107,9 @@ impl StateShowcase {
             .focus_scope(FocusScope::trapped(InitialFocus::Target(
                 "popover-close".into(),
             )))
-            .width(Length::Px(400.0))
-            .height(Length::Px(430.0))
-            .padding(Edges::all(20.0))
+            .width(length(400.0))
+            .height(length(430.0))
+            .padding(Sides::length(20.0))
             .gap(14.0)
             .background(widgets.card)
             .border(Border::all(1.0, widgets.border))
@@ -122,7 +123,11 @@ impl StateShowcase {
             )
             .z_index(500)
             .interaction(Interaction::blocker().enabled(progress > 0.0))
-            .scrollable(
+            .overflow(Axes {
+                x: Overflow::Hidden,
+                y: Overflow::Auto,
+            })
+            .scroll_config(
                 ScrollConfig::default()
                     .enabled(progress > 0.0)
                     .chaining(ScrollChaining::Contain)
@@ -136,9 +141,9 @@ impl StateShowcase {
     fn tooltip_content(&self, widgets: &WidgetTheme) -> Element {
         Element::text("Placed automatically after a 450 ms delay")
             .keyed("delayed-tooltip")
-            .width(Length::Px(250.0))
-            .height(Length::Px(54.0))
-            .padding(Edges::symmetric(11.0, 8.0))
+            .width(length(250.0))
+            .height(length(54.0))
+            .padding(sides(11.0, 8.0))
             .background(widgets.card)
             .border(Border::all(1.0, widgets.border))
             .radius(CornerRadii::all(9.0))

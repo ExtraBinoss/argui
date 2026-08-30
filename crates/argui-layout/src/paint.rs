@@ -88,6 +88,9 @@ fn paint_node(
     scroll_updates: &mut Vec<ScrollPaintUpdate>,
 ) -> bool {
     cache.visited += 1;
+    if map.style.display == argui_ui::Display::None {
+        return true;
+    }
     if parent.clips.is_empty() {
         return true;
     }
@@ -131,12 +134,20 @@ fn paint_node(
         transform,
         clips: parent.clips.clone(),
     };
-    paint_enter(ui, element, node, output, &context);
+    paint_enter(
+        ui,
+        element,
+        node,
+        output,
+        &context,
+        map.style.overflow.x.clips() || map.style.overflow.y.clips(),
+    );
 
-    let child_clips = if element.paint.clip == argui_paint::ClipBehavior::Bounds {
+    let child_clips = if map.style.overflow.x.clips() || map.style.overflow.y.clips() {
+        let radii = ui.resolved_quad(node.node, element).radii;
         context
             .clips
-            .appended(ClipRegion::new(node.bounds, transform))
+            .appended(ClipRegion::rounded(node.bounds, transform, radii))
     } else {
         context.clips.clone()
     };
@@ -144,7 +155,7 @@ fn paint_node(
         transform,
         clips: child_clips,
     };
-    if element.scroll.is_some()
+    if (map.style.overflow.x.scrolls() || map.style.overflow.y.scrolls())
         && let Some(region) = output
             .scroll_regions
             .iter_mut()
@@ -164,7 +175,8 @@ fn paint_node(
     let mut cacheable = element.bindings.is_empty()
         && !element.has_state_animation()
         && !matches!(element.kind, ElementKind::TextEditor { .. })
-        && element.scroll.is_none();
+        && !map.style.overflow.x.scrolls()
+        && !map.style.overflow.y.scrolls();
     for child in children {
         cacheable &= paint_node(
             child,
@@ -238,6 +250,7 @@ fn paint_enter(
     node: LayoutNode,
     output: &mut LayoutOutput,
     context: &PaintContext,
+    clips_content: bool,
 ) {
     let visual_bounds = context.transform.transform_rect(node.bounds);
     if let Some(layer) = element.layer.clone() {
@@ -276,7 +289,7 @@ fn paint_enter(
         node.node,
     );
 
-    let content_clips = if element.paint.clip == argui_paint::ClipBehavior::Bounds {
+    let content_clips = if clips_content {
         context
             .clips
             .appended(ClipRegion::new(node.bounds, context.transform))
@@ -313,6 +326,7 @@ fn paint_enter(
     }
     if let Some(region) = text_input {
         input::paint_caret(
+            ui,
             region,
             &mut output.display_list,
             context.transform,
@@ -516,15 +530,14 @@ fn push_hit_region(
     output: &mut LayoutOutput,
     context: &PaintContext,
 ) {
-    if let Some(interaction) = element.interaction.as_ref()
-        && interaction.enabled
-    {
+    if let Some(interaction) = element.interaction.as_ref() {
         output.hit_regions.push(HitRegion {
             node: node.node,
             bounds: node.bounds,
             transform: context.transform,
             clips: context.clips.clone(),
-            focusable: interaction.focusable,
+            enabled: interaction.enabled,
+            focusable: interaction.enabled && interaction.focusable,
             cursor: interaction.cursor,
             gestures: interaction.gestures,
             window_drag: interaction.window_drag,
@@ -534,10 +547,12 @@ fn push_hit_region(
 
 fn sync_scroll_config(elements: &[&Element], ui: &UiTree, output: &mut LayoutOutput) {
     for region in &mut output.scroll_regions {
-        if let Some(node) = output.nodes.iter().find(|node| node.node == region.node)
-            && let Some(config) = elements[node.index].scroll.clone()
-        {
-            let config = ui.resolved_scroll_config(region.node, &config);
+        if let Some(node) = output.nodes.iter().find(|node| node.node == region.node) {
+            let authored = elements[node.index]
+                .scroll
+                .clone()
+                .unwrap_or_else(|| region.config.clone());
+            let config = ui.resolved_scroll_config(region.node, &authored);
             if let (Some(scrollbar), Some(style)) = (&mut region.scrollbar, &config.scrollbar) {
                 scrollbar.style = style.clone();
             }

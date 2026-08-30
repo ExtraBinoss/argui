@@ -78,15 +78,30 @@ impl UiTree {
         } else {
             self.transitions.advance(now)
         };
-        strongest_updates(bindings, transitions)
+        let caret = if self.caret.advance(self.focused_animated_caret(), now) {
+            TreeUpdate::Paint
+        } else {
+            TreeUpdate::None
+        };
+        strongest_updates(strongest_updates(bindings, transitions), caret)
     }
 
     pub fn set_reduced_motion(&mut self, reduced: bool) -> TreeUpdate {
+        let caret_changed = self.focused_animated_caret().is_some();
         self.reduced_motion = reduced;
-        if reduced {
-            strongest_updates(self.animations.finish_active(), self.transitions.finish())
+        self.caret.reset();
+        let caret = if caret_changed || self.focused_animated_caret().is_some() {
+            TreeUpdate::Paint
         } else {
             TreeUpdate::None
+        };
+        if reduced {
+            strongest_updates(
+                strongest_updates(self.animations.finish_active(), self.transitions.finish()),
+                caret,
+            )
+        } else {
+            caret
         }
     }
 
@@ -97,6 +112,7 @@ impl UiTree {
             .iter()
             .any(|entry| entry.binding.track().is_active())
             || self.transitions.wants_frame()
+            || self.focused_animated_caret().is_some()
     }
 
     #[must_use]

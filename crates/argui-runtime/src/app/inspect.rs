@@ -4,9 +4,9 @@ use argui_inspect::{
     TreeSnapshot,
 };
 use argui_paint::{
-    Border, ClipBehavior, ClipChain, ClipRegion, Color, CornerRadii, Fill, Filter, LayerStyle, Quad,
+    Border, ClipChain, ClipRegion, Color, CornerRadii, Fill, Filter, LayerStyle, Quad,
 };
-use argui_ui::{Element, ElementKind, Length, NodeId};
+use argui_ui::{Axes, Dimension, Element, ElementKind, NodeId, Overflow};
 
 use super::Application;
 
@@ -227,12 +227,17 @@ fn reset_property(element: &mut Element, property: StyleProperty) {
         StyleProperty::Background => element.paint.quad.background = None,
         StyleProperty::Border => element.paint.quad.border = None,
         StyleProperty::Opacity => element.paint.quad.opacity = 1.0,
-        StyleProperty::Clip => element.paint.clip = ClipBehavior::None,
+        StyleProperty::Overflow => {
+            element.style.overflow = Axes {
+                x: Overflow::Visible,
+                y: Overflow::Visible,
+            };
+        }
         StyleProperty::Transform => element.transform = Transform2D::IDENTITY,
         StyleProperty::Layer => element.layer = None,
         StyleProperty::Effects => element.effects.clear(),
-        StyleProperty::Width => element.style.width = Length::Auto,
-        StyleProperty::Height => element.style.height = Length::Auto,
+        StyleProperty::Width => element.style.size.width = Dimension::auto(),
+        StyleProperty::Height => element.style.size.height = Dimension::auto(),
     }
 }
 
@@ -281,20 +286,20 @@ fn apply_property_value(element: &mut Element, property: StyleProperty, value: &
             }
         }
         (StyleProperty::Width, StyleValue::Length(value)) => {
-            element.style.width = inspect_length(*value);
+            element.style.size.width = inspect_length(*value);
         }
         (StyleProperty::Height, StyleValue::Length(value)) => {
-            element.style.height = inspect_length(*value);
+            element.style.size.height = inspect_length(*value);
         }
         _ => {}
     }
 }
 
-fn inspect_length(value: StyleLength) -> Length {
+fn inspect_length(value: StyleLength) -> Dimension {
     match value.unit {
-        StyleUnit::Auto => Length::Auto,
-        StyleUnit::Px => Length::Px(value.value.max(0.0)),
-        StyleUnit::Percent => Length::Percent(value.value.max(0.0)),
+        StyleUnit::Auto => Dimension::auto(),
+        StyleUnit::Px => Dimension::length(value.value.max(0.0)),
+        StyleUnit::Percent => Dimension::percent(value.value.max(0.0)),
     }
 }
 
