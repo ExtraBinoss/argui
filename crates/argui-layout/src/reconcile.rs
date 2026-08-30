@@ -36,7 +36,7 @@ fn reconcile_node(
 
     *cursor += 1;
     let previous = previous.filter(|previous| previous.node == node);
-    let resolved_style = ui.resolved_layout_style(element);
+    let resolved_style = ui.resolved_layout_style(node, element);
     let (id, previous_children) = match previous {
         Some(previous) => {
             let id = reuse_node(tree, &previous, element, &resolved_style, index)?;

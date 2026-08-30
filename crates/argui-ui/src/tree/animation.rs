@@ -68,17 +68,23 @@ impl AnimationRegistry {
 
 impl UiTree {
     pub fn advance_animations(&mut self, now: argui_animation::Time) -> TreeUpdate {
-        if self.reduced_motion {
+        let bindings = if self.reduced_motion {
             self.animations.finish_active()
         } else {
             self.animations.advance(now)
-        }
+        };
+        let transitions = if self.reduced_motion {
+            self.transitions.finish()
+        } else {
+            self.transitions.advance(now)
+        };
+        strongest_updates(bindings, transitions)
     }
 
     pub fn set_reduced_motion(&mut self, reduced: bool) -> TreeUpdate {
         self.reduced_motion = reduced;
         if reduced {
-            self.animations.finish_active()
+            strongest_updates(self.animations.finish_active(), self.transitions.finish())
         } else {
             TreeUpdate::None
         }
@@ -90,6 +96,7 @@ impl UiTree {
             .entries
             .iter()
             .any(|entry| entry.binding.track().is_active())
+            || self.transitions.wants_frame()
     }
 
     #[must_use]
@@ -98,8 +105,21 @@ impl UiTree {
     }
 
     #[must_use]
-    pub fn layout_animation_indices(&self) -> &[usize] {
-        &self.animations.layout_indices
+    pub fn layout_animation_indices(&self) -> Vec<usize> {
+        let mut indices = self.animations.layout_indices.clone();
+        indices.extend(self.transitions.layout_indices(&self.node_ids));
+        indices.sort_unstable();
+        indices.dedup();
+        indices
+    }
+}
+
+fn strongest_updates(left: TreeUpdate, right: TreeUpdate) -> TreeUpdate {
+    match (left, right) {
+        (TreeUpdate::Layout, _) | (_, TreeUpdate::Layout) => TreeUpdate::Layout,
+        (TreeUpdate::Scroll, _) | (_, TreeUpdate::Scroll) => TreeUpdate::Scroll,
+        (TreeUpdate::Paint, _) | (_, TreeUpdate::Paint) => TreeUpdate::Paint,
+        _ => TreeUpdate::None,
     }
 }
 

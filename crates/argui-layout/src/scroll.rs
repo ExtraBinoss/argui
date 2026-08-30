@@ -40,14 +40,14 @@ pub(crate) fn paint(region: &ScrollRegion, display_list: &mut DisplayList) {
         scrollbar.track,
         &region.clips,
         region.transform,
-        scrollbar.style.track.clone(),
+        scrollbar.style.track.base.clone(),
     );
     push_quad(
         display_list,
         scrollbar.thumb,
         &region.clips,
         region.transform,
-        scrollbar.style.thumb.clone(),
+        scrollbar.style.thumb.base.clone(),
     );
 }
 

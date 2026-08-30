@@ -50,12 +50,22 @@ Application state can request the same operation imperatively with
 resolved after layout against enabled focus regions; missing, duplicate, or
 out-of-scope targets perform no implicit fallback.
 
-## Paint-only state changes
+## Composed state styles
 
-`Interaction` stores optional `QuadStyle` values for hovered, pressed, and
-focused states. `QuadStyle` intentionally excludes layout and clipping. This
-allows `LayoutEngine::repaint` to rebuild only ordered quad commands while
-reusing Taffy geometry, shaped text, the glyph atlas, and hit regions.
+`Interaction` owns behavior only. Visuals are typed property patches attached
+with `Element::state`. Focused, hovered, pressed, and disabled patches compose
+in that order instead of replacing one another. `Element::transition` supplies
+one tween or spring default plus property- and direction-specific rules.
+
+Paint, transform, scroll, and layout properties retain their exact invalidation
+class. An interaction color does not invoke Taffy; an animated width updates the
+existing Taffy node. Tracks live beside stable `NodeId`s, so rebuilds retarget
+from the presented value without restarting or jumping. First mount snaps,
+reduced motion finishes active tracks, and idle state requests no frames.
+
+`Element::inherit_interaction_state` explicitly lets a descendant consume the
+nearest interactive ancestor's state. This supports icon and label animation
+inside a button without implicit CSS-style inheritance.
 
 `Button` is a composition helper in `argui-ui`: one interactive container, one
 text child, layout style, paint styles, and no renderer-specific widget code.

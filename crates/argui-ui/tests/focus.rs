@@ -22,6 +22,7 @@ fn region(node: argui_ui::NodeId, x: f32) -> HitRegion {
         focusable: true,
         cursor: CursorIcon::Auto,
         gestures: GestureSet::NONE,
+        window_drag: None,
     }
 }
 
@@ -82,7 +83,7 @@ fn space_holds_pressed_state_and_focus_change_cancels_the_click() {
             .iter()
             .any(|event| event.kind == UiEventKind::Pressed)
     );
-    assert_eq!(tree.visual_state(first), VisualState::Pressed);
+    assert!(tree.visual_states(first).contains(VisualState::Pressed));
 
     let changed = tree.sync_focus(&regions, Some(FocusRequest::Focus(second.into())));
     assert!(

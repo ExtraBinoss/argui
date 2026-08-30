@@ -25,6 +25,7 @@ mod lifecycle;
 mod preferences;
 mod renderer;
 mod scroll;
+mod window;
 
 enum RendererState {
     Loading,
@@ -80,6 +81,7 @@ pub(crate) struct Application {
     pending_scrollbar_drag: Option<Point>,
     pending_pointer_scroll: Option<ScrollDelta>,
     scroll_inertia: scroll::ScrollInertia,
+    window_drag: window::WindowDragState,
     pending_window_frame: frame::PendingWindowFrame,
     pub(super) pending_ui_frame: frame::PendingUiFrame,
     pub(super) frame_record: argui_inspect::FrameRecord,
@@ -159,6 +161,7 @@ impl Application {
             pending_scrollbar_drag: None,
             pending_pointer_scroll: None,
             scroll_inertia: scroll::ScrollInertia::default(),
+            window_drag: window::WindowDragState::default(),
             pending_window_frame: frame::PendingWindowFrame::default(),
             pending_ui_frame: frame::PendingUiFrame::default(),
             frame_record: argui_inspect::FrameRecord::default(),
@@ -361,21 +364,23 @@ impl Application {
             self.apply_ui_update(update, window, event_loop);
             return;
         }
-        let blocked =
-            argui_ui::scrollbar_at(point, &layout.scroll_regions, &layout.hit_regions).is_some();
+        let scrollbar = argui_ui::scrollbar_at(point, &layout.scroll_regions, &layout.hit_regions);
+        let mut update =
+            ui.scrollbar_pointer_moved(Some(point), scrollbar.map_or(&[], std::slice::from_ref));
+        let blocked = scrollbar.is_some();
         let hit_regions = if blocked {
             &[]
         } else {
             layout.hit_regions.as_slice()
         };
-        let update = ui.pointer_event(
+        update.merge(ui.pointer_event(
             PointerEvent {
                 buttons: self.pointer_buttons,
                 timestamp: self.input_epoch.elapsed(),
                 ..PointerEvent::mouse(PointerPhase::Moved, point)
             },
             hit_regions,
-        );
+        ));
         self.apply_ui_update(update, window, event_loop);
     }
 
@@ -456,14 +461,15 @@ impl Application {
         self.pointer = None;
         self.refresh_cursor(window);
         if let Some(ui) = &mut self.ui_tree {
-            let update = ui.pointer_event(
+            let mut update = ui.scrollbar_pointer_moved(None, &[]);
+            update.merge(ui.pointer_event(
                 PointerEvent {
                     buttons: self.pointer_buttons,
                     timestamp: self.input_epoch.elapsed(),
                     ..PointerEvent::mouse(PointerPhase::Left, point)
                 },
                 &[],
-            );
+            ));
             self.apply_ui_update(update, window, event_loop);
         }
     }
@@ -478,6 +484,9 @@ impl Application {
         self.flush_pointer_scroll(window, event_loop);
         if state == ButtonState::Released {
             self.flush_scrollbar_drag(window, event_loop);
+        }
+        if state == ButtonState::Pressed && self.handle_window_drag(window) {
+            return;
         }
         let Some(layout) = &self.ui_layout else {
             return;
@@ -511,7 +520,17 @@ impl Application {
             self.apply_ui_update(update, window, event_loop);
             return;
         }
-        if state == ButtonState::Released && ui.scrollbar_released() {
+        if state == ButtonState::Released
+            && let Some(mut update) = ui.scrollbar_released()
+        {
+            let scrollbar = self.pointer.and_then(|point| {
+                argui_ui::scrollbar_at(point, &layout.scroll_regions, &layout.hit_regions)
+            });
+            update.merge(ui.scrollbar_pointer_moved(
+                self.pointer,
+                scrollbar.map_or(&[], std::slice::from_ref),
+            ));
+            self.apply_ui_update(update, window, event_loop);
             return;
         }
         if state == ButtonState::Released {
@@ -549,8 +568,9 @@ impl Application {
             self.flush_scrollbar_drag(window, event_loop);
         }
         if !focused && let Some(ui) = &mut self.ui_tree {
-            ui.scrollbar_released();
-            let update = ui.window_blurred();
+            let mut update = ui.scrollbar_released().unwrap_or_default();
+            update.merge(ui.scrollbar_pointer_moved(None, &[]));
+            update.merge(ui.window_blurred());
             self.apply_ui_update(update, window, event_loop);
         }
         if focused && let (Some(ui), Some(layout)) = (&mut self.ui_tree, &self.ui_layout) {

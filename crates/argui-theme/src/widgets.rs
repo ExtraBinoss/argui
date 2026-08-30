@@ -1,7 +1,7 @@
 use argui_core::{Color, ColorScheme};
 use argui_paint::{Border, CornerRadii, PaintStyle, QuadStyle};
 use argui_text::TextStyle;
-use argui_ui::{ButtonStyle, ScrollbarStyle, TextInputStyle};
+use argui_ui::{ButtonStyle, ScrollbarPartStyle, ScrollbarStyle, TextInputStyle};
 
 use crate::Theme;
 
@@ -75,14 +75,16 @@ fn widgets(scheme: ColorScheme, primary: Color) -> WidgetTheme {
         .pressed(outline_active.opacity(0.78))
         .focused(outline.border(Border::all(2.0, primary)));
     let mut text_input = TextInputStyle::new(PaintStyle::new(quad(card, border)), text);
-    text_input.hovered = quad(card, mix(border, foreground, 0.28));
-    text_input.focused = quad(card, primary).border(Border::all(1.5, primary));
+    text_input.hovered = quad(card, mix(border, foreground, 0.28)).into();
+    text_input.focused = quad(card, primary).border(Border::all(1.5, primary)).into();
     text_input.placeholder.color = muted_foreground;
     text_input.selection = with_alpha(primary, 0.28);
     text_input.caret = primary;
     let scrollbar = ScrollbarStyle::new(
-        QuadStyle::solid(Color::TRANSPARENT),
-        QuadStyle::solid(mix(muted_foreground, card, 0.18)).radius(CornerRadii::all(999.0)),
+        ScrollbarPartStyle::new(QuadStyle::solid(Color::TRANSPARENT)),
+        ScrollbarPartStyle::new(
+            QuadStyle::solid(mix(muted_foreground, card, 0.18)).radius(CornerRadii::all(999.0)),
+        ),
     )
     .width(8.0)
     .insets(argui_ui::Edges::all(4.0))

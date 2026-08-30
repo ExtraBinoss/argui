@@ -384,6 +384,7 @@ dependencies = [
  "argui-image",
  "argui-layout",
  "argui-paint",
+ "argui-platform",
  "argui-runtime",
  "argui-text",
  "argui-theme",

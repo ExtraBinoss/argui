@@ -163,12 +163,26 @@ Before/after geometry animation for reorders, insertion, and removal remains a
 separate future feature; explicit animated layout properties already update
 their existing Taffy nodes without rebuilding the retained tree.
 
-### 7. Built-in consumers
+### 7. Built-in consumers — implemented
 
 - Implement caret blink without a permanent redraw loop.
 - Add animated hover, press, focus, scroll-to, momentum, and overlay entry/exit.
 - Expose reduced-motion behavior as application policy rather than a theme
   assumption.
+
+`StateStyle` is a sparse typed property patch shared by Rust builders and any
+future DSL. `StyleTransition` selects a tween or spring globally and can
+override it by `PropertyKey`, state entry, or state exit. Focused, hovered,
+pressed, and disabled states compose deterministically. Incompatible values,
+such as changing a linear gradient into a radial gradient, switch discretely at
+the transition midpoint; compatible scalar, color, geometry, transform, layer,
+shadow, scroll, layout, and custom-effect values interpolate.
+
+The retained transition registry is keyed by `NodeId`. It handles both
+interaction changes and authored style changes across application rebuilds,
+preserves spring velocity on retarget, and yields to explicit `Element::bind`
+motions as the final composition layer. Descendant state inheritance is
+explicit through `Element::inherit_interaction_state`.
 
 ### 8. Effects and shader parameters — implemented
 

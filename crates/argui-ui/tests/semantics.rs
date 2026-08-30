@@ -67,6 +67,7 @@ fn focus_falls_back_to_the_root_when_a_focused_node_is_semantically_hidden() {
         focusable: true,
         cursor: CursorIcon::Auto,
         gestures: GestureSet::NONE,
+        window_drag: None,
     };
     tree.sync_focus(&[region], Some(FocusRequest::Focus(child_id.into())));
     tree.update(Element::column([child.semantic_hidden(true)]));

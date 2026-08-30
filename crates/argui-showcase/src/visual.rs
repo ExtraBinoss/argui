@@ -100,6 +100,7 @@ impl StateShowcase {
                 TextWrap::Word,
             )),
         ])
+        .keyed("visual-primitives")
         .gap(12.0)
         .padding(Edges::all(16.0))
         .background(widgets.card)

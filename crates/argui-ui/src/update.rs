@@ -14,6 +14,7 @@ pub(crate) fn classify_update(
         return TreeUpdate::None;
     }
     let binding_update = binding_update(old, new);
+    let state_update = state_update(old, new);
     if old.key != new.key
         || kind_changes_layout(&old.kind, &new.kind)
         || old.style != new.style
@@ -22,6 +23,7 @@ pub(crate) fn classify_update(
         || old.overlay != new.overlay
         || old.children.len() != new.children.len()
         || binding_update == TreeUpdate::Layout
+        || state_update == TreeUpdate::Layout
     {
         return TreeUpdate::Layout;
     }
@@ -32,7 +34,9 @@ pub(crate) fn classify_update(
         .map(|(old, new)| classify_update(old, new, stats))
         .max_by_key(|update| update_priority(*update))
         .unwrap_or(TreeUpdate::None);
-    let local = if visual_changed(old, new) {
+    let local = if state_update != TreeUpdate::None {
+        state_update
+    } else if visual_changed(old, new) {
         TreeUpdate::Paint
     } else if binding_update != TreeUpdate::None {
         binding_update
@@ -64,10 +68,36 @@ fn visual_changed(old: &Element, new: &Element) -> bool {
         || old.transform != new.transform
         || old.transform_origin != new.transform_origin
         || old.interaction != new.interaction
+        || old.style_transition != new.style_transition
+        || old.inherit_interaction_state != new.inherit_interaction_state
         || old.layer != new.layer
         || old.effects != new.effects
         || old.scroll != new.scroll
         || old.z_index != new.z_index
+}
+
+fn state_update(old: &Element, new: &Element) -> TreeUpdate {
+    if old.state_styles == new.state_styles
+        && old.style_transition == new.style_transition
+        && old.inherit_interaction_state == new.inherit_interaction_state
+        && old.interaction == new.interaction
+    {
+        return TreeUpdate::None;
+    }
+    old.state_styles
+        .impact()
+        .into_iter()
+        .chain(new.state_styles.impact())
+        .fold(TreeUpdate::Paint, |update, impact| {
+            strongest_update(
+                update,
+                match impact {
+                    BindingImpact::Paint => TreeUpdate::Paint,
+                    BindingImpact::Scroll => TreeUpdate::Scroll,
+                    BindingImpact::Layout => TreeUpdate::Layout,
+                },
+            )
+        })
 }
 
 fn binding_update(old: &Element, new: &Element) -> TreeUpdate {

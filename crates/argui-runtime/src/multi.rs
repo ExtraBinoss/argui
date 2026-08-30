@@ -2,7 +2,7 @@
 use std::sync::Arc;
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use argui_platform::{ApplicationConfig, CloseBehavior, WindowKey, WindowSpec};
+use argui_platform::{ApplicationConfig, CloseBehavior, WindowKey, WindowLevel, WindowSpec};
 #[cfg(all(feature = "tray", not(target_arch = "wasm32")))]
 use argui_platform::{TrayAction, TrayEvent};
 use argui_render::RendererConfig;
@@ -15,10 +15,14 @@ use winit::{
     window::WindowId,
 };
 
+#[cfg(all(feature = "tray", not(target_arch = "wasm32")))]
+use crate::AppCommand;
 use crate::{
-    AppCommand, AppEvent, AppModel, AppUpdate, Context, Entity, LayoutSnapshot, Render,
-    RuntimeError, RuntimeEvent, ViewUpdate, app::Application, event::UserEvent,
+    AppEvent, AppModel, AppUpdate, Context, Entity, LayoutSnapshot, Render, RuntimeError,
+    RuntimeEvent, ViewUpdate, app::Application, event::UserEvent,
 };
+
+mod command;
 
 type SharedModel = Rc<RefCell<Box<dyn AppModel>>>;
 type SharedUpdates = Rc<RefCell<Vec<AppUpdate>>>;
@@ -135,6 +139,20 @@ impl MultiApplication {
             runtime.set_event_proxy(proxy.clone());
         }
         runtime.resumed(event_loop);
+        if let Some(window) = runtime.window() {
+            let capabilities = argui_platform::window_capabilities(window);
+            if spec.window.level != WindowLevel::Normal && !capabilities.window_level {
+                self.emit(RuntimeEvent::CommandFailed(format!(
+                    "window level {:?} is unavailable on this window backend",
+                    spec.window.level
+                )));
+            }
+            if spec.window.native_shadow && !capabilities.native_shadow {
+                self.emit(RuntimeEvent::CommandFailed(
+                    "native window shadows are unavailable on this window backend".into(),
+                ));
+            }
+        }
         let Some(window_id) = runtime.window_id() else {
             return;
         };
@@ -187,54 +205,6 @@ impl MultiApplication {
         self.emit(RuntimeEvent::CommandFailed(
             "application command loop exceeded 64 passes".into(),
         ));
-    }
-
-    fn apply_command(&mut self, event_loop: &ActiveEventLoop, command: AppCommand) {
-        match command {
-            AppCommand::OpenWindow(spec) => self.open_window(event_loop, spec),
-            AppCommand::CloseWindow(key) => self.close_window(&key),
-            AppCommand::ShowWindow(key) => self.set_visible(&key, true),
-            AppCommand::HideWindow(key) => self.set_visible(&key, false),
-            AppCommand::ToggleWindow(key) => {
-                if let Some(window) = self
-                    .windows
-                    .get(&key)
-                    .and_then(|entry| entry.runtime.window())
-                {
-                    self.set_visible(&key, !window.is_visible().unwrap_or(true));
-                }
-            }
-            AppCommand::FocusWindow(key) => {
-                if let Some(window) = self
-                    .windows
-                    .get(&key)
-                    .and_then(|entry| entry.runtime.window())
-                {
-                    window.set_visible(true);
-                    window.focus_window();
-                }
-            }
-            AppCommand::SetWindowTitle { window, title } => {
-                if let Some(window) = self
-                    .windows
-                    .get(&window)
-                    .and_then(|entry| entry.runtime.window())
-                {
-                    window.set_title(&title);
-                }
-            }
-            AppCommand::Quit => event_loop.exit(),
-        }
-    }
-
-    fn set_visible(&self, key: &WindowKey, visible: bool) {
-        if let Some(window) = self
-            .windows
-            .get(key)
-            .and_then(|entry| entry.runtime.window())
-        {
-            window.set_visible(visible);
-        }
     }
 
     #[cfg(all(feature = "tray", not(target_arch = "wasm32")))]

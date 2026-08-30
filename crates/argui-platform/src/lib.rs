@@ -34,4 +34,7 @@ pub use tray::{
 };
 #[cfg(target_arch = "wasm32")]
 pub use web_identity::{apply_web_identity, attach_web_canvas};
-pub use window::{CloseBehavior, WindowConfig, WindowKey, WindowSpec};
+pub use window::{
+    CloseBehavior, WindowBackend, WindowCapabilities, WindowConfig, WindowKey, WindowLevel,
+    WindowSpec, window_capabilities,
+};

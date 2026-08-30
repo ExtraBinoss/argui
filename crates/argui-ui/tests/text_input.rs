@@ -30,6 +30,7 @@ fn tree(value: &str) -> (UiTree, HitRegion) {
             focusable: true,
             cursor: CursorIcon::Text,
             gestures: argui_ui::GestureSet::NONE,
+            window_drag: None,
         },
     )
 }
@@ -362,6 +363,7 @@ fn text_area_inserts_lines_and_command_enter_submits() {
         focusable: true,
         cursor: CursorIcon::Text,
         gestures: argui_ui::GestureSet::NONE,
+        window_drag: None,
     };
     focus(&mut tree, &region);
     let newline = tree.edit_text_input(&key(Key::Enter, None, Modifiers::default()));

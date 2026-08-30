@@ -19,7 +19,7 @@ mod text;
 mod upload;
 mod vector;
 
-pub use config::{EffectQuality, EffectQualitySettings, RendererConfig};
+pub use config::{EffectQuality, EffectQualitySettings, RendererConfig, SurfaceAlphaMode};
 pub use effect_graph::EffectGraphStats;
 pub use error::RendererError;
 pub use offscreen::TexturePoolStats;

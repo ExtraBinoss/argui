@@ -1,7 +1,7 @@
 use argui_core::{Affine2D, Point, Rect, ScrollDelta};
 use argui_paint::{ClipChain, QuadStyle};
 
-use crate::{Edges, HitRegion, NodeId};
+use crate::{Edges, HitRegion, NodeId, StateStyle, StyleTransition, VisualState, VisualStates};
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum ScrollAxes {
@@ -120,13 +120,13 @@ pub struct ScrollbarStyle {
     pub width: f32,
     pub insets: Edges,
     pub min_thumb: f32,
-    pub track: QuadStyle,
-    pub thumb: QuadStyle,
+    pub track: ScrollbarPartStyle,
+    pub thumb: ScrollbarPartStyle,
 }
 
 impl ScrollbarStyle {
     #[must_use]
-    pub const fn new(track: QuadStyle, thumb: QuadStyle) -> Self {
+    pub const fn new(track: ScrollbarPartStyle, thumb: ScrollbarPartStyle) -> Self {
         Self {
             width: 10.0,
             insets: Edges::all(4.0),
@@ -152,6 +152,48 @@ impl ScrollbarStyle {
     pub const fn min_thumb(mut self, min_thumb: f32) -> Self {
         self.min_thumb = min_thumb;
         self
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ScrollbarPartStyle {
+    pub base: QuadStyle,
+    states: crate::state::ElementStateStyles,
+    pub transition: Option<StyleTransition>,
+}
+
+impl ScrollbarPartStyle {
+    #[must_use]
+    pub const fn new(base: QuadStyle) -> Self {
+        Self {
+            base,
+            states: crate::state::ElementStateStyles::new(),
+            transition: None,
+        }
+    }
+
+    #[must_use]
+    pub fn state(mut self, state: VisualState, style: StateStyle) -> Self {
+        assert!(
+            style.values().iter().all(|property| property.key.is_quad()),
+            "scrollbar states only accept quad paint properties"
+        );
+        self.states.set(state, style);
+        self
+    }
+
+    #[must_use]
+    pub fn transition(mut self, transition: StyleTransition) -> Self {
+        self.transition = Some(transition);
+        self
+    }
+
+    pub(crate) fn state_style(&self, state: VisualState) -> Option<&StateStyle> {
+        self.states.get(state)
+    }
+
+    pub(crate) fn has_states(&self) -> bool {
+        !self.states.is_empty()
     }
 }
 
@@ -241,15 +283,66 @@ struct ScrollDrag {
     grab: f32,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum ScrollbarPart {
+    Track,
+    Thumb,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct ScrollHover {
+    node: NodeId,
+    part: ScrollbarPart,
+}
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct ScrollState {
     offsets: Vec<(NodeId, Point)>,
     drag: Option<ScrollDrag>,
+    hover: Option<ScrollHover>,
 }
 
 impl ScrollState {
     pub fn dragging(&self) -> bool {
         self.drag.is_some()
+    }
+
+    pub fn visual_states(&self, node: NodeId, part: ScrollbarPart, enabled: bool) -> VisualStates {
+        let mut states = VisualStates::NONE;
+        if !enabled {
+            states.insert(VisualState::Disabled);
+        }
+        if self.hover == Some(ScrollHover { node, part }) {
+            states.insert(VisualState::Hovered);
+        }
+        if part == ScrollbarPart::Thumb && self.drag.is_some_and(|drag| drag.node == node) {
+            states.insert(VisualState::Pressed);
+        }
+        states
+    }
+
+    pub fn update_hover(&mut self, point: Option<Point>, regions: &[ScrollRegion]) -> bool {
+        let hover = point.and_then(|point| {
+            let region = regions
+                .iter()
+                .filter(|region| region.config.enabled && region.scrollbar_contains(point))
+                .max_by_key(|region| region.interaction_order)?;
+            let scrollbar = region.scrollbar.as_ref()?;
+            let local = region.local_point(point)?;
+            Some(ScrollHover {
+                node: region.node,
+                part: if scrollbar.thumb.contains(local) {
+                    ScrollbarPart::Thumb
+                } else {
+                    ScrollbarPart::Track
+                },
+            })
+        });
+        if self.hover == hover {
+            return false;
+        }
+        self.hover = hover;
+        true
     }
 
     pub fn offset(&self, node: NodeId) -> Point {
@@ -389,6 +482,9 @@ impl ScrollState {
         self.offsets.retain(|(node, _)| ids.contains(node));
         if self.drag.is_some_and(|drag| !ids.contains(&drag.node)) {
             self.drag = None;
+        }
+        if self.hover.is_some_and(|hover| !ids.contains(&hover.node)) {
+            self.hover = None;
         }
     }
 }

@@ -1,17 +1,19 @@
-use argui_paint::{ClipBehavior, Color, PaintStyle, QuadStyle};
+use argui_paint::{ClipBehavior, Color, PaintStyle};
 use argui_text::{TextColor, TextStyle, TextWrap};
 
 use crate::{
     Align, CursorIcon, Edges, Element, ElementKind, GestureSet, Interaction, LayoutStyle, Length,
     Role, ScrollChaining, ScrollConfig, ScrollbarStyle, SemanticAction, SemanticValue, Semantics,
+    StateStyle, StyleTransition, VisualState,
 };
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct TextInputStyle {
     pub layout: LayoutStyle,
     pub paint: PaintStyle,
-    pub hovered: QuadStyle,
-    pub focused: QuadStyle,
+    pub hovered: StateStyle,
+    pub focused: StateStyle,
+    pub transition: StyleTransition,
     pub text: TextStyle,
     pub placeholder: TextStyle,
     pub selection: Color,
@@ -32,8 +34,9 @@ impl TextInputStyle {
                 shrink: 0.0,
                 ..LayoutStyle::default()
             },
-            hovered: paint.quad.clone(),
-            focused: paint.quad.clone(),
+            hovered: StateStyle::from_quad(paint.quad.clone()),
+            focused: StateStyle::from_quad(paint.quad.clone()),
+            transition: StyleTransition::default(),
             paint,
             text,
             placeholder,
@@ -43,14 +46,20 @@ impl TextInputStyle {
     }
 
     #[must_use]
-    pub fn hovered(mut self, style: QuadStyle) -> Self {
-        self.hovered = style;
+    pub fn hovered(mut self, style: impl Into<StateStyle>) -> Self {
+        self.hovered = style.into();
         self
     }
 
     #[must_use]
-    pub fn focused(mut self, style: QuadStyle) -> Self {
-        self.focused = style;
+    pub fn focused(mut self, style: impl Into<StateStyle>) -> Self {
+        self.focused = style.into();
+        self
+    }
+
+    #[must_use]
+    pub fn transition(mut self, transition: StyleTransition) -> Self {
+        self.transition = transition;
         self
     }
 
@@ -158,9 +167,7 @@ fn editor(
     let interaction = Interaction::default()
         .focusable(true)
         .cursor(CursorIcon::Text)
-        .gestures(GestureSet::NONE.tap().pan())
-        .hovered(style.hovered)
-        .focused(style.focused);
+        .gestures(GestureSet::NONE.tap().pan());
     let semantics = Semantics::new(if multiline {
         Role::TextArea
     } else {
@@ -184,5 +191,12 @@ fn editor(
     element.style = style.layout;
     element.paint = style.paint;
     element.interaction = Some(interaction);
+    element
+        .state_styles
+        .set(VisualState::Hovered, style.hovered);
+    element
+        .state_styles
+        .set(VisualState::Focused, style.focused);
+    element.style_transition = Some(style.transition);
     element
 }

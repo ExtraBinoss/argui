@@ -319,7 +319,7 @@ pub(crate) fn update(ui: &mut UiTree, engine: &mut TextEngine, output: &mut crat
                     node.bounds,
                     region.clip,
                     content,
-                    config,
+                    ui.resolved_scroll_config(node.node, &config),
                     scroll,
                 );
                 if let Some(current) = output

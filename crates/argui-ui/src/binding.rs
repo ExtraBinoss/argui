@@ -8,7 +8,7 @@ use argui_paint::{
 use crate::LayoutStyle;
 
 mod effect;
-mod layout;
+pub(crate) mod layout;
 use layout::{layout_value, set_layout_value};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -18,7 +18,7 @@ pub enum BindingImpact {
     Scroll,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum LayoutTarget {
     WidthPx,
     WidthPercent,
@@ -45,7 +45,7 @@ pub enum LayoutTarget {
     InsetBottomPx,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum GradientPointTarget {
     LinearStart,
     LinearEnd,
@@ -186,178 +186,7 @@ pub trait MotionProperty: private::Sealed {
     fn into_binding(self, binding: MotionBinding<Self::Value>) -> PropertyBinding;
 }
 
-pub mod property {
-    use super::{
-        EffectId, EffectMotion, EffectTarget, GradientPointTarget, LayoutTarget, MotionBinding,
-        MotionProperty, PropertyBinding, private,
-    };
-    use argui_core::{Color, Point, Transform2D};
-
-    macro_rules! simple_property {
-        ($name:ident, $value:ty, $variant:ident) => {
-            #[derive(Clone, Copy, Debug, Default)]
-            pub struct $name;
-
-            impl private::Sealed for $name {}
-
-            impl MotionProperty for $name {
-                type Value = $value;
-
-                fn into_binding(self, binding: MotionBinding<Self::Value>) -> PropertyBinding {
-                    PropertyBinding::$variant(binding)
-                }
-            }
-        };
-    }
-
-    macro_rules! layout_property {
-        ($name:ident, $target:ident) => {
-            #[derive(Clone, Copy, Debug, Default)]
-            pub struct $name;
-
-            impl private::Sealed for $name {}
-
-            impl MotionProperty for $name {
-                type Value = f32;
-
-                fn into_binding(self, binding: MotionBinding<f32>) -> PropertyBinding {
-                    PropertyBinding::Layout(LayoutTarget::$target, binding)
-                }
-            }
-        };
-    }
-
-    simple_property!(Transform, Transform2D, Transform);
-    simple_property!(BackgroundColor, Color, BackgroundColor);
-    simple_property!(BorderColor, Color, BorderColor);
-    simple_property!(BorderWidths, [f32; 4], BorderWidths);
-    simple_property!(CornerRadii, [f32; 4], CornerRadii);
-    simple_property!(Opacity, f32, Opacity);
-    simple_property!(LayerOpacity, f32, LayerOpacity);
-    simple_property!(LayerMaskRadii, [f32; 4], LayerMaskRadii);
-    simple_property!(Scroll, Point, Scroll);
-
-    macro_rules! indexed_property {
-        ($name:ident, $constructor:ident, $value:ty, $variant:ident) => {
-            #[derive(Clone, Copy, Debug)]
-            pub struct $name(usize);
-
-            #[must_use]
-            pub const fn $constructor(index: usize) -> $name {
-                $name(index)
-            }
-
-            impl private::Sealed for $name {}
-
-            impl MotionProperty for $name {
-                type Value = $value;
-
-                fn into_binding(self, binding: MotionBinding<Self::Value>) -> PropertyBinding {
-                    PropertyBinding::$variant(self.0, binding)
-                }
-            }
-        };
-    }
-
-    indexed_property!(
-        GradientStopOffset,
-        gradient_stop_offset,
-        f32,
-        GradientStopOffset
-    );
-    indexed_property!(
-        GradientStopColor,
-        gradient_stop_color,
-        Color,
-        GradientStopColor
-    );
-    indexed_property!(ShadowOffset, shadow_offset, [f32; 2], ShadowOffset);
-    indexed_property!(ShadowBlur, shadow_blur, f32, ShadowBlur);
-    indexed_property!(ShadowSpread, shadow_spread, f32, ShadowSpread);
-    indexed_property!(ShadowColor, shadow_color, Color, ShadowColor);
-
-    macro_rules! gradient_point_property {
-        ($name:ident, $target:ident) => {
-            #[derive(Clone, Copy, Debug, Default)]
-            pub struct $name;
-
-            impl private::Sealed for $name {}
-
-            impl MotionProperty for $name {
-                type Value = Point;
-
-                fn into_binding(self, binding: MotionBinding<Point>) -> PropertyBinding {
-                    PropertyBinding::GradientPoint(GradientPointTarget::$target, binding)
-                }
-            }
-        };
-    }
-
-    gradient_point_property!(LinearGradientStart, LinearStart);
-    gradient_point_property!(LinearGradientEnd, LinearEnd);
-    gradient_point_property!(RadialGradientCenter, RadialCenter);
-    gradient_point_property!(RadialGradientRadius, RadialRadius);
-
-    layout_property!(WidthPx, WidthPx);
-    layout_property!(WidthPercent, WidthPercent);
-    layout_property!(HeightPx, HeightPx);
-    layout_property!(HeightPercent, HeightPercent);
-    layout_property!(MinWidthPx, MinWidthPx);
-    layout_property!(MinWidthPercent, MinWidthPercent);
-    layout_property!(MinHeightPx, MinHeightPx);
-    layout_property!(MinHeightPercent, MinHeightPercent);
-    layout_property!(MaxWidthPx, MaxWidthPx);
-    layout_property!(MaxWidthPercent, MaxWidthPercent);
-    layout_property!(MaxHeightPx, MaxHeightPx);
-    layout_property!(MaxHeightPercent, MaxHeightPercent);
-    layout_property!(PaddingLeft, PaddingLeft);
-    layout_property!(PaddingRight, PaddingRight);
-    layout_property!(PaddingTop, PaddingTop);
-    layout_property!(PaddingBottom, PaddingBottom);
-    layout_property!(Gap, Gap);
-    layout_property!(Grow, Grow);
-    layout_property!(Shrink, Shrink);
-    layout_property!(InsetLeftPx, InsetLeftPx);
-    layout_property!(InsetRightPx, InsetRightPx);
-    layout_property!(InsetTopPx, InsetTopPx);
-    layout_property!(InsetBottomPx, InsetBottomPx);
-
-    macro_rules! effect_property {
-        ($name:ident, $constructor:ident, $value:ty, $variant:ident) => {
-            #[derive(Clone, Copy, Debug)]
-            pub struct $name(EffectTarget);
-
-            #[must_use]
-            pub const fn $constructor(effect: EffectId, parameter: &'static str) -> $name {
-                $name(EffectTarget { effect, parameter })
-            }
-
-            impl private::Sealed for $name {}
-
-            impl MotionProperty for $name {
-                type Value = $value;
-
-                fn into_binding(self, binding: MotionBinding<Self::Value>) -> PropertyBinding {
-                    PropertyBinding::Effect(EffectMotion::$variant(self.0, binding))
-                }
-            }
-        };
-    }
-
-    effect_property!(EffectF32, effect_f32, f32, F32);
-    effect_property!(
-        EffectLogicalPixels,
-        effect_logical_pixels,
-        f32,
-        LogicalPixels
-    );
-    effect_property!(EffectVec2, effect_vec2, [f32; 2], Vec2);
-    effect_property!(EffectVec3, effect_vec3, [f32; 3], Vec3);
-    effect_property!(EffectVec4, effect_vec4, [f32; 4], Vec4);
-    effect_property!(EffectMat3, effect_mat3, [f32; 9], Mat3);
-    effect_property!(EffectMat4, effect_mat4, [f32; 16], Mat4);
-    effect_property!(EffectColor, effect_color, Color, Color);
-}
+pub mod property;
 
 pub(crate) fn sort_bindings(bindings: &mut [PropertyBinding]) {
     bindings.sort_by_key(PropertyBinding::priority);
@@ -553,6 +382,6 @@ pub(super) fn apply<T: Compose + Copy>(base: T, binding: &MotionBinding<T>) -> T
     }
 }
 
-mod private {
+pub(crate) mod private {
     pub trait Sealed {}
 }

@@ -1,18 +1,19 @@
-use argui_paint::{PaintStyle, QuadStyle};
+use argui_paint::PaintStyle;
 use argui_text::{TextStyle, TextWrap};
 
 use crate::{
     Align, CursorIcon, Edges, Element, GestureSet, Interaction, KeyboardActivation, LayoutStyle,
-    Length, Role, SemanticAction, Semantics,
+    Length, Role, SemanticAction, Semantics, StateStyle, StyleTransition, VisualState,
 };
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ButtonStyle {
     pub layout: LayoutStyle,
     pub paint: PaintStyle,
-    pub hovered: QuadStyle,
-    pub pressed: QuadStyle,
-    pub focused: QuadStyle,
+    pub hovered: StateStyle,
+    pub pressed: StateStyle,
+    pub focused: StateStyle,
+    pub transition: StyleTransition,
     pub label: TextStyle,
 }
 
@@ -28,9 +29,10 @@ impl ButtonStyle {
                 shrink: 0.0,
                 ..LayoutStyle::default()
             },
-            hovered: paint.quad.clone(),
-            pressed: paint.quad.clone(),
-            focused: paint.quad.clone(),
+            hovered: StateStyle::from_quad(paint.quad.clone()),
+            pressed: StateStyle::from_quad(paint.quad.clone()),
+            focused: StateStyle::from_quad(paint.quad.clone()),
+            transition: StyleTransition::default(),
             paint,
             label,
         }
@@ -43,20 +45,26 @@ impl ButtonStyle {
     }
 
     #[must_use]
-    pub fn hovered(mut self, style: QuadStyle) -> Self {
-        self.hovered = style;
+    pub fn hovered(mut self, style: impl Into<StateStyle>) -> Self {
+        self.hovered = style.into();
         self
     }
 
     #[must_use]
-    pub fn pressed(mut self, style: QuadStyle) -> Self {
-        self.pressed = style;
+    pub fn pressed(mut self, style: impl Into<StateStyle>) -> Self {
+        self.pressed = style.into();
         self
     }
 
     #[must_use]
-    pub fn focused(mut self, style: QuadStyle) -> Self {
-        self.focused = style;
+    pub fn focused(mut self, style: impl Into<StateStyle>) -> Self {
+        self.focused = style.into();
+        self
+    }
+
+    #[must_use]
+    pub fn transition(mut self, transition: StyleTransition) -> Self {
+        self.transition = transition;
         self
     }
 }
@@ -84,10 +92,7 @@ impl Button {
             .focusable(true)
             .cursor(CursorIcon::Pointer)
             .gestures(GestureSet::NONE.tap())
-            .keyboard_activation(KeyboardActivation::EnterOrSpace)
-            .hovered(self.style.hovered)
-            .pressed(self.style.pressed)
-            .focused(self.style.focused);
+            .keyboard_activation(KeyboardActivation::EnterOrSpace);
         let semantics = Semantics::new(Role::Button)
             .label(self.label.clone())
             .action(SemanticAction::Click)
@@ -99,6 +104,10 @@ impl Button {
         .layout_style(self.style.layout)
         .paint_style(self.style.paint)
         .interaction(interaction)
+        .state(VisualState::Hovered, self.style.hovered)
+        .state(VisualState::Pressed, self.style.pressed)
+        .state(VisualState::Focused, self.style.focused)
+        .transition(self.style.transition)
         .semantics(semantics)
     }
 }

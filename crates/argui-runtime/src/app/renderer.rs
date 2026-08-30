@@ -4,7 +4,9 @@ use std::sync::Arc;
 use std::rc::Rc;
 
 use argui_inspect::{AdapterRecord, FrameRecord, GpuFrameRecord, GpuPassRecord, Invalidation};
-use argui_render::{AdapterProfile, GpuFrameProfile, RenderStatus, SurfaceRenderer};
+use argui_render::{
+    AdapterProfile, GpuFrameProfile, RenderStatus, SurfaceAlphaMode, SurfaceRenderer,
+};
 use winit::{event_loop::ActiveEventLoop, window::Window};
 
 use crate::{RuntimeEvent, app::Application};
@@ -13,6 +15,16 @@ use super::RendererState;
 
 #[cfg_attr(coverage_nightly, coverage(off))]
 impl Application {
+    fn surface_renderer_config(&self) -> argui_render::RendererConfig {
+        self.renderer_config
+            .clone()
+            .surface_alpha(if self.window_config.transparent {
+                SurfaceAlphaMode::Transparent
+            } else {
+                SurfaceAlphaMode::Opaque
+            })
+    }
+
     #[cfg(not(target_arch = "wasm32"))]
     pub(super) fn initialize_renderer(
         &mut self,
@@ -21,13 +33,14 @@ impl Application {
     ) {
         let size = window.inner_size();
         let shared = self.renderer_device.borrow().clone();
+        let config = self.surface_renderer_config();
         let renderer = shared.map_or_else(
             || {
                 pollster::block_on(SurfaceRenderer::new(
                     Arc::clone(window),
                     size.width,
                     size.height,
-                    self.renderer_config.clone(),
+                    config.clone(),
                 ))
             },
             |device| {
@@ -35,7 +48,7 @@ impl Application {
                     Arc::clone(window),
                     size.width,
                     size.height,
-                    self.renderer_config.clone(),
+                    config.clone(),
                     device,
                 ))
             },
@@ -73,7 +86,7 @@ impl Application {
         let window = Arc::clone(window);
         let renderer = Rc::clone(&self.renderer);
         let renderer_device = Rc::clone(&self.renderer_device);
-        let config = self.renderer_config.clone();
+        let config = self.surface_renderer_config();
         let image_assets = self.image_assets.clone();
         let vector_assets = self.vector_assets.clone();
 

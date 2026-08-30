@@ -3,8 +3,9 @@ use argui_core::{Affine2D, Point, Rect, ScrollDelta, Size};
 use argui_paint::{ClipChain, ClipRegion};
 use argui_ui::{
     Color, CursorIcon, Element, GestureSet, HitRegion, QuadStyle, ScrollChaining, ScrollConfig,
-    ScrollPolarity, ScrollRegion, ScrollbarRegion, ScrollbarStyle, TreeUpdate, UiEventKind, UiTree,
-    property, scrollbar_at,
+    ScrollPolarity, ScrollRegion, ScrollbarPartStyle, ScrollbarRegion, ScrollbarStyle, StateStyle,
+    StyleTransition, Transition, TreeUpdate, UiEventKind, UiTree, VisualState, property,
+    scrollbar_at,
 };
 
 fn region(node: argui_ui::NodeId, config: ScrollConfig, max_y: f32) -> ScrollRegion {
@@ -31,6 +32,7 @@ fn hit_region(node: argui_ui::NodeId, bounds: Rect) -> HitRegion {
         focusable: false,
         cursor: CursorIcon::Default,
         gestures: GestureSet::NONE,
+        window_drag: None,
     }
 }
 
@@ -134,8 +136,8 @@ fn scrollbar_track_and_thumb_drive_the_retained_offset() {
     let mut tree = UiTree::new(Element::container([]).keyed("scroll"));
     let node = tree.node_id_at(0).unwrap();
     let style = ScrollbarStyle::new(
-        QuadStyle::solid(Color::rgb(0.0, 0.0, 0.0)),
-        QuadStyle::solid(Color::WHITE),
+        ScrollbarPartStyle::new(QuadStyle::solid(Color::rgb(0.0, 0.0, 0.0))),
+        ScrollbarPartStyle::new(QuadStyle::solid(Color::WHITE)),
     );
     let mut scroll = region(
         node,
@@ -159,8 +161,63 @@ fn scrollbar_track_and_thumb_drive_the_retained_offset() {
         .unwrap();
     assert!(dragged.scroll_changed);
     assert_eq!(tree.scroll_offset(node), Point::new(0.0, 1_000.0));
-    assert!(tree.scrollbar_released());
-    assert!(!tree.scrollbar_released());
+    assert!(tree.scrollbar_released().is_some());
+    assert!(tree.scrollbar_released().is_none());
+}
+
+#[test]
+fn scrollbar_parts_reuse_retained_state_transitions() {
+    let base = Color::rgb(0.1, 0.2, 0.3);
+    let hovered = Color::rgb(0.7, 0.8, 0.9);
+    let style = ScrollbarStyle::new(
+        ScrollbarPartStyle::new(QuadStyle::default()),
+        ScrollbarPartStyle::new(QuadStyle::solid(base))
+            .state(
+                VisualState::Hovered,
+                StateStyle::new()
+                    .set(property::BackgroundColor, hovered)
+                    .set(property::CornerRadii, [5.0; 4]),
+            )
+            .state(
+                VisualState::Pressed,
+                StateStyle::new().set(property::Opacity, 0.7),
+            )
+            .transition(StyleTransition::new(Transition::tween(Tween::new(
+                Duration::from_millis(100),
+            )))),
+    );
+    let config = ScrollConfig::default().scrollbar(style.clone());
+    let mut tree = UiTree::new(Element::container([]).scrollable(config.clone()));
+    let node = tree.node_id_at(0).unwrap();
+    let mut scroll = region(node, config.clone(), 1_000.0);
+    scroll.scrollbar = Some(ScrollbarRegion {
+        track: scroll.bounds,
+        thumb: Rect::new(Point::default(), Size::new(200.0, 40.0)),
+        style,
+    });
+
+    let regions = [scroll];
+    let point = Point::new(20.0, 20.0);
+    let update = tree.scrollbar_pointer_moved(Some(point), &regions);
+    assert!(update.paint_changed);
+    assert!(tree.wants_animation_frame());
+    assert_eq!(tree.set_reduced_motion(true), TreeUpdate::Paint);
+    let resolved = tree.resolved_scroll_config(node, &config);
+    let thumb = resolved.scrollbar.unwrap().thumb.base;
+    assert_eq!(thumb.background, Some(argui_ui::Fill::Solid(hovered)));
+    assert_eq!(thumb.radii.as_array(), [5.0; 4]);
+    tree.scrollbar_pressed(point, &regions).unwrap();
+    assert_eq!(
+        tree.resolved_scroll_config(node, &config)
+            .scrollbar
+            .unwrap()
+            .thumb
+            .base
+            .radii
+            .as_array(),
+        [5.0; 4]
+    );
+    assert!(tree.scrollbar_pointer_moved(None, &[]).paint_changed);
 }
 
 #[test]
@@ -172,7 +229,10 @@ fn scrollbar_hit_testing_follows_paint_order() {
     let scroll_node = tree.node_id_at(1).unwrap();
     let overlay_node = tree.node_id_at(2).unwrap();
     let mut scroll = region(scroll_node, ScrollConfig::default(), 100.0);
-    let style = ScrollbarStyle::new(QuadStyle::default(), QuadStyle::default());
+    let style = ScrollbarStyle::new(
+        ScrollbarPartStyle::new(QuadStyle::default()),
+        ScrollbarPartStyle::new(QuadStyle::default()),
+    );
     scroll.scrollbar = Some(ScrollbarRegion {
         track: scroll.bounds,
         thumb: scroll.bounds,
@@ -205,7 +265,10 @@ fn scrollbar_hit_testing_follows_paint_order() {
 fn scrollbar_ignores_track_outside_the_effective_clip() {
     let mut tree = UiTree::new(Element::container([]));
     let node = tree.node_id_at(0).unwrap();
-    let style = ScrollbarStyle::new(QuadStyle::default(), QuadStyle::default());
+    let style = ScrollbarStyle::new(
+        ScrollbarPartStyle::new(QuadStyle::default()),
+        ScrollbarPartStyle::new(QuadStyle::default()),
+    );
     let mut scroll = region(node, ScrollConfig::default(), 100.0);
     assert!(!scroll.scrollbar_contains(Point::new(10.0, 10.0)));
     scroll.clip = Rect::new(Point::default(), Size::new(50.0, 50.0));
@@ -229,7 +292,10 @@ fn scrollbar_ignores_track_outside_the_effective_clip() {
 fn scrollbar_track_clicks_reuse_offsets_and_degenerate_tracks_do_no_work() {
     let mut tree = UiTree::new(Element::container([]).keyed("scroll"));
     let node = tree.node_id_at(0).unwrap();
-    let style = ScrollbarStyle::new(QuadStyle::default(), QuadStyle::default());
+    let style = ScrollbarStyle::new(
+        ScrollbarPartStyle::new(QuadStyle::default()),
+        ScrollbarPartStyle::new(QuadStyle::default()),
+    );
     let mut scroll = region(node, ScrollConfig::default(), 1_000.0);
     scroll.scrollbar = Some(ScrollbarRegion {
         track: scroll.bounds,

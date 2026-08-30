@@ -4,20 +4,26 @@ use argui_core::{
 };
 use argui_paint::{ClipChain, ClipRegion, Color, QuadStyle};
 use argui_ui::{
-    ClipboardRequest, CursorIcon, Element, HitRegion, Interaction, InteractionUpdate, UiEventKind,
-    UiTree, VisualState,
+    ClipboardRequest, CursorIcon, Element, HitRegion, Interaction, InteractionUpdate, StateStyle,
+    UiEventKind, UiTree, VisualState, VisualStates,
 };
 
 fn interactive(key: &str) -> Element {
     Element::container([])
         .keyed(key)
         .background(Color::rgb(0.0, 0.0, 0.0))
-        .interaction(
-            Interaction::default()
-                .focusable(true)
-                .hovered(QuadStyle::solid(Color::WHITE))
-                .pressed(QuadStyle::solid(Color::rgb(1.0, 0.0, 0.0)))
-                .focused(QuadStyle::solid(Color::rgb(0.0, 1.0, 0.0))),
+        .interaction(Interaction::default().focusable(true))
+        .state(
+            VisualState::Hovered,
+            StateStyle::from_quad(QuadStyle::solid(Color::WHITE)),
+        )
+        .state(
+            VisualState::Pressed,
+            StateStyle::from_quad(QuadStyle::solid(Color::rgb(1.0, 0.0, 0.0))),
+        )
+        .state(
+            VisualState::Focused,
+            StateStyle::from_quad(QuadStyle::solid(Color::rgb(0.0, 1.0, 0.0))),
         )
 }
 
@@ -37,6 +43,7 @@ fn region_at(node: argui_ui::NodeId, x: f32, focusable: bool) -> HitRegion {
         focusable,
         cursor: CursorIcon::Auto,
         gestures: argui_ui::GestureSet::NONE,
+        window_drag: None,
     }
 }
 
@@ -58,13 +65,13 @@ fn pointer_state_honors_clips_capture_clicks_and_focus() {
 
     let clipped = tree.pointer_moved(Point::new(15.0, 20.0), &regions);
     assert!(clipped.events.is_empty());
-    assert_eq!(tree.visual_state(node), VisualState::Rest);
+    assert_eq!(tree.visual_states(node), VisualStates::NONE);
 
     let entered = tree.pointer_moved(Point::new(30.0, 20.0), &regions);
     assert!(entered.paint_changed);
     assert_eq!(entered.events[0].key.as_deref(), Some("save"));
     assert_eq!(entered.events[0].kind, UiEventKind::PointerEntered);
-    assert_eq!(tree.visual_state(node), VisualState::Hovered);
+    assert!(tree.visual_states(node).contains(VisualState::Hovered));
 
     let pressed = tree.primary_pressed(&regions);
     assert_eq!(pressed.events[0].kind, UiEventKind::Pressed);
@@ -74,7 +81,7 @@ fn pointer_state_honors_clips_capture_clicks_and_focus() {
             .iter()
             .any(|event| event.kind == UiEventKind::Focused)
     );
-    assert_eq!(tree.visual_state(node), VisualState::Pressed);
+    assert!(tree.visual_states(node).contains(VisualState::Pressed));
 
     let dragged_out = tree.pointer_moved(Point::new(200.0, 200.0), &regions);
     assert!(
@@ -83,12 +90,12 @@ fn pointer_state_honors_clips_capture_clicks_and_focus() {
             .iter()
             .any(|event| matches!(event.kind, UiEventKind::PointerMoved(_)))
     );
-    assert_eq!(tree.visual_state(node), VisualState::Pressed);
+    assert!(tree.visual_states(node).contains(VisualState::Pressed));
 
     let released = tree.primary_released();
     assert_eq!(released.events.len(), 1);
     assert_eq!(released.events[0].kind, UiEventKind::Released);
-    assert_eq!(tree.visual_state(node), VisualState::Focused);
+    assert!(tree.visual_states(node).contains(VisualState::Focused));
 
     let blurred = tree.window_blurred();
     assert!(
@@ -97,7 +104,7 @@ fn pointer_state_honors_clips_capture_clicks_and_focus() {
             .iter()
             .any(|event| event.kind == UiEventKind::Blurred)
     );
-    assert_eq!(tree.visual_state(node), VisualState::Rest);
+    assert_eq!(tree.visual_states(node), VisualStates::NONE);
 }
 
 #[test]
@@ -183,8 +190,8 @@ fn blocker_regions_occlude_interactions_behind_overlays() {
     let update = tree.pointer_moved(Point::new(30.0, 20.0), &regions);
     assert_eq!(update.events[0].target, overlay);
     assert_eq!(update.events[0].key.as_deref(), Some("overlay"));
-    assert_eq!(tree.visual_state(behind), VisualState::Rest);
-    assert_eq!(tree.visual_state(overlay), VisualState::Hovered);
+    assert_eq!(tree.visual_states(behind), VisualStates::NONE);
+    assert!(tree.visual_states(overlay).contains(VisualState::Hovered));
     assert!(!Interaction::blocker().focusable);
 }
 
@@ -277,7 +284,7 @@ fn empty_actions_focus_switches_and_blur_are_deterministic() {
 
     tree.pointer_moved(Point::new(30.0, 20.0), &regions);
     tree.primary_pressed(&regions);
-    assert_eq!(tree.visual_state(first), VisualState::Pressed);
+    assert!(tree.visual_states(first).contains(VisualState::Pressed));
     assert_eq!(
         tree.resolved_quad(first, &tree.root().children[0])
             .background,
@@ -315,7 +322,7 @@ fn incompatible_replacements_receive_new_ids_and_clear_state() {
     tree.replace(Element::text("now text").keyed("target"));
     let new = tree.node_id_at(0).unwrap();
     assert_ne!(old, new);
-    assert_eq!(tree.visual_state(old), VisualState::Rest);
+    assert_eq!(tree.visual_states(old), VisualStates::NONE);
     assert!(tree.window_blurred().events.is_empty());
 }
 

@@ -93,13 +93,16 @@ impl LayoutEngine {
             self.sync_or_rebuild(ui)?;
         }
         for index in ui.layout_animation_indices() {
-            let Some(id) = self.nodes_by_index.get(*index).copied() else {
-                return Err(LayoutError::MissingNodeIdentity(*index));
+            let Some(id) = self.nodes_by_index.get(index).copied() else {
+                return Err(LayoutError::MissingNodeIdentity(index));
             };
-            let Some(element) = ui.element_at(*index) else {
-                return Err(LayoutError::MissingNodeIdentity(*index));
+            let Some(element) = ui.element_at(index) else {
+                return Err(LayoutError::MissingNodeIdentity(index));
             };
-            let style = ui.resolved_layout_style(element);
+            let node = ui
+                .node_id_at(index)
+                .ok_or(LayoutError::MissingNodeIdentity(index))?;
+            let style = ui.resolved_layout_style(node, element);
             self.tree.set_style(id, taffy_style(&style))?;
         }
         let elements = flattened(ui.root());
@@ -245,7 +248,7 @@ fn build_node(
         .iter()
         .map(|child| build_node(tree, ui, child, next_index))
         .collect::<Result<Vec<_>, _>>()?;
-    let resolved_style = ui.resolved_layout_style(element);
+    let resolved_style = ui.resolved_layout_style(node, element);
     let style = taffy_style(&resolved_style);
     let id = match element.kind {
         ElementKind::Text { .. }
@@ -374,7 +377,7 @@ fn collect_layout(
             bounds,
             region_clip,
             content,
-            config,
+            ui.resolved_scroll_config(node.node, &config),
             offset,
         ));
     }
@@ -478,7 +481,7 @@ fn apply_scroll_layout(
             bounds,
             region_clip,
             content,
-            config,
+            ui.resolved_scroll_config(node.node, &config),
             offset,
         ));
     }

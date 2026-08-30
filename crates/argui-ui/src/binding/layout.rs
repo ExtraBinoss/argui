@@ -2,7 +2,7 @@ use crate::{LayoutStyle, Length};
 
 use super::LayoutTarget;
 
-pub(super) fn layout_value(style: &LayoutStyle, target: LayoutTarget) -> f32 {
+pub(crate) fn layout_value(style: &LayoutStyle, target: LayoutTarget) -> f32 {
     match target {
         LayoutTarget::WidthPx | LayoutTarget::WidthPercent => length_value(style.width),
         LayoutTarget::HeightPx | LayoutTarget::HeightPercent => length_value(style.height),
@@ -28,7 +28,7 @@ pub(super) fn layout_value(style: &LayoutStyle, target: LayoutTarget) -> f32 {
     }
 }
 
-pub(super) fn set_layout_value(style: &mut LayoutStyle, target: LayoutTarget, value: f32) {
+pub(crate) fn set_layout_value(style: &mut LayoutStyle, target: LayoutTarget, value: f32) {
     match target {
         LayoutTarget::WidthPx => style.width = Length::Px(value),
         LayoutTarget::WidthPercent => style.width = Length::Percent(value),

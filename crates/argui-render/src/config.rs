@@ -1,6 +1,13 @@
 use crate::EffectRegistry;
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum SurfaceAlphaMode {
+    #[default]
+    Opaque,
+    Transparent,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum EffectQuality {
     #[default]
     Normal,
@@ -42,6 +49,7 @@ pub struct RendererConfig {
     pub present_mode: wgpu::PresentMode,
     pub maximum_frame_latency: u32,
     pub clear_color: [f64; 4],
+    pub surface_alpha: SurfaceAlphaMode,
     pub profiling: bool,
     pub image_cache_bytes: usize,
     pub gradient_stop_capacity: usize,
@@ -56,6 +64,7 @@ impl Default for RendererConfig {
             present_mode: wgpu::PresentMode::AutoVsync,
             maximum_frame_latency: 2,
             clear_color: [0.055, 0.065, 0.09, 1.0],
+            surface_alpha: SurfaceAlphaMode::Opaque,
             profiling: false,
             image_cache_bytes: 64 * 1024 * 1024,
             gradient_stop_capacity: 65_536,
@@ -75,6 +84,15 @@ impl RendererConfig {
     #[must_use]
     pub fn profiling(mut self, enabled: bool) -> Self {
         self.profiling = enabled;
+        self
+    }
+
+    #[must_use]
+    pub fn surface_alpha(mut self, mode: SurfaceAlphaMode) -> Self {
+        self.surface_alpha = mode;
+        if mode == SurfaceAlphaMode::Transparent {
+            self.clear_color = [0.0; 4];
+        }
         self
     }
 

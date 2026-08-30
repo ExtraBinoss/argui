@@ -1,6 +1,4 @@
-use argui_core::{
-    ImeInput, Point, PointerEvent, PointerKind, PointerPhase, ScrollDelta, TextPosition,
-};
+use argui_core::{ImeInput, Point, PointerEvent, PointerKind, PointerPhase, TextPosition};
 
 use crate::interaction::{InteractionState, RawUpdate};
 use crate::scroll::ScrollState;
@@ -8,15 +6,18 @@ use crate::text_input::{TextInputState, TextInputStates};
 use crate::traversal::{flattened, nth_element};
 use crate::update::classify_update;
 use crate::{
-    Element, ElementKind, GestureArena, HitRegion, InteractionUpdate, NodeId, ScrollRegion,
-    UiEvent, UiEventKind, VisualState, identity,
+    Element, ElementKind, GestureArena, HitRegion, InteractionUpdate, NodeId, UiEvent, UiEventKind,
+    identity,
 };
 
 mod animation;
 mod focus;
 mod resolve;
+mod scroll;
+mod transition;
 use animation::AnimationRegistry;
 use focus::FocusRegistry;
+use transition::TransitionRegistry;
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum TreeUpdate {
@@ -49,6 +50,7 @@ pub struct UiTree {
     layout_dirty: bool,
     update_stats: TreeUpdateStats,
     animations: AnimationRegistry,
+    transitions: TransitionRegistry,
     reduced_motion: bool,
 }
 
@@ -72,9 +74,11 @@ impl UiTree {
             layout_dirty: true,
             update_stats: TreeUpdateStats::default(),
             animations,
+            transitions: TransitionRegistry::default(),
             reduced_motion: false,
         };
         tree.sync_text_inputs();
+        tree.sync_transitions();
         tree
     }
     #[must_use]
@@ -168,8 +172,8 @@ impl UiTree {
     }
 
     #[must_use]
-    pub fn visual_state(&self, node: NodeId) -> VisualState {
-        self.interaction.visual_state(node)
+    pub fn visual_states(&self, node: NodeId) -> crate::VisualStates {
+        self.interaction.visual_states(node)
     }
 
     #[must_use]
@@ -405,93 +409,7 @@ impl UiTree {
         self.text_inputs.release()
     }
 
-    #[must_use]
-    pub fn scroll_offset(&self, node: NodeId) -> Point {
-        let base = self.scroll.offset(node);
-        self.element_for(node).map_or(base, |element| {
-            crate::binding::resolved_scroll(&element.bindings, base)
-        })
-    }
-
-    pub fn set_scroll_offset(&mut self, node: NodeId, offset: Point) -> bool {
-        let changed = self.scroll.set_offset(node, offset);
-        if changed {
-            self.sync_scroll_motion(node, offset);
-        }
-        changed
-    }
-
-    pub fn scroll(
-        &mut self,
-        point: Point,
-        delta: ScrollDelta,
-        regions: &[ScrollRegion],
-    ) -> InteractionUpdate {
-        let Some(outcome) = self.scroll.scroll(point, delta, regions) else {
-            return InteractionUpdate::default();
-        };
-        match outcome {
-            crate::scroll::ScrollOutcome::Changed(change) => {
-                self.sync_scroll_motion(change.node, change.offset);
-                self.scroll_update(change)
-            }
-            crate::scroll::ScrollOutcome::Consumed => InteractionUpdate::default(),
-        }
-    }
-
-    pub fn scrollbar_pressed(
-        &mut self,
-        point: Point,
-        regions: &[ScrollRegion],
-    ) -> Option<InteractionUpdate> {
-        let change = self.scroll.scrollbar_pressed(point, regions)?;
-        Some(change.map_or_else(InteractionUpdate::default, |change| {
-            self.sync_scroll_motion(change.node, change.offset);
-            self.scroll_update(change)
-        }))
-    }
-
-    pub fn scrollbar_dragged(
-        &mut self,
-        point: Point,
-        regions: &[ScrollRegion],
-    ) -> Option<InteractionUpdate> {
-        if !self.scroll.dragging() {
-            return None;
-        }
-        let change = self.scroll.scrollbar_dragged(point, regions);
-        Some(change.map_or_else(InteractionUpdate::default, |change| {
-            self.sync_scroll_motion(change.node, change.offset);
-            self.scroll_update(change)
-        }))
-    }
-
-    pub fn scrollbar_released(&mut self) -> bool {
-        self.scroll.scrollbar_released()
-    }
-
-    #[must_use]
-    pub fn scrollbar_dragging(&self) -> bool {
-        self.scroll.dragging()
-    }
-
-    fn scroll_update(&self, change: crate::scroll::ScrollChange) -> InteractionUpdate {
-        InteractionUpdate {
-            events: vec![UiEvent {
-                target: change.node,
-                key: self.key_for(change.node).map(ToOwned::to_owned),
-                kind: UiEventKind::Scrolled {
-                    delta: change.delta,
-                    offset: change.offset,
-                },
-            }],
-            paint_changed: true,
-            scroll_changed: true,
-            ..InteractionUpdate::default()
-        }
-    }
-
-    fn decorate(&self, raw: RawUpdate) -> InteractionUpdate {
+    fn decorate(&mut self, raw: RawUpdate) -> InteractionUpdate {
         let text_input_changed = raw.events[..raw.count]
             .iter()
             .flatten()
@@ -508,10 +426,12 @@ impl UiTree {
                 kind: kind.clone(),
             })
             .collect();
+        let transition_update = self.sync_transitions();
         InteractionUpdate {
             events,
-            paint_changed: raw.paint_changed,
-            scroll_changed: false,
+            paint_changed: raw.paint_changed || transition_update == TreeUpdate::Paint,
+            scroll_changed: transition_update == TreeUpdate::Scroll,
+            layout_changed: transition_update == TreeUpdate::Layout,
             text_input_changed,
             ..InteractionUpdate::default()
         }
@@ -577,6 +497,7 @@ impl UiTree {
 
     fn sync_animation_registry(&mut self) {
         self.animations = AnimationRegistry::new(&self.root);
+        self.sync_transitions();
     }
 
     fn element_for(&self, node: NodeId) -> Option<&Element> {
@@ -585,16 +506,5 @@ impl UiTree {
             .iter()
             .position(|candidate| *candidate == node)?;
         nth_element(&self.root, index)
-    }
-
-    fn sync_scroll_motion(&self, node: NodeId, offset: Point) {
-        let Some(element) = self.element_for(node) else {
-            return;
-        };
-        for binding in &element.bindings {
-            if let crate::PropertyBinding::Scroll(binding) = binding {
-                binding.motion.set(offset);
-            }
-        }
     }
 }

@@ -1,7 +1,7 @@
 use argui_animation::Frame;
 use argui_inspect::InspectorHandle;
 use argui_paint::{ImageAsset, VectorAsset};
-use argui_platform::{PlatformEvent, TrayConfig, TrayEvent, WindowKey, WindowSpec};
+use argui_platform::{PlatformEvent, TrayConfig, TrayEvent, WindowKey, WindowLevel, WindowSpec};
 use argui_ui::{ClipboardRequest, Element, FocusRequest, UiEvent};
 
 use crate::{
@@ -29,7 +29,24 @@ pub enum AppCommand {
     HideWindow(WindowKey),
     ToggleWindow(WindowKey),
     FocusWindow(WindowKey),
-    SetWindowTitle { window: WindowKey, title: String },
+    SetWindowTitle {
+        window: WindowKey,
+        title: String,
+    },
+    MinimizeWindow(WindowKey),
+    SetWindowMaximized {
+        window: WindowKey,
+        maximized: bool,
+    },
+    ToggleWindowMaximized(WindowKey),
+    SetWindowLevel {
+        window: WindowKey,
+        level: WindowLevel,
+    },
+    SetWindowMousePassthrough {
+        window: WindowKey,
+        passthrough: bool,
+    },
     Quit,
 }
 

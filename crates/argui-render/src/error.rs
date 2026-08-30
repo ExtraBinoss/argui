@@ -6,6 +6,7 @@ pub enum RendererError {
     AdapterRequest(String),
     DeviceRequest(String),
     UnsupportedSurface,
+    UnsupportedSurfaceTransparency,
     GlyphAtlasFull,
     InvalidDisplayList(String),
     InvalidShader(String),
@@ -44,6 +45,8 @@ impl fmt::Display for RendererError {
             Self::UnsupportedSurface => {
                 formatter.write_str("the adapter cannot present to this surface")
             }
+            Self::UnsupportedSurfaceTransparency => formatter
+                .write_str("the surface does not support premultiplied transparent composition"),
             Self::GlyphAtlasFull => formatter.write_str("the bounded glyph atlas is full"),
             Self::InvalidDisplayList(message) => {
                 write!(formatter, "invalid display list: {message}")

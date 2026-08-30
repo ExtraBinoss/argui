@@ -25,7 +25,7 @@ fn one_typed_bind_entry_resolves_each_property_family() {
     assert_eq!(tree.resolved_transform(node, &element).translation.x, 4.0);
     assert_eq!(tree.resolved_quad(node, &element).opacity, 0.4);
     assert_eq!(
-        tree.resolved_layout_style(&element).width,
+        tree.resolved_layout_style(node, &element).width,
         Length::Px(120.0)
     );
     assert_eq!(tree.scroll_offset(node), Point::new(0.0, 30.0));
@@ -82,7 +82,7 @@ fn f32_effect_binding_updates_custom_uniform_value() {
         .layer(layer.clone())
         .bind(property::effect_f32(EFFECT, "phase"), phase);
     let tree = UiTree::new(element.clone());
-    let resolved = tree.resolved_layer(&element, &layer);
+    let resolved = tree.resolved_layer(tree.node_ids()[0], &element, &layer);
     let Filter::Effect(effect) = &resolved.filters[0] else {
         panic!("expected custom effect");
     };
@@ -135,7 +135,7 @@ fn custom_effect_bindings_preserve_parameter_types() {
             Motion::new(Color::rgba(0.1, 0.2, 0.3, 0.4)),
         );
     let tree = UiTree::new(element.clone());
-    let resolved = tree.resolved_layer(&element, &layer);
+    let resolved = tree.resolved_layer(tree.node_ids()[0], &element, &layer);
     let Filter::Effect(effect) = &resolved.filters[0] else {
         panic!("expected custom effect");
     };
@@ -178,7 +178,8 @@ fn every_layout_property_resolves_to_its_exact_typed_slot() {
         .bind(property::InsetRightPx, Motion::new(15.0))
         .bind(property::InsetTopPx, Motion::new(16.0))
         .bind(property::InsetBottomPx, Motion::new(17.0));
-    let style = UiTree::new(element.clone()).resolved_layout_style(&element);
+    let tree = UiTree::new(element.clone());
+    let style = tree.resolved_layout_style(tree.node_ids()[0], &element);
 
     assert_eq!(style.width, Length::Percent(1.0));
     assert_eq!(style.height, Length::Px(2.0));
@@ -234,7 +235,10 @@ fn bindings_ignore_absent_or_incompatible_paint_targets() {
         tree.resolved_quad(tree.node_ids()[0], &element),
         element.paint.quad
     );
-    assert_eq!(tree.resolved_layer(&element, &layer), layer);
+    assert_eq!(
+        tree.resolved_layer(tree.node_ids()[0], &element, &layer),
+        layer
+    );
 }
 
 #[test]
@@ -250,7 +254,7 @@ fn shared_motion_is_advanced_once_with_the_strongest_invalidation() {
         .bind(property::Opacity, shared.clone()),
     );
     assert_eq!(tree.animation_count(), 1);
-    assert_eq!(tree.layout_animation_indices(), &[1, 2]);
+    assert_eq!(tree.layout_animation_indices(), vec![1, 2]);
 
     shared.animate_to(2.0, Tween::new(Duration::from_millis(100)));
     tree.advance_animations(Time::from_nanos(1));
@@ -391,7 +395,7 @@ fn radial_and_layer_bindings_resolve_masks_and_indexed_shadows() {
     let Fill::Radial(gradient) = quad.background.unwrap() else {
         panic!("expected a radial gradient");
     };
-    let resolved = tree.resolved_layer(&element, &layer);
+    let resolved = tree.resolved_layer(tree.node_ids()[0], &element, &layer);
 
     assert_eq!(gradient.center, Point::new(0.4, 0.6));
     assert_eq!(gradient.radius, Point::new(0.7, 0.8));

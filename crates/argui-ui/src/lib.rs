@@ -12,6 +12,7 @@ mod overlay;
 mod resize;
 mod scroll;
 mod semantics;
+mod state;
 mod style;
 mod text_editor;
 mod text_input;
@@ -24,7 +25,7 @@ mod widget;
 pub use argui_accessibility::{
     LiveRegion, Orientation, Role, SemanticAction, SemanticState, SemanticValue, Semantics,
 };
-pub use argui_animation::{Motion, MotionBinding, MotionState, Tween};
+pub use argui_animation::{Motion, MotionBinding, MotionState, Transition, Tween};
 pub use argui_core::{Transform2D, TransformOrigin};
 pub use argui_paint::{
     BlendMode, Border, BorderWidths, ClipBehavior, Color, CornerRadii, EffectArgument, EffectId,
@@ -39,14 +40,18 @@ pub use element::{Element, ElementKind};
 pub use focus::{FocusContainment, FocusRequest, FocusScope, FocusTarget, InitialFocus};
 pub use gesture::{GestureArena, GestureEvent, GestureKind, GesturePhase, GestureSet};
 pub use interaction::{
-    HitRegion, Interaction, InteractionStyles, InteractionUpdate, KeyboardActivation, NodeId,
-    UiEvent, UiEventKind, VisualState,
+    HitRegion, Interaction, InteractionUpdate, KeyboardActivation, NodeId, UiEvent, UiEventKind,
+    WindowDragBehavior,
 };
 pub use overlay::{OverlayAlign, OverlayAnchor, OverlayPlacement, PlacedOverlay, PlacementSide};
 pub use resize::{Resizable, ResizeAxes, ResizeConfig, ResizeEvent, ResizeState};
 pub use scroll::{
-    ScrollAxes, ScrollChaining, ScrollConfig, ScrollPolarity, ScrollRegion, ScrollbarRegion,
-    ScrollbarStyle, scrollbar_at,
+    ScrollAxes, ScrollChaining, ScrollConfig, ScrollPolarity, ScrollRegion, ScrollbarPartStyle,
+    ScrollbarRegion, ScrollbarStyle, scrollbar_at,
+};
+pub use state::{
+    EffectPropertyKey, PropertyKey, StateProperty, StatePropertyValue, StateStyle, StyleTransition,
+    TransitionDirection, TransitionRule, VisualState, VisualStates,
 };
 pub use style::{Align, Direction, Edges, Inset, Justify, LayoutStyle, Length, Position, Wrap};
 pub use text_editor::{TextArea, TextInput, TextInputStyle};

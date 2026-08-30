@@ -4,6 +4,8 @@ mod animation;
 mod list;
 mod physics;
 mod popover;
+pub mod spotlight;
+mod state_style;
 mod theme;
 mod visual;
 
@@ -200,6 +202,7 @@ impl StateShowcase {
             self.animation_demo(widgets),
             self.physics_demo(widgets),
             self.visual_primitives(widgets),
+            state_style::demo(widgets),
             self.popover_demo(widgets),
             self.virtual_list(widgets),
             Element::text("OVERLAY · z-index 100")

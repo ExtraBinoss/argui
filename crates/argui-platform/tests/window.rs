@@ -1,5 +1,6 @@
 use argui_platform::{
-    AppIcon, ApplicationId, ApplicationIdentity, IconSet, WindowConfig, WindowKey, WindowSpec,
+    AppIcon, ApplicationId, ApplicationIdentity, IconSet, WindowBackend, WindowConfig, WindowKey,
+    WindowLevel, WindowSpec,
 };
 
 #[test]
@@ -10,8 +11,47 @@ fn default_window_is_a_decorated_resizable_surface() {
     assert!(config.decorations);
     assert!(config.resizable);
     assert!(!config.transparent);
+    assert!(!config.native_shadow);
+    assert_eq!(config.level, WindowLevel::Normal);
     assert!(config.append_to_document);
     let _attributes = config.into_attributes();
+}
+
+#[test]
+fn capabilities_expose_real_backend_limits() {
+    let wayland = WindowBackend::Wayland.capabilities();
+    assert!(wayland.native_drag);
+    assert!(!wayland.native_shadow);
+    assert!(wayland.mouse_passthrough);
+    assert!(!wayland.window_level);
+
+    for backend in [
+        WindowBackend::Windows,
+        WindowBackend::MacOs,
+        WindowBackend::X11,
+    ] {
+        let capabilities = backend.capabilities();
+        assert!(capabilities.native_drag);
+        assert!(capabilities.minimize);
+        assert!(capabilities.maximize);
+        assert!(capabilities.window_level);
+        assert!(capabilities.mouse_passthrough);
+    }
+    assert!(WindowBackend::Windows.capabilities().native_shadow);
+    assert!(WindowBackend::MacOs.capabilities().native_shadow);
+
+    assert_eq!(
+        WindowBackend::Web.capabilities(),
+        argui_platform::WindowCapabilities {
+            backend: WindowBackend::Web,
+            native_drag: false,
+            native_shadow: false,
+            minimize: false,
+            maximize: false,
+            window_level: false,
+            mouse_passthrough: false,
+        }
+    );
 }
 
 #[test]

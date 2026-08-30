@@ -47,7 +47,7 @@ pub(crate) fn resolve(
                 output.nodes[map.index].bounds,
                 clip,
                 content,
-                config,
+                ui.resolved_scroll_config(map.node, &config),
                 ui.scroll_offset(map.node),
             );
             if let Some(index) = output

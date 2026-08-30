@@ -1,6 +1,8 @@
 use argui_paint::{Color, PaintStyle, QuadStyle};
 use argui_text::{TextStyle, TextWrap};
-use argui_ui::{Button, ButtonStyle, CursorIcon, ElementKind, KeyboardActivation};
+use argui_ui::{
+    Button, ButtonStyle, CursorIcon, ElementKind, KeyboardActivation, UiTree, VisualState,
+};
 
 #[test]
 fn button_is_only_a_composed_interactive_element() {
@@ -23,7 +25,23 @@ fn button_is_only_a_composed_interactive_element() {
         interaction.keyboard_activation,
         KeyboardActivation::EnterOrSpace
     );
-    assert_eq!(interaction.styles.hovered, Some(hovered));
+    let mut tree = UiTree::new(element.clone());
+    let node = tree.node_ids()[0];
+    let regions = [argui_ui::HitRegion {
+        node,
+        bounds: argui_core::Rect::new(
+            argui_core::Point::default(),
+            argui_core::Size::new(20.0, 20.0),
+        ),
+        transform: argui_core::Affine2D::IDENTITY,
+        clips: argui_paint::ClipChain::default(),
+        focusable: true,
+        cursor: CursorIcon::Pointer,
+        gestures: argui_ui::GestureSet::NONE,
+        window_drag: None,
+    }];
+    tree.pointer_moved(argui_core::Point::new(2.0, 2.0), &regions);
+    assert!(tree.visual_states(node).contains(VisualState::Hovered));
     assert_eq!(element.children.len(), 1);
     assert!(matches!(
         &element.children[0].kind,

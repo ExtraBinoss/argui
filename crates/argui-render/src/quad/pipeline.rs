@@ -450,3 +450,22 @@ fn binding(binding: u32, buffer: &wgpu::Buffer, size: u64) -> wgpu::BindGroupEnt
         }),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    const SHADER: &str = include_str!("../shaders/primitives/quad.wgsl");
+
+    #[test]
+    fn quad_shader_is_valid_wgsl() {
+        naga::front::wgsl::parse_str(SHADER).unwrap();
+    }
+
+    #[test]
+    fn rounded_edges_use_orientation_independent_antialiasing() {
+        assert!(SHADER.contains("length(vec2(dpdx(distance), dpdy(distance)))"));
+        assert!(SHADER.contains("distance / pixel_width"));
+        assert!(SHADER.contains("outer_coverage - inner_coverage"));
+        assert!(!SHADER.contains("mix(quad.border_color"));
+        assert!(!SHADER.contains("fwidth("));
+    }
+}

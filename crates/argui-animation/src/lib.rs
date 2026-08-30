@@ -14,6 +14,7 @@ mod scheduler;
 mod time;
 mod timeline;
 mod timing;
+mod transition;
 
 pub use clock::{Clock, ManualClock};
 pub use composition::{Compose, Composition, Contribution, compose};
@@ -30,5 +31,6 @@ pub use spring::{Spring, SpringConfig};
 pub use time::{Duration, Time};
 pub use timeline::{PlaybackState, Timeline, TimelineEvents, TimelineSample};
 pub use timing::{Direction, FillMode, Iterations, Timing, TimingError};
+pub use transition::Transition;
 
 mod spring;

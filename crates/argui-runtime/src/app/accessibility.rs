@@ -229,6 +229,7 @@ mod tests {
             focusable: true,
             cursor: CursorIcon::Auto,
             gestures: GestureSet::NONE,
+            window_drag: None,
         });
         let request = |action, value| SemanticRequest {
             target: SemanticNodeId::new(target.get()),

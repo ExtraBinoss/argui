@@ -11,7 +11,6 @@ use argui_ui::{
     CursorIcon, GestureEvent, GestureKind, GesturePhase, HitRegion, ScrollConfig, ScrollRegion,
     UiEvent, UiEventKind, UiTree,
 };
-
 fn render_view(app: &StateShowcase) -> argui_ui::Element {
     app.view(argui_runtime::WindowEnvironment::default())
 }
@@ -45,6 +44,7 @@ fn events_for(app: &StateShowcase, key: &str) -> Vec<UiEvent> {
         focusable: true,
         cursor: CursorIcon::Auto,
         gestures: argui_ui::GestureSet::NONE,
+        window_drag: None,
     }];
     let mut events = tree.pointer_moved(Point::new(10.0, 10.0), &regions).events;
     events.extend(tree.primary_pressed(&regions).events);
@@ -121,6 +121,7 @@ fn shared_showcase_builds_one_tree_and_embeds_its_fonts() {
     );
     assert!(text.measure("Argui", &TextStyle::default(), None).width > 0.0);
 }
+
 #[test]
 fn every_showcase_control_rebuilds_the_single_shared_app() {
     let mut app = StateShowcase::default();
@@ -588,7 +589,6 @@ fn node_index_optional(root: &argui_ui::Element, key: &str) -> Option<usize> {
     }
     visit(root, key, &mut 0)
 }
-
 fn element_by_key<'a>(element: &'a argui_ui::Element, key: &str) -> Option<&'a argui_ui::Element> {
     if element.key.as_deref() == Some(key) {
         return Some(element);

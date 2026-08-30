@@ -4,7 +4,8 @@ use argui_text::{TextColor, TextStyle, TextWrap};
 use argui_theme::WidgetTheme;
 use argui_ui::{
     Align, Button, ButtonStyle, Edges, Element, Interaction, LayoutStyle, Length, ScrollConfig,
-    ScrollbarStyle, TextInput, TextInputStyle,
+    ScrollbarPartStyle, ScrollbarStyle, StateStyle, TextInput, TextInputStyle, VisualState,
+    property,
 };
 
 use crate::host::DevtoolsHost;
@@ -136,7 +137,7 @@ fn number_input(key: &str, value: f32, theme: &WidgetTheme) -> Element {
             PaintStyle::new(QuadStyle::solid(theme.card).radius(CornerRadii::all(4.0))),
             text(11.0, theme.foreground),
         )
-        .focused(QuadStyle::solid(theme.muted)),
+        .focused(StateStyle::new().set(property::BackgroundColor, theme.muted)),
     )
     .build()
     .width(Length::Px(92.0))
@@ -170,7 +171,11 @@ fn section_header(
     .gap(6.0)
     .padding(Edges::symmetric(5.0, 4.0))
     .background(if open { theme.muted } else { theme.background })
-    .interaction(Interaction::default().hovered(QuadStyle::solid(theme.muted)))
+    .interaction(Interaction::default())
+    .state(
+        VisualState::Hovered,
+        StateStyle::from_quad(QuadStyle::solid(theme.muted)),
+    )
 }
 
 fn button(key: &str, label: &str, active: bool, theme: &WidgetTheme) -> Element {
@@ -179,7 +184,7 @@ fn button(key: &str, label: &str, active: bool, theme: &WidgetTheme) -> Element 
         key,
         label,
         ButtonStyle::new(
-            PaintStyle::new(QuadStyle::solid(base)),
+            PaintStyle::new(QuadStyle::solid(base).radius(CornerRadii::all(5.0))),
             text(
                 12.0,
                 if active {
@@ -194,11 +199,10 @@ fn button(key: &str, label: &str, active: bool, theme: &WidgetTheme) -> Element 
             shrink: 0.0,
             ..LayoutStyle::default()
         })
-        .hovered(QuadStyle::solid(theme.muted))
-        .pressed(QuadStyle::solid(theme.primary)),
+        .hovered(StateStyle::new().set(property::BackgroundColor, theme.muted))
+        .pressed(StateStyle::new().set(property::BackgroundColor, theme.primary)),
     )
     .build()
-    .radius(CornerRadii::all(5.0))
 }
 
 fn text(size: f32, color: TextColor) -> TextStyle {
@@ -212,8 +216,8 @@ fn text(size: f32, color: TextColor) -> TextStyle {
 
 fn scrollbar(theme: &WidgetTheme) -> ScrollbarStyle {
     ScrollbarStyle::new(
-        QuadStyle::solid(theme.muted),
-        QuadStyle::solid(theme.primary).radius(CornerRadii::all(4.0)),
+        ScrollbarPartStyle::new(QuadStyle::solid(theme.muted)),
+        ScrollbarPartStyle::new(QuadStyle::solid(theme.primary).radius(CornerRadii::all(4.0))),
     )
     .width(8.0)
     .insets(argui_ui::Edges::all(3.0))

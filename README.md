@@ -18,6 +18,7 @@ cargo run -p argui --example window
 cargo run -p argui --example text
 cargo run -p argui --example layout
 cargo run -p argui --example state
+cargo run -p argui --example spotlight
 cargo run -p argui-perf-showcase --example perf
 ./scripts/serve-web.sh
 ```

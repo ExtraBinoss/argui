@@ -24,6 +24,9 @@ use crate::{
 mod composite;
 mod effects;
 
+mod configure;
+use configure::{drawable_size, srgb_target, surface_alpha_mode};
+
 enum FrameContent<'a> {
     None,
     Text {
@@ -191,6 +194,10 @@ impl SurfaceRenderer {
             .ok_or(RendererError::UnsupportedSurface)?;
         surface_config.present_mode = renderer_config.present_mode;
         surface_config.desired_maximum_frame_latency = renderer_config.maximum_frame_latency;
+        surface_config.alpha_mode = surface_alpha_mode(
+            renderer_config.surface_alpha,
+            &surface.get_capabilities(&adapter).alpha_modes,
+        )?;
         let target_format = srgb_target(surface_config.format);
         if target_format != surface_config.format {
             surface_config.view_formats.push(target_format);
@@ -553,45 +560,5 @@ impl SurfaceRenderer {
         ) {
             self.last_profile = profile;
         }
-    }
-}
-
-const fn drawable_size(width: u32, height: u32) -> Option<(u32, u32)> {
-    if width == 0 || height == 0 {
-        None
-    } else {
-        Some((width, height))
-    }
-}
-
-fn srgb_target(format: TextureFormat) -> TextureFormat {
-    format.add_srgb_suffix()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{drawable_size, srgb_target};
-
-    #[test]
-    fn zero_sized_surfaces_are_not_configured() {
-        assert_eq!(drawable_size(800, 600), Some((800, 600)));
-        assert_eq!(drawable_size(0, 600), None);
-        assert_eq!(drawable_size(800, 0), None);
-    }
-
-    #[test]
-    fn presentation_uses_an_srgb_view_when_the_surface_has_one() {
-        assert_eq!(
-            srgb_target(wgpu::TextureFormat::Bgra8Unorm),
-            wgpu::TextureFormat::Bgra8UnormSrgb
-        );
-        assert_eq!(
-            srgb_target(wgpu::TextureFormat::Rgba8UnormSrgb),
-            wgpu::TextureFormat::Rgba8UnormSrgb
-        );
-        assert_eq!(
-            srgb_target(wgpu::TextureFormat::Rgba16Float),
-            wgpu::TextureFormat::Rgba16Float
-        );
     }
 }

@@ -97,6 +97,7 @@ mod tests {
             focusable: false,
             cursor,
             gestures: argui_ui::GestureSet::NONE,
+            window_drag: None,
         }
     }
 

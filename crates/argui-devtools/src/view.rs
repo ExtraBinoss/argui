@@ -6,7 +6,8 @@ use argui_text::{TextColor, TextStyle, TextWrap};
 use argui_theme::WidgetTheme;
 use argui_ui::{
     Align, Button, ButtonStyle, Edges, Element, Inset, Interaction, LayoutStyle, Length,
-    ScrollConfig, ScrollbarStyle, TextInput, TextInputStyle, VirtualList,
+    ScrollConfig, ScrollbarPartStyle, ScrollbarStyle, StateStyle, TextInput, TextInputStyle,
+    VirtualList, VisualState, property,
 };
 
 use crate::host::{DevtoolsHost, Tab};
@@ -64,11 +65,14 @@ fn splitter(theme: &WidgetTheme) -> Element {
         .height(Length::Px(6.0))
         .shrink(0.0)
         .background(theme.primary)
-        .interaction(
-            Interaction::default()
-                .cursor(argui_ui::CursorIcon::NsResize)
-                .hovered(QuadStyle::solid(theme.primary))
-                .pressed(QuadStyle::solid(theme.foreground)),
+        .interaction(Interaction::default().cursor(argui_ui::CursorIcon::NsResize))
+        .state(
+            VisualState::Hovered,
+            StateStyle::from_quad(QuadStyle::solid(theme.primary)),
+        )
+        .state(
+            VisualState::Pressed,
+            StateStyle::from_quad(QuadStyle::solid(theme.foreground)),
         )
         .inspectable(false)
 }
@@ -156,7 +160,11 @@ fn morph_button<A>(tools: &DevtoolsHost<A>, theme: &WidgetTheme) -> Element {
     .gap(5.0)
     .align(Align::Center)
     .background(theme.background)
-    .interaction(Interaction::default().hovered(QuadStyle::solid(theme.muted)))
+    .interaction(Interaction::default())
+    .state(
+        VisualState::Hovered,
+        StateStyle::from_quad(QuadStyle::solid(theme.muted)),
+    )
 }
 
 fn elements_tab<A>(tools: &DevtoolsHost<A>, theme: &WidgetTheme) -> Element {
@@ -191,7 +199,7 @@ fn elements_tab<A>(tools: &DevtoolsHost<A>, theme: &WidgetTheme) -> Element {
                 PaintStyle::new(QuadStyle::solid(theme.card).radius(CornerRadii::all(5.0))),
                 text(12.0, theme.foreground),
             )
-            .focused(QuadStyle::solid(theme.muted)),
+            .focused(StateStyle::new().set(property::BackgroundColor, theme.muted)),
         )
         .build();
         Element::row([
@@ -250,7 +258,11 @@ fn tree_row(node: &NodeSnapshot, selected: bool, theme: &WidgetTheme) -> Element
                 theme.foreground
             },
         ))
-        .interaction(Interaction::default().hovered(QuadStyle::solid(theme.muted)))
+        .interaction(Interaction::default())
+        .state(
+            VisualState::Hovered,
+            StateStyle::from_quad(QuadStyle::solid(theme.muted)),
+        )
 }
 
 fn profiling_tab<A>(tools: &DevtoolsHost<A>, theme: &WidgetTheme) -> Element {
@@ -347,7 +359,11 @@ fn icon_label_button(key: &str, icon: VectorId, label: &str, theme: &WidgetTheme
     .padding(Edges::symmetric(9.0, 6.0))
     .background(theme.muted)
     .radius(CornerRadii::all(5.0))
-    .interaction(Interaction::default().hovered(QuadStyle::solid(theme.muted)))
+    .interaction(Interaction::default())
+    .state(
+        VisualState::Hovered,
+        StateStyle::from_quad(QuadStyle::solid(theme.muted)),
+    )
 }
 
 fn icon_element(icon: VectorId, size: f32) -> Element {
@@ -483,7 +499,7 @@ fn toggle_button(open: bool, theme: &WidgetTheme) -> Element {
             "__devtools-toggle",
             "DevTools",
             ButtonStyle::new(
-                PaintStyle::new(QuadStyle::solid(theme.primary)),
+                PaintStyle::new(QuadStyle::solid(theme.primary).radius(CornerRadii::all(7.0))),
                 text(13.0, theme.primary_foreground),
             )
             .layout(LayoutStyle {
@@ -491,11 +507,10 @@ fn toggle_button(open: bool, theme: &WidgetTheme) -> Element {
                 shrink: 0.0,
                 ..LayoutStyle::default()
             })
-            .hovered(QuadStyle::solid(theme.primary))
-            .pressed(QuadStyle::solid(theme.foreground)),
+            .hovered(StateStyle::new().set(property::BackgroundColor, theme.primary))
+            .pressed(StateStyle::new().set(property::BackgroundColor, theme.foreground)),
         )
         .build()
-        .radius(CornerRadii::all(7.0))
         .inspectable(false)
     }
 }
@@ -510,7 +525,7 @@ fn small_button(key: &str, label: &str, active: bool, theme: &WidgetTheme) -> El
         key,
         label,
         ButtonStyle::new(
-            PaintStyle::new(QuadStyle::solid(base)),
+            PaintStyle::new(QuadStyle::solid(base).radius(CornerRadii::all(5.0))),
             text(
                 12.0,
                 if active {
@@ -525,11 +540,10 @@ fn small_button(key: &str, label: &str, active: bool, theme: &WidgetTheme) -> El
             shrink: 0.0,
             ..LayoutStyle::default()
         })
-        .hovered(QuadStyle::solid(theme.muted))
-        .pressed(QuadStyle::solid(theme.primary)),
+        .hovered(StateStyle::new().set(property::BackgroundColor, theme.muted))
+        .pressed(StateStyle::new().set(property::BackgroundColor, theme.primary)),
     )
     .build()
-    .radius(CornerRadii::all(5.0))
 }
 
 fn metric(label: String, theme: &WidgetTheme) -> Element {
@@ -547,8 +561,10 @@ fn text(size: f32, color: TextColor) -> TextStyle {
 
 fn scrollbar() -> ScrollbarStyle {
     ScrollbarStyle::new(
-        QuadStyle::solid(Color::rgba(0.0, 0.0, 0.0, 0.18)),
-        QuadStyle::solid(Color::rgb(0.30, 0.38, 0.48)).radius(CornerRadii::all(4.0)),
+        ScrollbarPartStyle::new(QuadStyle::solid(Color::rgba(0.0, 0.0, 0.0, 0.18))),
+        ScrollbarPartStyle::new(
+            QuadStyle::solid(Color::rgb(0.30, 0.38, 0.48)).radius(CornerRadii::all(4.0)),
+        ),
     )
     .width(8.0)
     .insets(argui_ui::Edges::all(3.0))

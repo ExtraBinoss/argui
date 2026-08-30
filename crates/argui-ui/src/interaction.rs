@@ -1,7 +1,7 @@
 use argui_core::{Affine2D, KeyInput, Point, Rect};
-use argui_paint::{ClipChain, QuadStyle};
+use argui_paint::ClipChain;
 
-use crate::{CursorIcon, GestureSet};
+use crate::{CursorIcon, GestureSet, VisualState, VisualStates};
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct NodeId(u64);
@@ -18,15 +18,6 @@ impl NodeId {
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub enum VisualState {
-    #[default]
-    Rest,
-    Hovered,
-    Pressed,
-    Focused,
-}
-
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum KeyboardActivation {
     #[default]
     None,
@@ -34,11 +25,10 @@ pub enum KeyboardActivation {
     EnterOrSpace,
 }
 
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct InteractionStyles {
-    pub hovered: Option<QuadStyle>,
-    pub pressed: Option<QuadStyle>,
-    pub focused: Option<QuadStyle>,
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum WindowDragBehavior {
+    Move,
+    MoveAndToggleMaximize,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -46,9 +36,9 @@ pub struct Interaction {
     pub enabled: bool,
     pub focusable: bool,
     pub cursor: CursorIcon,
-    pub styles: InteractionStyles,
     pub gestures: GestureSet,
     pub keyboard_activation: KeyboardActivation,
+    pub window_drag: Option<WindowDragBehavior>,
 }
 
 impl Default for Interaction {
@@ -57,9 +47,9 @@ impl Default for Interaction {
             enabled: true,
             focusable: false,
             cursor: CursorIcon::Auto,
-            styles: InteractionStyles::default(),
             gestures: GestureSet::NONE,
             keyboard_activation: KeyboardActivation::None,
+            window_drag: None,
         }
     }
 }
@@ -79,13 +69,9 @@ impl Interaction {
             enabled: true,
             focusable: false,
             cursor: CursorIcon::Auto,
-            styles: InteractionStyles {
-                hovered: None,
-                pressed: None,
-                focused: None,
-            },
             gestures: GestureSet::NONE,
             keyboard_activation: KeyboardActivation::None,
+            window_drag: None,
         }
     }
 
@@ -114,32 +100,9 @@ impl Interaction {
     }
 
     #[must_use]
-    pub fn hovered(mut self, style: QuadStyle) -> Self {
-        self.styles.hovered = Some(style);
+    pub const fn window_drag(mut self, behavior: WindowDragBehavior) -> Self {
+        self.window_drag = Some(behavior);
         self
-    }
-
-    #[must_use]
-    pub fn pressed(mut self, style: QuadStyle) -> Self {
-        self.styles.pressed = Some(style);
-        self
-    }
-
-    #[must_use]
-    pub fn focused(mut self, style: QuadStyle) -> Self {
-        self.styles.focused = Some(style);
-        self
-    }
-
-    #[must_use]
-    pub fn resolve(&self, base: QuadStyle, state: VisualState) -> QuadStyle {
-        match state {
-            VisualState::Pressed => self.styles.pressed.clone(),
-            VisualState::Hovered => self.styles.hovered.clone(),
-            VisualState::Focused => self.styles.focused.clone(),
-            VisualState::Rest => None,
-        }
-        .unwrap_or(base)
     }
 }
 
@@ -152,6 +115,7 @@ pub struct HitRegion {
     pub focusable: bool,
     pub cursor: CursorIcon,
     pub gestures: GestureSet,
+    pub window_drag: Option<WindowDragBehavior>,
 }
 
 impl HitRegion {
@@ -245,16 +209,18 @@ impl InteractionState {
     pub const fn focused(&self) -> Option<NodeId> {
         self.focused
     }
-    pub fn visual_state(&self, node: NodeId) -> VisualState {
-        if self.pressed == Some(node) || self.keyboard_pressed == Some(node) {
-            VisualState::Pressed
-        } else if self.hovered == Some(node) {
-            VisualState::Hovered
-        } else if self.focused == Some(node) {
-            VisualState::Focused
-        } else {
-            VisualState::Rest
+    pub fn visual_states(&self, node: NodeId) -> VisualStates {
+        let mut states = VisualStates::NONE;
+        if self.focused == Some(node) {
+            states.insert(VisualState::Focused);
         }
+        if self.hovered == Some(node) {
+            states.insert(VisualState::Hovered);
+        }
+        if self.pressed == Some(node) || self.keyboard_pressed == Some(node) {
+            states.insert(VisualState::Pressed);
+        }
+        states
     }
 
     pub fn pointer_moved(&mut self, point: Point, regions: &[HitRegion]) -> RawUpdate {

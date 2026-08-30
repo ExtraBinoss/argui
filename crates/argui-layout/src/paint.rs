@@ -31,6 +31,7 @@ struct CachedFragment {
     hit_regions: Vec<HitRegion>,
     scroll_updates: Vec<ScrollPaintUpdate>,
     cacheable: bool,
+    visual_revision: u64,
 }
 
 #[derive(Default, Debug)]
@@ -53,7 +54,7 @@ pub(crate) fn repaint(
     cache.visited = 0;
     cache.reused = 0;
     cache.reused_commands = 0;
-    sync_scroll_config(&elements, output);
+    sync_scroll_config(&elements, ui, output);
     let clips = ClipChain::from_regions([ClipRegion::new(output.viewport, Affine2D::IDENTITY)]);
     if let Some(root) = root {
         let mut scroll_updates = Vec::new();
@@ -97,6 +98,7 @@ fn paint_node(
         && fragment.element.ptr_eq(element)
         && fragment.node == node
         && fragment.parent == *parent
+        && fragment.visual_revision == ui.visual_revision(node.node)
     {
         output.display_list.extend(fragment.commands.clone());
         output.hit_regions.extend(fragment.hit_regions.clone());
@@ -159,8 +161,8 @@ fn paint_node(
     }
     let mut children = map.children.iter().collect::<Vec<_>>();
     children.sort_by_key(|child| elements[child.index].z_index);
-    let mut cacheable = element.interaction.is_none()
-        && element.bindings.is_empty()
+    let mut cacheable = element.bindings.is_empty()
+        && !element.has_state_animation()
         && !matches!(element.kind, ElementKind::TextEditor { .. })
         && element.scroll.is_none();
     for child in children {
@@ -203,6 +205,7 @@ fn paint_node(
                 hit_regions: output.hit_regions[hit_start..].to_vec(),
                 scroll_updates: scroll_updates[scroll_start..].to_vec(),
                 cacheable,
+                visual_revision: ui.visual_revision(node.node),
             },
         );
     } else {
@@ -240,7 +243,7 @@ fn paint_enter(
     if let Some(layer) = element.layer.clone() {
         begin_layer(
             &mut output.display_list,
-            ui.resolved_layer(element, &layer),
+            ui.resolved_layer(node.node, element, &layer),
             visual_bounds,
             node.node,
         );
@@ -476,7 +479,7 @@ fn begin_scope(
     for effect in effects {
         begin_layer(
             display_list,
-            ui.resolved_layer(element, &effect.layer),
+            ui.resolved_layer(node, element, &effect.layer),
             bounds,
             node,
         );
@@ -524,15 +527,20 @@ fn push_hit_region(
             focusable: interaction.focusable,
             cursor: interaction.cursor,
             gestures: interaction.gestures,
+            window_drag: interaction.window_drag,
         });
     }
 }
 
-fn sync_scroll_config(elements: &[&Element], output: &mut LayoutOutput) {
+fn sync_scroll_config(elements: &[&Element], ui: &UiTree, output: &mut LayoutOutput) {
     for region in &mut output.scroll_regions {
         if let Some(node) = output.nodes.iter().find(|node| node.node == region.node)
             && let Some(config) = elements[node.index].scroll.clone()
         {
+            let config = ui.resolved_scroll_config(region.node, &config);
+            if let (Some(scrollbar), Some(style)) = (&mut region.scrollbar, &config.scrollbar) {
+                scrollbar.style = style.clone();
+            }
             region.config = config;
         }
     }

@@ -28,7 +28,12 @@ fn transformed(a: vec4<f32>, b: vec4<f32>, point: vec2<f32>) -> vec2<f32> {
 @vertex
 fn vertex(@builtin(vertex_index) vertex_index: u32, @builtin(instance_index) instance: u32) -> VertexOutput {
     let quad = quads[instance];
-    let local = CORNERS[vertex_index] * quad.rect.zw;
+    let scale = vec2(
+        length(vec2(quad.transform_a.x, quad.transform_a.y)),
+        length(vec2(quad.transform_a.z, quad.transform_a.w)),
+    );
+    let fringe = vec2(1.5) / max(scale, vec2(0.00001));
+    let local = CORNERS[vertex_index] * (quad.rect.zw + fringe * 2.0) - fringe;
     let pixel = transformed(quad.transform_a, quad.transform_b, quad.rect.xy + local) - viewport.origin;
     let ndc = vec2(pixel.x / viewport.size.x * 2.0 - 1.0, 1.0 - pixel.y / viewport.size.y * 2.0);
     var output: VertexOutput;
@@ -48,6 +53,12 @@ fn rounded_distance(point: vec2<f32>, size: vec2<f32>, radii: vec4<f32>) -> f32 
     let centered = point - size * 0.5;
     let offset = abs(centered) - max(size * 0.5 - vec2(radius), vec2(0.0));
     return length(max(offset, vec2(0.0))) + min(max(offset.x, offset.y), 0.0) - radius;
+}
+
+fn edge_coverage(distance: f32) -> f32 {
+    let gradient = length(vec2(dpdx(distance), dpdy(distance)));
+    let pixel_width = max(gradient, 0.75) * 1.5;
+    return clamp(0.5 - distance / pixel_width, 0.0, 1.0);
 }
 
 fn gradient_color(quad: Quad, value: f32) -> vec4<f32> {
@@ -86,7 +97,7 @@ fn fragment(input: VertexOutput) -> @location(0) vec4<f32> {
            local.x >= clip.bounds.x + clip.bounds.z || local.y >= clip.bounds.y + clip.bounds.w { discard; }
     }
     let outer_distance = rounded_distance(input.local, quad.rect.zw, quad.radii);
-    let outer_coverage = 1.0 - smoothstep(-max(fwidth(outer_distance), 0.75), max(fwidth(outer_distance), 0.75), outer_distance);
+    let outer_coverage = edge_coverage(outer_distance);
     let origin = vec2(quad.border_widths.x, quad.border_widths.z);
     let size = max(quad.rect.zw - vec2(quad.border_widths.x + quad.border_widths.y, quad.border_widths.z + quad.border_widths.w), vec2(0.0));
     let radii = max(quad.radii - vec4(
@@ -94,8 +105,14 @@ fn fragment(input: VertexOutput) -> @location(0) vec4<f32> {
         max(quad.border_widths.y, quad.border_widths.w), max(quad.border_widths.x, quad.border_widths.w)
     ), vec4(0.0));
     let inner_distance = rounded_distance(input.local - origin, size, radii);
-    let inner_coverage = 1.0 - smoothstep(-max(fwidth(inner_distance), 0.75), max(fwidth(inner_distance), 0.75), inner_distance);
-    var color = mix(quad.border_color, fill_color(quad, input.local), inner_coverage);
-    color.a *= outer_coverage * quad.params.x;
-    return color;
+    let inner_coverage = edge_coverage(inner_distance);
+    let border_coverage = max(outer_coverage - inner_coverage, 0.0);
+    let fill = fill_color(quad, input.local);
+    let border_alpha = quad.border_color.a * border_coverage;
+    let fill_alpha = fill.a * inner_coverage;
+    let alpha = border_alpha + fill_alpha;
+    let color = (
+        quad.border_color.rgb * border_alpha + fill.rgb * fill_alpha
+    ) / max(alpha, 0.00001);
+    return vec4(color, alpha * quad.params.x);
 }

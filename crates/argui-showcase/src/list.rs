@@ -2,7 +2,8 @@ use argui_paint::{Border, Color, CornerRadii, QuadStyle};
 use argui_text::TextWrap;
 use argui_theme::WidgetTheme;
 use argui_ui::{
-    Edges, Element, Interaction, ScrollConfig, ScrollPolarity, ScrollbarStyle, VirtualList,
+    Edges, Element, Interaction, ScrollConfig, ScrollPolarity, ScrollbarPartStyle, ScrollbarStyle,
+    StateStyle, VirtualList, VisualState,
 };
 
 use super::{StateShowcase, text_style};
@@ -29,8 +30,8 @@ impl StateShowcase {
 
     fn scrollbar_style_from_colors(&self, track: Color, thumb: Color) -> ScrollbarStyle {
         ScrollbarStyle::new(
-            QuadStyle::solid(track).radius(CornerRadii::all(5.0)),
-            QuadStyle::solid(thumb).radius(CornerRadii::all(5.0)),
+            ScrollbarPartStyle::new(QuadStyle::solid(track).radius(CornerRadii::all(5.0))),
+            ScrollbarPartStyle::new(QuadStyle::solid(thumb).radius(CornerRadii::all(5.0))),
         )
         .width(10.0)
         .insets(Edges::all(5.0))
@@ -64,9 +65,14 @@ impl StateShowcase {
                     .text_style(text_style(15.0, widgets.foreground, 500, TextWrap::None))
                     .padding(Edges::symmetric(12.0, 8.0))
                     .background(background)
-                    .interaction(Interaction::default().hovered(
-                        QuadStyle::solid(widgets.muted).border(Border::all(1.0, widgets.primary)),
-                    ))
+                    .interaction(Interaction::default())
+                    .state(
+                        VisualState::Hovered,
+                        StateStyle::from_quad(
+                            QuadStyle::solid(widgets.muted)
+                                .border(Border::all(1.0, widgets.primary)),
+                        ),
+                    )
             })
             .background(widgets.card)
             .border(Border::all(1.0, widgets.border))

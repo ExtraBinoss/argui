@@ -6,8 +6,8 @@ use argui_layout::{LayoutEngine, TextInputRegion};
 use argui_paint::{PaintStyle, QuadStyle};
 use argui_text::{CaretStop, TextEngine, TextStyle};
 use argui_ui::{
-    Edges, Element, GestureKind, Length, Resizable, ScrollbarStyle, TextArea, TextInputStyle,
-    UiEventKind, UiTree, scrollbar_at,
+    Edges, Element, GestureKind, Length, Resizable, ScrollbarPartStyle, ScrollbarStyle, TextArea,
+    TextInputStyle, UiEventKind, UiTree, scrollbar_at,
 };
 
 const NOTO_SANS: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
@@ -126,7 +126,11 @@ fn text_area_shapes_and_clips_scrollable_content_with_a_live_scrollbar() {
         TextInputStyle::new(PaintStyle::default(), TextStyle::default()),
     )
     .scrollbar(
-        ScrollbarStyle::new(QuadStyle::default(), QuadStyle::solid(Color::WHITE)).insets(Edges {
+        ScrollbarStyle::new(
+            ScrollbarPartStyle::new(QuadStyle::default()),
+            ScrollbarPartStyle::new(QuadStyle::solid(Color::WHITE)),
+        )
+        .insets(Edges {
             left: 3.0,
             right: 5.0,
             top: 7.0,
@@ -206,8 +210,8 @@ fn resizing_a_text_area_preserves_its_scroll_position() {
             TextInputStyle::new(PaintStyle::default(), TextStyle::default()),
         )
         .scrollbar(ScrollbarStyle::new(
-            QuadStyle::default(),
-            QuadStyle::solid(Color::WHITE),
+            ScrollbarPartStyle::new(QuadStyle::default()),
+            ScrollbarPartStyle::new(QuadStyle::solid(Color::WHITE)),
         ))
         .build()
         .height(Length::Px(height))
@@ -241,8 +245,8 @@ fn a_resize_handle_painted_over_a_scrollbar_keeps_pointer_priority() {
     style.layout.height = Length::Percent(1.0);
     let area = TextArea::new("notes", value, "notes", style)
         .scrollbar(ScrollbarStyle::new(
-            QuadStyle::default(),
-            QuadStyle::solid(Color::WHITE),
+            ScrollbarPartStyle::new(QuadStyle::default()),
+            ScrollbarPartStyle::new(QuadStyle::solid(Color::WHITE)),
         ))
         .build();
     let handle = Element::container([])

@@ -57,6 +57,7 @@ impl ApplicationHandler<UserEvent> for Application {
                     width: size.width,
                     height: size.height,
                     scale_factor: window.scale_factor(),
+                    capabilities: argui_platform::window_capabilities(&window),
                 }));
                 self.initialize_renderer(&window, event_loop);
                 window.set_visible(self.initial_visible);

@@ -80,3 +80,42 @@ are delivered through `AppEvent::Tray`.
 `AppUpdate` invalidates only the windows whose output changed. Open and close
 additional native windows or Web canvases with `AppCommand::OpenWindow` and
 `AppCommand::CloseWindow`. WGPU device state is shared across their surfaces.
+
+## Transparent overlays and custom chrome
+
+An overlay uses a transparent, undecorated window whose dimensions fit its
+interactive panel. Pixels outside that native rectangle naturally belong to
+other applications; `SetWindowMousePassthrough` can additionally disable input
+for the entire overlay until the application enables it again.
+
+```rust
+use argui::platform::{WindowConfig, WindowLevel};
+
+let overlay = WindowConfig {
+    decorations: false,
+    transparent: true,
+    native_shadow: cfg!(any(target_os = "windows", target_os = "macos")),
+    level: WindowLevel::AlwaysOnTop,
+    ..WindowConfig::default()
+};
+```
+
+Transparent windows automatically request premultiplied WGPU surface
+composition and clear to transparent black. `Interaction::window_drag` marks
+the exact element used for native movement; its
+`MoveAndToggleMaximize` behavior maximizes or restores on a double-click.
+Interactive children remain normal hit targets, so custom minimize and close
+buttons can live inside the drag region.
+
+Undecorated native shadows are available through winit on Windows and macOS.
+Set `native_shadow` only for those targets and inspect
+`WindowCapabilities::native_shadow` when windows are created dynamically.
+X11, Wayland, and Web expose no equivalent portable native shadow. A GPU shadow
+must stay inside the native surface; growing that surface also grows its
+hit-test rectangle, so compact click-through overlays should omit that shadow
+instead of creating an invisible input-blocking margin.
+
+`PlatformEvent::Opened` reports `WindowCapabilities`. Always-on-top is
+available through winit on Windows, macOS, and X11, but not on standard
+Wayland. Unsupported requests emit `RuntimeEvent::CommandFailed`; Argui does
+not silently substitute another window behavior.

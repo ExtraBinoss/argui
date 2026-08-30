@@ -8,6 +8,7 @@ fn only_surface_changes_request_a_frame() {
             width: 800,
             height: 600,
             scale_factor: 1.0,
+            capabilities: argui_platform::WindowBackend::X11.capabilities(),
         }
         .requires_redraw()
     );

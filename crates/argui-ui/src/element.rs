@@ -12,7 +12,8 @@ use std::{
 
 use crate::{
     Align, Direction, Edges, EffectScope, Inset, Interaction, Justify, LayoutStyle, Length,
-    MotionProperty, Position, PropertyBinding, ScopedEffect, ScrollConfig, Wrap,
+    MotionProperty, Position, PropertyBinding, ScopedEffect, ScrollConfig, StateStyle,
+    StyleTransition, VisualState, Wrap,
 };
 
 #[derive(Clone, Debug, PartialEq)]
@@ -55,6 +56,9 @@ pub struct ElementNode {
     pub transform: Transform2D,
     pub transform_origin: TransformOrigin,
     pub interaction: Option<Interaction>,
+    pub(crate) state_styles: crate::state::ElementStateStyles,
+    pub(crate) style_transition: Option<StyleTransition>,
+    pub(crate) inherit_interaction_state: bool,
     pub semantics: Option<Semantics>,
     pub semantic_hidden: bool,
     pub bindings: Vec<PropertyBinding>,
@@ -99,6 +103,9 @@ impl Element {
             transform: Transform2D::IDENTITY,
             transform_origin: TransformOrigin::CENTER,
             interaction: None,
+            state_styles: crate::state::ElementStateStyles::default(),
+            style_transition: None,
+            inherit_interaction_state: false,
             semantics: None,
             semantic_hidden: false,
             bindings: Vec::new(),
@@ -136,6 +143,9 @@ impl Element {
             transform: Transform2D::IDENTITY,
             transform_origin: TransformOrigin::CENTER,
             interaction: None,
+            state_styles: crate::state::ElementStateStyles::default(),
+            style_transition: None,
+            inherit_interaction_state: false,
             semantics: None,
             semantic_hidden: false,
             bindings: Vec::new(),
@@ -153,6 +163,11 @@ impl Element {
     #[must_use]
     pub fn ptr_eq(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.0, &other.0)
+    }
+
+    #[must_use]
+    pub fn has_state_animation(&self) -> bool {
+        self.style_transition.is_some() || !self.state_styles.is_empty()
     }
 
     #[must_use]
@@ -401,6 +416,24 @@ impl Element {
     #[must_use]
     pub fn interaction(mut self, interaction: Interaction) -> Self {
         self.interaction = Some(interaction);
+        self
+    }
+
+    #[must_use]
+    pub fn state(mut self, state: VisualState, style: StateStyle) -> Self {
+        self.state_styles.set(state, style);
+        self
+    }
+
+    #[must_use]
+    pub fn transition(mut self, transition: StyleTransition) -> Self {
+        self.style_transition = Some(transition);
+        self
+    }
+
+    #[must_use]
+    pub fn inherit_interaction_state(mut self) -> Self {
+        self.inherit_interaction_state = true;
         self
     }
 
