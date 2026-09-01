@@ -1,7 +1,7 @@
 use argui_paint::{VectorAsset, VectorId};
-use argui_vector::{morph_svg, parse_svg};
+use argui_vector::parse_svg;
 use icondata_core::IconData;
-use icondata_tb::{TbChevronDownOutline, TbChevronRightOutline, TbCopyOutline, TbTargetOutline};
+use icondata_tb::{TbChevronRightOutline, TbCopyOutline, TbTargetOutline};
 
 #[derive(Debug)]
 pub(crate) struct DevtoolsIcons {
@@ -16,11 +16,8 @@ impl DevtoolsIcons {
         let chevron = VectorId::fresh();
         let copy = VectorId::fresh();
         let target = VectorId::fresh();
-        let right = tabler_svg(TbChevronRightOutline);
-        let down = tabler_svg(TbChevronDownOutline);
         let assets = vec![
-            morph_svg(chevron, right.as_bytes(), down.as_bytes())
-                .expect("official Tabler chevrons form a compatible GPU morph"),
+            tabler(chevron, TbChevronRightOutline),
             tabler(copy, TbCopyOutline),
             tabler(target, TbTargetOutline),
         ];

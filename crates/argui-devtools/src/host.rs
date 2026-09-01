@@ -33,11 +33,11 @@ pub struct DevtoolsHost<A> {
     pub(crate) search: String,
     pub(crate) sections: [bool; 3],
     pub(crate) section_progress: [f32; 3],
-    pub(crate) morph_progress: f32,
+    pub(crate) icon_progress: f32,
     pub(crate) sheet_progress: f32,
     sheet_motion: Spring<f32>,
     section_motion: [Spring<f32>; 3],
-    morph_motion: Spring<f32>,
+    icon_motion: Spring<f32>,
     pub(crate) icons: DevtoolsIcons,
     clipboard: Option<ClipboardRequest>,
     pending_scroll: Option<ScrollRequest>,
@@ -68,11 +68,11 @@ impl<A> DevtoolsHost<A> {
             search: String::new(),
             sections: [true, true, true],
             section_progress: [1.0; 3],
-            morph_progress: 0.0,
+            icon_progress: 0.0,
             sheet_progress: 0.0,
             sheet_motion: sheet_spring(0.0),
             section_motion: std::array::from_fn(|_| section_spring(1.0)),
-            morph_motion: section_spring(0.0),
+            icon_motion: section_spring(0.0),
             icons: DevtoolsIcons::embedded(),
             clipboard: None,
             pending_scroll: None,
@@ -265,9 +265,9 @@ impl<A> DevtoolsHost<A> {
                     self.clipboard = Some(ClipboardRequest::Write(trace));
                 }
             }
-            "__devtools-morph" => {
-                let target = f32::from(self.morph_motion.target() < 0.5);
-                self.morph_motion.retarget(target);
+            "__devtools-icon-transform" => {
+                let target = f32::from(self.icon_motion.target() < 0.5);
+                self.icon_motion.retarget(target);
             }
             _ if key.starts_with("__devtools-section-") => {
                 if let Ok(index) = key
@@ -391,11 +391,11 @@ impl<A: Render> DevtoolsHost<A> {
                 sections = true;
             }
         }
-        let morph = self.morph_motion.advance(frame.elapsed);
-        if morph {
-            self.morph_progress = self.morph_motion.value().clamp(0.0, 1.0);
+        let icon = self.icon_motion.advance(frame.elapsed);
+        if icon {
+            self.icon_progress = self.icon_motion.value().clamp(0.0, 1.0);
         }
-        if sheet || sections || morph || profile || app == ViewUpdate::Rebuild {
+        if sheet || sections || icon || profile || app == ViewUpdate::Rebuild {
             ViewUpdate::Rebuild
         } else if app == ViewUpdate::Paint {
             ViewUpdate::Paint
@@ -407,7 +407,7 @@ impl<A: Render> DevtoolsHost<A> {
     pub fn wants_animation_frame(&self) -> bool {
         self.sheet_motion.is_active()
             || self.section_motion.iter().any(Spring::is_active)
-            || self.morph_motion.is_active()
+            || self.icon_motion.is_active()
             || (self.open && self.tab == Tab::Profiling && !self.inspector.paused())
             || self.app.wants_animation_frame()
     }

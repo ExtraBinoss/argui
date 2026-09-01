@@ -70,13 +70,8 @@ impl EffectGraph {
                     );
                     image += 1;
                 }
-                DisplayCommand::Vector(item) => {
-                    push_draw(
-                        &mut roots,
-                        &mut stack,
-                        DrawKind::Vector(item.vector),
-                        vector..vector + 1,
-                    );
+                DisplayCommand::Vector(_) => {
+                    push_draw(&mut roots, &mut stack, DrawKind::Vector, vector..vector + 1);
                     vector += 1;
                 }
                 DisplayCommand::BeginLayer(style) => {

@@ -1,3 +1,4 @@
+use argui_core::Transform2D;
 use argui_inspect::{InspectNodeId, NodeSnapshot, PropertySnapshot, StyleProperty};
 use argui_paint::{CornerRadii, PaintStyle, QuadStyle, VectorId};
 use argui_text::{TextColor, TextStyle, TextWrap};
@@ -165,7 +166,7 @@ fn section_header(
             .width(length(18.0))
             .height(length(18.0))
             .shrink(0.0)
-            .vector_progress(progress),
+            .transform(Transform2D::IDENTITY.rotate(progress * std::f32::consts::FRAC_PI_2)),
         Element::text(label).text_style(text(12.0, theme.foreground)),
     ])
     .keyed(format!("__devtools-section-{index}"))

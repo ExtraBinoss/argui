@@ -4,16 +4,24 @@ use argui_core::{
 };
 use argui_paint::{ClipChain, ClipRegion, PaintStyle, QuadStyle};
 use argui_text::TextStyle;
-use argui_ui::{ClipboardRequest, CursorIcon, HitRegion, Overflow, UiEventKind, UiTree};
-use argui_widgets::{Input, InputStyle, TextArea};
+use argui_ui::{
+    ClipboardRequest, CursorIcon, HitRegion, Overflow, TextSelection, TextSelectionRequest,
+    UiEventKind, UiTree,
+};
+use argui_widgets::{Input, InputKind, InputStyle, TextArea};
 
 fn tree(value: &str) -> (UiTree, HitRegion) {
+    filtered_tree(value, InputKind::Text)
+}
+
+fn filtered_tree(value: &str, kind: InputKind) -> (UiTree, HitRegion) {
     let input = Input::new(
         "field",
         value,
         "placeholder",
         InputStyle::new(PaintStyle::default(), TextStyle::default()),
     )
+    .kind(kind)
     .build();
     let tree = UiTree::new(input);
     let node = tree.node_id_at(0).unwrap();
@@ -32,6 +40,36 @@ fn tree(value: &str) -> (UiTree, HitRegion) {
             window_drag: None,
         },
     )
+}
+
+#[test]
+fn numeric_filters_reject_invalid_keyboard_ime_and_paste_edits() {
+    let (mut decimal, region) = filtered_tree("", InputKind::Number);
+    focus(&mut decimal, &region);
+    let letter = decimal.edit_text_input(&key(
+        Key::Character("x".into()),
+        Some("x"),
+        Modifiers::default(),
+    ));
+    assert!(letter.events.is_empty());
+    assert_eq!(decimal.text_input_value(region.node), Some(""));
+    assert!(decimal.paste_text("12.5").layout_changed);
+    assert!(!decimal.paste_text("px").layout_changed);
+    assert!(
+        !decimal
+            .ime_input(ImeInput::Commit("a".into()))
+            .layout_changed
+    );
+    assert_eq!(decimal.text_input_value(region.node), Some("12.5"));
+
+    let (mut expression, region) = filtered_tree("", InputKind::Arithmetic);
+    focus(&mut expression, &region);
+    assert!(expression.paste_text("(50 + 10) / 2").layout_changed);
+    assert!(!expression.paste_text("px").layout_changed);
+    assert_eq!(
+        expression.text_input_value(region.node),
+        Some("(50 + 10) / 2")
+    );
 }
 
 fn read_only_tree(value: &str) -> (UiTree, HitRegion) {
@@ -508,5 +546,32 @@ fn visual_positions_preserve_affinity_across_pointer_and_keyboard_updates() {
         !tree
             .move_text_position(node, before, false)
             .text_input_changed
+    );
+}
+
+#[test]
+fn targeted_selection_resolves_stable_keys_and_grapheme_boundaries() {
+    let (mut tree, region) = tree("a👋🏽z");
+    let update = tree.select_text(TextSelectionRequest::new("field", TextSelection::All));
+    assert!(update.text_input_changed);
+    assert_eq!(
+        tree.text_input_selection(region.node),
+        Some((0, "a👋🏽z".len()))
+    );
+
+    tree.select_text(TextSelectionRequest::new(
+        "field",
+        TextSelection::Range {
+            anchor: TextPosition::new(2, CaretAffinity::After),
+            cursor: TextPosition::new("a👋🏽".len(), CaretAffinity::Before),
+        },
+    ));
+    assert_eq!(
+        tree.text_input_selection(region.node),
+        Some((1, "a👋🏽".len()))
+    );
+    assert_eq!(
+        tree.select_text(TextSelectionRequest::new("missing", TextSelection::All)),
+        argui_ui::InteractionUpdate::default()
     );
 }

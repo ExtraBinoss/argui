@@ -221,6 +221,9 @@ fn snapshots_and_render_metrics_share_one_bounded_record() {
         textures: 6,
         reused_textures: 7,
         texture_bytes: 8,
+        vector_atlas_entries: 9,
+        vector_atlas_hits: 10,
+        vector_rasterizations: 11,
         ..FrameRecord::default()
     });
     let frame = inspector.frames()[0].clone();
@@ -232,6 +235,9 @@ fn snapshots_and_render_metrics_share_one_bounded_record() {
     assert_eq!(frame.textures, 6);
     assert_eq!(frame.reused_textures, 7);
     assert_eq!(frame.texture_bytes, 8);
+    assert_eq!(frame.vector_atlas_entries, 9);
+    assert_eq!(frame.vector_atlas_hits, 10);
+    assert_eq!(frame.vector_rasterizations, 11);
 }
 
 #[test]
@@ -349,6 +355,9 @@ fn gpu_trace_round_trip_preserves_strict_timeline_data() {
     inspector.select(Some(InspectNodeId(9)));
     inspector.record_ui(FrameRecord {
         update: Invalidation::Paint,
+        vector_atlas_entries: 5,
+        vector_atlas_hits: 8,
+        vector_rasterizations: 1,
         adapter: AdapterRecord {
             name: "Test GPU".into(),
             backend: "Vulkan".into(),
@@ -378,6 +387,9 @@ fn gpu_trace_round_trip_preserves_strict_timeline_data() {
     let pass = &frame.gpu.unwrap().passes[0];
     assert_eq!(frame.update, Invalidation::Paint);
     assert_eq!(frame.adapter.features, "TIMESTAMP_QUERY");
+    assert_eq!(frame.vector_atlas_entries, 5);
+    assert_eq!(frame.vector_atlas_hits, 8);
+    assert_eq!(frame.vector_rasterizations, 1);
     assert_eq!(pass.start, Duration::from_nanos(100));
     assert_eq!(pass.duration, Duration::from_nanos(300));
     assert_eq!(imported.selected(), Some(InspectNodeId(9)));
@@ -389,7 +401,7 @@ fn gpu_trace_rejects_unknown_versions_fields_and_enum_values() {
     inspector.record_ui(FrameRecord::default());
     let json = inspector.trace_json().unwrap();
 
-    let wrong_version = json.replace("argui-gpu-trace-v1", "argui-gpu-trace-v2");
+    let wrong_version = json.replace("argui-gpu-trace-v2", "argui-gpu-trace-v1");
     assert!(inspector.import_trace_json(&wrong_version).is_err());
 
     let unknown_field = json.replacen("{", "{\"unknown\":true,", 1);

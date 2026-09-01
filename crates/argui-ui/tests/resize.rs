@@ -14,6 +14,7 @@ fn event(phase: GesturePhase, total: Point) -> UiEvent {
             target,
             phase,
             kind: GestureKind::Pan {
+                position: total,
                 delta: total,
                 total,
                 velocity: Point::default(),

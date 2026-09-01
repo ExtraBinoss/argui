@@ -3,8 +3,9 @@ use argui_core::{Color, Point, Transform2D};
 use argui_paint::{Border, CornerRadii, Fill, GradientStop, LinearGradient, PaintStyle, QuadStyle};
 use argui_ui::{
     Axes, Element, FlexWrap, Interaction, KeyboardActivation, Overflow, PropertyKey, ScrollConfig,
-    ScrollbarPartStyle, ScrollbarStyle, Sides, StateStyle, StyleTransition, TransitionDirection,
-    TransitionRule, VisualState, length, percent, property, sides,
+    ScrollbarPartStyle, ScrollbarStyle, Sides, StateScopeId, StateSelector, StateStyle,
+    StyleTransition, TransitionDirection, TransitionRule, VisualState, length, percent, property,
+    sides,
 };
 use argui_widgets::WidgetTheme;
 
@@ -71,6 +72,7 @@ pub(crate) fn demo(theme: &WidgetTheme) -> Element {
 }
 
 fn spring_surface(theme: &WidgetTheme) -> Element {
+    let scope = StateScopeId::new("state-example-spring");
     let label = Element::text("Hover, focus, press")
         .text_style(text_style(
             15.0,
@@ -78,9 +80,8 @@ fn spring_surface(theme: &WidgetTheme) -> Element {
             650,
             argui_text::TextWrap::None,
         ))
-        .inherit_interaction_state()
         .state(
-            VisualState::Pressed,
+            StateSelector::scope(scope, VisualState::Pressed),
             StateStyle::new().set(
                 property::Transform,
                 Transform2D::IDENTITY.translate(4.0, 0.0),
@@ -89,6 +90,7 @@ fn spring_surface(theme: &WidgetTheme) -> Element {
         .transition(StyleTransition::new(Transition::spring()));
     Element::container([label])
         .keyed("state-example-spring")
+        .state_scope(scope)
         .width(percent(1.0))
         .padding(sides(18.0, 14.0))
         .paint_style(PaintStyle::new(
@@ -129,12 +131,12 @@ fn directional_surface(theme: &WidgetTheme) -> Element {
             .rule(
                 TransitionRule::new(fast)
                     .property(PropertyKey::Transform)
-                    .direction(TransitionDirection::Enter(VisualState::Hovered)),
+                    .direction(TransitionDirection::Enter(VisualState::Hovered.into())),
             )
             .rule(
                 TransitionRule::new(slow)
                     .property(PropertyKey::Transform)
-                    .direction(TransitionDirection::Exit(VisualState::Hovered)),
+                    .direction(TransitionDirection::Exit(VisualState::Hovered.into())),
             );
     Element::container([label("Fast in · slow out", theme.primary_foreground)])
         .keyed("state-example-directional")

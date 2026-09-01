@@ -343,6 +343,7 @@ fn snapshots_cover_every_media_summary_and_empty_identity_input() {
             placeholder: "placeholder".into(),
             multiline: false,
             read_only: false,
+            filter: argui_ui::TextInputFilter::Any,
             text: argui_text::TextStyle::default(),
             placeholder_text: argui_text::TextStyle::default(),
             selection: Color::WHITE,
@@ -353,7 +354,7 @@ fn snapshots_cover_every_media_summary_and_empty_identity_input() {
     let root = Element::container([
         text_input(""),
         text_input("value"),
-        Element::vector(argui_paint::VectorId(8)).vector_progress(0.25),
+        Element::vector(argui_paint::VectorId(8)),
     ]);
     let tree = UiTree::new(root);
     let mut snapshots = Vec::new();
@@ -373,7 +374,7 @@ fn snapshots_cover_every_media_summary_and_empty_identity_input() {
     assert_eq!(snapshots[1].summary.as_deref(), Some("placeholder"));
     assert_eq!(snapshots[2].summary.as_deref(), Some("value"));
     assert_eq!(snapshots[3].kind, "vector");
-    assert!(snapshots[3].summary.as_ref().unwrap().contains("morph"));
+    assert_eq!(snapshots[3].summary.as_deref(), Some("id=8 · Contain"));
 
     let mut none = Vec::new();
     collect_nodes(

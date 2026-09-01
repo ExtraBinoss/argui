@@ -464,13 +464,14 @@ fn push_vector(
     output: &mut LayoutOutput,
     context: &PaintContext,
 ) {
-    let ElementKind::Vector { vector, progress } = element.kind else {
+    let ElementKind::Vector { vector, fit, color } = element.kind else {
         return;
     };
     output.display_list.push_vector(VectorPrimitive {
         vector,
         bounds: node.bounds,
-        progress,
+        fit,
+        color,
         opacity: ui.resolved_quad(node.node, element).opacity,
         transform: context.transform,
         clips: context.clips.clone(),

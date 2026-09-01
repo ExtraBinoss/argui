@@ -454,6 +454,13 @@ impl Render for WindowModel {
                 argui_ui::FocusRequest::Clear => cx.clear_focus(),
             }
         }
+        if let Some(request) = self
+            .model
+            .borrow_mut()
+            .take_text_selection_request(&self.key)
+        {
+            cx.select_text(request.target, request.selection);
+        }
         if let Some(request) = self.model.borrow_mut().take_theme_request(&self.key) {
             cx.set_theme(request);
         }

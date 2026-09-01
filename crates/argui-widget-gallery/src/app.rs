@@ -10,9 +10,10 @@ use argui::{
         SemanticAction, Semantics, Sides, UiEvent, UiEventKind, length, percent, sides,
     },
     widgets::{
-        Button, Dialog, DialogAction, Input, InputKind, RadioGroup, Select, SelectAction,
-        SelectOption, SliderConfig, SliderState, Spinner, TablerIcon, Tabs, WidgetAssets,
-        WidgetTheme, shadcn,
+        Button, DialogAction, DialogBehavior, Input, InputKind, RadioGroupAction,
+        RadioGroupBehavior, RangeBehavior, RangeConfig, RangeState, SelectAction, SelectBehavior,
+        SelectOption, Spinner, TablerIcon, TabsAction, TabsBehavior, WidgetAssets, WidgetTheme,
+        shadcn,
     },
 };
 use argui_image::ImageLibrary;
@@ -41,6 +42,9 @@ pub struct WidgetGallery {
     pub(crate) notifications: bool,
     pub(crate) radio: usize,
     pub(crate) slider: f32,
+    pub(crate) plain_slider: f32,
+    pub(crate) slider_editing: bool,
+    pub(crate) slider_edit_value: String,
     pub(crate) tab: usize,
     pub(crate) select_open: bool,
     pub(crate) select_highlight: usize,
@@ -48,7 +52,8 @@ pub struct WidgetGallery {
     pub(crate) dialog_open: bool,
     pub(crate) clicks: u32,
     pub(crate) editor_size: ResizeState,
-    slider_state: SliderState,
+    pub(crate) slider_state: RangeState,
+    pub(crate) plain_slider_state: RangeState,
     images: ImageLibrary,
     logo: ImageId,
     light_assets: WidgetAssets,
@@ -85,6 +90,9 @@ impl Default for WidgetGallery {
             notifications: true,
             radio: 0,
             slider: 64.0,
+            plain_slider: 42.0,
+            slider_editing: false,
+            slider_edit_value: "64".into(),
             tab: 0,
             select_open: false,
             select_highlight: 0,
@@ -92,7 +100,8 @@ impl Default for WidgetGallery {
             dialog_open: false,
             clicks: 0,
             editor_size: ResizeState::new(Size::new(520.0, 170.0)),
-            slider_state: SliderState::default(),
+            slider_state: RangeState::default(),
+            plain_slider_state: RangeState::default(),
             images,
             logo,
             light_assets,
@@ -384,6 +393,20 @@ impl Render for WidgetGallery {
             cx.notify();
             return;
         }
+        if crate::property_slider::update(self, event, cx) {
+            return;
+        }
+        let plain_slider = RangeBehavior::new(
+            "plain-slider",
+            "Plain slider",
+            self.plain_slider,
+            RangeConfig::default(),
+        );
+        if let Some(action) = self.plain_slider_state.update(event, &plain_slider) {
+            self.plain_slider = action.value();
+            cx.notify();
+            return;
+        }
         if let UiEventKind::TextChanged(value) = &event.kind {
             match event.key.as_deref() {
                 Some("gallery-search") => {
@@ -433,28 +456,48 @@ impl Render for WidgetGallery {
                 }
             }
         }
-        if let Some(selection) = RadioGroup::selection("quality", event) {
+        let radio = RadioGroupBehavior::new(
+            "quality",
+            "Quality",
+            [
+                ("Maximum quality".into(), true),
+                ("Balanced".into(), true),
+                ("Performance".into(), true),
+            ],
+            Some(self.radio),
+        );
+        if let Some(RadioGroupAction::Select(selection)) = radio.action(event) {
             self.radio = selection;
             cx.notify();
             return;
         }
-        if let Some(selection) = Tabs::selection("demo-tabs", event) {
+        let tabs = TabsBehavior::new(
+            "demo-tabs",
+            [
+                ("General".into(), true),
+                ("Performance".into(), true),
+                ("Advanced".into(), true),
+            ],
+            self.tab,
+        );
+        if let Some(TabsAction::Select(selection)) = tabs.action(event) {
             self.tab = selection;
             cx.notify();
             return;
         }
         let options = Self::select_options();
-        if let Some(action) = Select::action("backend", &options, self.select_highlight, event) {
+        let select =
+            SelectBehavior::new("backend", "Choose a backend", options, self.select_selected)
+                .open(self.select_open)
+                .highlighted(self.select_highlight);
+        if let Some(action) = select.action(event) {
             match action {
                 SelectAction::Toggle => self.select_open = !self.select_open,
                 SelectAction::Close => self.select_open = false,
                 SelectAction::Highlight(index) => {
                     self.select_highlight = index;
-                    cx.request_focus(Select::option_key("backend", index));
-                    cx.scroll_to(
-                        Select::list_key("backend"),
-                        Point::new(0.0, index as f32 * 36.0),
-                    );
+                    cx.request_focus(select.option_key(index));
+                    cx.scroll_to(select.list_key(), Point::new(0.0, index as f32 * 36.0));
                 }
                 SelectAction::Select(index) => {
                     self.select_selected = Some(index);
@@ -466,16 +509,10 @@ impl Render for WidgetGallery {
             cx.notify();
             return;
         }
-        if let Some(action) = Dialog::action("demo-dialog", event) {
-            self.dialog_open = action == DialogAction::Open;
-            cx.notify();
-            return;
-        }
-        if let Some(value) =
-            self.slider_state
-                .update(event, "demo-slider", self.slider, SliderConfig::default())
+        if let Some(action) =
+            DialogBehavior::new("demo-dialog", "Delete GPU cache", self.dialog_open).action(event)
         {
-            self.slider = value;
+            self.dialog_open = action == DialogAction::Open;
             cx.notify();
             return;
         }
@@ -493,7 +530,14 @@ impl Render for WidgetGallery {
     }
 
     fn layout_changed(&mut self, layout: &LayoutSnapshot, _cx: &mut Context<Self>) {
-        self.slider_state.layout_changed(layout, "demo-slider");
+        crate::property_slider::layout_changed(self, layout);
+        let behavior = RangeBehavior::new(
+            "plain-slider",
+            "Plain slider",
+            self.plain_slider,
+            RangeConfig::default(),
+        );
+        self.plain_slider_state.layout_changed(layout, &behavior);
     }
 
     fn image_assets(&self) -> Vec<ImageAsset> {

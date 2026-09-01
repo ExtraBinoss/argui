@@ -1,13 +1,11 @@
 use argui_paint::{Border, CornerRadii, PaintStyle, QuadStyle};
 use argui_text::{TextStyle, TextWrap};
 use argui_ui::{
-    AlignItems, CursorIcon, Dimensions, Display, Element, FlexDirection, GestureSet, Interaction,
-    JustifyContent, KeyboardActivation, LayoutStyle, Orientation, Role, SemanticAction,
-    SemanticState, Semantics, StateStyle, StyleTransition, UiEvent, UiEventKind, VisualState, auto,
-    length,
+    AlignItems, Dimensions, Display, Element, FlexDirection, JustifyContent, LayoutStyle,
+    Orientation, Role, StateStyle, StyleTransition, VisualState, auto, length,
 };
 
-use crate::WidgetTheme;
+use crate::{RadioGroupBehavior, RadioGroupPart, ToggleBehavior, TogglePart, WidgetTheme};
 
 #[derive(Clone, Debug)]
 pub struct Checkbox {
@@ -73,19 +71,9 @@ impl Checkbox {
             ))
             .radius(CornerRadii::all(5.0))
             .semantic_hidden(true);
-        let state = SemanticState {
-            checked: Some(self.checked),
-            disabled: !self.enabled,
-            ..SemanticState::default()
-        };
-        control_row(
-            self.key,
-            self.label,
-            box_element,
-            self.enabled,
-            Semantics::new(Role::CheckBox).state(state),
-            theme,
-        )
+        let behavior = ToggleBehavior::new(&self.key, &self.label, Role::CheckBox, self.checked)
+            .enabled(self.enabled);
+        control_row(behavior, self.label, box_element, theme)
     }
 }
 
@@ -142,19 +130,9 @@ impl Switch {
             .border(Border::all(1.0, theme.border))
             .radius(CornerRadii::all(999.0))
             .semantic_hidden(true);
-        let state = SemanticState {
-            checked: Some(self.checked),
-            disabled: !self.enabled,
-            ..SemanticState::default()
-        };
-        control_row(
-            self.key,
-            self.label,
-            track,
-            self.enabled,
-            Semantics::new(Role::Switch).state(state),
-            theme,
-        )
+        let behavior = ToggleBehavior::new(&self.key, &self.label, Role::Switch, self.checked)
+            .enabled(self.enabled);
+        control_row(behavior, self.label, track, theme)
     }
 }
 
@@ -213,25 +191,16 @@ impl RadioGroup {
     }
 
     #[must_use]
-    pub fn option_key(key: &str, index: usize) -> String {
-        format!("{key}::option::{index}")
-    }
-
-    #[must_use]
-    pub fn selection(key: &str, event: &UiEvent) -> Option<usize> {
-        if !matches!(event.kind, UiEventKind::Clicked) {
-            return None;
-        }
-        event
-            .key
-            .as_deref()?
-            .strip_prefix(&format!("{key}::option::"))?
-            .parse()
-            .ok()
-    }
-
-    #[must_use]
     pub fn build(self, theme: &WidgetTheme) -> Element {
+        let behavior = RadioGroupBehavior::new(
+            &self.key,
+            &self.label,
+            self.options
+                .iter()
+                .map(|option| (option.label.clone(), option.enabled)),
+            self.selected,
+        )
+        .orientation(self.orientation);
         let children = self.options.iter().enumerate().map(|(index, option)| {
             let selected = self.selected == Some(index);
             let dot = Element::container(selected.then(|| {
@@ -255,48 +224,44 @@ impl RadioGroup {
                 },
             ))
             .radius(CornerRadii::all(999.0));
-            let state = SemanticState {
-                checked: Some(selected),
-                disabled: !option.enabled,
-                ..SemanticState::default()
-            };
-            control_row(
-                Self::option_key(&self.key, index),
-                option.label.clone(),
-                dot,
-                option.enabled,
-                Semantics::new(Role::RadioButton)
-                    .state(state)
-                    .position_in_set((index + 1) as u32, self.options.len() as u32),
-                theme,
+            behavior.decorate(
+                RadioGroupPart::Option(index),
+                control_row_content(
+                    option.label.clone(),
+                    behavior.decorate(RadioGroupPart::Indicator, dot),
+                    option.enabled,
+                    theme,
+                ),
             )
         });
         let content = match self.orientation {
             Orientation::Horizontal => Element::row(children.collect::<Vec<_>>()),
             Orientation::Vertical => Element::column(children.collect::<Vec<_>>()),
         };
-        content.gap(10.0).semantics(
-            Semantics::new(Role::Group)
-                .label(self.label)
-                .orientation(self.orientation),
-        )
+        behavior.decorate(RadioGroupPart::Root, content.gap(10.0))
     }
 }
 
 fn control_row(
-    key: String,
+    behavior: ToggleBehavior,
+    label: String,
+    control: Element,
+    theme: &WidgetTheme,
+) -> Element {
+    let enabled = behavior.is_enabled();
+    let control = behavior.decorate(TogglePart::Indicator, control);
+    behavior.decorate(
+        TogglePart::Root,
+        control_row_content(label, control, enabled, theme),
+    )
+}
+
+fn control_row_content(
     label: String,
     control: Element,
     enabled: bool,
-    semantics: Semantics,
     theme: &WidgetTheme,
 ) -> Element {
-    let interaction = Interaction::default()
-        .enabled(enabled)
-        .focusable(enabled)
-        .cursor(CursorIcon::Pointer)
-        .gestures(GestureSet::NONE.tap())
-        .keyboard_activation(KeyboardActivation::EnterOrSpace);
     let label_style = TextStyle {
         font_size: 14.0,
         line_height: 20.0,
@@ -309,42 +274,32 @@ fn control_row(
         ..TextStyle::default()
     };
     let hovered = StateStyle::from_quad(QuadStyle::solid(theme.muted));
-    Element::row([
-        control,
-        Element::text(label.clone())
-            .text_style(label_style)
-            .semantic_hidden(true),
-    ])
-    .keyed(key)
-    .layout_style(LayoutStyle {
-        display: Display::Flex,
-        flex_direction: FlexDirection::Row,
-        size: Dimensions {
-            width: auto(),
-            height: auto(),
-        },
-        padding: argui_ui::sides(6.0, 5.0),
-        align_items: Some(AlignItems::CENTER),
-        gap: Dimensions::length(9.0),
-        ..LayoutStyle::default()
-    })
-    .paint_style(PaintStyle::new(
-        QuadStyle::solid(argui_core::Color::TRANSPARENT).radius(CornerRadii::all(6.0)),
-    ))
-    .interaction(interaction)
-    .state(VisualState::Hovered, hovered)
-    .state(
-        VisualState::Focused,
-        QuadStyle::solid(argui_core::Color::TRANSPARENT)
-            .border(Border::all(2.0, theme.ring))
-            .radius(CornerRadii::all(6.0))
-            .into(),
-    )
-    .transition(StyleTransition::default())
-    .semantics(
-        semantics
-            .label(label)
-            .action(SemanticAction::Click)
-            .action(SemanticAction::Focus),
-    )
+    let label = Element::text(label)
+        .text_style(label_style)
+        .semantic_hidden(true);
+    Element::row([control, label])
+        .layout_style(LayoutStyle {
+            display: Display::Flex,
+            flex_direction: FlexDirection::Row,
+            size: Dimensions {
+                width: auto(),
+                height: auto(),
+            },
+            padding: argui_ui::sides(6.0, 5.0),
+            align_items: Some(AlignItems::CENTER),
+            gap: Dimensions::length(9.0),
+            ..LayoutStyle::default()
+        })
+        .paint_style(PaintStyle::new(
+            QuadStyle::solid(argui_core::Color::TRANSPARENT).radius(CornerRadii::all(6.0)),
+        ))
+        .state(VisualState::Hovered, hovered)
+        .state(
+            VisualState::FocusVisible,
+            QuadStyle::solid(argui_core::Color::TRANSPARENT)
+                .border(Border::all(2.0, theme.ring))
+                .radius(CornerRadii::all(6.0))
+                .into(),
+        )
+        .transition(StyleTransition::default())
 }

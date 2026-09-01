@@ -1,46 +1,62 @@
 # Vector rendering
 
-`argui-vector` is the SVG ingestion boundary. It parses SVG paths with `usvg`
-and tessellates their fills and strokes with Lyon once, when the application
-creates its immutable assets. It never rasterizes SVG into a bitmap.
-
-The resulting `VectorAsset` is registered through `Render::vector_assets` and
-uploaded once. `Element::vector(id)` then emits a renderer-independent vector
-command. `argui-render` draws its vertex and index buffers directly with WGPU,
-using the same transforms, clipping, z-order, layers and effects as every other
-display-list primitive. Native and WASM therefore execute the same UI tree and
-the same WGSL pipeline.
+`argui-vector` validates immutable SVG resources with `usvg` and retains their
+resolution-independent source. Applications register the resulting
+`VectorAsset` values through `Render::vector_assets`. `Element::vector(id)` then
+emits a normal display-list primitive with `ImageFit`, paint-time color,
+opacity, transforms, clips, z-order, layers and effects.
 
 ```rust
 let mut vectors = VectorLibrary::new();
 let id = vectors.insert_svg(include_bytes!("icon.svg"))?;
 
 Element::vector(id)
+    .vector_fit(ImageFit::Contain)
+    .vector_color(theme.foreground)
     .width(Length::Px(24.0))
     .height(Length::Px(24.0));
 ```
 
-## Morphing
+## Raster and GPU boundary
 
-`morph_svg` accepts two SVGs with corresponding path commands and verifies the
-affine mapping between their control points. It tessellates only the source, so
-the two states always share one stable topology. Each GPU vertex stores `from`
-and `to`; the WGPU vertex shader interpolates them from
-`Element::vector_progress(0.0..=1.0)`. Updating progress uploads only the small
-instance record: it does not parse or retessellate the SVG and does not allocate
-a texture.
+`argui-render` parses each registered source into a retained `resvg` tree. The
+first request for a physical-size variant rasterizes it with tiny-skia's
+antialiased SVG renderer. That RGBA result is uploaded into one 2048×2048 sRGB
+WGPU atlas. Later frames draw instanced quads from the atlas; they neither parse
+nor rasterize the SVG again.
 
-Complex morphs with different path structures need an explicit normalization
-step before registration. Silent raster fallback is intentionally forbidden.
+The atlas has a fixed 16 MiB GPU budget and transparent two-pixel gutters so
+linear sampling cannot leak adjacent icons. Nearby requested sizes reuse the
+closest cached variant within explicit quality hysteresis. A full atlas is
+recycled as a unit and rebuilt only from the current visible display list, so
+memory stays bounded on native WGPU and WebGPU.
 
-## Current SVG boundary
+Adjacent vector commands share one render batch regardless of asset identity.
+The common vector WGSL pipeline applies instance transforms, rounded clip-chain
+coverage, opacity and tint without creating per-icon pipelines or bind groups.
 
-The first implementation supports visible path fills and strokes, Bézier
-curves, nested transforms, paint/group opacity, fill rules, paint order, joins and caps. Embedded raster images,
-text, patterns and non-solid SVG paints return a typed error. Those features
-must be added as native vector/display-list capabilities instead of secretly
-falling back to CPU pixels.
+## Color and static SVG features
 
-The WGPU vector pipeline expands indexed meshes once during registration and
-adds analytic coverage only to their exterior edges. Small stroked icons remain
-smooth without MSAA, while internal tessellation edges stay invisible.
+SVGs authored with `currentColor` become alpha masks. Their RGB color is supplied
+by `Element::vector_color`, so light/dark themes and interaction states update a
+small instance record without duplicating or rerasterizing the asset. SVGs
+without `currentColor` preserve their authored colors.
+
+The retained static path accepts the shapes, curves, strokes, transforms,
+gradients, opacity, clipping, masks and filters supported by the configured
+`usvg`/`resvg` build. Font resolution, system fonts and external resource lookup
+are intentionally not part of the icon renderer.
+
+## Animation
+
+Vector elements use the same paint-time transform and opacity bindings as other
+primitives, so rotation, scale, translation and fades stay on the retained GPU
+path. The former affine-only `morph_svg` API was removed: it rejected legitimate
+SVG pairs and did not provide a general path-morph contract.
+
+## Profiling
+
+`RenderProfile::vector_atlas` reports entry count, cache hits, rasterizations and
+allocated bytes for the current frame. DevTools records the same counters in
+strict `argui-gpu-trace-v2` traces, making resize thrashing visible on Linux,
+Windows, macOS and WebGPU.

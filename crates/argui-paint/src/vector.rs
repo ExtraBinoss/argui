@@ -5,7 +5,7 @@ use std::sync::{
 
 use argui_core::{Affine2D, Color, Rect, Size};
 
-use crate::ClipChain;
+use crate::{ClipChain, ImageFit};
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct VectorId(pub u64);
@@ -21,27 +21,21 @@ impl VectorId {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct VectorVertex {
-    pub from: [f32; 2],
-    pub to: [f32; 2],
-    pub color_from: Color,
-    pub color_to: Color,
-}
-
+/// A validated, resolution-independent SVG resource.
 #[derive(Clone, Debug, PartialEq)]
 pub struct VectorAsset {
     pub id: VectorId,
     pub size: Size,
-    pub vertices: Arc<[VectorVertex]>,
-    pub indices: Arc<[u32]>,
+    pub svg: Arc<[u8]>,
+    pub tintable: bool,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct VectorPrimitive {
     pub vector: VectorId,
     pub bounds: Rect,
-    pub progress: f32,
+    pub fit: ImageFit,
+    pub color: Color,
     pub opacity: f32,
     pub transform: Affine2D,
     pub clips: ClipChain,

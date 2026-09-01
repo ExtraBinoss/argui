@@ -243,6 +243,9 @@ pub struct FrameRecord {
     pub textures: usize,
     pub reused_textures: usize,
     pub texture_bytes: u64,
+    pub vector_atlas_entries: usize,
+    pub vector_atlas_hits: usize,
+    pub vector_rasterizations: usize,
     pub adapter: AdapterRecord,
     pub gpu: Option<GpuFrameRecord>,
 }
@@ -344,6 +347,9 @@ impl InspectorHandle {
             frame.textures = record.textures;
             frame.reused_textures = record.reused_textures;
             frame.texture_bytes = record.texture_bytes;
+            frame.vector_atlas_entries = record.vector_atlas_entries;
+            frame.vector_atlas_hits = record.vector_atlas_hits;
+            frame.vector_rasterizations = record.vector_rasterizations;
             frame.adapter = record.adapter;
             frame.gpu = record.gpu;
         } else {

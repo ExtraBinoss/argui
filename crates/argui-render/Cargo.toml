@@ -11,6 +11,7 @@ argui-paint.workspace = true
 argui-text.workspace = true
 bytemuck.workspace = true
 naga.workspace = true
+resvg.workspace = true
 wgpu.workspace = true
 web-time.workspace = true
 

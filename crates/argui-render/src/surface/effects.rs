@@ -299,9 +299,9 @@ impl SurfaceRenderer {
                     batch.instances.clone(),
                     image_offset,
                 ),
-                DrawKind::Vector(vector) => {
+                DrawKind::Vector => {
                     self.vector
-                        .draw(&mut pass, vector, batch.instances.clone(), vector_offset);
+                        .draw(&mut pass, batch.instances.clone(), vector_offset);
                 }
             }
         }

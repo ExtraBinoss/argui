@@ -1,3 +1,4 @@
+use argui_core::Transform2D;
 use argui_inspect::{FrameRecord, NodeSnapshot};
 use argui_paint::{Border, Color, CornerRadii, LayerStyle, PaintStyle, QuadStyle, VectorId};
 use argui_text::{TextColor, TextStyle, TextWrap};
@@ -117,7 +118,7 @@ fn toolbar<A>(tools: &DevtoolsHost<A>, theme: &WidgetTheme) -> Element {
             theme,
         ),
         picker_button(tools, theme),
-        morph_button(tools, theme),
+        animated_icon_button(tools, theme),
     ])
     .height(length(42.0))
     .shrink(0.0)
@@ -159,12 +160,14 @@ fn picker_surface<A>(tools: &DevtoolsHost<A>) -> Element {
         .inspectable(false)
 }
 
-fn morph_button<A>(tools: &DevtoolsHost<A>, theme: &WidgetTheme) -> Element {
+fn animated_icon_button<A>(tools: &DevtoolsHost<A>, theme: &WidgetTheme) -> Element {
     Element::row([
-        icon_element(tools.icons.chevron, 20.0).vector_progress(tools.morph_progress),
-        Element::text("GPU morph").text_style(text(12.0, theme.foreground)),
+        icon_element(tools.icons.chevron, 20.0).transform(
+            Transform2D::IDENTITY.rotate(tools.icon_progress * std::f32::consts::FRAC_PI_2),
+        ),
+        Element::text("GPU transform").text_style(text(12.0, theme.foreground)),
     ])
-    .keyed("__devtools-morph")
+    .keyed("__devtools-icon-transform")
     .height(length(30.0))
     .padding(sides(8.0, 4.0))
     .gap(5.0)
@@ -418,8 +421,10 @@ fn details(frame: &FrameRecord, theme: &WidgetTheme) -> Element {
             frame.damaged_pixels,
         ), theme),
         metric(format!(
-            "textures {} · reused {} · resize events {}",
-            frame.textures, frame.reused_textures, frame.resize_events
+            "textures {} · reused {} · vectors {} cached / {} hits / {} rasterized · resize events {}",
+            frame.textures, frame.reused_textures, frame.vector_atlas_entries,
+            frame.vector_atlas_hits, frame.vector_rasterizations,
+            frame.resize_events
         ), theme),
         metric(format!(
             "adapter {} · {} · timestamps {} · features {}",

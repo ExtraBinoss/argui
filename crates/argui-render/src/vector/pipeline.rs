@@ -3,7 +3,7 @@ use std::{mem::size_of, ops::Range};
 use argui_paint::VectorPrimitive;
 use bytemuck::{Pod, Zeroable};
 
-use super::{GpuVertex, Mesh};
+use super::atlas::AtlasEntry;
 
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
@@ -18,17 +18,19 @@ pub(super) struct VectorClip {
 #[derive(Clone, Copy, Pod, Zeroable)]
 pub(super) struct VectorInstance {
     rect: [f32; 4],
-    source_size: [f32; 2],
-    params: [f32; 2],
+    uv: [f32; 4],
+    color: [f32; 4],
     transform_a: [f32; 4],
     transform_b: [f32; 4],
+    params: [f32; 4],
     clip_meta: [u32; 4],
 }
 
 impl VectorInstance {
     pub fn new(
         vector: &VectorPrimitive,
-        source_size: [f32; 2],
+        entry: AtlasEntry,
+        tintable: bool,
         scale: f32,
         clips: &mut Vec<VectorClip>,
     ) -> Self {
@@ -47,19 +49,53 @@ impl VectorInstance {
                 radii: clip.radii.as_array().map(|radius| radius * scale),
             })
         }));
+        let mut rect = [
+            vector.bounds.origin.x * scale,
+            vector.bounds.origin.y * scale,
+            vector.bounds.size.width * scale,
+            vector.bounds.size.height * scale,
+        ];
+        let mut uv = entry.uv;
+        fit(vector.fit, entry.size, &mut rect, &mut uv);
         let transform = vector.transform.scaled(scale);
         Self {
-            rect: [
-                vector.bounds.origin.x * scale,
-                vector.bounds.origin.y * scale,
-                vector.bounds.size.width * scale,
-                vector.bounds.size.height * scale,
-            ],
-            source_size,
-            params: [vector.progress.clamp(0.0, 1.0), vector.opacity],
+            rect,
+            uv,
+            color: vector.color.as_array(),
             transform_a: transform.matrix,
             transform_b: [transform.translation.x, transform.translation.y, 0.0, 0.0],
+            params: [vector.opacity, f32::from(tintable), 0.0, 0.0],
             clip_meta: [start, clips.len() as u32 - start, 0, 0],
+        }
+    }
+}
+
+fn fit(fit: argui_paint::ImageFit, image: [u32; 2], rect: &mut [f32; 4], uv: &mut [f32; 4]) {
+    let source = image[0] as f32 / image[1].max(1) as f32;
+    let target = rect[2] / rect[3].max(0.000_01);
+    match fit {
+        argui_paint::ImageFit::Fill => {}
+        argui_paint::ImageFit::Contain if source > target => {
+            let height = rect[2] / source;
+            rect[1] += (rect[3] - height) * 0.5;
+            rect[3] = height;
+        }
+        argui_paint::ImageFit::Contain => {
+            let width = rect[3] * source;
+            rect[0] += (rect[2] - width) * 0.5;
+            rect[2] = width;
+        }
+        argui_paint::ImageFit::Cover if source > target => {
+            let width = target / source;
+            let left = (uv[2] - uv[0]) * (1.0 - width) * 0.5;
+            uv[0] += left;
+            uv[2] -= left;
+        }
+        argui_paint::ImageFit::Cover => {
+            let height = source / target;
+            let top = (uv[3] - uv[1]) * (1.0 - height) * 0.5;
+            uv[1] += top;
+            uv[3] -= top;
         }
     }
 }
@@ -77,6 +113,7 @@ const VIEWPORT_CAPACITY: u64 = 1024;
 pub(super) struct VectorPipeline {
     pipeline: wgpu::RenderPipeline,
     scene_layout: wgpu::BindGroupLayout,
+    texture_layout: wgpu::BindGroupLayout,
     scene_group: wgpu::BindGroup,
     viewport: wgpu::Buffer,
     instances: wgpu::Buffer,
@@ -108,9 +145,30 @@ impl VectorPipeline {
                 ),
             ],
         });
+        let texture_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("argui-vector-texture-layout"),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+            ],
+        });
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("argui-vector-pipeline-layout"),
-            bind_group_layouts: &[Some(&scene_layout)],
+            bind_group_layouts: &[Some(&scene_layout), Some(&texture_layout)],
             immediate_size: 0,
         });
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -120,7 +178,7 @@ impl VectorPipeline {
                 module: &shader,
                 entry_point: Some("vertex"),
                 compilation_options: Default::default(),
-                buffers: &[Some(vertex_layout()), Some(instance_layout())],
+                buffers: &[Some(instance_layout())],
             },
             primitive: Default::default(),
             depth_stencil: None,
@@ -142,24 +200,25 @@ impl VectorPipeline {
             device,
             "argui-vector-viewport",
             VIEWPORT_STRIDE * VIEWPORT_CAPACITY,
-            wgpu::BufferUsages::UNIFORM,
+            wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         );
         let instances = buffer(
             device,
             "argui-vector-instances",
             size_of::<VectorInstance>() as u64,
-            wgpu::BufferUsages::VERTEX,
+            wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         );
         let clips = buffer(
             device,
             "argui-vector-clips",
             size_of::<VectorClip>() as u64,
-            wgpu::BufferUsages::STORAGE,
+            wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
         );
         let scene_group = scene_group(device, &scene_layout, &viewport, &clips);
         Self {
             pipeline,
             scene_layout,
+            texture_layout,
             scene_group,
             viewport,
             instances,
@@ -170,6 +229,28 @@ impl VectorPipeline {
             previous_clips: Vec::new(),
             next_viewport: 0,
         }
+    }
+
+    pub fn texture_group(
+        &self,
+        device: &wgpu::Device,
+        view: &wgpu::TextureView,
+        sampler: &wgpu::Sampler,
+    ) -> wgpu::BindGroup {
+        device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("argui-vector-texture-group"),
+            layout: &self.texture_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(sampler),
+                },
+            ],
+        })
     }
 
     pub fn write(
@@ -186,7 +267,7 @@ impl VectorPipeline {
                 device,
                 "argui-vector-instances",
                 (self.instance_capacity * size_of::<VectorInstance>()) as u64,
-                wgpu::BufferUsages::VERTEX,
+                wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
             );
         }
         let clips_reallocated = clips.len() > self.clip_capacity;
@@ -196,7 +277,7 @@ impl VectorPipeline {
                 device,
                 "argui-vector-clips",
                 (self.clip_capacity * size_of::<VectorClip>()) as u64,
-                wgpu::BufferUsages::STORAGE,
+                wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             );
             self.scene_group = scene_group(device, &self.scene_layout, &self.viewport, &self.clips);
         }
@@ -237,7 +318,7 @@ impl VectorPipeline {
     pub fn draw<'a>(
         &'a self,
         pass: &mut wgpu::RenderPass<'a>,
-        mesh: &'a Mesh,
+        texture: &'a wgpu::BindGroup,
         range: Range<u32>,
         viewport: u32,
     ) {
@@ -246,26 +327,17 @@ impl VectorPipeline {
         }
         pass.set_pipeline(&self.pipeline);
         pass.set_bind_group(0, &self.scene_group, &[viewport]);
-        pass.set_vertex_buffer(0, mesh.vertices.slice(..));
-        pass.set_vertex_buffer(1, self.instances.slice(..));
-        pass.draw(0..mesh.vertex_count, range);
-    }
-}
-
-fn vertex_layout() -> wgpu::VertexBufferLayout<'static> {
-    const ATTRS: [wgpu::VertexAttribute; 6] = wgpu::vertex_attr_array![
-        0=>Float32x2, 1=>Float32x2, 2=>Float32x4, 3=>Float32x4,
-        4=>Float32x3, 5=>Float32x3
-    ];
-    wgpu::VertexBufferLayout {
-        array_stride: size_of::<GpuVertex>() as u64,
-        step_mode: wgpu::VertexStepMode::Vertex,
-        attributes: &ATTRS,
+        pass.set_bind_group(1, texture, &[]);
+        pass.set_vertex_buffer(0, self.instances.slice(..));
+        pass.draw(0..6, range);
     }
 }
 
 fn instance_layout() -> wgpu::VertexBufferLayout<'static> {
-    const ATTRS: [wgpu::VertexAttribute; 6] = wgpu::vertex_attr_array![6=>Float32x4,7=>Float32x2,8=>Float32x2,9=>Float32x4,10=>Float32x4,11=>Uint32x4];
+    const ATTRS: [wgpu::VertexAttribute; 7] = wgpu::vertex_attr_array![
+        0=>Float32x4, 1=>Float32x4, 2=>Float32x4, 3=>Float32x4,
+        4=>Float32x4, 5=>Float32x4, 6=>Uint32x4
+    ];
     wgpu::VertexBufferLayout {
         array_stride: size_of::<VectorInstance>() as u64,
         step_mode: wgpu::VertexStepMode::Instance,
@@ -299,7 +371,7 @@ fn buffer(
     device.create_buffer(&wgpu::BufferDescriptor {
         label: Some(label),
         size,
-        usage: usage | wgpu::BufferUsages::COPY_DST,
+        usage,
         mapped_at_creation: false,
     })
 }

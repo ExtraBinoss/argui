@@ -63,6 +63,33 @@ fn pan_only_gestures_start_immediately_and_report_velocity() {
 }
 
 #[test]
+fn immediate_pan_begins_at_the_press_position() {
+    let node = target();
+    let mut arena = GestureArena::default();
+    let started = arena.update(
+        touch(1, PointerPhase::Pressed, 42.0, 18.0, 0),
+        Some((node, GestureSet::NONE.pan_immediate())),
+    );
+
+    assert_eq!(started.len(), 1);
+    assert_eq!(started[0].phase, GesturePhase::Started);
+    let GestureKind::Pan {
+        position, total, ..
+    } = started[0].kind
+    else {
+        panic!("expected an immediate pan");
+    };
+    assert_eq!(position, Point::new(42.0, 18.0));
+    assert_eq!(total, Point::default());
+
+    let ended = arena.update(touch(1, PointerPhase::Released, 60.0, 18.0, 20), None);
+    let GestureKind::Pan { position, .. } = ended[0].kind else {
+        panic!("expected a completed pan");
+    };
+    assert_eq!(position, Point::new(60.0, 18.0));
+}
+
+#[test]
 fn tap_and_pan_gestures_keep_a_drag_threshold() {
     let node = target();
     let mut arena = GestureArena::default();

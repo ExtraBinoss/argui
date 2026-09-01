@@ -1,5 +1,5 @@
 use argui_core::{Color, ColorScheme};
-use argui_ui::{Dimension, ElementKind, Overflow, Role, ScrollChaining};
+use argui_ui::{Dimension, ElementKind, Overflow, Role, ScrollChaining, TextInputFilter};
 use argui_widgets::{Input, InputKind, TablerIcon, TextArea, WidgetAssets, shadcn};
 
 #[test]
@@ -24,6 +24,7 @@ fn controlled_inputs_keep_semantics_and_editor_configuration_together() {
         ElementKind::TextEditor {
             multiline: false,
             read_only: true,
+            filter: TextInputFilter::Any,
             ..
         }
     ));
@@ -42,6 +43,24 @@ fn controlled_inputs_keep_semantics_and_editor_configuration_together() {
             ..
         }
     ));
+}
+
+#[test]
+fn numeric_input_kinds_select_engine_level_edit_filters() {
+    let themes = shadcn(Color::rgb(0.2, 0.5, 0.9));
+    let theme = themes.resolve(ColorScheme::Light);
+    for (kind, expected) in [
+        (InputKind::Number, TextInputFilter::Decimal),
+        (InputKind::Arithmetic, TextInputFilter::Arithmetic),
+    ] {
+        let input = Input::new("number", "12", "Value", theme.input.clone())
+            .kind(kind)
+            .build();
+        assert!(matches!(
+            input.kind,
+            ElementKind::TextEditor { filter, .. } if filter == expected
+        ));
+    }
 }
 
 #[test]

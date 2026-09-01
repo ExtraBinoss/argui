@@ -1,10 +1,11 @@
 use argui_paint::PaintStyle;
 use argui_text::{TextStyle, TextWrap};
 use argui_ui::{
-    AlignItems, CursorIcon, Display, Element, FlexDirection, GestureSet, Interaction,
-    JustifyContent, KeyboardActivation, LayoutStyle, Role, SemanticAction, Semantics, StateStyle,
+    AlignItems, Display, Element, FlexDirection, JustifyContent, LayoutStyle, StateStyle,
     StyleTransition, VisualState,
 };
+
+use crate::{ButtonBehavior, ButtonPart};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ButtonStyle {
@@ -123,50 +124,28 @@ impl Button {
     #[must_use]
     pub fn build(self) -> Element {
         let loading = self.loading.is_some();
-        let enabled = self.enabled && !loading;
-        let cursor = if !self.enabled {
-            CursorIcon::NotAllowed
-        } else if loading {
-            CursorIcon::Progress
-        } else {
-            CursorIcon::Pointer
-        };
-        let interaction = Interaction::default()
-            .enabled(enabled)
-            .focusable(enabled)
-            .cursor(cursor)
-            .gestures(GestureSet::NONE.tap())
-            .keyboard_activation(KeyboardActivation::EnterOrSpace);
-        let state = argui_ui::SemanticState {
-            disabled: !enabled,
-            busy: loading,
-            ..argui_ui::SemanticState::default()
-        };
-        let semantics = Semantics::new(Role::Button)
-            .label(self.label.clone())
-            .state(state)
-            .action(SemanticAction::Click)
-            .action(SemanticAction::Focus);
+        let behavior = ButtonBehavior::new(self.key, self.label.clone())
+            .enabled(self.enabled)
+            .busy(loading);
         let mut children = Vec::with_capacity(3);
         children.extend(self.loading.or(self.leading));
-        children.push(
-            Element::text(self.label)
-                .text_style(self.style.label)
-                .semantic_hidden(true),
-        );
+        children.push(behavior.decorate(
+            ButtonPart::Content,
+            Element::text(self.label).text_style(self.style.label),
+        ));
         children.extend(self.trailing);
-        let mut element = Element::row(children)
-            .keyed(self.key)
-            .layout_style(self.style.layout)
-            .paint_style(self.style.paint)
-            .interaction(interaction)
-            .state(VisualState::Hovered, self.style.hovered)
-            .state(VisualState::Pressed, self.style.pressed)
-            .transition(self.style.transition)
-            .semantics(semantics)
-            .gap(8.0);
+        let mut element = behavior.decorate(
+            ButtonPart::Root,
+            Element::row(children)
+                .layout_style(self.style.layout)
+                .paint_style(self.style.paint)
+                .state(VisualState::Hovered, self.style.hovered)
+                .state(VisualState::Pressed, self.style.pressed)
+                .transition(self.style.transition)
+                .gap(8.0),
+        );
         if let Some(focused) = self.style.focused {
-            element = element.state(VisualState::Focused, focused);
+            element = element.state(VisualState::FocusVisible, focused);
         }
         element
     }

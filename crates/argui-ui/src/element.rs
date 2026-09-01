@@ -1,8 +1,8 @@
 use crate::{
     AlignContent, AlignItems, AlignSelf, Dimension, Dimensions, Display, EffectScope,
     FlexDirection, FlexWrap, Interaction, JustifyContent, JustifyItems, JustifySelf, LayoutStyle,
-    LengthPercentage, LengthPercentageAuto, MotionProperty, Position, PropertyBinding,
-    ScopedEffect, ScrollConfig, Sides, StateStyle, StyleTransition, VisualState, WritingDirection,
+    LengthPercentage, LengthPercentageAuto, MotionProperty, Position, ScopedEffect, ScrollConfig,
+    Sides, StateName, StateScopeId, StateSelector, StateStyle, StyleTransition, WritingDirection,
 };
 use argui_accessibility::Semantics;
 use argui_core::{Transform2D, TransformOrigin};
@@ -15,61 +15,12 @@ use std::{
     ops::{Deref, DerefMut},
     rc::Rc,
 };
-#[derive(Clone, Debug, PartialEq)]
-pub enum ElementKind {
-    Container,
-    Text {
-        content: String,
-        style: TextStyle,
-    },
-    TextEditor {
-        value: String,
-        placeholder: String,
-        multiline: bool,
-        read_only: bool,
-        text: TextStyle,
-        placeholder_text: TextStyle,
-        selection: Color,
-        caret: crate::CaretStyle,
-    },
-    Image {
-        image: ImageId,
-        fit: ImageFit,
-        sampling: ImageSampling,
-    },
-    Vector {
-        vector: VectorId,
-        progress: f32,
-    },
-}
+
+mod kind;
+pub use kind::{ElementKind, ElementNode, TextEditorSpec};
 
 #[derive(Clone, Debug)]
 pub struct Element(Rc<ElementNode>);
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct ElementNode {
-    pub inspectable: bool,
-    pub key: Option<String>,
-    pub kind: ElementKind,
-    pub style: LayoutStyle,
-    pub paint: PaintStyle,
-    pub transform: Transform2D,
-    pub transform_origin: TransformOrigin,
-    pub interaction: Option<Interaction>,
-    pub(crate) state_styles: crate::state::ElementStateStyles,
-    pub(crate) style_transition: Option<StyleTransition>,
-    pub(crate) inherit_interaction_state: bool,
-    pub semantics: Option<Semantics>,
-    pub semantic_hidden: bool,
-    pub bindings: Vec<PropertyBinding>,
-    pub layer: Option<LayerStyle>,
-    pub effects: Vec<ScopedEffect>,
-    pub scroll: Option<ScrollConfig>,
-    pub overlay: Option<crate::OverlayAnchor>,
-    pub focus_scope: Option<crate::FocusScope>,
-    pub z_index: i32,
-    pub children: Vec<Element>,
-}
 
 impl PartialEq for Element {
     fn eq(&self, other: &Self) -> bool {
@@ -105,7 +56,8 @@ impl Element {
             interaction: None,
             state_styles: crate::state::ElementStateStyles::default(),
             style_transition: None,
-            inherit_interaction_state: false,
+            state_scope: None,
+            active_states: Vec::new(),
             semantics: None,
             semantic_hidden: false,
             bindings: Vec::new(),
@@ -160,7 +112,8 @@ impl Element {
             interaction: None,
             state_styles: crate::state::ElementStateStyles::default(),
             style_transition: None,
-            inherit_interaction_state: false,
+            state_scope: None,
+            active_states: Vec::new(),
             semantics: None,
             semantic_hidden: false,
             bindings: Vec::new(),
@@ -172,6 +125,23 @@ impl Element {
             z_index: 0,
             children: Vec::new(),
         }))
+    }
+
+    #[must_use]
+    pub fn text_editor(spec: TextEditorSpec) -> Self {
+        let mut element = Self::container([]);
+        element.kind = ElementKind::TextEditor {
+            value: spec.value,
+            placeholder: spec.placeholder,
+            multiline: spec.multiline,
+            read_only: spec.read_only,
+            filter: spec.filter,
+            text: spec.text,
+            placeholder_text: spec.placeholder_text,
+            selection: spec.selection,
+            caret: spec.caret,
+        };
+        element
     }
 
     /// Returns true when both values share the same retained subtree.
@@ -201,18 +171,22 @@ impl Element {
         let mut element = Self::container([]);
         element.kind = ElementKind::Vector {
             vector,
-            progress: 0.0,
+            fit: ImageFit::Contain,
+            color: Color::WHITE,
         };
         element
     }
-
     #[must_use]
-    pub fn vector_progress(mut self, progress: f32) -> Self {
-        if let ElementKind::Vector {
-            progress: value, ..
-        } = &mut self.kind
-        {
-            *value = progress;
+    pub fn vector_fit(mut self, fit: ImageFit) -> Self {
+        if let ElementKind::Vector { fit: value, .. } = &mut self.kind {
+            *value = fit;
+        }
+        self
+    }
+    #[must_use]
+    pub fn vector_color(mut self, color: Color) -> Self {
+        if let ElementKind::Vector { color: value, .. } = &mut self.kind {
+            *value = color;
         }
         self
     }
@@ -498,8 +472,8 @@ impl Element {
     }
 
     #[must_use]
-    pub fn state(mut self, state: VisualState, style: StateStyle) -> Self {
-        self.state_styles.set(state, style);
+    pub fn state(mut self, selector: impl Into<StateSelector>, style: StateStyle) -> Self {
+        self.state_styles.set(selector.into(), style);
         self
     }
 
@@ -510,8 +484,17 @@ impl Element {
     }
 
     #[must_use]
-    pub fn inherit_interaction_state(mut self) -> Self {
-        self.inherit_interaction_state = true;
+    pub fn state_scope(mut self, scope: StateScopeId) -> Self {
+        self.state_scope = Some(scope);
+        self
+    }
+
+    #[must_use]
+    pub fn active_state(mut self, state: StateName, active: bool) -> Self {
+        self.active_states.retain(|candidate| *candidate != state);
+        if active {
+            self.active_states.push(state);
+        }
         self
     }
 

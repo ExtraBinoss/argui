@@ -68,7 +68,8 @@ fn visual_changed(old: &Element, new: &Element) -> bool {
         || old.transform_origin != new.transform_origin
         || old.interaction != new.interaction
         || old.style_transition != new.style_transition
-        || old.inherit_interaction_state != new.inherit_interaction_state
+        || old.state_scope != new.state_scope
+        || old.active_states != new.active_states
         || old.layer != new.layer
         || old.effects != new.effects
         || old.scroll != new.scroll
@@ -78,7 +79,8 @@ fn visual_changed(old: &Element, new: &Element) -> bool {
 fn state_update(old: &Element, new: &Element) -> TreeUpdate {
     if old.state_styles == new.state_styles
         && old.style_transition == new.style_transition
-        && old.inherit_interaction_state == new.inherit_interaction_state
+        && old.state_scope == new.state_scope
+        && old.active_states == new.active_states
         && old.interaction == new.interaction
     {
         return TreeUpdate::None;

@@ -38,24 +38,27 @@ fn rust_builders_form_the_future_dsl_lowering_target() {
 }
 
 #[test]
-fn vector_builder_keeps_a_gpu_morph_progress_value() {
-    let element = Element::vector(VectorId(9)).vector_progress(0.75);
+fn vector_builder_keeps_fit_and_tint() {
+    let element = Element::vector(VectorId(9))
+        .vector_fit(argui_ui::ImageFit::Contain)
+        .vector_color(argui_ui::Color::rgb(0.2, 0.4, 0.6));
     assert_eq!(
         element.kind,
         ElementKind::Vector {
             vector: VectorId(9),
-            progress: 0.75,
+            fit: argui_ui::ImageFit::Contain,
+            color: argui_ui::Color::rgb(0.2, 0.4, 0.6),
         }
     );
 }
 
 #[test]
-fn vector_morph_progress_is_a_paint_only_update() {
-    let mut tree = UiTree::new(Element::vector(VectorId(9)).vector_progress(0.0));
+fn vector_tint_is_a_paint_only_update() {
+    let mut tree = UiTree::new(Element::vector(VectorId(9)).vector_color(argui_ui::Color::WHITE));
     let node = tree.node_id_at(0);
     tree.mark_layout_clean();
     assert_eq!(
-        tree.update(Element::vector(VectorId(9)).vector_progress(0.5)),
+        tree.update(Element::vector(VectorId(9)).vector_color(argui_ui::Color::rgb(0.5, 0.5, 0.5))),
         TreeUpdate::Paint
     );
     assert_eq!(tree.node_id_at(0), node);

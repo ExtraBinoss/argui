@@ -138,7 +138,7 @@ fn dock_controls_cover_filter_scroll_pause_clear_and_resize() {
     assert!(matches!(
         host.take_clipboard_request(),
         Some(argui_ui::ClipboardRequest::Write(trace))
-            if trace.contains("argui-gpu-trace-v1")
+            if trace.contains("argui-gpu-trace-v2")
     ));
     assert_eq!(host.take_clipboard_request(), None);
     host.update(&event("__devtools-section-0", UiEventKind::Clicked));
@@ -296,11 +296,11 @@ fn host_animation_and_layout_delegation_keep_the_app_viewport_explicit() {
 }
 
 #[test]
-fn toolbar_exposes_and_animates_the_gpu_path_morph() {
+fn toolbar_exposes_and_animates_the_gpu_transform() {
     let mut host = DevtoolsHost::new(App(Rc::new(Cell::new(0)))).open(true);
-    assert!(contains_text(&host.view(), "GPU morph"));
+    assert!(contains_text(&host.view(), "GPU transform"));
     assert_eq!(
-        host.update(&event("__devtools-morph", UiEventKind::Clicked)),
+        host.update(&event("__devtools-icon-transform", UiEventKind::Clicked)),
         ViewUpdate::Rebuild
     );
     assert!(host.wants_animation_frame());
@@ -376,7 +376,7 @@ fn sheet_relayouts_incrementally_and_vectors_stay_paint_only() {
     settle(&mut host);
     tree.update(host.view());
 
-    host.update(&event("__devtools-morph", UiEventKind::Clicked));
+    host.update(&event("__devtools-icon-transform", UiEventKind::Clicked));
     host.animation_frame(Frame {
         now: Time::ZERO,
         elapsed: Duration::from_millis(16),

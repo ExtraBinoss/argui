@@ -4,13 +4,15 @@ use argui_paint::{Border, Fill, GradientStop, GradientStops, LayerMask, LayerSty
 use crate::binding::layout::{layout_value, set_layout_value};
 use crate::binding::{GradientPointTarget, LayoutTarget};
 use crate::state::StateValue;
-use crate::{Element, NodeId, PropertyKey, StatePropertyValue, VisualState, VisualStates};
+use crate::{Element, NodeId, PropertyKey, StatePropertyValue, StateSelector, VisualStates};
 
-use super::{NodeSpec, TransitionRegistry, TransitionTarget};
+use super::{NodeSpec, ResolvedProperty, TransitionRegistry, TransitionTarget};
 
 mod effect;
 use effect::{apply_effect, effect_values};
 mod scrollbar;
+mod states;
+use states::{ScopeStack, StateContext};
 mod values;
 use values::{radii, widths_from_array};
 
@@ -22,19 +24,21 @@ pub(super) fn collect_specs<'a>(
     scroll_for: &impl Fn(NodeId) -> Point,
     output: &mut Vec<NodeSpec<'a>>,
 ) {
+    let states = StateContext::collect(element, ids, states_for);
     let context = SpecContext {
         ids,
-        states_for,
+        states: &states,
         scrollbar_states_for,
         scroll_for,
     };
     let mut index = 0;
-    collect_element(element, &mut index, VisualStates::NONE, &context, output);
+    let mut scope_stack = Vec::new();
+    collect_element(element, &mut index, &mut scope_stack, &context, output);
 }
 
 struct SpecContext<'a> {
     ids: &'a [NodeId],
-    states_for: &'a dyn Fn(NodeId) -> VisualStates,
+    states: &'a StateContext,
     scrollbar_states_for: &'a dyn Fn(NodeId, crate::scroll::ScrollbarPart, bool) -> VisualStates,
     scroll_for: &'a dyn Fn(NodeId) -> Point,
 }
@@ -42,30 +46,20 @@ struct SpecContext<'a> {
 fn collect_element<'a>(
     element: &'a Element,
     index: &mut usize,
-    inherited: VisualStates,
+    scope_stack: &mut ScopeStack,
     context: &SpecContext<'_>,
     output: &mut Vec<NodeSpec<'a>>,
 ) {
-    let node = context.ids[*index];
+    let node_index = *index;
+    let node = context.ids[node_index];
     *index += 1;
-    let mut own = (context.states_for)(node);
-    if element
-        .interaction
-        .as_ref()
-        .is_some_and(|value| !value.enabled)
-    {
-        own.insert(VisualState::Disabled);
-    }
-    let states = if element.inherit_interaction_state {
-        inherited
-    } else {
-        own
-    };
+    context.states.enter(node_index, scope_stack);
+    let matched = context.states.matched(element, node_index, scope_stack);
     if element.style_transition.is_some() || !element.state_styles.is_empty() {
         output.push(NodeSpec {
             target: TransitionTarget::Element(node),
-            states,
-            values: target_values(element, states, (context.scroll_for)(node)),
+            matched: matched.clone(),
+            values: target_values(element, &matched, (context.scroll_for)(node)),
             transition: element.style_transition.as_ref(),
         });
     }
@@ -73,53 +67,61 @@ fn collect_element<'a>(
         && let Some(scrollbar) = &config.scrollbar
     {
         scrollbar::collect(
-            node,
-            config.enabled,
+            scrollbar::ScrollbarContext {
+                node,
+                node_index,
+                enabled: config.enabled,
+                states: context.states,
+                scope_stack,
+                states_for: context.scrollbar_states_for,
+            },
             scrollbar,
-            context.scrollbar_states_for,
             output,
         );
     }
-    let descendants = if element.interaction.is_some() {
-        own
-    } else {
-        inherited
-    };
     for child in &element.children {
-        collect_element(child, index, descendants, context, output);
+        collect_element(child, index, scope_stack, context, output);
     }
+    context.states.exit(*index, scope_stack);
 }
 
 fn target_values(
     element: &Element,
-    states: VisualStates,
+    matched: &[StateSelector],
     scroll: Point,
-) -> Vec<StatePropertyValue> {
-    let mut values = base_values(element, scroll);
-    for state in [
-        VisualState::Hovered,
-        VisualState::Focused,
-        VisualState::Pressed,
-        VisualState::Disabled,
-    ] {
-        if states.contains(state)
-            && let Some(style) = element.state_styles.get(state)
-        {
-            for property in style.values() {
-                apply_target(&mut values, property);
+) -> Vec<ResolvedProperty> {
+    let mut values = resolved(base_values(element, scroll));
+    for rule in element.state_styles.rules() {
+        if matched.contains(&rule.selector) {
+            for property in rule.style.values() {
+                apply_target(&mut values, property, Some(rule.selector));
             }
         }
     }
     values
 }
 
-fn apply_target(values: &mut Vec<StatePropertyValue>, property: &StatePropertyValue) {
+fn resolved(values: Vec<StatePropertyValue>) -> Vec<ResolvedProperty> {
+    values
+        .into_iter()
+        .map(|property| ResolvedProperty {
+            property,
+            source: None,
+        })
+        .collect()
+}
+
+fn apply_target(
+    values: &mut Vec<ResolvedProperty>,
+    property: &StatePropertyValue,
+    source: Option<StateSelector>,
+) {
     let mut property = property.clone();
     match (&property.key, &property.value) {
         (PropertyKey::BackgroundColor, StateValue::BackgroundColor(color))
             if values
                 .iter()
-                .any(|value| value.key == PropertyKey::Background) =>
+                .any(|value| value.property.key == PropertyKey::Background) =>
         {
             remove_gradient_values(values);
             property.key = PropertyKey::Background;
@@ -127,16 +129,19 @@ fn apply_target(values: &mut Vec<StatePropertyValue>, property: &StatePropertyVa
         }
         (PropertyKey::Background, _) => {
             values.retain(|value| {
-                value.key != PropertyKey::BackgroundColor && !is_gradient_property(value.key)
+                value.property.key != PropertyKey::BackgroundColor
+                    && !is_gradient_property(value.property.key)
             });
         }
         (PropertyKey::BorderColor | PropertyKey::BorderWidths, _)
-            if values.iter().any(|value| value.key == PropertyKey::Border) =>
+            if values
+                .iter()
+                .any(|value| value.property.key == PropertyKey::Border) =>
         {
             let current = values
                 .iter()
-                .find(|value| value.key == PropertyKey::Border)
-                .and_then(|value| match value.value {
+                .find(|value| value.property.key == PropertyKey::Border)
+                .and_then(|value| match value.property.value {
                     StateValue::Border(border) => border,
                     _ => None,
                 })
@@ -155,17 +160,21 @@ fn apply_target(values: &mut Vec<StatePropertyValue>, property: &StatePropertyVa
         (PropertyKey::Border, _) => {
             values.retain(|value| {
                 !matches!(
-                    value.key,
+                    value.property.key,
                     PropertyKey::BorderColor | PropertyKey::BorderWidths
                 )
             });
         }
         _ => {}
     }
-    if let Some(existing) = values.iter_mut().find(|value| value.key == property.key) {
-        *existing = property;
+    if let Some(existing) = values
+        .iter_mut()
+        .find(|value| value.property.key == property.key)
+    {
+        existing.property = property;
+        existing.source = source;
     } else {
-        values.push(property);
+        values.push(ResolvedProperty { property, source });
     }
 }
 
@@ -308,8 +317,8 @@ fn is_gradient_property(key: PropertyKey) -> bool {
     )
 }
 
-fn remove_gradient_values(values: &mut Vec<StatePropertyValue>) {
-    values.retain(|value| !is_gradient_property(value.key));
+fn remove_gradient_values(values: &mut Vec<ResolvedProperty>) {
+    values.retain(|value| !is_gradient_property(value.property.key));
 }
 
 fn value(key: PropertyKey, value: StateValue) -> StatePropertyValue {

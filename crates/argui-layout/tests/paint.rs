@@ -172,7 +172,8 @@ fn disabled_interactions_keep_cursor_hit_geometry_but_reject_input() {
 #[test]
 fn vectors_lower_to_the_shared_clipped_transformed_display_list() {
     let vector = Element::vector(VectorId(7))
-        .vector_progress(0.35)
+        .vector_fit(ImageFit::Contain)
+        .vector_color(Color::rgb(0.2, 0.4, 0.6))
         .paint_opacity(0.6)
         .width(length(24.0))
         .height(length(24.0));
@@ -192,7 +193,8 @@ fn vectors_lower_to_the_shared_clipped_transformed_display_list() {
         panic!("vector element must lower to a vector command");
     };
     assert_eq!(vector.vector, VectorId(7));
-    assert_eq!(vector.progress, 0.35);
+    assert_eq!(vector.fit, ImageFit::Contain);
+    assert_eq!(vector.color, Color::rgb(0.2, 0.4, 0.6));
     assert_eq!(vector.opacity, 0.6);
     assert_eq!(vector.clips.regions().len(), 2);
 }

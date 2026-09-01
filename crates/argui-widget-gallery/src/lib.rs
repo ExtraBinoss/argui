@@ -2,7 +2,9 @@
 
 mod app;
 mod navigation;
+mod numeric_expression;
 mod pages;
+mod property_slider;
 
 pub use app::WidgetGallery;
 use argui::{

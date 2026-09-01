@@ -15,7 +15,7 @@ pub use effect::{
 pub use style::{
     Border, BorderWidths, CornerRadii, Fill, ImagePrimitive, PaintStyle, Quad, QuadStyle,
 };
-pub use vector::{VectorAsset, VectorId, VectorPrimitive, VectorVertex};
+pub use vector::{VectorAsset, VectorId, VectorPrimitive};
 pub use visual::{
     ClipChain, ClipRegion, GradientError, GradientStop, GradientStops, ImageAsset, ImageAssetError,
     ImageFit, ImageId, ImageSampling, LinearGradient, RadialGradient,

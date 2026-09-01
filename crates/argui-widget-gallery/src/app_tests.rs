@@ -47,7 +47,7 @@ fn every_gallery_route_builds_real_widget_content() {
         assert!(keyed(&root, "gallery-search"));
     }
     assert_eq!(gallery.image_assets().len(), 1);
-    assert_eq!(gallery.vector_assets().len(), 30);
+    assert_eq!(gallery.vector_assets().len(), 33);
 }
 
 #[test]
@@ -160,22 +160,72 @@ fn shortcuts_slider_layout_and_resize_use_engine_requests() {
         &mut gallery,
         &argui::runtime::LayoutSnapshot {
             viewport: Rect::default(),
-            nodes: vec![LayoutBounds {
-                node,
-                key: Some("demo-slider".into()),
-                bounds: Rect::new(Point::default(), Size::new(200.0, 28.0)),
-            }],
+            nodes: vec![
+                LayoutBounds {
+                    node,
+                    key: Some("property-slider::track".into()),
+                    bounds: Rect::new(Point::default(), Size::new(200.0, 28.0)),
+                },
+                LayoutBounds {
+                    node,
+                    key: Some("plain-slider::track".into()),
+                    bounds: Rect::new(Point::default(), Size::new(200.0, 28.0)),
+                },
+            ],
         },
         &mut Context::default(),
     );
     dispatch(
         &mut gallery,
         &event(
-            "demo-slider",
+            "property-slider",
             pressed(Key::ArrowRight, Modifiers::default()),
         ),
     );
     assert_eq!(gallery.slider, 65.0);
+
+    let range_pan = |phase, position| {
+        event(
+            "property-slider",
+            UiEventKind::Gesture(GestureEvent {
+                target: node,
+                phase,
+                kind: GestureKind::Pan {
+                    position,
+                    delta: Point::default(),
+                    total: Point::default(),
+                    velocity: Point::default(),
+                },
+            }),
+        )
+    };
+    dispatch(
+        &mut gallery,
+        &range_pan(GesturePhase::Started, Point::new(150.0, 14.0)),
+    );
+    assert_eq!(gallery.slider, 75.0);
+    dispatch(
+        &mut gallery,
+        &range_pan(GesturePhase::Changed, Point::new(40.0, 14.0)),
+    );
+    assert_eq!(gallery.slider, 20.0);
+    dispatch(
+        &mut gallery,
+        &event(
+            "plain-slider",
+            UiEventKind::Gesture(GestureEvent {
+                target: node,
+                phase: GesturePhase::Started,
+                kind: GestureKind::Pan {
+                    position: Point::new(130.0, 14.0),
+                    delta: Point::default(),
+                    total: Point::default(),
+                    velocity: Point::default(),
+                },
+            }),
+        ),
+    );
+    assert_eq!(gallery.plain_slider, 65.0);
 
     let resize = |phase, total| {
         event(
@@ -184,6 +234,7 @@ fn shortcuts_slider_layout_and_resize_use_engine_requests() {
                 target: node,
                 phase,
                 kind: GestureKind::Pan {
+                    position: total,
                     delta: total,
                     total,
                     velocity: Point::default(),
@@ -200,4 +251,50 @@ fn shortcuts_slider_layout_and_resize_use_engine_requests() {
         &resize(GesturePhase::Changed, Point::new(40.0, 30.0)),
     );
     assert_eq!(gallery.editor_size.size(), Size::new(560.0, 200.0));
+}
+
+#[test]
+fn property_slider_supports_direct_edit_cancel_and_reset() {
+    let mut gallery = WidgetGallery::default();
+    dispatch(
+        &mut gallery,
+        &event("property-slider::edit", UiEventKind::Clicked),
+    );
+    assert!(gallery.slider_editing);
+    dispatch(
+        &mut gallery,
+        &event(
+            "property-slider::input",
+            UiEventKind::TextChanged("83".into()),
+        ),
+    );
+    dispatch(
+        &mut gallery,
+        &event(
+            "property-slider::input",
+            UiEventKind::Submitted("83".into()),
+        ),
+    );
+    assert_eq!(gallery.slider, 83.0);
+    assert!(!gallery.slider_editing);
+
+    dispatch(
+        &mut gallery,
+        &event("property-slider::edit", UiEventKind::Clicked),
+    );
+    dispatch(
+        &mut gallery,
+        &event(
+            "property-slider::input",
+            pressed(Key::Escape, Modifiers::default()),
+        ),
+    );
+    assert!(!gallery.slider_editing);
+    assert_eq!(gallery.slider, 83.0);
+
+    dispatch(
+        &mut gallery,
+        &event("property-slider::reset", UiEventKind::Clicked),
+    );
+    assert_eq!(gallery.slider, 50.0);
 }

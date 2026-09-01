@@ -9,8 +9,9 @@ use argui::{
         length, percent,
     },
     widgets::{
-        Button, Checkbox, Dialog, Input, RadioGroup, RadioOption, Select, SelectOption, Slider,
-        SliderConfig, Switch, Tab, TablerIcon, Tabs, TextArea, WidgetAssets, WidgetTheme,
+        Button, Checkbox, Dialog, DialogBehavior, Input, RadioGroup, RadioOption, RangeConfig,
+        Select, SelectOption, Slider, Switch, Tab, TablerIcon, Tabs, TextArea, WidgetAssets,
+        WidgetTheme,
     },
 };
 use argui_effects::AnimatedGradient;
@@ -36,7 +37,7 @@ pub(crate) fn render(
         Page::Checkbox => checkboxes(gallery, theme, assets),
         Page::Switch => switches(gallery, theme),
         Page::RadioGroup => radios(gallery, theme),
-        Page::Slider => sliders(gallery, theme),
+        Page::Slider => sliders(gallery, theme, assets),
         Page::Tabs => tabs(gallery, theme),
         Page::Select => selects(gallery, theme, assets),
         Page::Dialog => dialogs(gallery, theme),
@@ -137,22 +138,17 @@ fn radios(gallery: &WidgetGallery, theme: &WidgetTheme) -> Element {
     )
 }
 
-fn sliders(gallery: &WidgetGallery, theme: &WidgetTheme) -> Element {
+fn sliders(gallery: &WidgetGallery, theme: &WidgetTheme, assets: &WidgetAssets) -> Element {
     preview(
         "Continuous and stepped input",
         "Drag, tap, arrow keys, Home/End and AccessKit values share one clamping path.",
         Element::column([
-            text(
-                format!("Render scale: {:.0}%", gallery.slider),
-                14.0,
-                theme.foreground,
-                600,
-            ),
+            crate::property_slider::render(gallery, theme, assets),
             Slider::new(
-                "demo-slider",
-                "Render scale",
-                gallery.slider,
-                SliderConfig::default(),
+                "plain-slider",
+                "Plain slider",
+                gallery.plain_slider,
+                RangeConfig::default(),
             )
             .build(theme),
         ])
@@ -210,7 +206,7 @@ fn dialogs(gallery: &WidgetGallery, theme: &WidgetTheme) -> Element {
             400,
         ),
         Button::new(
-            Dialog::close_key("demo-dialog"),
+            DialogBehavior::new("demo-dialog", "Delete GPU cache", gallery.dialog_open).close_key(),
             "Close dialog",
             theme.outline_button.clone(),
         )
@@ -282,10 +278,10 @@ fn settings(gallery: &WidgetGallery, theme: &WidgetTheme) -> Element {
             .orientation(argui::accessibility::Orientation::Horizontal)
             .build(theme),
             Slider::new(
-                "demo-slider",
+                "property-slider",
                 "Render scale",
                 gallery.slider,
-                SliderConfig::default(),
+                RangeConfig::default(),
             )
             .build(theme),
         ])

@@ -83,6 +83,7 @@ fn pointer_state_honors_clips_capture_clicks_and_focus() {
             .any(|event| event.kind == UiEventKind::Focused)
     );
     assert!(tree.visual_states(node).contains(VisualState::Pressed));
+    assert!(!tree.visual_states(node).contains(VisualState::FocusVisible));
 
     let dragged_out = tree.pointer_moved(Point::new(200.0, 200.0), &regions);
     assert!(
@@ -148,6 +149,10 @@ fn tab_focus_wraps_in_both_directions() {
     };
     tree.key_input(&tab(false), &regions);
     assert_eq!(tree.focused_node(), Some(first));
+    assert!(
+        tree.visual_states(first)
+            .contains(VisualState::FocusVisible)
+    );
     tree.key_input(&tab(false), &regions);
     assert_eq!(tree.focused_node(), Some(second));
     tree.key_input(&tab(false), &regions);
@@ -311,7 +316,7 @@ fn empty_actions_focus_switches_and_blur_are_deterministic() {
     assert_eq!(
         tree.resolved_quad(first, &tree.root().children[0])
             .background,
-        QuadStyle::solid(Color::rgb(1.0, 0.0, 0.0)).background
+        QuadStyle::solid(Color::rgb(0.0, 1.0, 0.0)).background
     );
     tree.primary_released();
     tree.pointer_moved(Point::new(130.0, 20.0), &regions);

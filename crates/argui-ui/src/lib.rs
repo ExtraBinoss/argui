@@ -39,7 +39,7 @@ pub use caret::{
 };
 pub use cursor::CursorIcon;
 pub use effect::{EffectScope, ScopedEffect};
-pub use element::{Element, ElementKind};
+pub use element::{Element, ElementKind, TextEditorSpec};
 pub use focus::{FocusContainment, FocusRequest, FocusScope, FocusTarget, InitialFocus};
 pub use gesture::{GestureArena, GestureEvent, GestureKind, GesturePhase, GestureSet};
 pub use interaction::{
@@ -53,8 +53,9 @@ pub use scroll::{
     ScrollbarRegion, ScrollbarStyle, scrollbar_at,
 };
 pub use state::{
-    EffectPropertyKey, PropertyKey, StateProperty, StatePropertyValue, StateStyle, StyleTransition,
-    TransitionDirection, TransitionRule, VisualState, VisualStates,
+    EffectPropertyKey, PropertyKey, State, StateName, StateProperty, StatePropertyValue,
+    StateScopeId, StateSelector, StateStyle, StyleTransition, TransitionDirection, TransitionRule,
+    VisualState, VisualStates,
 };
 pub use style::{
     AlignContent, AlignItems, AlignSelf, AlignmentSafety, Axes, BoxSizing, Dimension, Dimensions,
@@ -68,6 +69,6 @@ pub use style::{
 pub use style::{
     auto, evenly_sized_tracks, flex, fr, length, line, minmax, percent, repeat, sides, span, zero,
 };
-pub use text_input::ClipboardRequest;
+pub use text_input::{ClipboardRequest, TextInputFilter, TextSelection, TextSelectionRequest};
 pub use tree::{TreeUpdate, TreeUpdateStats, UiTree};
 pub use virtual_list::{MeasurementUpdate, VariableList, VirtualList, VirtualWindow};

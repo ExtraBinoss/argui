@@ -188,9 +188,7 @@ fn summary(kind: &ElementKind, children: usize) -> Option<String> {
             value, placeholder, ..
         } => Some(short(if value.is_empty() { placeholder } else { value })),
         ElementKind::Image { image, fit, .. } => Some(format!("id={} · {fit:?}", image.0)),
-        ElementKind::Vector { vector, progress } => {
-            Some(format!("id={} · morph {progress:.2}", vector.0))
-        }
+        ElementKind::Vector { vector, fit, .. } => Some(format!("id={} · {fit:?}", vector.0)),
     }
 }
 

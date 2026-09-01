@@ -2,9 +2,12 @@ use argui_core::{Affine2D, Color, ColorScheme, Point, Rect, Size};
 use argui_paint::{ClipChain, PaintStyle, QuadStyle};
 use argui_text::{TextStyle, TextWrap};
 use argui_ui::{
-    CursorIcon, Element, ElementKind, HitRegion, KeyboardActivation, Role, UiTree, VisualState,
+    CursorIcon, Element, ElementKind, HitRegion, KeyboardActivation, Role, UiEvent, UiEventKind,
+    UiTree, VisualState,
 };
-use argui_widgets::{Button, ButtonStyle, TablerIcon, WidgetAssets, shadcn};
+use argui_widgets::{
+    Button, ButtonAction, ButtonBehavior, ButtonStyle, TablerIcon, WidgetAssets, shadcn,
+};
 
 #[test]
 fn button_exposes_variants_content_and_busy_state() {
@@ -86,4 +89,24 @@ fn button_hover_uses_the_shared_retained_visual_state_path() {
         &element.children[0].kind,
         ElementKind::Text { style, .. } if style.wrap == TextWrap::None
     ));
+}
+
+#[test]
+fn headless_button_decodes_only_enabled_activation() {
+    let tree = UiTree::new(Element::container([]));
+    let clicked = UiEvent {
+        target: tree.node_ids()[0],
+        key: Some("save".into()),
+        kind: UiEventKind::Clicked,
+    };
+    assert_eq!(
+        ButtonBehavior::new("save", "Save").action(&clicked),
+        Some(ButtonAction::Activate)
+    );
+    assert_eq!(
+        ButtonBehavior::new("save", "Save")
+            .enabled(false)
+            .action(&clicked),
+        None
+    );
 }

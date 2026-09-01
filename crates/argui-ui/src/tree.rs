@@ -6,8 +6,8 @@ use crate::text_input::{TextInputState, TextInputStates};
 use crate::traversal::{flattened, nth_element};
 use crate::update::classify_update;
 use crate::{
-    Element, ElementKind, GestureArena, HitRegion, InteractionUpdate, NodeId, UiEvent, UiEventKind,
-    identity,
+    Element, ElementKind, GestureArena, HitRegion, InteractionUpdate, NodeId, TextSelectionRequest,
+    UiEvent, UiEventKind, identity,
 };
 
 mod animation;
@@ -232,6 +232,28 @@ impl UiTree {
     #[must_use]
     pub fn text_input_should_reveal_cursor(&self, node: NodeId) -> bool {
         self.text_inputs.should_reveal_cursor(node)
+    }
+
+    pub fn select_text(&mut self, request: TextSelectionRequest) -> InteractionUpdate {
+        let node = match request.target {
+            crate::FocusTarget::Node(node) => node,
+            crate::FocusTarget::Key(key) => {
+                let Some(node) = self
+                    .node_ids
+                    .iter()
+                    .copied()
+                    .find(|node| self.key_for(*node) == Some(key.as_str()))
+                else {
+                    return InteractionUpdate::default();
+                };
+                node
+            }
+        };
+        self.text_inputs
+            .select(node, request.selection)
+            .map_or_else(InteractionUpdate::default, |result| {
+                self.text_input_update(node, result)
+            })
     }
     pub fn mark_text_input_layout_clean(&mut self) {
         self.text_inputs.clear_cursor_reveals();
@@ -507,8 +529,9 @@ impl UiTree {
                     value,
                     multiline,
                     read_only,
+                    filter,
                     ..
-                } => Some((node, value.clone(), *multiline, *read_only)),
+                } => Some((node, value.clone(), *multiline, *read_only, *filter)),
                 _ => None,
             });
         self.text_inputs.sync(inputs);

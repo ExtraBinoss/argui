@@ -1,13 +1,13 @@
 use std::ops::Range;
 
-use argui_paint::{DisplayCommand, DisplayList, ImageId, ImageSampling, VectorId};
+use argui_paint::{DisplayCommand, DisplayList, ImageId, ImageSampling};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum DrawKind {
     Quad,
     Text,
     Image(ImageId, ImageSampling),
-    Vector(VectorId),
+    Vector,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -41,10 +41,10 @@ pub(crate) fn build_batches(
                 image += 1;
                 Some((DrawKind::Image(item.image, item.sampling), instances))
             }
-            DisplayCommand::Vector(item) => {
+            DisplayCommand::Vector(_) => {
                 let instances = vector..vector + 1;
                 vector += 1;
-                Some((DrawKind::Vector(item.vector), instances))
+                Some((DrawKind::Vector, instances))
             }
             DisplayCommand::BeginLayer(_) | DisplayCommand::EndLayer => None,
         };
@@ -99,7 +99,8 @@ mod tests {
             list.push_vector(VectorPrimitive {
                 vector: VectorId(id),
                 bounds: Rect::default(),
-                progress: 0.0,
+                fit: argui_paint::ImageFit::Contain,
+                color: Color::WHITE,
                 opacity: 1.0,
                 transform: Affine2D::IDENTITY,
                 clips: ClipChain::default(),
@@ -124,12 +125,8 @@ mod tests {
                     instances: 2..3,
                 },
                 DrawBatch {
-                    kind: DrawKind::Vector(VectorId(7)),
-                    instances: 0..2,
-                },
-                DrawBatch {
-                    kind: DrawKind::Vector(VectorId(8)),
-                    instances: 2..3,
+                    kind: DrawKind::Vector,
+                    instances: 0..3,
                 },
             ]
         );

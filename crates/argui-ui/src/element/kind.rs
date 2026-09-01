@@ -1,0 +1,71 @@
+use argui_paint::{Color, ImageFit, ImageId, ImageSampling, VectorId};
+use argui_text::TextStyle;
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ElementNode {
+    pub inspectable: bool,
+    pub key: Option<String>,
+    pub kind: ElementKind,
+    pub style: crate::LayoutStyle,
+    pub paint: argui_paint::PaintStyle,
+    pub transform: argui_core::Transform2D,
+    pub transform_origin: argui_core::TransformOrigin,
+    pub interaction: Option<crate::Interaction>,
+    pub(crate) state_styles: crate::state::ElementStateStyles,
+    pub(crate) style_transition: Option<crate::StyleTransition>,
+    pub(crate) state_scope: Option<crate::StateScopeId>,
+    pub(crate) active_states: Vec<crate::StateName>,
+    pub semantics: Option<argui_accessibility::Semantics>,
+    pub semantic_hidden: bool,
+    pub bindings: Vec<crate::PropertyBinding>,
+    pub layer: Option<argui_paint::LayerStyle>,
+    pub effects: Vec<crate::ScopedEffect>,
+    pub scroll: Option<crate::ScrollConfig>,
+    pub overlay: Option<crate::OverlayAnchor>,
+    pub focus_scope: Option<crate::FocusScope>,
+    pub z_index: i32,
+    pub children: Vec<super::Element>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum ElementKind {
+    Container,
+    Text {
+        content: String,
+        style: TextStyle,
+    },
+    TextEditor {
+        value: String,
+        placeholder: String,
+        multiline: bool,
+        read_only: bool,
+        filter: crate::TextInputFilter,
+        text: TextStyle,
+        placeholder_text: TextStyle,
+        selection: Color,
+        caret: crate::CaretStyle,
+    },
+    Image {
+        image: ImageId,
+        fit: ImageFit,
+        sampling: ImageSampling,
+    },
+    Vector {
+        vector: VectorId,
+        fit: ImageFit,
+        color: Color,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct TextEditorSpec {
+    pub value: String,
+    pub placeholder: String,
+    pub multiline: bool,
+    pub read_only: bool,
+    pub filter: crate::TextInputFilter,
+    pub text: TextStyle,
+    pub placeholder_text: TextStyle,
+    pub selection: Color,
+    pub caret: crate::CaretStyle,
+}

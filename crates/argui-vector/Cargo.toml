@@ -8,8 +8,6 @@ license.workspace = true
 [dependencies]
 argui-core.workspace = true
 argui-paint.workspace = true
-lyon_path.workspace = true
-lyon_tessellation.workspace = true
 thiserror.workspace = true
 usvg.workspace = true
 

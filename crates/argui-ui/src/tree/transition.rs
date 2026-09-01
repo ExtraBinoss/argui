@@ -1,7 +1,7 @@
 use crate::state::StateValue;
 use crate::{
-    BindingImpact, Element, NodeId, PropertyKey, StatePropertyValue, TransitionDirection,
-    TreeUpdate, VisualState, VisualStates,
+    BindingImpact, Element, NodeId, PropertyKey, StatePropertyValue, StateSelector,
+    TransitionDirection, TreeUpdate, VisualStates,
 };
 use argui_animation::{Motion, MotionTrack, Time, Transition};
 use argui_core::{Color, Point, Transform2D};
@@ -27,7 +27,7 @@ pub(super) struct TransitionRegistry {
 #[derive(Clone, Debug)]
 struct NodeTransition {
     target: TransitionTarget,
-    states: VisualStates,
+    matched: Vec<StateSelector>,
     values: Vec<AnimatedProperty>,
     revision: u64,
 }
@@ -36,6 +36,7 @@ struct NodeTransition {
 struct AnimatedProperty {
     key: PropertyKey,
     target: StateValue,
+    source: Option<StateSelector>,
     value: AnimatedValue,
 }
 
@@ -187,50 +188,68 @@ impl super::UiTree {
 
 struct NodeSpec<'a> {
     target: TransitionTarget,
-    states: VisualStates,
-    values: Vec<StatePropertyValue>,
+    matched: Vec<StateSelector>,
+    values: Vec<ResolvedProperty>,
     transition: Option<&'a crate::StyleTransition>,
+}
+
+#[derive(Clone, Debug)]
+struct ResolvedProperty {
+    property: StatePropertyValue,
+    source: Option<StateSelector>,
 }
 
 impl NodeTransition {
     fn new(spec: NodeSpec<'_>) -> Self {
         Self {
             target: spec.target,
-            states: spec.states,
+            matched: spec.matched,
             revision: 0,
             values: spec
                 .values
                 .into_iter()
-                .map(|property| AnimatedProperty {
-                    key: property.key,
-                    target: property.value.clone(),
-                    value: AnimatedValue::new(property.value),
+                .map(|resolved| AnimatedProperty {
+                    key: resolved.property.key,
+                    target: resolved.property.value.clone(),
+                    source: resolved.source,
+                    value: AnimatedValue::new(resolved.property.value),
                 })
                 .collect(),
         }
     }
 
     fn sync(&mut self, spec: NodeSpec<'_>, reduced_motion: bool) -> TreeUpdate {
-        let direction = changed_direction(self.states, spec.states);
-        self.states = spec.states;
-        self.values
-            .retain(|property| spec.values.iter().any(|value| value.key == property.key));
+        self.values.retain(|property| {
+            spec.values
+                .iter()
+                .any(|value| value.property.key == property.key)
+        });
         let mut update = TreeUpdate::None;
-        for target in spec.values {
+        for resolved in spec.values {
+            let target = resolved.property;
             let Some(property) = self.values.iter_mut().find(|value| value.key == target.key)
             else {
                 self.values.push(AnimatedProperty {
                     key: target.key,
                     target: target.value.clone(),
+                    source: resolved.source,
                     value: AnimatedValue::new(target.value),
                 });
                 update = strongest(update, target.key.impact().into());
                 continue;
             };
             if property.target == target.value {
+                property.source = resolved.source;
                 continue;
             }
+            let direction = property_direction(
+                &self.matched,
+                &spec.matched,
+                property.source,
+                resolved.source,
+            );
             property.target = target.value.clone();
+            property.source = resolved.source;
             if reduced_motion || spec.transition.is_none() {
                 property.value.set(target.value);
             } else if let Some(style_transition) = spec.transition {
@@ -241,6 +260,7 @@ impl NodeTransition {
             }
             update = strongest(update, target.key.impact().into());
         }
+        self.matched = spec.matched;
         if update != TreeUpdate::None {
             self.revision = self.revision.wrapping_add(1);
         }
@@ -412,20 +432,21 @@ impl AnimatedValue {
     }
 }
 
-fn changed_direction(old: VisualStates, new: VisualStates) -> Option<TransitionDirection> {
-    for state in [
-        VisualState::Disabled,
-        VisualState::Pressed,
-        VisualState::Hovered,
-        VisualState::Focused,
-    ] {
-        match (old.contains(state), new.contains(state)) {
-            (false, true) => return Some(TransitionDirection::Enter(state)),
-            (true, false) => return Some(TransitionDirection::Exit(state)),
-            _ => {}
-        }
+fn property_direction(
+    old: &[StateSelector],
+    new: &[StateSelector],
+    old_source: Option<StateSelector>,
+    new_source: Option<StateSelector>,
+) -> Option<TransitionDirection> {
+    if old_source == new_source {
+        return None;
     }
-    None
+    if let Some(selector) = new_source.filter(|selector| !old.contains(selector)) {
+        return Some(TransitionDirection::Enter(selector));
+    }
+    old_source
+        .filter(|selector| !new.contains(selector))
+        .map(TransitionDirection::Exit)
 }
 
 impl From<BindingImpact> for TreeUpdate {

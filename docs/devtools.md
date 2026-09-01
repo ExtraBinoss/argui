@@ -98,6 +98,7 @@ Profiling is explicit and bounded. A frame timeline records:
 - effect layers, named filter passes, processed pixels and downsample factors;
 - offscreen texture acquisitions, reuse, allocation, eviction, current bytes and
   peak bytes;
+- vector-atlas entries, cache hits, rerasterizations and allocated bytes;
 - GPU timestamp durations when the adapter exposes timestamp queries.
 
 Selecting a frame shows its stage waterfall and the most expensive nodes/layers.
@@ -107,7 +108,7 @@ timestamps are displayed as unavailable.
 
 Recording uses a fixed ring of 300 frames and is active only while the dock is
 open and not paused. Pause freezes the history, clear releases it, and export
-writes strict `argui-gpu-trace-v1` JSON. Unknown versions, fields and enum
+writes strict `argui-gpu-trace-v2` JSON. Unknown versions, fields and enum
 values are rejected during import. The same data-only document can be compared
 across Linux, Windows, macOS and WebGPU without platform-specific parsing.
 

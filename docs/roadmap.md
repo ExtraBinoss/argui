@@ -17,7 +17,7 @@ their dedicated documents and completed milestones are not repeated here.
   CPU stages, effect passes, offscreen pixels and texture-pool diagnostics.
 - Implemented: picker mode, per-pass GPU timestamps, chronological GPU
   waterfall, expensive-pass ranking, adapter capabilities, strict
-  `argui-gpu-trace-v1` export/import, regional damage counters and retained
+  `argui-gpu-trace-v2` export/import, regional damage counters and retained
   static-layer reuse.
 - Next: expand/collapse; richer authored/resolved style editors; keyboard and
   accessibility hardening; detached native window transport.
@@ -35,8 +35,10 @@ console logs, and disabled DevTools preserve the existing idle fast path.
   pointer capture, OS cursor and a standard Tabler GPU handle.
 - [x] Add typed Light/Dark/System themes and live per-window platform
   preferences without renderer coupling.
-- Build checkbox, slider, menu/select, and reusable modal/popover behavior from
-  existing primitives.
+- [x] Separate headless behavior from visual recipes for buttons, text fields,
+  toggles, radio groups, ranges, tabs, selects and dialogs.
+- [x] Add ordered named/scoped state rules, targeted text selection and a
+  composable property-range showcase with edit and reset actions.
 
 Done when complex text remains grapheme-safe and bidi-correct, and every control
 shares one behavior on native and web.

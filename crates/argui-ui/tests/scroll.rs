@@ -4,8 +4,8 @@ use argui_paint::{ClipChain, ClipRegion};
 use argui_ui::{
     Axes, Color, CursorIcon, Element, GestureSet, HitRegion, Overflow, QuadStyle, ScrollChaining,
     ScrollConfig, ScrollPolarity, ScrollRegion, ScrollbarPartStyle, ScrollbarRegion,
-    ScrollbarStyle, StateStyle, StyleTransition, Transition, TreeUpdate, UiEventKind, UiTree,
-    VisualState, property, scrollbar_at,
+    ScrollbarStyle, StateName, StateScopeId, StateSelector, StateStyle, StyleTransition,
+    Transition, TreeUpdate, UiEventKind, UiTree, VisualState, property, scrollbar_at,
 };
 
 fn region(node: argui_ui::NodeId, config: ScrollConfig, max_y: f32) -> ScrollRegion {
@@ -230,6 +230,36 @@ fn scrollbar_parts_reuse_retained_state_transitions() {
         [5.0; 4]
     );
     assert!(tree.scrollbar_pointer_moved(None, &[]).paint_changed);
+}
+
+#[test]
+fn scrollbar_parts_share_named_and_scoped_state_resolution() {
+    let scope = StateScopeId::new("scroll-host");
+    let active = StateName::new("active");
+    let selected = Color::rgb(0.8, 0.3, 0.2);
+    let style = ScrollbarStyle::new(
+        ScrollbarPartStyle::new(QuadStyle::default()),
+        ScrollbarPartStyle::new(QuadStyle::solid(Color::WHITE))
+            .state(active, StateStyle::new().set(property::Opacity, 0.6))
+            .state(
+                StateSelector::scope(scope, active),
+                StateStyle::new().set(property::BackgroundColor, selected),
+            ),
+    );
+    let config = ScrollConfig::default().scrollbar(style);
+    let element = Element::container([])
+        .state_scope(scope)
+        .active_state(active, true)
+        .scroll_config(config.clone());
+    let tree = UiTree::new(element);
+    let thumb = tree
+        .resolved_scroll_config(tree.node_ids()[0], &config)
+        .scrollbar
+        .unwrap()
+        .thumb
+        .base;
+    assert_eq!(thumb.opacity, 0.6);
+    assert_eq!(thumb.background, Some(argui_ui::Fill::Solid(selected)));
 }
 
 #[test]

@@ -1,6 +1,6 @@
 use argui_core::{Key, KeyInput, KeyState, Modifiers};
 use argui_ui::{Element, Role, UiEvent, UiEventKind, UiTree};
-use argui_widgets::{Button, Dialog, DialogAction, shadcn};
+use argui_widgets::{Button, Dialog, DialogAction, DialogBehavior, shadcn};
 
 fn event(key: Option<&str>, kind: UiEventKind) -> UiEvent {
     let tree = UiTree::new(Element::container([]));
@@ -13,42 +13,61 @@ fn event(key: Option<&str>, kind: UiEventKind) -> UiEvent {
 
 #[test]
 fn dialog_actions_and_modal_tree_are_explicit() {
+    let behavior = DialogBehavior::new("confirm", "Confirm", true);
     assert_eq!(
-        Dialog::action(
-            "confirm",
-            &event(Some("confirm::trigger"), UiEventKind::Clicked)
-        ),
+        behavior.action(&event(Some("confirm::trigger"), UiEventKind::Clicked)),
         Some(DialogAction::Open)
     );
     assert_eq!(
-        Dialog::action(
-            "confirm",
-            &event(Some("confirm::close"), UiEventKind::Clicked)
-        ),
+        behavior.action(&event(Some("confirm::close"), UiEventKind::Clicked)),
         Some(DialogAction::Close)
     );
     assert_eq!(
-        Dialog::action(
-            "confirm",
-            &event(Some("confirm::backdrop"), UiEventKind::Clicked)
-        ),
+        behavior.action(&event(Some("confirm::backdrop"), UiEventKind::Clicked)),
         Some(DialogAction::Close)
     );
     assert_eq!(
-        Dialog::action(
-            "confirm",
-            &event(
-                Some("confirm::panel"),
-                UiEventKind::KeyInput(KeyInput {
-                    key: Key::Escape,
-                    state: KeyState::Pressed,
-                    modifiers: Modifiers::default(),
-                    repeat: false,
-                    text: None,
-                })
-            )
-        ),
+        behavior.action(&event(
+            Some("confirm::panel"),
+            UiEventKind::KeyInput(KeyInput {
+                key: Key::Escape,
+                state: KeyState::Pressed,
+                modifiers: Modifiers::default(),
+                repeat: false,
+                text: None,
+            })
+        )),
         Some(DialogAction::Close)
+    );
+    assert_eq!(
+        behavior.action(&event(Some("confirm::panel"), UiEventKind::Clicked)),
+        None
+    );
+    assert_eq!(
+        behavior.action(&event(
+            Some("confirm::panel"),
+            UiEventKind::KeyInput(KeyInput {
+                key: Key::Escape,
+                state: KeyState::Released,
+                modifiers: Modifiers::default(),
+                repeat: false,
+                text: None,
+            })
+        )),
+        None
+    );
+    assert_eq!(
+        behavior.action(&event(
+            Some("confirm::panel"),
+            UiEventKind::KeyInput(KeyInput {
+                key: Key::Enter,
+                state: KeyState::Pressed,
+                modifiers: Modifiers::default(),
+                repeat: false,
+                text: None,
+            })
+        )),
+        None
     );
     let themes = shadcn(argui_core::Color::rgb(0.2, 0.5, 0.9));
     let theme = themes.resolve(argui_core::ColorScheme::Dark);

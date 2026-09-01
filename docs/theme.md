@@ -15,7 +15,8 @@ reads and continuously watches the XDG desktop portal. An unknown or explicitly
 neutral system preference resolves to Light. `PreferenceOverrides` always wins
 and is applied before the first visible frame.
 
-Vector colors are baked into tessellated assets. `WidgetAssets::embedded`
-therefore creates a palette-specific standard asset pack rather than pretending
-that vectors can be tinted at paint time. Applications register the returned
-assets through `Render::vector_assets` and may replace every preset or asset.
+Standard widget icons use SVG `currentColor`. Their alpha masks are cached in the
+shared vector atlas while `Element::vector_color` supplies the resolved theme
+color per instance. Theme changes therefore repaint existing vectors without
+duplicating or rerasterizing their assets. Applications register the assets
+through `Render::vector_assets` and may replace every preset or asset.

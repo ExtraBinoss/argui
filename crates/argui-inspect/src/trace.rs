@@ -6,7 +6,7 @@ use crate::{
     AdapterRecord, FrameRecord, GpuFrameRecord, GpuPassRecord, InspectNodeId, Invalidation,
 };
 
-pub const TRACE_VERSION: &str = "argui-gpu-trace-v1";
+pub const TRACE_VERSION: &str = "argui-gpu-trace-v2";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TraceError {
@@ -78,6 +78,9 @@ struct TraceFrame {
     textures: usize,
     reused_textures: usize,
     texture_bytes: u64,
+    vector_atlas_entries: usize,
+    vector_atlas_hits: usize,
+    vector_rasterizations: usize,
     gpu: Option<TraceGpuFrame>,
 }
 
@@ -208,6 +211,9 @@ impl From<&FrameRecord> for TraceFrame {
             textures: value.textures,
             reused_textures: value.reused_textures,
             texture_bytes: value.texture_bytes,
+            vector_atlas_entries: value.vector_atlas_entries,
+            vector_atlas_hits: value.vector_atlas_hits,
+            vector_rasterizations: value.vector_rasterizations,
             gpu: value.gpu.as_ref().map(TraceGpuFrame::from),
         }
     }
@@ -233,6 +239,9 @@ impl TraceFrame {
             textures: self.textures,
             reused_textures: self.reused_textures,
             texture_bytes: self.texture_bytes,
+            vector_atlas_entries: self.vector_atlas_entries,
+            vector_atlas_hits: self.vector_atlas_hits,
+            vector_rasterizations: self.vector_rasterizations,
             adapter,
             gpu: self.gpu.map(TraceGpuFrame::into_record),
         }

@@ -12,6 +12,7 @@ impl GestureSet {
     const PAN: u8 = 2;
     const PINCH: u8 = 4;
     const ROTATION: u8 = 8;
+    const PAN_IMMEDIATE: u8 = 16;
 
     pub const NONE: Self = Self(0);
     pub const ALL: Self = Self(Self::TAP | Self::PAN | Self::PINCH | Self::ROTATION);
@@ -25,6 +26,12 @@ impl GestureSet {
     #[must_use]
     pub const fn pan(mut self) -> Self {
         self.0 |= Self::PAN;
+        self
+    }
+
+    #[must_use]
+    pub const fn pan_immediate(mut self) -> Self {
+        self.0 |= Self::PAN | Self::PAN_IMMEDIATE;
         self
     }
 
@@ -59,6 +66,7 @@ pub enum GestureKind {
         position: Point,
     },
     Pan {
+        position: Point,
         delta: Point,
         total: Point,
         velocity: Point,
@@ -149,6 +157,7 @@ impl GestureArena {
         };
         let mut history = VecDeque::new();
         history.push_back((event.timestamp, event.position));
+        let pan_started = gestures.contains(GestureSet::PAN_IMMEDIATE);
         self.contacts.insert(
             event.id,
             Contact {
@@ -157,7 +166,7 @@ impl GestureArena {
                 start: event.position,
                 last: event.position,
                 started_at: event.timestamp,
-                pan_started: false,
+                pan_started,
                 history,
             },
         );
@@ -181,7 +190,15 @@ impl GestureArena {
                 rotation_started: false,
             });
         }
-        Vec::new()
+        if pan_started {
+            vec![pan_event(
+                &self.contacts[&event.id],
+                GesturePhase::Started,
+                Point::default(),
+            )]
+        } else {
+            Vec::new()
+        }
     }
 
     fn moved(&mut self, event: PointerEvent) -> Vec<GestureEvent> {
@@ -215,6 +232,7 @@ impl GestureArena {
             target: contact.target,
             phase,
             kind: GestureKind::Pan {
+                position: event.position,
                 delta,
                 total,
                 velocity: velocity(contact),
@@ -329,6 +347,7 @@ fn pan_event(contact: &Contact, phase: GesturePhase, delta: Point) -> GestureEve
         target: contact.target,
         phase,
         kind: GestureKind::Pan {
+            position: contact.last,
             delta,
             total: difference(contact.last, contact.start),
             velocity: velocity(contact),

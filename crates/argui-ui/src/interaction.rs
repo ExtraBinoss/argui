@@ -203,6 +203,7 @@ pub(crate) struct InteractionState {
     pressed: Option<NodeId>,
     keyboard_pressed: Option<NodeId>,
     focused: Option<NodeId>,
+    focus_visible: bool,
     captured: Option<NodeId>,
 }
 
@@ -214,6 +215,9 @@ impl InteractionState {
         let mut states = VisualStates::NONE;
         if self.focused == Some(node) {
             states.insert(VisualState::Focused);
+            if self.focus_visible {
+                states.insert(VisualState::FocusVisible);
+            }
         }
         if self.hovered == Some(node) {
             states.insert(VisualState::Hovered);
@@ -264,13 +268,16 @@ impl InteractionState {
             .iter()
             .find(|region| region.node == target)
             .is_some_and(|region| region.focusable)
-            && self.focused != Some(target)
         {
+            let focus_changed = self.focused != Some(target);
             self.release_keyboard(&mut update, false);
-            if let Some(previous) = self.focused.replace(target) {
-                update.push(previous, UiEventKind::Blurred);
+            if focus_changed {
+                if let Some(previous) = self.focused.replace(target) {
+                    update.push(previous, UiEventKind::Blurred);
+                }
+                update.push(target, UiEventKind::Focused);
             }
-            update.push(target, UiEventKind::Focused);
+            self.focus_visible = false;
         }
         update.paint_changed = true;
         update
@@ -318,6 +325,8 @@ impl InteractionState {
         let next = focusable[index];
         let mut update = RawUpdate::default();
         if self.focused == Some(next) {
+            update.paint_changed = !self.focus_visible;
+            self.focus_visible = true;
             return update;
         }
         self.release_keyboard(&mut update, false);
@@ -325,6 +334,7 @@ impl InteractionState {
             update.push(previous, UiEventKind::Blurred);
         }
         self.focused = Some(next);
+        self.focus_visible = true;
         update.push(next, UiEventKind::Focused);
         update.paint_changed = true;
         update
@@ -343,6 +353,7 @@ impl InteractionState {
         if let Some(previous) = self.focused.replace(node) {
             update.push(previous, UiEventKind::Blurred);
         }
+        self.focus_visible = true;
         update.push(node, UiEventKind::Focused);
         update.paint_changed = true;
         update
@@ -355,11 +366,16 @@ impl InteractionState {
             update.push(target, UiEventKind::Blurred);
             update.paint_changed = true;
         }
+        self.focus_visible = false;
         update
     }
 
     pub fn keyboard_pressed(&mut self, node: NodeId) -> RawUpdate {
         let mut update = RawUpdate::default();
+        if self.focused == Some(node) && !self.focus_visible {
+            self.focus_visible = true;
+            update.paint_changed = true;
+        }
         if self.keyboard_pressed.replace(node) != Some(node) {
             update.push(node, UiEventKind::Pressed);
             update.paint_changed = true;
@@ -375,6 +391,9 @@ impl InteractionState {
 
     pub fn keyboard_clicked(&mut self, node: NodeId) -> RawUpdate {
         let mut update = RawUpdate::default();
+        if self.focused == Some(node) {
+            self.focus_visible = true;
+        }
         update.push(node, UiEventKind::Pressed);
         update.push(node, UiEventKind::Clicked);
         update.push(node, UiEventKind::Released);
@@ -393,6 +412,7 @@ impl InteractionState {
             update.push(target, UiEventKind::Blurred);
             update.paint_changed = true;
         }
+        self.focus_visible = false;
         update
     }
 
@@ -409,6 +429,7 @@ impl InteractionState {
         }
         if !exists(self.focused) {
             self.focused = None;
+            self.focus_visible = false;
         }
         if !exists(self.captured) {
             self.captured = None;

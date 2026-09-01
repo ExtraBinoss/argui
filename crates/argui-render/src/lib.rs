@@ -23,7 +23,9 @@ pub use config::{EffectQuality, EffectQualitySettings, RendererConfig, SurfaceAl
 pub use effect_graph::EffectGraphStats;
 pub use error::RendererError;
 pub use offscreen::TexturePoolStats;
-pub use profile::{AdapterProfile, GpuFrameProfile, GpuPassProfile, RenderProfile};
+pub use profile::{
+    AdapterProfile, GpuFrameProfile, GpuPassProfile, RenderProfile, VectorAtlasStats,
+};
 pub use registry::{
     EffectDefinition, EffectInput, EffectParameter, EffectParameterType, EffectPassDefinition,
     EffectRegistry,

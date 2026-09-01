@@ -5,9 +5,9 @@ use argui_paint::{
     LayerMask, LayerStyle, LinearGradient, RadialGradient, Shadow,
 };
 use argui_ui::{
-    CursorIcon, Element, GestureSet, HitRegion, Interaction, PropertyKey, StateStyle,
-    StyleTransition, TransitionDirection, TransitionRule, TreeUpdate, UiTree, VisualState, length,
-    property,
+    CursorIcon, Element, GestureSet, HitRegion, Interaction, PropertyKey, StateName, StateScopeId,
+    StateSelector, StateStyle, StyleTransition, TransitionDirection, TransitionRule, TreeUpdate,
+    UiTree, VisualState, length, property,
 };
 
 fn region(node: argui_ui::NodeId) -> HitRegion {
@@ -93,18 +93,19 @@ fn stable_authored_changes_retarget_and_explicit_bindings_win() {
 
 #[test]
 fn composed_and_inherited_states_keep_each_property() {
+    let scope = StateScopeId::new("test-control");
     let child = Element::container([])
         .keyed("child")
         .background(black())
-        .inherit_interaction_state()
         .state(
-            VisualState::Hovered,
+            StateSelector::scope(scope, VisualState::Hovered),
             StateStyle::new()
                 .set(property::BackgroundColor, Color::WHITE)
                 .set(property::Opacity, 0.6),
         );
     let root = Element::container([child])
         .keyed("parent")
+        .state_scope(scope)
         .interaction(Interaction::default().focusable(true));
     let mut tree = UiTree::new(root);
     let parent = tree.node_ids()[0];
@@ -113,6 +114,51 @@ fn composed_and_inherited_states_keep_each_property() {
     let resolved = tree.resolved_quad(tree.node_ids()[1], &child);
     assert_eq!(solid(resolved.background), Color::WHITE);
     assert_eq!(resolved.opacity, 0.6);
+}
+
+#[test]
+fn descendant_interaction_and_named_state_compose_in_declaration_order() {
+    let scope = StateScopeId::new("ordered-control");
+    let selected = StateName::new("selected");
+    let child = Element::container([])
+        .background(black())
+        .state(
+            StateSelector::scope(scope, selected),
+            StateStyle::new().set(property::BackgroundColor, Color::WHITE),
+        )
+        .state(
+            StateSelector::scope(scope, VisualState::Hovered),
+            StateStyle::new()
+                .set(property::BackgroundColor, Color::rgb(1.0, 0.0, 0.0))
+                .set(property::Opacity, 0.7),
+        );
+    let root = Element::container([child])
+        .state_scope(scope)
+        .active_state(selected, true);
+    let mut tree = UiTree::new(root);
+    let child_node = tree.node_ids()[1];
+    let child = tree.root().children[0].clone();
+    tree.pointer_moved(Point::new(10.0, 10.0), &[region(child_node)]);
+    let resolved = tree.resolved_quad(child_node, &child);
+    assert_eq!(solid(resolved.background), Color::rgb(1.0, 0.0, 0.0));
+    assert_eq!(resolved.opacity, 0.7);
+}
+
+#[test]
+fn a_nested_scope_with_the_same_identity_shadows_its_ancestor() {
+    let scope = StateScopeId::new("nested-control");
+    let outer = StateName::new("outer");
+    let leaf = Element::container([]).state(
+        StateSelector::scope(scope, outer),
+        StateStyle::new().set(property::Opacity, 0.2),
+    );
+    let inner = Element::container([leaf]).state_scope(scope);
+    let root = Element::container([inner])
+        .state_scope(scope)
+        .active_state(outer, true);
+    let tree = UiTree::new(root);
+    let leaf = tree.root().children[0].children[0].clone();
+    assert_eq!(tree.resolved_quad(tree.node_ids()[2], &leaf).opacity, 1.0);
 }
 
 #[test]
@@ -351,17 +397,17 @@ fn transition_rules_are_directional_specific_and_last_rule_wins() {
     let transition = StyleTransition::new(Transition::tween(Tween::new(Duration::from_millis(20))))
         .rule(
             TransitionRule::new(Transition::tween(Tween::new(Duration::from_millis(300))))
-                .direction(TransitionDirection::Enter(VisualState::Hovered)),
+                .direction(TransitionDirection::Enter(VisualState::Hovered.into())),
         )
         .rule(
             TransitionRule::new(Transition::tween(Tween::new(Duration::from_millis(200))))
                 .property(PropertyKey::Opacity)
-                .direction(TransitionDirection::Enter(VisualState::Hovered)),
+                .direction(TransitionDirection::Enter(VisualState::Hovered.into())),
         )
         .rule(
             TransitionRule::new(Transition::tween(Tween::new(Duration::from_millis(100))))
                 .property(PropertyKey::Opacity)
-                .direction(TransitionDirection::Enter(VisualState::Hovered)),
+                .direction(TransitionDirection::Enter(VisualState::Hovered.into())),
         );
     let element = Element::container([])
         .interaction(Interaction::default())

@@ -39,6 +39,14 @@ pub struct GpuFrameProfile {
     pub passes: Vec<GpuPassProfile>,
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct VectorAtlasStats {
+    pub entries: usize,
+    pub hits_this_frame: usize,
+    pub rasterizations_this_frame: usize,
+    pub allocated_bytes: u64,
+}
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct RenderProfile {
     pub cpu_time: Duration,
@@ -46,6 +54,7 @@ pub struct RenderProfile {
     pub draw_batches: usize,
     pub effects: EffectGraphStats,
     pub texture_pool: TexturePoolStats,
+    pub vector_atlas: VectorAtlasStats,
     pub direct_surface: bool,
     pub adapter: AdapterProfile,
     pub gpu: Option<GpuFrameProfile>,
@@ -58,60 +67,42 @@ impl FrameProfiler {
         Self(enabled.then(Instant::now))
     }
 
-    pub fn finish(
-        self,
-        viewport: [f32; 2],
-        draw_batches: usize,
-        effects: EffectGraphStats,
-        texture_pool: TexturePoolStats,
-        adapter: AdapterProfile,
-        gpu: Option<GpuFrameProfile>,
-    ) -> Option<RenderProfile> {
-        self.0.map(|started| RenderProfile {
-            cpu_time: started.elapsed(),
-            viewport_pixels: viewport[0] as u64 * viewport[1] as u64,
-            draw_batches,
-            effects,
-            texture_pool,
-            direct_surface: effects.offscreen_layers == 0,
-            adapter,
-            gpu,
+    pub fn finish(self, mut profile: RenderProfile) -> Option<RenderProfile> {
+        self.0.map(|started| {
+            profile.cpu_time = started.elapsed();
+            profile
         })
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{EffectGraphStats, TexturePoolStats};
-
-    use super::{AdapterProfile, FrameProfiler};
+    use super::{FrameProfiler, RenderProfile, VectorAtlasStats};
 
     #[test]
     fn profiling_is_opt_in_and_reports_scene_costs() {
         assert!(
             FrameProfiler::start(false)
-                .finish(
-                    [100.0, 50.0],
-                    3,
-                    EffectGraphStats::default(),
-                    TexturePoolStats::default(),
-                    AdapterProfile::default(),
-                    None,
-                )
+                .finish(RenderProfile::default())
                 .is_none()
         );
         let profile = FrameProfiler::start(true)
-            .finish(
-                [100.0, 50.0],
-                3,
-                EffectGraphStats::default(),
-                TexturePoolStats::default(),
-                AdapterProfile::default(),
-                None,
-            )
+            .finish(RenderProfile {
+                viewport_pixels: 5_000,
+                draw_batches: 3,
+                direct_surface: true,
+                vector_atlas: VectorAtlasStats {
+                    entries: 2,
+                    hits_this_frame: 3,
+                    rasterizations_this_frame: 1,
+                    allocated_bytes: 64,
+                },
+                ..RenderProfile::default()
+            })
             .unwrap();
         assert_eq!(profile.viewport_pixels, 5_000);
         assert_eq!(profile.draw_batches, 3);
         assert!(profile.direct_surface);
+        assert_eq!(profile.vector_atlas.entries, 2);
     }
 }

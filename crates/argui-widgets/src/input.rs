@@ -1,16 +1,20 @@
 use argui_paint::{Color, PaintStyle};
 use argui_text::{TextColor, TextStyle, TextWrap};
 use argui_ui::{
-    AlignItems, Axes, CaretStyle, CursorIcon, Element, ElementKind, GestureSet, Interaction,
-    LayoutStyle, Overflow, Role, ScrollChaining, ScrollConfig, ScrollbarGutter, ScrollbarStyle,
-    SemanticAction, SemanticValue, Semantics, StateStyle, StyleTransition, VisualState, percent,
+    AlignItems, Axes, CaretStyle, Element, LayoutStyle, Overflow, Role, ScrollChaining,
+    ScrollConfig, ScrollbarGutter, ScrollbarStyle, StateSelector, StateStyle, StyleTransition,
+    TextEditorSpec, TextInputFilter, VisualState, percent,
 };
+
+use crate::{TEXT_FIELD_SCOPE, TextFieldBehavior, TextFieldPart};
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum InputKind {
     #[default]
     Text,
     Search,
+    Number,
+    Arithmetic,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -168,40 +172,34 @@ impl Input {
     #[must_use]
     pub fn build(self) -> Element {
         let mut style = self.style;
-        if let Some((_, slot_width)) = &self.leading {
+        if let Some((_, slot_width)) = self.leading.as_ref() {
             style.layout.padding.left = argui_ui::length(*slot_width);
         }
-        let editor = editor(EditorSpec {
-            key: self.key,
-            value: self.value,
-            placeholder: self.placeholder,
-            style,
-            multiline: false,
-            role: match self.kind {
-                InputKind::Text => Role::TextInput,
-                InputKind::Search => Role::SearchInput,
+        editor(
+            EditorSpec {
+                key: self.key,
+                value: self.value,
+                placeholder: self.placeholder,
+                style,
+                multiline: false,
+                role: match self.kind {
+                    InputKind::Text => Role::TextInput,
+                    InputKind::Search => Role::SearchInput,
+                    InputKind::Number | InputKind::Arithmetic => Role::TextInput,
+                },
+                filter: match self.kind {
+                    InputKind::Text | InputKind::Search => TextInputFilter::Any,
+                    InputKind::Number => TextInputFilter::Decimal,
+                    InputKind::Arithmetic => TextInputFilter::Arithmetic,
+                },
+                enabled: self.enabled,
+                read_only: self.read_only,
+                label: self.label,
+                description: self.description,
+                invalid: self.invalid,
             },
-            enabled: self.enabled,
-            read_only: self.read_only,
-            label: self.label,
-            description: self.description,
-            invalid: self.invalid,
-        });
-        let Some((leading, slot_width)) = self.leading else {
-            return editor;
-        };
-        let slot = Element::row([leading])
-            .absolute(argui_ui::Sides {
-                left: argui_ui::length(0.0),
-                right: argui_ui::auto(),
-                top: argui_ui::length(0.0),
-                bottom: argui_ui::auto(),
-            })
-            .width(argui_ui::length(slot_width))
-            .height(percent(1.0))
-            .align_items(AlignItems::CENTER)
-            .justify_content(argui_ui::JustifyContent::CENTER);
-        Element::container([editor, slot]).width(percent(1.0))
+            self.leading,
+        )
     }
 }
 
@@ -264,19 +262,23 @@ impl TextArea {
 
     #[must_use]
     pub fn build(self) -> Element {
-        editor(EditorSpec {
-            key: self.key,
-            value: self.value,
-            placeholder: self.placeholder,
-            style: self.style,
-            multiline: true,
-            role: Role::TextArea,
-            enabled: self.enabled,
-            read_only: self.read_only,
-            label: None,
-            description: None,
-            invalid: false,
-        })
+        editor(
+            EditorSpec {
+                key: self.key,
+                value: self.value,
+                placeholder: self.placeholder,
+                style: self.style,
+                multiline: true,
+                role: Role::TextArea,
+                filter: TextInputFilter::Any,
+                enabled: self.enabled,
+                read_only: self.read_only,
+                label: None,
+                description: None,
+                invalid: false,
+            },
+            None,
+        )
         .overflow(Axes {
             x: Overflow::Hidden,
             y: Overflow::Auto,
@@ -293,6 +295,7 @@ struct EditorSpec {
     style: InputStyle,
     multiline: bool,
     role: Role,
+    filter: TextInputFilter,
     enabled: bool,
     read_only: bool,
     label: Option<String>,
@@ -300,45 +303,57 @@ struct EditorSpec {
     invalid: bool,
 }
 
-fn editor(spec: EditorSpec) -> Element {
-    let interaction = Interaction::default()
+fn editor(spec: EditorSpec, leading: Option<(Element, f32)>) -> Element {
+    let label = spec.label.unwrap_or_else(|| spec.placeholder.clone());
+    let mut behavior = TextFieldBehavior::new(&spec.key, label, &spec.value, spec.role)
         .enabled(spec.enabled)
-        .focusable(spec.enabled)
-        .cursor(CursorIcon::Text)
-        .gestures(GestureSet::NONE.tap().pan());
-    let state = argui_ui::SemanticState {
-        disabled: !spec.enabled,
-        read_only: spec.read_only,
-        invalid: spec.invalid,
-        ..argui_ui::SemanticState::default()
-    };
-    let mut semantics = Semantics::new(spec.role)
-        .label(spec.label.unwrap_or_else(|| spec.placeholder.clone()))
-        .value(SemanticValue::Text(spec.value.clone()))
-        .state(state)
-        .action(SemanticAction::Focus)
-        .action(SemanticAction::SetValue);
+        .read_only(spec.read_only)
+        .invalid(spec.invalid);
     if let Some(description) = spec.description {
-        semantics = semantics.description(description);
+        behavior = behavior.description(description);
     }
-    let mut element = Element::container([]);
-    element.kind = ElementKind::TextEditor {
+    let element = Element::text_editor(TextEditorSpec {
         value: spec.value,
         placeholder: spec.placeholder,
         multiline: spec.multiline,
         read_only: spec.read_only,
+        filter: spec.filter,
         text: spec.style.text,
         placeholder_text: spec.style.placeholder,
         selection: spec.style.selection,
         caret: spec.style.caret,
+    })
+    .layout_style(spec.style.layout)
+    .paint_style(spec.style.paint)
+    .state(
+        StateSelector::scope(TEXT_FIELD_SCOPE, VisualState::Hovered),
+        spec.style.hovered,
+    )
+    .state(
+        StateSelector::scope(TEXT_FIELD_SCOPE, VisualState::Focused),
+        spec.style.focused,
+    )
+    .transition(spec.style.transition);
+    let editor = behavior.decorate(TextFieldPart::Editor, element);
+    let Some((leading, slot_width)) = leading else {
+        return behavior.decorate(TextFieldPart::Root, editor);
     };
-    element
-        .keyed(spec.key)
-        .layout_style(spec.style.layout)
-        .paint_style(spec.style.paint)
-        .interaction(interaction)
-        .state(VisualState::Hovered, spec.style.hovered)
-        .state(VisualState::Focused, spec.style.focused)
-        .transition(spec.style.transition)
-        .semantics(semantics)
+    let slot = behavior.decorate(
+        TextFieldPart::Decoration,
+        Element::row([leading])
+            .absolute(argui_ui::Sides {
+                left: argui_ui::length(0.0),
+                right: argui_ui::auto(),
+                top: argui_ui::length(0.0),
+                bottom: argui_ui::auto(),
+            })
+            .width(argui_ui::length(slot_width))
+            .height(percent(1.0))
+            .align_items(AlignItems::CENTER)
+            .justify_content(argui_ui::JustifyContent::CENTER),
+    );
+    behavior.decorate(
+        TextFieldPart::Root,
+        Element::container([editor, slot]).width(percent(1.0)),
+    )
 }

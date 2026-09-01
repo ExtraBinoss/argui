@@ -1,7 +1,9 @@
 use argui_core::{Affine2D, Point, Rect, ScrollDelta};
 use argui_paint::{ClipChain, QuadStyle};
 
-use crate::{HitRegion, NodeId, Sides, StateStyle, StyleTransition, VisualState, VisualStates};
+use crate::{
+    HitRegion, NodeId, Sides, StateSelector, StateStyle, StyleTransition, VisualState, VisualStates,
+};
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum ScrollAxes {
@@ -183,12 +185,12 @@ impl ScrollbarPartStyle {
     }
 
     #[must_use]
-    pub fn state(mut self, state: VisualState, style: StateStyle) -> Self {
+    pub fn state(mut self, selector: impl Into<StateSelector>, style: StateStyle) -> Self {
         assert!(
             style.values().iter().all(|property| property.key.is_quad()),
             "scrollbar states only accept quad paint properties"
         );
-        self.states.set(state, style);
+        self.states.set(selector.into(), style);
         self
     }
 
@@ -198,8 +200,8 @@ impl ScrollbarPartStyle {
         self
     }
 
-    pub(crate) fn state_style(&self, state: VisualState) -> Option<&StateStyle> {
-        self.states.get(state)
+    pub(crate) fn state_rules(&self) -> &[crate::state::StateRule] {
+        self.states.rules()
     }
 
     pub(crate) fn has_states(&self) -> bool {

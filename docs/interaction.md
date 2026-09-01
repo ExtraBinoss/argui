@@ -28,6 +28,10 @@ Focusable controls receive focus on press, and losing window focus clears hover,
 press, capture, and focus safely. The runtime restores the exact retained focus
 when the window becomes active again.
 
+`VisualState::Focused` reports focus ownership. `VisualState::FocusVisible`
+reports keyboard or programmatic focus and stays off for pointer focus. Widgets
+can therefore retain accessible keyboard rings without flashing them on click.
+
 ## Keyboard and focus
 
 Every physical key transition reaches the focused node as
@@ -37,6 +41,11 @@ and `Released` from Enter; Space retains the pressed visual until key release
 and cancels activation if focus or window ownership changes. Text editing runs
 after raw dispatch, so applications can observe Escape, arrows, Home/End and
 the edited value without platform-specific handlers.
+
+`TextInputFilter` applies the same edit policy to keyboard, paste, and IME
+commits. `Any`, `Decimal`, and `Arithmetic` let controlled fields reject an
+invalid edit before publishing `TextChanged`; widgets select the policy through
+`InputKind`.
 
 `Element::focus_scope` declares focus ownership around a retained subtree.
 `FocusScope::restoring` remembers the previous target,
@@ -53,9 +62,11 @@ out-of-scope targets perform no implicit fallback.
 ## Composed state styles
 
 `Interaction` owns behavior only. Visuals are typed property patches attached
-with `Element::state`. Focused, hovered, pressed, and disabled patches compose
-in that order instead of replacing one another. `Element::transition` supplies
-one tween or spring default plus property- and direction-specific rules.
+with `Element::state`. Every rule has an `Own` or named-scope selector; all
+matching rules compose in declaration order, so the last declaration for one
+property wins without discarding unrelated properties. `Element::transition`
+supplies one tween or spring default plus property- and direction-specific
+rules.
 
 Paint, transform, scroll, and layout properties retain their exact invalidation
 class. An interaction color does not invoke Taffy; an animated width updates the
@@ -63,9 +74,12 @@ existing Taffy node. Tracks live beside stable `NodeId`s, so rebuilds retarget
 from the presented value without restarting or jumping. First mount snaps,
 reduced motion finishes active tracks, and idle state requests no frames.
 
-`Element::inherit_interaction_state` explicitly lets a descendant consume the
-nearest interactive ancestor's state. This supports icon and label animation
-inside a button without implicit CSS-style inheritance.
+`Element::state_scope` establishes a stable control boundary and
+`StateSelector::scope` resolves the nearest matching boundary. Descendant
+interaction contributes hover, focus, and press to that scope; named states
+come from the scope root. Nested controls with the same scope identity shadow
+their ancestor, which prevents an inner control from accidentally styling an
+outer recipe.
 
 `Button` is a composition helper in `argui-ui`: one interactive container, one
 text child, layout style, paint styles, and no renderer-specific widget code.
@@ -81,3 +95,7 @@ press and scroll state. Every contact still enters the opt-in gesture arena so
 pinch and rotation can be recognized simultaneously. See
 [accessibility and touch](accessibility.md) for the semantic and gesture
 contracts.
+
+Ranges use absolute pointer coordinates, so pressing the track moves directly
+to that value. Optional `RangeDetents` add velocity-aware magnetic stops: slow
+motion settles within a configured tolerance while fast motion remains free.

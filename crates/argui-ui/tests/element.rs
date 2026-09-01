@@ -1,15 +1,18 @@
 use argui_text::TextStyle;
-use argui_ui::{Element, ElementKind, ImageFit, ImageId, ImageSampling, VectorId};
+use argui_ui::{Color, Element, ElementKind, ImageFit, ImageId, ImageSampling, VectorId};
 
 #[test]
 fn media_and_text_specific_builders_only_change_matching_elements() {
-    let vector = Element::vector(VectorId(3)).vector_progress(0.75);
+    let vector = Element::vector(VectorId(3))
+        .vector_fit(ImageFit::Fill)
+        .vector_color(Color::rgb(0.2, 0.4, 0.6));
     assert!(matches!(
         vector.kind,
-        ElementKind::Vector { progress, .. } if progress == 0.75
+        ElementKind::Vector { fit: ImageFit::Fill, color, .. }
+            if color == Color::rgb(0.2, 0.4, 0.6)
     ));
     assert!(matches!(
-        Element::container([]).vector_progress(0.75).kind,
+        Element::container([]).vector_fit(ImageFit::Fill).kind,
         ElementKind::Container
     ));
 

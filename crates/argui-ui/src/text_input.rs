@@ -1,7 +1,12 @@
 use argui_core::{CaretAffinity, ImeInput, Key, KeyInput, KeyState, TextPosition};
 use unicode_segmentation::UnicodeSegmentation;
 
-use crate::NodeId;
+use crate::FocusTarget;
+
+mod filter;
+pub use filter::TextInputFilter;
+mod states;
+pub(crate) use states::TextInputStates;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct TextInputState {
@@ -12,6 +17,7 @@ pub(crate) struct TextInputState {
     preedit: Option<Preedit>,
     multiline: bool,
     read_only: bool,
+    filter: TextInputFilter,
     reveal_cursor: bool,
 }
 
@@ -27,6 +33,32 @@ pub enum ClipboardRequest {
     Write(String),
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TextSelection {
+    All,
+    Caret(TextPosition),
+    Range {
+        anchor: TextPosition,
+        cursor: TextPosition,
+    },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TextSelectionRequest {
+    pub target: FocusTarget,
+    pub selection: TextSelection,
+}
+
+impl TextSelectionRequest {
+    #[must_use]
+    pub fn new(target: impl Into<FocusTarget>, selection: TextSelection) -> Self {
+        Self {
+            target: target.into(),
+            selection,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct EditResult {
     pub changed: bool,
@@ -37,13 +69,14 @@ pub(crate) struct EditResult {
 }
 
 impl TextInputState {
-    pub fn new(value: String, multiline: bool, read_only: bool) -> Self {
+    pub fn new(value: String, multiline: bool, read_only: bool, filter: TextInputFilter) -> Self {
         let cursor = value.len();
         Self {
             value,
             cursor,
             multiline,
             read_only,
+            filter,
             reveal_cursor: true,
             ..Self::default()
         }
@@ -53,9 +86,10 @@ impl TextInputState {
         &self.value
     }
 
-    pub fn sync(&mut self, value: &str, multiline: bool, read_only: bool) {
+    pub fn sync(&mut self, value: &str, multiline: bool, read_only: bool, filter: TextInputFilter) {
         self.multiline = multiline;
         self.read_only = read_only;
+        self.filter = filter;
         if self.value == value {
             return;
         }
@@ -151,8 +185,7 @@ impl TextInputState {
             Key::Escape => self.anchor = None,
             _ if !self.read_only && !input.modifiers.alt => {
                 if let Some(text) = input.text.as_deref().filter(|text| !text.is_empty()) {
-                    self.insert_input(text);
-                    result.changed = true;
+                    result.changed = self.insert_input(text);
                 }
             }
             _ => {}
@@ -192,11 +225,11 @@ impl TextInputState {
             }
             ImeInput::Commit(text) => {
                 self.preedit = None;
-                self.insert_input(&text);
+                let changed = self.insert_input(&text);
                 return EditResult {
-                    changed: !text.is_empty(),
-                    layout: !text.is_empty(),
-                    reshape: !text.is_empty(),
+                    changed,
+                    layout: changed,
+                    reshape: changed,
                     ..EditResult::default()
                 };
             }
@@ -214,11 +247,11 @@ impl TextInputState {
         if self.read_only {
             return EditResult::default();
         }
-        self.insert_input(text);
+        let changed = self.insert_input(text);
         EditResult {
-            changed: !text.is_empty(),
-            layout: !text.is_empty(),
-            reshape: !text.is_empty(),
+            changed,
+            layout: changed,
+            reshape: changed,
             ..EditResult::default()
         }
     }
@@ -228,6 +261,41 @@ impl TextInputState {
         self.move_to(position.index.min(self.value.len()));
         self.affinity = position.affinity;
         self.extend_selection(old, extend);
+        EditResult {
+            layout: true,
+            ..EditResult::default()
+        }
+    }
+
+    pub fn select(&mut self, selection: TextSelection) -> EditResult {
+        let boundary = |position: TextPosition| {
+            TextPosition::new(
+                grapheme_boundary(&self.value, position.index.min(self.value.len())),
+                position.affinity,
+            )
+        };
+        match selection {
+            TextSelection::All => {
+                self.anchor = Some(TextPosition::new(0, CaretAffinity::After));
+                self.cursor = self.value.len();
+                self.affinity = CaretAffinity::Before;
+            }
+            TextSelection::Caret(position) => {
+                let position = boundary(position);
+                self.anchor = None;
+                self.cursor = position.index;
+                self.affinity = position.affinity;
+            }
+            TextSelection::Range { anchor, cursor } => {
+                let anchor = boundary(anchor);
+                let cursor = boundary(cursor);
+                self.anchor = (anchor != cursor).then_some(anchor);
+                self.cursor = cursor.index;
+                self.affinity = cursor.affinity;
+            }
+        }
+        self.preedit = None;
+        self.reveal_cursor = true;
         EditResult {
             layout: true,
             ..EditResult::default()
@@ -287,13 +355,27 @@ impl TextInputState {
         self.anchor = None;
     }
 
-    fn insert_input(&mut self, text: &str) {
-        if self.multiline {
-            self.insert(text);
+    fn insert_input(&mut self, text: &str) -> bool {
+        let single_line;
+        let text = if self.multiline {
+            text
         } else {
-            let single_line = text.replace(['\r', '\n'], "");
-            self.insert(&single_line);
+            single_line = text.replace(['\r', '\n'], "");
+            &single_line
+        };
+        if text.is_empty() {
+            return false;
         }
+        let (start, end) = self.selection().unwrap_or((self.cursor, self.cursor));
+        let mut candidate = String::with_capacity(self.value.len() + text.len());
+        candidate.push_str(&self.value[..start]);
+        candidate.push_str(text);
+        candidate.push_str(&self.value[end..]);
+        if !self.filter.accepts(&candidate) {
+            return false;
+        }
+        self.insert(text);
+        true
     }
 
     fn backspace(&mut self) -> bool {
@@ -347,116 +429,6 @@ impl TextInputState {
         } else {
             self.anchor = None;
         }
-    }
-}
-
-#[derive(Clone, Debug, Default, PartialEq)]
-pub(crate) struct TextInputStates {
-    states: Vec<(NodeId, TextInputState)>,
-    drag: Option<NodeId>,
-}
-
-impl TextInputStates {
-    pub fn get(&self, node: NodeId) -> Option<&TextInputState> {
-        self.states
-            .iter()
-            .find_map(|(id, state)| (*id == node).then_some(state))
-    }
-
-    pub fn get_mut(&mut self, node: NodeId) -> Option<&mut TextInputState> {
-        self.states
-            .iter_mut()
-            .find_map(|(id, state)| (*id == node).then_some(state))
-    }
-
-    pub fn should_reveal_cursor(&self, node: NodeId) -> bool {
-        self.get(node).is_some_and(|state| state.reveal_cursor)
-    }
-
-    pub fn request_cursor_reveal(&mut self, node: NodeId) {
-        if let Some(state) = self.get_mut(node) {
-            state.reveal_cursor = true;
-        }
-    }
-
-    pub fn clear_cursor_reveals(&mut self) {
-        for (_, state) in &mut self.states {
-            state.reveal_cursor = false;
-        }
-    }
-
-    pub fn sync(&mut self, inputs: impl IntoIterator<Item = (NodeId, String, bool, bool)>) {
-        let inputs = inputs.into_iter().collect::<Vec<_>>();
-        self.states
-            .retain(|(node, _)| inputs.iter().any(|(id, _, _, _)| id == node));
-        if self.drag.is_some_and(|node| self.get(node).is_none()) {
-            self.drag = None;
-        }
-        for (node, value, multiline, read_only) in inputs {
-            if let Some(state) = self.get_mut(node) {
-                state.sync(&value, multiline, read_only);
-            } else {
-                self.states
-                    .push((node, TextInputState::new(value, multiline, read_only)));
-            }
-        }
-    }
-
-    pub fn place(&mut self, node: NodeId, index: usize, extend: bool) -> Option<EditResult> {
-        self.place_position(
-            node,
-            TextPosition::new(index, CaretAffinity::Before),
-            extend,
-        )
-    }
-
-    pub fn place_position(
-        &mut self,
-        node: NodeId,
-        position: TextPosition,
-        extend: bool,
-    ) -> Option<EditResult> {
-        let result = self.get_mut(node)?.place_position(position, extend);
-        self.drag = Some(node);
-        Some(result)
-    }
-
-    pub fn drag(&mut self, node: NodeId, index: usize) -> Option<EditResult> {
-        self.drag_position(node, TextPosition::new(index, CaretAffinity::Before))
-    }
-
-    pub fn drag_position(&mut self, node: NodeId, position: TextPosition) -> Option<EditResult> {
-        if self.drag != Some(node) {
-            return None;
-        }
-        self.get_mut(node)
-            .map(|state| state.place_position(position, true))
-    }
-
-    pub fn move_to(&mut self, node: NodeId, index: usize, extend: bool) -> Option<EditResult> {
-        self.move_to_position(
-            node,
-            TextPosition::new(index, CaretAffinity::Before),
-            extend,
-        )
-    }
-
-    pub fn move_to_position(
-        &mut self,
-        node: NodeId,
-        position: TextPosition,
-        extend: bool,
-    ) -> Option<EditResult> {
-        self.get_mut(node)
-            .map(|state| state.place_position(position, extend))
-    }
-
-    pub const fn dragging(&self) -> bool {
-        self.drag.is_some()
-    }
-
-    pub fn release(&mut self) -> bool {
-        self.drag.take().is_some()
     }
 }
 

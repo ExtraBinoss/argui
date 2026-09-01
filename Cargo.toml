@@ -52,9 +52,8 @@ image = { version = "=0.25.10", default-features = false, features = ["png", "jp
 ksni = { version = "=0.3.6", default-features = false, features = ["async-io", "blocking"] }
 tray-icon = { version = "=0.24.2", default-features = false }
 winresource = "=0.1.31"
-lyon_path = "=1.0.19"
-lyon_tessellation = "=1.0.20"
 usvg = { version = "=0.48.1", default-features = false }
+resvg = { version = "=0.48.1", default-features = false }
 icondata_core = "=0.1.0"
 icondata_tb = "=0.1.0"
 accesskit = "=0.24.1"

@@ -379,8 +379,8 @@ impl SurfaceRenderer {
         self.image.register(&self.device, &self.queue, asset)
     }
 
-    pub fn register_vector(&mut self, asset: &VectorAsset) {
-        self.vector.register(&self.device, asset);
+    pub fn register_vector(&mut self, asset: &VectorAsset) -> Result<(), RendererError> {
+        self.vector.register(asset)
     }
 
     #[cfg_attr(coverage_nightly, coverage(off))]
@@ -409,8 +409,12 @@ impl SurfaceRenderer {
         let mut graph_stats = EffectGraphStats::default();
         let mut effect_graph = None;
         match content {
-            FrameContent::None => self.batches.clear(),
+            FrameContent::None => {
+                self.vector.clear_frame_stats();
+                self.batches.clear();
+            }
             FrameContent::Text { engine, text } => {
+                self.vector.clear_frame_stats();
                 let draw = self.text.prepare(&self.device, &self.queue, engine, text)?;
                 let range = draw.all();
                 self.batches.clear();
@@ -526,9 +530,9 @@ impl SurfaceRenderer {
                         batch.instances.clone(),
                         image_offset,
                     ),
-                    DrawKind::Vector(vector) => {
+                    DrawKind::Vector => {
                         self.vector
-                            .draw(&mut pass, vector, batch.instances.clone(), vector_offset)
+                            .draw(&mut pass, batch.instances.clone(), vector_offset)
                     }
                 }
             }
@@ -550,14 +554,17 @@ impl SurfaceRenderer {
         viewport: [f32; 2],
         effects: EffectGraphStats,
     ) {
-        if let Some(profile) = profiler.finish(
-            viewport,
-            self.batches.len(),
+        if let Some(profile) = profiler.finish(RenderProfile {
+            viewport_pixels: viewport[0] as u64 * viewport[1] as u64,
+            draw_batches: self.batches.len(),
             effects,
-            self.offscreen.stats(),
-            self.gpu_profiler.adapter().clone(),
-            self.gpu_profiler.take_latest(),
-        ) {
+            texture_pool: self.offscreen.stats(),
+            vector_atlas: self.vector.stats(),
+            direct_surface: effects.offscreen_layers == 0,
+            adapter: self.gpu_profiler.adapter().clone(),
+            gpu: self.gpu_profiler.take_latest(),
+            ..RenderProfile::default()
+        }) {
             self.last_profile = profile;
         }
     }

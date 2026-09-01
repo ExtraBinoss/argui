@@ -173,6 +173,7 @@ fn theme_editors_and_resize_are_fully_controlled_by_showcase_state() {
         target: resize.target,
         phase: GesturePhase::Changed,
         kind: GestureKind::Pan {
+            position: Point::new(48.0, 32.0),
             delta: Point::new(48.0, 32.0),
             total: Point::new(48.0, 32.0),
             velocity: Point::default(),
@@ -180,7 +181,6 @@ fn theme_editors_and_resize_are_fully_controlled_by_showcase_state() {
     });
     assert_eq!(app.update(&resize), ViewUpdate::Rebuild);
 }
-
 #[test]
 fn virtual_scroll_rebuilds_only_when_the_visible_window_changes() {
     let mut app = StateShowcase::default();

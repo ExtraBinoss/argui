@@ -2,7 +2,7 @@ use argui_animation::Frame;
 use argui_inspect::InspectorHandle;
 use argui_paint::{ImageAsset, VectorAsset};
 use argui_platform::{PlatformEvent, TrayConfig, TrayEvent, WindowKey, WindowLevel, WindowSpec};
-use argui_ui::{ClipboardRequest, Element, FocusRequest, UiEvent};
+use argui_ui::{ClipboardRequest, Element, FocusRequest, TextSelectionRequest, UiEvent};
 
 use crate::{
     Entity, LayoutSnapshot, Render, ScrollRequest, ThemeRequest, ViewUpdate, WindowEnvironment,
@@ -161,6 +161,10 @@ pub trait AppModel: 'static {
         None
     }
 
+    fn take_text_selection_request(&mut self, _window: &WindowKey) -> Option<TextSelectionRequest> {
+        None
+    }
+
     fn take_theme_request(&mut self, _window: &WindowKey) -> Option<ThemeRequest> {
         None
     }
@@ -171,6 +175,7 @@ pub(crate) struct SingleWindowModel<A: Render> {
     clipboard: std::cell::RefCell<Option<ClipboardRequest>>,
     scroll: std::cell::RefCell<Option<ScrollRequest>>,
     focus: std::cell::RefCell<Option<FocusRequest>>,
+    text_selection: std::cell::RefCell<Option<TextSelectionRequest>>,
     theme: std::cell::RefCell<Option<ThemeRequest>>,
     animation_requested: std::cell::Cell<bool>,
 }
@@ -182,6 +187,7 @@ impl<A: Render> SingleWindowModel<A> {
             clipboard: std::cell::RefCell::new(None),
             scroll: std::cell::RefCell::new(None),
             focus: std::cell::RefCell::new(None),
+            text_selection: std::cell::RefCell::new(None),
             theme: std::cell::RefCell::new(None),
             animation_requested: std::cell::Cell::new(false),
         }
@@ -197,6 +203,9 @@ impl<A: Render> SingleWindowModel<A> {
         }
         if effects.focus.is_some() {
             *self.focus.borrow_mut() = effects.focus;
+        }
+        if effects.text_selection.is_some() {
+            *self.text_selection.borrow_mut() = effects.text_selection;
         }
         if effects.theme.is_some() {
             *self.theme.borrow_mut() = effects.theme;
@@ -280,6 +289,12 @@ impl<A: Render> AppModel for SingleWindowModel<A> {
             .flatten()
     }
 
+    fn take_text_selection_request(&mut self, window: &WindowKey) -> Option<TextSelectionRequest> {
+        (window.as_str() == WindowKey::MAIN_VALUE)
+            .then(|| self.text_selection.borrow_mut().take())
+            .flatten()
+    }
+
     fn take_theme_request(&mut self, window: &WindowKey) -> Option<ThemeRequest> {
         (window.as_str() == WindowKey::MAIN_VALUE)
             .then(|| self.theme.borrow_mut().take())
@@ -290,7 +305,7 @@ impl<A: Render> AppModel for SingleWindowModel<A> {
 #[cfg(test)]
 mod tests {
     use argui_core::{Color, ColorScheme, Point};
-    use argui_ui::{ClipboardRequest, Element, UiEvent, UiEventKind, UiTree};
+    use argui_ui::{ClipboardRequest, Element, TextSelection, UiEvent, UiEventKind, UiTree};
 
     use super::{AppEvent, AppModel, SingleWindowModel};
     use crate::{Context, Render, ThemeRequest};
@@ -306,6 +321,7 @@ mod tests {
             cx.write_clipboard(ClipboardRequest::Write("theme".into()));
             cx.scroll_to("theme", Point::new(1.0, 2.0));
             cx.request_focus("theme");
+            cx.select_text("theme", TextSelection::All);
             cx.request_animation_frame();
             cx.set_theme(ThemeRequest {
                 color_scheme: Some(ColorScheme::Dark),
@@ -331,6 +347,7 @@ mod tests {
         let _ = model.take_clipboard_request(&window);
         let _ = model.take_scroll_request(&window);
         let _ = model.take_focus_request(&window);
+        let _ = model.take_text_selection_request(&window);
         let _ = model.wants_animation_frame(&window);
         let _ = model.take_theme_request(&window);
         let _ = model.take_theme_request(&window);

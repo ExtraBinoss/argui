@@ -181,8 +181,10 @@ shadow, scroll, layout, and custom-effect values interpolate.
 The retained transition registry is keyed by `NodeId`. It handles both
 interaction changes and authored style changes across application rebuilds,
 preserves spring velocity on retarget, and yields to explicit `Element::bind`
-motions as the final composition layer. Descendant state inheritance is
-explicit through `Element::inherit_interaction_state`.
+motions as the final composition layer. `StateSelector` targets either the
+element itself or the nearest named `StateScopeId`; this lets arbitrary child
+content react to a control's hover, focus, press, disabled, or application-
+defined state without coupling the child to the widget recipe.
 
 ### 8. Effects and shader parameters — implemented
 

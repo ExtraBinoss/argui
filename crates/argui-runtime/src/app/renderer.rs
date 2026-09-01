@@ -64,7 +64,12 @@ impl Application {
                     event_loop.exit();
                     return;
                 }
-                register_vectors(&mut renderer, &self.vector_assets);
+                if let Err(error) = register_vectors(&mut renderer, &self.vector_assets) {
+                    (self.on_event)(RuntimeEvent::RendererFailed(error.to_string()));
+                    self.fatal_error = Some(error.into());
+                    event_loop.exit();
+                    return;
+                }
                 *self.renderer.borrow_mut() = RendererState::Ready(Box::new(renderer));
                 window.request_redraw();
             }
@@ -111,9 +116,9 @@ impl Application {
                     }
                     let current_size = window.inner_size();
                     surface.resize(current_size.width, current_size.height);
-                    register_images(&mut surface, &image_assets).map(|()| {
-                        register_vectors(&mut surface, &vector_assets);
-                        surface
+                    register_images(&mut surface, &image_assets).and_then(|()| {
+                        register_vectors(&mut surface, &vector_assets)?;
+                        Ok(surface)
                     })
                 }
                 Err(error) => Err(error),
@@ -194,9 +199,13 @@ impl Application {
                         offscreen_pixels: profile.effects.offscreen_pixels,
                         cached_layers: profile.effects.cached_layers,
                         damaged_pixels: profile.effects.damaged_pixels,
-                        textures: profile.texture_pool.textures,
+                        textures: profile.texture_pool.textures + 1,
                         reused_textures: profile.texture_pool.reused_this_frame,
-                        texture_bytes: profile.texture_pool.allocated_bytes,
+                        texture_bytes: profile.texture_pool.allocated_bytes
+                            + profile.vector_atlas.allocated_bytes,
+                        vector_atlas_entries: profile.vector_atlas.entries,
+                        vector_atlas_hits: profile.vector_atlas.hits_this_frame,
+                        vector_rasterizations: profile.vector_atlas.rasterizations_this_frame,
                         adapter: adapter_record(&profile.adapter),
                         gpu: profile.gpu.as_ref().map(gpu_record),
                         ..FrameRecord::default()
@@ -265,10 +274,14 @@ fn gpu_record(profile: &GpuFrameProfile) -> GpuFrameRecord {
     }
 }
 
-fn register_vectors(renderer: &mut SurfaceRenderer, assets: &[argui_paint::VectorAsset]) {
+fn register_vectors(
+    renderer: &mut SurfaceRenderer,
+    assets: &[argui_paint::VectorAsset],
+) -> Result<(), argui_render::RendererError> {
     for asset in assets {
-        renderer.register_vector(asset);
+        renderer.register_vector(asset)?;
     }
+    Ok(())
 }
 
 fn register_images(

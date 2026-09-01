@@ -1,6 +1,6 @@
 use argui_core::{Key, KeyInput, KeyState, Modifiers};
 use argui_ui::{Element, Role, UiEvent, UiEventKind, UiTree};
-use argui_widgets::{Select, SelectAction, SelectOption};
+use argui_widgets::{Select, SelectAction, SelectBehavior, SelectOption};
 
 fn event(key: &str, kind: UiEventKind) -> UiEvent {
     let tree = UiTree::new(Element::container([]));
@@ -32,71 +32,44 @@ fn select_navigation_skips_disabled_options_and_wraps() {
         SelectOption::new("DX12").enabled(false),
         SelectOption::new("Metal"),
     ];
+    let behavior = |highlighted| {
+        SelectBehavior::new("backend", "Backend", options.iter().cloned(), None)
+            .highlighted(highlighted)
+    };
     assert_eq!(
-        Select::action(
-            "backend",
-            &options,
-            0,
-            &event("backend", key(Key::ArrowDown))
-        ),
+        behavior(0).action(&event("backend", key(Key::ArrowDown))),
         Some(SelectAction::Highlight(2))
     );
     assert_eq!(
-        Select::action(
-            "backend",
-            &options,
-            2,
-            &event("backend", key(Key::ArrowDown))
-        ),
+        behavior(2).action(&event("backend", key(Key::ArrowDown))),
         Some(SelectAction::Highlight(0))
     );
     assert_eq!(
-        Select::action(
-            "backend",
-            &options,
-            0,
-            &event("backend::list", key(Key::ArrowUp))
-        ),
+        behavior(0).action(&event("backend::list", key(Key::ArrowUp))),
         Some(SelectAction::Highlight(2))
     );
     assert_eq!(
-        Select::action(
-            "backend",
-            &options,
-            0,
-            &event("backend::option::0", key(Key::ArrowDown))
-        ),
+        behavior(0).action(&event("backend::option::0", key(Key::ArrowDown))),
         Some(SelectAction::Highlight(2))
     );
     assert_eq!(
-        Select::action(
-            "backend",
-            &options,
-            0,
-            &event("backend", key(Key::Character("m".into())))
-        ),
+        behavior(0).action(&event("backend", key(Key::Character("m".into())))),
         Some(SelectAction::Highlight(2))
     );
     assert_eq!(
-        Select::action(
-            "backend",
-            &options,
-            0,
-            &event("backend::option::1", UiEventKind::Clicked)
-        ),
+        behavior(0).action(&event("backend::option::1", UiEventKind::Clicked)),
         None
     );
     assert_eq!(
-        Select::action(
+        behavior(0).action(&event(
             "backend",
-            &options,
-            0,
-            &event("backend", key_state(Key::ArrowDown, KeyState::Released))
-        ),
+            key_state(Key::ArrowDown, KeyState::Released),
+        )),
         None
     );
     assert_eq!(
-        Select::action("backend", &[], 0, &event("backend", key(Key::ArrowDown))),
+        SelectBehavior::new("backend", "Backend", [], None)
+            .action(&event("backend", key(Key::ArrowDown))),
         None
     );
 }

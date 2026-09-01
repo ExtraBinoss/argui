@@ -5,7 +5,7 @@ use icondata_core::IconData;
 use icondata_tb::{
     TbCheckOutline, TbChevronDownOutline, TbDeviceDesktopOutline,
     TbLayoutSidebarLeftCollapseOutline, TbLoader2Outline, TbMoonOutline, TbResizeOutline,
-    TbSearchOutline, TbSunOutline, TbXOutline,
+    TbRestoreOutline, TbSearchOutline, TbSunOutline, TbXOutline,
 };
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -21,10 +21,11 @@ pub enum TablerIcon {
     Loader,
     Resize,
     Sidebar,
+    Restore,
 }
 
 impl TablerIcon {
-    const ALL: [Self; 10] = [
+    const ALL: [Self; 11] = [
         Self::Search,
         Self::Sun,
         Self::Moon,
@@ -35,6 +36,7 @@ impl TablerIcon {
         Self::Loader,
         Self::Resize,
         Self::Sidebar,
+        Self::Restore,
     ];
 
     const fn data(self) -> &'static IconData {
@@ -49,14 +51,16 @@ impl TablerIcon {
             Self::Loader => TbLoader2Outline,
             Self::Resize => TbResizeOutline,
             Self::Sidebar => TbLayoutSidebarLeftCollapseOutline,
+            Self::Restore => TbRestoreOutline,
         }
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct WidgetAssets {
-    ids: [VectorId; 10],
+    ids: [VectorId; 11],
     assets: Vec<VectorAsset>,
+    color: Color,
 }
 
 impl WidgetAssets {
@@ -67,12 +71,12 @@ impl WidgetAssets {
             .iter()
             .enumerate()
             .map(|(index, icon)| {
-                let svg = tabler_svg(icon.data(), color);
+                let svg = tabler_svg(icon.data());
                 parse_svg(ids[index], svg.as_bytes())
                     .expect("embedded Tabler icon data must remain valid SVG")
             })
             .collect();
-        Self { ids, assets }
+        Self { ids, assets, color }
     }
 
     #[must_use]
@@ -82,6 +86,7 @@ impl WidgetAssets {
                 size: Dimensions::length(size),
                 ..LayoutStyle::default()
             })
+            .vector_color(self.color)
             .semantic_hidden(true)
     }
 
@@ -103,12 +108,9 @@ impl WidgetAssets {
     }
 }
 
-fn tabler_svg(icon: &IconData, color: Color) -> String {
-    let [red, green, blue, _] = color.as_array();
-    let [red, green, blue] =
-        [red, green, blue].map(|channel| (channel.clamp(0.0, 1.0) * 255.0).round() as u8);
+fn tabler_svg(icon: &IconData) -> String {
     format!(
-        r##"<svg xmlns="http://www.w3.org/2000/svg" width="{}" height="{}" viewBox="{}" fill="{}" stroke="#{red:02x}{green:02x}{blue:02x}" stroke-width="{}" stroke-linecap="{}" stroke-linejoin="{}">{}</svg>"##,
+        r##"<svg xmlns="http://www.w3.org/2000/svg" width="{}" height="{}" viewBox="{}" fill="{}" stroke="currentColor" stroke-width="{}" stroke-linecap="{}" stroke-linejoin="{}">{}</svg>"##,
         icon.width.unwrap_or("24"),
         icon.height.unwrap_or("24"),
         icon.view_box.unwrap_or("0 0 24 24"),

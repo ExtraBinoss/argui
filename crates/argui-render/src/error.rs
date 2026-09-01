@@ -23,6 +23,8 @@ pub enum RendererError {
     },
     MissingImage(u64),
     MissingVector(u64),
+    VectorAtlasFull,
+    VectorRasterization(String),
     ImageCacheFull {
         requested: usize,
         capacity: usize,
@@ -69,6 +71,10 @@ impl fmt::Display for RendererError {
             ),
             Self::MissingImage(id) => write!(formatter, "image {id} is not registered"),
             Self::MissingVector(id) => write!(formatter, "vector {id} is not registered"),
+            Self::VectorAtlasFull => formatter.write_str("the bounded vector atlas is full"),
+            Self::VectorRasterization(message) => {
+                write!(formatter, "SVG rasterization failed: {message}")
+            }
             Self::ImageCacheFull {
                 requested,
                 capacity,

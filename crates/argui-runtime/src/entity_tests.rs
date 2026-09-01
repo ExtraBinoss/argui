@@ -1,6 +1,9 @@
 use std::{cell::Cell, rc::Rc};
 
-use argui_ui::{Element, ElementKind, FocusRequest, FocusTarget, UiEvent, UiEventKind, UiTree};
+use argui_ui::{
+    Element, ElementKind, FocusRequest, FocusTarget, TextSelection, TextSelectionRequest, UiEvent,
+    UiEventKind, UiTree,
+};
 
 use argui_animation::{Duration, Frame, Time};
 use argui_core::{Color, ColorScheme, Point, Rect, Size};
@@ -176,6 +179,7 @@ impl Render for Effects {
         cx.write_clipboard(ClipboardRequest::Write("copied".into()));
         cx.scroll_to("target", Point::new(2.0, 4.0));
         cx.request_focus("target");
+        cx.select_text("target", TextSelection::All);
         cx.request_animation_frame();
     }
 }
@@ -194,6 +198,10 @@ fn context_bubbles_commands_clipboard_scroll_and_frame_requests() {
     assert_eq!(
         effects.focus,
         Some(FocusRequest::Focus(FocusTarget::Key("target".into())))
+    );
+    assert_eq!(
+        effects.text_selection,
+        Some(TextSelectionRequest::new("target", TextSelection::All))
     );
     assert!(effects.animation_frame);
 }
@@ -217,6 +225,7 @@ fn contexts_create_entities_and_propagate_nested_effects() {
     nested.write_clipboard(ClipboardRequest::Write("nested".into()));
     nested.scroll_to("nested-target", Point::new(8.0, 13.0));
     nested.request_focus("nested-target");
+    nested.select_text("nested-target", TextSelection::All);
     nested.clear_focus();
     nested.set_theme(ThemeRequest {
         color_scheme: Some(ColorScheme::Dark),
@@ -235,6 +244,13 @@ fn contexts_create_entities_and_propagate_nested_effects() {
     );
     assert_eq!(parent.effects.scroll.unwrap().key, "nested-target");
     assert_eq!(parent.effects.focus, Some(FocusRequest::Clear));
+    assert_eq!(
+        parent.effects.text_selection,
+        Some(TextSelectionRequest::new(
+            "nested-target",
+            TextSelection::All,
+        ))
+    );
     assert_eq!(
         parent.effects.theme,
         Some(ThemeRequest {

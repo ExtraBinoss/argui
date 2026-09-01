@@ -8,9 +8,91 @@ use crate::binding::{GradientPointTarget, LayoutTarget};
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum VisualState {
     Focused,
+    FocusVisible,
     Hovered,
     Pressed,
     Disabled,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct StateName(&'static str);
+
+impl StateName {
+    #[must_use]
+    pub const fn new(name: &'static str) -> Self {
+        Self(name)
+    }
+
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        self.0
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct StateScopeId(&'static str);
+
+impl StateScopeId {
+    #[must_use]
+    pub const fn new(name: &'static str) -> Self {
+        Self(name)
+    }
+
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        self.0
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum State {
+    Visual(VisualState),
+    Named(StateName),
+}
+
+impl From<VisualState> for State {
+    fn from(value: VisualState) -> Self {
+        Self::Visual(value)
+    }
+}
+
+impl From<StateName> for State {
+    fn from(value: StateName) -> Self {
+        Self::Named(value)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum StateSelector {
+    Own(State),
+    Scope { scope: StateScopeId, state: State },
+}
+
+impl StateSelector {
+    #[must_use]
+    pub const fn own(state: State) -> Self {
+        Self::Own(state)
+    }
+
+    #[must_use]
+    pub fn scope(scope: StateScopeId, state: impl Into<State>) -> Self {
+        Self::Scope {
+            scope,
+            state: state.into(),
+        }
+    }
+}
+
+impl From<VisualState> for StateSelector {
+    fn from(value: VisualState) -> Self {
+        Self::Own(State::Visual(value))
+    }
+}
+
+impl From<StateName> for StateSelector {
+    fn from(value: StateName) -> Self {
+        Self::Own(State::Named(value))
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -33,9 +115,10 @@ impl VisualState {
     const fn bit(self) -> u8 {
         match self {
             Self::Focused => 1,
-            Self::Hovered => 2,
-            Self::Pressed => 4,
-            Self::Disabled => 8,
+            Self::FocusVisible => 2,
+            Self::Hovered => 4,
+            Self::Pressed => 8,
+            Self::Disabled => 16,
         }
     }
 }
@@ -144,78 +227,55 @@ pub struct StateStyle {
     values: Vec<StatePropertyValue>,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct StateRule {
+    pub selector: StateSelector,
+    pub style: StateStyle,
+}
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct ElementStateStyles {
-    focused: Option<StateStyle>,
-    hovered: Option<StateStyle>,
-    pressed: Option<StateStyle>,
-    disabled: Option<StateStyle>,
+    rules: Vec<StateRule>,
 }
 
 impl ElementStateStyles {
     pub(crate) const fn new() -> Self {
-        Self {
-            focused: None,
-            hovered: None,
-            pressed: None,
-            disabled: None,
-        }
+        Self { rules: Vec::new() }
     }
 
-    pub(crate) fn set(&mut self, state: VisualState, style: StateStyle) {
-        *match state {
-            VisualState::Focused => &mut self.focused,
-            VisualState::Hovered => &mut self.hovered,
-            VisualState::Pressed => &mut self.pressed,
-            VisualState::Disabled => &mut self.disabled,
-        } = Some(style);
-    }
-
-    pub(crate) fn get(&self, state: VisualState) -> Option<&StateStyle> {
-        match state {
-            VisualState::Focused => self.focused.as_ref(),
-            VisualState::Hovered => self.hovered.as_ref(),
-            VisualState::Pressed => self.pressed.as_ref(),
-            VisualState::Disabled => self.disabled.as_ref(),
+    pub(crate) fn set(&mut self, selector: StateSelector, style: StateStyle) {
+        if let Some(rule) = self.rules.iter_mut().find(|rule| rule.selector == selector) {
+            rule.style = style;
+        } else {
+            self.rules.push(StateRule { selector, style });
         }
     }
 
     pub(crate) fn is_empty(&self) -> bool {
-        self.focused.is_none()
-            && self.hovered.is_none()
-            && self.pressed.is_none()
-            && self.disabled.is_none()
+        self.rules.is_empty()
+    }
+
+    pub(crate) fn rules(&self) -> &[StateRule] {
+        &self.rules
     }
 
     pub(crate) fn impact(&self) -> Option<BindingImpact> {
-        [
-            self.focused.as_ref(),
-            self.hovered.as_ref(),
-            self.pressed.as_ref(),
-            self.disabled.as_ref(),
-        ]
-        .into_iter()
-        .flatten()
-        .flat_map(StateStyle::values)
-        .map(|value| value.key.impact())
-        .max_by_key(|impact| match impact {
-            BindingImpact::Paint => 0,
-            BindingImpact::Scroll => 1,
-            BindingImpact::Layout => 2,
-        })
+        self.rules
+            .iter()
+            .flat_map(|rule| rule.style.values())
+            .map(|value| value.key.impact())
+            .max_by_key(|impact| match impact {
+                BindingImpact::Paint => 0,
+                BindingImpact::Scroll => 1,
+                BindingImpact::Layout => 2,
+            })
     }
 
     pub(crate) fn contains(&self, key: PropertyKey) -> bool {
-        [
-            self.focused.as_ref(),
-            self.hovered.as_ref(),
-            self.pressed.as_ref(),
-            self.disabled.as_ref(),
-        ]
-        .into_iter()
-        .flatten()
-        .flat_map(StateStyle::values)
-        .any(|value| value.key == key)
+        self.rules
+            .iter()
+            .flat_map(|rule| rule.style.values())
+            .any(|value| value.key == key)
     }
 }
 
@@ -266,8 +326,8 @@ impl From<QuadStyle> for StateStyle {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TransitionDirection {
-    Enter(VisualState),
-    Exit(VisualState),
+    Enter(StateSelector),
+    Exit(StateSelector),
 }
 
 #[derive(Clone, Debug, PartialEq)]

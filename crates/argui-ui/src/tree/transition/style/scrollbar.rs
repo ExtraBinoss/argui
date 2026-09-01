@@ -1,27 +1,51 @@
-use crate::{
-    NodeId, ScrollbarPartStyle, ScrollbarStyle, StatePropertyValue, VisualState, VisualStates,
-};
+use crate::{NodeId, ScrollbarPartStyle, ScrollbarStyle, StateSelector, VisualStates};
 
-use super::super::{NodeSpec, TransitionTarget};
-use super::{apply_target, quad_values};
+use super::super::{NodeSpec, ResolvedProperty, TransitionTarget};
+use super::states::{ScopeStack, StateContext};
+use super::{apply_target, quad_values, resolved};
+
+pub(super) struct ScrollbarContext<'a> {
+    pub node: NodeId,
+    pub node_index: usize,
+    pub enabled: bool,
+    pub states: &'a StateContext,
+    pub scope_stack: &'a ScopeStack,
+    pub states_for: &'a dyn Fn(NodeId, crate::scroll::ScrollbarPart, bool) -> VisualStates,
+}
 
 pub(super) fn collect<'a>(
-    node: NodeId,
-    enabled: bool,
+    context: ScrollbarContext<'_>,
     scrollbar: &'a ScrollbarStyle,
-    states_for: &dyn Fn(NodeId, crate::scroll::ScrollbarPart, bool) -> VisualStates,
     output: &mut Vec<NodeSpec<'a>>,
 ) {
     push(
-        TransitionTarget::ScrollbarTrack(node),
+        TransitionTarget::ScrollbarTrack(context.node),
         &scrollbar.track,
-        states_for(node, crate::scroll::ScrollbarPart::Track, enabled),
+        (context.states_for)(
+            context.node,
+            crate::scroll::ScrollbarPart::Track,
+            context.enabled,
+        ),
+        |selector, visual| {
+            context
+                .states
+                .matches_part(selector, context.node_index, context.scope_stack, visual)
+        },
         output,
     );
     push(
-        TransitionTarget::ScrollbarThumb(node),
+        TransitionTarget::ScrollbarThumb(context.node),
         &scrollbar.thumb,
-        states_for(node, crate::scroll::ScrollbarPart::Thumb, enabled),
+        (context.states_for)(
+            context.node,
+            crate::scroll::ScrollbarPart::Thumb,
+            context.enabled,
+        ),
+        |selector, visual| {
+            context
+                .states
+                .matches_part(selector, context.node_index, context.scope_stack, visual)
+        },
         output,
     );
 }
@@ -30,6 +54,7 @@ fn push<'a>(
     target: TransitionTarget,
     part: &'a ScrollbarPartStyle,
     states: VisualStates,
+    matches: impl Fn(StateSelector, VisualStates) -> bool,
     output: &mut Vec<NodeSpec<'a>>,
 ) {
     if part.transition.is_none() && !part.has_states() {
@@ -37,25 +62,34 @@ fn push<'a>(
     }
     output.push(NodeSpec {
         target,
-        states,
-        values: target_values(part, states),
+        matched: matched(part, states, &matches),
+        values: target_values(part, states, &matches),
         transition: part.transition.as_ref(),
     });
 }
 
-fn target_values(part: &ScrollbarPartStyle, states: VisualStates) -> Vec<StatePropertyValue> {
-    let mut values = quad_values(&part.base);
-    for state in [
-        VisualState::Focused,
-        VisualState::Hovered,
-        VisualState::Pressed,
-        VisualState::Disabled,
-    ] {
-        if states.contains(state)
-            && let Some(style) = part.state_style(state)
-        {
-            for property in style.values() {
-                apply_target(&mut values, property);
+fn matched(
+    part: &ScrollbarPartStyle,
+    states: VisualStates,
+    matches: &impl Fn(StateSelector, VisualStates) -> bool,
+) -> Vec<StateSelector> {
+    part.state_rules()
+        .iter()
+        .filter_map(|rule| matches(rule.selector, states).then_some(rule.selector))
+        .collect()
+}
+
+fn target_values(
+    part: &ScrollbarPartStyle,
+    states: VisualStates,
+    matches: &impl Fn(StateSelector, VisualStates) -> bool,
+) -> Vec<ResolvedProperty> {
+    let matched = matched(part, states, matches);
+    let mut values = resolved(quad_values(&part.base));
+    for rule in part.state_rules() {
+        if matched.contains(&rule.selector) {
+            for property in rule.style.values() {
+                apply_target(&mut values, property, Some(rule.selector));
             }
         }
     }

@@ -1,9 +1,12 @@
 use crate::AppCommand;
 use argui_animation::Frame;
-use argui_core::{Point, Rect, Size};
+use argui_core::{Point, Rect};
 use argui_inspect::InspectorHandle;
 use argui_paint::{ImageAsset, VectorAsset};
-use argui_ui::{ClipboardRequest, Element, FocusRequest, FocusTarget, NodeId, UiEvent};
+use argui_ui::{
+    ClipboardRequest, Element, FocusRequest, FocusTarget, TextSelection, TextSelectionRequest,
+    UiEvent,
+};
 use std::{
     any::Any,
     cell::{Cell, RefCell},
@@ -13,6 +16,9 @@ use std::{
 };
 
 use crate::{ThemeRequest, WindowEnvironment};
+
+mod layout;
+pub use layout::{LayoutBounds, LayoutSnapshot, ScrollRequest};
 
 /// Retained component identity. Cloning an entity never clones its state.
 pub struct Entity<T: Render>(Rc<EntityCell<T>>);
@@ -67,6 +73,7 @@ pub(crate) struct ContextEffects {
     pub(crate) clipboard: Option<ClipboardRequest>,
     pub(crate) scroll: Option<ScrollRequest>,
     pub(crate) focus: Option<FocusRequest>,
+    pub(crate) text_selection: Option<TextSelectionRequest>,
     pub(crate) theme: Option<ThemeRequest>,
     pub(crate) commands: Vec<AppCommand>,
     children: Vec<AnyEntity>,
@@ -145,6 +152,11 @@ impl<T: Render> Context<T> {
         self.request_paint();
     }
 
+    pub fn select_text(&mut self, target: impl Into<FocusTarget>, selection: TextSelection) {
+        self.effects.text_selection = Some(TextSelectionRequest::new(target, selection));
+        self.request_paint();
+    }
+
     pub fn set_theme(&mut self, request: ThemeRequest) {
         self.effects.theme = Some(request);
         self.notify();
@@ -204,6 +216,9 @@ impl<T: Render> Context<T> {
         }
         if child.effects.focus.is_some() {
             self.effects.focus = child.effects.focus;
+        }
+        if child.effects.text_selection.is_some() {
+            self.effects.text_selection = child.effects.text_selection;
         }
         if child.effects.theme.is_some() {
             self.effects.theme = child.effects.theme;
@@ -540,6 +555,9 @@ fn merge_effects(target: &mut ContextEffects, mut source: ContextEffects) {
     if source.focus.is_some() {
         target.focus = source.focus.take();
     }
+    if source.text_selection.is_some() {
+        target.text_selection = source.text_selection.take();
+    }
     if source.theme.is_some() {
         target.theme = source.theme.take();
     }
@@ -561,38 +579,4 @@ pub enum ViewUpdate {
     None,
     Paint,
     Rebuild,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct LayoutBounds {
-    pub node: NodeId,
-    pub key: Option<String>,
-    pub bounds: Rect,
-}
-
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct LayoutSnapshot {
-    pub viewport: Rect,
-    pub nodes: Vec<LayoutBounds>,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct ScrollRequest {
-    pub key: String,
-    pub offset: Point,
-}
-
-impl LayoutSnapshot {
-    #[must_use]
-    pub fn bounds(&self, key: &str) -> Option<Rect> {
-        self.nodes
-            .iter()
-            .find(|node| node.key.as_deref() == Some(key))
-            .map(|node| node.bounds)
-    }
-
-    #[must_use]
-    pub const fn viewport_size(&self) -> Size {
-        self.viewport.size
-    }
 }

@@ -293,6 +293,7 @@ impl Application {
         let mut clipboard = update.clipboard.clone();
         let mut scroll_request = None;
         let mut focus_request = None;
+        let mut text_selection_request = None;
         let mut theme_request = None;
         let mut rebuild = false;
         for event in &update.events {
@@ -313,6 +314,9 @@ impl Application {
                 if effects.focus.is_some() {
                     focus_request = effects.focus;
                 }
+                if effects.text_selection.is_some() {
+                    text_selection_request = effects.text_selection;
+                }
                 if effects.theme.is_some() {
                     theme_request = effects.theme;
                 }
@@ -327,6 +331,8 @@ impl Application {
         self.pending_ui_frame.merge(&update, rebuild);
         self.pending_ui_frame.request_scroll(scroll_request);
         self.pending_ui_frame.request_focus(focus_request);
+        self.pending_ui_frame
+            .request_text_selection(text_selection_request);
         if self.pending_ui_frame.needs_frame() || animation_changed {
             window.request_redraw();
         }
