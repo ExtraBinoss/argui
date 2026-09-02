@@ -6,8 +6,8 @@ use argui_paint::{
 };
 use argui_ui::{
     CursorIcon, Element, GestureSet, HitRegion, Interaction, PropertyKey, StateName, StateScopeId,
-    StateSelector, StateStyle, StyleTransition, TransitionDirection, TransitionRule, TreeUpdate,
-    UiTree, VisualState, length, property,
+    StateSelector, StyleCondition, StylePatch, StyleTransition, TransitionDirection,
+    TransitionRule, TreeUpdate, UiTree, VisualState, length, property,
 };
 
 fn region(node: argui_ui::NodeId) -> HitRegion {
@@ -16,6 +16,8 @@ fn region(node: argui_ui::NodeId) -> HitRegion {
         bounds: Rect::new(Point::default(), Size::new(100.0, 40.0)),
         transform: Affine2D::IDENTITY,
         clips: ClipChain::default(),
+        shape: argui_ui::HitShape::Bounds,
+        slop: argui_ui::HitTestStyle::default().slop,
         enabled: true,
         focusable: true,
         cursor: CursorIcon::Pointer,
@@ -33,11 +35,58 @@ fn interactive() -> Element {
         .keyed("surface")
         .background(black())
         .interaction(Interaction::default().focusable(true))
-        .state(
+        .when(
             VisualState::Hovered,
-            StateStyle::new().set(property::BackgroundColor, Color::WHITE),
+            StylePatch::new().set(property::BackgroundColor, Color::WHITE),
         )
         .transition(tween())
+}
+
+#[test]
+fn compound_conditions_compose_all_any_and_not() {
+    let selected = StateName::new("selected");
+    let blocked = StateName::new("blocked");
+    let condition = StyleCondition::all([
+        StyleCondition::state(selected),
+        !StyleCondition::state(blocked),
+        StyleCondition::any([
+            StyleCondition::state(selected),
+            StyleCondition::state(VisualState::Hovered),
+        ]),
+    ]);
+    let element = Element::container([])
+        .active_state(selected, true)
+        .when(condition, StylePatch::new().set(property::Opacity, 0.35));
+    let mut tree = UiTree::new(element.clone());
+    let node = tree.node_ids()[0];
+    assert!((tree.resolved_quad(node, &element).opacity - 0.35).abs() < 0.001);
+
+    let blocked_element = element.active_state(blocked, true);
+    tree.update(blocked_element.clone());
+    assert!((tree.resolved_quad(node, &blocked_element).opacity - 1.0).abs() < 0.001);
+}
+
+#[test]
+fn inherited_state_promotes_the_retained_update_to_layout() {
+    let scope = StateScopeId::new("layout-owner");
+    let expanded = StateName::new("expanded");
+    let child = Element::container([]).when(
+        StateSelector::scope(scope, expanded),
+        StylePatch::new().set(property::WidthPx, 240.0),
+    );
+    let root = Element::container([child.clone()])
+        .state_scope(scope)
+        .active_state(expanded, false);
+    let mut tree = UiTree::new(root);
+
+    let update = tree.update(
+        Element::container([child])
+            .state_scope(scope)
+            .active_state(expanded, true),
+    );
+
+    assert_eq!(update, TreeUpdate::Layout);
+    assert!(tree.layout_dirty());
 }
 
 #[test]
@@ -97,9 +146,9 @@ fn composed_and_inherited_states_keep_each_property() {
     let child = Element::container([])
         .keyed("child")
         .background(black())
-        .state(
+        .when(
             StateSelector::scope(scope, VisualState::Hovered),
-            StateStyle::new()
+            StylePatch::new()
                 .set(property::BackgroundColor, Color::WHITE)
                 .set(property::Opacity, 0.6),
         );
@@ -122,13 +171,13 @@ fn descendant_interaction_and_named_state_compose_in_declaration_order() {
     let selected = StateName::new("selected");
     let child = Element::container([])
         .background(black())
-        .state(
+        .when(
             StateSelector::scope(scope, selected),
-            StateStyle::new().set(property::BackgroundColor, Color::WHITE),
+            StylePatch::new().set(property::BackgroundColor, Color::WHITE),
         )
-        .state(
+        .when(
             StateSelector::scope(scope, VisualState::Hovered),
-            StateStyle::new()
+            StylePatch::new()
                 .set(property::BackgroundColor, Color::rgb(1.0, 0.0, 0.0))
                 .set(property::Opacity, 0.7),
         );
@@ -148,9 +197,9 @@ fn descendant_interaction_and_named_state_compose_in_declaration_order() {
 fn a_nested_scope_with_the_same_identity_shadows_its_ancestor() {
     let scope = StateScopeId::new("nested-control");
     let outer = StateName::new("outer");
-    let leaf = Element::container([]).state(
+    let leaf = Element::container([]).when(
         StateSelector::scope(scope, outer),
-        StateStyle::new().set(property::Opacity, 0.2),
+        StylePatch::new().set(property::Opacity, 0.2),
     );
     let inner = Element::container([leaf]).state_scope(scope);
     let root = Element::container([inner])
@@ -167,13 +216,13 @@ fn focus_overrides_hover_without_waiting_for_pointer_exit() {
     let element = Element::container([])
         .border(argui_paint::Border::all(1.0, black()))
         .interaction(Interaction::default().focusable(true))
-        .state(
+        .when(
             VisualState::Hovered,
-            StateStyle::new().set(property::BorderColor, Color::WHITE),
+            StylePatch::new().set(property::BorderColor, Color::WHITE),
         )
-        .state(
+        .when(
             VisualState::Focused,
-            StateStyle::new().set(property::BorderColor, focused),
+            StylePatch::new().set(property::BorderColor, focused),
         );
     let mut tree = UiTree::new(element.clone());
     let node = tree.node_ids()[0];
@@ -198,9 +247,9 @@ fn layout_states_invalidate_layout_and_reduced_motion_snaps() {
     let element = Element::container([])
         .width(length(100.0))
         .interaction(Interaction::default())
-        .state(
+        .when(
             VisualState::Hovered,
-            StateStyle::new().set(property::WidthPx, 200.0),
+            StylePatch::new().set(property::WidthPx, 200.0),
         )
         .transition(tween());
     let mut tree = UiTree::new(element.clone());
@@ -219,9 +268,9 @@ fn layout_states_invalidate_layout_and_reduced_motion_snaps() {
 fn scroll_state_animates_from_the_retained_offset() {
     let element = Element::container([])
         .interaction(Interaction::default())
-        .state(
+        .when(
             VisualState::Hovered,
-            StateStyle::new().set(property::Scroll, Point::new(0.0, 100.0)),
+            StylePatch::new().set(property::Scroll, Point::new(0.0, 100.0)),
         )
         .transition(tween());
     let mut tree = UiTree::new(element);
@@ -250,9 +299,9 @@ fn gradient_components_are_retained_and_animated() {
             ..argui_paint::QuadStyle::default()
         }))
         .interaction(Interaction::default())
-        .state(
+        .when(
             VisualState::Hovered,
-            StateStyle::new()
+            StylePatch::new()
                 .set(property::LinearGradientStart, Point::new(1.0, 1.0))
                 .set(property::gradient_stop_offset(0), 0.2)
                 .set(property::gradient_stop_color(1), Color::rgb(1.0, 0.0, 0.0)),
@@ -294,9 +343,9 @@ fn radial_gradient_state_updates_each_compatible_component() {
             ..argui_paint::QuadStyle::default()
         }))
         .interaction(Interaction::default().enabled(false))
-        .state(
+        .when(
             VisualState::Disabled,
-            StateStyle::new()
+            StylePatch::new()
                 .set(property::RadialGradientCenter, Point::new(0.25, 0.75))
                 .set(property::RadialGradientRadius, Point::new(0.8, 0.4))
                 .set(property::gradient_stop_offset(0), 0.1)
@@ -343,7 +392,7 @@ fn layer_and_custom_effect_properties_animate_from_the_authored_values() {
         .mask(LayerMask::Rounded(CornerRadii::all(2.0)))
         .shadow(Shadow::drop([0.0, 0.0], 2.0, black()))
         .filter(Filter::Effect(effect));
-    let state = StateStyle::new()
+    let state = StylePatch::new()
         .set(property::LayerOpacity, 0.5)
         .set(property::LayerMaskRadii, [10.0; 4])
         .set(property::shadow_offset(0), [4.0, 6.0])
@@ -361,7 +410,7 @@ fn layer_and_custom_effect_properties_animate_from_the_authored_values() {
     let element = Element::container([])
         .interaction(Interaction::default())
         .layer(layer.clone())
-        .state(VisualState::Hovered, state)
+        .when(VisualState::Hovered, state)
         .transition(tween());
     let mut tree = UiTree::new(element.clone());
     let node = tree.node_ids()[0];
@@ -411,9 +460,9 @@ fn transition_rules_are_directional_specific_and_last_rule_wins() {
         );
     let element = Element::container([])
         .interaction(Interaction::default())
-        .state(
+        .when(
             VisualState::Hovered,
-            StateStyle::new().set(property::Opacity, 0.0),
+            StylePatch::new().set(property::Opacity, 0.0),
         )
         .transition(transition);
     let mut tree = UiTree::new(element.clone());
@@ -428,13 +477,13 @@ fn transition_rules_are_directional_specific_and_last_rule_wins() {
 fn repeated_properties_replace_and_disabled_state_composes_on_mount() {
     let element = Element::container([])
         .interaction(Interaction::default().enabled(false))
-        .state(
+        .when(
             VisualState::Pressed,
-            StateStyle::new().set(property::Opacity, 0.1),
+            StylePatch::new().set(property::Opacity, 0.1),
         )
-        .state(
+        .when(
             VisualState::Disabled,
-            StateStyle::new()
+            StylePatch::new()
                 .set(property::Opacity, 0.8)
                 .set(property::Opacity, 0.3)
                 .set(

@@ -18,6 +18,9 @@ pub(crate) fn classify_update(
     if old.key != new.key
         || kind_changes_layout(&old.kind, &new.kind)
         || old.style != new.style
+        || old.container_scope != new.container_scope
+        || (old.scroll != new.scroll
+            && (old.has_container_queries() || new.has_container_queries()))
         || old.scroll.is_some() != new.scroll.is_some()
         || old.overlay != new.overlay
         || old.children.len() != new.children.len()
@@ -67,8 +70,10 @@ fn visual_changed(old: &Element, new: &Element) -> bool {
         || old.transform != new.transform
         || old.transform_origin != new.transform_origin
         || old.interaction != new.interaction
+        || old.hit_test != new.hit_test
         || old.style_transition != new.style_transition
         || old.state_scope != new.state_scope
+        || old.container_scope != new.container_scope
         || old.active_states != new.active_states
         || old.layer != new.layer
         || old.effects != new.effects
@@ -77,18 +82,24 @@ fn visual_changed(old: &Element, new: &Element) -> bool {
 }
 
 fn state_update(old: &Element, new: &Element) -> TreeUpdate {
-    if old.state_styles == new.state_styles
+    if old.conditional_styles == new.conditional_styles
         && old.style_transition == new.style_transition
         && old.state_scope == new.state_scope
+        && old.container_scope == new.container_scope
         && old.active_states == new.active_states
         && old.interaction == new.interaction
     {
         return TreeUpdate::None;
     }
-    old.state_styles
+    if old.conditional_styles.has_container_queries()
+        || new.conditional_styles.has_container_queries()
+    {
+        return TreeUpdate::Layout;
+    }
+    old.conditional_styles
         .impact()
         .into_iter()
-        .chain(new.state_styles.impact())
+        .chain(new.conditional_styles.impact())
         .fold(TreeUpdate::Paint, |update, impact| {
             strongest_update(
                 update,
@@ -118,7 +129,7 @@ fn binding_update(old: &Element, new: &Element) -> TreeUpdate {
         })
 }
 
-fn strongest_update(left: TreeUpdate, right: TreeUpdate) -> TreeUpdate {
+pub(crate) fn strongest_update(left: TreeUpdate, right: TreeUpdate) -> TreeUpdate {
     if update_priority(left) >= update_priority(right) {
         left
     } else {

@@ -6,6 +6,37 @@ use super::UiTree;
 
 impl UiTree {
     #[must_use]
+    pub fn resolved_text_style(
+        &self,
+        node: NodeId,
+        style: &argui_text::TextStyle,
+    ) -> argui_text::TextStyle {
+        let mut style = style.clone();
+        style.color = self.resolved_text_color(node, style.color);
+        style
+    }
+
+    #[must_use]
+    pub fn resolved_text_color(
+        &self,
+        node: NodeId,
+        mut color: argui_core::Color,
+    ) -> argui_core::Color {
+        super::transition::apply_text_color(&self.transitions, node, &mut color);
+        color
+    }
+
+    #[must_use]
+    pub fn resolved_vector_color(
+        &self,
+        node: NodeId,
+        mut color: argui_core::Color,
+    ) -> argui_core::Color {
+        super::transition::apply_vector_color(&self.transitions, node, &mut color);
+        color
+    }
+
+    #[must_use]
     pub fn resolved_quad(&self, node: NodeId, element: &Element) -> QuadStyle {
         let mut resolved = element.paint.quad.clone();
         super::transition::apply_quad(&self.transitions, node, &mut resolved);

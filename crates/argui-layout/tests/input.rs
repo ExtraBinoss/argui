@@ -4,12 +4,12 @@ use argui_core::{
 };
 use argui_layout::{LayoutEngine, TextInputRegion};
 use argui_paint::{PaintStyle, QuadStyle};
-use argui_text::{CaretStop, TextEngine, TextStyle};
+use argui_text::{CaretStop, TextEngine, TextOverflow, TextStyle};
 use argui_ui::{
     Element, GestureKind, Resizable, ScrollbarPartStyle, ScrollbarStyle, Sides, UiEventKind,
     UiTree, length, percent, scrollbar_at,
 };
-use argui_widgets::{InputStyle, TextArea};
+use argui_widgets::{Input, InputStyle, TextArea};
 
 const NOTO_SANS: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
 
@@ -195,6 +195,41 @@ fn text_area_shapes_and_clips_scrollable_content_with_a_live_scrollbar() {
     layout.apply_scroll(&ui, &mut output).unwrap();
     assert!(output.text.blocks()[0].bounds.origin.y > before);
     assert!(output.scroll_regions[0].scrollbar.is_some());
+}
+
+#[test]
+fn a_single_line_input_clips_its_text_after_a_retained_resize() {
+    let input = Input::new(
+        "search",
+        "",
+        "Search components with a deliberately long placeholder",
+        InputStyle::new(PaintStyle::default(), TextStyle::default()),
+    )
+    .build()
+    .height(length(40.0));
+    let mut ui = UiTree::new(Element::column([input]).width(percent(0.5)));
+    let mut layout = LayoutEngine::new();
+    let mut text = text_engine();
+
+    let wide = layout
+        .compute(&mut ui, &mut text, Size::new(420.0, 80.0))
+        .unwrap();
+    let narrow = layout
+        .compute(&mut ui, &mut text, Size::new(220.0, 80.0))
+        .unwrap();
+    let wide_region = &wide.text_inputs[0];
+    let narrow_region = &narrow.text_inputs[0];
+    let block = &narrow.text.blocks()[0];
+
+    assert!(narrow_region.bounds.size.width < wide_region.bounds.size.width);
+    assert_eq!(narrow_region.clip, narrow_region.bounds);
+    assert_eq!(block.clip, narrow_region.clip);
+    assert_eq!(block.bounds, narrow_region.viewport);
+    assert_eq!(block.style.overflow, TextOverflow::Ellipsis);
+    assert!(
+        narrow_region.clip.origin.x + narrow_region.clip.size.width
+            < narrow.viewport.origin.x + narrow.viewport.size.width
+    );
 }
 
 #[test]

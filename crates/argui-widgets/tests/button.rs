@@ -77,6 +77,8 @@ fn button_hover_uses_the_shared_retained_visual_state_path() {
             bounds: Rect::new(Point::default(), Size::new(20.0, 20.0)),
             transform: Affine2D::IDENTITY,
             clips: ClipChain::default(),
+            shape: argui_ui::HitShape::Bounds,
+            slop: argui_ui::HitTestStyle::default().slop,
             enabled: true,
             focusable: true,
             cursor: CursorIcon::Pointer,

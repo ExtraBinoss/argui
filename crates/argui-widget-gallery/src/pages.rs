@@ -22,6 +22,7 @@ use crate::{
 };
 
 mod buttons;
+mod composition;
 mod inputs;
 
 pub(crate) fn render(
@@ -46,6 +47,7 @@ pub(crate) fn render(
         Page::Layout => layout_system(theme),
         Page::Motion => motion(theme, spinner),
         Page::Effects => effects(theme),
+        Page::Composition => composition::render(gallery, theme, assets),
     };
     Element::column([
         Element::column([
@@ -452,5 +454,6 @@ const fn description(page: Page) -> &'static str {
         Page::Layout => "CSS-shaped Block, Flex, Grid, box model and text alignment.",
         Page::Motion => "Frame-paced feedback and interaction transitions.",
         Page::Effects => "Custom WGSL through the generic effect registry.",
+        Page::Composition => "Compound state, responsive layout and exact hit geometry.",
     }
 }

@@ -5,7 +5,7 @@ use argui_paint::{CornerRadii, DisplayCommand, LayerStyle, QuadStyle};
 use argui_text::TextEngine;
 use argui_ui::{
     Axes, Color, Element, Overflow, ScrollConfig, ScrollbarPartStyle, ScrollbarStyle, Sides,
-    StateStyle, StyleTransition, Transition, UiTree, VisualState, length, property,
+    StylePatch, StyleTransition, Transition, UiTree, VisualState, length, property,
 };
 
 const NOTO_SANS: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
@@ -80,9 +80,9 @@ fn scrollbar_state_transition_repaints_the_resolved_thumb() {
     let style = ScrollbarStyle::new(
         ScrollbarPartStyle::new(QuadStyle::default()),
         ScrollbarPartStyle::new(QuadStyle::solid(Color::WHITE))
-            .state(
+            .when(
                 VisualState::Hovered,
-                StateStyle::new().set(property::BackgroundColor, hovered),
+                StylePatch::new().set(property::BackgroundColor, hovered),
             )
             .transition(StyleTransition::new(Transition::tween(Tween::new(
                 Duration::from_millis(100),

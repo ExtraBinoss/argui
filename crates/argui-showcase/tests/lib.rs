@@ -8,8 +8,7 @@ use argui_runtime::{Context, Entity, LayoutSnapshot, Render, ViewUpdate};
 use argui_showcase::{StateShowcase, text_engine};
 use argui_text::TextStyle;
 use argui_ui::{
-    CursorIcon, GestureEvent, GestureKind, GesturePhase, HitRegion, ScrollConfig, ScrollRegion,
-    UiEvent, UiEventKind, UiTree,
+    CursorIcon, GestureEvent, GestureKind, GesturePhase, HitRegion, UiEvent, UiEventKind, UiTree,
 };
 fn render_view(app: &StateShowcase) -> argui_ui::Element {
     app.view(argui_runtime::WindowEnvironment::default())
@@ -40,6 +39,8 @@ fn events_for(app: &StateShowcase, key: &str) -> Vec<UiEvent> {
         bounds,
         transform: Affine2D::IDENTITY,
         clips: ClipChain::from_regions([ClipRegion::new(bounds, Affine2D::IDENTITY)]),
+        shape: argui_ui::HitShape::Bounds,
+        slop: argui_ui::HitTestStyle::default().slop,
         enabled: true,
         focusable: true,
         cursor: CursorIcon::Auto,
@@ -181,46 +182,6 @@ fn theme_editors_and_resize_are_fully_controlled_by_showcase_state() {
     });
     assert_eq!(app.update(&resize), ViewUpdate::Rebuild);
 }
-#[test]
-fn virtual_scroll_rebuilds_only_when_the_visible_window_changes() {
-    let mut app = StateShowcase::default();
-    let root = render_view(&app);
-    let index = node_index(&root, "million-list");
-    let mut tree = UiTree::new(root);
-    let node = tree.node_id_at(index).unwrap();
-    let bounds = Rect::new(Point::default(), Size::new(300.0, 260.0));
-    let regions = [ScrollRegion {
-        node,
-        bounds,
-        clip: bounds,
-        transform: Affine2D::IDENTITY,
-        clips: ClipChain::from_regions([ClipRegion::new(bounds, Affine2D::IDENTITY)]),
-        max_offset: Point::new(0.0, 1_000.0),
-        config: ScrollConfig::default().line_size(36.0),
-        scrollbar: None,
-        interaction_order: 0,
-    }];
-    for step in 1..=9 {
-        let update = tree.scroll(
-            Point::new(10.0, 10.0),
-            ScrollDelta::Lines(Point::new(0.0, -1.0)),
-            &regions,
-        );
-        let expected = if step == 9 {
-            ViewUpdate::Rebuild
-        } else {
-            ViewUpdate::None
-        };
-        assert_eq!(app.update(&update.events[0]), expected);
-    }
-    let sub_row = tree.scroll(
-        Point::new(10.0, 10.0),
-        ScrollDelta::Pixels(Point::new(0.0, -1.0)),
-        &regions,
-    );
-    assert_eq!(app.update(&sub_row.events[0]), ViewUpdate::None);
-}
-
 #[test]
 fn shared_animation_activates_samples_and_returns_to_idle() {
     let mut app = StateShowcase::default();

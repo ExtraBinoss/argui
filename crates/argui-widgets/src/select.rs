@@ -2,7 +2,7 @@ use argui_paint::{Border, CornerRadii, PaintStyle, QuadStyle};
 use argui_text::{TextStyle, TextWrap};
 use argui_ui::{
     AlignItems, Axes, Element, FocusScope, InitialFocus, JustifyContent, Overflow, OverlayAlign,
-    OverlayPlacement, PlacementSide, ScrollConfig, StateStyle, StyleTransition, VisualState,
+    OverlayPlacement, PlacementSide, ScrollConfig, StylePatch, StyleTransition, VisualState,
     length, percent,
 };
 
@@ -105,8 +105,8 @@ impl Select {
                 .align_items(AlignItems::CENTER)
                 .justify_content(JustifyContent::SPACE_BETWEEN)
                 .paint_style(self_theme_input(theme))
-                .state(VisualState::Hovered, theme.input.hovered.clone())
-                .state(VisualState::FocusVisible, theme.input.focused.clone())
+                .when(VisualState::Hovered, theme.input.hovered.clone())
+                .when(VisualState::FocusVisible, theme.input.focused.clone())
                 .transition(theme.input.transition.clone()),
         );
         let overlay = self.open.then(|| self.overlay(theme));
@@ -147,9 +147,9 @@ impl Select {
                     argui_core::Color::TRANSPARENT
                 })
                 .radius(CornerRadii::all(5.0))
-                .state(
+                .when(
                     VisualState::Hovered,
-                    StateStyle::from_quad(
+                    StylePatch::from_quad(
                         QuadStyle::solid(theme.muted).radius(CornerRadii::all(5.0)),
                     ),
                 )

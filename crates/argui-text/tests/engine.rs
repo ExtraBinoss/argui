@@ -1,5 +1,5 @@
 use argui_core::{Point, Rect, Size};
-use argui_text::{FontFamily, TextBlock, TextEngine, TextScene, TextStyle, TextWrap};
+use argui_text::{FontFamily, TextBlock, TextEngine, TextOverflow, TextScene, TextStyle, TextWrap};
 
 const NOTO_SANS: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
 const NOTO_ARABIC: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSansArabic.ttf");
@@ -76,6 +76,61 @@ fn no_wrap_labels_keep_their_intrinsic_width() {
     assert!(wrapped_size.height > wrapped.line_height);
     assert!(unwrapped_size.width > 55.0);
     assert_eq!(unwrapped_size.height, unwrapped.line_height);
+}
+
+#[test]
+fn ellipsis_replaces_overflowing_graphemes_and_tracks_available_width() {
+    let mut engine =
+        TextEngine::from_embedded_fonts([NOTO_SANS], "Noto Sans", "Noto Sans", "Noto Sans");
+    let clipped_style = TextStyle {
+        wrap: TextWrap::None,
+        ..TextStyle::default()
+    };
+    let ellipsis_style = TextStyle {
+        overflow: TextOverflow::Ellipsis,
+        ..clipped_style.clone()
+    };
+    let scene = |text: &str, width: f32, style: TextStyle| {
+        let mut block = TextBlock::new(text, bounds(0.0, 0.0, width, 24.0));
+        block.style = style;
+        TextScene::new().with(block)
+    };
+
+    let clipped = engine.prepare(
+        &scene("Search components with accents é🙂", 110.0, clipped_style),
+        1.0,
+    );
+    let shortened = engine.prepare(
+        &scene("Search components with accents é🙂", 110.0, ellipsis_style),
+        1.0,
+    );
+    let mark = engine.prepare(
+        &scene(
+            "…",
+            110.0,
+            TextStyle {
+                wrap: TextWrap::None,
+                ..TextStyle::default()
+            },
+        ),
+        1.0,
+    );
+    let wide = engine.prepare(
+        &scene(
+            "Search components with accents é🙂",
+            500.0,
+            TextStyle {
+                wrap: TextWrap::None,
+                overflow: TextOverflow::Ellipsis,
+                ..TextStyle::default()
+            },
+        ),
+        1.0,
+    );
+
+    assert!(shortened.glyphs.len() < clipped.glyphs.len());
+    assert_eq!(shortened.glyphs.last().unwrap().key, mark.glyphs[0].key);
+    assert_eq!(wide.glyphs.len(), clipped.glyphs.len());
 }
 
 #[test]

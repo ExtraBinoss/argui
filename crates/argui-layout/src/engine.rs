@@ -1,8 +1,5 @@
 use crate::{
-    LayoutError, TextInputRegion,
-    assets::{AssetMetrics, resolve_intrinsic},
-    input, paint, scroll,
-    style::taffy_style,
+    LayoutError, TextInputRegion, assets::AssetMetrics, input, paint, scroll, style::taffy_style,
 };
 use argui_core::{Point, Rect, Size};
 use argui_paint::{DisplayList, ImageAsset, VectorAsset};
@@ -10,10 +7,9 @@ use argui_text::{TextBlock, TextEngine, TextScene};
 use argui_ui::{
     Element, ElementKind, HitRegion, LayoutStyle, NodeId as UiNodeId, ScrollRegion, UiTree,
 };
-use taffy::{
-    AvailableSpace, NodeId, TaffyTree, compute_leaf_layout, geometry::Size as TaffySize,
-    tree::LayoutOutput as TaffyLayoutOutput,
-};
+use taffy::{NodeId, TaffyTree};
+
+mod compute;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct LayoutNode {
@@ -101,115 +97,6 @@ impl LayoutEngine {
                 .mark_dirty(root.id)
                 .expect("the retained layout root belongs to its Taffy tree");
         }
-    }
-
-    pub fn compute(
-        &mut self,
-        ui: &mut UiTree,
-        text_engine: &mut TextEngine,
-        viewport: Size,
-    ) -> Result<LayoutOutput, LayoutError> {
-        if self.revision != Some(ui.revision()) {
-            self.sync_or_rebuild(ui)?;
-        }
-        for index in ui.layout_animation_indices() {
-            let Some(id) = self.nodes_by_index.get(index).copied() else {
-                return Err(LayoutError::MissingNodeIdentity(index));
-            };
-            let Some(element) = ui.element_at(index) else {
-                return Err(LayoutError::MissingNodeIdentity(index));
-            };
-            let node = ui
-                .node_id_at(index)
-                .ok_or(LayoutError::MissingNodeIdentity(index))?;
-            let style = ui.resolved_layout_style(node, element);
-            self.tree.set_style(id, taffy_style(&style))?;
-        }
-        let elements = flattened(ui.root());
-        let root = self.root.as_ref().ok_or(LayoutError::MissingRoot)?;
-        self.tree.compute_layout_with_measure(
-            root.id,
-            TaffySize {
-                width: AvailableSpace::Definite(viewport.width),
-                height: AvailableSpace::Definite(viewport.height),
-            },
-            |inputs, _, context, style| {
-                let index = context.as_deref().copied();
-                let intrinsic =
-                    index.and_then(|index| self.assets.intrinsic(&elements[index].kind));
-                let text = index.and_then(|index| {
-                    let node = ui.node_id_at(index)?;
-                    let (content, text_style) = crate::text::content(ui, node, elements[index])?;
-                    let width = inputs
-                        .known_dimensions
-                        .width
-                        .or_else(|| inputs.available_space.width.into_option());
-                    Some(text_engine.measure_layout(&content, text_style, width))
-                });
-                if index.is_some_and(|index| {
-                    matches!(
-                        elements[index].kind,
-                        ElementKind::Text { .. } | ElementKind::TextEditor { .. }
-                    )
-                }) {
-                    debug_assert!(
-                        text.is_some_and(|measurement| measurement.first_baseline.is_some())
-                    );
-                }
-                let baselines = text.map_or(taffy::tree::Baselines::NONE, |measurement| {
-                    taffy::tree::Baselines {
-                        first: measurement.first_baseline,
-                        last: measurement.last_baseline,
-                    }
-                });
-                let size = compute_leaf_layout(
-                    inputs,
-                    style,
-                    |_, _| 0.0,
-                    |known, available| {
-                        if let Some(intrinsic) = intrinsic {
-                            return resolve_intrinsic(known, intrinsic);
-                        }
-                        let Some(measured) = text else {
-                            return TaffySize::ZERO;
-                        };
-                        let _ = available;
-                        TaffySize {
-                            width: known.width.unwrap_or(measured.size.width),
-                            height: known.height.unwrap_or(measured.size.height),
-                        }
-                    },
-                );
-                TaffyLayoutOutput { baselines, ..size }
-            },
-        )?;
-
-        let mut output = LayoutOutput {
-            viewport: Rect::new(Point::default(), viewport),
-            ..LayoutOutput::default()
-        };
-        collect_layout(
-            &self.tree,
-            root,
-            &elements,
-            ui,
-            text_engine,
-            Placement {
-                layout_parent: Point::default(),
-                translation: Point::default(),
-                clip: Some(Rect::new(Point::default(), viewport)),
-            },
-            &mut output,
-        )?;
-        crate::overlay::resolve(&self.tree, root, &elements, ui, &mut output)?;
-        drop(elements);
-        for region in &output.text_inputs {
-            ui.set_scroll_offset(region.node, Point::new(region.scroll_x, region.scroll_y));
-        }
-        ui.mark_text_input_layout_clean();
-        self.repaint(ui, &mut output);
-        ui.mark_layout_clean();
-        Ok(output)
     }
 
     pub fn apply_scroll(
@@ -389,11 +276,11 @@ fn collect_layout(
                     .max(0.0),
             ),
         );
-        let text_clip = scroll::clipped(node, placement.clip, bounds);
+        let text_clip = crate::text::clip(node, element, placement.clip, bounds);
         let text_clip = text_clip.unwrap_or_default();
         let mut block = TextBlock::new(content, text_bounds);
         block.clip = text_clip;
-        block.style = style.clone();
+        block.style = style.into_owned();
         if let Some((region, scroll)) = input::prepare(
             ui,
             node.node,
@@ -491,7 +378,7 @@ fn apply_scroll_layout(
             bounds.origin.x - previous_bounds.origin.x,
             bounds.origin.y - previous_bounds.origin.y,
         );
-        let text_clip = scroll::clipped(node, clip, bounds).unwrap_or_default();
+        let text_clip = crate::text::clip(node, element, clip, bounds).unwrap_or_default();
         let mut content_delta = Point::default();
         if let Some(region) = output
             .text_inputs

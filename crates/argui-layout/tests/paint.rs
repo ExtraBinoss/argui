@@ -3,8 +3,8 @@ use argui_layout::LayoutEngine;
 use argui_paint::{Border, Color, DisplayCommand, ImageFit, LayerStyle, VectorId};
 use argui_text::TextEngine;
 use argui_ui::{
-    Axes, CornerRadii, CursorIcon, Element, ImageId, Interaction, Overflow, Transform2D,
-    TransformOrigin, UiTree, length,
+    Axes, CornerRadii, CursorIcon, Element, HitTestStyle, ImageId, Interaction, Overflow,
+    PointerEvents, StylePatch, Transform2D, TransformOrigin, UiTree, VisualState, length, property,
 };
 
 const NOTO_SANS: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
@@ -35,6 +35,59 @@ fn plain_elements_keep_one_combined_quad_and_no_layers() {
             DisplayCommand::Text { block: 0, .. }
         ]
     ));
+}
+
+#[test]
+fn pointer_event_policy_controls_own_and_descendant_regions() {
+    let output_for = |pointer_events| {
+        let child = Element::container([])
+            .width(length(20.0))
+            .height(length(20.0))
+            .interaction(Interaction::default());
+        let root = Element::container([child])
+            .width(length(40.0))
+            .height(length(40.0))
+            .interaction(Interaction::default())
+            .hit_test(HitTestStyle::default().pointer_events(pointer_events));
+        let mut ui = UiTree::new(root);
+        LayoutEngine::new()
+            .compute(&mut ui, &mut text_engine(), Size::new(100.0, 100.0))
+            .unwrap()
+            .hit_regions
+    };
+
+    assert_eq!(output_for(PointerEvents::Auto).len(), 2);
+    assert_eq!(output_for(PointerEvents::None).len(), 0);
+    assert_eq!(output_for(PointerEvents::BoxOnly).len(), 1);
+    assert_eq!(output_for(PointerEvents::ContentsOnly).len(), 1);
+}
+
+#[test]
+fn paint_only_text_color_updates_without_reshaping() {
+    let root = Element::text("Retained glyphs")
+        .width(length(140.0))
+        .height(length(30.0))
+        .interaction(Interaction::default())
+        .when(
+            VisualState::Hovered,
+            StylePatch::new().set(property::TextColor, Color::rgb(0.9, 0.2, 0.3)),
+        );
+    let mut ui = UiTree::new(root);
+    let mut layout = LayoutEngine::new();
+    let mut output = layout
+        .compute(&mut ui, &mut text_engine(), Size::new(200.0, 80.0))
+        .unwrap();
+    let bounds = output.text.blocks()[0].bounds;
+
+    let update = ui.pointer_moved(Point::new(10.0, 10.0), &output.hit_regions);
+    assert!(update.paint_changed);
+    layout.repaint(&ui, &mut output);
+
+    assert_eq!(output.text.blocks()[0].bounds, bounds);
+    assert_eq!(
+        output.text.blocks()[0].style.color,
+        Color::rgb(0.9, 0.2, 0.3)
+    );
 }
 
 #[test]

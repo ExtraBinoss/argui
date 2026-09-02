@@ -4,7 +4,7 @@ use crate::interaction::{InteractionState, RawUpdate};
 use crate::scroll::ScrollState;
 use crate::text_input::{TextInputState, TextInputStates};
 use crate::traversal::{flattened, nth_element};
-use crate::update::classify_update;
+use crate::update::{classify_update, strongest_update};
 use crate::{
     Element, ElementKind, GestureArena, HitRegion, InteractionUpdate, NodeId, TextSelectionRequest,
     UiEvent, UiEventKind, identity,
@@ -13,6 +13,7 @@ use crate::{
 mod animation;
 mod focus;
 mod resolve;
+mod responsive;
 mod scroll;
 mod transition;
 use animation::AnimationRegistry;
@@ -52,6 +53,9 @@ pub struct UiTree {
     update_stats: TreeUpdateStats,
     animations: AnimationRegistry,
     transitions: TransitionRegistry,
+    container_sizes: Vec<(NodeId, argui_core::Size)>,
+    container_indices: Vec<(NodeId, usize)>,
+    has_container_queries: bool,
     reduced_motion: bool,
 }
 
@@ -77,9 +81,13 @@ impl UiTree {
             update_stats: TreeUpdateStats::default(),
             animations,
             transitions: TransitionRegistry::default(),
+            container_sizes: Vec::new(),
+            container_indices: Vec::new(),
+            has_container_queries: false,
             reduced_motion: false,
         };
         tree.sync_text_inputs();
+        tree.sync_responsive_registry();
         tree.sync_transitions();
         tree
     }
@@ -156,6 +164,12 @@ impl UiTree {
                     .sync(&self.root, &self.node_ids, focused_before, removed_focus);
             }
         }
+        if update == TreeUpdate::Layout {
+            self.sync_responsive_registry();
+        }
+        let transition_update = self.sync_transitions();
+        let update = strongest_update(update, transition_update);
+        self.layout_dirty |= update == TreeUpdate::Layout;
         update
     }
 
@@ -539,7 +553,6 @@ impl UiTree {
 
     fn sync_animation_registry(&mut self) {
         self.animations = AnimationRegistry::new(&self.root);
-        self.sync_transitions();
     }
 
     fn element_for(&self, node: NodeId) -> Option<&Element> {

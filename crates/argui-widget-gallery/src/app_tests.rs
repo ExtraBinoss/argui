@@ -1,6 +1,8 @@
 use argui::{
     core::{Key, KeyInput, KeyState, Modifiers, Point, Rect, Size},
+    layout::LayoutEngine,
     runtime::{Context, LayoutBounds, Render, ViewUpdate},
+    text::TextEngine,
     theme::ThemeMode,
     ui::{GestureEvent, GestureKind, GesturePhase, UiEvent, UiEventKind, UiTree},
 };
@@ -51,6 +53,43 @@ fn every_gallery_route_builds_real_widget_content() {
 }
 
 #[test]
+fn gallery_scroll_viewport_ends_inside_the_window() {
+    let mut gallery = WidgetGallery {
+        page: Page::Composition,
+        ..WidgetGallery::default()
+    };
+    let root = Render::render(&mut gallery, &mut Context::default());
+    let images = Render::image_assets(&gallery);
+    let vectors = Render::vector_assets(&gallery);
+    let mut tree = UiTree::new(root);
+    let scroll_node = tree
+        .node_ids()
+        .iter()
+        .copied()
+        .find(|node| tree.key(*node) == Some("gallery-content-scroll"))
+        .unwrap();
+    let mut layout = LayoutEngine::new();
+    layout.set_assets(&images, &vectors);
+    let mut text =
+        TextEngine::from_embedded_fonts([crate::NOTO_SANS], "Noto Sans", "Noto Sans", "Noto Sans");
+
+    let output = layout
+        .compute(&mut tree, &mut text, Size::new(1_220.0, 780.0))
+        .unwrap();
+    let scroll = output
+        .scroll_regions
+        .iter()
+        .find(|region| region.node == scroll_node)
+        .unwrap();
+    let bottom = scroll.bounds.origin.y + scroll.bounds.size.height;
+    assert!(scroll.bounds.origin.y >= 64.0);
+    assert!(bottom <= 780.0);
+    if let Some(scrollbar) = &scroll.scrollbar {
+        assert!(scrollbar.track.origin.y + scrollbar.track.size.height <= 780.0);
+    }
+}
+
+#[test]
 fn controlled_values_navigation_theme_and_search_update_state() {
     let mut gallery = WidgetGallery::default();
     for (key, value) in [
@@ -84,10 +123,16 @@ fn controlled_values_navigation_theme_and_search_update_state() {
 #[test]
 fn widget_events_are_decoded_by_their_public_control_protocols() {
     let mut gallery = WidgetGallery::default();
-    for key in ["demo-button", "accepted", "notifications"] {
+    for key in [
+        "demo-button",
+        "composition-circle",
+        "accepted",
+        "notifications",
+    ] {
         dispatch(&mut gallery, &event(key, UiEventKind::Clicked));
     }
     assert_eq!(gallery.clicks, 1);
+    assert_eq!(gallery.composition_hits, 1);
     assert!(!gallery.accepted);
     assert!(!gallery.notifications);
 

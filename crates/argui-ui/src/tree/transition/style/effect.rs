@@ -1,9 +1,9 @@
 use argui_paint::{EffectValue, Filter, LayerStyle};
 
 use crate::state::StateValue;
-use crate::{EffectPropertyKey, PropertyKey, StatePropertyValue};
+use crate::{EffectPropertyKey, PropertyKey, StylePropertyValue};
 
-pub(super) fn effect_values(layer: &LayerStyle, values: &mut Vec<StatePropertyValue>) {
+pub(super) fn effect_values(layer: &LayerStyle, values: &mut Vec<StylePropertyValue>) {
     for filter in layer.filters.iter().chain(&layer.backdrop_filters) {
         let Filter::Effect(effect) = filter else {
             continue;
@@ -89,6 +89,6 @@ pub(super) fn apply_effect(layer: &mut LayerStyle, key: PropertyKey, value: &Sta
     }
 }
 
-const fn state(key: PropertyKey, value: StateValue) -> StatePropertyValue {
-    StatePropertyValue { key, value }
+const fn state(key: PropertyKey, value: StateValue) -> StylePropertyValue {
+    StylePropertyValue { key, value }
 }

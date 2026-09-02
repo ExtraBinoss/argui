@@ -4,7 +4,7 @@ use argui_paint::{ClipChain, ClipRegion};
 use argui_ui::{
     Axes, Color, CursorIcon, Element, GestureSet, HitRegion, Overflow, QuadStyle, ScrollChaining,
     ScrollConfig, ScrollPolarity, ScrollRegion, ScrollbarPartStyle, ScrollbarRegion,
-    ScrollbarStyle, StateName, StateScopeId, StateSelector, StateStyle, StyleTransition,
+    ScrollbarStyle, StateName, StateScopeId, StateSelector, StylePatch, StyleTransition,
     Transition, TreeUpdate, UiEventKind, UiTree, VisualState, property, scrollbar_at,
 };
 
@@ -29,6 +29,8 @@ fn hit_region(node: argui_ui::NodeId, bounds: Rect) -> HitRegion {
         bounds,
         transform: Affine2D::IDENTITY,
         clips: ClipChain::from_regions([ClipRegion::new(bounds, Affine2D::IDENTITY)]),
+        shape: argui_ui::HitShape::Bounds,
+        slop: argui_ui::HitTestStyle::default().slop,
         enabled: true,
         focusable: false,
         cursor: CursorIcon::Default,
@@ -177,15 +179,15 @@ fn scrollbar_parts_reuse_retained_state_transitions() {
     let style = ScrollbarStyle::new(
         ScrollbarPartStyle::new(QuadStyle::default()),
         ScrollbarPartStyle::new(QuadStyle::solid(base))
-            .state(
+            .when(
                 VisualState::Hovered,
-                StateStyle::new()
+                StylePatch::new()
                     .set(property::BackgroundColor, hovered)
                     .set(property::CornerRadii, [5.0; 4]),
             )
-            .state(
+            .when(
                 VisualState::Pressed,
-                StateStyle::new().set(property::Opacity, 0.7),
+                StylePatch::new().set(property::Opacity, 0.7),
             )
             .transition(StyleTransition::new(Transition::tween(Tween::new(
                 Duration::from_millis(100),
@@ -240,10 +242,10 @@ fn scrollbar_parts_share_named_and_scoped_state_resolution() {
     let style = ScrollbarStyle::new(
         ScrollbarPartStyle::new(QuadStyle::default()),
         ScrollbarPartStyle::new(QuadStyle::solid(Color::WHITE))
-            .state(active, StateStyle::new().set(property::Opacity, 0.6))
-            .state(
+            .when(active, StylePatch::new().set(property::Opacity, 0.6))
+            .when(
                 StateSelector::scope(scope, active),
-                StateStyle::new().set(property::BackgroundColor, selected),
+                StylePatch::new().set(property::BackgroundColor, selected),
             ),
     );
     let config = ScrollConfig::default().scrollbar(style);

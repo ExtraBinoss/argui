@@ -2,7 +2,7 @@ use argui_paint::{Border, Color, CornerRadii, QuadStyle};
 use argui_text::TextWrap;
 use argui_ui::{
     Element, Interaction, ScrollConfig, ScrollPolarity, ScrollbarPartStyle, ScrollbarStyle, Sides,
-    StateStyle, VirtualList, VisualState, sides,
+    StylePatch, VirtualList, VisualState, sides,
 };
 use argui_widgets::WidgetTheme;
 
@@ -66,9 +66,9 @@ impl StateShowcase {
                     .padding(sides(12.0, 8.0))
                     .background(background)
                     .interaction(Interaction::default())
-                    .state(
+                    .when(
                         VisualState::Hovered,
-                        StateStyle::from_quad(
+                        StylePatch::from_quad(
                             QuadStyle::solid(widgets.muted)
                                 .border(Border::all(1.0, widgets.primary)),
                         ),

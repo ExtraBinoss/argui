@@ -59,14 +59,14 @@ Application state can request the same operation imperatively with
 resolved after layout against enabled focus regions; missing, duplicate, or
 out-of-scope targets perform no implicit fallback.
 
-## Composed state styles
+## Conditional styles
 
 `Interaction` owns behavior only. Visuals are typed property patches attached
-with `Element::state`. Every rule has an `Own` or named-scope selector; all
+with `Element::when`. `StyleCondition` accepts an own or named-scope state, a
+named container query, or a nested `all`, `any`, and `not` expression. All
 matching rules compose in declaration order, so the last declaration for one
 property wins without discarding unrelated properties. `Element::transition`
-supplies one tween or spring default plus property- and direction-specific
-rules.
+supplies one tween or spring default plus property- and direction-specific rules.
 
 Paint, transform, scroll, and layout properties retain their exact invalidation
 class. An interaction color does not invoke Taffy; an animated width updates the
@@ -80,6 +80,17 @@ interaction contributes hover, focus, and press to that scope; named states
 come from the scope root. Nested controls with the same scope identity shadow
 their ancestor, which prevents an inner control from accidentally styling an
 outer recipe.
+
+`HitTestStyle` is independent from paint. `PointerEvents` can target the box,
+its descendants, both, or neither. `HitShape` provides bounds, rounded-rectangle,
+and ellipse geometry, and per-edge hit slop can enlarge a touch target without
+changing its layout or pixels. Transforms and every ancestor clip are applied
+before a target participates in reverse paint-order hit testing.
+
+Named container queries modify typed style or layout values on the same retained
+elements. Ordinary flex and grid layouts remain automatic; a query is only for
+a deliberate semantic adaptation such as changing a toolbar from a row to a
+column. See [responsive styling](styling.md) for convergence and invalidation.
 
 `Button` is a composition helper in `argui-ui`: one interactive container, one
 text child, layout style, paint styles, and no renderer-specific widget code.

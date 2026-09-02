@@ -170,7 +170,7 @@ their existing Taffy nodes without rebuilding the retained tree.
 - Expose reduced-motion behavior as application policy rather than a theme
   assumption.
 
-`StateStyle` is a sparse typed property patch shared by Rust builders and any
+`StylePatch` is a sparse typed property patch shared by Rust builders and any
 future DSL. `StyleTransition` selects a tween or spring globally and can
 override it by `PropertyKey`, state entry, or state exit. Focused, hovered,
 pressed, and disabled states compose deterministically. Incompatible values,
@@ -184,7 +184,8 @@ preserves spring velocity on retarget, and yields to explicit `Element::bind`
 motions as the final composition layer. `StateSelector` targets either the
 element itself or the nearest named `StateScopeId`; this lets arbitrary child
 content react to a control's hover, focus, press, disabled, or application-
-defined state without coupling the child to the widget recipe.
+defined state without coupling the child to the widget recipe. Conditions may
+also combine state and named container queries through `all`, `any`, and `not`.
 
 ### 8. Effects and shader parameters — implemented
 

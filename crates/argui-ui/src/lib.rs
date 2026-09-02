@@ -12,6 +12,7 @@ mod interaction;
 mod layout_builders;
 mod overlay;
 mod resize;
+mod responsive;
 mod scroll;
 mod semantics;
 mod state;
@@ -43,19 +44,20 @@ pub use element::{Element, ElementKind, TextEditorSpec};
 pub use focus::{FocusContainment, FocusRequest, FocusScope, FocusTarget, InitialFocus};
 pub use gesture::{GestureArena, GestureEvent, GestureKind, GesturePhase, GestureSet};
 pub use interaction::{
-    HitRegion, Interaction, InteractionUpdate, KeyboardActivation, NodeId, UiEvent, UiEventKind,
-    WindowDragBehavior,
+    HitRegion, HitShape, HitTestStyle, Interaction, InteractionUpdate, KeyboardActivation, NodeId,
+    PointerEvents, UiEvent, UiEventKind, WindowDragBehavior,
 };
 pub use overlay::{OverlayAlign, OverlayAnchor, OverlayPlacement, PlacedOverlay, PlacementSide};
 pub use resize::{Resizable, ResizeAxes, ResizeConfig, ResizeEvent, ResizeState};
+pub use responsive::{ContainerQuery, ContainerScopeId};
 pub use scroll::{
     ScrollAxes, ScrollChaining, ScrollConfig, ScrollPolarity, ScrollRegion, ScrollbarPartStyle,
     ScrollbarRegion, ScrollbarStyle, scrollbar_at,
 };
 pub use state::{
-    EffectPropertyKey, PropertyKey, State, StateName, StateProperty, StatePropertyValue,
-    StateScopeId, StateSelector, StateStyle, StyleTransition, TransitionDirection, TransitionRule,
-    VisualState, VisualStates,
+    EffectPropertyKey, PropertyKey, State, StateName, StateScopeId, StateSelector, StyleCondition,
+    StylePatch, StyleProperty, StylePropertyValue, StyleTransition, TransitionDirection,
+    TransitionRule, VisualState, VisualStates,
 };
 pub use style::{
     AlignContent, AlignItems, AlignSelf, AlignmentSafety, Axes, BoxSizing, Dimension, Dimensions,

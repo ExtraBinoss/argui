@@ -1,26 +1,35 @@
 use crate::{
-    Element, NodeId, State, StateName, StateScopeId, StateSelector, VisualState, VisualStates,
+    Element, NodeId, State, StateName, StateScopeId, StateSelector, StyleCondition, VisualState,
+    VisualStates,
 };
 
-pub(super) type ScopeStack = Vec<usize>;
+#[derive(Default)]
+pub(super) struct ScopeStack {
+    states: Vec<usize>,
+    containers: Vec<usize>,
+}
 
 #[derive(Debug)]
 pub(super) struct StateContext {
     nodes: Vec<NodeStates>,
     scopes: Vec<ResolvedScope>,
     scope_at: Vec<Option<usize>>,
+    containers: Vec<ResolvedContainer>,
+    container_at: Vec<Option<usize>>,
 }
 
 impl StateContext {
     pub(super) fn collect(
         root: &Element,
         ids: &[NodeId],
-        states_for: &impl Fn(NodeId) -> VisualStates,
+        states_for: &dyn Fn(NodeId) -> VisualStates,
     ) -> Self {
         let mut context = Self {
             nodes: Vec::with_capacity(ids.len()),
             scopes: Vec::new(),
             scope_at: vec![None; ids.len()],
+            containers: Vec::new(),
+            container_at: vec![None; ids.len()],
         };
         let mut index = 0;
         context.collect_element(root, &mut index, ids, states_for);
@@ -29,16 +38,27 @@ impl StateContext {
 
     pub(super) fn enter(&self, node: usize, stack: &mut ScopeStack) {
         if let Some(scope) = self.scope_at[node] {
-            stack.push(scope);
+            stack.states.push(scope);
+        }
+        if let Some(container) = self.container_at[node] {
+            stack.containers.push(container);
         }
     }
 
     pub(super) fn exit(&self, next_node: usize, stack: &mut ScopeStack) {
         if stack
+            .states
             .last()
             .is_some_and(|scope| self.scopes[*scope].end == next_node)
         {
-            stack.pop();
+            stack.states.pop();
+        }
+        if stack
+            .containers
+            .last()
+            .is_some_and(|container| self.containers[*container].end == next_node)
+        {
+            stack.containers.pop();
         }
     }
 
@@ -47,29 +67,34 @@ impl StateContext {
         element: &Element,
         node: usize,
         stack: &ScopeStack,
-    ) -> Vec<StateSelector> {
+        container_size: &dyn Fn(NodeId) -> Option<argui_core::Size>,
+    ) -> Vec<StyleCondition> {
         element
-            .state_styles
+            .conditional_styles
             .rules()
             .iter()
             .filter_map(|rule| {
-                self.matches(rule.selector, node, stack)
-                    .then_some(rule.selector)
+                self.matches_condition(&rule.condition, node, stack, container_size)
+                    .then_some(rule.condition.clone())
             })
             .collect()
     }
 
     pub(super) fn matches_part(
         &self,
-        selector: StateSelector,
+        condition: &StyleCondition,
         node: usize,
         stack: &ScopeStack,
         part_visual: VisualStates,
+        container_size: &dyn Fn(NodeId) -> Option<argui_core::Size>,
     ) -> bool {
-        match selector {
-            StateSelector::Own(State::Visual(state)) => part_visual.contains(state),
-            _ => self.matches(selector, node, stack),
-        }
+        condition.matches(
+            &|selector| match selector {
+                StateSelector::Own(State::Visual(state)) => part_visual.contains(state),
+                _ => self.matches(selector, node, stack),
+            },
+            &|query| self.matches_container(query, stack, container_size),
+        )
     }
 
     fn collect_element(
@@ -77,7 +102,7 @@ impl StateContext {
         element: &Element,
         index: &mut usize,
         ids: &[NodeId],
-        states_for: &impl Fn(NodeId) -> VisualStates,
+        states_for: &dyn Fn(NodeId) -> VisualStates,
     ) -> VisualStates {
         let root = *index;
         let mut visual = states_for(ids[root]);
@@ -119,6 +144,15 @@ impl StateContext {
             });
             self.scope_at[root] = Some(scope);
         }
+        if let Some(id) = element.container_scope {
+            let container = self.containers.len();
+            self.containers.push(ResolvedContainer {
+                id,
+                node: ids[root],
+                end: *index,
+            });
+            self.container_at[root] = Some(container);
+        }
         aggregate
     }
 
@@ -127,6 +161,7 @@ impl StateContext {
             StateSelector::Own(_) => &self.nodes[node],
             StateSelector::Scope { scope, .. } => {
                 let Some(index) = stack
+                    .states
                     .iter()
                     .rev()
                     .find(|index| self.scopes[**index].id == scope)
@@ -144,6 +179,34 @@ impl StateContext {
             State::Named(state) => states.named.contains(&state),
         }
     }
+
+    pub(super) fn matches_condition(
+        &self,
+        condition: &StyleCondition,
+        node: usize,
+        stack: &ScopeStack,
+        container_size: &dyn Fn(NodeId) -> Option<argui_core::Size>,
+    ) -> bool {
+        condition.matches(&|selector| self.matches(selector, node, stack), &|query| {
+            self.matches_container(query, stack, container_size)
+        })
+    }
+
+    fn matches_container(
+        &self,
+        query: crate::ContainerQuery,
+        stack: &ScopeStack,
+        container_size: &dyn Fn(NodeId) -> Option<argui_core::Size>,
+    ) -> bool {
+        stack
+            .containers
+            .iter()
+            .rev()
+            .map(|index| &self.containers[*index])
+            .find(|container| container.id == query.scope())
+            .and_then(|container| container_size(container.node))
+            .is_some_and(|size| query.matches(size.width, size.height))
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -157,4 +220,11 @@ struct ResolvedScope {
     id: StateScopeId,
     end: usize,
     states: NodeStates,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct ResolvedContainer {
+    id: crate::ContainerScopeId,
+    node: NodeId,
+    end: usize,
 }

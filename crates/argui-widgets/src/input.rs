@@ -1,8 +1,8 @@
 use argui_paint::{Color, PaintStyle};
-use argui_text::{TextColor, TextStyle, TextWrap};
+use argui_text::{TextColor, TextOverflow, TextStyle, TextWrap};
 use argui_ui::{
     AlignItems, Axes, CaretStyle, Element, LayoutStyle, Overflow, Role, ScrollChaining,
-    ScrollConfig, ScrollbarGutter, ScrollbarStyle, StateSelector, StateStyle, StyleTransition,
+    ScrollConfig, ScrollbarGutter, ScrollbarStyle, StateSelector, StylePatch, StyleTransition,
     TextEditorSpec, TextInputFilter, VisualState, percent,
 };
 
@@ -21,8 +21,8 @@ pub enum InputKind {
 pub struct InputStyle {
     pub layout: LayoutStyle,
     pub paint: PaintStyle,
-    pub hovered: StateStyle,
-    pub focused: StateStyle,
+    pub hovered: StylePatch,
+    pub focused: StylePatch,
     pub transition: StyleTransition,
     pub text: TextStyle,
     pub placeholder: TextStyle,
@@ -36,6 +36,7 @@ impl InputStyle {
         text.wrap = TextWrap::None;
         let mut placeholder = text.clone();
         placeholder.color = TextColor::rgba(0.55, 0.60, 0.68, 1.0);
+        placeholder.overflow = TextOverflow::Ellipsis;
         Self {
             layout: LayoutStyle {
                 size: argui_ui::Dimensions {
@@ -47,8 +48,8 @@ impl InputStyle {
                 flex_shrink: 0.0,
                 ..LayoutStyle::default()
             },
-            hovered: StateStyle::from_quad(paint.quad.clone()),
-            focused: StateStyle::from_quad(paint.quad.clone()),
+            hovered: StylePatch::from_quad(paint.quad.clone()),
+            focused: StylePatch::from_quad(paint.quad.clone()),
             transition: StyleTransition::default(),
             paint,
             text,
@@ -59,13 +60,13 @@ impl InputStyle {
     }
 
     #[must_use]
-    pub fn hovered(mut self, style: impl Into<StateStyle>) -> Self {
+    pub fn hovered(mut self, style: impl Into<StylePatch>) -> Self {
         self.hovered = style.into();
         self
     }
 
     #[must_use]
-    pub fn focused(mut self, style: impl Into<StateStyle>) -> Self {
+    pub fn focused(mut self, style: impl Into<StylePatch>) -> Self {
         self.focused = style.into();
         self
     }
@@ -224,6 +225,7 @@ impl TextArea {
     ) -> Self {
         style.text.wrap = TextWrap::WordOrGlyph;
         style.placeholder.wrap = TextWrap::WordOrGlyph;
+        style.placeholder.overflow = TextOverflow::Clip;
         style.layout.align_items = Some(AlignItems::START);
         Self {
             key: key.into(),
@@ -325,11 +327,11 @@ fn editor(spec: EditorSpec, leading: Option<(Element, f32)>) -> Element {
     })
     .layout_style(spec.style.layout)
     .paint_style(spec.style.paint)
-    .state(
+    .when(
         StateSelector::scope(TEXT_FIELD_SCOPE, VisualState::Hovered),
         spec.style.hovered,
     )
-    .state(
+    .when(
         StateSelector::scope(TEXT_FIELD_SCOPE, VisualState::Focused),
         spec.style.focused,
     )

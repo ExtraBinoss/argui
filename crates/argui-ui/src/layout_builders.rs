@@ -1,4 +1,4 @@
-use argui_text::TextAlign;
+use argui_text::{TextAlign, TextOverflow};
 
 use crate::{
     Axes, BoxSizing, Dimension, Dimensions, Element, ElementKind, GridAutoFlow, GridPlacement,
@@ -141,6 +141,23 @@ impl Element {
             } => {
                 text.align = align;
                 placeholder_text.align = align;
+            }
+            ElementKind::Container | ElementKind::Image { .. } | ElementKind::Vector { .. } => {}
+        }
+        self
+    }
+
+    #[must_use]
+    pub fn text_overflow(mut self, overflow: TextOverflow) -> Self {
+        match &mut self.kind {
+            ElementKind::Text { style, .. } => style.overflow = overflow,
+            ElementKind::TextEditor {
+                text,
+                placeholder_text,
+                ..
+            } => {
+                text.overflow = overflow;
+                placeholder_text.overflow = overflow;
             }
             ElementKind::Container | ElementKind::Image { .. } | ElementKind::Vector { .. } => {}
         }

@@ -3,7 +3,9 @@ use std::{
     sync::Arc,
 };
 
-use crate::{FontFamily, GlyphKey, TextAlign, TextBlock, TextMeasurement, TextStyle, TextWrap};
+use crate::{
+    FontFamily, GlyphKey, TextAlign, TextBlock, TextMeasurement, TextOverflow, TextStyle, TextWrap,
+};
 
 const CACHE_CAPACITY: usize = 512;
 
@@ -48,7 +50,8 @@ impl ShapeKey {
             text: block.text.clone(),
             style: StyleKey::new(&block.style),
             size: [
-                if block.style.wrap == TextWrap::None {
+                if block.style.wrap == TextWrap::None && block.style.overflow == TextOverflow::Clip
+                {
                     0
                 } else {
                     block.bounds.size.width.to_bits()
@@ -76,6 +79,7 @@ struct StyleKey {
     family: FontFamily,
     weight: u16,
     wrap: TextWrap,
+    overflow: TextOverflow,
 }
 
 impl StyleKey {
@@ -86,6 +90,7 @@ impl StyleKey {
             family: style.family.clone(),
             weight: style.weight,
             wrap: style.wrap,
+            overflow: style.overflow,
         }
     }
 }

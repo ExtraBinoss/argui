@@ -1,6 +1,6 @@
 use crate::state::StateValue;
 use crate::{
-    BindingImpact, Element, NodeId, PropertyKey, StatePropertyValue, StateSelector,
+    BindingImpact, Element, NodeId, PropertyKey, StyleCondition, StylePropertyValue,
     TransitionDirection, TreeUpdate, VisualStates,
 };
 use argui_animation::{Motion, MotionTrack, Time, Transition};
@@ -9,7 +9,8 @@ use argui_core::{Color, Point, Transform2D};
 mod style;
 use style::collect_specs;
 pub(super) use style::{
-    apply_layer, apply_layout, apply_quad, apply_scroll, apply_scrollbar_part, apply_transform,
+    apply_layer, apply_layout, apply_quad, apply_scroll, apply_scrollbar_part, apply_text_color,
+    apply_transform, apply_vector_color,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -27,7 +28,7 @@ pub(super) struct TransitionRegistry {
 #[derive(Clone, Debug)]
 struct NodeTransition {
     target: TransitionTarget,
-    matched: Vec<StateSelector>,
+    matched: Vec<StyleCondition>,
     values: Vec<AnimatedProperty>,
     revision: u64,
 }
@@ -36,7 +37,7 @@ struct NodeTransition {
 struct AnimatedProperty {
     key: PropertyKey,
     target: StateValue,
-    source: Option<StateSelector>,
+    source: Option<StyleCondition>,
     value: AnimatedValue,
 }
 
@@ -58,23 +59,26 @@ enum AnimatedValue {
     },
 }
 
+struct TransitionSync<'a> {
+    root: &'a Element,
+    node_ids: &'a [NodeId],
+    states_for: &'a dyn Fn(NodeId) -> VisualStates,
+    scrollbar_states_for: &'a dyn Fn(NodeId, crate::scroll::ScrollbarPart, bool) -> VisualStates,
+    scroll_for: &'a dyn Fn(NodeId) -> Point,
+    container_size: &'a dyn Fn(NodeId) -> Option<argui_core::Size>,
+    reduced_motion: bool,
+}
+
 impl TransitionRegistry {
-    pub(super) fn sync(
-        &mut self,
-        root: &Element,
-        node_ids: &[NodeId],
-        states_for: impl Fn(NodeId) -> VisualStates,
-        scrollbar_states_for: impl Fn(NodeId, crate::scroll::ScrollbarPart, bool) -> VisualStates,
-        scroll_for: impl Fn(NodeId) -> Point,
-        reduced_motion: bool,
-    ) -> TreeUpdate {
+    fn sync(&mut self, input: TransitionSync<'_>) -> TreeUpdate {
         let mut specs = Vec::new();
         collect_specs(
-            root,
-            node_ids,
-            &states_for,
-            &scrollbar_states_for,
-            &scroll_for,
+            input.root,
+            input.node_ids,
+            input.states_for,
+            input.scrollbar_states_for,
+            input.scroll_for,
+            input.container_size,
             &mut specs,
         );
         let mut update = TreeUpdate::None;
@@ -89,7 +93,7 @@ impl TransitionRegistry {
                 self.entries.push(NodeTransition::new(spec));
                 continue;
             };
-            update = strongest(update, entry.sync(spec, reduced_motion));
+            update = strongest(update, entry.sync(spec, input.reduced_motion));
         }
         update
     }
@@ -168,16 +172,31 @@ impl TransitionRegistry {
 
 impl super::UiTree {
     pub(super) fn sync_transitions(&mut self) -> TreeUpdate {
+        self.sync_transitions_with(self.reduced_motion)
+    }
+
+    pub(super) fn sync_transitions_with(&mut self, reduced_motion: bool) -> TreeUpdate {
         let interaction = &self.interaction;
         let scroll = &self.scroll;
-        self.transitions.sync(
-            &self.root,
-            &self.node_ids,
-            |node| interaction.visual_states(node),
-            |node, part, enabled| scroll.visual_states(node, part, enabled),
-            |node| scroll.offset(node),
-            self.reduced_motion,
-        )
+        let container_sizes = &self.container_sizes;
+        let states_for = |node| interaction.visual_states(node);
+        let scrollbar_states_for = |node, part, enabled| scroll.visual_states(node, part, enabled);
+        let scroll_for = |node| scroll.offset(node);
+        let container_size = |node| {
+            container_sizes
+                .iter()
+                .find(|(id, _)| *id == node)
+                .map(|(_, size)| *size)
+        };
+        self.transitions.sync(TransitionSync {
+            root: &self.root,
+            node_ids: &self.node_ids,
+            states_for: &states_for,
+            scrollbar_states_for: &scrollbar_states_for,
+            scroll_for: &scroll_for,
+            container_size: &container_size,
+            reduced_motion,
+        })
     }
 
     #[must_use]
@@ -188,15 +207,15 @@ impl super::UiTree {
 
 struct NodeSpec<'a> {
     target: TransitionTarget,
-    matched: Vec<StateSelector>,
+    matched: Vec<StyleCondition>,
     values: Vec<ResolvedProperty>,
     transition: Option<&'a crate::StyleTransition>,
 }
 
 #[derive(Clone, Debug)]
 struct ResolvedProperty {
-    property: StatePropertyValue,
-    source: Option<StateSelector>,
+    property: StylePropertyValue,
+    source: Option<StyleCondition>,
 }
 
 impl NodeTransition {
@@ -245,8 +264,8 @@ impl NodeTransition {
             let direction = property_direction(
                 &self.matched,
                 &spec.matched,
-                property.source,
-                resolved.source,
+                property.source.as_ref(),
+                resolved.source.as_ref(),
             );
             property.target = target.value.clone();
             property.source = resolved.source;
@@ -329,6 +348,11 @@ impl AnimatedValue {
             StateValue::Vec3(value) => Self::Vec3(Motion::new(value)),
             StateValue::Mat3(value) => Self::Mat3(Motion::new(value)),
             StateValue::Mat4(value) => Self::Mat4(Motion::new(value)),
+            StateValue::LayoutStyle(value) => Self::Discrete {
+                from: StateValue::LayoutStyle(value.clone()),
+                target: StateValue::LayoutStyle(value),
+                progress: Motion::new(1.0),
+            },
         }
     }
 
@@ -362,6 +386,10 @@ impl AnimatedValue {
     }
 
     fn retarget(&mut self, target: StateValue, transition: &Transition) {
+        if matches!(target, StateValue::LayoutStyle(_)) {
+            self.set(target);
+            return;
+        }
         match (self, target) {
             (Self::Transform(motion), StateValue::Transform(value)) => {
                 transition.retarget(motion, value)
@@ -433,20 +461,20 @@ impl AnimatedValue {
 }
 
 fn property_direction(
-    old: &[StateSelector],
-    new: &[StateSelector],
-    old_source: Option<StateSelector>,
-    new_source: Option<StateSelector>,
+    old: &[StyleCondition],
+    new: &[StyleCondition],
+    old_source: Option<&StyleCondition>,
+    new_source: Option<&StyleCondition>,
 ) -> Option<TransitionDirection> {
     if old_source == new_source {
         return None;
     }
-    if let Some(selector) = new_source.filter(|selector| !old.contains(selector)) {
-        return Some(TransitionDirection::Enter(selector));
+    if let Some(condition) = new_source.filter(|condition| !old.contains(condition)) {
+        return Some(TransitionDirection::Enter(condition.clone()));
     }
     old_source
-        .filter(|selector| !new.contains(selector))
-        .map(TransitionDirection::Exit)
+        .filter(|condition| !new.contains(condition))
+        .map(|condition| TransitionDirection::Exit(condition.clone()))
 }
 
 impl From<BindingImpact> for TreeUpdate {

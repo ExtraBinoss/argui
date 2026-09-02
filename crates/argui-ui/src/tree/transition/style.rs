@@ -1,15 +1,17 @@
 use argui_core::{Color, Point, Transform2D};
 use argui_paint::{Border, Fill, GradientStop, GradientStops, LayerMask, LayerStyle, QuadStyle};
 
-use crate::binding::layout::{layout_value, set_layout_value};
-use crate::binding::{GradientPointTarget, LayoutTarget};
+use crate::binding::GradientPointTarget;
+use crate::binding::layout::layout_value;
 use crate::state::StateValue;
-use crate::{Element, NodeId, PropertyKey, StatePropertyValue, StateSelector, VisualStates};
+use crate::{Element, NodeId, PropertyKey, StyleCondition, StylePropertyValue, VisualStates};
 
 use super::{NodeSpec, ResolvedProperty, TransitionRegistry, TransitionTarget};
 
 mod effect;
 use effect::{apply_effect, effect_values};
+mod layout;
+pub(in crate::tree) use layout::apply as apply_layout;
 mod scrollbar;
 mod states;
 use states::{ScopeStack, StateContext};
@@ -19,9 +21,10 @@ use values::{radii, widths_from_array};
 pub(super) fn collect_specs<'a>(
     element: &'a Element,
     ids: &[NodeId],
-    states_for: &impl Fn(NodeId) -> VisualStates,
-    scrollbar_states_for: &impl Fn(NodeId, crate::scroll::ScrollbarPart, bool) -> VisualStates,
-    scroll_for: &impl Fn(NodeId) -> Point,
+    states_for: &dyn Fn(NodeId) -> VisualStates,
+    scrollbar_states_for: &dyn Fn(NodeId, crate::scroll::ScrollbarPart, bool) -> VisualStates,
+    scroll_for: &dyn Fn(NodeId) -> Point,
+    container_size: &dyn Fn(NodeId) -> Option<argui_core::Size>,
     output: &mut Vec<NodeSpec<'a>>,
 ) {
     let states = StateContext::collect(element, ids, states_for);
@@ -30,9 +33,10 @@ pub(super) fn collect_specs<'a>(
         states: &states,
         scrollbar_states_for,
         scroll_for,
+        container_size,
     };
     let mut index = 0;
-    let mut scope_stack = Vec::new();
+    let mut scope_stack = ScopeStack::default();
     collect_element(element, &mut index, &mut scope_stack, &context, output);
 }
 
@@ -41,6 +45,7 @@ struct SpecContext<'a> {
     states: &'a StateContext,
     scrollbar_states_for: &'a dyn Fn(NodeId, crate::scroll::ScrollbarPart, bool) -> VisualStates,
     scroll_for: &'a dyn Fn(NodeId) -> Point,
+    container_size: &'a dyn Fn(NodeId) -> Option<argui_core::Size>,
 }
 
 fn collect_element<'a>(
@@ -54,8 +59,10 @@ fn collect_element<'a>(
     let node = context.ids[node_index];
     *index += 1;
     context.states.enter(node_index, scope_stack);
-    let matched = context.states.matched(element, node_index, scope_stack);
-    if element.style_transition.is_some() || !element.state_styles.is_empty() {
+    let matched = context
+        .states
+        .matched(element, node_index, scope_stack, &context.container_size);
+    if element.style_transition.is_some() || !element.conditional_styles.is_empty() {
         output.push(NodeSpec {
             target: TransitionTarget::Element(node),
             matched: matched.clone(),
@@ -74,6 +81,7 @@ fn collect_element<'a>(
                 states: context.states,
                 scope_stack,
                 states_for: context.scrollbar_states_for,
+                container_size: context.container_size,
             },
             scrollbar,
             output,
@@ -87,21 +95,21 @@ fn collect_element<'a>(
 
 fn target_values(
     element: &Element,
-    matched: &[StateSelector],
+    matched: &[StyleCondition],
     scroll: Point,
 ) -> Vec<ResolvedProperty> {
     let mut values = resolved(base_values(element, scroll));
-    for rule in element.state_styles.rules() {
-        if matched.contains(&rule.selector) {
+    for rule in element.conditional_styles.rules() {
+        if matched.contains(&rule.condition) {
             for property in rule.style.values() {
-                apply_target(&mut values, property, Some(rule.selector));
+                apply_target(&mut values, property, Some(rule.condition.clone()));
             }
         }
     }
     values
 }
 
-fn resolved(values: Vec<StatePropertyValue>) -> Vec<ResolvedProperty> {
+fn resolved(values: Vec<StylePropertyValue>) -> Vec<ResolvedProperty> {
     values
         .into_iter()
         .map(|property| ResolvedProperty {
@@ -113,10 +121,13 @@ fn resolved(values: Vec<StatePropertyValue>) -> Vec<ResolvedProperty> {
 
 fn apply_target(
     values: &mut Vec<ResolvedProperty>,
-    property: &StatePropertyValue,
-    source: Option<StateSelector>,
+    property: &StylePropertyValue,
+    source: Option<StyleCondition>,
 ) {
     let mut property = property.clone();
+    if property.key == PropertyKey::LayoutStyle {
+        values.retain(|value| !matches!(value.property.key, PropertyKey::Layout(_)));
+    }
     match (&property.key, &property.value) {
         (PropertyKey::BackgroundColor, StateValue::BackgroundColor(color))
             if values
@@ -178,17 +189,36 @@ fn apply_target(
     }
 }
 
-fn base_values(element: &Element, scroll: Point) -> Vec<StatePropertyValue> {
+fn base_values(element: &Element, scroll: Point) -> Vec<StylePropertyValue> {
     let quad = &element.paint.quad;
     let mut values = quad_values(quad);
+    values.push(value(
+        PropertyKey::LayoutStyle,
+        StateValue::LayoutStyle(Box::new(element.style.clone())),
+    ));
     values.push(value(
         PropertyKey::Transform,
         StateValue::Transform(element.transform),
     ));
-    if element.state_styles.contains(PropertyKey::Scroll) {
+    match &element.kind {
+        crate::ElementKind::Text { style, .. } => {
+            values.push(value(
+                PropertyKey::TextColor,
+                StateValue::Color(style.color),
+            ));
+        }
+        crate::ElementKind::TextEditor { text, .. } => {
+            values.push(value(PropertyKey::TextColor, StateValue::Color(text.color)));
+        }
+        crate::ElementKind::Vector { color, .. } => {
+            values.push(value(PropertyKey::VectorColor, StateValue::Color(*color)));
+        }
+        crate::ElementKind::Container | crate::ElementKind::Image { .. } => {}
+    }
+    if element.conditional_styles.contains(PropertyKey::Scroll) {
         values.push(value(PropertyKey::Scroll, StateValue::Point(scroll)));
     }
-    for target in layout_targets(&element.style) {
+    for target in layout::targets(&element.style) {
         values.push(value(
             PropertyKey::Layout(target),
             StateValue::F32(layout_value(&element.style, target)),
@@ -203,7 +233,7 @@ fn base_values(element: &Element, scroll: Point) -> Vec<StatePropertyValue> {
     values
 }
 
-fn quad_values(quad: &QuadStyle) -> Vec<StatePropertyValue> {
+fn quad_values(quad: &QuadStyle) -> Vec<StylePropertyValue> {
     let mut values = vec![
         value(
             PropertyKey::CornerRadii,
@@ -242,7 +272,7 @@ fn quad_values(quad: &QuadStyle) -> Vec<StatePropertyValue> {
     values
 }
 
-fn gradient_values(background: &Fill, values: &mut Vec<StatePropertyValue>) {
+fn gradient_values(background: &Fill, values: &mut Vec<StylePropertyValue>) {
     let (first, second, stops) = match background {
         Fill::Linear(gradient) => (
             (GradientPointTarget::LinearStart, gradient.start),
@@ -276,7 +306,7 @@ fn gradient_values(background: &Fill, values: &mut Vec<StatePropertyValue>) {
     }
 }
 
-fn layer_values(layer: &LayerStyle, values: &mut Vec<StatePropertyValue>) {
+fn layer_values(layer: &LayerStyle, values: &mut Vec<StylePropertyValue>) {
     values.push(value(
         PropertyKey::LayerOpacity,
         StateValue::F32(layer.opacity),
@@ -321,107 +351,8 @@ fn remove_gradient_values(values: &mut Vec<ResolvedProperty>) {
     values.retain(|value| !is_gradient_property(value.property.key));
 }
 
-fn value(key: PropertyKey, value: StateValue) -> StatePropertyValue {
-    StatePropertyValue { key, value }
-}
-
-fn layout_targets(style: &crate::LayoutStyle) -> Vec<LayoutTarget> {
-    let mut values = vec![
-        LayoutTarget::PaddingLeft,
-        LayoutTarget::PaddingRight,
-        LayoutTarget::PaddingTop,
-        LayoutTarget::PaddingBottom,
-        LayoutTarget::Gap,
-        LayoutTarget::Grow,
-        LayoutTarget::Shrink,
-    ];
-    add_dimension(
-        &mut values,
-        style.size.width,
-        LayoutTarget::WidthPx,
-        LayoutTarget::WidthPercent,
-    );
-    add_dimension(
-        &mut values,
-        style.size.height,
-        LayoutTarget::HeightPx,
-        LayoutTarget::HeightPercent,
-    );
-    add_auto_length(
-        &mut values,
-        style.min_size.width,
-        LayoutTarget::MinWidthPx,
-        LayoutTarget::MinWidthPercent,
-    );
-    add_auto_length(
-        &mut values,
-        style.min_size.height,
-        LayoutTarget::MinHeightPx,
-        LayoutTarget::MinHeightPercent,
-    );
-    add_auto_length(
-        &mut values,
-        style.max_size.width,
-        LayoutTarget::MaxWidthPx,
-        LayoutTarget::MaxWidthPercent,
-    );
-    add_auto_length(
-        &mut values,
-        style.max_size.height,
-        LayoutTarget::MaxHeightPx,
-        LayoutTarget::MaxHeightPercent,
-    );
-    add_auto_length(
-        &mut values,
-        style.inset.left,
-        LayoutTarget::InsetLeftPx,
-        LayoutTarget::InsetLeftPx,
-    );
-    add_auto_length(
-        &mut values,
-        style.inset.right,
-        LayoutTarget::InsetRightPx,
-        LayoutTarget::InsetRightPx,
-    );
-    add_auto_length(
-        &mut values,
-        style.inset.top,
-        LayoutTarget::InsetTopPx,
-        LayoutTarget::InsetTopPx,
-    );
-    add_auto_length(
-        &mut values,
-        style.inset.bottom,
-        LayoutTarget::InsetBottomPx,
-        LayoutTarget::InsetBottomPx,
-    );
-    values
-}
-
-fn add_dimension(
-    values: &mut Vec<LayoutTarget>,
-    value: crate::Dimension,
-    pixels: LayoutTarget,
-    percent: LayoutTarget,
-) {
-    match value.expand() {
-        taffy::ExpandedDimension::Length(_) => values.push(pixels),
-        taffy::ExpandedDimension::Percent(_) => values.push(percent),
-        _ => {}
-    }
-}
-
-fn add_auto_length(
-    values: &mut Vec<LayoutTarget>,
-    value: crate::LengthPercentageAuto,
-    pixels: LayoutTarget,
-    percent: LayoutTarget,
-) {
-    match value.expand() {
-        taffy::ExpandedLengthPercentageAuto::Length(_) => values.push(pixels),
-        taffy::ExpandedLengthPercentageAuto::Percent(_) => values.push(percent),
-        _ => {}
-    }
+fn value(key: PropertyKey, value: StateValue) -> StylePropertyValue {
+    StylePropertyValue { key, value }
 }
 
 pub(in crate::tree) fn apply_quad(
@@ -546,14 +477,30 @@ pub(in crate::tree) fn apply_scroll(
     });
 }
 
-pub(in crate::tree) fn apply_layout(
+pub(in crate::tree) fn apply_text_color(
     registry: &TransitionRegistry,
     node: NodeId,
-    style: &mut crate::LayoutStyle,
+    color: &mut Color,
 ) {
     registry.visit(TransitionTarget::Element(node), |key, value| {
-        if let (PropertyKey::Layout(target), StateValue::F32(value)) = (key, value) {
-            set_layout_value(style, target, value);
+        if key == PropertyKey::TextColor
+            && let StateValue::Color(value) = value
+        {
+            *color = value;
+        }
+    });
+}
+
+pub(in crate::tree) fn apply_vector_color(
+    registry: &TransitionRegistry,
+    node: NodeId,
+    color: &mut Color,
+) {
+    registry.visit(TransitionTarget::Element(node), |key, value| {
+        if key == PropertyKey::VectorColor
+            && let StateValue::Color(value) = value
+        {
+            *color = value;
         }
     });
 }

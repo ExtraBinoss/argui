@@ -96,10 +96,11 @@ updated from semantic diffs after UI dispatch; semantic-only mutations never
 invalidate Taffy or paint. Pointer contacts use one mouse/touch/pen event schema,
 and the UI gesture arena remains independent from both platform and renderer.
 
-Hover, press, and focus select a `QuadStyle`, which excludes layout and clipping.
-The layout engine can therefore rebuild only the display list for these state
-changes. Taffy geometry and shaped Cosmic Text remain untouched. See the
-[interaction model](interaction.md) for the event and invalidation contract.
+Hover, press, focus, named state, and container conditions compose sparse typed
+`StylePatch` values. Paint and transform properties reuse Taffy geometry;
+layout properties update retained Taffy nodes; text color updates prepared text
+without reshaping glyphs. See the [interaction model](interaction.md) and
+[responsive styling](styling.md) for the invalidation contract.
 
 ## Application state flow
 

@@ -3,15 +3,18 @@ use argui_paint::{
     Border, ClipChain, ClipRegion, Color, DisplayList, ImagePrimitive, LayerStyle, ProfileDomain,
     Quad, QuadStyle, RenderObjectId, VectorPrimitive,
 };
-use argui_ui::{EffectScope, Element, ElementKind, HitRegion, NodeId, UiTree};
+use argui_ui::{EffectScope, Element, ElementKind, HitRegion, NodeId, PointerEvents, UiTree};
 use std::collections::HashMap;
 
 use crate::{LayoutNode, LayoutOutput, engine::NodeMap, input, scroll};
+
+mod sync;
 
 #[derive(Clone, Debug, PartialEq)]
 struct PaintContext {
     transform: Affine2D,
     clips: ClipChain,
+    hit_allowed: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -54,7 +57,8 @@ pub(crate) fn repaint(
     cache.visited = 0;
     cache.reused = 0;
     cache.reused_commands = 0;
-    sync_scroll_config(&elements, ui, output);
+    sync::scroll_config(&elements, ui, output);
+    sync::text_colors(&elements, ui, output);
     let clips = ClipChain::from_regions([ClipRegion::new(output.viewport, Affine2D::IDENTITY)]);
     if let Some(root) = root {
         let mut scroll_updates = Vec::new();
@@ -66,6 +70,7 @@ pub(crate) fn repaint(
             &PaintContext {
                 transform: Affine2D::IDENTITY,
                 clips,
+                hit_allowed: true,
             },
             cache,
             &mut scroll_updates,
@@ -122,6 +127,7 @@ fn paint_node(
         portal = PaintContext {
             transform: Affine2D::IDENTITY,
             clips: ClipChain::from_regions([ClipRegion::new(clip, Affine2D::IDENTITY)]),
+            hit_allowed: parent.hit_allowed,
         };
         &portal
     } else {
@@ -133,6 +139,7 @@ fn paint_node(
     let context = PaintContext {
         transform,
         clips: parent.clips.clone(),
+        hit_allowed: parent.hit_allowed,
     };
     paint_enter(
         ui,
@@ -154,6 +161,11 @@ fn paint_node(
     let child_context = PaintContext {
         transform,
         clips: child_clips,
+        hit_allowed: context.hit_allowed
+            && !matches!(
+                element.hit_test.pointer_events,
+                PointerEvents::None | PointerEvents::BoxOnly
+            ),
     };
     if (map.style.overflow.x.scrolls() || map.style.overflow.y.scrolls())
         && let Some(region) = output
@@ -471,7 +483,7 @@ fn push_vector(
         vector,
         bounds: node.bounds,
         fit,
-        color,
+        color: ui.resolved_vector_color(node.node, color),
         opacity: ui.resolved_quad(node.node, element).opacity,
         transform: context.transform,
         clips: context.clips.clone(),
@@ -531,33 +543,24 @@ fn push_hit_region(
     output: &mut LayoutOutput,
     context: &PaintContext,
 ) {
-    if let Some(interaction) = element.interaction.as_ref() {
+    let own_allowed = context.hit_allowed
+        && !matches!(
+            element.hit_test.pointer_events,
+            PointerEvents::None | PointerEvents::ContentsOnly
+        );
+    if own_allowed && let Some(interaction) = element.interaction.as_ref() {
         output.hit_regions.push(HitRegion {
             node: node.node,
             bounds: node.bounds,
             transform: context.transform,
             clips: context.clips.clone(),
+            shape: element.hit_test.shape,
+            slop: element.hit_test.slop,
             enabled: interaction.enabled,
             focusable: interaction.enabled && interaction.focusable,
             cursor: interaction.cursor,
             gestures: interaction.gestures,
             window_drag: interaction.window_drag,
         });
-    }
-}
-
-fn sync_scroll_config(elements: &[&Element], ui: &UiTree, output: &mut LayoutOutput) {
-    for region in &mut output.scroll_regions {
-        if let Some(node) = output.nodes.iter().find(|node| node.node == region.node) {
-            let authored = elements[node.index]
-                .scroll
-                .clone()
-                .unwrap_or_else(|| region.config.clone());
-            let config = ui.resolved_scroll_config(region.node, &authored);
-            if let (Some(scrollbar), Some(style)) = (&mut region.scrollbar, &config.scrollbar) {
-                scrollbar.style = style.clone();
-            }
-            region.config = config;
-        }
     }
 }

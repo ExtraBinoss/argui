@@ -1,7 +1,7 @@
 use argui_paint::PaintStyle;
 use argui_text::{TextStyle, TextWrap};
 use argui_ui::{
-    AlignItems, Display, Element, FlexDirection, JustifyContent, LayoutStyle, StateStyle,
+    AlignItems, Display, Element, FlexDirection, JustifyContent, LayoutStyle, StylePatch,
     StyleTransition, VisualState,
 };
 
@@ -11,9 +11,9 @@ use crate::{ButtonBehavior, ButtonPart};
 pub struct ButtonStyle {
     pub layout: LayoutStyle,
     pub paint: PaintStyle,
-    pub hovered: StateStyle,
-    pub pressed: StateStyle,
-    pub focused: Option<StateStyle>,
+    pub hovered: StylePatch,
+    pub pressed: StylePatch,
+    pub focused: Option<StylePatch>,
     pub transition: StyleTransition,
     pub label: TextStyle,
 }
@@ -32,8 +32,8 @@ impl ButtonStyle {
                 flex_shrink: 0.0,
                 ..LayoutStyle::default()
             },
-            hovered: StateStyle::from_quad(paint.quad.clone()),
-            pressed: StateStyle::from_quad(paint.quad.clone()),
+            hovered: StylePatch::from_quad(paint.quad.clone()),
+            pressed: StylePatch::from_quad(paint.quad.clone()),
             focused: None,
             transition: StyleTransition::default(),
             paint,
@@ -48,19 +48,19 @@ impl ButtonStyle {
     }
 
     #[must_use]
-    pub fn hovered(mut self, style: impl Into<StateStyle>) -> Self {
+    pub fn hovered(mut self, style: impl Into<StylePatch>) -> Self {
         self.hovered = style.into();
         self
     }
 
     #[must_use]
-    pub fn pressed(mut self, style: impl Into<StateStyle>) -> Self {
+    pub fn pressed(mut self, style: impl Into<StylePatch>) -> Self {
         self.pressed = style.into();
         self
     }
 
     #[must_use]
-    pub fn focused(mut self, style: impl Into<StateStyle>) -> Self {
+    pub fn focused(mut self, style: impl Into<StylePatch>) -> Self {
         self.focused = Some(style.into());
         self
     }
@@ -139,13 +139,13 @@ impl Button {
             Element::row(children)
                 .layout_style(self.style.layout)
                 .paint_style(self.style.paint)
-                .state(VisualState::Hovered, self.style.hovered)
-                .state(VisualState::Pressed, self.style.pressed)
+                .when(VisualState::Hovered, self.style.hovered)
+                .when(VisualState::Pressed, self.style.pressed)
                 .transition(self.style.transition)
                 .gap(8.0),
         );
         if let Some(focused) = self.style.focused {
-            element = element.state(VisualState::FocusVisible, focused);
+            element = element.when(VisualState::FocusVisible, focused);
         }
         element
     }

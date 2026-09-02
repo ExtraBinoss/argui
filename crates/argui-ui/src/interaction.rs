@@ -1,7 +1,66 @@
-use argui_core::{Affine2D, KeyInput, Point, Rect};
-use argui_paint::ClipChain;
+use argui_core::{Affine2D, KeyInput, Point, Rect, Size};
+use argui_paint::{ClipChain, CornerRadii};
 
-use crate::{CursorIcon, GestureSet, VisualState, VisualStates};
+use crate::{CursorIcon, GestureSet, Sides, VisualState, VisualStates};
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum PointerEvents {
+    #[default]
+    Auto,
+    None,
+    BoxOnly,
+    ContentsOnly,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub enum HitShape {
+    #[default]
+    Bounds,
+    RoundedRect(CornerRadii),
+    Ellipse,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct HitTestStyle {
+    pub pointer_events: PointerEvents,
+    pub shape: HitShape,
+    pub slop: Sides<f32>,
+}
+
+impl Default for HitTestStyle {
+    fn default() -> Self {
+        Self {
+            pointer_events: PointerEvents::Auto,
+            shape: HitShape::Bounds,
+            slop: Sides {
+                left: 0.0,
+                right: 0.0,
+                top: 0.0,
+                bottom: 0.0,
+            },
+        }
+    }
+}
+
+impl HitTestStyle {
+    #[must_use]
+    pub const fn pointer_events(mut self, pointer_events: PointerEvents) -> Self {
+        self.pointer_events = pointer_events;
+        self
+    }
+
+    #[must_use]
+    pub const fn shape(mut self, shape: HitShape) -> Self {
+        self.shape = shape;
+        self
+    }
+
+    #[must_use]
+    pub const fn slop(mut self, slop: Sides<f32>) -> Self {
+        self.slop = slop;
+        self
+    }
+}
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct NodeId(u64);
@@ -112,6 +171,8 @@ pub struct HitRegion {
     pub bounds: Rect,
     pub transform: Affine2D,
     pub clips: ClipChain,
+    pub shape: HitShape,
+    pub slop: Sides<f32>,
     pub enabled: bool,
     pub focusable: bool,
     pub cursor: CursorIcon,
@@ -122,11 +183,72 @@ pub struct HitRegion {
 impl HitRegion {
     #[must_use]
     pub fn contains(&self, point: Point) -> bool {
-        self.transform
-            .inverse()
-            .is_some_and(|inverse| self.bounds.contains(inverse.transform_point(point)))
-            && self.clips.contains(point)
+        self.transform.inverse().is_some_and(|inverse| {
+            let point = inverse.transform_point(point);
+            let bounds = expanded(self.bounds, self.slop);
+            shape_contains(bounds, self.shape, point)
+        }) && self.clips.contains(point)
     }
+}
+
+fn expanded(bounds: Rect, slop: Sides<f32>) -> Rect {
+    let left = slop.left.max(0.0);
+    let right = slop.right.max(0.0);
+    let top = slop.top.max(0.0);
+    let bottom = slop.bottom.max(0.0);
+    Rect::new(
+        Point::new(bounds.origin.x - left, bounds.origin.y - top),
+        Size::new(
+            (bounds.size.width + left + right).max(0.0),
+            (bounds.size.height + top + bottom).max(0.0),
+        ),
+    )
+}
+
+fn shape_contains(bounds: Rect, shape: HitShape, point: Point) -> bool {
+    if !bounds.contains(point) {
+        return false;
+    }
+    match shape {
+        HitShape::Bounds => true,
+        HitShape::RoundedRect(radii) => rounded_rect_contains(bounds, radii, point),
+        HitShape::Ellipse => ellipse_contains(bounds, point),
+    }
+}
+
+fn rounded_rect_contains(bounds: Rect, radii: CornerRadii, point: Point) -> bool {
+    let local = Point::new(point.x - bounds.origin.x, point.y - bounds.origin.y);
+    let width = bounds.size.width.max(0.0);
+    let height = bounds.size.height.max(0.0);
+    let radius = if local.y < height * 0.5 {
+        if local.x < width * 0.5 {
+            radii.top_left
+        } else {
+            radii.top_right
+        }
+    } else if local.x < width * 0.5 {
+        radii.bottom_left
+    } else {
+        radii.bottom_right
+    }
+    .clamp(0.0, width.min(height) * 0.5);
+    let center = Point::new(
+        local.x.clamp(radius, width - radius),
+        local.y.clamp(radius, height - radius),
+    );
+    let delta = Point::new(local.x - center.x, local.y - center.y);
+    delta.x * delta.x + delta.y * delta.y <= radius * radius
+}
+
+fn ellipse_contains(bounds: Rect, point: Point) -> bool {
+    let radius_x = bounds.size.width * 0.5;
+    let radius_y = bounds.size.height * 0.5;
+    if radius_x <= 0.0 || radius_y <= 0.0 {
+        return false;
+    }
+    let x = (point.x - bounds.origin.x - radius_x) / radius_x;
+    let y = (point.y - bounds.origin.y - radius_y) / radius_y;
+    x * x + y * y <= 1.0
 }
 
 #[derive(Clone, Debug, PartialEq)]

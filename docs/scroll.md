@@ -26,7 +26,7 @@ actual position in paint order, so a later sibling painted above it owns the
 overlap while the remaining track stays interactive.
 
 `ScrollbarPartStyle` gives the track and thumb their own base `QuadStyle`,
-`StateStyle` patches, and `StyleTransition`. Hover and thumb drag feed the same
+`StylePatch` values, and `StyleTransition`. Hover and thumb drag feed the same
 retained transition registry as ordinary elements, so colors, borders, opacity,
 corner radii, and gradient properties animate on the paint-only path. The
 scrollbar never asks the application to rebuild its tree for an interaction

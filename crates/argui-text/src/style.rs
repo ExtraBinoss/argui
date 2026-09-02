@@ -21,6 +21,13 @@ pub enum TextWrap {
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+pub enum TextOverflow {
+    #[default]
+    Clip,
+    Ellipsis,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub enum TextAlign {
     #[default]
     Start,
@@ -46,6 +53,7 @@ pub struct TextStyle {
     pub family: FontFamily,
     pub weight: u16,
     pub wrap: TextWrap,
+    pub overflow: TextOverflow,
     pub align: TextAlign,
 }
 
@@ -58,6 +66,7 @@ impl Default for TextStyle {
             family: FontFamily::SansSerif,
             weight: 400,
             wrap: TextWrap::WordOrGlyph,
+            overflow: TextOverflow::Clip,
             align: TextAlign::Start,
         }
     }

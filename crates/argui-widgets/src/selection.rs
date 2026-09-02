@@ -2,7 +2,7 @@ use argui_paint::{Border, CornerRadii, PaintStyle, QuadStyle};
 use argui_text::{TextStyle, TextWrap};
 use argui_ui::{
     AlignItems, Dimensions, Display, Element, FlexDirection, JustifyContent, LayoutStyle,
-    Orientation, Role, StateStyle, StyleTransition, VisualState, auto, length,
+    Orientation, Role, StylePatch, StyleTransition, VisualState, auto, length,
 };
 
 use crate::{RadioGroupBehavior, RadioGroupPart, ToggleBehavior, TogglePart, WidgetTheme};
@@ -273,7 +273,7 @@ fn control_row_content(
         wrap: TextWrap::None,
         ..TextStyle::default()
     };
-    let hovered = StateStyle::from_quad(QuadStyle::solid(theme.muted));
+    let hovered = StylePatch::from_quad(QuadStyle::solid(theme.muted));
     let label = Element::text(label)
         .text_style(label_style)
         .semantic_hidden(true);
@@ -293,8 +293,8 @@ fn control_row_content(
         .paint_style(PaintStyle::new(
             QuadStyle::solid(argui_core::Color::TRANSPARENT).radius(CornerRadii::all(6.0)),
         ))
-        .state(VisualState::Hovered, hovered)
-        .state(
+        .when(VisualState::Hovered, hovered)
+        .when(
             VisualState::FocusVisible,
             QuadStyle::solid(argui_core::Color::TRANSPARENT)
                 .border(Border::all(2.0, theme.ring))

@@ -4,8 +4,9 @@ use argui_core::{
 };
 use argui_paint::{ClipChain, ClipRegion, Color, QuadStyle};
 use argui_ui::{
-    ClipboardRequest, CursorIcon, Element, HitRegion, Interaction, InteractionUpdate, StateStyle,
-    UiEventKind, UiTree, VisualState, VisualStates,
+    ClipboardRequest, CursorIcon, Element, HitRegion, HitShape, HitTestStyle, Interaction,
+    InteractionUpdate, PointerEvents, Sides, StylePatch, TreeUpdate, UiEventKind, UiTree,
+    VisualState, VisualStates,
 };
 
 fn interactive(key: &str) -> Element {
@@ -13,17 +14,17 @@ fn interactive(key: &str) -> Element {
         .keyed(key)
         .background(Color::rgb(0.0, 0.0, 0.0))
         .interaction(Interaction::default().focusable(true))
-        .state(
+        .when(
             VisualState::Hovered,
-            StateStyle::from_quad(QuadStyle::solid(Color::WHITE)),
+            StylePatch::from_quad(QuadStyle::solid(Color::WHITE)),
         )
-        .state(
+        .when(
             VisualState::Pressed,
-            StateStyle::from_quad(QuadStyle::solid(Color::rgb(1.0, 0.0, 0.0))),
+            StylePatch::from_quad(QuadStyle::solid(Color::rgb(1.0, 0.0, 0.0))),
         )
-        .state(
+        .when(
             VisualState::Focused,
-            StateStyle::from_quad(QuadStyle::solid(Color::rgb(0.0, 1.0, 0.0))),
+            StylePatch::from_quad(QuadStyle::solid(Color::rgb(0.0, 1.0, 0.0))),
         )
 }
 
@@ -40,6 +41,8 @@ fn region_at(node: argui_ui::NodeId, x: f32, focusable: bool) -> HitRegion {
             Rect::new(Point::new(x + 10.0, 10.0), Size::new(70.0, 40.0)),
             Affine2D::IDENTITY,
         )]),
+        shape: argui_ui::HitShape::Bounds,
+        slop: argui_ui::HitTestStyle::default().slop,
         enabled: true,
         focusable,
         cursor: CursorIcon::Auto,
@@ -56,6 +59,58 @@ fn interactions_expose_explicit_platform_cursors() {
         CursorIcon::Grab
     );
     assert_eq!(Interaction::blocker().cursor, CursorIcon::Auto);
+}
+
+#[test]
+fn changing_hit_geometry_requests_a_new_paint_snapshot() {
+    let root = interactive("surface");
+    let mut tree = UiTree::new(root.clone());
+    assert_eq!(
+        tree.update(
+            root.hit_test(HitTestStyle::default().pointer_events(PointerEvents::ContentsOnly))
+        ),
+        TreeUpdate::Paint
+    );
+}
+
+#[test]
+fn hit_shapes_and_slop_are_transform_and_clip_aware() {
+    let bounds = Rect::new(Point::new(10.0, 10.0), Size::new(40.0, 20.0));
+    let mut target = region_at(
+        UiTree::new(Element::container([])).node_ids()[0],
+        10.0,
+        false,
+    );
+    target.bounds = bounds;
+    target.clips = ClipChain::from_regions([ClipRegion::new(
+        Rect::new(Point::default(), Size::new(100.0, 100.0)),
+        Affine2D::IDENTITY,
+    )]);
+    target.shape = HitShape::Ellipse;
+    target.slop = Sides {
+        left: 5.0,
+        right: 5.0,
+        top: 5.0,
+        bottom: 5.0,
+    };
+    assert!(target.contains(Point::new(5.0, 20.0)));
+    assert!(!target.contains(Point::new(5.0, 5.0)));
+
+    target.shape = HitShape::RoundedRect(argui_ui::CornerRadii::all(8.0));
+    target.transform = Affine2D::translation(20.0, 0.0);
+    assert!(target.contains(Point::new(35.0, 20.0)));
+    assert!(!target.contains(Point::new(25.0, 10.0)));
+
+    target.transform = Affine2D::IDENTITY;
+    target.slop = Sides::default();
+    assert!(!target.contains(Point::new(49.0, 11.0)));
+    assert!(!target.contains(Point::new(49.0, 29.0)));
+
+    target.shape = HitShape::Ellipse;
+    target.bounds = Rect::new(Point::new(10.0, 10.0), Size::new(0.0, 20.0));
+    assert!(!target.contains(Point::new(10.0, 20.0)));
+    target.bounds = Rect::new(Point::new(10.0, 10.0), Size::new(20.0, 0.0));
+    assert!(!target.contains(Point::new(20.0, 10.0)));
 }
 
 #[test]
@@ -175,6 +230,14 @@ fn release_over_the_captured_target_emits_a_click() {
             .events
             .iter()
             .any(|event| event.kind == UiEventKind::Clicked)
+    );
+
+    let pressed_again = tree.primary_pressed(&regions);
+    assert!(
+        pressed_again
+            .events
+            .iter()
+            .all(|event| event.kind != UiEventKind::Focused)
     );
 }
 

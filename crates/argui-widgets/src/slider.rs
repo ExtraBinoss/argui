@@ -1,7 +1,7 @@
 use argui_core::Transform2D;
 use argui_paint::{Border, CornerRadii, QuadStyle};
 use argui_ui::{
-    AlignItems, Element, LengthPercentageAuto, Sides, StateStyle, StyleTransition, VisualState,
+    AlignItems, Element, LengthPercentageAuto, Sides, StylePatch, StyleTransition, VisualState,
     auto, length, percent,
 };
 
@@ -66,9 +66,9 @@ impl Slider {
                 .width(percent(1.0))
                 .height(length(28.0))
                 .align_items(AlignItems::CENTER)
-                .state(
+                .when(
                     VisualState::FocusVisible,
-                    StateStyle::from_quad(
+                    StylePatch::from_quad(
                         QuadStyle::solid(argui_core::Color::TRANSPARENT)
                             .border(Border::all(2.0, theme.ring))
                             .radius(CornerRadii::all(8.0)),

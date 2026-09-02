@@ -88,13 +88,13 @@ impl Tabs {
                     .align_items(AlignItems::CENTER)
                     .justify_content(JustifyContent::CENTER)
                     .paint_style(PaintStyle::new(resting.clone()))
-                    .state(
+                    .when(
                         VisualState::Hovered,
                         QuadStyle::solid(theme.muted)
                             .radius(CornerRadii::all(6.0))
                             .into(),
                     )
-                    .state(
+                    .when(
                         VisualState::FocusVisible,
                         resting.border(Border::all(2.0, theme.ring)).into(),
                     )

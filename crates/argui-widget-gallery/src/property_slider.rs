@@ -4,7 +4,7 @@ use argui::{
     runtime::{Context, LayoutSnapshot},
     text::{TextAlign, TextStyle, TextWrap},
     ui::{
-        AlignItems, Axes, Element, JustifyContent, Overflow, Sides, StateSelector, StateStyle,
+        AlignItems, Axes, Element, JustifyContent, Overflow, Sides, StateSelector, StylePatch,
         StyleTransition, TextSelection, UiEvent, UiEventKind, VisualState, auto, length, percent,
         property,
     },
@@ -42,13 +42,13 @@ pub(crate) fn render(
             .paint_style(PaintStyle::new(
                 QuadStyle::solid(theme.foreground).opacity(0.0),
             ))
-            .state(
+            .when(
                 StateSelector::scope(RANGE_SCOPE, VisualState::Hovered),
-                StateStyle::new().set(property::Opacity, 0.42),
+                StylePatch::new().set(property::Opacity, 0.42),
             )
-            .state(
+            .when(
                 StateSelector::scope(RANGE_SCOPE, VisualState::Pressed),
-                StateStyle::new().set(property::Opacity, 0.62),
+                StylePatch::new().set(property::Opacity, 0.62),
             )
             .transition(StyleTransition::default())
     }))
@@ -78,15 +78,15 @@ pub(crate) fn render(
         ))
         .transform(Transform2D::IDENTITY.scale(0.75, 0.72))
         .transform_origin(TransformOrigin::CENTER)
-        .state(
+        .when(
             StateSelector::scope(RANGE_SCOPE, VisualState::Hovered),
-            StateStyle::new()
+            StylePatch::new()
                 .set(property::Opacity, 1.0)
                 .set(property::Transform, Transform2D::IDENTITY),
         )
-        .state(
+        .when(
             StateSelector::scope(RANGE_SCOPE, VisualState::Pressed),
-            StateStyle::new()
+            StylePatch::new()
                 .set(property::Opacity, 1.0)
                 .set(property::Transform, Transform2D::IDENTITY.scale(2.0, 1.0)),
         )
@@ -256,7 +256,7 @@ fn action(key: &str, label: &str, content: Element, theme: &WidgetTheme) -> Elem
             .paint_style(PaintStyle::new(
                 QuadStyle::solid(Color::TRANSPARENT).radius(CornerRadii::all(6.0)),
             ))
-            .state(
+            .when(
                 VisualState::Hovered,
                 QuadStyle::solid(theme.muted)
                     .radius(CornerRadii::all(6.0))

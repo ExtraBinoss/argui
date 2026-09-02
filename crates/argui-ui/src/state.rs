@@ -2,8 +2,8 @@ use argui_animation::Transition;
 use argui_core::{Color, Point, Transform2D};
 use argui_paint::{Border, EffectId, Fill, QuadStyle};
 
-use crate::BindingImpact;
 use crate::binding::{GradientPointTarget, LayoutTarget};
+use crate::{BindingImpact, ContainerQuery};
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum VisualState {
@@ -95,6 +95,94 @@ impl From<StateName> for StateSelector {
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub enum StyleCondition {
+    State(StateSelector),
+    Container(ContainerQuery),
+    All(Vec<Self>),
+    Any(Vec<Self>),
+    Not(Box<Self>),
+}
+
+impl StyleCondition {
+    #[must_use]
+    pub fn state(selector: impl Into<StateSelector>) -> Self {
+        Self::State(selector.into())
+    }
+
+    #[must_use]
+    pub const fn container(query: ContainerQuery) -> Self {
+        Self::Container(query)
+    }
+
+    #[must_use]
+    pub fn all(conditions: impl IntoIterator<Item = Self>) -> Self {
+        Self::All(conditions.into_iter().collect())
+    }
+
+    #[must_use]
+    pub fn any(conditions: impl IntoIterator<Item = Self>) -> Self {
+        Self::Any(conditions.into_iter().collect())
+    }
+
+    pub(crate) fn matches(
+        &self,
+        state: &impl Fn(StateSelector) -> bool,
+        container: &impl Fn(ContainerQuery) -> bool,
+    ) -> bool {
+        match self {
+            Self::State(selector) => state(*selector),
+            Self::Container(query) => container(*query),
+            Self::All(conditions) => conditions.iter().all(|item| item.matches(state, container)),
+            Self::Any(conditions) => conditions.iter().any(|item| item.matches(state, container)),
+            Self::Not(condition) => !condition.matches(state, container),
+        }
+    }
+
+    pub(crate) fn has_container_query(&self) -> bool {
+        match self {
+            Self::Container(_) => true,
+            Self::All(conditions) | Self::Any(conditions) => {
+                conditions.iter().any(Self::has_container_query)
+            }
+            Self::Not(condition) => condition.has_container_query(),
+            Self::State(_) => false,
+        }
+    }
+}
+
+impl From<StateSelector> for StyleCondition {
+    fn from(value: StateSelector) -> Self {
+        Self::State(value)
+    }
+}
+
+impl From<VisualState> for StyleCondition {
+    fn from(value: VisualState) -> Self {
+        Self::state(value)
+    }
+}
+
+impl From<StateName> for StyleCondition {
+    fn from(value: StateName) -> Self {
+        Self::state(value)
+    }
+}
+
+impl From<ContainerQuery> for StyleCondition {
+    fn from(value: ContainerQuery) -> Self {
+        Self::Container(value)
+    }
+}
+
+impl std::ops::Not for StyleCondition {
+    type Output = Self;
+
+    fn not(self) -> Self::Output {
+        Self::Not(Box::new(self))
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct VisualStates(u8);
 
@@ -139,6 +227,8 @@ pub enum PropertyKey {
     BorderWidths,
     CornerRadii,
     Opacity,
+    TextColor,
+    VectorColor,
     GradientPoint(GradientPointTarget),
     GradientStopOffset(usize),
     GradientStopColor(usize),
@@ -149,6 +239,7 @@ pub enum PropertyKey {
     ShadowSpread(usize),
     ShadowColor(usize),
     Layout(LayoutTarget),
+    LayoutStyle,
     Scroll,
     EffectF32(EffectPropertyKey),
     EffectLogicalPixels(EffectPropertyKey),
@@ -164,7 +255,7 @@ impl PropertyKey {
     #[must_use]
     pub const fn impact(self) -> BindingImpact {
         match self {
-            Self::Layout(_) => BindingImpact::Layout,
+            Self::Layout(_) | Self::LayoutStyle => BindingImpact::Layout,
             Self::Scroll => BindingImpact::Scroll,
             _ => BindingImpact::Paint,
         }
@@ -206,48 +297,53 @@ pub enum StateValue {
     Vec4([f32; 4]),
     Mat3([f32; 9]),
     Mat4([f32; 16]),
+    LayoutStyle(Box<crate::LayoutStyle>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct StatePropertyValue {
+pub struct StylePropertyValue {
     pub key: PropertyKey,
     #[doc(hidden)]
     pub value: StateValue,
 }
 
-pub trait StateProperty: crate::binding::private::Sealed {
+pub trait StyleProperty: crate::binding::private::Sealed {
     type Value;
 
     #[doc(hidden)]
-    fn into_state_value(self, value: Self::Value) -> StatePropertyValue;
+    fn into_state_value(self, value: Self::Value) -> StylePropertyValue;
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
-pub struct StateStyle {
-    values: Vec<StatePropertyValue>,
+pub struct StylePatch {
+    values: Vec<StylePropertyValue>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) struct StateRule {
-    pub selector: StateSelector,
-    pub style: StateStyle,
+pub(crate) struct StyleRule {
+    pub condition: StyleCondition,
+    pub style: StylePatch,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
-pub(crate) struct ElementStateStyles {
-    rules: Vec<StateRule>,
+pub(crate) struct ConditionalStyles {
+    rules: Vec<StyleRule>,
 }
 
-impl ElementStateStyles {
+impl ConditionalStyles {
     pub(crate) const fn new() -> Self {
         Self { rules: Vec::new() }
     }
 
-    pub(crate) fn set(&mut self, selector: StateSelector, style: StateStyle) {
-        if let Some(rule) = self.rules.iter_mut().find(|rule| rule.selector == selector) {
+    pub(crate) fn set(&mut self, condition: StyleCondition, style: StylePatch) {
+        if let Some(rule) = self
+            .rules
+            .iter_mut()
+            .find(|rule| rule.condition == condition)
+        {
             rule.style = style;
         } else {
-            self.rules.push(StateRule { selector, style });
+            self.rules.push(StyleRule { condition, style });
         }
     }
 
@@ -255,7 +351,7 @@ impl ElementStateStyles {
         self.rules.is_empty()
     }
 
-    pub(crate) fn rules(&self) -> &[StateRule] {
+    pub(crate) fn rules(&self) -> &[StyleRule] {
         &self.rules
     }
 
@@ -277,16 +373,22 @@ impl ElementStateStyles {
             .flat_map(|rule| rule.style.values())
             .any(|value| value.key == key)
     }
+
+    pub(crate) fn has_container_queries(&self) -> bool {
+        self.rules
+            .iter()
+            .any(|rule| rule.condition.has_container_query())
+    }
 }
 
-impl StateStyle {
+impl StylePatch {
     #[must_use]
     pub const fn new() -> Self {
         Self { values: Vec::new() }
     }
 
     #[must_use]
-    pub fn set<P: StateProperty>(mut self, property: P, value: P::Value) -> Self {
+    pub fn set<P: StyleProperty>(mut self, property: P, value: P::Value) -> Self {
         let value = property.into_state_value(value);
         if let Some(existing) = self.values.iter_mut().find(|item| item.key == value.key) {
             *existing = value;
@@ -294,6 +396,11 @@ impl StateStyle {
             self.values.push(value);
         }
         self
+    }
+
+    #[must_use]
+    pub fn layout(self, style: crate::LayoutStyle) -> Self {
+        self.set(crate::property::Layout, style)
     }
 
     #[must_use]
@@ -313,21 +420,21 @@ impl StateStyle {
         }
     }
 
-    pub(crate) fn values(&self) -> &[StatePropertyValue] {
+    pub(crate) fn values(&self) -> &[StylePropertyValue] {
         &self.values
     }
 }
 
-impl From<QuadStyle> for StateStyle {
+impl From<QuadStyle> for StylePatch {
     fn from(value: QuadStyle) -> Self {
         Self::from_quad(value)
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TransitionDirection {
-    Enter(StateSelector),
-    Exit(StateSelector),
+    Enter(StyleCondition),
+    Exit(StyleCondition),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -354,7 +461,7 @@ impl TransitionRule {
     }
 
     #[must_use]
-    pub const fn direction(mut self, direction: TransitionDirection) -> Self {
+    pub fn direction(mut self, direction: TransitionDirection) -> Self {
         self.direction = Some(direction);
         self
     }
@@ -393,7 +500,8 @@ impl StyleTransition {
                 rule.property.is_none_or(|candidate| candidate == property)
                     && rule
                         .direction
-                        .is_none_or(|candidate| Some(candidate) == direction)
+                        .as_ref()
+                        .is_none_or(|candidate| Some(candidate) == direction.as_ref())
             })
             .max_by_key(|(index, rule)| {
                 (

@@ -1,4 +1,4 @@
-use crate::{NodeId, ScrollbarPartStyle, ScrollbarStyle, StateSelector, VisualStates};
+use crate::{NodeId, ScrollbarPartStyle, ScrollbarStyle, StyleCondition, VisualStates};
 
 use super::super::{NodeSpec, ResolvedProperty, TransitionTarget};
 use super::states::{ScopeStack, StateContext};
@@ -11,6 +11,7 @@ pub(super) struct ScrollbarContext<'a> {
     pub states: &'a StateContext,
     pub scope_stack: &'a ScopeStack,
     pub states_for: &'a dyn Fn(NodeId, crate::scroll::ScrollbarPart, bool) -> VisualStates,
+    pub container_size: &'a dyn Fn(NodeId) -> Option<argui_core::Size>,
 }
 
 pub(super) fn collect<'a>(
@@ -26,10 +27,14 @@ pub(super) fn collect<'a>(
             crate::scroll::ScrollbarPart::Track,
             context.enabled,
         ),
-        |selector, visual| {
-            context
-                .states
-                .matches_part(selector, context.node_index, context.scope_stack, visual)
+        |condition, visual| {
+            context.states.matches_part(
+                condition,
+                context.node_index,
+                context.scope_stack,
+                visual,
+                &context.container_size,
+            )
         },
         output,
     );
@@ -41,10 +46,14 @@ pub(super) fn collect<'a>(
             crate::scroll::ScrollbarPart::Thumb,
             context.enabled,
         ),
-        |selector, visual| {
-            context
-                .states
-                .matches_part(selector, context.node_index, context.scope_stack, visual)
+        |condition, visual| {
+            context.states.matches_part(
+                condition,
+                context.node_index,
+                context.scope_stack,
+                visual,
+                &context.container_size,
+            )
         },
         output,
     );
@@ -54,7 +63,7 @@ fn push<'a>(
     target: TransitionTarget,
     part: &'a ScrollbarPartStyle,
     states: VisualStates,
-    matches: impl Fn(StateSelector, VisualStates) -> bool,
+    matches: impl Fn(&StyleCondition, VisualStates) -> bool,
     output: &mut Vec<NodeSpec<'a>>,
 ) {
     if part.transition.is_none() && !part.has_states() {
@@ -71,25 +80,25 @@ fn push<'a>(
 fn matched(
     part: &ScrollbarPartStyle,
     states: VisualStates,
-    matches: &impl Fn(StateSelector, VisualStates) -> bool,
-) -> Vec<StateSelector> {
+    matches: &impl Fn(&StyleCondition, VisualStates) -> bool,
+) -> Vec<StyleCondition> {
     part.state_rules()
         .iter()
-        .filter_map(|rule| matches(rule.selector, states).then_some(rule.selector))
+        .filter_map(|rule| matches(&rule.condition, states).then_some(rule.condition.clone()))
         .collect()
 }
 
 fn target_values(
     part: &ScrollbarPartStyle,
     states: VisualStates,
-    matches: &impl Fn(StateSelector, VisualStates) -> bool,
+    matches: &impl Fn(&StyleCondition, VisualStates) -> bool,
 ) -> Vec<ResolvedProperty> {
     let matched = matched(part, states, matches);
     let mut values = resolved(quad_values(&part.base));
     for rule in part.state_rules() {
-        if matched.contains(&rule.selector) {
+        if matched.contains(&rule.condition) {
             for property in rule.style.values() {
-                apply_target(&mut values, property, Some(rule.selector));
+                apply_target(&mut values, property, Some(rule.condition.clone()));
             }
         }
     }

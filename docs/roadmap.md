@@ -39,6 +39,8 @@ console logs, and disabled DevTools preserve the existing idle fast path.
   toggles, radio groups, ranges, tabs, selects and dialogs.
 - [x] Add ordered named/scoped state rules, targeted text selection and a
   composable property-range showcase with edit and reset actions.
+- [x] Unify interaction and container conditions into typed composable style
+  patches, with exact hit geometry and bounded convergent responsive layout.
 
 Done when complex text remains grapheme-safe and bidi-correct, and every control
 shares one behavior on native and web.

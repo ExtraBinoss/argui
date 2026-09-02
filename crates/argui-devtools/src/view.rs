@@ -4,7 +4,7 @@ use argui_paint::{Border, Color, CornerRadii, LayerStyle, PaintStyle, QuadStyle,
 use argui_text::{TextColor, TextStyle, TextWrap};
 use argui_ui::{
     AlignItems, Axes, Element, FlexWrap, Interaction, LayoutStyle, LengthPercentageAuto, Overflow,
-    ScrollConfig, ScrollbarPartStyle, ScrollbarStyle, Sides, StateStyle, VirtualList, VisualState,
+    ScrollConfig, ScrollbarPartStyle, ScrollbarStyle, Sides, StylePatch, VirtualList, VisualState,
     auto, length, percent, property, sides,
 };
 use argui_widgets::{Button, ButtonStyle, Input, InputStyle, WidgetTheme};
@@ -74,13 +74,13 @@ fn splitter(theme: &WidgetTheme) -> Element {
         .shrink(0.0)
         .background(theme.primary)
         .interaction(Interaction::default().cursor(argui_ui::CursorIcon::NsResize))
-        .state(
+        .when(
             VisualState::Hovered,
-            StateStyle::from_quad(QuadStyle::solid(theme.primary)),
+            StylePatch::from_quad(QuadStyle::solid(theme.primary)),
         )
-        .state(
+        .when(
             VisualState::Pressed,
-            StateStyle::from_quad(QuadStyle::solid(theme.foreground)),
+            StylePatch::from_quad(QuadStyle::solid(theme.foreground)),
         )
         .inspectable(false)
 }
@@ -174,9 +174,9 @@ fn animated_icon_button<A>(tools: &DevtoolsHost<A>, theme: &WidgetTheme) -> Elem
     .align_items(AlignItems::CENTER)
     .background(theme.background)
     .interaction(Interaction::default())
-    .state(
+    .when(
         VisualState::Hovered,
-        StateStyle::from_quad(QuadStyle::solid(theme.muted)),
+        StylePatch::from_quad(QuadStyle::solid(theme.muted)),
     )
 }
 
@@ -212,7 +212,7 @@ fn elements_tab<A>(tools: &DevtoolsHost<A>, theme: &WidgetTheme) -> Element {
                 PaintStyle::new(QuadStyle::solid(theme.card).radius(CornerRadii::all(5.0))),
                 text(12.0, theme.foreground),
             )
-            .focused(StateStyle::new().set(property::BackgroundColor, theme.muted)),
+            .focused(StylePatch::new().set(property::BackgroundColor, theme.muted)),
         )
         .build();
         Element::row([
@@ -272,9 +272,9 @@ fn tree_row(node: &NodeSnapshot, selected: bool, theme: &WidgetTheme) -> Element
             },
         ))
         .interaction(Interaction::default())
-        .state(
+        .when(
             VisualState::Hovered,
-            StateStyle::from_quad(QuadStyle::solid(theme.muted)),
+            StylePatch::from_quad(QuadStyle::solid(theme.muted)),
         )
 }
 
@@ -373,9 +373,9 @@ fn icon_label_button(key: &str, icon: VectorId, label: &str, theme: &WidgetTheme
     .background(theme.muted)
     .radius(CornerRadii::all(5.0))
     .interaction(Interaction::default())
-    .state(
+    .when(
         VisualState::Hovered,
-        StateStyle::from_quad(QuadStyle::solid(theme.muted)),
+        StylePatch::from_quad(QuadStyle::solid(theme.muted)),
     )
 }
 
@@ -522,8 +522,8 @@ fn toggle_button(open: bool, theme: &WidgetTheme) -> Element {
                 flex_shrink: 0.0,
                 ..LayoutStyle::default()
             })
-            .hovered(StateStyle::new().set(property::BackgroundColor, theme.primary))
-            .pressed(StateStyle::new().set(property::BackgroundColor, theme.foreground)),
+            .hovered(StylePatch::new().set(property::BackgroundColor, theme.primary))
+            .pressed(StylePatch::new().set(property::BackgroundColor, theme.foreground)),
         )
         .build()
         .inspectable(false)
@@ -555,8 +555,8 @@ fn small_button(key: &str, label: &str, active: bool, theme: &WidgetTheme) -> El
             flex_shrink: 0.0,
             ..LayoutStyle::default()
         })
-        .hovered(StateStyle::new().set(property::BackgroundColor, theme.muted))
-        .pressed(StateStyle::new().set(property::BackgroundColor, theme.primary)),
+        .hovered(StylePatch::new().set(property::BackgroundColor, theme.muted))
+        .pressed(StylePatch::new().set(property::BackgroundColor, theme.primary)),
     )
     .build()
 }

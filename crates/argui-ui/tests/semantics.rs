@@ -65,6 +65,8 @@ fn focus_falls_back_to_the_root_when_a_focused_node_is_semantically_hidden() {
         bounds: Rect::new(Point::default(), Size::new(100.0, 30.0)),
         transform: Affine2D::IDENTITY,
         clips: ClipChain::default(),
+        shape: argui_ui::HitShape::Bounds,
+        slop: argui_ui::HitTestStyle::default().slop,
         enabled: true,
         focusable: true,
         cursor: CursorIcon::Auto,

@@ -281,10 +281,10 @@ fn compact_style(theme: &argui_widgets::WidgetTheme) -> ButtonStyle {
         },
     );
     style.layout.padding = sides(10.0, 7.0);
-    style.hovered = argui_ui::StateStyle::from_quad(
+    style.hovered = argui_ui::StylePatch::from_quad(
         QuadStyle::solid(theme.muted).radius(CornerRadii::all(7.0)),
     );
-    style.pressed = argui_ui::StateStyle::from_quad(
+    style.pressed = argui_ui::StylePatch::from_quad(
         QuadStyle::solid(theme.muted)
             .radius(CornerRadii::all(7.0))
             .opacity(0.76),

@@ -51,6 +51,7 @@ pub struct WidgetGallery {
     pub(crate) select_selected: Option<usize>,
     pub(crate) dialog_open: bool,
     pub(crate) clicks: u32,
+    pub(crate) composition_hits: u32,
     pub(crate) editor_size: ResizeState,
     pub(crate) slider_state: RangeState,
     pub(crate) plain_slider_state: RangeState,
@@ -99,6 +100,7 @@ impl Default for WidgetGallery {
             select_selected: Some(0),
             dialog_open: false,
             clicks: 0,
+            composition_hits: 0,
             editor_size: ResizeState::new(Size::new(520.0, 170.0)),
             slider_state: RangeState::default(),
             plain_slider_state: RangeState::default(),
@@ -127,7 +129,8 @@ impl WidgetGallery {
                 pages::render(self, theme, assets, spinner)
                     .keyed("gallery-content-scroll")
                     .grow(1.0)
-                    .height(percent(1.0))
+                    .min_width(length(0.0))
+                    .min_height(length(0.0))
                     .padding(Sides::length(30.0))
                     .overflow(Axes {
                         x: Overflow::Hidden,
@@ -136,7 +139,7 @@ impl WidgetGallery {
                     .scroll_config(ScrollConfig::default().scrollbar(theme.scrollbar.clone())),
             ])
             .grow(1.0)
-            .height(percent(1.0)),
+            .min_height(length(0.0)),
         ])
         .keyed("gallery-root")
         .width(percent(1.0))
@@ -439,6 +442,11 @@ impl Render for WidgetGallery {
                     return;
                 }
                 Some("demo-button") => self.clicks = self.clicks.saturating_add(1),
+                Some("composition-circle") => {
+                    self.composition_hits = self.composition_hits.saturating_add(1);
+                    cx.notify();
+                    return;
+                }
                 Some("accepted") => self.accepted = !self.accepted,
                 Some("notifications") => self.notifications = !self.notifications,
                 _ => {

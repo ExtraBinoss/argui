@@ -1,8 +1,9 @@
 use crate::{
-    AlignContent, AlignItems, AlignSelf, Dimension, Dimensions, Display, EffectScope,
-    FlexDirection, FlexWrap, Interaction, JustifyContent, JustifyItems, JustifySelf, LayoutStyle,
-    LengthPercentage, LengthPercentageAuto, MotionProperty, Position, ScopedEffect, ScrollConfig,
-    Sides, StateName, StateScopeId, StateSelector, StateStyle, StyleTransition, WritingDirection,
+    AlignContent, AlignItems, AlignSelf, ContainerScopeId, Dimension, Dimensions, Display,
+    EffectScope, FlexDirection, FlexWrap, HitTestStyle, Interaction, JustifyContent, JustifyItems,
+    JustifySelf, LayoutStyle, LengthPercentage, LengthPercentageAuto, MotionProperty, Position,
+    ScopedEffect, ScrollConfig, Sides, StateName, StateScopeId, StyleCondition, StylePatch,
+    StyleTransition, WritingDirection,
 };
 use argui_accessibility::Semantics;
 use argui_core::{Transform2D, TransformOrigin};
@@ -54,9 +55,11 @@ impl Element {
             transform: Transform2D::IDENTITY,
             transform_origin: TransformOrigin::CENTER,
             interaction: None,
-            state_styles: crate::state::ElementStateStyles::default(),
+            hit_test: HitTestStyle::default(),
+            conditional_styles: crate::state::ConditionalStyles::default(),
             style_transition: None,
             state_scope: None,
+            container_scope: None,
             active_states: Vec::new(),
             semantics: None,
             semantic_hidden: false,
@@ -110,9 +113,11 @@ impl Element {
             transform: Transform2D::IDENTITY,
             transform_origin: TransformOrigin::CENTER,
             interaction: None,
-            state_styles: crate::state::ElementStateStyles::default(),
+            hit_test: HitTestStyle::default(),
+            conditional_styles: crate::state::ConditionalStyles::default(),
             style_transition: None,
             state_scope: None,
+            container_scope: None,
             active_states: Vec::new(),
             semantics: None,
             semantic_hidden: false,
@@ -152,7 +157,7 @@ impl Element {
 
     #[must_use]
     pub fn has_state_animation(&self) -> bool {
-        self.style_transition.is_some() || !self.state_styles.is_empty()
+        self.style_transition.is_some() || !self.conditional_styles.is_empty()
     }
 
     #[must_use]
@@ -472,8 +477,14 @@ impl Element {
     }
 
     #[must_use]
-    pub fn state(mut self, selector: impl Into<StateSelector>, style: StateStyle) -> Self {
-        self.state_styles.set(selector.into(), style);
+    pub fn hit_test(mut self, hit_test: HitTestStyle) -> Self {
+        self.hit_test = hit_test;
+        self
+    }
+
+    #[must_use]
+    pub fn when(mut self, condition: impl Into<StyleCondition>, style: StylePatch) -> Self {
+        self.conditional_styles.set(condition.into(), style);
         self
     }
 
@@ -486,6 +497,12 @@ impl Element {
     #[must_use]
     pub fn state_scope(mut self, scope: StateScopeId) -> Self {
         self.state_scope = Some(scope);
+        self
+    }
+
+    #[must_use]
+    pub fn container_scope(mut self, scope: ContainerScopeId) -> Self {
+        self.container_scope = Some(scope);
         self
     }
 

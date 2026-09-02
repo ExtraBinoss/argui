@@ -2,7 +2,8 @@ use argui_core::{Affine2D, Point, Rect, ScrollDelta};
 use argui_paint::{ClipChain, QuadStyle};
 
 use crate::{
-    HitRegion, NodeId, Sides, StateSelector, StateStyle, StyleTransition, VisualState, VisualStates,
+    HitRegion, NodeId, Sides, StyleCondition, StylePatch, StyleTransition, VisualState,
+    VisualStates,
 };
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -170,7 +171,7 @@ impl ScrollbarStyle {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ScrollbarPartStyle {
     pub base: QuadStyle,
-    states: crate::state::ElementStateStyles,
+    states: crate::state::ConditionalStyles,
     pub transition: Option<StyleTransition>,
 }
 
@@ -179,18 +180,18 @@ impl ScrollbarPartStyle {
     pub const fn new(base: QuadStyle) -> Self {
         Self {
             base,
-            states: crate::state::ElementStateStyles::new(),
+            states: crate::state::ConditionalStyles::new(),
             transition: None,
         }
     }
 
     #[must_use]
-    pub fn state(mut self, selector: impl Into<StateSelector>, style: StateStyle) -> Self {
+    pub fn when(mut self, condition: impl Into<StyleCondition>, style: StylePatch) -> Self {
         assert!(
             style.values().iter().all(|property| property.key.is_quad()),
             "scrollbar states only accept quad paint properties"
         );
-        self.states.set(selector.into(), style);
+        self.states.set(condition.into(), style);
         self
     }
 
@@ -200,12 +201,16 @@ impl ScrollbarPartStyle {
         self
     }
 
-    pub(crate) fn state_rules(&self) -> &[crate::state::StateRule] {
+    pub(crate) fn state_rules(&self) -> &[crate::state::StyleRule] {
         self.states.rules()
     }
 
     pub(crate) fn has_states(&self) -> bool {
         !self.states.is_empty()
+    }
+
+    pub(crate) fn has_container_queries(&self) -> bool {
+        self.states.has_container_queries()
     }
 }
 

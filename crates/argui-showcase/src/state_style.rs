@@ -3,7 +3,7 @@ use argui_core::{Color, Point, Transform2D};
 use argui_paint::{Border, CornerRadii, Fill, GradientStop, LinearGradient, PaintStyle, QuadStyle};
 use argui_ui::{
     Axes, Element, FlexWrap, Interaction, KeyboardActivation, Overflow, PropertyKey, ScrollConfig,
-    ScrollbarPartStyle, ScrollbarStyle, Sides, StateScopeId, StateSelector, StateStyle,
+    ScrollbarPartStyle, ScrollbarStyle, Sides, StateScopeId, StateSelector, StylePatch,
     StyleTransition, TransitionDirection, TransitionRule, VisualState, length, percent, property,
     sides,
 };
@@ -80,9 +80,9 @@ fn spring_surface(theme: &WidgetTheme) -> Element {
             650,
             argui_text::TextWrap::None,
         ))
-        .state(
+        .when(
             StateSelector::scope(scope, VisualState::Pressed),
-            StateStyle::new().set(
+            StylePatch::new().set(
                 property::Transform,
                 Transform2D::IDENTITY.translate(4.0, 0.0),
             ),
@@ -99,24 +99,24 @@ fn spring_surface(theme: &WidgetTheme) -> Element {
                 .border(Border::all(1.0, theme.border)),
         ))
         .interaction(interactive())
-        .state(
+        .when(
             VisualState::Hovered,
-            StateStyle::new().set(property::CornerRadii, [18.0; 4]).set(
+            StylePatch::new().set(property::CornerRadii, [18.0; 4]).set(
                 property::Transform,
                 Transform2D::IDENTITY
                     .translate(6.0, 0.0)
                     .scale(1.015, 1.015),
             ),
         )
-        .state(
+        .when(
             VisualState::Focused,
-            StateStyle::new()
+            StylePatch::new()
                 .set(property::BorderColor, theme.foreground)
                 .set(property::BorderWidths, [3.0; 4]),
         )
-        .state(
+        .when(
             VisualState::Pressed,
-            StateStyle::new()
+            StylePatch::new()
                 .set(property::Opacity, 0.72)
                 .set(property::Transform, Transform2D::IDENTITY.scale(0.97, 0.97)),
         )
@@ -145,18 +145,18 @@ fn directional_surface(theme: &WidgetTheme) -> Element {
         .background(theme.primary)
         .radius(CornerRadii::all(10.0))
         .interaction(interactive())
-        .state(
+        .when(
             VisualState::Hovered,
-            StateStyle::new()
+            StylePatch::new()
                 .set(
                     property::Transform,
                     Transform2D::IDENTITY.translate(18.0, 0.0).rotate(0.025),
                 )
                 .set(property::Opacity, 0.78),
         )
-        .state(
+        .when(
             VisualState::Focused,
-            StateStyle::new().set(property::Border, Some(Border::all(2.0, theme.foreground))),
+            StylePatch::new().set(property::Border, Some(Border::all(2.0, theme.foreground))),
         )
         .transition(transition)
 }
@@ -170,17 +170,17 @@ fn layout_surface(theme: &WidgetTheme) -> Element {
         .background(theme.primary)
         .radius(CornerRadii::all(10.0))
         .interaction(interactive())
-        .state(
+        .when(
             VisualState::Hovered,
-            StateStyle::new()
+            StylePatch::new()
                 .set(property::WidthPx, 260.0)
                 .set(property::PaddingLeft, 28.0)
                 .set(property::PaddingRight, 28.0)
                 .set(property::CornerRadii, [18.0; 4]),
         )
-        .state(
+        .when(
             VisualState::Pressed,
-            StateStyle::new().set(property::HeightPx, 46.0),
+            StylePatch::new().set(property::HeightPx, 46.0),
         )
         .transition(StyleTransition::new(Transition::tween(Tween::new(
             Duration::from_millis(220),
@@ -206,9 +206,9 @@ fn gradient_surface(theme: &WidgetTheme) -> Element {
         .fill(Fill::Linear(gradient))
         .radius(CornerRadii::all(10.0))
         .interaction(interactive())
-        .state(
+        .when(
             VisualState::Hovered,
-            StateStyle::new()
+            StylePatch::new()
                 .set(property::LinearGradientStart, Point::new(0.0, 1.0))
                 .set(property::LinearGradientEnd, Point::new(1.0, 0.0))
                 .set(property::gradient_stop_offset(1), 0.72)
@@ -238,9 +238,9 @@ fn scrollbar_surface(theme: &WidgetTheme) -> Element {
         .border(Border::all(1.0, theme.border))
         .radius(CornerRadii::all(8.0))
         .interaction(Interaction::default())
-        .state(
+        .when(
             VisualState::Hovered,
-            StateStyle::new()
+            StylePatch::new()
                 .set(property::BorderColor, theme.primary)
                 .set(property::CornerRadii, [14.0; 4])
                 .set(
@@ -258,23 +258,23 @@ fn scrollbar_surface(theme: &WidgetTheme) -> Element {
                 .radius(CornerRadii::all(999.0))
                 .opacity(0.45),
         )
-        .state(
+        .when(
             VisualState::Hovered,
-            StateStyle::new().set(property::Opacity, 1.0),
+            StylePatch::new().set(property::Opacity, 1.0),
         )
         .transition(StyleTransition::new(Transition::tween(Tween::new(
             Duration::from_millis(160),
         )))),
         ScrollbarPartStyle::new(QuadStyle::solid(theme.primary).radius(CornerRadii::all(999.0)))
-            .state(
+            .when(
                 VisualState::Hovered,
-                StateStyle::new()
+                StylePatch::new()
                     .set(property::BackgroundColor, theme.foreground)
                     .set(property::CornerRadii, [5.0; 4]),
             )
-            .state(
+            .when(
                 VisualState::Pressed,
-                StateStyle::new()
+                StylePatch::new()
                     .set(property::BackgroundColor, theme.primary)
                     .set(property::Opacity, 0.72),
             )

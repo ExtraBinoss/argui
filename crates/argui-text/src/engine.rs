@@ -5,10 +5,11 @@ use cosmic_text::{
     Align, Attrs, Buffer, Family, FontSystem, Metrics, Shaping, SwashCache, SwashContent, Weight,
     Wrap, fontdb,
 };
+use unicode_segmentation::UnicodeSegmentation;
 
 use crate::{
-    FontFamily, GlyphContent, GlyphImage, GlyphKey, PreparedGlyph, PreparedText, TextScene,
-    TextWrap,
+    FontFamily, GlyphContent, GlyphImage, GlyphKey, PreparedGlyph, PreparedText, TextOverflow,
+    TextScene, TextWrap,
     cache::{CachedGlyph, MeasureKey, ShapeKey, TextCache},
 };
 
@@ -134,6 +135,18 @@ impl TextEngine {
         scale_factor: f32,
         subpixel_origin: [f32; 2],
     ) -> Vec<CachedGlyph> {
+        let ellipsized = (block.style.wrap == TextWrap::None
+            && block.style.overflow == TextOverflow::Ellipsis)
+            .then(|| {
+                ellipsize(
+                    &mut self.fonts,
+                    &block.text,
+                    &block.style,
+                    block.bounds.size.width,
+                )
+            })
+            .flatten();
+        let rendered_text = ellipsized.as_deref().unwrap_or(&block.text);
         let metrics = Metrics::new(block.style.font_size, block.style.line_height);
         let mut buffer = Buffer::new(&mut self.fonts, metrics);
         buffer.set_size(
@@ -147,7 +160,7 @@ impl TextEngine {
             .family(family)
             .weight(Weight(block.style.weight));
         buffer.set_text(
-            &block.text,
+            rendered_text,
             &attrs,
             Shaping::Advanced,
             text_align(block.style.align),
@@ -193,6 +206,53 @@ impl TextEngine {
             data: image.data,
         })
     }
+}
+
+fn ellipsize(
+    fonts: &mut FontSystem,
+    text: &str,
+    style: &crate::TextStyle,
+    width: f32,
+) -> Option<String> {
+    if !width.is_finite() || line_width(fonts, text, style) <= width.max(0.0) {
+        return None;
+    }
+    const MARK: &str = "…";
+    let ends = text
+        .grapheme_indices(true)
+        .map(|(index, grapheme)| index + grapheme.len())
+        .collect::<Vec<_>>();
+    let mut first = 0;
+    let mut last = ends.len();
+    while first < last {
+        let middle = (first + last).div_ceil(2);
+        let end = ends[middle - 1];
+        let candidate = format!("{}{}", &text[..end], MARK);
+        if line_width(fonts, &candidate, style) <= width.max(0.0) {
+            first = middle;
+        } else {
+            last = middle - 1;
+        }
+    }
+    let prefix = first
+        .checked_sub(1)
+        .map_or("", |index| &text[..ends[index]]);
+    Some(format!("{prefix}{MARK}"))
+}
+
+fn line_width(fonts: &mut FontSystem, text: &str, style: &crate::TextStyle) -> f32 {
+    let mut buffer = Buffer::new(fonts, Metrics::new(style.font_size, style.line_height));
+    buffer.set_size(None, None);
+    buffer.set_wrap(Wrap::None);
+    let attrs = Attrs::new()
+        .family(family(&style.family))
+        .weight(Weight(style.weight));
+    buffer.set_text(text, &attrs, Shaping::Advanced, text_align(style.align));
+    buffer.shape_until_scroll(fonts, false);
+    buffer
+        .layout_runs()
+        .map(|run| run.line_w)
+        .fold(0.0, f32::max)
 }
 
 pub(crate) const fn text_align(align: crate::TextAlign) -> Option<Align> {

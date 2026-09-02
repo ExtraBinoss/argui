@@ -226,6 +226,8 @@ mod tests {
             bounds: Rect::new(Point::default(), Size::new(100.0, 40.0)),
             transform: Affine2D::IDENTITY,
             clips: ClipChain::default(),
+            shape: argui_ui::HitShape::Bounds,
+            slop: argui_ui::HitTestStyle::default().slop,
             enabled: true,
             focusable: true,
             cursor: CursorIcon::Auto,

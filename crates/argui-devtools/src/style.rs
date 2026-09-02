@@ -4,7 +4,7 @@ use argui_paint::{CornerRadii, PaintStyle, QuadStyle, VectorId};
 use argui_text::{TextColor, TextStyle, TextWrap};
 use argui_ui::{
     AlignItems, Axes, Element, Interaction, LayoutStyle, Overflow, ScrollConfig,
-    ScrollbarPartStyle, ScrollbarStyle, Sides, StateStyle, VisualState, length, property, sides,
+    ScrollbarPartStyle, ScrollbarStyle, Sides, StylePatch, VisualState, length, property, sides,
 };
 use argui_widgets::{Button, ButtonStyle, Input, InputStyle, WidgetTheme};
 
@@ -141,7 +141,7 @@ fn number_input(key: &str, value: f32, theme: &WidgetTheme) -> Element {
             PaintStyle::new(QuadStyle::solid(theme.card).radius(CornerRadii::all(4.0))),
             text(11.0, theme.foreground),
         )
-        .focused(StateStyle::new().set(property::BackgroundColor, theme.muted)),
+        .focused(StylePatch::new().set(property::BackgroundColor, theme.muted)),
     )
     .build()
     .width(length(92.0))
@@ -176,9 +176,9 @@ fn section_header(
     .padding(sides(5.0, 4.0))
     .background(if open { theme.muted } else { theme.background })
     .interaction(Interaction::default())
-    .state(
+    .when(
         VisualState::Hovered,
-        StateStyle::from_quad(QuadStyle::solid(theme.muted)),
+        StylePatch::from_quad(QuadStyle::solid(theme.muted)),
     )
 }
 
@@ -203,8 +203,8 @@ fn button(key: &str, label: &str, active: bool, theme: &WidgetTheme) -> Element 
             flex_shrink: 0.0,
             ..LayoutStyle::default()
         })
-        .hovered(StateStyle::new().set(property::BackgroundColor, theme.muted))
-        .pressed(StateStyle::new().set(property::BackgroundColor, theme.primary)),
+        .hovered(StylePatch::new().set(property::BackgroundColor, theme.muted))
+        .pressed(StylePatch::new().set(property::BackgroundColor, theme.primary)),
     )
     .build()
 }

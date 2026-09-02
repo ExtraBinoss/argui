@@ -1,4 +1,4 @@
-use argui_text::TextStyle;
+use argui_text::{TextOverflow, TextStyle};
 use argui_ui::{Color, Element, ElementKind, ImageFit, ImageId, ImageSampling, VectorId};
 
 #[test]
@@ -45,6 +45,22 @@ fn media_and_text_specific_builders_only_change_matching_elements() {
     ));
     assert!(matches!(
         Element::container([]).text_style(style).kind,
+        ElementKind::Container
+    ));
+}
+
+#[test]
+fn text_overflow_applies_only_to_textual_elements() {
+    assert!(matches!(
+        Element::text("truncate")
+            .text_overflow(TextOverflow::Ellipsis)
+            .kind,
+        ElementKind::Text { ref style, .. } if style.overflow == TextOverflow::Ellipsis
+    ));
+    assert!(matches!(
+        Element::container([])
+            .text_overflow(TextOverflow::Ellipsis)
+            .kind,
         ElementKind::Container
     ));
 }

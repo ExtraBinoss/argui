@@ -7,7 +7,7 @@ use super::{
     private,
 };
 use crate::state::StateValue;
-use crate::{EffectPropertyKey, PropertyKey, StateProperty, StatePropertyValue};
+use crate::{EffectPropertyKey, PropertyKey, StyleProperty, StylePropertyValue};
 
 macro_rules! simple_property {
     ($name:ident, $value:ty, $binding:ident, $key:expr, $state:ident) => {
@@ -24,11 +24,11 @@ macro_rules! simple_property {
             }
         }
 
-        impl StateProperty for $name {
+        impl StyleProperty for $name {
             type Value = $value;
 
-            fn into_state_value(self, value: Self::Value) -> StatePropertyValue {
-                StatePropertyValue {
+            fn into_state_value(self, value: Self::Value) -> StylePropertyValue {
+                StylePropertyValue {
                     key: $key,
                     value: StateValue::$state(value),
                 }
@@ -73,6 +73,54 @@ simple_property!(
     CornerRadii
 );
 simple_property!(Opacity, f32, Opacity, PropertyKey::Opacity, Opacity);
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct TextColor;
+
+impl private::Sealed for TextColor {}
+
+impl StyleProperty for TextColor {
+    type Value = Color;
+
+    fn into_state_value(self, value: Self::Value) -> StylePropertyValue {
+        StylePropertyValue {
+            key: PropertyKey::TextColor,
+            value: StateValue::Color(value),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct VectorColor;
+
+impl private::Sealed for VectorColor {}
+
+impl StyleProperty for VectorColor {
+    type Value = Color;
+
+    fn into_state_value(self, value: Self::Value) -> StylePropertyValue {
+        StylePropertyValue {
+            key: PropertyKey::VectorColor,
+            value: StateValue::Color(value),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Layout;
+
+impl private::Sealed for Layout {}
+
+impl StyleProperty for Layout {
+    type Value = crate::LayoutStyle;
+
+    fn into_state_value(self, value: Self::Value) -> StylePropertyValue {
+        StylePropertyValue {
+            key: PropertyKey::LayoutStyle,
+            value: StateValue::LayoutStyle(Box::new(value)),
+        }
+    }
+}
 simple_property!(
     LayerOpacity,
     f32,
@@ -94,11 +142,11 @@ pub struct Background;
 
 impl private::Sealed for Background {}
 
-impl StateProperty for Background {
+impl StyleProperty for Background {
     type Value = Option<Fill>;
 
-    fn into_state_value(self, value: Self::Value) -> StatePropertyValue {
-        StatePropertyValue {
+    fn into_state_value(self, value: Self::Value) -> StylePropertyValue {
+        StylePropertyValue {
             key: PropertyKey::Background,
             value: StateValue::Background(value),
         }
@@ -110,11 +158,11 @@ pub struct Border;
 
 impl private::Sealed for Border {}
 
-impl StateProperty for Border {
+impl StyleProperty for Border {
     type Value = Option<argui_paint::Border>;
 
-    fn into_state_value(self, value: Self::Value) -> StatePropertyValue {
-        StatePropertyValue {
+    fn into_state_value(self, value: Self::Value) -> StylePropertyValue {
+        StylePropertyValue {
             key: PropertyKey::Border,
             value: StateValue::Border(value),
         }
@@ -141,11 +189,11 @@ macro_rules! indexed_property {
             }
         }
 
-        impl StateProperty for $name {
+        impl StyleProperty for $name {
             type Value = $value;
 
-            fn into_state_value(self, value: Self::Value) -> StatePropertyValue {
-                StatePropertyValue {
+            fn into_state_value(self, value: Self::Value) -> StylePropertyValue {
+                StylePropertyValue {
                     key: PropertyKey::$key(self.0),
                     value: StateValue::$state(value),
                 }
@@ -211,11 +259,11 @@ macro_rules! gradient_point_property {
             }
         }
 
-        impl StateProperty for $name {
+        impl StyleProperty for $name {
             type Value = Point;
 
-            fn into_state_value(self, value: Point) -> StatePropertyValue {
-                StatePropertyValue {
+            fn into_state_value(self, value: Point) -> StylePropertyValue {
+                StylePropertyValue {
                     key: PropertyKey::GradientPoint(GradientPointTarget::$target),
                     value: StateValue::Point(value),
                 }
@@ -244,11 +292,11 @@ macro_rules! layout_property {
             }
         }
 
-        impl StateProperty for $name {
+        impl StyleProperty for $name {
             type Value = f32;
 
-            fn into_state_value(self, value: f32) -> StatePropertyValue {
-                StatePropertyValue {
+            fn into_state_value(self, value: f32) -> StylePropertyValue {
+                StylePropertyValue {
                     key: PropertyKey::Layout(LayoutTarget::$target),
                     value: StateValue::F32(value),
                 }
@@ -301,15 +349,15 @@ macro_rules! effect_property {
             }
         }
 
-        impl StateProperty for $name {
+        impl StyleProperty for $name {
             type Value = $value;
 
-            fn into_state_value(self, value: Self::Value) -> StatePropertyValue {
+            fn into_state_value(self, value: Self::Value) -> StylePropertyValue {
                 let target = EffectPropertyKey {
                     effect: self.0.effect,
                     parameter: self.0.parameter,
                 };
-                StatePropertyValue {
+                StylePropertyValue {
                     key: PropertyKey::$key(target),
                     value: StateValue::$state(value),
                 }

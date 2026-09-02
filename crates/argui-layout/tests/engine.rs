@@ -4,10 +4,13 @@ use argui_paint::{DisplayCommand, PaintStyle, QuadStyle};
 use argui_text::{TextEngine, TextStyle};
 use argui_ui::{
     AlignItems, Axes, Color, Element, FlexWrap, Interaction, LengthPercentageAuto, Overflow,
-    OverlayAlign, OverlayPlacement, PlacementSide, ScrollConfig, Sides, StateStyle, UiTree,
+    OverlayAlign, OverlayPlacement, PlacementSide, ScrollConfig, Sides, StylePatch, UiTree,
     VisualState, WindowDragBehavior, auto, length, percent, sides,
 };
 use argui_widgets::{Button, ButtonStyle, Input, InputStyle};
+
+#[path = "engine/compute.rs"]
+mod compute_tests;
 
 const NOTO_SANS: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
 
@@ -31,9 +34,9 @@ fn interaction_repaint_reuses_layout_and_shaped_text() {
         .padding(Sides::length(12.0))
         .background(Color::rgb(0.0, 0.0, 0.0))
         .interaction(Interaction::default())
-        .state(
+        .when(
             VisualState::Hovered,
-            StateStyle::from_quad(QuadStyle::solid(Color::WHITE)),
+            StylePatch::from_quad(QuadStyle::solid(Color::WHITE)),
         );
     let mut ui = UiTree::new(root);
     let mut layout = LayoutEngine::new();
