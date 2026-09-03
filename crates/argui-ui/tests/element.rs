@@ -53,13 +53,13 @@ fn media_and_text_specific_builders_only_change_matching_elements() {
 fn text_overflow_applies_only_to_textual_elements() {
     assert!(matches!(
         Element::text("truncate")
-            .text_overflow(TextOverflow::Ellipsis)
+            .text_overflow(TextOverflow::Ellipsis(argui_text::EllipsisPosition::End))
             .kind,
-        ElementKind::Text { ref style, .. } if style.overflow == TextOverflow::Ellipsis
+        ElementKind::Text { ref style, .. } if style.overflow == TextOverflow::Ellipsis(argui_text::EllipsisPosition::End)
     ));
     assert!(matches!(
         Element::container([])
-            .text_overflow(TextOverflow::Ellipsis)
+            .text_overflow(TextOverflow::Ellipsis(argui_text::EllipsisPosition::End))
             .kind,
         ElementKind::Container
     ));

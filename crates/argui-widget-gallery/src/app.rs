@@ -388,7 +388,7 @@ impl Render for WidgetGallery {
 
     fn event(&mut self, event: &UiEvent, cx: &mut Context<Self>) {
         if self.handle_shortcuts(event, cx) {
-            cx.stop_propagation();
+            event.stop_propagation();
             return;
         }
         if let Some(page) = self.update_search_keys(event) {
@@ -564,7 +564,7 @@ impl Render for WidgetGallery {
 }
 
 pub(crate) fn text(value: impl Into<String>, size: f32, color: TextColor, weight: u16) -> Element {
-    Element::text(value).text_style(TextStyle {
+    Element::text(value.into()).text_style(TextStyle {
         font_size: size,
         line_height: size * 1.35,
         color,

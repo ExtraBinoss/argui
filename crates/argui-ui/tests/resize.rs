@@ -7,10 +7,10 @@ use argui_ui::{
 fn event(phase: GesturePhase, total: Point) -> UiEvent {
     let tree = UiTree::new(Element::container([]));
     let target = tree.node_ids()[0];
-    UiEvent {
+    UiEvent::new(
         target,
-        key: Some("resize".into()),
-        kind: UiEventKind::Gesture(GestureEvent {
+        Some("resize".into()),
+        UiEventKind::Gesture(GestureEvent {
             target,
             phase,
             kind: GestureKind::Pan {
@@ -20,7 +20,7 @@ fn event(phase: GesturePhase, total: Point) -> UiEvent {
                 velocity: Point::default(),
             },
         }),
-    }
+    )
 }
 
 #[test]

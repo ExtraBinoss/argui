@@ -6,7 +6,7 @@ use argui_ui::{
 };
 
 use argui_animation::{Duration, Frame, Time};
-use argui_core::{Color, ColorScheme, Point, Rect, Size};
+use argui_core::{Color, ColorScheme, Point, PointerId, Rect, Size};
 use argui_ui::ClipboardRequest;
 
 use crate::{
@@ -61,11 +61,11 @@ impl Render for Child {
         Element::text("child").keyed("deep-child")
     }
 
-    fn event(&mut self, _event: &UiEvent, cx: &mut Context<Self>) {
+    fn event(&mut self, event: &UiEvent, cx: &mut Context<Self>) {
         self.events.set(self.events.get() + 1);
         cx.notify();
         if self.stop {
-            cx.stop_propagation();
+            event.stop_propagation();
         }
     }
 }
@@ -87,23 +87,27 @@ impl Render for Parent {
 }
 
 fn event() -> UiEvent {
-    UiEvent {
-        target: UiTree::new(Element::container([])).node_id_at(0).unwrap(),
-        key: Some("deep-child".into()),
-        kind: UiEventKind::Clicked,
-    }
+    UiEvent::new(
+        UiTree::new(Element::container([])).node_id_at(0).unwrap(),
+        Some("deep-child".into()),
+        UiEventKind::Clicked,
+    )
+}
+
+fn owned_event(owner: argui_ui::EventOwnerId) -> UiEvent {
+    event().with_current_owner(owner)
 }
 
 fn unkeyed_event() -> UiEvent {
-    UiEvent {
-        target: UiTree::new(Element::container([])).node_id_at(0).unwrap(),
-        key: None,
-        kind: UiEventKind::Clicked,
-    }
+    UiEvent::new(
+        UiTree::new(Element::container([])).node_id_at(0).unwrap(),
+        None,
+        UiEventKind::Clicked,
+    )
 }
 
 #[test]
-fn keyed_events_dispatch_to_the_deepest_entity_then_bubble() {
+fn event_owner_routes_directly_to_the_deepest_entity() {
     let child_events = Rc::new(Cell::new(0));
     let parent_events = Rc::new(Cell::new(0));
     let root = Entity::new(Parent {
@@ -113,14 +117,15 @@ fn keyed_events_dispatch_to_the_deepest_entity_then_bubble() {
         }),
         events: parent_events.clone(),
     });
-    let _ = root.render();
-    root.event(&event());
+    let rendered = root.render();
+    let owner = rendered.children[0].event_owner.unwrap();
+    root.event(&owned_event(owner));
     assert_eq!(child_events.get(), 1);
-    assert_eq!(parent_events.get(), 1);
+    assert_eq!(parent_events.get(), 0);
 }
 
 #[test]
-fn child_can_stop_entity_bubbling() {
+fn propagation_control_lives_on_the_dispatched_event() {
     let child_events = Rc::new(Cell::new(0));
     let parent_events = Rc::new(Cell::new(0));
     let root = Entity::new(Parent {
@@ -130,10 +135,13 @@ fn child_can_stop_entity_bubbling() {
         }),
         events: parent_events.clone(),
     });
-    let _ = root.render();
-    root.event(&event());
+    let rendered = root.render();
+    let owner = rendered.children[0].event_owner.unwrap();
+    let event = owned_event(owner);
+    root.event(&event);
     assert_eq!(child_events.get(), 1);
     assert_eq!(parent_events.get(), 0);
+    assert!(event.propagation_stopped());
 }
 
 #[test]
@@ -180,6 +188,9 @@ impl Render for Effects {
         cx.scroll_to("target", Point::new(2.0, 4.0));
         cx.request_focus("target");
         cx.select_text("target", TextSelection::All);
+        assert!(cx.capture_pointer(PointerId::MOUSE));
+        assert!(cx.release_pointer(PointerId::MOUSE));
+        cx.selection_command(argui_ui::SelectionCommand::Copy);
         cx.request_animation_frame();
     }
 }
@@ -204,6 +215,11 @@ fn context_bubbles_commands_clipboard_scroll_and_frame_requests() {
         Some(TextSelectionRequest::new("target", TextSelection::All))
     );
     assert!(effects.animation_frame);
+    assert_eq!(effects.pointer_capture.len(), 2);
+    assert_eq!(
+        effects.selection_command.unwrap().command,
+        argui_ui::SelectionCommand::Copy
+    );
 }
 
 #[test]
@@ -232,6 +248,10 @@ fn contexts_create_entities_and_propagate_nested_effects() {
         primary: Some(Color::rgb(0.8, 0.2, 0.4)),
     });
     nested.command(AppCommand::Quit);
+    let selection_target = UiTree::new(Element::container([])).node_ids()[0];
+    nested.selection_command_for(selection_target, argui_ui::SelectionCommand::SelectAll);
+    assert!(!nested.capture_pointer(PointerId::MOUSE));
+    assert!(!nested.release_pointer(PointerId::MOUSE));
     parent.propagate(nested);
     parent.propagate(Context::<Effects>::default());
 
@@ -244,6 +264,10 @@ fn contexts_create_entities_and_propagate_nested_effects() {
     );
     assert_eq!(parent.effects.scroll.unwrap().key, "nested-target");
     assert_eq!(parent.effects.focus, Some(FocusRequest::Clear));
+    assert_eq!(
+        parent.effects.selection_command.unwrap().target,
+        Some(selection_target)
+    );
     assert_eq!(
         parent.effects.text_selection,
         Some(TextSelectionRequest::new(

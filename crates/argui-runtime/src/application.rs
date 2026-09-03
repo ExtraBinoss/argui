@@ -337,11 +337,11 @@ mod tests {
         let tree = UiTree::new(Element::container([]));
         model.update(&AppEvent::Ui {
             window: window.clone(),
-            event: UiEvent {
-                target: tree.node_ids()[0],
-                key: Some("theme".into()),
-                kind: UiEventKind::Clicked,
-            },
+            event: UiEvent::new(
+                tree.node_ids()[0],
+                Some("theme".into()),
+                UiEventKind::Clicked,
+            ),
         });
         let _ = model.take_theme_request(&argui_platform::WindowKey::new("secondary"));
         let _ = model.take_clipboard_request(&window);

@@ -14,6 +14,7 @@ use argui::{
     render::RendererConfig,
     runtime::run_app_with_text_engine,
     text::TextEngine,
+    widgets::SelectionHost,
 };
 
 const NOTO_SANS: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
@@ -38,7 +39,7 @@ pub fn launch() -> Result<(), Box<dyn std::error::Error>> {
         ),
         RendererConfig::default().effects(argui_effects::registry()?),
         text,
-        WidgetGallery::default(),
+        SelectionHost::new(WidgetGallery::default()),
         |_| {},
     )?;
     Ok(())

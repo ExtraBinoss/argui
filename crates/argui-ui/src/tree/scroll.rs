@@ -1,10 +1,36 @@
 use argui_core::{Point, ScrollDelta};
 
-use crate::{InteractionUpdate, NodeId, ScrollRegion, UiEvent, UiEventKind};
+use crate::{InteractionUpdate, NodeId, ScrollRegion, UiEventKind};
 
 use super::UiTree;
 
 impl UiTree {
+    pub fn wheel_event(
+        &mut self,
+        point: Point,
+        delta: ScrollDelta,
+        regions: &[ScrollRegion],
+    ) -> InteractionUpdate {
+        let target = regions
+            .iter()
+            .rev()
+            .find(|region| region.config.enabled && region.contains(point))
+            .map(|region| region.node)
+            .or_else(|| self.node_ids().first().copied());
+        InteractionUpdate {
+            events: target.map_or_else(Vec::new, |target| {
+                self.event_deliveries(
+                    target,
+                    UiEventKind::Wheel {
+                        delta,
+                        position: point,
+                    },
+                )
+            }),
+            ..InteractionUpdate::default()
+        }
+    }
+
     #[must_use]
     pub fn scroll_offset(&self, node: NodeId) -> Point {
         let mut base = self.scroll.offset(node);
@@ -91,16 +117,15 @@ impl UiTree {
         self.scroll.dragging()
     }
 
-    fn scroll_update(&self, change: crate::scroll::ScrollChange) -> InteractionUpdate {
+    fn scroll_update(&mut self, change: crate::scroll::ScrollChange) -> InteractionUpdate {
         InteractionUpdate {
-            events: vec![UiEvent {
-                target: change.node,
-                key: self.key_for(change.node).map(ToOwned::to_owned),
-                kind: UiEventKind::Scrolled {
+            events: self.event_deliveries(
+                change.node,
+                UiEventKind::Scrolled {
                     delta: change.delta,
                     offset: change.offset,
                 },
-            }],
+            ),
             paint_changed: true,
             scroll_changed: true,
             ..InteractionUpdate::default()

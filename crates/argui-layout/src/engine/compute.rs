@@ -79,7 +79,7 @@ impl LayoutEngine {
                         .known_dimensions
                         .width
                         .or_else(|| inputs.available_space.width.into_option());
-                    Some(text_engine.measure_layout(&content, &text_style, width))
+                    Some(text_engine.measure_content(&content, &text_style, width))
                 });
                 if index.is_some_and(|index| {
                     matches!(

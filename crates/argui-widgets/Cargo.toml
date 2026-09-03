@@ -8,6 +8,7 @@ license.workspace = true
 [dependencies]
 argui-animation.workspace = true
 argui-core.workspace = true
+argui-inspect.workspace = true
 argui-paint.workspace = true
 argui-runtime.workspace = true
 argui-text.workspace = true

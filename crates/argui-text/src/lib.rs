@@ -4,12 +4,17 @@ mod cache;
 mod engine;
 mod input;
 mod layout;
+mod selection;
 mod style;
 
 pub use engine::TextEngine;
 pub use input::{CaretScroll, CaretStop, TextInputLayout, TextInputScroll};
-pub use layout::{GlyphContent, GlyphImage, GlyphKey, PreparedGlyph, PreparedText};
+pub use layout::{
+    GlyphContent, GlyphImage, GlyphKey, PreparedDecoration, PreparedGlyph, PreparedText,
+};
+pub use selection::{TextLayout, TextLineLayout, line_range, word_range};
 pub use style::{
-    FontFamily, TextAlign, TextBlock, TextColor, TextMeasurement, TextOverflow, TextScene,
-    TextStyle, TextWrap,
+    EllipsisPosition, FontFamily, FontStretch, FontStyle, LetterSpacing, TextAlign, TextBlock,
+    TextColor, TextContent, TextDecoration, TextMeasurement, TextOverflow, TextScene, TextSpan,
+    TextSpanStyle, TextStyle, TextWrap, UnderlineStyle,
 };

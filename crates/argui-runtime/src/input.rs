@@ -1,4 +1,5 @@
 use argui_platform::{ImeInput, Key, KeyInput, KeyState};
+use argui_ui::SelectionCommand;
 use winit::{
     dpi::{LogicalPosition, LogicalSize},
     event_loop::ActiveEventLoop,
@@ -29,9 +30,46 @@ impl Application {
         window: &Window,
         event_loop: &ActiveEventLoop,
     ) {
+        let Some(ui) = &mut self.ui_tree else {
+            return;
+        };
+        let key_update = ui.keyboard_event(input, &[]);
+        let key_event = key_update.events.first().cloned();
+        self.apply_ui_update(key_update, window, event_loop);
+        if key_event.is_some_and(|event| event.default_prevented()) {
+            return;
+        }
         let (Some(layout), Some(ui)) = (&self.ui_layout, &mut self.ui_tree) else {
             return;
         };
+        if input.state == KeyState::Pressed
+            && let Key::Character(key) = &input.key
+            && input.modifiers.command()
+        {
+            let key = key.to_ascii_lowercase();
+            let command = match key.as_str() {
+                "a" => Some(SelectionCommand::SelectAll),
+                "c" => Some(SelectionCommand::Copy),
+                "x" => Some(SelectionCommand::Cut),
+                "v" => Some(SelectionCommand::Paste),
+                _ => None,
+            };
+            if let Some(command) = command {
+                let update = ui.focused_selection_command(command);
+                self.apply_ui_update(update, window, event_loop);
+                return;
+            }
+        }
+        let focused_editor = ui
+            .focused_node()
+            .is_some_and(|node| ui.text_input_value(node).is_some());
+        if input.state == KeyState::Pressed && input.key == Key::Escape && !focused_editor {
+            let update = ui.clear_document_selection();
+            if update.paint_changed {
+                self.apply_ui_update(update, window, event_loop);
+                return;
+            }
+        }
         let update = if input.state == KeyState::Pressed
             && matches!(
                 input.key,
@@ -41,7 +79,7 @@ impl Application {
             && let Some(position) = ui.text_input_position(node)
             && let Some(region) = layout.text_inputs.iter().find(|region| region.node == node)
         {
-            let mut update = ui.keyboard_event(input, &layout.hit_regions);
+            let mut update = ui.keyboard_default(input, &layout.hit_regions);
             let position = match input.key {
                 Key::ArrowLeft | Key::ArrowRight => region.visual_neighbor(
                     position,
@@ -56,7 +94,11 @@ impl Application {
             update.merge(ui.move_text_position(node, position, input.modifiers.shift));
             update
         } else {
-            ui.key_input(input, &layout.hit_regions)
+            let mut update = ui.keyboard_default(input, &layout.hit_regions);
+            if !(input.state == KeyState::Pressed && input.key == Key::Tab && !input.repeat) {
+                update.merge(ui.edit_text_input(input));
+            }
+            update
         };
         self.apply_ui_update(update, window, event_loop);
         self.update_ime(window);

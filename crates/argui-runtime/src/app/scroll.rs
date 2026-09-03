@@ -131,9 +131,20 @@ impl Application {
         let Some(delta) = self.pending_pointer_scroll.take() else {
             return;
         };
-        let (Some(point), Some(layout), Some(ui)) =
-            (self.pointer, &self.ui_layout, &mut self.ui_tree)
-        else {
+        let Some(point) = self.pointer else {
+            return;
+        };
+        let wheel_update = match (&self.ui_layout, &mut self.ui_tree) {
+            (Some(layout), Some(ui)) => ui.wheel_event(point, delta, &layout.scroll_regions),
+            _ => return,
+        };
+        let wheel_event = wheel_update.events.first().cloned();
+        self.apply_ui_update(wheel_update, window, event_loop);
+        if wheel_event.is_some_and(|event| event.default_prevented()) {
+            self.scroll_inertia.cancel();
+            return;
+        }
+        let (Some(layout), Some(ui)) = (&self.ui_layout, &mut self.ui_tree) else {
             return;
         };
         let update = ui.scroll(point, delta, &layout.scroll_regions);

@@ -23,15 +23,13 @@ impl Render for Counter {
 fn apps_rebuild_only_when_their_state_changes() {
     let mut app = Counter::default();
     let tree = UiTree::new(Element::container([]));
-    let moved = UiEvent {
-        target: tree.node_id_at(0).unwrap(),
-        key: Some("increment".into()),
-        kind: UiEventKind::PointerEntered,
-    };
-    let clicked = UiEvent {
-        kind: UiEventKind::Clicked,
-        ..moved.clone()
-    };
+    let target = tree.node_id_at(0).unwrap();
+    let moved = UiEvent::new(
+        target,
+        Some("increment".into()),
+        UiEventKind::PointerEntered,
+    );
+    let clicked = UiEvent::new(target, Some("increment".into()), UiEventKind::Clicked);
 
     let mut cx = Context::default();
     app.event(&moved, &mut cx);
@@ -40,7 +38,7 @@ fn apps_rebuild_only_when_their_state_changes() {
     app.event(&clicked, &mut cx);
     assert_eq!(cx.view_update(), ViewUpdate::Rebuild);
     assert!(
-        matches!(&app.render(&mut Context::default()).kind, argui_ui::ElementKind::Text { content, .. } if content == "1")
+        matches!(&app.render(&mut Context::default()).kind, argui_ui::ElementKind::Text { content, .. } if content.as_str() == "1")
     );
     assert!(!Render::wants_animation_frame(&app));
     let mut cx = Context::default();

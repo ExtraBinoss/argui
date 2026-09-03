@@ -1,5 +1,5 @@
 use argui_paint::{Color, ImageFit, ImageId, ImageSampling, VectorId};
-use argui_text::TextStyle;
+use argui_text::{TextContent, TextStyle};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ElementNode {
@@ -25,6 +25,10 @@ pub struct ElementNode {
     pub scroll: Option<crate::ScrollConfig>,
     pub overlay: Option<crate::OverlayAnchor>,
     pub focus_scope: Option<crate::FocusScope>,
+    pub event_owner: Option<crate::EventOwnerId>,
+    pub event_listeners: Vec<crate::EventListener>,
+    pub user_select: crate::UserSelect,
+    pub selection_style: Option<crate::TextSelectionStyle>,
     pub z_index: i32,
     pub children: Vec<super::Element>,
 }
@@ -33,7 +37,7 @@ pub struct ElementNode {
 pub enum ElementKind {
     Container,
     Text {
-        content: String,
+        content: TextContent,
         style: TextStyle,
     },
     TextEditor {

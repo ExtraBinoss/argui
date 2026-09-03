@@ -28,11 +28,7 @@ impl Render for App {
 
 fn event(key: &str, kind: UiEventKind) -> UiEvent {
     let tree = UiTree::new(Element::container([]));
-    UiEvent {
-        target: tree.node_id_at(0).unwrap(),
-        key: Some(key.to_owned()),
-        kind,
-    }
+    UiEvent::new(tree.node_id_at(0).unwrap(), Some(key.to_owned()), kind)
 }
 
 #[test]
@@ -498,7 +494,7 @@ fn real_showcase_lowers_both_devtools_button_and_page_scrollbar() {
         .unwrap();
 
     assert!(output.text.blocks().iter().any(|block| {
-        block.text == "DevTools"
+        block.content.as_str() == "DevTools"
             && block.bounds.origin.x >= 0.0
             && block.bounds.origin.y >= 0.0
             && block.bounds.origin.x + block.bounds.size.width <= output.viewport.size.width
@@ -577,7 +573,7 @@ fn contains_key(element: &Element, key: &str) -> bool {
 }
 
 fn contains_text(element: &Element, needle: &str) -> bool {
-    matches!(&element.kind, argui_ui::ElementKind::Text { content, .. } if content.contains(needle))
+    matches!(&element.kind, argui_ui::ElementKind::Text { content, .. } if content.as_str().contains(needle))
         || element
             .children
             .iter()

@@ -50,6 +50,11 @@ impl GestureSet {
     const fn contains(self, flag: u8) -> bool {
         self.0 & flag != 0
     }
+
+    #[must_use]
+    pub const fn is_empty(self) -> bool {
+        self.0 == 0
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

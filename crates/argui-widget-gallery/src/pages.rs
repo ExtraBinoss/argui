@@ -24,6 +24,7 @@ use crate::{
 mod buttons;
 mod composition;
 mod inputs;
+mod typography;
 
 pub(crate) fn render(
     gallery: &WidgetGallery,
@@ -48,6 +49,7 @@ pub(crate) fn render(
         Page::Motion => motion(theme, spinner),
         Page::Effects => effects(theme),
         Page::Composition => composition::render(gallery, theme, assets),
+        Page::Typography => typography::render(theme),
     };
     Element::column([
         Element::column([
@@ -455,5 +457,6 @@ const fn description(page: Page) -> &'static str {
         Page::Motion => "Frame-paced feedback and interaction transitions.",
         Page::Effects => "Custom WGSL through the generic effect registry.",
         Page::Composition => "Compound state, responsive layout and exact hit geometry.",
+        Page::Typography => "Rich spans, decoration, clamping and web-like text selection.",
     }
 }

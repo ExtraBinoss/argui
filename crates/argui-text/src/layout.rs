@@ -15,10 +15,19 @@ pub struct PreparedGlyph {
     pub(crate) local: [i32; 2],
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PreparedDecoration {
+    pub block: usize,
+    pub rect: [f32; 4],
+    pub color: [f32; 4],
+    pub(crate) local: [i32; 4],
+}
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct PreparedText {
     pub blocks: usize,
     pub glyphs: Vec<PreparedGlyph>,
+    pub decorations: Vec<PreparedDecoration>,
     pub(crate) scale_factor: f32,
 }
 
@@ -43,6 +52,18 @@ impl PreparedText {
             glyph.x = anchor[0] + glyph.local[0];
             glyph.y = anchor[1] + glyph.local[1];
             glyph.clip = clip;
+        }
+        for decoration in self
+            .decorations
+            .iter_mut()
+            .filter(|decoration| decoration.block == block)
+        {
+            decoration.rect = [
+                (anchor[0] + decoration.local[0]) as f32,
+                (anchor[1] + decoration.local[1]) as f32,
+                decoration.local[2] as f32,
+                decoration.local[3] as f32,
+            ];
         }
     }
 }

@@ -187,7 +187,7 @@ mod tests {
         let themes = argui_widgets::shadcn(argui_paint::Color::WHITE);
         let demo = showcase.physics_demo(themes.resolve(argui_core::ColorScheme::Dark));
         match &demo.children[0].kind {
-            ElementKind::Text { content, .. } => content.clone(),
+            ElementKind::Text { content, .. } => content.as_str().to_owned(),
             _ => panic!("physics state is rendered as text"),
         }
     }

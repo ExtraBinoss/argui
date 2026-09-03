@@ -3,7 +3,7 @@ use argui_paint::{ClipChain, PaintStyle, QuadStyle};
 use argui_text::{TextStyle, TextWrap};
 use argui_ui::{
     CursorIcon, Element, ElementKind, HitRegion, KeyboardActivation, Role, UiEvent, UiEventKind,
-    UiTree, VisualState,
+    UiTree, UserSelect, VisualState,
 };
 use argui_widgets::{
     Button, ButtonAction, ButtonBehavior, ButtonStyle, TablerIcon, WidgetAssets, shadcn,
@@ -19,6 +19,7 @@ fn button_exposes_variants_content_and_busy_state() {
         .trailing(Element::text("⌘S"))
         .build();
     assert_eq!(button.key.as_deref(), Some("save"));
+    assert_eq!(button.user_select, UserSelect::None);
     assert_eq!(button.children.len(), 3);
     assert_eq!(button.semantics.as_ref().unwrap().role, Role::Button);
     assert_eq!(
@@ -96,11 +97,11 @@ fn button_hover_uses_the_shared_retained_visual_state_path() {
 #[test]
 fn headless_button_decodes_only_enabled_activation() {
     let tree = UiTree::new(Element::container([]));
-    let clicked = UiEvent {
-        target: tree.node_ids()[0],
-        key: Some("save".into()),
-        kind: UiEventKind::Clicked,
-    };
+    let clicked = UiEvent::new(
+        tree.node_ids()[0],
+        Some("save".into()),
+        UiEventKind::Clicked,
+    );
     assert_eq!(
         ButtonBehavior::new("save", "Save").action(&clicked),
         Some(ButtonAction::Activate)

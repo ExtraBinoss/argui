@@ -472,6 +472,7 @@ version = "0.1.0"
 dependencies = [
  "argui-animation",
  "argui-core",
+ "argui-inspect",
  "argui-paint",
  "argui-runtime",
  "argui-text",

@@ -3,7 +3,14 @@ use argui_core::{Color, Point, Transform2D};
 use argui_paint::{Border, EffectId, Fill, QuadStyle};
 
 use crate::binding::{GradientPointTarget, LayoutTarget};
-use crate::{BindingImpact, ContainerQuery};
+use crate::{BindingImpact, ContainerQuery, Element};
+
+impl Element {
+    #[must_use]
+    pub fn has_state_animation(&self) -> bool {
+        self.style_transition.is_some() || !self.conditional_styles.is_empty()
+    }
+}
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum VisualState {

@@ -70,7 +70,11 @@ pub(crate) enum UserEvent {
         preferences: argui_platform::SystemPreferences,
     },
     #[cfg(target_arch = "wasm32")]
-    ClipboardText { window: WindowKey, text: String },
+    ClipboardText {
+        window: WindowKey,
+        target: Option<argui_ui::NodeId>,
+        text: String,
+    },
     #[cfg(target_arch = "wasm32")]
     Accessibility {
         window: WindowKey,

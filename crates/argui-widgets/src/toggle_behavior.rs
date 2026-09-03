@@ -1,6 +1,6 @@
 use argui_ui::{
     CursorIcon, Element, GestureSet, Interaction, KeyboardActivation, Role, SemanticAction,
-    SemanticState, Semantics, StateName, StateScopeId, UiEvent, UiEventKind,
+    SemanticState, Semantics, StateName, StateScopeId, UiEvent, UiEventKind, UserSelect,
 };
 
 pub const TOGGLE_SCOPE: StateScopeId = StateScopeId::new("toggle");
@@ -82,6 +82,7 @@ impl ToggleBehavior {
         }
         element
             .keyed(self.key.clone())
+            .user_select(UserSelect::None)
             .state_scope(TOGGLE_SCOPE)
             .active_state(TOGGLE_CHECKED, self.checked)
             .interaction(

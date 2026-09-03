@@ -4,7 +4,9 @@ use std::{
 };
 
 use crate::{
-    FontFamily, GlyphKey, TextAlign, TextBlock, TextMeasurement, TextOverflow, TextStyle, TextWrap,
+    FontFamily, FontStretch, FontStyle, GlyphKey, LetterSpacing, TextAlign, TextBlock,
+    TextDecoration, TextLayout, TextMeasurement, TextOverflow, TextSpanStyle, TextStyle, TextWrap,
+    UnderlineStyle,
 };
 
 const CACHE_CAPACITY: usize = 512;
@@ -12,16 +14,49 @@ const CACHE_CAPACITY: usize = 512;
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub(crate) struct MeasureKey {
     text: String,
+    runs: Vec<RunKey>,
     style: StyleKey,
     width: Option<u32>,
 }
 
-impl MeasureKey {
-    pub(crate) fn new(text: &str, style: &TextStyle, width: Option<f32>) -> Self {
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub(crate) struct TextLayoutKey {
+    measurement: MeasureKey,
+    width: u32,
+    height: u32,
+}
+
+impl TextLayoutKey {
+    pub(crate) fn new(
+        content: &crate::TextContent,
+        style: &TextStyle,
+        size: argui_core::Size,
+    ) -> Self {
         Self {
-            text: text.to_owned(),
+            measurement: MeasureKey::new(content, style, Some(size.width)),
+            width: size.width.to_bits(),
+            height: size.height.to_bits(),
+        }
+    }
+}
+
+impl MeasureKey {
+    pub(crate) fn new(content: &crate::TextContent, style: &TextStyle, width: Option<f32>) -> Self {
+        Self {
+            text: content.as_str().to_owned(),
+            runs: content
+                .runs()
+                .iter()
+                .map(|(range, style)| RunKey {
+                    range: [range.start, range.end],
+                    style: SpanStyleKey::new(style),
+                })
+                .collect(),
             style: StyleKey::new(style),
-            width: if style.wrap == TextWrap::None {
+            width: if style.wrap == TextWrap::None
+                && style.overflow == TextOverflow::Clip
+                && matches!(style.align, TextAlign::Start | TextAlign::Left)
+            {
                 None
             } else {
                 width.map(f32::to_bits)
@@ -33,11 +68,13 @@ impl MeasureKey {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub(crate) struct ShapeKey {
     text: String,
+    runs: Vec<RunKey>,
     style: StyleKey,
     size: [u32; 2],
     scale_factor: u32,
     subpixel_origin: [u32; 2],
     align: TextAlign,
+    color: [u32; 4],
 }
 
 impl ShapeKey {
@@ -47,10 +84,21 @@ impl ShapeKey {
             block.bounds.origin.y * scale_factor,
         ];
         Self {
-            text: block.text.clone(),
+            text: block.content.as_str().to_owned(),
+            runs: block
+                .content
+                .runs()
+                .iter()
+                .map(|(range, style)| RunKey {
+                    range: [range.start, range.end],
+                    style: SpanStyleKey::new(style),
+                })
+                .collect(),
             style: StyleKey::new(&block.style),
             size: [
-                if block.style.wrap == TextWrap::None && block.style.overflow == TextOverflow::Clip
+                if block.style.wrap == TextWrap::None
+                    && block.style.overflow == TextOverflow::Clip
+                    && matches!(block.style.align, TextAlign::Start | TextAlign::Left)
                 {
                     0
                 } else {
@@ -64,6 +112,7 @@ impl ShapeKey {
                 (pixel[1] - pixel[1].round()).to_bits(),
             ],
             align: block.style.align,
+            color: block.style.color.as_array().map(f32::to_bits),
         }
     }
 
@@ -78,8 +127,13 @@ struct StyleKey {
     line_height: u32,
     family: FontFamily,
     weight: u16,
+    font_style: FontStyle,
+    stretch: FontStretch,
+    letter_spacing: LetterSpacingKey,
+    decoration: DecorationKey,
     wrap: TextWrap,
     overflow: TextOverflow,
+    line_clamp: Option<usize>,
 }
 
 impl StyleKey {
@@ -89,8 +143,88 @@ impl StyleKey {
             line_height: style.line_height.to_bits(),
             family: style.family.clone(),
             weight: style.weight,
+            font_style: style.font_style,
+            stretch: style.stretch,
+            letter_spacing: LetterSpacingKey::new(style.letter_spacing),
+            decoration: DecorationKey::new(style.decoration),
             wrap: style.wrap,
             overflow: style.overflow,
+            line_clamp: style.line_clamp.map(std::num::NonZeroUsize::get),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+struct RunKey {
+    range: [usize; 2],
+    style: SpanStyleKey,
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+struct SpanStyleKey {
+    font_size: Option<u32>,
+    line_height: Option<u32>,
+    color: Option<[u32; 4]>,
+    family: Option<FontFamily>,
+    weight: Option<u16>,
+    font_style: Option<FontStyle>,
+    stretch: Option<FontStretch>,
+    letter_spacing: Option<LetterSpacingKey>,
+    decoration: Option<DecorationKey>,
+}
+
+impl SpanStyleKey {
+    fn new(style: &TextSpanStyle) -> Self {
+        Self {
+            font_size: style.font_size.map(f32::to_bits),
+            line_height: style.line_height.map(f32::to_bits),
+            color: style.color.map(|value| value.as_array().map(f32::to_bits)),
+            family: style.family.clone(),
+            weight: style.weight,
+            font_style: style.font_style,
+            stretch: style.stretch,
+            letter_spacing: style.letter_spacing.map(LetterSpacingKey::new),
+            decoration: style.decoration.map(DecorationKey::new),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+enum LetterSpacingKey {
+    Normal,
+    Px(u32),
+    Em(u32),
+}
+
+impl LetterSpacingKey {
+    fn new(value: LetterSpacing) -> Self {
+        match value {
+            LetterSpacing::Normal => Self::Normal,
+            LetterSpacing::Px(value) => Self::Px(value.to_bits()),
+            LetterSpacing::Em(value) => Self::Em(value.to_bits()),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+struct DecorationKey {
+    underline: UnderlineStyle,
+    underline_color: Option<[u32; 4]>,
+    strikethrough: bool,
+    strikethrough_color: Option<[u32; 4]>,
+}
+
+impl DecorationKey {
+    fn new(value: TextDecoration) -> Self {
+        Self {
+            underline: value.underline,
+            underline_color: value
+                .underline_color
+                .map(|color| color.as_array().map(f32::to_bits)),
+            strikethrough: value.strikethrough,
+            strikethrough_color: value
+                .strikethrough_color
+                .map(|color| color.as_array().map(f32::to_bits)),
         }
     }
 }
@@ -102,14 +236,29 @@ pub(crate) struct CachedGlyph {
     pub(crate) end: usize,
     pub(crate) rtl: bool,
     pub(crate) local: [i32; 2],
+    pub(crate) color: [f32; 4],
+}
+
+#[derive(Clone, Copy)]
+pub(crate) struct CachedDecoration {
+    pub(crate) local: [i32; 4],
+    pub(crate) color: [f32; 4],
+}
+
+#[derive(Clone, Default)]
+pub(crate) struct CachedShape {
+    pub(crate) glyphs: Arc<[CachedGlyph]>,
+    pub(crate) decorations: Arc<[CachedDecoration]>,
 }
 
 #[derive(Default)]
 pub(crate) struct TextCache {
     measurements: HashMap<MeasureKey, TextMeasurement>,
     measurement_order: VecDeque<MeasureKey>,
-    shapes: HashMap<ShapeKey, Arc<[CachedGlyph]>>,
+    shapes: HashMap<ShapeKey, CachedShape>,
     shape_order: VecDeque<ShapeKey>,
+    layouts: HashMap<TextLayoutKey, Arc<TextLayout>>,
+    layout_order: VecDeque<TextLayoutKey>,
 }
 
 impl TextCache {
@@ -126,23 +275,31 @@ impl TextCache {
         );
     }
 
-    pub(crate) fn shape(&self, key: &ShapeKey) -> Option<Arc<[CachedGlyph]>> {
+    pub(crate) fn shape(&self, key: &ShapeKey) -> Option<CachedShape> {
         self.shapes.get(key).cloned()
     }
 
-    pub(crate) fn insert_shape(
+    pub(crate) fn insert_shape(&mut self, key: ShapeKey, shape: CachedShape) -> CachedShape {
+        insert_bounded(&mut self.shapes, &mut self.shape_order, key, shape.clone());
+        shape
+    }
+
+    pub(crate) fn layout(&self, key: &TextLayoutKey) -> Option<Arc<TextLayout>> {
+        self.layouts.get(key).cloned()
+    }
+
+    pub(crate) fn insert_layout(
         &mut self,
-        key: ShapeKey,
-        glyphs: Vec<CachedGlyph>,
-    ) -> Arc<[CachedGlyph]> {
-        let glyphs = Arc::from(glyphs);
+        key: TextLayoutKey,
+        layout: Arc<TextLayout>,
+    ) -> Arc<TextLayout> {
         insert_bounded(
-            &mut self.shapes,
-            &mut self.shape_order,
+            &mut self.layouts,
+            &mut self.layout_order,
             key,
-            Arc::clone(&glyphs),
+            Arc::clone(&layout),
         );
-        glyphs
+        layout
     }
 
     pub(crate) fn clear(&mut self) {
@@ -150,6 +307,8 @@ impl TextCache {
         self.measurement_order.clear();
         self.shapes.clear();
         self.shape_order.clear();
+        self.layouts.clear();
+        self.layout_order.clear();
     }
 }
 
@@ -173,7 +332,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::{CACHE_CAPACITY, MeasureKey, ShapeKey, TextCache};
-    use crate::{TextBlock, TextMeasurement, TextStyle, TextWrap};
+    use crate::{TextBlock, TextContent, TextMeasurement, TextStyle, TextWrap};
     use argui_core::{Point, Rect, Size};
 
     #[test]
@@ -181,7 +340,11 @@ mod tests {
         let mut cache = TextCache::default();
         for index in 0..=CACHE_CAPACITY {
             cache.insert_measurement(
-                MeasureKey::new(&index.to_string(), &TextStyle::default(), None),
+                MeasureKey::new(
+                    &TextContent::plain(index.to_string()),
+                    &TextStyle::default(),
+                    None,
+                ),
                 TextMeasurement {
                     size: Size::new(index as f32, 1.0),
                     ..TextMeasurement::default()
@@ -190,12 +353,16 @@ mod tests {
         }
         assert!(
             cache
-                .measurement(&MeasureKey::new("0", &TextStyle::default(), None))
+                .measurement(&MeasureKey::new(
+                    &TextContent::plain("0"),
+                    &TextStyle::default(),
+                    None,
+                ))
                 .is_none()
         );
         assert_eq!(
             cache.measurement(&MeasureKey::new(
-                &CACHE_CAPACITY.to_string(),
+                &TextContent::plain(CACHE_CAPACITY.to_string()),
                 &TextStyle::default(),
                 None
             )),
@@ -215,8 +382,8 @@ mod tests {
             ..TextStyle::default()
         };
         assert_eq!(
-            MeasureKey::new("fixed", &style, Some(100.0)),
-            MeasureKey::new("fixed", &style, Some(900.0))
+            MeasureKey::new(&TextContent::plain("fixed"), &style, Some(100.0)),
+            MeasureKey::new(&TextContent::plain("fixed"), &style, Some(900.0))
         );
         let block = |width| {
             let mut block =

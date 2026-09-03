@@ -267,11 +267,11 @@ mod tests {
     use super::PerfShowcase;
 
     fn event(key: &str, kind: UiEventKind) -> UiEvent {
-        UiEvent {
-            target: UiTree::new(Element::container([])).node_id_at(0).unwrap(),
-            key: Some(key.into()),
+        UiEvent::new(
+            UiTree::new(Element::container([])).node_id_at(0).unwrap(),
+            Some(key.into()),
             kind,
-        }
+        )
     }
 
     #[test]

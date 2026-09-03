@@ -2,11 +2,11 @@ use crate::{
     AnyEntity, LayoutBounds, LayoutSnapshot, RuntimeError, RuntimeEvent, ViewUpdate,
     animation::RuntimeAnimations,
 };
-use argui_core::{Point, PointerEvent, PointerId, PointerPhase, Size};
+use argui_core::{Point, PointerId, Size};
 use argui_inspect::InspectorHandle;
 use argui_layout::{LayoutEngine, LayoutOutput};
 use argui_paint::{ImageAsset, VectorAsset};
-use argui_platform::{ApplicationIdentity, ButtonState, Modifiers, ScrollDelta, WindowConfig};
+use argui_platform::{ApplicationIdentity, Modifiers, ScrollDelta, WindowConfig};
 use argui_render::{RendererConfig, RendererDevice, SurfaceRenderer};
 use argui_text::{PreparedText, TextEngine, TextScene};
 use argui_ui::{InteractionUpdate, UiTree};
@@ -22,9 +22,11 @@ mod cursor;
 mod frame;
 mod inspect;
 mod lifecycle;
+mod pointer;
 mod preferences;
 mod renderer;
 mod scroll;
+mod text_selection;
 mod window;
 
 enum RendererState {
@@ -72,6 +74,8 @@ pub(crate) struct Application {
     pointer_buttons: u16,
     touch_points: HashMap<PointerId, Point>,
     primary_touch: Option<PointerId>,
+    selection_click: text_selection::SelectionClick,
+    touch_selection: Option<text_selection::TouchSelection>,
     input_epoch: Instant,
     last_cursor: argui_ui::CursorIcon,
     modifiers: Modifiers,
@@ -154,6 +158,8 @@ impl Application {
             pointer_buttons: 0,
             touch_points: HashMap::new(),
             primary_touch: None,
+            selection_click: text_selection::SelectionClick::default(),
+            touch_selection: None,
             input_epoch: Instant::now(),
             last_cursor: argui_ui::CursorIcon::Default,
             modifiers: Modifiers::default(),
@@ -290,13 +296,29 @@ impl Application {
         window: &Window,
         event_loop: &ActiveEventLoop,
     ) {
+        for event in &mut update.events {
+            if let argui_ui::UiEventKind::DocumentSelectionChanged { bounds, .. } = &mut event.kind
+                && bounds.is_none()
+            {
+                *bounds = self.ui_layout.as_ref().and_then(|layout| {
+                    self.ui_tree
+                        .as_ref()
+                        .and_then(|ui| layout.document_selection_bounds(ui))
+                });
+            }
+        }
         let mut clipboard = update.clipboard.clone();
         let mut scroll_request = None;
         let mut focus_request = None;
         let mut text_selection_request = None;
         let mut theme_request = None;
+        let mut pointer_capture = Vec::new();
+        let mut selection_command = None;
         let mut rebuild = false;
         for event in &update.events {
+            if !event.should_dispatch() {
+                continue;
+            }
             if let Some(model) = &self.model {
                 model.event(event);
                 let effects = model.take_effects();
@@ -320,6 +342,10 @@ impl Application {
                 if effects.theme.is_some() {
                     theme_request = effects.theme;
                 }
+                pointer_capture.extend(effects.pointer_capture);
+                if effects.selection_command.is_some() {
+                    selection_command = effects.selection_command;
+                }
             }
             (self.on_event)(RuntimeEvent::Ui(event.clone()));
         }
@@ -339,6 +365,28 @@ impl Application {
         if let Some(request) = clipboard {
             self.clipboard_request(request, window, event_loop);
         }
+        for request in pointer_capture {
+            let Some(ui) = &mut self.ui_tree else {
+                break;
+            };
+            let capture_update = match request {
+                crate::model::PointerCaptureRequest::Capture { pointer, target } => {
+                    ui.capture_pointer(pointer, target)
+                }
+                crate::model::PointerCaptureRequest::Release { pointer, target } => {
+                    ui.release_pointer_capture(pointer, target)
+                }
+            };
+            if !capture_update.events.is_empty() {
+                self.apply_ui_update(capture_update, window, event_loop);
+            }
+        }
+        if let Some(request) = selection_command
+            && let Some(ui) = &mut self.ui_tree
+        {
+            let selection_update = ui.selection_command(request.target, request.command);
+            self.apply_ui_update(selection_update, window, event_loop);
+        }
     }
 
     pub(super) fn repaint(&mut self) {
@@ -347,226 +395,6 @@ impl Application {
         }
         self.publish_inspection();
         self.paint_inspection_highlight();
-    }
-
-    fn pointer_moved(&mut self, point: Point, window: &Window, event_loop: &ActiveEventLoop) {
-        self.pointer = Some(point);
-        self.refresh_cursor(window);
-        let Some(layout) = &self.ui_layout else {
-            return;
-        };
-        let Some(ui) = &mut self.ui_tree else {
-            return;
-        };
-        if ui.scrollbar_dragging() {
-            self.pending_scrollbar_drag = Some(point);
-            window.request_redraw();
-            return;
-        }
-        if ui.text_cursor_dragging()
-            && let Some(node) = ui.focused_node()
-            && let Some(region) = layout.text_inputs.iter().find(|region| region.node == node)
-        {
-            let local = local_point(layout, node, point).unwrap_or(point);
-            let update = ui.drag_text_position(node, region.closest_position(local));
-            self.apply_ui_update(update, window, event_loop);
-            return;
-        }
-        let scrollbar = argui_ui::scrollbar_at(point, &layout.scroll_regions, &layout.hit_regions);
-        let mut update =
-            ui.scrollbar_pointer_moved(Some(point), scrollbar.map_or(&[], std::slice::from_ref));
-        let blocked = scrollbar.is_some();
-        let hit_regions = if blocked {
-            &[]
-        } else {
-            layout.hit_regions.as_slice()
-        };
-        update.merge(ui.pointer_event(
-            PointerEvent {
-                buttons: self.pointer_buttons,
-                timestamp: self.input_epoch.elapsed(),
-                ..PointerEvent::mouse(PointerPhase::Moved, point)
-            },
-            hit_regions,
-        ));
-        self.apply_ui_update(update, window, event_loop);
-    }
-
-    fn touch_pointer(
-        &mut self,
-        mut event: PointerEvent,
-        window: &Window,
-        event_loop: &ActiveEventLoop,
-    ) -> PointerEvent {
-        if event.phase == PointerPhase::Pressed && self.primary_touch.is_none() {
-            self.primary_touch = Some(event.id);
-        }
-        event.primary = self.primary_touch == Some(event.id);
-        let finger_delta = match event.phase {
-            PointerPhase::Pressed => {
-                self.touch_points.insert(event.id, event.position);
-                None
-            }
-            PointerPhase::Moved => self
-                .touch_points
-                .insert(event.id, event.position)
-                .map(|previous| {
-                    Point::new(event.position.x - previous.x, event.position.y - previous.y)
-                })
-                .filter(|_| event.primary),
-            PointerPhase::Released | PointerPhase::Cancelled | PointerPhase::Left => {
-                self.touch_points.remove(&event.id);
-                None
-            }
-            PointerPhase::Entered => None,
-        };
-        let update = if let (Some(layout), Some(ui)) = (&self.ui_layout, &mut self.ui_tree) {
-            let mut update = ui.pointer_event(event, &layout.hit_regions);
-            if let Some(delta) = finger_delta {
-                update.merge(ui.scroll(
-                    event.position,
-                    ScrollDelta::Pixels(delta),
-                    &layout.scroll_regions,
-                ));
-            }
-            Some(update)
-        } else {
-            None
-        };
-        if let Some(update) = update {
-            self.apply_ui_update(update, window, event_loop);
-        }
-        if matches!(event.phase, PointerPhase::Pressed | PointerPhase::Released) {
-            self.update_ime(window);
-        }
-        if matches!(
-            event.phase,
-            PointerPhase::Released | PointerPhase::Cancelled | PointerPhase::Left
-        ) && event.primary
-        {
-            self.primary_touch = self.touch_points.keys().min_by_key(|id| id.get()).copied();
-        }
-        event
-    }
-
-    fn flush_scrollbar_drag(&mut self, window: &Window, event_loop: &ActiveEventLoop) {
-        let Some(point) = self.pending_scrollbar_drag.take() else {
-            return;
-        };
-        let (Some(layout), Some(ui)) = (&self.ui_layout, &mut self.ui_tree) else {
-            return;
-        };
-        if let Some(update) = ui.scrollbar_dragged(point, &layout.scroll_regions) {
-            self.apply_ui_update(update, window, event_loop);
-        }
-    }
-
-    fn pointer_left(&mut self, window: &Window, event_loop: &ActiveEventLoop) {
-        self.scroll_inertia.cancel();
-        self.flush_pointer_scroll(window, event_loop);
-        self.flush_scrollbar_drag(window, event_loop);
-        let point = self.pointer.unwrap_or_default();
-        self.pointer = None;
-        self.refresh_cursor(window);
-        if let Some(ui) = &mut self.ui_tree {
-            let mut update = ui.scrollbar_pointer_moved(None, &[]);
-            update.merge(ui.pointer_event(
-                PointerEvent {
-                    buttons: self.pointer_buttons,
-                    timestamp: self.input_epoch.elapsed(),
-                    ..PointerEvent::mouse(PointerPhase::Left, point)
-                },
-                &[],
-            ));
-            self.apply_ui_update(update, window, event_loop);
-        }
-    }
-
-    fn primary_button(
-        &mut self,
-        state: ButtonState,
-        window: &Window,
-        event_loop: &ActiveEventLoop,
-    ) {
-        self.scroll_inertia.cancel();
-        self.flush_pointer_scroll(window, event_loop);
-        if state == ButtonState::Released {
-            self.flush_scrollbar_drag(window, event_loop);
-        }
-        if state == ButtonState::Pressed && self.handle_window_drag(window) {
-            return;
-        }
-        let Some(layout) = &self.ui_layout else {
-            return;
-        };
-        let placement = self.pointer.and_then(|point| {
-            let target = layout
-                .hit_regions
-                .iter()
-                .rev()
-                .find(|region| region.contains(point))?
-                .node;
-            layout.text_inputs.iter().rev().find_map(|region| {
-                if region.node != target {
-                    return None;
-                }
-                let point = local_point(layout, region.node, point).unwrap_or(point);
-                region
-                    .hit_position(point)
-                    .map(|position| (region.node, position))
-            })
-        });
-        let Some(ui) = &mut self.ui_tree else {
-            return;
-        };
-        if state == ButtonState::Pressed
-            && let Some(point) = self.pointer
-            && let Some(region) =
-                argui_ui::scrollbar_at(point, &layout.scroll_regions, &layout.hit_regions)
-            && let Some(update) = ui.scrollbar_pressed(point, std::slice::from_ref(region))
-        {
-            self.apply_ui_update(update, window, event_loop);
-            return;
-        }
-        if state == ButtonState::Released
-            && let Some(mut update) = ui.scrollbar_released()
-        {
-            let scrollbar = self.pointer.and_then(|point| {
-                argui_ui::scrollbar_at(point, &layout.scroll_regions, &layout.hit_regions)
-            });
-            update.merge(ui.scrollbar_pointer_moved(
-                self.pointer,
-                scrollbar.map_or(&[], std::slice::from_ref),
-            ));
-            self.apply_ui_update(update, window, event_loop);
-            return;
-        }
-        if state == ButtonState::Released {
-            ui.release_text_cursor();
-        }
-        let phase = match state {
-            ButtonState::Pressed => PointerPhase::Pressed,
-            ButtonState::Released => PointerPhase::Released,
-        };
-        let point = self.pointer.unwrap_or_default();
-        let update = ui.pointer_event(
-            PointerEvent {
-                button: Some(argui_core::PointerButton::Primary),
-                buttons: self.pointer_buttons,
-                timestamp: self.input_epoch.elapsed(),
-                ..PointerEvent::mouse(phase, point)
-            },
-            &layout.hit_regions,
-        );
-        self.apply_ui_update(update, window, event_loop);
-        if state == ButtonState::Pressed
-            && let Some((node, position)) = placement
-            && let Some(ui) = &mut self.ui_tree
-        {
-            let update = ui.place_text_position(node, position, self.modifiers.shift);
-            self.apply_ui_update(update, window, event_loop);
-        }
-        self.update_ime(window);
     }
 
     fn window_focus(&mut self, focused: bool, window: &Window, event_loop: &ActiveEventLoop) {

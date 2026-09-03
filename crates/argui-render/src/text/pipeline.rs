@@ -2,7 +2,7 @@ use std::{mem::size_of, ops::Range};
 
 use argui_core::Affine2D;
 use argui_paint::ClipRegion;
-use argui_text::PreparedGlyph;
+use argui_text::{PreparedDecoration, PreparedGlyph};
 use bytemuck::{Pod, Zeroable};
 
 use super::atlas::AtlasEntry;
@@ -92,6 +92,23 @@ impl GlyphInstance {
             ],
             color: glyph.color,
             mode: [f32::from(entry.color), 0.0, 0.0, 0.0],
+            transform_a: transform.matrix,
+            transform_b: [transform.translation.x, transform.translation.y, 0.0, 0.0],
+            clip_meta: [clip_start, clip_count, 0, 0],
+        }
+    }
+
+    pub fn solid(
+        decoration: PreparedDecoration,
+        transform: Affine2D,
+        clip_start: u32,
+        clip_count: u32,
+    ) -> Self {
+        Self {
+            rect: decoration.rect,
+            uv: [0.0; 4],
+            color: decoration.color,
+            mode: [2.0, 0.0, 0.0, 0.0],
             transform_a: transform.matrix,
             transform_b: [transform.translation.x, transform.translation.y, 0.0, 0.0],
             clip_meta: [clip_start, clip_count, 0, 0],

@@ -12,11 +12,7 @@ use crate::navigation::Page;
 
 fn event(key: &str, kind: UiEventKind) -> UiEvent {
     let tree = UiTree::new(argui::ui::Element::container([]));
-    UiEvent {
-        target: tree.node_ids()[0],
-        key: Some(key.into()),
-        kind,
-    }
+    UiEvent::new(tree.node_ids()[0], Some(key.into()), kind)
 }
 
 fn pressed(key: Key, modifiers: Modifiers) -> UiEventKind {
@@ -50,6 +46,29 @@ fn every_gallery_route_builds_real_widget_content() {
     }
     assert_eq!(gallery.image_assets().len(), 1);
     assert_eq!(gallery.vector_assets().len(), 33);
+}
+
+#[test]
+fn gallery_document_text_remains_selectable_under_its_interactive_window_root() {
+    let mut gallery = WidgetGallery::default();
+    let root = Render::render(&mut gallery, &mut Context::default());
+    let mut tree = UiTree::new(root);
+
+    let button = tree
+        .node_ids()
+        .iter()
+        .copied()
+        .find(|node| tree.key(*node) == Some("demo-button"))
+        .unwrap();
+    assert_eq!(
+        tree.resolved_user_select(button),
+        argui::ui::UserSelect::None
+    );
+
+    tree.select_all_document_text();
+    let selected = tree.selected_document_text().unwrap();
+    assert!(selected.contains("Button"));
+    assert!(selected.contains("Actions with variants"));
 }
 
 #[test]

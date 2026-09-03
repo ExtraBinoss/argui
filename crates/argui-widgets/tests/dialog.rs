@@ -4,11 +4,7 @@ use argui_widgets::{Button, Dialog, DialogAction, DialogBehavior, shadcn};
 
 fn event(key: Option<&str>, kind: UiEventKind) -> UiEvent {
     let tree = UiTree::new(Element::container([]));
-    UiEvent {
-        target: tree.node_ids()[0],
-        key: key.map(str::to_owned),
-        kind,
-    }
+    UiEvent::new(tree.node_ids()[0], key.map(str::to_owned), kind)
 }
 
 #[test]

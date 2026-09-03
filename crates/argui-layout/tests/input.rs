@@ -225,7 +225,10 @@ fn a_single_line_input_clips_its_text_after_a_retained_resize() {
     assert_eq!(narrow_region.clip, narrow_region.bounds);
     assert_eq!(block.clip, narrow_region.clip);
     assert_eq!(block.bounds, narrow_region.viewport);
-    assert_eq!(block.style.overflow, TextOverflow::Ellipsis);
+    assert_eq!(
+        block.style.overflow,
+        TextOverflow::Ellipsis(argui_text::EllipsisPosition::End)
+    );
     assert!(
         narrow_region.clip.origin.x + narrow_region.clip.size.width
             < narrow.viewport.origin.x + narrow.viewport.size.width

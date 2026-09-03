@@ -1,5 +1,6 @@
 use crate::{
-    LayoutError, TextInputRegion, assets::AssetMetrics, input, paint, scroll, style::taffy_style,
+    LayoutError, TextInputRegion, TextRegion, assets::AssetMetrics, input, paint, scroll,
+    style::taffy_style,
 };
 use argui_core::{Point, Rect, Size};
 use argui_paint::{DisplayList, ImageAsset, VectorAsset};
@@ -28,6 +29,7 @@ pub struct LayoutOutput {
     pub hit_regions: Vec<HitRegion>,
     pub scroll_regions: Vec<ScrollRegion>,
     pub text_inputs: Vec<TextInputRegion>,
+    pub text_regions: Vec<TextRegion>,
     pub display_list: DisplayList,
     pub text: TextScene,
     pub paint_stats: PaintStats,
@@ -302,6 +304,31 @@ fn collect_layout(
         }
         output.text.push(block);
         text_index = Some(output.text.blocks().len() - 1);
+        if matches!(element.kind, ElementKind::Text { .. })
+            && ui.resolved_user_select(node.node) != argui_ui::UserSelect::None
+        {
+            output.text_regions.push(TextRegion {
+                node: node.node,
+                text_index: text_index.unwrap(),
+                text_len: output.text.blocks()[text_index.unwrap()]
+                    .content
+                    .as_str()
+                    .len(),
+                origin: text_bounds.origin,
+                layout: text_engine.layout_text(
+                    &output.text.blocks()[text_index.unwrap()].content,
+                    &output.text.blocks()[text_index.unwrap()].style,
+                    text_bounds.size,
+                ),
+                transform: argui_core::Affine2D::IDENTITY,
+                clips: argui_paint::ClipChain::from_regions([argui_paint::ClipRegion::new(
+                    text_clip,
+                    argui_core::Affine2D::IDENTITY,
+                )]),
+                style: ui.resolved_selection_style(node.node),
+                interaction_order: 0,
+            });
+        }
     }
     output.nodes.push(LayoutNode {
         index: node.index,
@@ -398,6 +425,13 @@ fn apply_scroll_layout(
         block.bounds.origin.x += content_delta.x;
         block.bounds.origin.y += content_delta.y;
         block.clip = text_clip;
+        if let Some(region) = output
+            .text_regions
+            .iter_mut()
+            .find(|region| region.node == node.node)
+        {
+            region.translate(delta);
+        }
     }
     let child_clip = scroll::clipped(node, clip, bounds);
     if let Some(config) = scroll::config(node, element)

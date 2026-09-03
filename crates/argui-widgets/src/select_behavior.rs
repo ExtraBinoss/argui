@@ -2,6 +2,7 @@ use argui_core::{Key, KeyState};
 use argui_ui::{
     CursorIcon, Element, GestureSet, Interaction, KeyboardActivation, Orientation, Role,
     SemanticAction, SemanticState, Semantics, StateName, StateScopeId, UiEvent, UiEventKind,
+    UserSelect,
 };
 
 use crate::select::SelectOption;
@@ -92,6 +93,7 @@ impl SelectBehavior {
             ),
             SelectPart::Trigger => element
                 .keyed(self.key.clone())
+                .user_select(UserSelect::None)
                 .interaction(
                     Interaction::default()
                         .focusable(true)
@@ -118,6 +120,7 @@ impl SelectBehavior {
                     .unwrap_or_default();
                 element
                     .keyed(self.option_key(index))
+                    .user_select(UserSelect::None)
                     .active_state(SELECT_SELECTED, self.selected == Some(index))
                     .active_state(SELECT_HIGHLIGHTED, self.highlighted == index)
                     .interaction(

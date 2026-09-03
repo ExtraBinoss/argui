@@ -5,6 +5,7 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 summary="$(mktemp)"
 trap 'rm -f "$summary"' EXIT
 minimum=85
+coverage_jobs="${ARGUI_COVERAGE_JOBS:-6}"
 
 command -v jq >/dev/null || {
   echo "error: jq is required to enforce all coverage metrics" >&2
@@ -12,7 +13,9 @@ command -v jq >/dev/null || {
 }
 
 cd "$repo_root"
-cargo +nightly llvm-cov --workspace --all-features --all-targets --branch \
+cargo +nightly llvm-cov clean --profraw-only
+cargo +nightly llvm-cov --workspace --all-features --all-targets --branch --no-clean \
+  --jobs "$coverage_jobs" --quiet \
   --json --summary-only --output-path "$summary"
 
 jq -r '.data[0].totals | ["branches", "functions", "lines", "regions"][] as $name |

@@ -3,7 +3,7 @@ use argui_accessibility::{
 };
 use argui_core::{Point, Rect, Size};
 use argui_layout::LayoutOutput;
-use argui_ui::{FocusRequest, InteractionUpdate, UiEvent, UiEventKind};
+use argui_ui::{FocusRequest, InteractionUpdate, UiEventKind};
 use winit::{event_loop::ActiveEventLoop, window::Window};
 
 #[cfg(target_arch = "wasm32")]
@@ -84,19 +84,16 @@ fn accessibility_action_update(
             )
         }));
     }
+    let kind = if request.action == SemanticAction::Click {
+        UiEventKind::Clicked
+    } else {
+        UiEventKind::SemanticAction {
+            action: request.action,
+            value: request.value,
+        }
+    };
     Some(InteractionUpdate {
-        events: vec![UiEvent {
-            target,
-            key: ui.key(target).map(ToOwned::to_owned),
-            kind: if request.action == SemanticAction::Click {
-                UiEventKind::Clicked
-            } else {
-                UiEventKind::SemanticAction {
-                    action: request.action,
-                    value: request.value,
-                }
-            },
-        }],
+        events: ui.event_deliveries(target, kind),
         ..InteractionUpdate::default()
     })
 }

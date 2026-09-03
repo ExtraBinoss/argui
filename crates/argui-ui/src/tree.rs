@@ -1,4 +1,4 @@
-use argui_core::{ImeInput, Point, PointerEvent, PointerKind, PointerPhase, TextPosition};
+use argui_core::{ImeInput, TextPosition};
 
 use crate::interaction::{InteractionState, RawUpdate};
 use crate::scroll::ScrollState;
@@ -6,17 +6,20 @@ use crate::text_input::{TextInputState, TextInputStates};
 use crate::traversal::{flattened, nth_element};
 use crate::update::{classify_update, strongest_update};
 use crate::{
-    Element, ElementKind, GestureArena, HitRegion, InteractionUpdate, NodeId, TextSelectionRequest,
-    UiEvent, UiEventKind, identity,
+    Element, ElementKind, GestureArena, InteractionUpdate, NodeId, TextSelectionRequest, UiEvent,
+    UiEventKind, identity,
 };
 
 mod animation;
+mod event;
 mod focus;
+mod pointer;
 mod resolve;
 mod responsive;
 mod scroll;
 mod transition;
 use animation::AnimationRegistry;
+use event::EventRegistry;
 use focus::FocusRegistry;
 use transition::TransitionRegistry;
 
@@ -42,11 +45,12 @@ pub struct UiTree {
     root: Element,
     node_ids: Vec<NodeId>,
     next_node_id: u64,
-    interaction: InteractionState,
+    pub(crate) interaction: InteractionState,
     focus: FocusRegistry,
     gestures: GestureArena,
     scroll: ScrollState,
-    text_inputs: TextInputStates,
+    pub(crate) text_inputs: TextInputStates,
+    pub(crate) document_selection: crate::text_selection::DocumentSelectionState,
     caret: crate::caret::CaretAnimator,
     revision: u64,
     layout_dirty: bool,
@@ -57,6 +61,7 @@ pub struct UiTree {
     container_indices: Vec<(NodeId, usize)>,
     has_container_queries: bool,
     reduced_motion: bool,
+    events: EventRegistry,
 }
 
 impl UiTree {
@@ -66,6 +71,7 @@ impl UiTree {
         let node_ids = identity::initial_ids(&root, &mut next_node_id);
         let animations = AnimationRegistry::new(&root);
         let focus = FocusRegistry::new(&root, &node_ids);
+        let events = EventRegistry::new(&root);
         let mut tree = Self {
             root,
             node_ids,
@@ -75,6 +81,7 @@ impl UiTree {
             gestures: GestureArena::default(),
             scroll: ScrollState::default(),
             text_inputs: TextInputStates::default(),
+            document_selection: crate::text_selection::DocumentSelectionState::default(),
             caret: crate::caret::CaretAnimator::default(),
             revision: 0,
             layout_dirty: true,
@@ -85,6 +92,7 @@ impl UiTree {
             container_indices: Vec::new(),
             has_container_queries: false,
             reduced_motion: false,
+            events,
         };
         tree.sync_text_inputs();
         tree.sync_responsive_registry();
@@ -151,19 +159,23 @@ impl UiTree {
                 self.interaction.retain(&self.node_ids);
                 self.scroll.retain(&self.node_ids);
                 self.sync_text_inputs();
+                if self.document_selection().is_some_and(|selection| {
+                    !self.node_ids.contains(&selection.anchor.node)
+                        || !self.node_ids.contains(&selection.focus.node)
+                }) {
+                    self.document_selection =
+                        crate::text_selection::DocumentSelectionState::default();
+                }
                 self.revision = self.revision.wrapping_add(1);
                 self.layout_dirty = true;
                 let removed_focus = focused_before
                     .filter(|node| !self.node_ids.contains(node))
-                    .map(|target| UiEvent {
-                        target,
-                        key: focused_key,
-                        kind: UiEventKind::Blurred,
-                    });
+                    .map(|target| UiEvent::new(target, focused_key, UiEventKind::Blurred));
                 self.focus
                     .sync(&self.root, &self.node_ids, focused_before, removed_focus);
             }
         }
+        self.events.sync(&self.root, &self.node_ids);
         if update == TreeUpdate::Layout {
             self.sync_responsive_registry();
         }
@@ -282,84 +294,6 @@ impl UiTree {
         style.sample(self.caret.elapsed(node))
     }
 
-    pub fn pointer_moved(&mut self, point: Point, regions: &[HitRegion]) -> InteractionUpdate {
-        let update = self.interaction.pointer_moved(point, regions);
-        self.decorate(update)
-    }
-
-    pub fn pointer_event(
-        &mut self,
-        event: PointerEvent,
-        regions: &[HitRegion],
-    ) -> InteractionUpdate {
-        let hit = regions
-            .iter()
-            .rev()
-            .find(|region| region.contains(event.position))
-            .filter(|region| region.enabled)
-            .map(|region| (region.node, region.gestures));
-        let gestures = self.gestures.update(event, hit);
-        let mut update = if event.kind == PointerKind::Touch && !event.primary {
-            InteractionUpdate::default()
-        } else {
-            match event.phase {
-                PointerPhase::Entered | PointerPhase::Moved => {
-                    self.pointer_moved(event.position, regions)
-                }
-                PointerPhase::Pressed => {
-                    let mut moved = self.pointer_moved(event.position, regions);
-                    moved.merge(self.primary_pressed(regions));
-                    moved
-                }
-                PointerPhase::Released => {
-                    let mut moved = self.pointer_moved(event.position, regions);
-                    moved.merge(self.primary_released());
-                    moved
-                }
-                PointerPhase::Left => self.pointer_left(),
-                PointerPhase::Cancelled => {
-                    let update = self.interaction.primary_cancelled();
-                    self.decorate(update)
-                }
-            }
-        };
-        update
-            .events
-            .extend(gestures.into_iter().map(|gesture| UiEvent {
-                target: gesture.target,
-                key: self.key_for(gesture.target).map(ToOwned::to_owned),
-                kind: UiEventKind::Gesture(gesture),
-            }));
-        update
-    }
-
-    pub fn pointer_left(&mut self) -> InteractionUpdate {
-        let update = self.interaction.pointer_left();
-        self.decorate(update)
-    }
-
-    pub fn primary_released(&mut self) -> InteractionUpdate {
-        let update = self.interaction.primary_released();
-        self.decorate(update)
-    }
-
-    pub fn window_blurred(&mut self) -> InteractionUpdate {
-        self.suspend_focus();
-        let update = self.interaction.window_blurred();
-        let mut update = self.decorate(update);
-        update.events.extend(
-            self.gestures
-                .cancel_all()
-                .into_iter()
-                .map(|gesture| UiEvent {
-                    target: gesture.target,
-                    key: self.key_for(gesture.target).map(ToOwned::to_owned),
-                    kind: UiEventKind::Gesture(gesture),
-                }),
-        );
-        update
-    }
-
     pub fn ime_input(&mut self, input: ImeInput) -> InteractionUpdate {
         let Some(node) = self.interaction.focused() else {
             return InteractionUpdate::default();
@@ -371,8 +305,8 @@ impl UiTree {
         self.text_input_update(node, result)
     }
 
-    pub fn paste_text(&mut self, text: &str) -> InteractionUpdate {
-        let Some(node) = self.interaction.focused() else {
+    pub fn paste_text(&mut self, target: Option<NodeId>, text: &str) -> InteractionUpdate {
+        let Some(node) = target.or_else(|| self.interaction.focused()) else {
             return InteractionUpdate::default();
         };
         let Some(state) = self.text_inputs.get_mut(node) else {
@@ -458,21 +392,14 @@ impl UiTree {
     }
 
     fn decorate(&mut self, raw: RawUpdate) -> InteractionUpdate {
-        let text_input_changed = raw.events[..raw.count]
-            .iter()
-            .flatten()
-            .any(|(target, kind)| {
-                matches!(kind, UiEventKind::Focused | UiEventKind::Blurred)
-                    && self.text_inputs.get(*target).is_some()
-            });
-        let events = raw.events[..raw.count]
-            .iter()
-            .flatten()
-            .map(|(target, kind)| UiEvent {
-                target: *target,
-                key: self.key_for(*target).map(ToOwned::to_owned),
-                kind: kind.clone(),
-            })
+        let text_input_changed = raw.events.iter().any(|(target, kind)| {
+            matches!(kind, UiEventKind::Focused | UiEventKind::Blurred)
+                && self.text_inputs.get(*target).is_some()
+        });
+        let events = raw
+            .events
+            .into_iter()
+            .flat_map(|(target, kind)| self.event_deliveries(target, kind))
             .collect();
         let transition_update = self.sync_transitions();
         if text_input_changed {
@@ -488,7 +415,7 @@ impl UiTree {
         }
     }
 
-    fn text_input_update(
+    pub(crate) fn text_input_update(
         &mut self,
         node: NodeId,
         result: crate::text_input::EditResult,
@@ -499,18 +426,10 @@ impl UiTree {
             .map_or_else(String::new, |state| state.value().to_owned());
         let mut events = Vec::with_capacity(2);
         if result.changed {
-            events.push(UiEvent {
-                target: node,
-                key: self.key_for(node).map(ToOwned::to_owned),
-                kind: UiEventKind::TextChanged(value.clone()),
-            });
+            events.extend(self.event_deliveries(node, UiEventKind::TextChanged(value.clone())));
         }
         if result.submitted {
-            events.push(UiEvent {
-                target: node,
-                key: self.key_for(node).map(ToOwned::to_owned),
-                kind: UiEventKind::Submitted(value),
-            });
+            events.extend(self.event_deliveries(node, UiEventKind::Submitted(value)));
         }
         if result.layout {
             self.text_inputs.request_cursor_reveal(node);

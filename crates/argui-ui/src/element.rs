@@ -11,7 +11,7 @@ use argui_paint::{
     Border, Color, CornerRadii, Fill, ImageFit, ImageId, ImageSampling, LayerStyle, PaintStyle,
     VectorId,
 };
-use argui_text::TextStyle;
+use argui_text::{TextContent, TextStyle};
 use std::{
     ops::{Deref, DerefMut},
     rc::Rc,
@@ -69,6 +69,10 @@ impl Element {
             scroll: None,
             overlay: None,
             focus_scope: None,
+            event_owner: None,
+            event_listeners: Vec::new(),
+            user_select: crate::UserSelect::Auto,
+            selection_style: None,
             z_index: 0,
             children: children.into_iter().collect(),
         }))
@@ -100,7 +104,7 @@ impl Element {
     }
 
     #[must_use]
-    pub fn text(value: impl Into<String>) -> Self {
+    pub fn text(value: impl Into<TextContent>) -> Self {
         Self(Rc::new(ElementNode {
             inspectable: true,
             key: None,
@@ -127,6 +131,10 @@ impl Element {
             scroll: None,
             overlay: None,
             focus_scope: None,
+            event_owner: None,
+            event_listeners: Vec::new(),
+            user_select: crate::UserSelect::Auto,
+            selection_style: None,
             z_index: 0,
             children: Vec::new(),
         }))
@@ -153,11 +161,6 @@ impl Element {
     #[must_use]
     pub fn ptr_eq(&self, other: &Self) -> bool {
         Rc::ptr_eq(&self.0, &other.0)
-    }
-
-    #[must_use]
-    pub fn has_state_animation(&self) -> bool {
-        self.style_transition.is_some() || !self.conditional_styles.is_empty()
     }
 
     #[must_use]

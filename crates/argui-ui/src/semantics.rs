@@ -110,7 +110,9 @@ fn resolved_semantics(
         return Some(semantics);
     }
     match &element.kind {
-        ElementKind::Text { content, .. } => Some(Semantics::new(Role::Text).label(content)),
+        ElementKind::Text { content, .. } => {
+            Some(Semantics::new(Role::Text).label(content.as_str()))
+        }
         ElementKind::TextEditor {
             placeholder,
             value,

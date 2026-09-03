@@ -16,6 +16,7 @@ mod spinner;
 mod tabs;
 mod tabs_behavior;
 mod text_field_behavior;
+mod text_selection;
 mod theme;
 mod toggle_behavior;
 
@@ -43,5 +44,6 @@ pub use tabs_behavior::{TAB_SELECTED, TABS_SCOPE, TabsAction, TabsBehavior, Tabs
 pub use text_field_behavior::{
     TEXT_FIELD_INVALID, TEXT_FIELD_READ_ONLY, TEXT_FIELD_SCOPE, TextFieldBehavior, TextFieldPart,
 };
+pub use text_selection::{SelectionHost, TextSelectionToolbar};
 pub use theme::{WidgetTheme, shadcn};
 pub use toggle_behavior::{TOGGLE_CHECKED, TOGGLE_SCOPE, ToggleAction, ToggleBehavior, TogglePart};

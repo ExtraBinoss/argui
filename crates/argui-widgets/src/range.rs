@@ -3,6 +3,7 @@ use argui_runtime::LayoutSnapshot;
 use argui_ui::{
     CursorIcon, Element, GestureKind, GesturePhase, GestureSet, Interaction, Orientation, Role,
     SemanticAction, SemanticState, SemanticValue, Semantics, StateScopeId, UiEvent, UiEventKind,
+    UserSelect,
 };
 
 pub const RANGE_SCOPE: StateScopeId = StateScopeId::new("range");
@@ -191,6 +192,7 @@ impl RangeBehavior {
                 };
                 element
                     .keyed(self.key.clone())
+                    .user_select(UserSelect::None)
                     .interaction(
                         Interaction::default()
                             .enabled(self.enabled)

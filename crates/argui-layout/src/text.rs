@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 
 use argui_core::Rect;
+use argui_text::TextContent;
 use argui_ui::{Element, ElementKind, NodeId, UiTree};
 
 use crate::engine::NodeMap;
@@ -9,10 +10,10 @@ pub(super) fn content<'a>(
     ui: &'a UiTree,
     node: NodeId,
     element: &'a Element,
-) -> Option<(Cow<'a, str>, Cow<'a, argui_text::TextStyle>)> {
+) -> Option<(TextContent, Cow<'a, argui_text::TextStyle>)> {
     match &element.kind {
         ElementKind::Text { content, style } => Some((
-            Cow::Borrowed(content),
+            content.clone(),
             Cow::Owned(ui.resolved_text_style(node, style)),
         )),
         ElementKind::TextEditor {
@@ -24,12 +25,12 @@ pub(super) fn content<'a>(
             let value = ui.text_input_display(node)?;
             if value.is_empty() {
                 Some((
-                    Cow::Borrowed(placeholder),
+                    TextContent::plain(placeholder.clone()),
                     Cow::Owned(ui.resolved_text_style(node, placeholder_text)),
                 ))
             } else {
                 Some((
-                    Cow::Owned(value),
+                    TextContent::plain(value),
                     Cow::Owned(ui.resolved_text_style(node, text)),
                 ))
             }

@@ -142,11 +142,11 @@ fn wrapped_button_labels_keep_every_glyph() {
         .unwrap();
 
     for block in output.text.blocks() {
-        let intrinsic = text.measure(&block.text, &block.style, None);
+        let intrinsic = text.measure(block.content.as_str(), &block.style, None);
         assert!(
             block.bounds.size.width + 1.0 >= intrinsic.width,
             "{}: layout {} < intrinsic {}",
-            block.text,
+            block.content.as_str(),
             block.bounds.size.width,
             intrinsic.width
         );
@@ -497,7 +497,7 @@ fn caret_and_selection_updates_skip_taffy_and_prepared_text_rebuilds() {
     assert!(!update.layout_changed);
     layout.update_text_inputs(&mut ui, &mut text, &mut output);
 
-    assert_eq!(output.text.blocks()[1].text, content.blocks()[1].text);
+    assert_eq!(output.text.blocks()[1].content, content.blocks()[1].content);
     assert!(!output.text_inputs[0].selection.is_empty());
 
     let mut missing_region = output.clone();

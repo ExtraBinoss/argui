@@ -2,7 +2,7 @@ use argui_core::{Key, KeyInput, KeyState, Modifiers, Point, Rect, Size};
 use argui_runtime::{LayoutBounds, LayoutSnapshot};
 use argui_ui::{
     Element, GestureEvent, GestureKind, GesturePhase, SemanticAction, SemanticValue, UiEvent,
-    UiEventKind, UiTree,
+    UiEventKind, UiTree, UserSelect,
 };
 use argui_widgets::{
     RangeAction, RangeAxis, RangeBehavior, RangeConfig, RangeDetents, RangeDirection, RangeState,
@@ -11,11 +11,7 @@ use argui_widgets::{
 
 fn event(kind: UiEventKind) -> UiEvent {
     let tree = UiTree::new(Element::container([]));
-    UiEvent {
-        target: tree.node_ids()[0],
-        key: Some("scale".into()),
-        kind,
-    }
+    UiEvent::new(tree.node_ids()[0], Some("scale".into()), kind)
 }
 
 #[test]
@@ -125,6 +121,7 @@ fn slider_uses_one_clamped_path_for_keys_pointer_and_semantics() {
     let zero = Slider::new("zero", "Zero", 0.0, RangeConfig::new(0.0, 0.0, 1.0))
         .enabled(false)
         .build(themes.resolve(argui_core::ColorScheme::Dark));
+    assert_eq!(zero.user_select, UserSelect::None);
     assert!(!zero.interaction.as_ref().unwrap().enabled);
     assert_eq!(
         state.update(&pressed(Key::ArrowRight), &behavior(4.0).enabled(false)),

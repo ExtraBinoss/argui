@@ -13,7 +13,7 @@ fn text_builders_keep_layout_ready_style() {
         .weight(700)
         .clip(Rect::new(Point::new(8.0, 12.0), Size::new(80.0, 20.0)));
 
-    assert_eq!(block.text, "Argui");
+    assert_eq!(block.content.as_str(), "Argui");
     assert_eq!(block.bounds, bounds);
     assert_eq!(block.style.font_size, 24.0);
     assert_eq!(block.style.line_height, 32.0);

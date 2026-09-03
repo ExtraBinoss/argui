@@ -155,6 +155,16 @@ impl UiTree {
     }
 
     pub fn primary_pressed(&mut self, regions: &[HitRegion]) -> InteractionUpdate {
+        let mut update = self.primary_pressed_for(argui_core::PointerId::MOUSE, regions);
+        update.merge(self.focus_pointer_default(regions));
+        update
+    }
+
+    pub(crate) fn primary_pressed_for(
+        &mut self,
+        pointer: argui_core::PointerId,
+        regions: &[HitRegion],
+    ) -> InteractionUpdate {
         let active = self.focus.active_trap();
         let scoped = regions
             .iter()
@@ -165,11 +175,41 @@ impl UiTree {
                 region
             })
             .collect::<Vec<_>>();
-        let raw = self.interaction.primary_pressed(&scoped);
+        let raw = self.interaction.primary_pressed(pointer, &scoped);
+        self.decorate(raw)
+    }
+
+    pub fn focus_pointer_default(&mut self, regions: &[HitRegion]) -> InteractionUpdate {
+        let active = self.focus.active_trap();
+        let scoped = regions
+            .iter()
+            .cloned()
+            .map(|mut region| {
+                region.focusable &=
+                    active.is_none_or(|scope| self.focus.contains(scope, region.node));
+                region
+            })
+            .collect::<Vec<_>>();
+        let raw = self.interaction.focus_pressed(&scoped);
         self.decorate(raw)
     }
 
     pub fn keyboard_event(&mut self, input: &KeyInput, regions: &[HitRegion]) -> InteractionUpdate {
+        let _ = regions;
+        let target = self.interaction.focused();
+        InteractionUpdate {
+            events: target.map_or_else(Vec::new, |node| {
+                self.event_deliveries(node, UiEventKind::KeyInput(input.clone()))
+            }),
+            ..InteractionUpdate::default()
+        }
+    }
+
+    pub fn keyboard_default(
+        &mut self,
+        input: &KeyInput,
+        regions: &[HitRegion],
+    ) -> InteractionUpdate {
         let Some(node) = self.interaction.focused() else {
             return if input.state == KeyState::Pressed && input.key == Key::Tab && !input.repeat {
                 self.focus_next_scoped(regions, input.modifiers.shift)
@@ -177,14 +217,7 @@ impl UiTree {
                 InteractionUpdate::default()
             };
         };
-        let mut update = InteractionUpdate {
-            events: vec![UiEvent {
-                target: node,
-                key: self.key_for(node).map(ToOwned::to_owned),
-                kind: UiEventKind::KeyInput(input.clone()),
-            }],
-            ..InteractionUpdate::default()
-        };
+        let mut update = InteractionUpdate::default();
         if input.state == KeyState::Pressed && input.key == Key::Tab && !input.repeat {
             update.merge(self.focus_next_scoped(regions, input.modifiers.shift));
             return update;
@@ -214,6 +247,7 @@ impl UiTree {
 
     pub fn key_input(&mut self, input: &KeyInput, regions: &[HitRegion]) -> InteractionUpdate {
         let mut update = self.keyboard_event(input, regions);
+        update.merge(self.keyboard_default(input, regions));
         if !(input.state == KeyState::Pressed && input.key == Key::Tab && !input.repeat) {
             update.merge(self.edit_text_input(input));
         }

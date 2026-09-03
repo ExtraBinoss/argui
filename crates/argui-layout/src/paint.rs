@@ -35,6 +35,8 @@ struct CachedFragment {
     scroll_updates: Vec<ScrollPaintUpdate>,
     cacheable: bool,
     visual_revision: u64,
+    selection_active: bool,
+    selection_revision: u64,
 }
 
 #[derive(Default, Debug)]
@@ -101,12 +103,15 @@ fn paint_node(
     }
     let node = output.nodes[map.index];
     let element = elements[node.index];
+    let selection_active = ui.document_selection_intersects(map.index, map.subtree_len);
     if let Some(fragment) = cache.fragments.get(&node.node)
         && fragment.cacheable
         && fragment.element.ptr_eq(element)
         && fragment.node == node
         && fragment.parent == *parent
         && fragment.visual_revision == ui.visual_revision(node.node)
+        && (fragment.selection_revision == ui.document_selection_revision()
+            || (!fragment.selection_active && !selection_active))
     {
         output.display_list.extend(fragment.commands.clone());
         output.hit_regions.extend(fragment.hit_regions.clone());
@@ -230,6 +235,8 @@ fn paint_node(
                 scroll_updates: scroll_updates[scroll_start..].to_vec(),
                 cacheable,
                 visual_revision: ui.visual_revision(node.node),
+                selection_active,
+                selection_revision: ui.document_selection_revision(),
             },
         );
     } else {
@@ -312,6 +319,17 @@ fn paint_enter(
         .text_inputs
         .iter()
         .find(|region| region.node == node.node);
+    if let Some(index) = output
+        .text_regions
+        .iter()
+        .position(|region| region.node == node.node)
+    {
+        let region = &mut output.text_regions[index];
+        region.transform = context.transform;
+        region.clips = content_clips.clone();
+        region.interaction_order = output.display_list.len();
+        crate::selection::paint(ui, region, &mut output.display_list);
+    }
     if let Some(region) = text_input {
         input::paint_selection(
             region,
@@ -548,7 +566,12 @@ fn push_hit_region(
             element.hit_test.pointer_events,
             PointerEvents::None | PointerEvents::ContentsOnly
         );
-    if own_allowed && let Some(interaction) = element.interaction.as_ref() {
+    let listens_to_pointer = element
+        .event_listeners
+        .iter()
+        .any(|listener| listener.event.requires_hit_test());
+    if own_allowed && (element.interaction.is_some() || listens_to_pointer) {
+        let interaction = element.interaction.clone().unwrap_or_default();
         output.hit_regions.push(HitRegion {
             node: node.node,
             bounds: node.bounds,

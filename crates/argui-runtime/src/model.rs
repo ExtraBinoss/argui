@@ -1,23 +1,26 @@
 use crate::AppCommand;
 use argui_animation::Frame;
-use argui_core::{Point, Rect};
+use argui_core::{Point, PointerId, Rect};
 use argui_inspect::InspectorHandle;
 use argui_paint::{ImageAsset, VectorAsset};
 use argui_ui::{
-    ClipboardRequest, Element, FocusRequest, FocusTarget, TextSelection, TextSelectionRequest,
-    UiEvent,
+    ClipboardRequest, Element, EventOwnerId, FocusRequest, FocusTarget, TextSelection,
+    TextSelectionRequest, UiEvent,
 };
 use std::{
     any::Any,
     cell::{Cell, RefCell},
-    collections::HashSet,
     marker::PhantomData,
     rc::{Rc, Weak},
 };
 
 use crate::{ThemeRequest, WindowEnvironment};
 
+mod effects;
 mod layout;
+pub(crate) use effects::PointerCaptureRequest;
+pub use effects::ViewUpdate;
+use effects::{ContextEffects, SelectionCommandRequest, merge_effects, strongest_update};
 pub use layout::{LayoutBounds, LayoutSnapshot, ScrollRequest};
 
 /// Retained component identity. Cloning an entity never clones its state.
@@ -29,7 +32,6 @@ struct EntityCell<T: Render> {
     dirty: Cell<bool>,
     pending: RefCell<ContextEffects>,
     children: RefCell<Vec<AnyEntity>>,
-    keys: RefCell<HashSet<String>>,
     observers: RefCell<std::collections::HashMap<usize, Rc<dyn Fn()>>>,
     environment: Cell<WindowEnvironment>,
     environment_used: Cell<bool>,
@@ -58,25 +60,11 @@ pub struct AnyEntity {
     wants_frame: Rc<dyn Fn() -> bool>,
     frame: Rc<dyn Fn(Frame) -> ContextEffects>,
     layout: Rc<dyn Fn(&LayoutSnapshot) -> ContextEffects>,
-    keys: Rc<dyn Fn(&str) -> bool>,
+    owns: Rc<dyn Fn(EventOwnerId) -> bool>,
     image_assets: Rc<dyn Fn() -> Vec<ImageAsset>>,
     vector_assets: Rc<dyn Fn() -> Vec<VectorAsset>>,
     inspector: Rc<dyn Fn() -> Option<InspectorHandle>>,
     take_effects: Rc<dyn Fn() -> ContextEffects>,
-}
-
-#[derive(Default)]
-pub(crate) struct ContextEffects {
-    pub(crate) update: ViewUpdate,
-    pub(crate) animation_frame: bool,
-    pub(crate) propagation_stopped: bool,
-    pub(crate) clipboard: Option<ClipboardRequest>,
-    pub(crate) scroll: Option<ScrollRequest>,
-    pub(crate) focus: Option<FocusRequest>,
-    pub(crate) text_selection: Option<TextSelectionRequest>,
-    pub(crate) theme: Option<ThemeRequest>,
-    pub(crate) commands: Vec<AppCommand>,
-    children: Vec<AnyEntity>,
 }
 
 /// Mutation and scheduling access scoped to one retained component.
@@ -85,6 +73,7 @@ pub struct Context<T: Render> {
     owner: Option<(usize, Rc<dyn Fn()>)>,
     environment: WindowEnvironment,
     environment_read: Cell<bool>,
+    event_target: Option<argui_ui::NodeId>,
     _marker: PhantomData<fn() -> T>,
 }
 
@@ -95,6 +84,7 @@ impl<T: Render> Default for Context<T> {
             owner: None,
             environment: WindowEnvironment::default(),
             environment_read: Cell::new(false),
+            event_target: None,
             _marker: PhantomData,
         }
     }
@@ -126,8 +116,24 @@ impl<T: Render> Context<T> {
         self.request_paint();
     }
 
-    pub fn stop_propagation(&mut self) {
-        self.effects.propagation_stopped = true;
+    pub fn capture_pointer(&mut self, pointer: PointerId) -> bool {
+        let Some(target) = self.event_target else {
+            return false;
+        };
+        self.effects
+            .pointer_capture
+            .push(PointerCaptureRequest::Capture { pointer, target });
+        true
+    }
+
+    pub fn release_pointer(&mut self, pointer: PointerId) -> bool {
+        let Some(target) = self.event_target else {
+            return false;
+        };
+        self.effects
+            .pointer_capture
+            .push(PointerCaptureRequest::Release { pointer, target });
+        true
     }
 
     pub fn write_clipboard(&mut self, request: ClipboardRequest) {
@@ -155,6 +161,24 @@ impl<T: Render> Context<T> {
     pub fn select_text(&mut self, target: impl Into<FocusTarget>, selection: TextSelection) {
         self.effects.text_selection = Some(TextSelectionRequest::new(target, selection));
         self.request_paint();
+    }
+
+    pub fn selection_command(&mut self, command: argui_ui::SelectionCommand) {
+        self.effects.selection_command = Some(SelectionCommandRequest {
+            target: self.event_target,
+            command,
+        });
+    }
+
+    pub fn selection_command_for(
+        &mut self,
+        target: argui_ui::NodeId,
+        command: argui_ui::SelectionCommand,
+    ) {
+        self.effects.selection_command = Some(SelectionCommandRequest {
+            target: Some(target),
+            command,
+        });
     }
 
     pub fn set_theme(&mut self, request: ThemeRequest) {
@@ -207,7 +231,6 @@ impl<T: Render> Context<T> {
             .set(self.environment_read.get() || child.environment_read.get());
         self.effects.update = strongest_update(self.effects.update, child.effects.update);
         self.effects.animation_frame |= child.effects.animation_frame;
-        self.effects.propagation_stopped |= child.effects.propagation_stopped;
         if child.effects.clipboard.is_some() {
             self.effects.clipboard = child.effects.clipboard;
         }
@@ -223,7 +246,13 @@ impl<T: Render> Context<T> {
         if child.effects.theme.is_some() {
             self.effects.theme = child.effects.theme;
         }
+        if child.effects.selection_command.is_some() {
+            self.effects.selection_command = child.effects.selection_command;
+        }
         self.effects.commands.append(&mut child.effects.commands);
+        self.effects
+            .pointer_capture
+            .append(&mut child.effects.pointer_capture);
         self.effects.children.append(&mut child.effects.children);
     }
 }
@@ -277,7 +306,6 @@ impl<T: Render> Entity<T> {
             dirty: Cell::new(true),
             pending: RefCell::new(ContextEffects::default()),
             children: RefCell::new(Vec::new()),
-            keys: RefCell::new(HashSet::new()),
             observers: RefCell::new(std::collections::HashMap::new()),
             environment: Cell::new(WindowEnvironment::default()),
             environment_used: Cell::new(false),
@@ -297,7 +325,7 @@ impl<T: Render> Entity<T> {
         let wants_frame = self.clone();
         let frame = self.clone();
         let layout = self.clone();
-        let keys = self.clone();
+        let owns = self.clone();
         let image_assets = self.clone();
         let vector_assets = self.clone();
         let inspector = self.clone();
@@ -310,7 +338,7 @@ impl<T: Render> Entity<T> {
             wants_frame: Rc::new(move || wants_frame.wants_frame()),
             frame: Rc::new(move |value| frame.dispatch_frame(value)),
             layout: Rc::new(move |snapshot| layout.dispatch_layout(snapshot)),
-            keys: Rc::new(move |key| keys.0.keys.borrow().contains(key)),
+            owns: Rc::new(move |owner| owns.owns(owner)),
             image_assets: Rc::new(move || image_assets.read(Render::image_assets)),
             vector_assets: Rc::new(move || vector_assets.read(Render::vector_assets)),
             inspector: Rc::new(move || inspector.read(Render::inspector)),
@@ -360,9 +388,8 @@ impl<T: Render> Entity<T> {
             environment,
             ..Context::default()
         };
-        let element = self.0.value.borrow_mut().render(&mut cx);
-        self.0.keys.borrow_mut().clear();
-        collect_keys(&element, &mut self.0.keys.borrow_mut());
+        let mut element = self.0.value.borrow_mut().render(&mut cx);
+        element.assign_event_owner(self.owner_id());
         *self.0.children.borrow_mut() = std::mem::take(&mut cx.effects.children);
         self.0.environment_used.set(cx.environment_read.get());
         *self.0.cached.borrow_mut() = Some(element.clone());
@@ -399,30 +426,42 @@ impl<T: Render> Entity<T> {
     }
 
     fn dispatch(&self, event: &UiEvent) -> ContextEffects {
-        let mut effects = ContextEffects::default();
-        if let Some(key) = event.key.as_deref()
+        if let Some(owner) = event.current_owner()
+            && owner != self.owner_id()
             && let Some(child) = self
                 .0
                 .children
                 .borrow()
                 .iter()
-                .rev()
-                .find(|child| (child.keys)(key))
+                .find(|child| (child.owns)(owner))
         {
-            merge_effects(&mut effects, (child.dispatch)(event));
+            return (child.dispatch)(event);
         }
-        if !effects.propagation_stopped {
-            let mut cx = Context {
-                environment: self.0.environment.get(),
-                ..Context::default()
-            };
-            self.0.value.borrow_mut().event(event, &mut cx);
-            merge_effects(&mut effects, cx.effects);
-        }
+        let mut cx = Context {
+            environment: self.0.environment.get(),
+            event_target: Some(event.current_target()),
+            ..Context::default()
+        };
+        self.0.value.borrow_mut().event(event, &mut cx);
+        let effects = cx.effects;
         if effects.update == ViewUpdate::Rebuild {
             self.mark_dirty();
         }
         effects
+    }
+
+    fn owner_id(&self) -> EventOwnerId {
+        EventOwnerId(Rc::as_ptr(&self.0) as usize)
+    }
+
+    fn owns(&self, owner: EventOwnerId) -> bool {
+        owner == self.owner_id()
+            || self
+                .0
+                .children
+                .borrow()
+                .iter()
+                .any(|child| (child.owns)(owner))
     }
 
     pub(crate) fn wants_frame(&self) -> bool {
@@ -532,51 +571,4 @@ impl AnyEntity {
     pub(crate) fn take_effects(&self) -> ContextEffects {
         (self.take_effects)()
     }
-}
-
-fn strongest_update(left: ViewUpdate, right: ViewUpdate) -> ViewUpdate {
-    match (left, right) {
-        (ViewUpdate::Rebuild, _) | (_, ViewUpdate::Rebuild) => ViewUpdate::Rebuild,
-        (ViewUpdate::Paint, _) | (_, ViewUpdate::Paint) => ViewUpdate::Paint,
-        _ => ViewUpdate::None,
-    }
-}
-
-fn merge_effects(target: &mut ContextEffects, mut source: ContextEffects) {
-    target.update = strongest_update(target.update, source.update);
-    target.animation_frame |= source.animation_frame;
-    target.propagation_stopped |= source.propagation_stopped;
-    if source.clipboard.is_some() {
-        target.clipboard = source.clipboard.take();
-    }
-    if source.scroll.is_some() {
-        target.scroll = source.scroll.take();
-    }
-    if source.focus.is_some() {
-        target.focus = source.focus.take();
-    }
-    if source.text_selection.is_some() {
-        target.text_selection = source.text_selection.take();
-    }
-    if source.theme.is_some() {
-        target.theme = source.theme.take();
-    }
-    target.commands.append(&mut source.commands);
-}
-
-fn collect_keys(element: &Element, keys: &mut HashSet<String>) {
-    if let Some(key) = &element.key {
-        keys.insert(key.clone());
-    }
-    for child in &element.children {
-        collect_keys(child, keys);
-    }
-}
-
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub enum ViewUpdate {
-    #[default]
-    None,
-    Paint,
-    Rebuild,
 }

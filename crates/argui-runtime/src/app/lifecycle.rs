@@ -118,13 +118,14 @@ impl ApplicationHandler<UserEvent> for Application {
                 UserEvent::Preferences { .. } => {}
                 UserEvent::ClipboardText {
                     window: window_key,
+                    target,
                     text,
                 } => {
                     if window_key != self.window_key {
                         return;
                     }
                     if let Some(ui) = &mut self.ui_tree {
-                        let update = ui.paste_text(&text);
+                        let update = ui.paste_text(target, &text);
                         self.apply_ui_update(update, &window, event_loop);
                     }
                 }
@@ -210,6 +211,8 @@ impl ApplicationHandler<UserEvent> for Application {
                 }
                 if button == PointerButton::Primary {
                     self.primary_button(state, &window, event_loop);
+                } else if button == PointerButton::Secondary {
+                    self.secondary_button(state, &window, event_loop);
                 }
                 PlatformEvent::Pointer(PointerEvent {
                     phase: if state == argui_platform::ButtonState::Pressed {
@@ -290,6 +293,7 @@ impl ApplicationHandler<UserEvent> for Application {
             }
             WindowEvent::RedrawRequested => {
                 self.begin_frame_profile();
+                self.advance_touch_selection(&window, event_loop);
                 self.advance_pointer_inertia(&window);
                 self.flush_pointer_scroll(&window, event_loop);
                 self.flush_scrollbar_drag(&window, event_loop);

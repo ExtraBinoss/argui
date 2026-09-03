@@ -1,5 +1,5 @@
 use argui_core::{CaretAffinity, Point, Rect, Size, TextPosition};
-use cosmic_text::{Attrs, Buffer, Metrics, Shaping, Weight};
+use cosmic_text::{Buffer, Metrics, Shaping};
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::{TextEngine, TextStyle, engine};
@@ -152,18 +152,13 @@ impl TextEngine {
     }
 }
 
-fn caret_stops(buffer: &Buffer, text: &str) -> Vec<CaretStop> {
+pub(crate) fn caret_stops(buffer: &Buffer, text: &str) -> Vec<CaretStop> {
     let mut boundaries = text
         .unicode_word_indices()
         .flat_map(|(index, word)| [index, index + word.len()])
         .collect::<Vec<_>>();
     boundaries.extend([0, text.len()]);
-    let mut line_offsets = vec![0];
-    for (index, character) in text.char_indices() {
-        if character == '\n' {
-            line_offsets.push(index + 1);
-        }
-    }
+    let line_offsets = engine::source_line_offsets(text);
     let mut stops = Vec::new();
     for run in buffer.layout_runs() {
         let base = line_offsets.get(run.line_i).copied().unwrap_or_default();
@@ -288,9 +283,7 @@ impl InputBuffer {
             crate::TextWrap::Word => cosmic_text::Wrap::Word,
             crate::TextWrap::WordOrGlyph => cosmic_text::Wrap::WordOrGlyph,
         });
-        let attrs = Attrs::new()
-            .family(engine::family(&style.family))
-            .weight(Weight(style.weight));
+        let attrs = engine::attrs(style);
         buffer.set_text(
             text,
             &attrs,

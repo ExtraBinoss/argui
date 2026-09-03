@@ -10,17 +10,13 @@ fn ui_event(key: &str, kind: UiEventKind) -> AppEvent {
     let tree = UiTree::new(Element::container([]));
     AppEvent::Ui {
         window: WindowKey::main(),
-        event: UiEvent {
-            target: tree.node_id_at(0).unwrap(),
-            key: Some(key.into()),
-            kind,
-        },
+        event: UiEvent::new(tree.node_id_at(0).unwrap(), Some(key.into()), kind),
     }
 }
 
 fn texts(element: &Element, output: &mut Vec<String>) {
     if let argui_ui::ElementKind::Text { content, .. } = &element.kind {
-        output.push(content.clone());
+        output.push(content.as_str().to_owned());
     }
     for child in &element.children {
         texts(child, output);

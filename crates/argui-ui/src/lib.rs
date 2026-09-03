@@ -5,6 +5,7 @@ mod caret;
 mod cursor;
 mod effect;
 mod element;
+mod event;
 mod focus;
 mod gesture;
 mod identity;
@@ -18,6 +19,7 @@ mod semantics;
 mod state;
 mod style;
 mod text_input;
+mod text_selection;
 mod traversal;
 mod tree;
 mod update;
@@ -41,11 +43,14 @@ pub use caret::{
 pub use cursor::CursorIcon;
 pub use effect::{EffectScope, ScopedEffect};
 pub use element::{Element, ElementKind, TextEditorSpec};
+pub use event::{
+    EventListener, EventListenerOptions, EventOwnerId, EventPhase, EventType, UiEvent, UiEventKind,
+};
 pub use focus::{FocusContainment, FocusRequest, FocusScope, FocusTarget, InitialFocus};
 pub use gesture::{GestureArena, GestureEvent, GestureKind, GesturePhase, GestureSet};
 pub use interaction::{
     HitRegion, HitShape, HitTestStyle, Interaction, InteractionUpdate, KeyboardActivation, NodeId,
-    PointerEvents, UiEvent, UiEventKind, WindowDragBehavior,
+    PointerEvents, WindowDragBehavior,
 };
 pub use overlay::{OverlayAlign, OverlayAnchor, OverlayPlacement, PlacedOverlay, PlacementSide};
 pub use resize::{Resizable, ResizeAxes, ResizeConfig, ResizeEvent, ResizeState};
@@ -72,5 +77,9 @@ pub use style::{
     auto, evenly_sized_tracks, flex, fr, length, line, minmax, percent, repeat, sides, span, zero,
 };
 pub use text_input::{ClipboardRequest, TextInputFilter, TextSelection, TextSelectionRequest};
+pub use text_selection::{
+    DocumentTextPoint, DocumentTextSelection, SelectionCapabilities, SelectionCommand,
+    SelectionGranularity, TextSelectionStyle, UserSelect,
+};
 pub use tree::{TreeUpdate, TreeUpdateStats, UiTree};
 pub use virtual_list::{MeasurementUpdate, VariableList, VirtualList, VirtualWindow};

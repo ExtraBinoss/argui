@@ -36,7 +36,7 @@ impl InputStyle {
         text.wrap = TextWrap::None;
         let mut placeholder = text.clone();
         placeholder.color = TextColor::rgba(0.55, 0.60, 0.68, 1.0);
-        placeholder.overflow = TextOverflow::Ellipsis;
+        placeholder.overflow = TextOverflow::Ellipsis(argui_text::EllipsisPosition::End);
         Self {
             layout: LayoutStyle {
                 size: argui_ui::Dimensions {

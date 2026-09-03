@@ -1,7 +1,7 @@
 use argui_core::{CaretAffinity, ImeInput, Key, KeyInput, KeyState, TextPosition};
 use unicode_segmentation::UnicodeSegmentation;
 
-use crate::FocusTarget;
+use crate::{FocusTarget, NodeId};
 
 mod filter;
 pub use filter::TextInputFilter;
@@ -29,7 +29,7 @@ struct Preedit {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ClipboardRequest {
-    Read,
+    Read { target: Option<NodeId> },
     Write(String),
 }
 
@@ -84,6 +84,24 @@ impl TextInputState {
 
     pub fn value(&self) -> &str {
         &self.value
+    }
+
+    pub(crate) const fn read_only(&self) -> bool {
+        self.read_only
+    }
+
+    pub(crate) fn has_selection(&self) -> bool {
+        self.selection().is_some()
+    }
+
+    pub(crate) fn selection_command(&mut self, command: crate::SelectionCommand) -> EditResult {
+        let key = match command {
+            crate::SelectionCommand::Cut => "x",
+            crate::SelectionCommand::Copy => "c",
+            crate::SelectionCommand::Paste => "v",
+            crate::SelectionCommand::SelectAll => "a",
+        };
+        self.shortcut(key)
     }
 
     pub fn sync(&mut self, value: &str, multiline: bool, read_only: bool, filter: TextInputFilter) {
@@ -318,13 +336,10 @@ impl TextInputState {
                 ..EditResult::default()
             },
             "x" => {
-                let clipboard = self.selected_text().map(ClipboardRequest::Write);
                 if self.read_only {
-                    return EditResult {
-                        clipboard,
-                        ..EditResult::default()
-                    };
+                    return EditResult::default();
                 }
+                let clipboard = self.selected_text().map(ClipboardRequest::Write);
                 let changed = clipboard.is_some() && self.delete_selection();
                 EditResult {
                     changed,
@@ -335,7 +350,7 @@ impl TextInputState {
                 }
             }
             "v" if !self.read_only => EditResult {
-                clipboard: Some(ClipboardRequest::Read),
+                clipboard: Some(ClipboardRequest::Read { target: None }),
                 ..EditResult::default()
             },
             _ => EditResult::default(),

@@ -1,3 +1,5 @@
+use std::{num::NonZeroUsize, ops::Range};
+
 use argui_core::{Rect, Size};
 
 pub use argui_core::Color as TextColor;
@@ -12,6 +14,52 @@ pub enum FontFamily {
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+pub enum FontStyle {
+    #[default]
+    Normal,
+    Italic,
+    Oblique,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+pub enum FontStretch {
+    UltraCondensed,
+    ExtraCondensed,
+    Condensed,
+    SemiCondensed,
+    #[default]
+    Normal,
+    SemiExpanded,
+    Expanded,
+    ExtraExpanded,
+    UltraExpanded,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub enum LetterSpacing {
+    #[default]
+    Normal,
+    Px(f32),
+    Em(f32),
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+pub enum UnderlineStyle {
+    #[default]
+    None,
+    Single,
+    Double,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct TextDecoration {
+    pub underline: UnderlineStyle,
+    pub underline_color: Option<TextColor>,
+    pub strikethrough: bool,
+    pub strikethrough_color: Option<TextColor>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub enum TextWrap {
     None,
     Glyph,
@@ -21,10 +69,18 @@ pub enum TextWrap {
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+pub enum EllipsisPosition {
+    Start,
+    Middle,
+    #[default]
+    End,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub enum TextOverflow {
     #[default]
     Clip,
-    Ellipsis,
+    Ellipsis(EllipsisPosition),
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
@@ -52,8 +108,13 @@ pub struct TextStyle {
     pub color: TextColor,
     pub family: FontFamily,
     pub weight: u16,
+    pub font_style: FontStyle,
+    pub stretch: FontStretch,
+    pub letter_spacing: LetterSpacing,
+    pub decoration: TextDecoration,
     pub wrap: TextWrap,
     pub overflow: TextOverflow,
+    pub line_clamp: Option<NonZeroUsize>,
     pub align: TextAlign,
 }
 
@@ -65,16 +126,169 @@ impl Default for TextStyle {
             color: TextColor::WHITE,
             family: FontFamily::SansSerif,
             weight: 400,
+            font_style: FontStyle::Normal,
+            stretch: FontStretch::Normal,
+            letter_spacing: LetterSpacing::Normal,
+            decoration: TextDecoration::default(),
             wrap: TextWrap::WordOrGlyph,
             overflow: TextOverflow::Clip,
+            line_clamp: None,
             align: TextAlign::Start,
         }
     }
 }
 
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct TextSpanStyle {
+    pub font_size: Option<f32>,
+    pub line_height: Option<f32>,
+    pub color: Option<TextColor>,
+    pub family: Option<FontFamily>,
+    pub weight: Option<u16>,
+    pub font_style: Option<FontStyle>,
+    pub stretch: Option<FontStretch>,
+    pub letter_spacing: Option<LetterSpacing>,
+    pub decoration: Option<TextDecoration>,
+}
+
+impl TextSpanStyle {
+    #[must_use]
+    pub const fn font_size(mut self, font_size: f32) -> Self {
+        self.font_size = Some(font_size);
+        self
+    }
+
+    #[must_use]
+    pub const fn line_height(mut self, line_height: f32) -> Self {
+        self.line_height = Some(line_height);
+        self
+    }
+
+    #[must_use]
+    pub const fn color(mut self, color: TextColor) -> Self {
+        self.color = Some(color);
+        self
+    }
+
+    #[must_use]
+    pub const fn weight(mut self, weight: u16) -> Self {
+        self.weight = Some(weight);
+        self
+    }
+
+    #[must_use]
+    pub fn family(mut self, family: FontFamily) -> Self {
+        self.family = Some(family);
+        self
+    }
+
+    #[must_use]
+    pub const fn font_style(mut self, style: FontStyle) -> Self {
+        self.font_style = Some(style);
+        self
+    }
+
+    #[must_use]
+    pub const fn stretch(mut self, stretch: FontStretch) -> Self {
+        self.stretch = Some(stretch);
+        self
+    }
+
+    #[must_use]
+    pub const fn letter_spacing(mut self, spacing: LetterSpacing) -> Self {
+        self.letter_spacing = Some(spacing);
+        self
+    }
+
+    #[must_use]
+    pub const fn decoration(mut self, decoration: TextDecoration) -> Self {
+        self.decoration = Some(decoration);
+        self
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct TextSpan {
+    pub content: String,
+    pub style: TextSpanStyle,
+}
+
+impl TextSpan {
+    #[must_use]
+    pub fn new(content: impl Into<String>) -> Self {
+        Self {
+            content: content.into(),
+            style: TextSpanStyle::default(),
+        }
+    }
+
+    #[must_use]
+    pub fn style(mut self, style: TextSpanStyle) -> Self {
+        self.style = style;
+        self
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct TextContent {
+    text: String,
+    runs: Vec<(Range<usize>, TextSpanStyle)>,
+}
+
+impl TextContent {
+    #[must_use]
+    pub fn plain(text: impl Into<String>) -> Self {
+        Self {
+            text: text.into(),
+            runs: Vec::new(),
+        }
+    }
+
+    #[must_use]
+    pub fn rich(spans: impl IntoIterator<Item = TextSpan>) -> Self {
+        let mut text = String::new();
+        let mut runs = Vec::new();
+        for span in spans {
+            let start = text.len();
+            text.push_str(&span.content);
+            let end = text.len();
+            if start != end {
+                runs.push((start..end, span.style));
+            }
+        }
+        Self { text, runs }
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.text
+    }
+
+    #[must_use]
+    pub fn is_rich(&self) -> bool {
+        !self.runs.is_empty()
+    }
+
+    pub(crate) fn runs(&self) -> &[(Range<usize>, TextSpanStyle)] {
+        &self.runs
+    }
+}
+
+impl From<&str> for TextContent {
+    fn from(value: &str) -> Self {
+        Self::plain(value)
+    }
+}
+
+impl From<String> for TextContent {
+    fn from(value: String) -> Self {
+        Self::plain(value)
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct TextBlock {
-    pub text: String,
+    pub content: TextContent,
     pub bounds: Rect,
     pub clip: Rect,
     pub style: TextStyle,
@@ -82,9 +296,9 @@ pub struct TextBlock {
 
 impl TextBlock {
     #[must_use]
-    pub fn new(text: impl Into<String>, bounds: Rect) -> Self {
+    pub fn new(content: impl Into<TextContent>, bounds: Rect) -> Self {
         Self {
-            text: text.into(),
+            content: content.into(),
             bounds,
             clip: bounds,
             style: TextStyle::default(),
@@ -119,6 +333,48 @@ impl TextBlock {
     #[must_use]
     pub const fn weight(mut self, weight: u16) -> Self {
         self.style.weight = weight;
+        self
+    }
+
+    #[must_use]
+    pub const fn font_style(mut self, style: FontStyle) -> Self {
+        self.style.font_style = style;
+        self
+    }
+
+    #[must_use]
+    pub const fn stretch(mut self, stretch: FontStretch) -> Self {
+        self.style.stretch = stretch;
+        self
+    }
+
+    #[must_use]
+    pub const fn letter_spacing(mut self, spacing: LetterSpacing) -> Self {
+        self.style.letter_spacing = spacing;
+        self
+    }
+
+    #[must_use]
+    pub const fn decoration(mut self, decoration: TextDecoration) -> Self {
+        self.style.decoration = decoration;
+        self
+    }
+
+    #[must_use]
+    pub const fn wrap(mut self, wrap: TextWrap) -> Self {
+        self.style.wrap = wrap;
+        self
+    }
+
+    #[must_use]
+    pub const fn overflow(mut self, overflow: TextOverflow) -> Self {
+        self.style.overflow = overflow;
+        self
+    }
+
+    #[must_use]
+    pub const fn line_clamp(mut self, line_clamp: Option<NonZeroUsize>) -> Self {
+        self.style.line_clamp = line_clamp;
         self
     }
 

@@ -1,5 +1,10 @@
+use std::num::NonZeroUsize;
+
 use argui_core::{Point, Rect, Size};
-use argui_text::{FontFamily, TextBlock, TextEngine, TextOverflow, TextScene, TextStyle, TextWrap};
+use argui_text::{
+    FontFamily, FontStyle, LetterSpacing, TextBlock, TextContent, TextDecoration, TextEngine,
+    TextOverflow, TextScene, TextSpan, TextSpanStyle, TextStyle, TextWrap, UnderlineStyle,
+};
 
 const NOTO_SANS: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
 const NOTO_ARABIC: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSansArabic.ttf");
@@ -87,7 +92,7 @@ fn ellipsis_replaces_overflowing_graphemes_and_tracks_available_width() {
         ..TextStyle::default()
     };
     let ellipsis_style = TextStyle {
-        overflow: TextOverflow::Ellipsis,
+        overflow: TextOverflow::Ellipsis(argui_text::EllipsisPosition::End),
         ..clipped_style.clone()
     };
     let scene = |text: &str, width: f32, style: TextStyle| {
@@ -121,7 +126,7 @@ fn ellipsis_replaces_overflowing_graphemes_and_tracks_available_width() {
             500.0,
             TextStyle {
                 wrap: TextWrap::None,
-                overflow: TextOverflow::Ellipsis,
+                overflow: TextOverflow::Ellipsis(argui_text::EllipsisPosition::End),
                 ..TextStyle::default()
             },
         ),
@@ -168,4 +173,85 @@ fn embedded_emoji_fallback_rasterizes_without_system_fonts() {
         .filter(|image| image.width > 0 && image.height > 0)
         .count();
     assert!(visible >= 2);
+}
+
+#[test]
+fn rich_spans_keep_per_run_color_metrics_and_decorations() {
+    let mut engine =
+        TextEngine::from_embedded_fonts([NOTO_SANS], "Noto Sans", "Noto Sans", "Noto Sans");
+    let red = argui_core::Color::rgb(1.0, 0.0, 0.0);
+    let green = argui_core::Color::rgb(0.0, 1.0, 0.0);
+    let content = TextContent::rich([
+        TextSpan::new("rich ").style(
+            TextSpanStyle::default()
+                .color(red)
+                .weight(700)
+                .font_style(FontStyle::Italic),
+        ),
+        TextSpan::new("text").style(TextSpanStyle::default().color(green).decoration(
+            TextDecoration {
+                underline: UnderlineStyle::Double,
+                strikethrough: true,
+                ..TextDecoration::default()
+            },
+        )),
+    ]);
+    let scene = TextScene::new().with(TextBlock::new(content, bounds(0.0, 0.0, 240.0, 40.0)));
+    let prepared = engine.prepare(&scene, 1.0);
+
+    assert!(prepared.glyphs.iter().any(|glyph| glyph.color[0] > 0.9));
+    assert!(prepared.glyphs.iter().any(|glyph| glyph.color[1] > 0.9));
+    assert!(prepared.decorations.len() >= 3);
+}
+
+#[test]
+fn empty_rich_spans_do_not_create_empty_shape_runs() {
+    let content = TextContent::rich([
+        TextSpan::new(""),
+        TextSpan::new("visible").style(TextSpanStyle::default().weight(600)),
+    ]);
+    assert_eq!(content.as_str(), "visible");
+    assert!(content.is_rich());
+}
+
+#[test]
+fn tracking_changes_intrinsic_measurement_and_layout_cache_is_reused() {
+    let mut engine =
+        TextEngine::from_embedded_fonts([NOTO_SANS], "Noto Sans", "Noto Sans", "Noto Sans");
+    let normal = TextStyle::default();
+    let tracked = TextStyle {
+        letter_spacing: LetterSpacing::Px(4.0),
+        ..normal.clone()
+    };
+    assert!(
+        engine.measure("tracking", &tracked, None).width
+            > engine.measure("tracking", &normal, None).width
+    );
+    let content = TextContent::plain("same allocation");
+    let first = engine.layout_text(&content, &tracked, Size::new(200.0, 80.0));
+    let second = engine.layout_text(&content, &tracked, Size::new(200.0, 80.0));
+    assert!(std::sync::Arc::ptr_eq(&first, &second));
+}
+
+#[test]
+fn multiline_ellipsis_clamps_shaping_and_selection_to_visual_lines() {
+    let mut engine =
+        TextEngine::from_embedded_fonts([NOTO_SANS], "Noto Sans", "Noto Sans", "Noto Sans");
+    let content = TextContent::plain(
+        "one two three four five six seven eight nine ten eleven twelve thirteen fourteen",
+    );
+    let style = TextStyle {
+        font_size: 16.0,
+        line_height: 20.0,
+        wrap: TextWrap::Word,
+        overflow: TextOverflow::Ellipsis(argui_text::EllipsisPosition::End),
+        line_clamp: NonZeroUsize::new(2),
+        ..TextStyle::default()
+    };
+
+    let layout = engine.layout_text(&content, &style, Size::new(120.0, 200.0));
+
+    assert_eq!(layout.lines.len(), 2);
+    assert!(layout.content_size.height <= 40.0);
+    assert!(layout.lines.last().unwrap().source.end < content.as_str().len());
 }

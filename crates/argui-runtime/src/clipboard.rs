@@ -17,11 +17,11 @@ impl Application {
         event_loop: &ActiveEventLoop,
     ) {
         match request {
-            ClipboardRequest::Read => {
+            ClipboardRequest::Read { target } => {
                 if let Ok(text) = self.clipboard.read_text()
                     && let Some(ui) = &mut self.ui_tree
                 {
-                    let update = ui.paste_text(&text);
+                    let update = ui.paste_text(target, &text);
                     self.apply_ui_update(update, window, event_loop);
                 }
             }
@@ -39,7 +39,7 @@ impl Application {
         _event_loop: &ActiveEventLoop,
     ) {
         match request {
-            ClipboardRequest::Read => {
+            ClipboardRequest::Read { target } => {
                 let Some(proxy) = self.event_proxy.clone() else {
                     return;
                 };
@@ -47,7 +47,11 @@ impl Application {
                 wasm_bindgen_futures::spawn_local(async move {
                     let mut clipboard = Clipboard::new();
                     if let Ok(text) = clipboard.read_text().await {
-                        let _ = proxy.send_event(UserEvent::ClipboardText { window, text });
+                        let _ = proxy.send_event(UserEvent::ClipboardText {
+                            window,
+                            target,
+                            text,
+                        });
                     }
                 });
             }

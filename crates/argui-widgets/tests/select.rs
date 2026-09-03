@@ -1,14 +1,10 @@
 use argui_core::{Key, KeyInput, KeyState, Modifiers};
-use argui_ui::{Element, Role, UiEvent, UiEventKind, UiTree};
+use argui_ui::{Element, Role, UiEvent, UiEventKind, UiTree, UserSelect};
 use argui_widgets::{Select, SelectAction, SelectBehavior, SelectOption};
 
 fn event(key: &str, kind: UiEventKind) -> UiEvent {
     let tree = UiTree::new(Element::container([]));
-    UiEvent {
-        target: tree.node_ids()[0],
-        key: Some(key.into()),
-        kind,
-    }
+    UiEvent::new(tree.node_ids()[0], Some(key.into()), kind)
 }
 
 fn key_state(key: Key, state: KeyState) -> UiEventKind {
@@ -94,10 +90,17 @@ fn open_select_is_an_anchored_trapped_listbox() {
         element.children[0].semantics.as_ref().unwrap().role,
         Role::Button
     );
+    assert_eq!(element.children[0].user_select, UserSelect::None);
     assert_eq!(
         element.children[1].semantics.as_ref().unwrap().role,
         Role::ListBox
     );
     assert!(element.children[1].overlay.is_some());
     assert!(element.children[1].focus_scope.is_some());
+    assert!(
+        element.children[1]
+            .children
+            .iter()
+            .all(|option| option.user_select == UserSelect::None)
+    );
 }

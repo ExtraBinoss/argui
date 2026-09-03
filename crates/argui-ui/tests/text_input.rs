@@ -55,8 +55,8 @@ fn numeric_filters_reject_invalid_keyboard_ime_and_paste_edits() {
     ));
     assert!(letter.events.is_empty());
     assert_eq!(decimal.text_input_value(region.node), Some(""));
-    assert!(decimal.paste_text("12.5").layout_changed);
-    assert!(!decimal.paste_text("px").layout_changed);
+    assert!(decimal.paste_text(None, "12.5").layout_changed);
+    assert!(!decimal.paste_text(None, "px").layout_changed);
     assert!(
         !decimal
             .ime_input(ImeInput::Commit("a".into()))
@@ -66,8 +66,8 @@ fn numeric_filters_reject_invalid_keyboard_ime_and_paste_edits() {
 
     let (mut expression, region) = filtered_tree("", InputKind::Arithmetic);
     focus(&mut expression, &region);
-    assert!(expression.paste_text("(50 + 10) / 2").layout_changed);
-    assert!(!expression.paste_text("px").layout_changed);
+    assert!(expression.paste_text(None, "(50 + 10) / 2").layout_changed);
+    assert!(!expression.paste_text(None, "px").layout_changed);
     assert_eq!(
         expression.text_input_value(region.node),
         Some("(50 + 10) / 2")
@@ -144,8 +144,11 @@ fn editing_respects_graphemes_selection_and_clipboard_requests() {
     assert_eq!(tree.text_input_value(node), Some(""));
 
     let paste = tree.edit_text_input(&key(Key::Character("v".into()), Some("v"), command));
-    assert_eq!(paste.clipboard, Some(ClipboardRequest::Read));
-    tree.paste_text("é");
+    assert_eq!(
+        paste.clipboard,
+        Some(ClipboardRequest::Read { target: None })
+    );
+    tree.paste_text(None, "é");
     assert_eq!(tree.text_input_value(node), Some("é"));
 }
 
@@ -208,7 +211,7 @@ fn read_only_inputs_allow_navigation_selection_and_copy_without_mutation() {
     assert_eq!(
         tree.edit_text_input(&key(Key::Character("x".into()), Some("x"), command))
             .clipboard,
-        Some(ClipboardRequest::Write("r".into()))
+        None
     );
     assert_eq!(
         tree.edit_text_input(&key(Key::Character("v".into()), Some("v"), command))
@@ -222,7 +225,7 @@ fn read_only_inputs_allow_navigation_selection_and_copy_without_mutation() {
         Modifiers::default(),
     ));
     assert_eq!(tree.text_input_value(node), Some("readonly"));
-    assert!(!tree.paste_text("mutate").layout_changed);
+    assert!(!tree.paste_text(None, "mutate").layout_changed);
     assert!(
         !tree
             .ime_input(ImeInput::Commit("mutate".into()))
@@ -313,7 +316,7 @@ fn unfocused_released_and_empty_ime_inputs_do_no_work() {
         ..key(Key::Character("a".into()), Some("a"), Modifiers::default())
     };
     assert!(!tree.edit_text_input(&released).layout_changed);
-    assert!(!tree.paste_text("x").layout_changed);
+    assert!(!tree.paste_text(None, "x").layout_changed);
     assert!(!tree.ime_input(ImeInput::Enabled).layout_changed);
 
     focus(&mut tree, &region);
@@ -336,7 +339,7 @@ fn unfocused_released_and_empty_ime_inputs_do_no_work() {
             .clipboard,
         None
     );
-    assert!(!tree.paste_text("").layout_changed);
+    assert!(!tree.paste_text(None, "").layout_changed);
     assert!(
         !tree
             .edit_text_input(&key(Key::ArrowDown, None, Modifiers::default()))
@@ -434,7 +437,7 @@ fn controlled_value_replaces_internal_state_only_when_it_differs() {
     let (mut tree, region) = tree("seed");
     focus(&mut tree, &region);
     let node = region.node;
-    tree.paste_text(" value");
+    tree.paste_text(None, " value");
 
     let replacement = Input::new(
         "field",
@@ -519,7 +522,7 @@ fn text_area_inserts_lines_and_command_enter_submits() {
     assert_eq!(tree.text_input_cursor(node), Some(12));
     tree.edit_text_input(&key(Key::Home, None, command));
     assert_eq!(tree.text_input_cursor(node), Some(0));
-    tree.paste_text("pasted\nlines");
+    tree.paste_text(None, "pasted\nlines");
     assert_eq!(
         tree.text_input_value(node),
         Some("pasted\nlinesfirst\nsecond")

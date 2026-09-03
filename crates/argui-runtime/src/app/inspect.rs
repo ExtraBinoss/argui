@@ -183,7 +183,7 @@ fn kind_name(kind: &ElementKind) -> &'static str {
 fn summary(kind: &ElementKind, children: usize) -> Option<String> {
     match kind {
         ElementKind::Container => Some(format!("{children} children")),
-        ElementKind::Text { content, .. } => Some(short(content)),
+        ElementKind::Text { content, .. } => Some(short(content.as_str())),
         ElementKind::TextEditor {
             value, placeholder, ..
         } => Some(short(if value.is_empty() { placeholder } else { value })),

@@ -117,32 +117,44 @@ impl TextGpu {
         visuals: Option<&[Option<BlockVisual>]>,
         scale_factor: f32,
     ) -> Result<PreparedGlyphs, RendererError> {
-        let mut instances = Vec::with_capacity(text.glyphs.len());
+        let mut instances = Vec::with_capacity(text.glyphs.len() + text.decorations.len());
         let mut ranges = vec![0..0; text.blocks];
         let mut clips = Vec::new();
         let prepared = prepare_visuals(text, visuals, scale_factor, &mut clips);
-        for glyph in &text.glyphs {
-            let visual = prepared[glyph.block];
+        for (block, visual) in prepared.iter().copied().enumerate() {
             if !visual.active {
                 continue;
             }
-            let Some(entry) = self.atlas.get_or_insert(queue, engine, glyph.key)? else {
-                continue;
-            };
-            let instance = instances.len() as u32;
-            instances.push(GlyphInstance::new(
-                *glyph,
-                entry,
-                self.atlas.size(),
-                visual.transform,
-                visual.clip_start,
-                visual.clip_count,
-            ));
-            let range = &mut ranges[glyph.block];
-            if range.start >= range.end {
-                *range = instance..instance + 1;
-            } else {
-                range.end = instance + 1;
+            let start = instances.len() as u32;
+            instances.extend(
+                text.decorations
+                    .iter()
+                    .filter(|item| item.block == block)
+                    .map(|item| {
+                        GlyphInstance::solid(
+                            *item,
+                            visual.transform,
+                            visual.clip_start,
+                            visual.clip_count,
+                        )
+                    }),
+            );
+            for glyph in text.glyphs.iter().filter(|glyph| glyph.block == block) {
+                let Some(entry) = self.atlas.get_or_insert(queue, engine, glyph.key)? else {
+                    continue;
+                };
+                instances.push(GlyphInstance::new(
+                    *glyph,
+                    entry,
+                    self.atlas.size(),
+                    visual.transform,
+                    visual.clip_start,
+                    visual.clip_count,
+                ));
+            }
+            let end = instances.len() as u32;
+            if start != end {
+                ranges[block] = start..end;
             }
         }
         Ok((instances, ranges, clips))

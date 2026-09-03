@@ -1,7 +1,9 @@
-use argui_core::{Affine2D, KeyInput, Point, Rect, Size};
+use std::collections::HashMap;
+
+use argui_core::{Affine2D, Point, PointerId, Rect, Size};
 use argui_paint::{ClipChain, CornerRadii};
 
-use crate::{CursorIcon, GestureSet, Sides, VisualState, VisualStates};
+use crate::{CursorIcon, GestureSet, Sides, UiEventKind, VisualState, VisualStates};
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum PointerEvents {
@@ -251,40 +253,9 @@ fn ellipse_contains(bounds: Rect, point: Point) -> bool {
     x * x + y * y <= 1.0
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub enum UiEventKind {
-    PointerEntered,
-    PointerLeft,
-    PointerMoved(Point),
-    Pressed,
-    Released,
-    Clicked,
-    KeyInput(KeyInput),
-    Scrolled {
-        delta: Point,
-        offset: Point,
-    },
-    Focused,
-    Blurred,
-    TextChanged(String),
-    Submitted(String),
-    Gesture(crate::GestureEvent),
-    SemanticAction {
-        action: crate::SemanticAction,
-        value: Option<crate::SemanticValue>,
-    },
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct UiEvent {
-    pub target: NodeId,
-    pub key: Option<String>,
-    pub kind: UiEventKind,
-}
-
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct InteractionUpdate {
-    pub events: Vec<UiEvent>,
+    pub events: Vec<crate::UiEvent>,
     pub paint_changed: bool,
     pub scroll_changed: bool,
     pub layout_changed: bool,
@@ -307,15 +278,13 @@ impl InteractionUpdate {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct RawUpdate {
-    pub events: [Option<(NodeId, UiEventKind)>; 5],
-    pub count: usize,
+    pub events: Vec<(NodeId, crate::UiEventKind)>,
     pub paint_changed: bool,
 }
 
 impl RawUpdate {
-    fn push(&mut self, target: NodeId, kind: UiEventKind) {
-        self.events[self.count] = Some((target, kind));
-        self.count += 1;
+    fn push(&mut self, target: NodeId, kind: crate::UiEventKind) {
+        self.events.push((target, kind));
     }
 }
 
@@ -326,7 +295,7 @@ pub(crate) struct InteractionState {
     keyboard_pressed: Option<NodeId>,
     focused: Option<NodeId>,
     focus_visible: bool,
-    captured: Option<NodeId>,
+    captured: HashMap<PointerId, NodeId>,
 }
 
 impl InteractionState {
@@ -350,7 +319,12 @@ impl InteractionState {
         states
     }
 
-    pub fn pointer_moved(&mut self, point: Point, regions: &[HitRegion]) -> RawUpdate {
+    pub fn pointer_moved(
+        &mut self,
+        pointer: PointerId,
+        point: Point,
+        regions: &[HitRegion],
+    ) -> RawUpdate {
         let hit = hit_test(regions, point).filter(|region| region.enabled);
         let mut update = RawUpdate::default();
         if hit.map(|region| region.node) != self.hovered {
@@ -363,29 +337,41 @@ impl InteractionState {
             }
             update.paint_changed = true;
         }
-        if let Some(target) = self.captured.or(self.hovered) {
+        if let Some(target) = self.captured.get(&pointer).copied().or(self.hovered) {
             update.push(target, UiEventKind::PointerMoved(point));
         }
         update
     }
 
-    pub fn pointer_left(&mut self) -> RawUpdate {
+    pub fn pointer_left(&mut self, pointer: PointerId) -> RawUpdate {
         let mut update = RawUpdate::default();
         if let Some(node) = self.hovered.take() {
             update.push(node, UiEventKind::PointerLeft);
             update.paint_changed = true;
         }
+        let _ = pointer;
         update
     }
 
-    pub fn primary_pressed(&mut self, regions: &[HitRegion]) -> RawUpdate {
+    pub fn primary_pressed(&mut self, pointer: PointerId, _regions: &[HitRegion]) -> RawUpdate {
         let mut update = RawUpdate::default();
         let Some(target) = self.hovered else {
             return update;
         };
         self.pressed = Some(target);
-        self.captured = Some(target);
         update.push(target, UiEventKind::Pressed);
+        if self.captured.insert(pointer, target) != Some(target) {
+            update.push(target, UiEventKind::GotPointerCapture(pointer));
+        }
+        update.paint_changed = true;
+        update
+    }
+
+    pub fn focus_pressed(&mut self, regions: &[HitRegion]) -> RawUpdate {
+        let mut update = RawUpdate::default();
+        let Some(target) = self.pressed else {
+            return update;
+        };
         if regions
             .iter()
             .find(|region| region.node == target)
@@ -401,26 +387,27 @@ impl InteractionState {
             }
             self.focus_visible = false;
         }
-        update.paint_changed = true;
         update
     }
 
-    pub fn primary_released(&mut self) -> RawUpdate {
+    pub fn primary_released(&mut self, pointer: PointerId) -> RawUpdate {
         let mut update = RawUpdate::default();
-        if let Some(target) = self.captured.take() {
+        if let Some(target) = self.captured.remove(&pointer) {
             update.push(target, UiEventKind::Released);
             if self.hovered == Some(target) {
                 update.push(target, UiEventKind::Clicked);
             }
+            update.push(target, UiEventKind::LostPointerCapture(pointer));
         }
         update.paint_changed = self.pressed.take().is_some();
         update
     }
 
-    pub fn primary_cancelled(&mut self) -> RawUpdate {
+    pub fn primary_cancelled(&mut self, pointer: PointerId) -> RawUpdate {
         let mut update = RawUpdate::default();
-        if let Some(target) = self.captured.take() {
+        if let Some(target) = self.captured.remove(&pointer) {
             update.push(target, UiEventKind::Released);
+            update.push(target, UiEventKind::LostPointerCapture(pointer));
         }
         update.paint_changed = self.pressed.take().is_some();
         update
@@ -523,13 +510,15 @@ impl InteractionState {
     }
 
     pub fn window_blurred(&mut self) -> RawUpdate {
-        let mut update = self.pointer_left();
+        let mut update = self.pointer_left(PointerId::MOUSE);
         if let Some(target) = self.pressed.take() {
             update.push(target, UiEventKind::Released);
             update.paint_changed = true;
         }
         self.release_keyboard(&mut update, false);
-        self.captured = None;
+        for (pointer, target) in self.captured.drain() {
+            update.push(target, UiEventKind::LostPointerCapture(pointer));
+        }
         if let Some(target) = self.focused.take() {
             update.push(target, UiEventKind::Blurred);
             update.paint_changed = true;
@@ -553,9 +542,30 @@ impl InteractionState {
             self.focused = None;
             self.focus_visible = false;
         }
-        if !exists(self.captured) {
-            self.captured = None;
+        self.captured.retain(|_, node| ids.contains(node));
+    }
+
+    pub fn capture_pointer(&mut self, pointer: PointerId, target: NodeId) -> RawUpdate {
+        let mut update = RawUpdate::default();
+        if self.captured.get(&pointer) == Some(&target) {
+            return update;
         }
+        if let Some(previous) = self.captured.insert(pointer, target)
+            && previous != target
+        {
+            update.push(previous, UiEventKind::LostPointerCapture(pointer));
+        }
+        update.push(target, UiEventKind::GotPointerCapture(pointer));
+        update
+    }
+
+    pub fn release_pointer(&mut self, pointer: PointerId, target: NodeId) -> RawUpdate {
+        let mut update = RawUpdate::default();
+        if self.captured.get(&pointer) == Some(&target) {
+            self.captured.remove(&pointer);
+            update.push(target, UiEventKind::LostPointerCapture(pointer));
+        }
+        update
     }
 
     fn release_keyboard(&mut self, update: &mut RawUpdate, activate: bool) {

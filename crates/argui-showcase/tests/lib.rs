@@ -57,11 +57,7 @@ fn keyed_event(app: &StateShowcase, key: &str, kind: UiEventKind) -> UiEvent {
     let root = render_view(app);
     let index = node_index(&root, key);
     let tree = UiTree::new(root);
-    UiEvent {
-        target: tree.node_id_at(index).unwrap(),
-        key: Some(key.into()),
-        kind,
-    }
+    UiEvent::new(tree.node_id_at(index).unwrap(), Some(key.into()), kind)
 }
 
 fn key_input(app: &StateShowcase, key: Key, state: KeyState, repeat: bool) -> UiEvent {
@@ -162,11 +158,11 @@ fn theme_editors_and_resize_are_fully_controlled_by_showcase_state() {
         let event = keyed_event(&app, key, UiEventKind::TextChanged(value.into()));
         assert_eq!(app.update(&event), ViewUpdate::Rebuild);
     }
-    let unknown = UiEvent {
-        target: UiTree::new(render_view(&app)).node_ids()[0],
-        key: Some("unknown-editor".into()),
-        kind: UiEventKind::TextChanged("ignored".into()),
-    };
+    let unknown = UiEvent::new(
+        UiTree::new(render_view(&app)).node_ids()[0],
+        Some("unknown-editor".into()),
+        UiEventKind::TextChanged("ignored".into()),
+    );
     assert_eq!(app.update(&unknown), ViewUpdate::None);
 
     let mut resize = keyed_event(&app, "notes-resize", UiEventKind::Clicked);
@@ -491,10 +487,11 @@ fn delayed_tooltip_appears_only_after_hover_delay() {
         ViewUpdate::Rebuild
     );
     assert!(node_index_optional(&render_view(&app), "delayed-tooltip").is_some());
-    let left = UiEvent {
-        kind: UiEventKind::PointerLeft,
-        ..entered
-    };
+    let left = UiEvent::new(
+        entered.target,
+        entered.key.clone(),
+        UiEventKind::PointerLeft,
+    );
     assert_eq!(app.update(&left), ViewUpdate::Rebuild);
     assert!(node_index_optional(&render_view(&app), "delayed-tooltip").is_none());
 }

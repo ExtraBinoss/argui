@@ -97,6 +97,14 @@ fn translate(map: &NodeMap, output: &mut LayoutOutput, delta: Point, incoming_cl
         input.translate(delta, content_clip);
     }
     if let Some(region) = output
+        .text_regions
+        .iter_mut()
+        .find(|region| region.node == map.node)
+    {
+        region.translate(delta);
+        region.clips = ClipChain::from_regions([ClipRegion::new(content_clip, Affine2D::IDENTITY)]);
+    }
+    if let Some(region) = output
         .scroll_regions
         .iter_mut()
         .find(|region| region.node == map.node)

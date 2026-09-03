@@ -1,6 +1,7 @@
 use argui_ui::{
     CursorIcon, Element, GestureSet, Interaction, KeyboardActivation, Orientation, Role,
     SemanticAction, SemanticState, Semantics, StateName, StateScopeId, UiEvent, UiEventKind,
+    UserSelect,
 };
 
 pub const TABS_SCOPE: StateScopeId = StateScopeId::new("tabs");
@@ -67,6 +68,7 @@ impl TabsBehavior {
                 let selected = index == self.selected;
                 element
                     .keyed(self.trigger_key(index))
+                    .user_select(UserSelect::None)
                     .active_state(TAB_SELECTED, selected)
                     .interaction(
                         Interaction::default()

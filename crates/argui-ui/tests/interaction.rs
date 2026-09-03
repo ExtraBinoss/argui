@@ -150,8 +150,12 @@ fn pointer_state_honors_clips_capture_clicks_and_focus() {
     assert!(tree.visual_states(node).contains(VisualState::Pressed));
 
     let released = tree.primary_released();
-    assert_eq!(released.events.len(), 1);
+    assert_eq!(released.events.len(), 2);
     assert_eq!(released.events[0].kind, UiEventKind::Released);
+    assert_eq!(
+        released.events[1].kind,
+        UiEventKind::LostPointerCapture(PointerId::MOUSE)
+    );
     assert!(tree.visual_states(node).contains(VisualState::Focused));
 
     let blurred = tree.window_blurred();
@@ -290,7 +294,7 @@ fn disabled_regions_occlude_controls_without_receiving_pointer_actions() {
 fn interaction_updates_merge_every_dirty_signal_and_latest_clipboard_request() {
     let mut update = InteractionUpdate {
         paint_changed: true,
-        clipboard: Some(ClipboardRequest::Read),
+        clipboard: Some(ClipboardRequest::Read { target: None }),
         ..InteractionUpdate::default()
     };
     update.merge(InteractionUpdate {
@@ -359,6 +363,54 @@ fn secondary_touches_do_not_replace_primary_interaction_capture() {
             .events
             .is_empty()
     );
+}
+
+#[test]
+fn explicit_pointer_capture_retargets_motion_and_reports_every_release() {
+    let mut tree = UiTree::new(Element::row([interactive("first"), interactive("second")]));
+    let first = tree.node_id_at(1).unwrap();
+    let second = tree.node_id_at(2).unwrap();
+    let regions = [region_at(first, 10.0, true), region_at(second, 110.0, true)];
+    let pointer = PointerId::new(7);
+
+    let captured = tree.capture_pointer(pointer, first);
+    assert_eq!(
+        captured.events[0].kind,
+        UiEventKind::GotPointerCapture(pointer)
+    );
+    let moved = tree.pointer_event(
+        PointerEvent {
+            id: pointer,
+            kind: PointerKind::Pen,
+            phase: PointerPhase::Moved,
+            position: Point::new(130.0, 20.0),
+            button: None,
+            buttons: 0,
+            pressure: Some(0.5),
+            primary: true,
+            timestamp: std::time::Duration::ZERO,
+        },
+        &regions,
+    );
+    assert!(moved.events.iter().any(|event| {
+        event.target == first && matches!(event.kind, UiEventKind::PointerMoved(_))
+    }));
+
+    assert!(
+        tree.release_pointer_capture(pointer, second)
+            .events
+            .is_empty()
+    );
+    assert_eq!(
+        tree.release_pointer_capture(pointer, first).events[0].kind,
+        UiEventKind::LostPointerCapture(pointer)
+    );
+
+    tree.capture_pointer(pointer, first);
+    let blurred = tree.window_blurred();
+    assert!(blurred.events.iter().any(|event| {
+        event.target == first && event.kind == UiEventKind::LostPointerCapture(pointer)
+    }));
 }
 
 #[test]

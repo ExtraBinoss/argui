@@ -1,14 +1,10 @@
 use argui_core::{Color, ColorScheme};
-use argui_ui::{CursorIcon, Element, Role, UiEvent, UiEventKind, UiTree};
+use argui_ui::{CursorIcon, Element, Role, UiEvent, UiEventKind, UiTree, UserSelect};
 use argui_widgets::{Tab, Tabs, TabsAction, TabsBehavior, TabsPart, shadcn};
 
 fn click(key: &str) -> UiEvent {
     let tree = UiTree::new(Element::container([]));
-    UiEvent {
-        target: tree.node_ids()[0],
-        key: Some(key.into()),
-        kind: UiEventKind::Clicked,
-    }
+    UiEvent::new(tree.node_ids()[0], Some(key.into()), UiEventKind::Clicked)
 }
 
 #[test]
@@ -28,6 +24,12 @@ fn tabs_mount_only_the_selected_panel_and_decode_selection() {
         tabs.children[0].semantics.as_ref().unwrap().role,
         Role::TabList
     );
+    assert!(
+        tabs.children[0]
+            .children
+            .iter()
+            .all(|trigger| trigger.user_select == UserSelect::None)
+    );
     assert_eq!(
         tabs.children[1].semantics.as_ref().unwrap().role,
         Role::TabPanel
@@ -44,10 +46,11 @@ fn tabs_mount_only_the_selected_panel_and_decode_selection() {
     );
     assert_eq!(behavior.action(&click("other::tab::0")), None);
     assert_eq!(
-        behavior.action(&UiEvent {
-            kind: UiEventKind::Focused,
-            ..click("settings::tab::0")
-        }),
+        behavior.action(&UiEvent::new(
+            click("settings::tab::0").target,
+            Some("settings::tab::0".into()),
+            UiEventKind::Focused,
+        )),
         None
     );
 

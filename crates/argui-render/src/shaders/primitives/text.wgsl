@@ -73,6 +73,9 @@ fn fragment(input: VertexOutput) -> @location(0) vec4<f32> {
         clip_coverage *= 1.0 - smoothstep(-clip_width, clip_width, clip_distance);
     }
     let sampled = textureSample(glyph_atlas, glyph_sampler, input.uv);
+    if input.mode > 1.5 {
+        return input.color * vec4(1.0, 1.0, 1.0, clip_coverage);
+    }
     if input.mode > 0.5 {
         return sampled * vec4(1.0, 1.0, 1.0, input.color.a * clip_coverage);
     }

@@ -7,11 +7,11 @@ use argui_ui::{Element, UiEvent, UiEventKind, UiTree};
 
 fn event(key: &str) -> UiEvent {
     let tree = UiTree::new(Element::container([]));
-    UiEvent {
-        target: tree.node_id_at(0).unwrap(),
-        key: Some(key.to_owned()),
-        kind: UiEventKind::Clicked,
-    }
+    UiEvent::new(
+        tree.node_id_at(0).unwrap(),
+        Some(key.to_owned()),
+        UiEventKind::Clicked,
+    )
 }
 
 #[test]

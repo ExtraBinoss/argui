@@ -1,6 +1,6 @@
 use argui_ui::{
     CursorIcon, Element, GestureSet, Interaction, KeyboardActivation, Role, SemanticAction,
-    SemanticState, Semantics, StateName, StateScopeId, UiEvent, UiEventKind,
+    SemanticState, Semantics, StateName, StateScopeId, UiEvent, UiEventKind, UserSelect,
 };
 
 pub const BUTTON_SCOPE: StateScopeId = StateScopeId::new("button");
@@ -63,6 +63,7 @@ impl ButtonBehavior {
         };
         element
             .keyed(self.key.clone())
+            .user_select(UserSelect::None)
             .state_scope(BUTTON_SCOPE)
             .active_state(BUTTON_BUSY, self.busy)
             .interaction(
