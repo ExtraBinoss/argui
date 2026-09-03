@@ -26,8 +26,8 @@ pub struct TextSelectionStyle {
 impl Default for TextSelectionStyle {
     fn default() -> Self {
         Self {
-            background: Color::rgba(0.20, 0.48, 0.96, 0.38),
-            handle: Color::rgb(0.20, 0.48, 0.96),
+            background: Color::srgba(0.20, 0.48, 0.96, 0.38),
+            handle: Color::srgb(0.20, 0.48, 0.96),
         }
     }
 }

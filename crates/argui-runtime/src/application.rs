@@ -325,7 +325,7 @@ mod tests {
             cx.request_animation_frame();
             cx.set_theme(ThemeRequest {
                 color_scheme: Some(ColorScheme::Dark),
-                primary: Some(Color::rgb(0.8, 0.2, 0.4)),
+                primary: Some(Color::srgb(0.8, 0.2, 0.4)),
             });
         }
     }

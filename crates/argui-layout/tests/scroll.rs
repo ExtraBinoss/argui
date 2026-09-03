@@ -34,7 +34,7 @@ fn content(scrollbar: ScrollbarStyle) -> Element {
 fn scrollbar_is_regular_paint_with_geometry_from_the_scroll_state() {
     let style = ScrollbarStyle::new(
         ScrollbarPartStyle::new(
-            QuadStyle::solid(Color::rgb(0.0, 0.0, 0.0)).radius(CornerRadii::all(4.0)),
+            QuadStyle::solid(Color::srgb(0.0, 0.0, 0.0)).radius(CornerRadii::all(4.0)),
         ),
         ScrollbarPartStyle::new(QuadStyle::solid(Color::WHITE).radius(CornerRadii::all(4.0))),
     )
@@ -76,7 +76,7 @@ fn scrollbar_is_regular_paint_with_geometry_from_the_scroll_state() {
 
 #[test]
 fn scrollbar_state_transition_repaints_the_resolved_thumb() {
-    let hovered = Color::rgb(0.8, 0.3, 0.2);
+    let hovered = Color::srgb(0.8, 0.3, 0.2);
     let style = ScrollbarStyle::new(
         ScrollbarPartStyle::new(QuadStyle::default()),
         ScrollbarPartStyle::new(QuadStyle::solid(Color::WHITE))

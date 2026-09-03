@@ -8,7 +8,7 @@ use argui_ui::{
 #[test]
 fn inherited_selection_policy_style_and_semantic_expansion_are_public() {
     let style = TextSelectionStyle {
-        background: argui_core::Color::rgb(1.0, 0.0, 0.0),
+        background: argui_core::Color::srgb(1.0, 0.0, 0.0),
         handle: argui_core::Color::WHITE,
     };
     let mut tree = UiTree::new(

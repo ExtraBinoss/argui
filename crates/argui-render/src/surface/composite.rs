@@ -72,7 +72,7 @@ impl SurfaceRenderer {
             self.clear_target(encoder, shadowed, wgpu::Color::TRANSPARENT);
             let mut params = uniform(viewport, region, blurred, backdrop, style.bounds);
             params.mode = if shadow.inset { 11 } else { 10 };
-            params.color = shadow.color.as_array();
+            params.color = shadow.color.to_linear_rgba();
             params.color[3] *= style.opacity.clamp(0.0, 1.0);
             params.data = [1.0, shadow.offset[0], shadow.offset[1], shadow.spread];
             params.radii = layer_radii(style.mask);

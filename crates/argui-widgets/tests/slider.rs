@@ -117,7 +117,7 @@ fn slider_uses_one_clamped_path_for_keys_pointer_and_semantics() {
         Some(RangeAction::Cancel(4.0))
     );
 
-    let themes = shadcn(argui_core::Color::rgb(0.2, 0.5, 0.9));
+    let themes = shadcn(argui_core::Color::srgb(0.2, 0.5, 0.9));
     let zero = Slider::new("zero", "Zero", 0.0, RangeConfig::new(0.0, 0.0, 1.0))
         .enabled(false)
         .build(themes.resolve(argui_core::ColorScheme::Dark));

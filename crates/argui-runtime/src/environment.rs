@@ -13,7 +13,7 @@ impl Default for WindowEnvironment {
     fn default() -> Self {
         Self {
             color_scheme: ColorScheme::Light,
-            primary: Color::rgb(0.10, 0.45, 0.91),
+            primary: Color::srgb(0.10, 0.45, 0.91),
             reduced_motion: false,
             high_contrast: false,
         }

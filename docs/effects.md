@@ -49,7 +49,8 @@ fn argui_effect(
     _backdrop: vec4<f32>,
 ) -> vec4<f32> {
     let amount = argui_param_f32(0u);
-    return mix(source, vec4<f32>(1.0, 0.2, 0.1, source.a), amount);
+    let tint = argui_srgb_to_linear(vec3<f32>(1.0, 0.2, 0.1));
+    return mix(source, vec4<f32>(tint, source.a), amount);
 }
 "#),
 ];
@@ -81,6 +82,13 @@ adapter-bounded storage buffers; definitions are not given raw WGPU handles.
 Passes may request a downsample divisor. The renderer combines it with the
 explicit `EffectQuality` setting. `Normal` preserves full current quality;
 `Balanced`, `Performance` and `Custom` are application choices.
+
+`source`, `backdrop`, `source_at`, `backdrop_at`, and color parameters use
+straight-alpha extended linear sRGB. The generated shader ABI unpremultiplies
+sampled layer textures before invoking custom code and premultiplies its result
+for the next renderer pass. Custom effects must not apply an sRGB transfer
+function themselves. `argui_srgb_to_linear` is available for color literals
+authored directly inside a shader.
 
 ## Profiling
 

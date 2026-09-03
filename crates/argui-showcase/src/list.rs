@@ -22,7 +22,7 @@ impl StateShowcase {
                     .polarity(polarity)
                     .line_size(36.0)
                     .scrollbar(self.scrollbar_style_from_colors(
-                        Color::rgba(0.5, 0.5, 0.5, 0.16),
+                        Color::srgba(0.5, 0.5, 0.5, 0.16),
                         self.accent(),
                     )),
             )

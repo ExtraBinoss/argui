@@ -1,4 +1,5 @@
 use crate::EffectRegistry;
+use argui_core::Color;
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum SurfaceAlphaMode {
@@ -48,7 +49,7 @@ pub struct RendererConfig {
     pub power_preference: wgpu::PowerPreference,
     pub present_mode: wgpu::PresentMode,
     pub maximum_frame_latency: u32,
-    pub clear_color: [f64; 4],
+    pub clear_color: Color,
     pub surface_alpha: SurfaceAlphaMode,
     pub profiling: bool,
     pub image_cache_bytes: usize,
@@ -63,7 +64,7 @@ impl Default for RendererConfig {
             power_preference: wgpu::PowerPreference::HighPerformance,
             present_mode: wgpu::PresentMode::AutoVsync,
             maximum_frame_latency: 2,
-            clear_color: [0.055, 0.065, 0.09, 1.0],
+            clear_color: Color::srgb(0.055, 0.065, 0.09),
             surface_alpha: SurfaceAlphaMode::Opaque,
             profiling: false,
             image_cache_bytes: 64 * 1024 * 1024,
@@ -88,10 +89,16 @@ impl RendererConfig {
     }
 
     #[must_use]
+    pub fn clear_color(mut self, color: Color) -> Self {
+        self.clear_color = color;
+        self
+    }
+
+    #[must_use]
     pub fn surface_alpha(mut self, mode: SurfaceAlphaMode) -> Self {
         self.surface_alpha = mode;
         if mode == SurfaceAlphaMode::Transparent {
-            self.clear_color = [0.0; 4];
+            self.clear_color = Color::TRANSPARENT;
         }
         self
     }
@@ -120,12 +127,13 @@ impl RendererConfig {
         self
     }
 
-    pub(crate) const fn wgpu_clear_color(&self) -> wgpu::Color {
+    pub(crate) fn wgpu_clear_color(&self) -> wgpu::Color {
+        let [red, green, blue, alpha] = self.clear_color.to_linear_rgba();
         wgpu::Color {
-            r: self.clear_color[0],
-            g: self.clear_color[1],
-            b: self.clear_color[2],
-            a: self.clear_color[3],
+            r: f64::from(red),
+            g: f64::from(green),
+            b: f64::from(blue),
+            a: f64::from(alpha),
         }
     }
 }

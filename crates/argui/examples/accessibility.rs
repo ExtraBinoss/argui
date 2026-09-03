@@ -25,15 +25,15 @@ fn text_style(size: f32, color: TextColor, weight: u16) -> TextStyle {
 
 fn panel() -> PaintStyle {
     PaintStyle::new(
-        QuadStyle::solid(Color::rgb(0.075, 0.095, 0.135))
-            .border(Border::all(1.0, Color::rgb(0.20, 0.30, 0.44)))
+        QuadStyle::solid(Color::srgb(0.075, 0.095, 0.135))
+            .border(Border::all(1.0, Color::srgb(0.20, 0.30, 0.44)))
             .radius(CornerRadii::all(18.0)),
     )
 }
 
 fn button(key: &str, label: &str) -> Element {
-    let rest = QuadStyle::solid(Color::rgb(0.10, 0.25, 0.38))
-        .border(Border::all(1.0, Color::rgb(0.25, 0.75, 0.95)))
+    let rest = QuadStyle::solid(Color::srgb(0.10, 0.25, 0.38))
+        .border(Border::all(1.0, Color::srgb(0.25, 0.75, 0.95)))
         .radius(CornerRadii::all(10.0));
     Button::new(
         key,
@@ -50,8 +50,8 @@ fn button(key: &str, label: &str) -> Element {
 }
 
 fn input() -> Element {
-    let rest = QuadStyle::solid(Color::rgb(0.055, 0.07, 0.10))
-        .border(Border::all(1.0, Color::rgb(0.24, 0.34, 0.48)))
+    let rest = QuadStyle::solid(Color::srgb(0.055, 0.07, 0.10))
+        .border(Border::all(1.0, Color::srgb(0.24, 0.34, 0.48)))
         .radius(CornerRadii::all(10.0));
     Input::new(
         "name",
@@ -63,7 +63,7 @@ fn input() -> Element {
         )
         .hovered(
             rest.clone()
-                .border(Border::all(1.0, Color::rgb(0.35, 0.75, 0.95))),
+                .border(Border::all(1.0, Color::srgb(0.35, 0.75, 0.95))),
         )
         .focused(rest.border(Border::all(2.0, Color::WHITE))),
     )
@@ -76,7 +76,7 @@ fn gesture_surface() -> Element {
             .text_style(text_style(20.0, TextColor::WHITE, 650))
             .semantic_hidden(true),
         Element::text("Tap, drag, pinch or rotate with two fingers")
-            .text_style(text_style(15.0, TextColor::rgb(0.68, 0.78, 0.90), 450))
+            .text_style(text_style(15.0, TextColor::srgb(0.68, 0.78, 0.90), 450))
             .semantic_hidden(true),
     ])
     .keyed("gesture-surface")
@@ -110,7 +110,7 @@ fn showcase(dialog_open: bool) -> Element {
             Element::text("Accessibility and touch")
                 .text_style(text_style(
                     38.0,
-                    TextColor::rgb(0.35, 0.85, 1.0),
+                    TextColor::srgb(0.35, 0.85, 1.0),
                     750,
                 ))
                 .semantics(

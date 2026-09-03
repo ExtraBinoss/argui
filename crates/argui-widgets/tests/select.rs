@@ -72,7 +72,7 @@ fn select_navigation_skips_disabled_options_and_wraps() {
 
 #[test]
 fn open_select_is_an_anchored_trapped_listbox() {
-    let theme = argui_widgets::shadcn(argui_core::Color::rgb(0.2, 0.5, 0.9));
+    let theme = argui_widgets::shadcn(argui_core::Color::srgb(0.2, 0.5, 0.9));
     let element = Select::new(
         "backend",
         "Backend",

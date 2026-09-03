@@ -6,7 +6,7 @@ fn paint_styles_are_explicit_and_theme_free() {
     let radii = CornerRadii::all(12.0);
     let style = PaintStyle {
         quad: QuadStyle {
-            background: Some(Fill::Solid(Color::rgb(0.1, 0.2, 0.3))),
+            background: Some(Fill::Solid(Color::srgb(0.1, 0.2, 0.3))),
             border: Some(border),
             radii,
             opacity: 0.8,

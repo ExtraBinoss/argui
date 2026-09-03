@@ -15,7 +15,7 @@ fn text_engine() -> TextEngine {
 
 #[test]
 fn document_selection_uses_glyph_regions_and_paints_without_relayout() {
-    let color = argui_core::Color::rgba(0.2, 0.5, 0.9, 0.4);
+    let color = argui_core::Color::srgba(0.2, 0.5, 0.9, 0.4);
     let mut ui = UiTree::new(
         Element::column([
             Element::text("first line"),
@@ -99,8 +99,8 @@ fn text_cursor_only_appears_over_shaped_line_geometry() {
 
 #[test]
 fn touch_selection_paints_both_handles_in_forward_and_reverse_order() {
-    let background = argui_core::Color::rgba(0.2, 0.5, 0.9, 0.4);
-    let handle = argui_core::Color::rgb(0.9, 0.2, 0.4);
+    let background = argui_core::Color::srgba(0.2, 0.5, 0.9, 0.4);
+    let handle = argui_core::Color::srgb(0.9, 0.2, 0.4);
     let mut ui = UiTree::new(
         Element::text("select these words")
             .width(percent(1.0))
@@ -140,8 +140,8 @@ fn touch_selection_paints_both_handles_in_forward_and_reverse_order() {
 
 #[test]
 fn touch_handles_attach_to_opposite_ends_across_text_nodes() {
-    let background = argui_core::Color::rgba(0.2, 0.5, 0.9, 0.4);
-    let handle = argui_core::Color::rgb(0.9, 0.2, 0.4);
+    let background = argui_core::Color::srgba(0.2, 0.5, 0.9, 0.4);
+    let handle = argui_core::Color::srgb(0.9, 0.2, 0.4);
     let mut ui = UiTree::new(
         Element::column([Element::text("first"), Element::text("second")])
             .width(percent(1.0))

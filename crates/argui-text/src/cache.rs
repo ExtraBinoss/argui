@@ -112,7 +112,7 @@ impl ShapeKey {
                 (pixel[1] - pixel[1].round()).to_bits(),
             ],
             align: block.style.align,
-            color: block.style.color.as_array().map(f32::to_bits),
+            color: block.style.color.to_linear_rgba().map(f32::to_bits),
         }
     }
 
@@ -178,7 +178,9 @@ impl SpanStyleKey {
         Self {
             font_size: style.font_size.map(f32::to_bits),
             line_height: style.line_height.map(f32::to_bits),
-            color: style.color.map(|value| value.as_array().map(f32::to_bits)),
+            color: style
+                .color
+                .map(|value| value.to_linear_rgba().map(f32::to_bits)),
             family: style.family.clone(),
             weight: style.weight,
             font_style: style.font_style,
@@ -220,11 +222,11 @@ impl DecorationKey {
             underline: value.underline,
             underline_color: value
                 .underline_color
-                .map(|color| color.as_array().map(f32::to_bits)),
+                .map(|color| color.to_linear_rgba().map(f32::to_bits)),
             strikethrough: value.strikethrough,
             strikethrough_color: value
                 .strikethrough_color
-                .map(|color| color.as_array().map(f32::to_bits)),
+                .map(|color| color.to_linear_rgba().map(f32::to_bits)),
         }
     }
 }

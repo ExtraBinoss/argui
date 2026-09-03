@@ -4,7 +4,7 @@ use argui_widgets::{TextSelectionToolbar, shadcn};
 
 #[test]
 fn touch_selection_toolbar_is_a_clamped_non_selectable_widget() {
-    let palette = shadcn(argui_core::Color::rgb(0.2, 0.4, 0.8));
+    let palette = shadcn(argui_core::Color::srgb(0.2, 0.4, 0.8));
     let theme = palette.resolve(ColorScheme::Light);
     let toolbar = TextSelectionToolbar::new(
         "copy",
@@ -26,7 +26,7 @@ fn touch_selection_toolbar_is_a_clamped_non_selectable_widget() {
 
 #[test]
 fn editable_toolbar_keeps_unavailable_commands_visible_but_disabled() {
-    let palette = shadcn(argui_core::Color::rgb(0.2, 0.4, 0.8));
+    let palette = shadcn(argui_core::Color::srgb(0.2, 0.4, 0.8));
     let theme = palette.resolve(ColorScheme::Dark);
     let toolbar = TextSelectionToolbar::new(
         "editor",

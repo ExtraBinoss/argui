@@ -143,7 +143,7 @@ fn scrollbar_track_and_thumb_drive_the_retained_offset() {
     let mut tree = UiTree::new(Element::container([]).keyed("scroll"));
     let node = tree.node_id_at(0).unwrap();
     let style = ScrollbarStyle::new(
-        ScrollbarPartStyle::new(QuadStyle::solid(Color::rgb(0.0, 0.0, 0.0))),
+        ScrollbarPartStyle::new(QuadStyle::solid(Color::srgb(0.0, 0.0, 0.0))),
         ScrollbarPartStyle::new(QuadStyle::solid(Color::WHITE)),
     );
     let mut scroll = region(
@@ -174,8 +174,8 @@ fn scrollbar_track_and_thumb_drive_the_retained_offset() {
 
 #[test]
 fn scrollbar_parts_reuse_retained_state_transitions() {
-    let base = Color::rgb(0.1, 0.2, 0.3);
-    let hovered = Color::rgb(0.7, 0.8, 0.9);
+    let base = Color::srgb(0.1, 0.2, 0.3);
+    let hovered = Color::srgb(0.7, 0.8, 0.9);
     let style = ScrollbarStyle::new(
         ScrollbarPartStyle::new(QuadStyle::default()),
         ScrollbarPartStyle::new(QuadStyle::solid(base))
@@ -238,7 +238,7 @@ fn scrollbar_parts_reuse_retained_state_transitions() {
 fn scrollbar_parts_share_named_and_scoped_state_resolution() {
     let scope = StateScopeId::new("scroll-host");
     let active = StateName::new("active");
-    let selected = Color::rgb(0.8, 0.3, 0.2);
+    let selected = Color::srgb(0.8, 0.3, 0.2);
     let style = ScrollbarStyle::new(
         ScrollbarPartStyle::new(QuadStyle::default()),
         ScrollbarPartStyle::new(QuadStyle::solid(Color::WHITE))

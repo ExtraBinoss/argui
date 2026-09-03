@@ -65,7 +65,7 @@ fn dialog_actions_and_modal_tree_are_explicit() {
         )),
         None
     );
-    let themes = shadcn(argui_core::Color::rgb(0.2, 0.5, 0.9));
+    let themes = shadcn(argui_core::Color::srgb(0.2, 0.5, 0.9));
     let theme = themes.resolve(argui_core::ColorScheme::Dark);
     let dialog = Dialog::new(
         "confirm",

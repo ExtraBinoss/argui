@@ -134,7 +134,7 @@ impl StateShowcase {
 
 pub(super) fn physics_color(value: f32) -> Color {
     let normalized = value.clamp(0.0, 1.0);
-    Color::rgb(
+    Color::srgb(
         0.18 + normalized * 0.68,
         0.72 - normalized * 0.32,
         0.92 - normalized * 0.58,

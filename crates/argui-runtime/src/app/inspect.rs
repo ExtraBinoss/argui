@@ -77,8 +77,8 @@ impl Application {
         }
         layout.display_list.push_quad(Quad {
             bounds: node.bounds,
-            background: Some(Fill::Solid(Color::rgba(0.20, 0.72, 1.0, 0.10))),
-            border: Border::all(2.0, Color::rgb(0.25, 0.72, 0.96)),
+            background: Some(Fill::Solid(Color::srgba(0.20, 0.72, 1.0, 0.10))),
+            border: Border::all(2.0, Color::srgb(0.25, 0.72, 0.96)),
             radii: CornerRadii::all(0.0),
             opacity: 1.0,
             transform: Affine2D::IDENTITY,
@@ -241,9 +241,9 @@ fn reset_property(element: &mut Element, property: StyleProperty) {
 
 fn apply_property_value(element: &mut Element, property: StyleProperty, value: &StyleValue) {
     match (property, value) {
-        (StyleProperty::Background, StyleValue::Color([red, green, blue, alpha])) => {
+        (StyleProperty::Background, StyleValue::Srgba([red, green, blue, alpha])) => {
             element.paint.quad.background =
-                Some(Fill::Solid(Color::rgba(*red, *green, *blue, *alpha)));
+                Some(Fill::Solid(Color::srgba(*red, *green, *blue, *alpha)));
         }
         (StyleProperty::Border, StyleValue::Parameters(fields)) => {
             if let Some(border) = &mut element.paint.quad.border {
@@ -252,12 +252,12 @@ fn apply_property_value(element: &mut Element, property: StyleProperty, value: &
                 set_if_present(&mut border.widths.right, &values, "right");
                 set_if_present(&mut border.widths.top, &values, "top");
                 set_if_present(&mut border.widths.bottom, &values, "bottom");
-                let [mut red, mut green, mut blue, mut alpha] = border.color.as_array();
+                let [mut red, mut green, mut blue, mut alpha] = border.color.to_srgba();
                 set_if_present(&mut red, &values, "red");
                 set_if_present(&mut green, &values, "green");
                 set_if_present(&mut blue, &values, "blue");
                 set_if_present(&mut alpha, &values, "alpha");
-                border.color = Color::rgba(red, green, blue, alpha);
+                border.color = Color::srgba(red, green, blue, alpha);
             }
         }
         (StyleProperty::Opacity, StyleValue::Number(value)) => {
@@ -341,12 +341,12 @@ fn apply_layer_fields(prefix: &str, layer: &mut LayerStyle, fields: &[StyleField
             &values,
             &format!("{shadow_prefix}spread"),
         );
-        let [mut red, mut green, mut blue, mut alpha] = shadow.color.as_array();
+        let [mut red, mut green, mut blue, mut alpha] = shadow.color.to_srgba();
         set_if_present(&mut red, &values, &format!("{shadow_prefix}red"));
         set_if_present(&mut green, &values, &format!("{shadow_prefix}green"));
         set_if_present(&mut blue, &values, &format!("{shadow_prefix}blue"));
         set_if_present(&mut alpha, &values, &format!("{shadow_prefix}alpha"));
-        shadow.color = Color::rgba(red, green, blue, alpha);
+        shadow.color = Color::srgba(red, green, blue, alpha);
     }
 }
 
@@ -424,9 +424,9 @@ fn apply_effect_value(
         EffectValue::Mat3(values) => apply_components(label, values, value),
         EffectValue::Mat4(values) => apply_components(label, values, value),
         EffectValue::Color(color) => {
-            let mut components = color.as_array();
+            let mut components = color.to_srgba();
             apply_components(label, &mut components, value);
-            *color = Color::rgba(components[0], components[1], components[2], components[3]);
+            *color = Color::srgba(components[0], components[1], components[2], components[3]);
         }
     }
 }

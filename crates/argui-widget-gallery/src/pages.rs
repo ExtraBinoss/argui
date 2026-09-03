@@ -1,5 +1,5 @@
 use argui::{
-    core::{Color, Point, Rect},
+    core::{Color, ColorInterpolation, Point, Rect},
     paint::{
         Border, CornerRadii, Fill, GradientStop, LayerMask, LayerStyle, LinearGradient, Shadow,
     },
@@ -368,9 +368,10 @@ fn effects(theme: &WidgetTheme) -> Element {
     let gradient = LinearGradient::new(
         Point::new(0.0, 0.0),
         Point::new(1.0, 1.0),
+        ColorInterpolation::Oklab,
         [
             GradientStop::new(0.0, theme.primary),
-            GradientStop::new(1.0, Color::rgb(0.65, 0.20, 0.94)),
+            GradientStop::new(1.0, Color::srgb(0.65, 0.20, 0.94)),
         ],
     )
     .expect("the gallery gradient stops are sorted");
@@ -395,16 +396,47 @@ fn effects(theme: &WidgetTheme) -> Element {
             .shadow(Shadow::drop(
                 [0.0, 14.0],
                 32.0,
-                Color::rgba(0.0, 0.0, 0.0, 0.28),
+                Color::srgba(0.0, 0.0, 0.0, 0.28),
             ))
             .mask(LayerMask::Rounded(CornerRadii::all(16.0))),
     );
     preview(
         "Opt-in GPU effect registry",
-        "The gallery registers presets, while applications may register their own typed WGSL effects.",
-        custom,
+        "The gallery registers presets and renders every authored color through the same linear GPU pipeline.",
+        Element::column([custom, color_spaces(theme)]).gap(18.0),
         theme,
     )
+}
+
+fn color_spaces(theme: &WidgetTheme) -> Element {
+    let samples = [
+        ("OKLab", ColorInterpolation::Oklab),
+        ("linear sRGB", ColorInterpolation::LinearSrgb),
+        ("sRGB", ColorInterpolation::Srgb),
+    ];
+    Element::column(samples.map(|(label, interpolation)| {
+        let gradient = LinearGradient::new(
+            Point::default(),
+            Point::new(1.0, 0.0),
+            interpolation,
+            [
+                GradientStop::new(0.0, Color::from_srgb8(239, 68, 68)),
+                GradientStop::new(1.0, Color::from_srgb8(59, 130, 246)),
+            ],
+        )
+        .expect("the color-space sample stops are sorted");
+        Element::row([
+            text(label, 12.0, theme.muted_foreground, 600).width(length(92.0)),
+            Element::container([])
+                .grow(1.0)
+                .height(length(28.0))
+                .fill(Fill::Linear(gradient))
+                .radius(CornerRadii::all(7.0)),
+        ])
+        .align_items(AlignItems::CENTER)
+        .gap(12.0)
+    }))
+    .gap(8.0)
 }
 
 fn preview(title: &str, description: &str, content: Element, theme: &WidgetTheme) -> Element {

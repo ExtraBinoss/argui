@@ -73,14 +73,35 @@ fn effect_in_region(pixel: vec2<f32>, region: vec4<f32>) -> bool {
     return all(pixel >= region.xy) && all(pixel < region.xy + region.zw);
 }
 
+fn argui_unpremultiply(color: vec4<f32>) -> vec4<f32> {
+    if color.a <= 0.000001 { return vec4<f32>(0.0); }
+    return vec4<f32>(color.rgb / color.a, color.a);
+}
+
+fn argui_premultiply(color: vec4<f32>) -> vec4<f32> {
+    return vec4<f32>(color.rgb * color.a, color.a);
+}
+
+fn argui_srgb_to_linear(color: vec3<f32>) -> vec3<f32> {
+    let magnitude = abs(color);
+    let converted = select(
+        magnitude / 12.92,
+        pow((magnitude + vec3<f32>(0.055)) / 1.055, vec3<f32>(2.4)),
+        magnitude > vec3<f32>(0.04045),
+    );
+    return sign(color) * converted;
+}
+
 fn source_at(pixel: vec2<f32>) -> vec4<f32> {
     if !effect_in_region(pixel, params.source) { return vec4<f32>(0.0); }
-    return textureSampleLevel(source_texture, linear_sampler, effect_allocated_uv(pixel, params.source, params.source_uv), 0.0);
+    let color = textureSampleLevel(source_texture, linear_sampler, effect_allocated_uv(pixel, params.source, params.source_uv), 0.0);
+    return argui_unpremultiply(color);
 }
 
 fn backdrop_at(pixel: vec2<f32>) -> vec4<f32> {
     if !effect_in_region(pixel, params.backdrop) { return vec4<f32>(0.0); }
-    return textureSampleLevel(backdrop_texture, linear_sampler, effect_allocated_uv(pixel, params.backdrop, params.backdrop_uv), 0.0);
+    let color = textureSampleLevel(backdrop_texture, linear_sampler, effect_allocated_uv(pixel, params.backdrop, params.backdrop_uv), 0.0);
+    return argui_unpremultiply(color);
 }
 
 fn layer_rounded_distance(pixel: vec2<f32>) -> f32 {

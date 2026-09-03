@@ -225,7 +225,7 @@ mod tests {
             None,
             |_| {},
         );
-        let primary = Color::rgb(0.88, 0.11, 0.28);
+        let primary = Color::srgb(0.88, 0.11, 0.28);
         application.apply_theme_request(crate::ThemeRequest {
             color_scheme: Some(ColorScheme::Dark),
             primary: Some(primary),

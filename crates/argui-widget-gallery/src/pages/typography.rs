@@ -159,8 +159,7 @@ fn selection_examples(theme: &WidgetTheme) -> Element {
 }
 
 fn with_alpha(color: argui::core::Color, alpha: f32) -> argui::core::Color {
-    let [red, green, blue, _] = color.as_array();
-    argui::core::Color::rgba(red, green, blue, alpha)
+    color.with_alpha(alpha)
 }
 
 fn body_style(theme: &WidgetTheme) -> TextStyle {

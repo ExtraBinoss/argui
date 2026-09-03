@@ -58,7 +58,7 @@ fn overrides_are_reversible_and_selection_is_stable() {
         None
     );
 
-    let mut value = StyleValue::Color([0.1, 0.2, 0.3, 1.0]);
+    let mut value = StyleValue::Srgba([0.1, 0.2, 0.3, 1.0]);
     assert!(value.set_field(1, 0.75));
     inspector.set_property_value(node, StyleProperty::Background, value.clone());
     assert_eq!(
@@ -296,12 +296,12 @@ fn every_style_value_exposes_edits_and_summaries_consistently() {
     assert!(!number.set_field(1, 4.0));
     assert_eq!(number.summary(), "2.500");
 
-    let mut color = StyleValue::Color([0.0, 0.25, 0.5, 1.0]);
+    let mut color = StyleValue::Srgba([0.0, 0.25, 0.5, 1.0]);
     assert_eq!(color.fields().len(), 4);
     assert!(color.set_field(0, -2.0));
     assert!(color.set_field(3, 4.0));
     assert!(!color.set_field(4, 0.0));
-    assert_eq!(color.summary(), "rgba(0.000, 0.250, 0.500, 1.000)");
+    assert_eq!(color.summary(), "srgba(0.000, 0.250, 0.500, 1.000)");
 
     let mut parameters = StyleValue::Parameters(vec![argui_inspect::StyleField {
         label: "blur".into(),

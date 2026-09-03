@@ -32,7 +32,7 @@ fn interaction_repaint_reuses_layout_and_shaped_text() {
     let root = Element::text("Fast repaint")
         .keyed("button")
         .padding(Sides::length(12.0))
-        .background(Color::rgb(0.0, 0.0, 0.0))
+        .background(Color::srgb(0.0, 0.0, 0.0))
         .interaction(Interaction::default())
         .when(
             VisualState::Hovered,
@@ -63,7 +63,7 @@ fn interaction_repaint_reuses_layout_and_shaped_text() {
 #[test]
 fn unchanged_static_subtree_reuses_its_retained_paint_fragment() {
     let mut ui = UiTree::new(Element::column((0..5_000).map(|index| {
-        Element::text(format!("row {index}")).background(Color::rgb(0.1, 0.2, 0.3))
+        Element::text(format!("row {index}")).background(Color::srgb(0.1, 0.2, 0.3))
     })));
     let mut layout = LayoutEngine::new();
     let mut text = text_engine();
@@ -115,7 +115,7 @@ fn wrapped_button_labels_keep_every_glyph() {
             key,
             label,
             ButtonStyle::new(
-                PaintStyle::new(QuadStyle::solid(Color::rgb(0.1, 0.2, 0.3))),
+                PaintStyle::new(QuadStyle::solid(Color::srgb(0.1, 0.2, 0.3))),
                 TextStyle {
                     font_size: 17.0,
                     line_height: 22.0,
@@ -168,7 +168,7 @@ fn taffy_layout_uses_real_text_measurement_and_viewport_constraints() {
     .width(percent(1.0))
     .height(percent(1.0))
     .padding(Sides::length(20.0))
-    .background(Color::rgb(0.1, 0.2, 0.3));
+    .background(Color::srgb(0.1, 0.2, 0.3));
     let mut ui = UiTree::new(root);
     let mut layout = LayoutEngine::new();
     let mut text = text_engine();
@@ -385,7 +385,7 @@ fn focused_text_inputs_emit_cosmic_caret_selection_and_hit_geometry() {
         "Hello مرحباً 👋🏽",
         "hint",
         InputStyle::new(
-            PaintStyle::new(QuadStyle::solid(Color::rgb(0.1, 0.1, 0.1))),
+            PaintStyle::new(QuadStyle::solid(Color::srgb(0.1, 0.1, 0.1))),
             TextStyle {
                 font_size: 18.0,
                 line_height: 24.0,
@@ -517,8 +517,8 @@ fn sibling_z_index_controls_paint_and_hit_test_order() {
             .interaction(Interaction::default())
             .z_index(z)
     };
-    let low = Color::rgb(0.1, 0.2, 0.3);
-    let high = Color::rgb(0.8, 0.7, 0.6);
+    let low = Color::srgb(0.1, 0.2, 0.3);
+    let high = Color::srgb(0.8, 0.7, 0.6);
     let mut ui = UiTree::new(
         Element::column([child(high, 4), child(low, -2)])
             .width(length(100.0))

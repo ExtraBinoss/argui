@@ -58,7 +58,7 @@ fn generic_keyframes_drive_color_opacity_and_transform() {
         Keyframe::new(0.0, CaretFrame::new(1.0, Color::WHITE)),
         Keyframe::new(
             1.0,
-            CaretFrame::new(0.0, Color::rgb(1.0, 0.0, 0.0))
+            CaretFrame::new(0.0, Color::srgb(1.0, 0.0, 0.0))
                 .transform(argui_core::Transform2D::IDENTITY.scale(2.0, 2.0)),
         ),
     ])
@@ -66,7 +66,14 @@ fn generic_keyframes_drive_color_opacity_and_transform() {
     let animation = CaretAnimation::new(frames, Duration::from_millis(1_000)).unwrap();
     let sample = animation.sample(Duration::from_millis(500));
     assert!((sample.opacity - 0.5).abs() < 0.001);
-    assert!((sample.tint.as_array()[1] - 0.5).abs() < 0.001);
+    assert_eq!(
+        sample.tint,
+        Color::WHITE.mix(
+            Color::srgb(1.0, 0.0, 0.0),
+            0.5,
+            argui_core::ColorInterpolation::Oklab,
+        )
+    );
     assert!((sample.transform.scale.x - 1.5).abs() < 0.001);
 }
 

@@ -16,7 +16,7 @@ fn demo_scene() -> TextScene {
             TextBlock::new("Argui text renderer", bounds(48.0, 38.0, 850.0, 70.0))
                 .size(48.0)
                 .weight(700)
-                .color(TextColor::rgb(0.35, 0.85, 1.0)),
+                .color(TextColor::srgb(0.35, 0.85, 1.0)),
         )
         .with(
             TextBlock::new(
@@ -24,7 +24,7 @@ fn demo_scene() -> TextScene {
                 bounds(50.0, 108.0, 900.0, 42.0),
             )
             .size(20.0)
-            .color(TextColor::rgb(0.72, 0.76, 0.84)),
+            .color(TextColor::srgb(0.72, 0.76, 0.84)),
         )
         .with(
             TextBlock::new(
@@ -32,7 +32,7 @@ fn demo_scene() -> TextScene {
                 bounds(50.0, 174.0, 900.0, 95.0),
             )
             .size(20.0)
-            .color(TextColor::rgb(0.94, 0.95, 0.98)),
+            .color(TextColor::srgb(0.94, 0.95, 0.98)),
         )
         .with(
             TextBlock::new(
@@ -40,7 +40,7 @@ fn demo_scene() -> TextScene {
                 bounds(50.0, 280.0, 900.0, 70.0),
             )
             .size(28.0)
-            .color(TextColor::rgb(1.0, 0.72, 0.38)),
+            .color(TextColor::srgb(1.0, 0.72, 0.38)),
         )
         .with(
             TextBlock::new(
@@ -49,7 +49,7 @@ fn demo_scene() -> TextScene {
             )
             .size(18.0)
             .family(FontFamily::Monospace)
-            .color(TextColor::rgb(0.62, 0.92, 0.68)),
+            .color(TextColor::srgb(0.62, 0.92, 0.68)),
         )
         .with(
             TextBlock::new(
@@ -58,7 +58,7 @@ fn demo_scene() -> TextScene {
             )
             .size(22.0)
             .line_height(28.0)
-            .color(TextColor::rgb(0.92, 0.56, 0.82)),
+            .color(TextColor::srgb(0.92, 0.56, 0.82)),
         )
         .with(
             TextBlock::new(
@@ -68,7 +68,7 @@ fn demo_scene() -> TextScene {
             .size(64.0)
             .weight(700)
             .family(FontFamily::Serif)
-            .color(TextColor::rgba(0.72, 0.62, 1.0, 0.95)),
+            .color(TextColor::srgba(0.72, 0.62, 1.0, 0.95)),
         )
 }
 

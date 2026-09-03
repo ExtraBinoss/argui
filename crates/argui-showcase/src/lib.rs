@@ -76,7 +76,7 @@ enum AnimationCommand {
 impl Default for StateShowcase {
     fn default() -> Self {
         let animated_color = PRIMARIES[0].1;
-        let shadow_color = Color::rgba(0.28, 0.72, 1.0, 0.28);
+        let shadow_color = Color::srgba(0.28, 0.72, 1.0, 0.28);
         let shadow_motion = Motion::new(shadow_color);
         shadow_motion.play(shadow_timeline(shadow_color));
         Self {
@@ -109,8 +109,8 @@ impl Default for StateShowcase {
             images: ShowcaseImages::embedded(),
             theme_mode: ThemeMode::System,
             primary_index: 0,
-            light_assets: WidgetAssets::tabler(Color::rgb(0.38, 0.42, 0.50)),
-            dark_assets: WidgetAssets::tabler(Color::rgb(0.64, 0.69, 0.76)),
+            light_assets: WidgetAssets::tabler(Color::srgb(0.38, 0.42, 0.50)),
+            dark_assets: WidgetAssets::tabler(Color::srgb(0.64, 0.69, 0.76)),
             message: "Hello · مرحباً · שלום · 👋🏽".into(),
             long_message: "This deliberately long editable line proves that the caret remains visible while the text scrolls horizontally.".into(),
             notes: "A controlled, wrapping text area. Resize it from the bottom-right handle.".into(),

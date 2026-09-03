@@ -5,6 +5,11 @@ values and resolves them with `ThemeMode::Light`, `Dark`, or `System`. Any
 application data can be themed; `WidgetTheme` is only the standard preset pack
 for buttons and text editors.
 
+Theme colors are authored in sRGB and stored internally as linear sRGB. The
+standard `shadcn` theme uses exact Zinc light/dark tokens and derives hover,
+pressed, scrollbar, and focus colors in OKLab. See [Color](color.md) for the
+renderer-wide contract.
+
 The runtime exposes `WindowEnvironment` through `Context::environment()`. It
 contains the effective color scheme, reduced-motion preference, and
 high-contrast preference. Components that read it are retained and rebuilt when

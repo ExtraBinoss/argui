@@ -1,3 +1,5 @@
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod color_tests;
 mod pipeline;
 
 use std::ops::Range;

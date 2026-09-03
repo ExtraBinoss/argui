@@ -17,7 +17,7 @@ fn text_engine() -> TextEngine {
 #[test]
 fn scrollable_overlay_translates_its_input_region_and_scrollbar() {
     let scrollbar = ScrollbarStyle::new(
-        ScrollbarPartStyle::new(QuadStyle::solid(Color::rgb(0.1, 0.1, 0.1))),
+        ScrollbarPartStyle::new(QuadStyle::solid(Color::srgb(0.1, 0.1, 0.1))),
         ScrollbarPartStyle::new(QuadStyle::solid(Color::WHITE)),
     );
     let anchor = Element::container([])

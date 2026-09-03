@@ -4,7 +4,7 @@ use argui_widgets::{Input, InputKind, TablerIcon, TextArea, WidgetAssets, shadcn
 
 #[test]
 fn controlled_inputs_keep_semantics_and_editor_configuration_together() {
-    let themes = shadcn(Color::rgb(0.2, 0.5, 0.9));
+    let themes = shadcn(Color::srgb(0.2, 0.5, 0.9));
     let theme = themes.resolve(ColorScheme::Light);
     let input = Input::new("search", "gpu", "Search", theme.input.clone())
         .kind(InputKind::Search)
@@ -47,7 +47,7 @@ fn controlled_inputs_keep_semantics_and_editor_configuration_together() {
 
 #[test]
 fn numeric_input_kinds_select_engine_level_edit_filters() {
-    let themes = shadcn(Color::rgb(0.2, 0.5, 0.9));
+    let themes = shadcn(Color::srgb(0.2, 0.5, 0.9));
     let theme = themes.resolve(ColorScheme::Light);
     for (kind, expected) in [
         (InputKind::Number, TextInputFilter::Decimal),
@@ -65,7 +65,7 @@ fn numeric_input_kinds_select_engine_level_edit_filters() {
 
 #[test]
 fn leading_content_is_overlaid_without_changing_the_editor_identity() {
-    let themes = shadcn(Color::rgb(0.2, 0.5, 0.9));
+    let themes = shadcn(Color::srgb(0.2, 0.5, 0.9));
     let theme = themes.resolve(ColorScheme::Light);
     let assets = WidgetAssets::tabler(theme.foreground);
     let input = Input::new("search", "", "Search", theme.input.clone())

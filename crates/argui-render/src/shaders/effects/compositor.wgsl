@@ -96,8 +96,13 @@ fn mask_coverage(pixel: vec2<f32>) -> f32 {
 fn composite(source: vec4<f32>, backdrop: vec4<f32>, pixel: vec2<f32>) -> vec4<f32> {
     let alpha = source.a * params.data.x * mask_coverage(pixel);
     let straight_source = source.rgb / max(source.a, 0.00001);
-    let mixed = blend_rgb(straight_source, backdrop.rgb, params.blend);
-    return vec4<f32>(mix(backdrop.rgb, mixed, alpha), alpha + backdrop.a * (1.0 - alpha));
+    let straight_backdrop = backdrop.rgb / max(backdrop.a, 0.00001);
+    let blended = blend_rgb(straight_source, straight_backdrop, params.blend);
+    let composited_source = mix(straight_source, blended, backdrop.a);
+    return vec4<f32>(
+        composited_source * alpha + backdrop.rgb * (1.0 - alpha),
+        alpha + backdrop.a * (1.0 - alpha),
+    );
 }
 
 fn sample_blur(pixel: vec2<f32>, axis: vec2<f32>) -> vec4<f32> {
@@ -126,12 +131,14 @@ fn fs_main(input: VertexOut) -> @location(0) vec4<f32> {
     if params.mode == 1u { source = sample_blur(pixel, vec2<f32>(1.0, 0.0)); }
     if params.mode == 2u { source = sample_blur(pixel, vec2<f32>(0.0, 1.0)); }
     if params.mode == 8u {
-        source = vec4<f32>(
-            dot(source, params.matrix[0]) + params.matrix[4].x,
-            dot(source, params.matrix[1]) + params.matrix[4].y,
-            dot(source, params.matrix[2]) + params.matrix[4].z,
-            dot(source, params.matrix[3]) + params.matrix[4].w
+        let straight = vec4<f32>(source.rgb / max(source.a, 0.00001), source.a);
+        let transformed = vec4<f32>(
+            dot(straight, params.matrix[0]) + params.matrix[4].x,
+            dot(straight, params.matrix[1]) + params.matrix[4].y,
+            dot(straight, params.matrix[2]) + params.matrix[4].z,
+            dot(straight, params.matrix[3]) + params.matrix[4].w
         );
+        source = vec4<f32>(transformed.rgb * transformed.a, transformed.a);
     }
     if params.mode == 9u {
         source = refracted_backdrop(pixel);

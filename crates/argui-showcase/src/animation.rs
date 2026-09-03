@@ -72,9 +72,9 @@ pub(super) fn animation_timeline(initial: Color) -> Timeline<Color> {
         CubicBezier::new(0.22, 1.0, 0.36, 1.0).expect("the showcase uses a valid cubic Bezier");
     let frames = Keyframes::new(vec![
         Keyframe::new(0.0, initial).easing(Easing::CubicBezier(ease)),
-        Keyframe::new(0.38, Color::rgb(0.62, 0.32, 0.96)).easing(Easing::CubicBezier(ease)),
-        Keyframe::new(0.72, Color::rgb(0.98, 0.48, 0.18)).easing(Easing::CubicBezier(ease)),
-        Keyframe::new(1.0, Color::rgb(0.24, 0.84, 0.55)),
+        Keyframe::new(0.38, Color::srgb(0.62, 0.32, 0.96)).easing(Easing::CubicBezier(ease)),
+        Keyframe::new(0.72, Color::srgb(0.98, 0.48, 0.18)).easing(Easing::CubicBezier(ease)),
+        Keyframe::new(1.0, Color::srgb(0.24, 0.84, 0.55)),
     ])
     .expect("the showcase keyframes are sorted and complete");
     Timeline::new(

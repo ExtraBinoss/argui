@@ -113,7 +113,10 @@ fn first_mount_snaps_and_hover_runs_one_retained_tween() {
         TreeUpdate::Paint
     );
     let color = solid(tree.resolved_quad(node, &element).background);
-    assert!((color.as_array()[0] - 0.5).abs() < 0.01);
+    assert_eq!(
+        color,
+        Color::BLACK.mix(Color::WHITE, 0.5, argui_core::ColorInterpolation::Oklab)
+    );
 }
 
 #[test]
@@ -125,18 +128,19 @@ fn stable_authored_changes_retarget_and_explicit_bindings_win() {
     assert!(tree.wants_animation_frame());
     tree.advance_animations(Time::from_nanos(1));
     tree.advance_animations(Time::from_nanos(50_000_001));
-    assert!(
-        (solid(tree.resolved_quad(node, &replacement).background).as_array()[0] - 0.5).abs() < 0.01
+    assert_eq!(
+        solid(tree.resolved_quad(node, &replacement).background),
+        Color::BLACK.mix(Color::WHITE, 0.5, argui_core::ColorInterpolation::Oklab)
     );
 
     let bound = replacement.bind(
         property::BackgroundColor,
-        Motion::new(Color::rgb(0.2, 0.8, 0.3)),
+        Motion::new(Color::srgb(0.2, 0.8, 0.3)),
     );
     tree.update(bound.clone());
     assert_eq!(
         solid(tree.resolved_quad(node, &bound).background),
-        Color::rgb(0.2, 0.8, 0.3)
+        Color::srgb(0.2, 0.8, 0.3)
     );
 }
 
@@ -178,7 +182,7 @@ fn descendant_interaction_and_named_state_compose_in_declaration_order() {
         .when(
             StateSelector::scope(scope, VisualState::Hovered),
             StylePatch::new()
-                .set(property::BackgroundColor, Color::rgb(1.0, 0.0, 0.0))
+                .set(property::BackgroundColor, Color::srgb(1.0, 0.0, 0.0))
                 .set(property::Opacity, 0.7),
         );
     let root = Element::container([child])
@@ -189,7 +193,7 @@ fn descendant_interaction_and_named_state_compose_in_declaration_order() {
     let child = tree.root().children[0].clone();
     tree.pointer_moved(Point::new(10.0, 10.0), &[region(child_node)]);
     let resolved = tree.resolved_quad(child_node, &child);
-    assert_eq!(solid(resolved.background), Color::rgb(1.0, 0.0, 0.0));
+    assert_eq!(solid(resolved.background), Color::srgb(1.0, 0.0, 0.0));
     assert_eq!(resolved.opacity, 0.7);
 }
 
@@ -212,7 +216,7 @@ fn a_nested_scope_with_the_same_identity_shadows_its_ancestor() {
 
 #[test]
 fn focus_overrides_hover_without_waiting_for_pointer_exit() {
-    let focused = Color::rgb(0.0, 0.4, 1.0);
+    let focused = Color::srgb(0.0, 0.4, 1.0);
     let element = Element::container([])
         .border(argui_paint::Border::all(1.0, black()))
         .interaction(Interaction::default().focusable(true))
@@ -287,6 +291,7 @@ fn gradient_components_are_retained_and_animated() {
     let gradient = LinearGradient::new(
         Point::new(0.0, 0.0),
         Point::new(1.0, 0.0),
+        argui_paint::ColorInterpolation::Oklab,
         [
             GradientStop::new(0.0, black()),
             GradientStop::new(1.0, Color::WHITE),
@@ -304,7 +309,7 @@ fn gradient_components_are_retained_and_animated() {
             StylePatch::new()
                 .set(property::LinearGradientStart, Point::new(1.0, 1.0))
                 .set(property::gradient_stop_offset(0), 0.2)
-                .set(property::gradient_stop_color(1), Color::rgb(1.0, 0.0, 0.0)),
+                .set(property::gradient_stop_color(1), Color::srgb(1.0, 0.0, 0.0)),
         )
         .transition(tween());
     let mut tree = UiTree::new(element.clone());
@@ -323,7 +328,14 @@ fn gradient_components_are_retained_and_animated() {
     assert!((gradient.start.x - 0.5).abs() < 0.01);
     assert!((gradient.start.y - 0.5).abs() < 0.01);
     assert!((gradient.stops.as_slice()[0].offset - 0.1).abs() < 0.01);
-    assert!((gradient.stops.as_slice()[1].color.as_array()[1] - 0.5).abs() < 0.01);
+    assert_eq!(
+        gradient.stops.as_slice()[1].color,
+        Color::WHITE.mix(
+            Color::srgb(1.0, 0.0, 0.0),
+            0.5,
+            argui_core::ColorInterpolation::Oklab,
+        )
+    );
 }
 
 #[test]
@@ -331,6 +343,7 @@ fn radial_gradient_state_updates_each_compatible_component() {
     let gradient = RadialGradient::new(
         Point::new(0.5, 0.5),
         Point::new(0.5, 0.5),
+        argui_paint::ColorInterpolation::Oklab,
         [
             GradientStop::new(0.0, black()),
             GradientStop::new(1.0, Color::WHITE),
@@ -349,7 +362,7 @@ fn radial_gradient_state_updates_each_compatible_component() {
                 .set(property::RadialGradientCenter, Point::new(0.25, 0.75))
                 .set(property::RadialGradientRadius, Point::new(0.8, 0.4))
                 .set(property::gradient_stop_offset(0), 0.1)
-                .set(property::gradient_stop_color(1), Color::rgb(0.0, 1.0, 0.0)),
+                .set(property::gradient_stop_color(1), Color::srgb(0.0, 1.0, 0.0)),
         );
     let tree = UiTree::new(element.clone());
     let Fill::Radial(gradient) = tree
@@ -364,7 +377,7 @@ fn radial_gradient_state_updates_each_compatible_component() {
     assert_eq!(gradient.stops.as_slice()[0].offset, 0.1);
     assert_eq!(
         gradient.stops.as_slice()[1].color,
-        Color::rgb(0.0, 1.0, 0.0)
+        Color::srgb(0.0, 1.0, 0.0)
     );
 }
 
@@ -424,7 +437,8 @@ fn layer_and_custom_effect_properties_animate_from_the_authored_values() {
     assert!((resolved.shadows[0].offset[0] - 2.0).abs() < 0.01);
     assert!((resolved.shadows[0].blur - 6.0).abs() < 0.01);
     assert!((resolved.shadows[0].spread - 2.0).abs() < 0.01);
-    assert!((resolved.shadows[0].color.as_array()[0] - 0.5).abs() < 0.01);
+    let midpoint = Color::BLACK.mix(Color::WHITE, 0.5, argui_core::ColorInterpolation::Oklab);
+    assert_eq!(resolved.shadows[0].color, midpoint);
     let Filter::Effect(effect) = &resolved.filters[0] else {
         panic!("expected custom effect");
     };
@@ -438,7 +452,7 @@ fn layer_and_custom_effect_properties_animate_from_the_authored_values() {
     let EffectValue::Color(color) = effect.parameters[7].value else {
         panic!("expected color parameter");
     };
-    assert!((color.as_array()[0] - 0.5).abs() < 0.01);
+    assert_eq!(color, midpoint);
 }
 
 #[test]
@@ -508,5 +522,5 @@ fn solid(fill: Option<Fill>) -> Color {
 }
 
 fn black() -> Color {
-    Color::rgb(0.0, 0.0, 0.0)
+    Color::srgb(0.0, 0.0, 0.0)
 }

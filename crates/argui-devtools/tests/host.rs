@@ -70,7 +70,7 @@ fn selected_nodes_receive_reversible_typed_style_overrides() {
             properties: vec![PropertySnapshot {
                 property: StyleProperty::Background,
                 authored: true,
-                value: StyleValue::Color([0.2, 0.4, 0.6, 1.0]),
+                value: StyleValue::Srgba([0.2, 0.4, 0.6, 1.0]),
             }],
         }],
     });
@@ -85,7 +85,7 @@ fn selected_nodes_receive_reversible_typed_style_overrides() {
     ));
     assert!(matches!(
         inspector.property_value(InspectNodeId(42), StyleProperty::Background),
-        Some(StyleValue::Color([red, _, _, _])) if red == 0.9
+        Some(StyleValue::Srgba([red, _, _, _])) if red == 0.9
     ));
     host.update(&event("__devtools-style-background", UiEventKind::Clicked));
     assert_eq!(inspector.selected(), Some(InspectNodeId(42)));

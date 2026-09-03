@@ -1,4 +1,4 @@
-use argui_core::{Color, ColorScheme};
+use argui_core::{Color, ColorInterpolation, ColorScheme};
 use argui_paint::{Border, CornerRadii, PaintStyle, QuadStyle};
 use argui_text::TextStyle;
 use argui_theme::Theme;
@@ -23,6 +23,7 @@ pub struct WidgetTheme {
     pub destructive: Color,
     pub destructive_foreground: Color,
     pub border: Color,
+    pub input_border: Color,
     pub ring: Color,
     pub button: ButtonStyle,
     pub secondary_button: ButtonStyle,
@@ -42,26 +43,28 @@ pub fn shadcn(primary: Color) -> Theme<WidgetTheme> {
 }
 
 fn widgets(scheme: ColorScheme, primary: Color) -> WidgetTheme {
-    let (background, card, foreground, muted, muted_foreground, border) = match scheme {
+    let (background, card, foreground, muted, muted_foreground, border, destructive) = match scheme
+    {
         ColorScheme::Light => (
-            Color::rgb(0.985, 0.985, 0.99),
             Color::WHITE,
-            Color::rgb(0.035, 0.035, 0.045),
-            Color::rgb(0.955, 0.955, 0.965),
-            Color::rgb(0.40, 0.40, 0.46),
-            Color::rgb(0.875, 0.875, 0.895),
+            Color::WHITE,
+            Color::from_srgb8(9, 9, 11),
+            Color::from_srgb8(244, 244, 245),
+            Color::from_srgb8(113, 113, 122),
+            Color::from_srgb8(228, 228, 231),
+            Color::from_srgb8(239, 68, 68),
         ),
         ColorScheme::Dark => (
-            Color::rgb(0.035, 0.035, 0.045),
-            Color::rgb(0.055, 0.055, 0.07),
-            Color::rgb(0.97, 0.97, 0.98),
-            Color::rgb(0.105, 0.105, 0.13),
-            Color::rgb(0.62, 0.62, 0.68),
-            Color::rgb(0.16, 0.16, 0.20),
+            Color::from_srgb8(9, 9, 11),
+            Color::from_srgb8(9, 9, 11),
+            Color::from_srgb8(250, 250, 250),
+            Color::from_srgb8(39, 39, 42),
+            Color::from_srgb8(161, 161, 170),
+            Color::from_srgb8(39, 39, 42),
+            Color::from_srgb8(127, 29, 29),
         ),
     };
     let primary_foreground = contrasting(primary);
-    let destructive = Color::rgb(0.86, 0.20, 0.24);
     let text = TextStyle {
         font_size: 15.0,
         line_height: 20.0,
@@ -129,6 +132,7 @@ fn widgets(scheme: ColorScheme, primary: Color) -> WidgetTheme {
         destructive,
         destructive_foreground: Color::WHITE,
         border,
+        input_border: border,
         ring: primary,
         button,
         secondary_button,
@@ -169,26 +173,18 @@ fn quad(background: Color, border: Color) -> QuadStyle {
 }
 
 fn contrasting(color: Color) -> Color {
-    let [red, green, blue, _] = color.as_array();
-    if red * 0.299 + green * 0.587 + blue * 0.114 > 0.62 {
-        Color::rgb(0.04, 0.04, 0.05)
-    } else {
+    let dark = Color::from_srgb8(9, 9, 11);
+    if color.contrast_ratio(Color::WHITE) >= color.contrast_ratio(dark) {
         Color::WHITE
+    } else {
+        dark
     }
 }
 
 fn mix(left: Color, right: Color, amount: f32) -> Color {
-    let left = left.as_array();
-    let right = right.as_array();
-    Color::rgba(
-        left[0] + (right[0] - left[0]) * amount,
-        left[1] + (right[1] - left[1]) * amount,
-        left[2] + (right[2] - left[2]) * amount,
-        left[3] + (right[3] - left[3]) * amount,
-    )
+    left.mix(right, amount, ColorInterpolation::Oklab)
 }
 
 fn with_alpha(color: Color, alpha: f32) -> Color {
-    let [red, green, blue, _] = color.as_array();
-    Color::rgba(red, green, blue, alpha)
+    color.with_alpha(alpha)
 }

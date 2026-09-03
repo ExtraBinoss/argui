@@ -12,7 +12,7 @@ use argui_ui::{
 fn interactive(key: &str) -> Element {
     Element::container([])
         .keyed(key)
-        .background(Color::rgb(0.0, 0.0, 0.0))
+        .background(Color::srgb(0.0, 0.0, 0.0))
         .interaction(Interaction::default().focusable(true))
         .when(
             VisualState::Hovered,
@@ -20,11 +20,11 @@ fn interactive(key: &str) -> Element {
         )
         .when(
             VisualState::Pressed,
-            StylePatch::from_quad(QuadStyle::solid(Color::rgb(1.0, 0.0, 0.0))),
+            StylePatch::from_quad(QuadStyle::solid(Color::srgb(1.0, 0.0, 0.0))),
         )
         .when(
             VisualState::Focused,
-            StylePatch::from_quad(QuadStyle::solid(Color::rgb(0.0, 1.0, 0.0))),
+            StylePatch::from_quad(QuadStyle::solid(Color::srgb(0.0, 1.0, 0.0))),
         )
 }
 
@@ -431,7 +431,7 @@ fn empty_actions_focus_switches_and_blur_are_deterministic() {
     assert_eq!(
         tree.resolved_quad(first, &tree.root().children[0])
             .background,
-        QuadStyle::solid(Color::rgb(0.0, 1.0, 0.0)).background
+        QuadStyle::solid(Color::srgb(0.0, 1.0, 0.0)).background
     );
     tree.primary_released();
     tree.pointer_moved(Point::new(130.0, 20.0), &regions);

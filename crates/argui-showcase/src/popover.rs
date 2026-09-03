@@ -180,9 +180,9 @@ fn entry_transform(side: PlacementSide, progress: f32) -> Transform2D {
 pub(super) fn shadow_timeline(initial: Color) -> Timeline<Color> {
     let frames = Keyframes::new(vec![
         Keyframe::new(0.0, initial),
-        Keyframe::new(0.25, Color::rgba(0.68, 0.28, 1.0, 0.28)),
-        Keyframe::new(0.5, Color::rgba(1.0, 0.30, 0.48, 0.28)),
-        Keyframe::new(0.75, Color::rgba(0.20, 0.92, 0.66, 0.28)),
+        Keyframe::new(0.25, Color::srgba(0.68, 0.28, 1.0, 0.28)),
+        Keyframe::new(0.5, Color::srgba(1.0, 0.30, 0.48, 0.28)),
+        Keyframe::new(0.75, Color::srgba(0.20, 0.92, 0.66, 0.28)),
         Keyframe::new(1.0, initial),
     ])
     .expect("the popover shadow keyframes are sorted and complete");

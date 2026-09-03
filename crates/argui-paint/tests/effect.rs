@@ -18,7 +18,7 @@ fn effect_layers_are_explicit_and_compute_conservative_bounds() {
         .shadow(Shadow::drop(
             [20.0, -2.0],
             8.0,
-            Color::rgba(0.0, 0.0, 0.0, 0.5),
+            Color::srgba(0.0, 0.0, 0.0, 0.5),
         ));
 
     assert!(layer.requires_offscreen());

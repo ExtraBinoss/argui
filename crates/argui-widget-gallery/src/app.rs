@@ -20,14 +20,16 @@ use argui_image::ImageLibrary;
 
 use crate::{navigation::Page, pages};
 
-pub(crate) const PRIMARIES: [Color; 6] = [
-    Color::rgb(0.10, 0.45, 0.91),
-    Color::rgb(0.49, 0.23, 0.93),
-    Color::rgb(0.86, 0.20, 0.45),
-    Color::rgb(0.04, 0.62, 0.48),
-    Color::rgb(0.92, 0.42, 0.08),
-    Color::rgb(0.20, 0.68, 0.94),
-];
+pub(crate) static PRIMARIES: LazyLock<[Color; 6]> = LazyLock::new(|| {
+    [
+        Color::srgb(0.10, 0.45, 0.91),
+        Color::srgb(0.49, 0.23, 0.93),
+        Color::srgb(0.86, 0.20, 0.45),
+        Color::srgb(0.04, 0.62, 0.48),
+        Color::srgb(0.92, 0.42, 0.08),
+        Color::srgb(0.20, 0.68, 0.94),
+    ]
+});
 
 pub struct WidgetGallery {
     pub(crate) page: Page,
@@ -71,8 +73,8 @@ impl Default for WidgetGallery {
                 "../../argui/examples/assets/astra-icon-256.png"
             ))
             .expect("the embedded Astra icon must remain a valid PNG");
-        let light_assets = WidgetAssets::tabler(Color::rgb(0.18, 0.20, 0.25));
-        let dark_assets = WidgetAssets::tabler(Color::rgb(0.88, 0.90, 0.95));
+        let light_assets = WidgetAssets::tabler(Color::srgb(0.18, 0.20, 0.25));
+        let dark_assets = WidgetAssets::tabler(Color::srgb(0.88, 0.90, 0.95));
         let accent_assets = WidgetAssets::tabler(PRIMARIES[0]);
         let spinner = Entity::new(Spinner::new(
             accent_assets.vector_id(TablerIcon::Loader),
@@ -585,3 +587,4 @@ const fn mode_label(mode: ThemeMode) -> &'static str {
 #[cfg(test)]
 #[path = "app_tests.rs"]
 mod tests;
+use std::sync::LazyLock;

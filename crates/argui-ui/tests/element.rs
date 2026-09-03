@@ -5,11 +5,11 @@ use argui_ui::{Color, Element, ElementKind, ImageFit, ImageId, ImageSampling, Ve
 fn media_and_text_specific_builders_only_change_matching_elements() {
     let vector = Element::vector(VectorId(3))
         .vector_fit(ImageFit::Fill)
-        .vector_color(Color::rgb(0.2, 0.4, 0.6));
+        .vector_color(Color::srgb(0.2, 0.4, 0.6));
     assert!(matches!(
         vector.kind,
         ElementKind::Vector { fit: ImageFit::Fill, color, .. }
-            if color == Color::rgb(0.2, 0.4, 0.6)
+            if color == Color::srgb(0.2, 0.4, 0.6)
     ));
     assert!(matches!(
         Element::container([]).vector_fit(ImageFit::Fill).kind,

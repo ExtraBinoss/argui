@@ -5,13 +5,15 @@ use argui_theme::ThemeMode;
 use argui_ui::{Element, LengthPercentageAuto, Resizable, Sides, auto, length, percent};
 use argui_widgets::{Input, TablerIcon, TextArea, WidgetAssets, WidgetTheme};
 
-pub(super) const PRIMARIES: [(&str, Color); 5] = [
-    ("Primary: blue", Color::rgb(0.10, 0.45, 0.91)),
-    ("Primary: violet", Color::rgb(0.49, 0.23, 0.93)),
-    ("Primary: rose", Color::rgb(0.88, 0.11, 0.28)),
-    ("Primary: orange", Color::rgb(0.92, 0.35, 0.05)),
-    ("Primary: emerald", Color::rgb(0.02, 0.59, 0.41)),
-];
+pub(super) static PRIMARIES: LazyLock<[(&str, Color); 5]> = LazyLock::new(|| {
+    [
+        ("Primary: blue", Color::srgb(0.10, 0.45, 0.91)),
+        ("Primary: violet", Color::srgb(0.49, 0.23, 0.93)),
+        ("Primary: rose", Color::srgb(0.88, 0.11, 0.28)),
+        ("Primary: orange", Color::srgb(0.92, 0.35, 0.05)),
+        ("Primary: emerald", Color::srgb(0.02, 0.59, 0.41)),
+    ]
+});
 
 pub(super) fn primary_label(index: usize) -> &'static str {
     PRIMARIES[index].0
@@ -82,3 +84,4 @@ pub(super) const fn label(mode: ThemeMode) -> &'static str {
         ThemeMode::System => "Theme: system",
     }
 }
+use std::sync::LazyLock;

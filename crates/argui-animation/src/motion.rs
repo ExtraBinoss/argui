@@ -159,13 +159,13 @@ impl MotionValue for Color {
     }
 
     fn scale(self, factor: f64) -> Self {
-        let [red, green, blue, alpha] = self.as_array();
+        let [red, green, blue, alpha] = self.to_linear_rgba();
         let factor = factor as f32;
-        Self::rgba(red * factor, green * factor, blue * factor, alpha * factor)
+        Self::linear_rgba(red * factor, green * factor, blue * factor, alpha * factor)
     }
 
     fn magnitude(self) -> f64 {
-        self.as_array()
+        self.to_linear_rgba()
             .into_iter()
             .map(|channel| f64::from(channel).powi(2))
             .sum::<f64>()
@@ -220,9 +220,9 @@ impl MotionValue for Transform2D {
 }
 
 fn map_color(left: Color, right: Color, operation: impl Fn(f32, f32) -> f32) -> Color {
-    let left = left.as_array();
-    let right = right.as_array();
-    Color::rgba(
+    let left = left.to_linear_rgba();
+    let right = right.to_linear_rgba();
+    Color::linear_rgba(
         operation(left[0], right[0]),
         operation(left[1], right[1]),
         operation(left[2], right[2]),

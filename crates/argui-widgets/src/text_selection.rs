@@ -518,7 +518,7 @@ mod tests {
             ElementKind::Text { .. }
         ));
 
-        let palette = shadcn(argui_core::Color::rgb(0.2, 0.4, 0.8));
+        let palette = shadcn(argui_core::Color::srgb(0.2, 0.4, 0.8));
         let theme = palette.resolve(ColorScheme::Light);
         let toolbar = TextSelectionToolbar::new(
             "editor",
@@ -535,7 +535,7 @@ mod tests {
 
     #[test]
     fn toolbar_prefers_the_space_above_a_low_selection() {
-        let palette = shadcn(argui_core::Color::rgb(0.2, 0.4, 0.8));
+        let palette = shadcn(argui_core::Color::srgb(0.2, 0.4, 0.8));
         let theme = palette.resolve(ColorScheme::Light);
         let toolbar = TextSelectionToolbar::new(
             "copy",

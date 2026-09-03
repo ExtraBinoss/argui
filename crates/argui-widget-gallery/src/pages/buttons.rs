@@ -71,7 +71,7 @@ fn elevated_button(theme: &WidgetTheme) -> Element {
     .layer(button_layer().shadow(Shadow::drop(
         [0.0, 5.0],
         12.0,
-        Color::rgba(0.0, 0.0, 0.0, 0.24),
+        Color::srgba(0.0, 0.0, 0.0, 0.24),
     )))
 }
 
@@ -94,7 +94,7 @@ fn lift_button(theme: &WidgetTheme) -> Element {
         .layer(button_layer().shadow(Shadow::drop(
             [0.0, 2.0],
             5.0,
-            Color::rgba(0.0, 0.0, 0.0, 0.22),
+            Color::srgba(0.0, 0.0, 0.0, 0.22),
         )))
 }
 
@@ -136,7 +136,7 @@ mod tests {
 
     #[test]
     fn shader_button_targets_the_registered_effect_on_hover() {
-        let themes = shadcn(Color::rgb(0.1, 0.45, 0.91));
+        let themes = shadcn(Color::srgb(0.1, 0.45, 0.91));
         let element = shader_button(themes.resolve(ColorScheme::Dark));
         let mut tree = UiTree::new(element.clone());
         let node = tree.node_ids()[0];

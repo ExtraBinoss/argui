@@ -7,7 +7,8 @@ means compiling the same renderer to WebAssembly/WebGPU.
 The repository provides a retained UI tree, responsive layout, shaped text and
 editing, interaction, scrolling, animation, transforms, gradients, decoded
 images, scoped GPU effects, and one WGPU renderer for native and web. See the
-[visual primitive contracts](docs/visual_primitives.md) and the
+[visual primitive contracts](docs/visual_primitives.md), the
+[color contract](docs/color.md), and the
 [overlay geometry API](docs/overlays.md), or the
 [remaining roadmap](docs/roadmap.md).
 

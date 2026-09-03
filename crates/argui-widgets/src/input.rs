@@ -35,7 +35,7 @@ impl InputStyle {
     pub fn new(paint: PaintStyle, mut text: TextStyle) -> Self {
         text.wrap = TextWrap::None;
         let mut placeholder = text.clone();
-        placeholder.color = TextColor::rgba(0.55, 0.60, 0.68, 1.0);
+        placeholder.color = TextColor::srgba(0.55, 0.60, 0.68, 1.0);
         placeholder.overflow = TextOverflow::Ellipsis(argui_text::EllipsisPosition::End);
         Self {
             layout: LayoutStyle {
@@ -54,7 +54,7 @@ impl InputStyle {
             paint,
             text,
             placeholder,
-            selection: Color::rgba(0.20, 0.68, 0.94, 0.38),
+            selection: Color::srgba(0.20, 0.68, 0.94, 0.38),
             caret: CaretStyle::default(),
         }
     }

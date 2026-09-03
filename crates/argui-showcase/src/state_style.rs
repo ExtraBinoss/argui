@@ -191,10 +191,11 @@ fn gradient_surface(theme: &WidgetTheme) -> Element {
     let gradient = LinearGradient::new(
         Point::new(0.0, 0.0),
         Point::new(1.0, 1.0),
+        argui_paint::ColorInterpolation::Oklab,
         [
             GradientStop::new(0.0, theme.primary),
-            GradientStop::new(0.5, Color::rgb(0.18, 0.82, 0.74)),
-            GradientStop::new(1.0, Color::rgb(0.74, 0.24, 0.92)),
+            GradientStop::new(0.5, Color::srgb(0.18, 0.82, 0.74)),
+            GradientStop::new(1.0, Color::srgb(0.74, 0.24, 0.92)),
         ],
     )
     .expect("showcase gradient is valid");
@@ -214,7 +215,7 @@ fn gradient_surface(theme: &WidgetTheme) -> Element {
                 .set(property::gradient_stop_offset(1), 0.72)
                 .set(
                     property::gradient_stop_color(0),
-                    Color::rgb(0.98, 0.32, 0.18),
+                    Color::srgb(0.98, 0.32, 0.18),
                 )
                 .set(property::CornerRadii, [24.0; 4]),
         )

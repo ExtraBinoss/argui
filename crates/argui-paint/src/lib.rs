@@ -6,7 +6,7 @@ mod style;
 mod vector;
 mod visual;
 
-pub use argui_core::Color;
+pub use argui_core::{Color, ColorInterpolation};
 pub use display_list::{DisplayCommand, DisplayList, DisplayListError};
 pub use effect::{
     BlendMode, EffectArgument, EffectId, EffectInstance, EffectValue, Filter, LayerMask,

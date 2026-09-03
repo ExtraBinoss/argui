@@ -65,7 +65,7 @@ impl EffectValue {
             Self::Vec2(values) => write_f32_words(words, values),
             Self::Vec3(values) => write_f32_words(words, values),
             Self::Vec4(values) => write_f32_words(words, values),
-            Self::Color(value) => write_f32_words(words, &value.as_array()),
+            Self::Color(value) => write_f32_words(words, &value.to_linear_rgba()),
             Self::Mat3(values) => write_f32_words(words, values),
             Self::Mat4(values) => write_f32_words(words, values),
         }

@@ -356,7 +356,7 @@ fn a_stalled_frame_cannot_teleport_the_physics_visual() {
         panic!("the physics visual uses a solid animated fill");
     };
     assert!(
-        color.as_array()[0] < 0.4,
+        color.to_linear_rgba()[0] < 0.4,
         "a long presentation stall must advance physics by one bounded visual step"
     );
 }
@@ -383,7 +383,7 @@ fn effects_popover_is_composed_and_only_animates_while_open() {
     assert_eq!(layer.backdrop_filters, [Filter::Blur(14.0)]);
     assert_eq!(layer.opacity, 1.0);
     assert_eq!(layer.shadows.len(), 1);
-    assert_eq!(layer.shadows[0].color.as_array()[3], 0.28);
+    assert_eq!(layer.shadows[0].color.to_linear_rgba()[3], 0.28);
     assert_eq!(popover.bindings.len(), 1);
     for input in [
         key_input(&app, Key::Enter, KeyState::Pressed, false),

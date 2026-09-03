@@ -114,8 +114,8 @@ fn colored_dot() -> CaretStyle {
     )
     .align(CaretAlign::End)
     .offset(1.0, -2.0);
-    let cyan = Color::rgb(0.10, 0.82, 1.0);
-    let pink = Color::rgb(1.0, 0.20, 0.58);
+    let cyan = Color::srgb(0.10, 0.82, 1.0);
+    let pink = Color::srgb(1.0, 0.20, 0.58);
     let frames = Keyframes::new([
         Keyframe::new(0.0, CaretFrame::new(1.0, cyan)).hold(),
         Keyframe::new(0.24, CaretFrame::new(1.0, cyan)),
@@ -146,22 +146,22 @@ fn animated_ellipsis() -> CaretStyle {
     let frames = Keyframes::new([
         Keyframe::new(
             0.0,
-            CaretFrame::new(1.0, Color::rgb(0.10, 0.82, 1.0))
+            CaretFrame::new(1.0, Color::srgb(0.10, 0.82, 1.0))
                 .transform(Transform2D::IDENTITY.scale(0.82, 0.82)),
         ),
         Keyframe::new(
             0.34,
-            CaretFrame::new(1.0, Color::rgb(0.58, 0.25, 1.0))
+            CaretFrame::new(1.0, Color::srgb(0.58, 0.25, 1.0))
                 .transform(Transform2D::IDENTITY.scale(1.15, 1.15)),
         ),
         Keyframe::new(
             0.68,
-            CaretFrame::new(1.0, Color::rgb(1.0, 0.24, 0.42))
+            CaretFrame::new(1.0, Color::srgb(1.0, 0.24, 0.42))
                 .transform(Transform2D::IDENTITY.scale(0.92, 0.92)),
         ),
         Keyframe::new(
             1.0,
-            CaretFrame::new(1.0, Color::rgb(0.10, 0.82, 1.0))
+            CaretFrame::new(1.0, Color::srgb(0.10, 0.82, 1.0))
                 .transform(Transform2D::IDENTITY.scale(0.82, 0.82)),
         ),
     ])

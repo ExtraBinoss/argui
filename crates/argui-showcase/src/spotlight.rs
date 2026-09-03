@@ -297,6 +297,5 @@ fn rebuild(window: &WindowKey) -> AppUpdate {
 }
 
 fn with_alpha(color: Color, alpha: f32) -> Color {
-    let [red, green, blue, _] = color.as_array();
-    Color::rgba(red, green, blue, alpha)
+    color.with_alpha(alpha)
 }

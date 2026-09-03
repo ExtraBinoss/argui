@@ -5,7 +5,7 @@ use argui_paint::{
 };
 
 fn stop(offset: f32) -> GradientStop {
-    GradientStop::new(offset, Color::rgba(offset, 0.2, 0.4, 1.0))
+    GradientStop::new(offset, Color::srgba(offset, 0.2, 0.4, 1.0))
 }
 
 #[test]
@@ -15,8 +15,18 @@ fn gradients_accept_runtime_generated_and_many_stops() {
 
     assert_eq!(stops.len(), 32);
     assert!(!stops.is_empty());
-    let linear = LinearGradient::with_stops(Point::default(), Point::new(1.0, 0.0), stops.clone());
-    let radial = RadialGradient::with_stops(Point::default(), Point::new(1.0, 1.0), stops);
+    let linear = LinearGradient::with_stops(
+        Point::default(),
+        Point::new(1.0, 0.0),
+        argui_paint::ColorInterpolation::Oklab,
+        stops.clone(),
+    );
+    let radial = RadialGradient::with_stops(
+        Point::default(),
+        Point::new(1.0, 1.0),
+        argui_paint::ColorInterpolation::Oklab,
+        stops,
+    );
     assert_eq!(linear.stops.len(), 32);
     assert_eq!(radial.stops.len(), 32);
 }

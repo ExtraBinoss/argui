@@ -10,7 +10,10 @@ fn renderer_defaults_to_vsync_and_a_discrete_gpu() {
     );
     assert_eq!(config.present_mode, wgpu::PresentMode::AutoVsync);
     assert_eq!(config.maximum_frame_latency, 2);
-    assert_eq!(config.clear_color, [0.055, 0.065, 0.09, 1.0]);
+    assert_eq!(
+        config.clear_color,
+        argui_core::Color::srgb(0.055, 0.065, 0.09)
+    );
     assert_eq!(config.surface_alpha, SurfaceAlphaMode::Opaque);
     assert!(!config.profiling);
     assert!(config.clone().profiling(true).profiling);
@@ -44,9 +47,12 @@ fn renderer_defaults_to_vsync_and_a_discrete_gpu() {
 fn transparent_surface_configuration_uses_a_transparent_clear() {
     let config = RendererConfig::default().surface_alpha(SurfaceAlphaMode::Transparent);
     assert_eq!(config.surface_alpha, SurfaceAlphaMode::Transparent);
-    assert_eq!(config.clear_color, [0.0; 4]);
+    assert_eq!(config.clear_color, argui_core::Color::TRANSPARENT);
 
     let opaque = RendererConfig::default().surface_alpha(SurfaceAlphaMode::Opaque);
     assert_eq!(opaque.surface_alpha, SurfaceAlphaMode::Opaque);
-    assert_eq!(opaque.clear_color, [0.055, 0.065, 0.09, 1.0]);
+    assert_eq!(
+        opaque.clear_color,
+        argui_core::Color::srgb(0.055, 0.065, 0.09)
+    );
 }

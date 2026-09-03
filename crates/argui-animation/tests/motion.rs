@@ -14,10 +14,10 @@ fn motion_values_provide_vector_arithmetic_and_magnitude() {
     assert_eq!(rect.subtract(rect), Rect::default());
     assert_eq!(rect.scale(2.0).origin, Point::new(2.0, 4.0));
 
-    let color = Color::rgba(0.4, 0.3, 0.2, 0.1);
+    let color = Color::linear_rgba(0.4, 0.3, 0.2, 0.1);
     assert_eq!(color.subtract(color), Color::TRANSPARENT);
-    assert_eq!(color.add(color), Color::rgba(0.8, 0.6, 0.4, 0.2));
-    assert_eq!(Color::rgba(1.0, 0.0, 0.0, 0.0).magnitude(), 1.0);
+    assert_eq!(color.add(color), Color::linear_rgba(0.8, 0.6, 0.4, 0.2));
+    assert_eq!(Color::linear_rgba(1.0, 0.0, 0.0, 0.0).magnitude(), 1.0);
 }
 
 #[test]

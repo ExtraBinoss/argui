@@ -1,6 +1,6 @@
 use std::{mem::size_of, ops::Range};
 
-use argui_paint::{ClipRegion, Fill, Quad};
+use argui_paint::{ClipRegion, ColorInterpolation, Fill, Quad};
 use bytemuck::{Pod, Zeroable};
 
 #[repr(C)]
@@ -69,7 +69,7 @@ impl QuadInstance {
                 quad.bounds.size.height * scale,
             ],
             background: [0.0; 4],
-            border_color: quad.border.color.as_array(),
+            border_color: quad.border.color.to_linear_rgba(),
             radii: quad.radii.as_array().map(|value| value * scale),
             border_widths: quad.border.widths.as_array().map(|value| value * scale),
             transform_a: transform.matrix,
@@ -85,7 +85,7 @@ impl QuadInstance {
 
     fn set_fill(&mut self, fill: Option<&Fill>, stops: &mut Vec<GradientStopInstance>) {
         match fill {
-            Some(Fill::Solid(color)) => self.background = color.as_array(),
+            Some(Fill::Solid(color)) => self.background = color.to_linear_rgba(),
             Some(Fill::Linear(gradient)) => {
                 self.params[1] = 1.0;
                 self.fill_geometry = [
@@ -94,7 +94,7 @@ impl QuadInstance {
                     gradient.end.x,
                     gradient.end.y,
                 ];
-                self.set_stops(gradient.stops.as_slice(), stops);
+                self.set_stops(gradient.stops.as_slice(), gradient.interpolation, stops);
             }
             Some(Fill::Radial(gradient)) => {
                 self.params[1] = 2.0;
@@ -104,7 +104,7 @@ impl QuadInstance {
                     gradient.radius.x,
                     gradient.radius.y,
                 ];
-                self.set_stops(gradient.stops.as_slice(), stops);
+                self.set_stops(gradient.stops.as_slice(), gradient.interpolation, stops);
             }
             None => {}
         }
@@ -113,13 +113,32 @@ impl QuadInstance {
     fn set_stops(
         &mut self,
         gradient: &[argui_paint::GradientStop],
+        interpolation: ColorInterpolation,
         stops: &mut Vec<GradientStopInstance>,
     ) {
-        self.gradient_meta = [stops.len() as u32, gradient.len() as u32, 0, 0];
-        stops.extend(gradient.iter().map(|stop| GradientStopInstance {
-            offset: [stop.offset, 0.0, 0.0, 0.0],
-            color: stop.color.as_array(),
+        let interpolation = match interpolation {
+            ColorInterpolation::Oklab => 0,
+            ColorInterpolation::LinearSrgb => 1,
+            ColorInterpolation::Srgb => 2,
+        };
+        self.gradient_meta = [stops.len() as u32, gradient.len() as u32, interpolation, 0];
+        stops.extend(gradient.iter().map(|stop| {
+            let [first, second, third, alpha] = stop
+                .color
+                .to_interpolation_components(interpolation_space(interpolation));
+            GradientStopInstance {
+                offset: [stop.offset, 0.0, 0.0, 0.0],
+                color: [first * alpha, second * alpha, third * alpha, alpha],
+            }
         }));
+    }
+}
+
+const fn interpolation_space(value: u32) -> ColorInterpolation {
+    match value {
+        0 => ColorInterpolation::Oklab,
+        1 => ColorInterpolation::LinearSrgb,
+        _ => ColorInterpolation::Srgb,
     }
 }
 
@@ -455,6 +474,11 @@ fn binding(binding: u32, buffer: &wgpu::Buffer, size: u64) -> wgpu::BindGroupEnt
 
 #[cfg(test)]
 mod tests {
+    use argui_core::{Affine2D, Color, ColorInterpolation, Point, Rect, Size};
+    use argui_paint::{Border, ClipChain, Fill, GradientStop, LinearGradient, Quad};
+
+    use super::QuadInstance;
+
     const SHADER: &str = include_str!("../shaders/primitives/quad.wgsl");
 
     #[test]
@@ -469,5 +493,56 @@ mod tests {
         assert!(SHADER.contains("outer_coverage - inner_coverage"));
         assert!(!SHADER.contains("mix(quad.border_color"));
         assert!(!SHADER.contains("fwidth("));
+    }
+
+    #[test]
+    fn gradient_stops_are_premultiplied_in_the_declared_space() {
+        for (space, encoded) in [
+            (ColorInterpolation::Oklab, 0),
+            (ColorInterpolation::LinearSrgb, 1),
+            (ColorInterpolation::Srgb, 2),
+        ] {
+            let color = Color::srgba(0.8, 0.2, 0.4, 0.5);
+            let gradient = LinearGradient::new(
+                Point::default(),
+                Point::new(1.0, 0.0),
+                space,
+                [
+                    GradientStop::new(0.0, Color::TRANSPARENT),
+                    GradientStop::new(1.0, color),
+                ],
+            )
+            .unwrap();
+            let quad = Quad {
+                bounds: Rect::new(Point::default(), Size::new(10.0, 10.0)),
+                background: Some(Fill::Linear(gradient)),
+                border: Border::all(0.0, Color::TRANSPARENT),
+                radii: Default::default(),
+                opacity: 1.0,
+                transform: Affine2D::IDENTITY,
+                clips: ClipChain::default(),
+            };
+            let mut stops = Vec::new();
+            let instance = QuadInstance::new(&quad, 1.0, 0, 0, &mut stops);
+            assert_eq!(instance.gradient_meta, [0, 2, encoded, 0]);
+            let packed = stops[1].color;
+            assert!((packed[3] - 0.5).abs() < f32::EPSILON);
+            let decoded = Color::from_interpolation_components(
+                [
+                    packed[0] / packed[3],
+                    packed[1] / packed[3],
+                    packed[2] / packed[3],
+                    packed[3],
+                ],
+                space,
+            );
+            for (actual, expected) in decoded
+                .to_linear_rgba()
+                .into_iter()
+                .zip(color.to_linear_rgba())
+            {
+                assert!((actual - expected).abs() < 0.000_01);
+            }
+        }
     }
 }

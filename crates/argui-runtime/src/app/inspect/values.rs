@@ -55,7 +55,7 @@ pub(super) fn property_value(element: &Element, property: StyleProperty) -> Styl
 
 fn background(element: &Element) -> StyleValue {
     match &element.paint.quad.background {
-        Some(Fill::Solid(color)) => StyleValue::Color(color.as_array()),
+        Some(Fill::Solid(color)) => StyleValue::Srgba(color.to_srgba()),
         Some(Fill::Linear(gradient)) => {
             StyleValue::Summary(format!("linear gradient · {} stops", gradient.stops.len()))
         }
@@ -71,7 +71,7 @@ fn border(element: &Element) -> StyleValue {
         || StyleValue::Summary("none".into()),
         |border| {
             let [left, right, top, bottom] = border.widths.as_array();
-            let [red, green, blue, alpha] = border.color.as_array();
+            let [red, green, blue, alpha] = border.color.to_srgba();
             StyleValue::Parameters(fields([
                 ("left", left),
                 ("right", right),
@@ -151,7 +151,7 @@ fn layer_fields(prefix: &str, layer: &LayerStyle) -> Vec<StyleField> {
     }
     for (index, shadow) in layer.shadows.iter().enumerate() {
         let prefix = format!("{prefix}shadow {index} · ");
-        let [red, green, blue, alpha] = shadow.color.as_array();
+        let [red, green, blue, alpha] = shadow.color.to_srgba();
         output.extend(fields([
             (&format!("{prefix}offset x"), shadow.offset[0]),
             (&format!("{prefix}offset y"), shadow.offset[1]),
@@ -218,7 +218,7 @@ fn effect_value_fields(
         EffectValue::Vec4(values) => push_components(label, values, push),
         EffectValue::Mat3(values) => push_components(label, values, push),
         EffectValue::Mat4(values) => push_components(label, values, push),
-        EffectValue::Color(color) => push_components(label, &color.as_array(), push),
+        EffectValue::Color(color) => push_components(label, &color.to_srgba(), push),
     }
 }
 

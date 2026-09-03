@@ -7,7 +7,7 @@ mod input;
 mod keyboard;
 mod text;
 
-pub use color::Color;
+pub use color::{Color, ColorInterpolation, ParseColorError};
 pub use environment::ColorScheme;
 pub use geometry::{Affine2D, Point, Rect, Size, Transform2D, TransformOrigin};
 pub use input::{PointerButton, PointerEvent, PointerId, PointerKind, PointerPhase, ScrollDelta};

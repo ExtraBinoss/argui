@@ -245,7 +245,7 @@ fn contexts_create_entities_and_propagate_nested_effects() {
     nested.clear_focus();
     nested.set_theme(ThemeRequest {
         color_scheme: Some(ColorScheme::Dark),
-        primary: Some(Color::rgb(0.8, 0.2, 0.4)),
+        primary: Some(Color::srgb(0.8, 0.2, 0.4)),
     });
     nested.command(AppCommand::Quit);
     let selection_target = UiTree::new(Element::container([])).node_ids()[0];
@@ -279,7 +279,7 @@ fn contexts_create_entities_and_propagate_nested_effects() {
         parent.effects.theme,
         Some(ThemeRequest {
             color_scheme: Some(ColorScheme::Dark),
-            primary: Some(Color::rgb(0.8, 0.2, 0.4)),
+            primary: Some(Color::srgb(0.8, 0.2, 0.4)),
         })
     );
 }

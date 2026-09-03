@@ -1,4 +1,4 @@
-use argui_core::{Color, Point, Rect, Size, Transform2D, TransformOrigin};
+use argui_core::{Color, ColorInterpolation, Point, Rect, Size, Transform2D, TransformOrigin};
 
 /// Produces a value between two typed endpoints.
 pub trait Interpolate: Sized {
@@ -29,14 +29,7 @@ impl<const N: usize> Interpolate for [f32; N] {
 
 impl Interpolate for Color {
     fn interpolate(self, target: Self, progress: f32) -> Self {
-        let from = self.as_array();
-        let to = target.as_array();
-        Self::rgba(
-            from[0].interpolate(to[0], progress),
-            from[1].interpolate(to[1], progress),
-            from[2].interpolate(to[2], progress),
-            from[3].interpolate(to[3], progress),
-        )
+        self.mix(target, progress, ColorInterpolation::Oklab)
     }
 }
 

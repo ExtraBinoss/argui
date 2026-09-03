@@ -11,7 +11,7 @@ use argui_widgets::{
 
 #[test]
 fn button_exposes_variants_content_and_busy_state() {
-    let theme = shadcn(Color::rgb(0.2, 0.5, 0.9));
+    let theme = shadcn(Color::srgb(0.2, 0.5, 0.9));
     let theme = theme.resolve(ColorScheme::Dark);
     let assets = WidgetAssets::tabler(theme.foreground);
     let button = Button::new("save", "Save", theme.button.clone())
@@ -50,7 +50,7 @@ fn button_exposes_variants_content_and_busy_state() {
 
 #[test]
 fn button_focus_style_is_explicitly_opt_in() {
-    let paint = PaintStyle::new(QuadStyle::solid(Color::rgb(0.0, 0.0, 0.0)));
+    let paint = PaintStyle::new(QuadStyle::solid(Color::srgb(0.0, 0.0, 0.0)));
     let default = ButtonStyle::new(paint.clone(), TextStyle::default());
     assert!(default.focused.is_none());
 
@@ -61,7 +61,7 @@ fn button_focus_style_is_explicitly_opt_in() {
 
 #[test]
 fn button_hover_uses_the_shared_retained_visual_state_path() {
-    let resting = QuadStyle::solid(Color::rgb(0.0, 0.0, 0.0));
+    let resting = QuadStyle::solid(Color::srgb(0.0, 0.0, 0.0));
     let hovered = QuadStyle::solid(Color::WHITE);
     let element = Button::new(
         "save",

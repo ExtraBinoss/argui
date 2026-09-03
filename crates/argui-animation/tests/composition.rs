@@ -39,8 +39,8 @@ fn geometry_and_color_support_additive_composition() {
         Rect::new(Point::new(3.0, 5.0), Size::new(7.0, 9.0))
     );
     assert_eq!(
-        Color::rgba(0.1, 0.2, 0.3, 0.4).scale(2.0),
-        Color::rgba(0.2, 0.4, 0.6, 0.8)
+        Color::linear_rgba(0.1, 0.2, 0.3, 0.4).scale(2.0),
+        Color::linear_rgba(0.2, 0.4, 0.6, 0.8)
     );
     assert_eq!(2.0_f64.scale(2.5), 5.0);
 }

@@ -90,9 +90,9 @@ impl<const N: usize> Compose for [f32; N] {
 
 impl Compose for Color {
     fn add(self, contribution: Self) -> Self {
-        let left = self.as_array();
-        let right = contribution.as_array();
-        Self::rgba(
+        let left = self.to_linear_rgba();
+        let right = contribution.to_linear_rgba();
+        Self::linear_rgba(
             left[0] + right[0],
             left[1] + right[1],
             left[2] + right[2],
@@ -101,8 +101,8 @@ impl Compose for Color {
     }
 
     fn scale(self, factor: f32) -> Self {
-        let value = self.as_array();
-        Self::rgba(
+        let value = self.to_linear_rgba();
+        Self::linear_rgba(
             value[0] * factor,
             value[1] * factor,
             value[2] * factor,

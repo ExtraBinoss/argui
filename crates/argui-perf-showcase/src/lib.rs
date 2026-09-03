@@ -47,7 +47,7 @@ impl Render for PerfShowcase {
                 self.renders, counter_renders, fixed_renders, variable_renders
             ))
             .keyed("perf-hud")
-            .text_style(text(15.0, TextColor::rgb(0.48, 0.88, 0.68), 650)),
+            .text_style(text(15.0, TextColor::srgb(0.48, 0.88, 0.68), 650)),
             cx.entity(&self.counter),
             cx.entity(&self.fixed),
             cx.entity(&self.variable),
@@ -56,7 +56,7 @@ impl Render for PerfShowcase {
         .gap(18.0)
         .width(percent(1.0))
         .height(percent(1.0))
-        .background(Color::rgb(0.035, 0.045, 0.065))
+        .background(Color::srgb(0.035, 0.045, 0.065))
         .overflow(Axes {
             x: Overflow::Hidden,
             y: Overflow::Auto,
@@ -135,7 +135,7 @@ impl Render for CounterLab {
             Element::text(format!("value={} (only this entity changes)", self.value))
                 .keyed("perf-counter")
                 .padding(sides(14.0, 9.0))
-                .background(Color::rgb(0.12, 0.36, 0.28))
+                .background(Color::srgb(0.12, 0.36, 0.28))
                 .radius(CornerRadii::all(9.0)),
         ])
     }
@@ -200,7 +200,7 @@ impl Render for VariableListLab {
             Element::text("Measure a visible row")
                 .keyed("perf-measure-variable")
                 .padding(sides(12.0, 8.0))
-                .background(Color::rgb(0.20, 0.35, 0.58))
+                .background(Color::srgb(0.20, 0.35, 0.58))
                 .radius(CornerRadii::all(8.0)),
             self.list.build("perf-million-variable", self.offset, row),
         ])
@@ -211,15 +211,15 @@ fn row(index: usize) -> Element {
     Element::text(format!("row {index:07}"))
         .keyed(format!("perf-row-{index}"))
         .padding(sides(10.0, 4.0))
-        .text_style(text(14.0, TextColor::rgb(0.76, 0.82, 0.91), 500))
+        .text_style(text(14.0, TextColor::srgb(0.76, 0.82, 0.91), 500))
 }
 
 fn panel(children: impl IntoIterator<Item = Element>) -> Element {
     Element::column(children)
         .padding(Sides::length(16.0))
         .gap(10.0)
-        .background(Color::rgb(0.07, 0.085, 0.12))
-        .border(Border::all(1.0, Color::rgb(0.16, 0.20, 0.28)))
+        .background(Color::srgb(0.07, 0.085, 0.12))
+        .border(Border::all(1.0, Color::srgb(0.16, 0.20, 0.28)))
         .radius(CornerRadii::all(14.0))
 }
 

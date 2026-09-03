@@ -20,7 +20,7 @@ fn effect() -> LayerStyle {
 #[test]
 fn plain_elements_keep_one_combined_quad_and_no_layers() {
     let root = Element::text("Fast path")
-        .background(Color::rgb(0.1, 0.2, 0.3))
+        .background(Color::srgb(0.1, 0.2, 0.3))
         .border(Border::all(2.0, Color::WHITE));
     let mut ui = UiTree::new(root);
     let output = LayoutEngine::new()
@@ -70,7 +70,7 @@ fn paint_only_text_color_updates_without_reshaping() {
         .interaction(Interaction::default())
         .when(
             VisualState::Hovered,
-            StylePatch::new().set(property::TextColor, Color::rgb(0.9, 0.2, 0.3)),
+            StylePatch::new().set(property::TextColor, Color::srgb(0.9, 0.2, 0.3)),
         );
     let mut ui = UiTree::new(root);
     let mut layout = LayoutEngine::new();
@@ -86,14 +86,14 @@ fn paint_only_text_color_updates_without_reshaping() {
     assert_eq!(output.text.blocks()[0].bounds, bounds);
     assert_eq!(
         output.text.blocks()[0].style.color,
-        Color::rgb(0.9, 0.2, 0.3)
+        Color::srgb(0.9, 0.2, 0.3)
     );
 }
 
 #[test]
 fn background_border_and_text_scopes_wrap_only_their_primitive() {
     let root = Element::text("Scoped")
-        .background(Color::rgb(0.1, 0.2, 0.3))
+        .background(Color::srgb(0.1, 0.2, 0.3))
         .border(Border::all(2.0, Color::WHITE))
         .radius(CornerRadii::all(8.0))
         .background_effect(effect())
@@ -226,7 +226,7 @@ fn disabled_interactions_keep_cursor_hit_geometry_but_reject_input() {
 fn vectors_lower_to_the_shared_clipped_transformed_display_list() {
     let vector = Element::vector(VectorId(7))
         .vector_fit(ImageFit::Contain)
-        .vector_color(Color::rgb(0.2, 0.4, 0.6))
+        .vector_color(Color::srgb(0.2, 0.4, 0.6))
         .paint_opacity(0.6)
         .width(length(24.0))
         .height(length(24.0));
@@ -247,7 +247,7 @@ fn vectors_lower_to_the_shared_clipped_transformed_display_list() {
     };
     assert_eq!(vector.vector, VectorId(7));
     assert_eq!(vector.fit, ImageFit::Contain);
-    assert_eq!(vector.color, Color::rgb(0.2, 0.4, 0.6));
+    assert_eq!(vector.color, Color::srgb(0.2, 0.4, 0.6));
     assert_eq!(vector.opacity, 0.6);
     assert_eq!(vector.clips.regions().len(), 2);
 }

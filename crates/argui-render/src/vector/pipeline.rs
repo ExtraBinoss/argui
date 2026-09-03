@@ -61,7 +61,7 @@ impl VectorInstance {
         Self {
             rect,
             uv,
-            color: vector.color.as_array(),
+            color: vector.color.to_linear_rgba(),
             transform_a: transform.matrix,
             transform_b: [transform.translation.x, transform.translation.y, 0.0, 0.0],
             params: [vector.opacity, f32::from(tintable), 0.0, 0.0],

@@ -61,19 +61,54 @@ fn edge_coverage(distance: f32) -> f32 {
     return clamp(0.5 - distance / pixel_width, 0.0, 1.0);
 }
 
+fn srgb_to_linear(value: vec3<f32>) -> vec3<f32> {
+    let magnitude = abs(value);
+    let converted = select(
+        magnitude / 12.92,
+        pow((magnitude + vec3<f32>(0.055)) / 1.055, vec3<f32>(2.4)),
+        magnitude > vec3<f32>(0.04045),
+    );
+    return sign(value) * converted;
+}
+
+fn oklab_to_linear_srgb(value: vec3<f32>) -> vec3<f32> {
+    let lms = vec3<f32>(
+        value.x + 0.39633778 * value.y + 0.21580376 * value.z,
+        value.x - 0.105561346 * value.y - 0.06385417 * value.z,
+        value.x - 0.08948418 * value.y - 1.2914855 * value.z,
+    );
+    let cubed = lms * lms * lms;
+    return vec3<f32>(
+        4.0767417 * cubed.x - 3.3077116 * cubed.y + 0.23096994 * cubed.z,
+        -1.268438 * cubed.x + 2.6097574 * cubed.y - 0.34131938 * cubed.z,
+        -0.0041960863 * cubed.x - 0.7034186 * cubed.y + 1.7076147 * cubed.z,
+    );
+}
+
+fn gradient_to_linear(color: vec4<f32>, mode: u32) -> vec4<f32> {
+    if color.a <= 0.000001 { return vec4<f32>(0.0); }
+    let straight = color.rgb / color.a;
+    if mode == 0u { return vec4<f32>(oklab_to_linear_srgb(straight), color.a); }
+    if mode == 2u { return vec4<f32>(srgb_to_linear(straight), color.a); }
+    return vec4<f32>(straight, color.a);
+}
+
 fn gradient_color(quad: Quad, value: f32) -> vec4<f32> {
     let start = quad.gradient_meta.x;
     let count = quad.gradient_meta.y;
-    if value <= gradient_stops[start].offset.x { return gradient_stops[start].color; }
+    if value <= gradient_stops[start].offset.x {
+        return gradient_to_linear(gradient_stops[start].color, quad.gradient_meta.z);
+    }
     for (var index = 1u; index < count; index++) {
         let upper = gradient_stops[start + index].offset.x;
         if value <= upper {
             let lower = gradient_stops[start + index - 1u].offset.x;
             let progress = clamp((value - lower) / max(upper - lower, 0.00001), 0.0, 1.0);
-            return mix(gradient_stops[start + index - 1u].color, gradient_stops[start + index].color, progress);
+            let color = mix(gradient_stops[start + index - 1u].color, gradient_stops[start + index].color, progress);
+            return gradient_to_linear(color, quad.gradient_meta.z);
         }
     }
-    return gradient_stops[start + count - 1u].color;
+    return gradient_to_linear(gradient_stops[start + count - 1u].color, quad.gradient_meta.z);
 }
 
 fn fill_color(quad: Quad, local: vec2<f32>) -> vec4<f32> {

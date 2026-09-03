@@ -40,15 +40,17 @@ impl StateShowcase {
         let linear = LinearGradient::with_stops(
             Point::new(0.0, 0.0),
             Point::new(1.0, 1.0),
+            argui_paint::ColorInterpolation::Oklab,
             many_stops(accent),
         );
         let radial = RadialGradient::new(
             Point::new(0.35, 0.3),
             Point::new(0.7, 0.8),
+            argui_paint::ColorInterpolation::Oklab,
             [
                 GradientStop::new(0.0, Color::WHITE),
                 GradientStop::new(0.25, accent),
-                GradientStop::new(1.0, Color::rgb(0.03, 0.05, 0.12)),
+                GradientStop::new(1.0, Color::srgb(0.03, 0.05, 0.12)),
             ],
         )
         .expect("showcase gradient is valid");
@@ -112,18 +114,18 @@ impl StateShowcase {
 
 fn many_stops(accent: Color) -> GradientStops {
     let colors = [
-        Color::rgb(0.05, 0.25, 0.88),
-        Color::rgb(0.05, 0.65, 0.98),
+        Color::srgb(0.05, 0.25, 0.88),
+        Color::srgb(0.05, 0.65, 0.98),
         accent,
-        Color::rgb(0.18, 0.88, 0.72),
-        Color::rgb(0.70, 0.92, 0.20),
-        Color::rgb(1.0, 0.70, 0.10),
-        Color::rgb(1.0, 0.32, 0.12),
-        Color::rgb(0.92, 0.14, 0.45),
-        Color::rgb(0.68, 0.18, 0.92),
-        Color::rgb(0.35, 0.20, 0.95),
-        Color::rgb(0.12, 0.42, 0.95),
-        Color::rgb(0.05, 0.25, 0.88),
+        Color::srgb(0.18, 0.88, 0.72),
+        Color::srgb(0.70, 0.92, 0.20),
+        Color::srgb(1.0, 0.70, 0.10),
+        Color::srgb(1.0, 0.32, 0.12),
+        Color::srgb(0.92, 0.14, 0.45),
+        Color::srgb(0.68, 0.18, 0.92),
+        Color::srgb(0.35, 0.20, 0.95),
+        Color::srgb(0.12, 0.42, 0.95),
+        Color::srgb(0.05, 0.25, 0.88),
     ];
     let last = (colors.len() - 1) as f32;
     GradientStops::from_vec(

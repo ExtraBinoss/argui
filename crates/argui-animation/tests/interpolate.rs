@@ -1,5 +1,5 @@
 use argui_animation::Interpolate;
-use argui_core::{Color, Point, Rect, Size};
+use argui_core::{Color, ColorInterpolation, Point, Rect, Size};
 
 #[test]
 fn scalar_interpolation_supports_endpoints_and_extrapolation() {
@@ -10,11 +10,12 @@ fn scalar_interpolation_supports_endpoints_and_extrapolation() {
 }
 
 #[test]
-fn core_visual_types_interpolate_component_wise() {
-    let color = Color::rgba(0.0, 0.2, 0.4, 0.6).interpolate(Color::rgba(1.0, 0.6, 0.8, 1.0), 0.5);
-    for (actual, expected) in color.as_array().into_iter().zip([0.5, 0.4, 0.6, 0.8]) {
-        assert!((actual - expected).abs() < f32::EPSILON * 2.0);
-    }
+fn core_visual_types_use_perceptual_color_interpolation() {
+    let from = Color::srgba(0.0, 0.2, 0.4, 0.6);
+    let target = Color::srgba(1.0, 0.6, 0.8, 1.0);
+    let color = from.interpolate(target, 0.5);
+    assert_eq!(color, from.mix(target, 0.5, ColorInterpolation::Oklab));
+    assert!((color.to_linear_rgba()[3] - 0.8).abs() < f32::EPSILON * 2.0);
     assert_eq!(
         Point::new(0.0, 10.0).interpolate(Point::new(10.0, 30.0), 0.5),
         Point::new(5.0, 20.0)

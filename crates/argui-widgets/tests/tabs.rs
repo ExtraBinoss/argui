@@ -9,7 +9,7 @@ fn click(key: &str) -> UiEvent {
 
 #[test]
 fn tabs_mount_only_the_selected_panel_and_decode_selection() {
-    let themes = shadcn(Color::rgb(0.2, 0.5, 0.9));
+    let themes = shadcn(Color::srgb(0.2, 0.5, 0.9));
     let tabs = Tabs::new(
         "settings",
         [

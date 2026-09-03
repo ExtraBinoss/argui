@@ -394,7 +394,7 @@ fn frame_bar(frame: &FrameRecord, theme: &WidgetTheme) -> Element {
         .height(length((milliseconds * 3.0).clamp(2.0, 94.0) as f32))
         .shrink(0.0)
         .background(if missed {
-            Color::rgb(1.0, 0.28, 0.24)
+            Color::srgb(1.0, 0.28, 0.24)
         } else {
             theme.primary
         })
@@ -576,9 +576,9 @@ fn text(size: f32, color: TextColor) -> TextStyle {
 
 fn scrollbar() -> ScrollbarStyle {
     ScrollbarStyle::new(
-        ScrollbarPartStyle::new(QuadStyle::solid(Color::rgba(0.0, 0.0, 0.0, 0.18))),
+        ScrollbarPartStyle::new(QuadStyle::solid(Color::srgba(0.0, 0.0, 0.0, 0.18))),
         ScrollbarPartStyle::new(
-            QuadStyle::solid(Color::rgb(0.30, 0.38, 0.48)).radius(CornerRadii::all(4.0)),
+            QuadStyle::solid(Color::srgb(0.30, 0.38, 0.48)).radius(CornerRadii::all(4.0)),
         ),
     )
     .width(8.0)

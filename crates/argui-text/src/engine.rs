@@ -398,7 +398,7 @@ fn letter_spacing(value: LetterSpacing, font_size: f32) -> f32 {
 }
 
 fn cosmic_color(value: argui_core::Color) -> Color {
-    let [r, g, b, a] = value.as_array();
+    let [r, g, b, a] = value.to_linear_rgba();
     let channel = |value: f32| (value.clamp(0.0, 1.0) * 255.0).round() as u8;
     Color::rgba(channel(r), channel(g), channel(b), channel(a))
 }

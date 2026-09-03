@@ -41,7 +41,7 @@ impl Dialog {
                     .absolute(Sides::length(0.0))
                     .width(percent(1.0))
                     .height(percent(1.0))
-                    .background(argui_core::Color::rgba(0.0, 0.0, 0.0, 0.52)),
+                    .background(argui_core::Color::srgba(0.0, 0.0, 0.0, 0.52)),
             );
             let panel = behavior.decorate(
                 DialogPart::Panel,

@@ -132,7 +132,7 @@ fn custom_effect_bindings_preserve_parameter_types() {
         )
         .bind(
             property::effect_color(EFFECT, "tint"),
-            Motion::new(Color::rgba(0.1, 0.2, 0.3, 0.4)),
+            Motion::new(Color::srgba(0.1, 0.2, 0.3, 0.4)),
         );
     let tree = UiTree::new(element.clone());
     let resolved = tree.resolved_layer(tree.node_ids()[0], &element, &layer);
@@ -153,7 +153,7 @@ fn custom_effect_bindings_preserve_parameter_types() {
             &EffectValue::Vec4([4.0, 5.0, 6.0, 7.0]),
             &EffectValue::Mat3([3.0; 9]),
             &EffectValue::Mat4([4.0; 16]),
-            &EffectValue::Color(Color::rgba(0.1, 0.2, 0.3, 0.4)),
+            &EffectValue::Color(Color::srgba(0.1, 0.2, 0.3, 0.4)),
         ]
     );
 }
@@ -303,8 +303,9 @@ fn paint_bindings_resolve_borders_radii_and_gradient_components() {
     let linear = LinearGradient::new(
         Point::new(0.0, 0.0),
         Point::new(1.0, 0.0),
+        argui_paint::ColorInterpolation::Oklab,
         [
-            GradientStop::new(0.0, Color::rgb(0.0, 0.0, 0.0)),
+            GradientStop::new(0.0, Color::srgb(0.0, 0.0, 0.0)),
             GradientStop::new(1.0, Color::WHITE),
         ],
     )
@@ -324,12 +325,12 @@ fn paint_bindings_resolve_borders_radii_and_gradient_components() {
         .bind(property::gradient_stop_offset(1), Motion::new(0.9_f32))
         .bind(
             property::gradient_stop_color(0),
-            Motion::new(Color::rgb(0.2, 0.4, 0.6)),
+            Motion::new(Color::srgb(0.2, 0.4, 0.6)),
         )
         .bind(property::BorderWidths, Motion::new([3.0, 4.0, 5.0, 6.0]))
         .bind(
             property::BorderColor,
-            Motion::new(Color::rgb(0.8, 0.1, 0.2)),
+            Motion::new(Color::srgb(0.8, 0.1, 0.2)),
         )
         .bind(property::CornerRadii, Motion::new([7.0, 8.0, 9.0, 10.0]));
     let tree = UiTree::new(element.clone());
@@ -343,11 +344,11 @@ fn paint_bindings_resolve_borders_radii_and_gradient_components() {
     assert_eq!(gradient.stops.as_slice()[1].offset, 0.9);
     assert_eq!(
         gradient.stops.as_slice()[0].color,
-        Color::rgb(0.2, 0.4, 0.6)
+        Color::srgb(0.2, 0.4, 0.6)
     );
     let border = resolved.border.unwrap();
     assert_eq!(border.widths.as_array(), [3.0, 4.0, 5.0, 6.0]);
-    assert_eq!(border.color, Color::rgb(0.8, 0.1, 0.2));
+    assert_eq!(border.color, Color::srgb(0.8, 0.1, 0.2));
     assert_eq!(resolved.radii.as_array(), [7.0, 8.0, 9.0, 10.0]);
 }
 
@@ -356,16 +357,17 @@ fn radial_and_layer_bindings_resolve_masks_and_indexed_shadows() {
     let radial = RadialGradient::new(
         Point::new(0.5, 0.5),
         Point::new(0.5, 0.5),
+        argui_paint::ColorInterpolation::Oklab,
         [
             GradientStop::new(0.0, Color::WHITE),
-            GradientStop::new(1.0, Color::rgb(0.0, 0.0, 0.0)),
+            GradientStop::new(1.0, Color::srgb(0.0, 0.0, 0.0)),
         ],
     )
     .unwrap();
     let layer = LayerStyle::new(Rect::default())
         .opacity(0.9)
         .mask(LayerMask::Rounded(CornerRadii::all(2.0)))
-        .shadow(Shadow::drop([1.0, 2.0], 3.0, Color::rgb(0.0, 0.0, 0.0)));
+        .shadow(Shadow::drop([1.0, 2.0], 3.0, Color::srgb(0.0, 0.0, 0.0)));
     let element = Element::container([])
         .fill(Fill::Radial(radial))
         .layer(layer.clone())
@@ -384,7 +386,7 @@ fn radial_and_layer_bindings_resolve_masks_and_indexed_shadows() {
         .bind(property::shadow_spread(0), Motion::new(11.0_f32))
         .bind(
             property::shadow_color(0),
-            Motion::new(Color::rgb(0.3, 0.4, 0.5)),
+            Motion::new(Color::srgb(0.3, 0.4, 0.5)),
         );
     let tree = UiTree::new(element.clone());
     let quad = tree.resolved_quad(tree.node_ids()[0], &element);
@@ -408,5 +410,5 @@ fn radial_and_layer_bindings_resolve_masks_and_indexed_shadows() {
     assert_eq!(resolved.shadows[0].offset, [8.0, 9.0]);
     assert_eq!(resolved.shadows[0].blur, 10.0);
     assert_eq!(resolved.shadows[0].spread, 11.0);
-    assert_eq!(resolved.shadows[0].color, Color::rgb(0.3, 0.4, 0.5));
+    assert_eq!(resolved.shadows[0].color, Color::srgb(0.3, 0.4, 0.5));
 }

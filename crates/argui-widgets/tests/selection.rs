@@ -12,7 +12,7 @@ fn click(key: &str) -> UiEvent {
 
 #[test]
 fn boolean_and_exclusive_controls_publish_controlled_state() {
-    let themes = shadcn(Color::rgb(0.2, 0.5, 0.9));
+    let themes = shadcn(Color::srgb(0.2, 0.5, 0.9));
     let theme = themes.resolve(ColorScheme::Dark);
     let check = Checkbox::new("metrics", "Metrics", true).build(theme);
     assert_eq!(check.user_select, UserSelect::None);

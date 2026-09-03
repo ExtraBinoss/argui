@@ -449,9 +449,9 @@ fn push_caret_quad(
 }
 
 fn tinted(color: Color, tint: Color) -> Color {
-    let color = color.as_array();
-    let tint = tint.as_array();
-    Color::rgba(
+    let color = color.to_linear_rgba();
+    let tint = tint.to_linear_rgba();
+    Color::linear_rgba(
         color[0] * tint[0],
         color[1] * tint[1],
         color[2] * tint[2],

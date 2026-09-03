@@ -15,7 +15,7 @@ use super::{
 fn fully_styled() -> Element {
     Element::container([])
         .background(Color::WHITE)
-        .border(Border::all(1.0, Color::rgb(0.0, 0.0, 0.0)))
+        .border(Border::all(1.0, Color::srgb(0.0, 0.0, 0.0)))
         .paint_opacity(0.5)
         .overflow(Axes {
             x: Overflow::Hidden,
@@ -148,7 +148,7 @@ fn inspector_serializes_and_applies_every_filter_parameter() {
             .cloned()
             .fold(LayerStyle::new(Rect::default()), LayerStyle::filter)
             .backdrop(Filter::Blur(1.0))
-            .shadow(Shadow::drop([1.0, 1.0], 1.0, Color::rgb(0.1, 0.2, 0.3)).spread(1.0)),
+            .shadow(Shadow::drop([1.0, 1.0], 1.0, Color::srgb(0.1, 0.2, 0.3)).spread(1.0)),
     );
     let StyleValue::Parameters(mut fields) = property_value(&element, StyleProperty::Layer) else {
         panic!("layer properties stay numeric and editable");
@@ -186,7 +186,7 @@ fn inspector_serializes_and_applies_every_filter_parameter() {
                 && value.parameters[7].value == EffectValue::Vec4([2.0; 4])
                 && value.parameters[8].value == EffectValue::Mat3([2.0; 9])
                 && value.parameters[9].value == EffectValue::Mat4([2.0; 16])
-                && value.parameters[10].value == EffectValue::Color(Color::rgba(2.0, 2.0, 2.0, 2.0))
+                && value.parameters[10].value == EffectValue::Color(Color::srgba(2.0, 2.0, 2.0, 2.0))
     ));
     assert_eq!(layer.shadows[0].offset, [2.0, 2.0]);
 
@@ -201,11 +201,23 @@ fn inspector_serializes_and_applies_every_filter_parameter() {
 #[test]
 fn inspector_describes_gradient_and_absent_paints_and_clamps_lengths() {
     let stops = [
-        GradientStop::new(0.0, Color::rgb(0.0, 0.0, 0.0)),
+        GradientStop::new(0.0, Color::srgb(0.0, 0.0, 0.0)),
         GradientStop::new(1.0, Color::WHITE),
     ];
-    let linear = LinearGradient::new(Point::default(), Point::new(1.0, 0.0), stops).unwrap();
-    let radial = RadialGradient::new(Point::default(), Point::new(1.0, 1.0), stops).unwrap();
+    let linear = LinearGradient::new(
+        Point::default(),
+        Point::new(1.0, 0.0),
+        argui_paint::ColorInterpolation::Oklab,
+        stops,
+    )
+    .unwrap();
+    let radial = RadialGradient::new(
+        Point::default(),
+        Point::new(1.0, 1.0),
+        argui_paint::ColorInterpolation::Oklab,
+        stops,
+    )
+    .unwrap();
     let mut element = Element::container([]);
     assert_eq!(
         property_value(&element, StyleProperty::Background),
@@ -248,11 +260,11 @@ fn primitive_and_optional_property_edits_cover_present_and_absent_targets() {
     apply_property_value(
         &mut element,
         StyleProperty::Background,
-        &StyleValue::Color([0.1, 0.2, 0.3, 0.4]),
+        &StyleValue::Srgba([0.1, 0.2, 0.3, 0.4]),
     );
     assert_eq!(
         element.paint.quad.background,
-        Some(Fill::Solid(Color::rgba(0.1, 0.2, 0.3, 0.4)))
+        Some(Fill::Solid(Color::srgba(0.1, 0.2, 0.3, 0.4)))
     );
 
     let border = property_value(&element, StyleProperty::Border);

@@ -15,7 +15,7 @@ fn rust_builders_form_the_future_dsl_lowering_target() {
             weight: 700,
             ..TextStyle::default()
         })])
-    .background(Color::rgb(0.1, 0.2, 0.3))
+    .background(Color::srgb(0.1, 0.2, 0.3))
     .border(Border::all(2.0, Color::WHITE))
     .radius(CornerRadii::all(8.0))
     .paint_opacity(0.9)
@@ -43,13 +43,13 @@ fn rust_builders_form_the_future_dsl_lowering_target() {
 fn vector_builder_keeps_fit_and_tint() {
     let element = Element::vector(VectorId(9))
         .vector_fit(argui_ui::ImageFit::Contain)
-        .vector_color(argui_ui::Color::rgb(0.2, 0.4, 0.6));
+        .vector_color(argui_ui::Color::srgb(0.2, 0.4, 0.6));
     assert_eq!(
         element.kind,
         ElementKind::Vector {
             vector: VectorId(9),
             fit: argui_ui::ImageFit::Contain,
-            color: argui_ui::Color::rgb(0.2, 0.4, 0.6),
+            color: argui_ui::Color::srgb(0.2, 0.4, 0.6),
         }
     );
 }
@@ -60,7 +60,9 @@ fn vector_tint_is_a_paint_only_update() {
     let node = tree.node_id_at(0);
     tree.mark_layout_clean();
     assert_eq!(
-        tree.update(Element::vector(VectorId(9)).vector_color(argui_ui::Color::rgb(0.5, 0.5, 0.5))),
+        tree.update(
+            Element::vector(VectorId(9)).vector_color(argui_ui::Color::srgb(0.5, 0.5, 0.5))
+        ),
         TreeUpdate::Paint
     );
     assert_eq!(tree.node_id_at(0), node);
@@ -71,14 +73,14 @@ fn vector_tint_is_a_paint_only_update() {
 fn tree_updates_distinguish_paint_from_layout() {
     let base = Element::container([])
         .keyed("panel")
-        .background(Color::rgb(0.1, 0.2, 0.3));
+        .background(Color::srgb(0.1, 0.2, 0.3));
     let mut tree = UiTree::new(base.clone());
     tree.mark_layout_clean();
     let revision = tree.revision();
     let node = tree.node_id_at(0);
 
     assert_eq!(
-        tree.update(base.clone().background(Color::rgb(0.3, 0.2, 0.1))),
+        tree.update(base.clone().background(Color::srgb(0.3, 0.2, 0.1))),
         TreeUpdate::Paint
     );
     assert_eq!(tree.revision(), revision);

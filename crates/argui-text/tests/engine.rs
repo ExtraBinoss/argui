@@ -179,8 +179,8 @@ fn embedded_emoji_fallback_rasterizes_without_system_fonts() {
 fn rich_spans_keep_per_run_color_metrics_and_decorations() {
     let mut engine =
         TextEngine::from_embedded_fonts([NOTO_SANS], "Noto Sans", "Noto Sans", "Noto Sans");
-    let red = argui_core::Color::rgb(1.0, 0.0, 0.0);
-    let green = argui_core::Color::rgb(0.0, 1.0, 0.0);
+    let red = argui_core::Color::srgb(1.0, 0.0, 0.0);
+    let green = argui_core::Color::srgb(0.0, 1.0, 0.0);
     let content = TextContent::rich([
         TextSpan::new("rich ").style(
             TextSpanStyle::default()

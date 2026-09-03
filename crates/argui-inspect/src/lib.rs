@@ -75,7 +75,7 @@ pub struct StyleField {
 pub enum StyleValue {
     Length(StyleLength),
     Number(f32),
-    Color([f32; 4]),
+    Srgba([f32; 4]),
     Parameters(Vec<StyleField>),
     Choice(String),
     Summary(String),
@@ -102,7 +102,7 @@ impl StyleValue {
                 label: "value".into(),
                 value: *value,
             }],
-            Self::Color(values) => ["r", "g", "b", "a"]
+            Self::Srgba(values) => ["r", "g", "b", "a"]
                 .into_iter()
                 .zip(values)
                 .map(|(label, value)| StyleField {
@@ -129,7 +129,7 @@ impl StyleValue {
                 *current = value;
                 true
             }
-            Self::Color(values) => values.get_mut(index).is_some_and(|current| {
+            Self::Srgba(values) => values.get_mut(index).is_some_and(|current| {
                 *current = value.clamp(0.0, 1.0);
                 true
             }),
@@ -150,8 +150,8 @@ impl StyleValue {
                 StyleUnit::Percent => format!("{:.2}%", length.value * 100.0),
             },
             Self::Number(value) => format!("{value:.3}"),
-            Self::Color([red, green, blue, alpha]) => {
-                format!("rgba({red:.3}, {green:.3}, {blue:.3}, {alpha:.3})")
+            Self::Srgba([red, green, blue, alpha]) => {
+                format!("srgba({red:.3}, {green:.3}, {blue:.3}, {alpha:.3})")
             }
             Self::Parameters(fields) => format!("{} parameters", fields.len()),
             Self::Choice(value) | Self::Summary(value) => value.clone(),

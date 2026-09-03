@@ -3,7 +3,7 @@ use std::sync::{
     atomic::{AtomicU64, Ordering},
 };
 
-use argui_core::{Affine2D, Color, Point, Rect};
+use argui_core::{Affine2D, Color, ColorInterpolation, Point, Rect};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct GradientStop {
@@ -85,6 +85,7 @@ pub struct LinearGradient {
     /// Relative coordinates where `(0, 0)` is the top-left of the primitive.
     pub start: Point,
     pub end: Point,
+    pub interpolation: ColorInterpolation,
     pub stops: GradientStops,
 }
 
@@ -92,13 +93,29 @@ impl LinearGradient {
     pub fn new<const N: usize>(
         start: Point,
         end: Point,
+        interpolation: ColorInterpolation,
         stops: [GradientStop; N],
     ) -> Result<Self, GradientError> {
-        Ok(Self::with_stops(start, end, GradientStops::new(stops)?))
+        Ok(Self::with_stops(
+            start,
+            end,
+            interpolation,
+            GradientStops::new(stops)?,
+        ))
     }
 
-    pub fn with_stops(start: Point, end: Point, stops: GradientStops) -> Self {
-        Self { start, end, stops }
+    pub fn with_stops(
+        start: Point,
+        end: Point,
+        interpolation: ColorInterpolation,
+        stops: GradientStops,
+    ) -> Self {
+        Self {
+            start,
+            end,
+            interpolation,
+            stops,
+        }
     }
 }
 
@@ -107,6 +124,7 @@ pub struct RadialGradient {
     /// Relative center and radii, allowing circular or elliptical gradients.
     pub center: Point,
     pub radius: Point,
+    pub interpolation: ColorInterpolation,
     pub stops: GradientStops,
 }
 
@@ -114,15 +132,27 @@ impl RadialGradient {
     pub fn new<const N: usize>(
         center: Point,
         radius: Point,
+        interpolation: ColorInterpolation,
         stops: [GradientStop; N],
     ) -> Result<Self, GradientError> {
-        Ok(Self::with_stops(center, radius, GradientStops::new(stops)?))
+        Ok(Self::with_stops(
+            center,
+            radius,
+            interpolation,
+            GradientStops::new(stops)?,
+        ))
     }
 
-    pub fn with_stops(center: Point, radius: Point, stops: GradientStops) -> Self {
+    pub fn with_stops(
+        center: Point,
+        radius: Point,
+        interpolation: ColorInterpolation,
+        stops: GradientStops,
+    ) -> Self {
         Self {
             center,
             radius,
+            interpolation,
             stops,
         }
     }

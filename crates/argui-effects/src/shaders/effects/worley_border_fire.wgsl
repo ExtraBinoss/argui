@@ -46,10 +46,10 @@ fn worley_fbm(position: vec2<f32>, phase: f32) -> f32 {
 }
 
 fn fire_palette(heat: f32) -> vec3<f32> {
-    let ember = vec3<f32>(0.24, 0.004, 0.015);
-    let red = vec3<f32>(0.95, 0.035, 0.005);
-    let orange = vec3<f32>(1.0, 0.34, 0.015);
-    let yellow = vec3<f32>(1.0, 0.94, 0.42);
+    let ember = argui_srgb_to_linear(vec3<f32>(0.24, 0.004, 0.015));
+    let red = argui_srgb_to_linear(vec3<f32>(0.95, 0.035, 0.005));
+    let orange = argui_srgb_to_linear(vec3<f32>(1.0, 0.34, 0.015));
+    let yellow = argui_srgb_to_linear(vec3<f32>(1.0, 0.94, 0.42));
     let low = mix(ember, red, smoothstep(0.0, 0.38, heat));
     let high = mix(orange, yellow, smoothstep(0.68, 1.0, heat));
     return mix(low, high, smoothstep(0.34, 0.76, heat));
@@ -81,6 +81,13 @@ fn argui_effect(
     let heat = smoothstep(0.18, 0.92, turbulence * radial_heat + radial_heat * 0.28);
     let alpha = outside * edge_fade * smoothstep(0.08, 0.46, heat)
         * clamp(argui_param_f32(1u), 0.0, 1.0);
-    let fire = vec4<f32>(fire_palette(heat) * alpha, alpha);
-    return fire + source * (1.0 - fire.a);
+    let output_alpha = alpha + source.a * (1.0 - alpha);
+    let premultiplied = fire_palette(heat) * alpha
+        + source.rgb * source.a * (1.0 - alpha);
+    let output_rgb = select(
+        vec3<f32>(0.0),
+        premultiplied / max(output_alpha, 0.000001),
+        output_alpha > 0.000001,
+    );
+    return vec4<f32>(output_rgb, output_alpha);
 }

@@ -29,12 +29,11 @@ pub(crate) fn render(
 ) -> Element {
     let behavior = behavior(gallery);
     let ratio = behavior.ratio();
-    let [red, green, blue, _] = theme.primary.as_array();
     let fill = Element::container([])
         .absolute(Sides::length(0.0))
         .width(percent(1.0))
         .height(percent(1.0))
-        .background(Color::rgba(red, green, blue, 0.28));
+        .background(theme.primary.with_alpha(0.28));
     let ticks = Element::row((0..9).map(|_| {
         Element::container([])
             .width(length(1.0))
