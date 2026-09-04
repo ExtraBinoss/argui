@@ -215,6 +215,29 @@ impl UiTree {
     }
 
     #[must_use]
+    pub fn resolve_node(&self, target: &crate::FocusTarget) -> Option<NodeId> {
+        match target {
+            crate::FocusTarget::Node(node) => self.node_ids.contains(node).then_some(*node),
+            crate::FocusTarget::Key(key) => self
+                .node_ids
+                .iter()
+                .copied()
+                .find(|node| self.key_for(*node) == Some(key.as_str())),
+        }
+    }
+
+    #[must_use]
+    pub fn parent_of(&self, node: NodeId) -> Option<NodeId> {
+        let index = self
+            .node_ids
+            .iter()
+            .position(|candidate| *candidate == node)?;
+        self.events
+            .parent(index)
+            .and_then(|parent| self.node_ids.get(parent).copied())
+    }
+
+    #[must_use]
     pub fn visual_states(&self, node: NodeId) -> crate::VisualStates {
         self.interaction.visual_states(node)
     }

@@ -1,5 +1,7 @@
-use argui_core::{Point, Rect, Size};
+use argui_core::{Rect, Size};
 use argui_ui::NodeId;
+
+pub use argui_ui::ScrollRequest;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct LayoutBounds {
@@ -12,12 +14,6 @@ pub struct LayoutBounds {
 pub struct LayoutSnapshot {
     pub viewport: Rect,
     pub nodes: Vec<LayoutBounds>,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct ScrollRequest {
-    pub key: String,
-    pub offset: Point,
 }
 
 impl LayoutSnapshot {

@@ -1,5 +1,7 @@
 use argui_core::ColorScheme;
-use argui_platform::{PlatformEvent, PreferenceOverrides, SystemPreferences};
+use argui_platform::{
+    PlatformEvent, PreferenceOverrides, PreferenceSource, ResolvedPreference, SystemPreferences,
+};
 use argui_ui::TreeUpdate;
 
 use crate::RuntimeEvent;
@@ -47,7 +49,47 @@ impl Application {
         }
     }
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
+    pub(super) fn initialize_preference_snapshot(
+        &mut self,
+        window_theme: Option<winit::window::Theme>,
+    ) {
+        self.system_color_scheme = window_theme.map(|theme| match theme {
+            winit::window::Theme::Light => ColorScheme::Light,
+            winit::window::Theme::Dark => ColorScheme::Dark,
+        });
+        let preferences =
+            self.resolve_preferences(SystemPreferences::detect(self.preference_overrides));
+        self.preferences = preferences;
+        self.environment.color_scheme = self
+            .theme_request
+            .color_scheme
+            .unwrap_or(preferences.color_scheme.value);
+        self.environment.reduced_motion = preferences.reduced_motion.value;
+        self.environment.high_contrast = preferences.high_contrast.value;
+    }
+
+    fn resolve_preferences(&self, mut preferences: SystemPreferences) -> SystemPreferences {
+        if self.preference_overrides.color_scheme.is_none()
+            && preferences.color_scheme.source == PreferenceSource::Default
+            && let Some(color_scheme) = self.system_color_scheme
+        {
+            preferences.color_scheme = ResolvedPreference {
+                value: color_scheme,
+                source: PreferenceSource::System,
+            };
+        }
+        preferences
+    }
+
     pub(super) fn apply_color_scheme(&mut self, color_scheme: ColorScheme) {
+        self.system_color_scheme = Some(color_scheme);
+        if self.preference_overrides.color_scheme.is_none() {
+            self.preferences.color_scheme = ResolvedPreference {
+                value: color_scheme,
+                source: PreferenceSource::System,
+            };
+        }
         if self.theme_request.color_scheme.is_some() {
             return;
         }
@@ -62,6 +104,7 @@ impl Application {
     }
 
     pub(super) fn apply_preferences(&mut self, preferences: SystemPreferences) {
+        let preferences = self.resolve_preferences(preferences);
         if self.preferences == preferences {
             return;
         }
@@ -120,7 +163,7 @@ mod tests {
     use argui_text::TextEngine;
     use argui_ui::{Element, UiTree};
 
-    use crate::RuntimeEvent;
+    use crate::{Context, Entity, Render, RuntimeEvent};
 
     use super::Application;
 
@@ -139,6 +182,63 @@ mod tests {
                 source: PreferenceSource::System,
             },
         }
+    }
+
+    struct EnvironmentView;
+
+    impl Render for EnvironmentView {
+        fn render(&mut self, cx: &mut Context<Self>) -> Element {
+            let key = match cx.environment().color_scheme {
+                ColorScheme::Light => "light",
+                ColorScheme::Dark => "dark",
+            };
+            Element::container([]).keyed(key)
+        }
+    }
+
+    #[test]
+    fn native_scheme_replaces_only_an_unresolved_platform_preference() {
+        let mut application = Application::new(
+            WindowConfig::default(),
+            RendererConfig::default(),
+            TextEngine::new(),
+            None,
+            None,
+            None,
+            |_| {},
+        );
+        application.system_color_scheme = Some(ColorScheme::Dark);
+
+        let resolved = application.resolve_preferences(SystemPreferences::default());
+        assert_eq!(resolved.color_scheme.value, ColorScheme::Dark);
+        assert_eq!(resolved.color_scheme.source, PreferenceSource::System);
+
+        let explicit = application.resolve_preferences(preferences());
+        assert_eq!(explicit.color_scheme, preferences().color_scheme);
+    }
+
+    #[test]
+    fn first_model_tree_uses_the_resolved_environment_directly() {
+        let mut application = Application::new(
+            WindowConfig::default(),
+            RendererConfig::default(),
+            TextEngine::new(),
+            None,
+            None,
+            Some(Entity::new(EnvironmentView).erase()),
+            |_| {},
+        );
+        application.environment.color_scheme = ColorScheme::Dark;
+
+        application.initialize_model_tree();
+
+        assert_eq!(
+            application
+                .ui_tree
+                .as_ref()
+                .and_then(|tree| tree.root().key.as_deref()),
+            Some("dark")
+        );
     }
 
     #[test]

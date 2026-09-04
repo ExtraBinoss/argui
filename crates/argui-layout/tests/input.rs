@@ -170,6 +170,7 @@ fn text_area_shapes_and_clips_scrollable_content_with_a_live_scrollbar() {
     assert_eq!(output.text.blocks()[0].clip, region.clip);
     assert!(scroll.max_offset.y > 0.0);
     let scrollbar = scroll.scrollbar.as_ref().unwrap();
+    let scrollbar = scrollbar.vertical.as_ref().unwrap();
     assert_eq!(scrollbar.track.origin.y, scroll.bounds.origin.y + 7.0);
     assert_eq!(
         scrollbar.track.origin.x + scrollbar.track.size.width,

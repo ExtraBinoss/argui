@@ -33,6 +33,8 @@ impl LayoutEngine {
                 } else {
                     self.repaint(ui, &mut output);
                 }
+                let root = self.root.as_ref().ok_or(LayoutError::MissingRoot)?;
+                self.scroll_anchors = crate::anchor::capture(root, &output);
                 ui.mark_layout_clean();
                 return Ok(output);
             }
@@ -113,11 +115,14 @@ impl LayoutEngine {
                 layout_parent: Point::default(),
                 translation: Point::default(),
                 clip: Some(Rect::new(Point::default(), viewport)),
+                sticky_container: None,
             },
             &mut output,
         )?;
         crate::overlay::resolve(&self.tree, root, &elements, ui, &mut output)?;
         drop(elements);
+        output.virtualization_changed = crate::virtual_list::measure(root, &output, ui);
+        let anchored = crate::anchor::apply(&self.scroll_anchors, ui, &output);
         for region in &output.text_inputs {
             ui.set_scroll_offset(region.node, Point::new(region.scroll_x, region.scroll_y));
         }
@@ -130,6 +135,11 @@ impl LayoutEngine {
             ui.resolve_container_queries(&sizes)
         } else {
             TreeUpdate::None
+        };
+        let update = if (anchored || output.virtualization_changed) && update == TreeUpdate::None {
+            TreeUpdate::Scroll
+        } else {
+            update
         };
         Ok((output, update, sizes))
     }

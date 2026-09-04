@@ -2,10 +2,11 @@ use argui_animation::{Duration, Motion, MotionState, Time, Tween};
 use argui_core::{Affine2D, Point, Rect, ScrollDelta, Size};
 use argui_paint::{ClipChain, ClipRegion};
 use argui_ui::{
-    Axes, Color, CursorIcon, Element, GestureSet, HitRegion, Overflow, QuadStyle, ScrollChaining,
-    ScrollConfig, ScrollPolarity, ScrollRegion, ScrollbarPartStyle, ScrollbarRegion,
-    ScrollbarStyle, StateName, StateScopeId, StateSelector, StylePatch, StyleTransition,
-    Transition, TreeUpdate, UiEventKind, UiTree, VisualState, property, scrollbar_at,
+    Axes, Color, CursorIcon, Element, GestureSet, HitRegion, Overflow, QuadStyle, ScrollConfig,
+    ScrollPolarity, ScrollPropagation, ScrollRegion, ScrollbarGeometry, ScrollbarPartStyle,
+    ScrollbarRegion, ScrollbarStyle, ScrollbarVisibility, StateName, StateScopeId, StateSelector,
+    StylePatch, StyleTransition, Transition, TreeUpdate, UiEventKind, UiTree, VisualState,
+    property, scrollbar_at,
 };
 
 fn region(node: argui_ui::NodeId, config: ScrollConfig, max_y: f32) -> ScrollRegion {
@@ -20,6 +21,14 @@ fn region(node: argui_ui::NodeId, config: ScrollConfig, max_y: f32) -> ScrollReg
         config,
         scrollbar: None,
         interaction_order: 0,
+    }
+}
+
+fn vertical_scrollbar(track: Rect, thumb: Rect, style: ScrollbarStyle) -> ScrollbarRegion {
+    ScrollbarRegion {
+        horizontal: None,
+        vertical: Some(ScrollbarGeometry { track, thumb }),
+        style,
     }
 }
 
@@ -78,6 +87,59 @@ fn scroll_polarity_is_explicit_and_offsets_are_clamped() {
 }
 
 #[test]
+fn invalid_numeric_scroll_configuration_is_safely_inert() {
+    let mut tree = UiTree::new(Element::container([]));
+    let node = tree.node_id_at(0).unwrap();
+    for config in [
+        ScrollConfig::default().line_size(f32::NAN),
+        ScrollConfig::default().multiplier(f32::NAN),
+    ] {
+        let update = tree.scroll(
+            Point::new(10.0, 10.0),
+            ScrollDelta::Lines(Point::new(0.0, -1.0)),
+            &[region(node, config, 100.0)],
+        );
+        assert!(!update.scroll_changed);
+    }
+}
+
+#[test]
+fn vertical_wheels_drive_horizontal_only_regions() {
+    let mut tree = UiTree::new(Element::container([]));
+    let node = tree.node_id_at(0).unwrap();
+    let mut horizontal = region(
+        node,
+        ScrollConfig::default().axes(argui_ui::ScrollAxes::Horizontal),
+        0.0,
+    );
+    horizontal.max_offset = Point::new(100.0, 0.0);
+    tree.scroll(
+        Point::new(10.0, 10.0),
+        ScrollDelta::Lines(Point::new(0.0, -1.0)),
+        &[horizontal],
+    );
+    assert_eq!(tree.scroll_offset(node), Point::new(40.0, 0.0));
+}
+
+#[test]
+fn both_axes_preserve_pixel_precision() {
+    let mut tree = UiTree::new(Element::container([]));
+    let node = tree.node_id_at(0).unwrap();
+    let mut region = region(
+        node,
+        ScrollConfig::default().axes(argui_ui::ScrollAxes::Both),
+        100.0,
+    );
+    region.max_offset.x = 100.0;
+    tree.scroll(
+        Point::new(10.0, 10.0),
+        ScrollDelta::Pixels(Point::new(-3.25, -7.5)),
+        &[region],
+    );
+    assert_eq!(tree.scroll_offset(node), Point::new(3.25, 7.5));
+}
+
+#[test]
 fn exhausted_nested_scrolls_chain_to_their_parent() {
     let mut tree = UiTree::new(Element::column([
         Element::container([]).keyed("parent"),
@@ -110,7 +172,7 @@ fn contained_nested_scroll_consumes_the_gesture_at_its_edge() {
         region(parent, ScrollConfig::default(), 100.0),
         region(
             child,
-            ScrollConfig::default().chaining(ScrollChaining::Contain),
+            ScrollConfig::default().propagation(ScrollPropagation::Contain),
             0.0,
         ),
     ];
@@ -151,11 +213,11 @@ fn scrollbar_track_and_thumb_drive_the_retained_offset() {
         ScrollConfig::default().scrollbar(style.clone()),
         1_000.0,
     );
-    scroll.scrollbar = Some(ScrollbarRegion {
-        track: scroll.bounds,
-        thumb: Rect::new(Point::default(), Size::new(200.0, 40.0)),
-        style: style.clone(),
-    });
+    scroll.scrollbar = Some(vertical_scrollbar(
+        scroll.bounds,
+        Rect::new(Point::default(), Size::new(200.0, 40.0)),
+        style.clone(),
+    ));
     let regions = [scroll.clone()];
 
     assert!(regions[0].scrollbar_contains(Point::new(100.0, 20.0)));
@@ -192,7 +254,8 @@ fn scrollbar_parts_reuse_retained_state_transitions() {
             .transition(StyleTransition::new(Transition::tween(Tween::new(
                 Duration::from_millis(100),
             )))),
-    );
+    )
+    .visibility(ScrollbarVisibility::Always);
     let config = ScrollConfig::default().scrollbar(style.clone());
     let mut tree = UiTree::new(
         Element::container([])
@@ -204,11 +267,11 @@ fn scrollbar_parts_reuse_retained_state_transitions() {
     );
     let node = tree.node_id_at(0).unwrap();
     let mut scroll = region(node, config.clone(), 1_000.0);
-    scroll.scrollbar = Some(ScrollbarRegion {
-        track: scroll.bounds,
-        thumb: Rect::new(Point::default(), Size::new(200.0, 40.0)),
+    scroll.scrollbar = Some(vertical_scrollbar(
+        scroll.bounds,
+        Rect::new(Point::default(), Size::new(200.0, 40.0)),
         style,
-    });
+    ));
 
     let regions = [scroll];
     let point = Point::new(20.0, 20.0);
@@ -247,7 +310,8 @@ fn scrollbar_parts_share_named_and_scoped_state_resolution() {
                 StateSelector::scope(scope, active),
                 StylePatch::new().set(property::BackgroundColor, selected),
             ),
-    );
+    )
+    .visibility(ScrollbarVisibility::Always);
     let config = ScrollConfig::default().scrollbar(style);
     let element = Element::container([])
         .state_scope(scope)
@@ -277,11 +341,7 @@ fn scrollbar_hit_testing_follows_paint_order() {
         ScrollbarPartStyle::new(QuadStyle::default()),
         ScrollbarPartStyle::new(QuadStyle::default()),
     );
-    scroll.scrollbar = Some(ScrollbarRegion {
-        track: scroll.bounds,
-        thumb: scroll.bounds,
-        style,
-    });
+    scroll.scrollbar = Some(vertical_scrollbar(scroll.bounds, scroll.bounds, style));
     scroll.interaction_order = 1;
     let point = Point::new(20.0, 20.0);
     let scroll_hit = hit_region(scroll_node, scroll.bounds);
@@ -316,11 +376,11 @@ fn scrollbar_ignores_track_outside_the_effective_clip() {
     let mut scroll = region(node, ScrollConfig::default(), 100.0);
     assert!(!scroll.scrollbar_contains(Point::new(10.0, 10.0)));
     scroll.clip = Rect::new(Point::default(), Size::new(50.0, 50.0));
-    scroll.scrollbar = Some(ScrollbarRegion {
-        track: scroll.bounds,
-        thumb: scroll.bounds,
-        style: style.clone(),
-    });
+    scroll.scrollbar = Some(vertical_scrollbar(
+        scroll.bounds,
+        scroll.bounds,
+        style.clone(),
+    ));
 
     assert!(!scroll.scrollbar_contains(Point::new(100.0, 100.0)));
     assert!(
@@ -341,11 +401,11 @@ fn scrollbar_track_clicks_reuse_offsets_and_degenerate_tracks_do_no_work() {
         ScrollbarPartStyle::new(QuadStyle::default()),
     );
     let mut scroll = region(node, ScrollConfig::default(), 1_000.0);
-    scroll.scrollbar = Some(ScrollbarRegion {
-        track: scroll.bounds,
-        thumb: Rect::new(Point::default(), Size::new(200.0, 40.0)),
-        style: style.clone(),
-    });
+    scroll.scrollbar = Some(vertical_scrollbar(
+        scroll.bounds,
+        Rect::new(Point::default(), Size::new(200.0, 40.0)),
+        style.clone(),
+    ));
 
     let first = tree
         .scrollbar_pressed(Point::new(100.0, 100.0), &[scroll.clone()])
@@ -358,11 +418,11 @@ fn scrollbar_track_clicks_reuse_offsets_and_degenerate_tracks_do_no_work() {
     tree.scrollbar_released();
 
     let mut no_travel = scroll.clone();
-    no_travel.scrollbar = Some(ScrollbarRegion {
-        track: no_travel.bounds,
-        thumb: no_travel.bounds,
+    no_travel.scrollbar = Some(vertical_scrollbar(
+        no_travel.bounds,
+        no_travel.bounds,
         style,
-    });
+    ));
     assert!(
         !tree
             .scrollbar_pressed(Point::new(20.0, 20.0), &[no_travel])
@@ -418,4 +478,56 @@ fn direct_scroll_input_takes_over_from_a_scroll_motion() {
     assert_eq!(offset.state(), MotionState::Idle);
     assert_eq!(offset.value(), Point::new(0.0, 40.0));
     assert_eq!(tree.scroll_offset(node), Point::new(0.0, 40.0));
+}
+
+#[test]
+fn nested_scroll_passes_only_its_unconsumed_delta_to_the_parent() {
+    let mut tree = UiTree::new(Element::column([
+        Element::container([]).keyed("parent"),
+        Element::container([]).keyed("child"),
+    ]));
+    let parent = tree.node_id_at(1).unwrap();
+    let child = tree.node_id_at(2).unwrap();
+    tree.set_scroll_offset(child, Point::new(0.0, 90.0));
+    let regions = [
+        region(parent, ScrollConfig::default(), 100.0),
+        region(child, ScrollConfig::default(), 100.0),
+    ];
+    let update = tree.scroll(
+        Point::new(10.0, 10.0),
+        ScrollDelta::Pixels(Point::new(0.0, -30.0)),
+        &regions,
+    );
+    assert!(update.scroll_changed);
+    assert_eq!(tree.scroll_offset(child), Point::new(0.0, 100.0));
+    assert_eq!(tree.scroll_offset(parent), Point::new(0.0, 20.0));
+}
+
+#[test]
+fn horizontal_scrollbar_thumb_drag_uses_horizontal_geometry() {
+    let style = ScrollbarStyle::new(
+        ScrollbarPartStyle::new(QuadStyle::default()),
+        ScrollbarPartStyle::new(QuadStyle::solid(Color::WHITE)),
+    );
+    let config = ScrollConfig::default()
+        .axes(argui_ui::ScrollAxes::Horizontal)
+        .scrollbar(style.clone());
+    let mut tree = UiTree::new(Element::container([]).scroll_config(config.clone()));
+    let node = tree.node_id_at(0).unwrap();
+    let mut scroll = region(node, config, 0.0);
+    scroll.max_offset = Point::new(500.0, 0.0);
+    scroll.scrollbar = Some(ScrollbarRegion {
+        horizontal: Some(ScrollbarGeometry {
+            track: scroll.bounds,
+            thumb: Rect::new(Point::default(), Size::new(40.0, 200.0)),
+        }),
+        vertical: None,
+        style,
+    });
+    let regions = [scroll];
+    tree.scrollbar_pressed(Point::new(20.0, 100.0), &regions)
+        .unwrap();
+    tree.scrollbar_dragged(Point::new(180.0, 100.0), &regions)
+        .unwrap();
+    assert_eq!(tree.scroll_offset(node), Point::new(500.0, 0.0));
 }

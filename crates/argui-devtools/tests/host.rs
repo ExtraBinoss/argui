@@ -342,7 +342,13 @@ fn picker_hit_tests_the_application_and_selects_without_clicking_through() {
     );
     assert_eq!(inspector.selected(), Some(InspectNodeId(2)));
     let request = host.take_scroll_request().expect("picker reveals tree row");
-    assert_eq!(request.key, "__devtools-tree");
+    assert!(matches!(
+        request.target,
+        argui_ui::ScrollTarget::Offset {
+            container: argui_ui::FocusTarget::Key(key),
+            ..
+        } if key == "__devtools-tree"
+    ));
     assert!(!contains_key(&host.view(), "__devtools-picker-surface"));
 
     host.update(&event("__devtools-picker", UiEventKind::Clicked));

@@ -86,6 +86,7 @@ impl Application {
                 argui_ui::scrollbar_at(point, &layout.scroll_regions, &layout.hit_regions)
             && let Some(update) = ui.scrollbar_pressed(point, std::slice::from_ref(region))
         {
+            self.programmatic_scroll = None;
             self.apply_ui_update(update, window, event_loop);
             return;
         }
@@ -327,6 +328,7 @@ impl Application {
             }
             PointerPhase::Entered => None,
         };
+        let mut touch_scroll = None;
         let update = if let (Some(layout), Some(ui)) = (&self.ui_layout, &mut self.ui_tree) {
             let selecting = ui.document_selection_dragging() && event.primary;
             let mut update = if selecting && event.phase == PointerPhase::Moved {
@@ -337,17 +339,30 @@ impl Application {
             } else {
                 ui.pointer_event(event, &layout.hit_regions)
             };
-            if let Some(delta) = finger_delta.filter(|_| !selecting) {
+            let default_prevented = update.events.iter().any(|event| event.default_prevented());
+            if let Some(delta) = finger_delta.filter(|_| !selecting && !default_prevented) {
+                self.programmatic_scroll = None;
+                touch_scroll = Some((Some(delta), event.phase));
                 update.merge(ui.scroll(
                     event.position,
                     ScrollDelta::Pixels(delta),
                     &layout.scroll_regions,
                 ));
+            } else if event.primary {
+                let phase = if selecting || default_prevented {
+                    PointerPhase::Cancelled
+                } else {
+                    event.phase
+                };
+                touch_scroll = Some((None, phase));
             }
             Some(update)
         } else {
             None
         };
+        if let Some((delta, phase)) = touch_scroll {
+            self.observe_touch_scroll(event.position, delta, phase, window);
+        }
         if let Some(update) = update {
             self.apply_ui_update(update, window, event_loop);
         }

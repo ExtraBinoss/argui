@@ -103,7 +103,11 @@ fn gallery_scroll_viewport_ends_inside_the_window() {
     let bottom = scroll.bounds.origin.y + scroll.bounds.size.height;
     assert!(scroll.bounds.origin.y >= 64.0);
     assert!(bottom <= 780.0);
-    if let Some(scrollbar) = &scroll.scrollbar {
+    if let Some(scrollbar) = scroll
+        .scrollbar
+        .as_ref()
+        .and_then(|scrollbar| scrollbar.vertical.as_ref())
+    {
         assert!(scrollbar.track.origin.y + scrollbar.track.size.height <= 780.0);
     }
 }

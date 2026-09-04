@@ -34,6 +34,7 @@ pub struct LayoutOutput {
     pub text: TextScene,
     pub portals: Vec<PortalLayout>,
     pub paint_stats: PaintStats,
+    pub virtualization_changed: bool,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -73,6 +74,14 @@ struct Placement {
     layout_parent: Point,
     translation: Point,
     clip: Option<Rect>,
+    sticky_container: Option<Rect>,
+}
+
+#[derive(Clone, Copy)]
+struct ScrollPlacement {
+    translation: Point,
+    clip: Option<Rect>,
+    sticky_container: Option<Rect>,
 }
 
 #[derive(Debug)]
@@ -83,6 +92,7 @@ pub struct LayoutEngine {
     paint_cache: paint::PaintCache,
     nodes_by_index: Vec<NodeId>,
     assets: AssetMetrics,
+    scroll_anchors: Vec<crate::anchor::ScrollAnchor>,
 }
 
 impl Default for LayoutEngine {
@@ -94,6 +104,7 @@ impl Default for LayoutEngine {
             paint_cache: paint::PaintCache::default(),
             nodes_by_index: Vec::new(),
             assets: AssetMetrics::default(),
+            scroll_anchors: Vec::new(),
         }
     }
 }
@@ -128,11 +139,15 @@ impl LayoutEngine {
             root,
             &elements,
             ui,
-            Point::default(),
-            Some(output.viewport),
+            ScrollPlacement {
+                translation: Point::default(),
+                clip: Some(output.viewport),
+                sticky_container: None,
+            },
             output,
         )?;
         crate::overlay::resolve(&self.tree, root, &elements, ui, output)?;
+        self.scroll_anchors = crate::anchor::capture(root, output);
         self.repaint(ui, output);
         Ok(())
     }
@@ -259,11 +274,14 @@ fn collect_layout(
         placement.layout_parent.x + layout.location.x,
         placement.layout_parent.y + layout.location.y,
     );
-    let origin = Point::new(
+    let normal_origin = Point::new(
         layout_origin.x - placement.translation.x,
         layout_origin.y - placement.translation.y,
     );
-    let bounds = Rect::new(origin, Size::new(layout.size.width, layout.size.height));
+    let size = Size::new(layout.size.width, layout.size.height);
+    let origin = sticky_origin(node, normal_origin, size, placement.sticky_container);
+    let sticky_delta = Point::new(origin.x - normal_origin.x, origin.y - normal_origin.y);
+    let bounds = Rect::new(origin, size);
     let layout_bounds = Rect::new(
         layout_origin,
         Size::new(layout.size.width, layout.size.height),
@@ -353,7 +371,8 @@ fn collect_layout(
         text_index,
     });
     let child_clip = scroll::clipped(node, placement.clip, bounds);
-    if let Some(config) = scroll::config(node, element)
+    let scroll_config = scroll::config(node, element);
+    if let Some(config) = scroll_config.clone()
         && let Some(region_clip) = placement.clip.and_then(|clip| clip.intersection(bounds))
     {
         let (content, offset) = match text_scroll {
@@ -371,9 +390,10 @@ fn collect_layout(
     }
     let scroll = ui.scroll_offset(node.node);
     let child_translation = Point::new(
-        placement.translation.x + scroll.x,
-        placement.translation.y + scroll.y,
+        placement.translation.x + scroll.x - sticky_delta.x,
+        placement.translation.y + scroll.y - sticky_delta.y,
     );
+    let sticky_container = scroll_config.map_or(placement.sticky_container, |_| Some(bounds));
     for child in &node.children {
         collect_layout(
             tree,
@@ -385,6 +405,7 @@ fn collect_layout(
                 layout_parent: layout_origin,
                 translation: child_translation,
                 clip: child_clip,
+                sticky_container,
             },
             output,
         )?;
@@ -397,29 +418,34 @@ fn apply_scroll_layout(
     node: &NodeMap,
     elements: &[&Element],
     ui: &UiTree,
-    translation: Point,
-    clip: Option<Rect>,
+    placement: ScrollPlacement,
     output: &mut LayoutOutput,
 ) -> Result<(), LayoutError> {
     let layout_bounds = output.nodes[node.index].layout_bounds;
     let previous_bounds = output.nodes[node.index].bounds;
-    let bounds = Rect::new(
-        Point::new(
-            layout_bounds.origin.x - translation.x,
-            layout_bounds.origin.y - translation.y,
-        ),
-        layout_bounds.size,
+    let normal_origin = Point::new(
+        layout_bounds.origin.x - placement.translation.x,
+        layout_bounds.origin.y - placement.translation.y,
     );
+    let origin = sticky_origin(
+        node,
+        normal_origin,
+        layout_bounds.size,
+        placement.sticky_container,
+    );
+    let sticky_delta = Point::new(origin.x - normal_origin.x, origin.y - normal_origin.y);
+    let bounds = Rect::new(origin, layout_bounds.size);
     let element = elements[node.index];
     let text_index = output.nodes[node.index].text_index;
     output.nodes[node.index].bounds = bounds;
-    output.nodes[node.index].clip = clip;
+    output.nodes[node.index].clip = placement.clip;
     if let Some(text_index) = text_index {
         let delta = Point::new(
             bounds.origin.x - previous_bounds.origin.x,
             bounds.origin.y - previous_bounds.origin.y,
         );
-        let text_clip = crate::text::clip(node, element, clip, bounds).unwrap_or_default();
+        let text_clip =
+            crate::text::clip(node, element, placement.clip, bounds).unwrap_or_default();
         let mut content_delta = Point::default();
         if let Some(region) = output
             .text_inputs
@@ -447,9 +473,10 @@ fn apply_scroll_layout(
             region.translate(delta);
         }
     }
-    let child_clip = scroll::clipped(node, clip, bounds);
-    if let Some(config) = scroll::config(node, element)
-        && let Some(region_clip) = clip.and_then(|clip| clip.intersection(bounds))
+    let child_clip = scroll::clipped(node, placement.clip, bounds);
+    let scroll_config = scroll::config(node, element);
+    if let Some(config) = scroll_config.clone()
+        && let Some(region_clip) = placement.clip.and_then(|clip| clip.intersection(bounds))
     {
         let (content, offset) = output
             .text_inputs
@@ -474,19 +501,56 @@ fn apply_scroll_layout(
         ));
     }
     let scroll = ui.scroll_offset(node.node);
-    let child_translation = Point::new(translation.x + scroll.x, translation.y + scroll.y);
+    let child_translation = Point::new(
+        placement.translation.x + scroll.x - sticky_delta.x,
+        placement.translation.y + scroll.y - sticky_delta.y,
+    );
+    let sticky_container = scroll_config.map_or(placement.sticky_container, |_| Some(bounds));
     for child in &node.children {
         apply_scroll_layout(
             tree,
             child,
             elements,
             ui,
-            child_translation,
-            child_clip,
+            ScrollPlacement {
+                translation: child_translation,
+                clip: child_clip,
+                sticky_container,
+            },
             output,
         )?;
     }
     Ok(())
+}
+
+fn sticky_origin(node: &NodeMap, origin: Point, size: Size, container: Option<Rect>) -> Point {
+    if node.style.position != argui_ui::Position::Sticky {
+        return origin;
+    }
+    let Some(container) = container else {
+        return origin;
+    };
+    let resolve = |value: argui_ui::LengthPercentageAuto, context: f32| {
+        value.resolve_to_option(context, |_, _| 0.0)
+    };
+    let mut result = origin;
+    if let Some(top) = resolve(node.style.inset.top, container.size.height) {
+        result.y = result.y.max(container.origin.y + top);
+    }
+    if let Some(bottom) = resolve(node.style.inset.bottom, container.size.height) {
+        result.y = result
+            .y
+            .min(container.origin.y + container.size.height - bottom - size.height);
+    }
+    if let Some(left) = resolve(node.style.inset.left, container.size.width) {
+        result.x = result.x.max(container.origin.x + left);
+    }
+    if let Some(right) = resolve(node.style.inset.right, container.size.width) {
+        result.x = result
+            .x
+            .min(container.origin.x + container.size.width - right - size.width);
+    }
+    result
 }
 
 pub(crate) fn content_size(tree: &TaffyTree<usize>, node: &NodeMap) -> Result<Size, LayoutError> {

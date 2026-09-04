@@ -284,8 +284,13 @@ fn translate(map: &NodeMap, output: &mut LayoutOutput, delta: Point, incoming_cl
         region.clip = incoming_clip.intersection(bounds).unwrap_or_default();
         region.clips = ClipChain::from_regions([ClipRegion::new(region.clip, Affine2D::IDENTITY)]);
         if let Some(scrollbar) = &mut region.scrollbar {
-            scrollbar.track.origin = add(scrollbar.track.origin, delta);
-            scrollbar.thumb.origin = add(scrollbar.thumb.origin, delta);
+            for geometry in [&mut scrollbar.vertical, &mut scrollbar.horizontal]
+                .into_iter()
+                .flatten()
+            {
+                geometry.track.origin = add(geometry.track.origin, delta);
+                geometry.thumb.origin = add(geometry.thumb.origin, delta);
+            }
         }
     }
     let child_clip = if map.style.overflow.x.clips() || map.style.overflow.y.clips() {

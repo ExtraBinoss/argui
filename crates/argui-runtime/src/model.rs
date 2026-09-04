@@ -1,6 +1,6 @@
 use crate::AppCommand;
 use argui_animation::Frame;
-use argui_core::{Point, PointerId, Rect};
+use argui_core::{PointerId, Rect};
 use argui_inspect::InspectorHandle;
 use argui_paint::{ImageAsset, VectorAsset};
 use argui_ui::{
@@ -140,11 +140,8 @@ impl<T: Render> Context<T> {
         self.effects.clipboard = Some(request);
     }
 
-    pub fn scroll_to(&mut self, key: impl Into<String>, offset: Point) {
-        self.effects.scroll = Some(ScrollRequest {
-            key: key.into(),
-            offset,
-        });
+    pub fn scroll(&mut self, request: ScrollRequest) {
+        self.effects.scroll = Some(request);
         self.request_paint();
     }
 

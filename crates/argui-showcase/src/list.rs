@@ -15,7 +15,7 @@ impl StateShowcase {
         } else {
             ScrollPolarity::Normal
         };
-        VirtualList::new(1_000_000, 36.0, 260.0)
+        VirtualList::fixed(1_000_000, 36.0, 260.0)
             .overscan(3)
             .scroll_config(
                 ScrollConfig::default()

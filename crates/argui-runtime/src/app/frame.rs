@@ -212,7 +212,7 @@ impl Application {
             TreeUpdate::None => Invalidation::None,
         };
         if let Some(request) = pending.scroll_request {
-            self.apply_scroll_request(&request.key, request.offset, event_loop);
+            self.apply_scroll_request(request, event_loop);
         }
         let focus_update = match (&mut self.ui_tree, &self.ui_layout) {
             (Some(ui), Some(layout)) => ui.sync_focus(&layout.hit_regions, pending.focus_request),
@@ -303,10 +303,7 @@ mod tests {
         rebuild.merge(&InteractionUpdate::default(), true);
         assert!(rebuild.needs_frame());
 
-        pending.request_scroll(Some(ScrollRequest {
-            key: "tree".into(),
-            offset: Point::new(0.0, 80.0),
-        }));
+        pending.request_scroll(Some(ScrollRequest::offset("tree", Point::new(0.0, 80.0))));
         pending.request_focus(Some(FocusRequest::Clear));
         pending.request_text_selection(Some(TextSelectionRequest::new(
             "editor",

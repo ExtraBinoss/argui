@@ -1,5 +1,5 @@
 use argui_core::{Color, ColorScheme};
-use argui_ui::{Dimension, ElementKind, Overflow, Role, ScrollChaining, TextInputFilter};
+use argui_ui::{Dimension, ElementKind, Overflow, Role, ScrollPropagation, TextInputFilter};
 use argui_widgets::{Input, InputKind, TablerIcon, TextArea, WidgetAssets, shadcn};
 
 #[test]
@@ -33,8 +33,8 @@ fn controlled_inputs_keep_semantics_and_editor_configuration_together() {
     assert_eq!(area.style.overflow.x, Overflow::Hidden);
     assert_eq!(area.style.overflow.y, Overflow::Auto);
     assert_eq!(
-        area.scroll.as_ref().unwrap().chaining,
-        ScrollChaining::Contain
+        area.scroll.as_ref().unwrap().propagation,
+        ScrollPropagation::Contain
     );
     assert!(matches!(
         area.kind,

@@ -1,12 +1,12 @@
 use crate::{
-    AnyEntity, LayoutBounds, LayoutSnapshot, RuntimeError, RuntimeEvent, ViewUpdate,
+    AnyEntity, LayoutBounds, LayoutSnapshot, RuntimeError, RuntimeEvent, ScrollRequest, ViewUpdate,
     animation::RuntimeAnimations,
 };
 use argui_core::{Point, PointerId, Size};
 use argui_inspect::InspectorHandle;
 use argui_layout::{LayoutEngine, LayoutOutput};
 use argui_paint::{ImageAsset, VectorAsset};
-use argui_platform::{ApplicationIdentity, Modifiers, ScrollDelta, WindowConfig};
+use argui_platform::{ApplicationIdentity, Modifiers, WindowConfig};
 use argui_render::{RendererConfig, RendererDevice, SurfaceRenderer};
 use argui_text::{PreparedText, TextEngine, TextScene};
 use argui_ui::{InteractionUpdate, UiTree};
@@ -44,6 +44,7 @@ pub(crate) struct Application {
     initial_visible: bool,
     preference_overrides: argui_platform::PreferenceOverrides,
     preferences: argui_platform::SystemPreferences,
+    system_color_scheme: Option<argui_core::ColorScheme>,
     theme_request: crate::ThemeRequest,
     environment: crate::WindowEnvironment,
     pub(super) renderer_config: RendererConfig,
@@ -83,8 +84,10 @@ pub(crate) struct Application {
     pub(super) clipboard: argui_platform::Clipboard,
     pub(super) event_proxy: Option<winit::event_loop::EventLoopProxy<crate::event::UserEvent>>,
     pending_scrollbar_drag: Option<Point>,
-    pending_pointer_scroll: Option<ScrollDelta>,
+    pending_pointer_scroll: Option<scroll::PendingScroll>,
     scroll_inertia: scroll::ScrollInertia,
+    programmatic_scroll: Option<scroll::ProgrammaticScroll>,
+    last_scroll_physics: Option<Instant>,
     window_drag: window::WindowDragState,
     pending_window_frame: frame::PendingWindowFrame,
     pub(super) pending_ui_frame: frame::PendingUiFrame,
@@ -128,6 +131,7 @@ impl Application {
             initial_visible: true,
             preference_overrides: argui_platform::PreferenceOverrides::default(),
             preferences: argui_platform::SystemPreferences::default(),
+            system_color_scheme: None,
             theme_request: crate::ThemeRequest::default(),
             environment: crate::WindowEnvironment::default(),
             renderer_config,
@@ -169,6 +173,8 @@ impl Application {
             pending_scrollbar_drag: None,
             pending_pointer_scroll: None,
             scroll_inertia: scroll::ScrollInertia::default(),
+            programmatic_scroll: None,
+            last_scroll_physics: None,
             window_drag: window::WindowDragState::default(),
             pending_window_frame: frame::PendingWindowFrame::default(),
             pending_ui_frame: frame::PendingUiFrame::default(),
@@ -223,7 +229,24 @@ impl Application {
     }
 
     fn prepare_text(&mut self) -> Result<(), RuntimeError> {
-        if let Some(layout) = self.compute_ui_layout()? {
+        if let Some(mut layout) = self.compute_ui_layout()? {
+            if layout.virtualization_changed {
+                if let Some(root) = self.inspected_view()
+                    && let Some(ui) = &mut self.ui_tree
+                {
+                    ui.update(root);
+                }
+                let Some(next) = self.compute_ui_layout()? else {
+                    return Ok(());
+                };
+                layout = next;
+                if layout.virtualization_changed {
+                    self.pending_ui_frame.request_rebuild();
+                    if let Some(window) = &self.window {
+                        window.request_redraw();
+                    }
+                }
+            }
             let snapshot = LayoutSnapshot {
                 viewport: layout.viewport,
                 nodes: layout
@@ -240,7 +263,6 @@ impl Application {
                     })
                     .collect(),
             };
-            self.ui_layout = Some(layout);
             let rebuild = self.model.as_ref().is_some_and(|model| {
                 model.layout_changed(&snapshot);
                 model.take_effects().update == ViewUpdate::Rebuild
@@ -249,8 +271,29 @@ impl Application {
                 if let Some(ui) = &mut self.ui_tree {
                     ui.update(root);
                 }
-                self.ui_layout = self.compute_ui_layout()?;
+                let Some(next) = self.compute_ui_layout()? else {
+                    return Ok(());
+                };
+                layout = next;
+                if layout.virtualization_changed {
+                    if let Some(root) = self.inspected_view()
+                        && let Some(ui) = &mut self.ui_tree
+                    {
+                        ui.update(root);
+                    }
+                    let Some(next) = self.compute_ui_layout()? else {
+                        return Ok(());
+                    };
+                    layout = next;
+                    if layout.virtualization_changed {
+                        self.pending_ui_frame.request_rebuild();
+                        if let Some(window) = &self.window {
+                            window.request_redraw();
+                        }
+                    }
+                }
             }
+            self.ui_layout = Some(layout);
             self.publish_inspection();
             self.paint_inspection_highlight();
         }
@@ -314,6 +357,9 @@ impl Application {
         let mut theme_request = None;
         let mut pointer_capture = Vec::new();
         let mut selection_command = None;
+        let focused = update.events.iter().rev().find_map(|event| {
+            matches!(event.kind, argui_ui::UiEventKind::Focused).then_some(event.target)
+        });
         let mut rebuild = false;
         for event in &update.events {
             if !event.should_dispatch() {
@@ -355,7 +401,8 @@ impl Application {
             rebuild = true;
         }
         self.pending_ui_frame.merge(&update, rebuild);
-        self.pending_ui_frame.request_scroll(scroll_request);
+        self.pending_ui_frame
+            .request_scroll(scroll_request.or_else(|| focused.map(ScrollRequest::reveal)));
         self.pending_ui_frame.request_focus(focus_request);
         self.pending_ui_frame
             .request_text_selection(text_selection_request);

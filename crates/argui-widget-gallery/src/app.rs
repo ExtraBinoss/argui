@@ -1,12 +1,12 @@
 use argui::{
-    core::{Color, ColorScheme, Key, KeyState, Point, Size},
+    core::{Color, ColorScheme, Key, KeyState, Size},
     paint::{Border, BorderWidths, CornerRadii, ImageAsset, ImageFit, ImageId, VectorAsset},
     runtime::{Context, Entity, LayoutSnapshot, Render, ThemeRequest, WindowEnvironment},
     text::{TextColor, TextStyle, TextWrap},
     theme::ThemeMode,
     ui::{
         AlignItems, Axes, CursorIcon, Element, GestureSet, Interaction, JustifyContent,
-        KeyboardActivation, Overflow, ResizeConfig, ResizeState, Role, ScrollConfig,
+        KeyboardActivation, Overflow, ResizeConfig, ResizeState, Role, ScrollConfig, ScrollRequest,
         SemanticAction, Semantics, Sides, UiEvent, UiEventKind, length, percent, sides,
     },
     widgets::{
@@ -507,7 +507,7 @@ impl Render for WidgetGallery {
                 SelectAction::Highlight(index) => {
                     self.select_highlight = index;
                     cx.request_focus(select.option_key(index));
-                    cx.scroll_to(select.list_key(), Point::new(0.0, index as f32 * 36.0));
+                    cx.scroll(ScrollRequest::reveal(select.option_key(index)));
                 }
                 SelectAction::Select(index) => {
                     self.select_selected = Some(index);

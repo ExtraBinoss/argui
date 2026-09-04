@@ -233,7 +233,7 @@ pub(crate) fn tree_list_config(item_count: usize, viewport: f32) -> VirtualList 
     } else {
         12
     };
-    VirtualList::new(item_count, 28.0, viewport)
+    VirtualList::fixed(item_count, 28.0, viewport)
         .overscan(overscan)
         .scroll_config(ScrollConfig::default().scrollbar(scrollbar()))
 }
@@ -357,7 +357,7 @@ fn profiling_list(frames: &[FrameRecord], offset: f32, theme: &WidgetTheme) -> E
 }
 
 pub(crate) fn profiling_list_config(item_count: usize) -> VirtualList {
-    VirtualList::new(item_count, 27.0, 130.0)
+    VirtualList::fixed(item_count, 27.0, 130.0)
         .scroll_config(ScrollConfig::default().scrollbar(scrollbar()))
 }
 

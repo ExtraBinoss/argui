@@ -305,7 +305,9 @@ impl<A: Render> AppModel for SingleWindowModel<A> {
 #[cfg(test)]
 mod tests {
     use argui_core::{Color, ColorScheme, Point};
-    use argui_ui::{ClipboardRequest, Element, TextSelection, UiEvent, UiEventKind, UiTree};
+    use argui_ui::{
+        ClipboardRequest, Element, ScrollRequest, TextSelection, UiEvent, UiEventKind, UiTree,
+    };
 
     use super::{AppEvent, AppModel, SingleWindowModel};
     use crate::{Context, Render, ThemeRequest};
@@ -319,7 +321,7 @@ mod tests {
 
         fn event(&mut self, _event: &UiEvent, cx: &mut Context<Self>) {
             cx.write_clipboard(ClipboardRequest::Write("theme".into()));
-            cx.scroll_to("theme", Point::new(1.0, 2.0));
+            cx.scroll(ScrollRequest::offset("theme", Point::new(1.0, 2.0)));
             cx.request_focus("theme");
             cx.select_text("theme", TextSelection::All);
             cx.request_animation_frame();

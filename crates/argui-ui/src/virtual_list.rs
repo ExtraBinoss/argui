@@ -1,4 +1,4 @@
-use std::ops::Range;
+use std::{cell::RefCell, ops::Range, rc::Rc};
 
 use crate::{Axes, Dimension, Element, Overflow, ScrollConfig};
 
@@ -10,33 +10,102 @@ pub struct VirtualWindow {
     pub total: f32,
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum VirtualAlignment {
+    Start,
+    Center,
+    End,
+    #[default]
+    Nearest,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct MeasurementUpdate {
+    pub changed: bool,
+    pub corrected_offset: f32,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct VirtualItem {
+    index: usize,
+    viewport_extent: f32,
+    state: Rc<RefCell<VariableExtents>>,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct VirtualList {
-    pub item_count: usize,
-    pub item_extent: f32,
-    pub viewport_extent: f32,
-    pub overscan: usize,
-    pub scroll: ScrollConfig,
+    item_count: usize,
+    viewport_extent: f32,
+    overscan: usize,
+    scroll: ScrollConfig,
+    extents: Extents,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+enum Extents {
+    Fixed(f32),
+    Variable {
+        estimate: f32,
+        state: Rc<RefCell<VariableExtents>>,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct VariableExtents {
+    values: Vec<f32>,
+    measured: Vec<bool>,
+    prefix: Fenwick,
 }
 
 impl VirtualList {
     #[must_use]
-    pub const fn new(item_count: usize, item_extent: f32, viewport_extent: f32) -> Self {
+    pub fn fixed(item_count: usize, item_extent: f32, viewport_extent: f32) -> Self {
+        Self::from_extents(
+            item_count,
+            viewport_extent,
+            Extents::Fixed(sanitize_extent(item_extent)),
+        )
+    }
+
+    #[must_use]
+    pub fn variable(item_count: usize, estimated_extent: f32, viewport_extent: f32) -> Self {
+        let estimate = sanitize_extent(estimated_extent);
+        Self::from_extents(
+            item_count,
+            viewport_extent,
+            Extents::Variable {
+                estimate,
+                state: Rc::new(RefCell::new(VariableExtents {
+                    values: vec![estimate; item_count],
+                    measured: vec![false; item_count],
+                    prefix: Fenwick::uniform(item_count, estimate),
+                })),
+            },
+        )
+    }
+
+    fn from_extents(item_count: usize, viewport_extent: f32, extents: Extents) -> Self {
+        let line_size = extents.extent(0).unwrap_or(1.0);
         Self {
             item_count,
-            item_extent,
-            viewport_extent,
+            viewport_extent: viewport_extent.max(0.0),
             overscan: 3,
-            scroll: ScrollConfig {
-                enabled: true,
-                axes: crate::ScrollAxes::Vertical,
-                polarity: crate::ScrollPolarity::Normal,
-                chaining: crate::ScrollChaining::Auto,
-                line_size: item_extent,
-                multiplier: 1.0,
-                scrollbar: None,
-            },
+            scroll: ScrollConfig::default().line_size(line_size),
+            extents,
         }
+    }
+
+    #[must_use]
+    pub fn item_count(&self) -> usize {
+        match &self.extents {
+            Extents::Fixed(_) => self.item_count,
+            Extents::Variable { state, .. } => state.borrow().values.len(),
+        }
+    }
+
+    #[must_use]
+    pub const fn viewport_extent(&self) -> f32 {
+        self.viewport_extent
     }
 
     #[must_use]
@@ -52,182 +121,171 @@ impl VirtualList {
     }
 
     #[must_use]
-    pub fn window(&self, offset: f32) -> VirtualWindow {
-        let extent = self.item_extent.max(f32::EPSILON);
-        let total = extent * self.item_count as f32;
-        let offset = offset.clamp(0.0, (total - self.viewport_extent).max(0.0));
-        let first = (offset / extent).floor() as usize;
-        let visible = (self.viewport_extent / extent).ceil() as usize + 1;
-        let chunk = visible.max(1);
-        let anchor = first / chunk * chunk;
-        let start = anchor.saturating_sub(self.overscan);
-        let end = anchor
-            .saturating_add(chunk)
-            .saturating_add(visible)
-            .saturating_add(self.overscan)
-            .min(self.item_count);
-        let before = start as f32 * extent;
-        let after = (self.item_count - end) as f32 * extent;
-        VirtualWindow {
-            range: start..end,
-            before,
-            after,
-            total,
-        }
-    }
-
-    #[must_use]
-    pub fn build(
-        self,
-        key: impl Into<String>,
-        offset: f32,
-        mut item: impl FnMut(usize) -> Element,
-    ) -> Element {
-        let window = self.window(offset);
-        let mut children = Vec::with_capacity(window.range.len() + 2);
-        children.push(spacer(window.before));
-        children.extend(window.range.map(|index| {
-            item(index)
-                .height(Dimension::length(self.item_extent))
-                .shrink(0.0)
-        }));
-        children.push(spacer(window.after));
-        Element::column([Element::column(children).shrink(0.0)])
-            .keyed(key)
-            .height(Dimension::length(self.viewport_extent))
-            .overflow(Axes {
-                x: Overflow::Hidden,
-                y: Overflow::Auto,
-            })
-            .scroll_config(self.scroll)
-    }
-}
-
-fn spacer(height: f32) -> Element {
-    Element::container([])
-        .height(Dimension::length(height))
-        .shrink(0.0)
-        .semantic_hidden(true)
-}
-
-/// A virtual list whose rows can report their real height after layout.
-///
-/// Prefix sums are maintained in a Fenwick tree, so finding the visible range
-/// and correcting an anchor after a measurement both cost `O(log n)`.
-#[derive(Clone, Debug, PartialEq)]
-pub struct VariableList {
-    item_count: usize,
-    estimated_extent: f32,
-    viewport_extent: f32,
-    overscan: usize,
-    extents: Vec<f32>,
-    measured: Vec<bool>,
-    prefix: Fenwick,
-    scroll: ScrollConfig,
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct MeasurementUpdate {
-    pub changed: bool,
-    pub corrected_offset: f32,
-}
-
-impl VariableList {
-    #[must_use]
-    pub fn new(item_count: usize, estimated_extent: f32, viewport_extent: f32) -> Self {
-        let estimate = sanitize_extent(estimated_extent);
-        Self {
-            item_count,
-            estimated_extent: estimate,
-            viewport_extent: viewport_extent.max(0.0),
-            overscan: 3,
-            extents: vec![estimate; item_count],
-            measured: vec![false; item_count],
-            prefix: Fenwick::uniform(item_count, estimate),
-            scroll: ScrollConfig {
-                enabled: true,
-                axes: crate::ScrollAxes::Vertical,
-                polarity: crate::ScrollPolarity::Normal,
-                chaining: crate::ScrollChaining::Auto,
-                line_size: estimate,
-                multiplier: 1.0,
-                scrollbar: None,
-            },
-        }
-    }
-
-    #[must_use]
-    pub fn overscan(mut self, overscan: usize) -> Self {
-        self.overscan = overscan;
-        self
-    }
-
-    #[must_use]
-    pub fn scroll_config(mut self, scroll: ScrollConfig) -> Self {
-        self.scroll = scroll;
-        self
-    }
-
-    #[must_use]
     pub fn item_extent(&self, index: usize) -> Option<f32> {
-        self.extents.get(index).copied()
+        (index < self.item_count())
+            .then(|| self.extents.extent(index))
+            .flatten()
     }
 
     #[must_use]
     pub fn is_measured(&self, index: usize) -> bool {
-        self.measured.get(index).copied().unwrap_or(false)
+        match &self.extents {
+            Extents::Fixed(_) => index < self.item_count(),
+            Extents::Variable { state, .. } => {
+                state.borrow().measured.get(index).copied().unwrap_or(false)
+            }
+        }
     }
 
     #[must_use]
     pub fn total_extent(&self) -> f32 {
-        self.prefix.total()
+        self.extents.total(self.item_count())
+    }
+
+    #[must_use]
+    pub fn estimated_extent(&self) -> f32 {
+        match self.extents {
+            Extents::Fixed(extent) => extent,
+            Extents::Variable { estimate, .. } => estimate,
+        }
+    }
+
+    #[must_use]
+    pub fn offset_of(&self, index: usize) -> f32 {
+        self.extents.prefix(index.min(self.item_count()))
+    }
+
+    #[must_use]
+    pub fn item_at_offset(&self, offset: f32) -> Option<usize> {
+        let item_count = self.item_count();
+        (item_count != 0).then(|| {
+            self.extents
+                .lower_bound(offset.max(0.0), item_count)
+                .min(item_count - 1)
+        })
+    }
+
+    #[must_use]
+    pub fn visible_range(&self, offset: f32) -> Range<usize> {
+        let start = self.item_at_offset(offset).unwrap_or(0);
+        let end = self
+            .item_at_offset(offset + self.viewport_extent)
+            .map_or(0, |index| index.saturating_add(1))
+            .min(self.item_count());
+        start..end.max(start).min(self.item_count())
     }
 
     #[must_use]
     pub fn window(&self, offset: f32) -> VirtualWindow {
         let total = self.total_extent();
+        let item_count = self.item_count();
         let offset = offset.clamp(0.0, (total - self.viewport_extent).max(0.0));
-        let first = self.prefix.lower_bound(offset);
-        let last = self
-            .prefix
-            .lower_bound((offset + self.viewport_extent).min(total))
-            .saturating_add(1)
-            .min(self.item_count);
-        let start = first.saturating_sub(self.overscan);
-        let end = last.saturating_add(self.overscan).min(self.item_count);
-        let before = self.prefix.sum(start);
-        let after = (total - self.prefix.sum(end)).max(0.0);
+        let first = self.extents.lower_bound(offset, item_count).min(item_count);
+        let (start, end) = match self.extents {
+            Extents::Fixed(extent) => {
+                let visible = (self.viewport_extent / extent).ceil() as usize + 1;
+                let chunk = visible.max(1);
+                let anchor = first / chunk * chunk;
+                (
+                    anchor.saturating_sub(self.overscan),
+                    anchor
+                        .saturating_add(chunk)
+                        .saturating_add(visible)
+                        .saturating_add(self.overscan)
+                        .min(item_count),
+                )
+            }
+            Extents::Variable { .. } => {
+                let last = self
+                    .extents
+                    .lower_bound((offset + self.viewport_extent).min(total), item_count)
+                    .saturating_add(1)
+                    .min(item_count);
+                (
+                    first.saturating_sub(self.overscan),
+                    last.saturating_add(self.overscan).min(item_count),
+                )
+            }
+        };
+        let before = self.offset_of(start);
         VirtualWindow {
             range: start..end,
             before,
-            after,
+            after: (total - self.offset_of(end)).max(0.0),
             total,
         }
     }
 
-    /// Records a measured row while preserving the row currently under the
-    /// viewport's top edge. The returned offset can be applied immediately.
-    pub fn measure(&mut self, index: usize, extent: f32, current_offset: f32) -> MeasurementUpdate {
-        let Some(previous) = self.extents.get(index).copied() else {
+    #[must_use]
+    pub fn scroll_to(&self, index: usize, align: VirtualAlignment, current_offset: f32) -> f32 {
+        let item_count = self.item_count();
+        if item_count == 0 {
+            return 0.0;
+        }
+        let index = index.min(item_count - 1);
+        let start = self.offset_of(index);
+        let end = start + self.item_extent(index).unwrap_or_default();
+        let viewport_end = current_offset + self.viewport_extent;
+        let target = match align {
+            VirtualAlignment::Start => start,
+            VirtualAlignment::Center => (start + end - self.viewport_extent) * 0.5,
+            VirtualAlignment::End => end - self.viewport_extent,
+            VirtualAlignment::Nearest if start < current_offset => start,
+            VirtualAlignment::Nearest if end > viewport_end => end - self.viewport_extent,
+            VirtualAlignment::Nearest => current_offset,
+        };
+        target.clamp(0.0, (self.total_extent() - self.viewport_extent).max(0.0))
+    }
+
+    pub fn measure(&mut self, index: usize, extent: f32, offset: f32) -> MeasurementUpdate {
+        let Extents::Variable { state, .. } = &self.extents else {
             return MeasurementUpdate {
-                corrected_offset: current_offset,
+                corrected_offset: offset,
                 ..MeasurementUpdate::default()
             };
         };
-        let next = sanitize_extent(extent);
-        let anchor = self.prefix.lower_bound(current_offset);
-        let within = current_offset - self.prefix.sum(anchor);
-        let changed = (next - previous).abs() > 0.01 || !self.measured[index];
-        if changed {
-            self.extents[index] = next;
-            self.measured[index] = true;
-            self.prefix.add(index, next - previous);
+        measure_variable(
+            &mut state.borrow_mut(),
+            index,
+            extent,
+            offset,
+            self.viewport_extent,
+        )
+    }
+
+    pub fn insert(&mut self, index: usize, count: usize) {
+        let item_count = self.item_count();
+        let index = index.min(item_count);
+        match &mut self.extents {
+            Extents::Fixed(_) => {}
+            Extents::Variable { estimate, state } => {
+                let mut state = state.borrow_mut();
+                state
+                    .values
+                    .splice(index..index, std::iter::repeat_n(*estimate, count));
+                state
+                    .measured
+                    .splice(index..index, std::iter::repeat_n(false, count));
+                state.prefix = Fenwick::from_values(&state.values);
+            }
         }
-        let max = (self.total_extent() - self.viewport_extent).max(0.0);
-        MeasurementUpdate {
-            changed,
-            corrected_offset: (self.prefix.sum(anchor) + within).clamp(0.0, max),
+        self.item_count = item_count.saturating_add(count);
+    }
+
+    pub fn remove(&mut self, range: Range<usize>) {
+        let item_count = self.item_count();
+        let start = range.start.min(item_count);
+        let end = range.end.max(start).min(item_count);
+        match &mut self.extents {
+            Extents::Fixed(_) => {}
+            Extents::Variable { state, .. } => {
+                let mut state = state.borrow_mut();
+                state.values.drain(start..end);
+                state.measured.drain(start..end);
+                state.prefix = Fenwick::from_values(&state.values);
+            }
         }
+        self.item_count = item_count - (end - start);
     }
 
     #[must_use]
@@ -241,9 +299,18 @@ impl VariableList {
         let mut children = Vec::with_capacity(window.range.len() + 2);
         children.push(spacer(window.before));
         children.extend(window.range.map(|index| {
-            item(index)
-                .height(Dimension::length(self.extents[index]))
-                .shrink(0.0)
+            let mut element = item(index).shrink(0.0);
+            match &self.extents {
+                Extents::Fixed(extent) => element.style.size.height = Dimension::length(*extent),
+                Extents::Variable { state, .. } => {
+                    element.virtual_item = Some(VirtualItem {
+                        index,
+                        viewport_extent: self.viewport_extent,
+                        state: state.clone(),
+                    });
+                }
+            }
+            element
         }));
         children.push(spacer(window.after));
         Element::column([Element::column(children).shrink(0.0)])
@@ -255,11 +322,82 @@ impl VariableList {
             })
             .scroll_config(self.scroll.clone())
     }
+}
 
-    #[must_use]
-    pub const fn estimated_extent(&self) -> f32 {
-        self.estimated_extent
+impl Extents {
+    fn extent(&self, index: usize) -> Option<f32> {
+        match self {
+            Self::Fixed(extent) => Some(*extent),
+            Self::Variable { state, .. } => state.borrow().values.get(index).copied(),
+        }
     }
+
+    fn prefix(&self, end: usize) -> f32 {
+        match self {
+            Self::Fixed(extent) => *extent * end as f32,
+            Self::Variable { state, .. } => state.borrow().prefix.sum(end),
+        }
+    }
+
+    fn total(&self, count: usize) -> f32 {
+        self.prefix(count)
+    }
+
+    fn lower_bound(&self, offset: f32, count: usize) -> usize {
+        match self {
+            Self::Fixed(extent) => (offset / *extent).floor() as usize,
+            Self::Variable { state, .. } => state.borrow().prefix.lower_bound(offset, count),
+        }
+    }
+}
+
+impl VirtualItem {
+    #[must_use]
+    pub fn measure_layout(&self, extent: f32, offset: f32) -> MeasurementUpdate {
+        measure_variable(
+            &mut self.state.borrow_mut(),
+            self.index,
+            extent,
+            offset,
+            self.viewport_extent,
+        )
+    }
+}
+
+fn measure_variable(
+    state: &mut VariableExtents,
+    index: usize,
+    extent: f32,
+    offset: f32,
+    viewport_extent: f32,
+) -> MeasurementUpdate {
+    let Some(previous) = state.values.get(index).copied() else {
+        return MeasurementUpdate {
+            corrected_offset: offset,
+            ..MeasurementUpdate::default()
+        };
+    };
+    let anchor = state.prefix.lower_bound(offset, state.values.len());
+    let within = offset - state.prefix.sum(anchor);
+    let next = sanitize_extent(extent);
+    let changed = (next - previous).abs() > 0.01 || !state.measured[index];
+    if changed {
+        state.values[index] = next;
+        state.measured[index] = true;
+        state.prefix.add(index, next - previous);
+    }
+    let maximum = (state.prefix.total() - viewport_extent).max(0.0);
+    MeasurementUpdate {
+        changed,
+        corrected_offset: (state.prefix.sum(anchor) + within).clamp(0.0, maximum),
+    }
+}
+
+fn spacer(height: f32) -> Element {
+    Element::container([])
+        .height(Dimension::length(height))
+        .shrink(0.0)
+        .semantic_hidden(true)
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -269,10 +407,14 @@ struct Fenwick {
 
 impl Fenwick {
     fn uniform(len: usize, value: f32) -> Self {
+        Self::from_values(&vec![value; len])
+    }
+
+    fn from_values(values: &[f32]) -> Self {
         let mut result = Self {
-            tree: vec![0.0; len + 1],
+            tree: vec![0.0; values.len() + 1],
         };
-        for index in 0..len {
+        for (index, value) in values.iter().copied().enumerate() {
             result.add(index, value);
         }
         result
@@ -300,23 +442,22 @@ impl Fenwick {
         self.sum(self.tree.len().saturating_sub(1))
     }
 
-    fn lower_bound(&self, target: f32) -> usize {
-        let len = self.tree.len().saturating_sub(1);
-        if len == 0 || target <= 0.0 {
+    fn lower_bound(&self, target: f32, count: usize) -> usize {
+        if count == 0 || target <= 0.0 {
             return 0;
         }
         let mut index = 0;
         let mut accumulated = 0.0;
-        let mut bit = len.next_power_of_two();
+        let mut bit = count.next_power_of_two();
         while bit != 0 {
             let next = index + bit;
-            if next <= len && accumulated + self.tree[next] <= target {
+            if next <= count && accumulated + self.tree[next] <= target {
                 index = next;
                 accumulated += self.tree[next];
             }
             bit >>= 1;
         }
-        index.min(len.saturating_sub(1))
+        index.min(count.saturating_sub(1))
     }
 }
 

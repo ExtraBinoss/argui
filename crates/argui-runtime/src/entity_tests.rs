@@ -1,8 +1,8 @@
 use std::{cell::Cell, rc::Rc};
 
 use argui_ui::{
-    Element, ElementKind, FocusRequest, FocusTarget, TextSelection, TextSelectionRequest, UiEvent,
-    UiEventKind, UiTree,
+    Element, ElementKind, FocusRequest, FocusTarget, ScrollRequest, ScrollTarget, TextSelection,
+    TextSelectionRequest, UiEvent, UiEventKind, UiTree,
 };
 
 use argui_animation::{Duration, Frame, Time};
@@ -185,7 +185,7 @@ impl Render for Effects {
     fn event(&mut self, _event: &UiEvent, cx: &mut Context<Self>) {
         cx.command(AppCommand::Quit);
         cx.write_clipboard(ClipboardRequest::Write("copied".into()));
-        cx.scroll_to("target", Point::new(2.0, 4.0));
+        cx.scroll(ScrollRequest::offset("target", Point::new(2.0, 4.0)));
         cx.request_focus("target");
         cx.select_text("target", TextSelection::All);
         assert!(cx.capture_pointer(PointerId::MOUSE));
@@ -205,7 +205,13 @@ fn context_bubbles_commands_clipboard_scroll_and_frame_requests() {
         effects.clipboard,
         Some(ClipboardRequest::Write("copied".into()))
     );
-    assert_eq!(effects.scroll.unwrap().key, "target");
+    assert!(matches!(
+        effects.scroll.unwrap().target,
+        ScrollTarget::Offset {
+            container: FocusTarget::Key(key),
+            ..
+        } if key == "target"
+    ));
     assert_eq!(
         effects.focus,
         Some(FocusRequest::Focus(FocusTarget::Key("target".into())))
@@ -239,7 +245,10 @@ fn contexts_create_entities_and_propagate_nested_effects() {
     nested.notify();
     nested.request_animation_frame();
     nested.write_clipboard(ClipboardRequest::Write("nested".into()));
-    nested.scroll_to("nested-target", Point::new(8.0, 13.0));
+    nested.scroll(ScrollRequest::offset(
+        "nested-target",
+        Point::new(8.0, 13.0),
+    ));
     nested.request_focus("nested-target");
     nested.select_text("nested-target", TextSelection::All);
     nested.clear_focus();
@@ -262,7 +271,13 @@ fn contexts_create_entities_and_propagate_nested_effects() {
         parent.effects.clipboard,
         Some(ClipboardRequest::Write("nested".into()))
     );
-    assert_eq!(parent.effects.scroll.unwrap().key, "nested-target");
+    assert!(matches!(
+        parent.effects.scroll.unwrap().target,
+        ScrollTarget::Offset {
+            container: FocusTarget::Key(key),
+            ..
+        } if key == "nested-target"
+    ));
     assert_eq!(parent.effects.focus, Some(FocusRequest::Clear));
     assert_eq!(
         parent.effects.selection_command.unwrap().target,

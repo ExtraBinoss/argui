@@ -33,7 +33,7 @@ impl UiTree {
 
     #[must_use]
     pub fn scroll_offset(&self, node: NodeId) -> Point {
-        let mut base = self.scroll.offset(node);
+        let mut base = self.scroll.visual_offset(node);
         super::transition::apply_scroll(&self.transitions, node, &mut base);
         self.element_for(node).map_or(base, |element| {
             crate::binding::resolved_scroll(&element.bindings, base)
@@ -48,6 +48,31 @@ impl UiTree {
         changed
     }
 
+    pub fn activate_scrollbar(&mut self, node: NodeId, regions: &[ScrollRegion]) {
+        self.scroll.activate_scrollbar(node, regions);
+    }
+
+    pub fn advance_scroll_physics(
+        &mut self,
+        elapsed: f32,
+        regions: &[ScrollRegion],
+    ) -> InteractionUpdate {
+        let changes = self.scroll.advance_overscroll(elapsed);
+        let mut update = InteractionUpdate::default();
+        for change in changes {
+            update.merge(self.scroll_update(change));
+        }
+        if self.scroll.advance_scrollbars(elapsed, regions) {
+            update.paint_changed = true;
+        }
+        update
+    }
+
+    #[must_use]
+    pub fn wants_scroll_frame(&self) -> bool {
+        self.scroll.overscroll_active() || self.scroll.scrollbar_activity_active()
+    }
+
     pub fn scroll(
         &mut self,
         point: Point,
@@ -58,9 +83,13 @@ impl UiTree {
             return InteractionUpdate::default();
         };
         match outcome {
-            crate::scroll::ScrollOutcome::Changed(change) => {
-                self.sync_scroll_motion(change.node, change.offset);
-                self.scroll_update(change)
+            crate::scroll::ScrollOutcome::Changed(changes) => {
+                let mut update = InteractionUpdate::default();
+                for change in changes {
+                    self.sync_scroll_motion(change.node, change.offset);
+                    update.merge(self.scroll_update(change));
+                }
+                update
             }
             crate::scroll::ScrollOutcome::Consumed => InteractionUpdate::default(),
         }
@@ -77,6 +106,7 @@ impl UiTree {
             self.scroll_update(change)
         });
         update.merge(transition_update(self.sync_transitions()));
+        update.paint_changed = true;
         Some(update)
     }
 
@@ -96,9 +126,11 @@ impl UiTree {
     }
 
     pub fn scrollbar_released(&mut self) -> Option<InteractionUpdate> {
-        self.scroll
-            .scrollbar_released()
-            .then(|| transition_update(self.sync_transitions()))
+        self.scroll.scrollbar_released().then(|| {
+            let mut update = transition_update(self.sync_transitions());
+            update.paint_changed = true;
+            update
+        })
     }
 
     pub fn scrollbar_pointer_moved(
@@ -109,7 +141,9 @@ impl UiTree {
         if !self.scroll.update_hover(point, regions) {
             return InteractionUpdate::default();
         }
-        transition_update(self.sync_transitions())
+        let mut update = transition_update(self.sync_transitions());
+        update.paint_changed = true;
+        update
     }
 
     #[must_use]

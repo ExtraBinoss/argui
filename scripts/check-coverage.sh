@@ -14,7 +14,8 @@ command -v jq >/dev/null || {
 
 cd "$repo_root"
 cargo +nightly llvm-cov clean --profraw-only
-cargo +nightly llvm-cov --workspace --all-features --all-targets --branch --no-clean \
+echo "coverage: running workspace library and integration tests"
+cargo +nightly llvm-cov --workspace --all-features --lib --tests --branch --no-clean \
   --jobs "$coverage_jobs" --quiet \
   --json --summary-only --output-path "$summary"
 

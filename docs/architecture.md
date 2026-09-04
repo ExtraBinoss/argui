@@ -136,9 +136,9 @@ unchanged branch in constant time. Quad uploads compare stable POD ranges and
 write only the changed interval through WGPU, identically on Vulkan, Metal,
 DX12, and WebGPU.
 
-`VirtualList` handles fixed rows. `VariableList` maintains measured extents in
-a Fenwick prefix tree, finds visible rows in `O(log n)`, and corrects the scroll
-offset to preserve the current top anchor when earlier measurements change.
+`VirtualList` handles fixed and variable rows. Variable extents use a Fenwick
+prefix tree, find visible rows in `O(log n)`, receive their real measurements
+from layout, and correct the scroll offset to preserve the current top anchor.
 Run `cargo run -p argui-perf-showcase --example perf` for the native million-row
 and component-isolation labs; the crate's `cdylib` entry runs the same labs on
 WASM without DevTools instrumentation.

@@ -317,13 +317,15 @@ impl<A> DevtoolsHost<A> {
         };
         self.search.clear();
         let viewport = (self.dock_height - 84.0).max(80.0);
-        let total = node_count as f32 * 28.0;
-        let centered = index as f32 * 28.0 - (viewport - 28.0) * 0.5;
-        self.tree_offset = centered.clamp(0.0, (total - viewport).max(0.0));
-        self.pending_scroll = Some(ScrollRequest {
-            key: "__devtools-tree".into(),
-            offset: Point::new(0.0, self.tree_offset),
-        });
+        self.tree_offset = view::tree_list_config(node_count, viewport).scroll_to(
+            index,
+            argui_ui::VirtualAlignment::Center,
+            self.tree_offset,
+        );
+        self.pending_scroll = Some(ScrollRequest::offset(
+            "__devtools-tree",
+            Point::new(0.0, self.tree_offset),
+        ));
     }
 
     fn tree_window(&self, offset: f32) -> std::ops::Range<usize> {
@@ -469,7 +471,7 @@ impl<A: Render> Render for DevtoolsHost<A> {
             cx.write_clipboard(request);
         }
         if let Some(request) = self.pending_scroll.take() {
-            cx.scroll_to(request.key, request.offset);
+            cx.scroll(request);
         }
     }
 

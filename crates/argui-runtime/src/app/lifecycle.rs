@@ -18,6 +18,18 @@ use crate::{
 
 use super::Application;
 
+impl Application {
+    pub(super) fn initialize_model_tree(&mut self) {
+        if self.model.is_none() {
+            return;
+        }
+        self.ui_tree = self.inspected_view().map(argui_ui::UiTree::new);
+        if let Some(tree) = &mut self.ui_tree {
+            tree.set_reduced_motion(self.environment.reduced_motion);
+        }
+    }
+}
+
 #[cfg_attr(coverage_nightly, coverage(off))]
 impl ApplicationHandler<UserEvent> for Application {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
@@ -39,14 +51,8 @@ impl ApplicationHandler<UserEvent> for Application {
                 let window = Arc::new(window);
                 let size = window.inner_size();
                 self.scale_factor = window.scale_factor() as f32;
-                if self.preference_overrides.color_scheme.is_none()
-                    && let Some(theme) = window.theme()
-                {
-                    self.environment.color_scheme = match theme {
-                        winit::window::Theme::Light => argui_core::ColorScheme::Light,
-                        winit::window::Theme::Dark => argui_core::ColorScheme::Dark,
-                    };
-                }
+                self.initialize_preference_snapshot(window.theme());
+                self.initialize_model_tree();
                 self.update_viewport(size.width, size.height);
                 if !self.prepare_or_exit(event_loop) {
                     return;
@@ -294,9 +300,11 @@ impl ApplicationHandler<UserEvent> for Application {
             WindowEvent::RedrawRequested => {
                 self.begin_frame_profile();
                 self.advance_touch_selection(&window, event_loop);
-                self.advance_pointer_inertia(&window);
+                self.advance_pointer_inertia(&window, event_loop);
                 self.flush_pointer_scroll(&window, event_loop);
+                self.advance_scroll_physics(&window, event_loop);
                 self.flush_scrollbar_drag(&window, event_loop);
+                self.advance_programmatic_scroll(&window, event_loop);
                 self.animate(&window, event_loop);
                 self.flush_window_frame();
                 self.flush_ui_frame(event_loop);

@@ -1,5 +1,6 @@
 //! Layout boundary backed by Taffy.
 
+mod anchor;
 mod assets;
 mod engine;
 mod error;
@@ -11,6 +12,7 @@ mod scroll;
 mod selection;
 mod style;
 mod text;
+mod virtual_list;
 
 pub use engine::{LayoutEngine, LayoutNode, LayoutOutput, PaintStats, PortalLayout};
 pub use error::LayoutError;

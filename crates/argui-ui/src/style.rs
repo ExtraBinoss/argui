@@ -9,13 +9,20 @@ pub use taffy::{
     FlexWrap, GridAutoFlow, GridPlacement, GridTemplateArea, GridTemplateAreas,
     GridTemplateComponent, GridTemplateRepetition, JustifyContent, JustifyItems, JustifySelf,
     LengthPercentage, LengthPercentageAuto, MaxTrackSizingFunction, MinTrackSizingFunction,
-    Position, RepetitionCount, TrackSizingFunction, geometry::Line,
-    style::Direction as WritingDirection,
+    RepetitionCount, TrackSizingFunction, geometry::Line, style::Direction as WritingDirection,
 };
 
 pub type Sides<T> = taffy::geometry::Rect<T>;
 pub type Dimensions<T> = taffy::geometry::Size<T>;
 pub type Axes<T> = taffy::geometry::Point<T>;
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum Position {
+    #[default]
+    Relative,
+    Absolute,
+    Sticky,
+}
 
 #[must_use]
 pub fn sides<T>(horizontal: f32, vertical: f32) -> Sides<T>

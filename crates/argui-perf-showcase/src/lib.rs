@@ -5,8 +5,8 @@ use argui::{
     runtime::{Context, Entity, Render},
     text::{TextColor, TextStyle, TextWrap},
     ui::{
-        Axes, Element, Overflow, ScrollConfig, Sides, UiEvent, UiEventKind, VariableList,
-        VirtualList, percent, sides,
+        Axes, Element, Overflow, ScrollConfig, Sides, UiEvent, UiEventKind, VirtualList, percent,
+        sides,
     },
 };
 
@@ -106,18 +106,6 @@ impl Render for PerfShowcase {
                 _ => {}
             }
         }
-        if event.kind == UiEventKind::Clicked
-            && event.key.as_deref() == Some("perf-measure-variable")
-        {
-            self.variable.update(|lab, child| {
-                let index = lab.list.window(lab.offset).range.start.saturating_add(2);
-                let extent = 28.0 + (index % 7) as f32 * 9.0;
-                let update = lab.list.measure(index, extent, lab.offset);
-                lab.offset = update.corrected_offset;
-                child.notify();
-            });
-            cx.notify();
-        }
     }
 }
 
@@ -150,7 +138,7 @@ struct FixedListLab {
 impl Default for FixedListLab {
     fn default() -> Self {
         Self {
-            list: VirtualList::new(ROWS, 28.0, 240.0).overscan(4),
+            list: VirtualList::fixed(ROWS, 28.0, 240.0).overscan(4),
             offset: 0.0,
             renders: 0,
         }
@@ -176,7 +164,7 @@ impl Render for FixedListLab {
 }
 
 struct VariableListLab {
-    list: VariableList,
+    list: VirtualList,
     offset: f32,
     renders: u64,
 }
@@ -184,7 +172,7 @@ struct VariableListLab {
 impl Default for VariableListLab {
     fn default() -> Self {
         Self {
-            list: VariableList::new(ROWS, 34.0, 260.0).overscan(5),
+            list: VirtualList::variable(ROWS, 34.0, 260.0).overscan(5),
             offset: 0.0,
             renders: 0,
         }
@@ -197,12 +185,10 @@ impl Render for VariableListLab {
         panel([
             Element::text("1,000,000 variable-height rows · anchored measurements")
                 .text_style(text(19.0, TextColor::WHITE, 700)),
-            Element::text("Measure a visible row")
-                .keyed("perf-measure-variable")
-                .padding(sides(12.0, 8.0))
-                .background(Color::srgb(0.20, 0.35, 0.58))
-                .radius(CornerRadii::all(8.0)),
-            self.list.build("perf-million-variable", self.offset, row),
+            Element::text("Visible rows are measured automatically; the anchor stays fixed.")
+                .text_style(text(14.0, TextColor::srgb(0.62, 0.70, 0.82), 500)),
+            self.list
+                .build("perf-million-variable", self.offset, variable_row),
         ])
     }
 }
@@ -212,6 +198,20 @@ fn row(index: usize) -> Element {
         .keyed(format!("perf-row-{index}"))
         .padding(sides(10.0, 4.0))
         .text_style(text(14.0, TextColor::srgb(0.76, 0.82, 0.91), 500))
+}
+
+fn variable_row(index: usize) -> Element {
+    Element::text(format!(
+        "row {index:07}{}",
+        if index.is_multiple_of(3) {
+            " · expanded content"
+        } else {
+            ""
+        }
+    ))
+    .keyed(format!("perf-variable-row-{index}"))
+    .padding(sides(10.0, 5.0 + (index % 4) as f32 * 4.0))
+    .text_style(text(14.0, TextColor::srgb(0.76, 0.82, 0.91), 500))
 }
 
 fn panel(children: impl IntoIterator<Item = Element>) -> Element {

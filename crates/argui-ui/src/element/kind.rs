@@ -23,6 +23,7 @@ pub struct ElementNode {
     pub layer: Option<argui_paint::LayerStyle>,
     pub effects: Vec<crate::ScopedEffect>,
     pub scroll: Option<crate::ScrollConfig>,
+    pub(crate) virtual_item: Option<crate::VirtualItem>,
     pub portal: Option<crate::Portal>,
     pub focus_scope: Option<crate::FocusScope>,
     pub event_owner: Option<crate::EventOwnerId>,

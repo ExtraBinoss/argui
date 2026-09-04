@@ -1,8 +1,8 @@
 use argui_paint::{Color, PaintStyle};
 use argui_text::{TextColor, TextOverflow, TextStyle, TextWrap};
 use argui_ui::{
-    AlignItems, Axes, CaretStyle, Element, LayoutStyle, Overflow, Role, ScrollChaining,
-    ScrollConfig, ScrollbarGutter, ScrollbarStyle, StateSelector, StylePatch, StyleTransition,
+    AlignItems, Axes, CaretStyle, Element, LayoutStyle, Overflow, Role, ScrollConfig,
+    ScrollPropagation, ScrollbarGutter, ScrollbarStyle, StateSelector, StylePatch, StyleTransition,
     TextEditorSpec, TextInputFilter, VisualState, percent,
 };
 
@@ -232,7 +232,7 @@ impl TextArea {
             value: value.into(),
             placeholder: placeholder.into(),
             style,
-            scroll: ScrollConfig::default().chaining(ScrollChaining::Contain),
+            scroll: ScrollConfig::default().propagation(ScrollPropagation::Contain),
             enabled: true,
             read_only: false,
         }

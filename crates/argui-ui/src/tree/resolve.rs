@@ -82,6 +82,9 @@ impl UiTree {
                 crate::scroll::ScrollbarPart::Thumb,
                 &mut scrollbar.thumb.base,
             );
+            let opacity = self.scroll.scrollbar_opacity(node, scrollbar.visibility);
+            scrollbar.track.base.opacity *= opacity;
+            scrollbar.thumb.base.opacity *= opacity;
         }
         resolved
     }

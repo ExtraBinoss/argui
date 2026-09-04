@@ -7,7 +7,7 @@ use argui_platform::{ApplicationConfig, CloseBehavior, WindowKey, WindowLevel, W
 use argui_platform::{TrayAction, TrayEvent};
 use argui_render::RendererConfig;
 use argui_text::TextEngine;
-use argui_ui::{Element, UiTree};
+use argui_ui::Element;
 use winit::{
     application::ApplicationHandler,
     event::WindowEvent,
@@ -113,9 +113,6 @@ impl MultiApplication {
             model: Rc::clone(&self.model),
             pending: Rc::clone(&self.pending),
         };
-        let root = adapter
-            .view(crate::WindowEnvironment::default())
-            .unwrap_or_else(|| Element::container(Vec::<Element>::new()));
         let callback = scoped_callback(
             key.clone(),
             Rc::clone(&self.model),
@@ -127,7 +124,7 @@ impl MultiApplication {
             self.renderer_config.clone(),
             self.initial_text_engine.take().unwrap_or_default(),
             None,
-            Some(UiTree::new(root)),
+            None,
             Some(Entity::new(adapter).erase()),
             callback,
         )
@@ -446,7 +443,7 @@ impl Render for WindowModel {
             cx.write_clipboard(request);
         }
         if let Some(request) = self.model.borrow_mut().take_scroll_request(&self.key) {
-            cx.scroll_to(request.key, request.offset);
+            cx.scroll(request);
         }
         if let Some(request) = self.model.borrow_mut().take_focus_request(&self.key) {
             match request {

@@ -15,6 +15,9 @@ mod overlay;
 mod resize;
 mod responsive;
 mod scroll;
+mod scroll_config;
+mod scroll_physics;
+mod scroll_request;
 mod semantics;
 mod state;
 mod style;
@@ -58,10 +61,13 @@ pub use overlay::{
 };
 pub use resize::{Resizable, ResizeAxes, ResizeConfig, ResizeEvent, ResizeState};
 pub use responsive::{ContainerQuery, ContainerScopeId};
-pub use scroll::{
-    ScrollAxes, ScrollChaining, ScrollConfig, ScrollPolarity, ScrollRegion, ScrollbarPartStyle,
-    ScrollbarRegion, ScrollbarStyle, scrollbar_at,
+pub use scroll::{ScrollRegion, ScrollbarAxis, ScrollbarGeometry, ScrollbarRegion, scrollbar_at};
+pub use scroll_config::{
+    ElasticScroll, InertialScroll, OverscrollBehavior, ScrollAnchoring, ScrollAxes, ScrollConfig,
+    ScrollPhysics, ScrollPolarity, ScrollPropagation, ScrollbarPartStyle, ScrollbarStyle,
+    ScrollbarVisibility,
 };
+pub use scroll_request::{ScrollAlignment, ScrollBehavior, ScrollRequest, ScrollTarget};
 pub use state::{
     EffectPropertyKey, PropertyKey, State, StateName, StateScopeId, StateSelector, StyleCondition,
     StylePatch, StyleProperty, StylePropertyValue, StyleTransition, TransitionDirection,
@@ -85,4 +91,6 @@ pub use text_selection::{
     SelectionGranularity, TextSelectionStyle, UserSelect,
 };
 pub use tree::{TreeUpdate, TreeUpdateStats, UiTree};
-pub use virtual_list::{MeasurementUpdate, VariableList, VirtualList, VirtualWindow};
+pub use virtual_list::{
+    MeasurementUpdate, VirtualAlignment, VirtualItem, VirtualList, VirtualWindow,
+};

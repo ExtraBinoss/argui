@@ -81,9 +81,11 @@ fn structural_updates_preserve_unchanged_taffy_branches() {
 #[test]
 fn virtual_windows_recycle_only_their_changed_rows() {
     let list = |offset| {
-        argui_ui::VirtualList::new(1_000_000, 36.0, 260.0).build("million-list", offset, |index| {
-            Element::text(index.to_string()).keyed(format!("row-{index}"))
-        })
+        argui_ui::VirtualList::fixed(1_000_000, 36.0, 260.0).build(
+            "million-list",
+            offset,
+            |index| Element::text(index.to_string()).keyed(format!("row-{index}")),
+        )
     };
     let mut ui = UiTree::new(list(0.0));
     let mut engine = LayoutEngine::new();

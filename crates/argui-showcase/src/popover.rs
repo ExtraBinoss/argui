@@ -6,7 +6,8 @@ use argui_paint::{Border, Color, CornerRadii, Filter, LayerMask, LayerStyle, Sha
 use argui_text::TextWrap;
 use argui_ui::{
     Axes, Element, FlexWrap, FloatingPlacement, FocusScope, InitialFocus, Interaction, Overflow,
-    Placement, ScrollChaining, ScrollConfig, Sides, WindowLayer, length, percent, property, sides,
+    Placement, ScrollConfig, ScrollPropagation, Sides, WindowLayer, length, percent, property,
+    sides,
 };
 use argui_widgets::WidgetTheme;
 
@@ -129,7 +130,7 @@ impl StateShowcase {
             .scroll_config(
                 ScrollConfig::default()
                     .enabled(progress > 0.0)
-                    .chaining(ScrollChaining::Contain)
+                    .propagation(ScrollPropagation::Contain)
                     .scrollbar(self.scrollbar_style(widgets)),
             )
             .transform(entry_transform(progress))

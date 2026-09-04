@@ -68,6 +68,7 @@ impl Element {
             layer: None,
             effects: Vec::new(),
             scroll: None,
+            virtual_item: None,
             portal: None,
             focus_scope: None,
             event_owner: None,
@@ -130,6 +131,7 @@ impl Element {
             layer: None,
             effects: Vec::new(),
             scroll: None,
+            virtual_item: None,
             portal: None,
             focus_scope: None,
             event_owner: None,
@@ -162,6 +164,11 @@ impl Element {
     #[must_use]
     pub fn ptr_eq(&self, other: &Self) -> bool {
         Rc::ptr_eq(&self.0, &other.0)
+    }
+
+    #[must_use]
+    pub fn virtual_item(&self) -> Option<&crate::VirtualItem> {
+        self.virtual_item.as_ref()
     }
 
     #[must_use]

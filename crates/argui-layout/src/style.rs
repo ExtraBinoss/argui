@@ -14,7 +14,10 @@ pub(crate) fn taffy_style(style: &LayoutStyle) -> Style {
             ScrollbarGutter::Auto => 0.0,
             ScrollbarGutter::Stable => style.scrollbar_width.max(0.0),
         },
-        position: style.position,
+        position: match style.position {
+            argui_ui::Position::Relative | argui_ui::Position::Sticky => taffy::Position::Relative,
+            argui_ui::Position::Absolute => taffy::Position::Absolute,
+        },
         inset: style.inset,
         size: style.size,
         min_size: style.min_size,
