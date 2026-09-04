@@ -1,4 +1,4 @@
-use argui_core::{Color, ColorScheme};
+use argui_core::{Color, ColorScheme, Transform2D};
 use argui_ui::{Role, UiEvent, UiEventKind, UiTree, UserSelect};
 use argui_widgets::{
     Checkbox, RadioGroup, RadioGroupAction, RadioGroupBehavior, RadioOption, Switch, ToggleAction,
@@ -62,4 +62,23 @@ fn boolean_and_exclusive_controls_publish_controlled_state() {
         None,
     );
     assert_eq!(disabled.action(&click("quality::option::1")), None);
+}
+
+#[test]
+fn switch_thumb_uses_a_retained_transform_transition() {
+    let themes = shadcn(Color::srgb(0.2, 0.5, 0.9));
+    let theme = themes.resolve(ColorScheme::Dark);
+    let mut tree = UiTree::new(Switch::new("profile", "Profile", false).build(theme));
+    let thumb = tree.node_id_at(2).unwrap();
+    assert_eq!(
+        tree.resolved_transform(thumb, tree.element_at(2).unwrap()),
+        Transform2D::IDENTITY
+    );
+
+    tree.set_reduced_motion(true);
+    tree.update(Switch::new("profile", "Profile", true).build(theme));
+    assert_eq!(
+        tree.resolved_transform(thumb, tree.element_at(2).unwrap()),
+        Transform2D::IDENTITY.translate(18.0, 0.0)
+    );
 }

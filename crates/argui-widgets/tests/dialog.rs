@@ -1,4 +1,5 @@
 use argui_core::{Key, KeyInput, KeyState, Modifiers};
+use argui_paint::{PaintStyle, QuadStyle};
 use argui_ui::{Element, Role, UiEvent, UiEventKind, UiTree};
 use argui_widgets::{Button, Dialog, DialogAction, DialogBehavior, shadcn};
 
@@ -74,10 +75,18 @@ fn dialog_actions_and_modal_tree_are_explicit() {
         Button::new("ignored", "Open", theme.button.clone()).build(),
         Element::text("content"),
     )
+    .backdrop(argui_core::Color::srgba(0.1, 0.2, 0.3, 0.4))
+    .backdrop_blur(0.0)
+    .panel_paint(PaintStyle::new(QuadStyle::solid(argui_core::Color::BLACK)))
+    .panel_width(320.0)
+    .viewport_margin(18.0)
     .build(theme);
     assert_eq!(dialog.children.len(), 2);
     assert!(dialog.children[1].focus_scope.is_some());
-    assert_eq!(dialog.children[1].z_index, 2_000);
+    assert_eq!(
+        dialog.children[1].portal.as_ref().unwrap().layer,
+        argui_ui::WindowLayer::Modal
+    );
     assert_eq!(
         dialog.children[1].children[1]
             .semantics
@@ -86,4 +95,30 @@ fn dialog_actions_and_modal_tree_are_explicit() {
             .role,
         Role::Dialog
     );
+}
+
+#[test]
+fn dialog_default_surface_uses_the_theme_blurs() {
+    let themes = shadcn(argui_core::Color::srgb(0.2, 0.5, 0.9));
+    let theme = themes.resolve(argui_core::ColorScheme::Dark);
+    let dialog = Dialog::new(
+        "default-dialog",
+        "Default dialog",
+        true,
+        Element::text("Open"),
+        Element::text("Content"),
+    )
+    .build(theme);
+    let overlay = &dialog.children[1];
+
+    assert!(
+        !overlay.children[0]
+            .layer
+            .as_ref()
+            .unwrap()
+            .backdrop_filters
+            .is_empty()
+    );
+    assert!(overlay.children[1].layer.is_some());
+    assert!(overlay.children[1].paint.quad.background.is_some());
 }

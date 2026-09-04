@@ -34,6 +34,7 @@ pub(crate) struct TextGpu {
 
 pub(crate) struct TextDraw {
     ranges: Vec<Range<u32>>,
+    changed: bool,
 }
 
 impl TextDraw {
@@ -43,6 +44,10 @@ impl TextDraw {
 
     pub fn ranges(&self) -> &[Range<u32>] {
         &self.ranges
+    }
+
+    pub const fn changed(&self) -> bool {
+        self.changed
     }
 }
 
@@ -95,15 +100,18 @@ impl TextGpu {
         let visuals = display_list.map(|list| block_visuals(list, text.blocks));
         match self.prepare_once(queue, engine, text, visuals.as_deref(), scale_factor) {
             Ok((instances, ranges, clips)) => {
-                self.pipeline.write(device, queue, &instances, &clips);
-                Ok(TextDraw { ranges })
+                let changed = self.pipeline.write(device, queue, &instances, &clips);
+                Ok(TextDraw { ranges, changed })
             }
             Err(RendererError::GlyphAtlasFull) => {
                 self.atlas.reset();
                 let (instances, ranges, clips) =
                     self.prepare_once(queue, engine, text, visuals.as_deref(), scale_factor)?;
                 self.pipeline.write(device, queue, &instances, &clips);
-                Ok(TextDraw { ranges })
+                Ok(TextDraw {
+                    ranges,
+                    changed: true,
+                })
             }
             Err(error) => Err(error),
         }
@@ -246,10 +254,12 @@ mod tests {
     fn text_draws_keep_per_block_ranges_and_full_extent() {
         let draw = TextDraw {
             ranges: vec![0..3, 0..0, 3..7, 0..0],
+            changed: false,
         };
 
         assert_eq!(draw.all(), 0..7);
         assert_eq!(draw.ranges(), &[0..3, 0..0, 3..7, 0..0]);
+        assert!(!draw.changed());
     }
 
     #[test]

@@ -1,7 +1,9 @@
-use argui_core::{Point, ScrollDelta};
+use argui_core::{Affine2D, Point, PointerEvent, PointerPhase, Rect, ScrollDelta, Size};
+use argui_paint::{ClipChain, ClipRegion};
 use argui_ui::{
-    Element, EventListenerOptions, EventOwnerId, EventPhase, EventType, UiEvent, UiEventKind,
-    UiTree,
+    CursorIcon, DismissPolicy, Element, EventListenerOptions, EventOwnerId, EventPhase, EventType,
+    FloatingPlacement, GestureSet, HitRegion, HitShape, Placement, Sides, UiEvent, UiEventKind,
+    UiTree, WindowLayer,
 };
 
 fn event_tree() -> UiTree {
@@ -134,6 +136,7 @@ fn event_metadata_matches_dom_delivery_rules() {
         EventType::Scroll,
     ];
     let direct = [
+        EventType::PointerOutside,
         EventType::GotPointerCapture,
         EventType::LostPointerCapture,
         EventType::Key,
@@ -176,6 +179,122 @@ fn listeners_are_unique_and_event_owners_are_stable() {
     root.assign_event_owner(EventOwnerId(9));
     assert_eq!(root.event_owner, Some(EventOwnerId(7)));
     assert_eq!(root.children[0].event_owner, Some(EventOwnerId(7)));
+}
+
+#[test]
+fn top_light_dismiss_portal_receives_pointer_outside() {
+    let mut tree = UiTree::new(Element::container([
+        Element::container([]).keyed("outside"),
+        Element::container([Element::container([]).keyed("inside")])
+            .keyed("portal")
+            .portal(WindowLayer::Popover)
+            .portal_dismiss(DismissPolicy::OutsidePointer),
+    ]));
+    let bounds = Rect::new(Point::default(), Size::new(20.0, 20.0));
+    let region = |node| HitRegion {
+        node,
+        bounds,
+        transform: Affine2D::IDENTITY,
+        clips: ClipChain::from_regions([ClipRegion::new(bounds, Affine2D::IDENTITY)]),
+        shape: HitShape::Bounds,
+        slop: Sides::default(),
+        enabled: true,
+        focusable: false,
+        cursor: CursorIcon::Auto,
+        gestures: GestureSet::NONE,
+        window_drag: None,
+    };
+    let outside = region(tree.node_id_at(1).unwrap());
+    let update = tree.pointer_event(
+        PointerEvent::mouse(PointerPhase::Pressed, Point::new(5.0, 5.0)),
+        &[outside],
+    );
+
+    assert!(update.events.iter().any(|event| {
+        event.target == tree.node_id_at(2).unwrap()
+            && matches!(event.kind, UiEventKind::PointerOutside)
+    }));
+
+    let inside = region(tree.node_id_at(3).unwrap());
+    let update = tree.pointer_event(
+        PointerEvent::mouse(PointerPhase::Pressed, Point::new(5.0, 5.0)),
+        &[inside],
+    );
+    assert!(
+        !update
+            .events
+            .iter()
+            .any(|event| matches!(event.kind, UiEventKind::PointerOutside))
+    );
+}
+
+#[test]
+fn manual_portals_are_ignored_and_only_the_top_outside_portal_dismisses() {
+    let mut tree = UiTree::new(Element::container([
+        Element::container([])
+            .keyed("manual")
+            .portal(WindowLayer::Popover),
+        Element::container([])
+            .keyed("lower")
+            .portal(WindowLayer::Popover)
+            .portal_dismiss(DismissPolicy::OutsidePointer),
+        Element::container([])
+            .keyed("upper")
+            .portal(WindowLayer::Popover)
+            .portal_dismiss(DismissPolicy::OutsidePointer),
+    ]));
+    let update = tree.pointer_event(
+        PointerEvent::mouse(PointerPhase::Pressed, Point::new(50.0, 50.0)),
+        &[],
+    );
+    let outside = update
+        .events
+        .iter()
+        .filter(|event| matches!(event.kind, UiEventKind::PointerOutside))
+        .collect::<Vec<_>>();
+
+    assert_eq!(outside.len(), 1);
+    assert_eq!(outside[0].target, tree.node_id_at(3).unwrap());
+}
+
+#[test]
+fn anchored_portal_treats_its_trigger_subtree_as_inside() {
+    let mut tree = UiTree::new(Element::container([
+        Element::container([Element::container([]).keyed("trigger-child")]).keyed("trigger"),
+        Element::container([])
+            .keyed("popover")
+            .anchored_portal(
+                WindowLayer::Popover,
+                "trigger",
+                FloatingPlacement::new(Placement::BottomStart),
+            )
+            .portal_dismiss(DismissPolicy::OutsidePointer),
+    ]));
+    let bounds = Rect::new(Point::default(), Size::new(20.0, 20.0));
+    let trigger_child = HitRegion {
+        node: tree.node_id_at(2).unwrap(),
+        bounds,
+        transform: Affine2D::IDENTITY,
+        clips: ClipChain::from_regions([ClipRegion::new(bounds, Affine2D::IDENTITY)]),
+        shape: HitShape::Bounds,
+        slop: Sides::default(),
+        enabled: true,
+        focusable: false,
+        cursor: CursorIcon::Auto,
+        gestures: GestureSet::NONE,
+        window_drag: None,
+    };
+    let update = tree.pointer_event(
+        PointerEvent::mouse(PointerPhase::Pressed, Point::new(5.0, 5.0)),
+        &[trigger_child],
+    );
+
+    assert!(
+        update
+            .events
+            .iter()
+            .all(|event| !matches!(event.kind, UiEventKind::PointerOutside))
+    );
 }
 
 #[test]

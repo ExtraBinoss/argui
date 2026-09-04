@@ -28,6 +28,24 @@ pub(crate) fn sidebar<A>(
             .text_style(text(13.0, theme.foreground)),
         button("__devtools-reset", "Reset overrides", false, theme),
     ];
+    if let Some(portal) = &node.portal {
+        rows.insert(
+            1,
+            Element::text(format!(
+                "Portal {} · {} → {} · available {:?}{}",
+                portal.layer,
+                portal.requested.as_deref().unwrap_or("viewport"),
+                portal.resolved.as_deref().unwrap_or("viewport"),
+                portal.available_size,
+                if portal.constrained_width || portal.constrained_height {
+                    " · constrained"
+                } else {
+                    ""
+                }
+            ))
+            .text_style(text(11.0, theme.muted_foreground)),
+        );
+    }
     let groups = [
         ("Layout", &[StyleProperty::Width, StyleProperty::Height][..]),
         (

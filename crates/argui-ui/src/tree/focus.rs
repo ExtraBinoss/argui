@@ -21,14 +21,19 @@ struct ScopeEntry {
 struct ScopeFrame {
     node: NodeId,
     restore: Option<NodeId>,
+    restore_visible: bool,
 }
 
 #[derive(Clone, Debug)]
 enum FocusIntent {
-    First(NodeId),
+    First {
+        scope: NodeId,
+        visible: Option<bool>,
+    },
     Target {
         target: FocusTarget,
         within: Option<NodeId>,
+        visible: Option<bool>,
     },
     Clear,
 }
@@ -53,6 +58,7 @@ impl FocusRegistry {
             registry.stack.push(ScopeFrame {
                 node: entry.node,
                 restore: None,
+                restore_visible: false,
             });
             if let Some(initial) = &entry.policy.initial {
                 registry.pending.push(initial_intent(entry.node, initial));
@@ -66,6 +72,7 @@ impl FocusRegistry {
         root: &Element,
         ids: &[NodeId],
         focused_before: Option<NodeId>,
+        focus_visible_before: bool,
         removed_focus: Option<UiEvent>,
     ) {
         let next = collect_scopes(root, ids);
@@ -86,6 +93,7 @@ impl FocusRegistry {
                 self.pending.push(FocusIntent::Target {
                     target: target.into(),
                     within: None,
+                    visible: Some(frame.restore_visible),
                 });
             }
         }
@@ -99,6 +107,7 @@ impl FocusRegistry {
             self.stack.push(ScopeFrame {
                 node: entry.node,
                 restore: focused_before,
+                restore_visible: focus_visible_before,
             });
             if let Some(initial) = &entry.policy.initial {
                 self.pending.push(initial_intent(entry.node, initial));
@@ -108,7 +117,13 @@ impl FocusRegistry {
         if let Some(event) = removed_focus {
             self.events.push(event);
             if let Some(scope) = self.active_trap() {
-                self.pending.insert(0, FocusIntent::First(scope));
+                self.pending.insert(
+                    0,
+                    FocusIntent::First {
+                        scope,
+                        visible: Some(focus_visible_before),
+                    },
+                );
             }
         }
     }
@@ -281,17 +296,25 @@ impl UiTree {
                 FocusRequest::Focus(target) => FocusIntent::Target {
                     target,
                     within: None,
+                    visible: Some(true),
                 },
                 FocusRequest::Clear => FocusIntent::Clear,
             });
         }
         for intent in intents {
             let active = self.focus.active_trap();
-            let target = match intent {
-                FocusIntent::First(scope) => self.first_focusable(regions, scope),
-                FocusIntent::Target { target, within } => {
-                    self.resolve_focus_target(regions, &target, within.or(active))
+            let (target, visible) = match intent {
+                FocusIntent::First { scope, visible } => {
+                    (self.first_focusable(regions, scope), visible)
                 }
+                FocusIntent::Target {
+                    target,
+                    within,
+                    visible,
+                } => (
+                    self.resolve_focus_target(regions, &target, within.or(active)),
+                    visible,
+                ),
                 FocusIntent::Clear if active.is_none() => {
                     let raw = self.interaction.clear_focus();
                     update.merge(self.decorate(raw));
@@ -300,7 +323,14 @@ impl UiTree {
                 FocusIntent::Clear => continue,
             };
             if let Some(target) = target {
-                let raw = self.interaction.focus_node(target, regions);
+                let raw = match visible {
+                    Some(visible) => self
+                        .interaction
+                        .focus_node_with_visibility(target, regions, visible),
+                    None => self
+                        .interaction
+                        .focus_node_preserving_visibility(target, regions),
+                };
                 update.merge(self.decorate(raw));
             }
         }
@@ -363,10 +393,14 @@ impl UiTree {
 
 fn initial_intent(scope: NodeId, initial: &InitialFocus) -> FocusIntent {
     match initial {
-        InitialFocus::First => FocusIntent::First(scope),
+        InitialFocus::First => FocusIntent::First {
+            scope,
+            visible: None,
+        },
         InitialFocus::Target(target) => FocusIntent::Target {
             target: target.clone(),
             within: Some(scope),
+            visible: None,
         },
     }
 }

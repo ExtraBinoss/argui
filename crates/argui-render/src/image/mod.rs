@@ -103,7 +103,7 @@ impl ImageGpu {
         queue: &wgpu::Queue,
         display_list: &DisplayList,
         scale_factor: f32,
-    ) -> Result<(), RendererError> {
+    ) -> Result<bool, RendererError> {
         let images = display_list
             .commands()
             .iter()
@@ -120,8 +120,7 @@ impl ImageGpu {
             let size = self.textures[&image.image].size;
             instances.push(ImageInstance::new(image, size, scale_factor, &mut clips));
         }
-        self.pipeline.write(device, queue, &instances, &clips);
-        Ok(())
+        Ok(self.pipeline.write(device, queue, &instances, &clips))
     }
 
     pub fn begin_frame(&mut self) {

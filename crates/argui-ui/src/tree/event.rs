@@ -41,7 +41,7 @@ impl EventRegistry {
         });
     }
 
-    fn parent(&self, index: usize) -> Option<usize> {
+    pub(super) fn parent(&self, index: usize) -> Option<usize> {
         self.parents.get(index).copied().flatten()
     }
 

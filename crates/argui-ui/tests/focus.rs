@@ -160,6 +160,48 @@ fn trapped_scope_autofocuses_cycles_and_restores_the_trigger() {
 }
 
 #[test]
+fn pointer_opened_scope_preserves_hidden_focus_rings() {
+    fn view(open: bool) -> Element {
+        Element::column(std::iter::once(control("trigger")).chain(open.then(|| {
+            Element::column([control("inside")])
+                .keyed("popover")
+                .focus_scope(FocusScope::trapped(InitialFocus::First))
+        })))
+    }
+
+    let mut tree = UiTree::new(view(false));
+    let trigger = tree.node_id_at(1).unwrap();
+    let closed_regions = [region(trigger, 0.0)];
+    tree.pointer_moved(Point::new(10.0, 10.0), &closed_regions);
+    tree.primary_pressed(&closed_regions);
+    assert!(
+        !tree
+            .visual_states(trigger)
+            .contains(VisualState::FocusVisible)
+    );
+
+    tree.update(view(true));
+    let inside = tree.node_id_at(3).unwrap();
+    let open_regions = [region(trigger, 0.0), region(inside, 50.0)];
+    tree.sync_focus(&open_regions, None);
+    assert_eq!(tree.focused_node(), Some(inside));
+    assert!(
+        !tree
+            .visual_states(inside)
+            .contains(VisualState::FocusVisible)
+    );
+
+    tree.update(view(false));
+    tree.sync_focus(&closed_regions, None);
+    assert_eq!(tree.focused_node(), Some(trigger));
+    assert!(
+        !tree
+            .visual_states(trigger)
+            .contains(VisualState::FocusVisible)
+    );
+}
+
+#[test]
 fn modal_scope_hides_background_semantics_and_marks_the_dialog() {
     let tree = UiTree::new(Element::column([
         control("background").semantics(Semantics::new(Role::Button).label("Background")),
@@ -207,6 +249,8 @@ fn invalid_explicit_targets_never_move_or_clear_valid_focus() {
     assert_eq!(tree.focused_node(), Some(valid));
     tree.sync_focus(&regions, Some(FocusRequest::Focus("missing".into())));
     assert_eq!(tree.focused_node(), Some(valid));
+    tree.sync_focus(&regions, Some(FocusRequest::Clear));
+    assert_eq!(tree.focused_node(), None);
 }
 
 #[test]

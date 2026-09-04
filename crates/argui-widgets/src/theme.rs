@@ -25,6 +25,9 @@ pub struct WidgetTheme {
     pub border: Color,
     pub input_border: Color,
     pub ring: Color,
+    pub overlay_blur: f32,
+    pub dialog_backdrop: Color,
+    pub dialog_backdrop_blur: f32,
     pub button: ButtonStyle,
     pub secondary_button: ButtonStyle,
     pub outline_button: ButtonStyle,
@@ -134,6 +137,9 @@ fn widgets(scheme: ColorScheme, primary: Color) -> WidgetTheme {
         border,
         input_border: border,
         ring: primary,
+        overlay_blur: 12.0,
+        dialog_backdrop: Color::srgba(0.0, 0.0, 0.0, 0.62),
+        dialog_backdrop_blur: 4.0,
         button,
         secondary_button,
         outline_button,
@@ -155,8 +161,8 @@ fn button_style(
     text.weight = 600;
     let resting = quad(background, border);
     let active = quad(
-        mix(background, active_mix, 0.10),
-        mix(border, active_mix, 0.24),
+        mix(background, active_mix, 0.16),
+        mix(border, active_mix, 0.36),
     );
     let mut style = ButtonStyle::new(PaintStyle::new(resting.clone()), text)
         .hovered(active.clone())

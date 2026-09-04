@@ -95,6 +95,39 @@ fn button_hover_uses_the_shared_retained_visual_state_path() {
 }
 
 #[test]
+fn themed_outline_button_has_a_visible_hover_surface() {
+    let themes = shadcn(Color::srgb(0.2, 0.5, 0.9));
+    let theme = themes.resolve(ColorScheme::Dark);
+    let element = Button::new("close", "Close dialog", theme.outline_button.clone()).build();
+    let resting = element.paint.quad.background.clone();
+    let mut tree = UiTree::new(element);
+    let node = tree.node_ids()[0];
+    tree.set_reduced_motion(true);
+    tree.pointer_moved(
+        Point::new(2.0, 2.0),
+        &[HitRegion {
+            node,
+            bounds: Rect::new(Point::default(), Size::new(120.0, 36.0)),
+            transform: Affine2D::IDENTITY,
+            clips: ClipChain::default(),
+            shape: argui_ui::HitShape::Bounds,
+            slop: argui_ui::HitTestStyle::default().slop,
+            enabled: true,
+            focusable: true,
+            cursor: CursorIcon::Pointer,
+            gestures: argui_ui::GestureSet::NONE,
+            window_drag: None,
+        }],
+    );
+
+    assert_ne!(
+        tree.resolved_quad(node, tree.element_at(0).unwrap())
+            .background,
+        resting
+    );
+}
+
+#[test]
 fn headless_button_decodes_only_enabled_activation() {
     let tree = UiTree::new(Element::container([]));
     let clicked = UiEvent::new(

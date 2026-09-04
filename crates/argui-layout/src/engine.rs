@@ -32,7 +32,21 @@ pub struct LayoutOutput {
     pub text_regions: Vec<TextRegion>,
     pub display_list: DisplayList,
     pub text: TextScene,
+    pub portals: Vec<PortalLayout>,
     pub paint_stats: PaintStats,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct PortalLayout {
+    pub node: UiNodeId,
+    pub layer: argui_ui::WindowLayer,
+    pub anchor: Option<String>,
+    pub requested: Option<argui_ui::Placement>,
+    pub resolved: Option<argui_ui::Placement>,
+    pub bounds: Rect,
+    pub available_size: Size,
+    pub constrained_width: bool,
+    pub constrained_height: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]

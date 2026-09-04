@@ -32,6 +32,7 @@ pub enum EventType {
     PointerLeave,
     PointerMove,
     PointerDown,
+    PointerOutside,
     PointerUp,
     Click,
     ContextMenu,
@@ -117,6 +118,7 @@ pub enum UiEventKind {
     PointerLeft,
     PointerMoved(Point),
     Pressed,
+    PointerOutside,
     Released,
     Clicked,
     ContextMenu {
@@ -159,6 +161,7 @@ impl UiEventKind {
             Self::PointerLeft => EventType::PointerLeave,
             Self::PointerMoved(_) => EventType::PointerMove,
             Self::Pressed => EventType::PointerDown,
+            Self::PointerOutside => EventType::PointerOutside,
             Self::Released => EventType::PointerUp,
             Self::Clicked => EventType::Click,
             Self::ContextMenu { .. } => EventType::ContextMenu,
@@ -195,6 +198,7 @@ impl UiEventKind {
         matches!(
             self,
             Self::Pressed
+                | Self::PointerOutside
                 | Self::Released
                 | Self::Clicked
                 | Self::ContextMenu { .. }

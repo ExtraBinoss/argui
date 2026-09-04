@@ -259,7 +259,7 @@ impl VectorPipeline {
         queue: &wgpu::Queue,
         instances: &[VectorInstance],
         clips: &[VectorClip],
-    ) {
+    ) -> bool {
         let instances_reallocated = instances.len() > self.instance_capacity;
         if instances_reallocated {
             self.instance_capacity = instances.len().next_power_of_two();
@@ -281,20 +281,21 @@ impl VectorPipeline {
             );
             self.scene_group = scene_group(device, &self.scene_layout, &self.viewport, &self.clips);
         }
-        crate::upload::write_changed(
+        let instances_changed = crate::upload::write_changed(
             queue,
             &self.instances,
             instances,
             &mut self.previous_instances,
             instances_reallocated,
         );
-        crate::upload::write_changed(
+        let clips_changed = crate::upload::write_changed(
             queue,
             &self.clips,
             clips,
             &mut self.previous_clips,
             clips_reallocated,
         );
+        instances_changed || clips_changed
     }
 
     pub fn begin_frame(&mut self) {

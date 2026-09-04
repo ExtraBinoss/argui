@@ -34,7 +34,10 @@ pub(super) fn text_colors(elements: &[&Element], ui: &UiTree, output: &mut Layou
                     .text_input_display(node.node)
                     .is_some_and(|value| value.is_empty())
                 {
-                    placeholder_text.color
+                    if let Some(block) = output.text.blocks_mut().get_mut(text_index) {
+                        block.style.color = placeholder_text.color;
+                    }
+                    continue;
                 } else {
                     text.color
                 }

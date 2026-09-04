@@ -79,6 +79,7 @@ pub struct SurfaceRenderer {
     last_profile: RenderProfile,
     profiling_active: bool,
     layer_cache: HashMap<argui_paint::RenderObjectId, effects::CachedLayer>,
+    content_revision: u64,
 }
 
 #[cfg_attr(coverage_nightly, coverage(off))]
@@ -256,6 +257,7 @@ impl SurfaceRenderer {
             last_profile: RenderProfile::default(),
             profiling_active,
             layer_cache: HashMap::new(),
+            content_revision: 0,
         })
     }
 
@@ -431,12 +433,15 @@ impl SurfaceRenderer {
                 display_list,
                 scale_factor,
             } => {
-                self.quad
-                    .prepare(&self.device, &self.queue, display_list, scale_factor)?;
-                self.image
-                    .prepare(&self.device, &self.queue, display_list, scale_factor)?;
-                self.vector
-                    .prepare(&self.device, &self.queue, display_list, scale_factor)?;
+                let quad_changed =
+                    self.quad
+                        .prepare(&self.device, &self.queue, display_list, scale_factor)?;
+                let image_changed =
+                    self.image
+                        .prepare(&self.device, &self.queue, display_list, scale_factor)?;
+                let vector_changed =
+                    self.vector
+                        .prepare(&self.device, &self.queue, display_list, scale_factor)?;
                 let draw = self.text.prepare_ui(
                     &self.device,
                     &self.queue,
@@ -445,9 +450,18 @@ impl SurfaceRenderer {
                     display_list,
                     scale_factor,
                 )?;
+                if quad_changed || image_changed || vector_changed || draw.changed() {
+                    self.content_revision = self.content_revision.wrapping_add(1);
+                }
                 build_batches(display_list, draw.ranges(), &mut self.batches);
-                let graph = EffectGraph::build(display_list, draw.ranges(), viewport, scale_factor)
-                    .map_err(|error| RendererError::InvalidDisplayList(error.to_string()))?;
+                let graph = EffectGraph::build(
+                    display_list,
+                    draw.ranges(),
+                    viewport,
+                    scale_factor,
+                    self.content_revision,
+                )
+                .map_err(|error| RendererError::InvalidDisplayList(error.to_string()))?;
                 let additional_effect_passes = self.validate_custom_effects(&graph)?;
                 graph_stats = graph.stats();
                 graph_stats.filter_passes += additional_effect_passes;

@@ -449,7 +449,20 @@ impl InteractionState {
         update
     }
 
-    pub fn focus_node(&mut self, node: NodeId, regions: &[HitRegion]) -> RawUpdate {
+    pub fn focus_node_preserving_visibility(
+        &mut self,
+        node: NodeId,
+        regions: &[HitRegion],
+    ) -> RawUpdate {
+        self.focus_node_with_visibility(node, regions, self.focus_visible)
+    }
+
+    pub fn focus_node_with_visibility(
+        &mut self,
+        node: NodeId,
+        regions: &[HitRegion],
+        focus_visible: bool,
+    ) -> RawUpdate {
         if !regions
             .iter()
             .any(|region| region.node == node && region.focusable)
@@ -462,7 +475,7 @@ impl InteractionState {
         if let Some(previous) = self.focused.replace(node) {
             update.push(previous, UiEventKind::Blurred);
         }
-        self.focus_visible = true;
+        self.focus_visible = focus_visible;
         update.push(node, UiEventKind::Focused);
         update.paint_changed = true;
         update

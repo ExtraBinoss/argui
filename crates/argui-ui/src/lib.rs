@@ -52,7 +52,10 @@ pub use interaction::{
     HitRegion, HitShape, HitTestStyle, Interaction, InteractionUpdate, KeyboardActivation, NodeId,
     PointerEvents, WindowDragBehavior,
 };
-pub use overlay::{OverlayAlign, OverlayAnchor, OverlayPlacement, PlacedOverlay, PlacementSide};
+pub use overlay::{
+    AnchorPortal, AnchorWidth, CollisionPolicy, DismissPolicy, FloatingPlacement, PlacedOverlay,
+    Placement, Portal, PortalTarget, ViewportAlign, ViewportPlacement, WindowLayer,
+};
 pub use resize::{Resizable, ResizeAxes, ResizeConfig, ResizeEvent, ResizeState};
 pub use responsive::{ContainerQuery, ContainerScopeId};
 pub use scroll::{

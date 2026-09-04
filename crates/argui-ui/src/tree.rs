@@ -133,14 +133,24 @@ impl UiTree {
         let update = classify_update(&self.root, &root, &mut stats);
         self.update_stats = stats;
         let focused_before = self.interaction.focused();
+        let focus_visible_before = focused_before.is_some_and(|node| {
+            self.interaction
+                .visual_states(node)
+                .contains(crate::VisualState::FocusVisible)
+        });
         let focused_key = focused_before.and_then(|node| self.key_for(node).map(ToOwned::to_owned));
         match update {
             TreeUpdate::None => return update,
             TreeUpdate::Semantics => {
                 self.root = root;
                 self.sync_animation_registry();
-                self.focus
-                    .sync(&self.root, &self.node_ids, focused_before, None);
+                self.focus.sync(
+                    &self.root,
+                    &self.node_ids,
+                    focused_before,
+                    focus_visible_before,
+                    None,
+                );
             }
             TreeUpdate::Paint | TreeUpdate::Scroll => {
                 self.root = root;
@@ -171,8 +181,13 @@ impl UiTree {
                 let removed_focus = focused_before
                     .filter(|node| !self.node_ids.contains(node))
                     .map(|target| UiEvent::new(target, focused_key, UiEventKind::Blurred));
-                self.focus
-                    .sync(&self.root, &self.node_ids, focused_before, removed_focus);
+                self.focus.sync(
+                    &self.root,
+                    &self.node_ids,
+                    focused_before,
+                    focus_visible_before,
+                    removed_focus,
+                );
             }
         }
         self.events.sync(&self.root, &self.node_ids);

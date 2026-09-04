@@ -26,7 +26,7 @@ pub(super) fn content<'a>(
             if value.is_empty() {
                 Some((
                     TextContent::plain(placeholder.clone()),
-                    Cow::Owned(ui.resolved_text_style(node, placeholder_text)),
+                    Cow::Borrowed(placeholder_text),
                 ))
             } else {
                 Some((

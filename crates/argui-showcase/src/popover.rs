@@ -5,9 +5,8 @@ use argui_core::Transform2D;
 use argui_paint::{Border, Color, CornerRadii, Filter, LayerMask, LayerStyle, Shadow};
 use argui_text::TextWrap;
 use argui_ui::{
-    Axes, Element, FlexWrap, FocusScope, InitialFocus, Interaction, Overflow, OverlayAlign,
-    OverlayPlacement, PlacementSide, ScrollChaining, ScrollConfig, Sides, length, percent,
-    property, sides,
+    Axes, Element, FlexWrap, FloatingPlacement, FocusScope, InitialFocus, Interaction, Overflow,
+    Placement, ScrollChaining, ScrollConfig, Sides, WindowLayer, length, percent, property, sides,
 };
 use argui_widgets::WidgetTheme;
 
@@ -114,12 +113,12 @@ impl StateShowcase {
             .background(widgets.card)
             .border(Border::all(1.0, widgets.border))
             .radius(CornerRadii::all(20.0))
-            .anchored_to(
+            .anchored_portal(
+                WindowLayer::Popover,
                 "popover-toggle",
-                OverlayPlacement::new(PlacementSide::Bottom)
-                    .align(OverlayAlign::End)
-                    .gap(12.0)
-                    .margin(14.0),
+                FloatingPlacement::new(Placement::BottomEnd)
+                    .offset(12.0)
+                    .viewport_padding(14.0),
             )
             .z_index(500)
             .interaction(Interaction::blocker().enabled(progress > 0.0))
@@ -133,7 +132,7 @@ impl StateShowcase {
                     .chaining(ScrollChaining::Contain)
                     .scrollbar(self.scrollbar_style(widgets)),
             )
-            .transform(entry_transform(PlacementSide::Bottom, progress))
+            .transform(entry_transform(progress))
             .layer(self.popover_layer(progress))
             .bind(property::shadow_color(0), self.shadow_motion.clone())
     }
@@ -148,11 +147,12 @@ impl StateShowcase {
             .border(Border::all(1.0, widgets.border))
             .radius(CornerRadii::all(9.0))
             .text_style(text_style(13.0, widgets.foreground, 550, TextWrap::Word))
-            .anchored_to(
+            .anchored_portal(
+                WindowLayer::Popover,
                 "tooltip-anchor",
-                OverlayPlacement::new(PlacementSide::Top)
-                    .gap(8.0)
-                    .margin(10.0),
+                FloatingPlacement::new(Placement::Top)
+                    .offset(8.0)
+                    .viewport_padding(10.0),
             )
             .z_index(700)
     }
@@ -166,15 +166,10 @@ impl StateShowcase {
     }
 }
 
-fn entry_transform(side: PlacementSide, progress: f32) -> Transform2D {
+fn entry_transform(progress: f32) -> Transform2D {
     let distance = (1.0 - progress) * 14.0;
     let transform = Transform2D::IDENTITY.scale(0.96 + progress * 0.04, 0.96 + progress * 0.04);
-    match side {
-        PlacementSide::Top => transform.translate(0.0, distance),
-        PlacementSide::Bottom => transform.translate(0.0, -distance),
-        PlacementSide::Left => transform.translate(distance, 0.0),
-        PlacementSide::Right => transform.translate(-distance, 0.0),
-    }
+    transform.translate(0.0, -distance)
 }
 
 pub(super) fn shadow_timeline(initial: Color) -> Timeline<Color> {

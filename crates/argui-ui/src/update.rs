@@ -22,7 +22,7 @@ pub(crate) fn classify_update(
         || (old.scroll != new.scroll
             && (old.has_container_queries() || new.has_container_queries()))
         || old.scroll.is_some() != new.scroll.is_some()
-        || old.overlay != new.overlay
+        || old.portal != new.portal
         || old.children.len() != new.children.len()
         || binding_update == TreeUpdate::Layout
         || state_update == TreeUpdate::Layout

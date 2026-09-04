@@ -90,7 +90,7 @@ impl Tabs {
                     .paint_style(PaintStyle::new(resting.clone()))
                     .when(
                         VisualState::Hovered,
-                        QuadStyle::solid(theme.muted)
+                        QuadStyle::solid(if active { theme.card } else { theme.background })
                             .radius(CornerRadii::all(6.0))
                             .into(),
                     )

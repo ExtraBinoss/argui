@@ -1,9 +1,118 @@
-use argui_core::{Affine2D, Point, Rect};
+use std::collections::HashMap;
+
+use argui_core::{Affine2D, Point, Rect, Size};
 use argui_paint::{ClipChain, ClipRegion};
-use argui_ui::{Element, UiTree};
+use argui_ui::{AnchorWidth, Element, PortalTarget, UiTree};
 use taffy::TaffyTree;
 
-use crate::{LayoutError, LayoutOutput, engine::NodeMap, scroll};
+use crate::{LayoutError, LayoutOutput, PortalLayout, engine::NodeMap, scroll};
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum PortalConstraint {
+    Bounds {
+        node: taffy::NodeId,
+        size: Size,
+        anchor_width: AnchorWidth,
+    },
+    Fill {
+        node: taffy::NodeId,
+        size: Size,
+    },
+}
+
+pub(crate) fn constraints(
+    tree: &TaffyTree<usize>,
+    root: &NodeMap,
+    elements: &[&Element],
+    ui: &UiTree,
+    viewport: Rect,
+) -> Result<Vec<PortalConstraint>, LayoutError> {
+    let mut bounds = vec![Rect::default(); elements.len()];
+    collect_bounds(
+        tree,
+        root,
+        ui,
+        Point::default(),
+        Point::default(),
+        &mut bounds,
+    )?;
+    let anchors = elements
+        .iter()
+        .enumerate()
+        .filter_map(|(index, element)| element.key.as_deref().map(|key| (key, bounds[index])))
+        .collect::<HashMap<_, _>>();
+    let mut portals = Vec::new();
+    collect(root, elements, &mut portals);
+    let mut output = Vec::with_capacity(portals.len());
+    for map in portals {
+        let element = elements[map.index];
+        let Some(portal) = &element.portal else {
+            continue;
+        };
+        let desired = bounds[map.index].size;
+        let constraint = match &portal.target {
+            PortalTarget::Layout => continue,
+            PortalTarget::Anchor(anchor) => {
+                let Some(anchor_bounds) = anchors.get(anchor.key.as_str()).copied() else {
+                    continue;
+                };
+                let placed = anchor.placement.place(
+                    viewport,
+                    anchor_bounds,
+                    desired,
+                    ui.resolved_layout_style(map.node, element)
+                        .writing_direction,
+                );
+                PortalConstraint::Bounds {
+                    node: map.id,
+                    size: placed.bounds.size,
+                    anchor_width: anchor.placement.anchor_width,
+                }
+            }
+            PortalTarget::Viewport(placement) => {
+                let placed = placement.place(viewport, desired);
+                match placement {
+                    argui_ui::ViewportPlacement::Fill { .. } => PortalConstraint::Fill {
+                        node: map.id,
+                        size: placed.size,
+                    },
+                    argui_ui::ViewportPlacement::Positioned { .. } => PortalConstraint::Bounds {
+                        node: map.id,
+                        size: placed.size,
+                        anchor_width: AnchorWidth::Content,
+                    },
+                }
+            }
+        };
+        output.push(constraint);
+    }
+    Ok(output)
+}
+
+fn collect_bounds(
+    tree: &TaffyTree<usize>,
+    node: &NodeMap,
+    ui: &UiTree,
+    parent: Point,
+    translation: Point,
+    output: &mut [Rect],
+) -> Result<(), LayoutError> {
+    let layout = tree.layout(node.id)?;
+    let layout_origin = Point::new(parent.x + layout.location.x, parent.y + layout.location.y);
+    output[node.index] = Rect::new(
+        Point::new(
+            layout_origin.x - translation.x,
+            layout_origin.y - translation.y,
+        ),
+        Size::new(layout.size.width, layout.size.height),
+    );
+    let scroll = ui.scroll_offset(node.node);
+    let child_translation = Point::new(translation.x + scroll.x, translation.y + scroll.y);
+    for child in &node.children {
+        collect_bounds(tree, child, ui, layout_origin, child_translation, output)?;
+    }
+    Ok(())
+}
 
 pub(crate) fn resolve(
     tree: &TaffyTree<usize>,
@@ -14,29 +123,91 @@ pub(crate) fn resolve(
 ) -> Result<(), LayoutError> {
     let mut overlays = Vec::new();
     collect(root, elements, &mut overlays);
+    output.portals.clear();
+    let anchors = elements
+        .iter()
+        .enumerate()
+        .filter_map(|(index, element)| element.key.as_deref().map(|key| (key, index)))
+        .collect::<HashMap<_, _>>();
     for map in overlays {
         let element = elements[map.index];
-        let Some(anchor) = element.overlay.as_ref() else {
+        let Some(portal) = element.portal.as_ref() else {
             continue;
         };
-        let Some(anchor_index) = elements
-            .iter()
-            .position(|element| element.key.as_deref() == Some(anchor.key.as_str()))
-        else {
-            continue;
-        };
-        let viewport = output.nodes[map.index].clip.unwrap_or(output.viewport);
+        let viewport = output.viewport;
         let desired = output.nodes[map.index].bounds.size;
-        let placed = anchor
-            .placement
-            .place(viewport, output.nodes[anchor_index].bounds, desired);
+        let (placed, anchor_key, requested, resolved, available, constrained) = match &portal.target
+        {
+            PortalTarget::Layout => {
+                let current = output.nodes[map.index].bounds;
+                translate(map, output, Point::default(), viewport);
+                output.nodes[map.index].bounds.size = current.size;
+                output.portals.push(PortalLayout {
+                    node: map.node,
+                    layer: portal.layer,
+                    anchor: None,
+                    requested: None,
+                    resolved: None,
+                    bounds: current,
+                    available_size: viewport.size,
+                    constrained_width: false,
+                    constrained_height: false,
+                });
+                continue;
+            }
+            PortalTarget::Anchor(anchor) => {
+                let Some(anchor_index) = anchors.get(anchor.key.as_str()).copied() else {
+                    continue;
+                };
+                let result = anchor.placement.place(
+                    viewport,
+                    output.nodes[anchor_index].bounds,
+                    desired,
+                    ui.resolved_layout_style(map.node, element)
+                        .writing_direction,
+                );
+                (
+                    result.bounds,
+                    Some(anchor.key.clone()),
+                    Some(anchor.placement.preferred),
+                    Some(result.placement),
+                    result.available_size,
+                    (result.constrained_width, result.constrained_height),
+                )
+            }
+            PortalTarget::Viewport(placement) => {
+                let bounds = placement.place(viewport, desired);
+                (
+                    bounds,
+                    None,
+                    None,
+                    None,
+                    bounds.size,
+                    (
+                        bounds.size.width < desired.width,
+                        bounds.size.height < desired.height,
+                    ),
+                )
+            }
+        };
         let current = output.nodes[map.index].bounds;
         let delta = Point::new(
-            placed.bounds.origin.x - current.origin.x,
-            placed.bounds.origin.y - current.origin.y,
+            placed.origin.x - current.origin.x,
+            placed.origin.y - current.origin.y,
         );
         translate(map, output, delta, viewport);
-        output.nodes[map.index].bounds.size = placed.bounds.size;
+        output.nodes[map.index].bounds.size = placed.size;
+        output.portals.push(PortalLayout {
+            node: map.node,
+            layer: portal.layer,
+            anchor: anchor_key,
+            requested,
+            resolved,
+            bounds: placed,
+            available_size: available,
+            constrained_width: constrained.0,
+            constrained_height: constrained.1,
+        });
 
         if let Some(config) = overlay_scroll_config(map, element)
             && let Some(clip) = viewport.intersection(output.nodes[map.index].bounds)
@@ -65,7 +236,7 @@ pub(crate) fn resolve(
 }
 
 fn collect<'a>(map: &'a NodeMap, elements: &[&Element], output: &mut Vec<&'a NodeMap>) {
-    if elements[map.index].overlay.is_some() {
+    if elements[map.index].portal.is_some() {
         output.push(map);
     }
     for child in &map.children {

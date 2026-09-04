@@ -3,9 +3,9 @@ use argui_layout::LayoutEngine;
 use argui_paint::{DisplayCommand, PaintStyle, QuadStyle};
 use argui_text::{TextEngine, TextStyle};
 use argui_ui::{
-    AlignItems, Axes, Color, Element, FlexWrap, Interaction, LengthPercentageAuto, Overflow,
-    OverlayAlign, OverlayPlacement, PlacementSide, ScrollConfig, Sides, StylePatch, UiTree,
-    VisualState, WindowDragBehavior, auto, length, percent, sides,
+    AlignItems, Axes, Color, Element, FlexWrap, FloatingPlacement, Interaction,
+    LengthPercentageAuto, Overflow, Placement, ScrollConfig, Sides, StylePatch, UiTree,
+    VisualState, WindowDragBehavior, WindowLayer, auto, length, percent, sides,
 };
 use argui_widgets::{Button, ButtonStyle, Input, InputStyle};
 
@@ -314,12 +314,12 @@ fn anchored_overlay_follows_a_scrolling_anchor_without_relayout() {
         .width(length(120.0))
         .height(length(60.0))
         .background(Color::WHITE)
-        .anchored_to(
+        .anchored_portal(
+            WindowLayer::Popover,
             "anchor",
-            OverlayPlacement::new(PlacementSide::Bottom)
-                .align(OverlayAlign::Start)
-                .gap(6.0)
-                .margin(0.0),
+            FloatingPlacement::new(Placement::BottomStart)
+                .offset(6.0)
+                .viewport_padding(0.0),
         );
     let mut ui = UiTree::new(
         Element::column([

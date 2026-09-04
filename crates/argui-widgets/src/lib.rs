@@ -6,6 +6,8 @@ mod dialog;
 mod dialog_behavior;
 mod icons;
 mod input;
+mod popover;
+mod popover_behavior;
 mod radio_group_behavior;
 mod range;
 mod select;
@@ -26,6 +28,10 @@ pub use dialog::Dialog;
 pub use dialog_behavior::{DIALOG_OPEN, DIALOG_SCOPE, DialogAction, DialogBehavior, DialogPart};
 pub use icons::{TablerIcon, WidgetAssets};
 pub use input::{Input, InputKind, InputStyle, TextArea};
+pub use popover::Popover;
+pub use popover_behavior::{
+    POPOVER_OPEN, POPOVER_SCOPE, PopoverAction, PopoverBehavior, PopoverPart,
+};
 pub use radio_group_behavior::{RadioGroupAction, RadioGroupBehavior, RadioGroupPart};
 pub use range::{
     RANGE_SCOPE, RangeAction, RangeAxis, RangeBehavior, RangeConfig, RangeDetents, RangeDirection,

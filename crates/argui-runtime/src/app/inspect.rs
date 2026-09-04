@@ -1,7 +1,7 @@
 use argui_core::{Affine2D, Transform2D};
 use argui_inspect::{
-    InspectNodeId, NodeSnapshot, StyleField, StyleLength, StyleProperty, StyleUnit, StyleValue,
-    TreeSnapshot,
+    InspectNodeId, NodeSnapshot, PortalSnapshot, StyleField, StyleLength, StyleProperty, StyleUnit,
+    StyleValue, TreeSnapshot,
 };
 use argui_paint::{
     Border, ClipChain, ClipRegion, Color, CornerRadii, Fill, Filter, LayerStyle, Quad,
@@ -135,6 +135,20 @@ fn collect_nodes(
         bounds,
         clip: layout_node.and_then(|candidate| candidate.clip),
         z_index: element.z_index,
+        portal: state
+            .layout
+            .portals
+            .iter()
+            .find(|portal| portal.node == node)
+            .map(|portal| PortalSnapshot {
+                layer: format!("{:?}", portal.layer),
+                anchor: portal.anchor.clone(),
+                requested: portal.requested.map(|value| format!("{value:?}")),
+                resolved: portal.resolved.map(|value| format!("{value:?}")),
+                available_size: portal.available_size,
+                constrained_width: portal.constrained_width,
+                constrained_height: portal.constrained_height,
+            }),
         visible,
         painted: paints_content(element),
         interactive: element

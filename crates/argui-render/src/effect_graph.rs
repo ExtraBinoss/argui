@@ -18,6 +18,7 @@ pub(crate) struct EffectLayer {
     pub style: LayerStyle,
     pub children: Vec<EffectNode>,
     pub region: Option<PixelRegion>,
+    pub content_revision: u64,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -42,6 +43,7 @@ impl EffectGraph {
         text_ranges: &[Range<u32>],
         viewport: [f32; 2],
         scale_factor: f32,
+        content_revision: u64,
     ) -> Result<Self, DisplayListError> {
         display_list.validate()?;
         let mut roots = Vec::new();
@@ -87,6 +89,7 @@ impl EffectGraph {
                         region,
                         style,
                         children: Vec::new(),
+                        content_revision,
                     });
                 }
                 DisplayCommand::EndLayer => {
@@ -203,7 +206,7 @@ mod tests {
         list.end_layer();
         list.end_layer();
 
-        let graph = EffectGraph::build(&list, &[0..2, 2..4, 4..7], [800.0, 600.0], 1.0).unwrap();
+        let graph = EffectGraph::build(&list, &[0..2, 2..4, 4..7], [800.0, 600.0], 1.0, 0).unwrap();
         assert!(graph.needs_offscreen_root());
         assert_eq!(graph.stats().layers, 2);
         assert_eq!(graph.stats().offscreen_layers, 2);
@@ -233,12 +236,18 @@ mod tests {
         list.end_layer();
         list.end_layer();
 
-        let graph = EffectGraph::build(&list, &[0..2, 2..4, 0..0], [800.0, 600.0], 1.0).unwrap();
+        let graph = EffectGraph::build(&list, &[0..2, 2..4, 0..0], [800.0, 600.0], 1.0, 0).unwrap();
         assert_eq!(graph.stats().draw_batches, 1);
         assert_eq!(graph.effects(), vec![&foreground, &backdrop]);
 
-        let plain =
-            EffectGraph::build(&argui_paint::DisplayList::new(), &[], [800.0, 600.0], 1.0).unwrap();
+        let plain = EffectGraph::build(
+            &argui_paint::DisplayList::new(),
+            &[],
+            [800.0, 600.0],
+            1.0,
+            0,
+        )
+        .unwrap();
         assert!(!plain.needs_offscreen_root());
         assert!(plain.effects().is_empty());
     }
@@ -256,7 +265,7 @@ mod tests {
         list.end_layer();
 
         let ranges = std::iter::once(0..4).collect::<Vec<_>>();
-        let graph = EffectGraph::build(&list, &ranges, [800.0, 600.0], 1.0).unwrap();
+        let graph = EffectGraph::build(&list, &ranges, [800.0, 600.0], 1.0, 0).unwrap();
         assert!(graph.roots.is_empty());
         assert!(!graph.needs_offscreen_root());
     }
@@ -270,7 +279,7 @@ mod tests {
         list.begin_layer(LayerStyle::new(inside).opacity(0.5));
         list.end_layer();
         list.end_layer();
-        let graph = EffectGraph::build(&list, &[], [100.0, 100.0], 1.0).unwrap();
+        let graph = EffectGraph::build(&list, &[], [100.0, 100.0], 1.0, 0).unwrap();
         let EffectNode::Layer(parent) = &graph.roots[0] else {
             panic!("expected parent layer");
         };
@@ -279,5 +288,22 @@ mod tests {
         };
         assert_eq!(parent.region, None);
         assert_eq!(child.region, None);
+    }
+
+    #[test]
+    fn layer_identity_includes_the_uploaded_primitive_generation() {
+        let bounds = Rect::new(Point::default(), Size::new(40.0, 40.0));
+        let mut list = argui_paint::DisplayList::new();
+        list.begin_layer(LayerStyle::new(bounds).filter(Filter::Blur(4.0)));
+        list.push_text(0);
+        list.end_layer();
+
+        let ranges = [0..2, 0..0];
+        let first = EffectGraph::build(&list, &ranges, [100.0, 100.0], 1.0, 7).unwrap();
+        let unchanged = EffectGraph::build(&list, &ranges, [100.0, 100.0], 1.0, 7).unwrap();
+        let changed = EffectGraph::build(&list, &ranges, [100.0, 100.0], 1.0, 8).unwrap();
+
+        assert_eq!(first.roots, unchanged.roots);
+        assert_ne!(first.roots, changed.roots);
     }
 }

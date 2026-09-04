@@ -263,7 +263,7 @@ impl WidgetGallery {
                     format!("nav::{}", page.slug()),
                     page.label(),
                     if page == self.page {
-                        theme.secondary_button.clone()
+                        theme.button.clone()
                     } else {
                         theme.ghost_button.clone()
                     },
@@ -513,7 +513,6 @@ impl Render for WidgetGallery {
                     self.select_selected = Some(index);
                     self.select_highlight = index;
                     self.select_open = false;
-                    cx.request_focus("backend");
                 }
             }
             cx.notify();

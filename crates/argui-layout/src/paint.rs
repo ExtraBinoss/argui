@@ -8,17 +8,19 @@ use std::collections::HashMap;
 
 use crate::{LayoutNode, LayoutOutput, engine::NodeMap, input, scroll};
 
+mod portal;
 mod sync;
 
 #[derive(Clone, Debug, PartialEq)]
-struct PaintContext {
+pub(super) struct PaintContext {
     transform: Affine2D,
     clips: ClipChain,
     hit_allowed: bool,
+    active_portal: Option<NodeId>,
 }
 
 #[derive(Clone, Debug)]
-struct ScrollPaintUpdate {
+pub(super) struct ScrollPaintUpdate {
     node: NodeId,
     transform: Affine2D,
     clips: ClipChain,
@@ -64,16 +66,18 @@ pub(crate) fn repaint(
     let clips = ClipChain::from_regions([ClipRegion::new(output.viewport, Affine2D::IDENTITY)]);
     if let Some(root) = root {
         let mut scroll_updates = Vec::new();
-        paint_node(
+        let context = PaintContext {
+            transform: Affine2D::IDENTITY,
+            clips,
+            hit_allowed: true,
+            active_portal: None,
+        };
+        portal::paint(
             root,
             &elements,
             ui,
             output,
-            &PaintContext {
-                transform: Affine2D::IDENTITY,
-                clips,
-                hit_allowed: true,
-            },
+            &context,
             cache,
             &mut scroll_updates,
         );
@@ -85,7 +89,7 @@ pub(crate) fn repaint(
     };
 }
 
-fn paint_node(
+pub(super) fn paint_node(
     map: &NodeMap,
     elements: &[&Element],
     ui: &UiTree,
@@ -94,15 +98,18 @@ fn paint_node(
     cache: &mut PaintCache,
     scroll_updates: &mut Vec<ScrollPaintUpdate>,
 ) -> bool {
-    cache.visited += 1;
     if map.style.display == argui_ui::Display::None {
-        return true;
-    }
-    if parent.clips.is_empty() {
         return true;
     }
     let node = output.nodes[map.index];
     let element = elements[node.index];
+    if element.portal.is_some() && parent.active_portal != Some(node.node) {
+        return true;
+    }
+    cache.visited += 1;
+    if parent.clips.is_empty() {
+        return true;
+    }
     let selection_active = ui.document_selection_intersects(map.index, map.subtree_len);
     if let Some(fragment) = cache.fragments.get(&node.node)
         && fragment.cacheable
@@ -127,12 +134,13 @@ fn paint_node(
     let hit_start = output.hit_regions.len();
     let scroll_start = scroll_updates.len();
     let portal;
-    let parent = if element.overlay.is_some() {
+    let parent = if element.portal.is_some() {
         let clip = node.clip.unwrap_or(output.viewport);
         portal = PaintContext {
             transform: Affine2D::IDENTITY,
             clips: ClipChain::from_regions([ClipRegion::new(clip, Affine2D::IDENTITY)]),
             hit_allowed: parent.hit_allowed,
+            active_portal: parent.active_portal,
         };
         &portal
     } else {
@@ -145,6 +153,7 @@ fn paint_node(
         transform,
         clips: parent.clips.clone(),
         hit_allowed: parent.hit_allowed,
+        active_portal: parent.active_portal,
     };
     paint_enter(
         ui,
@@ -171,6 +180,7 @@ fn paint_node(
                 element.hit_test.pointer_events,
                 PointerEvents::None | PointerEvents::BoxOnly
             ),
+        active_portal: context.active_portal,
     };
     if (map.style.overflow.x.scrolls() || map.style.overflow.y.scrolls())
         && let Some(region) = output

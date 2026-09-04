@@ -39,7 +39,7 @@ impl QuadGpu {
         queue: &wgpu::Queue,
         display_list: &DisplayList,
         scale_factor: f32,
-    ) -> Result<(), RendererError> {
+    ) -> Result<bool, RendererError> {
         self.instances.clear();
         self.clips.clear();
         self.gradients.clear();
@@ -67,9 +67,9 @@ impl QuadGpu {
                 capacity: self.gradient_stop_capacity,
             });
         }
-        self.pipeline
-            .write(device, queue, &self.instances, &self.clips, &self.gradients);
-        Ok(())
+        Ok(self
+            .pipeline
+            .write(device, queue, &self.instances, &self.clips, &self.gradients))
     }
 
     pub fn begin_frame(&mut self) {

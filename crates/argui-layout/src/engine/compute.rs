@@ -2,11 +2,16 @@ use argui_core::{Point, Rect, Size};
 use argui_text::TextEngine;
 use argui_ui::{ElementKind, TreeUpdate, UiTree};
 use taffy::{
-    AvailableSpace, compute_leaf_layout, geometry::Size as TaffySize,
-    tree::LayoutOutput as TaffyLayoutOutput,
+    AvailableSpace, Dimension, LengthPercentageAuto, NodeId, TaffyTree, compute_leaf_layout,
+    geometry::Size as TaffySize, tree::LayoutOutput as TaffyLayoutOutput,
 };
 
-use crate::{LayoutError, assets::resolve_intrinsic, style::taffy_style};
+use crate::{
+    LayoutError,
+    assets::{AssetMetrics, resolve_intrinsic},
+    overlay::PortalConstraint,
+    style::taffy_style,
+};
 
 use super::{LayoutEngine, LayoutOutput, Placement, collect_layout, flattened};
 
@@ -62,65 +67,40 @@ impl LayoutEngine {
         }
         let elements = flattened(ui.root());
         let root = self.root.as_ref().ok_or(LayoutError::MissingRoot)?;
-        self.tree.compute_layout_with_measure(
-            root.id,
-            TaffySize {
-                width: AvailableSpace::Definite(viewport.width),
-                height: AvailableSpace::Definite(viewport.height),
-            },
-            |inputs, _, context, style| {
-                let index = context.as_deref().copied();
-                let intrinsic =
-                    index.and_then(|index| self.assets.intrinsic(&elements[index].kind));
-                let text = index.and_then(|index| {
-                    let node = ui.node_id_at(index)?;
-                    let (content, text_style) = crate::text::content(ui, node, elements[index])?;
-                    let width = inputs
-                        .known_dimensions
-                        .width
-                        .or_else(|| inputs.available_space.width.into_option());
-                    Some(text_engine.measure_content(&content, &text_style, width))
-                });
-                if index.is_some_and(|index| {
-                    matches!(
-                        elements[index].kind,
-                        ElementKind::Text { .. } | ElementKind::TextEditor { .. }
-                    )
-                }) {
-                    debug_assert!(
-                        text.is_some_and(|measurement| measurement.first_baseline.is_some())
-                    );
-                }
-                let baselines = text.map_or(taffy::tree::Baselines::NONE, |measurement| {
-                    taffy::tree::Baselines {
-                        first: measurement.first_baseline,
-                        last: measurement.last_baseline,
-                    }
-                });
-                let size = compute_leaf_layout(
-                    inputs,
-                    style,
-                    |_, _| 0.0,
-                    |known, available| {
-                        if let Some(intrinsic) = intrinsic {
-                            return resolve_intrinsic(known, intrinsic);
-                        }
-                        let Some(measured) = text else {
-                            return TaffySize::ZERO;
-                        };
-                        let _ = available;
-                        TaffySize {
-                            width: known.width.unwrap_or(measured.size.width),
-                            height: known.height.unwrap_or(measured.size.height),
-                        }
-                    },
-                );
-                TaffyLayoutOutput { baselines, ..size }
-            },
+        restore_portal_styles(
+            &mut self.tree,
+            &self.assets,
+            &elements,
+            ui,
+            &self.nodes_by_index,
         )?;
+        compute_taffy(
+            &mut self.tree,
+            &self.assets,
+            root.id,
+            viewport,
+            &elements,
+            ui,
+            text_engine,
+        )?;
+        let viewport_rect = Rect::new(Point::default(), viewport);
+        for constraint in
+            crate::overlay::constraints(&self.tree, root, &elements, ui, viewport_rect)?
+        {
+            let (node, size) = apply_constraint(&mut self.tree, constraint)?;
+            compute_taffy(
+                &mut self.tree,
+                &self.assets,
+                node,
+                size,
+                &elements,
+                ui,
+                text_engine,
+            )?;
+        }
 
         let mut output = LayoutOutput {
-            viewport: Rect::new(Point::default(), viewport),
+            viewport: viewport_rect,
             ..LayoutOutput::default()
         };
         collect_layout(
@@ -153,4 +133,139 @@ impl LayoutEngine {
         };
         Ok((output, update, sizes))
     }
+}
+
+fn restore_portal_styles(
+    tree: &mut TaffyTree<usize>,
+    assets: &AssetMetrics,
+    elements: &[&argui_ui::Element],
+    ui: &UiTree,
+    nodes: &[NodeId],
+) -> Result<(), LayoutError> {
+    for (index, element) in elements.iter().enumerate() {
+        if element.portal.is_none() {
+            continue;
+        }
+        let node = ui
+            .node_id_at(index)
+            .ok_or(LayoutError::MissingNodeIdentity(index))?;
+        let style = assets.layout_style(ui.resolved_layout_style(node, element), &element.kind);
+        let style = taffy_style(&style);
+        let id = nodes
+            .get(index)
+            .copied()
+            .ok_or(LayoutError::MissingNodeIdentity(index))?;
+        if tree.style(id)? != &style {
+            tree.set_style(id, style)?;
+        }
+    }
+    Ok(())
+}
+
+fn apply_constraint(
+    tree: &mut TaffyTree<usize>,
+    constraint: PortalConstraint,
+) -> Result<(NodeId, Size), LayoutError> {
+    let (node, size) = match constraint {
+        PortalConstraint::Bounds {
+            node,
+            size,
+            anchor_width,
+        } => {
+            let mut style = tree.style(node)?.clone();
+            style.max_size = TaffySize {
+                width: LengthPercentageAuto::length(size.width),
+                height: LengthPercentageAuto::length(size.height),
+            };
+            match anchor_width {
+                argui_ui::AnchorWidth::Content => {}
+                argui_ui::AnchorWidth::AtLeastAnchor => {
+                    style.min_size.width = LengthPercentageAuto::length(size.width);
+                }
+                argui_ui::AnchorWidth::MatchAnchor => {
+                    style.size.width = Dimension::length(size.width);
+                }
+            }
+            tree.set_style(node, style)?;
+            (node, size)
+        }
+        PortalConstraint::Fill { node, size } => {
+            let mut style = tree.style(node)?.clone();
+            style.size = TaffySize {
+                width: Dimension::length(size.width),
+                height: Dimension::length(size.height),
+            };
+            style.max_size = TaffySize {
+                width: LengthPercentageAuto::length(size.width),
+                height: LengthPercentageAuto::length(size.height),
+            };
+            tree.set_style(node, style)?;
+            (node, size)
+        }
+    };
+    Ok((node, size))
+}
+
+fn compute_taffy(
+    tree: &mut TaffyTree<usize>,
+    assets: &AssetMetrics,
+    root: NodeId,
+    available: Size,
+    elements: &[&argui_ui::Element],
+    ui: &UiTree,
+    text_engine: &mut TextEngine,
+) -> Result<(), LayoutError> {
+    tree.compute_layout_with_measure(
+        root,
+        TaffySize {
+            width: AvailableSpace::Definite(available.width),
+            height: AvailableSpace::Definite(available.height),
+        },
+        |inputs, _, context, style| {
+            let index = context.as_deref().copied();
+            let intrinsic = index.and_then(|index| assets.intrinsic(&elements[index].kind));
+            let text = index.and_then(|index| {
+                let node = ui.node_id_at(index)?;
+                let (content, text_style) = crate::text::content(ui, node, elements[index])?;
+                let width = inputs
+                    .known_dimensions
+                    .width
+                    .or_else(|| inputs.available_space.width.into_option());
+                Some(text_engine.measure_content(&content, &text_style, width))
+            });
+            if index.is_some_and(|index| {
+                matches!(
+                    elements[index].kind,
+                    ElementKind::Text { .. } | ElementKind::TextEditor { .. }
+                )
+            }) {
+                debug_assert!(text.is_some_and(|measurement| measurement.first_baseline.is_some()));
+            }
+            let baselines = text.map_or(taffy::tree::Baselines::NONE, |measurement| {
+                taffy::tree::Baselines {
+                    first: measurement.first_baseline,
+                    last: measurement.last_baseline,
+                }
+            });
+            let size = compute_leaf_layout(
+                inputs,
+                style,
+                |_, _| 0.0,
+                |known, _| {
+                    if let Some(intrinsic) = intrinsic {
+                        return resolve_intrinsic(known, intrinsic);
+                    }
+                    let Some(measured) = text else {
+                        return TaffySize::ZERO;
+                    };
+                    TaffySize {
+                        width: known.width.unwrap_or(measured.size.width),
+                        height: known.height.unwrap_or(measured.size.height),
+                    }
+                },
+            );
+            TaffyLayoutOutput { baselines, ..size }
+        },
+    )?;
+    Ok(())
 }

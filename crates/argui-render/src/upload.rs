@@ -9,10 +9,11 @@ pub(crate) fn write_changed<T: Pod + Copy>(
     values: &[T],
     previous: &mut Vec<T>,
     reallocated: bool,
-) {
+) -> bool {
     if values.is_empty() {
+        let changed = !previous.is_empty();
         previous.clear();
-        return;
+        return changed;
     }
     let current: &[u8] = bytemuck::cast_slice(values);
     let old: &[u8] = bytemuck::cast_slice(previous.as_slice());
@@ -25,7 +26,7 @@ pub(crate) fn write_changed<T: Pod + Copy>(
             .zip(old.chunks_exact(stride))
             .position(|(current, old)| current != old);
         let Some(first) = first else {
-            return;
+            return false;
         };
         let suffix = current
             .chunks_exact(stride)
@@ -42,4 +43,5 @@ pub(crate) fn write_changed<T: Pod + Copy>(
     );
     previous.clear();
     previous.extend_from_slice(values);
+    true
 }

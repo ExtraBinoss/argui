@@ -289,7 +289,7 @@ impl TextPipeline {
         queue: &wgpu::Queue,
         instances: &[GlyphInstance],
         clips: &[TextClip],
-    ) {
+    ) -> bool {
         let mut rebuild = false;
         let instances_reallocated = instances.len() > self.instance_capacity;
         if instances_reallocated {
@@ -313,20 +313,21 @@ impl TextPipeline {
                 &self.clip_buffer,
             );
         }
-        crate::upload::write_changed(
+        let instances_changed = crate::upload::write_changed(
             queue,
             &self.instance_buffer,
             instances,
             &mut self.previous_instances,
             instances_reallocated,
         );
-        crate::upload::write_changed(
+        let clips_changed = crate::upload::write_changed(
             queue,
             &self.clip_buffer,
             clips,
             &mut self.previous_clips,
             clips_reallocated,
         );
+        instances_changed || clips_changed
     }
 
     pub fn begin_frame(&mut self) {

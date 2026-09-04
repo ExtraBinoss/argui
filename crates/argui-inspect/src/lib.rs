@@ -167,6 +167,17 @@ pub struct PropertySnapshot {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct PortalSnapshot {
+    pub layer: String,
+    pub anchor: Option<String>,
+    pub requested: Option<String>,
+    pub resolved: Option<String>,
+    pub available_size: argui_core::Size,
+    pub constrained_width: bool,
+    pub constrained_height: bool,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct NodeSnapshot {
     pub id: InspectNodeId,
     pub parent: Option<InspectNodeId>,
@@ -177,6 +188,7 @@ pub struct NodeSnapshot {
     pub bounds: Rect,
     pub clip: Option<Rect>,
     pub z_index: i32,
+    pub portal: Option<PortalSnapshot>,
     pub visible: bool,
     pub painted: bool,
     pub interactive: bool,

@@ -18,6 +18,7 @@ use std::{
 };
 
 mod kind;
+mod portal;
 pub use kind::{ElementKind, ElementNode, TextEditorSpec};
 
 #[derive(Clone, Debug)]
@@ -67,7 +68,7 @@ impl Element {
             layer: None,
             effects: Vec::new(),
             scroll: None,
-            overlay: None,
+            portal: None,
             focus_scope: None,
             event_owner: None,
             event_listeners: Vec::new(),
@@ -129,7 +130,7 @@ impl Element {
             layer: None,
             effects: Vec::new(),
             scroll: None,
-            overlay: None,
+            portal: None,
             focus_scope: None,
             event_owner: None,
             event_listeners: Vec::new(),
@@ -377,23 +378,6 @@ impl Element {
     pub fn absolute(mut self, inset: Sides<LengthPercentageAuto>) -> Self {
         self.style.position = Position::Absolute;
         self.style.inset = inset;
-        self
-    }
-
-    #[must_use]
-    pub fn anchored_to(
-        mut self,
-        key: impl Into<String>,
-        placement: crate::OverlayPlacement,
-    ) -> Self {
-        self.style.position = Position::Absolute;
-        self.style.inset = Sides {
-            left: LengthPercentageAuto::auto(),
-            right: LengthPercentageAuto::auto(),
-            top: LengthPercentageAuto::auto(),
-            bottom: LengthPercentageAuto::auto(),
-        };
-        self.overlay = Some(crate::OverlayAnchor::new(key, placement));
         self
     }
 

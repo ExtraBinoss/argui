@@ -1,9 +1,9 @@
-use argui_paint::{Border, CornerRadii, PaintStyle, QuadStyle};
+use argui_paint::{Border, CornerRadii, Filter, LayerMask, LayerStyle, PaintStyle, QuadStyle};
 use argui_text::{TextStyle, TextWrap};
 use argui_ui::{
-    AlignItems, Axes, Element, FocusScope, InitialFocus, JustifyContent, Overflow, OverlayAlign,
-    OverlayPlacement, PlacementSide, ScrollConfig, StylePatch, StyleTransition, VisualState,
-    length, percent,
+    AlignItems, AnchorWidth, Axes, DismissPolicy, Element, FloatingPlacement, FocusScope,
+    InitialFocus, JustifyContent, Overflow, Placement, ScrollConfig, StylePatch, StyleTransition,
+    VisualState, WindowLayer, length, percent,
 };
 
 use crate::{SelectBehavior, SelectPart, WidgetTheme};
@@ -142,7 +142,7 @@ impl Select {
                 .width(percent(1.0))
                 .padding(argui_ui::sides(10.0, 8.0))
                 .background(if highlighted {
-                    theme.muted
+                    theme.primary.with_alpha(0.14)
                 } else {
                     argui_core::Color::TRANSPARENT
                 })
@@ -150,41 +150,49 @@ impl Select {
                 .when(
                     VisualState::Hovered,
                     StylePatch::from_quad(
-                        QuadStyle::solid(theme.muted).radius(CornerRadii::all(5.0)),
+                        QuadStyle::solid(theme.primary.with_alpha(0.20))
+                            .radius(CornerRadii::all(5.0)),
                     ),
                 )
                 .transition(StyleTransition::default()),
             )
         });
-        behavior.decorate(
-            SelectPart::List,
-            Element::column(options)
-                .width(length(260.0))
-                .max_height(length(280.0))
-                .padding(argui_ui::Sides::length(5.0))
-                .gap(2.0)
-                .paint_style(PaintStyle::new(
-                    QuadStyle::solid(theme.popover)
-                        .border(Border::all(1.0, theme.border))
-                        .radius(CornerRadii::all(8.0)),
-                ))
-                .overflow(Axes {
-                    x: Overflow::Hidden,
-                    y: Overflow::Auto,
-                })
-                .scroll_config(ScrollConfig::default().scrollbar(theme.scrollbar.clone()))
-                .anchored_to(
-                    self.key.clone(),
-                    OverlayPlacement::new(PlacementSide::Bottom)
-                        .align(OverlayAlign::Start)
-                        .gap(6.0)
-                        .margin(10.0),
-                )
-                .focus_scope(FocusScope::trapped(InitialFocus::Target(
-                    behavior.option_key(self.highlighted).into(),
-                )))
-                .z_index(1_000),
-        )
+        let mut list = Element::column(options)
+            .width(length(260.0))
+            .max_height(length(280.0))
+            .padding(argui_ui::Sides::length(5.0))
+            .gap(2.0)
+            .paint_style(PaintStyle::new(
+                QuadStyle::solid(theme.popover)
+                    .border(Border::all(1.0, theme.border))
+                    .radius(CornerRadii::all(8.0)),
+            ))
+            .overflow(Axes {
+                x: Overflow::Hidden,
+                y: Overflow::Auto,
+            })
+            .scroll_config(ScrollConfig::default().scrollbar(theme.scrollbar.clone()))
+            .anchored_portal(
+                WindowLayer::Popover,
+                self.key.clone(),
+                FloatingPlacement::new(Placement::BottomStart)
+                    .anchor_width(AnchorWidth::AtLeastAnchor)
+                    .offset(6.0)
+                    .viewport_padding(10.0),
+            )
+            .portal_dismiss(DismissPolicy::OutsidePointer)
+            .focus_scope(FocusScope::trapped(InitialFocus::Target(
+                behavior.option_key(self.highlighted).into(),
+            )))
+            .z_index(1_000);
+        if theme.overlay_blur > 0.0 {
+            list = list.layer(
+                LayerStyle::new(Default::default())
+                    .backdrop(Filter::Blur(theme.overlay_blur))
+                    .mask(LayerMask::Rounded(CornerRadii::all(8.0))),
+            );
+        }
+        behavior.decorate(SelectPart::List, list)
     }
 }
 

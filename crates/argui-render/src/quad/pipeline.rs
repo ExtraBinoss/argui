@@ -272,7 +272,7 @@ impl QuadPipeline {
         instances: &[QuadInstance],
         clips: &[ClipInstance],
         gradients: &[GradientStopInstance],
-    ) {
+    ) -> bool {
         let mut changed = false;
         let mut instances_reallocated = false;
         let mut clips_reallocated = false;
@@ -314,27 +314,28 @@ impl QuadPipeline {
                 &self.gradient_buffer,
             );
         }
-        write_changed(
+        let instances_changed = crate::upload::write_changed(
             queue,
             &self.instance_buffer,
             instances,
             &mut self.previous_instances,
             instances_reallocated,
         );
-        write_changed(
+        let clips_changed = crate::upload::write_changed(
             queue,
             &self.clip_buffer,
             clips,
             &mut self.previous_clips,
             clips_reallocated,
         );
-        write_changed(
+        let gradients_changed = crate::upload::write_changed(
             queue,
             &self.gradient_buffer,
             gradients,
             &mut self.previous_gradients,
             gradients_reallocated,
         );
+        instances_changed || clips_changed || gradients_changed
     }
 
     pub fn begin_frame(&mut self) {
@@ -369,48 +370,6 @@ impl QuadPipeline {
         pass.set_bind_group(0, &self.bind_group, &[viewport_offset]);
         pass.draw(0..6, instances);
     }
-}
-
-#[cfg_attr(coverage_nightly, coverage(off))]
-fn write_changed<T: Pod + Copy>(
-    queue: &wgpu::Queue,
-    buffer: &wgpu::Buffer,
-    values: &[T],
-    previous: &mut Vec<T>,
-    reallocated: bool,
-) {
-    if values.is_empty() {
-        previous.clear();
-        return;
-    }
-    let current_bytes: &[u8] = bytemuck::cast_slice(values);
-    let previous_bytes: &[u8] = bytemuck::cast_slice(previous.as_slice());
-    let item_size = size_of::<T>();
-    let (start, end) = if reallocated || values.len() != previous.len() {
-        (0, values.len())
-    } else {
-        let first = current_bytes
-            .chunks_exact(item_size)
-            .zip(previous_bytes.chunks_exact(item_size))
-            .position(|(current, old)| current != old);
-        let Some(first) = first else {
-            return;
-        };
-        let suffix = current_bytes
-            .chunks_exact(item_size)
-            .rev()
-            .zip(previous_bytes.chunks_exact(item_size).rev())
-            .take_while(|(current, old)| current == old)
-            .count();
-        (first, values.len() - suffix)
-    };
-    queue.write_buffer(
-        buffer,
-        (start * item_size) as u64,
-        bytemuck::cast_slice(&values[start..end]),
-    );
-    previous.clear();
-    previous.extend_from_slice(values);
 }
 
 fn buffer_layout(

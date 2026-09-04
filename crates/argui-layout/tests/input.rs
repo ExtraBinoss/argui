@@ -17,6 +17,22 @@ fn text_engine() -> TextEngine {
     TextEngine::from_embedded_fonts([NOTO_SANS], "Noto Sans", "Noto Sans", "Noto Sans")
 }
 
+#[test]
+fn placeholder_keeps_its_authored_color_on_the_first_frame() {
+    let text = TextStyle {
+        color: Color::BLACK,
+        ..TextStyle::default()
+    };
+    let mut style = InputStyle::new(PaintStyle::default(), text);
+    style.placeholder.color = Color::WHITE;
+    let mut ui = UiTree::new(Input::new("search", "", "Search components", style).build());
+    let output = LayoutEngine::new()
+        .compute(&mut ui, &mut text_engine(), Size::new(320.0, 80.0))
+        .unwrap();
+
+    assert_eq!(output.text.blocks()[0].style.color, Color::WHITE);
+}
+
 fn stop(index: usize, x: f32, y: f32, word_boundary: bool) -> CaretStop {
     CaretStop {
         position: TextPosition::new(index, CaretAffinity::Before),

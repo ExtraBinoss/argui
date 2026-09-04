@@ -95,7 +95,7 @@ fn open_select_is_an_anchored_trapped_listbox() {
         element.children[1].semantics.as_ref().unwrap().role,
         Role::ListBox
     );
-    assert!(element.children[1].overlay.is_some());
+    assert!(element.children[1].portal.is_some());
     assert!(element.children[1].focus_scope.is_some());
     assert!(
         element.children[1]

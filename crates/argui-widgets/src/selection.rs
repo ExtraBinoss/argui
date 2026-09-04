@@ -1,11 +1,16 @@
+use argui_core::Transform2D;
 use argui_paint::{Border, CornerRadii, PaintStyle, QuadStyle};
 use argui_text::{TextStyle, TextWrap};
 use argui_ui::{
     AlignItems, Dimensions, Display, Element, FlexDirection, JustifyContent, LayoutStyle,
-    Orientation, Role, StylePatch, StyleTransition, VisualState, auto, length,
+    Orientation, Role, StateSelector, StylePatch, StyleTransition, VisualState, auto, length,
+    property,
 };
 
-use crate::{RadioGroupBehavior, RadioGroupPart, ToggleBehavior, TogglePart, WidgetTheme};
+use crate::{
+    RadioGroupBehavior, RadioGroupPart, TOGGLE_CHECKED, TOGGLE_SCOPE, ToggleBehavior, TogglePart,
+    WidgetTheme,
+};
 
 #[derive(Clone, Debug)]
 pub struct Checkbox {
@@ -104,31 +109,33 @@ impl Switch {
 
     #[must_use]
     pub fn build(self, theme: &WidgetTheme) -> Element {
+        let thumb_key = format!("{}::thumb", self.key);
         let thumb = Element::container([])
+            .keyed(thumb_key)
             .width(length(18.0))
             .height(length(18.0))
-            .background(if self.checked {
-                theme.primary_foreground
-            } else {
-                theme.foreground
-            })
-            .radius(CornerRadii::all(999.0));
+            .background(theme.primary_foreground)
+            .radius(CornerRadii::all(999.0))
+            .when(
+                StateSelector::scope(TOGGLE_SCOPE, TOGGLE_CHECKED),
+                StylePatch::new().set(
+                    property::Transform,
+                    Transform2D::IDENTITY.translate(18.0, 0.0),
+                ),
+            )
+            .transition(StyleTransition::default());
         let track = Element::row([thumb])
-            .width(length(38.0))
+            .width(length(40.0))
             .height(length(22.0))
             .padding(argui_ui::Sides::length(2.0))
-            .justify_content(if self.checked {
-                JustifyContent::END
-            } else {
-                JustifyContent::START
-            })
+            .justify_content(JustifyContent::START)
             .background(if self.checked {
                 theme.primary
             } else {
                 theme.muted
             })
-            .border(Border::all(1.0, theme.border))
             .radius(CornerRadii::all(999.0))
+            .transition(StyleTransition::default())
             .semantic_hidden(true);
         let behavior = ToggleBehavior::new(&self.key, &self.label, Role::Switch, self.checked)
             .enabled(self.enabled);

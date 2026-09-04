@@ -63,13 +63,14 @@ impl VectorGpu {
         queue: &wgpu::Queue,
         display_list: &DisplayList,
         scale: f32,
-    ) -> Result<(), RendererError> {
+    ) -> Result<bool, RendererError> {
         self.clear_frame_stats();
         match self.prepare_once(device, queue, display_list, scale) {
             Err(RendererError::VectorAtlasFull) => {
                 self.atlas.clear();
                 self.variants.clear();
                 self.prepare_once(device, queue, display_list, scale)
+                    .map(|_| true)
             }
             result => result,
         }
@@ -81,7 +82,7 @@ impl VectorGpu {
         queue: &wgpu::Queue,
         display_list: &DisplayList,
         scale: f32,
-    ) -> Result<(), RendererError> {
+    ) -> Result<bool, RendererError> {
         let vectors = display_list.commands().iter().filter_map(|command| {
             if let DisplayCommand::Vector(vector) = command {
                 Some(vector)
@@ -130,8 +131,7 @@ impl VectorGpu {
                 &mut clips,
             ));
         }
-        self.pipeline.write(device, queue, &instances, &clips);
-        Ok(())
+        Ok(self.pipeline.write(device, queue, &instances, &clips))
     }
 
     pub fn begin_frame(&mut self) {
