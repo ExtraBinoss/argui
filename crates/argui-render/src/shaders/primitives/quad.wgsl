@@ -121,6 +121,16 @@ fn fill_color(quad: Quad, local: vec2<f32>) -> vec4<f32> {
     return gradient_color(quad, length((uv - quad.fill_geometry.xy) / max(quad.fill_geometry.zw, vec2(0.00001))));
 }
 
+// Evaluate the SDF one framebuffer pixel away using the inverse affine basis.
+// Unlike fragment derivatives, these differences are valid in variable clip loops.
+fn clip_gradient(clip: Clip, local: vec2<f32>, distance: f32) -> vec2<f32> {
+    let point = local - clip.bounds.xy;
+    return vec2(
+        rounded_distance(point + clip.inverse_a.xy, clip.bounds.zw, clip.radii) - distance,
+        rounded_distance(point + clip.inverse_a.zw, clip.bounds.zw, clip.radii) - distance,
+    );
+}
+
 @fragment
 fn fragment(input: VertexOutput) -> @location(0) vec4<f32> {
     let quad = quads[input.instance];
@@ -130,7 +140,8 @@ fn fragment(input: VertexOutput) -> @location(0) vec4<f32> {
         let clip = clips[quad.clip_meta.x + offset];
         let local = transformed(clip.inverse_a, clip.inverse_b, pixel);
         let distance = rounded_distance(local - clip.bounds.xy, clip.bounds.zw, clip.radii);
-        clip_coverage *= edge_coverage(distance);
+        let pixel_width = max(length(clip_gradient(clip, local, distance)), 0.75) * 1.5;
+        clip_coverage *= clamp(0.5 - distance / pixel_width, 0.0, 1.0);
     }
     let outer_distance = rounded_distance(input.local, quad.rect.zw, quad.radii);
     let outer_coverage = edge_coverage(outer_distance);

@@ -58,6 +58,16 @@ fn vertex(
     return output;
 }
 
+// Evaluate the SDF one framebuffer pixel away using the inverse affine basis.
+// Unlike fragment derivatives, these differences are valid in variable clip loops.
+fn clip_gradient(clip: Clip, local: vec2<f32>, distance: f32) -> vec2<f32> {
+    let point = local - clip.bounds.xy;
+    return vec2(
+        rounded_distance(point + clip.inverse_a.xy, clip.bounds.zw, clip.radii) - distance,
+        rounded_distance(point + clip.inverse_a.zw, clip.bounds.zw, clip.radii) - distance,
+    );
+}
+
 @fragment
 fn fragment(input: VertexOutput) -> @location(0) vec4<f32> {
     let pixel = input.position.xy + viewport.origin;
@@ -69,7 +79,8 @@ fn fragment(input: VertexOutput) -> @location(0) vec4<f32> {
             clip.inverse_a.y * pixel.x + clip.inverse_a.w * pixel.y + clip.inverse_b.y,
         );
         let clip_distance = rounded_distance(local - clip.bounds.xy, clip.bounds.zw, clip.radii);
-        let clip_width = max(fwidth(clip_distance), 0.75);
+        let gradient = abs(clip_gradient(clip, local, clip_distance));
+        let clip_width = max(gradient.x + gradient.y, 0.75);
         clip_coverage *= 1.0 - smoothstep(-clip_width, clip_width, clip_distance);
     }
     let sampled = textureSample(glyph_atlas, glyph_sampler, input.uv);

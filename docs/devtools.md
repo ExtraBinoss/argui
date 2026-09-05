@@ -187,6 +187,12 @@ and above, the overview and selected detail view are side by side; narrower
 panels switch between Overview, GPU passes, and Frame details. GPU passes use
 the shared VList widget, with aligned name, duration, and timing columns.
 
+The frame history uses actual numeric columns, not whitespace alignment. Each
+pane has one scrollport: VList scrolls its measured header together with the
+virtual rows. Stable scrollbar gutters reserve space beside the content. GPU
+bar position indicates start time and bar width indicates duration on the same
+scale; a short pass is intentionally drawn as a short bar.
+
 The frame graph has 60 retained slots on a fixed 0–50 ms scale (larger peaks are
 clipped visually, not in recorded values). Its 120 ms paint-only transitions
 interpolate between 100 ms frontend samples; they do not animate layout heights

@@ -22,6 +22,7 @@ icondata_core.workspace = true
 icondata_tb.workspace = true
 
 [dev-dependencies]
+web-time.workspace = true
 argui-layout.workspace = true
 argui-showcase.workspace = true
 

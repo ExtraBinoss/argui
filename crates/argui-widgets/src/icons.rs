@@ -3,9 +3,10 @@ use argui_ui::{Dimensions, Element, LayoutStyle, Semantics};
 use argui_vector::parse_svg;
 use icondata_core::IconData;
 use icondata_tb::{
-    TbCheckOutline, TbChevronDownOutline, TbDeviceDesktopOutline,
-    TbLayoutSidebarLeftCollapseOutline, TbLoader2Outline, TbMoonOutline, TbResizeOutline,
-    TbRestoreOutline, TbSearchOutline, TbSunOutline, TbXOutline,
+    TbCheckOutline, TbChevronDownOutline, TbClipboardOutline, TbCopyOutline, TbCutOutline,
+    TbDeviceDesktopOutline, TbLayoutSidebarLeftCollapseOutline, TbLoader2Outline, TbMoonOutline,
+    TbResizeOutline, TbRestoreOutline, TbSearchOutline, TbSelectAllOutline, TbSunOutline,
+    TbXOutline,
 };
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -22,10 +23,14 @@ pub enum TablerIcon {
     Resize,
     Sidebar,
     Restore,
+    Copy,
+    Cut,
+    Paste,
+    SelectAll,
 }
 
 impl TablerIcon {
-    const ALL: [Self; 11] = [
+    const ALL: [Self; 15] = [
         Self::Search,
         Self::Sun,
         Self::Moon,
@@ -37,6 +42,10 @@ impl TablerIcon {
         Self::Resize,
         Self::Sidebar,
         Self::Restore,
+        Self::Copy,
+        Self::Cut,
+        Self::Paste,
+        Self::SelectAll,
     ];
 
     const fn data(self) -> &'static IconData {
@@ -52,13 +61,17 @@ impl TablerIcon {
             Self::Resize => TbResizeOutline,
             Self::Sidebar => TbLayoutSidebarLeftCollapseOutline,
             Self::Restore => TbRestoreOutline,
+            Self::Copy => TbCopyOutline,
+            Self::Cut => TbCutOutline,
+            Self::Paste => TbClipboardOutline,
+            Self::SelectAll => TbSelectAllOutline,
         }
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct WidgetAssets {
-    ids: [Option<VectorId>; 11],
+    ids: [Option<VectorId>; 15],
     assets: Vec<VectorAsset>,
     color: Color,
 }
@@ -71,8 +84,10 @@ impl WidgetAssets {
 
     #[must_use]
     pub fn tabler_subset(color: Color, requested: impl IntoIterator<Item = TablerIcon>) -> Self {
-        let mut ids = [None; 11];
-        let icons = requested.into_iter().collect::<std::collections::HashSet<_>>();
+        let mut ids = [None; 15];
+        let icons = requested
+            .into_iter()
+            .collect::<std::collections::HashSet<_>>();
         let assets = TablerIcon::ALL
             .iter()
             .filter(|icon| icons.contains(icon))

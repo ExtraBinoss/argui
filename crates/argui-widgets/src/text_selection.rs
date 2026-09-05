@@ -1,15 +1,17 @@
 use argui_core::{Rect, Size};
-use argui_paint::{ImageAsset, VectorAsset};
+use argui_paint::{
+    Border, CornerRadii, Filter, ImageAsset, LayerMask, PaintStyle, QuadStyle, VectorAsset,
+};
 use argui_runtime::{Context, Entity, LayoutSnapshot, Render, WindowEnvironment};
 use argui_ui::{
     Element, ElementKind, EventType, Interaction, SelectionCapabilities, SelectionCommand, Sides,
     UiEvent, UiEventKind, UserSelect, length,
 };
 
-use crate::{Button, WidgetTheme, shadcn};
+use crate::{Button, TablerIcon, WidgetAssets, WidgetTheme, shadcn};
 
 const TOOLBAR_HEIGHT: f32 = 40.0;
-const COMMAND_WIDTH: f32 = 88.0;
+const COMMAND_WIDTH: f32 = 112.0;
 const VIEWPORT_MARGIN: f32 = 8.0;
 const SELECTION_GAP: f32 = 8.0;
 
@@ -19,6 +21,7 @@ pub struct TextSelectionToolbar {
     selection: Rect,
     viewport: Size,
     capabilities: SelectionCapabilities,
+    icons: Option<WidgetAssets>,
 }
 
 impl TextSelectionToolbar {
@@ -34,7 +37,14 @@ impl TextSelectionToolbar {
             selection,
             viewport,
             capabilities,
+            icons: None,
         }
+    }
+
+    #[must_use]
+    pub fn icons(mut self, icons: &WidgetAssets) -> Self {
+        self.icons = Some(icons.clone());
+        self
     }
 
     #[must_use]
@@ -50,7 +60,10 @@ impl TextSelectionToolbar {
             self.capabilities.editable || matches!(*command, "copy" | "select-all")
         })
         .collect::<Vec<_>>();
-        let toolbar_width = COMMAND_WIDTH * commands.len().max(1) as f32;
+        let count = commands.len().max(1) as f32;
+        let command_width =
+            COMMAND_WIDTH.min((self.viewport.width - VIEWPORT_MARGIN * 2.0).max(0.0) / count);
+        let toolbar_width = command_width * count;
         let left = (self.selection.origin.x + self.selection.size.width * 0.5
             - toolbar_width * 0.5)
             .clamp(
@@ -65,15 +78,36 @@ impl TextSelectionToolbar {
                 .min((self.viewport.height - TOOLBAR_HEIGHT - VIEWPORT_MARGIN).max(VIEWPORT_MARGIN))
         };
         let buttons = commands.into_iter().map(|(suffix, label, enabled)| {
-            Button::new(
+            let mut button = Button::new(
                 format!("{}::{suffix}", self.key_prefix),
                 label,
-                theme.button(),
+                theme.ghost_button(),
             )
-            .enabled(enabled)
-            .build()
+            .enabled(enabled);
+            if let Some(icons) = &self.icons {
+                let icon = match suffix {
+                    "cut" => TablerIcon::Cut,
+                    "copy" => TablerIcon::Copy,
+                    "paste" => TablerIcon::Paste,
+                    _ => TablerIcon::SelectAll,
+                };
+                let icon = icons.icon(icon, 14.0).vector_color(theme.foreground);
+                button = if command_width < 100.0 {
+                    button.content(icon)
+                } else {
+                    button.leading(icon)
+                };
+            }
+            button
+                .build()
+                .width(length(command_width))
+                .height(length(TOOLBAR_HEIGHT))
+                .padding(argui_ui::sides(8.0, 6.0))
         });
         Element::row(buttons)
+            .keyed(self.key_prefix)
+            .portal(argui_ui::WindowLayer::Popover)
+            .portal_dismiss(argui_ui::DismissPolicy::OutsidePointer)
             .absolute(Sides {
                 left: length(left),
                 right: argui_ui::auto(),
@@ -82,6 +116,13 @@ impl TextSelectionToolbar {
             })
             .width(length(toolbar_width))
             .height(length(TOOLBAR_HEIGHT))
+            .paint_style(PaintStyle::new(
+                QuadStyle::solid(theme.popover.with_alpha(0.88))
+                    .border(Border::all(1.0, theme.border))
+                    .radius(CornerRadii::all(8.0)),
+            ))
+            .backdrop_filter(Filter::Blur(theme.overlay_blur.max(0.0)))
+            .mask(LayerMask::Rounded(CornerRadii::all(8.0)))
             .user_select(UserSelect::None)
             .interaction(Interaction::blocker())
             .z_index(i32::MAX)
@@ -100,6 +141,9 @@ pub struct SelectionHost<A: Render> {
     active: Option<ActiveSelection>,
     viewport: Size,
     menu_key: String,
+    icons: WidgetAssets,
+    presence: crate::Presence,
+    closing: Option<ActiveSelection>,
 }
 
 impl<A: Render> SelectionHost<A> {
@@ -110,6 +154,17 @@ impl<A: Render> SelectionHost<A> {
             active: None,
             viewport: Size::default(),
             menu_key: "argui::selection-menu".into(),
+            icons: WidgetAssets::tabler_subset(
+                argui_core::Color::WHITE,
+                [
+                    TablerIcon::Cut,
+                    TablerIcon::Copy,
+                    TablerIcon::Paste,
+                    TablerIcon::SelectAll,
+                ],
+            ),
+            presence: crate::Presence::default(),
+            closing: None,
         }
     }
 
@@ -121,8 +176,25 @@ impl<A: Render> SelectionHost<A> {
 }
 
 impl<A: Render> Render for SelectionHost<A> {
+    fn animation_frame(&mut self, frame: argui_animation::Frame, cx: &mut Context<Self>) {
+        if self.presence.advance(frame.elapsed) {
+            self.closing = None;
+            cx.notify();
+        } else {
+            cx.request_paint();
+        }
+    }
+
+    fn wants_animation_frame(&self) -> bool {
+        self.presence.animating()
+    }
+
     fn render(&mut self, cx: &mut Context<Self>) -> Element {
         let environment = cx.environment();
+        if environment.reduced_motion {
+            self.presence.set_open(self.active.is_some(), true);
+            self.closing = None;
+        }
         let application = cx.entity(&self.application);
         let mut root = self.compose(application, environment);
         for event in EventType::ALL {
@@ -143,7 +215,9 @@ impl<A: Render> Render for SelectionHost<A> {
     }
 
     fn vector_assets(&self) -> Vec<VectorAsset> {
-        self.application.read(Render::vector_assets)
+        let mut assets = self.application.read(Render::vector_assets);
+        assets.extend_from_slice(self.icons.assets());
+        assets
     }
 
     fn inspector(&self) -> Option<argui_inspect::InspectorHandle> {
@@ -153,7 +227,7 @@ impl<A: Render> Render for SelectionHost<A> {
 
 impl<A: Render> SelectionHost<A> {
     fn compose(&self, mut root: Element, environment: WindowEnvironment) -> Element {
-        if let Some(selection) = &self.active {
+        if let Some(selection) = self.active.as_ref().or(self.closing.as_ref()) {
             let theme = shadcn(environment.primary);
             let toolbar = TextSelectionToolbar::new(
                 &self.menu_key,
@@ -161,7 +235,9 @@ impl<A: Render> SelectionHost<A> {
                 self.viewport,
                 selection.capabilities,
             )
+            .icons(&self.icons)
             .build(theme.resolve(environment.color_scheme));
+            let toolbar = self.presence.decorate(toolbar);
             if matches!(root.kind, ElementKind::Container) {
                 root.children.push(toolbar);
             } else {
@@ -171,7 +247,23 @@ impl<A: Render> SelectionHost<A> {
         root
     }
     fn handle_event(&mut self, event: &UiEvent, cx: &mut Context<Self>) {
+        let previous = self.active.clone();
         match &event.kind {
+            UiEventKind::PointerOutside(_)
+                if event.target_key() == Some(self.menu_key.as_str()) =>
+            {
+                if self.active.take().is_some() {
+                    cx.notify();
+                }
+            }
+            UiEventKind::KeyInput(input)
+                if input.key == argui_core::Key::Escape
+                    && input.state == argui_core::KeyState::Pressed =>
+            {
+                if self.active.take().is_some() {
+                    cx.notify();
+                }
+            }
             UiEventKind::Pointer(argui_core::PointerEvent {
                 phase: argui_core::PointerPhase::Pressed,
                 ..
@@ -240,9 +332,22 @@ impl<A: Render> SelectionHost<A> {
             }
             _ => {}
         }
+        if previous.is_some() != self.active.is_some() {
+            self.presence
+                .set_open(self.active.is_some(), cx.environment().reduced_motion);
+            self.closing = if self.active.is_none() && self.presence.visible() {
+                previous
+            } else {
+                None
+            };
+            if self.presence.animating() {
+                cx.request_animation_frame();
+            }
+        }
     }
 
     fn command_for(&self, event: &UiEvent) -> Option<SelectionCommand> {
+        self.active.as_ref()?;
         let suffix = event
             .target_key()?
             .strip_prefix(self.menu_key.as_str())?

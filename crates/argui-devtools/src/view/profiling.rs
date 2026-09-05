@@ -101,6 +101,7 @@ pub(super) fn gpu_waterfall(
     theme: &WidgetTheme,
     viewport: f32,
     offset: f32,
+    header_extent: f32,
 ) -> Element {
     let Some(gpu) = &frame.gpu else {
         return Element::text(if frame.adapter.timestamp_queries {
@@ -111,8 +112,39 @@ pub(super) fn gpu_waterfall(
         .text_style(text(12.0, theme.muted_foreground));
     };
     let total = gpu.total.as_secs_f64().max(f64::EPSILON);
+    let header = Element::column([
+        Element::text(format!(
+            "GPU timeline · {} passes · {:.3} ms",
+            gpu.passes.len(),
+            millis(gpu.total)
+        ))
+        .text_style(text(12.0, theme.foreground)),
+        Element::text("Position = start time · width = duration")
+            .text_style(text(10.0, theme.muted_foreground)),
+        Element::row([
+            Element::text("Pass")
+                .text_style(text(10.0, theme.muted_foreground))
+                .width(percent(0.42)),
+            Element::text("ms")
+                .text_style(text(10.0, theme.muted_foreground))
+                .width(length(46.0))
+                .shrink(0.0),
+            Element::row([
+                Element::text("0").text_style(text(10.0, theme.muted_foreground)),
+                Element::text(format!("{:.2} ms", millis(gpu.total)))
+                    .text_style(text(10.0, theme.muted_foreground)),
+            ])
+            .grow(1.0)
+            .justify_content(argui_ui::JustifyContent::SPACE_BETWEEN),
+        ])
+        .gap(8.0),
+    ])
+    .keyed("__devtools-gpu-header")
+    .gap(8.0)
+    .padding(Sides::length(10.0));
+
     let timeline = argui_widgets::VList::new("__devtools-gpu-passes", 28.0, viewport, offset)
-        .build(gpu.passes.len(), theme, |index| {
+        .build_with_header(gpu.passes.len(), theme, header, header_extent, |index| {
             let pass = &gpu.passes[index];
             let start = (pass.start.as_secs_f64() / total).clamp(0.0, 1.0);
             let duration = (pass.duration.as_secs_f64() / total).clamp(0.0, 1.0 - start);
@@ -151,6 +183,7 @@ pub(super) fn gpu_waterfall(
                 track,
             ])
             .keyed(format!("__devtools-gpu-pass-{index}"))
+            .padding(argui_ui::sides(10.0, 0.0))
             .height(length(28.0))
             .shrink(0.0)
             .gap(8.0)
@@ -167,32 +200,8 @@ pub(super) fn gpu_waterfall(
                     )),
             )
         });
-    Element::column([
-        Element::text(format!(
-            "GPU timeline · {} passes · {:.3} ms",
-            gpu.passes.len(),
-            millis(gpu.total)
-        ))
-        .text_style(text(12.0, theme.foreground)),
-        Element::row([
-            Element::text("Pass")
-                .text_style(text(10.0, theme.muted_foreground))
-                .width(percent(0.42)),
-            Element::text("ms")
-                .text_style(text(10.0, theme.muted_foreground))
-                .width(length(46.0))
-                .shrink(0.0),
-            Element::row([
-                Element::text("0").text_style(text(10.0, theme.muted_foreground)),
-                Element::text(format!("{:.2} ms", millis(gpu.total)))
-                    .text_style(text(10.0, theme.muted_foreground)),
-            ])
-            .grow(1.0)
-            .justify_content(argui_ui::JustifyContent::SPACE_BETWEEN),
-        ])
-        .gap(8.0),
-        timeline,
-    ])
-    .keyed("__devtools-gpu-timeline")
-    .gap(8.0)
+    Element::container([timeline.height(percent(1.0)).min_height(length(0.0))])
+        .keyed("__devtools-gpu-timeline")
+        .height(percent(1.0))
+        .min_height(length(0.0))
 }

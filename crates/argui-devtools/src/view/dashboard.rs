@@ -11,41 +11,39 @@ pub(crate) struct DetailCache {
     theme: WidgetTheme,
     panel: usize,
     height: f32,
+    header_extent: f32,
     offset: f32,
     element: Element,
 }
 
 fn detail_content<A>(tools: &DevtoolsHost<A>, theme: &WidgetTheme) -> Element {
-    let height = if tools.dock_mode == crate::DockMode::Bottom {
-        tools.dock_extent()
-    } else {
-        tools.viewport.size.height
-    };
-    let height = (height
-        - if tools.panel_width() >= 760.0 {
-            230.0
-        } else {
-            270.0
-        })
-    .max(56.0);
+    let height = tools.profile_extents.gpu;
     let mut cache = tools.detail_cache.borrow_mut();
     if cache.as_ref().is_none_or(|cache| {
         cache.frame != tools.profile_details
             || cache.theme != *theme
             || cache.panel != tools.profile_panel
+            || cache.header_extent != tools.profile_extents.gpu_header
             || cache.height != height
             || cache.offset != tools.gpu_offset
     }) {
         let element = if tools.profile_panel == 2 {
             profiling::details(&tools.profile_details, theme)
         } else {
-            profiling::gpu_waterfall(&tools.profile_details, theme, height, tools.gpu_offset)
+            profiling::gpu_waterfall(
+                &tools.profile_details,
+                theme,
+                height,
+                tools.gpu_offset,
+                tools.profile_extents.gpu_header,
+            )
         };
         *cache = Some(DetailCache {
             frame: tools.profile_details.clone(),
             theme: theme.clone(),
             panel: tools.profile_panel,
             height,
+            header_extent: tools.profile_extents.gpu_header,
             offset: tools.gpu_offset,
             element,
         });
@@ -84,14 +82,6 @@ pub(super) fn panel<A>(tools: &DevtoolsHost<A>, theme: &WidgetTheme) -> Element 
         ),
         small_button("__devtools-clear", "Clear", false, theme),
         icon_label_button("__devtools-copy", tools.icons.copy, "Export", theme),
-        Element::text(if tools.selected_frame.is_some() {
-            "Selected frame · frozen"
-        } else if tools.inspector.paused() {
-            "Recording paused"
-        } else {
-            "Live recording"
-        })
-        .text_style(text(11.0, theme.muted_foreground)),
     ])
     .keyed("__devtools-profile-controls")
     .gap(6.0)
@@ -99,55 +89,38 @@ pub(super) fn panel<A>(tools: &DevtoolsHost<A>, theme: &WidgetTheme) -> Element 
     .padding(Sides::length(8.0))
     .shrink(0.0);
     let overview = || {
-        scroll(
-            "__devtools-overview",
-            Element::column([
-                Element::row([
-                    stat("Frame", format!("{:.2} ms", millis(frame.interval)), theme),
-                    stat("CPU", format!("{:.2} ms", millis(frame.total_cpu())), theme),
-                    stat(
-                        "GPU",
-                        frame.gpu.as_ref().map_or_else(
-                            || {
-                                if frame.adapter.timestamp_queries {
-                                    "Pending"
-                                } else {
-                                    "Unavailable"
-                                }
-                                .into()
-                            },
-                            |gpu| format!("{:.2} ms", millis(gpu.total)),
-                        ),
-                        theme,
-                    ),
-                ])
-                .gap(6.0),
-                graph::graph(&tools.profile_frames, theme),
-                Element::text("Recorded frames · select to inspect")
-                    .text_style(text(11.0, theme.muted_foreground)),
-                profiling_list(&tools.profile_frames, tools.profiling_offset, theme).shrink(0.0),
+        let header = Element::column([
+            Element::row([
+                stat("Frame", format!("{:.2} ms", millis(frame.interval)), theme),
+                stat("CPU", format!("{:.2} ms", millis(frame.total_cpu())), theme),
+                stat(
+                    "GPU",
+                    frame
+                        .gpu
+                        .as_ref()
+                        .map_or_else(|| "—".into(), |gpu| format!("{:.2} ms", millis(gpu.total))),
+                    theme,
+                ),
             ])
-            .gap(10.0),
-            theme,
-        )
+            .gap(6.0),
+            graph::graph(&tools.profile_frames, theme),
+        ])
+        .gap(10.0);
+        Element::container([profiling_list(tools, header, theme)])
+            .keyed("__devtools-overview")
+            .min_width(length(0.0))
+            .min_height(length(0.0))
     };
     let details = || {
-        scroll(
-            "__devtools-profile-details-body",
-            Element::column([
-                Element::text(if tools.selected_frame.is_some() {
-                    "Selected frame · exact recorded values"
-                } else if tools.inspector.paused() {
-                    "Recording paused · exact recorded values"
-                } else {
-                    "Live details · updated twice per second"
-                })
-                .text_style(text(10.0, theme.muted_foreground)),
-                detail_content(tools, theme),
-            ])
-            .gap(10.0),
-            theme,
-        )
+        let content = detail_content(tools, theme);
+        if tools.profile_panel == 2 {
+            scroll("__devtools-profile-details-body", content, theme)
+        } else {
+            Element::container([content])
+                .keyed("__devtools-profile-details-body")
+                .min_width(length(0.0))
+                .min_height(length(0.0))
+        }
     };
     let navigation = Element::row([
         small_button(
@@ -214,6 +187,7 @@ fn scroll(key: &str, child: Element, theme: &WidgetTheme) -> Element {
             y: Overflow::Auto,
         })
         .scroll_config(ScrollConfig::default().scrollbar(theme.scrollbar.clone()))
+        .scrollbar_gutter(argui_ui::ScrollbarGutter::Stable)
 }
 
 fn stat(label: &str, value: String, theme: &WidgetTheme) -> Element {

@@ -60,6 +60,88 @@ fn touch_selection_toolbar_is_a_clamped_non_selectable_widget() {
     assert_eq!(toolbar.user_select, UserSelect::None);
     assert!(!toolbar.interaction.as_ref().unwrap().focusable);
     assert_eq!(toolbar.children.len(), 2);
+    assert_eq!(
+        toolbar.portal.as_ref().unwrap().dismiss,
+        argui_ui::DismissPolicy::OutsidePointer
+    );
+    assert!(!toolbar.layer.as_ref().unwrap().backdrop_filters.is_empty());
+}
+
+#[test]
+fn selection_toolbar_dismisses_on_outside_pointer_without_consuming_it() {
+    let app = Entity::new(argui_widgets::SelectionHost::new(Editor));
+    dispatch(
+        &app,
+        UiEventKind::DocumentSelectionChanged {
+            text: Some("selected".into()),
+            bounds: Some(Rect::new(Point::new(40.0, 60.0), Size::new(50.0, 18.0))),
+            touch: true,
+            dragging: false,
+        },
+    );
+    let mut tree = UiTree::new(app.render());
+    let target = tree
+        .node_ids()
+        .iter()
+        .copied()
+        .find(|node| tree.key(*node) == Some("argui::selection-menu"))
+        .unwrap();
+    let events = tree.event_deliveries(
+        target,
+        UiEventKind::PointerOutside(argui_core::PointerEvent::mouse(
+            argui_core::PointerPhase::Pressed,
+            Point::new(0.0, 0.0),
+        )),
+    );
+    for event in &events {
+        if event.should_dispatch() {
+            app.dispatch_event(event);
+        }
+        assert!(!event.default_prevented());
+    }
+    assert!(!has_key(&app.render(), "argui::selection-menu"));
+}
+
+#[test]
+fn selection_toolbar_finishes_its_exit_before_unmounting() {
+    let app = Entity::new(argui_widgets::SelectionHost::new(Editor));
+    dispatch(
+        &app,
+        UiEventKind::DocumentSelectionChanged {
+            text: Some("selected".into()),
+            bounds: Some(Rect::new(Point::new(40.0, 60.0), Size::new(50.0, 18.0))),
+            touch: true,
+            dragging: false,
+        },
+    );
+    app.update(|host, cx| {
+        host.animation_frame(
+            argui_animation::Frame {
+                now: argui_animation::Time::from_nanos(140_000_000),
+                elapsed: argui_animation::Duration::from_millis(140),
+            },
+            cx,
+        )
+    });
+    dispatch_key(
+        &app,
+        "argui::selection-menu",
+        UiEventKind::PointerOutside(argui_core::PointerEvent::mouse(
+            argui_core::PointerPhase::Pressed,
+            Point::default(),
+        )),
+    );
+    assert!(has_key(&app.render(), "argui::selection-menu"));
+    app.update(|host, cx| {
+        host.animation_frame(
+            argui_animation::Frame {
+                now: argui_animation::Time::from_nanos(240_000_000),
+                elapsed: argui_animation::Duration::from_millis(100),
+            },
+            cx,
+        )
+    });
+    assert!(!has_key(&app.render(), "argui::selection-menu"));
 }
 
 #[test]

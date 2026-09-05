@@ -1,4 +1,4 @@
-use argui_inspect::{FrameRecord, NodeSnapshot};
+use argui_inspect::NodeSnapshot;
 use argui_paint::{Border, Color, CornerRadii, LayerStyle, PaintStyle, QuadStyle, VectorId};
 use argui_text::{TextColor, TextStyle, TextWrap};
 use argui_ui::{
@@ -223,36 +223,85 @@ pub(crate) fn matches_query(node: &NodeSnapshot, query: &str) -> bool {
             .is_some_and(|key| key.to_lowercase().contains(query))
 }
 
-fn profiling_list(frames: &[FrameRecord], offset: f32, theme: &WidgetTheme) -> Element {
-    profiling_list_config(frames.len()).build("__devtools-frames", offset, |index| {
-        let frame = &frames[frames.len() - 1 - index];
-        Button::new(
-            format!("__devtools-frame-{}", frames.len() - 1 - index),
-            format!(
-                "#{:03}  {:>6.2} ms · CPU {:>6.2} · {:?} · {} passes · {:.1} MiB",
-                frames.len().saturating_sub(index),
-                millis(frame.interval),
-                millis(frame.total_cpu()),
-                frame.update,
-                frame.passes,
-                frame.texture_bytes as f64 / 1_048_576.0,
-            ),
-            theme.ghost_button(),
-        )
-        .build()
-        .padding(sides(7.0, 3.0))
-        .background(if index % 2 == 0 {
-            theme.card
-        } else {
-            theme.background
-        })
-        .text_style(text(11.0, theme.foreground))
-    })
+fn profiling_list<A>(tools: &DevtoolsHost<A>, header: Element, theme: &WidgetTheme) -> Element {
+    let frames = &tools.profile_frames;
+    let columns = frame_columns(
+        ["Frame", "Time ms", "CPU ms", "Update", "Passes", "MiB"].map(str::to_owned),
+        theme,
+    );
+    let header = Element::column([header, columns])
+        .gap(10.0)
+        .padding(Sides::length(8.0))
+        .keyed("__devtools-frames-header");
+    argui_widgets::VList::new(
+        "__devtools-frames",
+        28.0,
+        tools.profile_extents.frames,
+        tools.profiling_offset,
+    )
+    .build_with_header(
+        frames.len(),
+        theme,
+        header,
+        tools.profile_extents.frames_header,
+        |index| {
+            let position = frames.len() - 1 - index;
+            let frame = &frames[position];
+            let values = [
+                format!("#{}", position + 1),
+                format!("{:.2}", millis(frame.interval)),
+                format!("{:.2}", millis(frame.total_cpu())),
+                format!("{:?}", frame.update),
+                frame.passes.to_string(),
+                format!("{:.1}", frame.texture_bytes as f64 / 1_048_576.0),
+            ];
+            Button::new(
+                format!("__devtools-frame-{position}"),
+                values.join(" · "),
+                theme.ghost_button(),
+            )
+            .content(frame_columns(values, theme))
+            .build()
+            .padding(sides(8.0, 3.0))
+            .background(if index % 2 == 0 {
+                theme.card
+            } else {
+                theme.background
+            })
+        },
+    )
+    .height(percent(1.0))
+    .min_height(length(0.0))
+    .min_width(length(0.0))
 }
 
-pub(crate) fn profiling_list_config(item_count: usize) -> VirtualList {
-    VirtualList::fixed(item_count, 27.0, 130.0)
-        .scroll_config(ScrollConfig::default().scrollbar(scrollbar()))
+fn frame_columns(values: [String; 6], theme: &WidgetTheme) -> Element {
+    Element::row(
+        values
+            .into_iter()
+            .zip([0.13, 0.19, 0.19, 0.18, 0.13, 0.18])
+            .map(|(value, width)| {
+                Element::row([Element::text(value).text_style(TextStyle {
+                    wrap: TextWrap::None,
+                    ..text(11.0, theme.foreground)
+                })])
+                .width(percent(width))
+                .min_width(length(0.0))
+                .shrink(0.0)
+                .justify_content(argui_ui::JustifyContent::END)
+                .padding(sides(4.0, 0.0))
+                .overflow(Axes {
+                    x: Overflow::Hidden,
+                    y: Overflow::Hidden,
+                })
+            }),
+    )
+    .width(percent(1.0))
+    .min_width(length(0.0))
+}
+
+pub(crate) fn profiling_list_config(item_count: usize, viewport: f32) -> VirtualList {
+    argui_widgets::VList::new("__devtools-frames", 28.0, viewport, 0.0).config(item_count)
 }
 
 fn icon_element(icon: VectorId, size: f32) -> Element {

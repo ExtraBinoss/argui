@@ -145,3 +145,127 @@ fn gpu_measurements_are_opt_in_and_details_are_reused_between_samples() {
     });
     assert!(find(&host.view(), "__devtools-gpu-timeline").is_none());
 }
+
+#[test]
+fn profiling_has_one_scrollport_per_pane_and_reserved_scrollbar_space() {
+    let mut host = profiled();
+    host.inspector().record_ui(FrameRecord {
+        interval: std::time::Duration::from_millis(999),
+        ..host.inspector().frames()[0].clone()
+    });
+    host.update(&event("__devtools-refresh"));
+    let mut tree = UiTree::new(host.view());
+    let mut engine = LayoutEngine::new();
+    let mut text = text_engine();
+    let mut output = engine
+        .compute(&mut tree, &mut text, Size::new(1220.0, 700.0))
+        .unwrap();
+    let mut settled = false;
+    for _ in 0..5 {
+        let snapshot = LayoutSnapshot {
+            viewport: output.viewport,
+            nodes: output
+                .nodes
+                .iter()
+                .map(|node| LayoutBounds {
+                    node: node.node,
+                    key: tree.key(node.node).map(str::to_owned),
+                    bounds: node.bounds,
+                })
+                .collect(),
+        };
+        if host.layout_changed(&snapshot) == ViewUpdate::None {
+            settled = true;
+            break;
+        }
+        tree.update(host.view());
+        output = engine
+            .compute(&mut tree, &mut text, Size::new(1220.0, 700.0))
+            .unwrap();
+    }
+    assert!(settled, "measured header heights must converge");
+    assert!(!contains_text(tree.root(), "Live recording"));
+    for key in ["__devtools-overview", "__devtools-profile-details-body"] {
+        assert!(find(tree.root(), key).unwrap().scroll.is_none());
+    }
+    let list = find(tree.root(), "__devtools-frames").unwrap();
+    assert_eq!(
+        list.style.scrollbar_gutter,
+        argui_ui::ScrollbarGutter::Stable
+    );
+    let region = output
+        .scroll_regions
+        .iter()
+        .find(|region| tree.key(region.node) == Some("__devtools-frames"))
+        .unwrap();
+    let track = region.scrollbar.as_ref().unwrap().vertical.unwrap().track;
+    let bounds = |element: &Element| {
+        let index = (0..tree.node_ids().len())
+            .find(|index| tree.element_at(*index).unwrap().ptr_eq(element))
+            .unwrap();
+        output
+            .nodes
+            .iter()
+            .find(|node| node.node == tree.node_ids()[index])
+            .unwrap()
+            .bounds
+    };
+    let first = find(tree.root(), "__devtools-frame-1").unwrap();
+    let second = find(tree.root(), "__devtools-frame-0").unwrap();
+    for (a, b) in first.children[0]
+        .children
+        .iter()
+        .zip(&second.children[0].children)
+    {
+        let a = bounds(a);
+        let b = bounds(b);
+        assert!((a.origin.x - b.origin.x).abs() < 0.1);
+        assert!((a.size.width - b.size.width).abs() < 0.1);
+        assert!(a.origin.x + a.size.width <= track.origin.x + 0.1);
+    }
+    for key in ["__devtools-pause", "__devtools-refresh", "__devtools-clear"] {
+        let button = find(tree.root(), key).unwrap();
+        let outer = bounds(button);
+        let label = bounds(&button.children[0]);
+        assert!(
+            (outer.origin.x + outer.size.width * 0.5 - label.origin.x - label.size.width * 0.5)
+                .abs()
+                < 0.6
+        );
+        assert!(
+            (outer.origin.y + outer.size.height * 0.5 - label.origin.y - label.size.height * 0.5)
+                .abs()
+                < 0.6,
+            "{key}: outer {outer:?}, label {label:?}"
+        );
+    }
+    let gpu_region = output
+        .scroll_regions
+        .iter()
+        .find(|region| tree.key(region.node) == Some("__devtools-gpu-passes"))
+        .unwrap();
+    let gpu_track = gpu_region
+        .scrollbar
+        .as_ref()
+        .unwrap()
+        .vertical
+        .unwrap()
+        .track;
+    let gpu_row = find(tree.root(), "__devtools-gpu-pass-0").unwrap();
+    let chart = bounds(gpu_row.children.last().unwrap());
+    assert!(chart.origin.x + chart.size.width <= gpu_track.origin.x + 0.1);
+    fn scrollports(element: &Element) -> usize {
+        usize::from(element.scroll.is_some())
+            + element.children.iter().map(scrollports).sum::<usize>()
+    }
+    assert_eq!(
+        scrollports(find(tree.root(), "__devtools-profiling-panel").unwrap()),
+        2
+    );
+    let select = find(tree.root(), "__devtools-dock").unwrap();
+    fn has_vector(element: &Element) -> bool {
+        matches!(element.kind, argui_ui::ElementKind::Vector { .. })
+            || element.children.iter().any(has_vector)
+    }
+    assert!(has_vector(select));
+}

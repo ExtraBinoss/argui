@@ -1,6 +1,9 @@
 use argui_text::{TextOverflow, TextStyle};
 use argui_ui::{Color, Element, ElementKind, ImageFit, ImageId, ImageSampling, VectorId};
 
+#[path = "element/portal.rs"]
+mod portal;
+
 #[test]
 fn media_and_text_specific_builders_only_change_matching_elements() {
     let vector = Element::vector(VectorId(3))

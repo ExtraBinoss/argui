@@ -343,9 +343,13 @@ fn profiling_and_closed_views_keep_the_dock_tree_retained() {
         UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
     ));
     let profile = host.view();
-    assert!(contains_text(&profile, "5 passes"));
-    assert!(contains_text(&profile, "1.0 MiB"));
-    host.update(&event("__devtools-profile-details", UiEventKind::Click(argui_ui::ClickEvent::accessibility())));
+    assert!(contains_text(&profile, "Passes"));
+    assert!(contains_text(&profile, "MiB"));
+    assert!(contains_text(&profile, "1.0"));
+    host.update(&event(
+        "__devtools-profile-details",
+        UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
+    ));
     let details = host.view();
     assert!(contains_text(&details, "Invalidation"));
     assert!(contains_text(&details, "Layout"));

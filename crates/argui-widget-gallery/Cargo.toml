@@ -20,3 +20,6 @@ wasm-bindgen.workspace = true
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+web-time.workspace = true

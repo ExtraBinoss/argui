@@ -7,6 +7,37 @@ use crate::{
 };
 
 impl Element {
+    /// Appends a content filter, preserving previously configured layer properties.
+    #[must_use]
+    pub fn filter(mut self, filter: Filter) -> Self {
+        self.layer
+            .get_or_insert_with(|| LayerStyle::new(Rect::default()))
+            .filters
+            .push(filter);
+        self
+    }
+
+    #[must_use]
+    pub fn mask(mut self, mask: argui_paint::LayerMask) -> Self {
+        self.layer
+            .get_or_insert_with(|| LayerStyle::new(Rect::default()))
+            .mask = mask;
+        self
+    }
+
+    /// Sets group opacity; this is not per-primitive alpha.
+    #[must_use]
+    pub fn opacity(mut self, opacity: f32) -> Self {
+        self.layer
+            .get_or_insert_with(|| LayerStyle::new(Rect::default()))
+            .opacity = if opacity.is_finite() {
+            opacity.clamp(0.0, 1.0)
+        } else {
+            1.0
+        };
+        self
+    }
+
     #[must_use]
     pub fn anchored_portal(
         mut self,

@@ -7,7 +7,8 @@ use argui_layout::LayoutEngine;
 use argui_runtime::{InspectionCache, ViewUpdate};
 use argui_showcase::{StateShowcase, text_engine};
 use argui_ui::{ClickEvent, Element, TreeUpdate, UiEvent, UiEventKind, UiTree};
-use std::time::{Duration as StdDuration, Instant};
+use std::time::Duration as StdDuration;
+use web_time::Instant;
 
 fn main() {
     for (label, open, profiling) in [

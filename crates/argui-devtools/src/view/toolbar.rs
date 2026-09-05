@@ -38,6 +38,11 @@ pub(super) fn toolbar<A>(tools: &DevtoolsHost<A>, theme: &WidgetTheme) -> Elemen
     )
     .open(tools.dock_menu)
     .highlighted(tools.dock_highlight)
+    .trailing(
+        icon_element(tools.icons.chevron, 14.0)
+            .vector_color(theme.foreground)
+            .transform(argui_core::Transform2D::IDENTITY.rotate(std::f32::consts::FRAC_PI_2)),
+    )
     .build(theme)
     .width(length(118.0));
     Element::row([
@@ -108,8 +113,12 @@ pub(super) fn small_button(key: &str, label: &str, active: bool, theme: &WidgetT
             ),
         )
         .layout(LayoutStyle {
+            display: argui_ui::Display::Flex,
+            flex_direction: argui_ui::FlexDirection::Row,
             padding: sides(9.0, 5.0),
             flex_shrink: 0.0,
+            align_items: Some(AlignItems::CENTER),
+            justify_content: Some(JustifyContent::CENTER),
             ..LayoutStyle::default()
         })
         .hovered(StylePatch::new().set(

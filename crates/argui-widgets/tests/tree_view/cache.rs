@@ -38,18 +38,18 @@ fn scrolling_reuses_rows_and_evicts_rows_outside_the_window() {
         list: VList::new("tree", 28.0, 280.0, 0.0),
         disclosure: None,
     };
-    let first = tree.build_cached(&theme, &mut cache);
+    let first = tree.build_cached(theme, &mut cache);
     tree.list.offset = 28.0;
-    let second = tree.build_cached(&theme, &mut cache);
+    let second = tree.build_cached(theme, &mut cache);
     let original = row(&first, "node-5").unwrap();
     let reused = row(&second, "node-5").unwrap();
     assert!(original.children[0].ptr_eq(&reused.children[0]));
     assert_eq!(vectors(reused), 1);
     assert!(row(&second, "node-100").is_none());
     tree.list.offset = 2800.0;
-    assert!(row(&tree.build_cached(&theme, &mut cache), "node-5").is_none());
+    assert!(row(&tree.build_cached(theme, &mut cache), "node-5").is_none());
     tree.list.offset = 0.0;
-    let returned = tree.build_cached(&theme, &mut cache);
+    let returned = tree.build_cached(theme, &mut cache);
     assert!(!original.children[0].ptr_eq(&row(&returned, "node-5").unwrap().children[0]));
 }
 
@@ -88,8 +88,8 @@ fn selection_collapse_data_theme_and_icons_invalidate_rows() {
         }
         .build_cached(theme, cache)
     };
-    let first = build(&nodes, &collapsed, None, None, &theme, &mut cache);
-    let selected = build(&nodes, &collapsed, Some("child"), None, &theme, &mut cache);
+    let first = build(&nodes, &collapsed, None, None, theme, &mut cache);
+    let selected = build(&nodes, &collapsed, Some("child"), None, theme, &mut cache);
     assert_ne!(
         row(&first, "child").unwrap().paint,
         row(&selected, "child").unwrap().paint
@@ -97,14 +97,14 @@ fn selection_collapse_data_theme_and_icons_invalidate_rows() {
     collapsed.insert("parent".into());
     assert!(
         row(
-            &build(&nodes, &collapsed, None, None, &theme, &mut cache),
+            &build(&nodes, &collapsed, None, None, theme, &mut cache),
             "child"
         )
         .is_none()
     );
     collapsed.clear();
     nodes[1].label = "Renamed".into();
-    let renamed = build(&nodes, &collapsed, None, None, &theme, &mut cache);
+    let renamed = build(&nodes, &collapsed, None, None, theme, &mut cache);
     assert!(
         !row(&first, "child").unwrap().children[0]
             .ptr_eq(&row(&renamed, "child").unwrap().children[0])
@@ -115,7 +115,7 @@ fn selection_collapse_data_theme_and_icons_invalidate_rows() {
         &collapsed,
         None,
         Some(VectorId::fresh()),
-        &light,
+        light,
         &mut cache,
     );
     assert_eq!(vectors(&changed), 1);
@@ -124,7 +124,7 @@ fn selection_collapse_data_theme_and_icons_invalidate_rows() {
             .ptr_eq(&row(&changed, "parent").unwrap().children[0])
     );
     assert!(
-        build(&[], &collapsed, None, None, &theme, &mut cache)
+        build(&[], &collapsed, None, None, theme, &mut cache)
             .children
             .len()
             <= 2

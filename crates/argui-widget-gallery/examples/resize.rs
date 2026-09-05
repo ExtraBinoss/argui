@@ -10,7 +10,7 @@ use argui::{
     },
 };
 use argui_widget_gallery::WidgetGallery;
-use std::time::Instant;
+use web_time::Instant;
 
 fn dispatch(gallery: &Entity<WidgetGallery>, tree: &mut UiTree, key: &str, kind: UiEventKind) {
     let target = tree

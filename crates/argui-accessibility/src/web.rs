@@ -11,10 +11,12 @@ use crate::{
     SemanticTree, SemanticValue,
 };
 
+type EventHandler = Closure<dyn FnMut(Event)>;
+
 struct DomNode {
     element: Element,
     actions: Vec<SemanticAction>,
-    _handlers: Vec<Closure<dyn FnMut(Event)>>,
+    _handlers: Vec<EventHandler>,
 }
 
 pub struct DomTree {
@@ -36,6 +38,17 @@ impl DomTree {
             .ok_or_else(|| JsValue::from_str("canvas has no owner document"))?;
         let root = document.create_element("div")?.dyn_into::<HtmlElement>()?;
         root.set_attribute("data-argui-accessibility", "")?;
+        let window_key = canvas
+            .get_attribute("data-argui-window")
+            .unwrap_or_else(|| snapshot.root.get().to_string());
+        let suffix = window_key
+            .as_bytes()
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>();
+        root.set_id(&format!("argui-accessibility-{suffix}"));
+        canvas.set_attribute("role", "application")?;
+        canvas.set_attribute("aria-owns", &root.id())?;
         let style = root.style();
         style.set_property("position", "fixed")?;
         style.set_property("z-index", "2147483647")?;
@@ -118,6 +131,7 @@ impl DomTree {
                 .owner_document()
                 .ok_or_else(|| JsValue::from_str("canvas has no owner document"))?;
             let element = document.create_element(tag)?;
+            element.set_id(&format!("{}-{}", self.root.id(), node.id.get()));
             let handlers = handlers(
                 node.id,
                 &node.semantics.actions,
@@ -162,13 +176,32 @@ impl DomTree {
         if let Some(node) = self.nodes.get(&id)
             && let Some(element) = node.element.dyn_ref::<HtmlElement>()
         {
-            let _ = element.focus();
+            // Keep canvas input uninterrupted during pointer/keyboard navigation.
+            // Moving DOM focus here emits a winit blur and cancels the pressed button.
+            let _ = self
+                .canvas
+                .set_attribute("aria-activedescendant", &element.id());
+            let active = self
+                .canvas
+                .owner_document()
+                .and_then(|document| document.active_element());
+            if active
+                .as_ref()
+                .is_some_and(|active| self.root.contains(Some(active)))
+            {
+                // Preserve direct DOM navigation initiated by assistive technology.
+                let _ = element.focus();
+            }
+        } else {
+            let _ = self.canvas.remove_attribute("aria-activedescendant");
         }
     }
 }
 
 impl Drop for DomTree {
     fn drop(&mut self) {
+        let _ = self.canvas.remove_attribute("aria-activedescendant");
+        let _ = self.canvas.remove_attribute("aria-owns");
         self.root.remove();
     }
 }
@@ -178,7 +211,7 @@ fn handlers(
     actions: &[SemanticAction],
     element: &Element,
     callback: std::rc::Rc<dyn Fn(SemanticRequest)>,
-) -> Result<Vec<Closure<dyn FnMut(Event)>>, JsValue> {
+) -> Result<Vec<EventHandler>, JsValue> {
     let mut output = Vec::new();
     for (name, action) in [
         ("click", SemanticAction::Click),

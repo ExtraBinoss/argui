@@ -18,7 +18,16 @@ impl<A: Render> DevtoolsHost<A> {
         if let UiEventKind::Scrolled { offset, .. } = event.kind
             && key == "__devtools-gpu-passes"
         {
-            let changed = (self.gpu_offset / 28.0).floor() != (offset.y / 28.0).floor();
+            let count = self
+                .profile_details
+                .gpu
+                .as_ref()
+                .map_or(0, |gpu| gpu.passes.len());
+            let list =
+                argui_widgets::VList::new(key, 28.0, self.profile_extents.gpu, 0.0).config(count);
+            let header = self.profile_extents.gpu_header;
+            let changed = list.window((self.gpu_offset - header).max(0.0)).range
+                != list.window((offset.y - header).max(0.0)).range;
             self.gpu_offset = offset.y;
             return Some(if changed {
                 ViewUpdate::Rebuild
@@ -173,13 +182,15 @@ impl<A: Render> DevtoolsHost<A> {
         if let UiEventKind::Scrolled { offset, .. } = event.kind
             && key == "__devtools-frames"
         {
-            let old = view::profiling_list_config(self.profile_frames.len())
-                .window(self.profiling_offset)
-                .range;
+            let old =
+                view::profiling_list_config(self.profile_frames.len(), self.profile_extents.frames)
+                    .window((self.profiling_offset - self.profile_extents.frames_header).max(0.0))
+                    .range;
             self.profiling_offset = offset.y;
-            let new = view::profiling_list_config(self.profile_frames.len())
-                .window(self.profiling_offset)
-                .range;
+            let new =
+                view::profiling_list_config(self.profile_frames.len(), self.profile_extents.frames)
+                    .window((self.profiling_offset - self.profile_extents.frames_header).max(0.0))
+                    .range;
             return Some(if old == new {
                 ViewUpdate::None
             } else {

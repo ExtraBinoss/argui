@@ -7,4 +7,4 @@ port="${1:-8080}"
 cd "$repo_root"
 wasm-pack build crates/argui-web-demo --target web --dev --out-dir ../../web/pkg
 echo "Argui web demo: http://127.0.0.1:$port"
-python3 -m http.server "$port" --directory web
+python3 scripts/dev_server.py "$port" --directory web

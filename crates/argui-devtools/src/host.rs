@@ -17,6 +17,13 @@ pub(crate) enum Tab {
     Profiling,
 }
 
+pub(crate) struct ProfileExtents {
+    pub frames: f32,
+    pub frames_header: f32,
+    pub gpu: f32,
+    pub gpu_header: f32,
+}
+
 pub struct DevtoolsHost<A> {
     pub(crate) app: Entity<A>,
     pub(crate) inspector: InspectorHandle,
@@ -58,6 +65,7 @@ pub struct DevtoolsHost<A> {
     pub(crate) selected_frame: Option<usize>,
     pub(crate) profile_panel: usize,
     pub(crate) gpu_offset: f32,
+    pub(crate) profile_extents: ProfileExtents,
     pub(crate) dock_menu: bool,
     pub(crate) dock_highlight: usize,
     pub(crate) detach_available: bool,
@@ -118,6 +126,12 @@ impl<A: Render> DevtoolsHost<A> {
             selected_frame: None,
             profile_panel: 0,
             gpu_offset: 0.0,
+            profile_extents: ProfileExtents {
+                frames: 200.0,
+                frames_header: 260.0,
+                gpu: 160.0,
+                gpu_header: 70.0,
+            },
             dock_menu: false,
             dock_highlight: 0,
             detach_available: false,
@@ -252,6 +266,7 @@ impl<A: Render> DevtoolsHost<A> {
     }
 
     pub fn layout_changed(&mut self, layout: &LayoutSnapshot) -> ViewUpdate {
+        let changed = self.measure_profile(layout);
         self.viewport = layout.viewport;
         if let Some(bounds) = layout.bounds("__devtools-tree") {
             self.tree_height = bounds.size.height;
@@ -263,7 +278,11 @@ impl<A: Render> DevtoolsHost<A> {
         self.app_viewport = application.viewport;
         self.app
             .update(|app, cx| app.layout_changed(&application, cx));
-        ViewUpdate::None
+        if changed {
+            ViewUpdate::Rebuild
+        } else {
+            ViewUpdate::None
+        }
     }
 
     pub fn image_assets(&self) -> Vec<ImageAsset> {
@@ -330,6 +349,9 @@ impl<A: Render> Render for DevtoolsHost<A> {
     }
 
     fn layout_changed(&mut self, layout: &LayoutSnapshot, cx: &mut Context<Self>) {
+        if self.measure_profile(layout) {
+            cx.notify();
+        }
         self.viewport = layout.viewport;
         if let Some(bounds) = layout.bounds("__devtools-tree") {
             self.tree_height = bounds.size.height;
@@ -396,6 +418,27 @@ fn section_spring(value: f32) -> Spring<f32> {
 }
 
 impl<A> DevtoolsHost<A> {
+    pub(crate) fn measure_profile(&mut self, layout: &LayoutSnapshot) -> bool {
+        let mut changed = false;
+        for (key, extent) in [
+            ("__devtools-frames", &mut self.profile_extents.frames),
+            (
+                "__devtools-frames-header",
+                &mut self.profile_extents.frames_header,
+            ),
+            ("__devtools-gpu-passes", &mut self.profile_extents.gpu),
+            (
+                "__devtools-gpu-header",
+                &mut self.profile_extents.gpu_header,
+            ),
+        ] {
+            if let Some(bounds) = layout.bounds(key) {
+                changed |= (*extent - bounds.size.height).abs() > 0.5;
+                *extent = bounds.size.height;
+            }
+        }
+        changed
+    }
     pub(crate) fn panel_width(&self) -> f32 {
         if self.dock_mode == crate::DockMode::Right {
             self.dock_extent()
