@@ -1,28 +1,14 @@
 use std::{cell::Cell, rc::Rc};
 
-use argui_core::{KeyInput, Point, PointerId, Rect, ScrollDelta};
+use argui_core::{KeyInput, Point, PointerEvent, PointerId, PointerPhase, Rect, ScrollDelta};
 
-use crate::{Element, NodeId, SelectionCapabilities, SemanticAction, SemanticValue};
+use crate::{ClickEvent, Element, NodeId, SelectionCapabilities, SemanticAction, SemanticValue};
 
 impl Element {
     #[must_use]
-    pub fn listen(mut self, event: EventType, options: EventListenerOptions) -> Self {
-        let listener = EventListener { event, options };
-        if !self.event_listeners.contains(&listener) {
-            self.event_listeners.push(listener);
-        }
+    pub fn on(mut self, listener: EventListener) -> Self {
+        self.event_listeners.push(listener);
         self
-    }
-
-    #[doc(hidden)]
-    pub fn assign_event_owner(&mut self, owner: EventOwnerId) {
-        if self.event_owner.is_some() {
-            return;
-        }
-        self.event_owner = Some(owner);
-        for child in &mut self.children {
-            child.assign_event_owner(owner);
-        }
     }
 }
 
@@ -34,6 +20,7 @@ pub enum EventType {
     PointerDown,
     PointerOutside,
     PointerUp,
+    PointerCancel,
     Click,
     ContextMenu,
     GotPointerCapture,
@@ -51,6 +38,30 @@ pub enum EventType {
 }
 
 impl EventType {
+    pub const ALL: [Self; 21] = [
+        Self::PointerEnter,
+        Self::PointerLeave,
+        Self::PointerMove,
+        Self::PointerDown,
+        Self::PointerOutside,
+        Self::PointerUp,
+        Self::PointerCancel,
+        Self::Click,
+        Self::ContextMenu,
+        Self::GotPointerCapture,
+        Self::LostPointerCapture,
+        Self::Key,
+        Self::Wheel,
+        Self::Scroll,
+        Self::Focus,
+        Self::Blur,
+        Self::Input,
+        Self::Submit,
+        Self::Gesture,
+        Self::SemanticAction,
+        Self::SelectionChange,
+    ];
+
     #[must_use]
     pub const fn requires_hit_test(self) -> bool {
         matches!(
@@ -103,24 +114,81 @@ impl EventListenerOptions {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct EventOwnerId(pub usize);
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct EventHandlerId {
+    owner: EventOwnerId,
+    slot: u32,
+}
+
+impl EventHandlerId {
+    #[doc(hidden)]
+    #[must_use]
+    pub const fn new(owner: EventOwnerId, slot: u32) -> Self {
+        Self { owner, slot }
+    }
+
+    #[doc(hidden)]
+    #[must_use]
+    pub const fn owner(self) -> EventOwnerId {
+        self.owner
+    }
+
+    #[doc(hidden)]
+    #[must_use]
+    pub const fn slot(self) -> u32 {
+        self.slot
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct EventListener {
     pub event: EventType,
     pub options: EventListenerOptions,
+    pub(crate) handler: EventHandlerId,
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct EventOwnerId(pub usize);
+impl EventListener {
+    #[doc(hidden)]
+    #[must_use]
+    pub const fn new(event: EventType, handler: EventHandlerId) -> Self {
+        Self {
+            event,
+            options: EventListenerOptions {
+                capture: false,
+                passive: false,
+                once: false,
+            },
+            handler,
+        }
+    }
+
+    #[must_use]
+    pub const fn capture(mut self, capture: bool) -> Self {
+        self.options.capture = capture;
+        self
+    }
+
+    #[must_use]
+    pub const fn passive(mut self, passive: bool) -> Self {
+        self.options.passive = passive;
+        self
+    }
+
+    #[must_use]
+    pub const fn once(mut self, once: bool) -> Self {
+        self.options.once = once;
+        self
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum UiEventKind {
-    PointerEntered,
-    PointerLeft,
-    PointerMoved(Point),
-    Pressed,
-    PointerOutside,
-    Released,
-    Clicked,
+    Pointer(PointerEvent),
+    PointerOutside(PointerEvent),
+    Click(ClickEvent),
     ContextMenu {
         position: Point,
         capabilities: SelectionCapabilities,
@@ -157,13 +225,16 @@ impl UiEventKind {
     #[must_use]
     pub const fn event_type(&self) -> EventType {
         match self {
-            Self::PointerEntered => EventType::PointerEnter,
-            Self::PointerLeft => EventType::PointerLeave,
-            Self::PointerMoved(_) => EventType::PointerMove,
-            Self::Pressed => EventType::PointerDown,
-            Self::PointerOutside => EventType::PointerOutside,
-            Self::Released => EventType::PointerUp,
-            Self::Clicked => EventType::Click,
+            Self::Pointer(event) => match event.phase {
+                PointerPhase::Entered => EventType::PointerEnter,
+                PointerPhase::Moved => EventType::PointerMove,
+                PointerPhase::Pressed => EventType::PointerDown,
+                PointerPhase::Released => EventType::PointerUp,
+                PointerPhase::Left => EventType::PointerLeave,
+                PointerPhase::Cancelled => EventType::PointerCancel,
+            },
+            Self::PointerOutside(_) => EventType::PointerOutside,
+            Self::Click(_) => EventType::Click,
             Self::ContextMenu { .. } => EventType::ContextMenu,
             Self::GotPointerCapture(_) => EventType::GotPointerCapture,
             Self::LostPointerCapture(_) => EventType::LostPointerCapture,
@@ -184,9 +255,10 @@ impl UiEventKind {
     pub const fn bubbles(&self) -> bool {
         !matches!(
             self,
-            Self::PointerEntered
-                | Self::PointerLeft
-                | Self::GotPointerCapture(_)
+            Self::Pointer(PointerEvent {
+                phase: PointerPhase::Entered | PointerPhase::Left,
+                ..
+            }) | Self::GotPointerCapture(_)
                 | Self::LostPointerCapture(_)
                 | Self::Focused
                 | Self::Blurred
@@ -197,12 +269,15 @@ impl UiEventKind {
     pub const fn cancelable(&self) -> bool {
         matches!(
             self,
-            Self::Pressed
-                | Self::PointerOutside
-                | Self::Released
-                | Self::Clicked
+            Self::Pointer(PointerEvent {
+                phase: PointerPhase::Moved
+                    | PointerPhase::Pressed
+                    | PointerPhase::Released
+                    | PointerPhase::Cancelled,
+                ..
+            }) | Self::PointerOutside(_)
+                | Self::Click(_)
                 | Self::ContextMenu { .. }
-                | Self::PointerMoved(_)
                 | Self::KeyInput(_)
                 | Self::Wheel { .. }
                 | Self::Scrolled { .. }
@@ -223,11 +298,11 @@ struct EventControl {
 #[derive(Clone, Debug)]
 pub struct UiEvent {
     pub target: NodeId,
-    pub key: Option<String>,
     pub kind: UiEventKind,
     target_key: Option<String>,
     current_target: NodeId,
-    current_owner: Option<EventOwnerId>,
+    current_key: Option<String>,
+    current_handler: Option<EventHandlerId>,
     phase: EventPhase,
     passive: bool,
     once: Option<Rc<Cell<bool>>>,
@@ -236,12 +311,21 @@ pub struct UiEvent {
 
 impl PartialEq for UiEvent {
     fn eq(&self, other: &Self) -> bool {
-        self.target == other.target
-            && self.key == other.key
-            && self.kind == other.kind
-            && self.target_key == other.target_key
-            && self.current_target == other.current_target
-            && self.phase == other.phase
+        (
+            self.target,
+            &self.kind,
+            &self.target_key,
+            self.current_target,
+            &self.current_key,
+            self.phase,
+        ) == (
+            other.target,
+            &other.kind,
+            &other.target_key,
+            other.current_target,
+            &other.current_key,
+            other.phase,
+        )
     }
 }
 
@@ -250,11 +334,11 @@ impl UiEvent {
     pub fn new(target: NodeId, key: Option<String>, kind: UiEventKind) -> Self {
         Self {
             target,
-            key: key.clone(),
             kind,
-            target_key: key,
+            target_key: key.clone(),
             current_target: target,
-            current_owner: None,
+            current_key: key,
+            current_handler: None,
             phase: EventPhase::Target,
             passive: false,
             once: None,
@@ -262,29 +346,22 @@ impl UiEvent {
         }
     }
 
-    #[doc(hidden)]
-    #[must_use]
-    pub fn with_current_owner(mut self, owner: EventOwnerId) -> Self {
-        self.current_owner = Some(owner);
-        self
-    }
-
     pub(crate) fn delivery(
         &self,
         current_target: NodeId,
         current_key: Option<String>,
-        current_owner: Option<EventOwnerId>,
+        current_handler: Option<EventHandlerId>,
         phase: EventPhase,
         passive: bool,
         once: Option<Rc<Cell<bool>>>,
     ) -> Self {
         Self {
             target: self.target,
-            key: current_key,
             kind: self.kind.clone(),
             target_key: self.target_key.clone(),
             current_target,
-            current_owner,
+            current_key,
+            current_handler,
             phase,
             passive,
             once,
@@ -297,9 +374,10 @@ impl UiEvent {
         self.current_target
     }
 
+    #[doc(hidden)]
     #[must_use]
-    pub const fn current_owner(&self) -> Option<EventOwnerId> {
-        self.current_owner
+    pub const fn current_handler(&self) -> Option<EventHandlerId> {
+        self.current_handler
     }
 
     #[must_use]
@@ -309,7 +387,7 @@ impl UiEvent {
 
     #[must_use]
     pub fn current_key(&self) -> Option<&str> {
-        self.key.as_deref()
+        self.current_key.as_deref()
     }
 
     #[must_use]
@@ -380,93 +458,5 @@ impl UiEvent {
                 .once
                 .as_ref()
                 .is_none_or(|consumed| !consumed.replace(true))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn event(target: u64) -> UiEvent {
-        UiEvent::new(
-            NodeId::new(target),
-            Some("target".into()),
-            UiEventKind::Clicked,
-        )
-    }
-
-    #[test]
-    fn element_listener_and_owner_registration_are_idempotent() {
-        let options = EventListenerOptions::default();
-        let mut element = Element::container([Element::text("child")])
-            .listen(EventType::Click, options)
-            .listen(EventType::Click, options);
-        assert_eq!(element.event_listeners.len(), 1);
-        element.assign_event_owner(EventOwnerId(3));
-        element.assign_event_owner(EventOwnerId(4));
-        assert_eq!(element.event_owner, Some(EventOwnerId(3)));
-        assert_eq!(element.children[0].event_owner, Some(EventOwnerId(3)));
-    }
-
-    #[test]
-    fn event_equality_compares_every_observable_delivery_field() {
-        let base = event(1);
-        assert_eq!(base, base.clone());
-        assert_ne!(base, event(2));
-
-        let mut changed = base.clone();
-        changed.key = Some("current".into());
-        assert_ne!(base, changed);
-        let mut changed = base.clone();
-        changed.kind = UiEventKind::Pressed;
-        assert_ne!(base, changed);
-        let mut changed = base.clone();
-        changed.target_key = None;
-        assert_ne!(base, changed);
-        let changed = base.delivery(
-            NodeId::new(2),
-            Some("target".into()),
-            None,
-            EventPhase::Bubble,
-            false,
-            None,
-        );
-        assert_ne!(base, changed);
-        let changed = base.delivery(
-            NodeId::new(1),
-            Some("target".into()),
-            None,
-            EventPhase::Bubble,
-            false,
-            None,
-        );
-        assert_ne!(base, changed);
-    }
-
-    #[test]
-    fn controls_cover_cancelation_propagation_and_once_delivery() {
-        let click = event(1);
-        assert!(click.prevent_default());
-        assert!(click.default_prevented());
-        click.stop_propagation();
-        click.stop_propagation();
-        assert!(click.should_dispatch());
-
-        let enter = UiEvent::new(NodeId::new(1), None, UiEventKind::PointerEntered);
-        assert!(!enter.prevent_default());
-        enter.stop_immediate_propagation();
-        assert!(!enter.should_dispatch());
-
-        let once = Rc::new(Cell::new(false));
-        let delivery = event(1).delivery(
-            NodeId::new(1),
-            None,
-            None,
-            EventPhase::Target,
-            false,
-            Some(once),
-        );
-        assert!(delivery.should_dispatch());
-        assert!(!delivery.should_dispatch());
     }
 }

@@ -12,15 +12,24 @@ fn event(key: Option<&str>, kind: UiEventKind) -> UiEvent {
 fn dialog_actions_and_modal_tree_are_explicit() {
     let behavior = DialogBehavior::new("confirm", "Confirm", true);
     assert_eq!(
-        behavior.action(&event(Some("confirm::trigger"), UiEventKind::Clicked)),
+        behavior.action(&event(
+            Some("confirm::trigger"),
+            UiEventKind::Click(argui_ui::ClickEvent::accessibility())
+        )),
         Some(DialogAction::Open)
     );
     assert_eq!(
-        behavior.action(&event(Some("confirm::close"), UiEventKind::Clicked)),
+        behavior.action(&event(
+            Some("confirm::close"),
+            UiEventKind::Click(argui_ui::ClickEvent::accessibility())
+        )),
         Some(DialogAction::Close)
     );
     assert_eq!(
-        behavior.action(&event(Some("confirm::backdrop"), UiEventKind::Clicked)),
+        behavior.action(&event(
+            Some("confirm::backdrop"),
+            UiEventKind::Click(argui_ui::ClickEvent::accessibility())
+        )),
         Some(DialogAction::Close)
     );
     assert_eq!(
@@ -37,7 +46,10 @@ fn dialog_actions_and_modal_tree_are_explicit() {
         Some(DialogAction::Close)
     );
     assert_eq!(
-        behavior.action(&event(Some("confirm::panel"), UiEventKind::Clicked)),
+        behavior.action(&event(
+            Some("confirm::panel"),
+            UiEventKind::Click(argui_ui::ClickEvent::accessibility())
+        )),
         None
     );
     assert_eq!(
@@ -72,7 +84,7 @@ fn dialog_actions_and_modal_tree_are_explicit() {
         "confirm",
         "Confirm",
         true,
-        Button::new("ignored", "Open", theme.button.clone()).build(),
+        Button::new("ignored", "Open", theme.button()).build(),
         Element::text("content"),
     )
     .backdrop(argui_core::Color::srgba(0.1, 0.2, 0.3, 0.4))

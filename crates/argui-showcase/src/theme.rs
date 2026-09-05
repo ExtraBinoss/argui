@@ -2,7 +2,10 @@ use argui_core::{Color, Size};
 use argui_paint::{Border, CornerRadii};
 use argui_text::{TextStyle, TextWrap};
 use argui_theme::ThemeMode;
-use argui_ui::{Element, LengthPercentageAuto, Resizable, Sides, auto, length, percent};
+use argui_ui::{
+    CursorIcon, Element, EventListener, GestureCapture, GestureSet, Interaction,
+    LengthPercentageAuto, PanGesture, Position, Sides, auto, length, percent,
+};
 use argui_widgets::{Input, TablerIcon, TextArea, WidgetAssets, WidgetTheme};
 
 pub(super) static PRIMARIES: LazyLock<[(&str, Color); 5]> = LazyLock::new(|| {
@@ -34,7 +37,7 @@ pub(super) fn text_input(
     placeholder: &str,
     widgets: &WidgetTheme,
 ) -> Element {
-    Input::new(key, value, placeholder, widgets.input.clone()).build()
+    Input::new(key, value, placeholder, widgets.input()).build()
 }
 
 pub(super) fn editor(
@@ -42,8 +45,9 @@ pub(super) fn editor(
     assets: &WidgetAssets,
     size: Size,
     value: &str,
+    resize_listener: Option<EventListener>,
 ) -> Element {
-    let mut style = widgets.input.clone();
+    let mut style = widgets.input();
     style.layout.size.height = percent(1.0);
     style.layout.padding = Sides::length(14.0);
     let scrollbar = widgets.scrollbar.clone().insets(Sides {
@@ -62,19 +66,49 @@ pub(super) fn editor(
             wrap: TextWrap::None,
             ..TextStyle::default()
         }),
-        Resizable::new(
-            size,
-            area,
-            "notes-resize",
-            assets.icon(TablerIcon::Resize, 18.0),
-        )
-        .build(),
+        resize_surface(size, area, assets, resize_listener),
     ])
     .gap(10.0)
     .padding(Sides::length(16.0))
     .background(widgets.card)
     .border(Border::all(1.0, widgets.border))
     .radius(CornerRadii::all(10.0))
+}
+
+fn resize_surface(
+    size: Size,
+    area: Element,
+    assets: &WidgetAssets,
+    listener: Option<EventListener>,
+) -> Element {
+    let mut handle = assets
+        .icon(TablerIcon::Resize, 18.0)
+        .keyed("notes-resize")
+        .absolute(Sides {
+            left: auto(),
+            right: length(0.0),
+            top: auto(),
+            bottom: length(0.0),
+        })
+        .interaction(
+            Interaction::default()
+                .cursor(CursorIcon::NwseResize)
+                .gestures(
+                    GestureSet::EMPTY.pan(
+                        PanGesture::default()
+                            .immediate()
+                            .capture(GestureCapture::OnPress)
+                            .delivery(argui_ui::GestureDelivery::FrameCoalesced),
+                    ),
+                ),
+        );
+    if let Some(listener) = listener {
+        handle = handle.on(listener);
+    }
+    Element::container([area, handle])
+        .width(length(size.width))
+        .height(length(size.height))
+        .position(Position::Relative)
 }
 
 pub(super) const fn label(mode: ThemeMode) -> &'static str {

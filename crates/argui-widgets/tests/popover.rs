@@ -1,4 +1,4 @@
-use argui_core::{Key, KeyInput, KeyState, Modifiers};
+use argui_core::{Key, KeyInput, KeyState, Modifiers, Point, PointerEvent, PointerPhase};
 use argui_paint::{Color, PaintStyle, QuadStyle};
 use argui_ui::{
     CollisionPolicy, DismissPolicy, Element, FloatingPlacement, Placement, PortalTarget, Role,
@@ -15,12 +15,21 @@ fn event(key: Option<&str>, kind: UiEventKind) -> UiEvent {
 fn popover_behavior_toggles_and_dismisses() {
     let closed = PopoverBehavior::new("menu", "Menu", false);
     assert_eq!(
-        closed.action(&event(Some("menu"), UiEventKind::Clicked)),
+        closed.action(&event(
+            Some("menu"),
+            UiEventKind::Click(argui_ui::ClickEvent::accessibility())
+        )),
         Some(PopoverAction::Toggle)
     );
     let open = PopoverBehavior::new("menu", "Menu", true);
     assert_eq!(
-        open.action(&event(Some("menu::content"), UiEventKind::PointerOutside)),
+        open.action(&event(
+            Some("menu::content"),
+            UiEventKind::PointerOutside(PointerEvent::mouse(
+                PointerPhase::Pressed,
+                Point::default(),
+            )),
+        )),
         Some(PopoverAction::Close)
     );
     assert_eq!(
@@ -37,15 +46,27 @@ fn popover_behavior_toggles_and_dismisses() {
         Some(PopoverAction::Close)
     );
     assert_eq!(
-        closed.action(&event(Some("other"), UiEventKind::Clicked)),
+        closed.action(&event(
+            Some("other"),
+            UiEventKind::Click(argui_ui::ClickEvent::accessibility())
+        )),
         None
     );
     assert_eq!(
-        closed.action(&event(Some("menu"), UiEventKind::PointerOutside)),
+        closed.action(&event(
+            Some("menu"),
+            UiEventKind::PointerOutside(PointerEvent::mouse(
+                PointerPhase::Pressed,
+                Point::default(),
+            )),
+        )),
         None
     );
     assert_eq!(
-        open.action(&event(Some("menu"), UiEventKind::Clicked)),
+        open.action(&event(
+            Some("menu"),
+            UiEventKind::Click(argui_ui::ClickEvent::accessibility())
+        )),
         Some(PopoverAction::Toggle)
     );
     assert_eq!(

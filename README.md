@@ -13,7 +13,7 @@ images, scoped GPU effects, and one WGPU renderer for native and web. See the
 [remaining roadmap](docs/roadmap.md).
 
 ```sh
-cargo test --workspace
+cargo nextest run --workspace --all-features
 ./scripts/quality.sh
 cargo run -p argui --example window
 cargo run -p argui --example text

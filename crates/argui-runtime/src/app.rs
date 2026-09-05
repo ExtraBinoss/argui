@@ -21,6 +21,7 @@ mod accessibility;
 mod cursor;
 mod frame;
 mod inspect;
+pub use inspect::{Inspection, InspectionCache};
 mod lifecycle;
 mod pointer;
 mod preferences;
@@ -61,6 +62,7 @@ pub(crate) struct Application {
     image_assets: Vec<ImageAsset>,
     vector_assets: Vec<VectorAsset>,
     pub(super) inspector: Option<InspectorHandle>,
+    inspection_cache: InspectionCache,
     pub(super) text_engine: TextEngine,
     text_scene: Option<TextScene>,
     pub(super) ui_tree: Option<UiTree>,
@@ -80,6 +82,7 @@ pub(crate) struct Application {
     input_epoch: Instant,
     last_cursor: argui_ui::CursorIcon,
     modifiers: Modifiers,
+    pointer_settings: argui_core::PointerSettings,
     #[cfg(not(target_arch = "wasm32"))]
     pub(super) clipboard: argui_platform::Clipboard,
     pub(super) event_proxy: Option<winit::event_loop::EventLoopProxy<crate::event::UserEvent>>,
@@ -123,6 +126,11 @@ impl Application {
             .unwrap_or_default();
         let mut layout_engine = LayoutEngine::new();
         layout_engine.set_assets(&image_assets, &vector_assets);
+        let pointer_settings = window_config.pointer;
+        let mut ui_tree = ui_tree;
+        if let Some(tree) = &mut ui_tree {
+            tree.set_pointer_settings(pointer_settings);
+        }
         Self {
             window_config,
             identity: None,
@@ -148,6 +156,7 @@ impl Application {
             image_assets,
             vector_assets,
             inspector,
+            inspection_cache: InspectionCache::default(),
             text_engine,
             text_scene,
             ui_tree,
@@ -167,6 +176,7 @@ impl Application {
             input_epoch: Instant::now(),
             last_cursor: argui_ui::CursorIcon::Default,
             modifiers: Modifiers::default(),
+            pointer_settings,
             #[cfg(not(target_arch = "wasm32"))]
             clipboard: argui_platform::Clipboard::new(),
             event_proxy: None,
@@ -406,7 +416,7 @@ impl Application {
         self.pending_ui_frame.request_focus(focus_request);
         self.pending_ui_frame
             .request_text_selection(text_selection_request);
-        if self.pending_ui_frame.needs_frame() || animation_changed {
+        if self.pending_ui_frame.needs_frame() || animation_changed || update.frame_requested {
             window.request_redraw();
         }
         if let Some(request) = clipboard {

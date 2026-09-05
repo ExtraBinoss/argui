@@ -4,6 +4,7 @@ mod animation;
 mod list;
 mod physics;
 mod popover;
+mod runtime;
 pub mod spotlight;
 mod state_style;
 mod theme;
@@ -13,12 +14,12 @@ use animation::{animation_timeline, motion_tween};
 use argui_animation::{Duration, Frame, Inertia, Motion, PlaybackState, Spring, Timeline};
 use argui_core::{Key, KeyState, Size, Transform2D};
 use argui_paint::{Border, Color, CornerRadii, ImageAsset, VectorAsset};
-use argui_runtime::{Context, Render, ThemeRequest, ViewUpdate, WindowEnvironment};
+use argui_runtime::{ThemeRequest, ViewUpdate, WindowEnvironment};
 use argui_text::{TextColor, TextEngine, TextStyle, TextWrap};
 use argui_theme::ThemeMode;
 use argui_ui::{
-    AlignItems, Axes, Element, FlexWrap, Overflow, ResizeConfig, ResizeState, ScrollConfig, Sides,
-    UiEvent, UiEventKind, percent, sides,
+    AlignItems, Axes, Element, FlexWrap, Overflow, ScrollConfig, Sides, UiEvent, UiEventKind,
+    percent, sides,
 };
 use argui_widgets::{Button, WidgetAssets, WidgetTheme, shadcn};
 use physics::{PhysicsCommand, PhysicsMode, showcase_inertia, showcase_spring};
@@ -61,7 +62,8 @@ pub struct StateShowcase {
     message: String,
     long_message: String,
     notes: String,
-    editor_size: ResizeState,
+    editor_size: Size,
+    editor_resize_start: Size,
 }
 
 #[derive(Clone, Copy)]
@@ -114,7 +116,8 @@ impl Default for StateShowcase {
             message: "Hello · مرحباً · שלום · 👋🏽".into(),
             long_message: "This deliberately long editable line proves that the caret remains visible while the text scrolls horizontally.".into(),
             notes: "A controlled, wrapping text area. Resize it from the bottom-right handle.".into(),
-            editor_size: ResizeState::new(Size::new(560.0, 180.0)),
+            editor_size: Size::new(560.0, 180.0),
+            editor_resize_start: Size::new(560.0, 180.0),
         }
     }
 }
@@ -134,6 +137,14 @@ impl StateShowcase {
     }
 
     pub fn view(&self, environment: WindowEnvironment) -> Element {
+        self.view_with_resize(environment, None)
+    }
+
+    fn view_with_resize(
+        &self,
+        environment: WindowEnvironment,
+        resize_listener: Option<argui_ui::EventListener>,
+    ) -> Element {
         let themes = shadcn(environment.primary);
         let widgets = themes.resolve(environment.color_scheme);
         let assets = match environment.color_scheme {
@@ -174,7 +185,7 @@ impl StateShowcase {
                 "Long single-line input",
                 widgets,
             ),
-            theme::editor(widgets, assets, self.editor_size.size(), &self.notes),
+            theme::editor(widgets, assets, self.editor_size, &self.notes, resize_listener),
             Element::row([
                 button("increment", "Increment", widgets, true),
                 button("theme", theme::label(self.theme_mode), widgets, false),
@@ -240,19 +251,8 @@ impl StateShowcase {
     }
 
     pub fn update(&mut self, event: &UiEvent) -> ViewUpdate {
-        if self
-            .editor_size
-            .update(
-                event,
-                "notes-resize",
-                ResizeConfig::new(Size::new(280.0, 120.0), Size::new(900.0, 520.0)),
-            )
-            .is_some()
-        {
-            return ViewUpdate::Rebuild;
-        }
         if let UiEventKind::TextChanged(value) = &event.kind {
-            match event.key.as_deref() {
+            match event.target_key() {
                 Some("message") => self.message.clone_from(value),
                 Some("long-message") => self.long_message.clone_from(value),
                 Some("notes") => self.notes.clone_from(value),
@@ -273,7 +273,7 @@ impl StateShowcase {
             return ViewUpdate::None;
         }
         if let UiEventKind::Scrolled { offset, .. } = event.kind
-            && event.key.as_deref() == Some("million-list")
+            && event.target_key() == Some("million-list")
         {
             let old = self.virtual_list_config().window(self.virtual_offset);
             self.virtual_offset = offset.y;
@@ -284,13 +284,19 @@ impl StateShowcase {
                 ViewUpdate::Rebuild
             };
         }
-        if event.key.as_deref() == Some("tooltip-anchor") {
+        if event.target_key() == Some("tooltip-anchor") {
             match event.kind {
-                UiEventKind::PointerEntered => {
+                UiEventKind::Pointer(argui_core::PointerEvent {
+                    phase: argui_core::PointerPhase::Entered,
+                    ..
+                }) => {
                     self.tooltip_hovered = true;
                     self.tooltip_delay = 0.0;
                 }
-                UiEventKind::PointerLeft => {
+                UiEventKind::Pointer(argui_core::PointerEvent {
+                    phase: argui_core::PointerPhase::Left,
+                    ..
+                }) => {
                     self.tooltip_hovered = false;
                     self.tooltip_delay = 0.0;
                     if self.tooltip_visible {
@@ -301,23 +307,29 @@ impl StateShowcase {
                 _ => {}
             }
         }
-        if event.key.as_deref() == Some("physics-inertia") {
+        if event.target_key() == Some("physics-inertia") {
             match event.kind {
-                UiEventKind::Pressed => {
+                UiEventKind::Pointer(argui_core::PointerEvent {
+                    phase: argui_core::PointerPhase::Pressed,
+                    ..
+                }) => {
                     self.hold_inertia();
                     return ViewUpdate::Rebuild;
                 }
-                UiEventKind::Released => {
+                UiEventKind::Pointer(argui_core::PointerEvent {
+                    phase: argui_core::PointerPhase::Released | argui_core::PointerPhase::Cancelled,
+                    ..
+                }) => {
                     self.release_inertia();
                     return ViewUpdate::Rebuild;
                 }
                 _ => {}
             }
         }
-        if event.kind != UiEventKind::Clicked {
+        if !matches!(event.kind, UiEventKind::Click(_)) {
             return ViewUpdate::None;
         }
-        match event.key.as_deref() {
+        match event.target_key() {
             Some("increment") => self.count += 1,
             Some("theme") => {
                 self.theme_mode = match self.theme_mode {
@@ -466,46 +478,6 @@ impl StateShowcase {
     }
 }
 
-impl Render for StateShowcase {
-    fn render(&mut self, cx: &mut Context<Self>) -> Element {
-        self.view(cx.environment())
-    }
-
-    fn event(&mut self, event: &UiEvent, cx: &mut Context<Self>) {
-        let update = self.update(event);
-        if matches!(event.key.as_deref(), Some("theme" | "primary"))
-            && event.kind == UiEventKind::Clicked
-        {
-            cx.set_theme(self.theme_request());
-        }
-        request_update(cx, update);
-    }
-
-    fn animation_frame(&mut self, frame: Frame, cx: &mut Context<Self>) {
-        request_update(cx, StateShowcase::animation_frame(self, frame));
-    }
-
-    fn wants_animation_frame(&self) -> bool {
-        StateShowcase::wants_animation_frame(self)
-    }
-
-    fn image_assets(&self) -> Vec<ImageAsset> {
-        StateShowcase::image_assets(self)
-    }
-
-    fn vector_assets(&self) -> Vec<VectorAsset> {
-        StateShowcase::vector_assets(self)
-    }
-}
-
-fn request_update<T: Render>(cx: &mut Context<T>, update: ViewUpdate) {
-    match update {
-        ViewUpdate::None => {}
-        ViewUpdate::Paint => cx.request_paint(),
-        ViewUpdate::Rebuild => cx.notify(),
-    }
-}
-
 impl StateShowcase {
     fn accent(&self) -> Color {
         PRIMARIES[self.primary_index].1
@@ -572,9 +544,9 @@ fn button(key: &str, label: &str, widgets: &WidgetTheme, primary: bool) -> Eleme
         key,
         label,
         if primary {
-            widgets.button.clone()
+            widgets.button()
         } else {
-            widgets.outline_button.clone()
+            widgets.outline_button()
         },
     )
     .build()

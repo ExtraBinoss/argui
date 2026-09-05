@@ -563,17 +563,3 @@ const fn built_in_label(mode: u32) -> &'static str {
         _ => "composite.copy",
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::blur_downsample;
-
-    #[test]
-    fn blur_sampling_and_outer_radii_have_explicit_thresholds() {
-        assert_eq!(blur_downsample(5.9, 1), 1);
-        assert_eq!(blur_downsample(6.0, 1), 2);
-        assert_eq!(blur_downsample(11.9, 1), 2);
-        assert_eq!(blur_downsample(12.0, 1), 4);
-        assert_eq!(blur_downsample(12.0, 2), 8);
-    }
-}

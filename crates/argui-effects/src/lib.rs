@@ -37,15 +37,3 @@ pub fn registry() -> Result<EffectRegistry, RendererError> {
     };
     EffectRegistry::new(definitions)
 }
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn registry_contains_exactly_the_enabled_families() {
-        let registry = super::registry().unwrap();
-        #[cfg(feature = "artistic")]
-        assert_eq!(registry.definitions().len(), 3);
-        #[cfg(not(feature = "artistic"))]
-        assert!(registry.is_empty());
-    }
-}

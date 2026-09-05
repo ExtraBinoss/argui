@@ -12,10 +12,12 @@ use argui::{
         AppIcon, ApplicationConfig, ApplicationId, ApplicationIdentity, IconSet, WindowConfig,
     },
     render::RendererConfig,
-    runtime::run_app_with_text_engine,
+    runtime::run_application_with_text_engine,
     text::TextEngine,
     widgets::SelectionHost,
 };
+use argui_devtools::DevtoolsApp;
+use argui::runtime::SingleWindowModel;
 
 const NOTO_SANS: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
 const APP_ICON: &[u8] = include_bytes!("../../argui/examples/assets/astra-icon-256.png");
@@ -23,7 +25,7 @@ const APP_ICON: &[u8] = include_bytes!("../../argui/examples/assets/astra-icon-2
 pub fn launch() -> Result<(), Box<dyn std::error::Error>> {
     let text = TextEngine::from_embedded_fonts([NOTO_SANS], "Noto Sans", "Noto Sans", "Noto Sans");
     let icons = IconSet::single(AppIcon::from_png(APP_ICON)?);
-    run_app_with_text_engine(
+    run_application_with_text_engine(
         ApplicationConfig::new(
             ApplicationIdentity::new(
                 ApplicationId::new("dev.argui.widgets")?,
@@ -39,7 +41,7 @@ pub fn launch() -> Result<(), Box<dyn std::error::Error>> {
         ),
         RendererConfig::default().effects(argui_effects::registry()?),
         text,
-        SelectionHost::new(WidgetGallery::default()),
+        DevtoolsApp::new(SingleWindowModel::new(SelectionHost::new(WidgetGallery::default()))),
         |_| {},
     )?;
     Ok(())

@@ -5,8 +5,8 @@ use argui_core::{
 use argui_paint::{ClipChain, ClipRegion, PaintStyle, QuadStyle};
 use argui_text::TextStyle;
 use argui_ui::{
-    ClipboardRequest, CursorIcon, HitRegion, Overflow, TextSelection, TextSelectionRequest,
-    UiEventKind, UiTree,
+    ClipboardRequest, CursorIcon, Element, EventHandlerId, EventListener, EventOwnerId, EventType,
+    HitRegion, Overflow, TextSelection, TextSelectionRequest, UiEventKind, UiTree,
 };
 use argui_widgets::{Input, InputKind, InputStyle, TextArea};
 
@@ -23,7 +23,7 @@ fn filtered_tree(value: &str, kind: InputKind) -> (UiTree, HitRegion) {
     )
     .kind(kind)
     .build();
-    let tree = UiTree::new(input);
+    let tree = UiTree::new(listens(input));
     let node = tree.node_id_at(0).unwrap();
     let bounds = Rect::new(Point::default(), Size::new(300.0, 40.0));
     (
@@ -38,7 +38,7 @@ fn filtered_tree(value: &str, kind: InputKind) -> (UiTree, HitRegion) {
             enabled: true,
             focusable: true,
             cursor: CursorIcon::Text,
-            gestures: argui_ui::GestureSet::NONE,
+            gestures: argui_ui::GestureSet::EMPTY,
             window_drag: None,
         },
     )
@@ -83,7 +83,7 @@ fn read_only_tree(value: &str) -> (UiTree, HitRegion) {
     )
     .read_only(true)
     .build();
-    let tree = UiTree::new(input);
+    let tree = UiTree::new(listens(input));
     let node = tree.node_id_at(0).unwrap();
     let bounds = Rect::new(Point::default(), Size::new(300.0, 40.0));
     (
@@ -98,7 +98,7 @@ fn read_only_tree(value: &str) -> (UiTree, HitRegion) {
             enabled: true,
             focusable: true,
             cursor: CursorIcon::Text,
-            gestures: argui_ui::GestureSet::NONE,
+            gestures: argui_ui::GestureSet::EMPTY,
             window_drag: None,
         },
     )
@@ -117,6 +117,18 @@ fn key(key: Key, text: Option<&str>, modifiers: Modifiers) -> KeyInput {
 fn focus(tree: &mut UiTree, region: &HitRegion) {
     tree.pointer_moved(Point::new(10.0, 10.0), std::slice::from_ref(region));
     tree.primary_pressed(std::slice::from_ref(region));
+}
+
+fn listens(element: Element) -> Element {
+    EventType::ALL
+        .into_iter()
+        .enumerate()
+        .fold(element, |element, (slot, event)| {
+            element.on(EventListener::new(
+                event,
+                EventHandlerId::new(EventOwnerId(1), slot as u32),
+            ))
+        })
 }
 
 #[test]
@@ -474,7 +486,7 @@ fn text_area_inserts_lines_and_command_enter_submits() {
     assert_eq!(area.style.overflow.x, Overflow::Hidden);
     assert_eq!(area.style.overflow.y, Overflow::Auto);
     assert!(area.scroll.is_some());
-    let mut tree = UiTree::new(area);
+    let mut tree = UiTree::new(listens(area));
     let node = tree.node_ids()[0];
     let bounds = Rect::new(Point::default(), Size::new(300.0, 140.0));
     let region = HitRegion {
@@ -487,7 +499,7 @@ fn text_area_inserts_lines_and_command_enter_submits() {
         enabled: true,
         focusable: true,
         cursor: CursorIcon::Text,
-        gestures: argui_ui::GestureSet::NONE,
+        gestures: argui_ui::GestureSet::EMPTY,
         window_drag: None,
     };
     focus(&mut tree, &region);

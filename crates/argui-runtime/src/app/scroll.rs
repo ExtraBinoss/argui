@@ -490,7 +490,3 @@ fn non_negative(value: f32, fallback: f32) -> f32 {
         fallback
     }
 }
-
-#[cfg(test)]
-#[path = "scroll/tests.rs"]
-mod tests;

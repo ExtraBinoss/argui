@@ -2,11 +2,11 @@ use argui_animation::{Duration, Motion, MotionState, Time, Tween};
 use argui_core::{Affine2D, Point, Rect, ScrollDelta, Size};
 use argui_paint::{ClipChain, ClipRegion};
 use argui_ui::{
-    Axes, Color, CursorIcon, Element, GestureSet, HitRegion, Overflow, QuadStyle, ScrollConfig,
-    ScrollPolarity, ScrollPropagation, ScrollRegion, ScrollbarGeometry, ScrollbarPartStyle,
-    ScrollbarRegion, ScrollbarStyle, ScrollbarVisibility, StateName, StateScopeId, StateSelector,
-    StylePatch, StyleTransition, Transition, TreeUpdate, UiEventKind, UiTree, VisualState,
-    property, scrollbar_at,
+    Axes, Color, CursorIcon, Element, EventHandlerId, EventListener, EventOwnerId, EventType,
+    GestureSet, HitRegion, Overflow, QuadStyle, ScrollConfig, ScrollPolarity, ScrollPropagation,
+    ScrollRegion, ScrollbarGeometry, ScrollbarPartStyle, ScrollbarRegion, ScrollbarStyle,
+    ScrollbarVisibility, StateName, StateScopeId, StateSelector, StylePatch, StyleTransition,
+    Transition, TreeUpdate, UiEventKind, UiTree, VisualState, property, scrollbar_at,
 };
 
 fn region(node: argui_ui::NodeId, config: ScrollConfig, max_y: f32) -> ScrollRegion {
@@ -43,15 +43,22 @@ fn hit_region(node: argui_ui::NodeId, bounds: Rect) -> HitRegion {
         enabled: true,
         focusable: false,
         cursor: CursorIcon::Default,
-        gestures: GestureSet::NONE,
+        gestures: GestureSet::EMPTY,
         window_drag: None,
     }
+}
+
+fn listens_for_scroll(element: Element) -> Element {
+    element.on(EventListener::new(
+        EventType::Scroll,
+        EventHandlerId::new(EventOwnerId(1), 0),
+    ))
 }
 
 #[test]
 fn scroll_polarity_is_explicit_and_offsets_are_clamped() {
     let mut tree = UiTree::new(
-        Element::container([])
+        listens_for_scroll(Element::container([]))
             .keyed("scroll")
             .overflow(Axes {
                 x: Overflow::Hidden,
@@ -142,7 +149,7 @@ fn both_axes_preserve_pixel_precision() {
 #[test]
 fn exhausted_nested_scrolls_chain_to_their_parent() {
     let mut tree = UiTree::new(Element::column([
-        Element::container([]).keyed("parent"),
+        listens_for_scroll(Element::container([])).keyed("parent"),
         Element::container([]).keyed("child"),
     ]));
     let parent = tree.node_id_at(1).unwrap();
@@ -530,4 +537,31 @@ fn horizontal_scrollbar_thumb_drag_uses_horizontal_geometry() {
     tree.scrollbar_dragged(Point::new(180.0, 100.0), &regions)
         .unwrap();
     assert_eq!(tree.scroll_offset(node), Point::new(500.0, 0.0));
+}
+
+#[test]
+fn scrollbar_hit_testing_respects_disabled_regions_and_inverse_transforms() {
+    let tree = UiTree::new(Element::container([]));
+    let node = tree.node_id_at(0).unwrap();
+    let style = ScrollbarStyle::new(
+        ScrollbarPartStyle::new(QuadStyle::default()),
+        ScrollbarPartStyle::new(QuadStyle::default()),
+    );
+    let mut scroll = region(node, ScrollConfig::default(), 120.0);
+    scroll.transform = Affine2D::translation(20.0, 30.0);
+    scroll.interaction_order = 1;
+    scroll.scrollbar = Some(vertical_scrollbar(scroll.bounds, scroll.bounds, style));
+
+    assert_eq!(
+        scroll.local_point(Point::new(25.0, 35.0)),
+        Some(Point::new(5.0, 5.0))
+    );
+    let hit = hit_region(
+        node,
+        Rect::new(Point::new(20.0, 30.0), Size::new(200.0, 200.0)),
+    );
+    assert!(scrollbar_at(Point::new(25.0, 35.0), &[scroll.clone()], &[hit]).is_some());
+
+    scroll.config = scroll.config.enabled(false);
+    assert!(scrollbar_at(Point::new(25.0, 35.0), &[scroll], &[]).is_none());
 }

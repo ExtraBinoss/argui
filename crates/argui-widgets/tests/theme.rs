@@ -18,8 +18,8 @@ fn shadcn_palette_resolves_system_mode_and_contrasting_primary_text() {
     assert_eq!(dark.input_border, dark.border);
     assert!(light.foreground.contrast_ratio(light.background) >= 4.5);
     assert!(dark.foreground.contrast_ratio(dark.background) >= 4.5);
-    assert_eq!(light.button.layout.size.height, Dimension::length(36.0));
-    assert_eq!(light.button.layout.padding, sides(14.0, 0.0));
+    assert_eq!(light.button().layout.size.height, Dimension::length(36.0));
+    assert_eq!(light.button().layout.padding, sides(14.0, 0.0));
     themes.set_mode(ThemeMode::Dark);
     assert_eq!(themes.resolve(ColorScheme::Light), &dark);
 

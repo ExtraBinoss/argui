@@ -48,10 +48,11 @@ widgets can reserve room for handles or controls. Pointer ownership follows
 paint order: a later visual above the track receives input, while an exposed
 track remains draggable.
 
-`Resizable` is independent from text editing. It composes arbitrary content and
-an arbitrary bottom-right handle, uses the shared pan gesture capture, exposes
-horizontal/vertical/both axes, clamps to explicit min/max sizes, and reports
-typed start/change/end/cancel phases. `argui-theme::WidgetAssets` provides the
-standard GPU-rendered Tabler resize handle. Leaving a window only clears hover;
-an active resize remains captured until pointer release. A real pointer cancel
-or window focus loss still emits `Cancelled` and restores the starting size.
+Resize is an ordinary composition rather than a specialized widget. Any
+`Element` can opt into a `PanGesture`, choose its axis, threshold, pointer
+capture, and immediate or frame-coalesced delivery, then handle typed
+start/change/end/cancel events in application state. The application owns its
+min/max constraints, reset policy, and persisted size. `WidgetAssets` merely
+provides an optional GPU-rendered Tabler handle; any painted element can be the
+interactive region. Leaving a window clears hover without cancelling an active
+pan, while pointer cancellation or focus loss emits `Cancelled`.

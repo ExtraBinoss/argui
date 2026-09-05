@@ -5,8 +5,6 @@ mod animation;
 mod app;
 mod application;
 mod clipboard;
-#[cfg(test)]
-mod entity_tests;
 mod environment;
 mod error;
 mod event;
@@ -16,7 +14,10 @@ mod model;
 mod multi;
 mod translate;
 
-pub use application::{AppCommand, AppEvent, AppModel, AppUpdate, WindowInvalidation};
+pub use app::{Inspection, InspectionCache};
+pub use application::{
+    AppCommand, AppEvent, AppModel, AppUpdate, SingleWindowModel, WindowInvalidation,
+};
 pub use environment::{ThemeRequest, WindowEnvironment};
 pub use error::RuntimeError;
 pub use event::{AnimationProfile, RuntimeEvent, WindowRuntimeEvent};

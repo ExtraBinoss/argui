@@ -4,13 +4,16 @@ use argui_core::{
 };
 use argui_paint::{ClipChain, ClipRegion, Color, QuadStyle};
 use argui_ui::{
-    ClipboardRequest, CursorIcon, Element, HitRegion, HitShape, HitTestStyle, Interaction,
-    InteractionUpdate, PointerEvents, Sides, StylePatch, TreeUpdate, UiEventKind, UiTree,
-    VisualState, VisualStates,
+    ClipboardRequest, CursorIcon, Element, EventHandlerId, EventListener, EventOwnerId, EventType,
+    HitRegion, HitShape, HitTestStyle, Interaction, InteractionUpdate, PointerEvents, Sides,
+    StylePatch, TreeUpdate, UiEventKind, UiTree, VisualState, VisualStates, WindowDragBehavior,
 };
 
+#[path = "interaction/pointer.rs"]
+mod pointer;
+
 fn interactive(key: &str) -> Element {
-    Element::container([])
+    let element = Element::container([])
         .keyed(key)
         .background(Color::srgb(0.0, 0.0, 0.0))
         .interaction(Interaction::default().focusable(true))
@@ -25,7 +28,20 @@ fn interactive(key: &str) -> Element {
         .when(
             VisualState::Focused,
             StylePatch::from_quad(QuadStyle::solid(Color::srgb(0.0, 1.0, 0.0))),
-        )
+        );
+    listeners(element)
+}
+
+fn listeners(element: Element) -> Element {
+    EventType::ALL
+        .into_iter()
+        .enumerate()
+        .fold(element, |element, (slot, event)| {
+            element.on(EventListener::new(
+                event,
+                EventHandlerId::new(EventOwnerId(1), slot as u32),
+            ))
+        })
 }
 
 fn region(node: argui_ui::NodeId) -> HitRegion {
@@ -46,7 +62,7 @@ fn region_at(node: argui_ui::NodeId, x: f32, focusable: bool) -> HitRegion {
         enabled: true,
         focusable,
         cursor: CursorIcon::Auto,
-        gestures: argui_ui::GestureSet::NONE,
+        gestures: argui_ui::GestureSet::EMPTY,
         window_drag: None,
     }
 }
@@ -59,6 +75,41 @@ fn interactions_expose_explicit_platform_cursors() {
         CursorIcon::Grab
     );
     assert_eq!(Interaction::blocker().cursor, CursorIcon::Auto);
+}
+
+#[test]
+fn interaction_builders_preserve_disabled_keyboard_and_window_drag_options() {
+    let interaction = Interaction::default()
+        .enabled(false)
+        .focusable(true)
+        .cursor(CursorIcon::ColResize)
+        .keyboard_activation(argui_ui::KeyboardActivation::EnterOrSpace)
+        .window_drag(WindowDragBehavior::MoveAndToggleMaximize);
+
+    assert!(!interaction.enabled);
+    assert!(interaction.focusable);
+    assert_eq!(interaction.cursor, CursorIcon::ColResize);
+    assert_eq!(
+        interaction.keyboard_activation,
+        argui_ui::KeyboardActivation::EnterOrSpace
+    );
+    assert_eq!(
+        interaction.window_drag,
+        Some(WindowDragBehavior::MoveAndToggleMaximize)
+    );
+
+    let hit_style = HitTestStyle::default()
+        .pointer_events(PointerEvents::ContentsOnly)
+        .shape(HitShape::Ellipse)
+        .slop(Sides {
+            left: 4.0,
+            right: -2.0,
+            top: 3.0,
+            bottom: 1.0,
+        });
+    assert_eq!(hit_style.pointer_events, PointerEvents::ContentsOnly);
+    assert_eq!(hit_style.shape, HitShape::Ellipse);
+    assert_eq!(hit_style.slop.right, -2.0);
 }
 
 #[test]
@@ -111,6 +162,11 @@ fn hit_shapes_and_slop_are_transform_and_clip_aware() {
     assert!(!target.contains(Point::new(10.0, 20.0)));
     target.bounds = Rect::new(Point::new(10.0, 10.0), Size::new(20.0, 0.0));
     assert!(!target.contains(Point::new(20.0, 10.0)));
+    target.transform = Affine2D {
+        matrix: [0.0; 4],
+        translation: Point::default(),
+    };
+    assert!(!target.contains(Point::new(10.0, 10.0)));
 }
 
 #[test]
@@ -125,12 +181,24 @@ fn pointer_state_honors_clips_capture_clicks_and_focus() {
 
     let entered = tree.pointer_moved(Point::new(30.0, 20.0), &regions);
     assert!(entered.paint_changed);
-    assert_eq!(entered.events[0].key.as_deref(), Some("save"));
-    assert_eq!(entered.events[0].kind, UiEventKind::PointerEntered);
+    assert_eq!(entered.events[0].target_key(), Some("save"));
+    assert!(matches!(
+        entered.events[0].kind,
+        UiEventKind::Pointer(PointerEvent {
+            phase: PointerPhase::Entered,
+            ..
+        })
+    ));
     assert!(tree.visual_states(node).contains(VisualState::Hovered));
 
     let pressed = tree.primary_pressed(&regions);
-    assert_eq!(pressed.events[0].kind, UiEventKind::Pressed);
+    assert!(matches!(
+        pressed.events[0].kind,
+        UiEventKind::Pointer(PointerEvent {
+            phase: PointerPhase::Pressed,
+            ..
+        })
+    ));
     assert!(
         pressed
             .events
@@ -140,18 +208,26 @@ fn pointer_state_honors_clips_capture_clicks_and_focus() {
     assert!(tree.visual_states(node).contains(VisualState::Pressed));
     assert!(!tree.visual_states(node).contains(VisualState::FocusVisible));
 
+    tree.capture_pointer(PointerId::MOUSE, node);
     let dragged_out = tree.pointer_moved(Point::new(200.0, 200.0), &regions);
-    assert!(
-        dragged_out
-            .events
-            .iter()
-            .any(|event| matches!(event.kind, UiEventKind::PointerMoved(_)))
-    );
+    assert!(dragged_out.events.iter().any(|event| matches!(
+        event.kind,
+        UiEventKind::Pointer(PointerEvent {
+            phase: PointerPhase::Moved,
+            ..
+        })
+    )));
     assert!(tree.visual_states(node).contains(VisualState::Pressed));
 
     let released = tree.primary_released();
     assert_eq!(released.events.len(), 2);
-    assert_eq!(released.events[0].kind, UiEventKind::Released);
+    assert!(matches!(
+        released.events[0].kind,
+        UiEventKind::Pointer(PointerEvent {
+            phase: PointerPhase::Released,
+            ..
+        })
+    ));
     assert_eq!(
         released.events[1].kind,
         UiEventKind::LostPointerCapture(PointerId::MOUSE)
@@ -229,12 +305,13 @@ fn release_over_the_captured_target_emits_a_click() {
     tree.primary_pressed(&regions);
 
     let released = tree.primary_released();
-    assert!(
-        released
-            .events
-            .iter()
-            .any(|event| event.kind == UiEventKind::Clicked)
-    );
+    assert!(released.events.iter().any(|event| matches!(
+        event.kind,
+        UiEventKind::Click(argui_ui::ClickEvent {
+            source: argui_ui::ActivationSource::Pointer(_),
+            ..
+        })
+    )));
 
     let pressed_again = tree.primary_pressed(&regions);
     assert!(
@@ -249,9 +326,11 @@ fn release_over_the_captured_target_emits_a_click() {
 fn blocker_regions_occlude_interactions_behind_overlays() {
     let mut tree = UiTree::new(Element::row([
         interactive("behind"),
-        Element::container([])
-            .keyed("overlay")
-            .interaction(Interaction::blocker()),
+        listeners(
+            Element::container([])
+                .keyed("overlay")
+                .interaction(Interaction::blocker()),
+        ),
     ]));
     let behind = tree.node_id_at(1).unwrap();
     let overlay = tree.node_id_at(2).unwrap();
@@ -262,7 +341,7 @@ fn blocker_regions_occlude_interactions_behind_overlays() {
 
     let update = tree.pointer_moved(Point::new(30.0, 20.0), &regions);
     assert_eq!(update.events[0].target, overlay);
-    assert_eq!(update.events[0].key.as_deref(), Some("overlay"));
+    assert_eq!(update.events[0].target_key(), Some("overlay"));
     assert_eq!(tree.visual_states(behind), VisualStates::NONE);
     assert!(tree.visual_states(overlay).contains(VisualState::Hovered));
     assert!(!Interaction::blocker().focusable);
@@ -330,33 +409,36 @@ fn secondary_touches_do_not_replace_primary_interaction_capture() {
         buttons: 1,
         pressure: None,
         primary,
+        modifiers: argui_core::Modifiers::default(),
         timestamp: std::time::Duration::ZERO,
     };
 
     let pressed = tree.pointer_event(touch(1, PointerPhase::Pressed, true), &regions);
-    assert!(
-        pressed
-            .events
-            .iter()
-            .any(|event| event.kind == UiEventKind::Pressed)
-    );
+    assert!(pressed.events.iter().any(|event| matches!(
+        event.kind,
+        UiEventKind::Pointer(PointerEvent {
+            phase: PointerPhase::Pressed,
+            ..
+        })
+    )));
     assert!(
         tree.pointer_event(touch(2, PointerPhase::Pressed, false), &regions)
             .events
             .is_empty()
     );
     let cancelled = tree.pointer_event(touch(1, PointerPhase::Cancelled, true), &regions);
+    assert!(cancelled.events.iter().any(|event| matches!(
+        event.kind,
+        UiEventKind::Pointer(PointerEvent {
+            phase: PointerPhase::Cancelled,
+            ..
+        })
+    )));
     assert!(
         cancelled
             .events
             .iter()
-            .any(|event| event.kind == UiEventKind::Released)
-    );
-    assert!(
-        cancelled
-            .events
-            .iter()
-            .all(|event| event.kind != UiEventKind::Clicked)
+            .all(|event| event.kind != UiEventKind::Click(argui_ui::ClickEvent::accessibility()))
     );
     assert!(
         tree.pointer_event(touch(1, PointerPhase::Cancelled, true), &regions)
@@ -388,12 +470,20 @@ fn explicit_pointer_capture_retargets_motion_and_reports_every_release() {
             buttons: 0,
             pressure: Some(0.5),
             primary: true,
+            modifiers: argui_core::Modifiers::default(),
             timestamp: std::time::Duration::ZERO,
         },
         &regions,
     );
     assert!(moved.events.iter().any(|event| {
-        event.target == first && matches!(event.kind, UiEventKind::PointerMoved(_))
+        event.target == first
+            && matches!(
+                event.kind,
+                UiEventKind::Pointer(PointerEvent {
+                    phase: PointerPhase::Moved,
+                    ..
+                })
+            )
     }));
 
     assert!(
@@ -444,14 +534,22 @@ fn empty_actions_focus_switches_and_blur_are_deterministic() {
     );
 
     let left = tree.pointer_left();
-    assert_eq!(left.events[0].kind, UiEventKind::PointerLeft);
+    assert!(matches!(
+        left.events[0].kind,
+        UiEventKind::Pointer(PointerEvent {
+            phase: PointerPhase::Left,
+            ..
+        })
+    ));
     let blurred = tree.window_blurred();
-    assert!(
-        blurred
-            .events
-            .iter()
-            .any(|event| event.target == second && event.kind == UiEventKind::Released)
-    );
+    assert!(blurred.events.iter().any(|event| event.target == second
+        && matches!(
+            event.kind,
+            UiEventKind::Pointer(PointerEvent {
+                phase: PointerPhase::Cancelled,
+                ..
+            })
+        )));
 }
 
 #[test]

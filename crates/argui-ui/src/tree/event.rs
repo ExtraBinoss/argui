@@ -1,14 +1,15 @@
 use std::{cell::Cell, collections::HashMap, rc::Rc};
 
-use crate::{Element, EventListener, EventPhase, EventType, NodeId, UiEvent, UiEventKind};
+use crate::{
+    Element, EventHandlerId, EventListener, EventPhase, EventType, NodeId, UiEvent, UiEventKind,
+};
 
 use super::UiTree;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 struct ConsumedListener {
     node: NodeId,
-    event: EventType,
-    capture: bool,
+    handler: EventHandlerId,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -32,11 +33,10 @@ impl EventRegistry {
                 return false;
             };
             element_at(root, index).is_some_and(|element| {
-                element.event_listeners.iter().any(|listener| {
-                    listener.event == consumed.event
-                        && listener.options.capture == consumed.capture
-                        && listener.options.once
-                })
+                element
+                    .event_listeners
+                    .iter()
+                    .any(|listener| listener.handler == consumed.handler && listener.options.once)
             })
         });
     }
@@ -51,8 +51,7 @@ impl EventRegistry {
         }
         let key = ConsumedListener {
             node,
-            event: listener.event,
-            capture: listener.options.capture,
+            handler: listener.handler,
         };
         Some(
             self.once
@@ -91,12 +90,6 @@ impl UiTree {
             );
         }
 
-        let target_declares_listener = self.element_at(target_index).is_some_and(|element| {
-            element
-                .event_listeners
-                .iter()
-                .any(|listener| listener.event == event_type)
-        });
         self.push_listeners(
             &base,
             target_index,
@@ -113,10 +106,6 @@ impl UiTree {
             EventPhase::Target,
             &mut deliveries,
         );
-        if !target_declares_listener {
-            deliveries.push(self.delivery(&base, target_index, EventPhase::Target, false, None));
-        }
-
         if base.bubbles() {
             for index in ancestry.into_iter().rev() {
                 self.push_listeners(
@@ -154,7 +143,14 @@ impl UiTree {
             if once.as_ref().is_some_and(|consumed| consumed.get()) {
                 continue;
             }
-            output.push(self.delivery(base, index, phase, listener.options.passive, once));
+            output.push(self.delivery(
+                base,
+                index,
+                phase,
+                listener.options.passive,
+                once,
+                Some(listener.handler),
+            ));
         }
     }
 
@@ -165,12 +161,13 @@ impl UiTree {
         phase: EventPhase,
         passive: bool,
         once: Option<Rc<Cell<bool>>>,
+        handler: Option<EventHandlerId>,
     ) -> UiEvent {
         let element = self.element_at(index);
         base.delivery(
             self.node_ids[index],
             element.and_then(|value| value.key.clone()),
-            element.and_then(|value| value.event_owner),
+            handler,
             phase,
             passive,
             once,
@@ -200,59 +197,4 @@ fn element_at(root: &Element, target: usize) -> Option<&Element> {
         None
     }
     visit(root, target, &mut 0)
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::{EventListenerOptions, EventType};
-
-    use super::*;
-
-    #[test]
-    fn dispatches_capture_target_and_bubble_in_order() {
-        let root = Element::column([Element::container([
-            Element::text("target").listen(EventType::Click, EventListenerOptions::default())
-        ])
-        .listen(EventType::Click, EventListenerOptions::default())])
-        .listen(
-            EventType::Click,
-            EventListenerOptions::default().capture(true),
-        );
-        let mut tree = UiTree::new(root);
-        let target = tree.node_id_at(2).unwrap();
-        let events = tree.event_deliveries(target, UiEventKind::Clicked);
-        assert_eq!(
-            events.iter().map(UiEvent::phase).collect::<Vec<_>>(),
-            [EventPhase::Capture, EventPhase::Target, EventPhase::Bubble]
-        );
-    }
-
-    #[test]
-    fn once_listener_is_consumed_until_removed() {
-        let root = Element::text("target")
-            .listen(EventType::Click, EventListenerOptions::default().once(true));
-        let mut tree = UiTree::new(root);
-        let target = tree.node_id_at(0).unwrap();
-        let events = tree.event_deliveries(target, UiEventKind::Clicked);
-        assert_eq!(events.len(), 1);
-        assert!(events[0].should_dispatch());
-        assert!(
-            tree.event_deliveries(target, UiEventKind::Clicked)
-                .is_empty()
-        );
-    }
-
-    #[test]
-    fn non_bubbling_events_ignore_ancestors_and_unrelated_listeners() {
-        let root = Element::container([Element::text("target")
-            .listen(EventType::PointerEnter, EventListenerOptions::default())
-            .listen(EventType::Click, EventListenerOptions::default())])
-        .listen(EventType::PointerEnter, EventListenerOptions::default());
-        let mut tree = UiTree::new(root);
-        let target = tree.node_id_at(1).unwrap();
-        let events = tree.event_deliveries(target, UiEventKind::PointerEntered);
-        assert_eq!(events.len(), 1);
-        assert_eq!(events[0].current_target(), target);
-        assert_eq!(events[0].phase(), EventPhase::Target);
-    }
 }

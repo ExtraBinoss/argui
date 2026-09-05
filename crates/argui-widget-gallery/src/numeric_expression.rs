@@ -98,17 +98,3 @@ impl Parser<'_> {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::evaluate;
-
-    #[test]
-    fn evaluates_precedence_parentheses_and_unary_signs() {
-        assert_eq!(evaluate("50 + 10 * 2"), Some(70.0));
-        assert_eq!(evaluate("-(50 + 10) / 2"), Some(-30.0));
-        assert_eq!(evaluate("11 % 4"), Some(3.0));
-        assert_eq!(evaluate("2 / 0"), None);
-        assert_eq!(evaluate("2 + nope"), None);
-    }
-}

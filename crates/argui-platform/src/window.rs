@@ -125,6 +125,7 @@ pub struct WindowConfig {
     pub append_to_document: bool,
     pub web_parent_id: Option<String>,
     pub close_behavior: CloseBehavior,
+    pub pointer: argui_core::PointerSettings,
 }
 
 impl Default for WindowConfig {
@@ -141,6 +142,7 @@ impl Default for WindowConfig {
             append_to_document: true,
             web_parent_id: None,
             close_behavior: CloseBehavior::Quit,
+            pointer: argui_core::PointerSettings::default(),
         }
     }
 }

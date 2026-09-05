@@ -93,9 +93,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         showcase(),
         |event| {
             if let RuntimeEvent::Ui(event) = &event
-                && event.kind == UiEventKind::Clicked
+                && event.kind == UiEventKind::Click(argui::ui::ClickEvent::accessibility())
             {
-                println!("clicked {:?}", event.key);
+                println!("clicked {:?}", event.target_key());
             }
             println!("{event:?}");
         },

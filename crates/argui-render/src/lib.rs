@@ -20,7 +20,7 @@ mod upload;
 mod vector;
 
 pub use config::{EffectQuality, EffectQualitySettings, RendererConfig, SurfaceAlphaMode};
-pub use effect_graph::EffectGraphStats;
+pub use effect_graph::{EffectGraphAnalysis, EffectGraphStats, analyze_display_list};
 pub use error::RendererError;
 pub use offscreen::TexturePoolStats;
 pub use profile::{

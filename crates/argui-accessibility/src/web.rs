@@ -455,5 +455,7 @@ const fn aria_role(role: Role) -> &'static str {
         Role::Dialog => "dialog",
         Role::Alert => "alert",
         Role::Separator => "separator",
+        Role::Tree => "tree",
+        Role::TreeItem => "treeitem",
     }
 }

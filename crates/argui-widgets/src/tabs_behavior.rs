@@ -79,7 +79,7 @@ impl TabsBehavior {
                             } else {
                                 CursorIcon::NotAllowed
                             })
-                            .gestures(GestureSet::NONE.tap())
+                            .gestures(GestureSet::default().tap(argui_ui::TapGesture::default()))
                             .keyboard_activation(KeyboardActivation::EnterOrSpace),
                     )
                     .semantics(
@@ -100,12 +100,11 @@ impl TabsBehavior {
 
     #[must_use]
     pub fn action(&self, event: &UiEvent) -> Option<TabsAction> {
-        if !matches!(event.kind, UiEventKind::Clicked) {
+        if !matches!(event.kind, UiEventKind::Click(_)) {
             return None;
         }
         let index = event
-            .key
-            .as_deref()?
+            .target_key()?
             .strip_prefix(&format!("{}::tab::", self.key))?
             .parse::<usize>()
             .ok()?;

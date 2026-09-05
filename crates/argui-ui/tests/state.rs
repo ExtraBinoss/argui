@@ -5,8 +5,8 @@ use argui_paint::{
     LayerMask, LayerStyle, LinearGradient, RadialGradient, Shadow,
 };
 use argui_ui::{
-    CursorIcon, Element, GestureSet, HitRegion, Interaction, PropertyKey, StateName, StateScopeId,
-    StateSelector, StyleCondition, StylePatch, StyleTransition, TransitionDirection,
+    CursorIcon, Element, GestureSet, HitRegion, Interaction, LayoutStyle, PropertyKey, StateName,
+    StateScopeId, StateSelector, StyleCondition, StylePatch, StyleTransition, TransitionDirection,
     TransitionRule, TreeUpdate, UiTree, VisualState, length, property,
 };
 
@@ -21,7 +21,7 @@ fn region(node: argui_ui::NodeId) -> HitRegion {
         enabled: true,
         focusable: true,
         cursor: CursorIcon::Pointer,
-        gestures: GestureSet::NONE,
+        gestures: GestureSet::EMPTY,
         window_drag: None,
     }
 }
@@ -512,6 +512,65 @@ fn repeated_properties_replace_and_disabled_state_composes_on_mount() {
         tree.resolved_transform(node, &element).translation,
         Point::new(8.0, 4.0)
     );
+}
+
+#[test]
+fn incompatible_paint_values_switch_discretely_and_layout_style_snaps() {
+    let gradient = LinearGradient::new(
+        Point::new(0.0, 0.0),
+        Point::new(1.0, 0.0),
+        argui_paint::ColorInterpolation::Oklab,
+        [
+            GradientStop::new(0.0, black()),
+            GradientStop::new(1.0, Color::WHITE),
+        ],
+    )
+    .expect("valid gradient");
+    let target = Fill::Solid(Color::srgb(0.0, 0.5, 1.0));
+    let element = Element::container([])
+        .fill(Fill::Linear(gradient))
+        .interaction(Interaction::default())
+        .when(
+            VisualState::Hovered,
+            StylePatch::new().set(property::Background, Some(target.clone())),
+        )
+        .transition(tween());
+    let mut tree = UiTree::new(element.clone());
+    let node = tree.node_ids()[0];
+
+    tree.pointer_moved(Point::new(10.0, 10.0), &[region(node)]);
+    assert!(matches!(
+        tree.resolved_quad(node, &element).background,
+        Some(Fill::Linear(_))
+    ));
+    tree.advance_animations(Time::from_nanos(1));
+    tree.advance_animations(Time::from_nanos(50_000_001));
+    assert_eq!(tree.resolved_quad(node, &element).background, Some(target));
+
+    let mut target_layout = LayoutStyle::default();
+    target_layout.size.width = length(240.0);
+    let layout_element = Element::container([])
+        .interaction(Interaction::default())
+        .when(
+            VisualState::Hovered,
+            StylePatch::new().layout(target_layout.clone()),
+        )
+        .transition(tween());
+    let mut layout_tree = UiTree::new(layout_element.clone());
+    let layout_node = layout_tree.node_ids()[0];
+    assert!(
+        layout_tree
+            .pointer_moved(Point::new(10.0, 10.0), &[region(layout_node)])
+            .layout_changed
+    );
+    assert_eq!(
+        layout_tree
+            .resolved_layout_style(layout_node, &layout_element)
+            .size
+            .width,
+        length(240.0)
+    );
+    assert!(!layout_tree.wants_animation_frame());
 }
 
 fn solid(fill: Option<Fill>) -> Color {

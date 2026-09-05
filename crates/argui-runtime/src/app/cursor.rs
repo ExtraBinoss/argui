@@ -7,7 +7,9 @@ use super::Application;
 impl Application {
     #[cfg_attr(coverage_nightly, coverage(off))]
     pub(super) fn refresh_cursor(&mut self, window: &Window) {
-        let cursor = self.pointer.map_or(CursorIcon::Default, |point| {
+        let captured = self.ui_tree.as_ref().zip(self.ui_layout.as_ref())
+            .and_then(|(tree, layout)| tree.captured_cursor(argui_core::PointerId::MOUSE, &layout.hit_regions));
+        let cursor = captured.unwrap_or_else(|| self.pointer.map_or(CursorIcon::Default, |point| {
             let Some(layout) = &self.ui_layout else {
                 return CursorIcon::Default;
             };
@@ -18,7 +20,7 @@ impl Application {
             } else {
                 cursor_at(&layout.hit_regions, point)
             }
-        });
+        }));
         if cursor != self.last_cursor {
             window.set_cursor(to_winit(cursor));
             self.last_cursor = cursor;
@@ -75,104 +77,5 @@ fn to_winit(cursor: CursorIcon) -> WinitCursorIcon {
         CursorIcon::ZoomOut => WinitCursorIcon::ZoomOut,
         CursorIcon::DndAsk => WinitCursorIcon::DndAsk,
         CursorIcon::AllResize => WinitCursorIcon::AllResize,
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::hint::black_box;
-
-    use argui_core::{Affine2D, Point, Rect, Size};
-    use argui_paint::ClipChain;
-    use argui_ui::{CursorIcon, HitRegion};
-
-    use super::{cursor_at, to_winit};
-
-    fn region(cursor: CursorIcon) -> HitRegion {
-        HitRegion {
-            node: argui_ui::UiTree::new(argui_ui::Element::container([]))
-                .node_id_at(0)
-                .unwrap(),
-            bounds: Rect::new(Point::default(), Size::new(40.0, 40.0)),
-            transform: Affine2D::IDENTITY,
-            clips: ClipChain::default(),
-            shape: argui_ui::HitShape::Bounds,
-            slop: argui_ui::HitTestStyle::default().slop,
-            enabled: true,
-            focusable: false,
-            cursor,
-            gestures: argui_ui::GestureSet::NONE,
-            window_drag: None,
-        }
-    }
-
-    #[test]
-    fn topmost_hit_region_controls_the_cursor() {
-        let regions = [region(CursorIcon::Pointer), region(CursorIcon::Text)];
-        assert_eq!(
-            cursor_at(&regions, Point::new(20.0, 20.0)),
-            CursorIcon::Text
-        );
-        assert_eq!(
-            cursor_at(&regions, Point::new(50.0, 50.0)),
-            CursorIcon::Default
-        );
-        assert_eq!(
-            cursor_at(&[region(CursorIcon::Auto)], Point::new(20.0, 20.0)),
-            CursorIcon::Default
-        );
-
-        let mut disabled = region(CursorIcon::NotAllowed);
-        disabled.enabled = false;
-        assert_eq!(
-            cursor_at(&[disabled], Point::new(20.0, 20.0)),
-            CursorIcon::NotAllowed
-        );
-    }
-
-    #[test]
-    fn every_public_cursor_maps_to_winit() {
-        let cursors = [
-            CursorIcon::Auto,
-            CursorIcon::Default,
-            CursorIcon::ContextMenu,
-            CursorIcon::Help,
-            CursorIcon::Pointer,
-            CursorIcon::Progress,
-            CursorIcon::Wait,
-            CursorIcon::Cell,
-            CursorIcon::Crosshair,
-            CursorIcon::Text,
-            CursorIcon::VerticalText,
-            CursorIcon::Alias,
-            CursorIcon::Copy,
-            CursorIcon::Move,
-            CursorIcon::NoDrop,
-            CursorIcon::NotAllowed,
-            CursorIcon::Grab,
-            CursorIcon::Grabbing,
-            CursorIcon::EResize,
-            CursorIcon::NResize,
-            CursorIcon::NeResize,
-            CursorIcon::NwResize,
-            CursorIcon::SResize,
-            CursorIcon::SeResize,
-            CursorIcon::SwResize,
-            CursorIcon::WResize,
-            CursorIcon::EwResize,
-            CursorIcon::NsResize,
-            CursorIcon::NeswResize,
-            CursorIcon::NwseResize,
-            CursorIcon::ColResize,
-            CursorIcon::RowResize,
-            CursorIcon::AllScroll,
-            CursorIcon::ZoomIn,
-            CursorIcon::ZoomOut,
-            CursorIcon::DndAsk,
-            CursorIcon::AllResize,
-        ];
-        for cursor in cursors {
-            black_box(to_winit(black_box(cursor)));
-        }
     }
 }

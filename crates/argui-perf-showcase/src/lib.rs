@@ -5,7 +5,7 @@ use argui::{
     runtime::{Context, Entity, Render},
     text::{TextColor, TextStyle, TextWrap},
     ui::{
-        Axes, Element, Overflow, ScrollConfig, Sides, UiEvent, UiEventKind, VirtualList, percent,
+        Axes, Element, EventType, Overflow, ScrollConfig, Sides, UiEventKind, VirtualList, percent,
         sides,
     },
 };
@@ -63,50 +63,6 @@ impl Render for PerfShowcase {
         })
         .scroll_config(ScrollConfig::default())
     }
-
-    fn event(&mut self, event: &UiEvent, cx: &mut Context<Self>) {
-        if event.kind == UiEventKind::Clicked && event.key.as_deref() == Some("perf-counter") {
-            self.counter.update(|lab, child| {
-                lab.value += 1;
-                child.notify();
-            });
-            cx.notify();
-            return;
-        }
-        if let UiEventKind::Scrolled { offset, .. } = event.kind {
-            match event.key.as_deref() {
-                Some("perf-million-fixed") => {
-                    let changed = self.fixed.read(|lab| {
-                        lab.list.window(lab.offset).range != lab.list.window(offset.y).range
-                    });
-                    self.fixed.update(|lab, child| {
-                        lab.offset = offset.y;
-                        if changed {
-                            child.notify();
-                        }
-                    });
-                    if changed {
-                        cx.notify();
-                    }
-                }
-                Some("perf-million-variable") => {
-                    let changed = self.variable.read(|lab| {
-                        lab.list.window(lab.offset).range != lab.list.window(offset.y).range
-                    });
-                    self.variable.update(|lab, child| {
-                        lab.offset = offset.y;
-                        if changed {
-                            child.notify();
-                        }
-                    });
-                    if changed {
-                        cx.notify();
-                    }
-                }
-                _ => {}
-            }
-        }
-    }
 }
 
 #[derive(Default)]
@@ -116,12 +72,16 @@ struct CounterLab {
 }
 
 impl Render for CounterLab {
-    fn render(&mut self, _cx: &mut Context<Self>) -> Element {
+    fn render(&mut self, cx: &mut Context<Self>) -> Element {
         self.renders += 1;
         panel([
             Element::text("Local retained state").text_style(text(19.0, TextColor::WHITE, 700)),
             Element::text(format!("value={} (only this entity changes)", self.value))
                 .keyed("perf-counter")
+                .on(cx.listener(EventType::Click, |lab, _, cx| {
+                    lab.value += 1;
+                    cx.notify();
+                }))
                 .padding(sides(14.0, 9.0))
                 .background(Color::srgb(0.12, 0.36, 0.28))
                 .radius(CornerRadii::all(9.0)),
@@ -146,12 +106,22 @@ impl Default for FixedListLab {
 }
 
 impl Render for FixedListLab {
-    fn render(&mut self, _cx: &mut Context<Self>) -> Element {
+    fn render(&mut self, cx: &mut Context<Self>) -> Element {
         self.renders += 1;
         let list = self
             .list
             .clone()
-            .build("perf-million-fixed", self.offset, row);
+            .build("perf-million-fixed", self.offset, row)
+            .on(cx.listener(EventType::Scroll, |lab, event, cx| {
+                let UiEventKind::Scrolled { offset, .. } = event.kind else {
+                    return;
+                };
+                let changed = lab.list.window(lab.offset).range != lab.list.window(offset.y).range;
+                lab.offset = offset.y;
+                if changed {
+                    cx.notify();
+                }
+            }));
         panel([
             Element::text("1,000,000 fixed-height rows").text_style(text(
                 19.0,
@@ -180,7 +150,7 @@ impl Default for VariableListLab {
 }
 
 impl Render for VariableListLab {
-    fn render(&mut self, _cx: &mut Context<Self>) -> Element {
+    fn render(&mut self, cx: &mut Context<Self>) -> Element {
         self.renders += 1;
         panel([
             Element::text("1,000,000 variable-height rows · anchored measurements")
@@ -188,7 +158,18 @@ impl Render for VariableListLab {
             Element::text("Visible rows are measured automatically; the anchor stays fixed.")
                 .text_style(text(14.0, TextColor::srgb(0.62, 0.70, 0.82), 500)),
             self.list
-                .build("perf-million-variable", self.offset, variable_row),
+                .build("perf-million-variable", self.offset, variable_row)
+                .on(cx.listener(EventType::Scroll, |lab, event, cx| {
+                    let UiEventKind::Scrolled { offset, .. } = event.kind else {
+                        return;
+                    };
+                    let changed =
+                        lab.list.window(lab.offset).range != lab.list.window(offset.y).range;
+                    lab.offset = offset.y;
+                    if changed {
+                        cx.notify();
+                    }
+                })),
         ])
     }
 }
@@ -254,83 +235,4 @@ pub fn start() -> Result<(), wasm_bindgen::JsValue> {
         |_| {},
     )
     .map_err(|error| wasm_bindgen::JsValue::from_str(&error.to_string()))
-}
-
-#[cfg(test)]
-mod tests {
-    use argui::{
-        core::Point,
-        runtime::{Context, Render},
-        ui::{Element, UiEvent, UiEventKind, UiTree},
-    };
-
-    use super::PerfShowcase;
-
-    fn event(key: &str, kind: UiEventKind) -> UiEvent {
-        UiEvent::new(
-            UiTree::new(Element::container([])).node_id_at(0).unwrap(),
-            Some(key.into()),
-            kind,
-        )
-    }
-
-    #[test]
-    fn labs_render_and_isolate_local_mutations() {
-        let mut app = PerfShowcase::default();
-        let mut cx = Context::default();
-        let first = app.render(&mut cx);
-        assert_eq!(first.children.len(), 5);
-        assert_eq!(app.counter.read(|lab| lab.renders), 1);
-        assert_eq!(app.fixed.read(|lab| lab.renders), 1);
-        assert_eq!(app.variable.read(|lab| lab.renders), 1);
-
-        app.event(&event("perf-counter", UiEventKind::Clicked), &mut cx);
-        let _ = app.render(&mut cx);
-        assert_eq!(app.counter.read(|lab| lab.value), 1);
-        assert_eq!(app.fixed.read(|lab| lab.renders), 1);
-        assert_eq!(app.variable.read(|lab| lab.renders), 1);
-    }
-
-    #[test]
-    fn both_million_row_labs_keep_bounded_visible_windows() {
-        let mut app = PerfShowcase::default();
-        let mut cx = Context::default();
-        let _ = app.render(&mut cx);
-        app.event(
-            &event(
-                "perf-million-fixed",
-                UiEventKind::Scrolled {
-                    delta: Point::new(0.0, 20_000.0),
-                    offset: Point::new(0.0, 20_000.0),
-                },
-            ),
-            &mut cx,
-        );
-        app.event(
-            &event(
-                "perf-million-variable",
-                UiEventKind::Scrolled {
-                    delta: Point::new(0.0, 24_000.0),
-                    offset: Point::new(0.0, 24_000.0),
-                },
-            ),
-            &mut cx,
-        );
-        app.event(
-            &event("perf-measure-variable", UiEventKind::Clicked),
-            &mut cx,
-        );
-        let tree = app.render(&mut cx);
-        assert_eq!(tree.children.len(), 5);
-        assert!(
-            app.fixed
-                .read(|lab| lab.list.window(lab.offset).range.len())
-                < 64
-        );
-        assert!(
-            app.variable
-                .read(|lab| lab.list.window(lab.offset).range.len())
-                < 64
-        );
-    }
 }

@@ -1,5 +1,11 @@
 use argui_core::{Point, Rect, Size};
-use argui_text::{FontFamily, TextBlock, TextColor, TextScene, TextStyle};
+use std::num::NonZeroUsize;
+
+use argui_text::{
+    EllipsisPosition, FontFamily, FontStretch, FontStyle, LetterSpacing, TextAlign, TextBlock,
+    TextColor, TextContent, TextDecoration, TextOverflow, TextScene, TextSpan, TextSpanStyle,
+    TextStyle, TextWrap, UnderlineStyle,
+};
 
 #[test]
 fn text_builders_keep_layout_ready_style() {
@@ -36,4 +42,56 @@ fn scenes_accept_both_builder_and_mutable_insertion() {
     assert_eq!(scene.blocks().len(), 2);
     assert_eq!(TextStyle::default().family, FontFamily::SansSerif);
     assert_eq!(FontFamily::default(), FontFamily::SansSerif);
+}
+
+#[test]
+fn rich_text_and_typography_builders_preserve_web_style_properties() {
+    let accent = TextColor::srgb(0.9, 0.2, 0.1);
+    let decoration = TextDecoration {
+        underline: UnderlineStyle::Double,
+        underline_color: Some(accent),
+        strikethrough: true,
+        strikethrough_color: Some(TextColor::WHITE),
+    };
+    let span_style = TextSpanStyle::default()
+        .font_size(18.0)
+        .line_height(24.0)
+        .color(accent)
+        .family(FontFamily::Serif)
+        .weight(600)
+        .font_style(FontStyle::Italic)
+        .stretch(FontStretch::SemiExpanded)
+        .letter_spacing(LetterSpacing::Em(0.05))
+        .decoration(decoration);
+    let content = TextContent::rich([
+        TextSpan::new("first").style(span_style.clone()),
+        TextSpan::new(" second"),
+    ]);
+
+    assert_eq!(content.as_str(), "first second");
+    assert!(content.is_rich());
+
+    let bounds = Rect::new(Point::new(0.0, 0.0), Size::new(120.0, 40.0));
+    let block = TextBlock::new(content, bounds)
+        .font_style(FontStyle::Oblique)
+        .stretch(FontStretch::Condensed)
+        .letter_spacing(LetterSpacing::Px(1.5))
+        .decoration(decoration)
+        .wrap(TextWrap::Glyph)
+        .overflow(TextOverflow::Ellipsis(EllipsisPosition::Middle))
+        .line_clamp(NonZeroUsize::new(2))
+        .align(TextAlign::Justify);
+
+    assert_eq!(block.style.font_style, FontStyle::Oblique);
+    assert_eq!(block.style.stretch, FontStretch::Condensed);
+    assert_eq!(block.style.letter_spacing, LetterSpacing::Px(1.5));
+    assert_eq!(block.style.decoration, decoration);
+    assert_eq!(block.style.wrap, TextWrap::Glyph);
+    assert_eq!(
+        block.style.overflow,
+        TextOverflow::Ellipsis(EllipsisPosition::Middle)
+    );
+    assert_eq!(block.style.line_clamp, NonZeroUsize::new(2));
+    assert_eq!(block.style.align, TextAlign::Justify);
+    assert_eq!(span_style.font_style, Some(FontStyle::Italic));
 }

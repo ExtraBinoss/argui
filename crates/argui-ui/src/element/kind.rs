@@ -26,7 +26,6 @@ pub struct ElementNode {
     pub(crate) virtual_item: Option<crate::VirtualItem>,
     pub portal: Option<crate::Portal>,
     pub focus_scope: Option<crate::FocusScope>,
-    pub event_owner: Option<crate::EventOwnerId>,
     pub event_listeners: Vec<crate::EventListener>,
     pub user_select: crate::UserSelect,
     pub selection_style: Option<crate::TextSelectionStyle>,

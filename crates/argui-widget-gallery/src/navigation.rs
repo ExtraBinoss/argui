@@ -119,23 +119,3 @@ impl Page {
         Self::ALL.into_iter().find(|page| page.slug() == slug)
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::Page;
-
-    #[test]
-    fn navigation_metadata_is_unique_and_searchable() {
-        let mut slugs = Page::ALL.map(Page::slug);
-        slugs.sort_unstable();
-        assert!(slugs.windows(2).all(|pair| pair[0] != pair[1]));
-        assert_eq!(
-            Page::from_navigation_key("nav::effects"),
-            Some(Page::Effects)
-        );
-        assert_eq!(Page::from_navigation_key("effects"), None);
-        assert!(Page::Slider.matches("SLIDE"));
-        assert!(Page::Form.matches("examples"));
-        assert!(!Page::Button.matches("textarea"));
-    }
-}

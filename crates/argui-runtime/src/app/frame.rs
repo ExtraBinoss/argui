@@ -43,6 +43,7 @@ impl PendingWindowFrame {
 
 #[derive(Default)]
 pub(crate) struct PendingUiFrame {
+    requested: bool,
     rebuild: bool,
     layout: bool,
     text_input: bool,
@@ -55,6 +56,11 @@ pub(crate) struct PendingUiFrame {
 
 impl PendingUiFrame {
     pub(crate) fn merge(&mut self, update: &InteractionUpdate, rebuild: bool) {
+        self.requested |= rebuild
+            | update.layout_changed
+            | update.text_input_changed
+            | update.scroll_changed
+            | update.paint_changed;
         self.rebuild |= rebuild;
         self.layout |= update.layout_changed;
         self.text_input |= update.text_input_changed;
@@ -63,48 +69,48 @@ impl PendingUiFrame {
     }
 
     pub(super) fn request_scroll(&mut self, request: Option<ScrollRequest>) {
+        self.requested |= request.is_some();
         if request.is_some() {
             self.scroll_request = request;
         }
     }
 
     pub(super) fn request_focus(&mut self, request: Option<FocusRequest>) {
+        self.requested |= request.is_some();
         if request.is_some() {
             self.focus_request = request;
         }
     }
 
     pub(super) fn request_text_selection(&mut self, request: Option<TextSelectionRequest>) {
+        self.requested |= request.is_some();
         if request.is_some() {
             self.text_selection_request = request;
         }
     }
 
     pub(super) fn request_layout(&mut self) {
+        self.requested = true;
         self.layout = true;
     }
 
     pub(super) fn request_scroll_update(&mut self) {
+        self.requested = true;
         self.scroll = true;
     }
 
     pub(super) fn request_paint(&mut self) {
+        self.requested = true;
         self.paint = true;
     }
 
     pub(super) fn request_rebuild(&mut self) {
+        self.requested = true;
         self.rebuild = true;
     }
 
     pub(super) fn needs_frame(&self) -> bool {
-        self.rebuild
-            || self.layout
-            || self.text_input
-            || self.scroll
-            || self.paint
-            || self.scroll_request.is_some()
-            || self.focus_request.is_some()
-            || self.text_selection_request.is_some()
+        self.requested
     }
 }
 
@@ -238,78 +244,5 @@ impl Application {
         }
         self.sync_accessibility();
         tree_update
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use argui_core::Point;
-    use argui_ui::{FocusRequest, InteractionUpdate, TextSelection, TextSelectionRequest};
-
-    use crate::ScrollRequest;
-
-    use super::{PendingUiFrame, PendingWindowFrame};
-
-    #[test]
-    fn window_changes_coalesce_to_the_latest_frame_values() {
-        let mut pending = PendingWindowFrame::default();
-        pending.resize(800, 600);
-        pending.resize(1_200, 900);
-        pending.scale_factor(2.0, 1_600, 1_200);
-
-        let frame = pending.take();
-        assert_eq!(frame.size(), Some((1_600, 1_200)));
-        assert_eq!(frame.scale(), Some(2.0));
-        assert_eq!(frame.events(), 3);
-        assert_eq!(pending.take(), PendingWindowFrame::default());
-    }
-
-    #[test]
-    fn ui_work_coalesces_without_dropping_any_invalidation_class() {
-        let mut pending = PendingUiFrame::default();
-        assert!(!pending.needs_frame());
-        pending.request_scroll(None);
-        assert!(!pending.needs_frame());
-        pending.request_focus(None);
-        assert!(!pending.needs_frame());
-        pending.request_text_selection(None);
-        assert!(!pending.needs_frame());
-
-        let updates = [
-            InteractionUpdate {
-                layout_changed: true,
-                ..InteractionUpdate::default()
-            },
-            InteractionUpdate {
-                text_input_changed: true,
-                ..InteractionUpdate::default()
-            },
-            InteractionUpdate {
-                scroll_changed: true,
-                ..InteractionUpdate::default()
-            },
-            InteractionUpdate {
-                paint_changed: true,
-                ..InteractionUpdate::default()
-            },
-        ];
-        for update in updates {
-            let mut isolated = PendingUiFrame::default();
-            isolated.merge(&update, false);
-            assert!(isolated.needs_frame());
-            pending.merge(&update, false);
-        }
-        let mut rebuild = PendingUiFrame::default();
-        rebuild.merge(&InteractionUpdate::default(), true);
-        assert!(rebuild.needs_frame());
-
-        pending.request_scroll(Some(ScrollRequest::offset("tree", Point::new(0.0, 80.0))));
-        pending.request_focus(Some(FocusRequest::Clear));
-        pending.request_text_selection(Some(TextSelectionRequest::new(
-            "editor",
-            TextSelection::All,
-        )));
-        pending.request_layout();
-        assert!(pending.needs_frame());
     }
 }

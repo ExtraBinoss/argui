@@ -81,6 +81,7 @@ pub struct Button {
     trailing: Option<Element>,
     enabled: bool,
     loading: Option<Element>,
+    content: Option<Element>,
 }
 
 impl Button {
@@ -94,6 +95,7 @@ impl Button {
             trailing: None,
             enabled: true,
             loading: None,
+            content: None,
         }
     }
 
@@ -101,6 +103,18 @@ impl Button {
     pub fn leading(mut self, icon: Element) -> Self {
         self.leading = Some(icon);
         self
+    }
+
+    /// Replaces the visible label while retaining its accessible name.
+    #[must_use]
+    pub fn content(mut self, content: Element) -> Self {
+        self.content = Some(content);
+        self
+    }
+
+    #[must_use]
+    pub fn icon(key: impl Into<String>, label: impl Into<String>, icon: Element, style: ButtonStyle) -> Self {
+        Self::new(key, label, style).content(icon)
     }
 
     #[must_use]
@@ -131,7 +145,7 @@ impl Button {
         children.extend(self.loading.or(self.leading));
         children.push(behavior.decorate(
             ButtonPart::Content,
-            Element::text(self.label).text_style(self.style.label),
+            self.content.unwrap_or_else(|| Element::text(self.label).text_style(self.style.label)),
         ));
         children.extend(self.trailing);
         let mut element = behavior.decorate(

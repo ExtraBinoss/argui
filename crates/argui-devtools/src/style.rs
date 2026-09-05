@@ -3,10 +3,10 @@ use argui_inspect::{InspectNodeId, NodeSnapshot, PropertySnapshot, StyleProperty
 use argui_paint::{CornerRadii, PaintStyle, QuadStyle, VectorId};
 use argui_text::{TextColor, TextStyle, TextWrap};
 use argui_ui::{
-    AlignItems, Axes, Element, Interaction, LayoutStyle, Overflow, ScrollConfig,
-    ScrollbarPartStyle, ScrollbarStyle, Sides, StylePatch, VisualState, length, property, sides,
+    AlignItems, Axes, Element, LayoutStyle, Overflow, ScrollConfig,
+    ScrollbarPartStyle, ScrollbarStyle, Sides, StylePatch, length, property, sides,
 };
-use argui_widgets::{Button, ButtonStyle, Input, InputStyle, WidgetTheme};
+use argui_widgets::{Button, ButtonStyle, Checkbox, Input, InputStyle, WidgetTheme};
 
 use crate::host::DevtoolsHost;
 
@@ -18,7 +18,7 @@ pub(crate) fn sidebar<A>(
 ) -> Element {
     let Some(node) = selected.and_then(|id| nodes.iter().find(|node| node.id == id)) else {
         return Element::text("Select an element to inspect its styles")
-            .width(length(340.0))
+            .width(if tools.panel_width() < 640.0 { argui_ui::percent(1.0) } else { length(340.0) })
             .padding(Sides::length(16.0))
             .background(theme.card)
             .text_style(text(13.0, theme.muted_foreground));
@@ -114,12 +114,7 @@ fn property_editor<A>(
         .inspector
         .property_value(node, property)
         .unwrap_or_else(|| snapshot.value.clone());
-    let mut rows = vec![button(
-        &format!("__devtools-style-{}", property.label()),
-        &format!("{} {}", if enabled { "☑" } else { "☐" }, property.label()),
-        snapshot.authored,
-        theme,
-    )];
+    let mut rows = vec![Checkbox::new(format!("__devtools-style-{}", property.label()), property.label(), enabled).build(theme)];
     let fields = value.fields();
     if fields.is_empty() {
         rows.push(
@@ -179,25 +174,23 @@ fn section_header(
     icon: VectorId,
     theme: &WidgetTheme,
 ) -> Element {
-    Element::row([
+    Button::new(format!("__devtools-section-{index}"), label, theme.ghost_button()).content(Element::row([
         Element::vector(icon)
             .width(length(18.0))
             .height(length(18.0))
             .shrink(0.0)
             .transform(Transform2D::IDENTITY.rotate(progress * std::f32::consts::FRAC_PI_2)),
         Element::text(label).text_style(text(12.0, theme.foreground)),
-    ])
-    .keyed(format!("__devtools-section-{index}"))
+    ]).gap(6.0)).build()
+    .semantics(argui_ui::Semantics::new(argui_ui::Role::Button).label(label)
+        .state(argui_ui::SemanticState { expanded: Some(open), ..Default::default() })
+        .action(argui_ui::SemanticAction::Click).action(argui_ui::SemanticAction::Focus))
     .height(length(29.0))
     .align_items(AlignItems::CENTER)
     .gap(6.0)
     .padding(sides(5.0, 4.0))
     .background(if open { theme.muted } else { theme.background })
-    .interaction(Interaction::default())
-    .when(
-        VisualState::Hovered,
-        StylePatch::from_quad(QuadStyle::solid(theme.muted)),
-    )
+
 }
 
 fn button(key: &str, label: &str, active: bool, theme: &WidgetTheme) -> Element {
@@ -231,7 +224,7 @@ fn text(size: f32, color: TextColor) -> TextStyle {
     TextStyle {
         font_size: size,
         color,
-        wrap: TextWrap::None,
+        wrap: TextWrap::Word,
         ..TextStyle::default()
     }
 }

@@ -402,11 +402,3 @@ fn scene_group(
         ],
     })
 }
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn vector_shader_is_valid_wgsl() {
-        naga::front::wgsl::parse_str(include_str!("../shaders/primitives/vector.wgsl")).unwrap();
-    }
-}

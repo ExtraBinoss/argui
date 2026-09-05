@@ -26,6 +26,11 @@ headless adapter is available.
 `#[coverage(off)]` is reserved for the smallest OS/GPU callback or launch
 boundary that requires a real display or graphics driver. Deterministic policy
 extracted from that boundary must remain covered; broad exclusions fail review.
+The coverage script keeps the same boundary as an explicit filename allowlist
+for winit orchestration and WGPU resource code. This makes exclusions auditable
+even when nightly branch export still reports regions annotated `coverage(off)`.
+Renderer-neutral planning, layout, event, widget, and inspection code is never
+part of that allowlist.
 
 ## Source and test structure
 
@@ -41,8 +46,10 @@ tests/
 ```
 
 The directory is named `tests/` rather than `test/` because Cargo discovers
-integration tests there automatically. Every integration-test path must mirror
-an existing source path. Unit tests may stay beside small private algorithms.
+integration tests there automatically. Every test path must mirror an existing
+source path. Test functions, test-only modules, and test-only source files are
+forbidden under `src/`; exercise private implementation through observable crate
+behavior instead of exposing internals for tests.
 
 Each crate owns one coherent responsibility and lists only the dependencies it
 directly uses. Avoid generic `utils`, duplicate geometry types, hidden globals,
@@ -74,3 +81,7 @@ cargo check --workspace --all-targets --target wasm32-unknown-unknown
 
 Branch instrumentation currently requires Rust nightly. The application and all
 normal checks stay on stable; only this measurement uses `cargo +nightly`.
+Coverage uses Nextest, disables incremental artifacts, and overrides the test
+profile with `opt-level=0` and no debug symbols so LLVM measures Argui's source
+branches without invalidating the stable interactive build cache. Instrumented
+artifacts live in `target/coverage/`; the coverage lock rejects concurrent runs.

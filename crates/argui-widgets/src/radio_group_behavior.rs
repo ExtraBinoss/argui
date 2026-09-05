@@ -83,12 +83,11 @@ impl RadioGroupBehavior {
 
     #[must_use]
     pub fn action(&self, event: &UiEvent) -> Option<RadioGroupAction> {
-        if !matches!(event.kind, UiEventKind::Clicked) {
+        if !matches!(event.kind, UiEventKind::Click(_)) {
             return None;
         }
         let index = event
-            .key
-            .as_deref()?
+            .target_key()?
             .strip_prefix(&format!("{}::option::", self.key))?
             .parse::<usize>()
             .ok()?;

@@ -70,7 +70,7 @@ fn focus_falls_back_to_the_root_when_a_focused_node_is_semantically_hidden() {
         enabled: true,
         focusable: true,
         cursor: CursorIcon::Auto,
-        gestures: GestureSet::NONE,
+        gestures: GestureSet::EMPTY,
         window_drag: None,
     };
     tree.sync_focus(&[region], Some(FocusRequest::Focus(child_id.into())));

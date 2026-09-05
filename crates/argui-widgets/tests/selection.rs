@@ -7,7 +7,11 @@ use argui_widgets::{
 
 fn click(key: &str) -> UiEvent {
     let tree = UiTree::new(argui_ui::Element::container([]));
-    UiEvent::new(tree.node_ids()[0], Some(key.into()), UiEventKind::Clicked)
+    UiEvent::new(
+        tree.node_ids()[0],
+        Some(key.into()),
+        UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
+    )
 }
 
 #[test]

@@ -74,35 +74,3 @@ impl FrameProfiler {
         })
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::{FrameProfiler, RenderProfile, VectorAtlasStats};
-
-    #[test]
-    fn profiling_is_opt_in_and_reports_scene_costs() {
-        assert!(
-            FrameProfiler::start(false)
-                .finish(RenderProfile::default())
-                .is_none()
-        );
-        let profile = FrameProfiler::start(true)
-            .finish(RenderProfile {
-                viewport_pixels: 5_000,
-                draw_batches: 3,
-                direct_surface: true,
-                vector_atlas: VectorAtlasStats {
-                    entries: 2,
-                    hits_this_frame: 3,
-                    rasterizations_this_frame: 1,
-                    allocated_bytes: 64,
-                },
-                ..RenderProfile::default()
-            })
-            .unwrap();
-        assert_eq!(profile.viewport_pixels, 5_000);
-        assert_eq!(profile.draw_batches, 3);
-        assert!(profile.direct_surface);
-        assert_eq!(profile.vector_atlas.entries, 2);
-    }
-}

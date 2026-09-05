@@ -18,6 +18,7 @@ pub(crate) struct ContextEffects {
     pub(crate) pointer_capture: Vec<PointerCaptureRequest>,
     pub(crate) selection_command: Option<SelectionCommandRequest>,
     pub(super) children: Vec<AnyEntity>,
+    pub(super) event_routes: Vec<AnyEntity>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -71,4 +72,6 @@ pub(super) fn merge_effects(target: &mut ContextEffects, mut source: ContextEffe
     }
     target.commands.append(&mut source.commands);
     target.pointer_capture.append(&mut source.pointer_capture);
+    target.children.append(&mut source.children);
+    target.event_routes.append(&mut source.event_routes);
 }

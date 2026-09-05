@@ -98,7 +98,7 @@ impl SelectBehavior {
                     Interaction::default()
                         .focusable(true)
                         .cursor(CursorIcon::Pointer)
-                        .gestures(GestureSet::NONE.tap())
+                        .gestures(GestureSet::default().tap(argui_ui::TapGesture::default()))
                         .keyboard_activation(KeyboardActivation::EnterOrSpace),
                 )
                 .semantics(
@@ -132,7 +132,7 @@ impl SelectBehavior {
                             } else {
                                 CursorIcon::NotAllowed
                             })
-                            .gestures(GestureSet::NONE.tap())
+                            .gestures(GestureSet::default().tap(argui_ui::TapGesture::default()))
                             .keyboard_activation(KeyboardActivation::EnterOrSpace),
                     )
                     .semantics(
@@ -153,11 +153,11 @@ impl SelectBehavior {
 
     #[must_use]
     pub fn action(&self, event: &UiEvent) -> Option<SelectAction> {
-        if self.open && matches!(event.kind, UiEventKind::PointerOutside) {
+        if self.open && matches!(event.kind, UiEventKind::PointerOutside(_)) {
             return Some(SelectAction::Close);
         }
-        let event_key = event.key.as_deref()?;
-        if matches!(event.kind, UiEventKind::Clicked) {
+        let event_key = event.target_key()?;
+        if matches!(event.kind, UiEventKind::Click(_)) {
             if event_key == self.key {
                 return Some(SelectAction::Toggle);
             }

@@ -66,9 +66,10 @@ impl DialogBehavior {
                 .state_scope(DIALOG_SCOPE)
                 .active_state(DIALOG_OPEN, self.open),
             DialogPart::Trigger => element.keyed(self.trigger_key()),
-            DialogPart::Backdrop => element
-                .keyed(self.backdrop_key())
-                .interaction(Interaction::blocker().gestures(GestureSet::NONE.tap())),
+            DialogPart::Backdrop => element.keyed(self.backdrop_key()).interaction(
+                Interaction::blocker()
+                    .gestures(GestureSet::default().tap(argui_ui::TapGesture::default())),
+            ),
             DialogPart::Panel => element
                 .keyed(self.panel_key())
                 .interaction(Interaction::blocker().focusable(true))
@@ -85,8 +86,8 @@ impl DialogBehavior {
 
     #[must_use]
     pub fn action(&self, event: &UiEvent) -> Option<DialogAction> {
-        let event_key = event.key.as_deref();
-        if matches!(event.kind, UiEventKind::Clicked) {
+        let event_key = event.target_key();
+        if matches!(event.kind, UiEventKind::Click(_)) {
             if event_key == Some(self.trigger_key().as_str()) {
                 return Some(DialogAction::Open);
             }

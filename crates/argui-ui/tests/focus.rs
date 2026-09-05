@@ -1,16 +1,31 @@
 use argui_core::{Affine2D, Key, KeyInput, KeyState, Modifiers, Point, Rect, Size};
 use argui_paint::ClipChain;
 use argui_ui::{
-    CursorIcon, Element, FocusRequest, FocusScope, GestureSet, HitRegion, InitialFocus,
-    Interaction, KeyboardActivation, Role, Semantics, UiEventKind, UiTree, VisualState,
+    ActivationSource, CursorIcon, Element, EventHandlerId, EventListener, EventOwnerId, EventType,
+    FocusRequest, FocusScope, GestureSet, HitRegion, InitialFocus, Interaction, KeyboardActivation,
+    Role, Semantics, UiEventKind, UiTree, VisualState,
 };
 
 fn control(key: &str) -> Element {
-    Element::container([]).keyed(key).interaction(
-        Interaction::default()
-            .focusable(true)
-            .keyboard_activation(KeyboardActivation::EnterOrSpace),
+    listeners(
+        Element::container([]).keyed(key).interaction(
+            Interaction::default()
+                .focusable(true)
+                .keyboard_activation(KeyboardActivation::EnterOrSpace),
+        ),
     )
+}
+
+fn listeners(element: Element) -> Element {
+    EventType::ALL
+        .into_iter()
+        .enumerate()
+        .fold(element, |element, (slot, event)| {
+            element.on(EventListener::new(
+                event,
+                EventHandlerId::new(EventOwnerId(1), slot as u32),
+            ))
+        })
 }
 
 fn region(node: argui_ui::NodeId, x: f32) -> HitRegion {
@@ -24,7 +39,7 @@ fn region(node: argui_ui::NodeId, x: f32) -> HitRegion {
         enabled: true,
         focusable: true,
         cursor: CursorIcon::Auto,
-        gestures: GestureSet::NONE,
+        gestures: GestureSet::EMPTY,
         window_drag: None,
     }
 }
@@ -55,10 +70,8 @@ fn focused_controls_receive_raw_keys_and_synthesized_activation() {
             .map(|event| &event.kind)
             .collect::<Vec<_>>(),
         vec![
-            &UiEventKind::KeyInput(enter),
-            &UiEventKind::Pressed,
-            &UiEventKind::Clicked,
-            &UiEventKind::Released,
+            &UiEventKind::KeyInput(enter.clone()),
+            &UiEventKind::Click(argui_ui::ClickEvent::keyboard(enter)),
         ]
     );
 
@@ -80,12 +93,7 @@ fn space_holds_pressed_state_and_focus_change_cancels_the_click() {
         &key(Key::Character(" ".into()), KeyState::Pressed, false),
         &regions,
     );
-    assert!(
-        pressed
-            .events
-            .iter()
-            .any(|event| event.kind == UiEventKind::Pressed)
-    );
+    assert_eq!(pressed.events.len(), 1);
     assert!(tree.visual_states(first).contains(VisualState::Pressed));
 
     let changed = tree.sync_focus(&regions, Some(FocusRequest::Focus(second.into())));
@@ -93,18 +101,19 @@ fn space_holds_pressed_state_and_focus_change_cancels_the_click() {
         changed
             .events
             .iter()
-            .any(|event| { event.target == first && event.kind == UiEventKind::Released })
+            .any(|event| event.target == first && event.kind == UiEventKind::Blurred)
     );
     let released = tree.key_input(
         &key(Key::Character(" ".into()), KeyState::Released, false),
         &regions,
     );
-    assert!(
-        !released
-            .events
-            .iter()
-            .any(|event| event.kind == UiEventKind::Clicked)
-    );
+    assert!(!released.events.iter().any(|event| matches!(
+        event.kind,
+        UiEventKind::Click(argui_ui::ClickEvent {
+            source: ActivationSource::Keyboard(_),
+            ..
+        })
+    )));
 }
 
 #[test]
@@ -270,12 +279,6 @@ fn window_focus_restores_the_exact_node_and_releases_space() {
         blurred
             .events
             .iter()
-            .any(|event| event.kind == UiEventKind::Released)
-    );
-    assert!(
-        blurred
-            .events
-            .iter()
             .any(|event| event.kind == UiEventKind::Blurred)
     );
     let focused = tree.window_focused(&regions);
@@ -361,10 +364,12 @@ fn trap_recovers_when_its_focused_child_is_removed_and_rejects_clear() {
 
 #[test]
 fn initial_key_target_and_enter_only_activation_are_exact() {
-    let enter_only = Element::container([]).keyed("inside").interaction(
-        Interaction::default()
-            .focusable(true)
-            .keyboard_activation(KeyboardActivation::Enter),
+    let enter_only = listeners(
+        Element::container([]).keyed("inside").interaction(
+            Interaction::default()
+                .focusable(true)
+                .keyboard_activation(KeyboardActivation::Enter),
+        ),
     );
     let mut tree = UiTree::new(
         Element::column([enter_only])
@@ -381,12 +386,13 @@ fn initial_key_target_and_enter_only_activation_are_exact() {
     );
     assert_eq!(space.events.len(), 1);
     let enter = tree.key_input(&key(Key::Enter, KeyState::Pressed, false), &regions);
-    assert!(
-        enter
-            .events
-            .iter()
-            .any(|event| event.kind == UiEventKind::Clicked)
-    );
+    assert!(enter.events.iter().any(|event| matches!(
+        event.kind,
+        UiEventKind::Click(argui_ui::ClickEvent {
+            source: ActivationSource::Keyboard(_),
+            ..
+        })
+    )));
 }
 
 #[test]

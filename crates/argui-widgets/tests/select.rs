@@ -53,7 +53,10 @@ fn select_navigation_skips_disabled_options_and_wraps() {
         Some(SelectAction::Highlight(2))
     );
     assert_eq!(
-        behavior(0).action(&event("backend::option::1", UiEventKind::Clicked)),
+        behavior(0).action(&event(
+            "backend::option::1",
+            UiEventKind::Click(argui_ui::ClickEvent::accessibility())
+        )),
         None
     );
     assert_eq!(

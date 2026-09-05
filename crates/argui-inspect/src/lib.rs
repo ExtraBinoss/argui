@@ -3,6 +3,8 @@ use std::{cell::RefCell, collections::VecDeque, rc::Rc, time::Duration};
 use argui_core::{Point, Rect};
 
 mod trace;
+mod frames;
+pub use frames::FrameCursor;
 
 use trace::TraceDocument;
 pub use trace::{TRACE_VERSION, TraceError};
@@ -287,6 +289,9 @@ struct InspectorState {
     overrides: Vec<StyleOverride>,
     paused: bool,
     recording: bool,
+    gpu_profiling: bool,
+    frame_sequence: u64,
+    frame_epoch: u64,
 }
 
 #[derive(Clone, Debug)]
@@ -312,6 +317,9 @@ impl InspectorHandle {
             overrides: Vec::new(),
             paused: false,
             recording: true,
+            gpu_profiling: true,
+            frame_sequence: 0,
+            frame_epoch: 0,
         })))
     }
 
@@ -342,6 +350,7 @@ impl InspectorHandle {
             state.frames.pop_front();
         }
         state.frames.push_back(record);
+        state.frame_sequence = state.frame_sequence.wrapping_add(1);
     }
 
     pub fn record_render(&self, record: FrameRecord) {
@@ -366,6 +375,7 @@ impl InspectorHandle {
             frame.gpu = record.gpu;
         } else {
             state.frames.push_back(record);
+            state.frame_sequence = state.frame_sequence.wrapping_add(1);
         }
     }
 
@@ -375,7 +385,9 @@ impl InspectorHandle {
     }
 
     pub fn clear_frames(&self) {
-        self.0.borrow_mut().frames.clear();
+        let mut state = self.0.borrow_mut();
+        state.frames.clear();
+        state.frame_epoch = state.frame_epoch.wrapping_add(1);
     }
 
     pub fn set_paused(&self, paused: bool) {
@@ -542,6 +554,7 @@ impl InspectorHandle {
         let mut state = self.0.borrow_mut();
         let (revision, selected, frames) = document.into_records();
         state.frames = frames.into();
+        state.frame_epoch = state.frame_epoch.wrapping_add(1);
         state.tree.revision = revision;
         state.selected = selected;
         Ok(())

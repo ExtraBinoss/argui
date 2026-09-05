@@ -1,7 +1,11 @@
 use std::time::Duration;
 
 use argui_core::{Point, PointerButton, PointerEvent, PointerId, PointerKind, PointerPhase};
-use argui_ui::{Element, GestureArena, GestureKind, GesturePhase, GestureSet, UiTree};
+use argui_ui::{
+    Element, EventHandlerId, EventListener, EventOwnerId, EventType, GestureArena, GestureCapture,
+    GestureDelivery, GestureKind, GesturePhase, GestureSet, HitRegion, HitShape, Interaction,
+    PanAxis, PanGesture, PinchGesture, RotationGesture, TapGesture, UiEventKind, UiTree,
+};
 
 fn target() -> argui_ui::NodeId {
     UiTree::new(Element::container([])).node_id_at(0).unwrap()
@@ -20,7 +24,65 @@ fn touch(id: u64, phase: PointerPhase, x: f32, y: f32, millis: u64) -> PointerEv
         )),
         pressure: Some(0.5),
         primary: id == 1,
+        modifiers: argui_core::Modifiers::default(),
         timestamp: Duration::from_millis(millis),
+    }
+}
+
+#[test]
+fn gesture_configuration_composes_without_hidden_defaults() {
+    let pan = PanGesture::default()
+        .axis(PanAxis::Horizontal)
+        .threshold(3.0)
+        .capture(GestureCapture::OnPress)
+        .delivery(GestureDelivery::FrameCoalesced);
+    let pinch = PinchGesture::default().delivery(GestureDelivery::FrameCoalesced);
+    let rotation = RotationGesture::default().delivery(GestureDelivery::FrameCoalesced);
+    let gestures = GestureSet::default()
+        .tap(TapGesture::default())
+        .pan(pan)
+        .pinch(pinch)
+        .rotation(rotation);
+
+    assert_eq!(gestures.pan, Some(pan));
+    assert_eq!(gestures.pinch, Some(pinch));
+    assert_eq!(gestures.rotation, Some(rotation));
+    assert!(gestures.captures_on_press());
+    assert!(!gestures.is_empty());
+    assert!(GestureSet::EMPTY.is_empty());
+    assert!(!GestureSet::EMPTY.captures_on_press());
+}
+
+#[test]
+fn pan_axes_filter_delta_total_and_velocity() {
+    let node = target();
+    for (axis, expected) in [
+        (PanAxis::Horizontal, Point::new(12.0, 0.0)),
+        (PanAxis::Vertical, Point::new(0.0, 9.0)),
+        (PanAxis::Both, Point::new(12.0, 9.0)),
+    ] {
+        let mut arena = GestureArena::default();
+        arena.update(
+            touch(1, PointerPhase::Pressed, 0.0, 0.0, 0),
+            Some((
+                node,
+                GestureSet::EMPTY.pan(PanGesture::default().axis(axis).immediate()),
+            )),
+        );
+        let events = arena.update(touch(1, PointerPhase::Moved, 12.0, 9.0, 10), None);
+        let GestureKind::Pan {
+            delta,
+            total,
+            velocity,
+            ..
+        } = events[0].kind
+        else {
+            panic!("expected pan");
+        };
+        assert_eq!(delta, expected);
+        assert_eq!(total, expected);
+        assert_eq!(velocity.x == 0.0, expected.x == 0.0);
+        assert_eq!(velocity.y == 0.0, expected.y == 0.0);
     }
 }
 
@@ -30,7 +92,7 @@ fn short_stationary_contacts_resolve_as_taps() {
     let mut arena = GestureArena::default();
     arena.update(
         touch(1, PointerPhase::Pressed, 10.0, 20.0, 0),
-        Some((node, GestureSet::NONE.tap())),
+        Some((node, GestureSet::EMPTY.tap(TapGesture::default()))),
     );
     let events = arena.update(touch(1, PointerPhase::Released, 12.0, 21.0, 120), None);
 
@@ -45,12 +107,15 @@ fn pan_only_gestures_start_immediately_and_report_velocity() {
     let mut arena = GestureArena::default();
     arena.update(
         touch(1, PointerPhase::Pressed, 0.0, 0.0, 0),
-        Some((node, GestureSet::NONE.pan())),
+        Some((
+            node,
+            GestureSet::EMPTY.pan(PanGesture::default().immediate()),
+        )),
     );
     let started = arena.update(touch(1, PointerPhase::Moved, 4.0, 0.0, 10), None);
     let ended = arena.update(touch(1, PointerPhase::Released, 20.0, 0.0, 30), None);
 
-    assert_eq!(started[0].phase, GesturePhase::Started);
+    assert_eq!(started[0].phase, GesturePhase::Changed);
     let GestureKind::Pan {
         total, velocity, ..
     } = started[0].kind
@@ -68,7 +133,10 @@ fn immediate_pan_begins_at_the_press_position() {
     let mut arena = GestureArena::default();
     let started = arena.update(
         touch(1, PointerPhase::Pressed, 42.0, 18.0, 0),
-        Some((node, GestureSet::NONE.pan_immediate())),
+        Some((
+            node,
+            GestureSet::EMPTY.pan(PanGesture::default().immediate()),
+        )),
     );
 
     assert_eq!(started.len(), 1);
@@ -95,7 +163,12 @@ fn tap_and_pan_gestures_keep_a_drag_threshold() {
     let mut arena = GestureArena::default();
     arena.update(
         touch(1, PointerPhase::Pressed, 0.0, 0.0, 0),
-        Some((node, GestureSet::NONE.tap().pan())),
+        Some((
+            node,
+            GestureSet::EMPTY
+                .tap(TapGesture::default())
+                .pan(PanGesture::default()),
+        )),
     );
     assert!(
         arena
@@ -110,7 +183,9 @@ fn tap_and_pan_gestures_keep_a_drag_threshold() {
 #[test]
 fn two_contacts_can_recognize_pinch_and_rotation_together() {
     let node = target();
-    let gestures = GestureSet::NONE.pinch().rotation();
+    let gestures = GestureSet::EMPTY
+        .pinch(PinchGesture::default())
+        .rotation(RotationGesture::default());
     let mut arena = GestureArena::default();
     arena.update(
         touch(1, PointerPhase::Pressed, 0.0, 0.0, 0),
@@ -161,7 +236,7 @@ fn unrelated_and_cancelled_contacts_produce_no_tap() {
     );
     arena.update(
         touch(1, PointerPhase::Pressed, 0.0, 0.0, 0),
-        Some((node, GestureSet::NONE.tap())),
+        Some((node, GestureSet::EMPTY.tap(TapGesture::default()))),
     );
     assert!(
         arena
@@ -170,7 +245,7 @@ fn unrelated_and_cancelled_contacts_produce_no_tap() {
     );
     arena.update(
         touch(1, PointerPhase::Pressed, 0.0, 0.0, 0),
-        Some((node, GestureSet::NONE.tap())),
+        Some((node, GestureSet::EMPTY.tap(TapGesture::default()))),
     );
     assert!(
         arena
@@ -190,7 +265,7 @@ fn active_pans_survive_pointer_leave_and_cancel_only_explicitly() {
     let mut arena = GestureArena::default();
     arena.update(
         touch(1, PointerPhase::Pressed, 0.0, 0.0, 0),
-        Some((node, GestureSet::NONE.pan())),
+        Some((node, GestureSet::EMPTY.pan(PanGesture::default()))),
     );
     let started = arena.update(touch(1, PointerPhase::Moved, 9.0, 0.0, 0), None);
     let GestureKind::Pan { velocity, .. } = started[0].kind else {
@@ -216,7 +291,7 @@ fn active_pans_survive_pointer_leave_and_cancel_only_explicitly() {
 
     arena.update(
         touch(1, PointerPhase::Pressed, 0.0, 0.0, 400),
-        Some((node, GestureSet::NONE.pan())),
+        Some((node, GestureSet::EMPTY.pan(PanGesture::default()))),
     );
     arena.update(touch(1, PointerPhase::Moved, 9.0, 0.0, 410), None);
     let cancelled = arena.update(touch(1, PointerPhase::Cancelled, 9.0, 0.0, 420), None);
@@ -226,7 +301,11 @@ fn active_pans_survive_pointer_leave_and_cancel_only_explicitly() {
 #[test]
 fn paired_gestures_emit_changed_and_ended_phases() {
     let node = target();
-    let gestures = GestureSet::ALL;
+    let gestures = GestureSet::EMPTY
+        .tap(TapGesture::default())
+        .pan(PanGesture::default())
+        .pinch(PinchGesture::default())
+        .rotation(RotationGesture::default());
     let mut arena = GestureArena::default();
     arena.update(
         touch(1, PointerPhase::Pressed, 0.0, 0.0, 0),
@@ -256,7 +335,7 @@ fn paired_gestures_emit_changed_and_ended_phases() {
 #[test]
 fn rotation_wraps_across_the_pi_boundary() {
     let node = target();
-    let gestures = GestureSet::NONE.rotation();
+    let gestures = GestureSet::EMPTY.rotation(RotationGesture::default());
     let mut arena = GestureArena::default();
     arena.update(
         touch(1, PointerPhase::Pressed, 0.0, 0.0, 0),
@@ -302,7 +381,7 @@ fn arena_edge_paths_keep_contacts_and_thresholds_independent() {
     let mut cancelled_pan = GestureArena::default();
     cancelled_pan.update(
         touch(1, PointerPhase::Pressed, 0.0, 0.0, 0),
-        Some((node, GestureSet::NONE.pan())),
+        Some((node, GestureSet::EMPTY.pan(PanGesture::default()))),
     );
     cancelled_pan.update(touch(1, PointerPhase::Moved, 9.0, 0.0, 1), None);
     assert_eq!(cancelled_pan.cancel_all()[0].phase, GesturePhase::Cancelled);
@@ -310,7 +389,7 @@ fn arena_edge_paths_keep_contacts_and_thresholds_independent() {
     let mut no_pan = GestureArena::default();
     no_pan.update(
         touch(1, PointerPhase::Pressed, 0.0, 0.0, 0),
-        Some((node, GestureSet::NONE.tap())),
+        Some((node, GestureSet::EMPTY.tap(TapGesture::default()))),
     );
     assert!(
         no_pan
@@ -324,7 +403,7 @@ fn arena_edge_paths_keep_contacts_and_thresholds_independent() {
     );
     no_pan.update(
         touch(2, PointerPhase::Pressed, 0.0, 0.0, 0),
-        Some((node, GestureSet::NONE.pan())),
+        Some((node, GestureSet::EMPTY.pan(PanGesture::default()))),
     );
     assert!(
         no_pan
@@ -333,7 +412,7 @@ fn arena_edge_paths_keep_contacts_and_thresholds_independent() {
     );
 
     let mut pair = GestureArena::default();
-    let pair_gestures = GestureSet::NONE.pinch();
+    let pair_gestures = GestureSet::EMPTY.pinch(PinchGesture::default());
     pair.update(
         touch(1, PointerPhase::Pressed, 0.0, 0.0, 0),
         Some((node, pair_gestures)),
@@ -344,7 +423,7 @@ fn arena_edge_paths_keep_contacts_and_thresholds_independent() {
     );
     pair.update(
         touch(3, PointerPhase::Pressed, 0.0, 0.0, 0),
-        Some((other, GestureSet::NONE.pan())),
+        Some((other, GestureSet::EMPTY.pan(PanGesture::default()))),
     );
     assert_eq!(
         pair.update(touch(3, PointerPhase::Moved, 10.0, 0.0, 8), None)[0].phase,
@@ -360,7 +439,7 @@ fn arena_edge_paths_keep_contacts_and_thresholds_independent() {
     let mut dense_history = GestureArena::default();
     dense_history.update(
         touch(1, PointerPhase::Pressed, 0.0, 0.0, 0),
-        Some((node, GestureSet::NONE.pan())),
+        Some((node, GestureSet::EMPTY.pan(PanGesture::default()))),
     );
     for step in 1..=8 {
         dense_history.update(
@@ -368,4 +447,68 @@ fn arena_edge_paths_keep_contacts_and_thresholds_independent() {
             None,
         );
     }
+}
+
+#[test]
+fn frame_coalesced_pan_keeps_only_the_latest_changed_sample() {
+    let gestures = GestureSet::EMPTY.pan(
+        PanGesture::default()
+            .immediate()
+            .delivery(GestureDelivery::FrameCoalesced),
+    );
+    let root = Element::container([])
+        .interaction(Interaction::default().gestures(gestures))
+        .on(EventListener::new(
+            EventType::Gesture,
+            EventHandlerId::new(EventOwnerId(1), 0),
+        ));
+    let mut tree = UiTree::new(root);
+    let node = tree.node_id_at(0).unwrap();
+    let region = HitRegion {
+        node,
+        bounds: argui_core::Rect::new(Point::default(), argui_core::Size::new(100.0, 100.0)),
+        transform: argui_core::Affine2D::IDENTITY,
+        clips: argui_paint::ClipChain::default(),
+        shape: HitShape::Bounds,
+        slop: argui_ui::Sides::default(),
+        enabled: true,
+        focusable: false,
+        cursor: argui_ui::CursorIcon::Auto,
+        gestures,
+        window_drag: None,
+    };
+
+    let started = tree.pointer_event(
+        touch(1, PointerPhase::Pressed, 0.0, 0.0, 0),
+        std::slice::from_ref(&region),
+    );
+    assert!(started.events.iter().any(|event| matches!(
+        event.kind,
+        UiEventKind::Gesture(argui_ui::GestureEvent {
+            phase: GesturePhase::Started,
+            ..
+        })
+    )));
+    let first = tree.pointer_event(
+        touch(1, PointerPhase::Moved, 12.0, 0.0, 8),
+        std::slice::from_ref(&region),
+    );
+    let second = tree.pointer_event(
+        touch(1, PointerPhase::Moved, 24.0, 0.0, 16),
+        std::slice::from_ref(&region),
+    );
+    assert!(first.events.is_empty() && first.frame_requested);
+    assert!(second.events.is_empty() && second.frame_requested);
+
+    let frame = tree.flush_gesture_frame();
+    assert_eq!(frame.events.len(), 1);
+    assert!(matches!(
+        frame.events[0].kind,
+        UiEventKind::Gesture(argui_ui::GestureEvent {
+            phase: GesturePhase::Changed,
+            kind: GestureKind::Pan { total, .. },
+            ..
+        }) if total == Point::new(24.0, 0.0)
+    ));
+    assert!(tree.flush_gesture_frame().events.is_empty());
 }

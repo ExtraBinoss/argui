@@ -30,9 +30,9 @@ timestamp. Winit coordinates are converted to logical UI units once in the
 runtime.
 
 `GestureArena` recognizes tap, pan, pinch and rotation. Gesture sets are opt-in
-per interactive element. `pan()` waits for the tap threshold when both
-recognizers are present; `pan_immediate()` emits `Started` at pointer-down for
-absolute-position controls such as ranges. Every pan event carries its current
+per interactive element. A default pan waits for its configured threshold;
+`PanGesture::immediate()` emits `Started` at pointer-down for absolute-position
+controls such as ranges. Every pan event carries its current
 logical position, delta, total displacement and velocity. Pinch and rotation
 can run simultaneously for a contact pair. Velocity uses a bounded 100 ms
 history, and cancellation produces explicit terminal events. The primary touch

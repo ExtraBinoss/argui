@@ -153,7 +153,7 @@ impl Application {
 
         renderer.set_profiling_active(self.inspector.as_ref().map_or(
             self.renderer_config.profiling,
-            argui_inspect::InspectorHandle::recording,
+            argui_inspect::InspectorHandle::gpu_profiling,
         ));
 
         if let Some(inspector) = &self.inspector {

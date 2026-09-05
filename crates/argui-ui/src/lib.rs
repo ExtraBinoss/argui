@@ -1,5 +1,6 @@
 //! Retained UI description consumed by the runtime and produced by Rust or a DSL.
 
+mod activation;
 mod binding;
 mod caret;
 mod cursor;
@@ -12,7 +13,6 @@ mod identity;
 mod interaction;
 mod layout_builders;
 mod overlay;
-mod resize;
 mod responsive;
 mod scroll;
 mod scroll_config;
@@ -28,6 +28,7 @@ mod tree;
 mod update;
 mod virtual_list;
 
+pub use activation::{ActivationSource, ClickEvent};
 pub use argui_accessibility::{
     LiveRegion, Orientation, Role, SemanticAction, SemanticState, SemanticValue, Semantics,
 };
@@ -47,10 +48,14 @@ pub use cursor::CursorIcon;
 pub use effect::{EffectScope, ScopedEffect};
 pub use element::{Element, ElementKind, TextEditorSpec};
 pub use event::{
-    EventListener, EventListenerOptions, EventOwnerId, EventPhase, EventType, UiEvent, UiEventKind,
+    EventHandlerId, EventListener, EventListenerOptions, EventOwnerId, EventPhase, EventType,
+    UiEvent, UiEventKind,
 };
 pub use focus::{FocusContainment, FocusRequest, FocusScope, FocusTarget, InitialFocus};
-pub use gesture::{GestureArena, GestureEvent, GestureKind, GesturePhase, GestureSet};
+pub use gesture::{
+    GestureArena, GestureCapture, GestureDelivery, GestureEvent, GestureKind, GesturePhase,
+    GestureSet, PanAxis, PanGesture, PinchGesture, RotationGesture, TapGesture,
+};
 pub use interaction::{
     HitRegion, HitShape, HitTestStyle, Interaction, InteractionUpdate, KeyboardActivation, NodeId,
     PointerEvents, WindowDragBehavior,
@@ -59,7 +64,6 @@ pub use overlay::{
     AnchorPortal, AnchorWidth, CollisionPolicy, DismissPolicy, FloatingPlacement, PlacedOverlay,
     Placement, Portal, PortalTarget, ViewportAlign, ViewportPlacement, WindowLayer,
 };
-pub use resize::{Resizable, ResizeAxes, ResizeConfig, ResizeEvent, ResizeState};
 pub use responsive::{ContainerQuery, ContainerScopeId};
 pub use scroll::{ScrollRegion, ScrollbarAxis, ScrollbarGeometry, ScrollbarRegion, scrollbar_at};
 pub use scroll_config::{

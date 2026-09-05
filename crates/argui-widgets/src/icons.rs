@@ -58,7 +58,7 @@ impl TablerIcon {
 
 #[derive(Clone, Debug)]
 pub struct WidgetAssets {
-    ids: [VectorId; 11],
+    ids: [Option<VectorId>; 11],
     assets: Vec<VectorAsset>,
     color: Color,
 }
@@ -66,13 +66,21 @@ pub struct WidgetAssets {
 impl WidgetAssets {
     #[must_use]
     pub fn tabler(color: Color) -> Self {
-        let ids = std::array::from_fn(|_| VectorId::fresh());
+        Self::tabler_subset(color, TablerIcon::ALL)
+    }
+
+    #[must_use]
+    pub fn tabler_subset(color: Color, requested: impl IntoIterator<Item = TablerIcon>) -> Self {
+        let mut ids = [None; 11];
+        let icons = requested.into_iter().collect::<std::collections::HashSet<_>>();
         let assets = TablerIcon::ALL
             .iter()
-            .enumerate()
-            .map(|(index, icon)| {
+            .filter(|icon| icons.contains(icon))
+            .map(|icon| {
+                let id = VectorId::fresh();
+                ids[*icon as usize] = Some(id);
                 let svg = tabler_svg(icon.data());
-                parse_svg(ids[index], svg.as_bytes())
+                parse_svg(id, svg.as_bytes())
                     .expect("embedded Tabler icon data must remain valid SVG")
             })
             .collect();
@@ -81,7 +89,7 @@ impl WidgetAssets {
 
     #[must_use]
     pub fn icon(&self, icon: TablerIcon, size: f32) -> Element {
-        Element::vector(self.ids[icon as usize])
+        Element::vector(self.vector_id(icon))
             .layout_style(LayoutStyle {
                 size: Dimensions::length(size),
                 ..LayoutStyle::default()
@@ -92,7 +100,7 @@ impl WidgetAssets {
 
     #[must_use]
     pub const fn vector_id(&self, icon: TablerIcon) -> VectorId {
-        self.ids[icon as usize]
+        self.ids[icon as usize].expect("requested icon must be included in WidgetAssets")
     }
 
     #[must_use]

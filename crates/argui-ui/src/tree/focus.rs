@@ -170,12 +170,28 @@ impl UiTree {
     }
 
     pub fn primary_pressed(&mut self, regions: &[HitRegion]) -> InteractionUpdate {
-        let mut update = self.primary_pressed_for(argui_core::PointerId::MOUSE, regions);
-        update.merge(self.focus_pointer_default(regions));
+        let event = argui_core::PointerEvent {
+            phase: argui_core::PointerPhase::Pressed,
+            ..argui_core::PointerEvent::mouse(
+                argui_core::PointerPhase::Pressed,
+                argui_core::Point::default(),
+            )
+        };
+        let mut update = self.primary_pressed_for(event, regions);
+        update.merge(self.focus_pointer_default(event.id, regions));
         update
     }
 
     pub(crate) fn primary_pressed_for(
+        &mut self,
+        event: argui_core::PointerEvent,
+        _regions: &[HitRegion],
+    ) -> InteractionUpdate {
+        let raw = self.interaction.primary_pressed(event);
+        self.decorate(raw)
+    }
+
+    pub fn focus_pointer_default(
         &mut self,
         pointer: argui_core::PointerId,
         regions: &[HitRegion],
@@ -190,22 +206,7 @@ impl UiTree {
                 region
             })
             .collect::<Vec<_>>();
-        let raw = self.interaction.primary_pressed(pointer, &scoped);
-        self.decorate(raw)
-    }
-
-    pub fn focus_pointer_default(&mut self, regions: &[HitRegion]) -> InteractionUpdate {
-        let active = self.focus.active_trap();
-        let scoped = regions
-            .iter()
-            .cloned()
-            .map(|mut region| {
-                region.focusable &=
-                    active.is_none_or(|scope| self.focus.contains(scope, region.node));
-                region
-            })
-            .collect::<Vec<_>>();
-        let raw = self.interaction.focus_pressed(&scoped);
+        let raw = self.interaction.focus_pressed(pointer, &scoped);
         self.decorate(raw)
     }
 
@@ -251,9 +252,9 @@ impl UiTree {
         let space = matches!(&input.key, Key::Character(value) if value == " ")
             && activation == KeyboardActivation::EnterOrSpace;
         let raw = match (input.state, input.repeat, enter, space) {
-            (KeyState::Pressed, false, true, _) => self.interaction.keyboard_clicked(node),
+            (KeyState::Pressed, false, true, _) => self.interaction.keyboard_clicked(node, input),
             (KeyState::Pressed, false, _, true) => self.interaction.keyboard_pressed(node),
-            (KeyState::Released, _, _, true) => self.interaction.keyboard_released(true),
+            (KeyState::Released, _, _, true) => self.interaction.keyboard_released(input, true),
             _ => Default::default(),
         };
         update.merge(self.decorate(raw));

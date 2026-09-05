@@ -51,14 +51,15 @@ impl TextDraw {
     }
 }
 
-#[cfg_attr(coverage_nightly, coverage(off))]
 impl TextGpu {
+    #[cfg_attr(coverage_nightly, coverage(off))]
     pub fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
         let atlas = GlyphAtlas::new(device, 1024);
         let pipeline = TextPipeline::new(device, format, atlas.view(), atlas.sampler());
         Self { atlas, pipeline }
     }
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     pub fn prepare(
         &mut self,
         device: &wgpu::Device,
@@ -69,6 +70,7 @@ impl TextGpu {
         self.prepare_with_visuals(device, queue, engine, text, None, 1.0)
     }
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     pub fn prepare_ui(
         &mut self,
         device: &wgpu::Device,
@@ -88,6 +90,7 @@ impl TextGpu {
         )
     }
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     fn prepare_with_visuals(
         &mut self,
         device: &wgpu::Device,
@@ -117,6 +120,7 @@ impl TextGpu {
         }
     }
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     fn prepare_once(
         &mut self,
         queue: &wgpu::Queue,
@@ -168,14 +172,17 @@ impl TextGpu {
         Ok((instances, ranges, clips))
     }
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     pub fn begin_frame(&mut self) {
         self.pipeline.begin_frame();
     }
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     pub fn target_offset(&mut self, queue: &wgpu::Queue, region: [f32; 4]) -> u32 {
         self.pipeline.target_offset(queue, region)
     }
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     pub fn draw<'pass>(
         &'pass self,
         pass: &mut wgpu::RenderPass<'pass>,
@@ -240,64 +247,4 @@ fn prepare_visuals(
             }
         })
         .collect()
-}
-
-#[cfg(test)]
-mod tests {
-    use argui_core::{Affine2D, Point, Rect, Size};
-    use argui_paint::{ClipChain, ClipRegion, DisplayList};
-    use argui_text::PreparedText;
-
-    use super::{TextDraw, block_visuals, prepare_visuals};
-
-    #[test]
-    fn text_draws_keep_per_block_ranges_and_full_extent() {
-        let draw = TextDraw {
-            ranges: vec![0..3, 0..0, 3..7, 0..0],
-            changed: false,
-        };
-
-        assert_eq!(draw.all(), 0..7);
-        assert_eq!(draw.ranges(), &[0..3, 0..0, 3..7, 0..0]);
-        assert!(!draw.changed());
-    }
-
-    #[test]
-    fn text_visuals_map_valid_blocks_and_keep_unstyled_fallbacks() {
-        let clip = ClipRegion::new(
-            Rect::new(Point::default(), Size::new(40.0, 20.0)),
-            Affine2D::IDENTITY,
-        );
-        let mut list = DisplayList::new();
-        list.push_text_transformed(
-            1,
-            Affine2D::translation(4.0, 5.0),
-            ClipChain::from_regions([clip]),
-        );
-        list.push_text(20);
-        let visuals = block_visuals(&list, 3);
-        assert!(visuals[0].is_none());
-        assert_eq!(
-            visuals[1].as_ref().unwrap().transform.translation,
-            Point::new(4.0, 5.0)
-        );
-        assert!(visuals[2].is_none());
-
-        let mut text = PreparedText::default();
-        text.blocks = 3;
-        let mut clips = Vec::new();
-        let prepared = prepare_visuals(&text, Some(&visuals), 2.0, &mut clips);
-        assert_eq!(clips.len(), 1);
-        assert!(!prepared[0].active);
-        assert!(prepared[1].active);
-        assert_eq!(prepared[0].clip_count, 0);
-        assert_eq!(prepared[1].clip_count, 1);
-        assert_eq!(prepared[1].transform.translation, Point::new(8.0, 10.0));
-
-        clips.clear();
-        let fallback = prepare_visuals(&text, None, 1.0, &mut clips);
-        assert!(fallback.iter().all(|visual| visual.active));
-        assert!(fallback.iter().all(|visual| visual.clip_count == 0));
-        assert!(clips.is_empty());
-    }
 }

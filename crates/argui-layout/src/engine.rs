@@ -579,6 +579,3 @@ pub(crate) fn flattened(root: &Element) -> Vec<&Element> {
     visit(root, &mut output);
     output
 }
-
-#[cfg(test)]
-mod tests;

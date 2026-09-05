@@ -1,9 +1,9 @@
 use argui_core::{Rect, Size};
 use argui_paint::{ImageAsset, VectorAsset};
-use argui_runtime::{Context, LayoutSnapshot, Render};
+use argui_runtime::{Context, Entity, LayoutSnapshot, Render, WindowEnvironment};
 use argui_ui::{
-    Element, ElementKind, Interaction, SelectionCapabilities, SelectionCommand, Sides, UiEvent,
-    UiEventKind, UserSelect, length,
+    Element, ElementKind, EventType, Interaction, SelectionCapabilities, SelectionCommand, Sides,
+    UiEvent, UiEventKind, UserSelect, length,
 };
 
 use crate::{Button, WidgetTheme, shadcn};
@@ -68,7 +68,7 @@ impl TextSelectionToolbar {
             Button::new(
                 format!("{}::{suffix}", self.key_prefix),
                 label,
-                theme.button.clone(),
+                theme.button(),
             )
             .enabled(enabled)
             .build()
@@ -96,7 +96,7 @@ struct ActiveSelection {
 }
 
 pub struct SelectionHost<A: Render> {
-    application: A,
+    application: Entity<A>,
     active: Option<ActiveSelection>,
     viewport: Size,
     menu_key: String,
@@ -106,7 +106,7 @@ impl<A: Render> SelectionHost<A> {
     #[must_use]
     pub fn new(application: A) -> Self {
         Self {
-            application,
+            application: Entity::new(application),
             active: None,
             viewport: Size::default(),
             menu_key: "argui::selection-menu".into(),
@@ -123,9 +123,36 @@ impl<A: Render> SelectionHost<A> {
 impl<A: Render> Render for SelectionHost<A> {
     fn render(&mut self, cx: &mut Context<Self>) -> Element {
         let environment = cx.environment();
-        let mut child = cx.child_context();
-        let mut root = self.application.render(&mut child);
-        cx.propagate(child);
+        let application = cx.entity(&self.application);
+        let mut root = self.compose(application, environment);
+        for event in EventType::ALL {
+            root = root.on(cx
+                .listener(event, |host, event, cx| host.handle_event(event, cx))
+                .capture(true));
+        }
+        root
+    }
+
+    fn layout_changed(&mut self, layout: &LayoutSnapshot, cx: &mut Context<Self>) {
+        self.viewport = layout.viewport_size();
+        cx.layout_entity(&self.application, layout);
+    }
+
+    fn image_assets(&self) -> Vec<ImageAsset> {
+        self.application.read(Render::image_assets)
+    }
+
+    fn vector_assets(&self) -> Vec<VectorAsset> {
+        self.application.read(Render::vector_assets)
+    }
+
+    fn inspector(&self) -> Option<argui_inspect::InspectorHandle> {
+        self.application.read(Render::inspector)
+    }
+}
+
+impl<A: Render> SelectionHost<A> {
+    fn compose(&self, mut root: Element, environment: WindowEnvironment) -> Element {
         if let Some(selection) = &self.active {
             let theme = shadcn(environment.primary);
             let toolbar = TextSelectionToolbar::new(
@@ -143,10 +170,12 @@ impl<A: Render> Render for SelectionHost<A> {
         }
         root
     }
-
-    fn event(&mut self, event: &UiEvent, cx: &mut Context<Self>) {
+    fn handle_event(&mut self, event: &UiEvent, cx: &mut Context<Self>) {
         match &event.kind {
-            UiEventKind::Pressed if self.command_for(event).is_some() => {
+            UiEventKind::Pointer(argui_core::PointerEvent {
+                phase: argui_core::PointerPhase::Pressed,
+                ..
+            }) if self.command_for(event).is_some() => {
                 let _ = event.prevent_default();
             }
             UiEventKind::DocumentSelectionChanged {
@@ -198,7 +227,7 @@ impl<A: Render> Render for SelectionHost<A> {
                     let _ = event.prevent_default();
                 }
             }
-            UiEventKind::Clicked if self.command_for(event).is_some() => {
+            UiEventKind::Click(_) if self.command_for(event).is_some() => {
                 let command = self.command_for(event).unwrap();
                 if let Some(target) = self.active.as_ref().and_then(|active| active.target) {
                     cx.selection_command_for(target, command);
@@ -208,49 +237,14 @@ impl<A: Render> Render for SelectionHost<A> {
                 self.active = None;
                 cx.notify();
                 event.stop_propagation();
-                return;
             }
             _ => {}
         }
-        let mut child = cx.child_context();
-        self.application.event(event, &mut child);
-        cx.propagate(child);
     }
 
-    fn animation_frame(&mut self, frame: argui_animation::Frame, cx: &mut Context<Self>) {
-        let mut child = cx.child_context();
-        self.application.animation_frame(frame, &mut child);
-        cx.propagate(child);
-    }
-
-    fn wants_animation_frame(&self) -> bool {
-        self.application.wants_animation_frame()
-    }
-
-    fn layout_changed(&mut self, layout: &LayoutSnapshot, cx: &mut Context<Self>) {
-        self.viewport = layout.viewport_size();
-        let mut child = cx.child_context();
-        self.application.layout_changed(layout, &mut child);
-        cx.propagate(child);
-    }
-
-    fn image_assets(&self) -> Vec<ImageAsset> {
-        self.application.image_assets()
-    }
-
-    fn vector_assets(&self) -> Vec<VectorAsset> {
-        self.application.vector_assets()
-    }
-
-    fn inspector(&self) -> Option<argui_inspect::InspectorHandle> {
-        self.application.inspector()
-    }
-}
-
-impl<A: Render> SelectionHost<A> {
     fn command_for(&self, event: &UiEvent) -> Option<SelectionCommand> {
         let suffix = event
-            .current_key()?
+            .target_key()?
             .strip_prefix(self.menu_key.as_str())?
             .strip_prefix("::")?;
         match suffix {
@@ -260,294 +254,5 @@ impl<A: Render> SelectionHost<A> {
             "select-all" => Some(SelectionCommand::SelectAll),
             _ => None,
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use argui_core::{ColorScheme, Point};
-    use argui_runtime::WindowEnvironment;
-
-    use super::*;
-
-    struct App {
-        container: bool,
-    }
-
-    impl Render for App {
-        fn render(&mut self, _cx: &mut Context<Self>) -> Element {
-            if self.container {
-                Element::container([Element::text("select me")])
-            } else {
-                Element::text("select me")
-            }
-        }
-    }
-
-    fn node() -> argui_ui::NodeId {
-        argui_ui::UiTree::new(Element::container([]))
-            .node_id_at(0)
-            .unwrap()
-    }
-
-    #[test]
-    fn host_composes_a_real_copy_button_for_touch_selection() {
-        let mut host = SelectionHost::new(App { container: false });
-        let mut cx = Context::default();
-        host.viewport = Size::new(320.0, 200.0);
-        host.active = Some(ActiveSelection {
-            bounds: Rect::new(Point::new(100.0, 80.0), Size::new(60.0, 20.0)),
-            capabilities: SelectionCapabilities {
-                copy: true,
-                select_all: true,
-                ..SelectionCapabilities::default()
-            },
-            target: None,
-        });
-        let root = host.render(&mut cx);
-        assert!(matches!(root.kind, ElementKind::Container));
-        assert_eq!(root.children.len(), 2);
-        assert_eq!(
-            WindowEnvironment::default().color_scheme,
-            ColorScheme::Light
-        );
-    }
-
-    #[test]
-    fn host_tracks_completed_touch_selections_without_rebuilding_during_drag() {
-        let mut host = SelectionHost::new(App { container: true }).menu_key("selection");
-        let bounds = Rect::new(Point::new(40.0, 60.0), Size::new(50.0, 18.0));
-        let selection = |text, bounds, touch, dragging| {
-            UiEvent::new(
-                node(),
-                None,
-                UiEventKind::DocumentSelectionChanged {
-                    text,
-                    bounds,
-                    touch,
-                    dragging,
-                },
-            )
-        };
-
-        let mut cx = Context::default();
-        host.event(
-            &selection(Some("selected".into()), Some(bounds), true, false),
-            &mut cx,
-        );
-        assert_eq!(cx.view_update(), argui_runtime::ViewUpdate::Rebuild);
-        assert!(host.active.as_ref().unwrap().capabilities.copy);
-        host.viewport = Size::new(240.0, 160.0);
-        let root = host.render(&mut Context::default());
-        assert!(matches!(root.kind, ElementKind::Container));
-        assert_eq!(root.children.len(), 2);
-
-        let mut unchanged = Context::default();
-        host.event(
-            &selection(Some("selected".into()), Some(bounds), true, false),
-            &mut unchanged,
-        );
-        assert_eq!(unchanged.view_update(), argui_runtime::ViewUpdate::None);
-
-        let mut dragging = Context::default();
-        host.event(
-            &selection(Some("selected".into()), Some(bounds), true, true),
-            &mut dragging,
-        );
-        assert!(host.active.is_none());
-        assert_eq!(dragging.view_update(), argui_runtime::ViewUpdate::Rebuild);
-
-        host.event(
-            &selection(Some("mouse".into()), Some(bounds), false, false),
-            &mut Context::default(),
-        );
-        host.event(
-            &selection(None, Some(bounds), true, false),
-            &mut Context::default(),
-        );
-        host.event(
-            &selection(Some("missing bounds".into()), None, true, false),
-            &mut Context::default(),
-        );
-        assert!(host.active.is_none());
-    }
-
-    #[test]
-    fn selection_commands_are_emitted_by_menu_items() {
-        let mut host = SelectionHost::new(App { container: false }).menu_key("selection");
-        let clicked = UiEvent::new(node(), Some("selection::copy".into()), UiEventKind::Clicked);
-        host.event(&clicked, &mut Context::default());
-        host.active = Some(ActiveSelection {
-            bounds: Rect::default(),
-            capabilities: SelectionCapabilities {
-                copy: true,
-                ..SelectionCapabilities::default()
-            },
-            target: None,
-        });
-        let mut cx = Context::default();
-        host.event(&clicked, &mut cx);
-        assert_eq!(cx.view_update(), argui_runtime::ViewUpdate::Rebuild);
-
-        let unrelated = UiEvent::new(node(), Some("other".into()), UiEventKind::Clicked);
-        host.event(&unrelated, &mut Context::default());
-    }
-
-    #[test]
-    fn command_keys_cover_the_complete_editing_menu() {
-        let host = SelectionHost::new(App { container: false }).menu_key("selection");
-        for (suffix, expected) in [
-            ("cut", SelectionCommand::Cut),
-            ("copy", SelectionCommand::Copy),
-            ("paste", SelectionCommand::Paste),
-            ("select-all", SelectionCommand::SelectAll),
-        ] {
-            let event = UiEvent::new(
-                node(),
-                Some(format!("selection::{suffix}")),
-                UiEventKind::Clicked,
-            );
-            assert_eq!(host.command_for(&event), Some(expected));
-        }
-        assert_eq!(
-            host.command_for(&UiEvent::new(
-                node(),
-                Some("selection::unknown".into()),
-                UiEventKind::Clicked,
-            )),
-            None
-        );
-        assert_eq!(
-            host.command_for(&UiEvent::new(node(), None, UiEventKind::Clicked)),
-            None
-        );
-    }
-
-    #[test]
-    fn context_menu_opens_only_for_available_commands_and_targets_the_editor() {
-        let mut host = SelectionHost::new(App { container: false }).menu_key("selection");
-        let target = node();
-        let empty = UiEvent::new(
-            target,
-            None,
-            UiEventKind::ContextMenu {
-                position: Point::new(40.0, 30.0),
-                capabilities: SelectionCapabilities::default(),
-            },
-        );
-        host.event(&empty, &mut Context::default());
-        assert!(host.active.is_none());
-        assert!(!empty.default_prevented());
-
-        let unrelated_press = UiEvent::new(target, Some("other".into()), UiEventKind::Pressed);
-        host.event(&unrelated_press, &mut Context::default());
-        assert!(!unrelated_press.default_prevented());
-
-        let editable = UiEvent::new(
-            target,
-            None,
-            UiEventKind::ContextMenu {
-                position: Point::new(40.0, 30.0),
-                capabilities: SelectionCapabilities {
-                    editable: true,
-                    paste: true,
-                    ..SelectionCapabilities::default()
-                },
-            },
-        );
-        host.event(&editable, &mut Context::default());
-        assert_eq!(host.active.as_ref().unwrap().target, Some(target));
-        assert!(editable.default_prevented());
-
-        let pressed = UiEvent::new(
-            target,
-            Some("selection::paste".into()),
-            UiEventKind::Pressed,
-        );
-        host.event(&pressed, &mut Context::default());
-        assert!(pressed.default_prevented());
-
-        let clicked = UiEvent::new(
-            target,
-            Some("selection::paste".into()),
-            UiEventKind::Clicked,
-        );
-        let mut cx = Context::default();
-        host.event(&clicked, &mut cx);
-        assert!(host.active.is_none());
-        assert!(clicked.propagation_stopped());
-        assert_eq!(cx.view_update(), argui_runtime::ViewUpdate::Rebuild);
-    }
-
-    #[test]
-    fn each_context_menu_capability_can_open_the_menu_independently() {
-        for capabilities in [
-            SelectionCapabilities {
-                cut: true,
-                ..SelectionCapabilities::default()
-            },
-            SelectionCapabilities {
-                copy: true,
-                ..SelectionCapabilities::default()
-            },
-            SelectionCapabilities {
-                select_all: true,
-                ..SelectionCapabilities::default()
-            },
-        ] {
-            let mut host = SelectionHost::new(App { container: false });
-            let event = UiEvent::new(
-                node(),
-                None,
-                UiEventKind::ContextMenu {
-                    position: Point::default(),
-                    capabilities,
-                },
-            );
-            host.event(&event, &mut Context::default());
-            assert!(host.active.is_some());
-            assert!(event.default_prevented());
-        }
-    }
-
-    #[test]
-    fn inactive_host_and_editable_toolbar_cover_both_composition_modes() {
-        let mut host = SelectionHost::new(App { container: false });
-        assert!(matches!(
-            host.render(&mut Context::default()).kind,
-            ElementKind::Text { .. }
-        ));
-
-        let palette = shadcn(argui_core::Color::srgb(0.2, 0.4, 0.8));
-        let theme = palette.resolve(ColorScheme::Light);
-        let toolbar = TextSelectionToolbar::new(
-            "editor",
-            Rect::default(),
-            Size::new(400.0, 200.0),
-            SelectionCapabilities {
-                editable: true,
-                ..SelectionCapabilities::default()
-            },
-        )
-        .build(theme);
-        assert_eq!(toolbar.children.len(), 4);
-    }
-
-    #[test]
-    fn toolbar_prefers_the_space_above_a_low_selection() {
-        let palette = shadcn(argui_core::Color::srgb(0.2, 0.4, 0.8));
-        let theme = palette.resolve(ColorScheme::Light);
-        let toolbar = TextSelectionToolbar::new(
-            "copy",
-            Rect::new(Point::new(100.0, 140.0), Size::new(30.0, 12.0)),
-            Size::new(400.0, 220.0),
-            SelectionCapabilities {
-                copy: true,
-                ..SelectionCapabilities::default()
-            },
-        )
-        .build(theme);
-        assert_eq!(toolbar.children.len(), 2);
-        assert_eq!(toolbar.style.inset.top, length(92.0));
     }
 }

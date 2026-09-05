@@ -33,18 +33,18 @@ impl AppModel for SpotlightShowcase {
 
     fn update(&mut self, event: &AppEvent) -> AppUpdate {
         match event {
-            AppEvent::Ui { window, event } => match (event.key.as_deref(), &event.kind) {
+            AppEvent::Ui { window, event } => match (event.target_key(), &event.kind) {
                 (Some(SEARCH_KEY), UiEventKind::TextChanged(value)) => {
                     self.query.clone_from(value);
                     rebuild(window)
                 }
-                (Some("minimize"), UiEventKind::Clicked) => {
+                (Some("minimize"), UiEventKind::Click(_)) => {
                     AppUpdate::none().command(AppCommand::MinimizeWindow(window.clone()))
                 }
-                (Some("close"), UiEventKind::Clicked) => {
+                (Some("close"), UiEventKind::Click(_)) => {
                     AppUpdate::none().command(AppCommand::Quit)
                 }
-                (Some("passthrough"), UiEventKind::Clicked)
+                (Some("passthrough"), UiEventKind::Click(_))
                     if self.passthrough_remaining.is_none() =>
                 {
                     self.passthrough_remaining = Some(PASSTHROUGH_TIME);
@@ -62,7 +62,7 @@ impl AppModel for SpotlightShowcase {
                 self.capabilities = Some(*capabilities);
                 rebuild(window)
             }
-            AppEvent::Window { .. } | AppEvent::Tray(_) => AppUpdate::none(),
+            AppEvent::Window { .. } | AppEvent::WindowReady { .. } | AppEvent::WindowFailed { .. } | AppEvent::Tray(_) => AppUpdate::none(),
         }
     }
 
@@ -99,7 +99,7 @@ impl SpotlightShowcase {
                     SEARCH_KEY,
                     &self.query,
                     "Search commands, files and settings",
-                    theme.input.clone(),
+                    theme.input(),
                 )
                 .build(),
                 self.results(theme),

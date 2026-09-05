@@ -3,16 +3,17 @@
 use argui::{
     platform::{ApplicationConfig, ApplicationId, ApplicationIdentity, IconSet, WindowConfig},
     render::RendererConfig,
-    runtime::run_app_with_text_engine,
+    runtime::run_application_with_text_engine,
 };
-use argui_devtools::DevtoolsHost;
+use argui_devtools::DevtoolsApp;
+use argui::runtime::SingleWindowModel;
 use argui_showcase::{StateShowcase, text_engine};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen(start)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 pub fn start() -> Result<(), JsValue> {
-    run_app_with_text_engine(
+    run_application_with_text_engine(
         ApplicationConfig::new(
             ApplicationIdentity::new(
                 ApplicationId::new("dev.argui.state")
@@ -27,7 +28,7 @@ pub fn start() -> Result<(), JsValue> {
         ),
         RendererConfig::default(),
         text_engine(),
-        DevtoolsHost::new(StateShowcase::default()),
+        DevtoolsApp::new(SingleWindowModel::new(StateShowcase::default())),
         |_| {},
     )
     .map_err(|error| JsValue::from_str(&error.to_string()))

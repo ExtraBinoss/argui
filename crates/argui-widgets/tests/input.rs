@@ -6,7 +6,7 @@ use argui_widgets::{Input, InputKind, TablerIcon, TextArea, WidgetAssets, shadcn
 fn controlled_inputs_keep_semantics_and_editor_configuration_together() {
     let themes = shadcn(Color::srgb(0.2, 0.5, 0.9));
     let theme = themes.resolve(ColorScheme::Light);
-    let input = Input::new("search", "gpu", "Search", theme.input.clone())
+    let input = Input::new("search", "gpu", "Search", theme.input())
         .kind(InputKind::Search)
         .label("Search components")
         .description("Command K")
@@ -29,7 +29,7 @@ fn controlled_inputs_keep_semantics_and_editor_configuration_together() {
         }
     ));
 
-    let area = TextArea::new("notes", "a\nb", "Notes", theme.input.clone()).build();
+    let area = TextArea::new("notes", "a\nb", "Notes", theme.input()).build();
     assert_eq!(area.style.overflow.x, Overflow::Hidden);
     assert_eq!(area.style.overflow.y, Overflow::Auto);
     assert_eq!(
@@ -53,7 +53,7 @@ fn numeric_input_kinds_select_engine_level_edit_filters() {
         (InputKind::Number, TextInputFilter::Decimal),
         (InputKind::Arithmetic, TextInputFilter::Arithmetic),
     ] {
-        let input = Input::new("number", "12", "Value", theme.input.clone())
+        let input = Input::new("number", "12", "Value", theme.input())
             .kind(kind)
             .build();
         assert!(matches!(
@@ -68,7 +68,7 @@ fn leading_content_is_overlaid_without_changing_the_editor_identity() {
     let themes = shadcn(Color::srgb(0.2, 0.5, 0.9));
     let theme = themes.resolve(ColorScheme::Light);
     let assets = WidgetAssets::tabler(theme.foreground);
-    let input = Input::new("search", "", "Search", theme.input.clone())
+    let input = Input::new("search", "", "Search", theme.input())
         .kind(InputKind::Search)
         .leading(assets.icon(TablerIcon::Search, 16.0), 38.0)
         .build();

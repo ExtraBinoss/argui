@@ -61,11 +61,13 @@ Cargo installs library dependencies automatically:
 rustup target add wasm32-unknown-unknown
 rustup toolchain install nightly --profile minimal --component llvm-tools-preview
 cargo install cargo-llvm-cov --locked
+cargo install cargo-nextest --locked
 cargo fetch
 ```
 
-The coverage gate also uses `jq` to validate the JSON summary because
-`cargo-llvm-cov` has no native `--fail-under-branches` option yet.
+The coverage gate runs integration tests concurrently through `cargo-nextest`
+and uses `jq` to validate the JSON summary because `cargo-llvm-cov` has no
+native `--fail-under-branches` option yet.
 
 Rust 1.89 is the workspace minimum because it is the highest current dependency
 MSRV (`cosmic-text`). Development may use a newer stable compiler.

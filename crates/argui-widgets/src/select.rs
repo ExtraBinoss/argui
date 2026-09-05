@@ -105,9 +105,9 @@ impl Select {
                 .align_items(AlignItems::CENTER)
                 .justify_content(JustifyContent::SPACE_BETWEEN)
                 .paint_style(self_theme_input(theme))
-                .when(VisualState::Hovered, theme.input.hovered.clone())
-                .when(VisualState::FocusVisible, theme.input.focused.clone())
-                .transition(theme.input.transition.clone()),
+                .when(VisualState::Hovered, theme.input().hovered.clone())
+                .when(VisualState::FocusVisible, theme.input().focused.clone())
+                .transition(theme.input().transition.clone()),
         );
         let overlay = self.open.then(|| self.overlay(theme));
         behavior.decorate(
@@ -197,7 +197,7 @@ impl Select {
 }
 
 fn self_theme_input(theme: &WidgetTheme) -> PaintStyle {
-    theme.input.paint.clone()
+    theme.input().paint.clone()
 }
 
 fn label_style(color: argui_core::Color) -> TextStyle {

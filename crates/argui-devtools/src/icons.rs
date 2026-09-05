@@ -1,13 +1,14 @@
 use argui_paint::{VectorAsset, VectorId};
 use argui_vector::parse_svg;
 use icondata_core::IconData;
-use icondata_tb::{TbChevronRightOutline, TbCopyOutline, TbTargetOutline};
+use icondata_tb::{TbChevronRightOutline, TbCopyOutline, TbTargetOutline, TbBoxOutline, TbFileTextOutline, TbPhotoOutline, TbVectorOutline, TbPointerOutline};
 
 #[derive(Debug)]
 pub(crate) struct DevtoolsIcons {
     pub(crate) chevron: VectorId,
     pub(crate) copy: VectorId,
     pub(crate) target: VectorId,
+    node_icons: [VectorId; 5],
     assets: Vec<VectorAsset>,
 }
 
@@ -16,21 +17,36 @@ impl DevtoolsIcons {
         let chevron = VectorId::fresh();
         let copy = VectorId::fresh();
         let target = VectorId::fresh();
-        let assets = vec![
+        let mut assets = vec![
             tabler(chevron, TbChevronRightOutline),
             tabler(copy, TbCopyOutline),
             tabler(target, TbTargetOutline),
         ];
+        let node_icons = std::array::from_fn(|_| VectorId::fresh());
+        for (id, icon) in node_icons.into_iter().zip([TbBoxOutline, TbFileTextOutline, TbPhotoOutline, TbVectorOutline, TbPointerOutline]) {
+            assets.push(tabler(id, icon));
+        }
         Self {
             chevron,
             copy,
             target,
+            node_icons,
             assets,
         }
     }
 
     pub(crate) fn assets(&self) -> &[VectorAsset] {
         &self.assets
+    }
+
+    pub(crate) fn node_icon(&self, kind: &str) -> VectorId {
+        self.node_icons[match kind {
+            "text" => 1,
+            "image" => 2,
+            "vector" => 3,
+            "text-input" | "text-area" => 4,
+            _ => 0,
+        }]
     }
 }
 

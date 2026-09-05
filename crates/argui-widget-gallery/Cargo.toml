@@ -10,9 +10,10 @@ publish = false
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-argui = { workspace = true, features = ["widgets"] }
+argui = { workspace = true, features = ["widgets-all"] }
 argui-image.workspace = true
 argui-effects = { workspace = true, features = ["artistic", "blur", "shadow"] }
+argui-devtools.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen.workspace = true

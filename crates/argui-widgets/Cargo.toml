@@ -5,18 +5,39 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 
+[features]
+default = []
+all = ["button", "input", "checkbox", "switch", "radio-group", "tabs", "select", "popover", "dialog", "range", "slider", "spinner", "text-selection", "split-pane", "vlist", "tree-view", "icons"]
+button = []
+input = []
+checkbox = []
+switch = []
+radio-group = []
+tabs = []
+select = []
+popover = []
+dialog = []
+range = ["dep:argui-runtime"]
+slider = ["range"]
+spinner = ["dep:argui-runtime"]
+text-selection = ["button", "dep:argui-runtime", "dep:argui-inspect"]
+split-pane = []
+vlist = []
+tree-view = ["vlist", "button"]
+icons = ["dep:argui-vector", "dep:icondata_core", "dep:icondata_tb"]
+
 [dependencies]
 argui-animation.workspace = true
 argui-core.workspace = true
-argui-inspect.workspace = true
+argui-inspect = { workspace = true, optional = true }
 argui-paint.workspace = true
-argui-runtime.workspace = true
+argui-runtime = { workspace = true, optional = true }
 argui-text.workspace = true
 argui-theme.workspace = true
 argui-ui.workspace = true
-argui-vector.workspace = true
-icondata_core.workspace = true
-icondata_tb.workspace = true
+argui-vector = { workspace = true, optional = true }
+icondata_core = { workspace = true, optional = true }
+icondata_tb = { workspace = true, optional = true }
 
 [lints]
 workspace = true

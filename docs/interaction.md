@@ -15,18 +15,36 @@ winit -> argui-platform -> argui-runtime -> argui-ui
 Every retained element receives a stable `NodeId`. Unkeyed nodes retain their ID
 at the same structural position; keyed siblings retain it when reordered. IDs
 are never derived from hashes, and duplicate keys never produce duplicate IDs.
-Application-facing `UiEvent`s carry both the ID and the optional key.
+Application-facing `UiEvent`s distinguish the original target from the current
+delivery target and expose both stable keys.
+
+Listeners are declared while rendering with `Context::listener` and attached to
+any `Element` with `Element::on`. Dispatch follows the DOM order: capture from
+the root to the target, target listeners, then bubbling back to the root.
+`stop_propagation`, `stop_immediate_propagation`, and `prevent_default` operate
+on the shared event control. Passive listeners cannot prevent defaults, and
+once listeners remain consumed across retained rebuilds.
 
 Hit regions are emitted in paint-tree order and tested in reverse, so the last
 interactive element painted wins. Bounds and the resolved rectangular ancestor
 clip must both contain the pointer. Future z-index/layer work must reorder paint
 and hit-test data together.
 
-Primary-button presses capture their target until release. A release over the
-captured target emits `Clicked`; a release outside emits only `Released`.
-Focusable controls receive focus on press, and losing window focus clears hover,
-press, capture, and focus safely. The runtime restores the exact retained focus
-when the window becomes active again.
+Pointer capture is explicit. A listener can call `Context::capture_pointer` and
+`Context::release_pointer`, while a configured gesture can request
+`GestureCapture::OnPress`. Captured movement and release stay targeted at the
+capturing element even when hover moves elsewhere. Release, cancellation, and
+window focus loss always terminate capture and emit `LostPointerCapture`.
+Focusable controls receive focus on press, and the runtime restores the exact
+retained focus when the window becomes active again.
+
+Tap, pan, pinch, and rotation are typed policies rather than widget behavior.
+`PanGesture` configures axis, threshold, capture, and delivery. Immediate
+delivery is appropriate for direct manipulation; frame-coalesced delivery keeps
+only the newest changed sample until the next presentation frame while never
+dropping started, ended, or cancelled phases. Consequently an arbitrary painted
+element can drive a splitter, drag surface, scrubber, selection handle, or
+resizer without a specialized engine type.
 
 `VisualState::Focused` reports focus ownership. `VisualState::FocusVisible`
 reports keyboard or programmatic focus and stays off for pointer focus. Widgets
@@ -36,11 +54,12 @@ can therefore retain accessible keyboard rings without flashing them on click.
 
 Every physical key transition reaches the focused node as
 `UiEventKind::KeyInput`, including modifiers and repeat state. Tab and
-Shift-Tab traverse the current scope. Buttons synthesize `Pressed`, `Clicked`
-and `Released` from Enter; Space retains the pressed visual until key release
-and cancels activation if focus or window ownership changes. Text editing runs
-after raw dispatch, so applications can observe Escape, arrows, Home/End and
-the edited value without platform-specific handlers.
+Shift-Tab traverse the current scope. Keyboard and accessibility activation
+synthesize the same `ClickEvent` as pointer activation while preserving its
+typed source. Space retains the pressed visual until key release and cancels
+activation if focus or window ownership changes. Text editing runs after raw
+dispatch, so applications can observe Escape, arrows, Home/End and the edited
+value without platform-specific handlers.
 
 `TextInputFilter` applies the same edit policy to keyboard, paste, and IME
 commits. `Any`, `Decimal`, and `Arithmetic` let controlled fields reject an

@@ -4,9 +4,10 @@ use argui::{
         TrayConfig, TrayItemId, TrayMenuItem, WindowConfig,
     },
     render::RendererConfig,
-    runtime::{RuntimeEvent, WindowRuntimeEvent, run_app_with_text_engine},
+    runtime::{RuntimeEvent, WindowRuntimeEvent, run_application_with_text_engine},
 };
-use argui_devtools::DevtoolsHost;
+use argui_devtools::DevtoolsApp;
+use argui::runtime::SingleWindowModel;
 use argui_showcase::{StateShowcase, text_engine};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -14,7 +15,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let icons = IconSet::single(AppIcon::from_png(include_bytes!(
         "assets/astra-icon-256.png"
     ))?);
-    run_app_with_text_engine(
+    run_application_with_text_engine(
         ApplicationConfig::new(
             ApplicationIdentity::new(
                 ApplicationId::new("dev.argui.state")?,
@@ -40,7 +41,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }),
         RendererConfig::default().profiling(profiling),
         text_engine(),
-        DevtoolsHost::new(StateShowcase::default()),
+        DevtoolsApp::new(SingleWindowModel::new(StateShowcase::default())),
         move |event| {
             if profiling {
                 log_profile(event);

@@ -115,7 +115,7 @@ pub(crate) fn render(
             .height(percent(1.0)),
     );
     let value = if gallery.slider_editing {
-        let mut style = theme.input.clone();
+        let mut style = theme.input();
         style.layout.padding = argui::ui::sides(8.0, 5.0);
         style.text.align = TextAlign::End;
         style.placeholder.align = TextAlign::End;
@@ -187,7 +187,7 @@ pub(crate) fn update(
     event: &UiEvent,
     cx: &mut Context<WidgetGallery>,
 ) -> bool {
-    if event.key.as_deref() == Some(INPUT_KEY) {
+    if event.target_key() == Some(INPUT_KEY) {
         match &event.kind {
             UiEventKind::TextChanged(value) => gallery.slider_edit_value.clone_from(value),
             UiEventKind::Submitted(_) | UiEventKind::Blurred => finish_edit(gallery, cx),
@@ -202,7 +202,7 @@ pub(crate) fn update(
         cx.notify();
         return true;
     }
-    if event.kind == UiEventKind::Clicked && event.key.as_deref() == Some(EDIT_KEY) {
+    if matches!(event.kind, UiEventKind::Click(_)) && event.target_key() == Some(EDIT_KEY) {
         gallery.slider_editing = true;
         gallery.slider_edit_value = format!("{:.0}", gallery.slider);
         cx.request_focus(INPUT_KEY);
@@ -210,7 +210,7 @@ pub(crate) fn update(
         cx.notify();
         return true;
     }
-    if event.kind == UiEventKind::Clicked && event.key.as_deref() == Some(RESET_KEY) {
+    if matches!(event.kind, UiEventKind::Click(_)) && event.target_key() == Some(RESET_KEY) {
         gallery.slider = DEFAULT_VALUE;
         cx.notify();
         return true;

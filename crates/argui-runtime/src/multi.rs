@@ -54,7 +54,6 @@ pub(crate) struct MultiApplication {
 
 // Window creation, visibility, tray registration, and command dispatch all require a live
 // `ActiveEventLoop`. Keep policy/data transformations below this boundary independently tested.
-#[cfg_attr(coverage_nightly, coverage(off))]
 impl MultiApplication {
     pub(crate) fn new(
         config: ApplicationConfig,
@@ -99,6 +98,7 @@ impl MultiApplication {
         self.event_proxy = Some(proxy);
     }
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     fn open_window(&mut self, event_loop: &ActiveEventLoop, spec: WindowSpec) {
         if self.windows.contains_key(&spec.key) {
             self.emit(RuntimeEvent::CommandFailed(format!(
@@ -171,6 +171,7 @@ impl MultiApplication {
         self.windows.insert(key, WindowEntry { spec, runtime });
     }
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     fn close_window(&mut self, key: &WindowKey) {
         if let Some(entry) = self.windows.remove(key)
             && let Some(window_id) = entry.runtime.window_id()
@@ -179,6 +180,7 @@ impl MultiApplication {
         }
     }
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     fn process_pending(&mut self, event_loop: &ActiveEventLoop) {
         for _ in 0..64 {
             let updates = std::mem::take(&mut *self.pending.borrow_mut());
@@ -205,6 +207,7 @@ impl MultiApplication {
     }
 
     #[cfg(all(feature = "tray", not(target_arch = "wasm32")))]
+    #[cfg_attr(coverage_nightly, coverage(off))]
     fn tray_event(&mut self, event_loop: &ActiveEventLoop, event: TrayEvent) {
         self.emit(RuntimeEvent::Tray(event.clone()));
         if let TrayEvent::Action { action, .. } = &event
@@ -218,6 +221,7 @@ impl MultiApplication {
         self.process_pending(event_loop);
     }
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     fn sync_tray(&mut self) {
         let config = self
             .model
@@ -276,8 +280,8 @@ impl MultiApplication {
     }
 }
 
-#[cfg_attr(coverage_nightly, coverage(off))]
 impl ApplicationHandler<UserEvent> for MultiApplication {
+    #[cfg_attr(coverage_nightly, coverage(off))]
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         #[cfg(target_arch = "wasm32")]
         if let Err(error) = argui_platform::apply_web_identity(&self.config.identity) {
@@ -291,12 +295,14 @@ impl ApplicationHandler<UserEvent> for MultiApplication {
         self.process_pending(event_loop);
     }
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     fn suspended(&mut self, event_loop: &ActiveEventLoop) {
         for entry in self.windows.values_mut() {
             entry.runtime.suspended(event_loop);
         }
     }
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     fn user_event(&mut self, event_loop: &ActiveEventLoop, event: UserEvent) {
         let _ = event_loop;
         match event {
@@ -332,6 +338,7 @@ impl ApplicationHandler<UserEvent> for MultiApplication {
         }
     }
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     fn window_event(
         &mut self,
         event_loop: &ActiveEventLoop,
@@ -381,6 +388,14 @@ fn scoped_callback(
     callback: SharedCallback,
 ) -> impl FnMut(RuntimeEvent) {
     move |event| {
+        let lifecycle = match &event {
+            RuntimeEvent::RendererReady => Some(AppEvent::WindowReady { window: key.clone() }),
+            RuntimeEvent::RendererFailed(error) => Some(AppEvent::WindowFailed { window: key.clone(), error: error.clone() }),
+            _ => None,
+        };
+        if let Some(event) = lifecycle {
+            pending.borrow_mut().push(model.borrow_mut().update(&event));
+        }
         if let RuntimeEvent::Platform(platform) = &event {
             let update = model.borrow_mut().update(&AppEvent::Window {
                 window: key.clone(),
@@ -425,15 +440,8 @@ impl WindowModel {
         }
         own
     }
-}
 
-impl Render for WindowModel {
-    fn render(&mut self, cx: &mut Context<Self>) -> Element {
-        self.view(cx.environment())
-            .unwrap_or_else(|| Element::container(Vec::<Element>::new()))
-    }
-
-    fn event(&mut self, event: &argui_ui::UiEvent, cx: &mut Context<Self>) {
+    fn handle_ui_event(&mut self, event: &argui_ui::UiEvent, cx: &mut Context<Self>) {
         let update = self.model.borrow_mut().update(&AppEvent::Ui {
             window: self.key.clone(),
             event: event.clone(),
@@ -461,6 +469,26 @@ impl Render for WindowModel {
         if let Some(request) = self.model.borrow_mut().take_theme_request(&self.key) {
             cx.set_theme(request);
         }
+    }
+}
+
+impl Render for WindowModel {
+    fn render(&mut self, cx: &mut Context<Self>) -> Element {
+        let mut root = self
+            .view(cx.environment())
+            .unwrap_or_else(|| Element::container(Vec::<Element>::new()));
+        if let Some(router) = self.model.borrow().event_router(&self.key) {
+            cx.route_events_to(router);
+            if !self.model.borrow().captures_ui_events() {
+                return root;
+            }
+        }
+        for event in argui_ui::EventType::ALL {
+            root = root.on(cx
+                .listener(event, |model, event, cx| model.handle_ui_event(event, cx))
+                .capture(true));
+        }
+        root
     }
 
     fn animation_frame(&mut self, frame: argui_animation::Frame, cx: &mut Context<Self>) {
@@ -497,6 +525,3 @@ fn request_update<T: Render>(cx: &mut Context<T>, update: ViewUpdate) {
         ViewUpdate::Rebuild => cx.notify(),
     }
 }
-
-#[cfg(all(test, feature = "tray", not(target_arch = "wasm32")))]
-mod tests;

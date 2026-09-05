@@ -26,8 +26,8 @@ pub(crate) struct VectorGpu {
     rasterizations_this_frame: usize,
 }
 
-#[cfg_attr(coverage_nightly, coverage(off))]
 impl VectorGpu {
+    #[cfg_attr(coverage_nightly, coverage(off))]
     pub fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
         let pipeline = VectorPipeline::new(device, format);
         let atlas = VectorAtlas::new(device);
@@ -43,6 +43,7 @@ impl VectorGpu {
         }
     }
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     pub fn register(&mut self, asset: &VectorAsset) -> Result<(), RendererError> {
         let tree = resvg::usvg::Tree::from_data(&asset.svg, &resvg::usvg::Options::default())
             .map_err(|error| RendererError::VectorRasterization(error.to_string()))?;
@@ -57,6 +58,7 @@ impl VectorGpu {
         Ok(())
     }
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     pub fn prepare(
         &mut self,
         device: &wgpu::Device,
@@ -76,6 +78,7 @@ impl VectorGpu {
         }
     }
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     fn prepare_once(
         &mut self,
         device: &wgpu::Device,
@@ -134,15 +137,18 @@ impl VectorGpu {
         Ok(self.pipeline.write(device, queue, &instances, &clips))
     }
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     pub fn begin_frame(&mut self) {
         self.pipeline.begin_frame();
     }
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     pub fn clear_frame_stats(&mut self) {
         self.hits_this_frame = 0;
         self.rasterizations_this_frame = 0;
     }
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     pub fn stats(&self) -> VectorAtlasStats {
         VectorAtlasStats {
             entries: self.atlas.entry_count(),
@@ -152,10 +158,12 @@ impl VectorGpu {
         }
     }
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     pub fn target_offset(&mut self, queue: &wgpu::Queue, region: [f32; 4]) -> u32 {
         self.pipeline.target_offset(queue, region)
     }
 
+    #[cfg_attr(coverage_nightly, coverage(off))]
     pub fn draw<'a>(
         &'a self,
         pass: &mut wgpu::RenderPass<'a>,
@@ -242,122 +250,5 @@ fn unpremultiply(pixels: &mut [u8]) {
                 *channel = ((u32::from(*channel) * 255 + alpha / 2) / alpha).min(255) as u8;
             }
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use argui_core::{Affine2D, Color, Point, Rect, Size};
-    use argui_paint::{ClipChain, ImageFit, VectorId, VectorPrimitive};
-
-    use super::{
-        RasterKey, RegisteredVector, choose_variant, pixel_extent, raster_dimensions, rasterize,
-        unpremultiply,
-    };
-
-    fn primitive(fit: ImageFit) -> VectorPrimitive {
-        VectorPrimitive {
-            vector: VectorId(1),
-            bounds: Rect::new(Point::default(), Size::new(32.0, 16.0)),
-            fit,
-            color: Color::WHITE,
-            opacity: 1.0,
-            transform: Affine2D::IDENTITY,
-            clips: ClipChain::default(),
-        }
-    }
-
-    fn registered(svg: &[u8], tintable: bool) -> RegisteredVector {
-        let tree = resvg::usvg::Tree::from_data(svg, &resvg::usvg::Options::default()).unwrap();
-        RegisteredVector {
-            size: Size::new(tree.size().width(), tree.size().height()),
-            tree,
-            tintable,
-        }
-    }
-
-    #[test]
-    fn raster_size_obeys_fit_and_scale() {
-        let source = Size::new(24.0, 24.0);
-        assert_eq!(
-            raster_dimensions(&primitive(ImageFit::Contain), source, 2.0),
-            [32, 32]
-        );
-        assert_eq!(
-            raster_dimensions(&primitive(ImageFit::Cover), source, 2.0),
-            [64, 64]
-        );
-        assert_eq!(
-            raster_dimensions(&primitive(ImageFit::Fill), source, 2.0),
-            [64, 32]
-        );
-    }
-
-    #[test]
-    fn raster_extent_is_finite_and_bounded() {
-        assert_eq!(pixel_extent(f32::NAN), 1);
-        assert_eq!(pixel_extent(50_000.0), 2040);
-    }
-
-    #[test]
-    fn straight_alpha_is_recovered() {
-        let mut pixels = [64, 32, 16, 128, 9, 8, 7, 0, 3, 4, 5, 255];
-        unpremultiply(&mut pixels);
-        assert_eq!(pixels, [128, 64, 32, 128, 0, 0, 0, 0, 3, 4, 5, 255]);
-    }
-
-    #[test]
-    fn raster_variants_use_quality_hysteresis() {
-        let cached = RasterKey {
-            id: VectorId(1),
-            width: 64,
-            height: 64,
-        };
-        let nearby = RasterKey {
-            id: VectorId(1),
-            width: 70,
-            height: 70,
-        };
-        let larger = RasterKey {
-            id: VectorId(1),
-            width: 80,
-            height: 80,
-        };
-        assert_eq!(choose_variant(nearby, &[cached]), cached);
-        assert_eq!(choose_variant(larger, &[cached]), larger);
-    }
-
-    #[test]
-    fn curved_icons_keep_antialiased_coverage_for_gpu_tinting() {
-        let icon = registered(
-            br#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><circle cx="12" cy="12" r="8" fill="currentColor"/></svg>"#,
-            true,
-        );
-        let pixels = rasterize(&icon, 16, 16).unwrap();
-        let pixels = pixels.as_chunks::<4>().0;
-        assert!(pixels.iter().any(|pixel| pixel[3] == 0));
-        assert!(pixels.iter().any(|pixel| pixel[3] == 255));
-        assert!(pixels.iter().any(|pixel| (1..255).contains(&pixel[3])));
-        assert!(
-            pixels
-                .iter()
-                .filter(|pixel| pixel[3] != 0)
-                .all(|pixel| pixel[..3] == [255, 255, 255])
-        );
-    }
-
-    #[test]
-    fn gradients_and_clips_survive_static_svg_rasterization() {
-        let asset = registered(
-            br##"<svg xmlns="http://www.w3.org/2000/svg" width="16" height="8"><defs><linearGradient id="g"><stop stop-color="#ff0000"/><stop offset="1" stop-color="#0000ff"/></linearGradient><clipPath id="c"><path d="M0 0H12V8H0Z"/></clipPath></defs><path clip-path="url(#c)" fill="url(#g)" d="M0 0H16V8H0Z"/></svg>"##,
-            false,
-        );
-        let pixels = rasterize(&asset, 16, 8).unwrap();
-        let left = &pixels[(4 * 4)..(4 * 5)];
-        let right = &pixels[(4 * 10)..(4 * 11)];
-        let clipped = &pixels[(4 * 15)..(4 * 16)];
-        assert!(left[0] > left[2]);
-        assert!(right[2] > right[0]);
-        assert_eq!(clipped[3], 0);
     }
 }

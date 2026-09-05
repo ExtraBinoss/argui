@@ -4,8 +4,8 @@ use argui_core::{PointerId, Rect};
 use argui_inspect::InspectorHandle;
 use argui_paint::{ImageAsset, VectorAsset};
 use argui_ui::{
-    ClipboardRequest, Element, EventOwnerId, FocusRequest, FocusTarget, TextSelection,
-    TextSelectionRequest, UiEvent,
+    ClipboardRequest, Element, EventHandlerId, EventOwnerId, FocusRequest, FocusTarget,
+    TextSelection, TextSelectionRequest, UiEvent,
 };
 use std::{
     any::Any,
@@ -17,35 +17,102 @@ use std::{
 use crate::{ThemeRequest, WindowEnvironment};
 
 mod effects;
+mod handler;
 mod layout;
 pub(crate) use effects::PointerCaptureRequest;
 pub use effects::ViewUpdate;
 use effects::{ContextEffects, SelectionCommandRequest, merge_effects, strongest_update};
+use handler::{HandlerRegistry, LocalHandler};
 pub use layout::{LayoutBounds, LayoutSnapshot, ScrollRequest};
 
-/// Retained component identity. Cloning an entity never clones its state.
-pub struct Entity<T: Render>(Rc<EntityCell<T>>);
+type HandlerDispatch = dyn Fn(EventHandlerId, &UiEvent) -> ContextEffects;
+type Observer = Rc<dyn Fn()>;
 
-struct EntityCell<T: Render> {
-    value: RefCell<T>,
-    cached: RefCell<Option<Element>>,
-    dirty: Cell<bool>,
-    pending: RefCell<ContextEffects>,
-    children: RefCell<Vec<AnyEntity>>,
-    observers: RefCell<std::collections::HashMap<usize, Rc<dyn Fn()>>>,
-    environment: Cell<WindowEnvironment>,
-    environment_used: Cell<bool>,
+struct RenderCache {
+    element: RefCell<Option<Element>>,
+    dirty: Rc<Cell<bool>>,
+    observers: RefCell<std::collections::HashMap<usize, Observer>>,
 }
 
-impl<T: Render> Clone for Entity<T> {
+impl RenderCache {
+    fn new() -> Self {
+        Self {
+            element: RefCell::new(None),
+            dirty: Rc::new(Cell::new(true)),
+            observers: RefCell::new(std::collections::HashMap::new()),
+        }
+    }
+
+    fn observer(&self) -> Observer {
+        let dirty = Rc::downgrade(&self.dirty);
+        Rc::new(move || {
+            if let Some(dirty) = dirty.upgrade() {
+                dirty.set(true);
+            }
+        })
+    }
+
+    fn register(&self, owner: &Option<(usize, Observer)>) {
+        if let Some((identity, observer)) = owner {
+            self.observers
+                .borrow_mut()
+                .insert(*identity, observer.clone());
+        }
+    }
+
+    fn reusable(&self, environment_changed: bool) -> Option<Element> {
+        if !self.dirty.get()
+            && !environment_changed
+            && let Some(element) = self.element.borrow().as_ref()
+        {
+            return Some(element.clone());
+        }
+        None
+    }
+
+    fn store(&self, element: &Element) {
+        *self.element.borrow_mut() = Some(element.clone());
+        self.dirty.set(false);
+    }
+
+    fn mark_dirty(&self) {
+        if !self.dirty.replace(true) {
+            for observer in self.observers.borrow().values() {
+                observer();
+            }
+        }
+    }
+
+    fn apply_update(&self, update: ViewUpdate) {
+        if update == ViewUpdate::Rebuild {
+            self.mark_dirty();
+        }
+    }
+}
+
+/// Retained component identity. Cloning an entity never clones its state.
+pub struct Entity<T>(Rc<EntityCell<T>>);
+
+struct EntityCell<T> {
+    value: RefCell<T>,
+    cache: RenderCache,
+    pending: RefCell<ContextEffects>,
+    children: RefCell<Vec<AnyEntity>>,
+    event_routes: RefCell<Vec<AnyEntity>>,
+    environment: Cell<WindowEnvironment>,
+    environment_used: Cell<bool>,
+    handlers: RefCell<HandlerRegistry<T>>,
+}
+
+impl<T> Clone for Entity<T> {
     fn clone(&self) -> Self {
         Self(Rc::clone(&self.0))
     }
 }
 
-pub struct WeakEntity<T: Render>(Weak<EntityCell<T>>);
+pub struct WeakEntity<T>(Weak<EntityCell<T>>);
 
-impl<T: Render> Clone for WeakEntity<T> {
+impl<T> Clone for WeakEntity<T> {
     fn clone(&self) -> Self {
         Self(Weak::clone(&self.0))
     }
@@ -55,7 +122,7 @@ impl<T: Render> Clone for WeakEntity<T> {
 pub struct AnyEntity {
     identity: Rc<dyn Any>,
     render: Rc<dyn Fn(WindowEnvironment) -> Element>,
-    dispatch: Rc<dyn Fn(&UiEvent) -> ContextEffects>,
+    dispatch_handler: Rc<HandlerDispatch>,
     store: Rc<dyn Fn(ContextEffects)>,
     wants_frame: Rc<dyn Fn() -> bool>,
     frame: Rc<dyn Fn(Frame) -> ContextEffects>,
@@ -68,16 +135,17 @@ pub struct AnyEntity {
 }
 
 /// Mutation and scheduling access scoped to one retained component.
-pub struct Context<T: Render> {
+pub struct Context<T> {
     pub(crate) effects: ContextEffects,
-    owner: Option<(usize, Rc<dyn Fn()>)>,
+    owner: Option<(usize, Observer)>,
     environment: WindowEnvironment,
     environment_read: Cell<bool>,
     event_target: Option<argui_ui::NodeId>,
+    handlers: Vec<LocalHandler<T>>,
     _marker: PhantomData<fn() -> T>,
 }
 
-impl<T: Render> Default for Context<T> {
+impl<T> Default for Context<T> {
     fn default() -> Self {
         Self {
             effects: ContextEffects::default(),
@@ -85,6 +153,7 @@ impl<T: Render> Default for Context<T> {
             environment: WindowEnvironment::default(),
             environment_read: Cell::new(false),
             event_target: None,
+            handlers: Vec::new(),
             _marker: PhantomData,
         }
     }
@@ -183,15 +252,6 @@ impl<T: Render> Context<T> {
         self.notify();
     }
 
-    /// Creates a context for a directly rendered child while preserving its window environment.
-    #[must_use]
-    pub fn child_context<U: Render>(&self) -> Context<U> {
-        Context {
-            environment: self.environment,
-            ..Context::default()
-        }
-    }
-
     pub fn command(&mut self, command: AppCommand) {
         self.effects.commands.push(command);
     }
@@ -209,48 +269,44 @@ impl<T: Render> Context<T> {
     /// Renders a child entity and reuses its exact subtree while it is clean.
     pub fn entity<U: Render>(&mut self, entity: &Entity<U>) -> Element {
         let element = entity.render_in(self.environment);
-        self.environment_read
-            .set(self.environment_read.get() || entity.0.environment_used.get());
-        if let Some((identity, observer)) = &self.owner {
-            entity
-                .0
-                .observers
-                .borrow_mut()
-                .insert(*identity, observer.clone());
-        }
+        inherit_environment_use(&self.environment_read, &entity.0.environment_used);
+        entity.0.cache.register(&self.owner);
         self.effects.children.push(entity.erase());
         element
     }
 
-    /// Bubbles scheduling effects produced while rendering or dispatching to a child component.
-    pub fn propagate<U: Render>(&mut self, mut child: Context<U>) {
-        self.environment_read
-            .set(self.environment_read.get() || child.environment_read.get());
-        self.effects.update = strongest_update(self.effects.update, child.effects.update);
-        self.effects.animation_frame |= child.effects.animation_frame;
-        if child.effects.clipboard.is_some() {
-            self.effects.clipboard = child.effects.clipboard;
-        }
-        if child.effects.scroll.is_some() {
-            self.effects.scroll = child.effects.scroll;
-        }
-        if child.effects.focus.is_some() {
-            self.effects.focus = child.effects.focus;
-        }
-        if child.effects.text_selection.is_some() {
-            self.effects.text_selection = child.effects.text_selection;
-        }
-        if child.effects.theme.is_some() {
-            self.effects.theme = child.effects.theme;
-        }
-        if child.effects.selection_command.is_some() {
-            self.effects.selection_command = child.effects.selection_command;
-        }
-        self.effects.commands.append(&mut child.effects.commands);
-        self.effects
-            .pointer_capture
-            .append(&mut child.effects.pointer_capture);
-        self.effects.children.append(&mut child.effects.children);
+    /// Connects handlers from an already-rendered retained subtree to this entity.
+    pub fn route_events_to(&mut self, entity: AnyEntity) {
+        self.effects.event_routes.push(entity);
+    }
+
+    pub(crate) fn merge_effects(&mut self, child: ContextEffects) {
+        merge_effects(&mut self.effects, child);
+    }
+
+    /// Delivers a layout snapshot to a retained child with a component-specific viewport.
+    pub fn layout_entity<U: Render>(&mut self, entity: &Entity<U>, layout: &LayoutSnapshot) {
+        self.merge_effects(entity.dispatch_layout(layout));
+    }
+}
+
+fn inherit_environment_use(parent: &Cell<bool>, child: &Cell<bool>) {
+    if child.get() {
+        parent.set(true);
+    }
+}
+
+fn update_environment(
+    current: &Cell<WindowEnvironment>,
+    used: &Cell<bool>,
+    next: WindowEnvironment,
+) -> bool {
+    current.replace(next) != next && used.get()
+}
+
+fn with_event_handler(event: &UiEvent, dispatch: &mut dyn FnMut(EventHandlerId)) {
+    if let Some(handler) = event.current_handler() {
+        dispatch(handler);
     }
 }
 
@@ -258,12 +314,6 @@ pub trait Render: 'static {
     fn render(&mut self, cx: &mut Context<Self>) -> Element
     where
         Self: Sized;
-
-    fn event(&mut self, _event: &UiEvent, _cx: &mut Context<Self>)
-    where
-        Self: Sized,
-    {
-    }
 
     fn animation_frame(&mut self, _frame: Frame, _cx: &mut Context<Self>)
     where
@@ -299,13 +349,13 @@ impl<T: Render> Entity<T> {
     pub fn new(value: T) -> Self {
         Self(Rc::new(EntityCell {
             value: RefCell::new(value),
-            cached: RefCell::new(None),
-            dirty: Cell::new(true),
+            cache: RenderCache::new(),
             pending: RefCell::new(ContextEffects::default()),
             children: RefCell::new(Vec::new()),
-            observers: RefCell::new(std::collections::HashMap::new()),
+            event_routes: RefCell::new(Vec::new()),
             environment: Cell::new(WindowEnvironment::default()),
             environment_used: Cell::new(false),
+            handlers: RefCell::new(HandlerRegistry::default()),
         }))
     }
 
@@ -317,7 +367,7 @@ impl<T: Render> Entity<T> {
     #[must_use]
     pub fn erase(&self) -> AnyEntity {
         let render = self.clone();
-        let dispatch = self.clone();
+        let handler = self.clone();
         let store = self.clone();
         let wants_frame = self.clone();
         let frame = self.clone();
@@ -330,7 +380,7 @@ impl<T: Render> Entity<T> {
         AnyEntity {
             identity: self.0.clone(),
             render: Rc::new(move |environment| render.render_in(environment)),
-            dispatch: Rc::new(move |event| dispatch.dispatch(event)),
+            dispatch_handler: Rc::new(move |id, event| handler.dispatch_handler(id, event)),
             store: Rc::new(move |effects| store.store_effects(effects)),
             wants_frame: Rc::new(move || wants_frame.wants_frame()),
             frame: Rc::new(move |value| frame.dispatch_frame(value)),
@@ -344,12 +394,7 @@ impl<T: Render> Entity<T> {
     }
 
     pub fn update(&self, update: impl FnOnce(&mut T, &mut Context<T>)) {
-        let weak = self.downgrade();
-        let observer = Rc::new(move || {
-            if let Some(entity) = weak.upgrade() {
-                entity.mark_dirty();
-            }
-        });
+        let observer = self.0.cache.observer();
         let mut cx = Context {
             owner: Some((Rc::as_ptr(&self.0) as usize, observer)),
             environment: self.0.environment.get(),
@@ -367,37 +412,35 @@ impl<T: Render> Entity<T> {
     #[must_use]
     pub fn render_in(&self, environment: WindowEnvironment) -> Element {
         let environment_changed =
-            self.0.environment.replace(environment) != environment && self.0.environment_used.get();
-        if !self.0.dirty.get()
-            && !environment_changed
-            && let Some(cached) = self.0.cached.borrow().as_ref()
-        {
-            return cached.clone();
+            update_environment(&self.0.environment, &self.0.environment_used, environment);
+        if let Some(element) = self.0.cache.reusable(environment_changed) {
+            return element;
         }
-        let weak = self.downgrade();
-        let observer = Rc::new(move || {
-            if let Some(entity) = weak.upgrade() {
-                entity.mark_dirty();
-            }
-        });
+        let observer = self.0.cache.observer();
         let mut cx = Context {
             owner: Some((Rc::as_ptr(&self.0) as usize, observer)),
             environment,
             ..Context::default()
         };
-        let mut element = self.0.value.borrow_mut().render(&mut cx);
-        element.assign_event_owner(self.owner_id());
+        let element = self.0.value.borrow_mut().render(&mut cx);
+        self.0
+            .handlers
+            .borrow_mut()
+            .replace(std::mem::take(&mut cx.handlers));
         *self.0.children.borrow_mut() = std::mem::take(&mut cx.effects.children);
+        *self.0.event_routes.borrow_mut() = std::mem::take(&mut cx.effects.event_routes);
         self.0.environment_used.set(cx.environment_read.get());
-        *self.0.cached.borrow_mut() = Some(element.clone());
-        self.0.dirty.set(false);
+        self.0.cache.store(&element);
         self.finish(cx);
         element
     }
 
-    pub(crate) fn event(&self, event: &UiEvent) {
-        let effects = self.dispatch(event);
-        self.store_effects(effects);
+    /// Dispatches one listener delivery produced by [`argui_ui::UiTree`].
+    pub fn dispatch_event(&self, event: &UiEvent) {
+        with_event_handler(event, &mut |handler| {
+            let effects = self.dispatch_handler(handler, event);
+            self.store_effects(effects);
+        });
     }
 
     pub(crate) fn animation_frame(&self, frame: Frame) {
@@ -415,36 +458,9 @@ impl<T: Render> Entity<T> {
     }
 
     fn store_effects(&self, effects: ContextEffects) {
-        if effects.update == ViewUpdate::Rebuild {
-            self.mark_dirty();
-        }
+        self.0.cache.apply_update(effects.update);
         let mut pending = self.0.pending.borrow_mut();
         merge_effects(&mut pending, effects);
-    }
-
-    fn dispatch(&self, event: &UiEvent) -> ContextEffects {
-        if let Some(owner) = event.current_owner()
-            && owner != self.owner_id()
-            && let Some(child) = self
-                .0
-                .children
-                .borrow()
-                .iter()
-                .find(|child| (child.owns)(owner))
-        {
-            return (child.dispatch)(event);
-        }
-        let mut cx = Context {
-            environment: self.0.environment.get(),
-            event_target: Some(event.current_target()),
-            ..Context::default()
-        };
-        self.0.value.borrow_mut().event(event, &mut cx);
-        let effects = cx.effects;
-        if effects.update == ViewUpdate::Rebuild {
-            self.mark_dirty();
-        }
-        effects
     }
 
     fn owner_id(&self) -> EventOwnerId {
@@ -459,6 +475,12 @@ impl<T: Render> Entity<T> {
                 .borrow()
                 .iter()
                 .any(|child| (child.owns)(owner))
+            || self
+                .0
+                .event_routes
+                .borrow()
+                .iter()
+                .any(|route| (route.owns)(owner))
     }
 
     pub(crate) fn wants_frame(&self) -> bool {
@@ -484,9 +506,7 @@ impl<T: Render> Entity<T> {
         };
         self.0.value.borrow_mut().animation_frame(frame, &mut cx);
         merge_effects(&mut effects, cx.effects);
-        if effects.update == ViewUpdate::Rebuild {
-            self.mark_dirty();
-        }
+        self.0.cache.apply_update(effects.update);
         effects
     }
 
@@ -496,19 +516,8 @@ impl<T: Render> Entity<T> {
             ..Context::default()
         };
         self.0.value.borrow_mut().layout_changed(layout, &mut cx);
-        if cx.effects.update == ViewUpdate::Rebuild {
-            self.mark_dirty();
-        }
+        self.0.cache.apply_update(cx.effects.update);
         cx.effects
-    }
-
-    fn mark_dirty(&self) {
-        let was_dirty = self.0.dirty.replace(true);
-        if !was_dirty {
-            for observer in self.0.observers.borrow().values() {
-                observer();
-            }
-        }
     }
 
     pub(crate) fn take_effects(&self) -> ContextEffects {
@@ -538,7 +547,9 @@ impl AnyEntity {
     }
 
     pub(crate) fn event(&self, event: &UiEvent) {
-        (self.store)((self.dispatch)(event));
+        with_event_handler(event, &mut |handler| {
+            (self.store)((self.dispatch_handler)(handler, event));
+        });
     }
 
     pub(crate) fn animation_frame(&self, frame: Frame) {

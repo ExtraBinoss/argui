@@ -197,6 +197,8 @@ const fn lower_role(role: Role) -> AccessRole {
         Role::Dialog => AccessRole::Dialog,
         Role::Alert => AccessRole::Alert,
         Role::Separator => AccessRole::Splitter,
+        Role::Tree => AccessRole::Tree,
+        Role::TreeItem => AccessRole::TreeItem,
     }
 }
 

@@ -15,7 +15,9 @@ mod web_identity;
 mod window;
 
 pub use application::{ApplicationConfig, ApplicationConfigError};
-pub use argui_core::{PointerButton, PointerEvent, PointerId, PointerKind, PointerPhase};
+pub use argui_core::{
+    PointerButton, PointerEvent, PointerId, PointerKind, PointerPhase, PointerSettings,
+};
 pub use clipboard::{Clipboard, ClipboardError};
 pub use error::PlatformError;
 pub use event::{

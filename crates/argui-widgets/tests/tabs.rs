@@ -8,7 +8,11 @@ use argui_widgets::{Tab, Tabs, TabsAction, TabsBehavior, TabsPart, shadcn};
 
 fn click(key: &str) -> UiEvent {
     let tree = UiTree::new(Element::container([]));
-    UiEvent::new(tree.node_ids()[0], Some(key.into()), UiEventKind::Clicked)
+    UiEvent::new(
+        tree.node_ids()[0],
+        Some(key.into()),
+        UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
+    )
 }
 
 #[test]
@@ -94,7 +98,7 @@ fn active_tab_keeps_its_surface_while_hovered() {
             enabled: true,
             focusable: true,
             cursor: CursorIcon::Pointer,
-            gestures: GestureSet::NONE,
+            gestures: GestureSet::EMPTY,
             window_drag: None,
         }],
     );

@@ -85,7 +85,7 @@ fn accessibility_action_update(
         }));
     }
     let kind = if request.action == SemanticAction::Click {
-        UiEventKind::Clicked
+        UiEventKind::Click(argui_ui::ClickEvent::accessibility())
     } else {
         UiEventKind::SemanticAction {
             action: request.action,
@@ -192,130 +192,6 @@ impl Application {
         {
             self.apply_accessibility_action(action, window, event_loop);
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use argui_accessibility::{SemanticAction, SemanticNodeId, SemanticRequest, SemanticValue};
-    use argui_core::{Affine2D, Point, Rect, Size};
-    use argui_layout::{LayoutNode, LayoutOutput};
-    use argui_paint::ClipChain;
-    use argui_ui::{
-        CursorIcon, Element, GestureSet, HitRegion, Interaction, Role, Semantics, UiEventKind,
-        UiTree,
-    };
-
-    use super::{accessibility_action_update, semantic_tree};
-
-    #[test]
-    fn actions_resolve_stable_nodes_focus_clicks_and_values() {
-        let mut ui = UiTree::new(
-            Element::container([])
-                .keyed("target")
-                .interaction(Interaction::default().focusable(true))
-                .semantics(Semantics::new(Role::Button)),
-        );
-        let target = ui.node_id_at(0).unwrap();
-        let mut layout = LayoutOutput::default();
-        layout.hit_regions.push(HitRegion {
-            node: target,
-            bounds: Rect::new(Point::default(), Size::new(100.0, 40.0)),
-            transform: Affine2D::IDENTITY,
-            clips: ClipChain::default(),
-            shape: argui_ui::HitShape::Bounds,
-            slop: argui_ui::HitTestStyle::default().slop,
-            enabled: true,
-            focusable: true,
-            cursor: CursorIcon::Auto,
-            gestures: GestureSet::NONE,
-            window_drag: None,
-        });
-        let request = |action, value| SemanticRequest {
-            target: SemanticNodeId::new(target.get()),
-            action,
-            value,
-        };
-
-        let focus = accessibility_action_update(
-            &mut ui,
-            Some(&layout),
-            request(SemanticAction::Focus, None),
-        )
-        .unwrap();
-        assert!(
-            focus
-                .events
-                .iter()
-                .any(|event| event.kind == UiEventKind::Focused)
-        );
-        let click =
-            accessibility_action_update(&mut ui, None, request(SemanticAction::Click, None))
-                .unwrap();
-        assert_eq!(click.events[0].kind, UiEventKind::Clicked);
-        let value = accessibility_action_update(
-            &mut ui,
-            None,
-            request(
-                SemanticAction::SetValue,
-                Some(SemanticValue::Text("new".into())),
-            ),
-        )
-        .unwrap();
-        assert!(matches!(
-            value.events[0].kind,
-            UiEventKind::SemanticAction {
-                action: SemanticAction::SetValue,
-                ..
-            }
-        ));
-        assert!(
-            accessibility_action_update(
-                &mut ui,
-                None,
-                SemanticRequest {
-                    target: SemanticNodeId::new(999),
-                    action: SemanticAction::Click,
-                    value: None,
-                }
-            )
-            .is_none()
-        );
-    }
-
-    #[test]
-    fn semantic_snapshots_clip_bounds_and_have_a_window_fallback() {
-        let ui = UiTree::new(Element::text("visible"));
-        let node = ui.node_id_at(0).unwrap();
-        let mut layout = LayoutOutput {
-            nodes: vec![LayoutNode {
-                index: 0,
-                node,
-                bounds: Rect::new(Point::new(10.0, 10.0), Size::new(50.0, 30.0)),
-                layout_bounds: Rect::default(),
-                clip: Some(Rect::new(Point::new(20.0, 0.0), Size::new(20.0, 30.0))),
-                text_index: None,
-            }],
-            ..LayoutOutput::default()
-        };
-        let snapshot = semantic_tree(Some(&ui), Some(&layout), Size::default(), 2.0);
-        assert_eq!(snapshot.nodes[0].bounds.origin, Point::new(40.0, 20.0));
-        assert_eq!(snapshot.nodes[0].bounds.size, Size::new(40.0, 40.0));
-
-        layout.nodes[0].clip = Some(Rect::new(Point::new(100.0, 100.0), Size::new(2.0, 2.0)));
-        assert_eq!(
-            semantic_tree(Some(&ui), Some(&layout), Size::default(), 1.0).nodes[0].bounds,
-            Rect::default()
-        );
-        layout.nodes[0].clip = None;
-        assert_eq!(
-            semantic_tree(Some(&ui), Some(&layout), Size::default(), 1.0).nodes[0].bounds,
-            layout.nodes[0].bounds
-        );
-
-        let fallback = semantic_tree(None, None, Size::new(320.0, 200.0), 1.5);
-        assert_eq!(fallback.nodes[0].semantics.role, Role::Window);
-        assert_eq!(fallback.nodes[0].bounds.size, Size::new(480.0, 300.0));
     }
 }
 

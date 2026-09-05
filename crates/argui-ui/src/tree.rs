@@ -62,6 +62,7 @@ pub struct UiTree {
     has_container_queries: bool,
     reduced_motion: bool,
     events: EventRegistry,
+    pending_gestures: Vec<crate::GestureEvent>,
 }
 
 impl UiTree {
@@ -93,6 +94,7 @@ impl UiTree {
             has_container_queries: false,
             reduced_motion: false,
             events,
+            pending_gestures: Vec::new(),
         };
         tree.sync_text_inputs();
         tree.sync_responsive_registry();
@@ -167,6 +169,8 @@ impl UiTree {
                 self.root = root;
                 self.sync_animation_registry();
                 self.interaction.retain(&self.node_ids);
+                self.pending_gestures
+                    .retain(|gesture| self.node_ids.contains(&gesture.target));
                 self.scroll.retain(&self.node_ids);
                 self.sync_text_inputs();
                 if self.document_selection().is_some_and(|selection| {
@@ -202,6 +206,10 @@ impl UiTree {
 
     pub fn mark_layout_clean(&mut self) {
         self.layout_dirty = false;
+    }
+
+    pub fn set_pointer_settings(&mut self, settings: argui_core::PointerSettings) {
+        self.interaction.set_pointer_settings(settings);
     }
 
     #[must_use]

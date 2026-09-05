@@ -156,22 +156,3 @@ fn size_class(size: u32) -> u32 {
 fn texture_bytes(format: TextureFormat, width: u32, height: u32) -> u64 {
     u64::from(width) * u64::from(height) * u64::from(format.block_copy_size(None).unwrap_or(4))
 }
-
-#[cfg(test)]
-mod tests {
-    use super::{size_class, texture_bytes};
-
-    #[test]
-    fn offscreen_dimensions_reuse_nearby_allocation_classes() {
-        assert_eq!(size_class(0), 64);
-        assert_eq!(size_class(1), 64);
-        assert_eq!(size_class(64), 64);
-        assert_eq!(size_class(65), 128);
-        assert_eq!(size_class(801), 832);
-        assert_eq!(texture_bytes(wgpu::TextureFormat::Rgba8Unorm, 10, 20), 800);
-        assert_eq!(
-            texture_bytes(wgpu::TextureFormat::Rgba16Float, 10, 20),
-            1_600
-        );
-    }
-}

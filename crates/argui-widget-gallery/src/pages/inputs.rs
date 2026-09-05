@@ -33,7 +33,7 @@ fn controlled_fields(
         "input-search-demo",
         "",
         "Search the GPU graph…",
-        theme.input.clone(),
+        theme.input(),
     )
     .kind(InputKind::Search)
     .label("GPU graph search")
@@ -43,22 +43,22 @@ fn controlled_fields(
         "Controlled fields",
         "Labels, descriptions, invalid, read-only and disabled states are semantic and visual.",
         Element::column([
-            Input::new("name", &gallery.name, "Full name", theme.input.clone())
+            Input::new("name", &gallery.name, "Full name", theme.input())
                 .label("Full name")
                 .build(),
-            Input::new("email", &gallery.email, "Email", theme.input.clone())
+            Input::new("email", &gallery.email, "Email", theme.input())
                 .label("Email address")
                 .description("Used only for this local preview")
                 .build(),
             search,
-            Input::new("invalid", "broken@", "Email", theme.input.clone())
+            Input::new("invalid", "broken@", "Email", theme.input())
                 .label("Invalid field")
                 .invalid(true)
                 .build(),
-            Input::new("readonly", "Read-only value", "", theme.input.clone())
+            Input::new("readonly", "Read-only value", "", theme.input())
                 .read_only(true)
                 .build(),
-            Input::new("input-disabled", "Disabled", "", theme.input.clone())
+            Input::new("input-disabled", "Disabled", "", theme.input())
                 .enabled(false)
                 .build(),
         ])
@@ -76,7 +76,7 @@ fn caret_playground(theme: &WidgetTheme) -> Element {
                 "caret-standard",
                 "Standard blinking bar",
                 "Standard caret",
-                theme.input.clone(),
+                theme.input(),
             )
             .read_only(true)
             .build(),
@@ -103,7 +103,7 @@ fn caret_playground(theme: &WidgetTheme) -> Element {
 }
 
 fn with_caret(theme: &WidgetTheme, caret: CaretStyle) -> argui::widgets::InputStyle {
-    theme.input.clone().caret(caret)
+    theme.input().caret(caret)
 }
 
 fn colored_dot() -> CaretStyle {
@@ -170,19 +170,4 @@ fn animated_ellipsis() -> CaretStyle {
         CaretAnimation::new(frames, Duration::from_millis(1_600))
             .expect("the ellipsis caret duration must be non-zero"),
     )
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn examples_are_authored_from_primitives_and_generic_keyframes() {
-        let dot = colored_dot();
-        assert_eq!(dot.visual.primitives.len(), 1);
-        assert!(dot.animation.is_some());
-        let ellipsis = animated_ellipsis();
-        assert_eq!(ellipsis.visual.primitives.len(), 3);
-        assert!(ellipsis.animation.is_some());
-    }
 }

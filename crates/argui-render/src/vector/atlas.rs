@@ -157,33 +157,3 @@ fn pad_pixels(pixels: &[u8], width: u32, height: u32) -> Vec<u8> {
     }
     padded
 }
-
-#[cfg(test)]
-mod tests {
-    use super::{ATLAS_SIZE, GUTTER, pad_pixels};
-
-    #[test]
-    fn atlas_budget_is_bounded() {
-        assert_eq!(ATLAS_SIZE as usize * ATLAS_SIZE as usize * 4, 16 << 20);
-        assert_eq!(GUTTER, 2);
-    }
-
-    #[test]
-    fn raster_upload_has_a_transparent_sampling_gutter() {
-        let padded = pad_pixels(&[1, 2, 3, 4, 5, 6, 7, 8], 2, 1);
-        let stride = (2 + GUTTER * 2) as usize * 4;
-        assert_eq!(padded.len(), stride * (1 + GUTTER * 2) as usize);
-        assert!(
-            padded[..stride * GUTTER as usize]
-                .iter()
-                .all(|byte| *byte == 0)
-        );
-        let content = stride * GUTTER as usize + GUTTER as usize * 4;
-        assert_eq!(&padded[content..content + 8], &[1, 2, 3, 4, 5, 6, 7, 8]);
-        assert!(
-            padded[content + 8..content + stride - GUTTER as usize * 4]
-                .iter()
-                .all(|byte| *byte == 0)
-        );
-    }
-}

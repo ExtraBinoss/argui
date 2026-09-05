@@ -100,7 +100,11 @@ impl TextFieldBehavior {
                             .enabled(self.enabled)
                             .focusable(self.enabled)
                             .cursor(CursorIcon::Text)
-                            .gestures(GestureSet::NONE.tap().pan()),
+                            .gestures(
+                                GestureSet::default()
+                                    .tap(argui_ui::TapGesture::default())
+                                    .pan(argui_ui::PanGesture::default()),
+                            ),
                     )
                     .semantics(semantics)
             }

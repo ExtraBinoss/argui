@@ -78,7 +78,6 @@ fn visual_changed(old: &Element, new: &Element) -> bool {
         || old.layer != new.layer
         || old.effects != new.effects
         || old.scroll != new.scroll
-        || old.event_owner != new.event_owner
         || old.event_listeners != new.event_listeners
         || old.user_select != new.user_select
         || old.selection_style != new.selection_style

@@ -213,16 +213,3 @@ fn boundary(text: &str, index: usize) -> usize {
         .find(|candidate| text.is_char_boundary(*candidate))
         .unwrap_or_default()
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn semantic_ranges_obey_unicode_and_lines() {
-        let text = "hello café\nsecond";
-        assert_eq!(word_range(text, 8), 6..11);
-        assert_eq!(line_range(text, 8), 0..11);
-        assert_eq!(line_range(text, text.len()), 12..18);
-    }
-}

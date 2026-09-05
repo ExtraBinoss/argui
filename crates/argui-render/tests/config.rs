@@ -1,4 +1,4 @@
-use argui_render::{RendererConfig, SurfaceAlphaMode};
+use argui_render::{EffectQuality, EffectQualitySettings, RendererConfig, SurfaceAlphaMode};
 
 #[test]
 fn renderer_defaults_to_vsync_and_a_discrete_gpu() {
@@ -55,4 +55,36 @@ fn transparent_surface_configuration_uses_a_transparent_clear() {
         opaque.clear_color,
         argui_core::Color::srgb(0.055, 0.065, 0.09)
     );
+}
+
+#[test]
+fn effect_quality_and_configuration_builders_are_composable() {
+    assert_eq!(
+        EffectQuality::Normal.settings(),
+        EffectQualitySettings {
+            blur_downsample_bias: 1,
+            spatial_effect_divisor: 1,
+        }
+    );
+    assert_eq!(EffectQuality::Balanced.settings().blur_downsample_bias, 2);
+    assert_eq!(
+        EffectQuality::Performance.settings().spatial_effect_divisor,
+        2
+    );
+
+    let custom = EffectQualitySettings {
+        blur_downsample_bias: 7,
+        spatial_effect_divisor: 5,
+    };
+    assert_eq!(EffectQuality::Custom(custom).settings(), custom);
+
+    let config = RendererConfig::default()
+        .clear_color(argui_core::Color::BLACK)
+        .image_cache_bytes(4096)
+        .gradient_stop_capacity(32)
+        .effect_quality(EffectQuality::Performance);
+    assert_eq!(config.clear_color, argui_core::Color::BLACK);
+    assert_eq!(config.image_cache_bytes, 4096);
+    assert_eq!(config.gradient_stop_capacity, 32);
+    assert_eq!(config.effect_quality, EffectQuality::Performance);
 }

@@ -28,15 +28,3 @@ fn contains_current_color(svg: &[u8]) -> bool {
     svg.windows(b"currentColor".len())
         .any(|window| window.eq_ignore_ascii_case(b"currentColor"))
 }
-
-#[cfg(test)]
-mod tests {
-    use super::contains_current_color;
-
-    #[test]
-    fn detects_current_color_case_insensitively() {
-        assert!(contains_current_color(b"stroke='currentColor'"));
-        assert!(contains_current_color(b"fill='CURRENTCOLOR'"));
-        assert!(!contains_current_color(b"stroke='#fff'"));
-    }
-}

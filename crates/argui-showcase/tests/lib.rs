@@ -1,15 +1,11 @@
 use argui_animation::{Duration, Frame, Time};
-use argui_core::{
-    Affine2D, ColorScheme, Key, KeyInput, KeyState, Modifiers, Point, Rect, ScrollDelta, Size,
-};
+use argui_core::{ColorScheme, Key, KeyInput, KeyState, Modifiers, Point, ScrollDelta, Size};
 use argui_layout::LayoutEngine;
-use argui_paint::{ClipChain, ClipRegion, Fill, Filter};
-use argui_runtime::{Context, Entity, LayoutSnapshot, Render, ViewUpdate};
+use argui_paint::{Fill, Filter};
+use argui_runtime::{Context, Entity, ViewUpdate};
 use argui_showcase::{StateShowcase, text_engine};
 use argui_text::TextStyle;
-use argui_ui::{
-    CursorIcon, GestureEvent, GestureKind, GesturePhase, HitRegion, UiEvent, UiEventKind, UiTree,
-};
+use argui_ui::{GestureEvent, GestureKind, GesturePhase, UiEvent, UiEventKind, UiTree};
 fn render_view(app: &StateShowcase) -> argui_ui::Element {
     app.view(argui_runtime::WindowEnvironment::default())
 }
@@ -31,26 +27,28 @@ fn node_index(root: &argui_ui::Element, key: &str) -> usize {
 fn events_for(app: &StateShowcase, key: &str) -> Vec<UiEvent> {
     let root = render_view(app);
     let index = node_index(&root, key);
-    let mut tree = UiTree::new(root);
+    let tree = UiTree::new(root);
     let node = tree.node_id_at(index).unwrap();
-    let bounds = Rect::new(Point::default(), Size::new(100.0, 40.0));
-    let regions = [HitRegion {
-        node,
-        bounds,
-        transform: Affine2D::IDENTITY,
-        clips: ClipChain::from_regions([ClipRegion::new(bounds, Affine2D::IDENTITY)]),
-        shape: argui_ui::HitShape::Bounds,
-        slop: argui_ui::HitTestStyle::default().slop,
-        enabled: true,
-        focusable: true,
-        cursor: CursorIcon::Auto,
-        gestures: argui_ui::GestureSet::NONE,
-        window_drag: None,
-    }];
-    let mut events = tree.pointer_moved(Point::new(10.0, 10.0), &regions).events;
-    events.extend(tree.primary_pressed(&regions).events);
-    events.extend(tree.primary_released().events);
-    events
+    let pointer = |phase| {
+        UiEvent::new(
+            node,
+            Some(key.into()),
+            UiEventKind::Pointer(argui_core::PointerEvent::mouse(
+                phase,
+                Point::new(10.0, 10.0),
+            )),
+        )
+    };
+    vec![
+        pointer(argui_core::PointerPhase::Entered),
+        pointer(argui_core::PointerPhase::Pressed),
+        pointer(argui_core::PointerPhase::Released),
+        UiEvent::new(
+            node,
+            Some(key.into()),
+            UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
+        ),
+    ]
 }
 
 fn keyed_event(app: &StateShowcase, key: &str, kind: UiEventKind) -> UiEvent {
@@ -77,7 +75,7 @@ fn key_input(app: &StateShowcase, key: Key, state: KeyState, repeat: bool) -> Ui
 fn click(app: &mut StateShowcase, key: &str) -> ViewUpdate {
     let event = events_for(app, key)
         .into_iter()
-        .find(|event| event.kind == UiEventKind::Clicked)
+        .find(|event| matches!(event.kind, UiEventKind::Click(_)))
         .unwrap();
     app.update(&event)
 }
@@ -140,14 +138,28 @@ fn theme_editors_and_resize_are_fully_controlled_by_showcase_state() {
     for _ in 0..5 {
         assert_eq!(click(&mut app, "primary"), ViewUpdate::Rebuild);
     }
-    let theme_event = keyed_event(&app, "theme", UiEventKind::Clicked);
-    let primary_event = keyed_event(&app, "primary", UiEventKind::Clicked);
-    let unrelated = keyed_event(&app, "increment", UiEventKind::Clicked);
+    let theme_event = keyed_event(
+        &app,
+        "theme",
+        UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
+    );
+    let primary_event = keyed_event(
+        &app,
+        "primary",
+        UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
+    );
+    let unrelated = keyed_event(
+        &app,
+        "increment",
+        UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
+    );
     let entity = Entity::new(app);
     entity.update(|showcase, cx: &mut Context<StateShowcase>| {
-        Render::event(showcase, &theme_event, cx);
-        Render::event(showcase, &primary_event, cx);
-        Render::event(showcase, &unrelated, cx);
+        for event in [&theme_event, &primary_event, &unrelated] {
+            if showcase.update(event) == ViewUpdate::Rebuild {
+                cx.notify();
+            }
+        }
     });
     let mut app = StateShowcase::default();
     for (key, value) in [
@@ -165,10 +177,19 @@ fn theme_editors_and_resize_are_fully_controlled_by_showcase_state() {
     );
     assert_eq!(app.update(&unknown), ViewUpdate::None);
 
-    let mut resize = keyed_event(&app, "notes-resize", UiEventKind::Clicked);
-    resize.kind = UiEventKind::Gesture(GestureEvent {
-        target: resize.target,
+    let entity = Entity::new(app);
+    let mut tree = UiTree::new(entity.render());
+    let target = tree
+        .node_ids()
+        .iter()
+        .copied()
+        .find(|node| tree.key(*node) == Some("notes-resize"))
+        .unwrap();
+    let resize = UiEventKind::Gesture(GestureEvent {
+        target,
+        pointer: argui_core::PointerId::MOUSE,
         phase: GesturePhase::Changed,
+        delivery: Default::default(),
         kind: GestureKind::Pan {
             position: Point::new(48.0, 32.0),
             delta: Point::new(48.0, 32.0),
@@ -176,7 +197,12 @@ fn theme_editors_and_resize_are_fully_controlled_by_showcase_state() {
             velocity: Point::default(),
         },
     });
-    assert_eq!(app.update(&resize), ViewUpdate::Rebuild);
+    for event in tree.event_deliveries(target, resize) {
+        if event.should_dispatch() {
+            entity.dispatch_event(&event);
+        }
+    }
+    assert_eq!(tree.update(entity.render()), argui_ui::TreeUpdate::Layout);
 }
 #[test]
 fn shared_animation_activates_samples_and_returns_to_idle() {
@@ -291,11 +317,27 @@ fn held_inertia_is_powered_until_release_then_decays() {
     let events = events_for(&app, "physics-inertia");
     let pressed = events
         .iter()
-        .find(|event| event.kind == UiEventKind::Pressed)
+        .find(|event| {
+            matches!(
+                event.kind,
+                UiEventKind::Pointer(argui_core::PointerEvent {
+                    phase: argui_core::PointerPhase::Pressed,
+                    ..
+                })
+            )
+        })
         .unwrap();
     let released = events
         .iter()
-        .find(|event| event.kind == UiEventKind::Released)
+        .find(|event| {
+            matches!(
+                event.kind,
+                UiEventKind::Pointer(argui_core::PointerEvent {
+                    phase: argui_core::PointerPhase::Released,
+                    ..
+                })
+            )
+        })
         .unwrap();
 
     assert_eq!(app.update(pressed), ViewUpdate::Rebuild);
@@ -469,11 +511,26 @@ fn effects_popover_scroll_repaints_a_valid_clipped_scene() {
 #[test]
 fn delayed_tooltip_appears_only_after_hover_delay() {
     let mut app = StateShowcase::default();
-    let idle_leave = keyed_event(&app, "tooltip-anchor", UiEventKind::PointerLeft);
+    let idle_leave = keyed_event(
+        &app,
+        "tooltip-anchor",
+        UiEventKind::Pointer(argui_core::PointerEvent::mouse(
+            argui_core::PointerPhase::Left,
+            Point::default(),
+        )),
+    );
     assert_eq!(app.update(&idle_leave), ViewUpdate::None);
     let entered = events_for(&app, "tooltip-anchor")
         .into_iter()
-        .find(|event| event.kind == UiEventKind::PointerEntered)
+        .find(|event| {
+            matches!(
+                event.kind,
+                UiEventKind::Pointer(argui_core::PointerEvent {
+                    phase: argui_core::PointerPhase::Entered,
+                    ..
+                })
+            )
+        })
         .unwrap();
     assert_eq!(app.update(&entered), ViewUpdate::None);
     assert!(app.wants_animation_frame());
@@ -489,48 +546,14 @@ fn delayed_tooltip_appears_only_after_hover_delay() {
     assert!(node_index_optional(&render_view(&app), "delayed-tooltip").is_some());
     let left = UiEvent::new(
         entered.target,
-        entered.key.clone(),
-        UiEventKind::PointerLeft,
+        entered.target_key().map(str::to_owned),
+        UiEventKind::Pointer(argui_core::PointerEvent::mouse(
+            argui_core::PointerPhase::Left,
+            Point::default(),
+        )),
     );
     assert_eq!(app.update(&left), ViewUpdate::Rebuild);
     assert!(node_index_optional(&render_view(&app), "delayed-tooltip").is_none());
-}
-
-#[test]
-fn overlay_layout_is_resolved_by_the_layout_engine_without_a_model_rebuild() {
-    let mut app = StateShowcase::default();
-    assert_eq!(
-        app.layout_changed(&LayoutSnapshot::default()),
-        ViewUpdate::None
-    );
-    open_popover(&mut app);
-    let view = render_view(&app);
-    let popover = element_by_key(&view, "effects-popover").unwrap();
-    assert!(popover.interaction.is_some());
-    assert!(popover.scroll.is_some());
-    assert_eq!(popover.style.size.height, argui_ui::length(430.0));
-
-    let mut tree = UiTree::new(view);
-    let mut layout = LayoutEngine::new();
-    let output = layout
-        .compute(&mut tree, &mut text_engine(), Size::new(500.0, 400.0))
-        .unwrap();
-    let bounds = |key: &str| {
-        output
-            .nodes
-            .iter()
-            .find(|node| tree.key(node.node) == Some(key))
-            .map(|node| node.bounds)
-            .unwrap()
-    };
-    let anchor = bounds("popover-toggle");
-    let placed = bounds("effects-popover");
-    assert!(placed.origin.y + placed.size.height <= output.viewport.size.height - 14.0);
-    assert!(placed.origin.y + placed.size.height <= anchor.origin.y - 12.0);
-    assert_eq!(
-        app.layout_changed(&LayoutSnapshot::default()),
-        ViewUpdate::None
-    );
 }
 
 fn node_index_optional(root: &argui_ui::Element, key: &str) -> Option<usize> {

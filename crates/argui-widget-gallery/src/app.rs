@@ -1,24 +1,25 @@
 use argui::{
     core::{Color, ColorScheme, Key, KeyState, Size},
-    paint::{Border, BorderWidths, CornerRadii, ImageAsset, ImageFit, ImageId, VectorAsset},
-    runtime::{Context, Entity, LayoutSnapshot, Render, ThemeRequest, WindowEnvironment},
+    paint::{Border, BorderWidths, CornerRadii, ImageFit, ImageId},
+    runtime::{Context, Entity, LayoutSnapshot, ThemeRequest, WindowEnvironment},
     text::{TextColor, TextStyle, TextWrap},
     theme::ThemeMode,
     ui::{
         AlignItems, Axes, CursorIcon, Element, GestureSet, Interaction, JustifyContent,
-        KeyboardActivation, Overflow, ResizeConfig, ResizeState, Role, ScrollConfig, ScrollRequest,
-        SemanticAction, Semantics, Sides, UiEvent, UiEventKind, length, percent, sides,
+        KeyboardActivation, Overflow, Role, ScrollConfig, ScrollRequest, SemanticAction, Semantics,
+        Sides, UiEvent, UiEventKind, length, percent,
     },
     widgets::{
         Button, DialogAction, DialogBehavior, Input, InputKind, RadioGroupAction,
         RadioGroupBehavior, RangeBehavior, RangeConfig, RangeState, SelectAction, SelectBehavior,
         SelectOption, Spinner, TablerIcon, TabsAction, TabsBehavior, WidgetAssets, WidgetTheme,
-        shadcn,
     },
 };
 use argui_image::ImageLibrary;
 
 use crate::{navigation::Page, pages};
+
+mod interaction;
 
 pub(crate) static PRIMARIES: LazyLock<[Color; 6]> = LazyLock::new(|| {
     [
@@ -30,6 +31,8 @@ pub(crate) static PRIMARIES: LazyLock<[Color; 6]> = LazyLock::new(|| {
         Color::srgb(0.20, 0.68, 0.94),
     ]
 });
+
+const EDITOR_DEFAULT_SIZE: Size = Size::new(520.0, 170.0);
 
 pub struct WidgetGallery {
     pub(crate) page: Page,
@@ -54,7 +57,9 @@ pub struct WidgetGallery {
     pub(crate) dialog_open: bool,
     pub(crate) clicks: u32,
     pub(crate) composition_hits: u32,
-    pub(crate) editor_size: ResizeState,
+    pub(crate) editor_size: Size,
+    editor_resize_start: Size,
+    shell: Entity<pages::AppShell>,
     pub(crate) slider_state: RangeState,
     pub(crate) plain_slider_state: RangeState,
     images: ImageLibrary,
@@ -103,7 +108,9 @@ impl Default for WidgetGallery {
             dialog_open: false,
             clicks: 0,
             composition_hits: 0,
-            editor_size: ResizeState::new(Size::new(520.0, 170.0)),
+            editor_size: EDITOR_DEFAULT_SIZE,
+            editor_resize_start: EDITOR_DEFAULT_SIZE,
+            shell: Entity::new(pages::AppShell::new(logo, light_assets.clone(), dark_assets.clone())),
             slider_state: RangeState::default(),
             plain_slider_state: RangeState::default(),
             images,
@@ -123,12 +130,13 @@ impl WidgetGallery {
         theme: &WidgetTheme,
         assets: &WidgetAssets,
         spinner: Element,
+        resize: pages::ResizeListeners,
     ) -> Element {
         Element::column([
             self.topbar(theme, assets),
             Element::row([
                 self.sidebar(theme, assets),
-                pages::render(self, theme, assets, spinner)
+                pages::render(self, theme, assets, spinner, resize)
                     .keyed("gallery-content-scroll")
                     .grow(1.0)
                     .min_width(length(0.0))
@@ -150,7 +158,7 @@ impl WidgetGallery {
         .interaction(
             Interaction::default()
                 .focusable(true)
-                .gestures(GestureSet::NONE.tap()),
+                .gestures(GestureSet::default().tap(argui::ui::TapGesture::default())),
         )
         .semantics(
             Semantics::new(Role::Window)
@@ -203,7 +211,7 @@ impl WidgetGallery {
                     Interaction::default()
                         .focusable(true)
                         .cursor(CursorIcon::Pointer)
-                        .gestures(GestureSet::NONE.tap())
+                        .gestures(GestureSet::default().tap(argui::ui::TapGesture::default()))
                         .keyboard_activation(KeyboardActivation::EnterOrSpace),
                 )
                 .semantics(
@@ -217,13 +225,18 @@ impl WidgetGallery {
         let theme_button = Button::new(
             "theme-mode",
             mode_label(self.theme_mode),
-            theme.ghost_button.clone(),
+            theme.ghost_button(),
         )
         .leading(assets.icon(mode_icon, 17.0))
         .build();
         Element::row([brand, Element::row([swatches, theme_button]).gap(14.0)])
             .height(length(64.0))
-            .padding(sides(22.0, 12.0))
+            .padding(Sides {
+                left: length(22.0),
+                right: length(126.0),
+                top: length(12.0),
+                bottom: length(12.0),
+            })
             .align_items(AlignItems::CENTER)
             .justify_content(JustifyContent::SPACE_BETWEEN)
             .background(theme.card)
@@ -241,7 +254,7 @@ impl WidgetGallery {
             "gallery-search",
             self.search.clone(),
             "Search components…",
-            theme.input.clone(),
+            theme.input(),
         )
         .kind(InputKind::Search)
         .label("Search components")
@@ -263,9 +276,9 @@ impl WidgetGallery {
                     format!("nav::{}", page.slug()),
                     page.label(),
                     if page == self.page {
-                        theme.button.clone()
+                        theme.button()
                     } else {
-                        theme.ghost_button.clone()
+                        theme.ghost_button()
                     },
                 )
                 .build()
@@ -347,7 +360,7 @@ impl WidgetGallery {
     }
 
     fn update_search_keys(&mut self, event: &UiEvent) -> Option<Page> {
-        if event.key.as_deref() != Some("gallery-search") {
+        if event.target_key() != Some("gallery-search") {
             return None;
         }
         let UiEventKind::KeyInput(input) = &event.kind else {
@@ -375,20 +388,8 @@ impl WidgetGallery {
     }
 }
 
-impl Render for WidgetGallery {
-    fn render(&mut self, cx: &mut Context<Self>) -> Element {
-        let environment = cx.environment();
-        let themes = shadcn(environment.primary);
-        let theme = themes.resolve(environment.color_scheme);
-        let assets = match environment.color_scheme {
-            ColorScheme::Light => &self.light_assets,
-            ColorScheme::Dark => &self.dark_assets,
-        };
-        let spinner = cx.entity(&self.spinner);
-        self.view(environment, theme, assets, spinner)
-    }
-
-    fn event(&mut self, event: &UiEvent, cx: &mut Context<Self>) {
+impl WidgetGallery {
+    fn handle_event(&mut self, event: &UiEvent, cx: &mut Context<Self>) {
         if self.handle_shortcuts(event, cx) {
             event.stop_propagation();
             return;
@@ -413,7 +414,7 @@ impl Render for WidgetGallery {
             return;
         }
         if let UiEventKind::TextChanged(value) = &event.kind {
-            match event.key.as_deref() {
+            match event.target_key() {
                 Some("gallery-search") => {
                     self.search.clone_from(value);
                     self.search_highlight = 0;
@@ -427,34 +428,44 @@ impl Render for WidgetGallery {
             return;
         }
         if let Some(page) = event
-            .key
-            .as_deref()
+            .target_key()
             .and_then(Page::from_navigation_key)
-            .filter(|_| matches!(event.kind, UiEventKind::Clicked))
+            .filter(|_| matches!(event.kind, UiEventKind::Click(_)))
         {
             self.page = page;
             cx.notify();
             return;
         }
-        if event.kind == UiEventKind::Clicked {
-            match event.key.as_deref() {
+        if matches!(event.kind, UiEventKind::Click(_)) {
+            match event.target_key() {
                 Some("theme-mode") => {
                     self.cycle_theme();
                     cx.set_theme(self.theme_request());
                     return;
                 }
-                Some("demo-button") => self.clicks = self.clicks.saturating_add(1),
+                Some("demo-button") => {
+                    self.clicks = self.clicks.saturating_add(1);
+                    cx.notify();
+                    return;
+                }
                 Some("composition-circle") => {
                     self.composition_hits = self.composition_hits.saturating_add(1);
                     cx.notify();
                     return;
                 }
-                Some("accepted") => self.accepted = !self.accepted,
-                Some("notifications") => self.notifications = !self.notifications,
+                Some("accepted") => {
+                    self.accepted = !self.accepted;
+                    cx.notify();
+                    return;
+                }
+                Some("notifications") => {
+                    self.notifications = !self.notifications;
+                    cx.notify();
+                    return;
+                }
                 _ => {
                     if let Some(index) = event
-                        .key
-                        .as_deref()
+                        .target_key()
                         .and_then(|key| key.strip_prefix("primary::"))
                         .and_then(|value| value.parse::<usize>().ok())
                         .filter(|index| *index < PRIMARIES.len())
@@ -523,22 +534,10 @@ impl Render for WidgetGallery {
         {
             self.dialog_open = action == DialogAction::Open;
             cx.notify();
-            return;
-        }
-        if self
-            .editor_size
-            .update(
-                event,
-                "notes-resize",
-                ResizeConfig::new(Size::new(280.0, 120.0), Size::new(760.0, 480.0)),
-            )
-            .is_some()
-        {
-            cx.notify();
         }
     }
 
-    fn layout_changed(&mut self, layout: &LayoutSnapshot, _cx: &mut Context<Self>) {
+    fn handle_layout(&mut self, layout: &LayoutSnapshot) {
         crate::property_slider::layout_changed(self, layout);
         let behavior = RangeBehavior::new(
             "plain-slider",
@@ -547,20 +546,6 @@ impl Render for WidgetGallery {
             RangeConfig::default(),
         );
         self.plain_slider_state.layout_changed(layout, &behavior);
-    }
-
-    fn image_assets(&self) -> Vec<ImageAsset> {
-        self.images.assets().to_vec()
-    }
-
-    fn vector_assets(&self) -> Vec<VectorAsset> {
-        self.light_assets
-            .assets()
-            .iter()
-            .chain(self.dark_assets.assets())
-            .chain(self.accent_assets.assets())
-            .cloned()
-            .collect()
     }
 }
 
@@ -583,7 +568,4 @@ const fn mode_label(mode: ThemeMode) -> &'static str {
     }
 }
 
-#[cfg(test)]
-#[path = "app_tests.rs"]
-mod tests;
 use std::sync::LazyLock;

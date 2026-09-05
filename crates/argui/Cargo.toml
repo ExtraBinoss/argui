@@ -8,8 +8,25 @@ license.workspace = true
 [features]
 default = []
 tray = ["argui-platform/tray", "argui-runtime/tray"]
-widgets = ["dep:argui-widgets"]
-devtools = ["widgets", "dep:argui-devtools"]
+widgets-all = ["argui-widgets/all"]
+widget-button = ["argui-widgets/button"]
+widget-input = ["argui-widgets/input"]
+widget-checkbox = ["argui-widgets/checkbox"]
+widget-switch = ["argui-widgets/switch"]
+widget-radio-group = ["argui-widgets/radio-group"]
+widget-tabs = ["argui-widgets/tabs"]
+widget-select = ["argui-widgets/select"]
+widget-popover = ["argui-widgets/popover"]
+widget-dialog = ["argui-widgets/dialog"]
+widget-range = ["argui-widgets/range"]
+widget-slider = ["argui-widgets/slider"]
+widget-spinner = ["argui-widgets/spinner"]
+widget-text-selection = ["argui-widgets/text-selection"]
+widget-split-pane = ["argui-widgets/split-pane"]
+widget-vlist = ["argui-widgets/vlist"]
+widget-tree-view = ["argui-widgets/tree-view"]
+widget-icons = ["argui-widgets/icons"]
+devtools = ["dep:argui-devtools"]
 
 [dependencies]
 argui-accessibility.workspace = true
@@ -30,7 +47,7 @@ argui-widgets = { workspace = true, optional = true }
 [dev-dependencies]
 argui-devtools.workspace = true
 argui-showcase.workspace = true
-argui-widgets.workspace = true
+argui-widgets = { workspace = true, features = ["all"] }
 
 [lints]
 workspace = true

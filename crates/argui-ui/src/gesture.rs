@@ -4,95 +4,15 @@ use argui_core::{Point, PointerEvent, PointerId, PointerPhase};
 
 use crate::NodeId;
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub struct GestureSet(u8);
-
-impl GestureSet {
-    const TAP: u8 = 1;
-    const PAN: u8 = 2;
-    const PINCH: u8 = 4;
-    const ROTATION: u8 = 8;
-    const PAN_IMMEDIATE: u8 = 16;
-
-    pub const NONE: Self = Self(0);
-    pub const ALL: Self = Self(Self::TAP | Self::PAN | Self::PINCH | Self::ROTATION);
-
-    #[must_use]
-    pub const fn tap(mut self) -> Self {
-        self.0 |= Self::TAP;
-        self
-    }
-
-    #[must_use]
-    pub const fn pan(mut self) -> Self {
-        self.0 |= Self::PAN;
-        self
-    }
-
-    #[must_use]
-    pub const fn pan_immediate(mut self) -> Self {
-        self.0 |= Self::PAN | Self::PAN_IMMEDIATE;
-        self
-    }
-
-    #[must_use]
-    pub const fn pinch(mut self) -> Self {
-        self.0 |= Self::PINCH;
-        self
-    }
-
-    #[must_use]
-    pub const fn rotation(mut self) -> Self {
-        self.0 |= Self::ROTATION;
-        self
-    }
-
-    const fn contains(self, flag: u8) -> bool {
-        self.0 & flag != 0
-    }
-
-    #[must_use]
-    pub const fn is_empty(self) -> bool {
-        self.0 == 0
-    }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum GesturePhase {
-    Started,
-    Changed,
-    Ended,
-    Cancelled,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum GestureKind {
-    Tap {
-        position: Point,
-    },
-    Pan {
-        position: Point,
-        delta: Point,
-        total: Point,
-        velocity: Point,
-    },
-    Pinch {
-        scale: f32,
-    },
-    Rotation {
-        radians: f32,
-    },
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct GestureEvent {
-    pub target: NodeId,
-    pub phase: GesturePhase,
-    pub kind: GestureKind,
-}
+mod config;
+pub use config::{
+    GestureCapture, GestureDelivery, GestureEvent, GestureKind, GesturePhase, GestureSet, PanAxis,
+    PanGesture, PinchGesture, RotationGesture, TapGesture,
+};
 
 #[derive(Clone, Debug)]
 struct Contact {
+    pointer: PointerId,
     target: NodeId,
     gestures: GestureSet,
     start: Point,
@@ -137,9 +57,10 @@ impl GestureArena {
     pub fn cancel_all(&mut self) -> Vec<GestureEvent> {
         let mut output = Vec::new();
         for contact in self.contacts.values() {
-            if contact.pan_started {
+            if let Some(pan) = contact.gestures.pan.filter(|_| contact.pan_started) {
                 output.push(pan_event(
                     contact,
+                    pan,
                     GesturePhase::Cancelled,
                     Point::default(),
                 ));
@@ -162,10 +83,11 @@ impl GestureArena {
         };
         let mut history = VecDeque::new();
         history.push_back((event.timestamp, event.position));
-        let pan_started = gestures.contains(GestureSet::PAN_IMMEDIATE);
+        let pan_started = gestures.pan.is_some_and(|pan| pan.threshold <= 0.0);
         self.contacts.insert(
             event.id,
             Contact {
+                pointer: event.id,
                 target,
                 gestures,
                 start: event.position,
@@ -195,9 +117,10 @@ impl GestureArena {
                 rotation_started: false,
             });
         }
-        if pan_started {
+        if let Some(pan) = gestures.pan.filter(|_| pan_started) {
             vec![pan_event(
                 &self.contacts[&event.id],
+                pan,
                 GesturePhase::Started,
                 Point::default(),
             )]
@@ -219,12 +142,10 @@ impl GestureArena {
             return update_pair(pair, &self.contacts);
         }
         let total = difference(event.position, contact.start);
-        let threshold = if contact.gestures.contains(GestureSet::TAP) {
-            8.0
-        } else {
-            0.0
+        let Some(pan) = contact.gestures.pan else {
+            return Vec::new();
         };
-        if !contact.gestures.contains(GestureSet::PAN) || magnitude(total) <= threshold {
+        if magnitude(axis_point(total, pan.axis)) <= pan.threshold {
             return Vec::new();
         }
         let phase = if contact.pan_started {
@@ -233,16 +154,18 @@ impl GestureArena {
             contact.pan_started = true;
             GesturePhase::Started
         };
-        vec![GestureEvent {
-            target: contact.target,
+        vec![gesture_event(
+            contact.target,
+            event.id,
             phase,
-            kind: GestureKind::Pan {
+            pan.delivery,
+            GestureKind::Pan {
                 position: event.position,
-                delta,
-                total,
-                velocity: velocity(contact),
+                delta: axis_point(delta, pan.axis),
+                total: axis_point(total, pan.axis),
+                velocity: axis_point(velocity(contact), pan.axis),
             },
-        }]
+        )]
     }
 
     fn released(&mut self, event: PointerEvent, cancelled: bool) -> Vec<GestureEvent> {
@@ -267,9 +190,10 @@ impl GestureArena {
         };
         contact.last = event.position;
         push_history(&mut contact, event.timestamp, event.position);
-        if contact.pan_started {
+        if let Some(pan) = contact.gestures.pan.filter(|_| contact.pan_started) {
             output.push(pan_event(
                 &contact,
+                pan,
                 if cancelled {
                     GesturePhase::Cancelled
                 } else {
@@ -278,18 +202,20 @@ impl GestureArena {
                 Point::default(),
             ));
         } else if !cancelled
-            && contact.gestures.contains(GestureSet::TAP)
-            && magnitude(difference(contact.last, contact.start)) < 8.0
-            && event.timestamp.saturating_sub(contact.started_at)
-                <= std::time::Duration::from_millis(500)
+            && contact.gestures.tap.is_some_and(|tap| {
+                magnitude(difference(contact.last, contact.start)) < tap.max_distance
+                    && event.timestamp.saturating_sub(contact.started_at) <= tap.max_duration
+            })
         {
-            output.push(GestureEvent {
-                target: contact.target,
-                phase: GesturePhase::Ended,
-                kind: GestureKind::Tap {
+            output.push(gesture_event(
+                contact.target,
+                event.id,
+                GesturePhase::Ended,
+                GestureDelivery::Immediate,
+                GestureKind::Tap {
                     position: event.position,
                 },
-            });
+            ));
         }
         output
     }
@@ -300,63 +226,98 @@ fn update_pair(pair: &mut Pair, contacts: &HashMap<PointerId, Contact>) -> Vec<G
     let second = &contacts[&pair.ids[1]];
     let mut output = Vec::new();
     let scale = distance(first.last, second.last) / pair.distance;
-    if pair.gestures.contains(GestureSet::PINCH) && (scale - 1.0).abs() >= 0.02 {
+    if let Some(pinch) = pair.gestures.pinch
+        && (scale - 1.0).abs() >= pinch.threshold
+    {
         let phase = if pair.pinch_started {
             GesturePhase::Changed
         } else {
             pair.pinch_started = true;
             GesturePhase::Started
         };
-        output.push(GestureEvent {
-            target: pair.target,
+        output.push(gesture_event(
+            pair.target,
+            pair.ids[0],
             phase,
-            kind: GestureKind::Pinch { scale },
-        });
+            pinch.delivery,
+            GestureKind::Pinch { scale },
+        ));
     }
     let radians = normalized_angle(angle(first.last, second.last) - pair.angle);
-    if pair.gestures.contains(GestureSet::ROTATION) && radians.abs() >= 2.0_f32.to_radians() {
+    if let Some(rotation) = pair.gestures.rotation
+        && radians.abs() >= rotation.threshold_radians
+    {
         let phase = if pair.rotation_started {
             GesturePhase::Changed
         } else {
             pair.rotation_started = true;
             GesturePhase::Started
         };
-        output.push(GestureEvent {
-            target: pair.target,
+        output.push(gesture_event(
+            pair.target,
+            pair.ids[0],
             phase,
-            kind: GestureKind::Rotation { radians },
-        });
+            rotation.delivery,
+            GestureKind::Rotation { radians },
+        ));
     }
     output
 }
 
 fn finish_pair(pair: &Pair, phase: GesturePhase, output: &mut Vec<GestureEvent>) {
-    if pair.pinch_started {
-        output.push(GestureEvent {
-            target: pair.target,
+    if let Some(pinch) = pair.gestures.pinch.filter(|_| pair.pinch_started) {
+        output.push(gesture_event(
+            pair.target,
+            pair.ids[0],
             phase,
-            kind: GestureKind::Pinch { scale: 1.0 },
-        });
+            pinch.delivery,
+            GestureKind::Pinch { scale: 1.0 },
+        ));
     }
-    if pair.rotation_started {
-        output.push(GestureEvent {
-            target: pair.target,
+    if let Some(rotation) = pair.gestures.rotation.filter(|_| pair.rotation_started) {
+        output.push(gesture_event(
+            pair.target,
+            pair.ids[0],
             phase,
-            kind: GestureKind::Rotation { radians: 0.0 },
-        });
+            rotation.delivery,
+            GestureKind::Rotation { radians: 0.0 },
+        ));
     }
 }
 
-fn pan_event(contact: &Contact, phase: GesturePhase, delta: Point) -> GestureEvent {
-    GestureEvent {
-        target: contact.target,
+fn pan_event(
+    contact: &Contact,
+    pan: PanGesture,
+    phase: GesturePhase,
+    delta: Point,
+) -> GestureEvent {
+    gesture_event(
+        contact.target,
+        contact.pointer,
         phase,
-        kind: GestureKind::Pan {
+        pan.delivery,
+        GestureKind::Pan {
             position: contact.last,
-            delta,
-            total: difference(contact.last, contact.start),
-            velocity: velocity(contact),
+            delta: axis_point(delta, pan.axis),
+            total: axis_point(difference(contact.last, contact.start), pan.axis),
+            velocity: axis_point(velocity(contact), pan.axis),
         },
+    )
+}
+
+fn gesture_event(
+    target: NodeId,
+    pointer: PointerId,
+    phase: GesturePhase,
+    delivery: GestureDelivery,
+    kind: GestureKind,
+) -> GestureEvent {
+    GestureEvent {
+        target,
+        pointer,
+        phase,
+        kind,
+        delivery,
     }
 }
 
@@ -391,6 +352,14 @@ fn magnitude(point: Point) -> f32 {
     point.x.hypot(point.y)
 }
 
+fn axis_point(point: Point, axis: PanAxis) -> Point {
+    match axis {
+        PanAxis::Horizontal => Point::new(point.x, 0.0),
+        PanAxis::Vertical => Point::new(0.0, point.y),
+        PanAxis::Both => point,
+    }
+}
+
 fn distance(a: Point, b: Point) -> f32 {
     magnitude(difference(a, b))
 }
@@ -406,15 +375,4 @@ fn normalized_angle(mut value: f32) -> f32 {
         value += std::f32::consts::TAU;
     }
     value
-}
-
-#[cfg(test)]
-mod tests {
-    use super::normalized_angle;
-
-    #[test]
-    fn angles_wrap_in_both_directions() {
-        assert!(normalized_angle(std::f32::consts::TAU + 0.2) < 0.21);
-        assert!(normalized_angle(-std::f32::consts::TAU - 0.2) > -0.21);
-    }
 }

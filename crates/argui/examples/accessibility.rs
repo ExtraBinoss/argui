@@ -7,7 +7,7 @@ use argui::{
     runtime::{Context, Render, RuntimeEvent, run_app},
     text::{TextColor, TextStyle},
     ui::{
-        AlignItems, Element, FocusScope, GestureSet, InitialFocus, Interaction, Sides, UiEvent,
+        AlignItems, Element, EventType, FocusScope, GestureSet, InitialFocus, Interaction, Sides,
         UiEventKind, length, percent,
     },
 };
@@ -85,9 +85,13 @@ fn gesture_surface() -> Element {
     .gap(7.0)
     .paint_style(panel())
     .interaction(
-        Interaction::default()
-            .focusable(true)
-            .gestures(GestureSet::ALL),
+        Interaction::default().focusable(true).gestures(
+            GestureSet::default()
+                .tap(argui::ui::TapGesture::default())
+                .pan(argui::ui::PanGesture::default())
+                .pinch(argui::ui::PinchGesture::default())
+                .rotation(argui::ui::RotationGesture::default()),
+        ),
     )
     .semantics(
         Semantics::new(Role::Slider)
@@ -169,48 +173,52 @@ struct AccessibilityDemo {
 }
 
 impl Render for AccessibilityDemo {
-    fn render(&mut self, _cx: &mut Context<Self>) -> Element {
-        showcase(self.dialog_open)
-    }
-
-    fn event(&mut self, event: &UiEvent, cx: &mut Context<Self>) {
-        let close_from_escape = matches!(
-            &event.kind,
-            UiEventKind::KeyInput(input)
-                if input.key == Key::Escape
-                    && input.state == KeyState::Pressed
-                    && !input.repeat
-                    && self.dialog_open
-        );
-        match (event.key.as_deref(), &event.kind) {
-            (Some("open-dialog"), UiEventKind::Clicked) => {
-                self.dialog_open = true;
-                cx.notify();
-            }
-            (Some("dismiss-dialog"), UiEventKind::Clicked) if self.dialog_open => {
-                self.dialog_open = false;
-                cx.notify();
-            }
-            _ if close_from_escape => {
-                self.dialog_open = false;
-                cx.notify();
-            }
-            _ => {}
+    fn render(&mut self, cx: &mut Context<Self>) -> Element {
+        let mut root = showcase(self.dialog_open);
+        for event_type in EventType::ALL {
+            root = root.on(cx
+                .listener(event_type, |demo, event, cx| {
+                    let close_from_escape = matches!(
+                        &event.kind,
+                        UiEventKind::KeyInput(input)
+                            if input.key == Key::Escape
+                                && input.state == KeyState::Pressed
+                                && !input.repeat
+                                && demo.dialog_open
+                    );
+                    match (event.target_key(), &event.kind) {
+                        (Some("open-dialog"), UiEventKind::Click(_)) => {
+                            demo.dialog_open = true;
+                            cx.notify();
+                        }
+                        (Some("dismiss-dialog"), UiEventKind::Click(_)) if demo.dialog_open => {
+                            demo.dialog_open = false;
+                            cx.notify();
+                        }
+                        _ if close_from_escape => {
+                            demo.dialog_open = false;
+                            cx.notify();
+                        }
+                        _ => {}
+                    }
+                    if matches!(
+                        event.kind,
+                        UiEventKind::Gesture(_)
+                            | UiEventKind::SemanticAction { .. }
+                            | UiEventKind::Click(_)
+                            | UiEventKind::TextChanged(_)
+                            | UiEventKind::KeyInput(_)
+                    ) {
+                        println!(
+                            "{}: {:?}",
+                            event.target_key().unwrap_or("semantic"),
+                            event.kind
+                        );
+                    }
+                })
+                .capture(true));
         }
-        if matches!(
-            event.kind,
-            UiEventKind::Gesture(_)
-                | UiEventKind::SemanticAction { .. }
-                | UiEventKind::Clicked
-                | UiEventKind::TextChanged(_)
-                | UiEventKind::KeyInput(_)
-        ) {
-            println!(
-                "{}: {:?}",
-                event.key.as_deref().unwrap_or("semantic"),
-                event.kind
-            );
-        }
+        root
     }
 }
 

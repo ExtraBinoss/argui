@@ -15,7 +15,7 @@ taffy.workspace = true
 unicode-segmentation.workspace = true
 
 [dev-dependencies]
-argui-widgets.workspace = true
+argui-widgets = { workspace = true, features = ["all"] }
 
 [lints]
 workspace = true

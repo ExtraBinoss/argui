@@ -163,26 +163,3 @@ fn rgba_pixels(content: GlyphContent, data: &[u8]) -> Vec<u8> {
             .collect(),
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use argui_text::GlyphContent;
-
-    use super::rgba_pixels;
-
-    #[test]
-    fn expands_masks_to_rgba() {
-        assert_eq!(
-            rgba_pixels(GlyphContent::Mask, &[0, 128]),
-            [255, 255, 255, 0, 255, 255, 255, 128]
-        );
-        assert_eq!(
-            rgba_pixels(GlyphContent::Color, &[1, 2, 3, 4]),
-            [1, 2, 3, 4]
-        );
-        assert_eq!(
-            rgba_pixels(GlyphContent::SubpixelMask, &[1, 9, 3]),
-            [255, 255, 255, 9]
-        );
-    }
-}

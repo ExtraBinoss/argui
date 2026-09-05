@@ -52,7 +52,9 @@ fn slider_uses_one_clamped_path_for_keys_pointer_and_semantics() {
     );
     let tap = event(UiEventKind::Gesture(GestureEvent {
         target: node,
+        pointer: argui_core::PointerId::MOUSE,
         phase: GesturePhase::Ended,
+        delivery: Default::default(),
         kind: GestureKind::Tap {
             position: Point::new(60.0, 10.0),
         },
@@ -79,7 +81,9 @@ fn slider_uses_one_clamped_path_for_keys_pointer_and_semantics() {
     let pan = |phase, position| {
         event(UiEventKind::Gesture(GestureEvent {
             target: node,
+            pointer: argui_core::PointerId::MOUSE,
             phase,
+            delivery: Default::default(),
             kind: GestureKind::Pan {
                 position,
                 delta: Point::default(),
@@ -185,7 +189,9 @@ fn range_covers_vertical_reverse_and_interaction_boundaries() {
     let gesture = |phase, kind| {
         event(UiEventKind::Gesture(GestureEvent {
             target: node,
+            pointer: argui_core::PointerId::MOUSE,
             phase,
+            delivery: Default::default(),
             kind,
         }))
     };
@@ -326,7 +332,9 @@ fn range_detents_are_magnetic_only_during_slow_pointer_motion() {
     let pan = |velocity| {
         event(UiEventKind::Gesture(GestureEvent {
             target: node,
+            pointer: argui_core::PointerId::MOUSE,
             phase: GesturePhase::Changed,
+            delivery: Default::default(),
             kind: GestureKind::Pan {
                 position: Point::new(48.0, 10.0),
                 delta: Point::default(),

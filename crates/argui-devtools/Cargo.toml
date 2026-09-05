@@ -10,13 +10,14 @@ argui-animation.workspace = true
 argui-core.workspace = true
 argui-inspect.workspace = true
 argui-paint.workspace = true
+argui-platform.workspace = true
 argui-render.workspace = true
 argui-runtime.workspace = true
 argui-text.workspace = true
 argui-theme.workspace = true
 argui-ui.workspace = true
 argui-vector.workspace = true
-argui-widgets.workspace = true
+argui-widgets = { workspace = true, features = ["button", "input", "checkbox", "tabs", "select", "split-pane", "vlist", "tree-view"] }
 icondata_core.workspace = true
 icondata_tb.workspace = true
 

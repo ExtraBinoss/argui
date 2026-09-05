@@ -94,7 +94,7 @@ impl ToggleBehavior {
                     } else {
                         CursorIcon::NotAllowed
                     })
-                    .gestures(GestureSet::NONE.tap())
+                    .gestures(GestureSet::default().tap(argui_ui::TapGesture::default()))
                     .keyboard_activation(KeyboardActivation::EnterOrSpace),
             )
             .semantics(semantics)
@@ -103,8 +103,8 @@ impl ToggleBehavior {
     #[must_use]
     pub fn action(&self, event: &UiEvent) -> Option<ToggleAction> {
         (self.enabled
-            && event.key.as_deref() == Some(self.key.as_str())
-            && matches!(event.kind, UiEventKind::Clicked))
+            && event.target_key() == Some(self.key.as_str())
+            && matches!(event.kind, UiEventKind::Click(_)))
         .then_some(ToggleAction::Toggle)
     }
 }

@@ -2,10 +2,10 @@ use argui::{
     core::Transform2D,
     paint::{Border, CornerRadii, PaintStyle, QuadStyle},
     ui::{
-        AlignItems, ContainerQuery, ContainerScopeId, CursorIcon, Element, FlexDirection,
-        GestureSet, HitShape, HitTestStyle, Interaction, JustifyContent, KeyboardActivation,
-        PointerEvents, Role, SemanticAction, Semantics, Sides, StyleCondition, StylePatch,
-        StyleTransition, VisualState, length, percent, property,
+        AlignItems, ContainerQuery, ContainerScopeId, CursorIcon, Element,
+        FlexDirection, GestureSet, HitShape, HitTestStyle, Interaction, JustifyContent,
+        KeyboardActivation, PointerEvents, Role, SemanticAction, Semantics, Sides, StyleCondition,
+        StylePatch, StyleTransition, VisualState, length, percent, property,
     },
     widgets::{Button, TablerIcon, WidgetAssets, WidgetTheme},
 };
@@ -13,14 +13,24 @@ use argui::{
 use super::preview;
 use crate::{app::WidgetGallery, property_slider};
 
+mod app_shell;
+pub(crate) use app_shell::AppShell;
+
 const PANEL_SCOPE: ContainerScopeId = ContainerScopeId::new("advanced-composition-panel");
 
 pub(super) fn render(
     gallery: &WidgetGallery,
     theme: &WidgetTheme,
     assets: &WidgetAssets,
+    shell: Element,
 ) -> Element {
     Element::column([
+        preview(
+            "Resizable application shell",
+            "Drag the divider. Min/max constraints stay synchronized and the sidebar becomes icon-only below its compact threshold. Double-click resets it.",
+            shell,
+            theme,
+        ),
         preview(
             "Editable property control",
             "A range behavior, direct arithmetic input, reset action, detents and animated parts compose without a specialized renderer.",
@@ -58,7 +68,7 @@ fn responsive_actions(theme: &WidgetTheme, assets: &WidgetAssets) -> Element {
     let action = Button::new(
         "composition-inspect",
         "Inspect frame",
-        theme.outline_button.clone(),
+        theme.outline_button(),
     )
     .leading(assets.icon(TablerIcon::Sidebar, 16.0))
     .build()
@@ -113,7 +123,7 @@ fn precise_target(gallery: &WidgetGallery, theme: &WidgetTheme, assets: &WidgetA
             Interaction::default()
                 .focusable(true)
                 .cursor(CursorIcon::Pointer)
-                .gestures(GestureSet::NONE.tap())
+                .gestures(GestureSet::default().tap(argui::ui::TapGesture::default()))
                 .keyboard_activation(KeyboardActivation::EnterOrSpace),
         )
         .hit_test(

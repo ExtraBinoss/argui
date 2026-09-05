@@ -198,7 +198,13 @@ impl RangeBehavior {
                             .enabled(self.enabled)
                             .focusable(self.enabled)
                             .cursor(cursor)
-                            .gestures(GestureSet::NONE.pan_immediate()),
+                            .gestures(
+                                GestureSet::default().pan(
+                                    argui_ui::PanGesture::default()
+                                        .immediate()
+                                        .capture(argui_ui::GestureCapture::OnPress),
+                                ),
+                            ),
                     )
                     .semantics(
                         Semantics::new(Role::Slider)
@@ -261,7 +267,7 @@ impl RangeState {
 
     #[must_use]
     pub fn update(&mut self, event: &UiEvent, behavior: &RangeBehavior) -> Option<RangeAction> {
-        if !behavior.enabled || event.key.as_deref() != Some(behavior.key.as_str()) {
+        if !behavior.enabled || event.target_key() != Some(behavior.key.as_str()) {
             return None;
         }
         let config = behavior.config;

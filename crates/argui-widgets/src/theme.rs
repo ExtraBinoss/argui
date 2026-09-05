@@ -1,13 +1,22 @@
 use argui_core::{Color, ColorInterpolation, ColorScheme};
-use argui_paint::{Border, CornerRadii, PaintStyle, QuadStyle};
+use argui_paint::{CornerRadii, QuadStyle};
+#[cfg(any(feature = "button", feature = "input"))]
+use argui_paint::{Border, PaintStyle};
+#[cfg(any(feature = "button", feature = "input"))]
 use argui_text::TextStyle;
 use argui_theme::Theme;
 use argui_ui::{
-    CaretHeight, CaretPrimitive, CaretStyle, CaretVisual, Dimension, ScrollbarPartStyle,
-    ScrollbarStyle, Sides,
+    ScrollbarPartStyle, ScrollbarStyle, Sides,
 };
 
-use crate::{ButtonStyle, InputStyle};
+#[cfg(feature = "button")]
+use crate::ButtonStyle;
+#[cfg(feature = "button")]
+use argui_ui::Dimension;
+#[cfg(feature = "input")]
+use crate::InputStyle;
+#[cfg(feature = "input")]
+use argui_ui::{CaretHeight, CaretPrimitive, CaretStyle, CaretVisual};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct WidgetTheme {
@@ -28,12 +37,6 @@ pub struct WidgetTheme {
     pub overlay_blur: f32,
     pub dialog_backdrop: Color,
     pub dialog_backdrop_blur: f32,
-    pub button: ButtonStyle,
-    pub secondary_button: ButtonStyle,
-    pub outline_button: ButtonStyle,
-    pub ghost_button: ButtonStyle,
-    pub destructive_button: ButtonStyle,
-    pub input: InputStyle,
     pub scrollbar: ScrollbarStyle,
 }
 
@@ -68,46 +71,6 @@ fn widgets(scheme: ColorScheme, primary: Color) -> WidgetTheme {
         ),
     };
     let primary_foreground = contrasting(primary);
-    let text = TextStyle {
-        font_size: 15.0,
-        line_height: 20.0,
-        color: foreground,
-        ..TextStyle::default()
-    };
-    let button = button_style(
-        primary,
-        primary,
-        primary_foreground,
-        foreground,
-        text.clone(),
-    );
-    let secondary_button = button_style(muted, border, foreground, foreground, text.clone());
-    let outline_button = button_style(card, border, foreground, primary, text.clone());
-    let ghost_button = button_style(
-        Color::TRANSPARENT,
-        Color::TRANSPARENT,
-        foreground,
-        primary,
-        text.clone(),
-    );
-    let destructive_button = button_style(
-        destructive,
-        destructive,
-        Color::WHITE,
-        foreground,
-        text.clone(),
-    );
-    let mut input = InputStyle::new(PaintStyle::new(quad(card, border)), text);
-    input.hovered = quad(card, mix(border, foreground, 0.28)).into();
-    input.focused = quad(card, primary).border(Border::all(1.5, primary)).into();
-    input.placeholder.color = muted_foreground;
-    input.selection = with_alpha(primary, 0.28);
-    input.caret = CaretStyle::default();
-    input.caret.visual = CaretVisual::new([CaretPrimitive::new(
-        1.5,
-        CaretHeight::Line,
-        QuadStyle::solid(primary),
-    )]);
     let scrollbar = ScrollbarStyle::new(
         ScrollbarPartStyle::new(QuadStyle::solid(Color::TRANSPARENT)),
         ScrollbarPartStyle::new(
@@ -140,16 +103,11 @@ fn widgets(scheme: ColorScheme, primary: Color) -> WidgetTheme {
         overlay_blur: 12.0,
         dialog_backdrop: Color::srgba(0.0, 0.0, 0.0, 0.62),
         dialog_backdrop_blur: 4.0,
-        button,
-        secondary_button,
-        outline_button,
-        ghost_button,
-        destructive_button,
-        input,
         scrollbar,
     }
 }
 
+#[cfg(feature = "button")]
 fn button_style(
     background: Color,
     border: Color,
@@ -172,6 +130,7 @@ fn button_style(
     style
 }
 
+#[cfg(any(feature = "button", feature = "input"))]
 fn quad(background: Color, border: Color) -> QuadStyle {
     QuadStyle::solid(background)
         .border(Border::all(1.0, border))
@@ -191,6 +150,46 @@ fn mix(left: Color, right: Color, amount: f32) -> Color {
     left.mix(right, amount, ColorInterpolation::Oklab)
 }
 
-fn with_alpha(color: Color, alpha: f32) -> Color {
-    color.with_alpha(alpha)
+impl WidgetTheme {
+    #[cfg(any(feature = "button", feature = "input"))]
+    fn text(&self) -> TextStyle {
+        TextStyle { font_size: 15.0, line_height: 20.0, color: self.foreground, ..TextStyle::default() }
+    }
+    #[cfg(feature = "button")]
+    #[must_use]
+    pub fn button(&self) -> ButtonStyle {
+        button_style(self.primary, self.primary, self.primary_foreground, self.foreground, self.text())
+    }
+    #[cfg(feature = "button")]
+    #[must_use]
+    pub fn secondary_button(&self) -> ButtonStyle {
+        button_style(self.muted, self.border, self.foreground, self.foreground, self.text())
+    }
+    #[cfg(feature = "button")]
+    #[must_use]
+    pub fn outline_button(&self) -> ButtonStyle {
+        button_style(self.card, self.border, self.foreground, self.primary, self.text())
+    }
+    #[cfg(feature = "button")]
+    #[must_use]
+    pub fn ghost_button(&self) -> ButtonStyle {
+        button_style(Color::TRANSPARENT, Color::TRANSPARENT, self.foreground, self.primary, self.text())
+    }
+    #[cfg(feature = "button")]
+    #[must_use]
+    pub fn destructive_button(&self) -> ButtonStyle {
+        button_style(self.destructive, self.destructive, self.destructive_foreground, self.foreground, self.text())
+    }
+    #[cfg(feature = "input")]
+    #[must_use]
+    pub fn input(&self) -> InputStyle {
+        let mut input = InputStyle::new(PaintStyle::new(quad(self.card, self.border)), self.text());
+        input.hovered = quad(self.card, mix(self.border, self.foreground, 0.28)).into();
+        input.focused = quad(self.card, self.primary).border(Border::all(1.5, self.primary)).into();
+        input.placeholder.color = self.muted_foreground;
+        input.selection = self.primary.with_alpha(0.28);
+        input.caret = CaretStyle::default();
+        input.caret.visual = CaretVisual::new([CaretPrimitive::new(1.5, CaretHeight::Line, QuadStyle::solid(self.primary))]);
+        input
+    }
 }

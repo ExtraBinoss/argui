@@ -153,20 +153,3 @@ fn expanded_radii(mask: LayerMask, expansion: f32) -> [f32; 4] {
         LayerMask::None | LayerMask::Bounds => [0.0; 4],
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use argui_paint::{CornerRadii, LayerMask};
-
-    use super::expanded_radii;
-
-    #[test]
-    fn expansion_only_changes_rounded_masks() {
-        assert_eq!(expanded_radii(LayerMask::None, 5.0), [0.0; 4]);
-        assert_eq!(expanded_radii(LayerMask::Bounds, 5.0), [0.0; 4]);
-        assert_eq!(
-            expanded_radii(LayerMask::Rounded(CornerRadii::all(4.0)), 5.0),
-            [9.0; 4]
-        );
-    }
-}

@@ -6,8 +6,9 @@ use argui_layout::{LayoutEngine, TextInputRegion};
 use argui_paint::{PaintStyle, QuadStyle};
 use argui_text::{CaretStop, TextEngine, TextOverflow, TextStyle};
 use argui_ui::{
-    Element, GestureKind, Resizable, ScrollbarPartStyle, ScrollbarStyle, Sides, UiEventKind,
-    UiTree, length, percent, scrollbar_at,
+    CursorIcon, Element, EventHandlerId, EventListener, EventOwnerId, EventType, GestureCapture,
+    GestureKind, GestureSet, Interaction, PanGesture, Position, ScrollbarPartStyle, ScrollbarStyle,
+    Sides, UiEventKind, UiTree, auto, length, percent, scrollbar_at,
 };
 use argui_widgets::{Input, InputStyle, TextArea};
 
@@ -306,10 +307,36 @@ fn a_resize_handle_painted_over_a_scrollbar_keeps_pointer_priority() {
         ))
         .build();
     let handle = Element::container([])
+        .keyed("resize")
+        .absolute(Sides {
+            left: auto(),
+            right: length(0.0),
+            top: auto(),
+            bottom: length(0.0),
+        })
         .width(length(18.0))
-        .height(length(18.0));
-    let mut ui =
-        UiTree::new(Resizable::new(Size::new(260.0, 96.0), area, "resize", handle).build());
+        .height(length(18.0))
+        .on(EventListener::new(
+            EventType::Gesture,
+            EventHandlerId::new(EventOwnerId(1), 0),
+        ))
+        .interaction(
+            Interaction::default()
+                .cursor(CursorIcon::NwseResize)
+                .gestures(
+                    GestureSet::EMPTY.pan(
+                        PanGesture::default()
+                            .immediate()
+                            .capture(GestureCapture::OnPress),
+                    ),
+                ),
+        );
+    let mut ui = UiTree::new(
+        Element::container([area, handle])
+            .width(length(260.0))
+            .height(length(96.0))
+            .position(Position::Relative),
+    );
     let handle = ui.node_id_at(2).unwrap();
     let mut layout = LayoutEngine::new();
     let mut text = text_engine();
@@ -356,7 +383,7 @@ fn a_resize_handle_painted_over_a_scrollbar_keeps_pointer_priority() {
         &output.hit_regions,
     );
     assert!(dragged.events.iter().any(|event| {
-        event.key.as_deref() == Some("resize")
+        event.target_key() == Some("resize")
             && matches!(
                 event.kind,
                 UiEventKind::Gesture(argui_ui::GestureEvent {

@@ -1,6 +1,9 @@
 use argui_core::{Point, PointerEvent, PointerId, PointerKind, PointerPhase};
 
-use crate::{HitRegion, InteractionUpdate, NodeId, UiEventKind};
+use crate::{
+    GestureDelivery, GestureEvent, GestureKind, GesturePhase, HitRegion, InteractionUpdate, NodeId,
+    UiEventKind,
+};
 
 use super::UiTree;
 
@@ -8,7 +11,7 @@ impl UiTree {
     pub fn pointer_moved(&mut self, point: Point, regions: &[HitRegion]) -> InteractionUpdate {
         let update = self
             .interaction
-            .pointer_moved(PointerId::MOUSE, point, regions);
+            .pointer_moved(PointerEvent::mouse(PointerPhase::Moved, point), regions);
         self.decorate(update)
     }
 
@@ -30,33 +33,36 @@ impl UiTree {
         } else {
             match event.phase {
                 PointerPhase::Entered | PointerPhase::Moved => {
-                    let update = self
-                        .interaction
-                        .pointer_moved(event.id, event.position, regions);
+                    let update = self.interaction.pointer_moved(event, regions);
                     self.decorate(update)
                 }
                 PointerPhase::Pressed => {
                     let moved = self
                         .interaction
-                        .pointer_moved(event.id, event.position, regions);
+                        .pointer_moved(with_phase(event, PointerPhase::Moved), regions);
                     let mut moved = self.decorate(moved);
-                    moved.merge(self.primary_pressed_for(event.id, regions));
+                    moved.merge(self.primary_pressed_for(event, regions));
+                    if let Some((node, gestures)) = hit
+                        && gestures.captures_on_press()
+                    {
+                        moved.merge(self.capture_pointer(event.id, node));
+                    }
                     moved
                 }
                 PointerPhase::Released => {
                     let moved = self
                         .interaction
-                        .pointer_moved(event.id, event.position, regions);
+                        .pointer_moved(with_phase(event, PointerPhase::Moved), regions);
                     let mut moved = self.decorate(moved);
-                    moved.merge(self.primary_released_for(event.id));
+                    moved.merge(self.primary_released_for(event));
                     moved
                 }
                 PointerPhase::Left => {
-                    let update = self.interaction.pointer_left(event.id);
+                    let update = self.interaction.pointer_left(event);
                     self.decorate(update)
                 }
                 PointerPhase::Cancelled => {
-                    let update = self.interaction.primary_cancelled(event.id);
+                    let update = self.interaction.primary_cancelled(event);
                     self.decorate(update)
                 }
             }
@@ -66,13 +72,9 @@ impl UiTree {
         {
             update
                 .events
-                .extend(self.event_deliveries(portal, UiEventKind::PointerOutside));
+                .extend(self.event_deliveries(portal, UiEventKind::PointerOutside(event)));
         }
-        for gesture in gestures {
-            update
-                .events
-                .extend(self.event_deliveries(gesture.target, UiEventKind::Gesture(gesture)));
-        }
+        self.dispatch_gestures(gestures, &mut update);
         update
     }
 
@@ -122,18 +124,31 @@ impl UiTree {
     }
 
     pub fn pointer_left(&mut self) -> InteractionUpdate {
-        let update = self.interaction.pointer_left(PointerId::MOUSE);
+        let update = self
+            .interaction
+            .pointer_left(PointerEvent::mouse(PointerPhase::Left, Point::default()));
         self.decorate(update)
     }
 
     pub fn primary_released(&mut self) -> InteractionUpdate {
-        let update = self.interaction.primary_released(PointerId::MOUSE);
+        let update = self.interaction.primary_released(PointerEvent {
+            button: Some(argui_core::PointerButton::Primary),
+            phase: PointerPhase::Released,
+            ..PointerEvent::mouse(PointerPhase::Released, Point::default())
+        });
         self.decorate(update)
     }
 
     pub fn capture_pointer(&mut self, pointer: PointerId, target: NodeId) -> InteractionUpdate {
         let update = self.interaction.capture_pointer(pointer, target);
         self.decorate(update)
+    }
+
+    /// A captured drag retains its cursor even when the pointer leaves its hit region.
+    pub fn captured_cursor(&self, pointer: PointerId, regions: &[HitRegion]) -> Option<crate::CursorIcon> {
+        let node = self.interaction.captured_node(pointer)?;
+        regions.iter().find(|region| region.node == node && region.enabled)
+            .map(|region| region.cursor).filter(|cursor| *cursor != crate::CursorIcon::Auto)
     }
 
     pub fn release_pointer_capture(
@@ -145,8 +160,8 @@ impl UiTree {
         self.decorate(update)
     }
 
-    fn primary_released_for(&mut self, pointer: PointerId) -> InteractionUpdate {
-        let update = self.interaction.primary_released(pointer);
+    fn primary_released_for(&mut self, event: PointerEvent) -> InteractionUpdate {
+        let update = self.interaction.primary_released(event);
         self.decorate(update)
     }
 
@@ -154,11 +169,74 @@ impl UiTree {
         self.suspend_focus();
         let update = self.interaction.window_blurred();
         let mut update = self.decorate(update);
-        for gesture in self.gestures.cancel_all() {
+        let gestures = self.gestures.cancel_all();
+        self.dispatch_gestures(gestures, &mut update);
+        update
+    }
+
+    /// Emits the newest pending update for each frame-coalesced gesture stream.
+    pub fn flush_gesture_frame(&mut self) -> InteractionUpdate {
+        let pending = std::mem::take(&mut self.pending_gestures);
+        let mut update = InteractionUpdate::default();
+        for gesture in pending {
             update
                 .events
                 .extend(self.event_deliveries(gesture.target, UiEventKind::Gesture(gesture)));
         }
         update
     }
+
+    fn dispatch_gestures(&mut self, gestures: Vec<GestureEvent>, update: &mut InteractionUpdate) {
+        for gesture in gestures {
+            if gesture.phase == GesturePhase::Changed
+                && gesture.delivery == GestureDelivery::FrameCoalesced
+            {
+                if let Some(pending) = self
+                    .pending_gestures
+                    .iter_mut()
+                    .find(|pending| same_gesture_stream(pending, &gesture))
+                {
+                    *pending = gesture;
+                } else {
+                    self.pending_gestures.push(gesture);
+                }
+                update.frame_requested = true;
+                continue;
+            }
+            self.flush_gesture_stream(&gesture, update);
+            update
+                .events
+                .extend(self.event_deliveries(gesture.target, UiEventKind::Gesture(gesture)));
+        }
+    }
+
+    fn flush_gesture_stream(&mut self, gesture: &GestureEvent, update: &mut InteractionUpdate) {
+        let pending = std::mem::take(&mut self.pending_gestures);
+        for candidate in pending {
+            if same_gesture_stream(&candidate, gesture) {
+                update.events.extend(
+                    self.event_deliveries(candidate.target, UiEventKind::Gesture(candidate)),
+                );
+            } else {
+                self.pending_gestures.push(candidate);
+            }
+        }
+    }
+}
+
+fn with_phase(mut event: PointerEvent, phase: PointerPhase) -> PointerEvent {
+    event.phase = phase;
+    event
+}
+
+fn same_gesture_stream(left: &GestureEvent, right: &GestureEvent) -> bool {
+    left.target == right.target
+        && left.pointer == right.pointer
+        && matches!(
+            (&left.kind, &right.kind),
+            (GestureKind::Pan { .. }, GestureKind::Pan { .. })
+                | (GestureKind::Pinch { .. }, GestureKind::Pinch { .. })
+                | (GestureKind::Rotation { .. }, GestureKind::Rotation { .. })
+                | (GestureKind::Tap { .. }, GestureKind::Tap { .. })
+        )
 }

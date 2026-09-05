@@ -1,6 +1,6 @@
 use argui_core::{Affine2D, Point, Rect, ScrollDelta, Size};
 use argui_paint::{ClipChain, ClipRegion};
-use argui_runtime::{Context, Render, ViewUpdate, WindowEnvironment};
+use argui_runtime::{Entity, WindowEnvironment};
 use argui_showcase::StateShowcase;
 use argui_ui::{ScrollConfig, ScrollRegion, UiTree};
 
@@ -21,8 +21,8 @@ fn node_index(root: &argui_ui::Element, key: &str) -> usize {
 
 #[test]
 fn virtual_scroll_rebuilds_only_when_the_visible_window_changes() {
-    let mut app = StateShowcase::default();
-    let root = app.view(WindowEnvironment::default());
+    let app = Entity::new(StateShowcase::default());
+    let root = app.render_in(WindowEnvironment::default());
     let index = node_index(&root, "million-list");
     let mut tree = UiTree::new(root);
     let node = tree.node_id_at(index).unwrap();
@@ -44,21 +44,27 @@ fn virtual_scroll_rebuilds_only_when_the_visible_window_changes() {
             ScrollDelta::Lines(Point::new(0.0, -1.0)),
             &regions,
         );
+        for event in &update.events {
+            if event.should_dispatch() {
+                app.dispatch_event(event);
+            }
+        }
         let expected = if step == 9 {
-            ViewUpdate::Rebuild
+            argui_ui::TreeUpdate::Layout
         } else {
-            ViewUpdate::None
+            argui_ui::TreeUpdate::None
         };
-        let mut context = Context::default();
-        Render::event(&mut app, &update.events[0], &mut context);
-        assert_eq!(context.view_update(), expected);
+        assert_eq!(tree.update(app.render()), expected);
     }
     let sub_row = tree.scroll(
         Point::new(10.0, 10.0),
         ScrollDelta::Pixels(Point::new(0.0, -1.0)),
         &regions,
     );
-    let mut context = Context::default();
-    Render::event(&mut app, &sub_row.events[0], &mut context);
-    assert_eq!(context.view_update(), ViewUpdate::None);
+    for event in &sub_row.events {
+        if event.should_dispatch() {
+            app.dispatch_event(event);
+        }
+    }
+    assert_eq!(tree.update(app.render()), argui_ui::TreeUpdate::None);
 }

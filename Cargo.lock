@@ -255,6 +255,7 @@ dependencies = [
  "argui-inspect",
  "argui-layout",
  "argui-paint",
+ "argui-platform",
  "argui-render",
  "argui-runtime",
  "argui-showcase",
@@ -461,6 +462,7 @@ name = "argui-widget-gallery"
 version = "0.1.0"
 dependencies = [
  "argui",
+ "argui-devtools",
  "argui-effects",
  "argui-image",
  "wasm-bindgen",

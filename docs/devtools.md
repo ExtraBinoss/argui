@@ -180,6 +180,60 @@ Checkpoint: closing DevTools returns to the same idle fast path, recording stays
 within its configured memory bound, and the frontend contains no renderer or
 application-specific code.
 
+## Profiling presentation and refresh
+
+Profiling keeps its commands outside the scroll regions. At 760 logical pixels
+and above, the overview and selected detail view are side by side; narrower
+panels switch between Overview, GPU passes, and Frame details. GPU passes use
+the shared VList widget, with aligned name, duration, and timing columns.
+
+The frame graph has 60 retained slots on a fixed 0–50 ms scale (larger peaks are
+clipped visually, not in recorded values). Its 120 ms paint-only transitions
+interpolate between 100 ms frontend samples; they do not animate layout heights
+or alter trace measurements. Heavy frame details refresh twice per second and
+reuse their element subtree between samples. Selecting a recorded frame freezes
+the displayed snapshot; Live returns to the current recording.
+
+Detailed renderer profiling is enabled only in the Profiling tab, and disabled
+in Elements, while paused, or when tools are closed. Tree inspection and CPU
+history remain independent of this GPU measurement switch.
+
+The frontend CPU workload can be measured independently of GPU query and
+presentation costs (run without concurrent builds or tests):
+
+```sh
+cargo run -p argui-devtools --all-features --example profiling
+```
+
+It exercises closed, Elements, and live Profiling states with 80 simulated GPU
+passes and changing timings. It follows retained layout-versus-paint
+invalidation and discards 40 warm-up ticks. These CPU results are not an
+end-to-end FPS measurement.
+
+## Scroll inspection cost
+
+`InspectionCache` compares shallow inspectable node descriptions and their
+geometry before allocating a snapshot. Changes confined to an
+`inspectable(false)` subtree do not republish the application tree. Application
+content, style, ancestry, clipping, and portal changes still invalidate it.
+
+The widget-level `TreeViewCache` retains only visible rows plus overscan. It
+reuses rows while scrolling and invalidates them when data, expansion, selection,
+theme, or vector icons change. DevTools node icons and disclosure arrows use
+embedded vectors rather than font glyphs.
+
+To reproduce the CPU inspection workload:
+
+```sh
+cargo run -p argui-widget-gallery --all-features --example resize -- --large-tree
+```
+
+On the development machine, a 10,000-node unchanged tree measured 2.9 ms p95
+with the cache versus 26.6 ms for allocating a complete snapshot (30 samples,
+optimized development profile). This isolates inspection CPU cost; it does not
+measure end-to-end scrolling, GPU time, or prove 60 FPS. The same example without
+`--large-tree` measures the composition resize workload.
+
 ## Acceptance gate
 
 - Same inspected tree and DevTools UI on native and WASM.

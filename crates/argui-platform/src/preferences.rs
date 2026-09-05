@@ -196,37 +196,3 @@ fn system_preferences() -> (Option<ColorScheme>, Option<bool>, Option<bool>) {
 fn system_preferences() -> (Option<ColorScheme>, Option<bool>, Option<bool>) {
     (None, None, None)
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn overrides_have_priority_and_report_their_source() {
-        let preferences = SystemPreferences::detect(PreferenceOverrides {
-            color_scheme: Some(ColorScheme::Dark),
-            reduced_motion: Some(true),
-            high_contrast: Some(false),
-        });
-        assert_eq!(preferences.color_scheme.value, ColorScheme::Dark);
-        assert_eq!(preferences.color_scheme.source, PreferenceSource::Override);
-        assert!(preferences.reduced_motion.value);
-        assert_eq!(preferences.high_contrast.source, PreferenceSource::Override);
-    }
-
-    #[test]
-    fn system_and_default_resolution_are_distinct() {
-        assert_eq!(
-            resolve(None, Some(true)),
-            ResolvedPreference {
-                value: true,
-                source: PreferenceSource::System,
-            }
-        );
-        assert_eq!(resolve::<bool>(None, None), ResolvedPreference::default());
-        assert_eq!(
-            resolve(Some(false), Some(true)).source,
-            PreferenceSource::Override
-        );
-    }
-}

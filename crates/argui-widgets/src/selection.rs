@@ -1,17 +1,27 @@
+#[cfg(feature = "switch")]
 use argui_core::Transform2D;
 use argui_paint::{Border, CornerRadii, PaintStyle, QuadStyle};
 use argui_text::{TextStyle, TextWrap};
 use argui_ui::{
     AlignItems, Dimensions, Display, Element, FlexDirection, JustifyContent, LayoutStyle,
-    Orientation, Role, StateSelector, StylePatch, StyleTransition, VisualState, auto, length,
-    property,
+    StylePatch, StyleTransition, VisualState, auto, length,
 };
 
-use crate::{
-    RadioGroupBehavior, RadioGroupPart, TOGGLE_CHECKED, TOGGLE_SCOPE, ToggleBehavior, TogglePart,
-    WidgetTheme,
-};
+use crate::WidgetTheme;
+#[cfg(feature = "radio-group")]
+use crate::{RadioGroupBehavior, RadioGroupPart};
+#[cfg(feature = "radio-group")]
+use argui_ui::Orientation;
+#[cfg(any(feature = "checkbox", feature = "switch"))]
+use crate::{ToggleBehavior, TogglePart};
+#[cfg(any(feature = "checkbox", feature = "switch"))]
+use argui_ui::Role;
+#[cfg(feature = "switch")]
+use crate::{TOGGLE_CHECKED, TOGGLE_SCOPE};
+#[cfg(feature = "switch")]
+use argui_ui::{StateSelector, property};
 
+#[cfg(feature = "checkbox")]
 #[derive(Clone, Debug)]
 pub struct Checkbox {
     key: String,
@@ -21,6 +31,7 @@ pub struct Checkbox {
     indicator: Option<Element>,
 }
 
+#[cfg(feature = "checkbox")]
 impl Checkbox {
     #[must_use]
     pub fn new(key: impl Into<String>, label: impl Into<String>, checked: bool) -> Self {
@@ -82,6 +93,7 @@ impl Checkbox {
     }
 }
 
+#[cfg(feature = "switch")]
 #[derive(Clone, Debug)]
 pub struct Switch {
     key: String,
@@ -90,6 +102,7 @@ pub struct Switch {
     enabled: bool,
 }
 
+#[cfg(feature = "switch")]
 impl Switch {
     #[must_use]
     pub fn new(key: impl Into<String>, label: impl Into<String>, checked: bool) -> Self {
@@ -143,12 +156,14 @@ impl Switch {
     }
 }
 
+#[cfg(feature = "radio-group")]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RadioOption {
     pub label: String,
     pub enabled: bool,
 }
 
+#[cfg(feature = "radio-group")]
 impl RadioOption {
     #[must_use]
     pub fn new(label: impl Into<String>) -> Self {
@@ -165,6 +180,7 @@ impl RadioOption {
     }
 }
 
+#[cfg(feature = "radio-group")]
 #[derive(Clone, Debug)]
 pub struct RadioGroup {
     key: String,
@@ -174,6 +190,7 @@ pub struct RadioGroup {
     orientation: Orientation,
 }
 
+#[cfg(feature = "radio-group")]
 impl RadioGroup {
     #[must_use]
     pub fn new(
@@ -249,6 +266,7 @@ impl RadioGroup {
     }
 }
 
+#[cfg(any(feature = "checkbox", feature = "switch"))]
 fn control_row(
     behavior: ToggleBehavior,
     label: String,

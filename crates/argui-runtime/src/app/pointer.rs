@@ -7,6 +7,16 @@ use super::{Application, local_point};
 
 #[cfg_attr(coverage_nightly, coverage(off))]
 impl Application {
+    pub(super) fn flush_gesture_frame(&mut self, window: &Window, event_loop: &ActiveEventLoop) {
+        let update = self
+            .ui_tree
+            .as_mut()
+            .map_or_else(InteractionUpdate::default, UiTree::flush_gesture_frame);
+        if !update.events.is_empty() {
+            self.apply_ui_update(update, window, event_loop);
+        }
+    }
+
     pub(super) fn flush_scrollbar_drag(&mut self, window: &Window, event_loop: &ActiveEventLoop) {
         let Some(point) = self.pending_scrollbar_drag.take() else {
             return;
@@ -31,6 +41,7 @@ impl Application {
             update.merge(ui.pointer_event(
                 PointerEvent {
                     buttons: self.pointer_buttons,
+                    modifiers: self.modifiers,
                     timestamp: self.input_epoch.elapsed(),
                     ..PointerEvent::mouse(PointerPhase::Left, point)
                 },
@@ -119,6 +130,7 @@ impl Application {
             PointerEvent {
                 button: Some(argui_core::PointerButton::Primary),
                 buttons: self.pointer_buttons,
+                modifiers: self.modifiers,
                 timestamp: self.input_epoch.elapsed(),
                 ..PointerEvent::mouse(phase, point)
             },
@@ -127,7 +139,15 @@ impl Application {
         let pointer_default = update
             .events
             .iter()
-            .find(|event| matches!(event.kind, argui_ui::UiEventKind::Pressed))
+            .find(|event| {
+                matches!(
+                    event.kind,
+                    argui_ui::UiEventKind::Pointer(argui_core::PointerEvent {
+                        phase: PointerPhase::Pressed,
+                        ..
+                    })
+                )
+            })
             .cloned();
         self.apply_ui_update(update, window, event_loop);
         let default_prevented = pointer_default.is_some_and(|event| event.default_prevented());
@@ -135,13 +155,14 @@ impl Application {
             if !default_prevented
                 && let (Some(ui), Some(layout)) = (&mut self.ui_tree, &self.ui_layout)
             {
-                let focus_update = ui.focus_pointer_default(&layout.hit_regions);
+                let focus_update =
+                    ui.focus_pointer_default(argui_core::PointerId::MOUSE, &layout.hit_regions);
                 self.apply_ui_update(focus_update, window, event_loop);
             }
             let selection_update = if default_prevented {
                 InteractionUpdate::default()
             } else if let Some(position) = static_placement {
-                let granularity = self.selection_click.next(point);
+                let granularity = self.selection_click.next(point, self.pointer_settings);
                 self.ui_tree
                     .as_mut()
                     .map_or_else(InteractionUpdate::default, |ui| {
@@ -282,6 +303,7 @@ impl Application {
         update.merge(ui.pointer_event(
             PointerEvent {
                 buttons: self.pointer_buttons,
+                modifiers: self.modifiers,
                 timestamp: self.input_epoch.elapsed(),
                 ..PointerEvent::mouse(PointerPhase::Moved, point)
             },

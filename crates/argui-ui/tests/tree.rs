@@ -1,10 +1,14 @@
 use argui_text::TextStyle;
 use argui_ui::{
-    Axes, Border, Color, ContainerQuery, ContainerScopeId, CornerRadii, Element, ElementKind,
-    FlexDirection, Interaction, LayerStyle, Overflow, Role, ScrollConfig, ScrollbarPartStyle,
-    ScrollbarStyle, Semantics, StylePatch, TreeUpdate, UiTree, VectorId, VisualState, length,
-    percent, property,
+    Axes, Border, Color, ContainerQuery, ContainerScopeId, CornerRadii, EffectScope, Element,
+    ElementKind, FlexDirection, Interaction, LayerStyle, Overflow, Role, ScrollConfig,
+    ScrollbarPartStyle, ScrollbarStyle, Semantics, StateName, StateScopeId, StylePatch,
+    StyleTransition, TextSelectionStyle, TransformOrigin, TreeUpdate, UiTree, UserSelect, VectorId,
+    VisualState, WindowLayer, length, percent, property,
 };
+
+#[path = "tree/event.rs"]
+mod event;
 
 #[test]
 fn rust_builders_form_the_future_dsl_lowering_target() {
@@ -246,6 +250,64 @@ fn responsive_and_scroll_configuration_changes_have_exact_invalidation() {
             VisualState::Hovered,
             StylePatch::new().set(property::WidthPx, 120.0),
         )),
+        TreeUpdate::Layout
+    );
+}
+
+#[test]
+fn structural_replacements_and_priority_merge_to_layout() {
+    let mut tree = UiTree::new(Element::container([Element::text("one")]));
+    assert_eq!(
+        tree.update(Element::container([
+            Element::text("one"),
+            Element::text("two")
+        ])),
+        TreeUpdate::Layout
+    );
+
+    let mut mixed = UiTree::new(Element::container([Element::text("one")]));
+    assert_eq!(mixed.update(Element::text("root")), TreeUpdate::Layout);
+
+    let mut nested = UiTree::new(Element::row([
+        Element::container([]).keyed("stable"),
+        Element::container([]),
+    ]));
+    let stable = nested.node_id_at(1).expect("stable child node");
+    assert_eq!(
+        nested.update(Element::row([
+            Element::container([])
+                .keyed("stable")
+                .background(Color::WHITE),
+            Element::container([]).semantics(Semantics::new(Role::Group)),
+        ])),
+        TreeUpdate::Paint
+    );
+    assert_eq!(nested.node_id_at(1), Some(stable));
+}
+
+#[test]
+fn every_visual_field_and_portal_change_has_an_exact_invalidation_class() {
+    let base = Element::container([]);
+    let paint_changes = [
+        base.clone().inspectable(false),
+        base.clone().transform_origin(TransformOrigin::TOP_LEFT),
+        base.clone().interaction(Interaction::default()),
+        base.clone()
+            .transition(StyleTransition::new(argui_ui::Transition::spring())),
+        base.clone().state_scope(StateScopeId::new("tree-update")),
+        base.clone().active_state(StateName::new("active"), true),
+        base.clone().layer(LayerStyle::new(Default::default())),
+        base.clone()
+            .effect(EffectScope::Content, LayerStyle::new(Default::default())),
+        base.clone().user_select(UserSelect::None),
+        base.clone().selection_style(TextSelectionStyle::default()),
+        base.clone().z_index(7),
+    ];
+    for changed in paint_changes {
+        assert_eq!(UiTree::new(base.clone()).update(changed), TreeUpdate::Paint);
+    }
+    assert_eq!(
+        UiTree::new(base.clone()).update(base.portal(WindowLayer::Popover)),
         TreeUpdate::Layout
     );
 }

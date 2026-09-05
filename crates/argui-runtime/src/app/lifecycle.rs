@@ -25,6 +25,7 @@ impl Application {
         }
         self.ui_tree = self.inspected_view().map(argui_ui::UiTree::new);
         if let Some(tree) = &mut self.ui_tree {
+            tree.set_pointer_settings(self.pointer_settings);
             tree.set_reduced_motion(self.environment.reduced_motion);
         }
     }
@@ -189,12 +190,14 @@ impl ApplicationHandler<UserEvent> for Application {
                 self.pointer_moved(point, &window, event_loop);
                 PlatformEvent::Pointer(PointerEvent {
                     buttons: self.pointer_buttons,
+                    modifiers: self.modifiers,
                     timestamp: self.input_epoch.elapsed(),
                     ..PointerEvent::mouse(PointerPhase::Moved, point)
                 })
             }
             WindowEvent::CursorEntered { .. } => PlatformEvent::Pointer(PointerEvent {
                 buttons: self.pointer_buttons,
+                modifiers: self.modifiers,
                 timestamp: self.input_epoch.elapsed(),
                 ..PointerEvent::mouse(PointerPhase::Entered, self.pointer.unwrap_or_default())
             }),
@@ -203,6 +206,7 @@ impl ApplicationHandler<UserEvent> for Application {
                 self.pointer_left(&window, event_loop);
                 PlatformEvent::Pointer(PointerEvent {
                     buttons: self.pointer_buttons,
+                    modifiers: self.modifiers,
                     timestamp: self.input_epoch.elapsed(),
                     ..PointerEvent::mouse(PointerPhase::Left, point)
                 })
@@ -228,6 +232,7 @@ impl ApplicationHandler<UserEvent> for Application {
                     },
                     button: Some(button),
                     buttons: self.pointer_buttons,
+                    modifiers: self.modifiers,
                     timestamp: self.input_epoch.elapsed(),
                     ..PointerEvent::mouse(PointerPhase::Moved, self.pointer.unwrap_or_default())
                 })
@@ -249,6 +254,7 @@ impl ApplicationHandler<UserEvent> for Application {
                     )),
                     pressure: touch.force.map(|force| force.normalized() as f32),
                     primary: false,
+                    modifiers: self.modifiers,
                     timestamp: self.input_epoch.elapsed(),
                 };
                 let event = self.touch_pointer(event, &window, event_loop);
@@ -304,6 +310,7 @@ impl ApplicationHandler<UserEvent> for Application {
                 self.flush_pointer_scroll(&window, event_loop);
                 self.advance_scroll_physics(&window, event_loop);
                 self.flush_scrollbar_drag(&window, event_loop);
+                self.flush_gesture_frame(&window, event_loop);
                 self.advance_programmatic_scroll(&window, event_loop);
                 self.animate(&window, event_loop);
                 self.flush_window_frame();

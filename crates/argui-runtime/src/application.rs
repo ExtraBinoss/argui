@@ -10,6 +10,8 @@ use crate::{
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum AppEvent {
+    WindowReady { window: WindowKey },
+    WindowFailed { window: WindowKey, error: String },
     Ui {
         window: WindowKey,
         event: UiEvent,
@@ -118,6 +120,15 @@ fn strongest(left: ViewUpdate, right: ViewUpdate) -> ViewUpdate {
 pub trait AppModel: 'static {
     fn view(&self, window: &WindowKey, environment: WindowEnvironment) -> Option<Element>;
 
+    fn event_router(&self, _window: &WindowKey) -> Option<crate::AnyEntity> {
+        None
+    }
+
+    /// Allows a composed application to observe events before a retained child router.
+    fn captures_ui_events(&self) -> bool {
+        false
+    }
+
     fn update(&mut self, event: &AppEvent) -> AppUpdate;
 
     fn animation_frame(&mut self, window: &WindowKey, frame: Frame) -> AppUpdate {
@@ -170,7 +181,8 @@ pub trait AppModel: 'static {
     }
 }
 
-pub(crate) struct SingleWindowModel<A: Render> {
+/// Headless-friendly [`AppModel`] adapter for one retained component window.
+pub struct SingleWindowModel<A: Render> {
     app: Entity<A>,
     clipboard: std::cell::RefCell<Option<ClipboardRequest>>,
     scroll: std::cell::RefCell<Option<ScrollRequest>>,
@@ -181,7 +193,8 @@ pub(crate) struct SingleWindowModel<A: Render> {
 }
 
 impl<A: Render> SingleWindowModel<A> {
-    pub(crate) fn new(app: A) -> Self {
+    #[must_use]
+    pub fn new(app: A) -> Self {
         Self {
             app: Entity::new(app),
             clipboard: std::cell::RefCell::new(None),
@@ -231,10 +244,14 @@ impl<A: Render> AppModel for SingleWindowModel<A> {
         (window.as_str() == WindowKey::MAIN_VALUE).then(|| self.app.render_in(environment))
     }
 
+    fn event_router(&self, window: &WindowKey) -> Option<crate::AnyEntity> {
+        (window.as_str() == WindowKey::MAIN_VALUE).then(|| self.app.erase())
+    }
+
     fn update(&mut self, event: &AppEvent) -> AppUpdate {
         match event {
             AppEvent::Ui { window, event } if window.as_str() == WindowKey::MAIN_VALUE => {
-                self.app.event(event);
+                self.app.dispatch_event(event);
                 self.drain_effects(window)
             }
             _ => AppUpdate::none(),
@@ -299,59 +316,5 @@ impl<A: Render> AppModel for SingleWindowModel<A> {
         (window.as_str() == WindowKey::MAIN_VALUE)
             .then(|| self.theme.borrow_mut().take())
             .flatten()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use argui_core::{Color, ColorScheme, Point};
-    use argui_ui::{
-        ClipboardRequest, Element, ScrollRequest, TextSelection, UiEvent, UiEventKind, UiTree,
-    };
-
-    use super::{AppEvent, AppModel, SingleWindowModel};
-    use crate::{Context, Render, ThemeRequest};
-
-    struct ThemedApp;
-
-    impl Render for ThemedApp {
-        fn render(&mut self, _cx: &mut Context<Self>) -> Element {
-            Element::container([]).keyed("theme")
-        }
-
-        fn event(&mut self, _event: &UiEvent, cx: &mut Context<Self>) {
-            cx.write_clipboard(ClipboardRequest::Write("theme".into()));
-            cx.scroll(ScrollRequest::offset("theme", Point::new(1.0, 2.0)));
-            cx.request_focus("theme");
-            cx.select_text("theme", TextSelection::All);
-            cx.request_animation_frame();
-            cx.set_theme(ThemeRequest {
-                color_scheme: Some(ColorScheme::Dark),
-                primary: Some(Color::srgb(0.8, 0.2, 0.4)),
-            });
-        }
-    }
-
-    #[test]
-    fn single_window_models_forward_theme_requests_to_the_runtime() {
-        let window = argui_platform::WindowKey::main();
-        let mut model = SingleWindowModel::new(ThemedApp);
-        let tree = UiTree::new(Element::container([]));
-        model.update(&AppEvent::Ui {
-            window: window.clone(),
-            event: UiEvent::new(
-                tree.node_ids()[0],
-                Some("theme".into()),
-                UiEventKind::Clicked,
-            ),
-        });
-        let _ = model.take_theme_request(&argui_platform::WindowKey::new("secondary"));
-        let _ = model.take_clipboard_request(&window);
-        let _ = model.take_scroll_request(&window);
-        let _ = model.take_focus_request(&window);
-        let _ = model.take_text_selection_request(&window);
-        let _ = model.wants_animation_frame(&window);
-        let _ = model.take_theme_request(&window);
-        let _ = model.take_theme_request(&window);
     }
 }

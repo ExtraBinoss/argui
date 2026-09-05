@@ -17,6 +17,8 @@ pub enum Role {
     SearchInput,
     List,
     ListItem,
+    Tree,
+    TreeItem,
     ListBox,
     Option,
     Menu,

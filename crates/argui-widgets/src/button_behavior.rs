@@ -71,7 +71,7 @@ impl ButtonBehavior {
                     .enabled(enabled)
                     .focusable(enabled)
                     .cursor(cursor)
-                    .gestures(GestureSet::NONE.tap())
+                    .gestures(GestureSet::default().tap(argui_ui::TapGesture::default()))
                     .keyboard_activation(KeyboardActivation::EnterOrSpace),
             )
             .semantics(
@@ -89,8 +89,8 @@ impl ButtonBehavior {
 
     #[must_use]
     pub fn action(&self, event: &UiEvent) -> Option<ButtonAction> {
-        (event.key.as_deref() == Some(self.key.as_str())
-            && matches!(event.kind, UiEventKind::Clicked)
+        (event.target_key() == Some(self.key.as_str())
+            && matches!(event.kind, UiEventKind::Click(_))
             && self.enabled
             && !self.busy)
             .then_some(ButtonAction::Activate)

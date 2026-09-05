@@ -82,13 +82,19 @@ fn search_is_controlled_and_filters_the_visible_results() {
 fn window_controls_emit_typed_commands() {
     let mut app = SpotlightShowcase::default();
     assert_eq!(
-        app.update(&ui_event("minimize", UiEventKind::Clicked))
-            .commands,
+        app.update(&ui_event(
+            "minimize",
+            UiEventKind::Click(argui_ui::ClickEvent::accessibility())
+        ))
+        .commands,
         [AppCommand::MinimizeWindow(WindowKey::main())]
     );
     assert_eq!(
-        app.update(&ui_event("close", UiEventKind::Clicked))
-            .commands,
+        app.update(&ui_event(
+            "close",
+            UiEventKind::Click(argui_ui::ClickEvent::accessibility())
+        ))
+        .commands,
         [AppCommand::Quit]
     );
 }
@@ -96,7 +102,10 @@ fn window_controls_emit_typed_commands() {
 #[test]
 fn passthrough_restores_itself_after_two_seconds() {
     let mut app = SpotlightShowcase::default();
-    let enabled = app.update(&ui_event("passthrough", UiEventKind::Clicked));
+    let enabled = app.update(&ui_event(
+        "passthrough",
+        UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
+    ));
     assert_eq!(
         enabled.commands,
         [AppCommand::SetWindowMousePassthrough {

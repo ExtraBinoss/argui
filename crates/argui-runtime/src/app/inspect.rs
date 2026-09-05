@@ -6,15 +6,15 @@ use argui_inspect::{
 use argui_paint::{
     Border, ClipChain, ClipRegion, Color, CornerRadii, Fill, Filter, LayerStyle, Quad,
 };
-use argui_ui::{Axes, Dimension, Element, ElementKind, NodeId, Overflow};
+use argui_ui::{Axes, Dimension, Element, ElementKind, NodeId, Overflow, UiTree};
 
 use super::Application;
 
 mod values;
+mod cache;
+pub use cache::InspectionCache;
 
 use values::properties;
-#[cfg(test)]
-use values::property_value;
 
 impl Application {
     #[cfg_attr(coverage_nightly, coverage(off))]
@@ -26,39 +26,24 @@ impl Application {
         let Some(inspector) = &self.inspector else {
             return Some(root);
         };
-        let ids = self
-            .ui_tree
-            .as_ref()
-            .map(|tree| tree.node_ids())
-            .unwrap_or(&[]);
-        apply_tree_overrides(&mut root, ids, inspector, &mut 0);
+        if let Some(tree) = self.ui_tree.as_ref() {
+            Inspection::apply_overrides(&mut root, tree, inspector);
+        }
         Some(root)
     }
 
     #[cfg_attr(coverage_nightly, coverage(off))]
-    pub(super) fn publish_inspection(&self) {
+    pub(super) fn publish_inspection(&mut self) {
         let (Some(inspector), Some(tree), Some(layout)) =
             (&self.inspector, &self.ui_tree, &self.ui_layout)
         else {
             return;
         };
-        let mut nodes = Vec::new();
-        collect_nodes(
-            tree.root(),
-            None,
-            0,
-            true,
-            &mut CollectState {
-                ids: tree.node_ids(),
-                layout,
-                output: &mut nodes,
-                cursor: 0,
-            },
-        );
-        inspector.publish_tree(TreeSnapshot {
-            revision: tree.revision(),
-            nodes,
-        });
+        if inspector.enabled()
+            && let Some(snapshot) = self.inspection_cache.snapshot(tree, layout)
+        {
+            inspector.publish_tree(snapshot);
+        }
     }
 
     #[cfg_attr(coverage_nightly, coverage(off))]
@@ -87,9 +72,47 @@ impl Application {
     }
 }
 
+/// Public inspection operations for retained UI trees.
+pub struct Inspection;
+
+impl Inspection {
+    /// Builds an inspectable snapshot from a retained tree and its layout.
+    #[must_use]
+    pub fn snapshot(tree: &UiTree, layout: &argui_layout::LayoutOutput) -> TreeSnapshot {
+        let mut nodes = Vec::new();
+        collect_nodes(
+            tree.root(),
+            None,
+            0,
+            true,
+            &mut CollectState {
+                ids: tree.node_ids(),
+                layout,
+                layout_nodes: layout.nodes.iter().map(|node| (node.node, *node)).collect(),
+                output: &mut nodes,
+                cursor: 0,
+            },
+        );
+        TreeSnapshot {
+            revision: tree.revision(),
+            nodes,
+        }
+    }
+
+    /// Applies the enabled inspector overrides to the matching retained nodes.
+    pub fn apply_overrides(
+        root: &mut Element,
+        tree: &UiTree,
+        inspector: &argui_inspect::InspectorHandle,
+    ) {
+        apply_tree_overrides(root, tree.node_ids(), inspector, &mut 0);
+    }
+}
+
 struct CollectState<'a> {
     ids: &'a [NodeId],
     layout: &'a argui_layout::LayoutOutput,
+    layout_nodes: std::collections::HashMap<NodeId, argui_layout::LayoutNode>,
     output: &'a mut Vec<NodeSnapshot>,
     cursor: usize,
 }
@@ -116,12 +139,7 @@ fn collect_nodes(
             .layer
             .as_ref()
             .is_none_or(|layer| layer.opacity > 0.0);
-    let layout_node = state
-        .layout
-        .nodes
-        .iter()
-        .find(|candidate| candidate.node == node)
-        .copied();
+    let layout_node = state.layout_nodes.get(&node).copied();
     let bounds = layout_node
         .map(|candidate| candidate.bounds)
         .unwrap_or_default();
@@ -471,6 +489,3 @@ fn apply_tree_overrides(
         apply_tree_overrides(child, ids, inspector, cursor);
     }
 }
-
-#[cfg(test)]
-mod tests;

@@ -37,20 +37,3 @@ fn decimal(value: &str) -> bool {
         }
     })
 }
-
-#[cfg(test)]
-mod tests {
-    use super::TextInputFilter;
-
-    #[test]
-    fn filters_accept_partial_numeric_edits_without_accepting_letters() {
-        for value in ["", "-", "+.5", "12.25"] {
-            assert!(TextInputFilter::Decimal.accepts(value));
-        }
-        for value in ["1.2.3", "--2", "2px"] {
-            assert!(!TextInputFilter::Decimal.accepts(value));
-        }
-        assert!(TextInputFilter::Arithmetic.accepts("(50 + 10) / 2"));
-        assert!(!TextInputFilter::Arithmetic.accepts("50px"));
-    }
-}

@@ -1,9 +1,17 @@
 use argui_core::{CaretAffinity, TextPosition};
 use argui_ui::{
-    ClipboardRequest, DocumentTextPoint, Element, GestureSet, Interaction, Role, SelectionCommand,
-    SelectionGranularity, Semantics, TextEditorSpec, TextInputFilter, TextSelectionStyle,
-    UiEventKind, UiTree, UserSelect,
+    ClipboardRequest, DocumentTextPoint, Element, EventHandlerId, EventListener, EventOwnerId,
+    EventType, GestureSet, Interaction, Role, SelectionCommand, SelectionGranularity, Semantics,
+    TapGesture, TextEditorSpec, TextInputFilter, TextSelectionStyle, UiEventKind, UiTree,
+    UserSelect,
 };
+
+fn listens_for_selection(element: Element) -> Element {
+    element.on(EventListener::new(
+        EventType::SelectionChange,
+        EventHandlerId::new(EventOwnerId(1), 0),
+    ))
+}
 
 #[test]
 fn inherited_selection_policy_style_and_semantic_expansion_are_public() {
@@ -11,13 +19,13 @@ fn inherited_selection_policy_style_and_semantic_expansion_are_public() {
         background: argui_core::Color::srgb(1.0, 0.0, 0.0),
         handle: argui_core::Color::WHITE,
     };
-    let mut tree = UiTree::new(
+    let mut tree = UiTree::new(listens_for_selection(
         Element::column([
             Element::text("alpha beta"),
             Element::text("atomic").user_select(UserSelect::All),
         ])
         .selection_style(style),
-    );
+    ));
     let first = tree.node_id_at(1).unwrap();
     let atomic = tree.node_id_at(2).unwrap();
     assert_eq!(tree.resolved_selection_style(first), style);
@@ -64,11 +72,11 @@ fn user_select_all_treats_a_container_as_one_atomic_selection() {
 
 #[test]
 fn selection_lifecycle_covers_extension_reverse_ranges_and_release() {
-    let mut tree = UiTree::new(Element::column([
+    let mut tree = UiTree::new(listens_for_selection(Element::column([
         Element::text("first"),
         Element::text("middle"),
         Element::text("last"),
-    ]));
+    ])));
     let first = tree.node_id_at(1).unwrap();
     let middle = tree.node_id_at(2).unwrap();
     let last = tree.node_id_at(3).unwrap();
@@ -236,7 +244,7 @@ fn accessibility_roles_do_not_change_the_user_select_cascade() {
         .interaction(
             Interaction::default()
                 .focusable(true)
-                .gestures(GestureSet::NONE.tap()),
+                .gestures(GestureSet::EMPTY.tap(TapGesture::default())),
         )
         .semantics(Semantics::new(Role::Window)),
     );

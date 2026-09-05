@@ -1,0 +1,64 @@
+#![cfg(feature = "artistic")]
+
+use argui_effects::{
+    ANIMATED_GRADIENT_ID, AnimatedGradient, LIQUID_GLASS_ID, LiquidGlass, WORLEY_BORDER_FIRE_ID,
+    WorleyBorderFire,
+};
+use argui_paint::{EffectValue, Filter};
+
+fn parameters(filter: Filter) -> (argui_paint::EffectId, Vec<(&'static str, EffectValue)>, f32) {
+    let Filter::Effect(effect) = filter else {
+        panic!("artistic presets must produce effect instances");
+    };
+    (
+        effect.id,
+        effect
+            .parameters
+            .into_iter()
+            .map(|argument| (argument.name, argument.value))
+            .collect(),
+        effect.expansion,
+    )
+}
+
+#[test]
+fn artistic_presets_expose_stable_ids_and_typed_parameters() {
+    let (id, values, expansion) = parameters(
+        AnimatedGradient::new(0.5)
+            .frequency(2.0)
+            .intensity(0.75)
+            .filter(),
+    );
+    assert_eq!(id, ANIMATED_GRADIENT_ID);
+    assert_eq!(values[0], ("phase", EffectValue::F32(0.5)));
+    assert_eq!(values[1], ("frequency", EffectValue::F32(2.0)));
+    assert_eq!(values[2], ("intensity", EffectValue::F32(0.75)));
+    assert_eq!(expansion, 0.0);
+
+    let (id, values, expansion) = parameters(
+        WorleyBorderFire::new(0.2)
+            .intensity(0.6)
+            .frequency(10.0)
+            .expansion(4.0)
+            .filter(),
+    );
+    assert_eq!(id, WORLEY_BORDER_FIRE_ID);
+    assert_eq!(values.len(), 4);
+    assert_eq!(values[3], ("expansion", EffectValue::LogicalPixels(4.0)));
+    assert_eq!(expansion, 4.0);
+
+    let (id, values, _) = parameters(
+        LiquidGlass::new()
+            .refraction(10.0)
+            .chromatic_aberration(2.0)
+            .blur(4.0)
+            .highlight(0.3)
+            .edge_width(20.0)
+            .saturation(1.2)
+            .filter(),
+    );
+    assert_eq!(id, LIQUID_GLASS_ID);
+    assert_eq!(values.len(), 6);
+    assert_eq!(values[0], ("refraction", EffectValue::LogicalPixels(10.0)));
+    assert_eq!(values[5], ("saturation", EffectValue::F32(1.2)));
+}

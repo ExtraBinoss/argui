@@ -14,7 +14,7 @@ fn button_exposes_variants_content_and_busy_state() {
     let theme = shadcn(Color::srgb(0.2, 0.5, 0.9));
     let theme = theme.resolve(ColorScheme::Dark);
     let assets = WidgetAssets::tabler(theme.foreground);
-    let button = Button::new("save", "Save", theme.button.clone())
+    let button = Button::new("save", "Save", theme.button())
         .leading(assets.icon(TablerIcon::Check, 16.0))
         .trailing(Element::text("⌘S"))
         .build();
@@ -27,7 +27,7 @@ fn button_exposes_variants_content_and_busy_state() {
         KeyboardActivation::EnterOrSpace
     );
 
-    let loading = Button::new("load", "Loading", theme.button.clone())
+    let loading = Button::new("load", "Loading", theme.button())
         .loading(Element::text("spinner"))
         .build();
     let semantics = loading.semantics.as_ref().unwrap();
@@ -39,7 +39,7 @@ fn button_exposes_variants_content_and_busy_state() {
         CursorIcon::Progress
     );
 
-    let disabled = Button::new("disabled", "Disabled", theme.button.clone())
+    let disabled = Button::new("disabled", "Disabled", theme.button())
         .enabled(false)
         .build();
     assert_eq!(
@@ -83,7 +83,7 @@ fn button_hover_uses_the_shared_retained_visual_state_path() {
             enabled: true,
             focusable: true,
             cursor: CursorIcon::Pointer,
-            gestures: argui_ui::GestureSet::NONE,
+            gestures: argui_ui::GestureSet::EMPTY,
             window_drag: None,
         }],
     );
@@ -98,7 +98,7 @@ fn button_hover_uses_the_shared_retained_visual_state_path() {
 fn themed_outline_button_has_a_visible_hover_surface() {
     let themes = shadcn(Color::srgb(0.2, 0.5, 0.9));
     let theme = themes.resolve(ColorScheme::Dark);
-    let element = Button::new("close", "Close dialog", theme.outline_button.clone()).build();
+    let element = Button::new("close", "Close dialog", theme.outline_button()).build();
     let resting = element.paint.quad.background.clone();
     let mut tree = UiTree::new(element);
     let node = tree.node_ids()[0];
@@ -115,7 +115,7 @@ fn themed_outline_button_has_a_visible_hover_surface() {
             enabled: true,
             focusable: true,
             cursor: CursorIcon::Pointer,
-            gestures: argui_ui::GestureSet::NONE,
+            gestures: argui_ui::GestureSet::EMPTY,
             window_drag: None,
         }],
     );
@@ -133,7 +133,7 @@ fn headless_button_decodes_only_enabled_activation() {
     let clicked = UiEvent::new(
         tree.node_ids()[0],
         Some("save".into()),
-        UiEventKind::Clicked,
+        UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
     );
     assert_eq!(
         ButtonBehavior::new("save", "Save").action(&clicked),

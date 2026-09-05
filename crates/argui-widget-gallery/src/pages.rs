@@ -5,7 +5,8 @@ use argui::{
     },
     text::TextAlign,
     ui::{
-        AlignItems, Element, FlexWrap, JustifyContent, Resizable, Sides, evenly_sized_tracks,
+        AlignItems, CursorIcon, Element, EventListener, FlexWrap, GestureCapture, GestureSet,
+        Interaction, JustifyContent, PanGesture, Position, Sides, auto, evenly_sized_tracks,
         length, percent,
     },
     widgets::{
@@ -23,19 +24,33 @@ use crate::{
 
 mod buttons;
 mod composition;
+pub(crate) use composition::AppShell;
 mod inputs;
 mod typography;
+
+pub(crate) struct ResizeListeners {
+    pub(crate) textarea: EventListener,
+    pub(crate) textarea_reset: EventListener,
+    pub(crate) shell: Element,
+}
 
 pub(crate) fn render(
     gallery: &WidgetGallery,
     theme: &WidgetTheme,
     assets: &WidgetAssets,
     spinner: Element,
+    resize: ResizeListeners,
 ) -> Element {
     let content = match gallery.page {
         Page::Button => buttons::render(gallery, theme, spinner),
         Page::Input => inputs::render(gallery, theme, assets),
-        Page::TextArea => textarea(gallery, theme, assets),
+        Page::TextArea => textarea(
+            gallery,
+            theme,
+            assets,
+            resize.textarea,
+            resize.textarea_reset,
+        ),
         Page::Checkbox => checkboxes(gallery, theme, assets),
         Page::Switch => switches(gallery, theme),
         Page::RadioGroup => radios(gallery, theme),
@@ -48,7 +63,9 @@ pub(crate) fn render(
         Page::Layout => layout_system(theme),
         Page::Motion => motion(theme, spinner),
         Page::Effects => effects(theme),
-        Page::Composition => composition::render(gallery, theme, assets),
+        Page::Composition => {
+            composition::render(gallery, theme, assets, resize.shell)
+        }
         Page::Typography => typography::render(theme),
     };
     Element::column([
@@ -64,8 +81,14 @@ pub(crate) fn render(
     .gap(24.0)
 }
 
-fn textarea(gallery: &WidgetGallery, theme: &WidgetTheme, assets: &WidgetAssets) -> Element {
-    let mut style = theme.input.clone();
+fn textarea(
+    gallery: &WidgetGallery,
+    theme: &WidgetTheme,
+    assets: &WidgetAssets,
+    resize_listener: EventListener,
+    resize_reset_listener: EventListener,
+) -> Element {
+    let mut style = theme.input();
     style.layout.size.height = percent(1.0);
     style.layout.padding = Sides::length(13.0);
     let scrollbar = theme.scrollbar.clone().insets(Sides {
@@ -78,15 +101,52 @@ fn textarea(gallery: &WidgetGallery, theme: &WidgetTheme, assets: &WidgetAssets)
     preview(
         "Resizable multiline input",
         "The engine preserves caret and scroll while the captured resize gesture changes layout.",
-        Resizable::new(
-            gallery.editor_size.size(),
+        resizable_textarea(
+            gallery.editor_size,
             area,
-            "notes-resize",
-            assets.icon(TablerIcon::Resize, 18.0),
-        )
-        .build(),
+            assets,
+            resize_listener,
+            resize_reset_listener,
+        ),
         theme,
     )
+}
+
+fn resizable_textarea(
+    size: argui::core::Size,
+    area: Element,
+    assets: &WidgetAssets,
+    listener: EventListener,
+    reset_listener: EventListener,
+) -> Element {
+    let handle = assets
+        .icon(TablerIcon::Resize, 18.0)
+        .keyed("notes-resize")
+        .absolute(Sides {
+            left: auto(),
+            right: length(0.0),
+            top: auto(),
+            bottom: length(0.0),
+        })
+        .interaction(
+            Interaction::default()
+                .cursor(CursorIcon::NwseResize)
+                .gestures(
+                    GestureSet::EMPTY.pan(
+                        PanGesture::default()
+                            .immediate()
+                            .capture(GestureCapture::OnPress)
+                            .delivery(argui::ui::GestureDelivery::FrameCoalesced),
+                    ),
+                ),
+        )
+        .on(listener)
+        .on(reset_listener);
+    Element::container([area, handle])
+        .keyed("notes-resizable")
+        .width(length(size.width))
+        .height(length(size.height))
+        .position(Position::Relative)
 }
 
 fn checkboxes(gallery: &WidgetGallery, theme: &WidgetTheme, assets: &WidgetAssets) -> Element {
@@ -212,7 +272,7 @@ fn dialogs(gallery: &WidgetGallery, theme: &WidgetTheme) -> Element {
         Button::new(
             DialogBehavior::new("demo-dialog", "Delete GPU cache", gallery.dialog_open).close_key(),
             "Close dialog",
-            theme.outline_button.clone(),
+            theme.outline_button(),
         )
         .build(),
     ])
@@ -224,7 +284,7 @@ fn dialogs(gallery: &WidgetGallery, theme: &WidgetTheme) -> Element {
             "demo-dialog",
             "Delete GPU cache",
             gallery.dialog_open,
-            Button::new("open-dialog", "Open dialog", theme.button.clone()).build(),
+            Button::new("open-dialog", "Open dialog", theme.button()).build(),
             content,
         )
         .build(theme),
@@ -237,10 +297,10 @@ fn form(gallery: &WidgetGallery, theme: &WidgetTheme, assets: &WidgetAssets) -> 
         "Profile form",
         "A realistic composition made only from public widget APIs.",
         Element::column([
-            Input::new("name", &gallery.name, "Full name", theme.input.clone())
+            Input::new("name", &gallery.name, "Full name", theme.input())
                 .label("Full name")
                 .build(),
-            Input::new("email", &gallery.email, "Email", theme.input.clone())
+            Input::new("email", &gallery.email, "Email", theme.input())
                 .label("Email")
                 .build(),
             Select::new(
@@ -256,7 +316,7 @@ fn form(gallery: &WidgetGallery, theme: &WidgetTheme, assets: &WidgetAssets) -> 
             Checkbox::new("accepted", "Share anonymous GPU metrics", gallery.accepted)
                 .indicator(assets.icon(TablerIcon::Check, 14.0))
                 .build(theme),
-            Button::new("save-profile", "Save profile", theme.button.clone()).build(),
+            Button::new("save-profile", "Save profile", theme.button()).build(),
         ])
         .gap(12.0),
         theme,
@@ -348,13 +408,13 @@ fn motion(theme: &WidgetTheme, spinner: Element) -> Element {
         "Motion and loading",
         "The spinner requests presentation frames only while mounted; reduced-motion stays still.",
         Element::row([
-            Button::new("loading-example", "Compiling shaders", theme.button.clone())
+            Button::new("loading-example", "Compiling shaders", theme.button())
                 .loading(spinner)
                 .build(),
             Button::new(
                 "motion-hover",
                 "Hover and press",
-                theme.outline_button.clone(),
+                theme.outline_button(),
             )
             .build(),
         ])

@@ -55,7 +55,7 @@ impl PopoverBehavior {
                     Interaction::default()
                         .focusable(true)
                         .cursor(CursorIcon::Pointer)
-                        .gestures(GestureSet::NONE.tap())
+                        .gestures(GestureSet::default().tap(argui_ui::TapGesture::default()))
                         .keyboard_activation(KeyboardActivation::EnterOrSpace),
                 )
                 .semantics(
@@ -78,15 +78,15 @@ impl PopoverBehavior {
     #[must_use]
     pub fn action(&self, event: &UiEvent) -> Option<PopoverAction> {
         if !self.open {
-            return (event.key.as_deref() == Some(self.key.as_str())
-                && matches!(event.kind, UiEventKind::Clicked))
+            return (event.target_key() == Some(self.key.as_str())
+                && matches!(event.kind, UiEventKind::Click(_)))
             .then_some(PopoverAction::Toggle);
         }
-        if matches!(event.kind, UiEventKind::PointerOutside) {
+        if matches!(event.kind, UiEventKind::PointerOutside(_)) {
             return Some(PopoverAction::Close);
         }
-        if event.key.as_deref() == Some(self.key.as_str())
-            && matches!(event.kind, UiEventKind::Clicked)
+        if event.target_key() == Some(self.key.as_str())
+            && matches!(event.kind, UiEventKind::Click(_))
         {
             return Some(PopoverAction::Toggle);
         }
