@@ -12,7 +12,7 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 argui = { workspace = true, features = ["widgets-all"] }
 argui-image.workspace = true
-argui-effects = { workspace = true, features = ["artistic", "blur", "shadow"] }
+argui-effects = { workspace = true, features = ["artistic", "blur", "shadow", "scroll"] }
 argui-devtools.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]

@@ -9,7 +9,9 @@ pub(super) fn scroll_config(elements: &[&Element], ui: &UiTree, output: &mut Lay
                 .scroll
                 .clone()
                 .unwrap_or_else(|| region.config.clone());
-            let config = ui.resolved_scroll_config(region.node, &authored);
+            let mut config = ui.resolved_scroll_config(region.node, &authored);
+            // Layout determines scrollable axes; repaint must not restore config defaults.
+            config.axes = region.config.axes;
             if let (Some(scrollbar), Some(style)) = (&mut region.scrollbar, &config.scrollbar) {
                 scrollbar.style = style.clone();
             }

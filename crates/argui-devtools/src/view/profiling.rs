@@ -102,6 +102,7 @@ pub(super) fn gpu_waterfall(
     viewport: f32,
     offset: f32,
     header_extent: f32,
+    effect: Option<argui_ui::ScrollEffect>,
 ) -> Element {
     let Some(gpu) = &frame.gpu else {
         return Element::text(if frame.adapter.timestamp_queries {
@@ -144,6 +145,7 @@ pub(super) fn gpu_waterfall(
     .padding(Sides::length(10.0));
 
     let timeline = argui_widgets::VList::new("__devtools-gpu-passes", 28.0, viewport, offset)
+        .effects(effect)
         .build_with_header(gpu.passes.len(), theme, header, header_extent, |index| {
             let pass = &gpu.passes[index];
             let start = (pass.start.as_secs_f64() / total).clamp(0.0, 1.0);

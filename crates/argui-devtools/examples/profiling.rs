@@ -12,12 +12,15 @@ use web_time::Instant;
 
 fn main() {
     let resizing = std::env::args().any(|arg| arg == "--resize");
+    let effects = !std::env::args().any(|arg| arg == "--no-scroll-effects");
     for (label, open, profiling) in [
         ("Closed", false, false),
         ("Elements", true, false),
         ("Profiling", true, true),
     ] {
-        let mut host = DevtoolsHost::new(StateShowcase::default()).open(open);
+        let mut host = DevtoolsHost::new(StateShowcase::default())
+            .open(open)
+            .scroll_effect(effects.then(|| argui_effects::EdgeFade::default().scroll()));
         let inspector = host.inspector();
         let mut record = FrameRecord {
             interval: StdDuration::from_micros(16_667),

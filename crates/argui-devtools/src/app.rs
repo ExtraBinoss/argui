@@ -62,6 +62,14 @@ impl<M: AppModel> DevtoolsApp<M> {
     }
 
     #[must_use]
+    pub fn scroll_effect(mut self, effect: Option<argui_ui::ScrollEffect>) -> Self {
+        let tools = self.tools.get_mut();
+        tools.scroll_effect = effect;
+        tools.detail_cache.borrow_mut().take();
+        self
+    }
+
+    #[must_use]
     pub fn inspector(&self) -> InspectorHandle {
         self.tools.borrow().inspector()
     }

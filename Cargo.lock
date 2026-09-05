@@ -252,6 +252,7 @@ version = "0.1.0"
 dependencies = [
  "argui-animation",
  "argui-core",
+ "argui-effects",
  "argui-inspect",
  "argui-layout",
  "argui-paint",
@@ -275,6 +276,9 @@ version = "0.1.0"
 dependencies = [
  "argui-paint",
  "argui-render",
+ "argui-ui",
+ "pollster",
+ "wgpu",
 ]
 
 [[package]]

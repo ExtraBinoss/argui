@@ -39,7 +39,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }],
             ..TrayConfig::default()
         }),
-        RendererConfig::default().profiling(profiling),
+        argui_devtools::configure_renderer(RendererConfig::default().profiling(profiling))?,
         text_engine(),
         DevtoolsApp::new(SingleWindowModel::new(StateShowcase::default())),
         move |event| {

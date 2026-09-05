@@ -26,12 +26,14 @@ mod buttons;
 mod composition;
 pub(crate) use composition::AppShell;
 mod inputs;
+pub(crate) mod scroll_effects;
 mod typography;
 
 pub(crate) struct ResizeListeners {
     pub(crate) textarea: EventListener,
     pub(crate) textarea_reset: EventListener,
     pub(crate) shell: Element,
+    pub(crate) scroll_demo: Element,
 }
 
 pub(crate) fn render(
@@ -62,7 +64,7 @@ pub(crate) fn render(
         Page::Settings => settings(gallery, theme),
         Page::Layout => layout_system(theme),
         Page::Motion => motion(theme, spinner),
-        Page::Effects => effects(theme),
+        Page::Effects => Element::column([resize.scroll_demo, effects(theme)]).gap(24.0),
         Page::Composition => composition::render(gallery, theme, assets, resize.shell),
         Page::Typography => typography::render(theme),
     };

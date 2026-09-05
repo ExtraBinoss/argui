@@ -9,6 +9,7 @@ pub struct VList {
     pub viewport: f32,
     pub offset: f32,
     pub row_height: f32,
+    pub effects: Vec<argui_ui::ScrollEffect>,
 }
 
 impl VList {
@@ -20,6 +21,7 @@ impl VList {
             row_height,
             viewport: viewport.max(0.0),
             offset: offset.max(0.0),
+            effects: Vec::new(),
         }
     }
 
@@ -29,14 +31,28 @@ impl VList {
     }
 
     #[must_use]
+    pub fn effect(mut self, effect: argui_ui::ScrollEffect) -> Self {
+        self.effects.push(effect);
+        self
+    }
+
+    #[must_use]
+    pub fn effects(mut self, effects: impl IntoIterator<Item = argui_ui::ScrollEffect>) -> Self {
+        self.effects.extend(effects);
+        self
+    }
+
+    #[must_use]
     pub fn build(
         &self,
         count: usize,
         theme: &WidgetTheme,
         row: impl FnMut(usize) -> Element,
     ) -> Element {
+        let mut scroll = ScrollConfig::default().scrollbar(theme.scrollbar.clone());
+        scroll.effects.clone_from(&self.effects);
         self.config(count)
-            .scroll_config(ScrollConfig::default().scrollbar(theme.scrollbar.clone()))
+            .scroll_config(scroll)
             .build(&self.key, self.offset, row)
             .scrollbar_gutter(argui_ui::ScrollbarGutter::Stable)
     }

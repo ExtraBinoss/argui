@@ -26,7 +26,8 @@ pub fn start() -> Result<(), JsValue> {
                 ..WindowConfig::default()
             },
         ),
-        RendererConfig::default(),
+        argui_devtools::configure_renderer(RendererConfig::default())
+            .map_err(|error| JsValue::from_str(&error.to_string()))?,
         text_engine(),
         DevtoolsApp::new(SingleWindowModel::new(StateShowcase::default())),
         |_| {},

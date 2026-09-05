@@ -52,7 +52,8 @@ impl<A> DevtoolsHost<A> {
             nodes,
             selected,
             collapsed: &self.collapsed,
-            list: VList::new("__devtools-tree", 28.0, self.tree_height, self.tree_offset),
+            list: VList::new("__devtools-tree", 28.0, self.tree_height, self.tree_offset)
+                .effects(self.scroll_effect.clone()),
             disclosure: Some(self.icons.chevron),
         }
     }

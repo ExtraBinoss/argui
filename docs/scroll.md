@@ -63,3 +63,61 @@ retained offset to preserve the visible item. Generic keyed scroll anchoring
 also preserves the first visible keyed descendant when content above it changes.
 `VirtualList::scroll_to` navigates fixed or variable data with the same four
 alignment modes.
+
+## Scroll-driven graphic effects
+
+Enable `argui-effects`' optional `scroll` feature and register its definitions
+with `RendererConfig::effects(argui_effects::registry()?)`. The widget itself
+does not depend on the effects crate:
+
+```rust
+let list = VList::new("results", 32.0, 240.0, offset)
+    .effect(argui_effects::EdgeFade::new(20.0).scroll())
+    .build(items.len(), theme, |index| row(&items[index]));
+```
+
+Any scroll container accepts the same effect through
+`ScrollConfig::default().effect(effect)`. `TreeView` uses the configuration on
+its `list`; headers and virtual spacers remain part of the same scroll extent.
+Nothing is enabled implicitly on application lists.
+
+`EdgeFade` changes content alpha rather than painting the background color over
+it. `EdgeShadow` shades the content toward a configurable color. Both expose
+width in logical pixels, intensity and `[left, top, right, bottom]` strengths.
+Their `.filter()` methods also work on ordinary layers without scrolling.
+`.scroll_with(threshold, ramp)` controls reveal distance; `.scroll()` uses a
+zero threshold and a smooth 12 px reveal. The default fade width is 20 px.
+Bands are capped at half the corresponding viewport dimension. Zero width,
+zero intensity and disabled edges avoid scroll-effect layers entirely.
+
+Custom WGSL uses the existing effect registry and ABI. Bind an existing named
+parameter with `ScrollEffect::new(layer).bind(filter_index, parameter, metric)`.
+`ScrollMetric` supplies clamped offsets, normalized progress, remaining distances,
+smooth per-edge strengths, logical viewport dimensions, or normalized local
+coordinate mappings for transformed viewports. Types are checked when binding;
+rebinding the same target replaces its previous source. Offset and remaining
+vectors are in logical pixels; viewport-size bindings use `LogicalPixels` and
+therefore receive the renderer's DPI scaling automatically.
+Use `.when_edges(strengths, threshold, ramp)` to explicitly skip an entire layer
+when its selected edges are invisible. Zero-valued bindings alone do not disable
+custom shaders, since zero can be a meaningful input to another effect.
+
+Bindings resolve during painting, not through application callbacks or layout.
+Effects run in declaration order on the scrolling content, excluding the
+container background, border, scrollbar and separately painted portals. Stable
+scrollbar gutters are removed from the effect viewport. No overflow means no
+extra layer, and idle effects request no animation frames. Active effects still
+have an offscreen/filter cost in the existing render graph; custom shaders retain
+their usual responsibility for output alpha and any expansion beyond the source.
+
+The DevTools enable a subtle fade by default. Pass
+`.scroll_effect(None)` to `DevtoolsApp` or `DevtoolsHost` to disable it, or pass
+`Some(effect)` to replace it. Configure the renderer with
+`argui_devtools::configure_renderer(config)?`; this adds the required presets
+without removing application shader definitions. The gallery's GPU effects
+page includes virtual, horizontal and nested scroll examples and a custom
+progress-driven tint shader.
+
+For a CPU-only resize comparison, run the DevTools `profiling` example with
+`--resize`, then `--resize --no-scroll-effects`. This does not measure GPU or
+presentation latency.

@@ -111,6 +111,7 @@ pub struct ScrollConfig {
     pub overscroll: OverscrollBehavior,
     pub anchoring: ScrollAnchoring,
     pub scrollbar: Option<ScrollbarStyle>,
+    pub effects: Vec<crate::ScrollEffect>,
 }
 
 impl Default for ScrollConfig {
@@ -126,11 +127,18 @@ impl Default for ScrollConfig {
             overscroll: OverscrollBehavior::Clamp,
             anchoring: ScrollAnchoring::Auto,
             scrollbar: None,
+            effects: Vec::new(),
         }
     }
 }
 
 impl ScrollConfig {
+    #[must_use]
+    pub fn effect(mut self, effect: crate::ScrollEffect) -> Self {
+        self.effects.push(effect);
+        self
+    }
+
     #[must_use]
     pub const fn enabled(mut self, enabled: bool) -> Self {
         self.enabled = enabled;

@@ -28,6 +28,7 @@ pub struct DevtoolsHost<A> {
     pub(crate) app: Entity<A>,
     pub(crate) inspector: InspectorHandle,
     pub(crate) open: bool,
+    pub(crate) scroll_effect: Option<argui_ui::ScrollEffect>,
     pub(crate) tab: Tab,
     pub(crate) dock_height: f32,
     pub(crate) viewport: Rect,
@@ -83,6 +84,7 @@ impl<A: Render> DevtoolsHost<A> {
             app: Entity::new(app),
             inspector,
             open: false,
+            scroll_effect: Some(argui_effects::EdgeFade::default().scroll()),
             tab: Tab::Elements,
             dock_height: 320.0,
             viewport: Rect::default(),
@@ -144,6 +146,14 @@ impl<A: Render> DevtoolsHost<A> {
     #[must_use]
     pub fn open(mut self, open: bool) -> Self {
         self.set_open_immediate(open);
+        self
+    }
+
+    /// Configures all DevTools list edges; `None` removes their offscreen passes.
+    #[must_use]
+    pub fn scroll_effect(mut self, effect: Option<argui_ui::ScrollEffect>) -> Self {
+        self.scroll_effect = effect;
+        self.detail_cache.borrow_mut().take();
         self
     }
 

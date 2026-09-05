@@ -39,7 +39,15 @@ pub fn launch() -> Result<(), Box<dyn std::error::Error>> {
                 ..WindowConfig::default()
             },
         ),
-        RendererConfig::default().effects(argui_effects::registry()?),
+        argui_devtools::configure_renderer(
+            RendererConfig::default().effects(argui::render::EffectRegistry::new(
+                argui_effects::registry()?
+                    .definitions()
+                    .iter()
+                    .cloned()
+                    .chain([pages::scroll_effects::definition()]),
+            )?),
+        )?,
         text,
         DevtoolsApp::new(SingleWindowModel::new(SelectionHost::new(
             WidgetGallery::default(),

@@ -10,8 +10,12 @@ mod blur;
 mod color;
 #[cfg(feature = "refraction")]
 mod refraction;
+#[cfg(feature = "scroll")]
+mod scroll;
 #[cfg(feature = "shadow")]
 mod shadow;
+#[cfg(feature = "scroll")]
+pub use scroll::{EDGE_FADE_ID, EDGE_SHADOW_ID, EdgeFade, EdgeShadow};
 
 #[cfg(feature = "artistic")]
 pub use artistic::{
@@ -33,6 +37,12 @@ pub fn registry() -> Result<EffectRegistry, RendererError> {
     let definitions = {
         let mut definitions = definitions;
         definitions.extend(artistic::definitions());
+        definitions
+    };
+    #[cfg(feature = "scroll")]
+    let definitions = {
+        let mut definitions = definitions;
+        definitions.extend(scroll::definitions());
         definitions
     };
     EffectRegistry::new(definitions)

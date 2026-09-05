@@ -2,6 +2,8 @@
 mod buttons;
 #[path = "pages/inputs.rs"]
 mod inputs;
+#[path = "pages/scroll_effects.rs"]
+mod scroll_effects;
 
 use argui::{
     core::{ColorScheme, Size},

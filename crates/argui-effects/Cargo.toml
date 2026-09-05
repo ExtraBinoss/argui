@@ -12,10 +12,16 @@ shadow = []
 color = []
 refraction = []
 artistic = []
+scroll = ["dep:argui-ui"]
 
 [dependencies]
 argui-paint.workspace = true
 argui-render.workspace = true
+argui-ui = { workspace = true, optional = true }
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+wgpu.workspace = true
+pollster.workspace = true

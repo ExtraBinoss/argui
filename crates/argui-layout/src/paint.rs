@@ -1,15 +1,17 @@
 use argui_core::{Affine2D, Rect};
 use argui_paint::{
-    Border, ClipChain, ClipRegion, Color, DisplayList, ImagePrimitive, LayerStyle, ProfileDomain,
-    Quad, QuadStyle, RenderObjectId, VectorPrimitive,
+    Border, ClipChain, ClipRegion, Color, DisplayList, ImagePrimitive, Quad, QuadStyle,
+    VectorPrimitive,
 };
 use argui_ui::{EffectScope, Element, ElementKind, HitRegion, NodeId, PointerEvents, UiTree};
 use std::collections::HashMap;
 
 use crate::{LayoutNode, LayoutOutput, engine::NodeMap, input, scroll};
 
+mod effects;
 mod portal;
 mod sync;
+use effects::{begin_layer, begin_scope, end_layers, scope_count};
 
 #[derive(Clone, Debug, PartialEq)]
 pub(super) struct PaintContext {
@@ -155,7 +157,7 @@ pub(super) fn paint_node(
         hit_allowed: parent.hit_allowed,
         active_portal: parent.active_portal,
     };
-    paint_enter(
+    let scroll_layers = paint_enter(
         ui,
         element,
         node,
@@ -215,6 +217,7 @@ pub(super) fn paint_node(
             scroll_updates,
         );
     }
+    end_layers(&mut output.display_list, scroll_layers);
     let interaction_order = output.hit_regions.len();
     if let Some(region) = output
         .scroll_regions
@@ -280,7 +283,7 @@ fn paint_enter(
     output: &mut LayoutOutput,
     context: &PaintContext,
     clips_content: bool,
-) {
+) -> usize {
     let visual_bounds = context.transform.transform_rect(node.bounds);
     if let Some(layer) = element.layer.clone() {
         begin_layer(
@@ -318,6 +321,7 @@ fn paint_enter(
         node.node,
     );
 
+    let scroll_layers = effects::begin_scroll(ui, element, node, output, context.transform);
     let content_clips = if clips_content {
         context
             .clips
@@ -373,6 +377,7 @@ fn paint_enter(
             &content_clips,
         );
     }
+    scroll_layers
 }
 
 fn paint_exit(element: &Element, display_list: &mut DisplayList) {
@@ -516,53 +521,6 @@ fn push_vector(
         transform: context.transform,
         clips: context.clips.clone(),
     });
-}
-
-fn begin_scope(
-    ui: &UiTree,
-    display_list: &mut DisplayList,
-    element: &Element,
-    scope: EffectScope,
-    bounds: Rect,
-    node: NodeId,
-) -> usize {
-    let effects = element
-        .effects
-        .iter()
-        .filter(|effect| effect.scope == scope);
-    let mut count = 0;
-    for effect in effects {
-        begin_layer(
-            display_list,
-            ui.resolved_layer(node, element, &effect.layer),
-            bounds,
-            node,
-        );
-        count += 1;
-    }
-    count
-}
-
-fn begin_layer(display_list: &mut DisplayList, mut layer: LayerStyle, bounds: Rect, node: NodeId) {
-    layer.bounds = bounds;
-    if layer.profile.is_none() {
-        layer.profile = Some(RenderObjectId::new(ProfileDomain::Ui, node.get()));
-    }
-    display_list.begin_layer(layer);
-}
-
-fn end_layers(display_list: &mut DisplayList, count: usize) {
-    for _ in 0..count {
-        display_list.end_layer();
-    }
-}
-
-fn scope_count(element: &Element, scope: EffectScope) -> usize {
-    element
-        .effects
-        .iter()
-        .filter(|effect| effect.scope == scope)
-        .count()
 }
 
 fn push_hit_region(

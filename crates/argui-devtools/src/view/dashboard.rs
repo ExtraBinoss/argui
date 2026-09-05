@@ -36,6 +36,7 @@ fn detail_content<A>(tools: &DevtoolsHost<A>, theme: &WidgetTheme) -> Element {
                 height,
                 tools.gpu_offset,
                 tools.profile_extents.gpu_header,
+                tools.scroll_effect.clone(),
             )
         };
         *cache = Some(DetailCache {

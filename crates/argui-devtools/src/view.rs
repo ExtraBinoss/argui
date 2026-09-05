@@ -239,6 +239,7 @@ fn profiling_list<A>(tools: &DevtoolsHost<A>, header: Element, theme: &WidgetThe
         tools.profile_extents.frames,
         tools.profiling_offset,
     )
+    .effects(tools.scroll_effect.clone())
     .build_with_header(
         frames.len(),
         theme,
