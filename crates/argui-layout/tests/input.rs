@@ -443,3 +443,50 @@ fn repeated_newlines_keep_the_multiline_caret_visible_and_scroll_monotonic() {
     }
     assert!(previous_scroll > 0.0);
 }
+
+#[test]
+fn empty_or_degenerate_custom_carets_do_not_emit_invalid_quads() {
+    use argui_ui::{CaretHeight, CaretPrimitive, CaretStyle, CaretVisual, FocusRequest};
+    let color = Color::srgb(0.3, 0.8, 0.4);
+    for (width, height, empty, expected) in [
+        (2.0, 10.0, true, 0),
+        (0.0, 10.0, false, 0),
+        (2.0, 0.0, false, 0),
+        (-2.0, 10.0, false, 0),
+        (2.0, -10.0, false, 0),
+        (2.0, 10.0, false, 1),
+    ] {
+        let mut style = InputStyle::new(PaintStyle::default(), TextStyle::default());
+        style.caret = CaretStyle::new(CaretVisual::new(if empty {
+            vec![]
+        } else {
+            vec![CaretPrimitive::new(
+                width,
+                CaretHeight::Pixels(height),
+                QuadStyle::solid(color),
+            )]
+        }));
+        let mut ui = UiTree::new(Input::new("custom-caret", "hello", "", style).build());
+        let mut engine = LayoutEngine::new();
+        let mut text = text_engine();
+        let mut output = engine
+            .compute(&mut ui, &mut text, Size::new(200.0, 60.0))
+            .unwrap();
+        ui.sync_focus(
+            &output.hit_regions,
+            Some(FocusRequest::Focus("custom-caret".into())),
+        );
+        engine.update_text_inputs(&mut ui, &mut text, &mut output);
+        assert!(output.text_inputs[0].caret.is_some());
+        let painted = output
+            .display_list
+            .commands()
+            .iter()
+            .filter(|command| {
+                matches!(command, argui_paint::DisplayCommand::Quad(quad)
+                if quad.background == Some(argui_paint::Fill::Solid(color)))
+            })
+            .count();
+        assert_eq!(painted, expected, "caret {width} x {height}, empty={empty}");
+    }
+}

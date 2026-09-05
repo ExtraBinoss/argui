@@ -130,6 +130,84 @@ fn registered_images_supply_intrinsic_size_and_aspect_ratio() {
 }
 
 #[test]
+fn image_assets_arriving_after_layout_invalidate_measurement_but_repeats_are_stable() {
+    let id = ImageId(91);
+    let image = ImageAsset::rgba8(id, 40, 20, Arc::<[u8]>::from(vec![255; 40 * 20 * 4])).unwrap();
+    let mut ui = UiTree::new(Element::image(id).width(length(80.0)));
+    let mut engine = LayoutEngine::new();
+    let mut text = text_engine();
+    let initial = engine
+        .compute(&mut ui, &mut text, Size::new(200.0, 100.0))
+        .unwrap();
+    assert_eq!(initial.nodes[0].bounds.size.height, 0.0);
+    for _ in 0..2 {
+        engine.set_assets(std::slice::from_ref(&image), &[]);
+        let loaded = engine
+            .compute(&mut ui, &mut text, Size::new(200.0, 100.0))
+            .unwrap();
+        assert_eq!(loaded.nodes[0].bounds.size, Size::new(80.0, 40.0));
+    }
+}
+
+#[test]
+fn nested_image_and_vector_dimensions_follow_replacement_and_removal() {
+    use argui_paint::{VectorAsset, VectorId};
+    let image_id = ImageId(92);
+    let vector_id = VectorId(93);
+    let root = Element::column([
+        Element::image(image_id).keyed("image").width(length(80.0)),
+        Element::vector(vector_id)
+            .keyed("vector")
+            .width(length(80.0)),
+        Element::image(image_id)
+            .keyed("authored")
+            .width(length(80.0))
+            .aspect_ratio(1.0),
+    ]);
+    let mut ui = UiTree::new(root);
+    let ids = ui.node_ids().to_vec();
+    let mut engine = LayoutEngine::new();
+    let mut text = text_engine();
+    for dimensions in [None, Some((40, 20)), Some((20, 40)), None, Some((40, 20))] {
+        let (images, vectors, expected) = if let Some((width, height)) = dimensions {
+            let image = ImageAsset::rgba8(
+                image_id,
+                width,
+                height,
+                Arc::<[u8]>::from(vec![255; (width * height * 4) as usize]),
+            )
+            .unwrap();
+            let svg = format!(
+                "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{width}\" height=\"{height}\"><rect width=\"{width}\" height=\"{height}\"/></svg>"
+            );
+            let vector = VectorAsset {
+                id: vector_id,
+                size: Size::new(width as f32, height as f32),
+                svg: Arc::from(svg.into_bytes()),
+                tintable: false,
+            };
+            (
+                vec![image],
+                vec![vector],
+                80.0 * height as f32 / width as f32,
+            )
+        } else {
+            (vec![], vec![], 0.0)
+        };
+        for _ in 0..2 {
+            engine.set_assets(&images, &vectors);
+            let output = engine
+                .compute(&mut ui, &mut text, Size::new(300.0, 600.0))
+                .unwrap();
+            assert_eq!(output.nodes[1].bounds.size, Size::new(80.0, expected));
+            assert_eq!(output.nodes[2].bounds.size, Size::new(80.0, expected));
+            assert_eq!(output.nodes[3].bounds.size, Size::new(80.0, 80.0));
+            assert_eq!(ui.node_ids(), ids);
+        }
+    }
+}
+
+#[test]
 fn text_baselines_align_across_different_font_sizes() {
     let small = TextStyle {
         font_size: 12.0,

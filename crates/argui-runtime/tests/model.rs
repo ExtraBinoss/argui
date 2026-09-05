@@ -5,6 +5,83 @@ use argui_runtime::{
 };
 use argui_ui::{Element, EventType, UiEventKind, UiTree};
 
+#[test]
+fn frames_visit_only_active_children_and_stop_after_their_last_frame() {
+    use argui_animation::{Duration, Frame, Time};
+    use argui_platform::WindowKey;
+    use argui_runtime::{AppModel, SingleWindowModel};
+    use std::{cell::Cell, rc::Rc};
+    struct Child {
+        active: bool,
+        calls: Rc<Cell<usize>>,
+    }
+    impl Render for Child {
+        fn render(&mut self, _: &mut Context<Self>) -> Element {
+            Element::container([])
+        }
+        fn wants_animation_frame(&self) -> bool {
+            self.active
+        }
+        fn animation_frame(&mut self, _: Frame, cx: &mut Context<Self>) {
+            self.calls.set(self.calls.get() + 1);
+            self.active = false;
+            cx.request_paint();
+        }
+    }
+    struct Parent {
+        children: [Entity<Child>; 2],
+        active: Rc<Cell<bool>>,
+    }
+    impl Render for Parent {
+        fn render(&mut self, cx: &mut Context<Self>) -> Element {
+            Element::column(self.children.iter().map(|child| cx.entity(child)))
+        }
+        fn wants_animation_frame(&self) -> bool {
+            self.active.get()
+        }
+    }
+    let inactive_calls = Rc::new(Cell::new(0));
+    let active_calls = Rc::new(Cell::new(0));
+    let parent_active = Rc::new(Cell::new(false));
+    let mut model = SingleWindowModel::new(Parent {
+        children: [
+            Entity::new(Child {
+                active: false,
+                calls: inactive_calls.clone(),
+            }),
+            Entity::new(Child {
+                active: true,
+                calls: active_calls.clone(),
+            }),
+        ],
+        active: parent_active.clone(),
+    });
+    let window = WindowKey::main();
+    assert!(model.view(&window, WindowEnvironment::default()).is_some());
+    assert!(model.wants_animation_frame(&window));
+    model.animation_frame(
+        &window,
+        Frame {
+            now: Time::ZERO,
+            elapsed: Duration::from_millis(16),
+        },
+    );
+    assert_eq!(inactive_calls.get(), 0);
+    assert_eq!(active_calls.get(), 1);
+    assert!(!model.wants_animation_frame(&window));
+    parent_active.set(true);
+    assert!(model.wants_animation_frame(&window));
+    model.animation_frame(
+        &window,
+        Frame {
+            now: Time::ZERO,
+            elapsed: Duration::ZERO,
+        },
+    );
+    assert_eq!(inactive_calls.get(), 0);
+    assert_eq!(active_calls.get(), 1);
+}
+
 #[derive(Default)]
 struct Counter(u32);
 

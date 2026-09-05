@@ -71,3 +71,44 @@ fn public_routing_reports_enter_and_leave_for_hit_regions() {
         )
     }));
 }
+
+#[test]
+fn captured_cursor_ignores_missing_or_disabled_regions() {
+    let mut tree = UiTree::new(interactive("cursor"));
+    let node = tree.node_id_at(0).unwrap();
+    let mut region = region(node);
+    region.cursor = CursorIcon::Grab;
+
+    assert_eq!(
+        tree.captured_cursor(PointerId::MOUSE, &[region.clone()]),
+        None
+    );
+    tree.capture_pointer(PointerId::MOUSE, node);
+    assert_eq!(
+        tree.captured_cursor(PointerId::MOUSE, &[region.clone()]),
+        Some(CursorIcon::Grab)
+    );
+    region.enabled = false;
+    assert_eq!(tree.captured_cursor(PointerId::MOUSE, &[region]), None);
+}
+
+#[test]
+fn replacing_capture_releases_the_previous_target_and_same_capture_is_idempotent() {
+    let mut tree = UiTree::new(Element::row([interactive("first"), interactive("second")]));
+    let first = tree.node_id_at(1).unwrap();
+    let second = tree.node_id_at(2).unwrap();
+    let pointer = PointerId::new(19);
+
+    assert_eq!(tree.capture_pointer(pointer, first).events.len(), 1);
+    assert!(tree.capture_pointer(pointer, first).events.is_empty());
+    let replaced = tree.capture_pointer(pointer, second);
+    assert_eq!(replaced.events.len(), 2);
+    assert_eq!(
+        replaced.events[0].kind,
+        UiEventKind::LostPointerCapture(pointer)
+    );
+    assert_eq!(
+        replaced.events[1].kind,
+        UiEventKind::GotPointerCapture(pointer)
+    );
+}

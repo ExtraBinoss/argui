@@ -336,6 +336,99 @@ fn primitive_and_optional_property_edits_cover_present_and_absent_targets() {
 }
 
 #[test]
+fn sparse_layer_overrides_preserve_unlisted_filter_values() {
+    let element = Element::container([]).layer(
+        LayerStyle::new(Rect::default())
+            .filter(Filter::Blur(4.0))
+            .filter(Filter::ColorMatrix([1.0; 20]))
+            .filter(Filter::Refraction(Refraction::new(1.0)))
+            .filter(Filter::Effect(EffectInstance::new(
+                EffectId::new("sparse.inspect"),
+                [("enabled", EffectValue::Bool(false))],
+            ))),
+    );
+    let tree = UiTree::new(element.clone());
+    let node = InspectNodeId(tree.node_ids()[0].get());
+    let inspector = InspectorHandle::default();
+    inspector.set_property_value(
+        node,
+        StyleProperty::Layer,
+        StyleValue::Parameters(vec![
+            StyleField {
+                label: "opacity".into(),
+                value: 0.25,
+            },
+            StyleField {
+                label: "filter 1 · matrix 0".into(),
+                value: 2.0,
+            },
+            StyleField {
+                label: "filter 2 · strength".into(),
+                value: 3.0,
+            },
+        ]),
+    );
+
+    let mut overridden = element;
+    Inspection::apply_overrides(&mut overridden, &tree, &inspector);
+    let layer = overridden.layer.as_ref().unwrap();
+    assert_eq!(layer.opacity, 0.25);
+    assert!(matches!(
+        &layer.filters[0],
+        Filter::Blur(value) if *value == 4.0
+    ));
+    assert!(matches!(
+        &layer.filters[1],
+        Filter::ColorMatrix(values) if values[0] == 2.0 && values[1..].iter().all(|value| *value == 1.0)
+    ));
+    assert!(matches!(
+        &layer.filters[2],
+        Filter::Refraction(value)
+            if value.strength == 3.0
+                && value.chromatic_aberration == 0.0
+                && value.edge == 0.15
+    ));
+    assert!(matches!(
+        &layer.filters[3],
+        Filter::Effect(value) if value.parameters[0].value == EffectValue::Bool(false)
+    ));
+}
+
+#[test]
+fn applying_overrides_handles_missing_values_and_stale_tree_ids() {
+    let mut without_layer = Element::container([]);
+    let tree = UiTree::new(without_layer.clone());
+    let node = InspectNodeId(tree.node_ids()[0].get());
+    let inspector = InspectorHandle::default();
+    assert!(!inspector.toggle(node, StyleProperty::Width));
+    assert!(inspector.toggle(node, StyleProperty::Width));
+    inspector.set_property_value(
+        node,
+        StyleProperty::Layer,
+        StyleValue::Parameters(vec![StyleField {
+            label: "opacity".into(),
+            value: 0.2,
+        }]),
+    );
+    Inspection::apply_overrides(&mut without_layer, &tree, &inspector);
+    assert_eq!(without_layer.style.size.width, Dimension::auto());
+    assert!(without_layer.layer.is_none());
+
+    let stale_tree = UiTree::new(Element::container([]));
+    let stale_node = InspectNodeId(stale_tree.node_ids()[0].get());
+    let stale_inspector = InspectorHandle::default();
+    stale_inspector.set_property_value(
+        stale_node,
+        StyleProperty::Background,
+        StyleValue::Srgba([0.1, 0.2, 0.3, 1.0]),
+    );
+    let mut expanded = Element::container([Element::text("unmapped")]);
+    Inspection::apply_overrides(&mut expanded, &stale_tree, &stale_inspector);
+    assert!(expanded.paint.quad.background.is_some());
+    assert!(expanded.children[0].paint.quad.background.is_none());
+}
+
+#[test]
 fn snapshots_distinguish_visual_interactive_and_hidden_structure() {
     let root = Element::container([
         Element::container([]).keyed("empty"),

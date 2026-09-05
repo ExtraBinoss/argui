@@ -120,6 +120,12 @@ fn selection_lifecycle_covers_extension_reverse_ranges_and_release() {
             ..
         }
     )));
+    tree.drag_document_selection(DocumentTextPoint::new(
+        first,
+        TextPosition::new(2, CaretAffinity::After),
+    ));
+    assert!(tree.document_selection_dragging());
+    tree.release_document_selection();
 
     tree.begin_document_selection(
         DocumentTextPoint::new(middle, TextPosition::new(3, CaretAffinity::After)),
@@ -365,6 +371,15 @@ fn document_selection_contains_points_and_exposes_static_commands() {
     assert!(tree.document_selection_contains(point(middle, 2)));
     assert!(!tree.document_selection_contains(point(first, 1)));
     assert!(!tree.document_selection_contains(point(last, 4)));
+    let foreign = UiTree::new(Element::column([
+        Element::text("foreign-a"),
+        Element::text("foreign-b"),
+        Element::text("foreign-c"),
+        Element::text("foreign-d"),
+    ]))
+    .node_id_at(4)
+    .unwrap();
+    assert!(!tree.document_selection_contains(point(foreign, 0)));
 
     let capabilities = tree.selection_capabilities(middle);
     assert!(!capabilities.editable);
@@ -374,6 +389,11 @@ fn document_selection_contains_points_and_exposes_static_commands() {
     assert_eq!(
         copied.clipboard,
         Some(ClipboardRequest::Write("pha\nbeta\ngam".into()))
+    );
+    assert_eq!(
+        tree.selection_command(Some(middle), SelectionCommand::Copy)
+            .clipboard,
+        copied.clipboard
     );
     assert_eq!(
         tree.selection_command(None, SelectionCommand::Cut),
@@ -407,4 +427,52 @@ fn read_only_editor_reports_web_style_command_capabilities() {
     assert!(!capabilities.cut);
     assert!(!capabilities.paste);
     assert!(capabilities.select_all);
+}
+
+#[test]
+fn selection_policy_keeps_collapsed_ranges_distinct_from_no_selection() {
+    let mut tree = UiTree::new(Element::text("single").user_select(UserSelect::Text));
+    let node = tree.node_id_at(0).unwrap();
+    let update = tree.begin_document_selection(
+        DocumentTextPoint::new(node, TextPosition::new(3, CaretAffinity::After)),
+        false,
+        SelectionGranularity::Character,
+    );
+    assert!(update.paint_changed);
+    assert!(tree.document_selection().is_some());
+    assert!(tree.has_document_selection());
+    assert!(tree.selected_document_text().is_none());
+    assert!(tree.selection_capabilities(node).copy);
+    assert!(tree.selection_capabilities(node).select_all);
+    assert!(
+        tree.selection_command(None, SelectionCommand::Copy)
+            .clipboard
+            .is_none()
+    );
+
+    let released = tree.release_document_selection();
+    assert!(!released.paint_changed);
+    assert!(released.events.is_empty());
+    assert!(tree.clear_document_selection().paint_changed);
+    assert!(tree.document_selection().is_none());
+
+    let mut restricted = UiTree::new(Element::text("hidden").user_select(UserSelect::None));
+    let restricted_node = restricted.node_id_at(0).unwrap();
+    assert!(
+        !restricted
+            .selection_capabilities(restricted_node)
+            .select_all
+    );
+    assert!(restricted.select_all_document_text().events.is_empty());
+    assert!(
+        restricted
+            .begin_document_selection(
+                DocumentTextPoint::new(restricted_node, TextPosition::default()),
+                false,
+                SelectionGranularity::Word,
+            )
+            .events
+            .is_empty()
+    );
+    assert!(restricted.document_selection().is_none());
 }

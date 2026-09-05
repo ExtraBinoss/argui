@@ -1,6 +1,24 @@
 use argui_animation::{DecayConfig, Duration, Inertia, InertiaConfig, InertiaState, PhysicsError};
 
 #[test]
+fn non_finite_bounds_are_rejected_on_either_side() {
+    for bounds in [
+        (f32::NAN, 1.0),
+        (0.0, f32::INFINITY),
+        (f32::NEG_INFINITY, 1.0),
+    ] {
+        assert_eq!(
+            InertiaConfig {
+                bounds: Some(bounds),
+                ..InertiaConfig::default()
+            }
+            .validate(),
+            Err(PhysicsError::InvalidBounds)
+        );
+    }
+}
+
+#[test]
 fn bounded_inertia_preserves_velocity_into_its_bounce() {
     let config = InertiaConfig {
         bounds: Some((0.0, 100.0)),

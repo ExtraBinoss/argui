@@ -23,6 +23,9 @@ fn decay_kicks_and_stops_at_its_rest_threshold() {
     assert!(!decay.advance(Duration::ZERO));
     decay.kick(10.0);
     assert!(decay.is_active());
+    assert!(!decay.advance(Duration::ZERO));
+    assert_eq!(decay.value(), 4.0);
+    assert_eq!(decay.velocity(), 10.0);
     for _ in 0..1_000 {
         decay.advance(Duration::from_millis(16));
         if !decay.is_active() {

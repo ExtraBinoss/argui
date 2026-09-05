@@ -91,8 +91,20 @@ fn scroll_polarity_is_explicit_and_offsets_are_clamped() {
         &inverted,
     );
     assert_eq!(tree.scroll_offset(node), Point::new(0.0, 0.0));
+    for (delta, candidate) in [
+        (ScrollDelta::Pixels(Point::default()), normal[0].clone()),
+        (
+            ScrollDelta::Lines(Point::new(0.0, -1.0)),
+            region(node, ScrollConfig::default(), f32::NAN),
+        ),
+    ] {
+        assert!(
+            !tree
+                .scroll(Point::new(10.0, 10.0), delta, &[candidate])
+                .scroll_changed
+        );
+    }
 }
-
 #[test]
 fn invalid_numeric_scroll_configuration_is_safely_inert() {
     let mut tree = UiTree::new(Element::container([]));
@@ -109,7 +121,6 @@ fn invalid_numeric_scroll_configuration_is_safely_inert() {
         assert!(!update.scroll_changed);
     }
 }
-
 #[test]
 fn vertical_wheels_drive_horizontal_only_regions() {
     let mut tree = UiTree::new(Element::container([]));
@@ -127,7 +138,6 @@ fn vertical_wheels_drive_horizontal_only_regions() {
     );
     assert_eq!(tree.scroll_offset(node), Point::new(40.0, 0.0));
 }
-
 #[test]
 fn both_axes_preserve_pixel_precision() {
     let mut tree = UiTree::new(Element::container([]));
@@ -145,7 +155,6 @@ fn both_axes_preserve_pixel_precision() {
     );
     assert_eq!(tree.scroll_offset(node), Point::new(3.25, 7.5));
 }
-
 #[test]
 fn exhausted_nested_scrolls_chain_to_their_parent() {
     let mut tree = UiTree::new(Element::column([
@@ -301,7 +310,29 @@ fn scrollbar_parts_reuse_retained_state_transitions() {
             .as_array(),
         [5.0; 4]
     );
+    assert!(
+        tree.scrollbar_pointer_moved(Some(Point::new(100.0, 100.0)), &regions)
+            .paint_changed
+    );
+    assert!(
+        tree.scrollbar_pointer_moved(Some(point), &regions)
+            .paint_changed
+    );
+    tree.scrollbar_pressed(point, &regions).unwrap();
+    assert_eq!(
+        tree.update(
+            Element::container([Element::container([])])
+                .overflow(Axes {
+                    x: Overflow::Hidden,
+                    y: Overflow::Auto,
+                })
+                .scroll_config(config.clone())
+        ),
+        TreeUpdate::Layout
+    );
+    assert!(tree.scrollbar_dragging());
     assert!(tree.scrollbar_pointer_moved(None, &[]).paint_changed);
+    assert!(!tree.scrollbar_pointer_moved(None, &[]).paint_changed);
 }
 
 #[test]

@@ -89,6 +89,42 @@ fn zero_duration_tweens_finish_synchronously() {
 }
 
 #[test]
+fn delayed_unfilled_timeline_keeps_the_presented_value_until_it_starts() {
+    let animation = Timeline::new(
+        Keyframes::new([Keyframe::new(0.0, 0.0_f32), Keyframe::new(1.0, 10.0)]).unwrap(),
+        Timing::new(Duration::from_millis(100)).delay(Duration::from_millis(100)),
+    )
+    .unwrap();
+    let motion = Motion::new(7.0);
+    motion.play(animation);
+    assert!(!motion.advance_spring(Time::ZERO));
+    assert!(!motion.advance(Time::ZERO).unwrap());
+    assert!(!motion.advance(Time::from_nanos(50_000_000)).unwrap());
+    assert_eq!(motion.value(), 7.0);
+    assert!(motion.advance(Time::from_nanos(150_000_000)).unwrap());
+    assert_eq!(motion.value(), 5.0);
+}
+
+#[test]
+fn spring_reaches_a_terminal_state_without_an_explicit_finish() {
+    let motion = Motion::new(0.0_f32);
+    motion.spring_to(10.0, SpringConfig::default()).unwrap();
+    motion.pause();
+    motion.resume();
+    assert!(!motion.advance(Time::ZERO).unwrap());
+    assert_eq!(motion.value(), 0.0);
+    for index in 1..1000 {
+        motion.advance_spring(Time::from_nanos(index * 16_000_000));
+        if !motion.is_active() {
+            break;
+        }
+    }
+    assert_eq!(motion.state(), MotionState::Finished);
+    assert_eq!(motion.value(), 10.0);
+    assert!(!motion.advance_spring(Time::from_nanos(20_000_000_000)));
+}
+
+#[test]
 fn identity_debug_and_idle_controls_are_stable() {
     let motion = Motion::new(3.0_f32);
     let clone = motion.clone();

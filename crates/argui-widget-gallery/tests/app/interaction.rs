@@ -354,6 +354,7 @@ fn editable_property_accepts_arithmetic_and_keeps_invalid_edits_safe() {
         ("(20 + 5) * 3", "75%"),
         ("100 / 4 + 6 % 4", "27%"),
         ("-10 + +30", "20%"),
+        ("(10.5 - .5) * 2", "20%"),
         ("200", "100%"),
     ] {
         click(&app, "property-slider::edit");
@@ -387,4 +388,150 @@ fn editable_property_accepts_arithmetic_and_keeps_invalid_edits_safe() {
     );
     click(&app, "property-slider::reset");
     assert!(contains_text(&app.render(), "50%"));
+}
+
+#[test]
+fn invalid_arithmetic_and_cancelled_edits_preserve_the_previous_value() {
+    let app = Entity::new(WidgetGallery::default());
+    click(&app, "nav::slider");
+    for expression in [
+        "", " ", "1 / 0", "5 % 0", "(3 + 2", "3 +", "NaN", "∞", "1e999", "1.2.3", ".",
+    ] {
+        click(&app, "property-slider::edit");
+        dispatch(
+            &app,
+            "property-slider::input",
+            UiEventKind::TextChanged(expression.into()),
+        );
+        dispatch(
+            &app,
+            "property-slider::input",
+            UiEventKind::Submitted(expression.into()),
+        );
+        let root = app.render();
+        assert!(
+            contains_text(&root, "64%"),
+            "invalid expression changed value: {expression}"
+        );
+        assert!(find_key(&root, "property-slider::input").is_none());
+    }
+    click(&app, "property-slider::edit");
+    dispatch(
+        &app,
+        "property-slider::input",
+        UiEventKind::TextChanged("25".into()),
+    );
+    dispatch(
+        &app,
+        "property-slider::input",
+        key(Key::ArrowLeft, Modifiers::default()),
+    );
+    dispatch(
+        &app,
+        "property-slider::input",
+        UiEventKind::KeyInput(KeyInput {
+            key: Key::Escape,
+            state: KeyState::Released,
+            modifiers: Modifiers::default(),
+            repeat: false,
+            text: None,
+        }),
+    );
+    assert!(find_key(&app.render(), "property-slider::input").is_some());
+    dispatch(
+        &app,
+        "property-slider::input",
+        key(Key::Escape, Modifiers::default()),
+    );
+    assert!(contains_text(&app.render(), "64%"));
+    click(&app, "property-slider::reset");
+    let root = app.render();
+    assert!(contains_text(&root, "50%"));
+    assert!(find_key(&root, "property-slider::reset").is_none());
+}
+
+#[test]
+fn empty_search_and_released_enter_do_not_navigate() {
+    let app = Entity::new(WidgetGallery::default());
+    dispatch(
+        &app,
+        "gallery-search",
+        UiEventKind::TextChanged("no-such-component".into()),
+    );
+    for navigation in [
+        Key::ArrowUp,
+        Key::ArrowDown,
+        Key::Home,
+        Key::End,
+        Key::Enter,
+    ] {
+        dispatch(
+            &app,
+            "gallery-search",
+            key(navigation, Modifiers::default()),
+        );
+        assert!(find_key(&app.render(), "demo-button").is_some());
+    }
+    dispatch(
+        &app,
+        "gallery-search",
+        UiEventKind::TextChanged("select".into()),
+    );
+    dispatch(
+        &app,
+        "gallery-search",
+        UiEventKind::KeyInput(KeyInput {
+            key: Key::Enter,
+            state: KeyState::Released,
+            modifiers: Modifiers::default(),
+            repeat: false,
+            text: None,
+        }),
+    );
+    assert!(find_key(&app.render(), "demo-button").is_some());
+    dispatch(
+        &app,
+        "gallery-search",
+        key(Key::Enter, Modifiers::default()),
+    );
+    assert!(find_key(&app.render(), "backend").is_some());
+}
+
+#[test]
+fn select_exit_survives_reopening_and_finishes_without_leaking_focus_targets() {
+    use argui::animation::{Duration, Frame, Time};
+    let app = Entity::new(WidgetGallery::default());
+    click(&app, "nav::select");
+    let advance = |milliseconds| {
+        app.update(|gallery, cx| {
+            gallery.animation_frame(
+                Frame {
+                    now: Time::ZERO,
+                    elapsed: Duration::from_millis(milliseconds),
+                },
+                cx,
+            );
+        })
+    };
+    click(&app, "backend");
+    advance(140);
+    dispatch(&app, "backend", key(Key::Escape, Modifiers::default()));
+    let closing = app.render();
+    let list = find_key(&closing, "backend::list").unwrap();
+    assert!(list.focus_scope.is_none());
+    assert!(app.read(Render::wants_animation_frame));
+    advance(40);
+    click(&app, "backend");
+    advance(140);
+    assert!(
+        find_key(&app.render(), "backend::list")
+            .unwrap()
+            .focus_scope
+            .is_some()
+    );
+    assert!(!app.read(Render::wants_animation_frame));
+    dispatch(&app, "backend", key(Key::Escape, Modifiers::default()));
+    advance(100);
+    assert!(find_key(&app.render(), "backend::list").is_none());
+    assert!(!app.read(Render::wants_animation_frame));
 }

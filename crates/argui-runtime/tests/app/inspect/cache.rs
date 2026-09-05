@@ -1,7 +1,8 @@
-use argui_core::{Color, Point, Rect, Size};
-use argui_layout::{LayoutNode, LayoutOutput};
+use argui_core::{Color, Point, Rect, Size, Transform2D};
+use argui_layout::{LayoutNode, LayoutOutput, PortalLayout};
+use argui_paint::LayerStyle;
 use argui_runtime::{Inspection, InspectionCache};
-use argui_ui::{Element, UiTree, length};
+use argui_ui::{EffectScope, Element, UiTree, WindowLayer, length};
 
 fn view(label: &str, tools: &str) -> Element {
     Element::column([
@@ -79,4 +80,67 @@ fn hidden_subtrees_preserve_sibling_identity_and_empty_snapshots_settle() {
     tree.update(Element::column([]).inspectable(false));
     assert!(cache.snapshot(&tree, &layout).unwrap().nodes.is_empty());
     assert!(cache.snapshot(&tree, &layout).is_none());
+}
+
+fn republishes_for_distinct_content(changed: Element) {
+    let mut cache = InspectionCache::default();
+    let original = UiTree::new(Element::container([]));
+    let layout = LayoutOutput::default();
+    assert!(cache.snapshot(&original, &layout).is_some());
+    let changed = UiTree::new(changed);
+    assert!(cache.snapshot(&changed, &layout).is_some());
+}
+
+#[test]
+fn content_field_changes_invalidate_the_matching_cached_entry() {
+    republishes_for_distinct_content(Element::container([]).keyed("changed"));
+    republishes_for_distinct_content(Element::container([]).background(Color::WHITE));
+    republishes_for_distinct_content(
+        Element::container([]).transform(Transform2D::IDENTITY.translate(1.0, 2.0)),
+    );
+    republishes_for_distinct_content(
+        Element::container([]).layer(LayerStyle::new(Rect::default())),
+    );
+    republishes_for_distinct_content(
+        Element::container([]).effect(EffectScope::Content, LayerStyle::new(Rect::default())),
+    );
+    republishes_for_distinct_content(Element::container([]).z_index(1));
+}
+
+#[test]
+fn replacing_a_child_with_an_incompatible_kind_invalidates_its_identity() {
+    let mut cache = InspectionCache::default();
+    let mut tree = UiTree::new(Element::column([Element::text("old")]));
+    let layout = LayoutOutput::default();
+    assert!(cache.snapshot(&tree, &layout).is_some());
+    let old_child = tree.node_ids()[1];
+
+    tree.update(Element::column([Element::image(argui_paint::ImageId(1))]));
+    assert_ne!(tree.node_ids()[1], old_child);
+    assert!(cache.snapshot(&tree, &layout).is_some());
+}
+
+#[test]
+fn portal_metadata_changes_republish_without_content_changes() {
+    let mut cache = InspectionCache::default();
+    let tree = UiTree::new(Element::container([]));
+    let node = tree.node_ids()[0];
+    let mut layout = LayoutOutput::default();
+    assert!(cache.snapshot(&tree, &layout).is_some());
+    layout.portals.push(PortalLayout {
+        node,
+        layer: WindowLayer::Popover,
+        anchor: Some("trigger".into()),
+        requested: None,
+        resolved: None,
+        bounds: Rect::default(),
+        available_size: Size::default(),
+        constrained_width: false,
+        constrained_height: false,
+    });
+    assert!(cache.snapshot(&tree, &layout).is_some());
+    assert!(cache.snapshot(&tree, &layout).is_none());
+
+    layout.portals[0].anchor = Some("other-trigger".into());
+    assert!(cache.snapshot(&tree, &layout).is_some());
 }

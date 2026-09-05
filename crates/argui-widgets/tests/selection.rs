@@ -1,8 +1,8 @@
 use argui_core::{Color, ColorScheme, Transform2D};
-use argui_ui::{Role, UiEvent, UiEventKind, UiTree, UserSelect};
+use argui_ui::{Element, Orientation, Role, UiEvent, UiEventKind, UiTree, UserSelect};
 use argui_widgets::{
-    Checkbox, RadioGroup, RadioGroupAction, RadioGroupBehavior, RadioOption, Switch, ToggleAction,
-    ToggleBehavior, shadcn,
+    Checkbox, RadioGroup, RadioGroupAction, RadioGroupBehavior, RadioGroupPart, RadioOption,
+    Switch, ToggleAction, ToggleBehavior, TogglePart, shadcn,
 };
 
 fn click(key: &str) -> UiEvent {
@@ -84,5 +84,126 @@ fn switch_thumb_uses_a_retained_transform_transition() {
     assert_eq!(
         tree.resolved_transform(thumb, tree.element_at(2).unwrap()),
         Transform2D::IDENTITY.translate(18.0, 0.0)
+    );
+}
+
+#[test]
+fn checkbox_variants_keep_indicator_and_disabled_state_consistent() {
+    let themes = shadcn(Color::srgb(0.2, 0.5, 0.9));
+    let theme = themes.resolve(ColorScheme::Light);
+    let unchecked = Checkbox::new("unchecked", "Unchecked", false).build(theme);
+    assert_eq!(unchecked.children[0].children.len(), 0);
+    assert_eq!(
+        unchecked.semantics.as_ref().unwrap().state.checked,
+        Some(false)
+    );
+    assert!(unchecked.interaction.as_ref().unwrap().enabled);
+    assert!(unchecked.interaction.as_ref().unwrap().focusable);
+
+    let custom = Element::text("custom mark");
+    let checked = Checkbox::new("checked", "Checked", true)
+        .indicator(custom.clone())
+        .build(theme);
+    assert_eq!(checked.children[0].children.len(), 1);
+    assert_eq!(checked.children[0].children[0], custom);
+
+    let disabled = Checkbox::new("disabled", "Disabled", true)
+        .enabled(false)
+        .build(theme);
+    let interaction = disabled.interaction.as_ref().unwrap();
+    assert!(!interaction.enabled);
+    assert!(!interaction.focusable);
+    assert_eq!(interaction.cursor, argui_ui::CursorIcon::NotAllowed);
+    assert!(disabled.semantics.as_ref().unwrap().state.disabled);
+}
+
+#[test]
+fn radio_group_supports_horizontal_layout_and_invalid_option_decoration() {
+    let themes = shadcn(Color::srgb(0.2, 0.5, 0.9));
+    let theme = themes.resolve(ColorScheme::Dark);
+    let group = RadioGroup::new(
+        "layout",
+        "Layout",
+        [
+            RadioOption::new("Grid"),
+            RadioOption::new("List").enabled(false),
+        ],
+        Some(99),
+    )
+    .orientation(Orientation::Horizontal)
+    .build(theme);
+    assert_eq!(
+        group.semantics.as_ref().unwrap().orientation,
+        Some(Orientation::Horizontal)
+    );
+    assert_eq!(group.style.flex_direction, argui_ui::FlexDirection::Row);
+    assert!(!group.children[1].interaction.as_ref().unwrap().enabled);
+    assert_eq!(
+        group.children[1]
+            .semantics
+            .as_ref()
+            .unwrap()
+            .position_in_set,
+        Some(2)
+    );
+    assert!(!group.children[0].semantics.as_ref().unwrap().state.selected);
+
+    let behavior = RadioGroupBehavior::new(
+        "layout",
+        "Layout",
+        [("Grid".into(), true), ("List".into(), false)],
+        None,
+    );
+    let invalid = behavior.decorate(RadioGroupPart::Option(7), Element::container([]));
+    assert_eq!(invalid.key.as_deref(), Some("layout::option::7"));
+    assert_eq!(
+        invalid.semantics.as_ref().unwrap().label.as_deref(),
+        Some("")
+    );
+    assert!(!invalid.interaction.as_ref().unwrap().enabled);
+    assert!(
+        behavior
+            .decorate(RadioGroupPart::Indicator, Element::text("dot"))
+            .semantic_hidden
+    );
+    assert!(
+        behavior
+            .decorate(RadioGroupPart::Label, Element::text("label"))
+            .semantic_hidden
+    );
+}
+
+#[test]
+fn toggle_decorations_publish_position_and_ignore_non_click_events() {
+    let behavior = ToggleBehavior::new("notifications", "Notifications", Role::Switch, false)
+        .enabled(false)
+        .position_in_set(2, 4);
+    let root = behavior.decorate(TogglePart::Root, Element::container([]));
+    let semantics = root.semantics.as_ref().unwrap();
+    assert_eq!(semantics.role, Role::Switch);
+    assert_eq!(semantics.position_in_set, Some(2));
+    assert_eq!(semantics.set_size, Some(4));
+    assert_eq!(semantics.state.checked, Some(false));
+    assert!(semantics.state.disabled);
+    assert_eq!(root.user_select, UserSelect::None);
+    assert_eq!(
+        root.interaction.as_ref().unwrap().cursor,
+        argui_ui::CursorIcon::NotAllowed
+    );
+
+    let tree = UiTree::new(Element::container([]));
+    let target = tree.node_ids()[0];
+    let focused = UiEvent::new(target, Some("notifications".into()), UiEventKind::Focused);
+    assert_eq!(behavior.action(&focused), None);
+    assert_eq!(behavior.action(&click("other")), None);
+    assert_eq!(
+        ToggleBehavior::new("notifications", "Notifications", Role::Switch, true)
+            .action(&click("notifications")),
+        Some(ToggleAction::Toggle)
+    );
+    assert_eq!(
+        ToggleBehavior::new("notifications", "Notifications", Role::Switch, true)
+            .action(&click("other")),
+        None
     );
 }

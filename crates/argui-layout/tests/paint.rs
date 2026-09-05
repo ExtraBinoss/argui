@@ -128,6 +128,37 @@ fn background_border_and_text_scopes_wrap_only_their_primitive() {
 }
 
 #[test]
+fn scoped_effects_do_not_fabricate_missing_backgrounds_or_borders() {
+    for background in [false, true] {
+        let root = Element::container([])
+            .width(length(40.0))
+            .height(length(30.0))
+            .background_effect(effect())
+            .border_effect(effect());
+        let root = if background {
+            root.background(Color::WHITE)
+        } else {
+            root.border(Border::all(2.0, Color::WHITE))
+        };
+        let mut ui = UiTree::new(root);
+        let output = LayoutEngine::new()
+            .compute(&mut ui, &mut text_engine(), Size::new(100.0, 100.0))
+            .unwrap();
+        assert_eq!(output.display_list.quad_count(), 1);
+        let commands = output.display_list.commands();
+        assert_eq!(commands.len(), 3);
+        assert!(matches!(commands[0], DisplayCommand::BeginLayer(_)));
+        let DisplayCommand::Quad(quad) = &commands[1] else {
+            panic!("missing scoped quad");
+        };
+        assert_eq!(quad.background.is_some(), background);
+        assert_eq!(quad.border.widths.left, if background { 0.0 } else { 2.0 });
+        assert!(matches!(commands[2], DisplayCommand::EndLayer));
+        assert!(output.display_list.validate().is_ok());
+    }
+}
+
+#[test]
 fn whole_and_content_scopes_nest_around_children_in_stable_order() {
     let root = Element::container([Element::text("Child")])
         .whole_effect(effect())

@@ -206,3 +206,6 @@ fn viewport_start_center_and_end_are_exact() {
     assert_eq!(start, rect(20.0, 170.0, 80.0, 40.0));
     assert_eq!(center, rect(120.0, 100.0, 80.0, 40.0));
 }
+
+#[path = "overlay/portal.rs"]
+mod portal;

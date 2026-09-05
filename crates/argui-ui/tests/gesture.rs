@@ -512,3 +512,34 @@ fn frame_coalesced_pan_keeps_only_the_latest_changed_sample() {
     ));
     assert!(tree.flush_gesture_frame().events.is_empty());
 }
+
+#[test]
+fn cancelling_an_active_pair_finishes_each_started_gesture_once() {
+    let node = target();
+    let gestures = GestureSet::EMPTY
+        .pinch(PinchGesture::default())
+        .rotation(RotationGesture::default());
+    let mut arena = GestureArena::default();
+    arena.update(
+        touch(1, PointerPhase::Pressed, 0.0, 0.0, 0),
+        Some((node, gestures)),
+    );
+    arena.update(
+        touch(2, PointerPhase::Pressed, 10.0, 0.0, 0),
+        Some((node, gestures)),
+    );
+    let changed = arena.update(touch(2, PointerPhase::Moved, 12.0, 1.0, 10), None);
+    assert!(changed.iter().any(|event| matches!(
+        event.kind,
+        GestureKind::Pinch { .. } | GestureKind::Rotation { .. }
+    )));
+
+    let cancelled = arena.cancel_all();
+    assert!(!cancelled.is_empty());
+    assert!(
+        cancelled
+            .iter()
+            .all(|event| event.phase == GesturePhase::Cancelled)
+    );
+    assert!(arena.cancel_all().is_empty());
+}

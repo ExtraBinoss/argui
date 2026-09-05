@@ -145,4 +145,60 @@ fn headless_button_decodes_only_enabled_activation() {
             .action(&clicked),
         None
     );
+    let other = UiEvent::new(
+        tree.node_ids()[0],
+        Some("other".into()),
+        UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
+    );
+    assert_eq!(ButtonBehavior::new("save", "Save").action(&other), None);
+}
+
+#[test]
+fn icon_and_custom_content_buttons_keep_label_but_hide_visual_content() {
+    let themes = shadcn(Color::srgb(0.2, 0.5, 0.9));
+    let theme = themes.resolve(ColorScheme::Dark);
+    let custom = Element::text("icon");
+    let button = Button::new("custom", "Accessible label", theme.button())
+        .content(custom)
+        .build();
+    assert_eq!(button.children.len(), 1);
+    assert!(button.children[0].semantic_hidden);
+    assert_eq!(
+        button.semantics.as_ref().unwrap().label.as_deref(),
+        Some("Accessible label")
+    );
+    let icon = Button::icon(
+        "icon-only",
+        "Open settings",
+        Element::text("⚙"),
+        theme.ghost_button(),
+    )
+    .build();
+    assert_eq!(icon.children.len(), 1);
+    assert_eq!(
+        icon.semantics.as_ref().unwrap().label.as_deref(),
+        Some("Open settings")
+    );
+}
+
+#[test]
+fn busy_button_is_not_activatable_even_when_enabled() {
+    let tree = UiTree::new(Element::container([]));
+    let clicked = UiEvent::new(
+        tree.node_ids()[0],
+        Some("save".into()),
+        UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
+    );
+    assert_eq!(
+        ButtonBehavior::new("save", "Save")
+            .busy(true)
+            .action(&clicked),
+        None
+    );
+    let decorated = ButtonBehavior::new("save", "Save")
+        .busy(true)
+        .decorate(argui_widgets::ButtonPart::Root, Element::container([]));
+    assert!(!decorated.interaction.as_ref().unwrap().enabled);
+    assert!(!decorated.interaction.as_ref().unwrap().focusable);
+    assert!(decorated.semantics.as_ref().unwrap().state.busy);
 }

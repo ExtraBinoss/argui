@@ -5,8 +5,9 @@ use argui_core::{
 use argui_paint::{ClipChain, ClipRegion, PaintStyle, QuadStyle};
 use argui_text::TextStyle;
 use argui_ui::{
-    ClipboardRequest, CursorIcon, Element, EventHandlerId, EventListener, EventOwnerId, EventType,
-    HitRegion, Overflow, TextSelection, TextSelectionRequest, UiEventKind, UiTree,
+    ClipboardRequest, CursorIcon, Element, ElementKind, EventHandlerId, EventListener,
+    EventOwnerId, EventType, HitRegion, Overflow, TextSelection, TextSelectionRequest, UiEventKind,
+    UiTree,
 };
 use argui_widgets::{Input, InputKind, InputStyle, TextArea};
 
@@ -23,7 +24,10 @@ fn filtered_tree(value: &str, kind: InputKind) -> (UiTree, HitRegion) {
     )
     .kind(kind)
     .build();
-    let tree = UiTree::new(listens(input));
+    with_region(UiTree::new(listens(input)))
+}
+
+fn with_region(tree: UiTree) -> (UiTree, HitRegion) {
     let node = tree.node_id_at(0).unwrap();
     let bounds = Rect::new(Point::default(), Size::new(300.0, 40.0));
     (
@@ -83,25 +87,7 @@ fn read_only_tree(value: &str) -> (UiTree, HitRegion) {
     )
     .read_only(true)
     .build();
-    let tree = UiTree::new(listens(input));
-    let node = tree.node_id_at(0).unwrap();
-    let bounds = Rect::new(Point::default(), Size::new(300.0, 40.0));
-    (
-        tree,
-        HitRegion {
-            node,
-            bounds,
-            transform: Affine2D::IDENTITY,
-            clips: ClipChain::from_regions([ClipRegion::new(bounds, Affine2D::IDENTITY)]),
-            shape: argui_ui::HitShape::Bounds,
-            slop: argui_ui::HitTestStyle::default().slop,
-            enabled: true,
-            focusable: true,
-            cursor: CursorIcon::Text,
-            gestures: argui_ui::GestureSet::EMPTY,
-            window_drag: None,
-        },
-    )
+    with_region(UiTree::new(listens(input)))
 }
 
 fn key(key: Key, text: Option<&str>, modifiers: Modifiers) -> KeyInput {
@@ -231,6 +217,7 @@ fn read_only_inputs_allow_navigation_selection_and_copy_without_mutation() {
         None
     );
     tree.edit_text_input(&key(Key::Backspace, None, Modifiers::default()));
+    tree.edit_text_input(&key(Key::Delete, None, Modifiers::default()));
     tree.edit_text_input(&key(
         Key::Character("z".into()),
         Some("z"),
@@ -303,6 +290,7 @@ fn word_motion_pointer_drag_and_state_retention_are_explicit() {
         ..Modifiers::default()
     };
     tree.edit_text_input(&key(Key::ArrowLeft, None, command));
+    tree.edit_text_input(&key(Key::ArrowLeft, None, Modifiers::default()));
     tree.edit_text_input(&key(Key::ArrowRight, None, command));
 
     tree.place_text_cursor(node, 0, false);
@@ -330,6 +318,7 @@ fn unfocused_released_and_empty_ime_inputs_do_no_work() {
     assert!(!tree.edit_text_input(&released).layout_changed);
     assert!(!tree.paste_text(None, "x").layout_changed);
     assert!(!tree.ime_input(ImeInput::Enabled).layout_changed);
+    assert!(!tree.edit_text_input(&released).layout_changed);
 
     focus(&mut tree, &region);
     let command = Modifiers {
@@ -532,12 +521,25 @@ fn text_area_inserts_lines_and_command_enter_submits() {
     assert_eq!(tree.text_input_cursor(node), Some(6));
     tree.edit_text_input(&key(Key::End, None, Modifiers::default()));
     assert_eq!(tree.text_input_cursor(node), Some(12));
+    tree.edit_text_input(&key(Key::End, None, command));
+    assert_eq!(tree.text_input_cursor(node), Some(12));
     tree.edit_text_input(&key(Key::Home, None, command));
     assert_eq!(tree.text_input_cursor(node), Some(0));
     tree.paste_text(None, "pasted\nlines");
     assert_eq!(
         tree.text_input_value(node),
         Some("pasted\nlinesfirst\nsecond")
+    );
+
+    let mut readonly = tree.root().clone();
+    if let ElementKind::TextEditor { read_only, .. } = &mut readonly.kind {
+        *read_only = true;
+    }
+    tree.update(readonly);
+    assert!(
+        tree.edit_text_input(&key(Key::Enter, None, Modifiers::default()))
+            .events
+            .is_empty()
     );
 }
 

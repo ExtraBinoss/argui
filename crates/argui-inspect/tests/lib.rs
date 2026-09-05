@@ -412,3 +412,149 @@ fn gpu_trace_rejects_unknown_versions_fields_and_enum_values() {
     let invalid_invalidation = json.replacen("\"none\"", "\"invalid\"", 1);
     assert!(inspector.import_trace_json(&invalid_invalidation).is_err());
 }
+
+#[test]
+fn inspector_state_gates_recording_and_updates_the_current_render_sample() {
+    let inspector = InspectorHandle::new(2);
+    inspector.set_recording(false);
+    inspector.record_ui(FrameRecord::default());
+    inspector.record_render(FrameRecord {
+        passes: 4,
+        ..FrameRecord::default()
+    });
+    assert!(inspector.frames().is_empty());
+    assert!(!inspector.recording());
+
+    inspector.set_recording(true);
+    inspector.record_ui(FrameRecord {
+        interval: Duration::from_millis(5),
+        model: Duration::from_millis(1),
+        update: Invalidation::Layout,
+        ..FrameRecord::default()
+    });
+    inspector.record_render(FrameRecord {
+        render_cpu: Duration::from_millis(2),
+        resize_events: 9,
+        layers: 3,
+        passes: 4,
+        offscreen_pixels: 5,
+        cached_layers: 6,
+        damaged_pixels: 7,
+        textures: 8,
+        reused_textures: 2,
+        texture_bytes: 10,
+        vector_atlas_entries: 11,
+        vector_atlas_hits: 12,
+        vector_rasterizations: 13,
+        adapter: AdapterRecord {
+            name: "adapter".into(),
+            vendor: 1,
+            device: 2,
+            device_type: "integrated".into(),
+            driver: "driver".into(),
+            driver_info: "info".into(),
+            backend: "backend".into(),
+            features: "features".into(),
+            timestamp_queries: true,
+            max_texture_dimension_2d: 14,
+            max_buffer_size: 15,
+            max_storage_buffer_binding_size: 16,
+            max_bind_groups: 17,
+        },
+        gpu: Some(GpuFrameRecord {
+            sequence: 18,
+            total: Duration::from_millis(3),
+            passes: vec![GpuPassRecord {
+                label: "pass".into(),
+                start: Duration::from_millis(1),
+                duration: Duration::from_millis(2),
+                pixels: 19,
+                object_domain: None,
+                object_id: None,
+            }],
+        }),
+        ..FrameRecord::default()
+    });
+    let frame = inspector.frames().pop().unwrap();
+    assert_eq!(frame.interval, Duration::from_millis(5));
+    assert_eq!(frame.model, Duration::from_millis(1));
+    assert_eq!(frame.update, Invalidation::Layout);
+    assert_eq!(frame.render_cpu, Duration::from_millis(2));
+    assert_eq!(frame.resize_events, 0, "resize counts belong to UI samples");
+    assert_eq!(frame.layers, 3);
+    assert_eq!(frame.vector_rasterizations, 13);
+    assert_eq!(frame.adapter.max_bind_groups, 17);
+    assert_eq!(frame.gpu.as_ref().unwrap().passes[0].pixels, 19);
+
+    inspector.set_paused(true);
+    assert!(!inspector.recording());
+    inspector.set_paused(false);
+    assert!(inspector.recording());
+}
+
+#[test]
+fn hit_testing_respects_viewport_edges_clips_and_stacking_ties() {
+    let inspector = InspectorHandle::default();
+    let viewport = Rect::new(Point::new(10.0, 10.0), Size::new(100.0, 100.0));
+    let mut clipped = node(2, None, 0, viewport, 5);
+    clipped.clip = Some(Rect::new(Point::new(20.0, 20.0), Size::new(10.0, 10.0)));
+    let mut interactive = node(3, None, 0, viewport, 5);
+    interactive.interactive = true;
+    let mut painted = node(4, None, 1, viewport, 5);
+    painted.painted = true;
+    inspector.publish_tree(TreeSnapshot {
+        revision: 3,
+        nodes: vec![node(1, None, 0, viewport, 0), clipped, interactive, painted],
+    });
+    assert_eq!(
+        inspector.hit_stack(Point::new(20.0, 20.0), viewport),
+        vec![
+            InspectNodeId(4),
+            InspectNodeId(3),
+            InspectNodeId(2),
+            InspectNodeId(1),
+        ]
+    );
+    assert_eq!(
+        inspector.hit_test(Point::new(10.0, 10.0), viewport),
+        Some(InspectNodeId(4))
+    );
+    assert!(
+        inspector
+            .hit_stack(Point::new(31.0, 20.0), viewport)
+            .contains(&InspectNodeId(1))
+    );
+    assert!(
+        inspector
+            .hit_stack(Point::new(9.99, 20.0), viewport)
+            .is_empty()
+    );
+}
+
+#[test]
+fn trace_errors_display_and_duration_saturation_are_stable() {
+    let inspector = InspectorHandle::default();
+    inspector.record_ui(FrameRecord {
+        interval: Duration::MAX,
+        update: Invalidation::None,
+        ..FrameRecord::default()
+    });
+    let json = inspector.trace_json().unwrap();
+    assert!(json.contains(&u64::MAX.to_string()));
+    let imported = InspectorHandle::default();
+    imported.import_trace_json(&json).unwrap();
+    assert_eq!(
+        imported.frames()[0].interval,
+        Duration::from_nanos(u64::MAX)
+    );
+
+    let invalid = imported.import_trace_json("not json").unwrap_err();
+    assert!(invalid.to_string().contains("invalid Argui GPU trace JSON"));
+    let wrong = json.replace("argui-gpu-trace-v2", "other");
+    let unsupported = imported.import_trace_json(&wrong).unwrap_err();
+    assert!(
+        unsupported
+            .to_string()
+            .contains("unsupported Argui GPU trace version 'other'")
+    );
+}

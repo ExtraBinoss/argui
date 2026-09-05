@@ -29,3 +29,31 @@ fn shadcn_palette_resolves_system_mode_and_contrasting_primary_text() {
         Color::WHITE
     );
 }
+
+#[test]
+fn explicit_light_mode_and_all_button_variants_keep_shared_dimensions() {
+    let themes = shadcn(Color::WHITE).with_mode(ThemeMode::Light);
+    assert_eq!(themes.mode(), ThemeMode::Light);
+    let theme = themes.resolve(ColorScheme::Dark);
+    assert_eq!(theme.background, Color::WHITE);
+    for style in [
+        theme.button(),
+        theme.secondary_button(),
+        theme.outline_button(),
+        theme.ghost_button(),
+        theme.destructive_button(),
+    ] {
+        assert_eq!(style.layout.size.height, Dimension::length(36.0));
+        assert_eq!(style.layout.padding, sides(14.0, 0.0));
+    }
+
+    let black_palette = shadcn(Color::BLACK);
+    let black_primary = black_palette.resolve(ColorScheme::Light);
+    assert_eq!(black_primary.primary_foreground, Color::WHITE);
+    let white_palette = shadcn(Color::WHITE);
+    let white_primary = white_palette.resolve(ColorScheme::Light);
+    assert_eq!(
+        white_primary.primary_foreground,
+        Color::from_srgb8(9, 9, 11)
+    );
+}

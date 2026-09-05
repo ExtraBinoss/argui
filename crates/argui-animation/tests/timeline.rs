@@ -164,3 +164,49 @@ fn retargeting_starts_from_the_presented_value_without_a_jump() {
     assert_eq!(animation.sample(milliseconds(100)).value, Some(125.0));
     assert_eq!(animation.sample(milliseconds(150)).value, Some(200.0));
 }
+
+#[test]
+fn inactive_controls_and_invalid_rates_preserve_playback() {
+    let mut animation = timeline(Timing::new(Duration::from_millis(100)).fill(FillMode::Both));
+    animation.pause(Time::ZERO);
+    animation.resume(Time::ZERO);
+    assert_eq!(animation.state(), PlaybackState::Idle);
+    animation.play(Time::ZERO);
+    for rate in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, 0.0] {
+        assert_eq!(
+            animation.set_playback_rate(rate, milliseconds(10)),
+            Err(TimingError::InvalidPlaybackRate)
+        );
+    }
+    close(animation.sample(milliseconds(20)).value, 20.0);
+    animation.finish();
+    animation.pause(milliseconds(30));
+    animation.resume(milliseconds(30));
+    let finished = animation.sample(milliseconds(30));
+    assert_eq!(finished.state, PlaybackState::Finished);
+    assert_eq!(finished.value, Some(100.0));
+    assert!(finished.events.finished);
+    assert!(!animation.sample(milliseconds(30)).events.finished);
+}
+
+#[test]
+fn reverse_playback_finishes_at_the_start_and_emits_completion_once() {
+    let mut animation = timeline(Timing::new(Duration::from_millis(100)).fill(FillMode::Both));
+    animation.reverse(Time::ZERO);
+    close(animation.sample(milliseconds(25)).value, 75.0);
+    let sample = animation.sample(milliseconds(100));
+    assert_eq!(sample.value, Some(0.0));
+    assert_eq!(sample.state, PlaybackState::Finished);
+    assert!(sample.events.finished);
+    assert!(!animation.sample(milliseconds(200)).events.finished);
+}
+
+#[test]
+fn motion_finishing_a_reversed_timeline_uses_its_start_value() {
+    let motion = argui_animation::Motion::new(100.0_f32);
+    let mut animation = timeline(Timing::new(Duration::from_millis(100)).fill(FillMode::Both));
+    animation.reverse(Time::ZERO);
+    motion.play(animation);
+    motion.finish();
+    assert_eq!(motion.value(), 0.0);
+}

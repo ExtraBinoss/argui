@@ -19,6 +19,10 @@ fn linear_custom_and_bezier_easing_sample_bounded_input() {
 #[test]
 fn invalid_bezier_coordinates_are_rejected() {
     assert_eq!(
+        CubicBezier::new(0.0, 0.0, 1.1, 1.0),
+        Err(EasingError::InvalidBezier)
+    );
+    assert_eq!(
         CubicBezier::new(-0.1, 0.0, 1.0, 1.0),
         Err(EasingError::InvalidBezier)
     );
@@ -71,6 +75,21 @@ fn piecewise_linear_easing_interpolates_and_supports_hard_stops() {
     close(easing.sample(1.0), 1.0);
 
     for invalid in [
+        vec![
+            LinearStop::new(0.0, 0.0),
+            LinearStop::new(f32::NAN, 0.5),
+            LinearStop::new(1.0, 1.0),
+        ],
+        vec![
+            LinearStop::new(0.0, 0.0),
+            LinearStop::new(0.5, f32::INFINITY),
+            LinearStop::new(1.0, 1.0),
+        ],
+        vec![
+            LinearStop::new(0.0, 0.0),
+            LinearStop::new(1.5, 0.5),
+            LinearStop::new(1.0, 1.0),
+        ],
         vec![LinearStop::new(0.0, 0.0)],
         vec![LinearStop::new(0.1, 0.0), LinearStop::new(1.0, 1.0)],
         vec![LinearStop::new(0.0, 0.0), LinearStop::new(0.9, f32::NAN)],

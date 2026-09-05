@@ -134,3 +134,22 @@ fn dialog_default_surface_uses_the_theme_blurs() {
     assert!(overlay.children[1].layer.is_some());
     assert!(overlay.children[1].paint.quad.background.is_some());
 }
+
+#[test]
+fn dialog_can_disable_the_theme_overlay_blur() {
+    let themes = shadcn(argui_core::Color::srgb(0.2, 0.5, 0.9));
+    let mut theme = themes.resolve(argui_core::ColorScheme::Dark).clone();
+    theme.overlay_blur = 0.0;
+    let dialog = Dialog::new(
+        "plain-dialog",
+        "Plain dialog",
+        true,
+        Element::text("Open"),
+        Element::text("Content"),
+    )
+    .backdrop_blur(0.0)
+    .build(&theme);
+    let overlay = &dialog.children[1];
+    assert!(overlay.children[0].layer.is_none());
+    assert!(overlay.children[1].layer.is_none());
+}

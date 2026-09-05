@@ -444,3 +444,58 @@ fn empty_restoring_scope_and_disabled_initial_candidate_are_explicit() {
     tree.sync_focus(&[disabled_region, region(enabled, 50.0)], None);
     assert_eq!(tree.focused_node(), Some(enabled));
 }
+
+#[test]
+fn removing_a_focused_node_queues_one_blur_without_restoring_a_stale_id() {
+    let mut tree = UiTree::new(Element::row([control("keep"), control("remove")]));
+    let keep = tree.node_id_at(1).unwrap();
+    let removed = tree.node_id_at(2).unwrap();
+    let regions = [region(keep, 0.0), region(removed, 50.0)];
+    tree.sync_focus(&regions, Some(FocusRequest::Focus(removed.into())));
+    assert_eq!(tree.focused_node(), Some(removed));
+
+    assert!(tree.update(Element::row([control("keep")])) == argui_ui::TreeUpdate::Layout);
+    assert_eq!(tree.focused_node(), None);
+    let update = tree.sync_focus(&[region(keep, 0.0)], None);
+    assert_eq!(
+        update
+            .events
+            .iter()
+            .filter(|event| event.target == removed && event.kind == UiEventKind::Blurred)
+            .count(),
+        1
+    );
+    assert_eq!(tree.focused_node(), None);
+    assert!(
+        tree.sync_focus(&[region(keep, 0.0)], None)
+            .events
+            .is_empty()
+    );
+}
+
+#[test]
+fn keyboard_focus_handles_empty_cycles_and_repeated_space_activation() {
+    let tab = key(Key::Tab, KeyState::Pressed, false);
+    let mut empty = UiTree::new(Element::container([]));
+    assert!(empty.key_input(&tab, &[]).events.is_empty());
+
+    let mut tree = UiTree::new(control("button"));
+    let node = tree.node_id_at(0).unwrap();
+    let regions = [region(node, 0.0)];
+    tree.sync_focus(&regions, Some(FocusRequest::Focus(node.into())));
+    tree.key_input(&tab, &regions);
+    assert_eq!(tree.focused_node(), Some(node));
+
+    let space = key(Key::Character(" ".into()), KeyState::Pressed, false);
+    tree.key_input(&space, &regions);
+    tree.key_input(&space, &regions);
+    let released = key(Key::Character(" ".into()), KeyState::Released, false);
+    let update = tree.key_input(&released, &regions);
+    assert!(update.events.iter().any(|event| matches!(
+        event.kind,
+        UiEventKind::Click(argui_ui::ClickEvent {
+            source: ActivationSource::Keyboard(_),
+            ..
+        })
+    )));
+}

@@ -119,11 +119,10 @@ impl LayoutEngine {
         if !self.assets.update(images, vectors) {
             return;
         }
-        if let Some(root) = &self.root {
-            self.tree
-                .mark_dirty(root.id)
-                .expect("the retained layout root belongs to its Taffy tree");
-        }
+        // Intrinsic dimensions also supply derived styles (such as aspect ratio).
+        // Invalidating measurement alone leaves those styles and child caches stale.
+        self.root = None;
+        self.revision = None;
     }
 
     pub fn apply_scroll(

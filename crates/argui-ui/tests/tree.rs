@@ -313,3 +313,6 @@ fn every_visual_field_and_portal_change_has_an_exact_invalidation_class() {
 }
 #[path = "tree/index.rs"]
 mod index;
+
+#[path = "tree/transition.rs"]
+mod transition;

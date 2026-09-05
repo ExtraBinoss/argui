@@ -5,7 +5,7 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 summary="$(mktemp)"
 coverage_lock="$repo_root/target/.argui-coverage-lock"
 coverage_target="$repo_root/target/coverage"
-minimum=85
+minimum=90
 coverage_jobs="${ARGUI_COVERAGE_JOBS:-6}"
 boundary_regex='crates/argui-runtime/src/(multi\.rs|animation\.rs|app/(accessibility|frame|lifecycle|preferences|scroll|text_selection|window)\.rs)|crates/argui-render/src/(text/|vector/|image/pipeline\.rs|surface/(configure|effects)\.rs)'
 
@@ -25,7 +25,9 @@ if ! mkdir "$coverage_lock" 2>/dev/null; then
   exit 1
 fi
 trap 'rm -f "$summary"; rmdir "$coverage_lock" 2>/dev/null || true' EXIT
-CARGO_TARGET_DIR="$coverage_target" cargo +nightly llvm-cov clean --profraw-only
+# Old feature/build variants contain duplicate coverage maps even after their
+# raw profiles are removed. Keep dependency caches, but discard workspace maps.
+CARGO_TARGET_DIR="$coverage_target" cargo +nightly llvm-cov clean --workspace
 echo "coverage: running workspace library and integration tests"
 CARGO_TARGET_DIR="$coverage_target" CARGO_INCREMENTAL=0 \
   CARGO_PROFILE_TEST_OPT_LEVEL=0 CARGO_PROFILE_TEST_DEBUG=0 \

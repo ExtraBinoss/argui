@@ -186,3 +186,118 @@ fn popover_surface_options_are_applied_without_trapping_focus() {
         argui_ui::LengthPercentage::length(20.0)
     );
 }
+
+#[test]
+fn closed_popover_mounts_only_trigger_and_reports_collapsed_state() {
+    let themes = shadcn(Color::srgb(0.2, 0.5, 0.9));
+    let theme = themes.resolve(argui_core::ColorScheme::Light);
+    let tree = Popover::new(
+        "closed",
+        "Closed menu",
+        false,
+        Element::text("Open"),
+        Element::text("Content"),
+    )
+    .build(theme);
+    assert_eq!(tree.children.len(), 1);
+    let trigger = &tree.children[0];
+    assert_eq!(trigger.key.as_deref(), Some("closed"));
+    assert_eq!(
+        trigger.semantics.as_ref().unwrap().state.expanded,
+        Some(false)
+    );
+    assert!(trigger.interaction.as_ref().unwrap().focusable);
+}
+
+#[test]
+fn popover_clamps_negative_surface_values_and_avoids_zero_blur_layer() {
+    let themes = shadcn(Color::srgb(0.2, 0.5, 0.9));
+    let theme = themes.resolve(argui_core::ColorScheme::Dark);
+    let tree = Popover::new(
+        "clamped",
+        "Clamped menu",
+        true,
+        Element::text("Open"),
+        Element::text("Content"),
+    )
+    .size(-10.0, -20.0)
+    .padding(-4.0)
+    .radius(-8.0)
+    .backdrop_blur(-1.0)
+    .build(theme);
+    let content = &tree.children[1];
+    assert_eq!(content.style.size.width, argui_ui::Dimension::length(0.0));
+    assert_eq!(
+        content.style.max_size.height,
+        argui_ui::LengthPercentageAuto::length(0.0)
+    );
+    assert_eq!(content.style.padding, argui_ui::Sides::length(0.0));
+    assert_eq!(content.paint.quad.radii, argui_paint::CornerRadii::all(0.0));
+    assert!(content.layer.is_none());
+    assert_eq!(
+        content.portal.as_ref().unwrap().dismiss,
+        DismissPolicy::OutsidePointer
+    );
+}
+
+#[test]
+fn popover_behavior_only_toggles_trigger_and_ignores_non_escape_close_events() {
+    let closed = PopoverBehavior::new("menu", "Menu", false);
+    assert_eq!(
+        closed.action(&event(
+            Some("menu::content"),
+            UiEventKind::KeyInput(KeyInput {
+                key: Key::Escape,
+                state: KeyState::Pressed,
+                modifiers: Modifiers::default(),
+                repeat: false,
+                text: None,
+            }),
+        )),
+        None
+    );
+    let open = PopoverBehavior::new("menu", "Menu", true);
+    assert_eq!(
+        open.action(&event(
+            Some("menu::content"),
+            UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
+        )),
+        None
+    );
+    assert_eq!(
+        open.action(&event(
+            Some("child"),
+            UiEventKind::KeyInput(KeyInput {
+                key: Key::Escape,
+                state: KeyState::Released,
+                modifiers: Modifiers::default(),
+                repeat: false,
+                text: None,
+            }),
+        )),
+        None
+    );
+    assert_eq!(
+        open.action(&event(
+            Some("child"),
+            UiEventKind::KeyInput(KeyInput {
+                key: Key::Enter,
+                state: KeyState::Pressed,
+                modifiers: Modifiers::default(),
+                repeat: false,
+                text: None,
+            }),
+        )),
+        None
+    );
+    assert_eq!(
+        open.action(&event(
+            Some("menu::content"),
+            UiEventKind::PointerOutside(PointerEvent::mouse(
+                PointerPhase::Released,
+                Point::default(),
+            )),
+        )),
+        Some(PopoverAction::Close)
+    );
+}

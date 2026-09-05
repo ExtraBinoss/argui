@@ -8,7 +8,7 @@ pass unless every check succeeds.
 - Every tracked Rust file, including tests, examples, and build scripts, is at
   most 600 physical lines. Split a file when a responsibility becomes distinct;
   never split it merely to evade the limit.
-- Workspace coverage must be at least 85% independently for lines, functions,
+- Workspace coverage must be at least 90% independently for lines, functions,
   LLVM regions, and branches.
 - Formatting and Clippy warnings fail the check.
 - `unsafe` is denied until a concrete, reviewed need is documented.
@@ -85,3 +85,5 @@ Coverage uses Nextest, disables incremental artifacts, and overrides the test
 profile with `opt-level=0` and no debug symbols so LLVM measures Argui's source
 branches without invalidating the stable interactive build cache. Instrumented
 artifacts live in `target/coverage/`; the coverage lock rejects concurrent runs.
+Before measuring, workspace instrumentation artifacts are cleaned while dependency
+caches are retained, so old feature variants cannot add duplicate uncovered maps.
