@@ -259,7 +259,7 @@ fn profiling_list<A>(tools: &DevtoolsHost<A>, header: Element, theme: &WidgetThe
             Button::new(
                 format!("__devtools-frame-{position}"),
                 values.join(" · "),
-                theme.ghost_button(),
+                theme.ghost_button().instant_hover(),
             )
             .content(frame_columns(values, theme))
             .build()

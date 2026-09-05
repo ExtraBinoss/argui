@@ -40,6 +40,7 @@ pub(super) struct PendingScroll {
     delta: ScrollDelta,
     point: Point,
     dispatch_wheel: bool,
+    target: Option<NodeId>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -176,17 +177,20 @@ impl Application {
         let Some(point) = self.pointer else {
             return;
         };
-        let (target, physics) = match (self.pointer, &self.ui_layout) {
-            (Some(point), Some(layout)) => layout
-                .scroll_regions
-                .iter()
-                .rev()
-                .find(|region| region.config.enabled && region.contains(point))
-                .map_or((None, ScrollPhysics::Direct), |region| {
-                    (Some(region.node), region.config.physics)
-                }),
-            _ => (None, ScrollPhysics::Direct),
+        let Some(layout) = &self.ui_layout else {
+            return;
         };
+        let target = self.scroll_gesture.target(
+            point,
+            self.input_epoch.elapsed(),
+            phase == TouchPhase::Started,
+            &layout.scroll_regions,
+        );
+        let physics = layout
+            .scroll_regions
+            .iter()
+            .find(|region| Some(region.node) == target)
+            .map_or(ScrollPhysics::Direct, |region| region.config.physics);
         self.scroll_inertia.observe(ScrollSample {
             delta,
             phase,
@@ -197,12 +201,16 @@ impl Application {
             dispatch_wheel: true,
         });
         if let Some(pending) = &mut self.pending_pointer_scroll {
-            if !pending.dispatch_wheel || !merge_delta(&mut pending.delta, delta) {
+            if !pending.dispatch_wheel
+                || pending.target != target
+                || !merge_delta(&mut pending.delta, delta)
+            {
                 self.flush_pointer_scroll(window, event_loop);
                 self.pending_pointer_scroll = Some(PendingScroll {
                     delta,
                     point,
                     dispatch_wheel: true,
+                    target,
                 });
             } else {
                 pending.point = point;
@@ -212,6 +220,7 @@ impl Application {
                 delta,
                 point,
                 dispatch_wheel: true,
+                target,
             });
         }
         window.request_redraw();
@@ -223,10 +232,12 @@ impl Application {
         window: &Window,
         event_loop: &ActiveEventLoop,
     ) {
+        let target = self.scroll_inertia.target;
         if let Some((delta, point, dispatch_wheel)) = self.scroll_inertia.advance(Instant::now()) {
             let delta = ScrollDelta::Pixels(delta);
             if let Some(pending) = &mut self.pending_pointer_scroll {
                 if pending.dispatch_wheel != dispatch_wheel
+                    || pending.target != target
                     || !merge_delta(&mut pending.delta, delta)
                 {
                     self.flush_pointer_scroll(window, event_loop);
@@ -234,6 +245,7 @@ impl Application {
                         delta,
                         point,
                         dispatch_wheel,
+                        target,
                     });
                 } else {
                     pending.point = point;
@@ -243,6 +255,7 @@ impl Application {
                     delta,
                     point,
                     dispatch_wheel,
+                    target,
                 });
             }
         }
@@ -321,7 +334,12 @@ impl Application {
         let delta = pending.delta;
         if pending.dispatch_wheel {
             let wheel_update = match (&self.ui_layout, &mut self.ui_tree) {
-                (Some(layout), Some(ui)) => ui.wheel_event(point, delta, &layout.scroll_regions),
+                (Some(_), Some(ui)) => pending
+                    .target
+                    .or_else(|| ui.node_id_at(0))
+                    .map_or_else(argui_ui::InteractionUpdate::default, |target| {
+                        ui.wheel_event_from(target, point, delta)
+                    }),
                 _ => return,
             };
             let wheel_event = wheel_update.events.first().cloned();
@@ -334,7 +352,11 @@ impl Application {
         let (Some(layout), Some(ui)) = (&self.ui_layout, &mut self.ui_tree) else {
             return;
         };
-        let update = ui.scroll(point, delta, &layout.scroll_regions);
+        let update = pending
+            .target
+            .map_or_else(argui_ui::InteractionUpdate::default, |target| {
+                ui.scroll_from(target, point, delta, &layout.scroll_regions)
+            });
         self.apply_ui_update(update, window, event_loop);
         if !pending.dispatch_wheel {
             return;

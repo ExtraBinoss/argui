@@ -175,9 +175,10 @@ impl Render for ScrollDemo {
                 cx.notify();
             }));
         let list = VList::new("scroll-demo-list", 32.0, 220.0, self.offset)
+            .propagation(argui::ui::ScrollPropagation::Contain)
             .effect(self.effect())
             .build(10_000, theme, |index| {
-                let mut style = theme.ghost_button();
+                let mut style = theme.ghost_button().instant_hover();
                 style.layout.justify_content = Some(JustifyContent::START);
                 style.layout.padding = argui::ui::sides(12.0, 4.0);
                 style.label.font_size = 13.0;
@@ -245,6 +246,7 @@ impl Render for ScrollDemo {
             })
             .scroll_config(
                 ScrollConfig::default()
+                    .propagation(argui::ui::ScrollPropagation::Contain)
                     .scrollbar(theme.scrollbar.clone())
                     .effect(self.effect()),
             )

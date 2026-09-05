@@ -17,6 +17,7 @@ mod responsive;
 mod scroll;
 mod scroll_config;
 mod scroll_effect;
+mod scroll_gesture;
 mod scroll_physics;
 mod scroll_request;
 mod semantics;
@@ -73,6 +74,7 @@ pub use scroll_config::{
     ScrollbarVisibility,
 };
 pub use scroll_effect::{ScrollEffect, ScrollMetric, ScrollMetrics};
+pub use scroll_gesture::ScrollGesture;
 pub use scroll_request::{ScrollAlignment, ScrollBehavior, ScrollRequest, ScrollTarget};
 pub use state::{
     EffectPropertyKey, PropertyKey, State, StateName, StateScopeId, StateSelector, StyleCondition,

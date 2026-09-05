@@ -220,15 +220,13 @@ impl ScrollState {
         point: Point,
         delta: ScrollDelta,
         regions: &[ScrollRegion],
+        targets: Option<&[NodeId]>,
     ) -> Option<ScrollOutcome> {
         let mut remaining = delta;
         let mut changes = Vec::new();
-        for (index, region) in regions
-            .iter()
-            .enumerate()
-            .rev()
-            .filter(|(_, region)| region.contains(point))
-        {
+        for (index, region) in regions.iter().enumerate().rev().filter(|(_, region)| {
+            targets.map_or_else(|| region.contains(point), |ids| ids.contains(&region.node))
+        }) {
             if !region.config.enabled {
                 continue;
             }
@@ -261,10 +259,13 @@ impl ScrollState {
             }
             remaining = residual_delta(remaining, requested, applied);
             let has_chain_target = region.config.propagation == ScrollPropagation::Chain
-                && regions[..index]
-                    .iter()
-                    .rev()
-                    .any(|candidate| candidate.config.enabled && candidate.contains(point));
+                && regions[..index].iter().rev().any(|candidate| {
+                    candidate.config.enabled
+                        && targets.map_or_else(
+                            || candidate.contains(point),
+                            |ids| ids.contains(&candidate.node),
+                        )
+                });
             if let OverscrollBehavior::Elastic(config) = region.config.overscroll
                 && !has_chain_target
                 && region.config.propagation != ScrollPropagation::None

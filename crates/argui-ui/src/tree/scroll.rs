@@ -17,16 +17,26 @@ impl UiTree {
             .find(|region| region.config.enabled && region.contains(point))
             .map(|region| region.node)
             .or_else(|| self.node_ids().first().copied());
+        target.map_or_else(InteractionUpdate::default, |target| {
+            self.wheel_event_from(target, point, delta)
+        })
+    }
+
+    /// Dispatch a wheel event to the viewport retained by the current gesture.
+    pub fn wheel_event_from(
+        &mut self,
+        target: NodeId,
+        point: Point,
+        delta: ScrollDelta,
+    ) -> InteractionUpdate {
         InteractionUpdate {
-            events: target.map_or_else(Vec::new, |target| {
-                self.event_deliveries(
-                    target,
-                    UiEventKind::Wheel {
-                        delta,
-                        position: point,
-                    },
-                )
-            }),
+            events: self.event_deliveries(
+                target,
+                UiEventKind::Wheel {
+                    delta,
+                    position: point,
+                },
+            ),
             ..InteractionUpdate::default()
         }
     }
@@ -79,7 +89,40 @@ impl UiTree {
         delta: ScrollDelta,
         regions: &[ScrollRegion],
     ) -> InteractionUpdate {
-        let Some(outcome) = self.scroll.scroll(point, delta, regions) else {
+        self.scroll_routed(point, delta, regions, None)
+    }
+
+    /// Scroll a latched viewport and its ancestors, never descendants newly under the pointer.
+    pub fn scroll_from(
+        &mut self,
+        target: NodeId,
+        point: Point,
+        delta: ScrollDelta,
+        regions: &[ScrollRegion],
+    ) -> InteractionUpdate {
+        if !regions
+            .iter()
+            .any(|region| region.node == target && region.config.enabled)
+        {
+            return InteractionUpdate::default();
+        }
+        let mut targets = vec![target];
+        let mut ancestor = self.parent_of(target);
+        while let Some(node) = ancestor {
+            targets.push(node);
+            ancestor = self.parent_of(node);
+        }
+        self.scroll_routed(point, delta, regions, Some(&targets))
+    }
+
+    fn scroll_routed(
+        &mut self,
+        point: Point,
+        delta: ScrollDelta,
+        regions: &[ScrollRegion],
+        targets: Option<&[NodeId]>,
+    ) -> InteractionUpdate {
+        let Some(outcome) = self.scroll.scroll(point, delta, regions, targets) else {
             return InteractionUpdate::default();
         };
         match outcome {

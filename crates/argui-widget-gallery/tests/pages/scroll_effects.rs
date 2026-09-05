@@ -220,3 +220,84 @@ fn effects_page_uses_the_available_width_instead_of_the_reading_column_limit() {
         );
     }
 }
+
+#[test]
+fn scrolling_effect_panels_never_moves_the_page_even_at_edges_or_after_row_rebuilds() {
+    let app = Entity::new(WidgetGallery::default());
+    dispatch(
+        &app,
+        "nav::effects",
+        UiEventKind::Click(ClickEvent::accessibility()),
+    );
+    for mode in 0..3 {
+        dispatch(
+            &app,
+            &format!("scroll-mode-{mode}"),
+            UiEventKind::Click(ClickEvent::accessibility()),
+        );
+        let mut tree = UiTree::new(app.render());
+        let mut engine = argui::layout::LayoutEngine::new();
+        let mut text = argui::text::TextEngine::new();
+        let size = argui::core::Size::new(1220.0, 780.0);
+        let mut output = engine.compute(&mut tree, &mut text, size).unwrap();
+        let page = output
+            .scroll_regions
+            .iter()
+            .find(|region| tree.key(region.node) == Some("gallery-content-scroll"))
+            .unwrap()
+            .node;
+        tree.set_scroll_offset(page, Point::new(0.0, 120.0));
+        engine.apply_scroll(&tree, &mut output).unwrap();
+        for key in ["scroll-demo-list", "scroll-demo-nested"] {
+            let region = output
+                .scroll_regions
+                .iter()
+                .find(|region| tree.key(region.node) == Some(key))
+                .unwrap()
+                .clone();
+            assert_eq!(
+                region.config.propagation,
+                argui::ui::ScrollPropagation::Contain
+            );
+            for (offset, dy) in [
+                (0.0, 40.0),
+                (0.0, -40.3),
+                (2000.0, -300.7),
+                (region.max_offset.y - 1.0, -500.0),
+                (region.max_offset.y, -500.0),
+            ] {
+                tree.set_scroll_offset(
+                    region.node,
+                    Point::new(0.0, offset.min(region.max_offset.y)),
+                );
+                engine.apply_scroll(&tree, &mut output).unwrap();
+                let update = tree.scroll_from(
+                    region.node,
+                    region.bounds.origin,
+                    argui::core::ScrollDelta::Pixels(Point::new(0.25, dy)),
+                    &output.scroll_regions,
+                );
+                let expected =
+                    (offset.min(region.max_offset.y) - dy).clamp(0.0, region.max_offset.y);
+                assert!((tree.scroll_offset(region.node).y - expected).abs() < 0.01);
+                assert_eq!(
+                    tree.scroll_offset(page).y,
+                    120.0,
+                    "mode {mode}, {key}, offset {offset}, delta {dy}"
+                );
+                for event in update.events {
+                    if event.should_dispatch() {
+                        app.dispatch_event(&event);
+                    }
+                }
+                tree.update(app.render());
+                output = engine.compute(&mut tree, &mut text, size).unwrap();
+                assert_eq!(
+                    tree.scroll_offset(page).y,
+                    120.0,
+                    "page moved during a virtual row rebuild"
+                );
+            }
+        }
+    }
+}

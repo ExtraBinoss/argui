@@ -128,7 +128,8 @@ impl TreeView<'_> {
             theme.button()
         } else {
             theme.ghost_button()
-        };
+        }
+        .instant_hover();
         style.layout.padding = argui_ui::sides(8.0 + node.depth as f32 * 12.0, 2.0);
         style.layout.justify_content = Some(argui_ui::JustifyContent::START);
         style.label.font_size = 12.0;

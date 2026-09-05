@@ -88,10 +88,161 @@ fn button_hover_uses_the_shared_retained_visual_state_path() {
         }],
     );
     assert!(tree.visual_states(node).contains(VisualState::Hovered));
+    assert_eq!(
+        tree.resolved_quad(node, &element).background,
+        Some(argui_paint::Fill::Solid(Color::WHITE))
+    );
     assert!(matches!(
         &element.children[0].kind,
         ElementKind::Text { style, .. } if style.wrap == TextWrap::None
     ));
+}
+
+#[test]
+fn rapid_hover_enters_immediately_and_reentry_interrupts_the_soft_exit() {
+    use argui_animation::Time;
+    let style = ButtonStyle::new(
+        PaintStyle::new(QuadStyle::solid(Color::BLACK)),
+        TextStyle::default(),
+    )
+    .hovered(QuadStyle::solid(Color::WHITE));
+    let mut tree = UiTree::new(Element::column([
+        Button::new("a", "A", style.clone()).build(),
+        Button::new("b", "B", style.clone()).build(),
+        Button::new("disabled", "Disabled", style)
+            .enabled(false)
+            .build(),
+    ]));
+    let nodes: Vec<_> = ["a", "b", "disabled"]
+        .map(|key| {
+            tree.node_ids()
+                .iter()
+                .copied()
+                .find(|node| tree.key(*node) == Some(key))
+                .unwrap()
+        })
+        .into();
+    let regions: Vec<_> = nodes
+        .iter()
+        .enumerate()
+        .map(|(index, &node)| hover_region(node, index as f32 * 40.0, index < 2))
+        .collect();
+    let background = |tree: &UiTree, node| {
+        let index = tree
+            .node_ids()
+            .iter()
+            .position(|candidate| *candidate == node)
+            .unwrap();
+        tree.resolved_quad(node, tree.element_at(index).unwrap())
+            .background
+    };
+    // No animation frame elapses between these rapid crossings.
+    for index in [0, 1, 0, 1] {
+        tree.pointer_moved(Point::new(5.0, index as f32 * 40.0 + 5.0), &regions);
+        assert_eq!(
+            background(&tree, nodes[index]),
+            Some(argui_paint::Fill::Solid(Color::WHITE))
+        );
+        assert!(
+            tree.visual_states(nodes[index])
+                .contains(VisualState::Hovered)
+        );
+        assert!(
+            !tree
+                .visual_states(nodes[1 - index])
+                .contains(VisualState::Hovered)
+        );
+    }
+    tree.pointer_moved(Point::new(5.0, 85.0), &regions);
+    assert!(!tree.visual_states(nodes[2]).contains(VisualState::Hovered));
+    assert_eq!(
+        background(&tree, nodes[2]),
+        Some(argui_paint::Fill::Solid(Color::BLACK))
+    );
+    tree.advance_animations(Time::from_nanos(1));
+    tree.advance_animations(Time::from_nanos(60_000_001));
+    let fading = background(&tree, nodes[1]);
+    assert_ne!(fading, Some(argui_paint::Fill::Solid(Color::WHITE)));
+    assert_ne!(fading, Some(argui_paint::Fill::Solid(Color::BLACK)));
+    tree.pointer_moved(Point::new(5.0, 45.0), &regions);
+    assert_eq!(
+        background(&tree, nodes[1]),
+        Some(argui_paint::Fill::Solid(Color::WHITE))
+    );
+}
+
+#[test]
+fn explicit_button_transition_can_still_animate_hover_entry() {
+    let element = Button::new(
+        "custom",
+        "Custom",
+        ButtonStyle::new(
+            PaintStyle::new(QuadStyle::solid(Color::BLACK)),
+            TextStyle::default(),
+        )
+        .hovered(QuadStyle::solid(Color::WHITE))
+        .transition(argui_ui::StyleTransition::default()),
+    )
+    .build();
+    let mut tree = UiTree::new(element.clone());
+    let node = tree.node_ids()[0];
+    tree.pointer_moved(Point::new(5.0, 5.0), &[hover_region(node, 0.0, true)]);
+    assert_eq!(
+        tree.resolved_quad(node, &element).background,
+        Some(argui_paint::Fill::Solid(Color::BLACK))
+    );
+    tree.advance_animations(argui_animation::Time::from_nanos(1));
+    tree.advance_animations(argui_animation::Time::from_nanos(120_000_001));
+    assert_eq!(
+        tree.resolved_quad(node, &element).background,
+        Some(argui_paint::Fill::Solid(Color::WHITE))
+    );
+}
+
+fn hover_region(node: argui_ui::NodeId, y: f32, enabled: bool) -> HitRegion {
+    HitRegion {
+        node,
+        bounds: Rect::new(Point::new(0.0, y), Size::new(100.0, 36.0)),
+        transform: Affine2D::IDENTITY,
+        clips: ClipChain::default(),
+        shape: argui_ui::HitShape::Bounds,
+        slop: argui_ui::HitTestStyle::default().slop,
+        enabled,
+        focusable: true,
+        cursor: CursorIcon::Pointer,
+        gestures: argui_ui::GestureSet::EMPTY,
+        window_drag: None,
+    }
+}
+
+#[test]
+fn dense_row_hover_leaves_no_trail_without_advancing_time() {
+    let element = Button::new(
+        "row",
+        "Row",
+        ButtonStyle::new(
+            PaintStyle::new(QuadStyle::solid(Color::BLACK)),
+            TextStyle::default(),
+        )
+        .hovered(QuadStyle::solid(Color::WHITE))
+        .instant_hover(),
+    )
+    .build();
+    let mut tree = UiTree::new(element.clone());
+    let node = tree.node_ids()[0];
+    let regions = [hover_region(node, 0.0, true)];
+    for _ in 0..10 {
+        tree.pointer_moved(Point::new(5.0, 5.0), &regions);
+        assert_eq!(
+            tree.resolved_quad(node, &element).background,
+            Some(argui_paint::Fill::Solid(Color::WHITE))
+        );
+        tree.pointer_moved(Point::new(500.0, 500.0), &regions);
+        assert_eq!(
+            tree.resolved_quad(node, &element).background,
+            Some(argui_paint::Fill::Solid(Color::BLACK))
+        );
+    }
 }
 
 #[test]

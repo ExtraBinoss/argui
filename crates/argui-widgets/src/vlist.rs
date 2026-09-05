@@ -10,6 +10,7 @@ pub struct VList {
     pub offset: f32,
     pub row_height: f32,
     pub effects: Vec<argui_ui::ScrollEffect>,
+    pub propagation: argui_ui::ScrollPropagation,
 }
 
 impl VList {
@@ -22,6 +23,7 @@ impl VList {
             viewport: viewport.max(0.0),
             offset: offset.max(0.0),
             effects: Vec::new(),
+            propagation: argui_ui::ScrollPropagation::Chain,
         }
     }
 
@@ -42,6 +44,13 @@ impl VList {
         self
     }
 
+    /// Controls whether unused scroll input can reach an enclosing viewport.
+    #[must_use]
+    pub fn propagation(mut self, propagation: argui_ui::ScrollPropagation) -> Self {
+        self.propagation = propagation;
+        self
+    }
+
     #[must_use]
     pub fn build(
         &self,
@@ -49,7 +58,9 @@ impl VList {
         theme: &WidgetTheme,
         row: impl FnMut(usize) -> Element,
     ) -> Element {
-        let mut scroll = ScrollConfig::default().scrollbar(theme.scrollbar.clone());
+        let mut scroll = ScrollConfig::default()
+            .propagation(self.propagation)
+            .scrollbar(theme.scrollbar.clone());
         scroll.effects.clone_from(&self.effects);
         self.config(count)
             .scroll_config(scroll)

@@ -11,13 +11,15 @@ fn header_shares_the_row_scrollport_and_offsets_the_virtual_window() {
     let themes = shadcn(Color::WHITE);
     let theme = themes.resolve(ColorScheme::Dark);
     let build = |offset| {
-        VList::new("list", 20.0, 100.0, offset).build_with_header(
-            1000,
-            theme,
-            Element::text("Header").keyed("header"),
-            200.0,
-            |index| Element::text(index.to_string()).keyed(format!("row-{index}")),
-        )
+        VList::new("list", 20.0, 100.0, offset)
+            .propagation(argui_ui::ScrollPropagation::Contain)
+            .build_with_header(
+                1000,
+                theme,
+                Element::text("Header").keyed("header"),
+                200.0,
+                |index| Element::text(index.to_string()).keyed(format!("row-{index}")),
+            )
     };
     let first = build(100.0);
     assert!(has(&first, "row-0"));
@@ -28,6 +30,10 @@ fn header_shares_the_row_scrollport_and_offsets_the_virtual_window() {
     assert!(!has(&scrolled, "row-900"));
     assert_eq!(scrolled.style.scrollbar_gutter, ScrollbarGutter::Stable);
     assert!(scrolled.scroll.is_some());
+    assert_eq!(
+        scrolled.scroll.as_ref().unwrap().propagation,
+        argui_ui::ScrollPropagation::Contain
+    );
     assert!(scrolled.children.iter().all(|child| child.scroll.is_none()));
 }
 
@@ -44,6 +50,10 @@ fn effects_are_opt_in_and_survive_headers_without_mounting_more_rows() {
         Element::text(index.to_string())
     });
     assert!(base.scroll.as_ref().unwrap().effects.is_empty());
+    assert_eq!(
+        base.scroll.as_ref().unwrap().propagation,
+        argui_ui::ScrollPropagation::Chain
+    );
     assert_eq!(built.scroll.as_ref().unwrap().effects, vec![effect]);
     assert_eq!(built.children.len(), base.children.len() + 1);
     assert!(built.children.len() < 30);

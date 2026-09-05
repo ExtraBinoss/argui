@@ -35,7 +35,14 @@ impl ButtonStyle {
             hovered: StylePatch::from_quad(paint.quad.clone()),
             pressed: StylePatch::from_quad(paint.quad.clone()),
             focused: None,
-            transition: StyleTransition::default(),
+            transition: StyleTransition::default().rule(
+                argui_ui::TransitionRule::new(argui_ui::Transition::tween(
+                    argui_animation::Tween::new(argui_animation::Duration::ZERO),
+                ))
+                .direction(argui_ui::TransitionDirection::Enter(
+                    VisualState::Hovered.into(),
+                )),
+            ),
             paint,
             label,
         }
@@ -68,6 +75,23 @@ impl ButtonStyle {
     #[must_use]
     pub fn transition(mut self, transition: StyleTransition) -> Self {
         self.transition = transition;
+        self
+    }
+
+    /// Immediate hover entry and exit for dense lists, without changing other transitions.
+    #[must_use]
+    pub fn instant_hover(mut self) -> Self {
+        for direction in [
+            argui_ui::TransitionDirection::Enter(VisualState::Hovered.into()),
+            argui_ui::TransitionDirection::Exit(VisualState::Hovered.into()),
+        ] {
+            self.transition = self.transition.rule(
+                argui_ui::TransitionRule::new(argui_ui::Transition::tween(
+                    argui_animation::Tween::new(argui_animation::Duration::ZERO),
+                ))
+                .direction(direction),
+            );
+        }
         self
     }
 }

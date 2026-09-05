@@ -11,6 +11,72 @@ use argui_widget_gallery::WidgetGallery;
 #[path = "app/interaction.rs"]
 mod interaction;
 
+#[test]
+fn sidebar_fast_hover_has_no_trail_and_keeps_the_active_page_highlighted() {
+    let gallery = Entity::new(WidgetGallery::default());
+    let mut tree = UiTree::new(gallery.render());
+    let output = argui::layout::LayoutEngine::new()
+        .compute(
+            &mut tree,
+            &mut argui::text::TextEngine::new(),
+            argui::core::Size::new(1220.0, 900.0),
+        )
+        .unwrap();
+    let entries: Vec<_> = [
+        "nav::button",
+        "nav::input",
+        "nav::textarea",
+        "nav::checkbox",
+    ]
+    .into_iter()
+    .map(|key| {
+        let index = tree
+            .node_ids()
+            .iter()
+            .position(|node| tree.key(*node) == Some(key))
+            .unwrap();
+        let node = tree.node_ids()[index];
+        let region = output
+            .hit_regions
+            .iter()
+            .find(|region| region.node == node)
+            .unwrap();
+        (
+            node,
+            index,
+            Point::new(region.bounds.origin.x + 10.0, region.bounds.origin.y + 10.0),
+            tree.resolved_quad(node, tree.element_at(index).unwrap())
+                .background,
+        )
+    })
+    .collect();
+    // Cross several buttons without advancing a frame or waiting for a tween.
+    for hovered in [1, 2, 3, 2, 1] {
+        tree.pointer_moved(entries[hovered].2, &output.hit_regions);
+        for (index, (node, element, _, resting)) in entries.iter().enumerate() {
+            let background = tree
+                .resolved_quad(*node, tree.element_at(*element).unwrap())
+                .background;
+            if index == hovered {
+                assert_ne!(&background, resting);
+            } else {
+                assert_eq!(
+                    &background, resting,
+                    "sidebar row {index} left a hover trail"
+                );
+            }
+        }
+    }
+    tree.pointer_moved(Point::new(1200.0, 890.0), &output.hit_regions);
+    for (node, index, _, resting) in entries {
+        assert_eq!(
+            tree.resolved_quad(node, tree.element_at(index).unwrap())
+                .background,
+            resting
+        );
+    }
+}
+
 fn has_key(element: &Element, key: &str) -> bool {
     element.key.as_deref() == Some(key) || element.children.iter().any(|child| has_key(child, key))
 }

@@ -278,17 +278,15 @@ impl WidgetGallery {
             }
             children.push(text(category, 11.0, theme.muted_foreground, 700));
             children.extend(pages.into_iter().map(|page| {
-                Button::new(
-                    format!("nav::{}", page.slug()),
-                    page.label(),
-                    if page == self.page {
-                        theme.button()
-                    } else {
-                        theme.ghost_button()
-                    },
-                )
-                .build()
-                .width(percent(1.0))
+                let style = if page == self.page {
+                    theme.button()
+                } else {
+                    theme.ghost_button()
+                }
+                .instant_hover();
+                Button::new(format!("nav::{}", page.slug()), page.label(), style)
+                    .build()
+                    .width(percent(1.0))
             }));
         }
         Element::column(children)
