@@ -1,11 +1,12 @@
+use crate::app::text;
 use argui::{
     core::Color,
-    paint::{EffectId, EffectInstance, EffectValue, Filter, LayerStyle},
+    paint::{Border, CornerRadii, EffectId, EffectInstance, EffectValue, Filter, LayerStyle},
     render::{EffectDefinition, EffectParameter, EffectParameterType, EffectPassDefinition},
     runtime::{Context, Render},
     ui::{
-        Axes, Element, EventType, Overflow, ScrollConfig, ScrollEffect, ScrollMetric, UiEventKind,
-        length, percent,
+        AlignItems, Axes, Element, EventType, JustifyContent, Overflow, ScrollConfig, ScrollEffect,
+        ScrollMetric, Sides, UiEventKind, length, percent,
     },
     widgets::{Button, VList, WidgetTheme, shadcn},
 };
@@ -63,18 +64,34 @@ impl ScrollDemo {
 
     fn horizontal(&self, theme: &WidgetTheme) -> Element {
         Element::row((0..16).map(|index| {
-            Button::new(
-                format!("scroll-card-{index}"),
-                format!("Card {}", index + 1),
-                theme.ghost_button(),
-            )
-            .build()
-            .width(length(110.0))
-            .height(length(60.0))
+            Element::column([
+                Element::container([])
+                    .height(length(3.0))
+                    .width(length(28.0))
+                    .background(theme.primary),
+                text(
+                    format!("Collection {:02}", index + 1),
+                    13.0,
+                    theme.foreground,
+                    600,
+                ),
+                text("12 components", 11.0, theme.muted_foreground, 400),
+            ])
+            .keyed(format!("scroll-card-{index}"))
+            .padding(Sides::length(12.0))
+            .gap(8.0)
+            .background(theme.card)
+            .border(Border::all(1.0, theme.border))
+            .radius(CornerRadii::all(8.0))
+            .width(length(150.0))
+            .height(length(88.0))
             .shrink(0.0)
         }))
         .keyed("scroll-horizontal")
-        .height(length(84.0))
+        .min_width(length(0.0))
+        .height(length(110.0))
+        .shrink(0.0)
+        .gap(10.0)
         .width(percent(1.0))
         .overflow(Axes {
             x: Overflow::Auto,
@@ -93,56 +110,96 @@ impl Render for ScrollDemo {
     fn render(&mut self, cx: &mut Context<Self>) -> Element {
         let themes = shadcn(cx.environment().primary);
         let theme = themes.resolve(cx.environment().color_scheme);
-        let controls = Element::row([
-            Button::new(
-                "scroll-mode",
-                ["Fade", "Shadow", "Custom WGSL"][self.mode],
-                theme.ghost_button(),
+        let modes = Element::row(
+            ["Fade", "Shadow", "Custom WGSL"]
+                .into_iter()
+                .enumerate()
+                .map(|(index, label)| {
+                    Button::new(
+                        format!("scroll-mode-{index}"),
+                        label,
+                        if self.mode == index {
+                            theme.button()
+                        } else {
+                            theme.ghost_button()
+                        },
+                    )
+                    .build()
+                }),
+        )
+        .gap(4.0)
+        .flex_wrap(argui::ui::FlexWrap::Wrap);
+        let settings = if self.mode == 2 {
+            text(
+                "The custom shader changes tint with scroll progress.",
+                12.0,
+                theme.muted_foreground,
+                400,
             )
-            .build(),
-            Button::new(
-                "scroll-width",
-                format!("Width: {} px", self.width),
-                theme.ghost_button(),
-            )
-            .build(),
-            Button::new(
-                "scroll-intensity",
-                format!("Intensity: {:.0}%", self.intensity * 100.0),
-                theme.ghost_button(),
-            )
-            .build(),
-        ])
-        .gap(8.0)
-        .flex_wrap(argui::ui::FlexWrap::Wrap)
-        .on(cx.listener(EventType::Click, |demo, event, cx| {
-            match event.target_key() {
-                Some("scroll-mode") => demo.mode = (demo.mode + 1) % 3,
-                Some("scroll-width") => {
-                    demo.width = if demo.width >= 60.0 {
-                        0.0
-                    } else {
-                        demo.width + 10.0
+        } else {
+            Element::row([
+                setting(
+                    "Width",
+                    &format!("{} px", self.width),
+                    "scroll-width",
+                    theme,
+                ),
+                setting(
+                    "Intensity",
+                    &format!("{:.0}%", self.intensity * 100.0),
+                    "scroll-intensity",
+                    theme,
+                ),
+            ])
+            .gap(16.0)
+            .flex_wrap(argui::ui::FlexWrap::Wrap)
+        };
+        let controls = Element::column([modes, settings])
+            .keyed("scroll-effect-controls")
+            .gap(8.0)
+            .on(cx.listener(EventType::Click, |demo, event, cx| {
+                match event.target_key() {
+                    Some("scroll-mode-0") => demo.mode = 0,
+                    Some("scroll-mode-1") => demo.mode = 1,
+                    Some("scroll-mode-2") => demo.mode = 2,
+                    Some("scroll-width-less") => demo.width = (demo.width - 10.0).max(0.0),
+                    Some("scroll-width-more") => demo.width = (demo.width + 10.0).min(60.0),
+                    Some("scroll-intensity-less") => {
+                        demo.intensity = (demo.intensity - 0.25).max(0.0)
                     }
-                }
-                Some("scroll-intensity") => {
-                    demo.intensity = if demo.intensity >= 1.0 {
-                        0.0
-                    } else {
-                        demo.intensity + 0.25
+                    Some("scroll-intensity-more") => {
+                        demo.intensity = (demo.intensity + 0.25).min(1.0)
                     }
+                    _ => return,
                 }
-                _ => return,
-            }
-            cx.notify();
-        }));
+                cx.notify();
+            }));
         let list = VList::new("scroll-demo-list", 32.0, 220.0, self.offset)
             .effect(self.effect())
             .build(10_000, theme, |index| {
+                let mut style = theme.ghost_button();
+                style.layout.justify_content = Some(JustifyContent::START);
+                style.layout.padding = argui::ui::sides(12.0, 4.0);
+                style.label.font_size = 13.0;
                 Button::new(
                     format!("scroll-row-{index}"),
-                    format!("Virtual row {:05}", index + 1),
-                    theme.ghost_button(),
+                    [
+                        "Application shell",
+                        "Navigation menu",
+                        "Search field",
+                        "Settings panel",
+                        "Activity timeline",
+                    ][index % 5],
+                    style,
+                )
+                .leading(
+                    text(
+                        format!("{:05}", index + 1),
+                        11.0,
+                        theme.muted_foreground,
+                        400,
+                    )
+                    .width(length(46.0)),
                 )
                 .build()
                 .width(percent(1.0))
@@ -159,38 +216,110 @@ impl Render for ScrollDemo {
                     }
                 }
             }));
-        let nested = Element::column([
-            crate::app::text(
-                "Horizontal scroll inside a vertical viewport",
-                13.0,
-                theme.muted_foreground,
-                400,
-            ),
-            self.horizontal(theme),
-            Element::container([])
-                .height(length(180.0))
-                .shrink(0.0)
-                .background(theme.muted),
-        ])
-        .gap(10.0)
-        .height(length(160.0))
-        .width(percent(1.0))
-        .keyed("scroll-demo-nested")
-        .overflow(Axes {
-            x: Overflow::Hidden,
-            y: Overflow::Auto,
-        })
-        .scroll_config(
-            ScrollConfig::default()
-                .scrollbar(theme.scrollbar.clone())
-                .effect(self.effect()),
-        )
-        .scrollbar_gutter(argui::ui::ScrollbarGutter::Stable);
+        let mut nested_content = vec![self.horizontal(theme)];
+        for label in [
+            "Scroll sideways to reveal more collections.",
+            "Scroll down here to test the parent viewport.",
+            "Each viewport controls its own edge effect.",
+        ] {
+            nested_content.push(
+                text(label, 12.0, theme.muted_foreground, 400)
+                    .padding(Sides::length(12.0))
+                    .min_height(length(52.0))
+                    .shrink(0.0)
+                    .background(theme.card)
+                    .radius(CornerRadii::all(6.0)),
+            );
+        }
+        let nested = Element::column(nested_content)
+            .padding(Sides::length(10.0))
+            .min_width(length(0.0))
+            .gap(10.0)
+            .height(length(190.0))
+            .shrink(0.0)
+            .width(percent(1.0))
+            .keyed("scroll-demo-nested")
+            .overflow(Axes {
+                x: Overflow::Hidden,
+                y: Overflow::Auto,
+            })
+            .scroll_config(
+                ScrollConfig::default()
+                    .scrollbar(theme.scrollbar.clone())
+                    .effect(self.effect()),
+            )
+            .scrollbar_gutter(argui::ui::ScrollbarGutter::Stable);
         super::preview(
             "Scroll-driven effects",
-            "10,000 virtual rows. Effects follow scroll geometry without rebuilding rows between virtual windows. Click the controls to compare presets and a custom shader.",
-            Element::column([controls, list, nested]).gap(14.0),
+            "Scroll each panel to reveal the effect at its edges. Compare a fade, a shadow and a custom shader.",
+            Element::column([
+                controls,
+                frame(
+                    "Virtual list",
+                    "10,000 items · only visible rows are mounted",
+                    list,
+                    theme,
+                ),
+                frame(
+                    "Nested scroll",
+                    "Horizontal collections inside a vertical viewport",
+                    nested,
+                    theme,
+                ),
+            ])
+            .keyed("scroll-effects-demo")
+            .width(percent(1.0))
+            .min_width(length(0.0))
+            .gap(18.0)
+            .shrink(0.0),
             theme,
         )
     }
+}
+
+fn setting(label: &str, value: &str, key: &str, theme: &WidgetTheme) -> Element {
+    Element::row([
+        text(label, 12.0, theme.muted_foreground, 500),
+        Button::new(format!("{key}-less"), "−", theme.ghost_button())
+            .build()
+            .width(length(30.0))
+            .padding(Sides::length(4.0)),
+        text(value, 12.0, theme.foreground, 500).width(length(52.0)),
+        Button::new(format!("{key}-more"), "+", theme.ghost_button())
+            .build()
+            .width(length(30.0))
+            .padding(Sides::length(4.0)),
+    ])
+    .align_items(AlignItems::CENTER)
+    .gap(4.0)
+}
+
+fn frame(title: &str, hint: &str, content: Element, theme: &WidgetTheme) -> Element {
+    Element::column([
+        Element::column([
+            text(title, 14.0, theme.foreground, 600),
+            text(hint, 11.0, theme.muted_foreground, 400),
+        ])
+        .gap(4.0)
+        .padding(Sides::length(14.0))
+        .shrink(0.0),
+        Element::container([])
+            .height(length(1.0))
+            .shrink(0.0)
+            .background(theme.border),
+        content
+            .width(percent(1.0))
+            .min_width(length(0.0))
+            .shrink(0.0),
+    ])
+    .width(percent(1.0))
+    .min_width(length(0.0))
+    .shrink(0.0)
+    .background(theme.background)
+    .border(Border::all(1.0, theme.border))
+    .radius(CornerRadii::all(12.0))
+    .overflow(Axes {
+        x: Overflow::Hidden,
+        y: Overflow::Hidden,
+    })
 }

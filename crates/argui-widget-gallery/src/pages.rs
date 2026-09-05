@@ -77,7 +77,11 @@ pub(crate) fn render(
         content,
     ])
     .width(percent(1.0))
-    .max_width(length(920.0))
+    .max_width(if gallery.page == Page::Effects {
+        percent(1.0)
+    } else {
+        length(920.0)
+    })
     .gap(24.0)
 }
 
