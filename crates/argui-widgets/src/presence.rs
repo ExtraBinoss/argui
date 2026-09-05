@@ -23,6 +23,11 @@ impl Default for Presence {
 }
 
 impl Presence {
+    #[must_use]
+    pub const fn is_open(&self) -> bool {
+        self.open
+    }
+
     pub fn set_open(&mut self, open: bool, reduced_motion: bool) {
         self.open = open;
         if reduced_motion {
@@ -43,6 +48,9 @@ impl Presence {
 
     /// Returns true when the mounted state changes, requiring reconciliation.
     pub fn advance(&mut self, elapsed: Duration) -> bool {
+        if !self.animating() {
+            return false;
+        }
         let visible = self.visible();
         let duration = if self.open { 0.140 } else { 0.100 };
         let delta = (elapsed.as_secs_f64() / duration) as f32;
@@ -65,6 +73,7 @@ impl Presence {
             .bind(property::LayerOpacity, self.opacity.clone())
             .bind(property::Transform, self.transform.clone());
         if !self.open {
+            disable_focus(&mut element);
             element = element.semantic_hidden(true);
             element.hit_test.pointer_events = PointerEvents::None;
             if let Some(portal) = &mut element.portal {
@@ -72,5 +81,16 @@ impl Presence {
             }
         }
         element
+    }
+}
+
+fn disable_focus(element: &mut Element) {
+    element.focus_scope = None;
+    if let Some(interaction) = &mut element.interaction {
+        interaction.enabled = false;
+        interaction.focusable = false;
+    }
+    for child in &mut element.children {
+        disable_focus(child);
     }
 }

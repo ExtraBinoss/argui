@@ -62,17 +62,13 @@ fn expressive_buttons(theme: &WidgetTheme) -> Element {
 }
 
 fn elevated_button(theme: &WidgetTheme) -> Element {
-    Button::new(
-        "button-elevated",
-        "Elevated",
-        theme.secondary_button(),
-    )
-    .build()
-    .layer(button_layer().shadow(Shadow::drop(
-        [0.0, 5.0],
-        12.0,
-        Color::srgba(0.0, 0.0, 0.0, 0.24),
-    )))
+    Button::new("button-elevated", "Elevated", theme.secondary_button())
+        .build()
+        .layer(button_layer().shadow(Shadow::drop(
+            [0.0, 5.0],
+            12.0,
+            Color::srgba(0.0, 0.0, 0.0, 0.24),
+        )))
 }
 
 fn lift_button(theme: &WidgetTheme) -> Element {

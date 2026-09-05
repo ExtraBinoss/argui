@@ -7,6 +7,16 @@ use crate::{
 };
 
 impl Element {
+    /// Clips content to the element's bounds and sets its rounded surface corners.
+    /// Geometric clipping does not require an offscreen compositing layer.
+    #[must_use]
+    pub fn clip(self, radii: argui_paint::CornerRadii) -> Self {
+        self.radius(radii).overflow(crate::Axes {
+            x: crate::Overflow::Hidden,
+            y: crate::Overflow::Hidden,
+        })
+    }
+
     /// Appends a content filter, preserving previously configured layer properties.
     #[must_use]
     pub fn filter(mut self, filter: Filter) -> Self {

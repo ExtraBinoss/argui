@@ -39,6 +39,7 @@ pub struct Select {
     highlighted: usize,
     open: bool,
     trailing: Option<Element>,
+    presence: Option<crate::Presence>,
 }
 
 impl Select {
@@ -57,6 +58,7 @@ impl Select {
             highlighted: selected.unwrap_or(0),
             open: false,
             trailing: None,
+            presence: None,
         }
     }
 
@@ -75,6 +77,13 @@ impl Select {
     #[must_use]
     pub fn trailing(mut self, trailing: Element) -> Self {
         self.trailing = Some(trailing);
+        self
+    }
+
+    #[must_use]
+    pub fn presence(mut self, presence: &crate::Presence) -> Self {
+        self.open = presence.is_open();
+        self.presence = Some(presence.clone());
         self
     }
 
@@ -109,7 +118,14 @@ impl Select {
                 .when(VisualState::FocusVisible, theme.input().focused.clone())
                 .transition(theme.input().transition.clone()),
         );
-        let overlay = self.open.then(|| self.overlay(theme));
+        let overlay = (self.open || self.presence.as_ref().is_some_and(crate::Presence::visible))
+            .then(|| {
+                let overlay = self.overlay(theme);
+                match &self.presence {
+                    Some(presence) => presence.decorate(overlay),
+                    None => overlay,
+                }
+            });
         behavior.decorate(
             SelectPart::Root,
             Element::container(std::iter::once(trigger).chain(overlay)),

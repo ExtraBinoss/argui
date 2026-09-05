@@ -143,6 +143,14 @@ impl<M: AppModel> DevtoolsApp<M> {
 
 impl<M: AppModel> AppModel for DevtoolsApp<M> {
     fn view(&self, window: &WindowKey, environment: WindowEnvironment) -> Option<Element> {
+        {
+            let mut tools = self.tools.borrow_mut();
+            tools.reduced_motion = environment.reduced_motion;
+            if tools.reduced_motion {
+                let open = tools.dock_presence.is_open();
+                tools.dock_presence.set_open(open, true);
+            }
+        }
         let themes = argui_widgets::shadcn(environment.primary);
         let theme = themes.resolve(environment.color_scheme);
         if window == &self.detached {

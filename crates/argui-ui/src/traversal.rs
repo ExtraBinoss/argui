@@ -12,18 +12,3 @@ pub(crate) fn flattened(root: &Element) -> Vec<&Element> {
     visit(root, &mut output);
     output
 }
-
-pub(crate) fn nth_element(root: &Element, target: usize) -> Option<&Element> {
-    fn visit<'a>(element: &'a Element, target: usize, cursor: &mut usize) -> Option<&'a Element> {
-        if *cursor == target {
-            return Some(element);
-        }
-        *cursor += 1;
-        element
-            .children
-            .iter()
-            .find_map(|child| visit(child, target, cursor))
-    }
-
-    visit(root, target, &mut 0)
-}

@@ -98,17 +98,7 @@ impl UiTree {
     }
 
     fn selection_context(&self, target: NodeId) -> Option<(UserSelect, TextSelectionStyle)> {
-        let mut result = None;
-        walk_context(
-            self.root(),
-            self.node_ids(),
-            &mut 0,
-            UserSelect::Text,
-            TextSelectionStyle::default(),
-            target,
-            &mut result,
-        );
-        result
+        self.index.selection(target)
     }
 
     pub(super) fn selectable_text_entries(&self) -> Vec<TextEntry<'_>> {
@@ -132,34 +122,6 @@ pub(super) struct TextEntry<'a> {
     policy: UserSelect,
     atomic_root: Option<NodeId>,
     pub(super) contain_root: Option<NodeId>,
-}
-
-fn resolve_policy(parent: UserSelect, element: &Element) -> UserSelect {
-    match element.user_select {
-        UserSelect::Auto => parent,
-        explicit => explicit,
-    }
-}
-
-fn walk_context(
-    element: &Element,
-    ids: &[NodeId],
-    index: &mut usize,
-    parent_policy: UserSelect,
-    parent_style: TextSelectionStyle,
-    target: NodeId,
-    result: &mut Option<(UserSelect, TextSelectionStyle)>,
-) {
-    let node = ids[*index];
-    *index += 1;
-    let policy = resolve_policy(parent_policy, element);
-    let style = element.selection_style.unwrap_or(parent_style);
-    if node == target {
-        *result = Some((policy, style));
-    }
-    for child in &element.children {
-        walk_context(child, ids, index, policy, style, target, result);
-    }
 }
 
 fn collect_entries<'a>(

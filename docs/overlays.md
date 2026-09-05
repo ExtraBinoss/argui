@@ -1,5 +1,26 @@
 # Overlay geometry
 
+## Retained enter and exit animations
+
+`argui_widgets::Presence` is shared by selection toolbars, Select and Popover.
+Keep it in the owning component, call `set_open(open, reduced_motion)` on state
+changes, and pass `.presence(&presence)` to the widget builder. Presence is the
+source of truth for its open state; do not combine it with a separate `.open()`.
+
+Advance it once in the owner's animation callback with `advance(frame.elapsed)`.
+A `true` result means the exit completed and requires rebuilding to unmount;
+otherwise request paint only. Return `presence.animating()` from
+`wants_animation_frame()`. The gallery's backend Select and the devtools dock
+Select implement this pattern. Reduced motion should also finish presence when
+the environment changes, not only when the menu opens.
+
+The shared timings are 140 ms in and 100 ms out, with opacity and a 4 px
+translation. Exiting overlays are retained visually but have no pointer targets,
+focus scope, enabled controls or accessibility exposure. Reopening reverses from
+the current progress. No animation frame is required once settled.
+
+## Placement
+
 Overlay placement is renderer-independent and uses logical pixels. The runtime
 passes a `LayoutSnapshot` to `Render::layout_changed` after Taffy finishes. It
 contains the canvas `viewport` and bounds addressable by stable element key:

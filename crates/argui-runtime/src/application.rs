@@ -10,8 +10,13 @@ use crate::{
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum AppEvent {
-    WindowReady { window: WindowKey },
-    WindowFailed { window: WindowKey, error: String },
+    WindowReady {
+        window: WindowKey,
+    },
+    WindowFailed {
+        window: WindowKey,
+        error: String,
+    },
     Ui {
         window: WindowKey,
         event: UiEvent,

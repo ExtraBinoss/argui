@@ -66,7 +66,8 @@ pub struct DevtoolsHost<A> {
     pub(crate) profile_panel: usize,
     pub(crate) gpu_offset: f32,
     pub(crate) profile_extents: ProfileExtents,
-    pub(crate) dock_menu: bool,
+    pub(crate) dock_presence: argui_widgets::Presence,
+    pub(crate) reduced_motion: bool,
     pub(crate) dock_highlight: usize,
     pub(crate) detach_available: bool,
     pub(crate) requested_mode: Option<crate::DockMode>,
@@ -132,7 +133,8 @@ impl<A: Render> DevtoolsHost<A> {
                 gpu: 160.0,
                 gpu_header: 70.0,
             },
-            dock_menu: false,
+            dock_presence: argui_widgets::Presence::default(),
+            reduced_motion: false,
             dock_highlight: 0,
             detach_available: false,
             requested_mode: None,
@@ -209,6 +211,8 @@ impl<A: Render> DevtoolsHost<A> {
     }
 
     fn advance_animations(&mut self, frame: Frame, app: ViewUpdate) -> ViewUpdate {
+        let dock_animating = self.dock_presence.animating();
+        let dock_unmounted = self.dock_presence.advance(frame.elapsed);
         let mut profile = false;
         if self.open && self.tab == Tab::Profiling && !self.inspector.paused() {
             self.profile_refresh += frame.elapsed;
@@ -236,9 +240,9 @@ impl<A: Render> DevtoolsHost<A> {
                 sections = true;
             }
         }
-        if sheet || sections || profile || app == ViewUpdate::Rebuild {
+        if dock_unmounted || sheet || sections || profile || app == ViewUpdate::Rebuild {
             ViewUpdate::Rebuild
-        } else if app == ViewUpdate::Paint {
+        } else if dock_animating || app == ViewUpdate::Paint {
             ViewUpdate::Paint
         } else {
             ViewUpdate::None
@@ -246,7 +250,8 @@ impl<A: Render> DevtoolsHost<A> {
     }
 
     pub fn wants_animation_frame(&self) -> bool {
-        self.sheet_motion.is_active()
+        self.dock_presence.animating()
+            || self.sheet_motion.is_active()
             || self.section_motion.iter().any(Spring::is_active)
             || (self.open
                 && self.tab == Tab::Profiling
@@ -315,6 +320,11 @@ impl<A: Render> DevtoolsHost<A> {
 impl<A: Render> Render for DevtoolsHost<A> {
     fn render(&mut self, cx: &mut Context<Self>) -> Element {
         let environment = cx.environment();
+        self.reduced_motion = environment.reduced_motion;
+        if self.reduced_motion {
+            self.dock_presence
+                .set_open(self.dock_presence.is_open(), true);
+        }
         let app = cx.entity(&self.app);
         let themes = argui_widgets::shadcn(environment.primary);
         let mut root = view::host(self, app, themes.resolve(environment.color_scheme), None);

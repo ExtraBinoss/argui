@@ -14,5 +14,24 @@ pub use argui_text as text;
 pub use argui_theme as theme;
 pub use argui_ui as ui;
 pub use argui_vector as vector;
-#[cfg(any(feature = "widgets-all", feature = "widget-button", feature = "widget-input", feature = "widget-checkbox", feature = "widget-switch", feature = "widget-radio-group", feature = "widget-tabs", feature = "widget-select", feature = "widget-popover", feature = "widget-dialog", feature = "widget-range", feature = "widget-slider", feature = "widget-spinner", feature = "widget-text-selection", feature = "widget-split-pane", feature = "widget-vlist", feature = "widget-tree-view", feature = "widget-icons"))]
+#[cfg(any(
+    feature = "widgets-all",
+    feature = "widget-button",
+    feature = "widget-input",
+    feature = "widget-checkbox",
+    feature = "widget-switch",
+    feature = "widget-radio-group",
+    feature = "widget-tabs",
+    feature = "widget-select",
+    feature = "widget-popover",
+    feature = "widget-dialog",
+    feature = "widget-range",
+    feature = "widget-slider",
+    feature = "widget-spinner",
+    feature = "widget-text-selection",
+    feature = "widget-split-pane",
+    feature = "widget-vlist",
+    feature = "widget-tree-view",
+    feature = "widget-icons"
+))]
 pub use argui_widgets as widgets;

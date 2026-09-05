@@ -311,3 +311,5 @@ fn every_visual_field_and_portal_change_has_an_exact_invalidation_class() {
         TreeUpdate::Layout
     );
 }
+#[path = "tree/index.rs"]
+mod index;

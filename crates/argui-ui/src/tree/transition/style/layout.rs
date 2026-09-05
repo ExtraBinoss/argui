@@ -109,13 +109,15 @@ pub(in crate::tree) fn apply(
     node: NodeId,
     style: &mut crate::LayoutStyle,
 ) {
-    registry.visit(TransitionTarget::Element(node), |key, value| {
-        match (key, value) {
+    registry.visit(
+        TransitionTarget::Element(node),
+        |key| key.impact() == crate::BindingImpact::Layout,
+        |key, value| match (key, value) {
             (PropertyKey::LayoutStyle, StateValue::LayoutStyle(value)) => *style = *value,
             (PropertyKey::Layout(target), StateValue::F32(value)) => {
                 set_layout_value(style, target, value);
             }
             _ => {}
-        }
-    });
+        },
+    );
 }

@@ -10,8 +10,8 @@ use argui_ui::{Axes, Dimension, Element, ElementKind, NodeId, Overflow, UiTree};
 
 use super::Application;
 
-mod values;
 mod cache;
+mod values;
 pub use cache::InspectionCache;
 
 use values::properties;

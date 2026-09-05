@@ -64,8 +64,10 @@ impl LayoutEngine {
             let node = ui
                 .node_id_at(index)
                 .ok_or(LayoutError::MissingNodeIdentity(index))?;
-            self.tree
-                .set_style(id, taffy_style(&ui.resolved_layout_style(node, element)))?;
+            let style = taffy_style(&ui.resolved_layout_style(node, element));
+            if self.tree.style(id)? != &style {
+                self.tree.set_style(id, style)?;
+            }
         }
         let elements = flattened(ui.root());
         let root = self.root.as_ref().ok_or(LayoutError::MissingRoot)?;

@@ -11,6 +11,7 @@ use std::time::Duration as StdDuration;
 use web_time::Instant;
 
 fn main() {
+    let resizing = std::env::args().any(|arg| arg == "--resize");
     for (label, open, profiling) in [
         ("Closed", false, false),
         ("Elements", true, false),
@@ -49,6 +50,28 @@ fn main() {
         let mut output = engine
             .compute(&mut tree, &mut text, Size::new(1220.0, 780.0))
             .unwrap();
+        let target = tree.node_ids()[0];
+        let resize_event = |phase, offset| {
+            UiEvent::new(
+                target,
+                Some("__devtools-splitter".into()),
+                UiEventKind::Gesture(argui_ui::GestureEvent {
+                    target,
+                    pointer: argui_core::PointerId::MOUSE,
+                    phase,
+                    delivery: argui_ui::GestureDelivery::FrameCoalesced,
+                    kind: argui_ui::GestureKind::Pan {
+                        position: argui_core::Point::default(),
+                        delta: argui_core::Point::default(),
+                        total: argui_core::Point::new(0.0, offset),
+                        velocity: argui_core::Point::default(),
+                    },
+                }),
+            )
+        };
+        if resizing && open {
+            host.update(&resize_event(argui_ui::GesturePhase::Started, 0.0));
+        }
         let mut samples = Vec::new();
         let mut model_samples = Vec::new();
         let mut layout_samples = Vec::new();
@@ -59,15 +82,24 @@ fn main() {
             }
             inspector.record_ui(record.clone());
             let start = Instant::now();
+            let resize_update = if resizing && open {
+                host.update(&resize_event(
+                    argui_ui::GesturePhase::Changed,
+                    -((index as f32 * 0.05).sin() * 0.5 + 0.5) * 400.0,
+                ))
+            } else {
+                ViewUpdate::None
+            };
             let model_update = host.animation_frame(Frame {
                 now: Time::from_nanos(index * 16_667_000),
                 elapsed: Duration::from_millis(17),
             });
-            let change = if model_update == ViewUpdate::Rebuild {
-                tree.update(host.view())
-            } else {
-                TreeUpdate::None
-            };
+            let change =
+                if model_update == ViewUpdate::Rebuild || resize_update == ViewUpdate::Rebuild {
+                    tree.update(host.view())
+                } else {
+                    TreeUpdate::None
+                };
             let animated = tree.advance_animations(Time::from_nanos(index * 16_667_000));
             let model_ms = start.elapsed().as_secs_f64() * 1000.0;
             let layout_start = Instant::now();
@@ -77,6 +109,24 @@ fn main() {
                     .unwrap();
             } else {
                 engine.repaint(&tree, &mut output);
+            }
+            let snapshot = argui_runtime::LayoutSnapshot {
+                viewport: output.viewport,
+                nodes: output
+                    .nodes
+                    .iter()
+                    .map(|node| argui_runtime::LayoutBounds {
+                        node: node.node,
+                        key: tree.key(node.node).map(str::to_owned),
+                        bounds: node.bounds,
+                    })
+                    .collect(),
+            };
+            if host.layout_changed(&snapshot) == ViewUpdate::Rebuild {
+                tree.update(host.view());
+                output = engine
+                    .compute(&mut tree, &mut text, Size::new(1220.0, 780.0))
+                    .unwrap();
             }
             let layout_ms = layout_start.elapsed().as_secs_f64() * 1000.0;
             if inspector.enabled()

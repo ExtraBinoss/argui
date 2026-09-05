@@ -113,7 +113,12 @@ impl Button {
     }
 
     #[must_use]
-    pub fn icon(key: impl Into<String>, label: impl Into<String>, icon: Element, style: ButtonStyle) -> Self {
+    pub fn icon(
+        key: impl Into<String>,
+        label: impl Into<String>,
+        icon: Element,
+        style: ButtonStyle,
+    ) -> Self {
         Self::new(key, label, style).content(icon)
     }
 
@@ -143,10 +148,13 @@ impl Button {
             .busy(loading);
         let mut children = Vec::with_capacity(3);
         children.extend(self.loading.or(self.leading));
-        children.push(behavior.decorate(
-            ButtonPart::Content,
-            self.content.unwrap_or_else(|| Element::text(self.label).text_style(self.style.label)),
-        ));
+        children.push(
+            behavior.decorate(
+                ButtonPart::Content,
+                self.content
+                    .unwrap_or_else(|| Element::text(self.label).text_style(self.style.label)),
+            ),
+        );
         children.extend(self.trailing);
         let mut element = behavior.decorate(
             ButtonPart::Root,

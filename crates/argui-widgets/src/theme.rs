@@ -1,20 +1,18 @@
 use argui_core::{Color, ColorInterpolation, ColorScheme};
-use argui_paint::{CornerRadii, QuadStyle};
 #[cfg(any(feature = "button", feature = "input"))]
 use argui_paint::{Border, PaintStyle};
+use argui_paint::{CornerRadii, QuadStyle};
 #[cfg(any(feature = "button", feature = "input"))]
 use argui_text::TextStyle;
 use argui_theme::Theme;
-use argui_ui::{
-    ScrollbarPartStyle, ScrollbarStyle, Sides,
-};
+use argui_ui::{ScrollbarPartStyle, ScrollbarStyle, Sides};
 
 #[cfg(feature = "button")]
 use crate::ButtonStyle;
-#[cfg(feature = "button")]
-use argui_ui::Dimension;
 #[cfg(feature = "input")]
 use crate::InputStyle;
+#[cfg(feature = "button")]
+use argui_ui::Dimension;
 #[cfg(feature = "input")]
 use argui_ui::{CaretHeight, CaretPrimitive, CaretStyle, CaretVisual};
 
@@ -153,43 +151,84 @@ fn mix(left: Color, right: Color, amount: f32) -> Color {
 impl WidgetTheme {
     #[cfg(any(feature = "button", feature = "input"))]
     fn text(&self) -> TextStyle {
-        TextStyle { font_size: 15.0, line_height: 20.0, color: self.foreground, ..TextStyle::default() }
+        TextStyle {
+            font_size: 15.0,
+            line_height: 20.0,
+            color: self.foreground,
+            ..TextStyle::default()
+        }
     }
     #[cfg(feature = "button")]
     #[must_use]
     pub fn button(&self) -> ButtonStyle {
-        button_style(self.primary, self.primary, self.primary_foreground, self.foreground, self.text())
+        button_style(
+            self.primary,
+            self.primary,
+            self.primary_foreground,
+            self.foreground,
+            self.text(),
+        )
     }
     #[cfg(feature = "button")]
     #[must_use]
     pub fn secondary_button(&self) -> ButtonStyle {
-        button_style(self.muted, self.border, self.foreground, self.foreground, self.text())
+        button_style(
+            self.muted,
+            self.border,
+            self.foreground,
+            self.foreground,
+            self.text(),
+        )
     }
     #[cfg(feature = "button")]
     #[must_use]
     pub fn outline_button(&self) -> ButtonStyle {
-        button_style(self.card, self.border, self.foreground, self.primary, self.text())
+        button_style(
+            self.card,
+            self.border,
+            self.foreground,
+            self.primary,
+            self.text(),
+        )
     }
     #[cfg(feature = "button")]
     #[must_use]
     pub fn ghost_button(&self) -> ButtonStyle {
-        button_style(Color::TRANSPARENT, Color::TRANSPARENT, self.foreground, self.primary, self.text())
+        button_style(
+            Color::TRANSPARENT,
+            Color::TRANSPARENT,
+            self.foreground,
+            self.primary,
+            self.text(),
+        )
     }
     #[cfg(feature = "button")]
     #[must_use]
     pub fn destructive_button(&self) -> ButtonStyle {
-        button_style(self.destructive, self.destructive, self.destructive_foreground, self.foreground, self.text())
+        button_style(
+            self.destructive,
+            self.destructive,
+            self.destructive_foreground,
+            self.foreground,
+            self.text(),
+        )
     }
     #[cfg(feature = "input")]
     #[must_use]
     pub fn input(&self) -> InputStyle {
         let mut input = InputStyle::new(PaintStyle::new(quad(self.card, self.border)), self.text());
         input.hovered = quad(self.card, mix(self.border, self.foreground, 0.28)).into();
-        input.focused = quad(self.card, self.primary).border(Border::all(1.5, self.primary)).into();
+        input.focused = quad(self.card, self.primary)
+            .border(Border::all(1.5, self.primary))
+            .into();
         input.placeholder.color = self.muted_foreground;
         input.selection = self.primary.with_alpha(0.28);
         input.caret = CaretStyle::default();
-        input.caret.visual = CaretVisual::new([CaretPrimitive::new(1.5, CaretHeight::Line, QuadStyle::solid(self.primary))]);
+        input.caret.visual = CaretVisual::new([CaretPrimitive::new(
+            1.5,
+            CaretHeight::Line,
+            QuadStyle::solid(self.primary),
+        )]);
         input
     }
 }

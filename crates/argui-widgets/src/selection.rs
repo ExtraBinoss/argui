@@ -10,14 +10,14 @@ use argui_ui::{
 use crate::WidgetTheme;
 #[cfg(feature = "radio-group")]
 use crate::{RadioGroupBehavior, RadioGroupPart};
+#[cfg(feature = "switch")]
+use crate::{TOGGLE_CHECKED, TOGGLE_SCOPE};
+#[cfg(any(feature = "checkbox", feature = "switch"))]
+use crate::{ToggleBehavior, TogglePart};
 #[cfg(feature = "radio-group")]
 use argui_ui::Orientation;
 #[cfg(any(feature = "checkbox", feature = "switch"))]
-use crate::{ToggleBehavior, TogglePart};
-#[cfg(any(feature = "checkbox", feature = "switch"))]
 use argui_ui::Role;
-#[cfg(feature = "switch")]
-use crate::{TOGGLE_CHECKED, TOGGLE_SCOPE};
 #[cfg(feature = "switch")]
 use argui_ui::{StateSelector, property};
 

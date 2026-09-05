@@ -9,7 +9,6 @@ use argui::{
 use super::{EDITOR_DEFAULT_SIZE, WidgetGallery};
 use crate::pages::ResizeListeners;
 
-
 impl WidgetGallery {
     pub(super) fn render_element(&mut self, cx: &mut Context<Self>) -> Element {
         let environment = cx.environment();
@@ -65,12 +64,26 @@ impl WidgetGallery {
             cx.notify();
         }
     }
-
-
 }
 
 impl Render for WidgetGallery {
+    fn animation_frame(&mut self, frame: argui::animation::Frame, cx: &mut Context<Self>) {
+        if self.select_presence.advance(frame.elapsed) {
+            cx.notify();
+        } else {
+            cx.request_paint();
+        }
+    }
+
+    fn wants_animation_frame(&self) -> bool {
+        self.select_presence.animating()
+    }
+
     fn render(&mut self, cx: &mut Context<Self>) -> Element {
+        if cx.environment().reduced_motion {
+            self.select_presence
+                .set_open(self.select_presence.is_open(), true);
+        }
         let mut root = self.render_element(cx);
         for event_type in EventType::ALL {
             root = root.on(cx

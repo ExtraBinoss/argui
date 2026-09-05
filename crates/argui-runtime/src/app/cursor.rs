@@ -7,20 +7,27 @@ use super::Application;
 impl Application {
     #[cfg_attr(coverage_nightly, coverage(off))]
     pub(super) fn refresh_cursor(&mut self, window: &Window) {
-        let captured = self.ui_tree.as_ref().zip(self.ui_layout.as_ref())
-            .and_then(|(tree, layout)| tree.captured_cursor(argui_core::PointerId::MOUSE, &layout.hit_regions));
-        let cursor = captured.unwrap_or_else(|| self.pointer.map_or(CursorIcon::Default, |point| {
-            let Some(layout) = &self.ui_layout else {
-                return CursorIcon::Default;
-            };
-            if scrollbar_at(point, &layout.scroll_regions, &layout.hit_regions).is_some() {
-                CursorIcon::Default
-            } else if super::text_selection::text_region_at(&layout.text_regions, point) {
-                CursorIcon::Text
-            } else {
-                cursor_at(&layout.hit_regions, point)
-            }
-        }));
+        let captured =
+            self.ui_tree
+                .as_ref()
+                .zip(self.ui_layout.as_ref())
+                .and_then(|(tree, layout)| {
+                    tree.captured_cursor(argui_core::PointerId::MOUSE, &layout.hit_regions)
+                });
+        let cursor = captured.unwrap_or_else(|| {
+            self.pointer.map_or(CursorIcon::Default, |point| {
+                let Some(layout) = &self.ui_layout else {
+                    return CursorIcon::Default;
+                };
+                if scrollbar_at(point, &layout.scroll_regions, &layout.hit_regions).is_some() {
+                    CursorIcon::Default
+                } else if super::text_selection::text_region_at(&layout.text_regions, point) {
+                    CursorIcon::Text
+                } else {
+                    cursor_at(&layout.hit_regions, point)
+                }
+            })
+        });
         if cursor != self.last_cursor {
             window.set_cursor(to_winit(cursor));
             self.last_cursor = cursor;

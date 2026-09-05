@@ -381,37 +381,48 @@ fn apply_quad_target(
     target: TransitionTarget,
     quad: &mut QuadStyle,
 ) {
-    registry.visit(target, |key, value| match (key, value) {
-        (PropertyKey::Background, StateValue::Background(value)) => quad.background = value,
-        (
-            PropertyKey::BackgroundColor,
-            StateValue::Color(value) | StateValue::BackgroundColor(value),
-        ) => quad.background = Some(Fill::Solid(value)),
-        (PropertyKey::Border, StateValue::Border(value)) => quad.border = value,
-        (PropertyKey::BorderColor, StateValue::Color(value) | StateValue::BorderColor(value)) => {
-            quad.border.get_or_insert(Border::all(0.0, value)).color = value;
+    registry.visit(target, PropertyKey::is_quad, |key, value| {
+        match (key, value) {
+            (PropertyKey::Background, StateValue::Background(value)) => quad.background = value,
+            (
+                PropertyKey::BackgroundColor,
+                StateValue::Color(value) | StateValue::BackgroundColor(value),
+            ) => quad.background = Some(Fill::Solid(value)),
+            (PropertyKey::Border, StateValue::Border(value)) => quad.border = value,
+            (
+                PropertyKey::BorderColor,
+                StateValue::Color(value) | StateValue::BorderColor(value),
+            ) => {
+                quad.border.get_or_insert(Border::all(0.0, value)).color = value;
+            }
+            (
+                PropertyKey::BorderWidths,
+                StateValue::Vec4(value) | StateValue::BorderWidths(value),
+            ) => {
+                quad.border
+                    .get_or_insert(Border::all(0.0, Color::TRANSPARENT))
+                    .widths = widths_from_array(value);
+            }
+            (
+                PropertyKey::CornerRadii,
+                StateValue::Vec4(value) | StateValue::CornerRadii(value),
+            ) => {
+                quad.radii = radii(value);
+            }
+            (PropertyKey::Opacity, StateValue::F32(value) | StateValue::Opacity(value)) => {
+                quad.opacity = value;
+            }
+            (PropertyKey::GradientPoint(target), StateValue::Point(value)) => {
+                apply_gradient_point(&mut quad.background, target, value);
+            }
+            (PropertyKey::GradientStopOffset(index), StateValue::F32(value)) => {
+                apply_gradient_stop(&mut quad.background, index, |stop| stop.offset = value);
+            }
+            (PropertyKey::GradientStopColor(index), StateValue::Color(value)) => {
+                apply_gradient_stop(&mut quad.background, index, |stop| stop.color = value);
+            }
+            _ => {}
         }
-        (PropertyKey::BorderWidths, StateValue::Vec4(value) | StateValue::BorderWidths(value)) => {
-            quad.border
-                .get_or_insert(Border::all(0.0, Color::TRANSPARENT))
-                .widths = widths_from_array(value);
-        }
-        (PropertyKey::CornerRadii, StateValue::Vec4(value) | StateValue::CornerRadii(value)) => {
-            quad.radii = radii(value);
-        }
-        (PropertyKey::Opacity, StateValue::F32(value) | StateValue::Opacity(value)) => {
-            quad.opacity = value;
-        }
-        (PropertyKey::GradientPoint(target), StateValue::Point(value)) => {
-            apply_gradient_point(&mut quad.background, target, value);
-        }
-        (PropertyKey::GradientStopOffset(index), StateValue::F32(value)) => {
-            apply_gradient_stop(&mut quad.background, index, |stop| stop.offset = value);
-        }
-        (PropertyKey::GradientStopColor(index), StateValue::Color(value)) => {
-            apply_gradient_stop(&mut quad.background, index, |stop| stop.color = value);
-        }
-        _ => {}
     });
 }
 
@@ -454,13 +465,17 @@ pub(in crate::tree) fn apply_transform(
     node: NodeId,
     transform: &mut Transform2D,
 ) {
-    registry.visit(TransitionTarget::Element(node), |key, value| {
-        if key == PropertyKey::Transform
-            && let StateValue::Transform(value) = value
-        {
-            *transform = value;
-        }
-    });
+    registry.visit(
+        TransitionTarget::Element(node),
+        |key| key == PropertyKey::Transform,
+        |key, value| {
+            if key == PropertyKey::Transform
+                && let StateValue::Transform(value) = value
+            {
+                *transform = value;
+            }
+        },
+    );
 }
 
 pub(in crate::tree) fn apply_scroll(
@@ -468,13 +483,17 @@ pub(in crate::tree) fn apply_scroll(
     node: NodeId,
     offset: &mut Point,
 ) {
-    registry.visit(TransitionTarget::Element(node), |key, value| {
-        if key == PropertyKey::Scroll
-            && let StateValue::Point(value) = value
-        {
-            *offset = value;
-        }
-    });
+    registry.visit(
+        TransitionTarget::Element(node),
+        |key| key == PropertyKey::Scroll,
+        |key, value| {
+            if key == PropertyKey::Scroll
+                && let StateValue::Point(value) = value
+            {
+                *offset = value;
+            }
+        },
+    );
 }
 
 pub(in crate::tree) fn apply_text_color(
@@ -482,13 +501,17 @@ pub(in crate::tree) fn apply_text_color(
     node: NodeId,
     color: &mut Color,
 ) {
-    registry.visit(TransitionTarget::Element(node), |key, value| {
-        if key == PropertyKey::TextColor
-            && let StateValue::Color(value) = value
-        {
-            *color = value;
-        }
-    });
+    registry.visit(
+        TransitionTarget::Element(node),
+        |key| key == PropertyKey::TextColor,
+        |key, value| {
+            if key == PropertyKey::TextColor
+                && let StateValue::Color(value) = value
+            {
+                *color = value;
+            }
+        },
+    );
 }
 
 pub(in crate::tree) fn apply_vector_color(
@@ -496,13 +519,17 @@ pub(in crate::tree) fn apply_vector_color(
     node: NodeId,
     color: &mut Color,
 ) {
-    registry.visit(TransitionTarget::Element(node), |key, value| {
-        if key == PropertyKey::VectorColor
-            && let StateValue::Color(value) = value
-        {
-            *color = value;
-        }
-    });
+    registry.visit(
+        TransitionTarget::Element(node),
+        |key| key == PropertyKey::VectorColor,
+        |key, value| {
+            if key == PropertyKey::VectorColor
+                && let StateValue::Color(value) = value
+            {
+                *color = value;
+            }
+        },
+    );
 }
 
 pub(in crate::tree) fn apply_layer(
@@ -510,8 +537,17 @@ pub(in crate::tree) fn apply_layer(
     node: NodeId,
     layer: &mut LayerStyle,
 ) {
-    registry.visit(TransitionTarget::Element(node), |key, value| {
-        match (key, value) {
+    registry.visit(
+        TransitionTarget::Element(node),
+        |key| {
+            key.impact() == crate::BindingImpact::Paint
+                && !key.is_quad()
+                && !matches!(
+                    key,
+                    PropertyKey::TextColor | PropertyKey::VectorColor | PropertyKey::Transform
+                )
+        },
+        |key, value| match (key, value) {
             (PropertyKey::LayerOpacity, StateValue::F32(value)) => layer.opacity = value,
             (
                 PropertyKey::LayerMaskRadii,
@@ -540,6 +576,6 @@ pub(in crate::tree) fn apply_layer(
                 }
             }
             (key, value) => apply_effect(layer, key, &value),
-        }
-    });
+        },
+    );
 }

@@ -12,6 +12,54 @@ fn event(key: Option<&str>, kind: UiEventKind) -> UiEvent {
 }
 
 #[test]
+fn animated_popover_keeps_exit_visuals_but_releases_focus() {
+    let palette = shadcn(Color::WHITE);
+    let theme = palette.resolve(argui_core::ColorScheme::Dark);
+    let mut presence = argui_widgets::Presence::default();
+    presence.set_open(true, true);
+    presence.set_open(false, false);
+    let build = |presence: &argui_widgets::Presence| {
+        Popover::new(
+            "animated",
+            "Animated",
+            false,
+            Element::text("Open"),
+            Element::text("Content").interaction(argui_ui::Interaction::default().focusable(true)),
+        )
+        .presence(presence)
+        .trap_focus(true)
+        .build(theme)
+    };
+    let closing = build(&presence);
+    assert_eq!(closing.children.len(), 2);
+    let content = &closing.children[1];
+    assert!(content.focus_scope.is_none());
+    assert!(content.semantic_hidden);
+    assert!(!content.children[0].interaction.as_ref().unwrap().focusable);
+    assert_eq!(
+        content.portal.as_ref().unwrap().dismiss,
+        DismissPolicy::Manual
+    );
+    presence.advance(argui_animation::Duration::from_millis(100));
+    assert_eq!(build(&presence).children.len(), 1);
+}
+
+#[test]
+fn outside_pointer_only_dismisses_the_addressed_popover() {
+    let open = PopoverBehavior::new("menu", "Menu", true);
+    assert_eq!(
+        open.action(&event(
+            Some("other::content"),
+            UiEventKind::PointerOutside(PointerEvent::mouse(
+                PointerPhase::Pressed,
+                Point::default()
+            ),)
+        )),
+        None
+    );
+}
+
+#[test]
 fn popover_behavior_toggles_and_dismisses() {
     let closed = PopoverBehavior::new("menu", "Menu", false);
     assert_eq!(

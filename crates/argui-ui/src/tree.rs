@@ -3,7 +3,7 @@ use argui_core::{ImeInput, TextPosition};
 use crate::interaction::{InteractionState, RawUpdate};
 use crate::scroll::ScrollState;
 use crate::text_input::{TextInputState, TextInputStates};
-use crate::traversal::{flattened, nth_element};
+use crate::traversal::flattened;
 use crate::update::{classify_update, strongest_update};
 use crate::{
     Element, ElementKind, GestureArena, InteractionUpdate, NodeId, TextSelectionRequest, UiEvent,
@@ -13,6 +13,7 @@ use crate::{
 mod animation;
 mod event;
 mod focus;
+mod index;
 mod pointer;
 mod resolve;
 mod responsive;
@@ -44,6 +45,7 @@ pub struct TreeUpdateStats {
 pub struct UiTree {
     root: Element,
     node_ids: Vec<NodeId>,
+    pub(crate) index: index::TreeIndex,
     next_node_id: u64,
     pub(crate) interaction: InteractionState,
     focus: FocusRegistry,
@@ -74,6 +76,7 @@ impl UiTree {
         let focus = FocusRegistry::new(&root, &node_ids);
         let events = EventRegistry::new(&root);
         let mut tree = Self {
+            index: index::TreeIndex::new(&root, &node_ids),
             root,
             node_ids,
             next_node_id,
@@ -257,7 +260,7 @@ impl UiTree {
 
     #[must_use]
     pub fn element_at(&self, index: usize) -> Option<&Element> {
-        nth_element(&self.root, index)
+        self.index.at(index)
     }
 
     #[must_use]
@@ -492,11 +495,7 @@ impl UiTree {
     }
 
     fn key_for(&self, node: NodeId) -> Option<&str> {
-        let index = self
-            .node_ids
-            .iter()
-            .position(|candidate| *candidate == node)?;
-        nth_element(&self.root, index)?.key.as_deref()
+        self.index.element(node)?.key.as_deref()
     }
 
     fn sync_text_inputs(&mut self) {
@@ -517,15 +516,12 @@ impl UiTree {
     }
 
     fn sync_animation_registry(&mut self) {
+        self.index = index::TreeIndex::new(&self.root, &self.node_ids);
         self.animations = AnimationRegistry::new(&self.root);
     }
 
     fn element_for(&self, node: NodeId) -> Option<&Element> {
-        let index = self
-            .node_ids
-            .iter()
-            .position(|candidate| *candidate == node)?;
-        nth_element(&self.root, index)
+        self.index.element(node)
     }
 
     fn focused_animated_caret(&self) -> Option<NodeId> {

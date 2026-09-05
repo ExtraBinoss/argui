@@ -5,6 +5,7 @@ use crate::{
 };
 use argui_animation::{Motion, MotionTrack, Time, Transition};
 use argui_core::{Color, Point, Transform2D};
+use std::collections::{HashMap, HashSet};
 
 mod style;
 use style::collect_specs;
@@ -13,7 +14,7 @@ pub(super) use style::{
     apply_transform, apply_vector_color,
 };
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 enum TransitionTarget {
     Element(NodeId),
     ScrollbarTrack(NodeId),
@@ -22,7 +23,7 @@ enum TransitionTarget {
 
 #[derive(Clone, Debug, Default)]
 pub(super) struct TransitionRegistry {
-    entries: Vec<NodeTransition>,
+    entries: HashMap<TransitionTarget, NodeTransition>,
 }
 
 #[derive(Clone, Debug)]
@@ -82,15 +83,11 @@ impl TransitionRegistry {
             &mut specs,
         );
         let mut update = TreeUpdate::None;
-        self.entries
-            .retain(|entry| specs.iter().any(|spec| spec.target == entry.target));
+        let targets: HashSet<_> = specs.iter().map(|spec| spec.target).collect();
+        self.entries.retain(|target, _| targets.contains(target));
         for spec in specs {
-            let Some(entry) = self
-                .entries
-                .iter_mut()
-                .find(|entry| entry.target == spec.target)
-            else {
-                self.entries.push(NodeTransition::new(spec));
+            let Some(entry) = self.entries.get_mut(&spec.target) else {
+                self.entries.insert(spec.target, NodeTransition::new(spec));
                 continue;
             };
             update = strongest(update, entry.sync(spec, input.reduced_motion));
@@ -100,7 +97,7 @@ impl TransitionRegistry {
 
     pub(super) fn advance(&mut self, now: Time) -> TreeUpdate {
         self.entries
-            .iter_mut()
+            .values_mut()
             .fold(TreeUpdate::None, |update, entry| {
                 strongest(update, entry.advance(now))
             })
@@ -108,21 +105,20 @@ impl TransitionRegistry {
 
     pub(super) fn finish(&mut self) -> TreeUpdate {
         self.entries
-            .iter_mut()
+            .values_mut()
             .fold(TreeUpdate::None, |update, entry| {
                 strongest(update, entry.finish())
             })
     }
 
     pub(super) fn wants_frame(&self) -> bool {
-        self.entries.iter().any(NodeTransition::is_active)
+        self.entries.values().any(NodeTransition::is_active)
     }
 
     pub(super) fn set_scroll(&mut self, node: NodeId, offset: Point) {
         let Some(property) = self
             .entries
-            .iter_mut()
-            .find(|entry| entry.target == TransitionTarget::Element(node))
+            .get_mut(&TransitionTarget::Element(node))
             .and_then(|entry| {
                 entry
                     .values
@@ -136,17 +132,24 @@ impl TransitionRegistry {
         property.value.set(StateValue::Point(offset));
     }
 
-    fn visit(&self, target: TransitionTarget, mut visit: impl FnMut(PropertyKey, StateValue)) {
-        if let Some(entry) = self.entries.iter().find(|entry| entry.target == target) {
+    fn visit(
+        &self,
+        target: TransitionTarget,
+        accepts: impl Fn(PropertyKey) -> bool,
+        mut visit: impl FnMut(PropertyKey, StateValue),
+    ) {
+        if let Some(entry) = self.entries.get(&target) {
             for property in &entry.values {
-                visit(property.key, property.value.value());
+                if accepts(property.key) {
+                    visit(property.key, property.value.value());
+                }
             }
         }
     }
 
     pub(super) fn layout_indices(&self, ids: &[NodeId]) -> Vec<usize> {
         self.entries
-            .iter()
+            .values()
             .filter(|entry| {
                 entry
                     .values
@@ -164,8 +167,7 @@ impl TransitionRegistry {
 
     pub(super) fn revision(&self, node: NodeId) -> u64 {
         self.entries
-            .iter()
-            .find(|entry| entry.target == TransitionTarget::Element(node))
+            .get(&TransitionTarget::Element(node))
             .map_or(0, |entry| entry.revision)
     }
 }

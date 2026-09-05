@@ -63,9 +63,7 @@ pub(crate) fn render(
         Page::Layout => layout_system(theme),
         Page::Motion => motion(theme, spinner),
         Page::Effects => effects(theme),
-        Page::Composition => {
-            composition::render(gallery, theme, assets, resize.shell)
-        }
+        Page::Composition => composition::render(gallery, theme, assets, resize.shell),
         Page::Typography => typography::render(theme),
     };
     Element::column([
@@ -252,7 +250,7 @@ fn selects(gallery: &WidgetGallery, theme: &WidgetTheme, assets: &WidgetAssets) 
             select_options(),
             gallery.select_selected,
         )
-        .open(gallery.select_open)
+        .presence(&gallery.select_presence)
         .highlighted(gallery.select_highlight)
         .trailing(assets.icon(TablerIcon::ChevronDown, 17.0))
         .build(theme),
@@ -309,7 +307,7 @@ fn form(gallery: &WidgetGallery, theme: &WidgetTheme, assets: &WidgetAssets) -> 
                 select_options(),
                 gallery.select_selected,
             )
-            .open(gallery.select_open)
+            .presence(&gallery.select_presence)
             .highlighted(gallery.select_highlight)
             .trailing(assets.icon(TablerIcon::ChevronDown, 17.0))
             .build(theme),
@@ -411,12 +409,7 @@ fn motion(theme: &WidgetTheme, spinner: Element) -> Element {
             Button::new("loading-example", "Compiling shaders", theme.button())
                 .loading(spinner)
                 .build(),
-            Button::new(
-                "motion-hover",
-                "Hover and press",
-                theme.outline_button(),
-            )
-            .build(),
+            Button::new("motion-hover", "Hover and press", theme.outline_button()).build(),
         ])
         .flex_wrap(FlexWrap::Wrap)
         .gap(12.0),

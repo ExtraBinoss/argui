@@ -2,8 +2,8 @@ use std::{cell::RefCell, collections::VecDeque, rc::Rc, time::Duration};
 
 use argui_core::{Point, Rect};
 
-mod trace;
 mod frames;
+mod trace;
 pub use frames::FrameCursor;
 
 use trace::TraceDocument;

@@ -1,3 +1,4 @@
+use argui::runtime::SingleWindowModel;
 use argui::{
     platform::{
         AppIcon, ApplicationConfig, ApplicationId, ApplicationIdentity, IconSet, TrayAction,
@@ -7,7 +8,6 @@ use argui::{
     runtime::{RuntimeEvent, WindowRuntimeEvent, run_application_with_text_engine},
 };
 use argui_devtools::DevtoolsApp;
-use argui::runtime::SingleWindowModel;
 use argui_showcase::{StateShowcase, text_engine};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

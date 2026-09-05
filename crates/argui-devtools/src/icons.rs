@@ -1,7 +1,10 @@
 use argui_paint::{VectorAsset, VectorId};
 use argui_vector::parse_svg;
 use icondata_core::IconData;
-use icondata_tb::{TbChevronRightOutline, TbCopyOutline, TbTargetOutline, TbBoxOutline, TbFileTextOutline, TbPhotoOutline, TbVectorOutline, TbPointerOutline};
+use icondata_tb::{
+    TbBoxOutline, TbChevronRightOutline, TbCopyOutline, TbFileTextOutline, TbPhotoOutline,
+    TbPointerOutline, TbTargetOutline, TbVectorOutline,
+};
 
 #[derive(Debug)]
 pub(crate) struct DevtoolsIcons {
@@ -23,7 +26,13 @@ impl DevtoolsIcons {
             tabler(target, TbTargetOutline),
         ];
         let node_icons = std::array::from_fn(|_| VectorId::fresh());
-        for (id, icon) in node_icons.into_iter().zip([TbBoxOutline, TbFileTextOutline, TbPhotoOutline, TbVectorOutline, TbPointerOutline]) {
+        for (id, icon) in node_icons.into_iter().zip([
+            TbBoxOutline,
+            TbFileTextOutline,
+            TbPhotoOutline,
+            TbVectorOutline,
+            TbPointerOutline,
+        ]) {
             assets.push(tabler(id, icon));
         }
         Self {

@@ -21,6 +21,7 @@ pub struct Popover {
     radius: f32,
     backdrop_blur: Option<f32>,
     trap_focus: bool,
+    presence: Option<crate::Presence>,
 }
 
 impl Popover {
@@ -47,6 +48,7 @@ impl Popover {
             radius: 8.0,
             backdrop_blur: None,
             trap_focus: false,
+            presence: None,
         }
     }
 
@@ -94,45 +96,57 @@ impl Popover {
     }
 
     #[must_use]
+    pub fn presence(mut self, presence: &crate::Presence) -> Self {
+        self.open = presence.is_open();
+        self.presence = Some(presence.clone());
+        self
+    }
+
+    #[must_use]
     pub fn build(self, theme: &WidgetTheme) -> Element {
         let behavior = PopoverBehavior::new(&self.key, &self.label, self.open);
         let trigger = behavior.decorate(PopoverPart::Trigger, self.trigger);
-        let content = self.open.then(|| {
-            let radius = self.radius.max(0.0);
-            let paint = self.paint.unwrap_or_else(|| {
-                PaintStyle::new(
-                    QuadStyle::solid(theme.popover)
-                        .border(Border::all(1.0, theme.border))
-                        .radius(CornerRadii::all(radius)),
-                )
+        let content = (self.open || self.presence.as_ref().is_some_and(crate::Presence::visible))
+            .then(|| {
+                let radius = self.radius.max(0.0);
+                let paint = self.paint.unwrap_or_else(|| {
+                    PaintStyle::new(
+                        QuadStyle::solid(theme.popover)
+                            .border(Border::all(1.0, theme.border))
+                            .radius(CornerRadii::all(radius)),
+                    )
+                });
+                let mut content = Element::column([self.content])
+                    .width(length(self.width.max(0.0)))
+                    .max_height(length(self.max_height.max(0.0)))
+                    .padding(Sides::length(self.padding.max(0.0)))
+                    .paint_style(paint)
+                    .overflow(Axes {
+                        x: Overflow::Hidden,
+                        y: Overflow::Auto,
+                    })
+                    .scroll_config(ScrollConfig::default().scrollbar(theme.scrollbar.clone()))
+                    .anchored_portal(WindowLayer::Popover, self.key.clone(), self.placement)
+                    .portal_dismiss(DismissPolicy::OutsidePointer);
+                let blur = self.backdrop_blur.unwrap_or(theme.overlay_blur).max(0.0);
+                if blur > 0.0 {
+                    content = content.layer(
+                        LayerStyle::new(Default::default())
+                            .backdrop(Filter::Blur(blur))
+                            .mask(LayerMask::Rounded(CornerRadii::all(radius))),
+                    );
+                }
+                content = if self.trap_focus {
+                    content.focus_scope(FocusScope::trapped(InitialFocus::First))
+                } else {
+                    content.focus_scope(FocusScope::restoring())
+                };
+                let content = behavior.decorate(PopoverPart::Content, content);
+                match &self.presence {
+                    Some(presence) => presence.decorate(content),
+                    None => content,
+                }
             });
-            let mut content = Element::column([self.content])
-                .width(length(self.width.max(0.0)))
-                .max_height(length(self.max_height.max(0.0)))
-                .padding(Sides::length(self.padding.max(0.0)))
-                .paint_style(paint)
-                .overflow(Axes {
-                    x: Overflow::Hidden,
-                    y: Overflow::Auto,
-                })
-                .scroll_config(ScrollConfig::default().scrollbar(theme.scrollbar.clone()))
-                .anchored_portal(WindowLayer::Popover, self.key.clone(), self.placement)
-                .portal_dismiss(DismissPolicy::OutsidePointer);
-            let blur = self.backdrop_blur.unwrap_or(theme.overlay_blur).max(0.0);
-            if blur > 0.0 {
-                content = content.layer(
-                    LayerStyle::new(Default::default())
-                        .backdrop(Filter::Blur(blur))
-                        .mask(LayerMask::Rounded(CornerRadii::all(radius))),
-                );
-            }
-            content = if self.trap_focus {
-                content.focus_scope(FocusScope::trapped(InitialFocus::First))
-            } else {
-                content.focus_scope(FocusScope::restoring())
-            };
-            behavior.decorate(PopoverPart::Content, content)
-        });
         behavior.decorate(
             PopoverPart::Root,
             Element::container(std::iter::once(trigger).chain(content)),

@@ -7,6 +7,7 @@ mod pages;
 mod property_slider;
 
 pub use app::WidgetGallery;
+use argui::runtime::SingleWindowModel;
 use argui::{
     platform::{
         AppIcon, ApplicationConfig, ApplicationId, ApplicationIdentity, IconSet, WindowConfig,
@@ -17,7 +18,6 @@ use argui::{
     widgets::SelectionHost,
 };
 use argui_devtools::DevtoolsApp;
-use argui::runtime::SingleWindowModel;
 
 const NOTO_SANS: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
 const APP_ICON: &[u8] = include_bytes!("../../argui/examples/assets/astra-icon-256.png");
@@ -41,7 +41,9 @@ pub fn launch() -> Result<(), Box<dyn std::error::Error>> {
         ),
         RendererConfig::default().effects(argui_effects::registry()?),
         text,
-        DevtoolsApp::new(SingleWindowModel::new(SelectionHost::new(WidgetGallery::default()))),
+        DevtoolsApp::new(SingleWindowModel::new(SelectionHost::new(
+            WidgetGallery::default(),
+        ))),
         |_| {},
     )?;
     Ok(())

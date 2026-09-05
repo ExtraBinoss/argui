@@ -88,15 +88,19 @@ impl<A: Render> DevtoolsHost<A> {
             options,
             Some(self.dock_mode as usize),
         )
-        .open(self.dock_menu)
+        .open(self.dock_presence.is_open())
         .highlighted(self.dock_highlight);
         if let Some(action) = behavior.action(event) {
             match action {
-                argui_widgets::SelectAction::Toggle => self.dock_menu = !self.dock_menu,
-                argui_widgets::SelectAction::Close => self.dock_menu = false,
+                argui_widgets::SelectAction::Toggle => self
+                    .dock_presence
+                    .set_open(!self.dock_presence.is_open(), self.reduced_motion),
+                argui_widgets::SelectAction::Close => {
+                    self.dock_presence.set_open(false, self.reduced_motion)
+                }
                 argui_widgets::SelectAction::Highlight(index) => self.dock_highlight = index,
                 argui_widgets::SelectAction::Select(index) => {
-                    self.dock_menu = false;
+                    self.dock_presence.set_open(false, self.reduced_motion);
                     let mode = [
                         crate::DockMode::Bottom,
                         crate::DockMode::Right,

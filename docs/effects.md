@@ -25,6 +25,21 @@ An effect used by the display list but absent from that registry is an explicit
 rendering error. There is no process-global registration and no implicit preset
 loading.
 
+## Composable element operations
+
+`Element::filter` appends a content filter; `backdrop_filter` appends an
+independent background filter. Both preserve the same layer's other settings.
+`mask` replaces its alpha mask and `opacity` sets clamped group opacity, not
+per-primitive alpha. `transform` remains the geometric transform builder.
+`clip(radii)` clips to rounded element bounds and sets the surface corner radii;
+unlike an alpha mask, this geometric clip does not introduce an offscreen layer.
+Calling `layer` explicitly replaces the complete layer configuration.
+
+The pipeline remains layout → display list → layer analysis → necessary
+offscreen passes → wgpu composition → surface. These builders do not register
+effects or bundle optional shader presets. Gradient masks and additional effect
+families are not implied by the current `LayerMask` variants.
+
 ## Defining an effect
 
 Definitions use namespaced stable identifiers, a named typed parameter schema

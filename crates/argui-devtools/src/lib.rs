@@ -1,9 +1,9 @@
+mod app;
 mod host;
 mod icons;
+mod presentation;
 mod style;
 mod view;
-mod presentation;
-mod app;
 pub use app::DevtoolsApp;
 pub use presentation::DockMode;
 

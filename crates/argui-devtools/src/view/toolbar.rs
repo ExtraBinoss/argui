@@ -36,7 +36,7 @@ pub(super) fn toolbar<A>(tools: &DevtoolsHost<A>, theme: &WidgetTheme) -> Elemen
         crate::presentation::dock_options(tools.detach_available),
         Some(tools.dock_mode as usize),
     )
-    .open(tools.dock_menu)
+    .presence(&tools.dock_presence)
     .highlighted(tools.dock_highlight)
     .trailing(
         icon_element(tools.icons.chevron, 14.0)

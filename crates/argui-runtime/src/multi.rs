@@ -389,8 +389,13 @@ fn scoped_callback(
 ) -> impl FnMut(RuntimeEvent) {
     move |event| {
         let lifecycle = match &event {
-            RuntimeEvent::RendererReady => Some(AppEvent::WindowReady { window: key.clone() }),
-            RuntimeEvent::RendererFailed(error) => Some(AppEvent::WindowFailed { window: key.clone(), error: error.clone() }),
+            RuntimeEvent::RendererReady => Some(AppEvent::WindowReady {
+                window: key.clone(),
+            }),
+            RuntimeEvent::RendererFailed(error) => Some(AppEvent::WindowFailed {
+                window: key.clone(),
+                error: error.clone(),
+            }),
             _ => None,
         };
         if let Some(event) = lifecycle {

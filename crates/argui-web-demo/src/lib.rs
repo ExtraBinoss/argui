@@ -1,12 +1,12 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
+use argui::runtime::SingleWindowModel;
 use argui::{
     platform::{ApplicationConfig, ApplicationId, ApplicationIdentity, IconSet, WindowConfig},
     render::RendererConfig,
     runtime::run_application_with_text_engine,
 };
 use argui_devtools::DevtoolsApp;
-use argui::runtime::SingleWindowModel;
 use argui_showcase::{StateShowcase, text_engine};
 use wasm_bindgen::prelude::*;
 

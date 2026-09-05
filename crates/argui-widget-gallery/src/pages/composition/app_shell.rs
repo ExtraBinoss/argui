@@ -1,11 +1,12 @@
 use argui::{
-    paint::{Border, BorderWidths, CornerRadii, ImageId, ImageFit},
-    runtime::{Context, Render},
     core::ColorScheme,
+    paint::{Border, BorderWidths, CornerRadii, ImageFit, ImageId},
+    runtime::{Context, Render},
     ui::{
-        AlignItems, Axes, Element, EventListener, EventType, JustifyContent, Overflow, Sides, Role, Semantics, length, percent, sides,
+        AlignItems, Axes, Element, EventListener, EventType, JustifyContent, Overflow, Role,
+        Semantics, Sides, length, percent, sides,
     },
-    widgets::{Button, SplitPane, SplitAxis, TablerIcon, WidgetAssets, WidgetTheme, shadcn},
+    widgets::{Button, SplitAxis, SplitPane, TablerIcon, WidgetAssets, WidgetTheme, shadcn},
 };
 
 use crate::app::text;
@@ -74,7 +75,10 @@ fn render(
 
     Element::row([
         sidebar,
-        split.separator(theme).on(resize_listener).on(reset_listener),
+        split
+            .separator(theme)
+            .on(resize_listener)
+            .on(reset_listener),
         content(theme),
     ])
     .keyed("resizable-app-shell")
@@ -90,7 +94,8 @@ fn render(
 }
 
 fn brand(compact: bool, logo: ImageId, theme: &WidgetTheme) -> Element {
-    let mark = Element::image(logo).image_fit(ImageFit::Contain)
+    let mark = Element::image(logo)
+        .image_fit(ImageFit::Contain)
         .semantics(Semantics::new(Role::Image).label("Argui logo"))
         .width(length(34.0))
         .height(length(34.0))
@@ -128,7 +133,9 @@ fn navigation_item(
     if !compact {
         children.push(text(label, 13.0, theme.foreground, 550));
     }
-    Button::new(key, label, theme.ghost_button()).content(Element::row(children).gap(9.0)).build()
+    Button::new(key, label, theme.ghost_button())
+        .content(Element::row(children).gap(9.0))
+        .build()
         .width(percent(1.0))
         .height(length(38.0))
         .padding(if compact {
@@ -213,7 +220,18 @@ pub(crate) struct AppShell {
 
 impl AppShell {
     pub(crate) fn new(logo: ImageId, light: WidgetAssets, dark: WidgetAssets) -> Self {
-        Self { split: SplitPane::new("shell-sidebar-resize", SplitAxis::Horizontal, 224.0, MIN_WIDTH, MAX_WIDTH), logo, light, dark }
+        Self {
+            split: SplitPane::new(
+                "shell-sidebar-resize",
+                SplitAxis::Horizontal,
+                224.0,
+                MIN_WIDTH,
+                MAX_WIDTH,
+            ),
+            logo,
+            light,
+            dark,
+        }
     }
 }
 
@@ -222,16 +240,27 @@ impl Render for AppShell {
         let environment = cx.environment();
         let themes = shadcn(environment.primary);
         let theme = themes.resolve(environment.color_scheme);
-        let assets = if environment.color_scheme == ColorScheme::Dark { &self.dark } else { &self.light };
+        let assets = if environment.color_scheme == ColorScheme::Dark {
+            &self.dark
+        } else {
+            &self.light
+        };
         let listener = cx.listener(EventType::Gesture, |shell, event, cx| {
-            if shell.split.update(event) { cx.notify(); }
+            if shell.split.update(event) {
+                cx.notify();
+            }
         });
         let reset = cx.listener(EventType::Click, |shell, event, cx| {
-            if shell.split.update(event) { cx.notify(); }
+            if shell.split.update(event) {
+                cx.notify();
+            }
         });
-        render(&self.split, self.logo, theme, assets, listener, reset)
-            .on(cx.listener(EventType::Key, |shell, event, cx| {
-                if shell.split.update(event) { cx.notify(); }
-            }).capture(true))
+        render(&self.split, self.logo, theme, assets, listener, reset).on(cx
+            .listener(EventType::Key, |shell, event, cx| {
+                if shell.split.update(event) {
+                    cx.notify();
+                }
+            })
+            .capture(true))
     }
 }

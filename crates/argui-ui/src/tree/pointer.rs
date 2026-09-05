@@ -145,10 +145,17 @@ impl UiTree {
     }
 
     /// A captured drag retains its cursor even when the pointer leaves its hit region.
-    pub fn captured_cursor(&self, pointer: PointerId, regions: &[HitRegion]) -> Option<crate::CursorIcon> {
+    pub fn captured_cursor(
+        &self,
+        pointer: PointerId,
+        regions: &[HitRegion],
+    ) -> Option<crate::CursorIcon> {
         let node = self.interaction.captured_node(pointer)?;
-        regions.iter().find(|region| region.node == node && region.enabled)
-            .map(|region| region.cursor).filter(|cursor| *cursor != crate::CursorIcon::Auto)
+        regions
+            .iter()
+            .find(|region| region.node == node && region.enabled)
+            .map(|region| region.cursor)
+            .filter(|cursor| *cursor != crate::CursorIcon::Auto)
     }
 
     pub fn release_pointer_capture(

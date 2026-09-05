@@ -62,7 +62,10 @@ impl AppModel for SpotlightShowcase {
                 self.capabilities = Some(*capabilities);
                 rebuild(window)
             }
-            AppEvent::Window { .. } | AppEvent::WindowReady { .. } | AppEvent::WindowFailed { .. } | AppEvent::Tray(_) => AppUpdate::none(),
+            AppEvent::Window { .. }
+            | AppEvent::WindowReady { .. }
+            | AppEvent::WindowFailed { .. }
+            | AppEvent::Tray(_) => AppUpdate::none(),
         }
     }
 

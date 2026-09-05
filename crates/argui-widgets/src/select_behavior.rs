@@ -153,7 +153,10 @@ impl SelectBehavior {
 
     #[must_use]
     pub fn action(&self, event: &UiEvent) -> Option<SelectAction> {
-        if self.open && matches!(event.kind, UiEventKind::PointerOutside(_)) {
+        if self.open
+            && matches!(event.kind, UiEventKind::PointerOutside(_))
+            && event.target_key() == Some(self.list_key().as_str())
+        {
             return Some(SelectAction::Close);
         }
         let event_key = event.target_key()?;

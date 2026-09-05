@@ -16,6 +16,8 @@ mod input;
 mod popover;
 #[cfg(feature = "popover")]
 mod popover_behavior;
+#[cfg(any(feature = "text-selection", feature = "popover", feature = "select"))]
+mod presence;
 #[cfg(feature = "radio-group")]
 mod radio_group_behavior;
 #[cfg(feature = "range")]
@@ -39,8 +41,6 @@ mod text_field_behavior;
 #[cfg(feature = "text-selection")]
 mod text_selection;
 mod theme;
-#[cfg(any(feature = "text-selection", feature = "popover", feature = "select"))]
-mod presence;
 #[cfg(any(feature = "text-selection", feature = "popover", feature = "select"))]
 pub use presence::Presence;
 #[cfg(feature = "split-pane")]

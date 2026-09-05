@@ -51,7 +51,7 @@ pub struct WidgetGallery {
     pub(crate) slider_editing: bool,
     pub(crate) slider_edit_value: String,
     pub(crate) tab: usize,
-    pub(crate) select_open: bool,
+    pub(crate) select_presence: argui::widgets::Presence,
     pub(crate) select_highlight: usize,
     pub(crate) select_selected: Option<usize>,
     pub(crate) dialog_open: bool,
@@ -102,7 +102,7 @@ impl Default for WidgetGallery {
             slider_editing: false,
             slider_edit_value: "64".into(),
             tab: 0,
-            select_open: false,
+            select_presence: argui::widgets::Presence::default(),
             select_highlight: 0,
             select_selected: Some(0),
             dialog_open: false,
@@ -110,7 +110,11 @@ impl Default for WidgetGallery {
             composition_hits: 0,
             editor_size: EDITOR_DEFAULT_SIZE,
             editor_resize_start: EDITOR_DEFAULT_SIZE,
-            shell: Entity::new(pages::AppShell::new(logo, light_assets.clone(), dark_assets.clone())),
+            shell: Entity::new(pages::AppShell::new(
+                logo,
+                light_assets.clone(),
+                dark_assets.clone(),
+            )),
             slider_state: RangeState::default(),
             plain_slider_state: RangeState::default(),
             images,
@@ -509,12 +513,17 @@ impl WidgetGallery {
         let options = Self::select_options();
         let select =
             SelectBehavior::new("backend", "Choose a backend", options, self.select_selected)
-                .open(self.select_open)
+                .open(self.select_presence.is_open())
                 .highlighted(self.select_highlight);
         if let Some(action) = select.action(event) {
             match action {
-                SelectAction::Toggle => self.select_open = !self.select_open,
-                SelectAction::Close => self.select_open = false,
+                SelectAction::Toggle => self.select_presence.set_open(
+                    !self.select_presence.is_open(),
+                    cx.environment().reduced_motion,
+                ),
+                SelectAction::Close => self
+                    .select_presence
+                    .set_open(false, cx.environment().reduced_motion),
                 SelectAction::Highlight(index) => {
                     self.select_highlight = index;
                     cx.request_focus(select.option_key(index));
@@ -523,7 +532,8 @@ impl WidgetGallery {
                 SelectAction::Select(index) => {
                     self.select_selected = Some(index);
                     self.select_highlight = index;
-                    self.select_open = false;
+                    self.select_presence
+                        .set_open(false, cx.environment().reduced_motion);
                 }
             }
             cx.notify();
