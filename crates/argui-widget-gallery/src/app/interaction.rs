@@ -37,6 +37,7 @@ impl WidgetGallery {
         });
         let shell = cx.entity(&self.shell);
         let scroll_demo = cx.entity(&self.scroll_demo);
+        let webview = cx.entity(&self.webview);
         self.view(
             environment,
             theme,
@@ -47,6 +48,7 @@ impl WidgetGallery {
                 textarea_reset: resize_reset_listener,
                 shell,
                 scroll_demo,
+                webview,
             },
         )
     }

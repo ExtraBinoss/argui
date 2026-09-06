@@ -1,10 +1,40 @@
 use web_time::Instant;
-use winit::event_loop::ActiveEventLoop;
 
 use argui_inspect::Invalidation;
 use argui_ui::{FocusRequest, InteractionUpdate, TextSelectionRequest, TreeUpdate};
 
 use crate::{RuntimeEvent, ScrollRequest, app::Application};
+
+impl Application {
+    pub(crate) fn redraw(&mut self, event_loop: &dyn crate::host::LoopControl) {
+        let Some(window) = self.window.clone() else {
+            return;
+        };
+        self.begin_frame_profile();
+        self.advance_touch_selection(&window, event_loop);
+        self.advance_pointer_inertia(&window, event_loop);
+        self.flush_pointer_scroll(&window, event_loop);
+        self.advance_scroll_physics(&window, event_loop);
+        self.flush_scrollbar_drag(&window, event_loop);
+        self.flush_gesture_frame(&window, event_loop);
+        self.advance_programmatic_scroll(&window, event_loop);
+        self.animate(&window, event_loop);
+        self.flush_window_frame();
+        self.flush_ui_frame(event_loop);
+        #[cfg(all(
+            feature = "webview",
+            any(
+                target_arch = "wasm32",
+                target_os = "linux",
+                target_os = "windows",
+                target_os = "macos"
+            )
+        ))]
+        self.sync_native_views();
+        self.refresh_cursor(&window);
+        self.render(event_loop);
+    }
+}
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub(super) struct PendingWindowFrame {
@@ -154,7 +184,10 @@ impl Application {
     }
 
     #[cfg_attr(coverage_nightly, coverage(off))]
-    pub(super) fn flush_ui_frame(&mut self, event_loop: &ActiveEventLoop) -> TreeUpdate {
+    pub(super) fn flush_ui_frame(
+        &mut self,
+        event_loop: &dyn crate::host::LoopControl,
+    ) -> TreeUpdate {
         let pending = std::mem::take(&mut self.pending_ui_frame);
         let tree_started = Instant::now();
         let tree_update = if pending.rebuild {

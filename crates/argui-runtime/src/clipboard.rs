@@ -1,7 +1,6 @@
 #[cfg(target_arch = "wasm32")]
 use argui_platform::Clipboard;
 use argui_ui::ClipboardRequest;
-use winit::{event_loop::ActiveEventLoop, window::Window};
 
 use crate::app::Application;
 #[cfg(target_arch = "wasm32")]
@@ -13,8 +12,8 @@ impl Application {
     pub(super) fn clipboard_request(
         &mut self,
         request: ClipboardRequest,
-        window: &Window,
-        event_loop: &ActiveEventLoop,
+        window: &dyn crate::host::WindowHost,
+        event_loop: &dyn crate::host::LoopControl,
     ) {
         match request {
             ClipboardRequest::Read { target } => {
@@ -35,8 +34,8 @@ impl Application {
     pub(super) fn clipboard_request(
         &mut self,
         request: ClipboardRequest,
-        _window: &Window,
-        _event_loop: &ActiveEventLoop,
+        _window: &dyn crate::host::WindowHost,
+        _event_loop: &dyn crate::host::LoopControl,
     ) {
         match request {
             ClipboardRequest::Read { target } => {

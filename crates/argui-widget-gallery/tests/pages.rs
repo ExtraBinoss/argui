@@ -4,6 +4,8 @@ mod buttons;
 mod inputs;
 #[path = "pages/scroll_effects.rs"]
 mod scroll_effects;
+#[path = "pages/webview.rs"]
+mod webview;
 
 use argui::{
     core::{ColorScheme, Size},

@@ -28,6 +28,7 @@ argui-theme = { path = "crates/argui-theme" }
 argui-ui = { path = "crates/argui-ui" }
 argui-vector = { path = "crates/argui-vector" }
 argui-widgets = { path = "crates/argui-widgets" }
+argui-webview = { path = "crates/argui-webview" }
 
 bytemuck = { version = "=1.25.2", features = ["derive"] }
 arboard = { version = "=3.6.1", default-features = false, features = ["wayland-data-control"] }

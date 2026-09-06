@@ -8,6 +8,7 @@ mod clipboard;
 mod environment;
 mod error;
 mod event;
+mod host;
 mod input;
 mod launch;
 mod model;

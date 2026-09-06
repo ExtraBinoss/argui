@@ -52,14 +52,42 @@ pub fn launch() -> Result<(), Box<dyn std::error::Error>> {
         DevtoolsApp::new(SingleWindowModel::new(SelectionHost::new(
             WidgetGallery::default(),
         ))),
-        |_| {},
+        |event| {
+            use argui::runtime::{RuntimeEvent, WindowRuntimeEvent};
+            let error = match event {
+                RuntimeEvent::RendererFailed(message)
+                | RuntimeEvent::LayoutFailed(message)
+                | RuntimeEvent::CommandFailed(message) => Some(message),
+                RuntimeEvent::Window {
+                    event:
+                        WindowRuntimeEvent::RendererFailed(message)
+                        | WindowRuntimeEvent::LayoutFailed(message),
+                    ..
+                } => Some(message),
+                _ => None,
+            };
+            if let Some(error) = error {
+                #[cfg(target_arch = "wasm32")]
+                browser_error(&error);
+                #[cfg(not(target_arch = "wasm32"))]
+                eprintln!("{error}");
+            }
+        },
     )?;
     Ok(())
+}
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen::prelude::wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_namespace = console, js_name = error)]
+    fn browser_error(message: &str);
 }
 
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen::prelude::wasm_bindgen(start)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 pub fn start() -> Result<(), wasm_bindgen::JsValue> {
+    std::panic::set_hook(Box::new(|info| browser_error(&info.to_string())));
     launch().map_err(|error| wasm_bindgen::JsValue::from_str(&error.to_string()))
 }

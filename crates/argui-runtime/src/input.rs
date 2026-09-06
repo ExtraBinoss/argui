@@ -1,10 +1,6 @@
 use argui_platform::{ImeInput, Key, KeyInput, KeyState};
 use argui_ui::SelectionCommand;
-use winit::{
-    dpi::{LogicalPosition, LogicalSize},
-    event_loop::ActiveEventLoop,
-    window::Window,
-};
+use winit::dpi::{LogicalPosition, LogicalSize};
 
 use crate::app::Application;
 
@@ -27,8 +23,8 @@ impl Application {
     pub(super) fn keyboard_input(
         &mut self,
         input: &KeyInput,
-        window: &Window,
-        event_loop: &ActiveEventLoop,
+        window: &dyn crate::host::WindowHost,
+        event_loop: &dyn crate::host::LoopControl,
     ) {
         let Some(ui) = &mut self.ui_tree else {
             return;
@@ -107,8 +103,8 @@ impl Application {
     pub(super) fn ime_input(
         &mut self,
         input: ImeInput,
-        window: &Window,
-        event_loop: &ActiveEventLoop,
+        window: &dyn crate::host::WindowHost,
+        event_loop: &dyn crate::host::LoopControl,
     ) {
         let Some(ui) = &mut self.ui_tree else {
             return;
@@ -117,7 +113,7 @@ impl Application {
         self.apply_ui_update(update, window, event_loop);
     }
 
-    pub(super) fn update_ime(&self, window: &Window) {
+    pub(super) fn update_ime(&self, window: &dyn crate::host::WindowHost) {
         let enabled = self
             .ui_tree
             .as_ref()

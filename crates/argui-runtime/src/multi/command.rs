@@ -1,12 +1,15 @@
 use argui_platform::{WindowCapabilities, WindowKey, WindowLevel};
-use winit::{event_loop::ActiveEventLoop, window::Window};
 
 use super::MultiApplication;
 use crate::{AppCommand, RuntimeEvent};
 
 impl MultiApplication {
     #[cfg_attr(coverage_nightly, coverage(off))]
-    pub(super) fn apply_command(&mut self, event_loop: &ActiveEventLoop, command: AppCommand) {
+    pub(super) fn apply_command(
+        &mut self,
+        event_loop: &dyn crate::host::WindowFactory,
+        command: AppCommand,
+    ) {
         match command {
             AppCommand::OpenWindow(spec) => self.open_window(event_loop, spec),
             AppCommand::CloseWindow(key) => self.close_window(&key),
@@ -109,7 +112,7 @@ impl MultiApplication {
         key: &WindowKey,
         name: &str,
         supported: impl FnOnce(WindowCapabilities) -> bool,
-        apply: impl FnOnce(&Window) -> Result<(), String>,
+        apply: impl FnOnce(&dyn crate::host::WindowHost) -> Result<(), String>,
     ) {
         let Some(window) = self
             .windows
@@ -122,7 +125,7 @@ impl MultiApplication {
             )));
             return;
         };
-        if supported(argui_platform::window_capabilities(window)) {
+        if supported(window.capabilities()) {
             if let Err(error) = apply(window) {
                 self.emit(RuntimeEvent::CommandFailed(format!(
                     "{name} failed for window '{}': {error}",

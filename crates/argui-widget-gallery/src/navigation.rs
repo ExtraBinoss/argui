@@ -18,10 +18,11 @@ pub enum Page {
     Effects,
     Composition,
     Typography,
+    WebView,
 }
 
 impl Page {
-    pub const ALL: [Self; 17] = [
+    pub const ALL: [Self; 18] = [
         Self::Button,
         Self::Input,
         Self::TextArea,
@@ -39,6 +40,7 @@ impl Page {
         Self::Effects,
         Self::Composition,
         Self::Typography,
+        Self::WebView,
     ];
 
     pub const fn category(self) -> &'static str {
@@ -59,7 +61,8 @@ impl Page {
             | Self::Motion
             | Self::Effects
             | Self::Composition
-            | Self::Typography => "Examples",
+            | Self::Typography
+            | Self::WebView => "Examples",
         }
     }
 
@@ -82,6 +85,7 @@ impl Page {
             Self::Effects => "GPU effects / WGSL",
             Self::Composition => "Advanced composition",
             Self::Typography => "Typography & selection",
+            Self::WebView => "WebView",
         }
     }
 
@@ -104,6 +108,7 @@ impl Page {
             Self::Effects => "effects",
             Self::Composition => "composition",
             Self::Typography => "typography",
+            Self::WebView => "webview",
         }
     }
 

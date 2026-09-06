@@ -6,6 +6,8 @@ mod caret;
 mod cursor;
 mod effect;
 mod element;
+mod native_content;
+pub use native_content::NativeContent;
 mod event;
 mod focus;
 mod gesture;

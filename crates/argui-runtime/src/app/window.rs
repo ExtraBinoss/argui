@@ -2,7 +2,6 @@ use std::time::Duration;
 
 use argui_core::Point;
 use argui_ui::{NodeId, WindowDragBehavior};
-use winit::window::Window;
 
 use crate::{RuntimeEvent, app::Application};
 
@@ -60,7 +59,7 @@ impl WindowDragState {
 
 impl Application {
     #[cfg_attr(coverage_nightly, coverage(off))]
-    pub(super) fn handle_window_drag(&mut self, window: &Window) -> bool {
+    pub(super) fn handle_window_drag(&mut self, window: &dyn crate::host::WindowHost) -> bool {
         let Some(point) = self.pointer else {
             return false;
         };
@@ -74,7 +73,7 @@ impl Application {
         }) else {
             return false;
         };
-        let capabilities = argui_platform::window_capabilities(window);
+        let capabilities = window.capabilities();
         match self
             .window_drag
             .press(behavior, node, point, self.input_epoch.elapsed())

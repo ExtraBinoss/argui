@@ -148,10 +148,13 @@ fn launch(mut application: Application) -> Result<(), RuntimeError> {
     event_loop
         .run_app(&mut application)
         .map_err(PlatformError::from)?;
-    application.fatal_error.map_or(Ok(()), Err)
+    application.fatal_error.take().map_or(Ok(()), Err)
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(all(
+    not(target_arch = "wasm32"),
+    not(all(feature = "webview", target_os = "linux"))
+))]
 fn launch_multi(mut application: MultiApplication) -> Result<(), RuntimeError> {
     let event_loop = EventLoop::<UserEvent>::with_user_event()
         .build()
@@ -161,7 +164,12 @@ fn launch_multi(mut application: MultiApplication) -> Result<(), RuntimeError> {
     event_loop
         .run_app(&mut application)
         .map_err(PlatformError::from)?;
-    application.fatal_error.map_or(Ok(()), Err)
+    application.fatal_error.take().map_or(Ok(()), Err)
+}
+
+#[cfg(all(feature = "webview", target_os = "linux"))]
+fn launch_multi(application: MultiApplication) -> Result<(), RuntimeError> {
+    crate::multi::gtk::launch(application)
 }
 
 #[cfg(target_arch = "wasm32")]

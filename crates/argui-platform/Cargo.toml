@@ -8,6 +8,7 @@ license.workspace = true
 [features]
 default = []
 tray = ["dep:ksni", "dep:tray-icon"]
+gtk-host = ["dep:gtk", "dep:tao", "dep:wayland-client", "dep:wayland-backend", "dep:raw-window-handle"]
 
 [dependencies]
 argui-core.workspace = true
@@ -22,6 +23,11 @@ ashpd.workspace = true
 futures-util.workspace = true
 ksni = { workspace = true, optional = true }
 pollster.workspace = true
+gtk = { version = "=0.18.2", optional = true }
+tao = { version = "=0.37.0", features = ["rwh_06"], optional = true }
+wayland-client = { version = "=0.31.15", optional = true }
+wayland-backend = { version = "=0.3.17", features = ["client_system"], optional = true }
+raw-window-handle = { version = "=0.6.2", optional = true }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows = { workspace = true, features = ["UI_ViewManagement"] }

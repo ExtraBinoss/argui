@@ -27,6 +27,7 @@ widget-vlist = ["argui-widgets/vlist"]
 widget-tree-view = ["argui-widgets/tree-view"]
 widget-icons = ["argui-widgets/icons"]
 devtools = ["dep:argui-devtools"]
+webview = ["dep:argui-webview", "argui-runtime/webview"]
 
 [dependencies]
 argui-accessibility.workspace = true
@@ -43,6 +44,7 @@ argui-theme.workspace = true
 argui-ui.workspace = true
 argui-vector.workspace = true
 argui-widgets = { workspace = true, optional = true }
+argui-webview = { workspace = true, optional = true }
 
 [dev-dependencies]
 argui-devtools.workspace = true

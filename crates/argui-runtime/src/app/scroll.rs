@@ -1,7 +1,7 @@
 use argui_core::{Point, ScrollDelta};
 use argui_ui::{InertialScroll, NodeId, ScrollBehavior, ScrollPhysics, ScrollRequest};
 use web_time::Instant;
-use winit::{event::TouchPhase, event_loop::ActiveEventLoop, window::Window};
+use winit::event::TouchPhase;
 
 use crate::{RuntimeError, RuntimeEvent, app::Application};
 
@@ -170,8 +170,8 @@ impl Application {
         &mut self,
         delta: ScrollDelta,
         phase: TouchPhase,
-        window: &Window,
-        event_loop: &ActiveEventLoop,
+        window: &dyn crate::host::WindowHost,
+        event_loop: &dyn crate::host::LoopControl,
     ) {
         self.programmatic_scroll = None;
         let Some(point) = self.pointer else {
@@ -229,8 +229,8 @@ impl Application {
     #[cfg_attr(coverage_nightly, coverage(off))]
     pub(super) fn advance_pointer_inertia(
         &mut self,
-        window: &Window,
-        event_loop: &ActiveEventLoop,
+        window: &dyn crate::host::WindowHost,
+        event_loop: &dyn crate::host::LoopControl,
     ) {
         let target = self.scroll_inertia.target;
         if let Some((delta, point, dispatch_wheel)) = self.scroll_inertia.advance(Instant::now()) {
@@ -269,7 +269,7 @@ impl Application {
         point: Point,
         delta: Option<Point>,
         phase: argui_core::PointerPhase,
-        window: &Window,
+        window: &dyn crate::host::WindowHost,
     ) {
         let phase = match phase {
             argui_core::PointerPhase::Pressed => TouchPhase::Started,
@@ -308,7 +308,11 @@ impl Application {
     }
 
     #[cfg_attr(coverage_nightly, coverage(off))]
-    pub(super) fn advance_scroll_physics(&mut self, window: &Window, event_loop: &ActiveEventLoop) {
+    pub(super) fn advance_scroll_physics(
+        &mut self,
+        window: &dyn crate::host::WindowHost,
+        event_loop: &dyn crate::host::LoopControl,
+    ) {
         let now = Instant::now();
         let elapsed = self
             .last_scroll_physics
@@ -326,7 +330,11 @@ impl Application {
     }
 
     #[cfg_attr(coverage_nightly, coverage(off))]
-    pub(super) fn flush_pointer_scroll(&mut self, window: &Window, event_loop: &ActiveEventLoop) {
+    pub(super) fn flush_pointer_scroll(
+        &mut self,
+        window: &dyn crate::host::WindowHost,
+        event_loop: &dyn crate::host::LoopControl,
+    ) {
         let Some(pending) = self.pending_pointer_scroll.take() else {
             return;
         };
@@ -369,7 +377,7 @@ impl Application {
     }
 
     #[cfg_attr(coverage_nightly, coverage(off))]
-    pub(super) fn scroll_or_exit(&mut self, event_loop: &ActiveEventLoop) -> bool {
+    pub(super) fn scroll_or_exit(&mut self, event_loop: &dyn crate::host::LoopControl) -> bool {
         let result = match (&self.ui_tree, &mut self.ui_layout) {
             (Some(ui), Some(layout)) => self.layout_engine.apply_scroll(ui, layout),
             _ => return false,
@@ -394,7 +402,7 @@ impl Application {
     pub(super) fn apply_scroll_request(
         &mut self,
         request: ScrollRequest,
-        event_loop: &ActiveEventLoop,
+        event_loop: &dyn crate::host::LoopControl,
     ) -> bool {
         self.scroll_inertia.cancel();
         let (Some(ui), Some(layout)) = (&self.ui_tree, &self.ui_layout) else {
@@ -444,8 +452,8 @@ impl Application {
     #[cfg_attr(coverage_nightly, coverage(off))]
     pub(super) fn advance_programmatic_scroll(
         &mut self,
-        window: &Window,
-        event_loop: &ActiveEventLoop,
+        window: &dyn crate::host::WindowHost,
+        event_loop: &dyn crate::host::LoopControl,
     ) {
         let Some(animation) = &self.programmatic_scroll else {
             return;

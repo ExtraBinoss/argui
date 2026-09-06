@@ -14,6 +14,8 @@ pub use argui_text as text;
 pub use argui_theme as theme;
 pub use argui_ui as ui;
 pub use argui_vector as vector;
+#[cfg(feature = "webview")]
+pub use argui_webview as webview;
 #[cfg(any(
     feature = "widgets-all",
     feature = "widget-button",

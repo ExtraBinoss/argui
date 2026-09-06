@@ -6,6 +6,7 @@ pub struct ElementNode {
     pub inspectable: bool,
     pub key: Option<String>,
     pub kind: ElementKind,
+    pub native_content: Option<crate::NativeContent>,
     pub style: crate::LayoutStyle,
     pub paint: argui_paint::PaintStyle,
     pub transform: argui_core::Transform2D,

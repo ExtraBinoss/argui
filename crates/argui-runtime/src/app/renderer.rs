@@ -15,7 +15,7 @@ use super::RendererState;
 
 #[cfg_attr(coverage_nightly, coverage(off))]
 impl Application {
-    fn surface_renderer_config(&self) -> argui_render::RendererConfig {
+    pub(super) fn surface_renderer_config(&self) -> argui_render::RendererConfig {
         self.renderer_config
             .clone()
             .surface_alpha(if self.window_config.transparent {
@@ -53,6 +53,16 @@ impl Application {
                 ))
             },
         );
+        self.install_renderer(renderer, window, event_loop);
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(super) fn install_renderer(
+        &mut self,
+        renderer: Result<SurfaceRenderer, argui_render::RendererError>,
+        window: &dyn crate::host::WindowHost,
+        event_loop: &dyn crate::host::LoopControl,
+    ) {
         match renderer {
             Ok(mut renderer) => {
                 if self.renderer_device.borrow().is_none() {
@@ -131,8 +141,8 @@ impl Application {
         });
     }
 
-    pub(super) fn render(&mut self, event_loop: &ActiveEventLoop) {
-        let Some(window) = self.window.as_ref().map(Arc::clone) else {
+    pub(super) fn render(&mut self, event_loop: &dyn crate::host::LoopControl) {
+        let Some(window) = self.window.clone() else {
             return;
         };
         let mut state = self.renderer.borrow_mut();
@@ -224,8 +234,8 @@ impl Application {
                 window.request_redraw();
                 Ok(())
             }
-            Ok(RenderStatus::RecreateSurface) => renderer
-                .recreate_surface(Arc::clone(&window))
+            Ok(RenderStatus::RecreateSurface) => window
+                .recreate_surface(renderer)
                 .inspect(|()| window.request_redraw()),
             Err(error) => Err(error),
         };

@@ -1,13 +1,16 @@
 use argui_core::{Point, PointerEvent, PointerPhase};
 use argui_platform::{ButtonState, ScrollDelta};
 use argui_ui::{InteractionUpdate, UiTree};
-use winit::{event_loop::ActiveEventLoop, window::Window};
 
 use super::{Application, local_point};
 
 #[cfg_attr(coverage_nightly, coverage(off))]
 impl Application {
-    pub(super) fn flush_gesture_frame(&mut self, window: &Window, event_loop: &ActiveEventLoop) {
+    pub(super) fn flush_gesture_frame(
+        &mut self,
+        window: &dyn crate::host::WindowHost,
+        event_loop: &dyn crate::host::LoopControl,
+    ) {
         let update = self
             .ui_tree
             .as_mut()
@@ -17,7 +20,11 @@ impl Application {
         }
     }
 
-    pub(super) fn flush_scrollbar_drag(&mut self, window: &Window, event_loop: &ActiveEventLoop) {
+    pub(super) fn flush_scrollbar_drag(
+        &mut self,
+        window: &dyn crate::host::WindowHost,
+        event_loop: &dyn crate::host::LoopControl,
+    ) {
         let Some(point) = self.pending_scrollbar_drag.take() else {
             return;
         };
@@ -29,7 +36,11 @@ impl Application {
         }
     }
 
-    pub(super) fn pointer_left(&mut self, window: &Window, event_loop: &ActiveEventLoop) {
+    pub(super) fn pointer_left(
+        &mut self,
+        window: &dyn crate::host::WindowHost,
+        event_loop: &dyn crate::host::LoopControl,
+    ) {
         self.scroll_inertia.cancel();
         self.flush_pointer_scroll(window, event_loop);
         self.flush_scrollbar_drag(window, event_loop);
@@ -54,8 +65,8 @@ impl Application {
     pub(super) fn primary_button(
         &mut self,
         state: ButtonState,
-        window: &Window,
-        event_loop: &ActiveEventLoop,
+        window: &dyn crate::host::WindowHost,
+        event_loop: &dyn crate::host::LoopControl,
     ) {
         self.scroll_inertia.cancel();
         self.flush_pointer_scroll(window, event_loop);
@@ -196,8 +207,8 @@ impl Application {
     pub(super) fn secondary_button(
         &mut self,
         state: ButtonState,
-        window: &Window,
-        event_loop: &ActiveEventLoop,
+        window: &dyn crate::host::WindowHost,
+        event_loop: &dyn crate::host::LoopControl,
     ) {
         if state != ButtonState::Pressed {
             return;
@@ -260,8 +271,8 @@ impl Application {
     pub(super) fn pointer_moved(
         &mut self,
         point: Point,
-        window: &Window,
-        event_loop: &ActiveEventLoop,
+        window: &dyn crate::host::WindowHost,
+        event_loop: &dyn crate::host::LoopControl,
     ) {
         self.pointer = Some(point);
         self.refresh_cursor(window);
@@ -315,8 +326,8 @@ impl Application {
     pub(super) fn touch_pointer(
         &mut self,
         mut event: PointerEvent,
-        window: &Window,
-        event_loop: &ActiveEventLoop,
+        window: &dyn crate::host::WindowHost,
+        event_loop: &dyn crate::host::LoopControl,
     ) -> PointerEvent {
         if event.phase == PointerPhase::Pressed && self.primary_touch.is_none() {
             self.primary_touch = Some(event.id);

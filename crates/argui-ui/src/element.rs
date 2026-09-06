@@ -49,6 +49,7 @@ impl Element {
     pub fn container(children: impl IntoIterator<Item = Self>) -> Self {
         Self(Rc::new(ElementNode {
             inspectable: true,
+            native_content: None,
             key: None,
             kind: ElementKind::Container,
             style: LayoutStyle::default(),
@@ -108,6 +109,7 @@ impl Element {
     pub fn text(value: impl Into<TextContent>) -> Self {
         Self(Rc::new(ElementNode {
             inspectable: true,
+            native_content: None,
             key: None,
             kind: ElementKind::Text {
                 content: value.into(),

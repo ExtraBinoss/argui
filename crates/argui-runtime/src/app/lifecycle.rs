@@ -50,6 +50,10 @@ impl ApplicationHandler<UserEvent> for Application {
         match event_loop.create_window(attributes) {
             Ok(window) => {
                 let window = Arc::new(window);
+                #[cfg(all(feature = "webview", target_arch = "wasm32"))]
+                self.initialize_browser_webviews(&window);
+                #[cfg(all(feature = "webview", any(target_os = "windows", target_os = "macos")))]
+                self.initialize_winit_webviews(window.clone());
                 let size = window.inner_size();
                 self.scale_factor = window.scale_factor() as f32;
                 self.initialize_preference_snapshot(window.theme());
@@ -68,7 +72,7 @@ impl ApplicationHandler<UserEvent> for Application {
                 }));
                 self.initialize_renderer(&window, event_loop);
                 window.set_visible(self.initial_visible);
-                self.window = Some(window);
+                self.window = Some(std::rc::Rc::new(window));
                 self.initialize_preferences();
                 #[cfg(target_arch = "wasm32")]
                 if self.exit_on_close
@@ -106,8 +110,10 @@ impl ApplicationHandler<UserEvent> for Application {
         {
             match event {
                 UserEvent::Preferences { .. } => {}
+                #[cfg(all(feature = "webview", target_os = "linux"))]
+                UserEvent::NativeInput { .. } => {}
                 UserEvent::AccessKit(event) => {
-                    let Some(window) = self.window.as_ref().map(Arc::clone) else {
+                    let Some(window) = self.window.clone() else {
                         return;
                     };
                     self.accessibility_event(event, &window, event_loop);
@@ -118,7 +124,7 @@ impl ApplicationHandler<UserEvent> for Application {
         }
         #[cfg(target_arch = "wasm32")]
         {
-            let Some(window) = self.window.as_ref().map(Arc::clone) else {
+            let Some(window) = self.window.clone() else {
                 return;
             };
             match event {
@@ -154,15 +160,17 @@ impl ApplicationHandler<UserEvent> for Application {
         window_id: WindowId,
         event: WindowEvent,
     ) {
-        let Some(window) = self.window.as_ref().map(Arc::clone) else {
+        let Some(window) = self.window.clone() else {
             return;
         };
-        if window.id() != window_id {
+        if self.window_id() != Some(crate::host::HostId::Winit(window_id)) {
             return;
         }
         #[cfg(not(target_arch = "wasm32"))]
-        if let Some(adapter) = &mut self.accessibility {
-            adapter.process_event(&window, &event);
+        if let Some(adapter) = &mut self.accessibility
+            && let Some(native) = window.winit()
+        {
+            adapter.process_event(native, &event);
         }
         let platform_event = match event {
             WindowEvent::CloseRequested => PlatformEvent::CloseRequested,
@@ -304,19 +312,7 @@ impl ApplicationHandler<UserEvent> for Application {
                 })
             }
             WindowEvent::RedrawRequested => {
-                self.begin_frame_profile();
-                self.advance_touch_selection(&window, event_loop);
-                self.advance_pointer_inertia(&window, event_loop);
-                self.flush_pointer_scroll(&window, event_loop);
-                self.advance_scroll_physics(&window, event_loop);
-                self.flush_scrollbar_drag(&window, event_loop);
-                self.flush_gesture_frame(&window, event_loop);
-                self.advance_programmatic_scroll(&window, event_loop);
-                self.animate(&window, event_loop);
-                self.flush_window_frame();
-                self.flush_ui_frame(event_loop);
-                self.refresh_cursor(&window);
-                self.render(event_loop);
+                self.redraw(event_loop);
                 PlatformEvent::RedrawRequested
             }
             _ => return,

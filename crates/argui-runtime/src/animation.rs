@@ -2,7 +2,6 @@ use crate::{AnyEntity, ViewUpdate, app::Application};
 use argui_animation::{AnimationId, Clock, Frame, Scheduler, Time};
 use argui_ui::{InteractionUpdate, TreeUpdate};
 use web_time::Instant;
-use winit::{event_loop::ActiveEventLoop, window::Window};
 
 pub(super) struct RuntimeAnimations {
     clock: MonotonicClock,
@@ -56,7 +55,11 @@ impl Application {
     }
 
     #[cfg_attr(coverage_nightly, coverage(off))]
-    pub(super) fn animate(&mut self, window: &Window, _event_loop: &ActiveEventLoop) {
+    pub(super) fn animate(
+        &mut self,
+        window: &dyn crate::host::WindowHost,
+        _event_loop: &dyn crate::host::LoopControl,
+    ) {
         let Some(frame) = self.animations.frame() else {
             return;
         };

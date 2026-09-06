@@ -5,6 +5,8 @@ mod application;
 mod clipboard;
 mod error;
 mod event;
+#[cfg(all(feature = "gtk-host", target_os = "linux"))]
+pub mod gtk_host;
 mod identity;
 #[cfg(all(feature = "tray", not(target_arch = "wasm32")))]
 mod native_tray;

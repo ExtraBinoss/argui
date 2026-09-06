@@ -1,7 +1,6 @@
 use argui_platform::{PlatformEvent, TrayEvent, WindowKey};
 use argui_render::RenderProfile;
 use argui_ui::{TreeUpdate, UiEvent};
-use winit::event_loop::EventLoopProxy;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct AnimationProfile {
@@ -65,6 +64,8 @@ impl RuntimeEvent {
 
 #[derive(Debug)]
 pub(crate) enum UserEvent {
+    #[cfg(all(feature = "webview", target_os = "linux"))]
+    NativeInput { window: WindowKey },
     Preferences {
         window: WindowKey,
         preferences: argui_platform::SystemPreferences,
@@ -87,8 +88,8 @@ pub(crate) enum UserEvent {
 }
 
 impl Application {
-    pub(crate) fn set_event_proxy(&mut self, proxy: EventLoopProxy<UserEvent>) {
-        self.event_proxy = Some(proxy);
+    pub(crate) fn set_event_proxy(&mut self, proxy: impl Into<crate::host::EventProxy>) {
+        self.event_proxy = Some(proxy.into());
     }
 }
 

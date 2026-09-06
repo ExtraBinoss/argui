@@ -1,0 +1,30 @@
+[package]
+name = "argui-webview"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+argui-core.workspace = true
+argui-ui.workspace = true
+argui-layout.workspace = true
+url = "=2.5.8"
+ammonia = "=4.1.2"
+
+[target.'cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))'.dependencies]
+wry = { version = "=0.56.1", default-features = false, features = ["os-webview", "x11"] }
+raw-window-handle = "=0.6.2"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+gtk = "=0.18.2"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen.workspace = true
+web-sys = { workspace = true, features = ["HtmlCanvasElement"] }
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+argui-text.workspace = true

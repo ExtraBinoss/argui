@@ -1,12 +1,12 @@
 use argui_core::Point;
 use argui_ui::{CursorIcon, HitRegion, scrollbar_at};
-use winit::{window::CursorIcon as WinitCursorIcon, window::Window};
+use winit::window::CursorIcon as WinitCursorIcon;
 
 use super::Application;
 
 impl Application {
     #[cfg_attr(coverage_nightly, coverage(off))]
-    pub(super) fn refresh_cursor(&mut self, window: &Window) {
+    pub(super) fn refresh_cursor(&mut self, window: &dyn crate::host::WindowHost) {
         let captured =
             self.ui_tree
                 .as_ref()

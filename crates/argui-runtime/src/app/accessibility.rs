@@ -4,6 +4,7 @@ use argui_accessibility::{
 use argui_core::{Point, Rect, Size};
 use argui_layout::LayoutOutput;
 use argui_ui::{FocusRequest, InteractionUpdate, UiEventKind};
+#[cfg(not(target_arch = "wasm32"))]
 use winit::{event_loop::ActiveEventLoop, window::Window};
 
 #[cfg(target_arch = "wasm32")]
@@ -38,8 +39,8 @@ impl Application {
     fn apply_accessibility_action(
         &mut self,
         request: SemanticRequest,
-        window: &Window,
-        event_loop: &ActiveEventLoop,
+        window: &dyn crate::host::WindowHost,
+        event_loop: &dyn crate::host::LoopControl,
     ) {
         let Some(update) = self
             .ui_tree
@@ -144,7 +145,7 @@ impl Application {
         event_loop: &ActiveEventLoop,
         window: &Window,
     ) {
-        let Some(proxy) = self.event_proxy.clone() else {
+        let Some(crate::host::EventProxy::Winit(proxy)) = self.event_proxy.clone() else {
             return;
         };
         let snapshot = Arc::new(Mutex::new(self.current_semantic_tree()));
@@ -181,10 +182,10 @@ impl Application {
     pub(super) fn accessibility_event(
         &mut self,
         event: accesskit_winit::Event,
-        window: &Window,
-        event_loop: &ActiveEventLoop,
+        window: &dyn crate::host::WindowHost,
+        event_loop: &dyn crate::host::LoopControl,
     ) {
-        if event.window_id != window.id() {
+        if Some(crate::host::HostId::Winit(event.window_id)) != self.window_id() {
             return;
         }
         if let accesskit_winit::WindowEvent::ActionRequested(request) = event.window_event
@@ -203,6 +204,7 @@ impl Application {
         let window = self
             .window
             .as_deref()
+            .and_then(crate::host::WindowHost::winit)
             .ok_or_else(|| "window is not initialized".to_owned())?;
         let canvas = window
             .canvas()
@@ -241,8 +243,8 @@ impl Application {
     pub(super) fn web_accessibility_action(
         &mut self,
         request: SemanticRequest,
-        window: &Window,
-        event_loop: &ActiveEventLoop,
+        window: &dyn crate::host::WindowHost,
+        event_loop: &dyn crate::host::LoopControl,
     ) {
         self.apply_accessibility_action(request, window, event_loop);
     }

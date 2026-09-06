@@ -1,7 +1,7 @@
 # Argui — Another Rust GUI
 
 An experimental, native-first Rust UI core built around `winit`, `wgpu`,
-`cosmic-text`, and `taffy`. No WebView and no TypeScript frontend. Web support
+`cosmic-text`, and `taffy`. No mandatory WebView or TypeScript frontend. Web support
 means compiling the same renderer to WebAssembly/WebGPU.
 
 The repository provides a retained UI tree, responsive layout, shaped text and
@@ -40,3 +40,61 @@ measurement, so native-window and browser resizing share the same reflow path.
 The state showcase embeds a transparent PNG and a JPEG. `argui-image` is an
 optional decoding boundary; the renderer receives validated RGBA assets and
 does not depend on a file format or filesystem.
+
+## Optional WebView
+
+`argui-webview` provides retained sessions, a bounded native-view cache and a
+Wry backend on desktop and a sandboxed iframe backend on the web. Enable the
+`webview` feature on `argui` for its re-export.
+The runtime mounts native content from the retained layout. WebView-enabled
+Linux applications use the GTK/Tao Wayland host; ordinary applications retain
+Winit. See [the integration status and security model](docs/webview.md).
+
+`./scripts/serve-widget-gallery.sh` enables WebView support automatically.
+Open **Examples → WebView → Email** at `/widgets/` to render sanitized email
+HTML in the browser. Webpage mode can embed only sites that permit iframes.
+The script also starts the separate-origin relay for the Webpage **isolated /
+compatible** toggle. Its origin allowlist and typed popup/download permissions
+are documented in [WebView configuration](docs/webview.md#explicit-webpage-permissions).
+
+Its Wry backend needs GTK 3 and WebKitGTK 4.1 development packages on Linux.
+These WebView-specific
+packages are not required by the current Winit/WGPU renderer, including its
+Wayland backend, or by the WebAssembly gallery.
+
+Fedora:
+
+```sh
+sudo dnf install pkgconf-pkg-config gtk3-devel webkit2gtk4.1-devel libsoup3-devel javascriptcoregtk4.1-devel
+```
+
+Ubuntu / Debian:
+
+```sh
+sudo apt install pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev
+```
+
+The package manager installs the required transitive development dependencies.
+Check that Cargo's native build dependencies can discover them:
+
+```sh
+pkg-config --modversion gtk+-3.0 webkit2gtk-4.1 javascriptcoregtk-4.1 libsoup-3.0
+```
+
+No shell restart or `source` command is needed after a standard system-package
+installation. Runtime libraries alone are insufficient: the development
+packages provide the metadata used by `pkg-config`. Installing WebKitGTK 6.0
+for GTK 4 does not replace WebKitGTK 4.1 for this integration.
+
+With Wry, embedding under native Wayland requires a GTK container; a Winit
+window handle alone only supports the Linux X11 embedding path. Installing
+these packages prepares the build environment but does not itself add that
+host to Argui. See [Wry's platform requirements](https://docs.rs/wry/latest/wry/).
+
+Open **Examples → WebView** in the native gallery for the **Email** and
+**Webpage** tabs. The latter loads Google; the former reuses a restricted HTML
+session when switching messages. The default cache retains two native views:
+
+```sh
+GDK_BACKEND=wayland cargo run -p argui-widget-gallery --features webview
+```

@@ -6,6 +6,10 @@ rust-version.workspace = true
 license.workspace = true
 publish = false
 
+[features]
+default = []
+webview = ["argui/webview"]
+
 [lib]
 crate-type = ["cdylib", "rlib"]
 

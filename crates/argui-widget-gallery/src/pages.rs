@@ -28,12 +28,14 @@ pub(crate) use composition::AppShell;
 mod inputs;
 pub(crate) mod scroll_effects;
 mod typography;
+pub(crate) mod webview;
 
 pub(crate) struct ResizeListeners {
     pub(crate) textarea: EventListener,
     pub(crate) textarea_reset: EventListener,
     pub(crate) shell: Element,
     pub(crate) scroll_demo: Element,
+    pub(crate) webview: Element,
 }
 
 pub(crate) fn render(
@@ -67,6 +69,7 @@ pub(crate) fn render(
         Page::Effects => Element::column([resize.scroll_demo, effects(theme)]).gap(24.0),
         Page::Composition => composition::render(gallery, theme, assets, resize.shell),
         Page::Typography => typography::render(theme),
+        Page::WebView => resize.webview,
     };
     Element::column([
         Element::column([
@@ -549,5 +552,6 @@ const fn description(page: Page) -> &'static str {
         Page::Effects => "Custom WGSL through the generic effect registry.",
         Page::Composition => "Compound state, responsive layout and exact hit geometry.",
         Page::Typography => "Rich spans, decoration, clamping and web-like text selection.",
+        Page::WebView => "Retained web content, with separate email and webpage security policies.",
     }
 }

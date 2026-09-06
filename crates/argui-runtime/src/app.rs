@@ -10,19 +10,27 @@ use argui_platform::{ApplicationIdentity, Modifiers, WindowConfig};
 use argui_render::{RendererConfig, RendererDevice, SurfaceRenderer};
 use argui_text::{PreparedText, TextEngine, TextScene};
 use argui_ui::{InteractionUpdate, UiTree};
-use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Arc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use web_time::Instant;
-use winit::{
-    event_loop::ActiveEventLoop,
-    window::{Window, WindowId},
-};
 
 mod accessibility;
 mod cursor;
 mod frame;
+#[cfg(all(feature = "webview", target_os = "linux"))]
+mod gtk;
 mod inspect;
 pub use inspect::{Inspection, InspectionCache};
 mod lifecycle;
+#[cfg(all(
+    feature = "webview",
+    any(
+        target_arch = "wasm32",
+        target_os = "linux",
+        target_os = "windows",
+        target_os = "macos"
+    )
+))]
+mod native_views;
 mod pointer;
 mod preferences;
 mod renderer;
@@ -49,7 +57,19 @@ pub(crate) struct Application {
     theme_request: crate::ThemeRequest,
     environment: crate::WindowEnvironment,
     pub(super) renderer_config: RendererConfig,
-    window: Option<Arc<Window>>,
+    window: Option<Rc<dyn crate::host::WindowHost>>,
+    #[cfg(all(
+        feature = "webview",
+        any(
+            target_arch = "wasm32",
+            target_os = "linux",
+            target_os = "windows",
+            target_os = "macos"
+        )
+    ))]
+    native_views: Option<argui_webview::WebViewPool<native_views::Backend>>,
+    #[cfg(all(feature = "webview", target_os = "linux"))]
+    native_corner_radius: Option<f32>,
     #[cfg(not(target_arch = "wasm32"))]
     accessibility: Option<accesskit_winit::Adapter>,
     #[cfg(not(target_arch = "wasm32"))]
@@ -85,7 +105,7 @@ pub(crate) struct Application {
     pointer_settings: argui_core::PointerSettings,
     #[cfg(not(target_arch = "wasm32"))]
     pub(super) clipboard: argui_platform::Clipboard,
-    pub(super) event_proxy: Option<winit::event_loop::EventLoopProxy<crate::event::UserEvent>>,
+    pub(super) event_proxy: Option<crate::host::EventProxy>,
     pending_scrollbar_drag: Option<Point>,
     pending_pointer_scroll: Option<scroll::PendingScroll>,
     scroll_inertia: scroll::ScrollInertia,
@@ -145,6 +165,18 @@ impl Application {
             environment: crate::WindowEnvironment::default(),
             renderer_config,
             window: None,
+            #[cfg(all(
+                feature = "webview",
+                any(
+                    target_arch = "wasm32",
+                    target_os = "linux",
+                    target_os = "windows",
+                    target_os = "macos"
+                )
+            ))]
+            native_views: None,
+            #[cfg(all(feature = "webview", target_os = "linux"))]
+            native_corner_radius: None,
             #[cfg(not(target_arch = "wasm32"))]
             accessibility: None,
             #[cfg(not(target_arch = "wasm32"))]
@@ -221,11 +253,11 @@ impl Application {
         self
     }
 
-    pub(crate) fn window_id(&self) -> Option<WindowId> {
-        self.window.as_deref().map(Window::id)
+    pub(crate) fn window_id(&self) -> Option<crate::host::HostId> {
+        self.window().map(crate::host::WindowHost::id)
     }
 
-    pub(crate) fn window(&self) -> Option<&Window> {
+    pub(crate) fn window(&self) -> Option<&dyn crate::host::WindowHost> {
         self.window.as_deref()
     }
 
@@ -335,7 +367,7 @@ impl Application {
         );
     }
 
-    pub(super) fn prepare_or_exit(&mut self, event_loop: &ActiveEventLoop) -> bool {
+    pub(super) fn prepare_or_exit(&mut self, event_loop: &dyn crate::host::LoopControl) -> bool {
         if let Err(error) = self.prepare_text() {
             (self.on_event)(RuntimeEvent::LayoutFailed(error.to_string()));
             self.fatal_error = Some(error);
@@ -348,8 +380,8 @@ impl Application {
     pub(super) fn apply_ui_update(
         &mut self,
         mut update: InteractionUpdate,
-        window: &Window,
-        event_loop: &ActiveEventLoop,
+        window: &dyn crate::host::WindowHost,
+        event_loop: &dyn crate::host::LoopControl,
     ) {
         for event in &mut update.events {
             if let argui_ui::UiEventKind::DocumentSelectionChanged { bounds, .. } = &mut event.kind
@@ -456,7 +488,12 @@ impl Application {
         self.paint_inspection_highlight();
     }
 
-    fn window_focus(&mut self, focused: bool, window: &Window, event_loop: &ActiveEventLoop) {
+    fn window_focus(
+        &mut self,
+        focused: bool,
+        window: &dyn crate::host::WindowHost,
+        event_loop: &dyn crate::host::LoopControl,
+    ) {
         if !focused {
             self.scroll_inertia.cancel();
             self.flush_pointer_scroll(window, event_loop);

@@ -2,7 +2,6 @@ use argui_core::{Point, PointerEvent, PointerId, PointerKind, PointerPhase};
 use argui_layout::{LayoutOutput, TextRegion};
 use argui_ui::{DocumentTextPoint, SelectionGranularity};
 use web_time::Instant;
-use winit::{event_loop::ActiveEventLoop, window::Window};
 
 use super::Application;
 
@@ -95,7 +94,12 @@ impl Application {
             .map(|region| region.closest_position(point))
     }
 
-    pub(super) fn begin_touch_selection(&mut self, id: PointerId, point: Point, window: &Window) {
+    pub(super) fn begin_touch_selection(
+        &mut self,
+        id: PointerId,
+        point: Point,
+        window: &dyn crate::host::WindowHost,
+    ) {
         self.touch_selection = touch_candidate(self.ui_layout.as_ref(), id, point);
         if self.touch_selection.is_some() {
             window.request_redraw();
@@ -118,8 +122,8 @@ impl Application {
     #[cfg_attr(coverage_nightly, coverage(off))]
     pub(super) fn advance_touch_selection(
         &mut self,
-        window: &Window,
-        event_loop: &ActiveEventLoop,
+        window: &dyn crate::host::WindowHost,
+        event_loop: &dyn crate::host::LoopControl,
     ) {
         let Some(candidate) = self.touch_selection else {
             return;

@@ -9,9 +9,7 @@ use argui_render::RendererConfig;
 use argui_text::TextEngine;
 use argui_ui::Element;
 use winit::{
-    application::ApplicationHandler,
-    event::WindowEvent,
-    event_loop::{ActiveEventLoop, EventLoopProxy},
+    application::ApplicationHandler, event::WindowEvent, event_loop::ActiveEventLoop,
     window::WindowId,
 };
 
@@ -23,6 +21,8 @@ use crate::{
 };
 
 mod command;
+#[cfg(all(feature = "webview", target_os = "linux"))]
+pub(crate) mod gtk;
 
 type SharedModel = Rc<RefCell<Box<dyn AppModel>>>;
 type SharedUpdates = Rc<RefCell<Vec<AppUpdate>>>;
@@ -42,8 +42,8 @@ pub(crate) struct MultiApplication {
     pending: SharedUpdates,
     callback: SharedCallback,
     windows: HashMap<WindowKey, WindowEntry>,
-    by_winit: HashMap<WindowId, WindowKey>,
-    event_proxy: Option<EventLoopProxy<UserEvent>>,
+    by_native: HashMap<crate::host::HostId, WindowKey>,
+    event_proxy: Option<crate::host::EventProxy>,
     #[cfg(all(feature = "tray", not(target_arch = "wasm32")))]
     native_tray: Option<argui_platform::NativeTray>,
     #[cfg(any(not(feature = "tray"), target_arch = "wasm32"))]
@@ -83,7 +83,7 @@ impl MultiApplication {
             pending: Rc::new(RefCell::new(Vec::new())),
             callback: Rc::new(RefCell::new(Box::new(on_event))),
             windows: HashMap::new(),
-            by_winit: HashMap::new(),
+            by_native: HashMap::new(),
             event_proxy: None,
             #[cfg(all(feature = "tray", not(target_arch = "wasm32")))]
             native_tray: None,
@@ -94,12 +94,12 @@ impl MultiApplication {
         })
     }
 
-    pub(crate) fn set_event_proxy(&mut self, proxy: EventLoopProxy<UserEvent>) {
-        self.event_proxy = Some(proxy);
+    pub(crate) fn set_event_proxy(&mut self, proxy: impl Into<crate::host::EventProxy>) {
+        self.event_proxy = Some(proxy.into());
     }
 
     #[cfg_attr(coverage_nightly, coverage(off))]
-    fn open_window(&mut self, event_loop: &ActiveEventLoop, spec: WindowSpec) {
+    fn open_window(&mut self, event_loop: &dyn crate::host::WindowFactory, spec: WindowSpec) {
         if self.windows.contains_key(&spec.key) {
             self.emit(RuntimeEvent::CommandFailed(format!(
                 "window already exists: {}",
@@ -135,9 +135,9 @@ impl MultiApplication {
         if let Some(proxy) = &self.event_proxy {
             runtime.set_event_proxy(proxy.clone());
         }
-        runtime.resumed(event_loop);
+        event_loop.open(&mut runtime);
         if let Some(window) = runtime.window() {
-            let capabilities = argui_platform::window_capabilities(window);
+            let capabilities = window.capabilities();
             if spec.window.level != WindowLevel::Normal && !capabilities.window_level {
                 self.emit(RuntimeEvent::CommandFailed(format!(
                     "window level {:?} is unavailable on this window backend",
@@ -154,7 +154,7 @@ impl MultiApplication {
             return;
         };
         #[cfg(target_arch = "wasm32")]
-        if let Some(window) = runtime.window()
+        if let Some(window) = runtime.window().and_then(crate::host::WindowHost::winit)
             && let Err(error) = argui_platform::attach_web_canvas(
                 window,
                 &key,
@@ -167,7 +167,7 @@ impl MultiApplication {
         if let Err(error) = runtime.initialize_web_accessibility() {
             self.emit(RuntimeEvent::CommandFailed(error));
         }
-        self.by_winit.insert(window_id, key.clone());
+        self.by_native.insert(window_id, key.clone());
         self.windows.insert(key, WindowEntry { spec, runtime });
     }
 
@@ -176,12 +176,12 @@ impl MultiApplication {
         if let Some(entry) = self.windows.remove(key)
             && let Some(window_id) = entry.runtime.window_id()
         {
-            self.by_winit.remove(&window_id);
+            self.by_native.remove(&window_id);
         }
     }
 
     #[cfg_attr(coverage_nightly, coverage(off))]
-    fn process_pending(&mut self, event_loop: &ActiveEventLoop) {
+    fn process_pending(&mut self, event_loop: &dyn crate::host::WindowFactory) {
         for _ in 0..64 {
             let updates = std::mem::take(&mut *self.pending.borrow_mut());
             if updates.is_empty() {
@@ -208,7 +208,7 @@ impl MultiApplication {
 
     #[cfg(all(feature = "tray", not(target_arch = "wasm32")))]
     #[cfg_attr(coverage_nightly, coverage(off))]
-    fn tray_event(&mut self, event_loop: &ActiveEventLoop, event: TrayEvent) {
+    fn tray_event(&mut self, event_loop: &dyn crate::host::WindowFactory, event: TrayEvent) {
         self.emit(RuntimeEvent::Tray(event.clone()));
         if let TrayEvent::Action { action, .. } = &event
             && let Some(command) = tray_command(action.clone())
@@ -306,6 +306,8 @@ impl ApplicationHandler<UserEvent> for MultiApplication {
     fn user_event(&mut self, event_loop: &ActiveEventLoop, event: UserEvent) {
         let _ = event_loop;
         match event {
+            #[cfg(all(feature = "webview", target_os = "linux"))]
+            UserEvent::NativeInput { .. } => {}
             UserEvent::Preferences { ref window, .. } => {
                 if let Some(entry) = self.windows.get_mut(window) {
                     entry.runtime.user_event(event_loop, event);
@@ -325,7 +327,10 @@ impl ApplicationHandler<UserEvent> for MultiApplication {
             }
             #[cfg(not(target_arch = "wasm32"))]
             UserEvent::AccessKit(event) => {
-                if let Some(key) = self.by_winit.get(&event.window_id).cloned()
+                if let Some(key) = self
+                    .by_native
+                    .get(&crate::host::HostId::Winit(event.window_id))
+                    .cloned()
                     && let Some(entry) = self.windows.get_mut(&key)
                 {
                     entry
@@ -345,7 +350,11 @@ impl ApplicationHandler<UserEvent> for MultiApplication {
         window_id: WindowId,
         event: WindowEvent,
     ) {
-        let Some(key) = self.by_winit.get(&window_id).cloned() else {
+        let Some(key) = self
+            .by_native
+            .get(&crate::host::HostId::Winit(window_id))
+            .cloned()
+        else {
             return;
         };
         let close = matches!(event, WindowEvent::CloseRequested);
@@ -356,13 +365,19 @@ impl ApplicationHandler<UserEvent> for MultiApplication {
         if !close {
             return;
         }
-        let behavior = self.windows.get(&key).map_or(CloseBehavior::Quit, |entry| {
+        self.handle_close(&key, event_loop);
+    }
+}
+
+impl MultiApplication {
+    fn handle_close(&mut self, key: &WindowKey, event_loop: &dyn crate::host::LoopControl) {
+        let behavior = self.windows.get(key).map_or(CloseBehavior::Quit, |entry| {
             entry.spec.window.close_behavior
         });
         match behavior {
             CloseBehavior::Quit => event_loop.exit(),
-            CloseBehavior::CloseWindow => self.close_window(&key),
-            CloseBehavior::Hide => self.set_visible(&key, false),
+            CloseBehavior::CloseWindow => self.close_window(key),
+            CloseBehavior::Hide => self.set_visible(key, false),
             CloseBehavior::NotifyApp => {}
         }
     }
