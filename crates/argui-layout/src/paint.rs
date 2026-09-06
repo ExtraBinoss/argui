@@ -36,6 +36,7 @@ struct CachedFragment {
     parent: PaintContext,
     commands: Vec<argui_paint::DisplayCommand>,
     hit_regions: Vec<HitRegion>,
+    text_orders: Vec<(NodeId, usize)>,
     scroll_updates: Vec<ScrollPaintUpdate>,
     cacheable: bool,
     visual_revision: u64,
@@ -122,6 +123,16 @@ pub(super) fn paint_node(
         && (fragment.selection_revision == ui.document_selection_revision()
             || (!fragment.selection_active && !selection_active))
     {
+        let base = output.hit_regions.len();
+        for (node, relative) in &fragment.text_orders {
+            if let Some(region) = output
+                .text_regions
+                .iter_mut()
+                .find(|region| region.node == *node)
+            {
+                region.interaction_order = base + relative;
+            }
+        }
         output.display_list.extend(fragment.commands.clone());
         output.hit_regions.extend(fragment.hit_regions.clone());
         for update in &fragment.scroll_updates {
@@ -245,6 +256,21 @@ pub(super) fn paint_node(
                 parent: parent.clone(),
                 commands: output.display_list.commands()[command_start..].to_vec(),
                 hit_regions: output.hit_regions[hit_start..].to_vec(),
+                text_orders: output
+                    .text_regions
+                    .iter()
+                    .filter(|region| {
+                        output.nodes[map.index..map.index + map.subtree_len]
+                            .iter()
+                            .any(|node| node.node == region.node)
+                    })
+                    .map(|region| {
+                        (
+                            region.node,
+                            region.interaction_order.saturating_sub(hit_start),
+                        )
+                    })
+                    .collect(),
                 scroll_updates: scroll_updates[scroll_start..].to_vec(),
                 cacheable,
                 visual_revision: ui.visual_revision(node.node),
@@ -341,7 +367,7 @@ fn paint_enter(
         let region = &mut output.text_regions[index];
         region.transform = context.transform;
         region.clips = content_clips.clone();
-        region.interaction_order = output.display_list.len();
+        region.interaction_order = output.hit_regions.len();
         crate::selection::paint(ui, region, &mut output.display_list);
     }
     if let Some(region) = text_input {

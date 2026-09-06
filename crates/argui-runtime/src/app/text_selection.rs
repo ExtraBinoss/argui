@@ -1,5 +1,5 @@
 use argui_core::{Point, PointerEvent, PointerId, PointerKind, PointerPhase};
-use argui_layout::{LayoutOutput, TextRegion};
+use argui_layout::LayoutOutput;
 use argui_ui::{DocumentTextPoint, SelectionGranularity};
 use web_time::Instant;
 
@@ -63,16 +63,7 @@ impl SelectionClick {
 
 impl Application {
     pub(super) fn static_text_at(layout: &LayoutOutput, point: Point) -> Option<DocumentTextPoint> {
-        layout
-            .text_regions
-            .iter()
-            .filter_map(|region| {
-                region
-                    .hit_position(point)
-                    .map(|position| (region.interaction_order, position))
-            })
-            .max_by_key(|(order, _)| *order)
-            .map(|(_, point)| point)
+        layout.text_at(point)
     }
 
     pub(super) fn closest_static_text(
@@ -196,10 +187,4 @@ fn cancel_touch_candidate(candidate: &mut Option<TouchSelection>, id: PointerId)
     if candidate.is_some_and(|candidate| candidate.tracks(id)) {
         *candidate = None;
     }
-}
-
-pub(super) fn text_region_at(regions: &[TextRegion], point: Point) -> bool {
-    regions
-        .iter()
-        .any(|region| region.hit_position(point).is_some())
 }

@@ -17,6 +17,7 @@ pub struct TextRegion {
     pub transform: Affine2D,
     pub clips: ClipChain,
     pub style: TextSelectionStyle,
+    /// Number of hit regions emitted through this text's paint position.
     pub interaction_order: usize,
 }
 
@@ -85,6 +86,29 @@ impl TextRegion {
             .inverse()
             .map_or(point, |inverse| inverse.transform_point(point));
         Point::new(point.x - self.origin.x, point.y - self.origin.y)
+    }
+}
+
+impl LayoutOutput {
+    /// Selectable text under the pointer, excluding later-painted hit surfaces.
+    /// A transparent blocker still owns input; its paint alpha is irrelevant.
+    pub fn text_at(&self, point: Point) -> Option<DocumentTextPoint> {
+        self.text_regions
+            .iter()
+            .filter_map(|region| {
+                let position = region.hit_position(point)?;
+                if self
+                    .hit_regions
+                    .iter()
+                    .skip(region.interaction_order)
+                    .any(|hit| hit.contains(point))
+                {
+                    return None;
+                }
+                Some((region.interaction_order, position))
+            })
+            .max_by_key(|(order, _)| *order)
+            .map(|(_, position)| position)
     }
 }
 

@@ -3,6 +3,31 @@ use argui_ui::{Element, PointerEvents};
 use argui_widgets::Presence;
 
 #[test]
+fn immediate_entry_retains_a_full_exit_even_when_closed_before_first_frame() {
+    let mut presence = Presence::default().fade_in(false);
+    presence.set_open(true, false);
+    let element = presence.decorate(Element::container([]).keyed("overlay"));
+    let tree = argui_ui::UiTree::new(element.clone());
+    let node = tree.node_ids()[0];
+    let opacity = || {
+        tree.resolved_layer(node, &element, element.layer.as_ref().unwrap())
+            .opacity
+    };
+    assert_eq!(opacity(), 1.0);
+    presence.set_open(false, false);
+    assert!(presence.visible());
+    assert_eq!(opacity(), 1.0);
+    assert!(!presence.advance(Duration::from_millis(50)));
+    assert!((opacity() - 0.5).abs() < 0.001);
+    presence.set_open(true, false);
+    assert_eq!(opacity(), 1.0);
+    presence.set_open(false, true);
+    assert_eq!(opacity(), 0.0);
+    assert!(!presence.visible());
+    assert!(!presence.animating());
+}
+
+#[test]
 fn presence_retains_exit_without_intercepting_input_and_can_reverse() {
     let mut presence = Presence::default();
     assert!(!presence.visible());

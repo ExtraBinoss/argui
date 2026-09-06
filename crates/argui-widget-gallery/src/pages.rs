@@ -26,6 +26,7 @@ mod buttons;
 mod composition;
 pub(crate) use composition::AppShell;
 mod inputs;
+pub(crate) mod liquid_glass;
 pub(crate) mod scroll_effects;
 mod typography;
 pub(crate) mod webview;
@@ -36,6 +37,7 @@ pub(crate) struct ResizeListeners {
     pub(crate) shell: Element,
     pub(crate) scroll_demo: Element,
     pub(crate) webview: Element,
+    pub(crate) glass: Element,
 }
 
 pub(crate) fn render(
@@ -66,7 +68,9 @@ pub(crate) fn render(
         Page::Settings => settings(gallery, theme),
         Page::Layout => layout_system(theme),
         Page::Motion => motion(theme, spinner),
-        Page::Effects => Element::column([resize.scroll_demo, effects(theme)]).gap(24.0),
+        Page::Effects => {
+            Element::column([resize.scroll_demo, effects(theme), resize.glass]).gap(24.0)
+        }
         Page::Composition => composition::render(gallery, theme, assets, resize.shell),
         Page::Typography => typography::render(theme),
         Page::WebView => resize.webview,

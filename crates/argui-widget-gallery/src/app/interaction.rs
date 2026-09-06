@@ -38,6 +38,7 @@ impl WidgetGallery {
         let shell = cx.entity(&self.shell);
         let scroll_demo = cx.entity(&self.scroll_demo);
         let webview = cx.entity(&self.webview);
+        let glass = cx.entity(&self.glass);
         self.view(
             environment,
             theme,
@@ -49,6 +50,7 @@ impl WidgetGallery {
                 shell,
                 scroll_demo,
                 webview,
+                glass,
             },
         )
     }
@@ -97,8 +99,9 @@ impl Render for WidgetGallery {
         root
     }
 
-    fn layout_changed(&mut self, layout: &LayoutSnapshot, _cx: &mut Context<Self>) {
+    fn layout_changed(&mut self, layout: &LayoutSnapshot, cx: &mut Context<Self>) {
         self.handle_layout(layout);
+        cx.layout_entity(&self.glass, layout);
     }
 
     fn image_assets(&self) -> Vec<ImageAsset> {

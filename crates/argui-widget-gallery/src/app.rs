@@ -62,6 +62,7 @@ pub struct WidgetGallery {
     shell: Entity<pages::AppShell>,
     scroll_demo: Entity<pages::scroll_effects::ScrollDemo>,
     webview: Entity<pages::webview::WebViewDemo>,
+    glass: Entity<pages::liquid_glass::GlassDemo>,
     pub(crate) slider_state: RangeState,
     pub(crate) plain_slider_state: RangeState,
     images: ImageLibrary,
@@ -90,6 +91,7 @@ impl Default for WidgetGallery {
         Self {
             scroll_demo: Entity::new(pages::scroll_effects::ScrollDemo::default()),
             webview: pages::webview::WebViewDemo::entity(),
+            glass: Entity::new(pages::liquid_glass::GlassDemo::default()),
             page: Page::Button,
             search: String::new(),
             search_highlight: 0,

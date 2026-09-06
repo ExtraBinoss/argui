@@ -1,8 +1,7 @@
 #![cfg(feature = "artistic")]
 
 use argui_effects::{
-    ANIMATED_GRADIENT_ID, AnimatedGradient, LIQUID_GLASS_ID, LiquidGlass, WORLEY_BORDER_FIRE_ID,
-    WorleyBorderFire,
+    ANIMATED_GRADIENT_ID, AnimatedGradient, WORLEY_BORDER_FIRE_ID, WorleyBorderFire,
 };
 use argui_paint::{EffectValue, Filter};
 
@@ -46,19 +45,4 @@ fn artistic_presets_expose_stable_ids_and_typed_parameters() {
     assert_eq!(values.len(), 4);
     assert_eq!(values[3], ("expansion", EffectValue::LogicalPixels(4.0)));
     assert_eq!(expansion, 4.0);
-
-    let (id, values, _) = parameters(
-        LiquidGlass::new()
-            .refraction(10.0)
-            .chromatic_aberration(2.0)
-            .blur(4.0)
-            .highlight(0.3)
-            .edge_width(20.0)
-            .saturation(1.2)
-            .filter(),
-    );
-    assert_eq!(id, LIQUID_GLASS_ID);
-    assert_eq!(values.len(), 6);
-    assert_eq!(values[0], ("refraction", EffectValue::LogicalPixels(10.0)));
-    assert_eq!(values[5], ("saturation", EffectValue::F32(1.2)));
 }

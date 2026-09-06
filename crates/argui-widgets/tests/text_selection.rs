@@ -2,6 +2,8 @@ use argui_core::{ColorScheme, Point, Rect, Size};
 use argui_runtime::{Context, Entity, Render, WindowEnvironment};
 use argui_ui::{Element, ElementKind, SelectionCapabilities, UiEventKind, UiTree, UserSelect};
 use argui_widgets::{TablerIcon, TextSelectionToolbar, WidgetAssets, shadcn};
+#[path = "text_selection/host.rs"]
+mod host;
 
 struct Editor;
 
@@ -109,6 +111,7 @@ fn selection_toolbar_dismisses_on_outside_pointer_without_consuming_it() {
         }
         assert!(!event.default_prevented());
     }
+    host::finish_exit(&app);
     assert!(!has_key(&app.render(), "argui::selection-menu"));
 }
 
@@ -200,6 +203,7 @@ fn selection_host_presents_and_removes_the_public_touch_toolbar() {
             dragging: true,
         },
     );
+    host::finish_exit(&app);
     assert!(matches!(app.render().kind, ElementKind::Text { .. }));
 }
 
@@ -232,6 +236,7 @@ fn context_menu_requires_a_command_and_public_toolbar_commands_dismiss_it() {
         "argui::selection-menu::copy",
         UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
     );
+    host::finish_exit(&app);
     assert!(!has_key(&app.render(), "argui::selection-menu::copy"));
 }
 

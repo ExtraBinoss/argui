@@ -14,6 +14,85 @@ fn text_engine() -> TextEngine {
 }
 
 #[test]
+fn transparent_overlays_block_text_hits_including_cached_portals() {
+    use argui_ui::{CursorIcon, HitShape, HitTestStyle, Interaction, Sides, WindowLayer, length};
+    for portal in [false, true] {
+        let mut overlay = Element::container([])
+            .keyed("glass")
+            .width(length(100.0))
+            .height(length(40.0))
+            .absolute(Sides {
+                left: length(0.0),
+                top: length(0.0),
+                right: argui_ui::auto(),
+                bottom: argui_ui::auto(),
+            })
+            .user_select(UserSelect::None)
+            .hit_test(
+                HitTestStyle::default()
+                    .shape(HitShape::RoundedRect(argui_paint::CornerRadii::all(20.0))),
+            )
+            .interaction(Interaction::blocker().cursor(CursorIcon::Grab));
+        if portal {
+            overlay = overlay.portal(WindowLayer::Popover).absolute(Sides {
+                left: length(0.0),
+                top: length(0.0),
+                right: argui_ui::auto(),
+                bottom: argui_ui::auto(),
+            });
+        }
+        let mut ui = UiTree::new(Element::container([
+            Element::text("selectable behind the glass"),
+            overlay,
+        ]));
+        let mut engine = LayoutEngine::new();
+        let mut text = text_engine();
+        let mut output = engine
+            .compute(&mut ui, &mut text, Size::new(300.0, 100.0))
+            .unwrap();
+        for _ in 0..3 {
+            assert!(
+                output.text_regions[0]
+                    .hit_position(Point::new(40.0, 14.0))
+                    .is_some()
+            );
+            assert!(
+                output.text_at(Point::new(40.0, 14.0)).is_none(),
+                "overlay owns pointer, portal={portal}, hits={:?}, text order={}",
+                output.hit_regions,
+                output.text_regions[0].interaction_order
+            );
+            assert!(
+                output.text_at(Point::new(5.0, 5.0)).is_some(),
+                "rounded cutout passes input"
+            );
+            assert!(
+                output.text_at(Point::new(130.0, 8.0)).is_some(),
+                "uncovered text remains selectable"
+            );
+            engine.repaint(&ui, &mut output);
+        }
+        assert!(output.paint_stats.reused_subtrees > 0);
+    }
+}
+
+#[test]
+fn interactive_parent_does_not_occlude_its_own_selectable_text() {
+    let mut ui = UiTree::new(
+        Element::container([Element::text("select me")])
+            .interaction(argui_ui::Interaction::blocker()),
+    );
+    let mut engine = LayoutEngine::new();
+    let mut output = engine
+        .compute(&mut ui, &mut text_engine(), Size::new(300.0, 100.0))
+        .unwrap();
+    for _ in 0..3 {
+        assert!(output.text_at(Point::new(20.0, 8.0)).is_some());
+        engine.repaint(&ui, &mut output);
+    }
+}
+
+#[test]
 fn document_selection_uses_glyph_regions_and_paints_without_relayout() {
     let color = argui_core::Color::srgba(0.2, 0.5, 0.9, 0.4);
     let mut ui = UiTree::new(

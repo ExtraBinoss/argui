@@ -2,6 +2,8 @@
 mod buttons;
 #[path = "pages/inputs.rs"]
 mod inputs;
+#[path = "pages/liquid_glass.rs"]
+mod liquid_glass;
 #[path = "pages/scroll_effects.rs"]
 mod scroll_effects;
 #[path = "pages/webview.rs"]

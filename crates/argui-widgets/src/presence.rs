@@ -7,6 +7,8 @@ use argui_ui::{Element, PointerEvents, property};
 pub struct Presence {
     open: bool,
     progress: f32,
+    fade_progress: f32,
+    fade_in: bool,
     opacity: Motion<f32>,
     transform: Motion<Transform2D>,
 }
@@ -16,6 +18,8 @@ impl Default for Presence {
         Self {
             open: false,
             progress: 0.0,
+            fade_progress: 0.0,
+            fade_in: true,
             opacity: Motion::new(0.0),
             transform: Motion::new(Transform2D::IDENTITY.translate(0.0, 4.0)),
         }
@@ -23,6 +27,17 @@ impl Default for Presence {
 }
 
 impl Presence {
+    /// Keep content immediately readable while retaining entry movement and exit fading.
+    #[must_use]
+    pub fn fade_in(mut self, enabled: bool) -> Self {
+        self.fade_in = enabled;
+        if self.open && !enabled {
+            self.fade_progress = 1.0;
+            self.sample();
+        }
+        self
+    }
+
     #[must_use]
     pub const fn is_open(&self) -> bool {
         self.open
@@ -30,20 +45,25 @@ impl Presence {
 
     pub fn set_open(&mut self, open: bool, reduced_motion: bool) {
         self.open = open;
+        if open && !self.fade_in {
+            self.fade_progress = 1.0;
+        }
         if reduced_motion {
             self.progress = if open { 1.0 } else { 0.0 };
-            self.sample();
+            self.fade_progress = self.progress;
         }
+        self.sample();
     }
 
     #[must_use]
     pub fn visible(&self) -> bool {
-        self.open || self.progress > 0.0
+        self.open || self.progress > 0.0 || self.fade_progress > 0.0
     }
 
     #[must_use]
     pub fn animating(&self) -> bool {
-        self.progress != if self.open { 1.0 } else { 0.0 }
+        let target = if self.open { 1.0 } else { 0.0 };
+        self.progress != target || self.fade_progress != target
     }
 
     /// Returns true when the mounted state changes, requiring reconciliation.
@@ -55,13 +75,16 @@ impl Presence {
         let duration = if self.open { 0.140 } else { 0.100 };
         let delta = (elapsed.as_secs_f64() / duration) as f32;
         self.progress = (self.progress + if self.open { delta } else { -delta }).clamp(0.0, 1.0);
+        self.fade_progress =
+            (self.fade_progress + if self.open { delta } else { -delta }).clamp(0.0, 1.0);
         self.sample();
         visible != self.visible()
     }
 
     fn sample(&self) {
         let eased = self.progress * self.progress * (3.0 - 2.0 * self.progress);
-        self.opacity.set(eased);
+        let fade = self.fade_progress;
+        self.opacity.set(fade * fade * (3.0 - 2.0 * fade));
         self.transform
             .set(Transform2D::IDENTITY.translate(0.0, 4.0 * (1.0 - eased)));
     }

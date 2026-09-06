@@ -21,7 +21,7 @@ impl Application {
                 };
                 if scrollbar_at(point, &layout.scroll_regions, &layout.hit_regions).is_some() {
                     CursorIcon::Default
-                } else if super::text_selection::text_region_at(&layout.text_regions, point) {
+                } else if layout.text_at(point).is_some() {
                     CursorIcon::Text
                 } else {
                     cursor_at(&layout.hit_regions, point)

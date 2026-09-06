@@ -4,6 +4,10 @@ use argui_render::{EffectDefinition, EffectRegistry, RendererError};
 
 #[cfg(feature = "artistic")]
 mod artistic;
+#[cfg(feature = "liquid-glass")]
+mod liquid_glass;
+#[cfg(feature = "liquid-glass")]
+pub use liquid_glass::{LIQUID_GLASS_ID, LiquidGlass};
 #[cfg(feature = "blur")]
 mod blur;
 #[cfg(feature = "color")]
@@ -19,8 +23,7 @@ pub use scroll::{EDGE_FADE_ID, EDGE_SHADOW_ID, EdgeFade, EdgeShadow};
 
 #[cfg(feature = "artistic")]
 pub use artistic::{
-    ANIMATED_GRADIENT_ID, AnimatedGradient, LIQUID_GLASS_ID, LiquidGlass, WORLEY_BORDER_FIRE_ID,
-    WorleyBorderFire,
+    ANIMATED_GRADIENT_ID, AnimatedGradient, WORLEY_BORDER_FIRE_ID, WorleyBorderFire,
 };
 #[cfg(feature = "blur")]
 pub use blur::Blur;
@@ -43,6 +46,12 @@ pub fn registry() -> Result<EffectRegistry, RendererError> {
     let definitions = {
         let mut definitions = definitions;
         definitions.extend(scroll::definitions());
+        definitions
+    };
+    #[cfg(feature = "liquid-glass")]
+    let definitions = {
+        let mut definitions = definitions;
+        definitions.push(liquid_glass::definition());
         definitions
     };
     EffectRegistry::new(definitions)
