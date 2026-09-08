@@ -1,11 +1,15 @@
 #[path = "pages/buttons.rs"]
 mod buttons;
+#[path = "pages/data.rs"]
+mod data;
 #[path = "pages/inputs.rs"]
 mod inputs;
 #[path = "pages/liquid_glass.rs"]
 mod liquid_glass;
 #[path = "pages/scroll_effects.rs"]
 mod scroll_effects;
+#[path = "pages/timeline.rs"]
+mod timeline;
 #[path = "pages/webview.rs"]
 mod webview;
 
@@ -44,13 +48,11 @@ fn all_pages_keep_finite_layout_when_narrow_dark_or_reduced_motion() {
         ("tabs", "Tabs"),
         ("select", "Select"),
         ("dialog", "Dialog"),
-        ("form", "Profile form"),
-        ("settings", "Settings panel"),
         ("layout", "Web layout"),
         ("motion", "Motion & loading"),
         ("effects", "GPU effects / WGSL"),
-        ("composition", "Advanced composition"),
         ("typography", "Typography & selection"),
+        ("custom-timeline", "Custom Timeline"),
     ] {
         let key = format!("nav::{slug}");
         tree.update(app.render());

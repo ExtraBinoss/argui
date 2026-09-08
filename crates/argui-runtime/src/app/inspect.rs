@@ -58,8 +58,9 @@ impl Application {
             return;
         };
         if inspector.enabled()
-            && let Some(snapshot) = self.inspection_cache.snapshot(tree, layout)
+            && let Some(mut snapshot) = self.inspection_cache.snapshot(tree, layout)
         {
+            Inspection::custom_stats(&mut snapshot, &self.layout_engine.custom_stats());
             inspector.publish_tree(snapshot);
         }
     }
@@ -94,6 +95,27 @@ impl Application {
 pub struct Inspection;
 
 impl Inspection {
+    /// Adds extension diagnostics only when the inspector requests a snapshot.
+    pub fn custom_stats(snapshot: &mut TreeSnapshot, stats: &[argui_layout::CustomElementStats]) {
+        for stats in stats {
+            if let Some(node) = snapshot
+                .nodes
+                .iter_mut()
+                .find(|node| node.id.0 == stats.node.get())
+            {
+                node.summary = Some(format!(
+                    "{} · layout {} · prepare {} · paint {} · available {:?} · resolved {:?}",
+                    stats.type_name,
+                    stats.phases.layouts,
+                    stats.phases.preparations,
+                    stats.phases.paints,
+                    stats.phases.available,
+                    stats.phases.known_size,
+                ));
+            }
+        }
+    }
+
     /// Builds an inspectable snapshot from a retained tree and its layout.
     #[must_use]
     pub fn snapshot(tree: &UiTree, layout: &argui_layout::LayoutOutput) -> TreeSnapshot {
@@ -167,7 +189,11 @@ fn collect_nodes(
         depth,
         key: element.key.clone(),
         kind: kind_name(&element.kind).to_owned(),
-        summary: summary(&element.kind, element.children.len()),
+        summary: if element.text_privacy.protected() {
+            Some("Protected text".into())
+        } else {
+            summary(&element.kind, element.children.len())
+        },
         bounds,
         clip: layout_node.and_then(|candidate| candidate.clip),
         z_index: element.z_index,
@@ -216,6 +242,7 @@ fn descendant_count(element: &Element) -> usize {
 
 fn kind_name(kind: &ElementKind) -> &'static str {
     match kind {
+        ElementKind::Custom(_) => "custom",
         ElementKind::Container => "container",
         ElementKind::Text { .. } => "text",
         ElementKind::TextEditor { multiline, .. } => {
@@ -232,6 +259,7 @@ fn kind_name(kind: &ElementKind) -> &'static str {
 
 fn summary(kind: &ElementKind, children: usize) -> Option<String> {
     match kind {
+        ElementKind::Custom(custom) => Some(custom.type_name().to_owned()),
         ElementKind::Container => Some(format!("{children} children")),
         ElementKind::Text { content, .. } => Some(short(content.as_str())),
         ElementKind::TextEditor {

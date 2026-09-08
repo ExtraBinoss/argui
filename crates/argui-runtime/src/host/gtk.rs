@@ -28,6 +28,9 @@ impl WindowHost for GtkHost {
     fn set_title(&self, title: &str) {
         self.platform.native().set_title(title);
     }
+    fn is_minimized(&self) -> Option<bool> {
+        Some(self.platform.native().is_minimized())
+    }
     fn set_minimized(&self, minimized: bool) {
         self.platform.native().set_minimized(minimized);
     }

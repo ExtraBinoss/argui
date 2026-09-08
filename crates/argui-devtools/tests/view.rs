@@ -21,12 +21,18 @@ fn event(key: &str) -> UiEvent {
 
 #[test]
 fn opening_tools_survives_the_transient_zero_height_application_viewport() {
-    let mut host = DevtoolsHost::new(StateShowcase::default());
+    let host = argui_runtime::Entity::new(DevtoolsHost::new(StateShowcase::default()))
+        .mount()
+        .unwrap();
     assert_eq!(
-        host.update(&event("__devtools-toggle")),
+        host.update(|tools, cx| {
+            cx.notify();
+            tools.update(&event("__devtools-toggle"))
+        })
+        .unwrap(),
         ViewUpdate::Rebuild
     );
-    let mut tree = UiTree::new(host.view());
+    let mut tree = UiTree::new(host.render(Default::default()).unwrap());
     let mut layout = LayoutEngine::new();
     let output = layout
         .compute(&mut tree, &mut text_engine(), Size::new(1_100.0, 230.0))
@@ -44,13 +50,22 @@ fn opening_tools_survives_the_transient_zero_height_application_viewport() {
             .collect(),
     };
 
-    assert_eq!(host.layout_changed(&snapshot), ViewUpdate::None);
+    assert_eq!(
+        host.update(|tools, cx| {
+            cx.notify();
+            tools.inspect_layout(&snapshot)
+        })
+        .unwrap(),
+        ViewUpdate::None
+    );
 }
 
 #[test]
 fn toggle_button_keeps_its_authored_radius_while_pressed() {
-    let mut host = DevtoolsHost::new(StateShowcase::default());
-    let mut tree = UiTree::new(host.view());
+    let host = argui_runtime::Entity::new(DevtoolsHost::new(StateShowcase::default()))
+        .mount()
+        .unwrap();
+    let mut tree = UiTree::new(host.render(Default::default()).unwrap());
     let mut layout = LayoutEngine::new();
     let output = layout
         .compute(&mut tree, &mut text_engine(), Size::new(1_100.0, 700.0))
@@ -89,8 +104,10 @@ fn toggle_button_keeps_its_authored_radius_while_pressed() {
 
 #[test]
 fn open_dock_reserves_application_viewport_space() {
-    let mut host = DevtoolsHost::new(StateShowcase::default()).open(true);
-    let mut tree = UiTree::new(host.view());
+    let host = argui_runtime::Entity::new(DevtoolsHost::new(StateShowcase::default()).open(true))
+        .mount()
+        .unwrap();
+    let mut tree = UiTree::new(host.render(Default::default()).unwrap());
     let mut layout = LayoutEngine::new();
     let output = layout
         .compute(&mut tree, &mut text_engine(), Size::new(1_100.0, 700.0))
@@ -118,8 +135,10 @@ fn open_dock_reserves_application_viewport_space() {
 
 #[test]
 fn closed_dock_keeps_a_visible_overlay_button_without_stealing_app_height() {
-    let mut host = DevtoolsHost::new(StateShowcase::default());
-    let mut tree = UiTree::new(host.view());
+    let host = argui_runtime::Entity::new(DevtoolsHost::new(StateShowcase::default()))
+        .mount()
+        .unwrap();
+    let mut tree = UiTree::new(host.render(Default::default()).unwrap());
     let mut layout = LayoutEngine::new();
     let output = layout
         .compute(&mut tree, &mut text_engine(), Size::new(1_100.0, 700.0))
@@ -148,8 +167,10 @@ fn closed_dock_keeps_a_visible_overlay_button_without_stealing_app_height() {
 
 #[test]
 fn real_showcase_lowers_both_devtools_button_and_page_scrollbar() {
-    let mut host = DevtoolsHost::new(StateShowcase::default());
-    let mut tree = UiTree::new(host.view());
+    let host = argui_runtime::Entity::new(DevtoolsHost::new(StateShowcase::default()))
+        .mount()
+        .unwrap();
+    let mut tree = UiTree::new(host.render(Default::default()).unwrap());
     let toggle = tree
         .node_ids()
         .iter()
@@ -191,45 +212,76 @@ fn real_showcase_lowers_both_devtools_button_and_page_scrollbar() {
 
 #[test]
 fn toolbar_exposes_docking_and_has_no_demo_animation() {
-    let mut host = DevtoolsHost::new(StateShowcase::default()).open(true);
-    let root = host.view();
+    let host = argui_runtime::Entity::new(DevtoolsHost::new(StateShowcase::default()).open(true))
+        .mount()
+        .unwrap();
+    let root = host.render(Default::default()).unwrap();
     assert!(!contains_text(&root, "GPU transform"));
     assert!(contains_text(&root, "Bottom"));
     assert_eq!(
-        host.update(&event("__devtools-icon-transform")),
+        host.update(|tools, cx| {
+            cx.notify();
+            tools.update(&event("__devtools-icon-transform"))
+        })
+        .unwrap(),
         ViewUpdate::None
     );
-    assert!(!host.wants_animation_frame());
+    assert!(!host.read(|tools| tools.wants_animation_frame()));
 }
 
 #[test]
 fn sheet_relayouts_incrementally_and_returns_to_idle() {
-    let mut host = DevtoolsHost::new(StateShowcase::default());
-    let mut tree = UiTree::new(host.view());
-    host.update(&event("__devtools-toggle"));
-    assert_eq!(tree.update(host.view()), argui_ui::TreeUpdate::Paint);
-    host.animation_frame(Frame {
-        now: Time::ZERO,
-        elapsed: Duration::from_millis(16),
-    });
-    assert_eq!(tree.update(host.view()), argui_ui::TreeUpdate::Layout);
-
-    for _ in 0..60 {
-        host.animation_frame(Frame {
+    let host = argui_runtime::Entity::new(DevtoolsHost::new(StateShowcase::default()))
+        .mount()
+        .unwrap();
+    let mut tree = UiTree::new(host.render(Default::default()).unwrap());
+    host.update(|tools, cx| {
+        cx.notify();
+        tools.update(&event("__devtools-toggle"))
+    })
+    .unwrap();
+    assert_eq!(
+        tree.update(host.render(Default::default()).unwrap()),
+        argui_ui::TreeUpdate::Paint
+    );
+    host.update(|tools, cx| {
+        cx.notify();
+        tools.animation_frame(Frame {
             now: Time::ZERO,
             elapsed: Duration::from_millis(16),
-        });
-    }
-    tree.update(host.view());
+        })
+    })
+    .unwrap();
+    assert_eq!(
+        tree.update(host.render(Default::default()).unwrap()),
+        argui_ui::TreeUpdate::Layout
+    );
 
-    assert!(!host.wants_animation_frame());
-    assert_eq!(tree.update(host.view()), argui_ui::TreeUpdate::None);
+    for _ in 0..60 {
+        host.update(|tools, cx| {
+            cx.notify();
+            tools.animation_frame(Frame {
+                now: Time::ZERO,
+                elapsed: Duration::from_millis(16),
+            })
+        })
+        .unwrap();
+    }
+    tree.update(host.render(Default::default()).unwrap());
+
+    assert!(!host.read(|tools| tools.wants_animation_frame()));
+    assert_eq!(
+        tree.update(host.render(Default::default()).unwrap()),
+        argui_ui::TreeUpdate::None
+    );
 }
 
 #[test]
 fn profiling_view_presents_gpu_passes_and_unavailable_timestamp_state() {
-    let mut host = DevtoolsHost::new(StateShowcase::default()).open(true);
-    host.inspector().record_ui(FrameRecord {
+    let host = argui_runtime::Entity::new(DevtoolsHost::new(StateShowcase::default()).open(true))
+        .mount()
+        .unwrap();
+    host.read(|tools| tools.inspector()).record_ui(FrameRecord {
         interval: std::time::Duration::from_millis(18),
         model: std::time::Duration::from_millis(1),
         tree: std::time::Duration::from_millis(2),
@@ -258,19 +310,34 @@ fn profiling_view_presents_gpu_passes_and_unavailable_timestamp_state() {
         ..FrameRecord::default()
     });
     assert_eq!(
-        host.update(&event("__devtools-profiling")),
+        host.update(|tools, cx| {
+            cx.notify();
+            tools.update(&event("__devtools-profiling"))
+        })
+        .unwrap(),
         ViewUpdate::Rebuild
     );
-    let profiling = host.view();
+    let profiling = host.render(Default::default()).unwrap();
     assert!(contains_text(&profiling, "GPU timeline"));
     assert!(contains_text(&profiling, "blur pass"));
     assert!(!contains_text(&profiling, "Most expensive passes"));
-    host.update(&event("__devtools-profile-details"));
-    assert!(contains_text(&host.view(), "test-adapter"));
-    host.update(&event("__devtools-profile-gpu"));
+    host.update(|tools, cx| {
+        cx.notify();
+        tools.update(&event("__devtools-profile-details"))
+    })
+    .unwrap();
+    assert!(contains_text(
+        &host.render(Default::default()).unwrap(),
+        "test-adapter"
+    ));
+    host.update(|tools, cx| {
+        cx.notify();
+        tools.update(&event("__devtools-profile-gpu"))
+    })
+    .unwrap();
 
-    host.inspector().clear_frames();
-    host.inspector().record_ui(FrameRecord {
+    host.read(|tools| tools.inspector()).clear_frames();
+    host.read(|tools| tools.inspector()).record_ui(FrameRecord {
         adapter: AdapterRecord {
             timestamp_queries: false,
             ..AdapterRecord::default()
@@ -278,11 +345,15 @@ fn profiling_view_presents_gpu_passes_and_unavailable_timestamp_state() {
         ..FrameRecord::default()
     });
     assert_eq!(
-        host.update(&event("__devtools-refresh")),
+        host.update(|tools, cx| {
+            cx.notify();
+            tools.update(&event("__devtools-refresh"))
+        })
+        .unwrap(),
         ViewUpdate::Rebuild
     );
     assert!(contains_text(
-        &host.view(),
+        &host.render(Default::default()).unwrap(),
         "GPU timestamps unavailable on this adapter"
     ));
 }

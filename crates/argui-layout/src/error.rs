@@ -2,6 +2,7 @@ use std::{error::Error, fmt};
 
 #[derive(Debug)]
 pub enum LayoutError {
+    Custom(String),
     Taffy(taffy::TaffyError),
     MissingRoot,
     MissingNodeIdentity(usize),
@@ -11,6 +12,7 @@ pub enum LayoutError {
 impl fmt::Display for LayoutError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Custom(error) => write!(formatter, "custom element: {error}"),
             Self::Taffy(error) => write!(formatter, "layout failed: {error}"),
             Self::MissingRoot => formatter.write_str("layout tree has no root"),
             Self::MissingNodeIdentity(index) => {
@@ -27,7 +29,8 @@ impl Error for LayoutError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::Taffy(error) => Some(error),
-            Self::MissingRoot
+            Self::Custom(_)
+            | Self::MissingRoot
             | Self::MissingNodeIdentity(_)
             | Self::NonConvergentContainerQueries => None,
         }

@@ -15,6 +15,7 @@ pub enum InputKind {
     Search,
     Number,
     Arithmetic,
+    Password,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -176,6 +177,11 @@ impl Input {
         if let Some((_, slot_width)) = self.leading.as_ref() {
             style.layout.padding.left = argui_ui::length(*slot_width);
         }
+        let privacy = if self.kind == InputKind::Password {
+            argui_ui::TextPrivacy::Password
+        } else {
+            argui_ui::TextPrivacy::Public
+        };
         editor(
             EditorSpec {
                 key: self.key,
@@ -184,12 +190,14 @@ impl Input {
                 style,
                 multiline: false,
                 role: match self.kind {
-                    InputKind::Text => Role::TextInput,
+                    InputKind::Text | InputKind::Password => Role::TextInput,
                     InputKind::Search => Role::SearchInput,
                     InputKind::Number | InputKind::Arithmetic => Role::TextInput,
                 },
                 filter: match self.kind {
-                    InputKind::Text | InputKind::Search => TextInputFilter::Any,
+                    InputKind::Text | InputKind::Search | InputKind::Password => {
+                        TextInputFilter::Any
+                    }
                     InputKind::Number => TextInputFilter::Decimal,
                     InputKind::Arithmetic => TextInputFilter::Arithmetic,
                 },
@@ -201,6 +209,7 @@ impl Input {
             },
             self.leading,
         )
+        .text_privacy(privacy)
     }
 }
 

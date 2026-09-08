@@ -1,4 +1,4 @@
-use argui_paint::{Border, CornerRadii, Filter, LayerMask, LayerStyle, PaintStyle, QuadStyle};
+use argui_paint::{Border, CornerRadii, PaintStyle, QuadStyle};
 use argui_text::{TextStyle, TextWrap};
 use argui_ui::{
     AlignItems, AnchorWidth, Axes, DismissPolicy, Element, FloatingPlacement, FocusScope,
@@ -173,14 +173,14 @@ impl Select {
                 .transition(StyleTransition::default()),
             )
         });
-        let mut list = Element::column(options)
+        let list = Element::column(options)
             .width(length(260.0))
             .max_height(length(280.0))
             .padding(argui_ui::Sides::length(5.0))
             .gap(2.0)
             .paint_style(PaintStyle::new(
                 QuadStyle::solid(theme.popover)
-                    .border(Border::all(1.0, theme.border))
+                    .border(Border::all(1.0, theme.popover_border))
                     .radius(CornerRadii::all(8.0)),
             ))
             .overflow(Axes {
@@ -200,14 +200,8 @@ impl Select {
             .focus_scope(FocusScope::trapped(InitialFocus::Target(
                 behavior.option_key(self.highlighted).into(),
             )))
-            .z_index(1_000);
-        if theme.overlay_blur > 0.0 {
-            list = list.layer(
-                LayerStyle::new(Default::default())
-                    .backdrop(Filter::Blur(theme.overlay_blur))
-                    .mask(LayerMask::Rounded(CornerRadii::all(8.0))),
-            );
-        }
+            .z_index(1_000)
+            .layer(theme.overlay_layer(8.0, theme.overlay_blur));
         behavior.decorate(SelectPart::List, list)
     }
 }

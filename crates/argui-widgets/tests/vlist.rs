@@ -58,3 +58,52 @@ fn effects_are_opt_in_and_survive_headers_without_mounting_more_rows() {
     assert_eq!(built.children.len(), base.children.len() + 1);
     assert!(built.children.len() < 30);
 }
+
+#[test]
+fn variable_measurements_survive_rebuild_resize_and_selection() {
+    use argui_ui::{VirtualAlignment, VirtualList};
+    use argui_widgets::ListState;
+    let themes = shadcn(Color::WHITE);
+    let theme = themes.resolve(ColorScheme::Light);
+    let mut config = VirtualList::variable(1000, 20.0, 100.0);
+    let row = |index: usize| Element::text(index.to_string());
+    let first = VList::variable("variable", &config, 0.0).build(1000, theme, row);
+    let update = first.children[0].children[1]
+        .virtual_item()
+        .as_ref()
+        .unwrap()
+        .measure_layout(60.0, 400.0);
+    assert!(update.changed);
+    assert_eq!(update.corrected_offset, 440.0);
+    assert_eq!(config.item_extent(0), Some(60.0));
+    let mut list = VList::variable("variable", &config, update.corrected_offset);
+    list.viewport = 200.0;
+    assert_eq!(list.config(1000).viewport_extent(), 200.0);
+    assert_eq!(list.config(1000).item_extent(0), Some(60.0));
+    assert_eq!(
+        list.config(1000).scroll_to(999, VirtualAlignment::End, 0.0),
+        19840.0
+    );
+    let mut state = ListState::default();
+    state.select(20, 1000, true, Default::default());
+    let built = list.build_list(1000, &state, true, theme, row);
+    assert!(has(&built, "variable::row::20"));
+    assert!(!has(&built, "variable::row::999"));
+    assert!(built.children[0].children.len() < 32);
+    config.insert(0, 2);
+    config.remove(1..2);
+    assert_eq!(config.item_extent(1), Some(60.0));
+    assert_eq!(
+        VList::variable("variable", &config, 0.0)
+            .config(1001)
+            .item_count(),
+        1001
+    );
+}
+
+#[test]
+#[should_panic(expected = "variable list count must match")]
+fn variable_lists_reject_a_count_that_disagrees_with_retained_measurements() {
+    let config = argui_ui::VirtualList::variable(3, 20.0, 100.0);
+    let _ = VList::variable("list", &config, 0.0).config(4);
+}

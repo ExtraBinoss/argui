@@ -10,6 +10,58 @@ use argui_ui::{Axes, Dimension, EffectScope, Element, ElementKind, Interaction, 
 
 mod cache;
 
+#[test]
+fn custom_phase_diagnostics_report_retained_work_and_ignore_removed_nodes() {
+    #[derive(Debug)]
+    struct Rectangle;
+    impl argui_ui::CustomElement for Rectangle {
+        type State = ();
+        fn create_state(&self) {}
+        fn layout_revision(&self) -> u64 {
+            0
+        }
+        fn paint_revision(&self) -> u64 {
+            0
+        }
+        fn prepare(&self, _: &mut (), _: Size) {}
+        fn layout(
+            &self,
+            _: &mut (),
+            _: &mut dyn argui_ui::CustomLayoutContext,
+        ) -> Result<argui_ui::CustomMeasurement, String> {
+            Ok(argui_ui::CustomMeasurement {
+                size: Size::new(40.0, 20.0),
+                baseline: None,
+            })
+        }
+        fn paint(&self, _: &mut (), cx: &mut argui_ui::CustomPaintContext<'_>) {
+            cx.quad(
+                Rect::new(Point::default(), cx.bounds.size),
+                argui_paint::QuadStyle::solid(Color::WHITE),
+            );
+        }
+    }
+    let mut ui = UiTree::new(Element::custom(Rectangle));
+    let mut engine = argui_layout::LayoutEngine::new();
+    let layout = engine
+        .compute(
+            &mut ui,
+            &mut argui_text::TextEngine::new(),
+            Size::new(100.0, 50.0),
+        )
+        .unwrap();
+    let stats = engine.custom_stats();
+    let mut snapshot = Inspection::snapshot(&ui, &layout);
+    Inspection::custom_stats(&mut snapshot, &stats);
+    let summary = snapshot.nodes[0].summary.as_ref().unwrap();
+    assert!(summary.contains("Rectangle"));
+    assert!(summary.contains(&format!("layout {}", stats[0].phases.layouts)));
+    assert!(summary.contains("prepare 1 · paint 1"));
+    snapshot.nodes.clear();
+    Inspection::custom_stats(&mut snapshot, &stats);
+    assert!(snapshot.nodes.is_empty());
+}
+
 fn fully_styled() -> Element {
     Element::container([])
         .background(Color::WHITE)

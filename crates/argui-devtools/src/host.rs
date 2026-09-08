@@ -205,13 +205,6 @@ impl<A: Render> DevtoolsHost<A> {
 }
 
 impl<A: Render> DevtoolsHost<A> {
-    pub fn view(&mut self) -> Element {
-        let app = self.app.render();
-        let environment = argui_runtime::WindowEnvironment::default();
-        let themes = argui_widgets::shadcn(environment.primary);
-        view::host(self, app, themes.resolve(environment.color_scheme), None)
-    }
-
     pub fn update(&mut self, event: &UiEvent) -> ViewUpdate {
         self.update_tools(event).unwrap_or(ViewUpdate::None)
     }
@@ -280,7 +273,9 @@ impl<A: Render> DevtoolsHost<A> {
             .unwrap_or_default();
     }
 
-    pub fn layout_changed(&mut self, layout: &LayoutSnapshot) -> ViewUpdate {
+    /// Update inspector geometry without delivering layout to the application.
+    /// Application layout delivery belongs to the retained parent presentation.
+    pub fn inspect_layout(&mut self, layout: &LayoutSnapshot) -> ViewUpdate {
         let changed = self.measure_profile(layout);
         self.viewport = layout.viewport;
         if let Some(bounds) = layout.bounds("__devtools-tree") {
@@ -291,8 +286,6 @@ impl<A: Render> DevtoolsHost<A> {
             application.viewport = bounds;
         }
         self.app_viewport = application.viewport;
-        self.app
-            .update(|app, cx| app.layout_changed(&application, cx));
         if changed {
             ViewUpdate::Rebuild
         } else {
@@ -369,18 +362,9 @@ impl<A: Render> Render for DevtoolsHost<A> {
     }
 
     fn layout_changed(&mut self, layout: &LayoutSnapshot, cx: &mut Context<Self>) {
-        if self.measure_profile(layout) {
-            cx.notify();
-        }
-        self.viewport = layout.viewport;
-        if let Some(bounds) = layout.bounds("__devtools-tree") {
-            self.tree_height = bounds.size.height;
-        }
+        request_update(cx, self.inspect_layout(layout));
         let mut application = layout.clone();
-        if let Some(bounds) = layout.bounds("__devtools-app-root") {
-            application.viewport = bounds;
-        }
-        self.app_viewport = application.viewport;
+        application.viewport = self.app_viewport;
         cx.layout_entity(&self.app, &application);
     }
 

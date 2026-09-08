@@ -1,7 +1,48 @@
 use super::*;
 
-pub(super) fn finish_exit(app: &Entity<argui_widgets::SelectionHost<Editor>>) {
-    let root = app.render();
+#[test]
+fn selection_toolbar_dismisses_on_outside_pointer_without_consuming_it() {
+    let app = Entity::new(argui_widgets::SelectionHost::new(Editor))
+        .mount()
+        .unwrap();
+    dispatch(
+        &app,
+        UiEventKind::DocumentSelectionChanged {
+            text: Some("selected".into()),
+            bounds: Some(Rect::new(Point::new(40.0, 60.0), Size::new(50.0, 18.0))),
+            touch: true,
+            dragging: false,
+        },
+    );
+    let mut tree = UiTree::new(app.render(WindowEnvironment::default()).unwrap());
+    let target = tree
+        .node_ids()
+        .iter()
+        .copied()
+        .find(|node| tree.key(*node) == Some("argui::selection-menu"))
+        .unwrap();
+    let events = tree.event_deliveries(
+        target,
+        UiEventKind::PointerOutside(argui_core::PointerEvent::mouse(
+            argui_core::PointerPhase::Pressed,
+            Point::new(0.0, 0.0),
+        )),
+    );
+    for event in &events {
+        if event.should_dispatch() {
+            app.dispatch_event(event).unwrap();
+        }
+        assert!(!event.default_prevented());
+    }
+    host::finish_exit(&app);
+    assert!(!has_key(
+        &app.render(WindowEnvironment::default()).unwrap(),
+        "argui::selection-menu"
+    ));
+}
+
+pub(super) fn finish_exit(app: &Mount<argui_widgets::SelectionHost<Editor>>) {
+    let root = app.render(WindowEnvironment::default()).unwrap();
     let menu = find_key(&root, "argui::selection-menu").unwrap();
     assert!(menu.semantic_hidden);
     assert_eq!(menu.hit_test.pointer_events, argui_ui::PointerEvents::None);
@@ -13,12 +54,15 @@ pub(super) fn finish_exit(app: &Entity<argui_widgets::SelectionHost<Editor>>) {
             },
             cx,
         )
-    });
+    })
+    .unwrap();
 }
 
 #[test]
 fn menu_is_readable_on_zero_elapsed_frame_and_finishes_without_pointer_events() {
-    let app = Entity::new(argui_widgets::SelectionHost::new(Editor));
+    let app = Entity::new(argui_widgets::SelectionHost::new(Editor))
+        .mount()
+        .unwrap();
     dispatch(
         &app,
         UiEventKind::ContextMenu {
@@ -30,7 +74,7 @@ fn menu_is_readable_on_zero_elapsed_frame_and_finishes_without_pointer_events() 
             },
         },
     );
-    let root = app.render();
+    let root = app.render(WindowEnvironment::default()).unwrap();
     let toolbar = find_key(&root, "argui::selection-menu").unwrap();
     assert!(matches!(
         toolbar.layer.as_ref().unwrap().backdrop_filters.as_slice(),
@@ -53,7 +97,8 @@ fn menu_is_readable_on_zero_elapsed_frame_and_finishes_without_pointer_events() 
                 },
                 cx,
             )
-        });
+        })
+        .unwrap();
         assert_eq!(
             tree.resolved_layer(node, toolbar, toolbar.layer.as_ref().unwrap())
                 .opacity,
@@ -81,8 +126,12 @@ fn menu_is_readable_on_zero_elapsed_frame_and_finishes_without_pointer_events() 
             },
             cx,
         )
-    });
-    assert!(!has_key(&app.render(), "argui::selection-menu"));
+    })
+    .unwrap();
+    assert!(!has_key(
+        &app.render(WindowEnvironment::default()).unwrap(),
+        "argui::selection-menu"
+    ));
     assert!(!app.read(Render::wants_animation_frame));
 }
 
@@ -90,7 +139,9 @@ fn menu_is_readable_on_zero_elapsed_frame_and_finishes_without_pointer_events() 
 fn context_menu_survives_passive_selection_refresh_then_closes_on_drag() {
     let app = Entity::new(
         argui_widgets::SelectionHost::new(Editor).backdrop_filter(argui_paint::Filter::Blur(3.0)),
-    );
+    )
+    .mount()
+    .unwrap();
     dispatch(
         &app,
         UiEventKind::ContextMenu {
@@ -119,8 +170,9 @@ fn context_menu_survives_passive_selection_refresh_then_closes_on_drag() {
             },
             cx,
         )
-    });
-    let root = app.render();
+    })
+    .unwrap();
+    let root = app.render(WindowEnvironment::default()).unwrap();
     let toolbar = find_key(&root, "argui::selection-menu")
         .expect("passive selection refresh must not dismiss menu");
     let tree = UiTree::new(root.clone());
@@ -153,13 +205,19 @@ fn context_menu_survives_passive_selection_refresh_then_closes_on_drag() {
             },
             cx,
         )
-    });
-    assert!(!has_key(&app.render(), "argui::selection-menu"));
+    })
+    .unwrap();
+    assert!(!has_key(
+        &app.render(WindowEnvironment::default()).unwrap(),
+        "argui::selection-menu"
+    ));
 }
 
 #[test]
 fn reopen_during_exit_restores_interaction_and_full_opacity() {
-    let app = Entity::new(argui_widgets::SelectionHost::new(Editor));
+    let app = Entity::new(argui_widgets::SelectionHost::new(Editor))
+        .mount()
+        .unwrap();
     for _ in 0..3 {
         dispatch(
             &app,
@@ -179,7 +237,8 @@ fn reopen_during_exit_restores_interaction_and_full_opacity() {
                 },
                 cx,
             )
-        });
+        })
+        .unwrap();
         dispatch_key(
             &app,
             "argui::selection-menu",
@@ -199,11 +258,88 @@ fn reopen_during_exit_restores_interaction_and_full_opacity() {
             },
         },
     );
-    let root = app.render();
+    let root = app.render(WindowEnvironment::default()).unwrap();
     assert!(
         !find_key(&root, "argui::selection-menu")
             .unwrap()
             .semantic_hidden
     );
     assert!(app.read(Render::wants_animation_frame));
+}
+
+#[test]
+fn selection_host_reduced_motion_mounts_immediately_and_global_command_uses_no_target() {
+    let app = Entity::new(argui_widgets::SelectionHost::new(Editor))
+        .mount()
+        .unwrap();
+    let environment = WindowEnvironment {
+        reduced_motion: true,
+        ..WindowEnvironment::default()
+    };
+    let _ = app.render(environment).unwrap();
+    dispatch(
+        &app,
+        UiEventKind::DocumentSelectionChanged {
+            text: Some("selected".into()),
+            bounds: Some(Rect::new(Point::new(40.0, 60.0), Size::new(50.0, 18.0))),
+            touch: true,
+            dragging: false,
+        },
+    );
+    let rendered = app.render(environment).unwrap();
+    assert!(has_key(&rendered, "argui::selection-menu"));
+    assert!(!app.read(Render::wants_animation_frame));
+
+    dispatch_key_in(
+        &app,
+        "argui::selection-menu::copy",
+        UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
+        environment,
+    );
+    assert!(!has_key(
+        &app.render(environment).unwrap(),
+        "argui::selection-menu"
+    ));
+}
+
+#[test]
+fn selection_host_prevents_pointer_default_for_command_press_and_keeps_menu_open() {
+    let app = Entity::new(argui_widgets::SelectionHost::new(Editor))
+        .mount()
+        .unwrap();
+    dispatch(
+        &app,
+        UiEventKind::ContextMenu {
+            position: Point::new(20.0, 24.0),
+            capabilities: SelectionCapabilities {
+                copy: true,
+                ..SelectionCapabilities::default()
+            },
+        },
+    );
+    let mut tree = UiTree::new(app.render(WindowEnvironment::default()).unwrap());
+    let target = tree
+        .node_ids()
+        .iter()
+        .copied()
+        .find(|node| tree.key(*node) == Some("argui::selection-menu::copy"))
+        .unwrap();
+    let events = tree.event_deliveries(
+        target,
+        UiEventKind::Pointer(argui_core::PointerEvent::mouse(
+            argui_core::PointerPhase::Pressed,
+            Point::new(22.0, 25.0),
+        )),
+    );
+    assert!(!events.is_empty());
+    for event in &events {
+        if event.should_dispatch() {
+            app.dispatch_event(event).unwrap();
+        }
+    }
+    assert!(events.iter().all(argui_ui::UiEvent::default_prevented));
+    assert!(has_key(
+        &app.render(WindowEnvironment::default()).unwrap(),
+        "argui::selection-menu::copy"
+    ));
 }

@@ -16,7 +16,7 @@ pub(crate) struct ContextEffects {
     pub(crate) theme: Option<ThemeRequest>,
     pub(crate) commands: Vec<AppCommand>,
     pub(crate) pointer_capture: Vec<PointerCaptureRequest>,
-    pub(crate) selection_command: Option<SelectionCommandRequest>,
+    pub(crate) ui_commands: Vec<argui_ui::UiCommand>,
     pub(super) children: Vec<AnyEntity>,
     pub(super) event_routes: Vec<AnyEntity>,
 }
@@ -25,12 +25,6 @@ pub(crate) struct ContextEffects {
 pub(crate) enum PointerCaptureRequest {
     Capture { pointer: PointerId, target: NodeId },
     Release { pointer: PointerId, target: NodeId },
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) struct SelectionCommandRequest {
-    pub(crate) target: Option<NodeId>,
-    pub(crate) command: argui_ui::SelectionCommand,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -64,9 +58,7 @@ pub(super) fn merge_effects(target: &mut ContextEffects, mut source: ContextEffe
     if source.text_selection.is_some() {
         target.text_selection = source.text_selection.take();
     }
-    if source.selection_command.is_some() {
-        target.selection_command = source.selection_command;
-    }
+    target.ui_commands.append(&mut source.ui_commands);
     if source.theme.is_some() {
         target.theme = source.theme.take();
     }

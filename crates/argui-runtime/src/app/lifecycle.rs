@@ -109,6 +109,14 @@ impl ApplicationHandler<UserEvent> for Application {
         #[cfg(not(target_arch = "wasm32"))]
         {
             match event {
+                UserEvent::ModelsReady => self.models_ready(event_loop),
+                #[cfg(feature = "tasks")]
+                UserEvent::TasksReady => {
+                    if let Some(tasks) = &self.tasks {
+                        tasks.drain();
+                    }
+                    self.tasks_ready(event_loop);
+                }
                 UserEvent::Preferences { .. } => {}
                 #[cfg(all(feature = "webview", target_os = "linux"))]
                 UserEvent::NativeInput { .. } => {}
@@ -128,6 +136,14 @@ impl ApplicationHandler<UserEvent> for Application {
                 return;
             };
             match event {
+                UserEvent::ModelsReady => self.models_ready(event_loop),
+                #[cfg(feature = "tasks")]
+                UserEvent::TasksReady => {
+                    if let Some(tasks) = &self.tasks {
+                        tasks.drain();
+                    }
+                    self.tasks_ready(event_loop);
+                }
                 UserEvent::Preferences { .. } => {}
                 UserEvent::ClipboardText {
                     window: window_key,
@@ -175,6 +191,7 @@ impl ApplicationHandler<UserEvent> for Application {
         let platform_event = match event {
             WindowEvent::CloseRequested => PlatformEvent::CloseRequested,
             WindowEvent::Resized(size) => {
+                self.sync_host_visibility();
                 self.pending_window_frame.resize(size.width, size.height);
                 PlatformEvent::Resized {
                     width: size.width,
@@ -287,7 +304,13 @@ impl ApplicationHandler<UserEvent> for Application {
                 self.ime_input(input.clone(), &window, event_loop);
                 PlatformEvent::Ime(input)
             }
+            WindowEvent::Occluded(occluded) => {
+                self.occluded = occluded;
+                self.sync_host_visibility();
+                return;
+            }
             WindowEvent::Focused(focused) => {
+                self.sync_host_visibility();
                 self.window_focus(focused, &window, event_loop);
                 PlatformEvent::Focused(focused)
             }

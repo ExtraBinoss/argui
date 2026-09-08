@@ -19,6 +19,8 @@ mod frame;
 #[cfg(all(feature = "webview", target_os = "linux"))]
 mod gtk;
 mod inspect;
+mod model_updates;
+mod visibility;
 pub use inspect::{Inspection, InspectionCache};
 mod lifecycle;
 #[cfg(all(
@@ -51,6 +53,8 @@ pub(crate) struct Application {
     pub(crate) window_key: argui_platform::WindowKey,
     exit_on_close: bool,
     initial_visible: bool,
+    pub(super) presentation_visible: bool,
+    pub(super) occluded: bool,
     preference_overrides: argui_platform::PreferenceOverrides,
     preferences: argui_platform::SystemPreferences,
     system_color_scheme: Option<argui_core::ColorScheme>,
@@ -106,6 +110,8 @@ pub(crate) struct Application {
     #[cfg(not(target_arch = "wasm32"))]
     pub(super) clipboard: argui_platform::Clipboard,
     pub(super) event_proxy: Option<crate::host::EventProxy>,
+    #[cfg(feature = "tasks")]
+    pub(crate) tasks: Option<crate::tasks::TaskRuntime>,
     pending_scrollbar_drag: Option<Point>,
     pending_pointer_scroll: Option<scroll::PendingScroll>,
     scroll_inertia: scroll::ScrollInertia,
@@ -118,6 +124,7 @@ pub(crate) struct Application {
     pub(super) frame_record: argui_inspect::FrameRecord,
     pub(super) last_redraw: Option<Instant>,
     pub(crate) fatal_error: Option<RuntimeError>,
+    pub(crate) pending_app_commands: Vec<crate::AppCommand>,
     pub(super) on_event: Box<dyn FnMut(RuntimeEvent)>,
 }
 
@@ -153,11 +160,14 @@ impl Application {
             tree.set_pointer_settings(pointer_settings);
         }
         Self {
+            pending_app_commands: Vec::new(),
             window_config,
             identity: None,
             window_key: argui_platform::WindowKey::main(),
             exit_on_close: true,
             initial_visible: true,
+            presentation_visible: true,
+            occluded: false,
             preference_overrides: argui_platform::PreferenceOverrides::default(),
             preferences: argui_platform::SystemPreferences::default(),
             system_color_scheme: None,
@@ -213,6 +223,8 @@ impl Application {
             #[cfg(not(target_arch = "wasm32"))]
             clipboard: argui_platform::Clipboard::new(),
             event_proxy: None,
+            #[cfg(feature = "tasks")]
+            tasks: None,
             pending_scrollbar_drag: None,
             pending_pointer_scroll: None,
             scroll_inertia: scroll::ScrollInertia::default(),
@@ -248,8 +260,12 @@ impl Application {
         self
     }
 
-    pub(crate) const fn initially_visible(mut self, visible: bool) -> Self {
+    pub(crate) fn initially_visible(mut self, visible: bool) -> Self {
         self.initial_visible = visible;
+        self.presentation_visible = visible;
+        if let Some(model) = &self.model {
+            model.set_host_visible(visible);
+        }
         self
     }
 
@@ -267,7 +283,9 @@ impl Application {
             ViewUpdate::Paint => self.pending_ui_frame.request_paint(),
             ViewUpdate::Rebuild => self.pending_ui_frame.request_rebuild(),
         }
-        if let Some(window) = &self.window {
+        if self.presentation_visible
+            && let Some(window) = &self.window
+        {
             window.request_redraw();
         }
     }
@@ -309,7 +327,9 @@ impl Application {
             };
             let rebuild = self.model.as_ref().is_some_and(|model| {
                 model.layout_changed(&snapshot);
-                model.take_effects().update == ViewUpdate::Rebuild
+                let effects = model.take_effects();
+                self.pending_app_commands.extend(effects.commands);
+                effects.update == ViewUpdate::Rebuild
             });
             if rebuild && let Some(root) = self.inspected_view() {
                 if let Some(ui) = &mut self.ui_tree {
@@ -400,7 +420,7 @@ impl Application {
         let mut text_selection_request = None;
         let mut theme_request = None;
         let mut pointer_capture = Vec::new();
-        let mut selection_command = None;
+        let mut ui_commands = Vec::new();
         let focused = update.events.iter().rev().find_map(|event| {
             matches!(event.kind, argui_ui::UiEventKind::Focused).then_some(event.target)
         });
@@ -409,9 +429,18 @@ impl Application {
             if !event.should_dispatch() {
                 continue;
             }
+            if let argui_ui::UiEventKind::Action(invocation) = event.kind
+                && event.current_handler().is_none()
+                && let Some(ui) = &mut self.ui_tree
+            {
+                let action_update = ui.invoke_action(invocation);
+                self.apply_ui_update(action_update, window, event_loop);
+                continue;
+            }
             if let Some(model) = &self.model {
                 model.event(event);
                 let effects = model.take_effects();
+                self.pending_app_commands.extend(effects.commands);
                 match effects.update {
                     ViewUpdate::None => {}
                     ViewUpdate::Paint => update.paint_changed = true,
@@ -433,11 +462,13 @@ impl Application {
                     theme_request = effects.theme;
                 }
                 pointer_capture.extend(effects.pointer_capture);
-                if effects.selection_command.is_some() {
-                    selection_command = effects.selection_command;
-                }
+                ui_commands.extend(effects.ui_commands);
             }
-            (self.on_event)(RuntimeEvent::Ui(event.clone()));
+            let published = self
+                .ui_tree
+                .as_ref()
+                .map_or_else(|| event.clone(), |ui| ui.inspect_event(event));
+            (self.on_event)(RuntimeEvent::Ui(published));
         }
         let animation_changed = self.sync_animations();
         if let Some(request) = theme_request {
@@ -472,11 +503,11 @@ impl Application {
                 self.apply_ui_update(capture_update, window, event_loop);
             }
         }
-        if let Some(request) = selection_command
-            && let Some(ui) = &mut self.ui_tree
-        {
-            let selection_update = ui.selection_command(request.target, request.command);
-            self.apply_ui_update(selection_update, window, event_loop);
+        for command in ui_commands {
+            if let Some(ui) = &mut self.ui_tree {
+                let command_update = ui.apply_command(command);
+                self.apply_ui_update(command_update, window, event_loop);
+            }
         }
     }
 
@@ -520,4 +551,34 @@ fn local_point(layout: &LayoutOutput, node: argui_ui::NodeId, point: Point) -> O
         .find(|region| region.node == node)
         .and_then(|region| region.transform.inverse())
         .map(|inverse| inverse.transform_point(point))
+}
+
+impl Drop for Application {
+    fn drop(&mut self) {
+        if let Some(model) = &self.model {
+            if self.exit_on_close {
+                crate::shutdown_presentations(std::slice::from_ref(model));
+            } else {
+                model.close_presentation();
+            }
+        }
+        #[cfg(feature = "tasks")]
+        {
+            if self.exit_on_close
+                && let Some(tasks) = &self.tasks
+            {
+                tasks.shutdown();
+            }
+        }
+        #[cfg(all(
+            feature = "webview",
+            any(
+                target_arch = "wasm32",
+                target_os = "linux",
+                target_os = "windows",
+                target_os = "macos"
+            )
+        ))]
+        self.native_views.take();
+    }
 }

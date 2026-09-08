@@ -11,18 +11,22 @@ pub enum Page {
     Tabs,
     Select,
     Dialog,
-    Form,
-    Settings,
+    List,
+    VList,
+    Table,
     Layout,
     Motion,
     Effects,
-    Composition,
     Typography,
     WebView,
+    AsyncTasks,
+    Actions,
+    Editing,
+    CustomTimeline,
 }
 
 impl Page {
-    pub const ALL: [Self; 18] = [
+    pub const ALL: [Self; 22] = [
         Self::Button,
         Self::Input,
         Self::TextArea,
@@ -33,14 +37,18 @@ impl Page {
         Self::Tabs,
         Self::Select,
         Self::Dialog,
-        Self::Form,
-        Self::Settings,
+        Self::List,
+        Self::VList,
+        Self::Table,
         Self::Layout,
         Self::Motion,
         Self::Effects,
-        Self::Composition,
         Self::Typography,
         Self::WebView,
+        Self::AsyncTasks,
+        Self::Actions,
+        Self::Editing,
+        Self::CustomTimeline,
     ];
 
     pub const fn category(self) -> &'static str {
@@ -54,15 +62,19 @@ impl Page {
             | Self::Slider
             | Self::Tabs
             | Self::Select
-            | Self::Dialog => "Widgets",
-            Self::Form
-            | Self::Settings
-            | Self::Layout
+            | Self::Dialog
+            | Self::List
+            | Self::VList
+            | Self::Table => "Widgets",
+            Self::Layout
             | Self::Motion
             | Self::Effects
-            | Self::Composition
             | Self::Typography
-            | Self::WebView => "Examples",
+            | Self::WebView
+            | Self::AsyncTasks
+            | Self::Actions
+            | Self::Editing
+            | Self::CustomTimeline => "Examples",
         }
     }
 
@@ -78,14 +90,18 @@ impl Page {
             Self::Tabs => "Tabs",
             Self::Select => "Select",
             Self::Dialog => "Dialog",
-            Self::Form => "Profile form",
-            Self::Settings => "Settings panel",
+            Self::List => "List",
+            Self::VList => "VList",
+            Self::Table => "Table",
             Self::Layout => "Web layout",
             Self::Motion => "Motion & loading",
             Self::Effects => "GPU effects / WGSL",
-            Self::Composition => "Advanced composition",
             Self::Typography => "Typography & selection",
             Self::WebView => "WebView",
+            Self::AsyncTasks => "Async tasks",
+            Self::Actions => "Actions",
+            Self::Editing => "Editing & Password",
+            Self::CustomTimeline => "Custom Timeline",
         }
     }
 
@@ -101,14 +117,18 @@ impl Page {
             Self::Tabs => "tabs",
             Self::Select => "select",
             Self::Dialog => "dialog",
-            Self::Form => "form",
-            Self::Settings => "settings",
+            Self::List => "list",
+            Self::VList => "vlist",
+            Self::Table => "table",
             Self::Layout => "layout",
             Self::Motion => "motion",
             Self::Effects => "effects",
-            Self::Composition => "composition",
             Self::Typography => "typography",
             Self::WebView => "webview",
+            Self::AsyncTasks => "async-tasks",
+            Self::Actions => "actions",
+            Self::Editing => "editing",
+            Self::CustomTimeline => "custom-timeline",
         }
     }
 

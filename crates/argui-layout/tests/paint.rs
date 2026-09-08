@@ -1,6 +1,8 @@
 use argui_core::{Point, Size};
 #[path = "paint/effects.rs"]
 mod effects;
+#[path = "paint/geometry.rs"]
+mod geometry;
 use argui_layout::LayoutEngine;
 use argui_paint::{Border, Color, DisplayCommand, ImageFit, LayerStyle, VectorId};
 use argui_text::TextEngine;

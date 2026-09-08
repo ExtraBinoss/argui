@@ -142,7 +142,10 @@ impl Element {
                 text.align = align;
                 placeholder_text.align = align;
             }
-            ElementKind::Container | ElementKind::Image { .. } | ElementKind::Vector { .. } => {}
+            ElementKind::Custom(_)
+            | ElementKind::Container
+            | ElementKind::Image { .. }
+            | ElementKind::Vector { .. } => {}
         }
         self
     }
@@ -159,7 +162,10 @@ impl Element {
                 text.overflow = overflow;
                 placeholder_text.overflow = overflow;
             }
-            ElementKind::Container | ElementKind::Image { .. } | ElementKind::Vector { .. } => {}
+            ElementKind::Custom(_)
+            | ElementKind::Container
+            | ElementKind::Image { .. }
+            | ElementKind::Vector { .. } => {}
         }
         self
     }

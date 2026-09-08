@@ -1,6 +1,20 @@
 use argui_paint::{Color, ImageFit, ImageId, ImageSampling, VectorId};
 use argui_text::{TextContent, TextStyle};
 
+impl std::fmt::Debug for super::Element {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.text_privacy.protected() {
+            formatter
+                .debug_struct("Element")
+                .field("key", &self.key)
+                .field("content", &"[protected]")
+                .finish()
+        } else {
+            std::fmt::Debug::fmt(&self.0, formatter)
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct ElementNode {
     pub inspectable: bool,
@@ -27,6 +41,10 @@ pub struct ElementNode {
     pub(crate) virtual_item: Option<crate::VirtualItem>,
     pub portal: Option<crate::Portal>,
     pub focus_scope: Option<crate::FocusScope>,
+    pub text_privacy: crate::TextPrivacy,
+    pub text_history: Option<crate::HistoryConfig>,
+    pub action_scope: Option<crate::ActionScope>,
+    pub action: Option<crate::ActionInvocation>,
     pub event_listeners: Vec<crate::EventListener>,
     pub user_select: crate::UserSelect,
     pub selection_style: Option<crate::TextSelectionStyle>,
@@ -36,6 +54,7 @@ pub struct ElementNode {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ElementKind {
+    Custom(crate::CustomDescription),
     Container,
     Text {
         content: TextContent,

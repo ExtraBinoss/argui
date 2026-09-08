@@ -89,6 +89,90 @@ fn app_model_defaults_are_noop_and_return_empty_resources() {
 
 struct EffectsSurface;
 
+#[test]
+fn named_window_adapter_ignores_foreign_frames_layout_and_effect_requests() {
+    use std::{cell::Cell, rc::Rc};
+    struct Probe(Rc<Cell<usize>>);
+    impl Render for Probe {
+        fn render(&mut self, _: &mut Context<Self>) -> Element {
+            Element::text("auxiliary")
+        }
+        fn animation_frame(&mut self, _: Frame, cx: &mut Context<Self>) {
+            self.0.set(self.0.get() + 1);
+            cx.request_paint();
+        }
+        fn layout_changed(&mut self, _: &LayoutSnapshot, cx: &mut Context<Self>) {
+            self.0.set(self.0.get() + 10);
+            cx.write_clipboard(ClipboardRequest::Write("mailbox".into()));
+        }
+    }
+    let calls = Rc::new(Cell::new(0));
+    let key = WindowKey::new("mailbox");
+    let foreign = WindowKey::main();
+    let mut app = SingleWindowModel::new(Probe(calls.clone())).window_key(key.clone());
+    assert!(app.view(&foreign, Default::default()).is_none());
+    assert!(app.event_router(&foreign).is_none());
+    assert!(app.view(&key, Default::default()).is_some());
+    assert!(app.event_router(&key).is_some());
+    let frame = Frame {
+        now: Time::ZERO,
+        elapsed: Duration::from_millis(16),
+    };
+    assert!(app.animation_frame(&foreign, frame).windows.is_empty());
+    assert!(
+        app.layout_changed(&foreign, &LayoutSnapshot::default())
+            .windows
+            .is_empty()
+    );
+    assert_eq!(calls.get(), 0);
+    app.animation_frame(&key, frame);
+    app.layout_changed(&key, &LayoutSnapshot::default());
+    assert_eq!(calls.get(), 11);
+    assert!(app.take_focus_request(&foreign).is_none());
+    assert!(app.take_clipboard_request(&foreign).is_none());
+    assert_eq!(
+        app.take_clipboard_request(&key),
+        Some(ClipboardRequest::Write("mailbox".into()))
+    );
+    assert!(app.take_ui_commands(&foreign).is_empty());
+}
+
+#[test]
+fn window_adapters_retain_independent_mounts_of_one_shared_entity() {
+    struct Shared;
+    impl Render for Shared {
+        fn render(&mut self, cx: &mut Context<Self>) -> Element {
+            Element::text(format!("{:?}", cx.environment().color_scheme))
+        }
+    }
+    let model = argui_runtime::Entity::new(Shared);
+    let first = SingleWindowModel::from_entity(model.clone()).unwrap();
+    let second = SingleWindowModel::from_entity(model.clone()).unwrap();
+    let window = WindowKey::main();
+    let dark = WindowEnvironment {
+        color_scheme: ColorScheme::Dark,
+        ..Default::default()
+    };
+    let first_view = first.view(&window, dark).unwrap();
+    let second_view = second.view(&window, WindowEnvironment::default()).unwrap();
+    assert_ne!(first_view, second_view);
+    assert_eq!(first.view(&window, dark).unwrap(), first_view);
+    assert_eq!(model.resources().resource_count(), 2);
+    drop(first);
+    assert_eq!(model.resources().resource_count(), 1);
+    assert_eq!(
+        second.view(&window, WindowEnvironment::default()).unwrap(),
+        second_view
+    );
+    drop(second);
+    assert_eq!(model.resources().resource_count(), 0);
+    model.resources().close();
+    assert!(matches!(
+        SingleWindowModel::from_entity(model),
+        Err(argui_runtime::ScopeClosed)
+    ));
+}
+
 impl Render for EffectsSurface {
     fn render(&mut self, cx: &mut Context<Self>) -> Element {
         Element::container([]).keyed("effects").on(cx.listener(
@@ -102,6 +186,8 @@ impl Render for EffectsSurface {
                 assert!(cx.capture_pointer(PointerId::MOUSE));
                 assert!(cx.release_pointer(PointerId::MOUSE));
                 cx.selection_command(SelectionCommand::Copy);
+                cx.edit_text("effects", "atomic edit");
+                cx.invoke_action(argui_ui::ActionInvocation::new(argui_ui::ActionId::UNDO));
                 cx.set_theme(ThemeRequest {
                     color_scheme: Some(ColorScheme::Dark),
                     primary: Some(Color::srgb(0.8, 0.2, 0.4)),
@@ -178,6 +264,23 @@ fn single_window_adapter_exposes_every_component_effect_without_a_native_window(
     assert!(model.take_scroll_request(&other).is_none());
     assert!(model.take_focus_request(&other).is_none());
     assert!(model.take_text_selection_request(&other).is_none());
+    assert!(model.take_ui_commands(&other).is_empty());
+    let commands = model.take_ui_commands(&main);
+    assert_eq!(commands.len(), 3);
+    assert!(matches!(
+        commands[0],
+        argui_ui::UiCommand::Selection {
+            command: SelectionCommand::Copy,
+            ..
+        }
+    ));
+    assert!(
+        matches!(&commands[1], argui_ui::UiCommand::ReplaceText { value, .. } if value == "atomic edit")
+    );
+    assert!(
+        matches!(commands[2], argui_ui::UiCommand::Action(invocation) if invocation.id == argui_ui::ActionId::UNDO)
+    );
+    assert!(model.take_ui_commands(&main).is_empty());
     assert!(model.take_theme_request(&other).is_none());
     assert!(model.wants_animation_frame(&main));
     assert!(!model.wants_animation_frame(&other));

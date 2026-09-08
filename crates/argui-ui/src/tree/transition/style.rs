@@ -213,7 +213,9 @@ fn base_values(element: &Element, scroll: Point) -> Vec<StylePropertyValue> {
         crate::ElementKind::Vector { color, .. } => {
             values.push(value(PropertyKey::VectorColor, StateValue::Color(*color)));
         }
-        crate::ElementKind::Container | crate::ElementKind::Image { .. } => {}
+        crate::ElementKind::Custom(_)
+        | crate::ElementKind::Container
+        | crate::ElementKind::Image { .. } => {}
     }
     if element.conditional_styles.contains(PropertyKey::Scroll) {
         values.push(value(PropertyKey::Scroll, StateValue::Point(scroll)));

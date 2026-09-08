@@ -6,6 +6,7 @@ use crate::WidgetTheme;
 #[derive(Clone, Debug)]
 pub struct VList {
     key: String,
+    variable: Option<VirtualList>,
     pub viewport: f32,
     pub offset: f32,
     pub row_height: f32,
@@ -19,6 +20,7 @@ impl VList {
         assert!(row_height.is_finite() && row_height > 0.0);
         Self {
             key: key.into(),
+            variable: None,
             row_height,
             viewport: viewport.max(0.0),
             offset: offset.max(0.0),
@@ -27,9 +29,45 @@ impl VList {
         }
     }
 
+    /// Keep `config` in application state; clones share measured row heights.
+    #[must_use]
+    pub fn variable(key: impl Into<String>, config: &VirtualList, offset: f32) -> Self {
+        let mut list = Self::new(
+            key,
+            config.estimated_extent(),
+            config.viewport_extent(),
+            offset,
+        );
+        list.variable = Some(config.clone());
+        list
+    }
+
+    /// Builds selectable rows with the same behavior as a non-virtual List.
+    #[must_use]
+    pub fn build_list(
+        &self,
+        count: usize,
+        state: &crate::ListState,
+        multiple: bool,
+        theme: &WidgetTheme,
+        mut row: impl FnMut(usize) -> Element,
+    ) -> Element {
+        let list = crate::List::new(&self.key, count).selection(state, multiple);
+        list.root(self.build(count, theme, |index| list.row(index, row(index), theme)))
+    }
+
     #[must_use]
     pub fn config(&self, count: usize) -> VirtualList {
-        VirtualList::fixed(count, self.row_height, self.viewport).overscan(8)
+        if let Some(config) = &self.variable {
+            assert_eq!(
+                count,
+                config.item_count(),
+                "variable list count must match its retained configuration"
+            );
+            config.clone().with_viewport(self.viewport).overscan(8)
+        } else {
+            VirtualList::fixed(count, self.row_height, self.viewport).overscan(8)
+        }
     }
 
     #[must_use]

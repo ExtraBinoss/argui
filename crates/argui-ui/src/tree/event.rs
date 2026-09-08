@@ -67,9 +67,23 @@ impl UiTree {
         let Some(target_index) = self.node_ids.iter().position(|node| *node == target) else {
             return Vec::new();
         };
+        if matches!(kind, UiEventKind::Click(_)) && !self.input_available(target) {
+            return Vec::new();
+        }
         let event_type = kind.event_type();
         let target_key = self.key_for(target).map(ToOwned::to_owned);
-        let base = UiEvent::new(target, target_key, kind);
+        if matches!(kind, UiEventKind::Blurred | UiEventKind::Focused)
+            && let Some(state) = self.text_inputs.get_mut(target)
+        {
+            state.break_edit_group();
+        }
+        let mut base = UiEvent::new(target, target_key, kind);
+        base.set_focused_node(self.focused_node());
+        base.set_history(
+            self.text_inputs
+                .get(target)
+                .map(|state| (state.can_undo(), state.can_redo())),
+        );
         let mut ancestry = Vec::new();
         let mut cursor = self.events.parent(target_index);
         while let Some(index) = cursor {
@@ -117,6 +131,9 @@ impl UiTree {
                     &mut deliveries,
                 );
             }
+        }
+        if let Some(action) = self.default_action(&base) {
+            deliveries.push(action);
         }
         deliveries
     }

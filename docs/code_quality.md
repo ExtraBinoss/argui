@@ -76,6 +76,7 @@ unbounded caches, and abstractions created for hypothetical future work.
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo check --workspace --all-targets --target wasm32-unknown-unknown
+cargo test -p argui-runtime --all-features --doc model::model_context::ModelContext
 ./scripts/check-coverage.sh
 ```
 
@@ -87,3 +88,8 @@ branches without invalidating the stable interactive build cache. Instrumented
 artifacts live in `target/coverage/`; the coverage lock rejects concurrent runs.
 Before measuring, workspace instrumentation artifacts are cleaned while dependency
 caches are retained, so old feature variants cannot add duplicate uncovered maps.
+
+The model-context compilation contracts live in
+`crates/argui-runtime/tests/model/model_context.md` and are included in the public
+API documentation. Rustdoc checks both rejected window capabilities and a valid
+presentation consumer; Nextest remains the runner for behavioral tests.

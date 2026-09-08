@@ -64,8 +64,13 @@ impl RuntimeEvent {
 
 #[derive(Debug)]
 pub(crate) enum UserEvent {
+    ModelsReady,
+    #[cfg(feature = "tasks")]
+    TasksReady,
     #[cfg(all(feature = "webview", target_os = "linux"))]
-    NativeInput { window: WindowKey },
+    NativeInput {
+        window: WindowKey,
+    },
     Preferences {
         window: WindowKey,
         preferences: argui_platform::SystemPreferences,
@@ -89,7 +94,26 @@ pub(crate) enum UserEvent {
 
 impl Application {
     pub(crate) fn set_event_proxy(&mut self, proxy: impl Into<crate::host::EventProxy>) {
-        self.event_proxy = Some(proxy.into());
+        let proxy = proxy.into();
+        if let Some(model) = &self.model {
+            let wake = proxy.clone();
+            model.set_model_wake(move || {
+                let _ = wake.send_event(UserEvent::ModelsReady);
+            });
+        }
+        #[cfg(feature = "tasks")]
+        {
+            let wake = proxy.clone();
+            let tasks = self.tasks.get_or_insert_with(|| {
+                crate::tasks::TaskRuntime::new(move || {
+                    let _ = wake.send_event(UserEvent::TasksReady);
+                })
+            });
+            if let Some(model) = &self.model {
+                model.set_task_runtime(tasks.clone());
+            }
+        }
+        self.event_proxy = Some(proxy);
     }
 }
 

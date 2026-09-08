@@ -44,7 +44,10 @@ pub(super) fn text_colors(elements: &[&Element], ui: &UiTree, output: &mut Layou
                     text.color
                 }
             }
-            ElementKind::Container | ElementKind::Image { .. } | ElementKind::Vector { .. } => {
+            ElementKind::Custom(_)
+            | ElementKind::Container
+            | ElementKind::Image { .. }
+            | ElementKind::Vector { .. } => {
                 continue;
             }
         };

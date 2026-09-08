@@ -30,9 +30,10 @@ impl AssetMetrics {
         match kind {
             ElementKind::Image { image, .. } => self.images.get(image).copied(),
             ElementKind::Vector { vector, .. } => self.vectors.get(vector).copied(),
-            ElementKind::Container | ElementKind::Text { .. } | ElementKind::TextEditor { .. } => {
-                None
-            }
+            ElementKind::Custom(_)
+            | ElementKind::Container
+            | ElementKind::Text { .. }
+            | ElementKind::TextEditor { .. } => None,
         }
     }
 

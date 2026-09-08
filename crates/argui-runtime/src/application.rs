@@ -123,6 +123,12 @@ fn strongest(left: ViewUpdate, right: ViewUpdate) -> ViewUpdate {
 }
 
 pub trait AppModel: 'static {
+    fn take_ui_commands(&mut self, _window: &WindowKey) -> Vec<argui_ui::UiCommand> {
+        Vec::new()
+    }
+    fn tasks_ready(&mut self, _window: &WindowKey) -> AppUpdate {
+        AppUpdate::none()
+    }
     fn view(&self, window: &WindowKey, environment: WindowEnvironment) -> Option<Element>;
 
     fn event_router(&self, _window: &WindowKey) -> Option<crate::AnyEntity> {
@@ -188,7 +194,9 @@ pub trait AppModel: 'static {
 
 /// Headless-friendly [`AppModel`] adapter for one retained component window.
 pub struct SingleWindowModel<A: Render> {
-    app: Entity<A>,
+    window: WindowKey,
+    ui_commands: std::cell::RefCell<Vec<argui_ui::UiCommand>>,
+    app: crate::Mount<A>,
     clipboard: std::cell::RefCell<Option<ClipboardRequest>>,
     scroll: std::cell::RefCell<Option<ScrollRequest>>,
     focus: std::cell::RefCell<Option<FocusRequest>>,
@@ -200,19 +208,35 @@ pub struct SingleWindowModel<A: Render> {
 impl<A: Render> SingleWindowModel<A> {
     #[must_use]
     pub fn new(app: A) -> Self {
-        Self {
-            app: Entity::new(app),
+        Self::from_entity(Entity::new(app)).expect("new application model is open")
+    }
+
+    /// Create an independent window presentation in an existing model domain.
+    /// Other windows may retain the same entity without sharing this mount.
+    pub fn from_entity(app: Entity<A>) -> Result<Self, crate::ScopeClosed> {
+        Ok(Self {
+            window: WindowKey::main(),
+            ui_commands: std::cell::RefCell::new(Vec::new()),
+            app: app.mount()?,
             clipboard: std::cell::RefCell::new(None),
             scroll: std::cell::RefCell::new(None),
             focus: std::cell::RefCell::new(None),
             text_selection: std::cell::RefCell::new(None),
             theme: std::cell::RefCell::new(None),
             animation_requested: std::cell::Cell::new(false),
-        }
+        })
+    }
+
+    /// Bind this single presentation to a named application window.
+    #[must_use]
+    pub fn window_key(mut self, window: WindowKey) -> Self {
+        self.window = window;
+        self
     }
 
     fn drain_effects(&self, window: &WindowKey) -> AppUpdate {
-        let effects = self.app.take_effects();
+        let effects = self.app.entity.take_effects();
+        self.ui_commands.borrow_mut().extend(effects.ui_commands);
         if effects.clipboard.is_some() {
             *self.clipboard.borrow_mut() = effects.clipboard;
         }
@@ -244,19 +268,48 @@ impl<A: Render> SingleWindowModel<A> {
     }
 }
 
+impl<A: Render> Drop for SingleWindowModel<A> {
+    fn drop(&mut self) {
+        self.app.close();
+    }
+}
+
 impl<A: Render> AppModel for SingleWindowModel<A> {
+    #[cfg(feature = "tasks")]
+    fn tasks_ready(&mut self, window: &WindowKey) -> AppUpdate {
+        if window != &self.window {
+            return AppUpdate::none();
+        }
+        let effects = self.app.entity.take_task_effects();
+        self.app.entity.store_effects(effects);
+        self.drain_effects(window)
+    }
     fn view(&self, window: &WindowKey, environment: WindowEnvironment) -> Option<Element> {
-        (window.as_str() == WindowKey::MAIN_VALUE).then(|| self.app.render_in(environment))
+        (window == &self.window).then(|| self.app.entity.render_in(environment))
     }
 
     fn event_router(&self, window: &WindowKey) -> Option<crate::AnyEntity> {
-        (window.as_str() == WindowKey::MAIN_VALUE).then(|| self.app.erase())
+        (window == &self.window).then(|| self.app.entity.erase())
     }
 
     fn update(&mut self, event: &AppEvent) -> AppUpdate {
         match event {
-            AppEvent::Ui { window, event } if window.as_str() == WindowKey::MAIN_VALUE => {
-                self.app.dispatch_event(event);
+            AppEvent::Window {
+                window,
+                event: PlatformEvent::VisibilityChanged(visible),
+            } if window == &self.window => {
+                self.app.entity.erase().set_host_visible(*visible);
+                AppUpdate::none()
+            }
+            AppEvent::Window {
+                window,
+                event: PlatformEvent::Closed,
+            } if window == &self.window => {
+                self.app.entity.erase().close_presentation();
+                AppUpdate::none()
+            }
+            AppEvent::Ui { window, event } if window == &self.window => {
+                self.app.entity.dispatch_event(event);
                 self.drain_effects(window)
             }
             _ => AppUpdate::none(),
@@ -264,61 +317,74 @@ impl<A: Render> AppModel for SingleWindowModel<A> {
     }
 
     fn animation_frame(&mut self, window: &WindowKey, frame: Frame) -> AppUpdate {
+        if window != &self.window {
+            return AppUpdate::none();
+        }
         self.animation_requested.set(false);
-        self.app.animation_frame(frame);
+        self.app.entity.animation_frame(frame);
         self.drain_effects(window)
     }
 
     fn wants_animation_frame(&self, window: &WindowKey) -> bool {
-        window.as_str() == WindowKey::MAIN_VALUE
-            && (self.animation_requested.get() || self.app.wants_frame())
+        window == &self.window && (self.animation_requested.get() || self.app.entity.wants_frame())
     }
 
     fn layout_changed(&mut self, window: &WindowKey, layout: &LayoutSnapshot) -> AppUpdate {
-        self.app.layout_changed(layout);
+        if window != &self.window {
+            return AppUpdate::none();
+        }
+        self.app.entity.layout_changed(layout);
         self.drain_effects(window)
     }
 
     fn image_assets(&self) -> Vec<ImageAsset> {
-        self.app.read(Render::image_assets)
+        self.app.entity.read(Render::image_assets)
     }
 
     fn vector_assets(&self) -> Vec<VectorAsset> {
-        self.app.read(Render::vector_assets)
+        self.app.entity.read(Render::vector_assets)
     }
 
     fn inspector(&self, window: &WindowKey) -> Option<InspectorHandle> {
-        (window.as_str() == WindowKey::MAIN_VALUE)
-            .then(|| self.app.read(Render::inspector))
+        (window == &self.window)
+            .then(|| self.app.entity.read(Render::inspector))
             .flatten()
     }
 
     fn take_clipboard_request(&mut self, window: &WindowKey) -> Option<ClipboardRequest> {
-        (window.as_str() == WindowKey::MAIN_VALUE)
+        (window == &self.window)
             .then(|| self.clipboard.borrow_mut().take())
             .flatten()
     }
 
+    fn take_ui_commands(&mut self, window: &WindowKey) -> Vec<argui_ui::UiCommand> {
+        if window == &self.window {
+            self.ui_commands.take()
+        } else {
+            Vec::new()
+        }
+    }
+
     fn take_scroll_request(&mut self, window: &WindowKey) -> Option<ScrollRequest> {
-        (window.as_str() == WindowKey::MAIN_VALUE)
+        (window == &self.window)
             .then(|| self.scroll.borrow_mut().take())
             .flatten()
     }
 
     fn take_focus_request(&mut self, window: &WindowKey) -> Option<FocusRequest> {
-        (window.as_str() == WindowKey::MAIN_VALUE)
+        (window == &self.window)
             .then(|| self.focus.borrow_mut().take())
             .flatten()
     }
 
     fn take_text_selection_request(&mut self, window: &WindowKey) -> Option<TextSelectionRequest> {
-        (window.as_str() == WindowKey::MAIN_VALUE)
+        (window == &self.window)
             .then(|| self.text_selection.borrow_mut().take())
             .flatten()
     }
 
     fn take_theme_request(&mut self, window: &WindowKey) -> Option<ThemeRequest> {
-        (window.as_str() == WindowKey::MAIN_VALUE)
+        (window == &self.window)
             .then(|| self.theme.borrow_mut().take())
             .flatten()
     }

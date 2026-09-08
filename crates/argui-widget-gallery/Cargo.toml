@@ -14,7 +14,7 @@ webview = ["argui/webview"]
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-argui = { workspace = true, features = ["widgets-all"] }
+argui = { workspace = true, features = ["widgets-all", "tasks"] }
 argui-image.workspace = true
 argui-effects = { workspace = true, features = ["artistic", "blur", "shadow", "scroll", "liquid-glass"] }
 argui-devtools.workspace = true

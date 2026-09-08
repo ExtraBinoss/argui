@@ -35,6 +35,28 @@ pub struct SemanticTree {
 }
 
 impl SemanticTree {
+    /// Converts surface-relative bounds for hosts whose accessible nodes are
+    /// positioned relative to their semantic parent (for example nested DOM).
+    /// Root and unattached nodes retain surface coordinates. Recompute after
+    /// parent movement/reparenting even when a child's surface bounds are unchanged.
+    #[must_use]
+    pub fn parent_relative_bounds(&self) -> HashMap<SemanticNodeId, Rect> {
+        let mut bounds = self
+            .nodes
+            .iter()
+            .map(|node| (node.id, node.bounds))
+            .collect::<HashMap<_, _>>();
+        for parent in &self.nodes {
+            for child in &parent.children {
+                if let Some(bounds) = bounds.get_mut(child) {
+                    bounds.origin.x -= parent.bounds.origin.x;
+                    bounds.origin.y -= parent.bounds.origin.y;
+                }
+            }
+        }
+        bounds
+    }
+
     #[must_use]
     pub fn node(&self, id: SemanticNodeId) -> Option<&SemanticNode> {
         self.nodes.iter().find(|node| node.id == id)

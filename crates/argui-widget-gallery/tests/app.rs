@@ -91,36 +91,6 @@ fn find_key<'a>(element: &'a Element, key: &str) -> Option<&'a Element> {
         .find_map(|child| find_key(child, key))
 }
 
-fn contains_text(element: &Element, value: &str) -> bool {
-    matches!(&element.kind, argui::ui::ElementKind::Text { content, .. } if content.as_str() == value)
-        || element
-            .children
-            .iter()
-            .any(|child| contains_text(child, value))
-}
-
-fn dispatch(gallery: &Entity<WidgetGallery>, key: &str, kind: UiEventKind) {
-    let mut tree = UiTree::new(gallery.render());
-    let target = tree
-        .node_ids()
-        .iter()
-        .copied()
-        .find(|node| tree.key(*node) == Some(key))
-        .unwrap();
-    let kind = match kind {
-        UiEventKind::Gesture(mut gesture) => {
-            gesture.target = target;
-            UiEventKind::Gesture(gesture)
-        }
-        kind => kind,
-    };
-    for event in tree.event_deliveries(target, kind) {
-        if event.should_dispatch() {
-            gallery.dispatch_event(&event);
-        }
-    }
-}
-
 #[test]
 fn gallery_app_builds_a_searchable_public_root() {
     let gallery = Entity::new(WidgetGallery::default());
@@ -206,75 +176,24 @@ fn any_element_can_drive_a_constrained_resize_and_double_click_reset() {
     assert_eq!(panel.style.size.height, length(170.0));
 }
 
-#[test]
-fn application_shell_resize_clamps_collapses_and_resets() {
-    let gallery = Entity::new(WidgetGallery::default());
-    dispatch(
-        &gallery,
-        "nav::composition",
-        UiEventKind::Click(ClickEvent::accessibility()),
-    );
-    let pan = |phase, total| {
-        UiEventKind::Gesture(GestureEvent {
-            target: UiTree::new(Element::container([])).node_id_at(0).unwrap(),
-            pointer: PointerId::MOUSE,
-            phase,
-            kind: GestureKind::Pan {
-                position: total,
-                delta: total,
-                total,
-                velocity: Point::default(),
-            },
-            delivery: GestureDelivery::FrameCoalesced,
-        })
+fn dispatch(gallery: &Entity<WidgetGallery>, key: &str, kind: UiEventKind) {
+    let mut tree = UiTree::new(gallery.render());
+    let target = tree
+        .node_ids()
+        .iter()
+        .copied()
+        .find(|node| tree.key(*node) == Some(key))
+        .unwrap();
+    let kind = match kind {
+        UiEventKind::Gesture(mut gesture) => {
+            gesture.target = target;
+            UiEventKind::Gesture(gesture)
+        }
+        kind => kind,
     };
-    dispatch(
-        &gallery,
-        "shell-sidebar-resize",
-        pan(GesturePhase::Started, Point::default()),
-    );
-    dispatch(
-        &gallery,
-        "shell-sidebar-resize",
-        pan(GesturePhase::Changed, Point::new(-1_000.0, 0.0)),
-    );
-    let compact = gallery.render();
-    let sidebar = find_key(&compact, "shell-sidebar").unwrap();
-    assert_eq!(sidebar.style.size.width, length(72.0));
-    assert_eq!(sidebar.style.min_size.width, length(72.0));
-    assert_eq!(sidebar.style.max_size.width, length(300.0));
-    assert!(!contains_text(&compact, "Overview"));
-
-    dispatch(
-        &gallery,
-        "shell-sidebar-resize",
-        pan(GesturePhase::Changed, Point::new(1_000.0, 0.0)),
-    );
-    let expanded = gallery.render();
-    assert_eq!(
-        find_key(&expanded, "shell-sidebar")
-            .unwrap()
-            .style
-            .size
-            .width,
-        length(300.0)
-    );
-    assert!(contains_text(&expanded, "Overview"));
-
-    dispatch(
-        &gallery,
-        "shell-sidebar-resize",
-        UiEventKind::Click(ClickEvent::pointer(
-            PointerEvent::mouse(PointerPhase::Released, Point::default()),
-            2,
-        )),
-    );
-    assert_eq!(
-        find_key(&gallery.render(), "shell-sidebar")
-            .unwrap()
-            .style
-            .size
-            .width,
-        length(224.0)
-    );
+    for event in tree.event_deliveries(target, kind) {
+        if event.should_dispatch() {
+            gallery.dispatch_event(&event);
+        }
+    }
 }

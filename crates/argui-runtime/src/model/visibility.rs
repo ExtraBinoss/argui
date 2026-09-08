@@ -1,0 +1,163 @@
+use super::{
+    Context, Entity, Mount, Render, ScopeClosed, ViewUpdate, WeakEntity, inherit_environment_use,
+};
+use argui_ui::Element;
+
+impl<T> super::Presentation<T> {
+    pub(super) fn visible_effects(&self, effects: super::ContextEffects) -> super::ContextEffects {
+        if self.is_visible() {
+            effects
+        } else {
+            super::ContextEffects {
+                commands: effects.commands,
+                ..Default::default()
+            }
+        }
+    }
+
+    pub(super) fn is_visible(&self) -> bool {
+        self.visible.get() && self.host_visible.get() && !self.resources.is_closed()
+    }
+}
+
+impl<T: 'static> Mount<T> {
+    /// Whether this live mount is shown. A hidden mount keeps its identity,
+    /// subscriptions and tasks; closing it is a separate, irreversible operation.
+    #[must_use]
+    pub fn is_visible(&self) -> bool {
+        self.entity.0.presentation.is_visible()
+    }
+
+    /// Changes presentation visibility without cancelling any work. Repeated
+    /// requests are inert. Showing renders the latest data on the next frame.
+    pub fn set_visible(&self, visible: bool) -> Result<(), ScopeClosed> {
+        if self.resources().is_closed() {
+            return Err(ScopeClosed);
+        }
+        let _transaction = self.entity.0.model.runtime.enter();
+        let before = self.is_visible();
+        if self.entity.0.presentation.visible.replace(visible) != visible {
+            if before != self.is_visible() {
+                self.entity
+                    .0
+                    .presentation
+                    .lifecycle
+                    .visibility(self.is_visible());
+            }
+            self.entity
+                .0
+                .presentation
+                .cache
+                .apply_update(ViewUpdate::Rebuild);
+        }
+        Ok(())
+    }
+}
+
+impl<T: Render> Context<T> {
+    /// Renders a child entity and reuses its exact subtree while it is clean.
+    pub fn entity<U: Render>(&mut self, entity: &Entity<U>) -> Element {
+        self.entity_visible(entity, true)
+    }
+
+    /// Retains a child while hidden, without rendering or accepting UI input.
+    /// Omitting this call on a later render unmounts the child instead.
+    pub fn entity_visible<U: Render>(&mut self, entity: &Entity<U>, visible: bool) -> Element {
+        let entity = self.child_presentation(entity);
+        let before = entity.0.presentation.is_visible();
+        entity.0.presentation.visible.set(visible);
+        if before != entity.0.presentation.is_visible() {
+            entity
+                .0
+                .presentation
+                .lifecycle
+                .visibility(entity.0.presentation.is_visible());
+        }
+        if let Some(owner) = self.entity.as_ref().and_then(WeakEntity::upgrade) {
+            entity.bind_model_wake(&owner.0.model.runtime);
+        }
+        #[cfg(feature = "tasks")]
+        self.inherit_tasks(&entity);
+        let element = entity.render_in(self.environment);
+        inherit_environment_use(
+            &self.environment_read,
+            &entity.0.presentation.environment_used,
+        );
+        if visible && let Some((_, observer)) = &self.owner {
+            self.dependencies
+                .push(entity.0.model.signal.subscribe(observer.clone()));
+            self.dependencies
+                .push(entity.0.presentation.cache.subscribe(observer.clone()));
+        }
+        self.effects.children.push(entity.erase());
+        element
+    }
+}
+
+impl<T: 'static> Entity<T> {
+    pub(super) fn host_visibility(&self, visible: bool) {
+        let presentation = &self.0.presentation;
+        let before = presentation.is_visible();
+        presentation.host_visible.set(visible);
+        let after = presentation.is_visible();
+        if before != after {
+            presentation.lifecycle.visibility(after);
+            presentation.cache.apply_update(ViewUpdate::Rebuild);
+        }
+        let children: Vec<_> = presentation
+            .children
+            .borrow()
+            .iter()
+            .chain(presentation.event_routes.borrow().iter())
+            .cloned()
+            .collect();
+        for child in children {
+            child.set_host_visible(visible);
+        }
+    }
+
+    pub(super) fn close_host(&self) {
+        if self.0.presentation.resources.is_closed() {
+            return;
+        }
+        let children: Vec<_> = self
+            .0
+            .presentation
+            .children
+            .borrow()
+            .iter()
+            .chain(self.0.presentation.event_routes.borrow().iter())
+            .cloned()
+            .collect();
+        let mut panic = None;
+        for child in children {
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                child.close_presentation()
+            }));
+            if panic.is_none() {
+                panic = result.err();
+            }
+        }
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            self.0.presentation.resources.close()
+        }));
+        self.0.presentation.clear();
+        if let Some(payload) = panic.or(result.err())
+            && !std::thread::panicking()
+        {
+            std::panic::resume_unwind(payload);
+        }
+    }
+}
+
+impl super::AnyEntity {
+    /// Applies window visibility independently of each child's local hide/show state.
+    pub fn set_host_visible(&self, visible: bool) {
+        (self.host_visibility)(visible);
+    }
+    /// Closes this presentation and routed presentations, even if external handles remain.
+    /// Data models and their resources retain their separate ownership.
+    pub fn close_presentation(&self) {
+        (self.close_host)();
+    }
+}

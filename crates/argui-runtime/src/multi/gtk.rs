@@ -91,6 +91,13 @@ pub(crate) fn launch(mut application: MultiApplication) -> Result<(), RuntimeErr
                     entry.runtime.gtk_preferences(preferences);
                 }
             }
+            #[cfg(feature = "tasks")]
+            Event::UserEvent(UserEvent::TasksReady) => {
+                application.tasks_ready(&context);
+            }
+            Event::UserEvent(UserEvent::ModelsReady) => {
+                application.models_ready(&context);
+            }
             Event::UserEvent(UserEvent::NativeInput { window }) => {
                 if let Some(entry) = application.windows.get_mut(&window) {
                     entry.runtime.gtk_pointer_boundary(&context);
@@ -121,6 +128,6 @@ pub(crate) fn launch(mut application: MultiApplication) -> Result<(), RuntimeErr
             *control = ControlFlow::WaitUntil(deadline);
         }
     });
-    application.windows.clear();
-    application.fatal_error.map_or(Ok(()), Err)
+    application.shutdown();
+    application.fatal_error.take().map_or(Ok(()), Err)
 }

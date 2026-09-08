@@ -16,6 +16,8 @@ pub(crate) fn classify_update(
     let binding_update = binding_update(old, new);
     let state_update = state_update(old, new);
     if old.key != new.key
+        || old.text_privacy != new.text_privacy
+        || old.text_history != new.text_history
         || kind_changes_layout(&old.kind, &new.kind)
         || old.style != new.style
         || old.container_scope != new.container_scope
@@ -79,6 +81,8 @@ fn visual_changed(old: &Element, new: &Element) -> bool {
         || old.effects != new.effects
         || old.scroll != new.scroll
         || old.event_listeners != new.event_listeners
+        || old.action_scope != new.action_scope
+        || old.action != new.action
         || old.user_select != new.user_select
         || old.selection_style != new.selection_style
         || old.z_index != new.z_index
@@ -142,6 +146,7 @@ pub(crate) fn strongest_update(left: TreeUpdate, right: TreeUpdate) -> TreeUpdat
 
 fn kind_changes_layout(old: &ElementKind, new: &ElementKind) -> bool {
     match (old, new) {
+        (ElementKind::Custom(old), ElementKind::Custom(new)) => !old.same_layout(new),
         (ElementKind::Container, ElementKind::Container)
         | (ElementKind::Image { .. }, ElementKind::Image { .. })
         | (ElementKind::Vector { .. }, ElementKind::Vector { .. }) => false,

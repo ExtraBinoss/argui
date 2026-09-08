@@ -16,92 +16,71 @@ use std::{
 
 use crate::{ThemeRequest, WindowEnvironment};
 
-mod effects;
+pub(crate) mod effects;
 mod handler;
 mod layout;
 pub(crate) use effects::PointerCaptureRequest;
 pub use effects::ViewUpdate;
-use effects::{ContextEffects, SelectionCommandRequest, merge_effects, strongest_update};
+use effects::{ContextEffects, merge_effects, strongest_update};
+mod editing;
 use handler::{HandlerRegistry, LocalHandler};
 pub use layout::{LayoutBounds, LayoutSnapshot, ScrollRequest};
 
 type HandlerDispatch = dyn Fn(EventHandlerId, &UiEvent) -> ContextEffects;
-type Observer = Rc<dyn Fn()>;
+type Observer = Rc<dyn Fn(&ModelRuntime)>;
 
-struct RenderCache {
-    element: RefCell<Option<Element>>,
-    dirty: Rc<Cell<bool>>,
-    observers: RefCell<std::collections::HashMap<usize, Observer>>,
-}
-
-impl RenderCache {
-    fn new() -> Self {
-        Self {
-            element: RefCell::new(None),
-            dirty: Rc::new(Cell::new(true)),
-            observers: RefCell::new(std::collections::HashMap::new()),
-        }
-    }
-
-    fn observer(&self) -> Observer {
-        let dirty = Rc::downgrade(&self.dirty);
-        Rc::new(move || {
-            if let Some(dirty) = dirty.upgrade() {
-                dirty.set(true);
-            }
-        })
-    }
-
-    fn register(&self, owner: &Option<(usize, Observer)>) {
-        if let Some((identity, observer)) = owner {
-            self.observers
-                .borrow_mut()
-                .insert(*identity, observer.clone());
-        }
-    }
-
-    fn reusable(&self, environment_changed: bool) -> Option<Element> {
-        if !self.dirty.get()
-            && !environment_changed
-            && let Some(element) = self.element.borrow().as_ref()
-        {
-            return Some(element.clone());
-        }
-        None
-    }
-
-    fn store(&self, element: &Element) {
-        *self.element.borrow_mut() = Some(element.clone());
-        self.dirty.set(false);
-    }
-
-    fn mark_dirty(&self) {
-        if !self.dirty.replace(true) {
-            for observer in self.observers.borrow().values() {
-                observer();
-            }
-        }
-    }
-
-    fn apply_update(&self, update: ViewUpdate) {
-        if update == ViewUpdate::Rebuild {
-            self.mark_dirty();
-        }
-    }
-}
+mod entity;
+mod host;
+pub use entity::EntityId;
+use host::ModelRuntimeVisitor;
+pub use host::shutdown_presentations;
+mod dispatch;
+pub use dispatch::ModelRuntime;
+mod events;
+pub use events::{EventEmitter, EventError};
+mod subscription;
+pub use subscription::Subscription;
+mod scope;
+pub use scope::{ResourceLease, ResourceScope, ScopeClosed};
+mod cache;
+mod services;
+mod signal;
+use cache::RenderCache;
+pub use services::{ServiceAlreadyRegistered, ServiceRegistration};
+mod model_context;
+mod mount;
+pub use model_context::ModelContext;
+mod lifecycle;
+pub use lifecycle::{MountEvent, MountTransition};
+mod presentation;
+mod visibility;
+pub use mount::{Mount, MountId, WeakMount};
+use presentation::{Presentation, PresentationId};
+#[cfg(feature = "tasks")]
+mod tasks;
 
 /// Retained component identity. Cloning an entity never clones its state.
 pub struct Entity<T>(Rc<EntityCell<T>>);
 
 struct EntityCell<T> {
+    model: Rc<ModelState<T>>,
+    presentation: Presentation<T>,
+}
+
+struct ModelState<T> {
+    commands: RefCell<Vec<AppCommand>>,
+    id: EntityId,
+    signal: signal::ModelSignal,
+    runtime: ModelRuntime,
+    events: Rc<events::EventRegistry>,
+    resources: ResourceScope,
     value: RefCell<T>,
-    cache: RenderCache,
-    pending: RefCell<ContextEffects>,
-    children: RefCell<Vec<AnyEntity>>,
-    event_routes: RefCell<Vec<AnyEntity>>,
-    environment: Cell<WindowEnvironment>,
-    environment_used: Cell<bool>,
-    handlers: RefCell<HandlerRegistry<T>>,
+}
+
+impl<T> Drop for ModelState<T> {
+    fn drop(&mut self) {
+        self.resources.close();
+    }
 }
 
 impl<T> Clone for Entity<T> {
@@ -110,17 +89,34 @@ impl<T> Clone for Entity<T> {
     }
 }
 
-pub struct WeakEntity<T>(Weak<EntityCell<T>>);
+pub struct WeakEntity<T> {
+    model: Weak<ModelState<T>>,
+    presentation: Weak<EntityCell<T>>,
+}
 
 impl<T> Clone for WeakEntity<T> {
     fn clone(&self) -> Self {
-        Self(Weak::clone(&self.0))
+        Self {
+            model: self.model.clone(),
+            presentation: self.presentation.clone(),
+        }
     }
 }
 
 #[derive(Clone)]
 pub struct AnyEntity {
+    host_visibility: Rc<dyn Fn(bool)>,
+    close_host: Rc<dyn Fn()>,
+    model_id: EntityId,
+    runtime: ModelRuntime,
+    model_runtimes: Rc<ModelRuntimeVisitor>,
+    model_effects: Rc<dyn Fn() -> ContextEffects>,
+    bind_model_wake: Rc<dyn Fn(&ModelRuntime)>,
+    #[cfg(feature = "tasks")]
+    task_effects: Rc<dyn Fn() -> ContextEffects>,
     identity: Rc<dyn Any>,
+    #[cfg(feature = "tasks")]
+    tasks: Rc<dyn Fn(crate::tasks::TaskRuntime)>,
     render: Rc<dyn Fn(WindowEnvironment) -> Element>,
     dispatch_handler: Rc<HandlerDispatch>,
     store: Rc<dyn Fn(ContextEffects)>,
@@ -136,26 +132,58 @@ pub struct AnyEntity {
 
 /// Mutation and scheduling access scoped to one retained component.
 pub struct Context<T> {
+    entity: Option<WeakEntity<T>>,
     pub(crate) effects: ContextEffects,
-    owner: Option<(usize, Observer)>,
+    owner: Option<(PresentationId, Observer)>,
     environment: WindowEnvironment,
     environment_read: Cell<bool>,
     event_target: Option<argui_ui::NodeId>,
     handlers: Vec<LocalHandler<T>>,
+    dependencies: Vec<Subscription>,
     _marker: PhantomData<fn() -> T>,
 }
 
 impl<T> Default for Context<T> {
     fn default() -> Self {
         Self {
+            entity: None,
             effects: ContextEffects::default(),
             owner: None,
             environment: WindowEnvironment::default(),
             environment_read: Cell::new(false),
             event_target: None,
             handlers: Vec::new(),
+            dependencies: Vec::new(),
             _marker: PhantomData,
         }
+    }
+}
+
+impl<T: 'static> Context<T> {
+    #[must_use]
+    pub fn new_entity<U: 'static>(&mut self, value: U) -> Entity<U> {
+        match self.entity.as_ref().and_then(WeakEntity::upgrade) {
+            Some(owner) => owner.0.model.runtime.entity(value),
+            None => Entity::new(value),
+        }
+    }
+
+    /// Marks this entity dirty. Its cached subtree is rebuilt once at the next frame.
+    pub fn notify(&mut self) {
+        self.effects.update = ViewUpdate::Rebuild;
+    }
+
+    pub fn command(&mut self, command: AppCommand) {
+        self.effects.commands.push(command);
+    }
+
+    #[must_use]
+    pub const fn view_update(&self) -> ViewUpdate {
+        self.effects.update
+    }
+
+    pub(crate) fn merge_effects(&mut self, child: ContextEffects) {
+        merge_effects(&mut self.effects, child);
     }
 }
 
@@ -164,16 +192,6 @@ impl<T: Render> Context<T> {
     pub fn environment(&self) -> WindowEnvironment {
         self.environment_read.set(true);
         self.environment
-    }
-
-    #[must_use]
-    pub fn new_entity<U: Render>(&mut self, value: U) -> Entity<U> {
-        Entity::new(value)
-    }
-
-    /// Marks this entity dirty. Its cached subtree is rebuilt once at the next frame.
-    pub fn notify(&mut self) {
-        self.effects.update = ViewUpdate::Rebuild;
     }
 
     pub fn request_paint(&mut self) {
@@ -229,36 +247,9 @@ impl<T: Render> Context<T> {
         self.request_paint();
     }
 
-    pub fn selection_command(&mut self, command: argui_ui::SelectionCommand) {
-        self.effects.selection_command = Some(SelectionCommandRequest {
-            target: self.event_target,
-            command,
-        });
-    }
-
-    pub fn selection_command_for(
-        &mut self,
-        target: argui_ui::NodeId,
-        command: argui_ui::SelectionCommand,
-    ) {
-        self.effects.selection_command = Some(SelectionCommandRequest {
-            target: Some(target),
-            command,
-        });
-    }
-
     pub fn set_theme(&mut self, request: ThemeRequest) {
         self.effects.theme = Some(request);
         self.notify();
-    }
-
-    pub fn command(&mut self, command: AppCommand) {
-        self.effects.commands.push(command);
-    }
-
-    #[must_use]
-    pub const fn view_update(&self) -> ViewUpdate {
-        self.effects.update
     }
 
     #[must_use]
@@ -266,27 +257,21 @@ impl<T: Render> Context<T> {
         layout.bounds(key)
     }
 
-    /// Renders a child entity and reuses its exact subtree while it is clean.
-    pub fn entity<U: Render>(&mut self, entity: &Entity<U>) -> Element {
-        let element = entity.render_in(self.environment);
-        inherit_environment_use(&self.environment_read, &entity.0.environment_used);
-        entity.0.cache.register(&self.owner);
-        self.effects.children.push(entity.erase());
-        element
-    }
-
     /// Connects handlers from an already-rendered retained subtree to this entity.
     pub fn route_events_to(&mut self, entity: AnyEntity) {
+        if let Some(owner) = self.entity.as_ref().and_then(WeakEntity::upgrade) {
+            (entity.bind_model_wake)(&owner.0.model.runtime);
+        }
+        #[cfg(feature = "tasks")]
+        if let Some(runtime) = self
+            .entity
+            .as_ref()
+            .and_then(WeakEntity::upgrade)
+            .and_then(|owner| owner.0.model.runtime.task_runtime())
+        {
+            entity.set_task_runtime(runtime);
+        }
         self.effects.event_routes.push(entity);
-    }
-
-    pub(crate) fn merge_effects(&mut self, child: ContextEffects) {
-        merge_effects(&mut self.effects, child);
-    }
-
-    /// Delivers a layout snapshot to a retained child with a component-specific viewport.
-    pub fn layout_entity<U: Render>(&mut self, entity: &Entity<U>, layout: &LayoutSnapshot) {
-        self.merge_effects(entity.dispatch_layout(layout));
     }
 }
 
@@ -311,6 +296,12 @@ fn with_event_handler(event: &UiEvent, dispatch: &mut dyn FnMut(EventHandlerId))
 }
 
 pub trait Render: 'static {
+    #[cfg(feature = "tasks")]
+    fn tasks_ready(&mut self, _cx: &mut Context<Self>)
+    where
+        Self: Sized,
+    {
+    }
     fn render(&mut self, cx: &mut Context<Self>) -> Element
     where
         Self: Sized;
@@ -346,26 +337,13 @@ pub trait Render: 'static {
 
 impl<T: Render> Entity<T> {
     #[must_use]
-    pub fn new(value: T) -> Self {
-        Self(Rc::new(EntityCell {
-            value: RefCell::new(value),
-            cache: RenderCache::new(),
-            pending: RefCell::new(ContextEffects::default()),
-            children: RefCell::new(Vec::new()),
-            event_routes: RefCell::new(Vec::new()),
-            environment: Cell::new(WindowEnvironment::default()),
-            environment_used: Cell::new(false),
-            handlers: RefCell::new(HandlerRegistry::default()),
-        }))
-    }
-
-    #[must_use]
-    pub fn downgrade(&self) -> WeakEntity<T> {
-        WeakEntity(Rc::downgrade(&self.0))
-    }
-
-    #[must_use]
     pub fn erase(&self) -> AnyEntity {
+        #[cfg(feature = "tasks")]
+        let tasks = self.clone();
+        #[cfg(feature = "tasks")]
+        let task_effects = self.clone();
+        let host_visibility = self.clone();
+        let close_host = self.clone();
         let render = self.clone();
         let handler = self.clone();
         let store = self.clone();
@@ -377,8 +355,22 @@ impl<T: Render> Entity<T> {
         let vector_assets = self.clone();
         let inspector = self.clone();
         let take_effects = self.clone();
+        let model_runtimes = self.clone();
+        let model_effects = self.clone();
+        let bind_model_wake = self.clone();
         AnyEntity {
+            host_visibility: Rc::new(move |visible| host_visibility.host_visibility(visible)),
+            close_host: Rc::new(move || close_host.close_host()),
+            model_id: self.id(),
+            runtime: self.0.model.runtime.clone(),
+            model_runtimes: Rc::new(move |visited| model_runtimes.collect_model_runtimes(visited)),
+            model_effects: Rc::new(move || model_effects.collect_model_effects()),
+            bind_model_wake: Rc::new(move |runtime| bind_model_wake.bind_model_wake(runtime)),
+            #[cfg(feature = "tasks")]
+            task_effects: Rc::new(move || task_effects.take_task_effects()),
             identity: self.0.clone(),
+            #[cfg(feature = "tasks")]
+            tasks: Rc::new(move |runtime| tasks.set_task_runtime(runtime)),
             render: Rc::new(move |environment| render.render_in(environment)),
             dispatch_handler: Rc::new(move |id, event| handler.dispatch_handler(id, event)),
             store: Rc::new(move |effects| store.store_effects(effects)),
@@ -393,44 +385,63 @@ impl<T: Render> Entity<T> {
         }
     }
 
-    pub fn update(&self, update: impl FnOnce(&mut T, &mut Context<T>)) {
-        let observer = self.0.cache.observer();
-        let mut cx = Context {
-            owner: Some((Rc::as_ptr(&self.0) as usize, observer)),
-            environment: self.0.environment.get(),
-            ..Context::default()
-        };
-        update(&mut self.0.value.borrow_mut(), &mut cx);
-        self.finish(cx);
-    }
-
     #[must_use]
     pub fn render(&self) -> Element {
-        self.render_in(self.0.environment.get())
+        self.render_in(self.0.presentation.environment.get())
     }
 
     #[must_use]
     pub fn render_in(&self, environment: WindowEnvironment) -> Element {
-        let environment_changed =
-            update_environment(&self.0.environment, &self.0.environment_used, environment);
-        if let Some(element) = self.0.cache.reusable(environment_changed) {
+        let _transaction = self.0.model.runtime.enter();
+        if !self.0.presentation.is_visible() {
+            return Element::container([]);
+        }
+        self.0.presentation.lifecycle.start();
+        let environment_changed = update_environment(
+            &self.0.presentation.environment,
+            &self.0.presentation.environment_used,
+            environment,
+        );
+        if let Some(element) = self.0.presentation.cache.reusable(environment_changed) {
             return element;
         }
-        let observer = self.0.cache.observer();
+        let observer = self.0.presentation.cache.observer();
         let mut cx = Context {
-            owner: Some((Rc::as_ptr(&self.0) as usize, observer)),
+            entity: Some(self.downgrade()),
+            owner: Some((self.0.presentation.id, observer)),
             environment,
             ..Context::default()
         };
-        let element = self.0.value.borrow_mut().render(&mut cx);
+        let element = self.0.model.value.borrow_mut().render(&mut cx);
+        if self.0.presentation.resources.is_closed() {
+            return Element::container([]);
+        }
         self.0
+            .presentation
             .handlers
             .borrow_mut()
             .replace(std::mem::take(&mut cx.handlers));
-        *self.0.children.borrow_mut() = std::mem::take(&mut cx.effects.children);
-        *self.0.event_routes.borrow_mut() = std::mem::take(&mut cx.effects.event_routes);
-        self.0.environment_used.set(cx.environment_read.get());
-        self.0.cache.store(&element);
+        let previous_children = self
+            .0
+            .presentation
+            .children
+            .replace(std::mem::take(&mut cx.effects.children));
+        let previous_routes = self
+            .0
+            .presentation
+            .event_routes
+            .replace(std::mem::take(&mut cx.effects.event_routes));
+        drop(previous_children);
+        drop(previous_routes);
+        self.0
+            .presentation
+            .environment_used
+            .set(cx.environment_read.get());
+        self.0.presentation.cache.store(&element);
+        self.0
+            .presentation
+            .cache
+            .replace_dependencies(std::mem::take(&mut cx.dependencies));
         self.finish(cx);
         element
     }
@@ -453,86 +464,80 @@ impl<T: Render> Entity<T> {
         self.store_effects(effects);
     }
 
-    fn finish(&self, cx: Context<T>) {
-        self.store_effects(cx.effects);
-    }
-
-    fn store_effects(&self, effects: ContextEffects) {
-        self.0.cache.apply_update(effects.update);
-        let mut pending = self.0.pending.borrow_mut();
-        merge_effects(&mut pending, effects);
-    }
-
-    fn owner_id(&self) -> EventOwnerId {
-        EventOwnerId(Rc::as_ptr(&self.0) as usize)
-    }
-
-    fn owns(&self, owner: EventOwnerId) -> bool {
-        owner == self.owner_id()
-            || self
-                .0
-                .children
-                .borrow()
-                .iter()
-                .any(|child| (child.owns)(owner))
-            || self
-                .0
-                .event_routes
-                .borrow()
-                .iter()
-                .any(|route| (route.owns)(owner))
-    }
-
     pub(crate) fn wants_frame(&self) -> bool {
-        self.0.value.borrow().wants_animation_frame()
-            || self
-                .0
-                .children
-                .borrow()
-                .iter()
-                .any(|child| (child.wants_frame)())
+        self.0.presentation.is_visible()
+            && (self.0.model.value.borrow().wants_animation_frame()
+                || self
+                    .0
+                    .presentation
+                    .children
+                    .borrow()
+                    .iter()
+                    .any(|child| (child.wants_frame)()))
     }
 
     fn dispatch_frame(&self, frame: Frame) -> ContextEffects {
+        if !self.0.presentation.is_visible() {
+            return ContextEffects::default();
+        }
+        let _transaction = self.0.model.runtime.enter();
         let mut effects = ContextEffects::default();
-        for child in self.0.children.borrow().iter() {
+        let children = self.0.presentation.children.borrow().clone();
+        for child in children {
             if (child.wants_frame)() {
                 merge_effects(&mut effects, (child.frame)(frame));
             }
         }
+        if !self.0.presentation.is_visible() {
+            return self.0.presentation.visible_effects(effects);
+        }
         let mut cx = Context {
-            environment: self.0.environment.get(),
+            entity: Some(self.downgrade()),
+            environment: self.0.presentation.environment.get(),
             ..Context::default()
         };
-        self.0.value.borrow_mut().animation_frame(frame, &mut cx);
+        self.0
+            .model
+            .value
+            .borrow_mut()
+            .animation_frame(frame, &mut cx);
         merge_effects(&mut effects, cx.effects);
-        self.0.cache.apply_update(effects.update);
+        self.0.model.signal.apply_update(effects.update);
         effects
     }
 
     fn dispatch_layout(&self, layout: &LayoutSnapshot) -> ContextEffects {
+        if !self.0.presentation.is_visible() {
+            return ContextEffects::default();
+        }
+        let _transaction = self.0.model.runtime.enter();
         let mut cx = Context {
-            environment: self.0.environment.get(),
+            entity: Some(self.downgrade()),
+            environment: self.0.presentation.environment.get(),
             ..Context::default()
         };
-        self.0.value.borrow_mut().layout_changed(layout, &mut cx);
-        self.0.cache.apply_update(cx.effects.update);
+        self.0
+            .model
+            .value
+            .borrow_mut()
+            .layout_changed(layout, &mut cx);
+        self.0.model.signal.apply_update(cx.effects.update);
         cx.effects
-    }
-
-    pub(crate) fn take_effects(&self) -> ContextEffects {
-        std::mem::take(&mut *self.0.pending.borrow_mut())
-    }
-
-    pub fn read<R>(&self, read: impl FnOnce(&T) -> R) -> R {
-        read(&self.0.value.borrow())
     }
 }
 
-impl<T: Render> WeakEntity<T> {
+impl<T: 'static> WeakEntity<T> {
     #[must_use]
     pub fn upgrade(&self) -> Option<Entity<T>> {
-        self.0.upgrade().map(Entity)
+        if let Some(presentation) = self.presentation.upgrade() {
+            return Some(Entity(presentation));
+        }
+        self.model.upgrade().map(|model| {
+            Entity(Rc::new(EntityCell {
+                presentation: Presentation::new(model.signal.clone()),
+                model,
+            }))
+        })
     }
 }
 

@@ -11,6 +11,45 @@ use argui_ui::{
 mod event;
 
 #[test]
+fn replacing_editor_value_obeys_read_only_filters_and_emits_input() {
+    use argui_ui::{EventHandlerId, EventListener, EventOwnerId, EventType, UiEventKind};
+    use argui_widgets::{Input, InputKind, shadcn};
+    let themes = shadcn(Color::BLACK);
+    let theme = themes.resolve(argui_core::ColorScheme::Light);
+    let editor = Input::new("number", "12", "", theme.input())
+        .kind(InputKind::Number)
+        .build()
+        .on(EventListener::new(
+            EventType::Input,
+            EventHandlerId::new(EventOwnerId(1), 0),
+        ));
+    let mut tree = UiTree::new(editor.clone());
+    let node = tree.node_ids()[0];
+    let changed = tree.replace_text_input(node, "34");
+    assert_eq!(tree.text_input_value(node), Some("34"));
+    assert!(
+        changed
+            .events
+            .iter()
+            .any(|event| matches!(&event.kind, UiEventKind::TextChanged(value) if value == "34"))
+    );
+    assert!(tree.replace_text_input(node, "abc").events.is_empty());
+    assert_eq!(tree.text_input_value(node), Some("34"));
+    assert!(tree.replace_text_input(node, "34").events.is_empty());
+    let mut disabled = editor;
+    disabled.interaction.as_mut().unwrap().enabled = false;
+    tree.update(disabled);
+    assert!(tree.replace_text_input(node, "56").events.is_empty());
+    assert_eq!(tree.text_input_value(node), Some("34"));
+    let readonly = Input::new("number", "12", "", theme.input())
+        .read_only(true)
+        .build();
+    tree.update(readonly);
+    assert!(tree.replace_text_input(node, "56").events.is_empty());
+    assert_eq!(tree.text_input_value(node), Some("34"));
+}
+
+#[test]
 fn rust_builders_form_the_future_dsl_lowering_target() {
     let root = Element::row([Element::text("hello")
         .keyed("greeting")

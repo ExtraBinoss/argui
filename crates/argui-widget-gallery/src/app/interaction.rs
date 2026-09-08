@@ -18,7 +18,6 @@ impl WidgetGallery {
             ColorScheme::Light => &self.light_assets,
             ColorScheme::Dark => &self.dark_assets,
         };
-        let spinner = cx.entity(&self.spinner);
         let resize_listener = cx.listener(EventType::Gesture, |gallery, event, cx| {
             let UiEventKind::Gesture(gesture) = event.kind else {
                 return;
@@ -35,22 +34,14 @@ impl WidgetGallery {
                 cx.notify();
             }
         });
-        let shell = cx.entity(&self.shell);
-        let scroll_demo = cx.entity(&self.scroll_demo);
-        let webview = cx.entity(&self.webview);
-        let glass = cx.entity(&self.glass);
         self.view(
             environment,
             theme,
             assets,
-            spinner,
+            cx,
             ResizeListeners {
                 textarea: resize_listener,
                 textarea_reset: resize_reset_listener,
-                shell,
-                scroll_demo,
-                webview,
-                glass,
             },
         )
     }

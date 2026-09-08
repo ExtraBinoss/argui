@@ -1,15 +1,15 @@
 use argui_core::{Rect, Size};
-use argui_paint::{Border, CornerRadii, Filter, LayerMask, PaintStyle, QuadStyle};
+use argui_paint::{Border, CornerRadii, Filter, PaintStyle, QuadStyle};
 use argui_ui::{Element, Interaction, SelectionCapabilities, Sides, UserSelect, length};
 
 use crate::{Button, TablerIcon, WidgetAssets, WidgetTheme};
 mod host;
 pub use host::SelectionHost;
 
-const TOOLBAR_HEIGHT: f32 = 40.0;
-const COMMAND_WIDTH: f32 = 112.0;
+const TOOLBAR_HEIGHT: f32 = 32.0;
+const COMMAND_WIDTH: f32 = 96.0;
 const VIEWPORT_MARGIN: f32 = 8.0;
-const SELECTION_GAP: f32 = 8.0;
+const SELECTION_GAP: f32 = 16.0;
 
 #[derive(Clone, Debug)]
 pub struct TextSelectionToolbar {
@@ -83,12 +83,11 @@ impl TextSelectionToolbar {
                 .min((self.viewport.height - TOOLBAR_HEIGHT - VIEWPORT_MARGIN).max(VIEWPORT_MARGIN))
         };
         let buttons = commands.into_iter().map(|(suffix, label, enabled)| {
-            let mut button = Button::new(
-                format!("{}::{suffix}", self.key_prefix),
-                label,
-                theme.ghost_button(),
-            )
-            .enabled(enabled);
+            let mut style = theme.ghost_button();
+            style.label.font_size = 13.0;
+            style.label.line_height = 18.0;
+            let mut button = Button::new(format!("{}::{suffix}", self.key_prefix), label, style)
+                .enabled(enabled);
             if let Some(icons) = &self.icons {
                 let icon = match suffix {
                     "cut" => TablerIcon::Cut,
@@ -97,7 +96,7 @@ impl TextSelectionToolbar {
                     _ => TablerIcon::SelectAll,
                 };
                 let icon = icons.icon(icon, 14.0).vector_color(theme.foreground);
-                button = if command_width < 100.0 {
+                button = if command_width < 90.0 {
                     button.content(icon)
                 } else {
                     button.leading(icon)
@@ -107,7 +106,7 @@ impl TextSelectionToolbar {
                 .build()
                 .width(length(command_width))
                 .height(length(TOOLBAR_HEIGHT))
-                .padding(argui_ui::sides(8.0, 6.0))
+                .padding(argui_ui::sides(6.0, 4.0))
         });
         Element::row(buttons)
             .keyed(self.key_prefix)
@@ -127,14 +126,15 @@ impl TextSelectionToolbar {
                 } else {
                     0.88
                 }))
-                .border(Border::all(1.0, theme.border))
+                .border(Border::all(1.0, theme.popover_border))
                 .radius(CornerRadii::all(8.0)),
             ))
-            .backdrop_filter(
-                self.backdrop
-                    .unwrap_or(Filter::Blur(theme.overlay_blur.max(0.0))),
+            .layer(
+                theme.overlay_layer(8.0, 0.0).backdrop(
+                    self.backdrop
+                        .unwrap_or(Filter::Blur(theme.overlay_blur.max(0.0))),
+                ),
             )
-            .mask(LayerMask::Rounded(CornerRadii::all(8.0)))
             .user_select(UserSelect::None)
             .interaction(Interaction::blocker())
             .z_index(i32::MAX)

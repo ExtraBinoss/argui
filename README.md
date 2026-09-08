@@ -41,6 +41,22 @@ The state showcase embeds a transparent PNG and a JPEG. `argui-image` is an
 optional decoding boundary; the renderer receives validated RGBA assets and
 does not depend on a file format or filesystem.
 
+## Optional asynchronous tasks
+
+Enable `argui/tasks` for owned, cancellable asynchronous tasks independently
+of WebView support: Tokio on native and browser futures on Web.
+See [the task contract](docs/tasks.md) and **Examples → Async tasks** in the gallery.
+
+## Actions and editing
+
+Scoped actions share commands across buttons, keyboard shortcuts, menus and
+palettes. Text editors retain bounded transactional undo/redo; Password fields
+mask graphemes and suppress clipboard export/history. Menu and command palette
+widgets are individually opt-in. See [the API guide](docs/actions-editing.md) and
+the **Actions** and **Editing & Password** gallery pages.
+Reusable data widgets are documented in [Lists and tables](docs/lists-tables.md);
+[the shadcn checklist](docs/shadcn-lib.md) tracks the component backlog.
+
 ## Optional WebView
 
 `argui-webview` provides retained sessions, a bounded native-view cache and a

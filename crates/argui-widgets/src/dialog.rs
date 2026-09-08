@@ -1,5 +1,5 @@
 use argui_core::Color;
-use argui_paint::{Border, CornerRadii, Filter, LayerMask, LayerStyle, PaintStyle, QuadStyle};
+use argui_paint::{Border, CornerRadii, Filter, PaintStyle, QuadStyle};
 use argui_ui::{
     AlignItems, Display, Element, JustifyContent, Sides, ViewportPlacement, WindowLayer, length,
     percent,
@@ -96,24 +96,18 @@ impl Dialog {
             let panel_paint = self.panel_paint.unwrap_or_else(|| {
                 PaintStyle::new(
                     QuadStyle::solid(theme.popover)
-                        .border(Border::all(1.0, theme.border))
+                        .border(Border::all(1.0, theme.popover_border))
                         .radius(CornerRadii::all(12.0)),
                 )
             });
-            let mut panel = Element::column([self.content])
+            let panel = Element::column([self.content])
                 .width(length(self.panel_width.max(0.0)))
                 .max_width(percent(0.90))
                 .padding(argui_ui::Sides::length(24.0))
                 .gap(18.0)
                 .paint_style(panel_paint)
-                .z_index(1);
-            if theme.overlay_blur > 0.0 {
-                panel = panel.layer(
-                    LayerStyle::new(Default::default())
-                        .backdrop(Filter::Blur(theme.overlay_blur))
-                        .mask(LayerMask::Rounded(CornerRadii::all(12.0))),
-                );
-            }
+                .z_index(1)
+                .layer(theme.overlay_layer(12.0, theme.overlay_blur));
             let panel = behavior.decorate(DialogPart::Panel, panel);
             behavior.decorate(
                 DialogPart::Overlay,

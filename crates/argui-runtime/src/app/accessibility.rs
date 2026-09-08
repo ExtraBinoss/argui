@@ -85,6 +85,12 @@ fn accessibility_action_update(
             )
         }));
     }
+    if request.action == SemanticAction::SetValue
+        && ui.text_input_value(target).is_some()
+        && let Some(argui_accessibility::SemanticValue::Text(value)) = &request.value
+    {
+        return Some(ui.replace_text_input(target, value));
+    }
     let kind = if request.action == SemanticAction::Click {
         UiEventKind::Click(argui_ui::ClickEvent::accessibility())
     } else {
@@ -106,17 +112,7 @@ fn semantic_tree(
     scale_factor: f32,
 ) -> SemanticTree {
     if let (Some(ui), Some(layout)) = (ui, layout) {
-        let bounds = layout
-            .nodes
-            .iter()
-            .map(|node| {
-                let bounds = node.clip.map_or(node.bounds, |clip| {
-                    node.bounds.intersection(clip).unwrap_or_default()
-                });
-                (node.node, bounds)
-            })
-            .collect::<Vec<_>>();
-        return ui.semantic_tree(&bounds, scale_factor);
+        return ui.semantic_tree(&layout.semantic_bounds, scale_factor);
     }
     let root = SemanticNodeId::new(1);
     SemanticTree {
@@ -233,6 +229,15 @@ impl Application {
             .dom_accessibility
             .as_mut()
             .and_then(|dom| dom.sync(next).err());
+        if let (Some(ui), Some(dom)) = (&self.ui_tree, &self.dom_accessibility) {
+            for &node in ui.node_ids() {
+                if ui.text_input_protected(node)
+                    && let Some(value) = ui.text_input_value(node)
+                {
+                    dom.set_protected_value(SemanticNodeId::new(node.get()), value);
+                }
+            }
+        }
         if let Some(error) = error {
             (self.on_event)(RuntimeEvent::CommandFailed(format!(
                 "failed to update accessibility DOM: {error:?}"

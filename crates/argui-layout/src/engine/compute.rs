@@ -1,8 +1,9 @@
+use crate::layout_tree::LayoutTree;
 use argui_core::{Point, Rect, Size};
 use argui_text::TextEngine;
 use argui_ui::{ElementKind, TreeUpdate, UiTree};
 use taffy::{
-    AvailableSpace, Dimension, LengthPercentageAuto, NodeId, TaffyTree, compute_leaf_layout,
+    AvailableSpace, Dimension, LengthPercentageAuto, NodeId, compute_leaf_layout,
     geometry::Size as TaffySize, tree::LayoutOutput as TaffyLayoutOutput,
 };
 
@@ -52,6 +53,7 @@ impl LayoutEngine {
         viewport: Size,
     ) -> Result<(LayoutOutput, TreeUpdate, Vec<Size>), LayoutError> {
         if self.revision != Some(ui.revision()) {
+            crate::custom::validate(ui.root())?;
             self.sync_or_rebuild(ui)?;
         }
         for index in ui.layout_animation_indices() {
@@ -148,7 +150,7 @@ impl LayoutEngine {
 }
 
 fn restore_portal_styles(
-    tree: &mut TaffyTree<usize>,
+    tree: &mut LayoutTree,
     assets: &AssetMetrics,
     elements: &[&argui_ui::Element],
     ui: &UiTree,
@@ -175,7 +177,7 @@ fn restore_portal_styles(
 }
 
 fn apply_constraint(
-    tree: &mut TaffyTree<usize>,
+    tree: &mut LayoutTree,
     constraint: PortalConstraint,
 ) -> Result<(NodeId, Size), LayoutError> {
     let (node, size) = match constraint {
@@ -219,7 +221,7 @@ fn apply_constraint(
 }
 
 fn compute_taffy(
-    tree: &mut TaffyTree<usize>,
+    tree: &mut LayoutTree,
     assets: &AssetMetrics,
     root: NodeId,
     available: Size,

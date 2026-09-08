@@ -95,7 +95,9 @@ fn resolved_semantics(
         if matches!(element.kind, ElementKind::TextEditor { .. })
             && let Some(value) = tree.text_input_value(node)
         {
-            semantics.value = Some(SemanticValue::Text(value.to_owned()));
+            semantics.value =
+                (!element.text_privacy.protected()).then(|| SemanticValue::Text(value.to_owned()));
+            semantics.state.protected = element.text_privacy.protected();
         }
         semantics.state.disabled = element
             .interaction
@@ -118,17 +120,26 @@ fn resolved_semantics(
             value,
             multiline,
             ..
-        } => Some(
-            Semantics::new(if *multiline {
+        } => Some({
+            let mut semantics = Semantics::new(if *multiline {
                 Role::TextArea
             } else {
                 Role::TextInput
             })
             .label(placeholder)
-            .value(SemanticValue::Text(value.clone()))
+            .value(SemanticValue::Text(if element.text_privacy.protected() {
+                String::new()
+            } else {
+                value.clone()
+            }))
             .action(SemanticAction::Focus)
-            .action(SemanticAction::SetValue),
-        ),
+            .action(SemanticAction::SetValue);
+            if element.text_privacy.protected() {
+                semantics.value = None;
+                semantics.state.protected = true;
+            }
+            semantics
+        }),
         _ if is_root => Some(Semantics::new(Role::Window)),
         _ => None,
     }

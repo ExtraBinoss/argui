@@ -344,5 +344,7 @@ fn select_can_disable_the_theme_overlay_blur() {
     let select = Select::new("plain", "Plain", [SelectOption::new("First")], Some(0))
         .open(true)
         .build(&theme);
-    assert!(select.children[1].layer.is_none());
+    let layer = select.children[1].layer.as_ref().unwrap();
+    assert!(layer.backdrop_filters.is_empty());
+    assert_eq!(layer.shadows, theme.overlay_shadows);
 }

@@ -4,13 +4,18 @@ use unicode_segmentation::UnicodeSegmentation;
 use crate::{FocusTarget, NodeId};
 
 mod filter;
+mod history;
+mod privacy;
 pub use filter::TextInputFilter;
+pub use history::HistoryConfig;
+pub use privacy::TextPrivacy;
 mod states;
-pub(crate) use states::TextInputStates;
+pub(crate) use states::{RetainedInput, TextInputStates};
 
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Default, Eq, PartialEq)]
 pub(crate) struct TextInputState {
     value: String,
+    authored_value: String,
     cursor: usize,
     affinity: CaretAffinity,
     anchor: Option<TextPosition>,
@@ -19,6 +24,8 @@ pub(crate) struct TextInputState {
     read_only: bool,
     filter: TextInputFilter,
     reveal_cursor: bool,
+    history: history::History,
+    privacy: TextPrivacy,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -69,9 +76,31 @@ pub(crate) struct EditResult {
 }
 
 impl TextInputState {
+    fn replace_value_inner(&mut self, value: &str) -> EditResult {
+        let value = if self.multiline {
+            value.to_owned()
+        } else {
+            value.replace(['\r', '\n'], "")
+        };
+        if self.read_only || self.value == value || !self.filter.accepts(&value) {
+            return EditResult::default();
+        }
+        self.value = value;
+        self.cursor = self.value.len();
+        self.anchor = None;
+        self.affinity = CaretAffinity::Before;
+        self.preedit = None;
+        EditResult {
+            changed: true,
+            layout: true,
+            reshape: true,
+            ..Default::default()
+        }
+    }
     pub fn new(value: String, multiline: bool, read_only: bool, filter: TextInputFilter) -> Self {
         let cursor = value.len();
         Self {
+            authored_value: value.clone(),
             value,
             cursor,
             multiline,
@@ -95,22 +124,41 @@ impl TextInputState {
     }
 
     pub(crate) fn selection_command(&mut self, command: crate::SelectionCommand) -> EditResult {
+        if matches!(
+            command,
+            crate::SelectionCommand::Undo | crate::SelectionCommand::Redo
+        ) {
+            return self.history_step(command == crate::SelectionCommand::Redo);
+        }
+        if self.composing() {
+            return EditResult::default();
+        }
         let key = match command {
             crate::SelectionCommand::Cut => "x",
             crate::SelectionCommand::Copy => "c",
             crate::SelectionCommand::Paste => "v",
             crate::SelectionCommand::SelectAll => "a",
+            crate::SelectionCommand::Undo | crate::SelectionCommand::Redo => unreachable!(),
         };
-        self.shortcut(key)
+        self.record_edit(history::EditKind::Atomic, |state| state.shortcut(key))
     }
 
     pub fn sync(&mut self, value: &str, multiline: bool, read_only: bool, filter: TextInputFilter) {
+        if self.multiline != multiline || self.filter != filter {
+            self.history.clear();
+            self.preedit = None;
+        }
         self.multiline = multiline;
         self.read_only = read_only;
         self.filter = filter;
+        if self.authored_value == value {
+            return;
+        }
+        self.authored_value = value.to_owned();
         if self.value == value {
             return;
         }
+        self.history.clear();
         self.value.clear();
         self.value.push_str(value);
         self.cursor = grapheme_boundary(&self.value, self.cursor.min(self.value.len()));
@@ -131,11 +179,13 @@ impl TextInputState {
     }
 
     pub fn display_position(&self) -> TextPosition {
-        self.preedit
+        let position = self
+            .preedit
             .as_ref()
             .map_or(TextPosition::new(self.cursor, self.affinity), |preedit| {
                 TextPosition::new(self.cursor + preedit.cursor, CaretAffinity::Before)
-            })
+            });
+        self.mask_position(position)
     }
 
     pub fn selection(&self) -> Option<(usize, usize)> {
@@ -145,10 +195,20 @@ impl TextInputState {
 
     pub fn selection_positions(&self) -> Option<(TextPosition, TextPosition)> {
         let anchor = self.anchor?;
+        let anchor = self.mask_position(anchor);
         (anchor != self.display_position()).then(|| (anchor, self.display_position()))
     }
 
     pub fn display(&self) -> String {
+        let display = self.unmasked_display();
+        if self.privacy == TextPrivacy::Password {
+            "•".repeat(display.graphemes(true).count())
+        } else {
+            display
+        }
+    }
+
+    fn unmasked_display(&self) -> String {
         let Some(preedit) = &self.preedit else {
             return self.value.clone();
         };
@@ -157,7 +217,7 @@ impl TextInputState {
         display
     }
 
-    pub fn key(&mut self, input: &KeyInput) -> EditResult {
+    fn key_inner(&mut self, input: &KeyInput) -> EditResult {
         if input.state != KeyState::Pressed {
             return EditResult::default();
         }
@@ -226,8 +286,8 @@ impl TextInputState {
         result
     }
 
-    pub fn ime(&mut self, input: ImeInput) -> EditResult {
-        if self.read_only {
+    fn ime_inner(&mut self, input: ImeInput) -> EditResult {
+        if self.read_only && !matches!(input, ImeInput::Disabled) {
             return EditResult::default();
         }
         let before = self.preedit.clone();
@@ -246,8 +306,8 @@ impl TextInputState {
                 let changed = self.insert_input(&text);
                 return EditResult {
                     changed,
-                    layout: changed,
-                    reshape: changed,
+                    layout: changed || before.is_some(),
+                    reshape: changed || before.is_some(),
                     ..EditResult::default()
                 };
             }
@@ -261,7 +321,7 @@ impl TextInputState {
         }
     }
 
-    pub fn paste(&mut self, text: &str) -> EditResult {
+    fn paste_inner(&mut self, text: &str) -> EditResult {
         if self.read_only {
             return EditResult::default();
         }
@@ -275,8 +335,9 @@ impl TextInputState {
     }
 
     pub fn place_position(&mut self, position: TextPosition, extend: bool) -> EditResult {
+        self.history.break_group();
         let old = TextPosition::new(self.cursor, self.affinity);
-        self.move_to(position.index.min(self.value.len()));
+        self.move_to(self.unmask_index(position.index));
         self.affinity = position.affinity;
         self.extend_selection(old, extend);
         EditResult {
@@ -286,6 +347,7 @@ impl TextInputState {
     }
 
     pub fn select(&mut self, selection: TextSelection) -> EditResult {
+        self.history.break_group();
         let boundary = |position: TextPosition| {
             TextPosition::new(
                 grapheme_boundary(&self.value, position.index.min(self.value.len())),
@@ -358,6 +420,9 @@ impl TextInputState {
     }
 
     fn selected_text(&self) -> Option<String> {
+        if self.protected() {
+            return None;
+        }
         let (start, end) = self.selection()?;
         Some(self.value[start..end].to_owned())
     }
@@ -488,11 +553,14 @@ fn char_boundary(value: &str, index: usize) -> usize {
 }
 
 fn grapheme_boundary(value: &str, index: usize) -> usize {
-    value[..char_boundary(value, index)]
+    if index >= value.len() {
+        return value.len();
+    }
+    value
         .grapheme_indices(true)
-        .next_back()
-        .map_or(0, |(boundary, grapheme)| boundary + grapheme.len())
-        .min(index)
+        .take_while(|(boundary, _)| *boundary <= index)
+        .last()
+        .map_or(0, |(boundary, _)| boundary)
 }
 
 fn line_start(value: &str, cursor: usize) -> usize {

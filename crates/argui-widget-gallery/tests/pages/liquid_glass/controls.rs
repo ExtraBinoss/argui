@@ -1,13 +1,13 @@
 use super::{click, filter, find};
 use argui::{
     paint::{EffectValue, Filter},
-    runtime::Entity,
+    runtime::{Entity, Mount},
     ui::{SemanticAction, SemanticValue, UiEventKind, UiTree},
 };
 use argui_widget_gallery::WidgetGallery;
 
-fn set(app: &Entity<WidgetGallery>, key: &str, value: f64) {
-    let mut tree = UiTree::new(app.render());
+fn set(app: &Mount<WidgetGallery>, key: &str, value: f64) {
+    let mut tree = UiTree::new(app.render(Default::default()).unwrap());
     let node = tree
         .node_ids()
         .iter()
@@ -27,12 +27,12 @@ fn set(app: &Entity<WidgetGallery>, key: &str, value: f64) {
         },
     ) {
         if event.should_dispatch() {
-            app.dispatch_event(&event);
+            app.dispatch_event(&event).unwrap();
         }
     }
 }
 
-fn parameter(app: &Entity<WidgetGallery>, name: &str) -> EffectValue {
+fn parameter(app: &Mount<WidgetGallery>, name: &str) -> EffectValue {
     let Filter::Effect(effect) = filter(app).unwrap() else {
         panic!()
     };
@@ -46,7 +46,7 @@ fn parameter(app: &Entity<WidgetGallery>, name: &str) -> EffectValue {
 
 #[test]
 fn sliders_update_shader_parameters_clamp_and_reset_without_moving_pane() {
-    let app = Entity::new(WidgetGallery::default());
+    let app = Entity::new(WidgetGallery::default()).mount().unwrap();
     click(&app, "nav::effects");
     let initial = filter(&app);
     for (key, name, min, max, pixels) in [
@@ -89,24 +89,30 @@ fn sliders_update_shader_parameters_clamp_and_reset_without_moving_pane() {
         parameter(&app, "tint"),
         EffectValue::Vec4([1.0, 0.15, 0.3, 1.0])
     );
-    let before = find(&app.render(), "liquid-glass-pane")
-        .unwrap()
-        .style
-        .inset;
+    let before = find(
+        &app.render(Default::default()).unwrap(),
+        "liquid-glass-pane",
+    )
+    .unwrap()
+    .style
+    .inset;
     click(&app, "glass-reset");
     assert_eq!(filter(&app), initial);
     assert_eq!(
-        find(&app.render(), "liquid-glass-pane")
-            .unwrap()
-            .style
-            .inset,
+        find(
+            &app.render(Default::default()).unwrap(),
+            "liquid-glass-pane"
+        )
+        .unwrap()
+        .style
+        .inset,
         before
     );
 }
 
 #[test]
 fn noise_controls_are_inactive_until_enabled_and_keep_settings_when_toggled() {
-    let app = Entity::new(WidgetGallery::default());
+    let app = Entity::new(WidgetGallery::default()).mount().unwrap();
     click(&app, "nav::effects");
     let initial = filter(&app);
     set(&app, "glass-frequency", 0.5);
@@ -133,10 +139,10 @@ fn blur_drag_uses_track_geometry_cancels_and_supports_keyboard() {
         runtime::{LayoutBounds, LayoutSnapshot, Render},
         ui::{GestureDelivery, GestureEvent, GestureKind, GesturePhase},
     };
-    let app = Entity::new(WidgetGallery::default());
+    let app = Entity::new(WidgetGallery::default()).mount().unwrap();
     click(&app, "nav::effects");
     let initial = parameter(&app, "blur");
-    let mut tree = UiTree::new(app.render());
+    let mut tree = UiTree::new(app.render(Default::default()).unwrap());
     let node = tree
         .node_ids()
         .iter()
@@ -155,7 +161,8 @@ fn blur_drag_uses_track_geometry_cancels_and_supports_keyboard() {
             },
             cx,
         )
-    });
+    })
+    .unwrap();
     for (phase, x, expected) in [
         (
             GesturePhase::Started,
@@ -183,7 +190,7 @@ fn blur_drag_uses_track_geometry_cancels_and_supports_keyboard() {
         });
         for event in tree.event_deliveries(node, kind) {
             if event.should_dispatch() {
-                app.dispatch_event(&event);
+                app.dispatch_event(&event).unwrap();
             }
         }
         assert_eq!(parameter(&app, "blur"), expected);
@@ -200,7 +207,7 @@ fn blur_drag_uses_track_geometry_cancels_and_supports_keyboard() {
             }),
         ) {
             if event.should_dispatch() {
-                app.dispatch_event(&event);
+                app.dispatch_event(&event).unwrap();
             }
         }
     }

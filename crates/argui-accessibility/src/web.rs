@@ -28,6 +28,16 @@ pub struct DomTree {
 }
 
 impl DomTree {
+    /// Updates the native password control without storing its secret in semantic snapshots.
+    pub fn set_protected_value(&self, id: SemanticNodeId, value: &str) {
+        if let Some(node) = self.nodes.get(&id)
+            && let Some(input) = node.element.dyn_ref::<HtmlInputElement>()
+            && input.type_() == "password"
+            && input.value() != value
+        {
+            input.set_value(value);
+        }
+    }
     pub fn new(
         canvas: HtmlCanvasElement,
         snapshot: SemanticTree,
@@ -152,6 +162,25 @@ impl DomTree {
     }
 
     fn attach_children(&self, tree: &SemanticTree) -> Result<(), JsValue> {
+        let scale = self
+            .canvas
+            .owner_document()
+            .and_then(|document| document.default_view())
+            .map_or(1.0, |window| window.device_pixel_ratio());
+        for (id, bounds) in tree.parent_relative_bounds() {
+            if let Some(element) = self
+                .nodes
+                .get(&id)
+                .and_then(|node| node.element.dyn_ref::<HtmlElement>())
+            {
+                element
+                    .style()
+                    .set_property("left", &format!("{}px", f64::from(bounds.origin.x) / scale))?;
+                element
+                    .style()
+                    .set_property("top", &format!("{}px", f64::from(bounds.origin.y) / scale))?;
+            }
+        }
         let root = self
             .nodes
             .get(&tree.root)
@@ -299,6 +328,9 @@ fn apply_attributes(
         element.remove_attribute("tabindex")?;
     }
     match node.semantics.role {
+        Role::TextInput if node.semantics.state.protected => {
+            element.set_attribute("type", "password")?
+        }
         Role::Button => element.set_attribute("type", "button")?,
         Role::SearchInput => element.set_attribute("type", "search")?,
         _ => element.remove_attribute("type")?,
@@ -318,6 +350,15 @@ fn apply_attributes(
         },
     )?;
     set_bool(element, "aria-selected", node.semantics.state.selected)?;
+    set_optional_bool(
+        element,
+        "aria-multiselectable",
+        matches!(
+            node.semantics.role,
+            Role::ListBox | Role::Grid | Role::Tree | Role::TabList
+        )
+        .then_some(node.semantics.state.multiselectable),
+    )?;
     set_bool(element, "aria-required", node.semantics.state.required)?;
     set_bool(element, "aria-readonly", node.semantics.state.read_only)?;
     set_bool(element, "aria-invalid", node.semantics.state.invalid)?;
@@ -474,6 +515,11 @@ const fn aria_role(role: Role) -> &'static str {
         Role::TextInput => "textbox",
         Role::TextArea => "textbox",
         Role::SearchInput => "searchbox",
+        Role::Table => "table",
+        Role::Grid => "grid",
+        Role::Row => "row",
+        Role::ColumnHeader => "columnheader",
+        Role::Cell => "cell",
         Role::List => "list",
         Role::ListItem => "listitem",
         Role::ListBox => "listbox",

@@ -1,4 +1,4 @@
-use argui_paint::{Border, CornerRadii, Filter, LayerMask, LayerStyle, PaintStyle, QuadStyle};
+use argui_paint::{Border, CornerRadii, PaintStyle, QuadStyle};
 use argui_ui::{
     AnchorWidth, Axes, DismissPolicy, Element, FloatingPlacement, FocusScope, InitialFocus,
     Overflow, Placement, ScrollConfig, Sides, WindowLayer, length,
@@ -112,7 +112,7 @@ impl Popover {
                 let paint = self.paint.unwrap_or_else(|| {
                     PaintStyle::new(
                         QuadStyle::solid(theme.popover)
-                            .border(Border::all(1.0, theme.border))
+                            .border(Border::all(1.0, theme.popover_border))
                             .radius(CornerRadii::all(radius)),
                     )
                 });
@@ -129,13 +129,7 @@ impl Popover {
                     .anchored_portal(WindowLayer::Popover, self.key.clone(), self.placement)
                     .portal_dismiss(DismissPolicy::OutsidePointer);
                 let blur = self.backdrop_blur.unwrap_or(theme.overlay_blur).max(0.0);
-                if blur > 0.0 {
-                    content = content.layer(
-                        LayerStyle::new(Default::default())
-                            .backdrop(Filter::Blur(blur))
-                            .mask(LayerMask::Rounded(CornerRadii::all(radius))),
-                    );
-                }
+                content = content.layer(theme.overlay_layer(radius, blur));
                 content = if self.trap_focus {
                     content.focus_scope(FocusScope::trapped(InitialFocus::First))
                 } else {

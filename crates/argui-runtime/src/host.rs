@@ -25,6 +25,7 @@ pub(crate) trait WindowHost {
     fn focus_window(&self);
     fn set_title(&self, title: &str);
     fn set_minimized(&self, minimized: bool);
+    fn is_minimized(&self) -> Option<bool>;
     fn set_window_level(&self, level: winit::window::WindowLevel);
     fn set_cursor_hittest(&self, enabled: bool) -> Result<(), String>;
     fn request_redraw(&self);
@@ -66,6 +67,9 @@ impl WindowHost for Arc<Window> {
     }
     fn set_minimized(&self, minimized: bool) {
         self.as_ref().set_minimized(minimized);
+    }
+    fn is_minimized(&self) -> Option<bool> {
+        self.as_ref().is_minimized()
     }
     fn set_window_level(&self, level: winit::window::WindowLevel) {
         self.as_ref().set_window_level(level);
@@ -140,6 +144,9 @@ impl<T: WindowHost + ?Sized> WindowHost for std::rc::Rc<T> {
     }
     fn set_minimized(&self, minimized: bool) {
         self.as_ref().set_minimized(minimized);
+    }
+    fn is_minimized(&self) -> Option<bool> {
+        self.as_ref().is_minimized()
     }
     fn set_window_level(&self, level: winit::window::WindowLevel) {
         self.as_ref().set_window_level(level);

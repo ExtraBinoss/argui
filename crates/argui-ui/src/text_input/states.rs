@@ -4,6 +4,16 @@ use crate::NodeId;
 
 use super::{EditResult, TextInputFilter, TextInputState, TextSelection};
 
+pub(crate) struct RetainedInput {
+    pub node: NodeId,
+    pub value: String,
+    pub multiline: bool,
+    pub read_only: bool,
+    pub filter: TextInputFilter,
+    pub privacy: super::TextPrivacy,
+    pub history: Option<super::HistoryConfig>,
+}
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct TextInputStates {
     states: Vec<(NodeId, TextInputState)>,
@@ -39,17 +49,23 @@ impl TextInputStates {
         }
     }
 
-    pub fn sync(
-        &mut self,
-        inputs: impl IntoIterator<Item = (NodeId, String, bool, bool, TextInputFilter)>,
-    ) {
+    pub fn sync(&mut self, inputs: impl IntoIterator<Item = RetainedInput>) {
         let inputs = inputs.into_iter().collect::<Vec<_>>();
         self.states
-            .retain(|(node, _)| inputs.iter().any(|(id, _, _, _, _)| id == node));
+            .retain(|(node, _)| inputs.iter().any(|input| input.node == *node));
         if self.drag.is_some_and(|node| self.get(node).is_none()) {
             self.drag = None;
         }
-        for (node, value, multiline, read_only, filter) in inputs {
+        for RetainedInput {
+            node,
+            value,
+            multiline,
+            read_only,
+            filter,
+            privacy,
+            history,
+        } in inputs
+        {
             if let Some(state) = self.get_mut(node) {
                 state.sync(&value, multiline, read_only, filter);
             } else {
@@ -57,6 +73,14 @@ impl TextInputStates {
                     node,
                     TextInputState::new(value, multiline, read_only, filter),
                 ));
+            }
+            self.get_mut(node)
+                .expect("editor was inserted")
+                .set_privacy(privacy);
+            if let Some(history) = history {
+                self.get_mut(node)
+                    .expect("editor was inserted")
+                    .configure_history(history);
             }
         }
     }

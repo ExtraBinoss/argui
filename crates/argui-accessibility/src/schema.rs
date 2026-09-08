@@ -15,6 +15,11 @@ pub enum Role {
     TextInput,
     TextArea,
     SearchInput,
+    Table,
+    Grid,
+    Row,
+    ColumnHeader,
+    Cell,
     List,
     ListItem,
     Tree,
@@ -73,8 +78,10 @@ pub enum Orientation {
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct SemanticState {
+    pub protected: bool,
     pub disabled: bool,
     pub selected: bool,
+    pub multiselectable: bool,
     pub checked: Option<bool>,
     pub expanded: Option<bool>,
     pub required: bool,
@@ -115,8 +122,10 @@ impl Semantics {
             description: None,
             value: None,
             state: SemanticState {
+                protected: false,
                 disabled: false,
                 selected: false,
+                multiselectable: false,
                 checked: None,
                 expanded: None,
                 required: false,

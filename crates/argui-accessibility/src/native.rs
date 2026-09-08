@@ -119,6 +119,9 @@ fn lower_node(node: &SemanticNode) -> (NodeId, Node) {
         output.set_disabled();
     }
     output.set_selected(node.semantics.state.selected);
+    if node.semantics.state.multiselectable {
+        output.set_multiselectable();
+    }
     if let Some(value) = node.semantics.state.checked {
         output.set_toggled(if value {
             accesskit::Toggled::True
@@ -134,6 +137,9 @@ fn lower_node(node: &SemanticNode) -> (NodeId, Node) {
     }
     if node.semantics.state.read_only {
         output.set_read_only();
+    }
+    if node.semantics.state.protected {
+        output.set_role(accesskit::Role::PasswordInput);
     }
     if node.semantics.state.invalid {
         output.set_invalid(accesskit::Invalid::True);
@@ -183,6 +189,10 @@ const fn lower_role(role: Role) -> AccessRole {
         Role::TextInput => AccessRole::TextInput,
         Role::TextArea => AccessRole::MultilineTextInput,
         Role::SearchInput => AccessRole::SearchInput,
+        Role::Table | Role::Grid => AccessRole::Table,
+        Role::Row => AccessRole::Row,
+        Role::ColumnHeader => AccessRole::ColumnHeader,
+        Role::Cell => AccessRole::Cell,
         Role::List => AccessRole::List,
         Role::ListItem => AccessRole::ListItem,
         Role::ListBox => AccessRole::ListBox,

@@ -14,6 +14,8 @@ use argui_ui::{
 
 #[path = "host/interaction.rs"]
 mod interaction;
+#[path = "host/tree.rs"]
+mod tree;
 
 struct App(Rc<Cell<usize>>);
 
@@ -37,7 +39,12 @@ fn pointer(phase: PointerPhase, point: Point) -> UiEventKind {
     UiEventKind::Pointer(PointerEvent::mouse(phase, point))
 }
 
-fn dispatch_key<T: Render>(entity: &Entity<T>, tree: &mut UiTree, key: &str, kind: UiEventKind) {
+fn dispatch_key<T: Render>(
+    entity: &argui_runtime::Mount<T>,
+    tree: &mut UiTree,
+    key: &str,
+    kind: UiEventKind,
+) {
     let target = tree
         .node_ids()
         .iter()
@@ -46,7 +53,7 @@ fn dispatch_key<T: Render>(entity: &Entity<T>, tree: &mut UiTree, key: &str, kin
         .expect("event target must exist");
     for delivery in tree.event_deliveries(target, kind) {
         if delivery.should_dispatch() {
-            entity.dispatch_event(&delivery);
+            entity.dispatch_event(&delivery).unwrap();
         }
     }
 }
@@ -54,8 +61,10 @@ fn dispatch_key<T: Render>(entity: &Entity<T>, tree: &mut UiTree, key: &str, kin
 #[test]
 fn host_routes_application_and_devtools_events_independently() {
     let updates = Rc::new(Cell::new(0));
-    let host = Entity::new(DevtoolsHost::new(App(updates.clone())).open(true));
-    let mut tree = UiTree::new(host.render());
+    let host = Entity::new(DevtoolsHost::new(App(updates.clone())).open(true))
+        .mount()
+        .unwrap();
+    let mut tree = UiTree::new(host.render(Default::default()).unwrap());
     let target = tree
         .node_ids()
         .iter()
@@ -67,7 +76,7 @@ fn host_routes_application_and_devtools_events_independently() {
         UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
     ) {
         if delivery.should_dispatch() {
-            host.dispatch_event(&delivery);
+            host.dispatch_event(&delivery).unwrap();
         }
     }
     assert_eq!(updates.get(), 1);
@@ -79,157 +88,120 @@ fn host_routes_application_and_devtools_events_independently() {
             )),
             ViewUpdate::Rebuild
         );
-    });
+    })
+    .unwrap();
     assert_eq!(updates.get(), 1);
 }
 
 #[test]
-fn selected_nodes_receive_reversible_typed_style_overrides() {
-    let mut host = DevtoolsHost::new(App(Rc::new(Cell::new(0)))).open(true);
-    let inspector = host.inspector();
-    inspector.publish_tree(TreeSnapshot {
-        revision: 1,
-        nodes: vec![NodeSnapshot {
-            id: InspectNodeId(42),
-            parent: None,
-            depth: 0,
-            key: Some("panel".into()),
-            kind: "container".into(),
-            summary: Some("panel content".into()),
-            bounds: Rect::new(Point::default(), Size::new(100.0, 80.0)),
-            clip: None,
-            z_index: 0,
-            portal: None,
-            visible: true,
-            painted: true,
-            interactive: false,
-            child_count: 0,
-            properties: vec![PropertySnapshot {
-                property: StyleProperty::Background,
-                authored: true,
-                value: StyleValue::Srgba([0.2, 0.4, 0.6, 1.0]),
-            }],
-        }],
-    });
-    host.update(&event(
-        "__devtools-node-42",
-        UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
-    ));
-    assert!(contains_key(
-        &host.view(),
-        "__devtools-value-42-background-0"
-    ));
-    host.update(&event(
-        "__devtools-value-42-background-0",
-        UiEventKind::TextChanged("0.9".into()),
-    ));
-    assert!(matches!(
-        inspector.property_value(InspectNodeId(42), StyleProperty::Background),
-        Some(StyleValue::Srgba([red, _, _, _])) if red == 0.9
-    ));
-    host.update(&event(
-        "__devtools-style-background",
-        UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
-    ));
-    assert_eq!(inspector.selected(), Some(InspectNodeId(42)));
-    assert_eq!(
-        inspector.property_enabled(InspectNodeId(42), StyleProperty::Background),
-        Some(false)
-    );
-    assert!(contains_key(&host.view(), "__devtools-tree"));
-}
-
-#[test]
 fn dock_controls_cover_filter_scroll_pause_clear_and_resize() {
-    let mut host = populated_host();
-    let inspector = host.inspector();
+    let host = Entity::new(populated_host()).mount().unwrap();
+    let inspector = host.read(|tools| tools.inspector());
     assert_eq!(
-        host.update(&event(
+        change_tools(&host, |tools| tools.update(&event(
             "__devtools-search",
             UiEventKind::TextChanged("button".into())
-        )),
+        ))),
         ViewUpdate::Rebuild
     );
-    let filtered = host.view();
+    let filtered = host.render(Default::default()).unwrap();
     assert!(contains_text(&filtered, "button  #save"));
     assert!(!contains_text(&filtered, "container  #panel"));
     assert_eq!(
-        host.update(&event(
+        change_tools(&host, |tools| tools.update(&event(
             "__devtools-tree",
             UiEventKind::Scrolled {
                 delta: Point::new(0.0, 20.0),
                 offset: Point::new(0.0, 40.0),
             }
-        )),
+        ))),
         ViewUpdate::None
     );
     assert_eq!(
-        host.update(&event(
+        change_tools(&host, |tools| tools.update(&event(
             "__devtools-frames",
             UiEventKind::Scrolled {
                 delta: Point::new(0.0, 12.0),
                 offset: Point::new(0.0, 24.0),
             }
-        )),
+        ))),
         ViewUpdate::None
     );
-    host.update(&event(
-        "__devtools-copy",
-        UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
-    ));
+    change_tools(&host, |tools| {
+        tools.update(&event(
+            "__devtools-copy",
+            UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
+        ))
+    });
     assert!(matches!(
-        host.take_clipboard_request(),
+        change_tools(&host, |tools| tools.take_clipboard_request()),
         Some(argui_ui::ClipboardRequest::Write(trace))
             if trace.contains("argui-gpu-trace-v2")
     ));
-    assert_eq!(host.take_clipboard_request(), None);
-    host.update(&event(
-        "__devtools-section-0",
-        UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
-    ));
-    assert!(host.wants_animation_frame());
     assert_eq!(
-        host.animation_frame(Frame {
+        change_tools(&host, |tools| tools.take_clipboard_request()),
+        None
+    );
+    change_tools(&host, |tools| {
+        tools.update(&event(
+            "__devtools-section-0",
+            UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
+        ))
+    });
+    assert!(host.read(|tools| tools.wants_animation_frame()));
+    assert_eq!(
+        change_tools(&host, |tools| tools.animation_frame(Frame {
             now: Time::ZERO,
             elapsed: Duration::from_millis(16),
-        }),
+        })),
         ViewUpdate::Rebuild
     );
-    host.update(&event(
-        "__devtools-section-nope",
-        UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
-    ));
-    host.update(&event(
-        "__devtools-section-99",
-        UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
-    ));
-    host.update(&event(
-        "__devtools-pause",
-        UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
-    ));
+    change_tools(&host, |tools| {
+        tools.update(&event(
+            "__devtools-section-nope",
+            UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
+        ))
+    });
+    change_tools(&host, |tools| {
+        tools.update(&event(
+            "__devtools-section-99",
+            UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
+        ))
+    });
+    change_tools(&host, |tools| {
+        tools.update(&event(
+            "__devtools-pause",
+            UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
+        ))
+    });
     assert!(inspector.paused());
-    host.update(&event(
-        "__devtools-pause",
-        UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
-    ));
+    change_tools(&host, |tools| {
+        tools.update(&event(
+            "__devtools-pause",
+            UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
+        ))
+    });
     assert!(!inspector.paused());
     inspector.record_ui(FrameRecord::default());
-    host.update(&event(
-        "__devtools-clear",
-        UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
-    ));
+    change_tools(&host, |tools| {
+        tools.update(&event(
+            "__devtools-clear",
+            UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
+        ))
+    });
     assert!(inspector.frames().is_empty());
-    host.update(&event(
-        "__devtools-reset",
-        UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
-    ));
+    change_tools(&host, |tools| {
+        tools.update(&event(
+            "__devtools-reset",
+            UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
+        ))
+    });
     let layout = LayoutSnapshot {
         viewport: Rect::new(Point::default(), Size::new(900.0, 700.0)),
         nodes: Vec::new(),
     };
-    host.layout_changed(&layout);
-    let host = Entity::new(host);
-    let mut tree = UiTree::new(host.render());
+    change_tools(&host, |tools| tools.inspect_layout(&layout));
+    let mut tree = UiTree::new(host.render(Default::default()).unwrap());
     let splitter = tree
         .node_ids()
         .iter()
@@ -270,51 +242,16 @@ fn dock_controls_cover_filter_scroll_pause_clear_and_resize() {
             },
         }),
     );
-    assert_eq!(tree.update(host.render()), argui_ui::TreeUpdate::Layout);
-}
-
-#[test]
-fn elements_render_selection_highlight_and_every_style_control() {
-    let mut host = populated_host();
-    let inspector = host.inspector();
-    host.update(&event(
-        "__devtools-node-2",
-        UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
-    ));
-    let view = host.view();
-    assert!(contains_text(&view, "Reset overrides"));
-    assert!(contains_key(&view, "__devtools-style-effects"));
-
-    for property in StyleProperty::ALL {
-        host.update(&event(
-            &format!("__devtools-style-{}", property.label()),
-            UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
-        ));
-        assert_eq!(
-            inspector.property_enabled(InspectNodeId(2), property),
-            Some(false)
-        );
-    }
-    inspector.select(Some(InspectNodeId(999)));
-    assert!(contains_text(
-        &host.view(),
-        "Select an element to inspect its styles"
-    ));
-    host.update(&event(
-        "__devtools-node-not-a-number",
-        UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
-    ));
-    assert_eq!(inspector.selected(), None);
-    host.update(&event(
-        "__devtools-style-not-real",
-        UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
-    ));
+    assert_eq!(
+        tree.update(host.render(Default::default()).unwrap()),
+        argui_ui::TreeUpdate::Layout
+    );
 }
 
 #[test]
 fn profiling_and_closed_views_keep_the_dock_tree_retained() {
-    let mut host = populated_host();
-    let inspector = host.inspector();
+    let host = Entity::new(populated_host()).mount().unwrap();
+    let inspector = host.read(|tools| tools.inspector());
     inspector.record_ui(FrameRecord {
         interval: StdDuration::from_millis(16),
         model: StdDuration::from_micros(100),
@@ -338,34 +275,48 @@ fn profiling_and_closed_views_keep_the_dock_tree_retained() {
         texture_bytes: 1_048_576,
         ..FrameRecord::default()
     });
-    host.update(&event(
-        "__devtools-profiling",
-        UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
-    ));
-    let profile = host.view();
+    change_tools(&host, |tools| {
+        tools.update(&event(
+            "__devtools-profiling",
+            UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
+        ))
+    });
+    let profile = host.render(Default::default()).unwrap();
     assert!(contains_text(&profile, "Passes"));
     assert!(contains_text(&profile, "MiB"));
     assert!(contains_text(&profile, "1.0"));
-    host.update(&event(
-        "__devtools-profile-details",
-        UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
-    ));
-    let details = host.view();
+    change_tools(&host, |tools| {
+        tools.update(&event(
+            "__devtools-profile-details",
+            UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
+        ))
+    });
+    let details = host.render(Default::default()).unwrap();
     assert!(contains_text(&details, "Invalidation"));
     assert!(contains_text(&details, "Layout"));
 
-    host.update(&event(
-        "__devtools-elements",
-        UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
+    change_tools(&host, |tools| {
+        tools.update(&event(
+            "__devtools-elements",
+            UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
+        ))
+    });
+    assert!(contains_key(
+        &host.render(Default::default()).unwrap(),
+        "__devtools-tree"
     ));
-    assert!(contains_key(&host.view(), "__devtools-tree"));
-    host.update(&event(
-        "__devtools-toggle",
-        UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
+    change_tools(&host, |tools| {
+        tools.update(&event(
+            "__devtools-toggle",
+            UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
+        ))
+    });
+    assert!(contains_key(
+        &host.render(Default::default()).unwrap(),
+        "__devtools-tree"
     ));
-    assert!(contains_key(&host.view(), "__devtools-tree"));
-    settle(&mut host);
-    let closed = host.view();
+    settle(&host);
+    let closed = host.render(Default::default()).unwrap();
     assert!(contains_text(&closed, "DevTools"));
     assert!(contains_key(&closed, "__devtools-tree"));
 }
@@ -373,84 +324,94 @@ fn profiling_and_closed_views_keep_the_dock_tree_retained() {
 #[test]
 fn host_animation_and_layout_delegation_keep_the_app_viewport_explicit() {
     let updates = Rc::new(Cell::new(0));
-    let mut host = DevtoolsHost::new(App(updates.clone()));
-    assert!(!host.wants_animation_frame());
+    let host = Entity::new(DevtoolsHost::new(App(updates.clone())))
+        .mount()
+        .unwrap();
+    assert!(!host.read(|tools| tools.wants_animation_frame()));
     assert_eq!(
-        host.animation_frame(Frame {
+        change_tools(&host, |tools| tools.animation_frame(Frame {
             now: Time::ZERO,
             elapsed: Duration::ZERO,
-        }),
+        })),
         ViewUpdate::None
     );
-    host.update(&event(
-        "__devtools-toggle",
-        UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
-    ));
-    assert!(host.wants_animation_frame());
+    change_tools(&host, |tools| {
+        tools.update(&event(
+            "__devtools-toggle",
+            UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
+        ))
+    });
+    assert!(host.read(|tools| tools.wants_animation_frame()));
     assert_eq!(
-        host.animation_frame(Frame {
+        change_tools(&host, |tools| tools.animation_frame(Frame {
             now: Time::ZERO,
             elapsed: Duration::from_millis(16),
-        }),
+        })),
         ViewUpdate::Rebuild
     );
 
     let tree = UiTree::new(Element::container([]));
     let app_bounds = Rect::new(Point::new(0.0, 0.0), Size::new(800.0, 400.0));
     assert_eq!(
-        host.layout_changed(&LayoutSnapshot {
+        change_tools(&host, |tools| tools.inspect_layout(&LayoutSnapshot {
             viewport: Rect::new(Point::default(), Size::new(800.0, 700.0)),
             nodes: vec![LayoutBounds {
                 node: tree.node_id_at(0).unwrap(),
                 key: Some("__devtools-app-root".into()),
                 bounds: app_bounds,
             }],
-        }),
+        })),
         ViewUpdate::None
     );
-    assert!(host.image_assets().is_empty());
-    assert_eq!(host.vector_assets().len(), 8);
-    assert!(Render::inspector(&host).is_some());
+    assert!(host.read(|tools| tools.image_assets()).is_empty());
+    assert_eq!(host.read(|tools| tools.vector_assets()).len(), 8);
+    assert!(host.read(Render::inspector).is_some());
 }
 
 #[test]
 fn picker_hit_tests_the_application_and_selects_without_clicking_through() {
-    let mut host = populated_host();
-    let inspector = host.inspector();
-    host.layout_changed(&LayoutSnapshot {
-        viewport: Rect::new(Point::default(), Size::new(900.0, 700.0)),
-        nodes: vec![LayoutBounds {
-            node: UiTree::new(Element::container([])).node_id_at(0).unwrap(),
-            key: Some("__devtools-app-root".into()),
-            bounds: Rect::new(Point::default(), Size::new(900.0, 380.0)),
-        }],
+    let host = Entity::new(populated_host()).mount().unwrap();
+    let inspector = host.read(|tools| tools.inspector());
+    change_tools(&host, |tools| {
+        tools.inspect_layout(&LayoutSnapshot {
+            viewport: Rect::new(Point::default(), Size::new(900.0, 700.0)),
+            nodes: vec![LayoutBounds {
+                node: UiTree::new(Element::container([])).node_id_at(0).unwrap(),
+                key: Some("__devtools-app-root".into()),
+                bounds: Rect::new(Point::default(), Size::new(900.0, 380.0)),
+            }],
+        })
     });
 
     assert_eq!(
-        host.update(&event(
+        change_tools(&host, |tools| tools.update(&event(
             "__devtools-picker",
             UiEventKind::Click(argui_ui::ClickEvent::accessibility())
-        )),
+        ))),
         ViewUpdate::Rebuild
     );
-    assert!(contains_key(&host.view(), "__devtools-picker-surface"));
+    assert!(contains_key(
+        &host.render(Default::default()).unwrap(),
+        "__devtools-picker-surface"
+    ));
     assert_eq!(
-        host.update(&event(
+        change_tools(&host, |tools| tools.update(&event(
             "__devtools-picker-surface",
             pointer(PointerPhase::Moved, Point::new(40.0, 40.0)),
-        )),
+        ))),
         ViewUpdate::Paint
     );
     assert_eq!(inspector.selected(), None);
     assert_eq!(
-        host.update(&event(
+        change_tools(&host, |tools| tools.update(&event(
             "__devtools-picker-surface",
             UiEventKind::Click(argui_ui::ClickEvent::accessibility())
-        )),
+        ))),
         ViewUpdate::Rebuild
     );
     assert_eq!(inspector.selected(), Some(InspectNodeId(2)));
-    let request = host.take_scroll_request().expect("picker reveals tree row");
+    let request =
+        change_tools(&host, |tools| tools.take_scroll_request()).expect("picker reveals tree row");
     assert!(matches!(
         request.target,
         argui_ui::ScrollTarget::Offset {
@@ -458,20 +419,29 @@ fn picker_hit_tests_the_application_and_selects_without_clicking_through() {
             ..
         } if key == "__devtools-tree"
     ));
-    assert!(!contains_key(&host.view(), "__devtools-picker-surface"));
+    assert!(!contains_key(
+        &host.render(Default::default()).unwrap(),
+        "__devtools-picker-surface"
+    ));
 
-    host.update(&event(
-        "__devtools-picker",
-        UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
-    ));
-    host.update(&event(
-        "__devtools-picker-surface",
-        pointer(PointerPhase::Moved, Point::new(40.0, 40.0)),
-    ));
-    host.update(&event(
-        "__devtools-picker-surface",
-        UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
-    ));
+    change_tools(&host, |tools| {
+        tools.update(&event(
+            "__devtools-picker",
+            UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
+        ))
+    });
+    change_tools(&host, |tools| {
+        tools.update(&event(
+            "__devtools-picker-surface",
+            pointer(PointerPhase::Moved, Point::new(40.0, 40.0)),
+        ))
+    });
+    change_tools(&host, |tools| {
+        tools.update(&event(
+            "__devtools-picker-surface",
+            UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
+        ))
+    });
     assert_eq!(
         inspector.selected(),
         Some(InspectNodeId(1)),
@@ -480,43 +450,24 @@ fn picker_hit_tests_the_application_and_selects_without_clicking_through() {
 }
 
 #[test]
-fn live_profiler_records_do_not_invalidate_the_visible_snapshot() {
-    let mut host = populated_host();
-    host.update(&event(
-        "__devtools-profiling",
-        UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
-    ));
-    let mut tree = UiTree::new(host.view());
-    tree.mark_layout_clean();
-    host.inspector().record_ui(FrameRecord {
-        interval: StdDuration::from_millis(400),
-        ..FrameRecord::default()
-    });
-    assert_eq!(tree.update(host.view()), argui_ui::TreeUpdate::None);
-    host.update(&event(
-        "__devtools-refresh",
-        UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
-    ));
-    assert_eq!(tree.update(host.view()), argui_ui::TreeUpdate::Layout);
-}
-
-#[test]
 fn non_click_tool_events_are_consumed_without_reaching_the_application() {
     let updates = Rc::new(Cell::new(0));
-    let mut host = DevtoolsHost::new(App(updates.clone())).open(true);
+    let host = Entity::new(DevtoolsHost::new(App(updates.clone())).open(true))
+        .mount()
+        .unwrap();
     assert_eq!(
-        host.update(&event(
+        change_tools(&host, |tools| tools.update(&event(
             "__devtools-unknown",
             pointer(PointerPhase::Moved, Point::new(1.0, 2.0))
-        )),
+        ))),
         ViewUpdate::None
     );
     assert_eq!(updates.get(), 0);
     assert_eq!(
-        host.update(&event(
+        change_tools(&host, |tools| tools.update(&event(
             "unrelated",
             pointer(PointerPhase::Left, Point::default())
-        )),
+        ))),
         ViewUpdate::None
     );
     assert_eq!(updates.get(), 0);
@@ -589,11 +540,23 @@ fn contains_text(element: &Element, needle: &str) -> bool {
             .any(|child| contains_text(child, needle))
 }
 
-fn settle(host: &mut DevtoolsHost<App>) {
+fn settle(host: &argui_runtime::Mount<DevtoolsHost<App>>) {
     for _ in 0..60 {
         host.animation_frame(Frame {
             now: Time::ZERO,
             elapsed: Duration::from_millis(16),
-        });
+        })
+        .unwrap();
     }
+}
+
+fn change_tools<R>(
+    host: &argui_runtime::Mount<DevtoolsHost<App>>,
+    change: impl FnOnce(&mut DevtoolsHost<App>) -> R,
+) -> R {
+    host.update(|tools, cx| {
+        cx.notify();
+        change(tools)
+    })
+    .unwrap()
 }

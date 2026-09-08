@@ -13,6 +13,8 @@ mod input;
 mod launch;
 mod model;
 mod multi;
+#[cfg(feature = "tasks")]
+pub mod tasks;
 mod translate;
 
 pub use app::{Inspection, InspectionCache};
@@ -27,6 +29,10 @@ pub use launch::{
     run_ui, run_ui_with_text_engine, run_with_text, run_with_text_engine,
 };
 pub use model::{
-    AnyEntity, Context, Entity, LayoutBounds, LayoutSnapshot, Render, ScrollRequest, ViewUpdate,
-    WeakEntity,
+    AnyEntity, Context, Entity, EntityId, EventEmitter, EventError, LayoutBounds, LayoutSnapshot,
+    ModelContext, ModelRuntime, Mount, MountEvent, MountId, MountTransition, Render, ResourceLease,
+    ResourceScope, ScopeClosed, ScrollRequest, ServiceAlreadyRegistered, ServiceRegistration,
+    Subscription, ViewUpdate, WeakEntity, WeakMount,
 };
+
+pub use model::shutdown_presentations;

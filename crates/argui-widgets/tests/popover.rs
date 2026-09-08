@@ -180,7 +180,9 @@ fn popover_surface_options_are_applied_without_trapping_focus() {
 
     assert_eq!(anchor.placement.preferred, Placement::TopEnd);
     assert!(!content.focus_scope.as_ref().unwrap().traps());
-    assert!(content.layer.is_none());
+    let layer = content.layer.as_ref().unwrap();
+    assert!(layer.backdrop_filters.is_empty());
+    assert_eq!(layer.shadows, theme.overlay_shadows);
     assert_eq!(
         content.style.padding.left,
         argui_ui::LengthPercentage::length(20.0)
@@ -233,7 +235,9 @@ fn popover_clamps_negative_surface_values_and_avoids_zero_blur_layer() {
     );
     assert_eq!(content.style.padding, argui_ui::Sides::length(0.0));
     assert_eq!(content.paint.quad.radii, argui_paint::CornerRadii::all(0.0));
-    assert!(content.layer.is_none());
+    let layer = content.layer.as_ref().unwrap();
+    assert!(layer.backdrop_filters.is_empty());
+    assert_eq!(layer.shadows, theme.overlay_shadows);
     assert_eq!(
         content.portal.as_ref().unwrap().dismiss,
         DismissPolicy::OutsidePointer

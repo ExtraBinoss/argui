@@ -27,6 +27,19 @@ impl<T> HandlerRegistry<T> {
 }
 
 impl<T: Render> Context<T> {
+    #[must_use]
+    pub fn on_action(
+        &mut self,
+        id: argui_ui::ActionId,
+        state: argui_ui::ActionState,
+        handler: impl Fn(&mut T, &UiEvent, &mut Context<T>) + 'static,
+    ) -> argui_ui::ActionBinding {
+        argui_ui::ActionBinding {
+            id,
+            state,
+            listener: self.listener(EventType::Action, handler),
+        }
+    }
     /// Declares an event handler owned by the component currently being rendered.
     #[must_use]
     pub fn listener(
@@ -36,7 +49,7 @@ impl<T: Render> Context<T> {
     ) -> EventListener {
         let owner = self.owner.as_ref().map_or_else(
             || panic!("listeners require an entity render context"),
-            |owner| owner.0,
+            |owner| owner.0.get(),
         );
         let slot = u32::try_from(self.handlers.len()).expect("handler slot count must fit in u32");
         self.handlers.push(Rc::new(handler));
@@ -53,36 +66,45 @@ impl<T: Render> Entity<T> {
         handler: EventHandlerId,
         event: &UiEvent,
     ) -> super::effects::ContextEffects {
+        let _transaction = self.0.model.runtime.enter();
+        if !self.0.presentation.is_visible() {
+            return super::effects::ContextEffects::default();
+        }
         if handler.owner() != self.owner_id() {
-            if let Some(child) = self
+            let child = self
                 .0
+                .presentation
                 .children
                 .borrow()
                 .iter()
                 .find(|child| (child.owns)(handler.owner()))
-            {
+                .cloned();
+            if let Some(child) = child {
                 return (child.dispatch_handler)(handler, event);
             }
-            return self
+            let route = self
                 .0
+                .presentation
                 .event_routes
                 .borrow()
                 .iter()
                 .find(|route| (route.owns)(handler.owner()))
-                .map_or_else(super::effects::ContextEffects::default, |route| {
-                    (route.dispatch_handler)(handler, event)
-                });
+                .cloned();
+            return route.map_or_else(super::effects::ContextEffects::default, |route| {
+                (route.dispatch_handler)(handler, event)
+            });
         }
-        let Some(callback) = self.0.handlers.borrow().get(handler.slot()) else {
+        let Some(callback) = self.0.presentation.handlers.borrow().get(handler.slot()) else {
             return super::effects::ContextEffects::default();
         };
         let mut cx = Context {
-            environment: self.0.environment.get(),
+            entity: Some(self.downgrade()),
+            environment: self.0.presentation.environment.get(),
             event_target: Some(event.current_target()),
             ..Context::default()
         };
-        callback(&mut self.0.value.borrow_mut(), event, &mut cx);
-        self.0.cache.apply_update(cx.effects.update);
+        callback(&mut self.0.model.value.borrow_mut(), event, &mut cx);
+        self.0.model.signal.apply_update(cx.effects.update);
         cx.effects
     }
 }

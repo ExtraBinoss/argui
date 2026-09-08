@@ -46,6 +46,9 @@ impl RuntimeAnimations {
 
 impl Application {
     pub(super) fn sync_animations(&mut self) -> bool {
+        if !self.presentation_visible {
+            return self.animations.sync(false);
+        }
         let model_active = self.model.as_ref().is_some_and(AnyEntity::wants_frame);
         let tree_active = self
             .ui_tree
@@ -66,7 +69,9 @@ impl Application {
         let model_started = Instant::now();
         let model_update = self.model.as_ref().map_or(ViewUpdate::None, |model| {
             model.animation_frame(frame);
-            model.take_effects().update
+            let effects = model.take_effects();
+            self.pending_app_commands.extend(effects.commands);
+            effects.update
         });
         let rebuild = model_update == ViewUpdate::Rebuild;
         let model_time = model_started.elapsed();

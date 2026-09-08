@@ -14,5 +14,7 @@ echo "quality: native clippy"
 cargo clippy --workspace --all-targets --all-features -- -D warnings
 echo "quality: wasm check"
 cargo check --workspace --all-targets --target wasm32-unknown-unknown
+echo "quality: model API compilation contracts"
+cargo test -p argui-runtime --all-features --doc model::model_context::ModelContext
 echo "quality: instrumented library coverage"
 ./scripts/check-coverage.sh

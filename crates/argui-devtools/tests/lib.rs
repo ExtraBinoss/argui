@@ -23,29 +23,26 @@ fn host_can_disable_or_replace_edge_effects() {
             root.children.iter().find_map(|child| find(child, key))
         }
     }
-    let mut host = argui_devtools::DevtoolsHost::new(argui_showcase::StateShowcase::default())
-        .open(true)
-        .scroll_effect(None);
-    assert!(
-        find(&host.view(), "__devtools-tree")
-            .unwrap()
-            .scroll
-            .as_ref()
-            .unwrap()
-            .effects
-            .is_empty()
-    );
     let effect = argui_effects::EdgeFade::new(40.0).scroll();
-    host = host.scroll_effect(Some(effect.clone()));
-    assert_eq!(
-        find(&host.view(), "__devtools-tree")
-            .unwrap()
-            .scroll
-            .as_ref()
-            .unwrap()
-            .effects,
-        vec![effect]
-    );
+    for effects in [None, Some(effect)] {
+        let host = argui_runtime::Entity::new(
+            argui_devtools::DevtoolsHost::new(argui_showcase::StateShowcase::default())
+                .open(true)
+                .scroll_effect(effects.clone()),
+        )
+        .mount()
+        .unwrap();
+        let root = host.render(Default::default()).unwrap();
+        assert_eq!(
+            find(&root, "__devtools-tree")
+                .unwrap()
+                .scroll
+                .as_ref()
+                .unwrap()
+                .effects,
+            effects.into_iter().collect::<Vec<_>>()
+        );
+    }
     let app = argui_devtools::DevtoolsApp::new(argui_runtime::SingleWindowModel::new(
         argui_showcase::StateShowcase::default(),
     ))

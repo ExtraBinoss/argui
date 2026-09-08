@@ -21,7 +21,7 @@ mod kind;
 mod portal;
 pub use kind::{ElementKind, ElementNode, TextEditorSpec};
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Element(Rc<ElementNode>);
 
 impl PartialEq for Element {
@@ -72,6 +72,10 @@ impl Element {
             virtual_item: None,
             portal: None,
             focus_scope: None,
+            text_privacy: crate::TextPrivacy::Public,
+            text_history: None,
+            action_scope: None,
+            action: None,
             event_listeners: Vec::new(),
             user_select: crate::UserSelect::Auto,
             selection_style: None,
@@ -135,6 +139,10 @@ impl Element {
             virtual_item: None,
             portal: None,
             focus_scope: None,
+            text_privacy: crate::TextPrivacy::Public,
+            text_history: None,
+            action_scope: None,
+            action: None,
             event_listeners: Vec::new(),
             user_select: crate::UserSelect::Auto,
             selection_style: None,

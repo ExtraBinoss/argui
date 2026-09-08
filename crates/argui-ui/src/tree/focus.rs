@@ -212,7 +212,22 @@ impl UiTree {
 
     pub fn keyboard_event(&mut self, input: &KeyInput, regions: &[HitRegion]) -> InteractionUpdate {
         let _ = regions;
-        let target = self.interaction.focused();
+        let target = self
+            .interaction
+            .focused()
+            .or_else(|| self.node_ids.first().copied());
+        if self.interaction.focused().is_none()
+            && target.is_some_and(|node| {
+                self.default_action(&UiEvent::new(
+                    node,
+                    None,
+                    UiEventKind::KeyInput(input.clone()),
+                ))
+                .is_none()
+            })
+        {
+            return InteractionUpdate::default();
+        }
         InteractionUpdate {
             events: target.map_or_else(Vec::new, |node| {
                 self.event_deliveries(node, UiEventKind::KeyInput(input.clone()))
@@ -274,6 +289,9 @@ impl UiTree {
         let Some(node) = self.interaction.focused() else {
             return InteractionUpdate::default();
         };
+        if !self.input_available(node) {
+            return InteractionUpdate::default();
+        }
         let Some(state) = self.text_inputs.get_mut(node) else {
             return InteractionUpdate::default();
         };

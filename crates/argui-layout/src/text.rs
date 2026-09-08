@@ -35,7 +35,10 @@ pub(super) fn content<'a>(
                 ))
             }
         }
-        ElementKind::Container | ElementKind::Image { .. } | ElementKind::Vector { .. } => None,
+        ElementKind::Custom(_)
+        | ElementKind::Container
+        | ElementKind::Image { .. }
+        | ElementKind::Vector { .. } => None,
     }
 }
 

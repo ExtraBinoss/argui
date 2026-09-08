@@ -1,5 +1,4 @@
 use argui_platform::{ImeInput, Key, KeyInput, KeyState};
-use argui_ui::SelectionCommand;
 use winit::dpi::{LogicalPosition, LogicalSize};
 
 use crate::app::Application;
@@ -38,23 +37,11 @@ impl Application {
         let (Some(layout), Some(ui)) = (&self.ui_layout, &mut self.ui_tree) else {
             return;
         };
-        if input.state == KeyState::Pressed
-            && let Key::Character(key) = &input.key
-            && input.modifiers.command()
+        if ui
+            .focused_node()
+            .is_some_and(|node| ui.text_input_composing(node))
         {
-            let key = key.to_ascii_lowercase();
-            let command = match key.as_str() {
-                "a" => Some(SelectionCommand::SelectAll),
-                "c" => Some(SelectionCommand::Copy),
-                "x" => Some(SelectionCommand::Cut),
-                "v" => Some(SelectionCommand::Paste),
-                _ => None,
-            };
-            if let Some(command) = command {
-                let update = ui.focused_selection_command(command);
-                self.apply_ui_update(update, window, event_loop);
-                return;
-            }
+            return;
         }
         let focused_editor = ui
             .focused_node()

@@ -25,12 +25,13 @@ impl MultiApplication {
                 }
             }
             AppCommand::FocusWindow(key) => {
+                self.set_visible(&key, true);
                 if let Some(window) = self
                     .windows
                     .get(&key)
                     .and_then(|entry| entry.runtime.window())
                 {
-                    window.set_visible(true);
+                    window.set_minimized(false);
                     window.focus_window();
                 }
             }
@@ -53,6 +54,9 @@ impl MultiApplication {
                         Ok(())
                     },
                 );
+                if let Some(entry) = self.windows.get_mut(&key) {
+                    entry.runtime.sync_host_visibility();
+                }
             }
             AppCommand::SetWindowMaximized { window, maximized } => {
                 self.with_window_capability(
@@ -141,13 +145,9 @@ impl MultiApplication {
     }
 
     #[cfg_attr(coverage_nightly, coverage(off))]
-    pub(super) fn set_visible(&self, key: &WindowKey, visible: bool) {
-        if let Some(window) = self
-            .windows
-            .get(key)
-            .and_then(|entry| entry.runtime.window())
-        {
-            window.set_visible(visible);
+    pub(super) fn set_visible(&mut self, key: &WindowKey, visible: bool) {
+        if let Some(entry) = self.windows.get_mut(key) {
+            entry.runtime.set_window_visible(visible);
         }
     }
 }

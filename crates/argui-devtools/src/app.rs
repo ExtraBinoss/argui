@@ -195,6 +195,10 @@ impl<M: AppModel> AppModel for DevtoolsApp<M> {
         true
     }
 
+    fn tasks_ready(&mut self, window: &WindowKey) -> AppUpdate {
+        self.app.tasks_ready(window)
+    }
+
     fn update(&mut self, event: &AppEvent) -> AppUpdate {
         match event {
             AppEvent::WindowReady { window } if window == &self.detached && self.pending_detach => {
@@ -357,6 +361,10 @@ impl<M: AppModel> AppModel for DevtoolsApp<M> {
     }
     fn take_text_selection_request(&mut self, window: &WindowKey) -> Option<TextSelectionRequest> {
         self.app.take_text_selection_request(window)
+    }
+
+    fn take_ui_commands(&mut self, window: &WindowKey) -> Vec<argui_ui::UiCommand> {
+        self.app.take_ui_commands(window)
     }
     fn take_theme_request(&mut self, window: &WindowKey) -> Option<argui_runtime::ThemeRequest> {
         self.app.take_theme_request(window)

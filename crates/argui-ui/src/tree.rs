@@ -10,7 +10,9 @@ use crate::{
     UiEventKind, identity,
 };
 
+mod action;
 mod animation;
+mod editing;
 mod event;
 mod focus;
 mod index;
@@ -347,6 +349,11 @@ impl UiTree {
         let Some(node) = self.interaction.focused() else {
             return InteractionUpdate::default();
         };
+        let input = if self.input_available(node) {
+            input
+        } else {
+            ImeInput::Disabled
+        };
         let Some(state) = self.text_inputs.get_mut(node) else {
             return InteractionUpdate::default();
         };
@@ -358,10 +365,25 @@ impl UiTree {
         let Some(node) = target.or_else(|| self.interaction.focused()) else {
             return InteractionUpdate::default();
         };
+        if !self.input_available(node) {
+            return InteractionUpdate::default();
+        }
         let Some(state) = self.text_inputs.get_mut(node) else {
             return InteractionUpdate::default();
         };
         let result = state.paste(text);
+        self.text_input_update(node, result)
+    }
+
+    /// Replace a controlled editor's content as a user edit, not an external model reset.
+    pub fn replace_text_input(&mut self, node: NodeId, value: &str) -> InteractionUpdate {
+        if !self.input_available(node) {
+            return InteractionUpdate::default();
+        }
+        let Some(state) = self.text_inputs.get_mut(node) else {
+            return InteractionUpdate::default();
+        };
+        let result = state.replace_value(value);
         self.text_input_update(node, result)
     }
 
@@ -509,7 +531,15 @@ impl UiTree {
                     read_only,
                     filter,
                     ..
-                } => Some((node, value.clone(), *multiline, *read_only, *filter)),
+                } => Some(crate::text_input::RetainedInput {
+                    node,
+                    value: value.clone(),
+                    multiline: *multiline,
+                    read_only: *read_only,
+                    filter: *filter,
+                    privacy: element.text_privacy,
+                    history: element.text_history,
+                }),
                 _ => None,
             });
         self.text_inputs.sync(inputs);

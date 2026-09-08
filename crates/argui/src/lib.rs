@@ -19,6 +19,8 @@ pub use argui_webview as webview;
 #[cfg(any(
     feature = "widgets-all",
     feature = "widget-button",
+    feature = "widget-menu",
+    feature = "widget-command-palette",
     feature = "widget-input",
     feature = "widget-checkbox",
     feature = "widget-switch",

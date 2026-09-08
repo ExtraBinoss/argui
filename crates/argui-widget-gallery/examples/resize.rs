@@ -73,7 +73,7 @@ fn main() {
     dispatch(
         &gallery,
         &mut tree,
-        "nav::composition",
+        "nav::textarea",
         UiEventKind::Click(ClickEvent::accessibility()),
     );
     tree.update(gallery.render());
@@ -102,7 +102,7 @@ fn main() {
     dispatch(
         &gallery,
         &mut tree,
-        "shell-sidebar-resize",
+        "notes-resize",
         gesture(GesturePhase::Started, Point::default()),
     );
     let mut model = Vec::new();
@@ -115,7 +115,7 @@ fn main() {
         dispatch(
             &gallery,
             &mut tree,
-            "shell-sidebar-resize",
+            "notes-resize",
             gesture(GesturePhase::Changed, position),
         );
         tree.update(gallery.render());

@@ -14,6 +14,46 @@ use argui_widgets::{Input, InputStyle, TextArea};
 
 const NOTO_SANS: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
 
+#[test]
+fn password_layout_caret_stops_map_back_to_graphemes_without_shaping_the_secret() {
+    let mut ui = UiTree::new(
+        Input::new(
+            "password",
+            "A👩‍🚀e\u{301}",
+            "Password",
+            InputStyle::new(PaintStyle::default(), TextStyle::default()),
+        )
+        .kind(argui_widgets::InputKind::Password)
+        .build(),
+    );
+    let mut engine = LayoutEngine::new();
+    let mut text = text_engine();
+    let output = engine
+        .compute(&mut ui, &mut text, Size::new(400.0, 100.0))
+        .unwrap();
+    let node = ui.node_ids()[0];
+    assert_eq!(ui.text_input_display(node).as_deref(), Some("•••"));
+    let region = &output.text_inputs[0];
+    assert!(
+        region
+            .stops
+            .iter()
+            .all(|stop| stop.position.index <= 9 && stop.position.index % 3 == 0)
+    );
+    let after_first = region
+        .stops
+        .iter()
+        .find(|stop| stop.position.index == 3)
+        .unwrap()
+        .position;
+    ui.move_text_position(node, after_first, false);
+    ui.paste_text(Some(node), "x");
+    assert_eq!(ui.text_input_value(node), Some("Ax👩‍🚀e\u{301}"));
+    engine
+        .compute(&mut ui, &mut text, Size::new(400.0, 100.0))
+        .unwrap();
+}
+
 fn text_engine() -> TextEngine {
     TextEngine::from_embedded_fonts([NOTO_SANS], "Noto Sans", "Noto Sans", "Noto Sans")
 }

@@ -7,7 +7,6 @@ mod pages;
 mod property_slider;
 
 pub use app::WidgetGallery;
-use argui::runtime::SingleWindowModel;
 use argui::{
     platform::{
         AppIcon, ApplicationConfig, ApplicationId, ApplicationIdentity, IconSet, WindowConfig,
@@ -15,7 +14,6 @@ use argui::{
     render::RendererConfig,
     runtime::run_application_with_text_engine,
     text::TextEngine,
-    widgets::SelectionHost,
 };
 use argui_devtools::DevtoolsApp;
 
@@ -49,9 +47,9 @@ pub fn launch() -> Result<(), Box<dyn std::error::Error>> {
             )?),
         )?,
         text,
-        DevtoolsApp::new(SingleWindowModel::new(SelectionHost::new(
-            WidgetGallery::default(),
-        ))),
+        DevtoolsApp::new(argui::runtime::SingleWindowModel::new(
+            argui::widgets::SelectionHost::new(WidgetGallery::default()),
+        )),
         |event| {
             use argui::runtime::{RuntimeEvent, WindowRuntimeEvent};
             let error = match event {

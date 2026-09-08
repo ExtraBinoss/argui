@@ -81,6 +81,10 @@ impl Application {
     }
 
     pub(crate) fn gtk_geometry(&mut self) {
+        self.sync_host_visibility();
+        if !self.presentation_visible {
+            return;
+        }
         let Some(window) = self.window.clone() else {
             return;
         };
@@ -110,6 +114,7 @@ impl Application {
     }
 
     pub(crate) fn gtk_event(&mut self, event: WindowEvent<'_>, control: &dyn LoopControl) {
+        self.sync_host_visibility();
         let Some(window) = self.window.clone() else {
             return;
         };

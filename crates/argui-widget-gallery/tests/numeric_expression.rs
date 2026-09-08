@@ -22,7 +22,7 @@ fn gallery_exposes_a_numeric_property_editor() {
         .node_ids()
         .iter()
         .copied()
-        .find(|node| tree.key(*node) == Some("nav::composition"))
+        .find(|node| tree.key(*node) == Some("nav::slider"))
         .unwrap();
     for event in tree.event_deliveries(target, UiEventKind::Click(ClickEvent::accessibility())) {
         if event.should_dispatch() {
@@ -30,6 +30,6 @@ fn gallery_exposes_a_numeric_property_editor() {
         }
     }
     let root = gallery.render();
-    assert!(contains_text(&root, "Editable property control"));
+    assert!(contains_text(&root, "Continuous and stepped input"));
     assert!(contains_text(&root, "%"));
 }

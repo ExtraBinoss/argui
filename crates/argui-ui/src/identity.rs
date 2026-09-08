@@ -83,6 +83,9 @@ fn reconcile_node(
 }
 
 fn compatible(old: &Element, new: &Element) -> bool {
+    if let (ElementKind::Custom(old_kind), ElementKind::Custom(new_kind)) = (&old.kind, &new.kind) {
+        return old.key == new.key && old_kind.same_type(new_kind);
+    }
     old.key == new.key
         && matches!(
             (&old.kind, &new.kind),

@@ -18,10 +18,14 @@ fn main() {
         ("Elements", true, false),
         ("Profiling", true, true),
     ] {
-        let mut host = DevtoolsHost::new(StateShowcase::default())
-            .open(open)
-            .scroll_effect(effects.then(|| argui_effects::EdgeFade::default().scroll()));
-        let inspector = host.inspector();
+        let host = argui_runtime::Entity::new(
+            DevtoolsHost::new(StateShowcase::default())
+                .open(open)
+                .scroll_effect(effects.then(|| argui_effects::EdgeFade::default().scroll())),
+        )
+        .mount()
+        .unwrap();
+        let inspector = host.read(|tools| tools.inspector());
         let mut record = FrameRecord {
             interval: StdDuration::from_micros(16_667),
             gpu: Some(GpuFrameRecord {
@@ -40,13 +44,20 @@ fn main() {
         };
         if profiling {
             let target = UiTree::new(Element::container([])).node_ids()[0];
-            host.update(&UiEvent::new(
-                target,
-                Some("__devtools-profiling".into()),
-                UiEventKind::Click(ClickEvent::accessibility()),
-            ));
+            host.update(|tools, cx| {
+                let update = tools.update(&UiEvent::new(
+                    target,
+                    Some("__devtools-profiling".into()),
+                    UiEventKind::Click(ClickEvent::accessibility()),
+                ));
+                if update == ViewUpdate::Rebuild {
+                    cx.notify();
+                }
+                update
+            })
+            .unwrap();
         }
-        let mut tree = UiTree::new(host.view());
+        let mut tree = UiTree::new(host.render(Default::default()).unwrap());
         let mut engine = LayoutEngine::new();
         let mut text = text_engine();
         let mut cache = InspectionCache::default();
@@ -73,7 +84,14 @@ fn main() {
             )
         };
         if resizing && open {
-            host.update(&resize_event(argui_ui::GesturePhase::Started, 0.0));
+            host.update(|tools, cx| {
+                let update = tools.update(&resize_event(argui_ui::GesturePhase::Started, 0.0));
+                if update == ViewUpdate::Rebuild {
+                    cx.notify();
+                }
+                update
+            })
+            .unwrap();
         }
         let mut samples = Vec::new();
         let mut model_samples = Vec::new();
@@ -86,20 +104,35 @@ fn main() {
             inspector.record_ui(record.clone());
             let start = Instant::now();
             let resize_update = if resizing && open {
-                host.update(&resize_event(
-                    argui_ui::GesturePhase::Changed,
-                    -((index as f32 * 0.05).sin() * 0.5 + 0.5) * 400.0,
-                ))
+                host.update(|tools, cx| {
+                    let update = tools.update(&resize_event(
+                        argui_ui::GesturePhase::Changed,
+                        -((index as f32 * 0.05).sin() * 0.5 + 0.5) * 400.0,
+                    ));
+                    if update == ViewUpdate::Rebuild {
+                        cx.notify();
+                    }
+                    update
+                })
+                .unwrap()
             } else {
                 ViewUpdate::None
             };
-            let model_update = host.animation_frame(Frame {
-                now: Time::from_nanos(index * 16_667_000),
-                elapsed: Duration::from_millis(17),
-            });
+            let model_update = host
+                .update(|tools, cx| {
+                    let update = tools.animation_frame(Frame {
+                        now: Time::from_nanos(index * 16_667_000),
+                        elapsed: Duration::from_millis(17),
+                    });
+                    if update == ViewUpdate::Rebuild {
+                        cx.notify();
+                    }
+                    update
+                })
+                .unwrap();
             let change =
                 if model_update == ViewUpdate::Rebuild || resize_update == ViewUpdate::Rebuild {
-                    tree.update(host.view())
+                    tree.update(host.render(Default::default()).unwrap())
                 } else {
                     TreeUpdate::None
                 };
@@ -125,8 +158,18 @@ fn main() {
                     })
                     .collect(),
             };
-            if host.layout_changed(&snapshot) == ViewUpdate::Rebuild {
-                tree.update(host.view());
+            if host
+                .update(|tools, cx| {
+                    let update = tools.inspect_layout(&snapshot);
+                    if update == ViewUpdate::Rebuild {
+                        cx.notify();
+                    }
+                    update
+                })
+                .unwrap()
+                == ViewUpdate::Rebuild
+            {
+                tree.update(host.render(Default::default()).unwrap());
                 output = engine
                     .compute(&mut tree, &mut text, Size::new(1220.0, 780.0))
                     .unwrap();

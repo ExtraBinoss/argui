@@ -7,6 +7,10 @@ use crate::{RuntimeEvent, ScrollRequest, app::Application};
 
 impl Application {
     pub(crate) fn redraw(&mut self, event_loop: &dyn crate::host::LoopControl) {
+        self.sync_host_visibility();
+        if !self.presentation_visible {
+            return;
+        }
         let Some(window) = self.window.clone() else {
             return;
         };

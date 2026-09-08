@@ -9,6 +9,29 @@ use argui_accessibility::{
 use argui_core::{Point, Rect, Size};
 
 #[test]
+fn protected_text_uses_the_native_password_role_without_a_value() {
+    let root = SemanticNodeId::new(1);
+    let tree = SemanticTree {
+        root,
+        focus: root,
+        nodes: vec![SemanticNode {
+            id: root,
+            bounds: Rect::default(),
+            children: Vec::new(),
+            semantics: Semantics::new(Role::TextInput)
+                .label("Password")
+                .state(SemanticState {
+                    protected: true,
+                    ..Default::default()
+                }),
+        }],
+    };
+    let update = AccessKitTree::full(&tree);
+    assert_eq!(update.nodes[0].1.role(), accesskit::Role::PasswordInput);
+    assert!(update.nodes[0].1.value().is_none());
+}
+
+#[test]
 fn complete_snapshots_are_valid_accesskit_trees() {
     let root = SemanticNodeId::new(1);
     let button = SemanticNodeId::new(2);
@@ -101,8 +124,10 @@ fn rich_nodes_lower_every_value_state_and_relation() {
             step: Some(2.0),
         })
         .state(SemanticState {
+            protected: false,
             disabled: true,
             selected: true,
+            multiselectable: true,
             checked: Some(true),
             expanded: Some(false),
             required: true,
@@ -252,4 +277,33 @@ fn accesskit_actions_lower_supported_data_and_reject_unknown_actions() {
         })
         .is_err()
     );
+}
+
+#[test]
+fn table_roles_and_multiple_selection_reach_accesskit() {
+    for (role, expected) in [
+        (Role::Table, accesskit::Role::Table),
+        (Role::Grid, accesskit::Role::Table),
+        (Role::Row, accesskit::Role::Row),
+        (Role::ColumnHeader, accesskit::Role::ColumnHeader),
+        (Role::Cell, accesskit::Role::Cell),
+    ] {
+        let id = SemanticNodeId::new(1);
+        let tree = SemanticTree {
+            root: id,
+            focus: id,
+            nodes: vec![SemanticNode {
+                id,
+                bounds: Rect::default(),
+                children: vec![],
+                semantics: Semantics::new(role).state(SemanticState {
+                    multiselectable: true,
+                    ..Default::default()
+                }),
+            }],
+        };
+        let update = AccessKitTree::full(&tree);
+        assert_eq!(update.nodes[0].1.role(), expected);
+        assert!(update.nodes[0].1.is_multiselectable());
+    }
 }

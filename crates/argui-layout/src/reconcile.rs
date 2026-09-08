@@ -1,12 +1,13 @@
+use crate::layout_tree::LayoutTree;
 use std::collections::HashMap;
 
 use argui_ui::{Element, ElementKind, UiTree};
-use taffy::{NodeId, TaffyTree};
+use taffy::NodeId;
 
 use crate::{LayoutError, assets::AssetMetrics, engine::NodeMap, style::taffy_style};
 
 pub(crate) fn sync(
-    tree: &mut TaffyTree<usize>,
+    tree: &mut LayoutTree,
     root: NodeMap,
     assets: &AssetMetrics,
     ui: &UiTree,
@@ -16,7 +17,7 @@ pub(crate) fn sync(
 }
 
 fn reconcile_node(
-    tree: &mut TaffyTree<usize>,
+    tree: &mut LayoutTree,
     previous: Option<NodeMap>,
     assets: &AssetMetrics,
     ui: &UiTree,
@@ -37,7 +38,23 @@ fn reconcile_node(
     }
 
     *cursor += 1;
-    let previous = previous.filter(|previous| previous.node == node);
+    let previous = match previous {
+        Some(previous) if previous.node != node => {
+            remove_subtree(tree, previous)?;
+            None
+        }
+        previous => previous,
+    };
+    let custom_state = previous
+        .as_ref()
+        .and_then(|node| node.custom_state.clone())
+        .or_else(|| {
+            if let ElementKind::Custom(custom) = &element.kind {
+                Some(std::rc::Rc::new(custom.create_state()))
+            } else {
+                None
+            }
+        });
     let resolved_style =
         assets.layout_style(ui.resolved_layout_style(node, element), &element.kind);
     let (id, previous_children) = match previous {
@@ -84,6 +101,7 @@ fn reconcile_node(
         .map(|child| child.subtree_len)
         .sum::<usize>();
     Ok(NodeMap {
+        custom_state: crate::custom::install(tree, id, &element.kind, custom_state)?,
         index,
         node,
         id,
@@ -96,7 +114,7 @@ fn reconcile_node(
 }
 
 fn reuse_node(
-    tree: &mut TaffyTree<usize>,
+    tree: &mut LayoutTree,
     previous: &NodeMap,
     element: &Element,
     style: &argui_ui::LayoutStyle,
@@ -115,7 +133,7 @@ fn reuse_node(
 }
 
 fn create_node(
-    tree: &mut TaffyTree<usize>,
+    tree: &mut LayoutTree,
     element: &Element,
     style: &argui_ui::LayoutStyle,
     index: usize,
@@ -127,7 +145,7 @@ fn create_node(
     }
 }
 
-fn remove_subtree(tree: &mut TaffyTree<usize>, node: NodeMap) -> Result<(), LayoutError> {
+fn remove_subtree(tree: &mut LayoutTree, node: NodeMap) -> Result<(), LayoutError> {
     for child in node.children {
         remove_subtree(tree, child)?;
     }
@@ -136,6 +154,9 @@ fn remove_subtree(tree: &mut TaffyTree<usize>, node: NodeMap) -> Result<(), Layo
 }
 
 fn intrinsic_measure_changed(old: &ElementKind, new: &ElementKind) -> bool {
+    if let (ElementKind::Custom(old), ElementKind::Custom(new)) = (old, new) {
+        return !old.same_layout(new);
+    }
     old != new
         && matches!(
             (old, new),

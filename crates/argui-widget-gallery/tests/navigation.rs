@@ -54,13 +54,13 @@ fn navigation_rebuilds_widget_and_example_pages_from_public_events() {
         ("nav::tabs", "Tabs"),
         ("nav::select", "Select"),
         ("nav::dialog", "Dialog"),
-        ("nav::form", "Profile form"),
-        ("nav::settings", "Settings panel"),
         ("nav::layout", "Web layout"),
         ("nav::motion", "Motion & loading"),
         ("nav::effects", "GPU effects / WGSL"),
-        ("nav::composition", "Advanced composition"),
         ("nav::typography", "Typography & selection"),
+        ("nav::async-tasks", "Search 10,000 draft titles"),
+        ("nav::actions", "Left scope"),
+        ("nav::editing", "Unicode text"),
     ] {
         click_page(&gallery, key);
         assert!(

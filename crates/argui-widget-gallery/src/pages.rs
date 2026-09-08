@@ -10,9 +10,8 @@ use argui::{
         length, percent,
     },
     widgets::{
-        Button, Checkbox, Dialog, DialogBehavior, Input, RadioGroup, RadioOption, RangeConfig,
-        Select, SelectOption, Slider, Switch, Tab, TablerIcon, Tabs, TextArea, WidgetAssets,
-        WidgetTheme,
+        Button, Checkbox, Dialog, DialogBehavior, RadioGroup, RadioOption, RangeConfig, Select,
+        SelectOption, Slider, Switch, Tab, TablerIcon, Tabs, TextArea, WidgetAssets, WidgetTheme,
     },
 };
 use argui_effects::AnimatedGradient;
@@ -22,33 +21,34 @@ use crate::{
     navigation::Page,
 };
 
+mod action_menu;
+pub(crate) mod actions;
+pub(crate) mod async_tasks;
 mod buttons;
-mod composition;
-pub(crate) use composition::AppShell;
+pub(crate) mod data;
+pub(crate) mod editing;
 mod inputs;
 pub(crate) mod liquid_glass;
 pub(crate) mod scroll_effects;
+pub(crate) mod timeline;
 mod typography;
 pub(crate) mod webview;
 
 pub(crate) struct ResizeListeners {
     pub(crate) textarea: EventListener,
     pub(crate) textarea_reset: EventListener,
-    pub(crate) shell: Element,
-    pub(crate) scroll_demo: Element,
-    pub(crate) webview: Element,
-    pub(crate) glass: Element,
 }
 
 pub(crate) fn render(
     gallery: &WidgetGallery,
     theme: &WidgetTheme,
     assets: &WidgetAssets,
-    spinner: Element,
+    cx: &mut argui::runtime::Context<WidgetGallery>,
     resize: ResizeListeners,
 ) -> Element {
     let content = match gallery.page {
-        Page::Button => buttons::render(gallery, theme, spinner),
+        Page::List | Page::VList | Page::Table => data::render(&gallery.data, gallery.page, cx),
+        Page::Button => buttons::render(gallery, theme, cx.entity(&gallery.spinner)),
         Page::Input => inputs::render(gallery, theme, assets),
         Page::TextArea => textarea(
             gallery,
@@ -64,16 +64,20 @@ pub(crate) fn render(
         Page::Tabs => tabs(gallery, theme),
         Page::Select => selects(gallery, theme, assets),
         Page::Dialog => dialogs(gallery, theme),
-        Page::Form => form(gallery, theme, assets),
-        Page::Settings => settings(gallery, theme),
         Page::Layout => layout_system(theme),
-        Page::Motion => motion(theme, spinner),
-        Page::Effects => {
-            Element::column([resize.scroll_demo, effects(theme), resize.glass]).gap(24.0)
-        }
-        Page::Composition => composition::render(gallery, theme, assets, resize.shell),
+        Page::Motion => motion(theme, cx.entity(&gallery.spinner)),
+        Page::Effects => Element::column([
+            cx.entity(&gallery.scroll_demo),
+            effects(theme),
+            cx.entity(&gallery.glass),
+        ])
+        .gap(24.0),
         Page::Typography => typography::render(theme),
-        Page::WebView => resize.webview,
+        Page::WebView => cx.entity(&gallery.webview),
+        Page::AsyncTasks => cx.entity(&gallery.tasks),
+        Page::Actions => cx.entity(&gallery.actions),
+        Page::Editing => cx.entity(&gallery.editing),
+        Page::CustomTimeline => cx.entity(&gallery.timeline),
     };
     Element::column([
         Element::column([
@@ -303,68 +307,6 @@ fn dialogs(gallery: &WidgetGallery, theme: &WidgetTheme) -> Element {
     )
 }
 
-fn form(gallery: &WidgetGallery, theme: &WidgetTheme, assets: &WidgetAssets) -> Element {
-    preview(
-        "Profile form",
-        "A realistic composition made only from public widget APIs.",
-        Element::column([
-            Input::new("name", &gallery.name, "Full name", theme.input())
-                .label("Full name")
-                .build(),
-            Input::new("email", &gallery.email, "Email", theme.input())
-                .label("Email")
-                .build(),
-            Select::new(
-                "backend",
-                "Preferred backend",
-                select_options(),
-                gallery.select_selected,
-            )
-            .presence(&gallery.select_presence)
-            .highlighted(gallery.select_highlight)
-            .trailing(assets.icon(TablerIcon::ChevronDown, 17.0))
-            .build(theme),
-            Checkbox::new("accepted", "Share anonymous GPU metrics", gallery.accepted)
-                .indicator(assets.icon(TablerIcon::Check, 14.0))
-                .build(theme),
-            Button::new("save-profile", "Save profile", theme.button()).build(),
-        ])
-        .gap(12.0),
-        theme,
-    )
-}
-
-fn settings(gallery: &WidgetGallery, theme: &WidgetTheme) -> Element {
-    preview(
-        "Renderer settings",
-        "Switches, radio controls, tabs and a slider remain independent controlled values.",
-        Element::column([
-            Switch::new("notifications", "Live GPU profiling", gallery.notifications).build(theme),
-            RadioGroup::new(
-                "quality",
-                "Quality",
-                [
-                    RadioOption::new("Quality"),
-                    RadioOption::new("Balanced"),
-                    RadioOption::new("Performance"),
-                ],
-                Some(gallery.radio),
-            )
-            .orientation(argui::accessibility::Orientation::Horizontal)
-            .build(theme),
-            Slider::new(
-                "property-slider",
-                "Render scale",
-                gallery.slider,
-                RangeConfig::default(),
-            )
-            .build(theme),
-        ])
-        .gap(16.0),
-        theme,
-    )
-}
-
 fn layout_system(theme: &WidgetTheme) -> Element {
     let flex = Element::row([
         layout_tile("A", theme),
@@ -539,6 +481,9 @@ fn select_options() -> Vec<SelectOption> {
 
 const fn description(page: Page) -> &'static str {
     match page {
+        Page::List => "Selection and keyboard navigation.",
+        Page::VList => "Measured variable-height rows and virtual scrolling.",
+        Page::Table => "Columns and row selection.",
         Page::Button => "Actions with variants, icons, loading and accessible activation.",
         Page::Input => "Controlled single-line and search fields.",
         Page::TextArea => "Multiline editing, scrolling, clipping and resize capture.",
@@ -549,13 +494,18 @@ const fn description(page: Page) -> &'static str {
         Page::Tabs => "Roving navigation and one mounted panel.",
         Page::Select => "Anchored, collision-aware option overlay.",
         Page::Dialog => "Modal focus containment and restoration.",
-        Page::Form => "A complete controlled profile form.",
-        Page::Settings => "A realistic renderer configuration panel.",
         Page::Layout => "CSS-shaped Block, Flex, Grid, box model and text alignment.",
         Page::Motion => "Frame-paced feedback and interaction transitions.",
         Page::Effects => "Custom WGSL through the generic effect registry.",
-        Page::Composition => "Compound state, responsive layout and exact hit geometry.",
         Page::Typography => "Rich spans, decoration, clamping and web-like text selection.",
         Page::WebView => "Retained web content, with separate email and webpage security policies.",
+        Page::AsyncTasks => "Owned, cancellable work with event-driven delivery to the UI.",
+        Page::Actions => "One command for buttons, menus, palettes and focused shortcuts.",
+        Page::Editing => {
+            "Transactional undo/redo, Unicode, filtered fields and protected passwords."
+        }
+        Page::CustomTimeline => {
+            "Custom measurement and painting with draggable clips and standard controls."
+        }
     }
 }

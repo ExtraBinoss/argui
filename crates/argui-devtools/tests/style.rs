@@ -126,31 +126,48 @@ fn contains_text(element: &Element, needle: &str) -> bool {
 
 #[test]
 fn portal_metadata_and_collapsible_style_sections_follow_snapshot_state() {
-    let mut host = DevtoolsHost::new(App).open(true);
-    let inspector = host.inspector();
+    let host = argui_runtime::Entity::new(DevtoolsHost::new(App).open(true))
+        .mount()
+        .unwrap();
+    let inspector = host.read(|tools| tools.inspector());
     inspector.publish_tree(TreeSnapshot {
         revision: 1,
         nodes: vec![portal_node(true, false)],
     });
-    host.update(&event("__devtools-node-7"));
+    host.update(|tools, cx| {
+        cx.notify();
+        tools.update(&event("__devtools-node-7"))
+    })
+    .unwrap();
 
-    let constrained = host.view();
+    let constrained = host.render(Default::default()).unwrap();
     assert!(contains_text(&constrained, "Portal overlay"));
     assert!(contains_text(&constrained, "constrained"));
     assert!(contains_key(&constrained, "__devtools-value-7-width-0"));
     assert!(contains_text(&constrained, "auto"));
 
     assert_eq!(
-        host.update(&event("__devtools-section-0")),
+        host.update(|tools, cx| {
+            cx.notify();
+            tools.update(&event("__devtools-section-0"))
+        })
+        .unwrap(),
         ViewUpdate::Rebuild
     );
-    assert!(!contains_key(&host.view(), "__devtools-value-7-width-0"));
-    assert!(host.wants_animation_frame());
+    assert!(!contains_key(
+        &host.render(Default::default()).unwrap(),
+        "__devtools-value-7-width-0"
+    ));
+    assert!(host.read(|tools| tools.wants_animation_frame()));
     assert_eq!(
-        host.animation_frame(Frame {
-            now: Time::ZERO,
-            elapsed: Duration::from_millis(16),
-        }),
+        host.update(|tools, cx| {
+            cx.notify();
+            tools.animation_frame(Frame {
+                now: Time::ZERO,
+                elapsed: Duration::from_millis(16),
+            })
+        })
+        .unwrap(),
         ViewUpdate::Rebuild
     );
 
@@ -159,19 +176,38 @@ fn portal_metadata_and_collapsible_style_sections_follow_snapshot_state() {
             revision,
             nodes: vec![portal_node(width, height)],
         });
-        let view = host.view();
+        host.update(|_, cx| cx.notify()).unwrap();
+        let view = host.render(Default::default()).unwrap();
         assert_eq!(contains_text(&view, "constrained"), text);
     }
 
-    host.update(&event("__devtools-section-0"));
-    assert!(contains_key(&host.view(), "__devtools-value-7-width-0"));
-    host.layout_changed(&argui_runtime::LayoutSnapshot {
-        viewport: Rect::new(Point::default(), Size::new(500.0, 700.0)),
-        nodes: vec![],
-    });
-    assert!(contains_key(&host.view(), "__devtools-back"));
-    host.update(&event("__devtools-back"));
-    let elements = host.view();
+    host.update(|tools, cx| {
+        cx.notify();
+        tools.update(&event("__devtools-section-0"))
+    })
+    .unwrap();
+    assert!(contains_key(
+        &host.render(Default::default()).unwrap(),
+        "__devtools-value-7-width-0"
+    ));
+    host.update(|tools, cx| {
+        cx.notify();
+        tools.inspect_layout(&argui_runtime::LayoutSnapshot {
+            viewport: Rect::new(Point::default(), Size::new(500.0, 700.0)),
+            nodes: vec![],
+        })
+    })
+    .unwrap();
+    assert!(contains_key(
+        &host.render(Default::default()).unwrap(),
+        "__devtools-back"
+    ));
+    host.update(|tools, cx| {
+        cx.notify();
+        tools.update(&event("__devtools-back"))
+    })
+    .unwrap();
+    let elements = host.render(Default::default()).unwrap();
     assert!(contains_key(&elements, "__devtools-tree"));
     assert!(!contains_key(&elements, "__devtools-back"));
 }

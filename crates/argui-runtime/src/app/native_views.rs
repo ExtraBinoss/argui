@@ -92,10 +92,3 @@ impl Application {
             .map(|deadline| self.input_epoch + deadline)
     }
 }
-
-impl Drop for Application {
-    fn drop(&mut self) {
-        // Native children must be destroyed before the renderer releases its parent window.
-        self.native_views.take();
-    }
-}

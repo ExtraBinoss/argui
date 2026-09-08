@@ -9,9 +9,11 @@ fn find<'a>(root: &'a Element, key: &str) -> Option<&'a Element> {
     root.children.iter().find_map(|child| find(child, key))
 }
 
-fn profiled() -> DevtoolsHost<StateShowcase> {
-    let mut host = DevtoolsHost::new(StateShowcase::default()).open(true);
-    host.inspector().record_ui(FrameRecord {
+fn profiled() -> argui_runtime::Mount<DevtoolsHost<StateShowcase>> {
+    let host = argui_runtime::Entity::new(DevtoolsHost::new(StateShowcase::default()).open(true))
+        .mount()
+        .unwrap();
+    host.read(|tools| tools.inspector()).record_ui(FrameRecord {
         interval: std::time::Duration::from_millis(10),
         gpu: Some(GpuFrameRecord {
             total: std::time::Duration::from_millis(4),
@@ -27,19 +29,27 @@ fn profiled() -> DevtoolsHost<StateShowcase> {
         }),
         ..FrameRecord::default()
     });
-    host.update(&event("__devtools-profiling"));
+    host.update(|tools, cx| {
+        cx.notify();
+        tools.update(&event("__devtools-profiling"))
+    })
+    .unwrap();
     host
 }
 
 #[test]
 fn controls_stay_outside_scroll_regions_and_narrow_panels_switch_views() {
     for width in [420.0, 800.0, 1220.0] {
-        let mut host = profiled();
-        host.layout_changed(&LayoutSnapshot {
-            viewport: Rect::new(Point::default(), Size::new(width, 700.0)),
-            nodes: vec![],
-        });
-        let mut tree = UiTree::new(host.view());
+        let host = profiled();
+        host.update(|tools, cx| {
+            cx.notify();
+            tools.inspect_layout(&LayoutSnapshot {
+                viewport: Rect::new(Point::default(), Size::new(width, 700.0)),
+                nodes: vec![],
+            })
+        })
+        .unwrap();
+        let mut tree = UiTree::new(host.render(Default::default()).unwrap());
         let output = LayoutEngine::new()
             .compute(&mut tree, &mut text_engine(), Size::new(width, 700.0))
             .unwrap();
@@ -65,8 +75,12 @@ fn controls_stay_outside_scroll_regions_and_narrow_panels_switch_views() {
         assert!(overview.size.height > 0.0);
         if width < 760.0 {
             assert!(find(tree.root(), "__devtools-gpu-timeline").is_none());
-            host.update(&event("__devtools-profile-gpu"));
-            let gpu = host.view();
+            host.update(|tools, cx| {
+                cx.notify();
+                tools.update(&event("__devtools-profile-gpu"))
+            })
+            .unwrap();
+            let gpu = host.render(Default::default()).unwrap();
             assert!(find(&gpu, "__devtools-profile-graph").is_none());
             assert!(find(&gpu, "__devtools-gpu-timeline").is_some());
         } else {
@@ -84,19 +98,29 @@ fn controls_stay_outside_scroll_regions_and_narrow_panels_switch_views() {
 
 #[test]
 fn graph_updates_animate_paint_without_reflowing_the_plot() {
-    let mut host = profiled();
-    let graph = find(&host.view(), "__devtools-profile-graph")
-        .unwrap()
-        .clone();
+    let host = profiled();
+    let graph = find(
+        &host.render(Default::default()).unwrap(),
+        "__devtools-profile-graph",
+    )
+    .unwrap()
+    .clone();
     let mut tree = UiTree::new(graph);
-    host.inspector().record_ui(FrameRecord {
+    host.read(|tools| tools.inspector()).record_ui(FrameRecord {
         interval: std::time::Duration::from_millis(30),
         ..FrameRecord::default()
     });
-    host.update(&event("__devtools-refresh"));
-    let next = find(&host.view(), "__devtools-profile-graph")
-        .unwrap()
-        .clone();
+    host.update(|tools, cx| {
+        cx.notify();
+        tools.update(&event("__devtools-refresh"))
+    })
+    .unwrap();
+    let next = find(
+        &host.render(Default::default()).unwrap(),
+        "__devtools-profile-graph",
+    )
+    .unwrap()
+    .clone();
     assert_eq!(tree.update(next), argui_ui::TreeUpdate::Paint);
     let node = tree
         .node_ids()
@@ -117,44 +141,81 @@ fn graph_updates_animate_paint_without_reflowing_the_plot() {
 
 #[test]
 fn gpu_measurements_are_opt_in_and_details_are_reused_between_samples() {
-    let mut host = DevtoolsHost::new(StateShowcase::default()).open(true);
-    assert!(!host.inspector().gpu_profiling());
-    host.update(&event("__devtools-profiling"));
-    assert!(host.inspector().gpu_profiling());
-    host.update(&event("__devtools-pause"));
-    assert!(!host.inspector().gpu_profiling());
-    host.update(&event("__devtools-pause"));
-    host.update(&event("__devtools-elements"));
-    assert!(!host.inspector().gpu_profiling());
-    let mut host = profiled();
-    let before = host.view();
-    host.inspector().record_ui(FrameRecord::default());
-    host.animation_frame(Frame {
-        now: Time::ZERO,
-        elapsed: Duration::from_millis(100),
-    });
-    let after = host.view();
+    let host = argui_runtime::Entity::new(DevtoolsHost::new(StateShowcase::default()).open(true))
+        .mount()
+        .unwrap();
+    assert!(!host.read(|tools| tools.inspector()).gpu_profiling());
+    host.update(|tools, cx| {
+        cx.notify();
+        tools.update(&event("__devtools-profiling"))
+    })
+    .unwrap();
+    assert!(host.read(|tools| tools.inspector()).gpu_profiling());
+    host.update(|tools, cx| {
+        cx.notify();
+        tools.update(&event("__devtools-pause"))
+    })
+    .unwrap();
+    assert!(!host.read(|tools| tools.inspector()).gpu_profiling());
+    host.update(|tools, cx| {
+        cx.notify();
+        tools.update(&event("__devtools-pause"))
+    })
+    .unwrap();
+    host.update(|tools, cx| {
+        cx.notify();
+        tools.update(&event("__devtools-elements"))
+    })
+    .unwrap();
+    assert!(!host.read(|tools| tools.inspector()).gpu_profiling());
+    let host = profiled();
+    let before = host.render(Default::default()).unwrap();
+    host.read(|tools| tools.inspector())
+        .record_ui(FrameRecord::default());
+    host.update(|tools, cx| {
+        cx.notify();
+        tools.animation_frame(Frame {
+            now: Time::ZERO,
+            elapsed: Duration::from_millis(100),
+        })
+    })
+    .unwrap();
+    let after = host.render(Default::default()).unwrap();
     assert!(
         find(&before, "__devtools-gpu-timeline")
             .unwrap()
             .ptr_eq(find(&after, "__devtools-gpu-timeline").unwrap())
     );
-    host.animation_frame(Frame {
-        now: Time::ZERO,
-        elapsed: Duration::from_millis(500),
-    });
-    assert!(find(&host.view(), "__devtools-gpu-timeline").is_none());
+    host.update(|tools, cx| {
+        cx.notify();
+        tools.animation_frame(Frame {
+            now: Time::ZERO,
+            elapsed: Duration::from_millis(500),
+        })
+    })
+    .unwrap();
+    assert!(
+        find(
+            &host.render(Default::default()).unwrap(),
+            "__devtools-gpu-timeline"
+        )
+        .is_none()
+    );
 }
 
 #[test]
 fn profiling_has_one_scrollport_per_pane_and_reserved_scrollbar_space() {
-    let mut host = profiled();
-    host.inspector().record_ui(FrameRecord {
+    let host = profiled();
+    host.read(|tools| tools.inspector()).record_ui(FrameRecord {
         interval: std::time::Duration::from_millis(999),
-        ..host.inspector().frames()[0].clone()
+        ..host.read(|tools| tools.inspector()).frames()[0].clone()
     });
-    host.update(&event("__devtools-refresh"));
-    let mut tree = UiTree::new(host.view());
+    host.update(|tools, cx| {
+        cx.notify();
+        tools.update(&event("__devtools-refresh"))
+    })
+    .unwrap();
+    let mut tree = UiTree::new(host.render(Default::default()).unwrap());
     let mut engine = LayoutEngine::new();
     let mut text = text_engine();
     let mut output = engine
@@ -174,11 +235,18 @@ fn profiling_has_one_scrollport_per_pane_and_reserved_scrollbar_space() {
                 })
                 .collect(),
         };
-        if host.layout_changed(&snapshot) == ViewUpdate::None {
+        if host
+            .update(|tools, cx| {
+                cx.notify();
+                tools.inspect_layout(&snapshot)
+            })
+            .unwrap()
+            == ViewUpdate::None
+        {
             settled = true;
             break;
         }
-        tree.update(host.view());
+        tree.update(host.render(Default::default()).unwrap());
         output = engine
             .compute(&mut tree, &mut text, Size::new(1220.0, 700.0))
             .unwrap();

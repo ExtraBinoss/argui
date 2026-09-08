@@ -1,7 +1,7 @@
 use argui_core::{Color, ColorInterpolation, ColorScheme};
 #[cfg(any(feature = "button", feature = "input"))]
 use argui_paint::{Border, PaintStyle};
-use argui_paint::{CornerRadii, QuadStyle};
+use argui_paint::{CornerRadii, Filter, LayerMask, LayerStyle, QuadStyle, Shadow};
 #[cfg(any(feature = "button", feature = "input"))]
 use argui_text::TextStyle;
 use argui_theme::Theme;
@@ -21,6 +21,8 @@ pub struct WidgetTheme {
     pub background: Color,
     pub card: Color,
     pub popover: Color,
+    /// Floating-surface outline, independent from ordinary control borders.
+    pub popover_border: Color,
     pub foreground: Color,
     pub muted: Color,
     pub muted_foreground: Color,
@@ -33,6 +35,8 @@ pub struct WidgetTheme {
     pub input_border: Color,
     pub ring: Color,
     pub overlay_blur: f32,
+    /// Shared floating-panel elevation. Clear this vector to disable shadows.
+    pub overlay_shadows: Vec<Shadow>,
     pub dialog_backdrop: Color,
     pub dialog_backdrop_blur: f32,
     pub scrollbar: ScrollbarStyle,
@@ -69,6 +73,15 @@ fn widgets(scheme: ColorScheme, primary: Color) -> WidgetTheme {
         ),
     };
     let primary_foreground = contrasting(primary);
+    let (popover, popover_border, shadow_alpha, backdrop_alpha) = match scheme {
+        ColorScheme::Light => (Color::WHITE, Color::BLACK.with_alpha(0.10), 0.18, 0.32),
+        ColorScheme::Dark => (
+            Color::from_srgb8(24, 24, 27),
+            Color::WHITE.with_alpha(0.08),
+            0.55,
+            0.62,
+        ),
+    };
     let scrollbar = ScrollbarStyle::new(
         ScrollbarPartStyle::new(QuadStyle::solid(Color::TRANSPARENT)),
         ScrollbarPartStyle::new(
@@ -86,7 +99,8 @@ fn widgets(scheme: ColorScheme, primary: Color) -> WidgetTheme {
     WidgetTheme {
         background,
         card,
-        popover: card,
+        popover,
+        popover_border,
         foreground,
         muted,
         muted_foreground,
@@ -99,7 +113,12 @@ fn widgets(scheme: ColorScheme, primary: Color) -> WidgetTheme {
         input_border: border,
         ring: primary,
         overlay_blur: 12.0,
-        dialog_backdrop: Color::srgba(0.0, 0.0, 0.0, 0.62),
+        overlay_shadows: vec![Shadow::drop(
+            [0.0, 6.0],
+            14.0,
+            Color::BLACK.with_alpha(shadow_alpha),
+        )],
+        dialog_backdrop: Color::BLACK.with_alpha(backdrop_alpha),
         dialog_backdrop_blur: 4.0,
         scrollbar,
     }
@@ -149,6 +168,18 @@ fn mix(left: Color, right: Color, amount: f32) -> Color {
 }
 
 impl WidgetTheme {
+    /// Rounded floating surface with independent backdrop blur and elevation.
+    #[must_use]
+    pub fn overlay_layer(&self, radius: f32, blur: f32) -> LayerStyle {
+        let mut layer = LayerStyle::new(Default::default())
+            .mask(LayerMask::Rounded(CornerRadii::all(radius.max(0.0))));
+        layer.shadows.clone_from(&self.overlay_shadows);
+        if blur > 0.0 {
+            layer = layer.backdrop(Filter::Blur(blur));
+        }
+        layer
+    }
+
     #[cfg(any(feature = "button", feature = "input"))]
     fn text(&self) -> TextStyle {
         TextStyle {

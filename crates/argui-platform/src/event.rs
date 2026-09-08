@@ -13,6 +13,8 @@ pub enum PlatformEvent {
         capabilities: crate::WindowCapabilities,
     },
     Suspended,
+    VisibilityChanged(bool),
+    Closed,
     Resized {
         width: u32,
         height: u32,

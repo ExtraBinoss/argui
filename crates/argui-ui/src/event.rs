@@ -14,6 +14,7 @@ impl Element {
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum EventType {
+    Action,
     PointerEnter,
     PointerLeave,
     PointerMove,
@@ -38,7 +39,8 @@ pub enum EventType {
 }
 
 impl EventType {
-    pub const ALL: [Self; 21] = [
+    pub const ALL: [Self; 22] = [
+        Self::Action,
         Self::PointerEnter,
         Self::PointerLeave,
         Self::PointerMove,
@@ -186,6 +188,7 @@ impl EventListener {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum UiEventKind {
+    Action(crate::ActionInvocation),
     Pointer(PointerEvent),
     PointerOutside(PointerEvent),
     Click(ClickEvent),
@@ -225,6 +228,7 @@ impl UiEventKind {
     #[must_use]
     pub const fn event_type(&self) -> EventType {
         match self {
+            Self::Action(_) => EventType::Action,
             Self::Pointer(event) => match event.phase {
                 PointerPhase::Entered => EventType::PointerEnter,
                 PointerPhase::Moved => EventType::PointerMove,
@@ -255,10 +259,12 @@ impl UiEventKind {
     pub const fn bubbles(&self) -> bool {
         !matches!(
             self,
-            Self::Pointer(PointerEvent {
-                phase: PointerPhase::Entered | PointerPhase::Left,
-                ..
-            }) | Self::GotPointerCapture(_)
+            Self::Action(_)
+                | Self::Pointer(PointerEvent {
+                    phase: PointerPhase::Entered | PointerPhase::Left,
+                    ..
+                })
+                | Self::GotPointerCapture(_)
                 | Self::LostPointerCapture(_)
                 | Self::Focused
                 | Self::Blurred
@@ -307,6 +313,9 @@ pub struct UiEvent {
     passive: bool,
     once: Option<Rc<Cell<bool>>>,
     control: Rc<EventControl>,
+    default_action: bool,
+    focused_node: Option<NodeId>,
+    history: Option<(bool, bool)>,
 }
 
 impl PartialEq for UiEvent {
@@ -343,6 +352,9 @@ impl UiEvent {
             passive: false,
             once: None,
             control: Rc::new(EventControl::default()),
+            default_action: false,
+            focused_node: None,
+            history: None,
         }
     }
 
@@ -366,6 +378,9 @@ impl UiEvent {
             passive,
             once,
             control: Rc::clone(&self.control),
+            default_action: self.default_action,
+            focused_node: self.focused_node,
+            history: self.history,
         }
     }
 
@@ -445,6 +460,9 @@ impl UiEvent {
 
     #[doc(hidden)]
     pub fn should_dispatch(&self) -> bool {
+        if self.default_action {
+            return !self.control.default_prevented.replace(true);
+        }
         if self.control.immediate_target.get().is_some() {
             return false;
         }
@@ -458,5 +476,26 @@ impl UiEvent {
                 .once
                 .as_ref()
                 .is_none_or(|consumed| !consumed.replace(true))
+    }
+
+    pub(crate) fn into_default_action(mut self) -> Self {
+        self.default_action = true;
+        self
+    }
+    pub(crate) fn set_focused_node(&mut self, node: Option<NodeId>) {
+        self.focused_node = node;
+    }
+    pub(crate) fn set_history(&mut self, history: Option<(bool, bool)>) {
+        self.history = history;
+    }
+    /// Undo/redo availability for the target editor at event creation.
+    #[must_use]
+    pub const fn edit_history(&self) -> Option<(bool, bool)> {
+        self.history
+    }
+    /// Focus at event creation, before a pointer default moves it to a menu trigger.
+    #[must_use]
+    pub const fn focused_node(&self) -> Option<NodeId> {
+        self.focused_node
     }
 }

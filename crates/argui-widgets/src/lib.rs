@@ -1,4 +1,12 @@
 //! Optional, accessible widgets built from Argui engine primitives.
+#[cfg(feature = "menu")]
+mod menu;
+#[cfg(feature = "menu")]
+pub use menu::{Menu, MenuItem, MenuResponse};
+#[cfg(feature = "command-palette")]
+mod command_palette;
+#[cfg(feature = "command-palette")]
+pub use command_palette::CommandPalette;
 
 #[cfg(feature = "button")]
 mod button;
@@ -113,3 +121,12 @@ pub use text_selection::{SelectionHost, TextSelectionToolbar};
 pub use theme::{WidgetTheme, shadcn};
 #[cfg(any(feature = "checkbox", feature = "switch", feature = "radio-group"))]
 pub use toggle_behavior::{TOGGLE_CHECKED, TOGGLE_SCOPE, ToggleAction, ToggleBehavior, TogglePart};
+
+#[cfg(feature = "list")]
+mod list;
+#[cfg(feature = "list")]
+pub use list::{List, ListState};
+#[cfg(feature = "table")]
+mod table;
+#[cfg(feature = "table")]
+pub use table::{Table, TableColumn};

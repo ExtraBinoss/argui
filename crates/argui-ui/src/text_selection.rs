@@ -61,6 +61,8 @@ pub enum SelectionGranularity {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SelectionCommand {
+    Undo,
+    Redo,
     Cut,
     Copy,
     Paste,
@@ -237,7 +239,7 @@ impl UiTree {
     #[must_use]
     pub fn selection_capabilities(&self, target: NodeId) -> SelectionCapabilities {
         if let Some(input) = self.text_inputs.get(target) {
-            let selected = input.has_selection();
+            let selected = input.has_selection() && !input.protected();
             return SelectionCapabilities {
                 editable: true,
                 cut: selected && !input.read_only(),
@@ -246,6 +248,11 @@ impl UiTree {
                 select_all: !input.value().is_empty(),
             };
         }
+        self.document_selection_capabilities()
+    }
+
+    #[must_use]
+    pub fn document_selection_capabilities(&self) -> SelectionCapabilities {
         SelectionCapabilities {
             copy: self.has_document_selection(),
             select_all: !self.selectable_text_entries().is_empty(),
@@ -263,6 +270,11 @@ impl UiTree {
         target: Option<NodeId>,
         command: SelectionCommand,
     ) -> InteractionUpdate {
+        if target
+            .is_some_and(|node| self.text_inputs.get(node).is_some() && !self.input_available(node))
+        {
+            return InteractionUpdate::default();
+        }
         if let Some(node) = target
             && let Some(state) = self.text_inputs.get_mut(node)
         {
@@ -281,7 +293,10 @@ impl UiTree {
                     })
             }
             SelectionCommand::SelectAll => self.select_all_document_text(),
-            SelectionCommand::Cut | SelectionCommand::Paste => InteractionUpdate::default(),
+            SelectionCommand::Cut
+            | SelectionCommand::Paste
+            | SelectionCommand::Undo
+            | SelectionCommand::Redo => InteractionUpdate::default(),
         }
     }
 

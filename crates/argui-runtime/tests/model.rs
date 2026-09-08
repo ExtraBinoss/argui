@@ -5,6 +5,33 @@ use argui_runtime::{
 };
 use argui_ui::{Element, EventType, UiEventKind, UiTree};
 
+#[path = "model/cache.rs"]
+mod cache;
+#[path = "model/dispatch.rs"]
+mod dispatch;
+#[path = "model/entity.rs"]
+mod entity;
+#[path = "model/events.rs"]
+mod events;
+#[path = "model/handler.rs"]
+mod handler;
+#[path = "model/host.rs"]
+mod host;
+#[path = "model/lifecycle.rs"]
+mod lifecycle;
+#[path = "model/mount.rs"]
+mod mount;
+#[path = "model/presentation.rs"]
+mod presentation;
+#[path = "model/scope.rs"]
+mod scope;
+#[path = "model/services.rs"]
+mod services;
+#[path = "model/signal.rs"]
+mod signal;
+#[path = "model/visibility.rs"]
+mod visibility;
+
 #[test]
 fn frames_visit_only_active_children_and_stop_after_their_last_frame() {
     use argui_animation::{Duration, Frame, Time};
@@ -177,16 +204,20 @@ fn context_exposes_environment_children_and_invalidation_without_internal_state(
     assert!(!context.capture_pointer(PointerId::MOUSE));
     assert!(!context.release_pointer(PointerId::MOUSE));
 
-    let child = context.new_entity(PlainRender);
-    let child_view = context.entity(&child);
-    assert!(child_view.ptr_eq(&child.render()));
-
     context.request_paint();
     assert_eq!(context.view_update(), ViewUpdate::Paint);
     context.request_animation_frame();
     assert_eq!(context.view_update(), ViewUpdate::Paint);
     context.set_theme(ThemeRequest::default());
     assert_eq!(context.view_update(), ViewUpdate::Rebuild);
+}
+
+#[test]
+#[should_panic(expected = "child views require a retained parent context")]
+fn detached_context_cannot_own_a_child_mount() {
+    let mut context = Context::<PlainRender>::default();
+    let child = context.new_entity(PlainRender);
+    let _ = context.entity(&child);
 }
 
 mod entity_tests {

@@ -2,7 +2,7 @@ use argui_animation::{Duration, Frame, Time};
 use argui_core::{ColorScheme, Key, KeyInput, KeyState, Modifiers, Point, ScrollDelta, Size};
 use argui_layout::LayoutEngine;
 use argui_paint::{Fill, Filter};
-use argui_runtime::{Context, Entity, ViewUpdate};
+use argui_runtime::{Entity, ViewUpdate};
 use argui_showcase::{StateShowcase, text_engine};
 use argui_text::TextStyle;
 use argui_ui::{GestureEvent, GestureKind, GesturePhase, UiEvent, UiEventKind, UiTree};
@@ -154,7 +154,7 @@ fn theme_editors_and_resize_are_fully_controlled_by_showcase_state() {
         UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
     );
     let entity = Entity::new(app);
-    entity.update(|showcase, cx: &mut Context<StateShowcase>| {
+    entity.update(|showcase, cx| {
         for event in [&theme_event, &primary_event, &unrelated] {
             if showcase.update(event) == ViewUpdate::Rebuild {
                 cx.notify();

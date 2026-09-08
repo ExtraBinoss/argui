@@ -23,10 +23,18 @@ use crate::{
 mod command;
 #[cfg(all(feature = "webview", target_os = "linux"))]
 pub(crate) mod gtk;
+mod lifecycle;
+mod model_updates;
 
 type SharedModel = Rc<RefCell<Box<dyn AppModel>>>;
 type SharedUpdates = Rc<RefCell<Vec<AppUpdate>>>;
 type SharedCallback = Rc<RefCell<Box<dyn FnMut(RuntimeEvent)>>>;
+
+impl Drop for MultiApplication {
+    fn drop(&mut self) {
+        self.shutdown();
+    }
+}
 
 struct WindowEntry {
     spec: WindowSpec,
@@ -34,6 +42,8 @@ struct WindowEntry {
 }
 
 pub(crate) struct MultiApplication {
+    #[cfg(feature = "tasks")]
+    tasks: Option<crate::tasks::TaskRuntime>,
     config: ApplicationConfig,
     renderer_config: RendererConfig,
     initial_text_engine: Option<TextEngine>,
@@ -42,6 +52,7 @@ pub(crate) struct MultiApplication {
     pending: SharedUpdates,
     callback: SharedCallback,
     windows: HashMap<WindowKey, WindowEntry>,
+    retired: Vec<crate::ModelRuntime>,
     by_native: HashMap<crate::host::HostId, WindowKey>,
     event_proxy: Option<crate::host::EventProxy>,
     #[cfg(all(feature = "tray", not(target_arch = "wasm32")))]
@@ -55,6 +66,12 @@ pub(crate) struct MultiApplication {
 // Window creation, visibility, tray registration, and command dispatch all require a live
 // `ActiveEventLoop`. Keep policy/data transformations below this boundary independently tested.
 impl MultiApplication {
+    #[cfg(feature = "tasks")]
+    pub(crate) fn shutdown_tasks(&self) {
+        if let Some(tasks) = &self.tasks {
+            tasks.shutdown();
+        }
+    }
     pub(crate) fn new(
         config: ApplicationConfig,
         renderer_config: RendererConfig,
@@ -83,8 +100,11 @@ impl MultiApplication {
             pending: Rc::new(RefCell::new(Vec::new())),
             callback: Rc::new(RefCell::new(Box::new(on_event))),
             windows: HashMap::new(),
+            retired: Vec::new(),
             by_native: HashMap::new(),
             event_proxy: None,
+            #[cfg(feature = "tasks")]
+            tasks: None,
             #[cfg(all(feature = "tray", not(target_arch = "wasm32")))]
             native_tray: None,
             #[cfg(any(not(feature = "tray"), target_arch = "wasm32"))]
@@ -95,7 +115,15 @@ impl MultiApplication {
     }
 
     pub(crate) fn set_event_proxy(&mut self, proxy: impl Into<crate::host::EventProxy>) {
-        self.event_proxy = Some(proxy.into());
+        let proxy = proxy.into();
+        #[cfg(feature = "tasks")]
+        {
+            let wake = proxy.clone();
+            self.tasks = Some(crate::tasks::TaskRuntime::new(move || {
+                let _ = wake.send_event(UserEvent::TasksReady);
+            }));
+        }
+        self.event_proxy = Some(proxy);
     }
 
     #[cfg_attr(coverage_nightly, coverage(off))]
@@ -125,7 +153,13 @@ impl MultiApplication {
             self.initial_text_engine.take().unwrap_or_default(),
             None,
             None,
-            Some(Entity::new(adapter).erase()),
+            Some(
+                Entity::new(adapter)
+                    .mount()
+                    .expect("new window model is open")
+                    .entity
+                    .erase(),
+            ),
             callback,
         )
         .identified(self.config.identity.clone(), key.clone())
@@ -133,6 +167,10 @@ impl MultiApplication {
         .preference_overrides(self.config.preferences)
         .shared_renderer_device(Rc::clone(&self.renderer_device));
         if let Some(proxy) = &self.event_proxy {
+            #[cfg(feature = "tasks")]
+            {
+                runtime.tasks = self.tasks.clone();
+            }
             runtime.set_event_proxy(proxy.clone());
         }
         event_loop.open(&mut runtime);
@@ -172,18 +210,10 @@ impl MultiApplication {
     }
 
     #[cfg_attr(coverage_nightly, coverage(off))]
-    fn close_window(&mut self, key: &WindowKey) {
-        if let Some(entry) = self.windows.remove(key)
-            && let Some(window_id) = entry.runtime.window_id()
-        {
-            self.by_native.remove(&window_id);
-        }
-    }
-
-    #[cfg_attr(coverage_nightly, coverage(off))]
     fn process_pending(&mut self, event_loop: &dyn crate::host::WindowFactory) {
         for _ in 0..64 {
-            let updates = std::mem::take(&mut *self.pending.borrow_mut());
+            let mut updates = std::mem::take(&mut *self.pending.borrow_mut());
+            self.collect_app_commands(&mut updates);
             if updates.is_empty() {
                 return;
             }
@@ -296,6 +326,10 @@ impl ApplicationHandler<UserEvent> for MultiApplication {
     }
 
     #[cfg_attr(coverage_nightly, coverage(off))]
+    fn exiting(&mut self, _event_loop: &ActiveEventLoop) {
+        self.shutdown();
+    }
+
     fn suspended(&mut self, event_loop: &ActiveEventLoop) {
         for entry in self.windows.values_mut() {
             entry.runtime.suspended(event_loop);
@@ -306,6 +340,9 @@ impl ApplicationHandler<UserEvent> for MultiApplication {
     fn user_event(&mut self, event_loop: &ActiveEventLoop, event: UserEvent) {
         let _ = event_loop;
         match event {
+            UserEvent::ModelsReady => self.models_ready(event_loop),
+            #[cfg(feature = "tasks")]
+            UserEvent::TasksReady => self.tasks_ready(event_loop),
             #[cfg(all(feature = "webview", target_os = "linux"))]
             UserEvent::NativeInput { .. } => {}
             UserEvent::Preferences { ref window, .. } => {
@@ -467,6 +504,13 @@ impl WindowModel {
             event: event.clone(),
         });
         request_update(cx, self.record(update));
+        self.forward_requests(cx);
+    }
+
+    fn forward_requests(&mut self, cx: &mut Context<Self>) {
+        for command in self.model.borrow_mut().take_ui_commands(&self.key) {
+            cx.ui_command(command);
+        }
         if let Some(request) = self.model.borrow_mut().take_clipboard_request(&self.key) {
             cx.write_clipboard(request);
         }
@@ -493,6 +537,12 @@ impl WindowModel {
 }
 
 impl Render for WindowModel {
+    #[cfg(feature = "tasks")]
+    fn tasks_ready(&mut self, cx: &mut Context<Self>) {
+        let update = self.model.borrow_mut().tasks_ready(&self.key);
+        request_update(cx, self.record(update));
+        self.forward_requests(cx);
+    }
     fn render(&mut self, cx: &mut Context<Self>) -> Element {
         let mut root = self
             .view(cx.environment())

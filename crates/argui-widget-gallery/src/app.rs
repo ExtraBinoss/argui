@@ -56,13 +56,16 @@ pub struct WidgetGallery {
     pub(crate) select_selected: Option<usize>,
     pub(crate) dialog_open: bool,
     pub(crate) clicks: u32,
-    pub(crate) composition_hits: u32,
     pub(crate) editor_size: Size,
     editor_resize_start: Size,
-    shell: Entity<pages::AppShell>,
-    scroll_demo: Entity<pages::scroll_effects::ScrollDemo>,
-    webview: Entity<pages::webview::WebViewDemo>,
-    glass: Entity<pages::liquid_glass::GlassDemo>,
+    pub(crate) scroll_demo: Entity<pages::scroll_effects::ScrollDemo>,
+    pub(crate) webview: Entity<pages::webview::WebViewDemo>,
+    pub(crate) glass: Entity<pages::liquid_glass::GlassDemo>,
+    pub(crate) data: Entity<pages::data::DataDemo>,
+    pub(crate) tasks: Entity<pages::async_tasks::TasksDemo>,
+    pub(crate) actions: Entity<pages::actions::ActionsDemo>,
+    pub(crate) editing: Entity<pages::editing::EditingDemo>,
+    pub(crate) timeline: Entity<pages::timeline::Timeline>,
     pub(crate) slider_state: RangeState,
     pub(crate) plain_slider_state: RangeState,
     images: ImageLibrary,
@@ -70,7 +73,7 @@ pub struct WidgetGallery {
     light_assets: WidgetAssets,
     dark_assets: WidgetAssets,
     accent_assets: WidgetAssets,
-    spinner: Entity<Spinner>,
+    pub(crate) spinner: Entity<Spinner>,
 }
 
 impl Default for WidgetGallery {
@@ -92,6 +95,11 @@ impl Default for WidgetGallery {
             scroll_demo: Entity::new(pages::scroll_effects::ScrollDemo::default()),
             webview: pages::webview::WebViewDemo::entity(),
             glass: Entity::new(pages::liquid_glass::GlassDemo::default()),
+            data: Entity::new(pages::data::DataDemo::default()),
+            tasks: Entity::new(pages::async_tasks::TasksDemo::default()),
+            actions: Entity::new(pages::actions::ActionsDemo::default()),
+            editing: Entity::new(pages::editing::EditingDemo::default()),
+            timeline: Entity::new(pages::timeline::Timeline::default()),
             page: Page::Button,
             search: String::new(),
             search_highlight: 0,
@@ -108,19 +116,13 @@ impl Default for WidgetGallery {
             slider_editing: false,
             slider_edit_value: "64".into(),
             tab: 0,
-            select_presence: argui::widgets::Presence::default(),
+            select_presence: argui::widgets::Presence::default().fade_in(false),
             select_highlight: 0,
             select_selected: Some(0),
             dialog_open: false,
             clicks: 0,
-            composition_hits: 0,
             editor_size: EDITOR_DEFAULT_SIZE,
             editor_resize_start: EDITOR_DEFAULT_SIZE,
-            shell: Entity::new(pages::AppShell::new(
-                logo,
-                light_assets.clone(),
-                dark_assets.clone(),
-            )),
             slider_state: RangeState::default(),
             plain_slider_state: RangeState::default(),
             images,
@@ -139,14 +141,14 @@ impl WidgetGallery {
         _environment: WindowEnvironment,
         theme: &WidgetTheme,
         assets: &WidgetAssets,
-        spinner: Element,
+        cx: &mut Context<Self>,
         resize: pages::ResizeListeners,
     ) -> Element {
         Element::column([
             self.topbar(theme, assets),
             Element::row([
                 self.sidebar(theme, assets),
-                pages::render(self, theme, assets, spinner, resize)
+                pages::render(self, theme, assets, cx, resize)
                     .keyed("gallery-content-scroll")
                     .grow(1.0)
                     .min_width(length(0.0))
@@ -453,11 +455,6 @@ impl WidgetGallery {
                 }
                 Some("demo-button") => {
                     self.clicks = self.clicks.saturating_add(1);
-                    cx.notify();
-                    return;
-                }
-                Some("composition-circle") => {
-                    self.composition_hits = self.composition_hits.saturating_add(1);
                     cx.notify();
                     return;
                 }

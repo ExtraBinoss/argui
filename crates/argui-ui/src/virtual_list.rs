@@ -108,6 +108,13 @@ impl VirtualList {
         self.viewport_extent
     }
 
+    /// Resizes a viewport while retaining shared variable measurements.
+    #[must_use]
+    pub fn with_viewport(mut self, extent: f32) -> Self {
+        self.viewport_extent = extent.max(0.0);
+        self
+    }
+
     #[must_use]
     pub const fn overscan(mut self, overscan: usize) -> Self {
         self.overscan = overscan;

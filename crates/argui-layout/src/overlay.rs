@@ -1,9 +1,9 @@
+use crate::layout_tree::LayoutTree;
 use std::collections::HashMap;
 
 use argui_core::{Affine2D, Point, Rect, Size};
 use argui_paint::{ClipChain, ClipRegion};
 use argui_ui::{AnchorWidth, Element, PortalTarget, UiTree};
-use taffy::TaffyTree;
 
 use crate::{LayoutError, LayoutOutput, PortalLayout, engine::NodeMap, scroll};
 
@@ -21,7 +21,7 @@ pub(crate) enum PortalConstraint {
 }
 
 pub(crate) fn constraints(
-    tree: &TaffyTree<usize>,
+    tree: &LayoutTree,
     root: &NodeMap,
     elements: &[&Element],
     ui: &UiTree,
@@ -90,7 +90,7 @@ pub(crate) fn constraints(
 }
 
 fn collect_bounds(
-    tree: &TaffyTree<usize>,
+    tree: &LayoutTree,
     node: &NodeMap,
     ui: &UiTree,
     parent: Point,
@@ -115,7 +115,7 @@ fn collect_bounds(
 }
 
 pub(crate) fn resolve(
-    tree: &TaffyTree<usize>,
+    tree: &LayoutTree,
     root: &NodeMap,
     elements: &[&Element],
     ui: &UiTree,

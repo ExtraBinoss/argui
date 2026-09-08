@@ -1,3 +1,4 @@
+use crate::layout_tree::LayoutTree;
 use crate::{
     LayoutError, TextInputRegion, TextRegion, assets::AssetMetrics, input, paint, scroll,
     style::taffy_style,
@@ -8,7 +9,7 @@ use argui_text::{TextBlock, TextEngine, TextScene};
 use argui_ui::{
     Element, ElementKind, HitRegion, LayoutStyle, NodeId as UiNodeId, ScrollRegion, UiTree,
 };
-use taffy::{NodeId, TaffyTree};
+use taffy::NodeId;
 
 mod compute;
 
@@ -26,6 +27,7 @@ pub struct LayoutNode {
 pub struct LayoutOutput {
     pub viewport: Rect,
     pub nodes: Vec<LayoutNode>,
+    pub semantic_bounds: Vec<(UiNodeId, Rect)>,
     pub hit_regions: Vec<HitRegion>,
     pub scroll_regions: Vec<ScrollRegion>,
     pub text_inputs: Vec<TextInputRegion>,
@@ -59,6 +61,7 @@ pub struct PaintStats {
 
 #[derive(Debug)]
 pub(crate) struct NodeMap {
+    pub(crate) custom_state: Option<std::rc::Rc<argui_ui::CustomState>>,
     pub(crate) index: usize,
     pub(crate) node: UiNodeId,
     pub(crate) id: NodeId,
@@ -86,7 +89,7 @@ struct ScrollPlacement {
 
 #[derive(Debug)]
 pub struct LayoutEngine {
-    tree: TaffyTree<usize>,
+    tree: LayoutTree,
     root: Option<NodeMap>,
     revision: Option<u64>,
     paint_cache: paint::PaintCache,
@@ -98,7 +101,7 @@ pub struct LayoutEngine {
 impl Default for LayoutEngine {
     fn default() -> Self {
         Self {
-            tree: TaffyTree::new(),
+            tree: LayoutTree::new(),
             root: None,
             revision: None,
             paint_cache: paint::PaintCache::default(),
@@ -110,6 +113,16 @@ impl Default for LayoutEngine {
 }
 
 impl LayoutEngine {
+    /// Samples retained extension counters on demand, with no frame-time traversal.
+    pub fn custom_stats(&self) -> Vec<crate::CustomElementStats> {
+        crate::custom::stats(self.root.as_ref())
+    }
+
+    /// Live retained layout nodes, including nodes currently hidden by display style.
+    #[must_use]
+    pub fn retained_node_count(&self) -> usize {
+        self.tree.len()
+    }
     #[must_use]
     pub fn new() -> Self {
         Self::default()
@@ -166,7 +179,7 @@ impl LayoutEngine {
     }
 
     fn rebuild(&mut self, ui: &UiTree) -> Result<(), LayoutError> {
-        self.tree = TaffyTree::new();
+        self.tree = LayoutTree::new();
         let mut next_index = 0;
         self.root = Some(build_node(
             &mut self.tree,
@@ -204,7 +217,7 @@ impl LayoutEngine {
 }
 
 fn build_node(
-    tree: &mut TaffyTree<usize>,
+    tree: &mut LayoutTree,
     assets: &AssetMetrics,
     ui: &UiTree,
     element: &Element,
@@ -228,12 +241,13 @@ fn build_node(
         | ElementKind::TextEditor { .. }
         | ElementKind::Image { .. }
         | ElementKind::Vector { .. } => tree.new_leaf_with_context(style, index)?,
-        ElementKind::Container => {
+        ElementKind::Custom(_) | ElementKind::Container => {
             let child_ids = children.iter().map(|child| child.id).collect::<Vec<_>>();
             tree.new_with_children(style, &child_ids)?
         }
     };
     Ok(NodeMap {
+        custom_state: crate::custom::install(tree, id, &element.kind, None)?,
         index,
         node,
         id,
@@ -260,7 +274,7 @@ fn collect_node_ids(node: &NodeMap, output: &mut Vec<NodeId>) {
 }
 
 fn collect_layout(
-    tree: &TaffyTree<usize>,
+    tree: &LayoutTree,
     node: &NodeMap,
     elements: &[&Element],
     ui: &UiTree,
@@ -413,7 +427,7 @@ fn collect_layout(
 }
 
 fn apply_scroll_layout(
-    tree: &TaffyTree<usize>,
+    tree: &LayoutTree,
     node: &NodeMap,
     elements: &[&Element],
     ui: &UiTree,
@@ -552,9 +566,15 @@ fn sticky_origin(node: &NodeMap, origin: Point, size: Size, container: Option<Re
     result
 }
 
-pub(crate) fn content_size(tree: &TaffyTree<usize>, node: &NodeMap) -> Result<Size, LayoutError> {
+pub(crate) fn content_size(tree: &LayoutTree, node: &NodeMap) -> Result<Size, LayoutError> {
     let layout = tree.layout(node.id)?;
-    let mut size = Size::new(layout.size.width, layout.size.height);
+    let mut size = Size::new(
+        layout.size.width.max(layout.scrollable_overflow_rect.right),
+        layout
+            .size
+            .height
+            .max(layout.scrollable_overflow_rect.bottom),
+    );
     for child in &node.children {
         let child_layout = tree.layout(child.id)?;
         size.width = size

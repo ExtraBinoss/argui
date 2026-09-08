@@ -151,5 +151,7 @@ fn dialog_can_disable_the_theme_overlay_blur() {
     .build(&theme);
     let overlay = &dialog.children[1];
     assert!(overlay.children[0].layer.is_none());
-    assert!(overlay.children[1].layer.is_none());
+    let layer = overlay.children[1].layer.as_ref().unwrap();
+    assert!(layer.backdrop_filters.is_empty());
+    assert_eq!(layer.shadows, theme.overlay_shadows);
 }

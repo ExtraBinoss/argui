@@ -9,6 +9,7 @@ use std::collections::HashMap;
 use crate::{LayoutNode, LayoutOutput, engine::NodeMap, input, scroll};
 
 mod effects;
+mod geometry;
 mod portal;
 mod sync;
 use effects::{begin_layer, begin_scope, end_layers, scope_count};
@@ -36,6 +37,7 @@ struct CachedFragment {
     parent: PaintContext,
     commands: Vec<argui_paint::DisplayCommand>,
     hit_regions: Vec<HitRegion>,
+    semantic_bounds: Vec<(NodeId, Rect)>,
     text_orders: Vec<(NodeId, usize)>,
     scroll_updates: Vec<ScrollPaintUpdate>,
     cacheable: bool,
@@ -61,6 +63,7 @@ pub(crate) fn repaint(
     let elements = crate::engine::flattened(ui.root());
     output.display_list.clear();
     output.hit_regions.clear();
+    output.semantic_bounds.clear();
     cache.visited = 0;
     cache.reused = 0;
     cache.reused_commands = 0;
@@ -135,6 +138,9 @@ pub(super) fn paint_node(
         }
         output.display_list.extend(fragment.commands.clone());
         output.hit_regions.extend(fragment.hit_regions.clone());
+        output
+            .semantic_bounds
+            .extend_from_slice(&fragment.semantic_bounds);
         for update in &fragment.scroll_updates {
             apply_scroll_update(output, update);
             scroll_updates.push(update.clone());
@@ -144,6 +150,7 @@ pub(super) fn paint_node(
         return true;
     }
     let command_start = output.display_list.len();
+    let semantic_start = output.semantic_bounds.len();
     let hit_start = output.hit_regions.len();
     let scroll_start = scroll_updates.len();
     let portal;
@@ -168,6 +175,7 @@ pub(super) fn paint_node(
         hit_allowed: parent.hit_allowed,
         active_portal: parent.active_portal,
     };
+    geometry::record(node, &context, output);
     let scroll_layers = paint_enter(
         ui,
         element,
@@ -195,6 +203,7 @@ pub(super) fn paint_node(
             ),
         active_portal: context.active_portal,
     };
+    crate::custom::paint(map, element, node, output, transform, &child_context.clips);
     if (map.style.overflow.x.scrolls() || map.style.overflow.y.scrolls())
         && let Some(region) = output
             .scroll_regions
@@ -256,6 +265,7 @@ pub(super) fn paint_node(
                 parent: parent.clone(),
                 commands: output.display_list.commands()[command_start..].to_vec(),
                 hit_regions: output.hit_regions[hit_start..].to_vec(),
+                semantic_bounds: output.semantic_bounds[semantic_start..].to_vec(),
                 text_orders: output
                     .text_regions
                     .iter()

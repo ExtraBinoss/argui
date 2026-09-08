@@ -7,6 +7,7 @@ license.workspace = true
 
 [features]
 default = []
+tasks = ["dep:tokio", "dep:futures-util", "dep:futures-channel", "dep:gloo-timers"]
 tray = ["argui-platform/tray"]
 webview = ["dep:argui-webview", "argui-platform/gtk-host", "dep:tao", "dep:gtk"]
 
@@ -23,6 +24,8 @@ argui-text.workspace = true
 argui-ui.workspace = true
 web-time.workspace = true
 winit.workspace = true
+futures-util = { workspace = true, features = ["sink"], optional = true }
+futures-channel = { version = "=0.3.34", features = ["sink"], optional = true }
 argui-webview = { workspace = true, optional = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
@@ -33,9 +36,16 @@ gtk = { version = "=0.18.2", optional = true }
 accesskit.workspace = true
 accesskit_winit.workspace = true
 pollster.workspace = true
+tokio = { version = "=1.53.1", features = ["rt-multi-thread", "time", "net"], optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen-futures.workspace = true
+gloo-timers = { version = "=0.3.0", features = ["futures"], optional = true }
 
 [lints]
 workspace = true
+
+[[test]]
+name = "launch"
+harness = false
+required-features = ["tasks"]

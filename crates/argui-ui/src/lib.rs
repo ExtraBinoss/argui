@@ -1,9 +1,20 @@
 //! Retained UI description consumed by the runtime and produced by Rust or a DSL.
 
+mod action;
 mod activation;
+mod editing;
+pub use action::{
+    ActionBinding, ActionError, ActionId, ActionInvocation, ActionScope, ActionState, Shortcut,
+};
+pub use editing::UiCommand;
 mod binding;
 mod caret;
 mod cursor;
+mod custom;
+pub use custom::{
+    CustomConstraints, CustomDescription, CustomElement, CustomLayoutContext, CustomMeasurement,
+    CustomPaintContext, CustomPhaseStats, CustomState,
+};
 mod effect;
 mod element;
 mod native_content;
@@ -95,7 +106,10 @@ pub use style::{
 pub use style::{
     auto, evenly_sized_tracks, flex, fr, length, line, minmax, percent, repeat, sides, span, zero,
 };
-pub use text_input::{ClipboardRequest, TextInputFilter, TextSelection, TextSelectionRequest};
+pub use text_input::{
+    ClipboardRequest, HistoryConfig, TextInputFilter, TextPrivacy, TextSelection,
+    TextSelectionRequest,
+};
 pub use text_selection::{
     DocumentTextPoint, DocumentTextSelection, SelectionCapabilities, SelectionCommand,
     SelectionGranularity, TextSelectionStyle, UserSelect,
