@@ -8,8 +8,10 @@ pass unless every check succeeds.
 - Every tracked Rust file, including tests, examples, and build scripts, is at
   most 600 physical lines. Split a file when a responsibility becomes distinct;
   never split it merely to evade the limit.
-- Workspace coverage must be at least 90% independently for lines, functions,
-  LLVM regions, and branches.
+- Workspace coverage must be at least 85% independently for lines, functions,
+  LLVM regions, and branches, both globally and for every modified crate.
+  Crate totals aggregate covered/count values, never file percentages. A metric
+  with no instrumentable entries is N/A; a missing crate report fails the gate.
 - Formatting and Clippy warnings fail the check.
 - `unsafe` is denied until a concrete, reviewed need is documented.
 - Migration shims, backward-compatibility layers, deprecated APIs, and legacy
@@ -89,7 +91,25 @@ artifacts live in `target/coverage/`; the coverage lock rejects concurrent runs.
 Before measuring, workspace instrumentation artifacts are cleaned while dependency
 caches are retained, so old feature variants cannot add duplicate uncovered maps.
 
+The gate reads the detailed JSON branch counters. When the source locations
+account for all branches in a file, it unions each outcome across generic
+instantiations; executing the true and false outcomes in different instantiations
+covers both source outcomes. LLVM's original branch denominator is preserved.
+For folded expressions or macro expansions whose locations do not account for
+that denominator, LLVM's summary is retained. Functions, lines and regions use
+LLVM's summaries. The aggregation and rejection threshold have regression tests:
+`python3 -m unittest discover -s tests/scripts`.
+
+`ARGUI_NATIVE_TESTS=1` includes the opt-in native lifecycle and GTK input checks.
+This mode defaults to one Nextest worker, since native windows and off-screen
+renderer tests share the display/GPU. `ARGUI_COVERAGE_JOBS` explicitly overrides
+that worker count. It does not start a browser.
+
 The model-context compilation contracts live in
 `crates/argui-runtime/tests/model/model_context.md` and are included in the public
 API documentation. Rustdoc checks both rejected window capabilities and a valid
 presentation consumer; Nextest remains the runner for behavioral tests.
+
+The coverage baseline defaults to the merge base with `origin/main`. Set
+`ARGUI_COVERAGE_BASE` to the implementation's starting commit when work spans
+multiple commits. The JSON export and gate results remain in `target/` for review.

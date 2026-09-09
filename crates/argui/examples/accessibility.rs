@@ -85,13 +85,15 @@ fn gesture_surface() -> Element {
     .gap(7.0)
     .paint_style(panel())
     .interaction(
-        Interaction::default().focusable(true).gestures(
-            GestureSet::default()
-                .tap(argui::ui::TapGesture::default())
-                .pan(argui::ui::PanGesture::default())
-                .pinch(argui::ui::PinchGesture::default())
-                .rotation(argui::ui::RotationGesture::default()),
-        ),
+        Interaction::default()
+            .focus_policy(argui_ui::FocusPolicy::TabStop)
+            .gestures(
+                GestureSet::default()
+                    .tap(argui::ui::TapGesture::default())
+                    .pan(argui::ui::PanGesture::default())
+                    .pinch(argui::ui::PinchGesture::default())
+                    .rotation(argui::ui::RotationGesture::default()),
+            ),
     )
     .semantics(
         Semantics::new(Role::Slider)

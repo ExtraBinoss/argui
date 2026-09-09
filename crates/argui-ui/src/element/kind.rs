@@ -34,6 +34,8 @@ pub struct ElementNode {
     pub(crate) active_states: Vec<crate::StateName>,
     pub semantics: Option<argui_accessibility::Semantics>,
     pub semantic_hidden: bool,
+    pub semantic_scope: bool,
+    pub semantic_bindings: crate::SemanticBindings,
     pub bindings: Vec<crate::PropertyBinding>,
     pub layer: Option<argui_paint::LayerStyle>,
     pub effects: Vec<crate::ScopedEffect>,

@@ -2,7 +2,7 @@
 #[cfg(feature = "menu")]
 mod menu;
 #[cfg(feature = "menu")]
-pub use menu::{Menu, MenuItem, MenuResponse};
+pub use menu::{Menu, MenuIntent, MenuItem, MenuItemKind, MenuResponse};
 #[cfg(feature = "command-palette")]
 mod command_palette;
 #[cfg(feature = "command-palette")]
@@ -123,10 +123,55 @@ pub use theme::{WidgetTheme, shadcn};
 pub use toggle_behavior::{TOGGLE_CHECKED, TOGGLE_SCOPE, ToggleAction, ToggleBehavior, TogglePart};
 
 #[cfg(feature = "list")]
+mod collection;
+#[cfg(feature = "list")]
 mod list;
 #[cfg(feature = "list")]
-pub use list::{List, ListState};
+pub use collection::{Collection, CollectionItem, DuplicateItemId, ListState};
+#[cfg(feature = "list")]
+pub use list::List;
 #[cfg(feature = "table")]
 mod table;
 #[cfg(feature = "table")]
 pub use table::{Table, TableColumn};
+
+mod typeahead;
+pub use typeahead::{Typeahead, TypeaheadConfig, unicode_prefix};
+
+#[cfg(feature = "calendar")]
+mod calendar;
+#[cfg(feature = "calendar")]
+pub use calendar::{
+    Calendar, CalendarConstraints, CalendarLocale, CalendarSelection, CalendarState,
+    IsoCalendarLocale,
+};
+#[cfg(feature = "calendar")]
+pub use time::{Date, Month, Weekday};
+
+#[cfg(feature = "date-picker")]
+mod date_picker;
+#[cfg(feature = "date-picker")]
+pub use date_picker::{DatePicker, DatePickerResponse, DatePickerState};
+
+#[cfg(feature = "toast")]
+mod toast;
+#[cfg(feature = "toast")]
+pub use toast::{Toast, ToastHost, ToastInsertError, ToastPause, ToastState, ToastVariant};
+
+#[cfg(feature = "data-table")]
+mod data_table;
+#[cfg(feature = "data-table")]
+pub use data_table::{
+    CellAddress, CellCommit, CellEdit, DataColumn, DataPage, DataRow, DataSort, DataTable,
+    DataTableAction, DataTableError, DataTableModel,
+};
+
+#[cfg(feature = "menu")]
+mod context_menu;
+#[cfg(feature = "menu")]
+pub use context_menu::ContextMenu;
+
+#[cfg(feature = "menu")]
+mod menubar;
+#[cfg(feature = "menu")]
+pub use menubar::{Menubar, MenubarResponse};

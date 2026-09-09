@@ -45,6 +45,10 @@ fn navigation_rebuilds_widget_and_example_pages_from_public_events() {
     let gallery = Entity::new(WidgetGallery::default());
 
     for (key, heading) in [
+        ("nav::calendar", "Calendar"),
+        ("nav::date-picker", "Date picker"),
+        ("nav::data-table", "Value"),
+        ("nav::toast", "Show notification"),
         ("nav::input", "Input & Search"),
         ("nav::textarea", "Text area"),
         ("nav::checkbox", "Checkbox"),

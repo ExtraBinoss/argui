@@ -44,14 +44,17 @@ fn palette(query: &str, open: bool) -> CommandPalette {
         query,
         vec![
             MenuItem::new(
+                "disabled",
                 ActionInvocation::new(ActionId("disabled")),
                 ActionState::new("Save unavailable").enabled(false),
             ),
             MenuItem::new(
+                "save",
                 ActionInvocation::new(ActionId("save")),
                 ActionState::new("Save draft"),
             ),
             MenuItem::new(
+                "undo",
                 ActionInvocation::new(ActionId("undo")),
                 ActionState::new("Undo"),
             ),

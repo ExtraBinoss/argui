@@ -196,7 +196,11 @@ impl RangeBehavior {
                     .interaction(
                         Interaction::default()
                             .enabled(self.enabled)
-                            .focusable(self.enabled)
+                            .focus_policy(if self.enabled {
+                                argui_ui::FocusPolicy::TabStop
+                            } else {
+                                argui_ui::FocusPolicy::None
+                            })
                             .cursor(cursor)
                             .gestures(
                                 GestureSet::default().pan(

@@ -53,7 +53,7 @@ impl PopoverBehavior {
                 .user_select(UserSelect::None)
                 .interaction(
                     Interaction::default()
-                        .focusable(true)
+                        .focus_policy(argui_ui::FocusPolicy::TabStop)
                         .cursor(CursorIcon::Pointer)
                         .gestures(GestureSet::default().tap(argui_ui::TapGesture::default()))
                         .keyboard_activation(KeyboardActivation::EnterOrSpace),

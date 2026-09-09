@@ -41,7 +41,7 @@ fn hit_region(node: argui_ui::NodeId, bounds: Rect) -> HitRegion {
         shape: argui_ui::HitShape::Bounds,
         slop: argui_ui::HitTestStyle::default().slop,
         enabled: true,
-        focusable: false,
+        focus_policy: argui_ui::FocusPolicy::None,
         cursor: CursorIcon::Default,
         gestures: GestureSet::EMPTY,
         window_drag: None,

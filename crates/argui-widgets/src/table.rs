@@ -20,28 +20,28 @@ impl TableColumn {
 
 /// A table with shared column widths and controlled row selection.
 #[derive(Clone, Debug)]
-pub struct Table {
-    list: List,
+pub struct Table<'a> {
+    list: List<'a>,
     columns: Vec<TableColumn>,
     count: usize,
 }
 
-impl Table {
+impl<'a> Table<'a> {
     #[must_use]
     pub fn new(
         key: impl Into<String>,
         columns: impl IntoIterator<Item = TableColumn>,
-        count: usize,
+        collection: &'a crate::Collection,
     ) -> Self {
         Self {
-            list: List::new(key, count),
+            list: List::new(key, collection),
             columns: columns.into_iter().collect(),
-            count,
+            count: collection.len(),
         }
     }
 
     #[must_use]
-    pub fn selection(mut self, state: &ListState, multiple: bool) -> Self {
+    pub fn selection(mut self, state: &'a ListState, multiple: bool) -> Self {
         self.list = self.list.selection(state, multiple);
         self
     }

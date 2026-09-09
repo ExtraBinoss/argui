@@ -73,7 +73,11 @@ impl TabsBehavior {
                     .interaction(
                         Interaction::default()
                             .enabled(enabled)
-                            .focusable(enabled)
+                            .focus_policy(if enabled {
+                                argui_ui::FocusPolicy::TabStop
+                            } else {
+                                argui_ui::FocusPolicy::None
+                            })
                             .cursor(if enabled {
                                 CursorIcon::Pointer
                             } else {

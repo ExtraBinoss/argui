@@ -18,6 +18,12 @@ pub use argui_vector as vector;
 pub use argui_webview as webview;
 #[cfg(any(
     feature = "widgets-all",
+    feature = "widget-list",
+    feature = "widget-table",
+    feature = "widget-data-table",
+    feature = "widget-calendar",
+    feature = "widget-date-picker",
+    feature = "widget-toast",
     feature = "widget-button",
     feature = "widget-menu",
     feature = "widget-command-palette",

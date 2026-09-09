@@ -101,31 +101,40 @@ fn reduced_motion_interrupts_an_exit_and_decoration_releases_all_input() {
     assert!(open.bindings.len() >= 2);
 
     let nested = Element::container([
-        Element::container([]).interaction(argui_ui::Interaction::default().focusable(true)),
-        Element::container([
-            Element::text("focus").interaction(argui_ui::Interaction::default().focusable(true))
-        ])
-        .interaction(argui_ui::Interaction::default().focusable(true)),
+        Element::container([]).interaction(
+            argui_ui::Interaction::default().focus_policy(argui_ui::FocusPolicy::TabStop),
+        ),
+        Element::container([Element::text("focus").interaction(
+            argui_ui::Interaction::default().focus_policy(argui_ui::FocusPolicy::TabStop),
+        )])
+        .interaction(argui_ui::Interaction::default().focus_policy(argui_ui::FocusPolicy::TabStop)),
     ])
-    .interaction(argui_ui::Interaction::default().focusable(true));
+    .interaction(argui_ui::Interaction::default().focus_policy(argui_ui::FocusPolicy::TabStop));
     presence.set_open(false, true);
     let closed = presence.decorate(nested);
     assert!(closed.semantic_hidden);
     assert_eq!(closed.hit_test.pointer_events, PointerEvents::None);
     assert!(closed.focus_scope.is_none());
     assert!(!closed.interaction.as_ref().unwrap().enabled);
-    assert!(!closed.interaction.as_ref().unwrap().focusable);
-    assert!(closed.children.iter().all(|child| {
-        child
+    assert!(
+        !closed
             .interaction
             .as_ref()
-            .is_none_or(|interaction| !interaction.enabled && !interaction.focusable)
+            .unwrap()
+            .focus_policy
+            .is_focusable()
+    );
+    assert!(closed.children.iter().all(|child| {
+        child.interaction.as_ref().is_none_or(|interaction| {
+            !interaction.enabled && !interaction.focus_policy.is_focusable()
+        })
     }));
     assert!(
         !closed.children[1].children[0]
             .interaction
             .as_ref()
             .unwrap()
-            .focusable
+            .focus_policy
+            .is_focusable()
     );
 }

@@ -10,7 +10,7 @@ fn control(key: &str) -> Element {
     listeners(
         Element::container([]).keyed(key).interaction(
             Interaction::default()
-                .focusable(true)
+                .focus_policy(argui_ui::FocusPolicy::TabStop)
                 .keyboard_activation(KeyboardActivation::EnterOrSpace),
         ),
     )
@@ -37,7 +37,7 @@ fn region(node: argui_ui::NodeId, x: f32) -> HitRegion {
         shape: argui_ui::HitShape::Bounds,
         slop: argui_ui::HitTestStyle::default().slop,
         enabled: true,
-        focusable: true,
+        focus_policy: argui_ui::FocusPolicy::TabStop,
         cursor: CursorIcon::Auto,
         gestures: GestureSet::EMPTY,
         window_drag: None,
@@ -367,7 +367,7 @@ fn initial_key_target_and_enter_only_activation_are_exact() {
     let enter_only = listeners(
         Element::container([]).keyed("inside").interaction(
             Interaction::default()
-                .focusable(true)
+                .focus_policy(argui_ui::FocusPolicy::TabStop)
                 .keyboard_activation(KeyboardActivation::Enter),
         ),
     );
@@ -440,7 +440,7 @@ fn empty_restoring_scope_and_disabled_initial_candidate_are_explicit() {
     let disabled = tree.node_id_at(1).unwrap();
     let enabled = tree.node_id_at(2).unwrap();
     let mut disabled_region = region(disabled, 0.0);
-    disabled_region.focusable = false;
+    disabled_region.focus_policy = argui_ui::FocusPolicy::None;
     tree.sync_focus(&[disabled_region, region(enabled, 50.0)], None);
     assert_eq!(tree.focused_node(), Some(enabled));
 }
@@ -498,4 +498,75 @@ fn keyboard_focus_handles_empty_cycles_and_repeated_space_activation() {
             ..
         })
     )));
+}
+
+#[test]
+fn programmatic_focus_is_excluded_from_tab_order_but_accepts_explicit_focus() {
+    let mut middle = control("middle");
+    middle.interaction.as_mut().unwrap().focus_policy = argui_ui::FocusPolicy::Programmatic;
+    let mut tree = UiTree::new(Element::row([control("first"), middle, control("last")]));
+    let nodes: Vec<_> = ["first", "middle", "last"]
+        .map(|key| {
+            tree.node_ids()
+                .iter()
+                .copied()
+                .find(|node| tree.key(*node) == Some(key))
+                .unwrap()
+        })
+        .into();
+    let mut regions: Vec<_> = nodes
+        .iter()
+        .enumerate()
+        .map(|(i, node)| region(*node, i as f32 * 40.0))
+        .collect();
+    regions[1].focus_policy = argui_ui::FocusPolicy::Programmatic;
+    tree.key_input(&key(Key::Tab, KeyState::Pressed, false), &regions);
+    assert_eq!(tree.focused_node(), Some(nodes[0]));
+    tree.key_input(&key(Key::Tab, KeyState::Pressed, false), &regions);
+    assert_eq!(tree.focused_node(), Some(nodes[2]));
+    tree.sync_focus(&regions, Some(FocusRequest::Focus("middle".into())));
+    assert_eq!(tree.focused_node(), Some(nodes[1]));
+    tree.key_input(&key(Key::Tab, KeyState::Pressed, false), &regions);
+    assert_eq!(tree.focused_node(), Some(nodes[2]));
+}
+
+#[test]
+fn closing_a_nonmodal_scope_preserves_focus_that_already_left_it() {
+    fn view(open: bool) -> Element {
+        Element::column(
+            std::iter::once(control("trigger"))
+                .chain(open.then(|| {
+                    Element::column([control("item")])
+                        .keyed("popup")
+                        .focus_scope(argui_ui::FocusScope {
+                            containment: argui_ui::FocusContainment::None,
+                            initial: Some(InitialFocus::First),
+                            restore: true,
+                        })
+                }))
+                .chain(std::iter::once(control("next"))),
+        )
+    }
+    let mut tree = UiTree::new(view(false));
+    let trigger = tree.node_ids()[1];
+    let next = tree.node_ids()[2];
+    tree.sync_focus(
+        &[region(trigger, 0.0), region(next, 100.0)],
+        Some(FocusRequest::Focus(trigger.into())),
+    );
+    tree.update(view(true));
+    let item = tree.node_ids()[3];
+    let next = *tree.node_ids().last().unwrap();
+    let regions = [
+        region(trigger, 0.0),
+        region(item, 50.0),
+        region(next, 100.0),
+    ];
+    tree.sync_focus(&regions, None);
+    assert_eq!(tree.focused_node(), Some(item));
+    tree.key_input(&key(Key::Tab, KeyState::Pressed, false), &regions);
+    assert_eq!(tree.focused_node(), Some(next));
+    tree.update(view(false));
+    tree.sync_focus(&[region(trigger, 0.0), region(next, 100.0)], None);
+    assert_eq!(tree.focused_node(), Some(next));
 }

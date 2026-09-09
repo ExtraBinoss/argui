@@ -7,9 +7,12 @@ use web_sys::{
 };
 
 use crate::{
-    LiveRegion, Role, SemanticAction, SemanticNode, SemanticNodeId, SemanticPatch, SemanticRequest,
-    SemanticTree, SemanticValue,
+    SemanticAction, SemanticNode, SemanticNodeId, SemanticPatch, SemanticRequest, SemanticTree,
+    SemanticValue,
 };
+
+mod attributes;
+use attributes::{apply_attributes, html_tag};
 
 type EventHandler = Closure<dyn FnMut(Event)>;
 
@@ -158,7 +161,13 @@ impl DomTree {
             );
         }
         let current = &self.nodes[&node.id].element;
-        apply_attributes(current, node, self.canvas.width(), self.canvas.height())
+        apply_attributes(
+            current,
+            node,
+            self.canvas.width(),
+            self.canvas.height(),
+            &self.root.id(),
+        )
     }
 
     fn attach_children(&self, tree: &SemanticTree) -> Result<(), JsValue> {
@@ -312,229 +321,4 @@ fn handlers(
         output.push(handler);
     }
     Ok(output)
-}
-
-fn apply_attributes(
-    element: &Element,
-    node: &SemanticNode,
-    canvas_width: u32,
-    canvas_height: u32,
-) -> Result<(), JsValue> {
-    element.set_attribute("data-argui-node", &node.id.get().to_string())?;
-    element.set_attribute("role", aria_role(node.semantics.role))?;
-    if node.semantics.actions.contains(&SemanticAction::Focus) {
-        element.set_attribute("tabindex", "0")?;
-    } else {
-        element.remove_attribute("tabindex")?;
-    }
-    match node.semantics.role {
-        Role::TextInput if node.semantics.state.protected => {
-            element.set_attribute("type", "password")?
-        }
-        Role::Button => element.set_attribute("type", "button")?,
-        Role::SearchInput => element.set_attribute("type", "search")?,
-        _ => element.remove_attribute("type")?,
-    }
-    set_optional(element, "aria-label", node.semantics.label.as_deref())?;
-    set_optional(
-        element,
-        "aria-description",
-        node.semantics.description.as_deref(),
-    )?;
-    element.set_attribute(
-        "aria-disabled",
-        if node.semantics.state.disabled {
-            "true"
-        } else {
-            "false"
-        },
-    )?;
-    set_bool(element, "aria-selected", node.semantics.state.selected)?;
-    set_optional_bool(
-        element,
-        "aria-multiselectable",
-        matches!(
-            node.semantics.role,
-            Role::ListBox | Role::Grid | Role::Tree | Role::TabList
-        )
-        .then_some(node.semantics.state.multiselectable),
-    )?;
-    set_bool(element, "aria-required", node.semantics.state.required)?;
-    set_bool(element, "aria-readonly", node.semantics.state.read_only)?;
-    set_bool(element, "aria-invalid", node.semantics.state.invalid)?;
-    set_bool(element, "aria-busy", node.semantics.state.busy)?;
-    set_optional(
-        element,
-        "aria-modal",
-        node.semantics.state.modal.then_some("true"),
-    )?;
-    set_optional_bool(element, "aria-checked", node.semantics.state.checked)?;
-    set_optional_bool(element, "aria-expanded", node.semantics.state.expanded)?;
-    for attribute in [
-        "aria-valuetext",
-        "aria-valuenow",
-        "aria-valuemin",
-        "aria-valuemax",
-    ] {
-        element.remove_attribute(attribute)?;
-    }
-    match &node.semantics.value {
-        Some(SemanticValue::Text(value)) => {
-            if let Some(input) = element.dyn_ref::<HtmlInputElement>() {
-                if input.value() != *value {
-                    input.set_value(value);
-                }
-            } else if let Some(textarea) = element.dyn_ref::<HtmlTextAreaElement>() {
-                if textarea.value() != *value {
-                    textarea.set_value(value);
-                }
-            } else {
-                element.set_attribute("aria-valuetext", value)?;
-            }
-        }
-        Some(SemanticValue::Number {
-            value,
-            minimum,
-            maximum,
-            step: _,
-        }) => {
-            element.set_attribute("aria-valuenow", &value.to_string())?;
-            set_optional_number(element, "aria-valuemin", *minimum)?;
-            set_optional_number(element, "aria-valuemax", *maximum)?;
-        }
-        None => {}
-    }
-    set_optional(
-        element,
-        "aria-live",
-        match node.semantics.live {
-            LiveRegion::Off => None,
-            LiveRegion::Polite => Some("polite"),
-            LiveRegion::Assertive => Some("assertive"),
-        },
-    )?;
-    set_optional(
-        element,
-        "aria-orientation",
-        node.semantics
-            .orientation
-            .map(|orientation| match orientation {
-                crate::Orientation::Horizontal => "horizontal",
-                crate::Orientation::Vertical => "vertical",
-            }),
-    )?;
-    set_optional_number(element, "aria-level", node.semantics.level.map(f64::from))?;
-    set_optional_number(
-        element,
-        "aria-posinset",
-        node.semantics.position_in_set.map(f64::from),
-    )?;
-    set_optional_number(
-        element,
-        "aria-setsize",
-        node.semantics.set_size.map(f64::from),
-    )?;
-    let scale_x = f64::from(canvas_width.max(1));
-    let scale_y = f64::from(canvas_height.max(1));
-    let canvas_rect = element
-        .owner_document()
-        .and_then(|document| document.default_view())
-        .map_or(1.0, |window| window.device_pixel_ratio());
-    let x = f64::from(node.bounds.origin.x) / canvas_rect;
-    let y = f64::from(node.bounds.origin.y) / canvas_rect;
-    let width = f64::from(node.bounds.size.width) / canvas_rect;
-    let height = f64::from(node.bounds.size.height) / canvas_rect;
-    let style = element.dyn_ref::<HtmlElement>().map(HtmlElement::style);
-    if let Some(style) = style {
-        style.set_property("position", "absolute")?;
-        style.set_property("left", &format!("{}px", x.min(scale_x)))?;
-        style.set_property("top", &format!("{}px", y.min(scale_y)))?;
-        style.set_property("width", &format!("{}px", width.max(1.0)))?;
-        style.set_property("height", &format!("{}px", height.max(1.0)))?;
-        style.set_property("opacity", "0.001")?;
-        style.set_property("pointer-events", "none")?;
-    }
-    Ok(())
-}
-
-fn set_optional(element: &Element, name: &str, value: Option<&str>) -> Result<(), JsValue> {
-    if let Some(value) = value {
-        element.set_attribute(name, value)
-    } else {
-        element.remove_attribute(name)
-    }
-}
-
-fn set_bool(element: &Element, name: &str, value: bool) -> Result<(), JsValue> {
-    element.set_attribute(name, if value { "true" } else { "false" })
-}
-
-fn set_optional_bool(element: &Element, name: &str, value: Option<bool>) -> Result<(), JsValue> {
-    set_optional(
-        element,
-        name,
-        value.map(|value| if value { "true" } else { "false" }),
-    )
-}
-
-fn set_optional_number(element: &Element, name: &str, value: Option<f64>) -> Result<(), JsValue> {
-    if let Some(value) = value {
-        element.set_attribute(name, &value.to_string())
-    } else {
-        element.remove_attribute(name)
-    }
-}
-
-const fn html_tag(role: Role) -> &'static str {
-    match role {
-        Role::Button => "button",
-        Role::TextInput | Role::SearchInput => "input",
-        Role::TextArea => "textarea",
-        Role::Link => "a",
-        Role::List => "ul",
-        Role::ListItem => "li",
-        Role::Heading => "h2",
-        Role::Text => "span",
-        _ => "div",
-    }
-}
-
-const fn aria_role(role: Role) -> &'static str {
-    match role {
-        Role::Generic => "presentation",
-        Role::Window => "application",
-        Role::Group => "group",
-        Role::Text => "text",
-        Role::Heading => "heading",
-        Role::Image => "img",
-        Role::Link => "link",
-        Role::Button => "button",
-        Role::CheckBox => "checkbox",
-        Role::RadioButton => "radio",
-        Role::Switch => "switch",
-        Role::TextInput => "textbox",
-        Role::TextArea => "textbox",
-        Role::SearchInput => "searchbox",
-        Role::Table => "table",
-        Role::Grid => "grid",
-        Role::Row => "row",
-        Role::ColumnHeader => "columnheader",
-        Role::Cell => "cell",
-        Role::List => "list",
-        Role::ListItem => "listitem",
-        Role::ListBox => "listbox",
-        Role::Option => "option",
-        Role::Menu => "menu",
-        Role::MenuItem => "menuitem",
-        Role::Slider => "slider",
-        Role::Progress => "progressbar",
-        Role::Tab => "tab",
-        Role::TabList => "tablist",
-        Role::TabPanel => "tabpanel",
-        Role::Dialog => "dialog",
-        Role::Alert => "alert",
-        Role::Separator => "separator",
-        Role::Tree => "tree",
-        Role::TreeItem => "treeitem",
-    }
 }

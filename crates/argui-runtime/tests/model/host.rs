@@ -23,6 +23,46 @@ impl Render for Parent {
 }
 
 #[test]
+fn shutdown_closes_remaining_routes_and_roots_when_cleanup_panics() {
+    struct Routes(Vec<argui_runtime::AnyEntity>);
+    impl Render for Routes {
+        fn render(&mut self, cx: &mut Context<Self>) -> Element {
+            for route in &self.0 {
+                cx.route_events_to(route.clone());
+            }
+            Element::container([])
+        }
+    }
+    let children: Vec<_> = (0..3)
+        .map(|_| Entity::new(Child).mount().unwrap())
+        .collect();
+    let leases: Vec<_> = children
+        .iter()
+        .enumerate()
+        .map(|(index, child)| {
+            child
+                .resources()
+                .defer(move || panic!("child cleanup {index}"))
+                .unwrap()
+        })
+        .collect();
+    let root = Entity::new(Routes(children.iter().map(|child| child.erase()).collect()));
+    let _ = root.render();
+    let other = Entity::new(Child).mount().unwrap();
+    let roots = [root.erase(), other.erase()];
+    assert!(
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            argui_runtime::shutdown_presentations(&roots);
+        }))
+        .is_err()
+    );
+    assert!(children.iter().all(|child| child.resources().is_closed()));
+    assert!(other.resources().is_closed());
+    assert!(leases.iter().all(|lease| !lease.is_active()));
+    argui_runtime::shutdown_presentations(&roots);
+}
+
+#[test]
 fn rendered_and_routed_children_inherit_host_wakes_without_duplicate_rebinding() {
     for routed in [false, true] {
         let child = Entity::new(Child);

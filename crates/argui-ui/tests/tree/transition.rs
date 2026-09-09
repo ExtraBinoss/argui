@@ -19,7 +19,7 @@ fn region(node: argui_ui::NodeId) -> HitRegion {
         shape: HitShape::Bounds,
         slop: argui_ui::Sides::default(),
         enabled: true,
-        focusable: false,
+        focus_policy: argui_ui::FocusPolicy::None,
         cursor: CursorIcon::Auto,
         gestures: GestureSet::EMPTY,
         window_drag: None,

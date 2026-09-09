@@ -584,7 +584,11 @@ fn push_hit_region(
             shape: element.hit_test.shape,
             slop: element.hit_test.slop,
             enabled: interaction.enabled,
-            focusable: interaction.enabled && interaction.focusable,
+            focus_policy: if interaction.enabled {
+                interaction.focus_policy
+            } else {
+                argui_ui::FocusPolicy::None
+            },
             cursor: interaction.cursor,
             gestures: interaction.gestures,
             window_drag: interaction.window_drag,

@@ -111,7 +111,7 @@ fn disable_focus(element: &mut Element) {
     element.focus_scope = None;
     if let Some(interaction) = &mut element.interaction {
         interaction.enabled = false;
-        interaction.focusable = false;
+        interaction.focus_policy = argui_ui::FocusPolicy::None;
     }
     for child in &mut element.children {
         disable_focus(child);

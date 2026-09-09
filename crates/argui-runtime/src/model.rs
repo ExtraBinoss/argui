@@ -412,7 +412,13 @@ impl<T: Render> Entity<T> {
             environment,
             ..Context::default()
         };
-        let element = self.0.model.value.borrow_mut().render(&mut cx);
+        let element = self
+            .0
+            .model
+            .value
+            .borrow_mut()
+            .render(&mut cx)
+            .semantic_scope();
         if self.0.presentation.resources.is_closed() {
             return Element::container([]);
         }

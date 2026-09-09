@@ -95,7 +95,11 @@ fn select_navigation_skips_disabled_options_and_wraps() {
         Some(SelectAction::Highlight(2))
     );
     assert_eq!(
-        behavior(0).action(&event("backend", key(Key::Character("m".into())))),
+        behavior(0).search(
+            &event("backend", key(Key::Character("m".into()))),
+            &mut argui_widgets::Typeahead::default(),
+            std::time::Duration::ZERO
+        ),
         Some(SelectAction::Highlight(2))
     );
     assert_eq!(
@@ -198,7 +202,14 @@ fn select_behavior_decorates_disabled_and_invalid_options_without_activation() {
         trigger.semantics.as_ref().unwrap().state.expanded,
         Some(true)
     );
-    assert!(trigger.interaction.as_ref().unwrap().focusable);
+    assert!(
+        trigger
+            .interaction
+            .as_ref()
+            .unwrap()
+            .focus_policy
+            .is_focusable()
+    );
     let value = behavior.decorate(SelectPart::Value, Element::text("Mode"));
     assert!(value.semantic_hidden);
     let list = behavior.decorate(SelectPart::List, Element::container([]));
@@ -224,7 +235,14 @@ fn select_behavior_decorates_disabled_and_invalid_options_without_activation() {
     );
     assert!(disabled.semantics.as_ref().unwrap().state.disabled);
     let invalid = behavior.decorate(SelectPart::Option(10), Element::container([]));
-    assert!(!invalid.interaction.as_ref().unwrap().focusable);
+    assert!(
+        !invalid
+            .interaction
+            .as_ref()
+            .unwrap()
+            .focus_policy
+            .is_focusable()
+    );
     assert_eq!(
         invalid.semantics.as_ref().unwrap().label.as_deref(),
         Some("")
@@ -300,11 +318,19 @@ fn select_keyboard_actions_cover_edges_queries_and_unrelated_targets() {
         Some(SelectAction::Highlight(0))
     );
     assert_eq!(
-        behavior(0).action(&event("mode::option::0", key(Key::Character("g".into())),)),
+        behavior(0).search(
+            &event("mode::option::0", key(Key::Character("g".into())),),
+            &mut argui_widgets::Typeahead::default(),
+            std::time::Duration::ZERO
+        ),
         Some(SelectAction::Highlight(2))
     );
     assert_eq!(
-        behavior(0).action(&event("mode::option::0", key(Key::Character("z".into())),)),
+        behavior(0).search(
+            &event("mode::option::0", key(Key::Character("z".into())),),
+            &mut argui_widgets::Typeahead::default(),
+            std::time::Duration::ZERO
+        ),
         None
     );
     assert_eq!(

@@ -63,6 +63,19 @@ impl Element {
         self
     }
 
+    /// Anchor to viewport coordinates, for context menus, carets or selection bounds.
+    #[must_use]
+    pub fn rect_portal(
+        mut self,
+        layer: WindowLayer,
+        bounds: Rect,
+        placement: FloatingPlacement,
+    ) -> Self {
+        self.prepare_portal();
+        self.portal = Some(Portal::new(layer, PortalTarget::Rect { bounds, placement }));
+        self
+    }
+
     #[must_use]
     pub fn viewport_portal(mut self, layer: WindowLayer, placement: ViewportPlacement) -> Self {
         self.prepare_portal();

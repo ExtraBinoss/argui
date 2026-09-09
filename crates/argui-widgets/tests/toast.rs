@@ -1,0 +1,137 @@
+use argui_widgets::{Toast, ToastInsertError, ToastPause, ToastState};
+use std::time::Duration;
+fn sec(value: u64) -> Duration {
+    Duration::from_secs(value)
+}
+fn toast(id: &str) -> Toast {
+    Toast::new(id, id, Some(sec(10)))
+}
+
+#[test]
+fn queue_capacity_duplicate_ids_and_visible_lifetimes_are_explicit() {
+    let mut state = ToastState::new(1, 2, sec(0));
+    state.insert(toast("a"), sec(0)).unwrap();
+    state.insert(toast("b"), sec(0)).unwrap();
+    assert_eq!(
+        state.insert(toast("a"), sec(0)),
+        Err(ToastInsertError::DuplicateId)
+    );
+    assert_eq!(
+        state.insert(toast("c"), sec(0)),
+        Err(ToastInsertError::Capacity)
+    );
+    assert_eq!(state.next_deadline(), Some(sec(10)));
+    assert!(!state.advance(sec(5)));
+    assert!(state.advance(sec(10)));
+    assert_eq!(state.visible().next().unwrap().id, "b");
+    assert_eq!(state.next_deadline(), Some(sec(20)));
+    assert!(state.advance(sec(20)));
+    assert!(state.is_empty());
+    assert_eq!(state.next_deadline(), None);
+}
+
+#[test]
+fn independent_pause_reasons_and_updates_do_not_lose_remaining_time() {
+    let mut state = ToastState::new(2, 3, sec(0));
+    state.insert(toast("a"), sec(0)).unwrap();
+    state
+        .insert(Toast::new("b", "Persistent", None), sec(0))
+        .unwrap();
+    assert!(state.pause("a", ToastPause::Hover, true, sec(3)));
+    assert_eq!(state.next_deadline(), None);
+    assert!(state.pause("a", ToastPause::Focus, true, sec(4)));
+    assert!(state.pause("a", ToastPause::Hover, false, sec(5)));
+    assert!(!state.advance(sec(30)));
+    assert!(state.pause("a", ToastPause::Focus, false, sec(30)));
+    assert_eq!(state.next_deadline(), Some(sec(37)));
+    assert!(!state.pause("a", ToastPause::Focus, false, sec(31)));
+    assert!(!state.advance(sec(20)));
+    assert_eq!(state.next_deadline(), Some(sec(37)));
+    assert!(state.update(Toast::new("a", "Updated", Some(sec(2))), sec(32)));
+    assert_eq!(state.next_deadline(), Some(sec(34)));
+    assert!(state.close("a", sec(33)));
+    assert_eq!(state.len(), 1);
+    assert_eq!(state.next_deadline(), None);
+    assert!(!state.close("missing", sec(33)));
+    assert!(!state.pause("missing", ToastPause::Hover, true, sec(33)));
+    assert!(!state.update(toast("missing"), sec(33)));
+}
+
+#[test]
+fn expiry_removes_multiple_visible_entries_before_promoting_the_queue() {
+    let mut state = ToastState::new(2, 3, sec(0));
+    for id in ["a", "b", "c"] {
+        state.insert(toast(id), sec(0)).unwrap();
+    }
+    assert!(state.advance(sec(20)));
+    assert_eq!(
+        state
+            .visible()
+            .map(|toast| toast.id.as_str())
+            .collect::<Vec<_>>(),
+        ["c"]
+    );
+    assert_eq!(state.next_deadline(), Some(sec(30)));
+}
+
+#[test]
+fn host_announces_errors_and_pauses_for_pointer_or_action_focus() {
+    use argui_core::{Color, ColorScheme, Point, PointerEvent, PointerPhase};
+    use argui_ui::{
+        ActionId, ActionInvocation, ActionState, Element, Role, UiEvent, UiEventKind, UiTree,
+    };
+    use argui_widgets::{ToastHost, ToastVariant, shadcn};
+    let mut state = ToastState::new(1, 2, sec(0));
+    let mut error = toast("error");
+    error.variant = ToastVariant::Error;
+    error.actions.push((
+        ActionInvocation::new(ActionId("retry")),
+        ActionState::new("Retry"),
+    ));
+    state.insert(error, sec(0)).unwrap();
+    state.insert(toast("queued"), sec(0)).unwrap();
+    let host = ToastHost {
+        key: "host",
+        state: &state,
+        close_label: "Close",
+    };
+    let themes = shadcn(Color::WHITE);
+    let tree = UiTree::new(host.build(themes.resolve(ColorScheme::Light)));
+    assert!(
+        tree.semantic_tree(&[], 1.0)
+            .nodes
+            .iter()
+            .any(|node| node.semantics.role == Role::Alert)
+    );
+    let id = UiTree::new(Element::container([])).node_ids()[0];
+    let event = |target: &str, kind| UiEvent::new(id, Some(target.into()), kind);
+    for (phase, expected) in [
+        (PointerPhase::Entered, Some(true)),
+        (PointerPhase::Left, Some(false)),
+        (PointerPhase::Moved, None),
+    ] {
+        let response = host.pause_action(&event(
+            "host::toast::error",
+            UiEventKind::Pointer(PointerEvent::mouse(phase, Point::default())),
+        ));
+        assert_eq!(
+            response.map(|(_, reason, paused)| (reason, paused)),
+            expected.map(|paused| (ToastPause::Hover, paused))
+        );
+    }
+    assert_eq!(
+        host.pause_action(&event("host::action::error::0", UiEventKind::Focused)),
+        Some(("error".into(), ToastPause::Focus, true))
+    );
+    assert!(
+        host.pause_action(&event("unknown", UiEventKind::Focused))
+            .is_none()
+    );
+    assert!(
+        host.close_action(&event(
+            "host::close::queued",
+            UiEventKind::Click(argui_ui::ClickEvent::accessibility())
+        ))
+        .is_none()
+    );
+}

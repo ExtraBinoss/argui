@@ -93,6 +93,7 @@ impl Render for WidgetGallery {
     fn layout_changed(&mut self, layout: &LayoutSnapshot, cx: &mut Context<Self>) {
         self.handle_layout(layout);
         cx.layout_entity(&self.glass, layout);
+        cx.layout_entity(&self.menus, layout);
     }
 
     fn image_assets(&self) -> Vec<ImageAsset> {

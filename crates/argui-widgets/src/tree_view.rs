@@ -95,10 +95,19 @@ impl TreeView<'_> {
                     Key::ArrowRight if self.has_children(index) => {
                         Some(TreeAction::Select(self.nodes[index + 1].key.clone()))
                     }
-                    Key::ArrowUp | Key::ArrowDown | Key::Home | Key::End => {
+                    Key::ArrowUp
+                    | Key::ArrowDown
+                    | Key::Home
+                    | Key::End
+                    | Key::PageUp
+                    | Key::PageDown => {
                         let next = match input.key {
                             Key::ArrowUp => position.saturating_sub(1),
                             Key::ArrowDown => (position + 1).min(visible.len() - 1),
+                            Key::PageUp => position.saturating_sub(self.page_size(visible.len())),
+                            Key::PageDown => {
+                                (position + self.page_size(visible.len())).min(visible.len() - 1)
+                            }
                             Key::Home => 0,
                             _ => visible.len() - 1,
                         };
@@ -111,17 +120,63 @@ impl TreeView<'_> {
         }
     }
 
+    pub fn search(
+        &self,
+        event: &UiEvent,
+        search: &mut crate::Typeahead,
+        now: std::time::Duration,
+    ) -> Option<TreeAction> {
+        let visible = self.visible_indices();
+        let active = visible
+            .iter()
+            .position(|&index| Some(self.nodes[index].key.as_str()) == event.target_key())?;
+        let UiEventKind::KeyInput(input) = &event.kind else {
+            return None;
+        };
+        let Key::Character(query) = &input.key else {
+            return None;
+        };
+        if input.state != KeyState::Pressed || input.modifiers.command() || input.modifiers.alt {
+            return None;
+        }
+        let found = search.search(
+            query,
+            now,
+            Some(active),
+            visible.len(),
+            |index| Some(self.nodes[visible[index]].label.as_str()),
+            crate::unicode_prefix,
+        )?;
+        Some(TreeAction::Select(self.nodes[visible[found]].key.clone()))
+    }
+
     #[must_use]
     pub fn build(&self, theme: &WidgetTheme) -> Element {
         let visible = self.visible_indices();
+        let active = self.active_position(&visible);
         self.list
-            .build(visible.len(), theme, |position| {
-                self.row(visible[position], theme)
+            .build_pinned(visible.len(), theme, active, |position| {
+                self.row(visible[position], active == Some(position), theme)
             })
             .semantics(Semantics::new(Role::Tree).label("Elements"))
     }
 
-    fn row(&self, index: usize, theme: &WidgetTheme) -> Element {
+    fn page_size(&self, count: usize) -> usize {
+        self.list
+            .config(count)
+            .visible_range(self.list.offset)
+            .len()
+            .max(1)
+    }
+
+    fn active_position(&self, visible: &[usize]) -> Option<usize> {
+        visible
+            .iter()
+            .position(|&index| self.selected == Some(self.nodes[index].key.as_str()))
+            .or_else(|| (!visible.is_empty()).then_some(0))
+    }
+
+    fn row(&self, index: usize, active: bool, theme: &WidgetTheme) -> Element {
         let node = &self.nodes[index];
         let selected = self.selected == Some(node.key.as_str());
         let mut style = if selected {
@@ -185,7 +240,7 @@ impl TreeView<'_> {
                     .semantic_hidden(true),
             );
         }
-        Button::new(&node.key, &node.label, style)
+        let mut row = Button::new(&node.key, &node.label, style)
             .leading(Element::row(icons).gap(4.0).shrink(0.0))
             .build()
             .width(argui_ui::percent(1.0))
@@ -203,6 +258,15 @@ impl TreeView<'_> {
                     })
                     .action(SemanticAction::Click)
                     .action(SemanticAction::Focus),
-            )
+            );
+        row.interaction
+            .as_mut()
+            .expect("tree row button interaction")
+            .focus_policy = if active {
+            argui_ui::FocusPolicy::TabStop
+        } else {
+            argui_ui::FocusPolicy::Programmatic
+        };
+        row
     }
 }

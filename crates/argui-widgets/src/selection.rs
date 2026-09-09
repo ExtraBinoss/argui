@@ -26,7 +26,7 @@ use argui_ui::{StateSelector, property};
 pub struct Checkbox {
     key: String,
     label: String,
-    checked: bool,
+    checked: argui_ui::CheckedState,
     enabled: bool,
     indicator: Option<Element>,
 }
@@ -34,7 +34,11 @@ pub struct Checkbox {
 #[cfg(feature = "checkbox")]
 impl Checkbox {
     #[must_use]
-    pub fn new(key: impl Into<String>, label: impl Into<String>, checked: bool) -> Self {
+    pub fn new(
+        key: impl Into<String>,
+        label: impl Into<String>,
+        checked: argui_ui::CheckedState,
+    ) -> Self {
         Self {
             key: key.into(),
             label: label.into(),
@@ -58,35 +62,44 @@ impl Checkbox {
 
     #[must_use]
     pub fn build(self, theme: &WidgetTheme) -> Element {
-        let box_color = if self.checked {
+        let box_color = if self.checked != argui_ui::CheckedState::Unchecked {
             theme.primary
         } else {
             theme.card
         };
         let mark = self.indicator.unwrap_or_else(|| {
             Element::container([])
-                .width(length(7.0))
-                .height(length(7.0))
+                .width(length(if self.checked == argui_ui::CheckedState::Mixed {
+                    10.0
+                } else {
+                    7.0
+                }))
+                .height(length(if self.checked == argui_ui::CheckedState::Mixed {
+                    2.0
+                } else {
+                    7.0
+                }))
                 .background(theme.primary_foreground)
                 .radius(CornerRadii::all(2.0))
         });
-        let box_element = Element::container(self.checked.then_some(mark))
-            .width(length(18.0))
-            .height(length(18.0))
-            .display(Display::Flex)
-            .align_items(AlignItems::CENTER)
-            .justify_content(JustifyContent::CENTER)
-            .background(box_color)
-            .border(Border::all(
-                1.0,
-                if self.checked {
-                    theme.primary
-                } else {
-                    theme.border
-                },
-            ))
-            .radius(CornerRadii::all(5.0))
-            .semantic_hidden(true);
+        let box_element =
+            Element::container((self.checked != argui_ui::CheckedState::Unchecked).then_some(mark))
+                .width(length(18.0))
+                .height(length(18.0))
+                .display(Display::Flex)
+                .align_items(AlignItems::CENTER)
+                .justify_content(JustifyContent::CENTER)
+                .background(box_color)
+                .border(Border::all(
+                    1.0,
+                    if self.checked != argui_ui::CheckedState::Unchecked {
+                        theme.primary
+                    } else {
+                        theme.border
+                    },
+                ))
+                .radius(CornerRadii::all(5.0))
+                .semantic_hidden(true);
         let behavior = ToggleBehavior::new(&self.key, &self.label, Role::CheckBox, self.checked)
             .enabled(self.enabled);
         control_row(behavior, self.label, box_element, theme)
@@ -150,8 +163,17 @@ impl Switch {
             .radius(CornerRadii::all(999.0))
             .transition(StyleTransition::default())
             .semantic_hidden(true);
-        let behavior = ToggleBehavior::new(&self.key, &self.label, Role::Switch, self.checked)
-            .enabled(self.enabled);
+        let behavior = ToggleBehavior::new(
+            &self.key,
+            &self.label,
+            Role::Switch,
+            if self.checked {
+                argui_ui::CheckedState::Checked
+            } else {
+                argui_ui::CheckedState::Unchecked
+            },
+        )
+        .enabled(self.enabled);
         control_row(behavior, self.label, track, theme)
     }
 }

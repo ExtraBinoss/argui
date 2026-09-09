@@ -98,7 +98,11 @@ impl TextFieldBehavior {
                     .interaction(
                         Interaction::default()
                             .enabled(self.enabled)
-                            .focusable(self.enabled)
+                            .focus_policy(if self.enabled {
+                                argui_ui::FocusPolicy::TabStop
+                            } else {
+                                argui_ui::FocusPolicy::None
+                            })
                             .cursor(CursorIcon::Text)
                             .gestures(
                                 GestureSet::default()

@@ -334,6 +334,6 @@ fn label(text: &str, color: Color) -> Element {
 
 fn interactive() -> Interaction {
     Interaction::default()
-        .focusable(true)
+        .focus_policy(argui_ui::FocusPolicy::TabStop)
         .keyboard_activation(KeyboardActivation::EnterOrSpace)
 }

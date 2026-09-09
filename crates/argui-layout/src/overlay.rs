@@ -69,6 +69,20 @@ pub(crate) fn constraints(
                     anchor_width: anchor.placement.anchor_width,
                 }
             }
+            PortalTarget::Rect { bounds, placement } => {
+                let placed = placement.place(
+                    viewport,
+                    *bounds,
+                    desired,
+                    ui.resolved_layout_style(map.node, element)
+                        .writing_direction,
+                );
+                PortalConstraint::Bounds {
+                    node: map.id,
+                    size: placed.bounds.size,
+                    anchor_width: placement.anchor_width,
+                }
+            }
             PortalTarget::Viewport(placement) => {
                 let placed = placement.place(viewport, desired);
                 match placement {
@@ -170,6 +184,23 @@ pub(crate) fn resolve(
                     result.bounds,
                     Some(anchor.key.clone()),
                     Some(anchor.placement.preferred),
+                    Some(result.placement),
+                    result.available_size,
+                    (result.constrained_width, result.constrained_height),
+                )
+            }
+            PortalTarget::Rect { bounds, placement } => {
+                let result = placement.place(
+                    viewport,
+                    *bounds,
+                    desired,
+                    ui.resolved_layout_style(map.node, element)
+                        .writing_direction,
+                );
+                (
+                    result.bounds,
+                    None,
+                    Some(placement.preferred),
                     Some(result.placement),
                     result.available_size,
                     (result.constrained_width, result.constrained_height),

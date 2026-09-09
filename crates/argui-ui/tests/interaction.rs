@@ -16,7 +16,7 @@ fn interactive(key: &str) -> Element {
     let element = Element::container([])
         .keyed(key)
         .background(Color::srgb(0.0, 0.0, 0.0))
-        .interaction(Interaction::default().focusable(true))
+        .interaction(Interaction::default().focus_policy(argui_ui::FocusPolicy::TabStop))
         .when(
             VisualState::Hovered,
             StylePatch::from_quad(QuadStyle::solid(Color::WHITE)),
@@ -60,7 +60,11 @@ fn region_at(node: argui_ui::NodeId, x: f32, focusable: bool) -> HitRegion {
         shape: argui_ui::HitShape::Bounds,
         slop: argui_ui::HitTestStyle::default().slop,
         enabled: true,
-        focusable,
+        focus_policy: if focusable {
+            argui_ui::FocusPolicy::TabStop
+        } else {
+            argui_ui::FocusPolicy::None
+        },
         cursor: CursorIcon::Auto,
         gestures: argui_ui::GestureSet::EMPTY,
         window_drag: None,
@@ -81,13 +85,13 @@ fn interactions_expose_explicit_platform_cursors() {
 fn interaction_builders_preserve_disabled_keyboard_and_window_drag_options() {
     let interaction = Interaction::default()
         .enabled(false)
-        .focusable(true)
+        .focus_policy(argui_ui::FocusPolicy::TabStop)
         .cursor(CursorIcon::ColResize)
         .keyboard_activation(argui_ui::KeyboardActivation::EnterOrSpace)
         .window_drag(WindowDragBehavior::MoveAndToggleMaximize);
 
     assert!(!interaction.enabled);
-    assert!(interaction.focusable);
+    assert!(interaction.focus_policy.is_focusable());
     assert_eq!(interaction.cursor, CursorIcon::ColResize);
     assert_eq!(
         interaction.keyboard_activation,
@@ -344,7 +348,7 @@ fn blocker_regions_occlude_interactions_behind_overlays() {
     assert_eq!(update.events[0].target_key(), Some("overlay"));
     assert_eq!(tree.visual_states(behind), VisualStates::NONE);
     assert!(tree.visual_states(overlay).contains(VisualState::Hovered));
-    assert!(!Interaction::blocker().focusable);
+    assert!(!Interaction::blocker().focus_policy.is_focusable());
 }
 
 #[test]

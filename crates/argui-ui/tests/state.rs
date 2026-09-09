@@ -19,7 +19,7 @@ fn region(node: argui_ui::NodeId) -> HitRegion {
         shape: argui_ui::HitShape::Bounds,
         slop: argui_ui::HitTestStyle::default().slop,
         enabled: true,
-        focusable: true,
+        focus_policy: argui_ui::FocusPolicy::TabStop,
         cursor: CursorIcon::Pointer,
         gestures: GestureSet::EMPTY,
         window_drag: None,
@@ -34,7 +34,7 @@ fn interactive() -> Element {
     Element::container([])
         .keyed("surface")
         .background(black())
-        .interaction(Interaction::default().focusable(true))
+        .interaction(Interaction::default().focus_policy(argui_ui::FocusPolicy::TabStop))
         .when(
             VisualState::Hovered,
             StylePatch::new().set(property::BackgroundColor, Color::WHITE),
@@ -159,7 +159,7 @@ fn composed_and_inherited_states_keep_each_property() {
     let root = Element::container([child])
         .keyed("parent")
         .state_scope(scope)
-        .interaction(Interaction::default().focusable(true));
+        .interaction(Interaction::default().focus_policy(argui_ui::FocusPolicy::TabStop));
     let mut tree = UiTree::new(root);
     let parent = tree.node_ids()[0];
     let child = tree.root().children[0].clone();
@@ -219,7 +219,7 @@ fn focus_overrides_hover_without_waiting_for_pointer_exit() {
     let focused = Color::srgb(0.0, 0.4, 1.0);
     let element = Element::container([])
         .border(argui_paint::Border::all(1.0, black()))
-        .interaction(Interaction::default().focusable(true))
+        .interaction(Interaction::default().focus_policy(argui_ui::FocusPolicy::TabStop))
         .when(
             VisualState::Hovered,
             StylePatch::new().set(property::BorderColor, Color::WHITE),

@@ -7,10 +7,14 @@ pub enum KeyState {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Key {
     Character(String),
+    Function(u8),
+    ContextMenu,
     ArrowLeft,
     ArrowRight,
     ArrowUp,
     ArrowDown,
+    PageUp,
+    PageDown,
     Home,
     End,
     Backspace,

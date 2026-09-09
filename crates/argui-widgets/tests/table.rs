@@ -1,18 +1,20 @@
 use argui_core::{Color, ColorScheme};
 use argui_ui::{ClickEvent, Element, Role, UiEvent, UiEventKind, UiTree, length};
-use argui_widgets::{ListState, Table, TableColumn, shadcn};
+use argui_widgets::{Collection, CollectionItem, ListState, Table, TableColumn, shadcn};
 
 #[test]
 fn columns_align_headers_and_cells_and_rows_share_selection_behavior() {
+    let items =
+        Collection::new((0..3).map(|i| CollectionItem::new(i.to_string(), i.to_string()))).unwrap();
     let mut state = ListState::default();
-    state.select(1, 3, true, Default::default());
+    state.select(1, &items, true, Default::default());
     let table = Table::new(
         "table",
         [
             TableColumn::new("Name", 120.0),
             TableColumn::new("Count", 60.0),
         ],
-        3,
+        &items,
     )
     .label("Inventory")
     .selection(&state, true);
@@ -54,7 +56,7 @@ fn columns_align_headers_and_cells_and_rows_share_selection_behavior() {
         Some("table::row::2".into()),
         UiEventKind::Click(ClickEvent::accessibility()),
     );
-    assert_eq!(table.action(&event).unwrap().selected, [2].into());
+    assert_eq!(table.action(&event).unwrap().selected, ["2".into()].into());
 }
 
 #[test]

@@ -4,3 +4,4 @@ lcov.info
 coverage/
 /web/pkg/
 /web/widgets/pkg/
+__pycache__/

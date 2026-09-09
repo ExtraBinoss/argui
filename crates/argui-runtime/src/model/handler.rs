@@ -8,21 +8,45 @@ pub(super) type LocalHandler<T> = Rc<dyn Fn(&mut T, &UiEvent, &mut Context<T>)>;
 
 pub(super) struct HandlerRegistry<T> {
     slots: Vec<LocalHandler<T>>,
+    ids: Vec<u32>,
+    next: u32,
 }
 
 impl<T> Default for HandlerRegistry<T> {
     fn default() -> Self {
-        Self { slots: Vec::new() }
+        Self {
+            slots: Vec::new(),
+            ids: Vec::new(),
+            next: 0,
+        }
     }
 }
 
 impl<T> HandlerRegistry<T> {
+    fn next_slot(&self, index: usize) -> u32 {
+        self.ids.get(index).copied().unwrap_or_else(|| {
+            self.next
+                .checked_add(
+                    u32::try_from(index - self.ids.len()).expect("handler count must fit in u32"),
+                )
+                .expect("handler identity space exhausted")
+        })
+    }
     pub(super) fn replace(&mut self, handlers: Vec<LocalHandler<T>>) {
+        self.ids.truncate(handlers.len());
+        while self.ids.len() < handlers.len() {
+            self.ids.push(self.next);
+            self.next = self
+                .next
+                .checked_add(1)
+                .expect("handler identity space exhausted");
+        }
         self.slots = handlers;
     }
 
     pub(super) fn get(&self, slot: u32) -> Option<LocalHandler<T>> {
-        self.slots.get(slot as usize).cloned()
+        let index = self.ids.binary_search(&slot).ok()?;
+        Some(self.slots[index].clone())
     }
 }
 
@@ -40,7 +64,7 @@ impl<T: Render> Context<T> {
             listener: self.listener(EventType::Action, handler),
         }
     }
-    /// Declares an event handler owned by the component currently being rendered.
+    /// Declares a handler slot for this render. Removed slots are never reused.
     #[must_use]
     pub fn listener(
         &mut self,
@@ -51,7 +75,17 @@ impl<T: Render> Context<T> {
             || panic!("listeners require an entity render context"),
             |owner| owner.0.get(),
         );
-        let slot = u32::try_from(self.handlers.len()).expect("handler slot count must fit in u32");
+        let entity = self
+            .entity
+            .as_ref()
+            .and_then(super::WeakEntity::upgrade)
+            .expect("listeners require a live entity render context");
+        let slot = entity
+            .0
+            .presentation
+            .handlers
+            .borrow()
+            .next_slot(self.handlers.len());
         self.handlers.push(Rc::new(handler));
         EventListener::new(
             event,

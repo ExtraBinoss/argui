@@ -10,6 +10,10 @@ pub enum PortalTarget {
     #[default]
     Layout,
     Anchor(AnchorPortal),
+    Rect {
+        bounds: Rect,
+        placement: FloatingPlacement,
+    },
     Viewport(ViewportPlacement),
 }
 

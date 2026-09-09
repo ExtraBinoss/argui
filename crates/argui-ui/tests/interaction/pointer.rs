@@ -44,7 +44,7 @@ fn public_routing_reports_enter_and_leave_for_hit_regions() {
         shape: HitShape::Bounds,
         slop: HitTestStyle::default().slop,
         enabled: true,
-        focusable: false,
+        focus_policy: argui_ui::FocusPolicy::None,
         cursor: CursorIcon::Auto,
         gestures: argui_ui::GestureSet::EMPTY,
         window_drag: None,

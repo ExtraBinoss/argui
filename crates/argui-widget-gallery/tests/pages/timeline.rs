@@ -57,7 +57,13 @@ fn timeline_uses_custom_element_and_standard_keyboard_accessible_controls() {
         ElementKind::Custom(_)
     ));
     let clip = find(&before, "timeline-clip-0");
-    assert!(clip.interaction.as_ref().unwrap().focusable);
+    assert!(
+        clip.interaction
+            .as_ref()
+            .unwrap()
+            .focus_policy
+            .is_focusable()
+    );
     let size = clip.style.size;
     let position = bounds(&before, "timeline-clip-0").origin;
     click(&app, "timeline-extend");
@@ -198,7 +204,14 @@ fn resize_regions_share_semantic_and_keyboard_edits_and_reject_nonfinite_values(
     let before = app.render(Default::default()).unwrap();
     let handle = find(&before, "timeline-resize-0");
     assert_eq!(handle.semantics.as_ref().unwrap().role, Role::Slider);
-    assert!(handle.interaction.as_ref().unwrap().focusable);
+    assert!(
+        handle
+            .interaction
+            .as_ref()
+            .unwrap()
+            .focus_policy
+            .is_focusable()
+    );
     let initial = bounds(&before, "timeline-clip-0").size.width;
     dispatch(
         &app,

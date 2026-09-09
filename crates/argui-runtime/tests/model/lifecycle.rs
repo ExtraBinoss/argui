@@ -1,6 +1,72 @@
 use argui_runtime::{Context, Entity, ModelRuntime, MountTransition, Render};
 use argui_ui::Element;
 use std::{cell::RefCell, rc::Rc};
+
+#[test]
+fn dropping_a_mount_with_failed_cleanup_preserves_its_model_and_final_event() {
+    let runtime = ModelRuntime::new(|| {});
+    let model = runtime.entity(View);
+    let events = Rc::new(RefCell::new(Vec::new()));
+    let log = events.clone();
+    let _subscription =
+        runtime.observe_mounts(move |event| log.borrow_mut().push(event.transition));
+    let mount = model.mount().unwrap();
+    let weak = mount.downgrade();
+    let lease = mount.resources().defer(|| panic!("mount cleanup")).unwrap();
+    assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| drop(mount))).is_err());
+    assert!(weak.upgrade().is_none());
+    assert!(!lease.is_active());
+    assert_eq!(model.resources().resource_count(), 0);
+    runtime.dispatch_pending();
+    assert_eq!(
+        &*events.borrow(),
+        &[MountTransition::Mounted, MountTransition::Unmounted]
+    );
+    assert!(model.mount().is_ok());
+}
+
+#[test]
+fn shutdown_delivers_every_final_listener_even_after_multiple_panics() {
+    for unwinding in [false, true] {
+        let runtime = ModelRuntime::new(|| {});
+        let _first = runtime.observe_mounts(|_| panic!("first listener"));
+        let _second = runtime.observe_mounts(|_| panic!("second listener"));
+        let delivered = Rc::new(RefCell::new(Vec::new()));
+        let log = delivered.clone();
+        let _last = runtime.observe_mounts(move |event| log.borrow_mut().push(event.transition));
+        let model = runtime.entity(View);
+        let mount = model.mount().unwrap();
+        mount.close();
+        struct Shutdown(ModelRuntime);
+        impl Drop for Shutdown {
+            fn drop(&mut self) {
+                self.0.shutdown_host();
+            }
+        }
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            if unwinding {
+                let _shutdown = Shutdown(runtime.clone());
+                panic!("outer failure");
+            }
+            runtime.shutdown_host();
+        }));
+        let payload = result.unwrap_err();
+        assert_eq!(
+            payload.downcast_ref::<&str>(),
+            Some(&if unwinding {
+                "outer failure"
+            } else {
+                "first listener"
+            })
+        );
+        assert_eq!(
+            &*delivered.borrow(),
+            &[MountTransition::Mounted, MountTransition::Unmounted]
+        );
+        assert_eq!(runtime.pending_mount_events(), 0);
+        runtime.shutdown_host();
+    }
+}
 struct View;
 impl Render for View {
     fn render(&mut self, _: &mut Context<Self>) -> Element {

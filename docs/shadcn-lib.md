@@ -25,21 +25,21 @@ interne ou une page de démonstration ne suffisent pas à livrer un widget.
 - [ ] **Bubble** — absent ; présentation réutilisable à définir.
 - [x] **Button** — [`Button`](../crates/argui-widgets/src/button.rs) ; variantes via le thème, icônes, chargement et activation accessible.
 - [ ] **Button Group** — absent ; disposer des boutons en ligne ne constitue pas encore une API de groupe.
-- [ ] **Calendar** — absent ; modèle de date, locale, limites et navigation par jour/mois nécessaires.
+- [x] **Calendar** — `Calendar` et `CalendarState` ; locale, limites, sélection simple/multiple/plage et navigation clavier.
 - [ ] **Card** — absent ; conteneurs stylables disponibles, API de sections à livrer.
 - [ ] **Carousel** — absent ; défilement disponible, pagination, gestes et annonces à coordonner.
 - [ ] **Chart** — absent ; rendu vectoriel disponible, échelles, séries et interactions à concevoir.
-- [x] **Checkbox** — [`Checkbox`](../crates/argui-widgets/src/selection.rs) ; contrôle booléen. État indéterminé à ajouter séparément.
+- [x] **Checkbox** — [`Checkbox`](../crates/argui-widgets/src/selection.rs) ; `CheckedState` expose Unchecked, Checked et Mixed ; activation du mode Mixed vers Checked.
 - [ ] **Collapsible** — absent ; API d'ouverture, trigger et contenu à créer.
 - [ ] **Combobox** — partiel ; `Select` et recherche existent séparément, sans combobox publique dédiée.
 - [x] **Command** — [`CommandPalette`](../crates/argui-widgets/src/command_palette.rs) ; recherche et invocation d'actions. Groupes et variantes avancées restent à examiner.
-- [ ] **Context Menu** — partiel ; menu contextuel de sélection de texte, sans menu générique public à coordonnées libres.
-- [ ] **Data Table** — partiel ; `Table` et sélection de lignes existent. Tri, filtres, pagination, visibilité des colonnes et virtualisation de table ne sont pas intégrés.
-- [ ] **Date Picker** — absent ; dépend du calendrier et d'un contrat de saisie/localisation des dates.
+- [x] **Context Menu** — `ContextMenu` partage les entrées de `Menu`, avec ancrage au pointeur ou au clavier.
+- [x] **Data Table** — modèle typé, filtres, tri multiple stable, pagination, colonnes visibles, virtualisation et édition contrôlée ; en-têtes alignés au défilement.
+- [x] **Date Picker** — saisie localisable, brouillon contrôlé, validation et calendrier réutilisé.
 - [x] **Dialog** — [`Dialog`](../crates/argui-widgets/src/dialog.rs) ; modal, fermeture et restauration du focus.
 - [ ] **Direction** — partiel ; texte bidi et alignement logique disponibles, sans fournisseur de direction commun aux widgets.
 - [ ] **Drawer** — absent ; panneau gestuel, seuils de fermeture et focus à implémenter.
-- [ ] **Dropdown Menu** — partiel ; [`Menu`](../crates/argui-widgets/src/menu.rs) à un niveau. Sous-menus, groupes et entrées checkbox/radio manquent.
+- [x] **Dropdown Menu** — [`Menu`](../crates/argui-widgets/src/menu.rs) ; identifiants stables, sous-menus, groupes, entrées checkbox/radio, indicateurs et navigation clavier.
 - [ ] **Empty** — absent ; présentation d'état vide avec contenu/actions à exposer.
 - [ ] **Field** — partiel ; labels et erreurs existent sur `Input`, sans composition générique label/aide/erreur/contrôle.
 - [ ] **Hover Card** — absent ; overlay disponible, délais d'ouverture/fermeture et maintien au survol à ajouter.
@@ -50,7 +50,7 @@ interne ou une page de démonstration ne suffisent pas à livrer un widget.
 - [ ] **Kbd** — absent ; composant typographique pour raccourcis à livrer.
 - [ ] **Label** — partiel ; nom accessible sur les contrôles, sans label public associé à une cible de focus.
 - [ ] **Marker** — absent ; composant dédié à définir.
-- [ ] **Menubar** — absent ; actions disponibles, navigation entre menus et sous-menus à coordonner.
+- [x] **Menubar** — focus entre déclencheurs, ouverture des menus, sous-menus et navigation RTL.
 - [ ] **Message** — absent ; composant de message réutilisable à définir, sans mini-application imposée.
 - [ ] **Message Scroller** — partiel ; `VList` virtualise, mais suivi du bas, chargement antérieur et compteur de nouveautés restent applicatifs.
 - [ ] **Native Select** — absent ; `Select` est rendu par Argui. Pour ce catalogue, reproduire son usage avec un composant Argui ; aucun contrôle système requis.
@@ -73,7 +73,7 @@ interne ou une page de démonstration ne suffisent pas à livrer un widget.
 - [x] **Table** — [`Table`](../crates/argui-widgets/src/table.rs) ; en-têtes, cellules, largeurs communes, sélection et navigation par ligne. Pas de datagrid complet.
 - [x] **Tabs** — [`Tabs`](../crates/argui-widgets/src/tabs.rs) ; sélection, navigation et montage du panneau actif.
 - [x] **Textarea** — [`TextArea`](../crates/argui-widgets/src/input.rs) ; édition multiligne et scroll. Le redimensionnement se compose avec les gestes publics.
-- [ ] **Toast** — absent ; file de notifications, durée, annonces et actions à ajouter.
+- [x] **Toast** — file contrôlée, durée, pause au survol/focus, annonces et actions.
 - [ ] **Toggle** — partiel ; comportement booléen interne, sans bouton toggle public.
 - [ ] **Toggle Group** — absent ; groupe de toggles avec navigation et sélection simple/multiple à livrer.
 - [ ] **Tooltip** — absent ; délais, ancrage et description accessible à coordonner.
@@ -99,12 +99,10 @@ pas d'un DSL ni de shadcn.
 2. **Interactions courantes** : Tooltip, Collapsible/Accordion, Toggle/Toggle Group,
    puis Field/Input Group/Combobox. Vérifier clavier, focus et sémantique avant
    d'élargir les variantes visuelles.
-3. **Menus et panneaux** : terminer Dropdown/Context Menu, puis Sheet, Alert Dialog,
-   Hover Card et Toast ; mutualiser les comportements d'overlay existants.
-4. **Données** : tables virtualisées, tri, filtrage et colonnes ; conserver une API
-   de table simple indépendante de ces fonctionnalités avancées.
-5. **Chantiers plus coûteux** : Calendar/Date Picker (dates/locales), Chart
-   (géométrie/interactions), Drawer/Carousel (gestes), Native Select (plateformes).
+3. **Panneaux** : Sheet, Alert Dialog et Hover Card ; réutiliser les comportements
+   d'overlay et de focus validés.
+4. **Chantiers plus coûteux** : Chart (géométrie/interactions), Drawer/Carousel
+   (gestes), Native Select (équivalent Argui).
 
 Aucun composant purement visuel de cette liste n'est déclaré impossible.
 Les bibliothèques React sous-jacentes ne sont pas directement réutilisables dans
@@ -123,32 +121,33 @@ pour cette démarche.
 L'architecture permet de poursuivre ce catalogue, mais l'API actuelle ne couvre
 pas encore tous ses contrats d'interaction et d'accessibilité. Les primitives de
 layout, dessin, texte, gestes, overlays, modèles et éléments personnalisés sont
-présentes. Les points suivants nécessitent des extensions ciblées :
+présentes. Les extensions suivantes sont maintenant disponibles :
 
-- **Relations accessibles** : `Semantics` possède un label et une description
-  textuels, mais pas de relations vers les éléments qui étiquettent, décrivent ou
-  contrôlent un autre élément, ni de descendant actif. À compléter pour Field,
-  Combobox, Tooltip et les collections virtuelles.
-- **État indéterminé** : `checked: Option<bool>` représente une valeur booléenne
-  ou l'absence de valeur, pas un troisième état « mixte ». Le contrat doit évoluer
-  pour une checkbox de sélection partielle.
-- **Focus des collections** : `Interaction::focusable` ne distingue pas la
-  possibilité de recevoir le focus et la participation au parcours Tab. Ce
-  contrat doit permettre un seul arrêt Tab dans une collection, avec déplacement
-  interne et conservation du focus pendant la virtualisation.
-- **Clavier** : `Key` ne distingue pas PageUp/PageDown. Ajouter leur traduction
-  plateforme pour les calendriers et les grandes collections.
+- **Relations accessibles** : références par clés locales pour les labels,
+  descriptions, contrôles et descendants actifs ; résolution par scope/montage,
+  diagnostics et traduction native/DOM.
+- **État indéterminé** : `CheckedState::{Unchecked, Checked, Mixed}` remplace la
+  valeur booléenne des checkboxes.
+- **Focus des collections** : `FocusPolicy::{None, Programmatic, TabStop}`
+  distingue le focus explicite du parcours Tab. Les collections conservent une cible de focus
+  stable et montent l'option active même hors écran.
+- **Clavier** : PageUp/PageDown, touches de fonction et touche de menu contextuel
+  ont une représentation dans `Key` et une traduction native.
+
+Ces extensions sont implémentées et la campagne complète passe 958 tests. Les
+quatre métriques de couverture dépassent 85 % globalement et dans chaque crate
+modifié. Voir [le bilan de validation](widget-api-completion.md). Cela ne remplace
+pas un audit manuel des lecteurs d'écran ou de toutes les variantes du catalogue.
 
 Sources : [sémantiques](../crates/argui-accessibility/src/schema.rs),
 [interaction](../crates/argui-ui/src/interaction.rs),
 [clavier](../crates/argui-core/src/keyboard.rs),
 [éléments personnalisés](../crates/argui-ui/src/custom.rs).
 
-Sous-menus, délais de survol, recherche au clavier, gestion des toasts, modèle de
-dates et opérations sur les colonnes relèvent principalement de comportements
-et modèles à ajouter aux widgets. Leur absence ne prouve pas un manque dans le
-renderer. Les contrats communs seront extraits lorsqu'un composant en démontre
-le besoin, sans construire à l'avance une nouvelle infrastructure générale.
+Les sous-menus, délais de survol, recherches conservées, notifications, dates et
+opérations sur les colonnes possèdent désormais des modèles publics dans les
+widgets. Leurs pages de galerie restent indépendantes. Les détails des contrats
+et de la validation sont suivis dans [widget-api-completion.md](widget-api-completion.md).
 
 Aucun composant du catalogue n'est identifié comme impossible à reproduire dans
 Argui. Cela constitue une appréciation de faisabilité architecturale, pas une

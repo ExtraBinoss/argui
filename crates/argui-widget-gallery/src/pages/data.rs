@@ -6,11 +6,12 @@ use argui::{
         Element, EventType, ScrollRequest, UiEvent, UiEventKind, VirtualAlignment, VirtualList,
         length,
     },
-    widgets::{List, ListState, Table, TableColumn, VList, shadcn},
+    widgets::{Collection, CollectionItem, List, ListState, Table, TableColumn, VList, shadcn},
 };
 
 pub(crate) struct DataDemo {
     page: Page,
+    items: Collection,
     selection: ListState,
     heights: VirtualList,
     offset: f32,
@@ -20,6 +21,7 @@ impl Default for DataDemo {
     fn default() -> Self {
         Self {
             page: Page::List,
+            items: items(8),
             selection: ListState::default(),
             heights: VirtualList::variable(10_000, 40.0, 320.0),
             offset: 0.0,
@@ -35,6 +37,7 @@ pub(crate) fn render(
     if entity.read(|demo| demo.page != page) {
         entity.update(|demo, cx| {
             demo.page = page;
+            demo.items = items(if page == Page::VList { 10_000 } else { 8 });
             demo.selection = ListState::default();
             cx.notify();
         });
@@ -43,10 +46,6 @@ pub(crate) fn render(
 }
 
 impl DataDemo {
-    fn count(&self) -> usize {
-        if self.page == Page::VList { 10_000 } else { 8 }
-    }
-
     fn event(&mut self, event: &UiEvent, cx: &mut Context<Self>) {
         if let UiEventKind::Scrolled { offset, .. } = event.kind {
             if event.target_key() == Some("data") {
@@ -55,18 +54,20 @@ impl DataDemo {
             }
             return;
         }
-        if let Some(state) = List::new("data", self.count())
+        if let Some(state) = List::new("data", &self.items)
             .selection(&self.selection, true)
             .action(event)
         {
             self.selection = state;
             let _ = event.prevent_default();
             event.stop_propagation();
-            if let Some(active) = self.selection.active {
-                cx.request_focus(format!("data::row::{active}"));
-            }
+            cx.request_focus("data");
             if self.page == Page::VList
-                && let Some(active) = self.selection.active
+                && let Some(active) = self
+                    .selection
+                    .active
+                    .as_deref()
+                    .and_then(|id| self.items.index_of(id))
             {
                 self.offset =
                     self.heights
@@ -96,7 +97,7 @@ impl Render for DataDemo {
         };
         let content = match self.page {
             Page::VList => VList::variable("data", &self.heights, self.offset).build_list(
-                self.count(),
+                &self.items,
                 &self.selection,
                 true,
                 theme,
@@ -108,7 +109,7 @@ impl Render for DataDemo {
                     TableColumn::new("Name", 180.0),
                     TableColumn::new("Value", 120.0),
                 ],
-                self.count(),
+                &self.items,
             )
             .selection(&self.selection, true)
             .build(theme, |index, column| {
@@ -119,7 +120,7 @@ impl Render for DataDemo {
                 })
                 .padding(argui::ui::Sides::length(8.0))
             }),
-            _ => List::new("data", self.count())
+            _ => List::new("data", &self.items)
                 .selection(&self.selection, true)
                 .build(theme, row),
         };
@@ -133,4 +134,11 @@ impl Render for DataDemo {
         ])
         .gap(12.0)
     }
+}
+
+fn items(count: usize) -> Collection {
+    Collection::new(
+        (0..count).map(|i| CollectionItem::new(i.to_string(), format!("Item {}", i + 1))),
+    )
+    .expect("unique item identities")
 }

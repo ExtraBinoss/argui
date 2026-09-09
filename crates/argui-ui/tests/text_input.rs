@@ -40,7 +40,7 @@ fn with_region(tree: UiTree) -> (UiTree, HitRegion) {
             shape: argui_ui::HitShape::Bounds,
             slop: argui_ui::HitTestStyle::default().slop,
             enabled: true,
-            focusable: true,
+            focus_policy: argui_ui::FocusPolicy::TabStop,
             cursor: CursorIcon::Text,
             gestures: argui_ui::GestureSet::EMPTY,
             window_drag: None,
@@ -177,7 +177,7 @@ fn text_input_style_remains_composed_from_existing_primitives() {
     let style = InputStyle::new(PaintStyle::new(QuadStyle::default()), TextStyle::default());
     let input = Input::new("field", "", "hint", style).build();
     let interaction = input.interaction.as_ref().unwrap();
-    assert!(interaction.focusable);
+    assert!(interaction.focus_policy.is_focusable());
     assert_eq!(interaction.cursor, CursorIcon::Text);
     assert!(input.children.is_empty());
 }
@@ -486,7 +486,7 @@ fn text_area_inserts_lines_and_command_enter_submits() {
         shape: argui_ui::HitShape::Bounds,
         slop: argui_ui::HitTestStyle::default().slop,
         enabled: true,
-        focusable: true,
+        focus_policy: argui_ui::FocusPolicy::TabStop,
         cursor: CursorIcon::Text,
         gestures: argui_ui::GestureSet::EMPTY,
         window_drag: None,

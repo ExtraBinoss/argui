@@ -2,6 +2,26 @@ use argui_runtime::{Context, Entity, Render};
 use argui_ui::Element;
 
 #[test]
+fn cancelling_observation_before_dispatch_leaves_the_receiver_clean() {
+    let runtime = argui_runtime::ModelRuntime::new(|| {});
+    let source = runtime.entity(0);
+    let receiver = runtime.entity(0);
+    let subscription = receiver.update(|_, cx| cx.observe(&source)).unwrap();
+    runtime.transaction(|| {
+        source.update(|value, cx| {
+            *value = 1;
+            cx.notify();
+        });
+        subscription.cancel();
+    });
+    runtime.dispatch_pending();
+    assert_eq!(source.revision(), 1);
+    assert_eq!(receiver.revision(), 0);
+    assert_eq!(runtime.pending_invalidations(), 0);
+    assert!(!subscription.is_active());
+}
+
+#[test]
 fn data_revision_tracks_notifications_without_a_render_implementation() {
     let model = Entity::new(0);
     assert_eq!(model.revision(), 0);

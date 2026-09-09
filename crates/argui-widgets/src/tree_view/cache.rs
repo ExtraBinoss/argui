@@ -19,6 +19,7 @@ pub struct TreeViewCache {
 
 struct Row {
     selected: bool,
+    active: bool,
     element: Element,
 }
 
@@ -43,18 +44,23 @@ impl TreeView<'_> {
             .config(cache.visible.len())
             .window(self.list.offset)
             .range;
-        cache.rows.retain(|position, _| range.contains(position));
+        let active = self.active_position(&cache.visible);
+        cache
+            .rows
+            .retain(|position, _| range.contains(position) || active == Some(*position));
         self.list
-            .build(cache.visible.len(), theme, |position| {
+            .build_pinned(cache.visible.len(), theme, active, |position| {
                 let index = cache.visible[position];
                 let selected = self.selected == Some(self.nodes[index].key.as_str());
                 let row = cache.rows.entry(position).or_insert_with(|| Row {
                     selected,
-                    element: self.row(index, theme),
+                    active: active == Some(position),
+                    element: self.row(index, active == Some(position), theme),
                 });
-                if row.selected != selected {
+                if row.selected != selected || row.active != (active == Some(position)) {
                     row.selected = selected;
-                    row.element = self.row(index, theme);
+                    row.active = active == Some(position);
+                    row.element = self.row(index, row.active, theme);
                 }
                 row.element.clone()
             })

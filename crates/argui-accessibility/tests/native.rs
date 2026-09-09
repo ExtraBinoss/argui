@@ -128,7 +128,7 @@ fn rich_nodes_lower_every_value_state_and_relation() {
             disabled: true,
             selected: true,
             multiselectable: true,
-            checked: Some(true),
+            checked: Some(argui_accessibility::CheckedState::Checked),
             expanded: Some(false),
             required: true,
             read_only: true,
@@ -175,7 +175,7 @@ fn rich_nodes_lower_every_value_state_and_relation() {
                 semantics: Semantics::new(Role::TextInput)
                     .value(SemanticValue::Text("value".into()))
                     .state(SemanticState {
-                        checked: Some(false),
+                        checked: Some(argui_accessibility::CheckedState::Unchecked),
                         expanded: Some(true),
                         ..SemanticState::default()
                     })
@@ -306,4 +306,63 @@ fn table_roles_and_multiple_selection_reach_accesskit() {
         assert_eq!(update.nodes[0].1.role(), expected);
         assert!(update.nodes[0].1.is_multiselectable());
     }
+}
+
+#[test]
+fn relations_mixed_state_and_grid_metadata_reach_the_native_tree() {
+    use argui_accessibility::{
+        CheckedState, GridPosition, PopupKind, SemanticRelations, SortDirection,
+    };
+    let root = SemanticNodeId::new(1);
+    let child = SemanticNodeId::new(2);
+    let mut semantics = Semantics::new(Role::ComboBox);
+    semantics.state.checked = Some(CheckedState::Mixed);
+    semantics.relations = SemanticRelations {
+        labelled_by: vec![child],
+        described_by: vec![child],
+        controls: vec![child],
+        active_descendant: Some(child),
+    };
+    semantics.grid = GridPosition {
+        row_count: Some(4),
+        column_count: Some(3),
+        row_index: Some(2),
+        column_index: Some(1),
+    };
+    semantics.sort = Some(SortDirection::Descending);
+    semantics.popup = Some(PopupKind::Grid);
+    let tree = SemanticTree {
+        root,
+        focus: root,
+        nodes: vec![
+            SemanticNode {
+                id: root,
+                bounds: Rect::default(),
+                semantics,
+                children: vec![child],
+            },
+            SemanticNode {
+                id: child,
+                bounds: Rect::default(),
+                semantics: Semantics::new(Role::Text).label("Label"),
+                children: Vec::new(),
+            },
+        ],
+    };
+    let update = AccessKitTree::full(&tree);
+    let node = &update.nodes[0].1;
+    assert_eq!(node.toggled(), Some(accesskit::Toggled::Mixed));
+    assert_eq!(node.labelled_by(), &[NodeId(2)]);
+    assert_eq!(node.described_by(), &[NodeId(2)]);
+    assert_eq!(node.controls(), &[NodeId(2)]);
+    assert_eq!(node.active_descendant(), Some(NodeId(2)));
+    assert_eq!(node.row_count(), Some(4));
+    assert_eq!(node.column_count(), Some(3));
+    assert_eq!(node.row_index(), Some(1));
+    assert_eq!(node.column_index(), Some(0));
+    assert_eq!(
+        node.sort_direction(),
+        Some(accesskit::SortDirection::Descending)
+    );
+    assert_eq!(node.has_popup(), Some(accesskit::HasPopup::Grid));
 }

@@ -193,7 +193,7 @@ fn transformed_images_share_exact_clips_layers_and_hit_geometry() {
         .height(length(40.0))
         .interaction(
             Interaction::default()
-                .focusable(true)
+                .focus_policy(argui_ui::FocusPolicy::TabStop)
                 .cursor(CursorIcon::Crosshair),
         )
         .transform(Transform2D::IDENTITY.translate(20.0, 10.0).rotate(0.1))
@@ -240,7 +240,7 @@ fn disabled_interactions_keep_cursor_hit_geometry_but_reject_input() {
         .interaction(
             Interaction::default()
                 .enabled(false)
-                .focusable(true)
+                .focus_policy(argui_ui::FocusPolicy::TabStop)
                 .cursor(CursorIcon::NotAllowed),
         );
     let mut ui = UiTree::new(root);
@@ -252,7 +252,7 @@ fn disabled_interactions_keep_cursor_hit_geometry_but_reject_input() {
         output.hit_regions.as_slice(),
         [region]
             if !region.enabled
-                && !region.focusable
+                && !region.focus_policy.is_focusable()
                 && region.cursor == CursorIcon::NotAllowed
     ));
 }

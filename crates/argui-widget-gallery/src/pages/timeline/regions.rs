@@ -30,7 +30,7 @@ impl TimelineView {
         Element::custom_region(
             self.key(&format!("resize-{index}")),
             Interaction::default()
-                .focusable(true)
+                .focus_policy(argui::ui::FocusPolicy::TabStop)
                 .cursor(CursorIcon::EwResize)
                 .gestures(
                     GestureSet::EMPTY.pan(

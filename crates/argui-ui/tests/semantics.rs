@@ -56,7 +56,7 @@ fn buttons_publish_one_actionable_semantic_leaf() {
 #[test]
 fn focus_falls_back_to_the_root_when_a_focused_node_is_semantically_hidden() {
     let child = Element::container([])
-        .interaction(Interaction::default().focusable(true))
+        .interaction(Interaction::default().focus_policy(argui_ui::FocusPolicy::TabStop))
         .semantics(Semantics::new(Role::Button).label("Hidden"));
     let mut tree = UiTree::new(Element::column([child.clone()]));
     let child_id = tree.node_id_at(1).unwrap();
@@ -68,7 +68,7 @@ fn focus_falls_back_to_the_root_when_a_focused_node_is_semantically_hidden() {
         shape: argui_ui::HitShape::Bounds,
         slop: argui_ui::HitTestStyle::default().slop,
         enabled: true,
-        focusable: true,
+        focus_policy: argui_ui::FocusPolicy::TabStop,
         cursor: CursorIcon::Auto,
         gestures: GestureSet::EMPTY,
         window_drag: None,
@@ -118,7 +118,11 @@ fn text_inputs_publish_retained_values_and_disabled_state() {
     let style = InputStyle::new(PaintStyle::default(), TextStyle::default());
     let input = Input::new("query", "Argui", "Search", style)
         .build()
-        .interaction(Interaction::default().focusable(true).enabled(false));
+        .interaction(
+            Interaction::default()
+                .focus_policy(argui_ui::FocusPolicy::TabStop)
+                .enabled(false),
+        );
     let tree = UiTree::new(input);
     let semantics = tree.semantic_tree(&[], 1.0);
     let node = &semantics.nodes[0];
@@ -143,5 +147,36 @@ fn hidden_branches_skip_all_descendants_without_disturbing_siblings() {
     assert_eq!(
         semantics.nodes[1].semantics.label.as_deref(),
         Some("Visible child")
+    );
+}
+
+#[test]
+fn semantic_snapshots_distinguish_tab_stops_from_programmatic_focus() {
+    use argui_ui::{FocusPolicy, Interaction};
+    let tree = UiTree::new(Element::column([
+        Element::text("Programmatic")
+            .interaction(Interaction::default().focus_policy(FocusPolicy::Programmatic)),
+        Element::text("Tab stop")
+            .interaction(Interaction::default().focus_policy(FocusPolicy::TabStop)),
+        Element::text("Disabled").interaction(
+            Interaction::default()
+                .focus_policy(FocusPolicy::TabStop)
+                .enabled(false),
+        ),
+    ]));
+    let snapshot = tree.semantic_tree(&[], 1.0);
+    let policies: Vec<_> = snapshot
+        .nodes
+        .iter()
+        .skip(1)
+        .map(|node| node.semantics.focus_policy)
+        .collect();
+    assert_eq!(
+        policies,
+        [
+            FocusPolicy::Programmatic,
+            FocusPolicy::TabStop,
+            FocusPolicy::None
+        ]
     );
 }

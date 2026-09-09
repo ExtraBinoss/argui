@@ -24,7 +24,9 @@ fn animated_popover_keeps_exit_visuals_but_releases_focus() {
             "Animated",
             false,
             Element::text("Open"),
-            Element::text("Content").interaction(argui_ui::Interaction::default().focusable(true)),
+            Element::text("Content").interaction(
+                argui_ui::Interaction::default().focus_policy(argui_ui::FocusPolicy::TabStop),
+            ),
         )
         .presence(presence)
         .trap_focus(true)
@@ -35,7 +37,14 @@ fn animated_popover_keeps_exit_visuals_but_releases_focus() {
     let content = &closing.children[1];
     assert!(content.focus_scope.is_none());
     assert!(content.semantic_hidden);
-    assert!(!content.children[0].interaction.as_ref().unwrap().focusable);
+    assert!(
+        !content.children[0]
+            .interaction
+            .as_ref()
+            .unwrap()
+            .focus_policy
+            .is_focusable()
+    );
     assert_eq!(
         content.portal.as_ref().unwrap().dismiss,
         DismissPolicy::Manual
@@ -208,7 +217,14 @@ fn closed_popover_mounts_only_trigger_and_reports_collapsed_state() {
         trigger.semantics.as_ref().unwrap().state.expanded,
         Some(false)
     );
-    assert!(trigger.interaction.as_ref().unwrap().focusable);
+    assert!(
+        trigger
+            .interaction
+            .as_ref()
+            .unwrap()
+            .focus_policy
+            .is_focusable()
+    );
 }
 
 #[test]

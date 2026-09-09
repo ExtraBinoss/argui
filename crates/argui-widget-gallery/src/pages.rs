@@ -26,11 +26,15 @@ pub(crate) mod actions;
 pub(crate) mod async_tasks;
 mod buttons;
 pub(crate) mod data;
+pub(crate) mod data_table;
+pub(crate) mod dates;
 pub(crate) mod editing;
 mod inputs;
 pub(crate) mod liquid_glass;
+pub(crate) mod menus;
 pub(crate) mod scroll_effects;
 pub(crate) mod timeline;
+pub(crate) mod toast;
 mod typography;
 pub(crate) mod webview;
 
@@ -47,6 +51,14 @@ pub(crate) fn render(
     resize: ResizeListeners,
 ) -> Element {
     let content = match gallery.page {
+        Page::Menu | Page::ContextMenu | Page::Menubar => {
+            menus::render(&gallery.menus, gallery.page, cx)
+        }
+        Page::Calendar | Page::DatePicker => {
+            dates::render(&gallery.dates, gallery.page == Page::DatePicker, cx)
+        }
+        Page::DataTable => cx.entity(&gallery.data_table),
+        Page::Toast => cx.entity(&gallery.toasts),
         Page::List | Page::VList | Page::Table => data::render(&gallery.data, gallery.page, cx),
         Page::Button => buttons::render(gallery, theme, cx.entity(&gallery.spinner)),
         Page::Input => inputs::render(gallery, theme, assets),
@@ -169,13 +181,30 @@ fn checkboxes(gallery: &WidgetGallery, theme: &WidgetTheme, assets: &WidgetAsset
         "Checkbox states",
         "Space and Enter activate the focused control.",
         Element::column([
-            Checkbox::new("accepted", "Accept the renderer terms", gallery.accepted)
-                .indicator(assets.icon(TablerIcon::Check, 14.0))
-                .build(theme),
-            Checkbox::new("check-empty", "Unchecked option", false).build(theme),
-            Checkbox::new("check-disabled", "Disabled option", true)
-                .enabled(false)
-                .build(theme),
+            Checkbox::new(
+                "accepted",
+                "Accept the renderer terms",
+                if gallery.accepted {
+                    argui::ui::CheckedState::Checked
+                } else {
+                    argui::ui::CheckedState::Unchecked
+                },
+            )
+            .indicator(assets.icon(TablerIcon::Check, 14.0))
+            .build(theme),
+            Checkbox::new(
+                "check-empty",
+                "Unchecked option",
+                argui::ui::CheckedState::Unchecked,
+            )
+            .build(theme),
+            Checkbox::new(
+                "check-disabled",
+                "Disabled option",
+                argui::ui::CheckedState::Checked,
+            )
+            .enabled(false)
+            .build(theme),
         ])
         .gap(8.0),
         theme,
@@ -484,10 +513,17 @@ const fn description(page: Page) -> &'static str {
         Page::List => "Selection and keyboard navigation.",
         Page::VList => "Measured variable-height rows and virtual scrolling.",
         Page::Table => "Columns and row selection.",
+        Page::Menu => "Nested menus, checkbox and radio entries.",
+        Page::ContextMenu => "Open a menu at the pointer or with Shift+F10.",
+        Page::Menubar => "Move between menus with the arrow keys.",
+        Page::DataTable => "Sort columns, select rows and edit cells with Enter.",
+        Page::Calendar => "Choose dates with arrows and PageUp/PageDown.",
+        Page::DatePicker => "Type a date or choose it from the calendar.",
+        Page::Toast => "Notifications with a bounded queue and explicit dismissal.",
         Page::Button => "Actions with variants, icons, loading and accessible activation.",
         Page::Input => "Controlled single-line and search fields.",
         Page::TextArea => "Multiline editing, scrolling, clipping and resize capture.",
-        Page::Checkbox => "Boolean state with keyboard and touch activation.",
+        Page::Checkbox => "Unchecked, checked and mixed states with keyboard and touch activation.",
         Page::Switch => "Animated binary preferences.",
         Page::RadioGroup => "Exclusive selection with semantic grouping.",
         Page::Slider => "Pointer, touch, keyboard and accessibility values.",

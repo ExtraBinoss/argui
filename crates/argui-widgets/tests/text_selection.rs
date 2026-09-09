@@ -79,7 +79,14 @@ fn touch_selection_toolbar_is_a_clamped_non_selectable_widget() {
 
     assert!(matches!(toolbar.kind, ElementKind::Container));
     assert_eq!(toolbar.user_select, UserSelect::None);
-    assert!(!toolbar.interaction.as_ref().unwrap().focusable);
+    assert!(
+        !toolbar
+            .interaction
+            .as_ref()
+            .unwrap()
+            .focus_policy
+            .is_focusable()
+    );
     assert_eq!(toolbar.children.len(), 2);
     assert_eq!(
         toolbar.portal.as_ref().unwrap().dismiss,

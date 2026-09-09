@@ -36,7 +36,7 @@ fn editor(value: &str, kind: InputKind) -> (UiTree, HitRegion) {
         shape: HitShape::Bounds,
         slop: argui_ui::Sides::length(0.0),
         enabled: true,
-        focusable: true,
+        focus_policy: argui_ui::FocusPolicy::TabStop,
         cursor: CursorIcon::Text,
         gestures: argui_ui::GestureSet::EMPTY,
         window_drag: None,

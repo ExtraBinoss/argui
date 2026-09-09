@@ -5,6 +5,30 @@ use std::{
 };
 
 #[test]
+fn multiple_cleanup_panics_preserve_reverse_order_and_the_first_failure() {
+    let scope = ResourceScope::default();
+    let log = Rc::new(RefCell::new(Vec::new()));
+    let leases: Vec<_> = (0..3)
+        .map(|index| {
+            let log = log.clone();
+            scope
+                .defer(move || {
+                    log.borrow_mut().push(index);
+                    std::panic::panic_any(index);
+                })
+                .unwrap()
+        })
+        .collect();
+    let error =
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| scope.close())).unwrap_err();
+    assert_eq!(error.downcast_ref::<i32>(), Some(&2));
+    assert_eq!(&*log.borrow(), &[2, 1, 0]);
+    assert!(leases.iter().all(|lease| !lease.is_active()));
+    assert_eq!(scope.resource_count(), 0);
+    scope.close();
+}
+
+#[test]
 fn cleanup_runs_once_in_reverse_order_and_leases_do_not_retain_the_scope() {
     let scope = ResourceScope::default();
     let calls = Rc::new(RefCell::new(Vec::new()));

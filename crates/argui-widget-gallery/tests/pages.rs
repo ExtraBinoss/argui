@@ -108,3 +108,55 @@ fn find_content(element: &Element) -> Option<&Element> {
     }
     element.children.iter().find_map(find_content)
 }
+
+fn dispatch(app: &Entity<WidgetGallery>, key: &str, kind: UiEventKind) {
+    let mut tree = UiTree::new(app.render());
+    let node = tree
+        .node_ids()
+        .iter()
+        .copied()
+        .find(|id| tree.key(*id) == Some(key))
+        .unwrap_or_else(|| panic!("missing {key}"));
+    for event in tree.event_deliveries(node, kind) {
+        if event.should_dispatch() {
+            app.dispatch_event(&event);
+        }
+    }
+}
+fn click(app: &Entity<WidgetGallery>, key: &str) {
+    dispatch(app, key, UiEventKind::Click(ClickEvent::accessibility()));
+}
+fn keyboard(app: &Entity<WidgetGallery>, target: &str, key: argui::core::Key) {
+    dispatch(
+        app,
+        target,
+        UiEventKind::KeyInput(argui::core::KeyInput {
+            key,
+            state: argui::core::KeyState::Pressed,
+            modifiers: Default::default(),
+            repeat: false,
+            text: None,
+        }),
+    );
+}
+fn keyed<'a>(root: &'a Element, key: &str) -> Option<&'a Element> {
+    if root.key.as_deref() == Some(key) {
+        Some(root)
+    } else {
+        root.children.iter().find_map(|child| keyed(child, key))
+    }
+}
+#[path = "pages/actions.rs"]
+mod actions;
+#[path = "pages/async_tasks.rs"]
+mod async_tasks;
+#[path = "pages/data_table.rs"]
+mod data_table;
+#[path = "pages/dates.rs"]
+mod dates;
+#[path = "pages/editing.rs"]
+mod editing;
+#[path = "pages/menus.rs"]
+mod menus;
+#[path = "pages/toast.rs"]
+mod toast;

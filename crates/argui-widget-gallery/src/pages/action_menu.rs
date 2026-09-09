@@ -1,7 +1,7 @@
 use argui::{
     runtime::{Context, Render},
     ui::{NodeId, UiEvent, UiEventKind},
-    widgets::{Button, CommandPalette, Menu, MenuItem, MenuResponse, WidgetTheme},
+    widgets::{Button, CommandPalette, Menu, MenuItem, MenuItemKind, MenuResponse, WidgetTheme},
 };
 
 /// Gallery-owned visibility/query; the reusable widgets own presentation and keyboard policy.
@@ -55,7 +55,9 @@ impl ActionMenu {
         items
             .into_iter()
             .map(|mut item| {
-                item.invocation.origin = self.origin.or(item.invocation.origin);
+                if let MenuItemKind::Action(invocation) = &mut item.kind {
+                    invocation.origin = self.origin.or(invocation.origin);
+                }
                 item
             })
             .collect()
@@ -123,6 +125,10 @@ impl ActionMenu {
             return;
         };
         match response {
+            MenuResponse::Open { focus } => {
+                self.open = true;
+                cx.request_focus(focus);
+            }
             MenuResponse::Toggle => {
                 if palette_response {
                     self.palette = !self.palette;
@@ -133,7 +139,8 @@ impl ActionMenu {
                 }
             }
             MenuResponse::Close => {
-                if matches!(event.kind, UiEventKind::KeyInput(_)) {
+                if matches!(&event.kind, UiEventKind::KeyInput(input) if input.key != argui::core::Key::Tab)
+                {
                     let _ = event.prevent_default();
                 }
                 self.open = false;
@@ -143,6 +150,8 @@ impl ActionMenu {
                 let _ = event.prevent_default();
                 cx.request_focus(target);
             }
+            MenuResponse::Submenu { focus, .. } => cx.request_focus(focus),
+            MenuResponse::Checked { .. } | MenuResponse::Radio { .. } => return,
             MenuResponse::Invoke(invocation) => {
                 let _ = event.prevent_default();
                 cx.invoke_action(invocation);

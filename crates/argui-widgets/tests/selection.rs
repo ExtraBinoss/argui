@@ -18,10 +18,13 @@ fn click(key: &str) -> UiEvent {
 fn boolean_and_exclusive_controls_publish_controlled_state() {
     let themes = shadcn(Color::srgb(0.2, 0.5, 0.9));
     let theme = themes.resolve(ColorScheme::Dark);
-    let check = Checkbox::new("metrics", "Metrics", true).build(theme);
+    let check = Checkbox::new("metrics", "Metrics", argui_ui::CheckedState::Checked).build(theme);
     assert_eq!(check.user_select, UserSelect::None);
     assert_eq!(check.semantics.as_ref().unwrap().role, Role::CheckBox);
-    assert_eq!(check.semantics.as_ref().unwrap().state.checked, Some(true));
+    assert_eq!(
+        check.semantics.as_ref().unwrap().state.checked,
+        Some(argui_ui::CheckedState::Checked)
+    );
     let switch = Switch::new("profile", "Profile", false)
         .enabled(false)
         .build(theme);
@@ -55,8 +58,16 @@ fn boolean_and_exclusive_controls_publish_controlled_state() {
         Some(RadioGroupAction::Select(1))
     );
     assert_eq!(behavior.action(&click("other::option::1")), None);
-    let toggle = ToggleBehavior::new("metrics", "Metrics", Role::CheckBox, true);
-    assert_eq!(toggle.action(&click("metrics")), Some(ToggleAction::Toggle));
+    let toggle = ToggleBehavior::new(
+        "metrics",
+        "Metrics",
+        Role::CheckBox,
+        argui_ui::CheckedState::Checked,
+    );
+    assert_eq!(
+        toggle.action(&click("metrics")),
+        Some(ToggleAction::SetChecked(argui_ui::CheckedState::Unchecked))
+    );
     assert_eq!(toggle.enabled(false).action(&click("metrics")), None);
 
     let disabled = RadioGroupBehavior::new(
@@ -91,28 +102,36 @@ fn switch_thumb_uses_a_retained_transform_transition() {
 fn checkbox_variants_keep_indicator_and_disabled_state_consistent() {
     let themes = shadcn(Color::srgb(0.2, 0.5, 0.9));
     let theme = themes.resolve(ColorScheme::Light);
-    let unchecked = Checkbox::new("unchecked", "Unchecked", false).build(theme);
+    let unchecked =
+        Checkbox::new("unchecked", "Unchecked", argui_ui::CheckedState::Unchecked).build(theme);
     assert_eq!(unchecked.children[0].children.len(), 0);
     assert_eq!(
         unchecked.semantics.as_ref().unwrap().state.checked,
-        Some(false)
+        Some(argui_ui::CheckedState::Unchecked)
     );
     assert!(unchecked.interaction.as_ref().unwrap().enabled);
-    assert!(unchecked.interaction.as_ref().unwrap().focusable);
+    assert!(
+        unchecked
+            .interaction
+            .as_ref()
+            .unwrap()
+            .focus_policy
+            .is_focusable()
+    );
 
     let custom = Element::text("custom mark");
-    let checked = Checkbox::new("checked", "Checked", true)
+    let checked = Checkbox::new("checked", "Checked", argui_ui::CheckedState::Checked)
         .indicator(custom.clone())
         .build(theme);
     assert_eq!(checked.children[0].children.len(), 1);
     assert_eq!(checked.children[0].children[0], custom);
 
-    let disabled = Checkbox::new("disabled", "Disabled", true)
+    let disabled = Checkbox::new("disabled", "Disabled", argui_ui::CheckedState::Checked)
         .enabled(false)
         .build(theme);
     let interaction = disabled.interaction.as_ref().unwrap();
     assert!(!interaction.enabled);
-    assert!(!interaction.focusable);
+    assert!(!interaction.focus_policy.is_focusable());
     assert_eq!(interaction.cursor, argui_ui::CursorIcon::NotAllowed);
     assert!(disabled.semantics.as_ref().unwrap().state.disabled);
 }
@@ -175,15 +194,23 @@ fn radio_group_supports_horizontal_layout_and_invalid_option_decoration() {
 
 #[test]
 fn toggle_decorations_publish_position_and_ignore_non_click_events() {
-    let behavior = ToggleBehavior::new("notifications", "Notifications", Role::Switch, false)
-        .enabled(false)
-        .position_in_set(2, 4);
+    let behavior = ToggleBehavior::new(
+        "notifications",
+        "Notifications",
+        Role::Switch,
+        argui_ui::CheckedState::Unchecked,
+    )
+    .enabled(false)
+    .position_in_set(2, 4);
     let root = behavior.decorate(TogglePart::Root, Element::container([]));
     let semantics = root.semantics.as_ref().unwrap();
     assert_eq!(semantics.role, Role::Switch);
     assert_eq!(semantics.position_in_set, Some(2));
     assert_eq!(semantics.set_size, Some(4));
-    assert_eq!(semantics.state.checked, Some(false));
+    assert_eq!(
+        semantics.state.checked,
+        Some(argui_ui::CheckedState::Unchecked)
+    );
     assert!(semantics.state.disabled);
     assert_eq!(root.user_select, UserSelect::None);
     assert_eq!(
@@ -197,13 +224,41 @@ fn toggle_decorations_publish_position_and_ignore_non_click_events() {
     assert_eq!(behavior.action(&focused), None);
     assert_eq!(behavior.action(&click("other")), None);
     assert_eq!(
-        ToggleBehavior::new("notifications", "Notifications", Role::Switch, true)
-            .action(&click("notifications")),
-        Some(ToggleAction::Toggle)
+        ToggleBehavior::new(
+            "notifications",
+            "Notifications",
+            Role::Switch,
+            argui_ui::CheckedState::Checked
+        )
+        .action(&click("notifications")),
+        Some(ToggleAction::SetChecked(argui_ui::CheckedState::Unchecked))
     );
     assert_eq!(
-        ToggleBehavior::new("notifications", "Notifications", Role::Switch, true)
-            .action(&click("other")),
+        ToggleBehavior::new(
+            "notifications",
+            "Notifications",
+            Role::Switch,
+            argui_ui::CheckedState::Checked
+        )
+        .action(&click("other")),
         None
     );
+}
+
+#[test]
+fn mixed_checkbox_has_its_own_semantics_and_activates_to_checked() {
+    use argui_ui::CheckedState;
+    let themes = shadcn(argui_core::Color::WHITE);
+    let checkbox = Checkbox::new("all", "All rows", CheckedState::Mixed)
+        .build(themes.resolve(argui_core::ColorScheme::Dark));
+    assert_eq!(
+        checkbox.semantics.as_ref().unwrap().state.checked,
+        Some(CheckedState::Mixed)
+    );
+    let behavior = ToggleBehavior::new("all", "All rows", Role::CheckBox, CheckedState::Mixed);
+    assert_eq!(
+        behavior.action(&click("all")),
+        Some(ToggleAction::SetChecked(CheckedState::Checked))
+    );
+    assert_eq!(CheckedState::Unchecked.toggled(), CheckedState::Checked);
 }

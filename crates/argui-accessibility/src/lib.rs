@@ -9,8 +9,8 @@ mod native;
 #[cfg(not(target_arch = "wasm32"))]
 pub use native::AccessKitTree;
 pub use schema::{
-    LiveRegion, Orientation, Role, SemanticAction, SemanticRequest, SemanticState, SemanticValue,
-    Semantics,
+    CheckedState, FocusPolicy, LiveRegion, Orientation, Role, SemanticAction, SemanticRequest,
+    SemanticState, SemanticValue, Semantics,
 };
 pub use tree::{SemanticNode, SemanticNodeId, SemanticPatch, SemanticTree};
 
@@ -18,3 +18,6 @@ pub use tree::{SemanticNode, SemanticNodeId, SemanticPatch, SemanticTree};
 mod web;
 #[cfg(target_arch = "wasm32")]
 pub use web::DomTree;
+
+mod relations;
+pub use relations::{GridPosition, PopupKind, SemanticRelations, SortDirection};

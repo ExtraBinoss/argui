@@ -147,7 +147,7 @@ impl SplitPane {
             .user_select(UserSelect::None)
             .interaction(
                 Interaction::default()
-                    .focusable(true)
+                    .focus_policy(argui_ui::FocusPolicy::TabStop)
                     .cursor(if horizontal {
                         CursorIcon::EwResize
                     } else {

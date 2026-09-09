@@ -91,6 +91,59 @@ fn lower_node(node: &SemanticNode) -> (NodeId, Node) {
     if let Some(description) = &node.semantics.description {
         output.set_description(description.clone());
     }
+    let relations = &node.semantics.relations;
+    output.set_labelled_by(
+        relations
+            .labelled_by
+            .iter()
+            .map(|id| NodeId(id.get()))
+            .collect::<Vec<_>>(),
+    );
+    output.set_described_by(
+        relations
+            .described_by
+            .iter()
+            .map(|id| NodeId(id.get()))
+            .collect::<Vec<_>>(),
+    );
+    output.set_controls(
+        relations
+            .controls
+            .iter()
+            .map(|id| NodeId(id.get()))
+            .collect::<Vec<_>>(),
+    );
+    if let Some(id) = relations.active_descendant {
+        output.set_active_descendant(NodeId(id.get()));
+    }
+    let grid = node.semantics.grid;
+    if let Some(value) = grid.row_count {
+        output.set_row_count(value as usize);
+    }
+    if let Some(value) = grid.column_count {
+        output.set_column_count(value as usize);
+    }
+    if let Some(value) = grid.row_index {
+        output.set_row_index(value.saturating_sub(1) as usize);
+    }
+    if let Some(value) = grid.column_index {
+        output.set_column_index(value.saturating_sub(1) as usize);
+    }
+    if let Some(value) = node.semantics.sort {
+        output.set_sort_direction(match value {
+            crate::SortDirection::Ascending => accesskit::SortDirection::Ascending,
+            crate::SortDirection::Descending => accesskit::SortDirection::Descending,
+        });
+    }
+    if let Some(value) = node.semantics.popup {
+        output.set_has_popup(match value {
+            crate::PopupKind::Menu => accesskit::HasPopup::Menu,
+            crate::PopupKind::ListBox => accesskit::HasPopup::Listbox,
+            crate::PopupKind::Tree => accesskit::HasPopup::Tree,
+            crate::PopupKind::Grid => accesskit::HasPopup::Grid,
+            crate::PopupKind::Dialog => accesskit::HasPopup::Dialog,
+        });
+    }
     match &node.semantics.value {
         Some(SemanticValue::Text(value)) => output.set_value(value.clone()),
         Some(SemanticValue::Number {
@@ -123,10 +176,10 @@ fn lower_node(node: &SemanticNode) -> (NodeId, Node) {
         output.set_multiselectable();
     }
     if let Some(value) = node.semantics.state.checked {
-        output.set_toggled(if value {
-            accesskit::Toggled::True
-        } else {
-            accesskit::Toggled::False
+        output.set_toggled(match value {
+            crate::CheckedState::Unchecked => accesskit::Toggled::False,
+            crate::CheckedState::Checked => accesskit::Toggled::True,
+            crate::CheckedState::Mixed => accesskit::Toggled::Mixed,
         });
     }
     if let Some(value) = node.semantics.state.expanded {
@@ -198,6 +251,13 @@ const fn lower_role(role: Role) -> AccessRole {
         Role::ListBox => AccessRole::ListBox,
         Role::Option => AccessRole::ListBoxOption,
         Role::Menu => AccessRole::Menu,
+        Role::MenuBar => AccessRole::MenuBar,
+        Role::MenuItemCheckBox => AccessRole::MenuItemCheckBox,
+        Role::MenuItemRadio => AccessRole::MenuItemRadio,
+        Role::ComboBox => AccessRole::ComboBox,
+        Role::Tooltip => AccessRole::Tooltip,
+        Role::Status => AccessRole::Status,
+        Role::AlertDialog => AccessRole::AlertDialog,
         Role::MenuItem => AccessRole::MenuItem,
         Role::Slider => AccessRole::Slider,
         Role::Progress => AccessRole::ProgressIndicator,

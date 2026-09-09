@@ -81,7 +81,7 @@ fn button_hover_uses_the_shared_retained_visual_state_path() {
             shape: argui_ui::HitShape::Bounds,
             slop: argui_ui::HitTestStyle::default().slop,
             enabled: true,
-            focusable: true,
+            focus_policy: argui_ui::FocusPolicy::TabStop,
             cursor: CursorIcon::Pointer,
             gestures: argui_ui::GestureSet::EMPTY,
             window_drag: None,
@@ -208,7 +208,7 @@ fn hover_region(node: argui_ui::NodeId, y: f32, enabled: bool) -> HitRegion {
         shape: argui_ui::HitShape::Bounds,
         slop: argui_ui::HitTestStyle::default().slop,
         enabled,
-        focusable: true,
+        focus_policy: argui_ui::FocusPolicy::TabStop,
         cursor: CursorIcon::Pointer,
         gestures: argui_ui::GestureSet::EMPTY,
         window_drag: None,
@@ -264,7 +264,7 @@ fn themed_outline_button_has_a_visible_hover_surface() {
             shape: argui_ui::HitShape::Bounds,
             slop: argui_ui::HitTestStyle::default().slop,
             enabled: true,
-            focusable: true,
+            focus_policy: argui_ui::FocusPolicy::TabStop,
             cursor: CursorIcon::Pointer,
             gestures: argui_ui::GestureSet::EMPTY,
             window_drag: None,
@@ -350,6 +350,13 @@ fn busy_button_is_not_activatable_even_when_enabled() {
         .busy(true)
         .decorate(argui_widgets::ButtonPart::Root, Element::container([]));
     assert!(!decorated.interaction.as_ref().unwrap().enabled);
-    assert!(!decorated.interaction.as_ref().unwrap().focusable);
+    assert!(
+        !decorated
+            .interaction
+            .as_ref()
+            .unwrap()
+            .focus_policy
+            .is_focusable()
+    );
     assert!(decorated.semantics.as_ref().unwrap().state.busy);
 }

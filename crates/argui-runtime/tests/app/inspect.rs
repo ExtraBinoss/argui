@@ -414,10 +414,6 @@ fn sparse_layer_overrides_preserve_unlisted_filter_values() {
                 label: "filter 1 · matrix 0".into(),
                 value: 2.0,
             },
-            StyleField {
-                label: "filter 2 · strength".into(),
-                value: 3.0,
-            },
         ]),
     );
 
@@ -436,7 +432,7 @@ fn sparse_layer_overrides_preserve_unlisted_filter_values() {
     assert!(matches!(
         &layer.filters[2],
         Filter::Refraction(value)
-            if value.strength == 3.0
+            if value.strength == 1.0
                 && value.chromatic_aberration == 0.0
                 && value.edge == 0.15
     ));

@@ -1,116 +1,34 @@
-use std::collections::BTreeSet;
-
-use argui_core::{Key, KeyState, Modifiers};
+use argui_core::{Key, KeyState};
 use argui_paint::{Border, QuadStyle};
 use argui_ui::{
     Element, GestureSet, Interaction, Role, SemanticAction, SemanticState, Semantics, TapGesture,
     UiEvent, UiEventKind, UserSelect, VisualState,
 };
 
-use crate::WidgetTheme;
-
-/// Controlled selection shared by lists and tables. Indices refer to the current order.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct ListState {
-    pub selected: BTreeSet<usize>,
-    pub active: Option<usize>,
-    anchor: Option<usize>,
-}
-
-impl ListState {
-    /// Remap selection when rows are inserted before `index`.
-    pub fn insert(&mut self, index: usize, count: usize) {
-        let shift = |value: usize| {
-            if value >= index {
-                value.saturating_add(count)
-            } else {
-                value
-            }
-        };
-        self.selected = self.selected.iter().copied().map(shift).collect();
-        self.active = self.active.map(shift);
-        self.anchor = self.anchor.map(shift);
-    }
-
-    /// Remap selection after removal. A removed active row moves to its next neighbour.
-    pub fn remove(&mut self, range: std::ops::Range<usize>, remaining: usize) {
-        let shift = |value: usize| {
-            if range.contains(&value) {
-                None
-            } else {
-                Some(if value >= range.end {
-                    value.saturating_sub(range.len())
-                } else {
-                    value
-                })
-            }
-        };
-        self.selected = self
-            .selected
-            .iter()
-            .copied()
-            .filter_map(shift)
-            .filter(|index| *index < remaining)
-            .collect();
-        self.active = self
-            .active
-            .and_then(|value| shift(value).or(Some(range.start)))
-            .filter(|_| remaining > 0)
-            .map(|value| value.min(remaining - 1));
-        self.anchor = self
-            .anchor
-            .and_then(shift)
-            .filter(|index| *index < remaining);
-    }
-
-    pub fn select(&mut self, index: usize, count: usize, multiple: bool, modifiers: Modifiers) {
-        if index >= count {
-            return;
-        }
-        self.selected.retain(|index| *index < count);
-        if multiple && modifiers.shift {
-            let anchor = self
-                .anchor
-                .unwrap_or(self.active.unwrap_or(index))
-                .min(count - 1);
-            if !modifiers.command() {
-                self.selected.clear();
-            }
-            self.selected.extend(anchor.min(index)..=anchor.max(index));
-            self.anchor = Some(anchor);
-        } else {
-            if !multiple || !modifiers.command() {
-                self.selected.clear();
-            }
-            if !self.selected.insert(index) {
-                self.selected.remove(&index);
-            }
-            self.anchor = Some(index);
-        }
-        self.active = Some(index);
-    }
-}
+use crate::{Collection, ListState, WidgetTheme};
 
 /// Decoration and event interpretation independent from row contents and rendering.
 #[derive(Clone, Debug)]
-pub struct List {
+pub struct List<'a> {
     key: String,
     label: String,
-    count: usize,
-    state: ListState,
+    collection: &'a Collection,
+    state: Option<&'a ListState>,
     multiple: bool,
+    page_size: Option<usize>,
 }
 
-impl List {
+impl<'a> List<'a> {
     #[must_use]
-    pub fn new(key: impl Into<String>, count: usize) -> Self {
+    pub fn new(key: impl Into<String>, collection: &'a Collection) -> Self {
         let key = key.into();
         Self {
             label: key.clone(),
             key,
-            count,
-            state: ListState::default(),
+            collection,
+            state: None,
             multiple: false,
+            page_size: None,
         }
     }
 
@@ -121,22 +39,69 @@ impl List {
     }
 
     #[must_use]
-    pub fn selection(mut self, state: &ListState, multiple: bool) -> Self {
-        self.state = state.clone();
+    pub fn selection(mut self, state: &'a ListState, multiple: bool) -> Self {
+        self.state = Some(state);
         self.multiple = multiple;
         self
     }
 
+    /// Set to the number of rows in the viewport when interpreting PageUp/PageDown.
+    #[must_use]
+    pub fn page_size(mut self, rows: usize) -> Self {
+        self.page_size = Some(rows.max(1));
+        self
+    }
+
+    /// Interpret printable input using an explicitly retained search buffer and clock.
+    pub fn search(
+        &self,
+        search: &mut crate::Typeahead,
+        input: &str,
+        now: std::time::Duration,
+        matches: impl Fn(&str, &str) -> bool,
+    ) -> Option<ListState> {
+        let mut state = self.state.cloned().unwrap_or_default();
+        let active = state
+            .active
+            .as_deref()
+            .and_then(|id| self.collection.index_of(id));
+        let index = search.search(
+            input,
+            now,
+            active,
+            self.collection.len(),
+            |index| {
+                self.collection
+                    .get(index)
+                    .filter(|item| item.enabled)
+                    .map(|item| item.label.as_str())
+            },
+            matches,
+        )?;
+        state.select(
+            index,
+            self.collection,
+            self.multiple,
+            argui_core::Modifiers::default(),
+        );
+        Some(state)
+    }
+
     #[must_use]
     pub fn row_key(&self, index: usize) -> String {
-        format!("{}::row::{index}", self.key)
+        format!(
+            "{}::row::{}",
+            self.key,
+            self.collection.get(index).expect("row index").id
+        )
     }
 
     #[must_use]
     pub fn root(&self, element: Element) -> Element {
-        element
+        let mut root = element
+            .semantic_scope()
             .keyed(&self.key)
-            .interaction(Interaction::default().focusable(true))
+            .interaction(Interaction::default().focus_policy(argui_ui::FocusPolicy::TabStop))
             .semantics(
                 Semantics::new(Role::ListBox)
                     .label(&self.label)
@@ -144,14 +109,28 @@ impl List {
                         multiselectable: self.multiple,
                         ..SemanticState::default()
                     }),
-            )
+            );
+        if let Some(index) = self
+            .state
+            .and_then(|state| state.active.as_deref())
+            .and_then(|id| self.collection.index_of(id))
+        {
+            root = root.active_descendant(self.row_key(index));
+        }
+        root
     }
 
     #[must_use]
     pub fn row(&self, index: usize, element: Element, theme: &WidgetTheme) -> Element {
-        let selected = self.state.selected.contains(&index);
+        let item = self.collection.get(index).expect("row index");
+        let selected = self
+            .state
+            .is_some_and(|state| state.selected.contains(&item.id));
+        let active = self
+            .state
+            .is_some_and(|state| state.active.as_ref() == Some(&item.id));
         let mut semantics = content_semantics(Role::Option, &element);
-        if self.state.active == Some(index) {
+        if active {
             semantics = semantics.action(SemanticAction::Focus);
         }
         element
@@ -159,16 +138,18 @@ impl List {
             .user_select(UserSelect::None)
             .interaction(
                 Interaction::default()
-                    .focusable(self.state.active == Some(index))
+                    .enabled(item.enabled)
+                    .focus_policy(argui_ui::FocusPolicy::None)
                     .gestures(GestureSet::default().tap(TapGesture::default())),
             )
             .semantics(
                 semantics
                     .state(SemanticState {
                         selected,
+                        disabled: !item.enabled,
                         ..SemanticState::default()
                     })
-                    .position_in_set((index + 1) as u32, self.count as u32)
+                    .position_in_set((index + 1) as u32, self.collection.len() as u32)
                     .action(SemanticAction::Click),
             )
             .background(if selected {
@@ -178,11 +159,7 @@ impl List {
             })
             .border(Border::all(
                 1.0,
-                if self.state.active == Some(index) {
-                    theme.ring
-                } else {
-                    theme.border
-                },
+                if active { theme.ring } else { theme.border },
             ))
             .when(VisualState::Hovered, QuadStyle::solid(theme.muted).into())
     }
@@ -190,7 +167,7 @@ impl List {
     #[must_use]
     pub fn build(&self, theme: &WidgetTheme, mut row: impl FnMut(usize) -> Element) -> Element {
         self.root(Element::column(
-            (0..self.count).map(|index| self.row(index, row(index), theme)),
+            (0..self.collection.len()).map(|index| self.row(index, row(index), theme)),
         ))
     }
 
@@ -201,48 +178,90 @@ impl List {
         let key = event.target_key()?;
         let index = key
             .strip_prefix(&format!("{}::row::", self.key))
-            .and_then(|value| value.parse::<usize>().ok())
-            .filter(|index| *index < self.count);
+            .and_then(|value| self.collection.index_of(value))
+            .filter(|index| *index < self.collection.len());
         if key != self.key && index.is_none() {
             return None;
         }
-        if self.count == 0 {
+        if self.collection.is_empty() {
             return None;
         }
-        let mut state = self.state.clone();
+        let mut state = self.state.cloned().unwrap_or_default();
         match &event.kind {
             UiEventKind::Click(click) => {
-                state.select(index?, self.count, self.multiple, click.modifiers())
+                state.select(index?, self.collection, self.multiple, click.modifiers())
             }
             UiEventKind::KeyInput(input) if input.state == KeyState::Pressed => {
-                let active = state.active.unwrap_or(0).min(self.count - 1);
+                let active = state
+                    .active
+                    .as_deref()
+                    .and_then(|id| self.collection.index_of(id));
                 let target = match &input.key {
-                    Key::ArrowDown => state.active.map_or(0, |_| (active + 1).min(self.count - 1)),
-                    Key::ArrowUp => active.saturating_sub(1),
-                    Key::Home => 0,
-                    Key::End => self.count - 1,
+                    Key::ArrowDown => self
+                        .collection
+                        .enabled_from(active.map_or(0, |i| i + 1), false)
+                        .or(active)?,
+                    Key::ArrowUp => self
+                        .collection
+                        .enabled_from(active.unwrap_or(0).saturating_sub(1), true)
+                        .or(active)?,
+                    Key::PageDown => {
+                        let target = active
+                            .unwrap_or(0)
+                            .saturating_add(self.page_size?)
+                            .min(self.collection.len() - 1);
+                        self.collection
+                            .enabled_from(target, false)
+                            .or_else(|| self.collection.enabled_from(target, true))?
+                    }
+                    Key::PageUp => {
+                        let target = active.unwrap_or(0).saturating_sub(self.page_size?);
+                        self.collection
+                            .enabled_from(target, true)
+                            .or_else(|| self.collection.enabled_from(target, false))?
+                    }
+                    Key::Home => self.collection.enabled_from(0, false)?,
+                    Key::End => self
+                        .collection
+                        .enabled_from(self.collection.len() - 1, true)?,
                     Key::Character(value)
                         if value.eq_ignore_ascii_case("a")
                             && input.modifiers.command()
                             && self.multiple =>
                     {
-                        state.selected = (0..self.count).collect();
+                        state.selected = self
+                            .collection
+                            .items()
+                            .iter()
+                            .filter(|item| item.enabled)
+                            .map(|item| item.id.clone())
+                            .collect();
                         return Some(state);
                     }
                     Key::Enter => {
-                        state.select(active, self.count, self.multiple, input.modifiers);
+                        state.select(
+                            active.or_else(|| self.collection.enabled_from(0, false))?,
+                            self.collection,
+                            self.multiple,
+                            input.modifiers,
+                        );
                         return Some(state);
                     }
                     Key::Character(value) if value == " " => {
-                        state.select(active, self.count, self.multiple, input.modifiers);
+                        state.select(
+                            active.or_else(|| self.collection.enabled_from(0, false))?,
+                            self.collection,
+                            self.multiple,
+                            input.modifiers,
+                        );
                         return Some(state);
                     }
                     _ => return None,
                 };
                 if input.modifiers.command() && !input.modifiers.shift {
-                    state.active = Some(target);
+                    state.active = Some(self.collection.get(target)?.id.clone());
                 } else {
-                    state.select(target, self.count, self.multiple, input.modifiers);
+                    state.select(target, self.collection, self.multiple, input.modifiers);
                 }
             }
             _ => return None,

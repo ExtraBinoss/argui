@@ -46,14 +46,25 @@ impl VList {
     #[must_use]
     pub fn build_list(
         &self,
-        count: usize,
+        collection: &crate::Collection,
         state: &crate::ListState,
         multiple: bool,
         theme: &WidgetTheme,
         mut row: impl FnMut(usize) -> Element,
     ) -> Element {
-        let list = crate::List::new(&self.key, count).selection(state, multiple);
-        list.root(self.build(count, theme, |index| list.row(index, row(index), theme)))
+        let list = crate::List::new(&self.key, collection).selection(state, multiple);
+        let pinned = state
+            .active
+            .as_deref()
+            .and_then(|id| collection.index_of(id));
+        list.root(
+            self.config(collection.len())
+                .scroll_config(self.scroll(theme))
+                .build_pinned(&self.key, self.offset, pinned, |index| {
+                    list.row(index, row(index), theme)
+                })
+                .scrollbar_gutter(argui_ui::ScrollbarGutter::Stable),
+        )
     }
 
     #[must_use]
@@ -96,14 +107,30 @@ impl VList {
         theme: &WidgetTheme,
         row: impl FnMut(usize) -> Element,
     ) -> Element {
+        self.build_pinned(count, theme, None, row)
+    }
+
+    /// Keeps the active row mounted when it leaves the virtual window.
+    #[must_use]
+    pub fn build_pinned(
+        &self,
+        count: usize,
+        theme: &WidgetTheme,
+        pinned: Option<usize>,
+        row: impl FnMut(usize) -> Element,
+    ) -> Element {
+        self.config(count)
+            .scroll_config(self.scroll(theme))
+            .build_pinned(&self.key, self.offset, pinned, row)
+            .scrollbar_gutter(argui_ui::ScrollbarGutter::Stable)
+    }
+
+    fn scroll(&self, theme: &WidgetTheme) -> ScrollConfig {
         let mut scroll = ScrollConfig::default()
             .propagation(self.propagation)
             .scrollbar(theme.scrollbar.clone());
         scroll.effects.clone_from(&self.effects);
-        self.config(count)
-            .scroll_config(scroll)
-            .build(&self.key, self.offset, row)
-            .scrollbar_gutter(argui_ui::ScrollbarGutter::Stable)
+        scroll
     }
 
     /// Scrolls a non-virtual header and virtual rows in one viewport.

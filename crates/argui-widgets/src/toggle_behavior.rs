@@ -15,7 +15,7 @@ pub enum TogglePart {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ToggleAction {
-    Toggle,
+    SetChecked(argui_ui::CheckedState),
 }
 
 #[derive(Clone, Debug)]
@@ -23,7 +23,7 @@ pub struct ToggleBehavior {
     key: String,
     label: String,
     role: Role,
-    checked: bool,
+    checked: argui_ui::CheckedState,
     enabled: bool,
     position: Option<(u32, u32)>,
 }
@@ -34,7 +34,7 @@ impl ToggleBehavior {
         key: impl Into<String>,
         label: impl Into<String>,
         role: Role,
-        checked: bool,
+        checked: argui_ui::CheckedState,
     ) -> Self {
         Self {
             key: key.into(),
@@ -84,11 +84,18 @@ impl ToggleBehavior {
             .keyed(self.key.clone())
             .user_select(UserSelect::None)
             .state_scope(TOGGLE_SCOPE)
-            .active_state(TOGGLE_CHECKED, self.checked)
+            .active_state(
+                TOGGLE_CHECKED,
+                self.checked == argui_ui::CheckedState::Checked,
+            )
             .interaction(
                 Interaction::default()
                     .enabled(self.enabled)
-                    .focusable(self.enabled)
+                    .focus_policy(if self.enabled {
+                        argui_ui::FocusPolicy::TabStop
+                    } else {
+                        argui_ui::FocusPolicy::None
+                    })
                     .cursor(if self.enabled {
                         CursorIcon::Pointer
                     } else {
@@ -105,6 +112,6 @@ impl ToggleBehavior {
         (self.enabled
             && event.target_key() == Some(self.key.as_str())
             && matches!(event.kind, UiEventKind::Click(_)))
-        .then_some(ToggleAction::Toggle)
+        .then_some(ToggleAction::SetChecked(self.checked.toggled()))
     }
 }

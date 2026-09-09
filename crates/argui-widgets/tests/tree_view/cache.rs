@@ -130,3 +130,105 @@ fn selection_collapse_data_theme_and_icons_invalidate_rows() {
             <= 2
     );
 }
+
+#[test]
+fn active_row_stays_mounted_and_is_the_only_tab_stop() {
+    let nodes: Vec<_> = (0..1000)
+        .map(|i| TreeNode {
+            key: i.to_string(),
+            label: i.to_string(),
+            depth: 0,
+            icon: None,
+        })
+        .collect();
+    let collapsed = BTreeSet::new();
+    let themes = shadcn(Color::WHITE);
+    let theme = themes.resolve(ColorScheme::Light);
+    let mut cache = TreeViewCache::default();
+    for selected in [Some("999"), Some("500"), None, Some("deleted")] {
+        let tree = TreeView {
+            nodes: &nodes,
+            selected,
+            collapsed: &collapsed,
+            list: VList::new("tree", 28.0, 280.0, 5600.0),
+            disclosure: None,
+        };
+        for built in [tree.build(theme), tree.build_cached(theme, &mut cache)] {
+            let ui = argui_ui::UiTree::new(built);
+            assert!(ui.node_ids().len() < 250);
+            let stops: Vec<_> = (0..ui.node_ids().len())
+                .filter_map(|i| ui.element_at(i))
+                .filter(|element| {
+                    element
+                        .interaction
+                        .as_ref()
+                        .is_some_and(|i| i.focus_policy == argui_ui::FocusPolicy::TabStop)
+                })
+                .map(|element| element.key.as_deref().unwrap())
+                .collect();
+            assert_eq!(
+                stops,
+                vec![selected.filter(|id| *id != "deleted").unwrap_or("0")]
+            );
+        }
+    }
+}
+
+#[test]
+fn focus_survives_virtual_scroll_and_tab_leaves_the_tree_once() {
+    use argui_core::{Key, KeyInput, KeyState, Size};
+    use argui_layout::LayoutEngine;
+    use argui_text::TextEngine;
+    use argui_ui::{FocusRequest, UiTree};
+    let nodes: Vec<_> = (0..100)
+        .map(|i| TreeNode {
+            key: i.to_string(),
+            label: i.to_string(),
+            depth: 0,
+            icon: None,
+        })
+        .collect();
+    let collapsed = BTreeSet::new();
+    let themes = shadcn(Color::WHITE);
+    let theme = themes.resolve(ColorScheme::Light);
+    let mut cache = TreeViewCache::default();
+    let mut view = TreeView {
+        nodes: &nodes,
+        collapsed: &collapsed,
+        selected: Some("50"),
+        list: VList::new("tree", 28.0, 140.0, 1400.0),
+        disclosure: None,
+    };
+    let build = |view: &TreeView<'_>, cache: &mut TreeViewCache| {
+        Element::column([
+            view.build_cached(theme, cache),
+            argui_widgets::Button::new("next", "Next", theme.button()).build(),
+        ])
+    };
+    let mut ui = UiTree::new(build(&view, &mut cache));
+    let mut engine = LayoutEngine::new();
+    let mut text = TextEngine::new();
+    let output = engine
+        .compute(&mut ui, &mut text, Size::new(300.0, 300.0))
+        .unwrap();
+    ui.sync_focus(&output.hit_regions, Some(FocusRequest::Focus("50".into())));
+    let focused = ui.focused_node().unwrap();
+    view.list.offset = 0.0;
+    ui.update(build(&view, &mut cache));
+    let output = engine
+        .compute(&mut ui, &mut text, Size::new(300.0, 300.0))
+        .unwrap();
+    ui.sync_focus(&output.hit_regions, None);
+    assert_eq!(ui.focused_node(), Some(focused));
+    ui.key_input(
+        &KeyInput {
+            key: Key::Tab,
+            state: KeyState::Pressed,
+            modifiers: Default::default(),
+            repeat: false,
+            text: None,
+        },
+        &output.hit_regions,
+    );
+    assert_eq!(ui.key(ui.focused_node().unwrap()), Some("next"));
+}

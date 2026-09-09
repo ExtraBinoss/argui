@@ -96,7 +96,7 @@ impl SelectBehavior {
                 .user_select(UserSelect::None)
                 .interaction(
                     Interaction::default()
-                        .focusable(true)
+                        .focus_policy(argui_ui::FocusPolicy::TabStop)
                         .cursor(CursorIcon::Pointer)
                         .gestures(GestureSet::default().tap(argui_ui::TapGesture::default()))
                         .keyboard_activation(KeyboardActivation::EnterOrSpace),
@@ -126,7 +126,13 @@ impl SelectBehavior {
                     .interaction(
                         Interaction::default()
                             .enabled(enabled)
-                            .focusable(enabled)
+                            .focus_policy(if enabled && self.highlighted == index {
+                                argui_ui::FocusPolicy::TabStop
+                            } else if enabled {
+                                argui_ui::FocusPolicy::Programmatic
+                            } else {
+                                argui_ui::FocusPolicy::None
+                            })
                             .cursor(if enabled {
                                 CursorIcon::Pointer
                             } else {
@@ -182,25 +188,51 @@ impl SelectBehavior {
         }
         match &input.key {
             Key::Escape => Some(SelectAction::Close),
-            Key::Enter => Some(SelectAction::Select(self.highlighted)),
+            Key::Enter => self
+                .options
+                .get(self.highlighted)
+                .filter(|option| option.enabled)
+                .map(|_| SelectAction::Select(self.highlighted)),
             Key::ArrowDown => self.next_enabled(true).map(SelectAction::Highlight),
             Key::ArrowUp => self.next_enabled(false).map(SelectAction::Highlight),
             Key::Home => self.first_enabled().map(SelectAction::Highlight),
             Key::End => self.last_enabled().map(SelectAction::Highlight),
-            Key::Character(query) => self
-                .options
-                .iter()
-                .enumerate()
-                .find(|(_, option)| {
-                    option.enabled
-                        && option
-                            .label
-                            .to_lowercase()
-                            .starts_with(&query.to_lowercase())
-                })
-                .map(|(index, _)| SelectAction::Highlight(index)),
             _ => None,
         }
+    }
+
+    pub fn search(
+        &self,
+        event: &UiEvent,
+        search: &mut crate::Typeahead,
+        now: std::time::Duration,
+    ) -> Option<SelectAction> {
+        if !self.contains_key(event.target_key()?) {
+            return None;
+        }
+        let UiEventKind::KeyInput(input) = &event.kind else {
+            return None;
+        };
+        let Key::Character(query) = &input.key else {
+            return None;
+        };
+        if input.state != KeyState::Pressed || input.modifiers.command() || input.modifiers.alt {
+            return None;
+        }
+        search
+            .search(
+                query,
+                now,
+                Some(self.highlighted),
+                self.options.len(),
+                |index| {
+                    self.options[index]
+                        .enabled
+                        .then_some(self.options[index].label.as_str())
+                },
+                crate::unicode_prefix,
+            )
+            .map(SelectAction::Highlight)
     }
 
     fn contains_key(&self, key: &str) -> bool {

@@ -14,6 +14,13 @@ pub enum Page {
     List,
     VList,
     Table,
+    DataTable,
+    Calendar,
+    DatePicker,
+    Toast,
+    Menu,
+    ContextMenu,
+    Menubar,
     Layout,
     Motion,
     Effects,
@@ -26,7 +33,7 @@ pub enum Page {
 }
 
 impl Page {
-    pub const ALL: [Self; 22] = [
+    pub const ALL: [Self; 29] = [
         Self::Button,
         Self::Input,
         Self::TextArea,
@@ -40,6 +47,13 @@ impl Page {
         Self::List,
         Self::VList,
         Self::Table,
+        Self::DataTable,
+        Self::Calendar,
+        Self::DatePicker,
+        Self::Toast,
+        Self::Menu,
+        Self::ContextMenu,
+        Self::Menubar,
         Self::Layout,
         Self::Motion,
         Self::Effects,
@@ -65,6 +79,13 @@ impl Page {
             | Self::Dialog
             | Self::List
             | Self::VList
+            | Self::DataTable
+            | Self::Calendar
+            | Self::DatePicker
+            | Self::Toast
+            | Self::Menu
+            | Self::ContextMenu
+            | Self::Menubar
             | Self::Table => "Widgets",
             Self::Layout
             | Self::Motion
@@ -93,6 +114,13 @@ impl Page {
             Self::List => "List",
             Self::VList => "VList",
             Self::Table => "Table",
+            Self::DataTable => "Data table",
+            Self::Calendar => "Calendar",
+            Self::DatePicker => "Date picker",
+            Self::Toast => "Toast",
+            Self::Menu => "Menu",
+            Self::ContextMenu => "Context menu",
+            Self::Menubar => "Menubar",
             Self::Layout => "Web layout",
             Self::Motion => "Motion & loading",
             Self::Effects => "GPU effects / WGSL",
@@ -120,6 +148,13 @@ impl Page {
             Self::List => "list",
             Self::VList => "vlist",
             Self::Table => "table",
+            Self::DataTable => "data-table",
+            Self::Calendar => "calendar",
+            Self::DatePicker => "date-picker",
+            Self::Toast => "toast",
+            Self::Menu => "menu",
+            Self::ContextMenu => "context-menu",
+            Self::Menubar => "menubar",
             Self::Layout => "layout",
             Self::Motion => "motion",
             Self::Effects => "effects",

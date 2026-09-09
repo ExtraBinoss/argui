@@ -88,6 +88,7 @@ impl FocusRegistry {
                 .iter()
                 .find(|entry| entry.node == frame.node)
                 .is_some_and(|entry| entry.policy.restore)
+                && focused_before.is_none_or(|focused| self.contains(frame.node, focused))
                 && let Some(target) = frame.restore
             {
                 self.pending.push(FocusIntent::Target {
@@ -201,8 +202,9 @@ impl UiTree {
             .iter()
             .cloned()
             .map(|mut region| {
-                region.focusable &=
-                    active.is_none_or(|scope| self.focus.contains(scope, region.node));
+                if active.is_some_and(|scope| !self.focus.contains(scope, region.node)) {
+                    region.focus_policy = crate::FocusPolicy::None;
+                }
                 region
             })
             .collect::<Vec<_>>();
@@ -385,9 +387,15 @@ impl UiTree {
     }
 
     fn first_focusable(&self, regions: &[HitRegion], scope: NodeId) -> Option<NodeId> {
-        regions
-            .iter()
-            .find(|region| region.focusable && self.focus.contains(scope, region.node))
+        let mut candidates = regions.iter().filter(|region| {
+            region.enabled
+                && region.focus_policy.is_focusable()
+                && self.focus.contains(scope, region.node)
+        });
+        candidates
+            .clone()
+            .find(|region| region.focus_policy.is_tab_stop())
+            .or_else(|| candidates.next())
             .map(|region| region.node)
     }
 
@@ -398,7 +406,7 @@ impl UiTree {
         within: Option<NodeId>,
     ) -> Option<NodeId> {
         let mut matches = regions.iter().filter(|region| {
-            region.focusable
+            region.focus_policy.is_focusable()
                 && within.is_none_or(|scope| self.focus.contains(scope, region.node))
                 && match target {
                     FocusTarget::Node(node) => region.node == *node,

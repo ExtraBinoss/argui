@@ -69,7 +69,11 @@ impl ButtonBehavior {
             .interaction(
                 Interaction::default()
                     .enabled(enabled)
-                    .focusable(enabled)
+                    .focus_policy(if enabled {
+                        argui_ui::FocusPolicy::TabStop
+                    } else {
+                        argui_ui::FocusPolicy::None
+                    })
                     .cursor(cursor)
                     .gestures(GestureSet::default().tap(argui_ui::TapGesture::default()))
                     .keyboard_activation(KeyboardActivation::EnterOrSpace),

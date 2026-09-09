@@ -122,7 +122,11 @@ fn property_editor<A>(
         Checkbox::new(
             format!("__devtools-style-{}", property.label()),
             property.label(),
-            enabled,
+            if enabled {
+                argui_ui::CheckedState::Checked
+            } else {
+                argui_ui::CheckedState::Unchecked
+            },
         )
         .build(theme),
     ];

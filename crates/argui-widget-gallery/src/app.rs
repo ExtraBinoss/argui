@@ -52,6 +52,8 @@ pub struct WidgetGallery {
     pub(crate) slider_edit_value: String,
     pub(crate) tab: usize,
     pub(crate) select_presence: argui::widgets::Presence,
+    select_search: argui::widgets::Typeahead,
+    search_clock: web_time::Instant,
     pub(crate) select_highlight: usize,
     pub(crate) select_selected: Option<usize>,
     pub(crate) dialog_open: bool,
@@ -61,6 +63,10 @@ pub struct WidgetGallery {
     pub(crate) scroll_demo: Entity<pages::scroll_effects::ScrollDemo>,
     pub(crate) webview: Entity<pages::webview::WebViewDemo>,
     pub(crate) glass: Entity<pages::liquid_glass::GlassDemo>,
+    pub(crate) menus: Entity<pages::menus::MenusDemo>,
+    pub(crate) dates: Entity<pages::dates::DatesDemo>,
+    pub(crate) data_table: Entity<pages::data_table::TableDemo>,
+    pub(crate) toasts: Entity<pages::toast::ToastDemo>,
     pub(crate) data: Entity<pages::data::DataDemo>,
     pub(crate) tasks: Entity<pages::async_tasks::TasksDemo>,
     pub(crate) actions: Entity<pages::actions::ActionsDemo>,
@@ -95,6 +101,10 @@ impl Default for WidgetGallery {
             scroll_demo: Entity::new(pages::scroll_effects::ScrollDemo::default()),
             webview: pages::webview::WebViewDemo::entity(),
             glass: Entity::new(pages::liquid_glass::GlassDemo::default()),
+            menus: Entity::new(pages::menus::MenusDemo::default()),
+            dates: Entity::new(pages::dates::DatesDemo::default()),
+            data_table: Entity::new(pages::data_table::TableDemo::default()),
+            toasts: Entity::new(pages::toast::ToastDemo::default()),
             data: Entity::new(pages::data::DataDemo::default()),
             tasks: Entity::new(pages::async_tasks::TasksDemo::default()),
             actions: Entity::new(pages::actions::ActionsDemo::default()),
@@ -117,6 +127,8 @@ impl Default for WidgetGallery {
             slider_edit_value: "64".into(),
             tab: 0,
             select_presence: argui::widgets::Presence::default().fade_in(false),
+            select_search: argui::widgets::Typeahead::default(),
+            search_clock: web_time::Instant::now(),
             select_highlight: 0,
             select_selected: Some(0),
             dialog_open: false,
@@ -169,7 +181,7 @@ impl WidgetGallery {
         .background(theme.background)
         .interaction(
             Interaction::default()
-                .focusable(true)
+                .focus_policy(argui::ui::FocusPolicy::TabStop)
                 .gestures(GestureSet::default().tap(argui::ui::TapGesture::default())),
         )
         .semantics(
@@ -221,7 +233,7 @@ impl WidgetGallery {
                 .radius(CornerRadii::all(999.0))
                 .interaction(
                     Interaction::default()
-                        .focusable(true)
+                        .focus_policy(argui::ui::FocusPolicy::TabStop)
                         .cursor(CursorIcon::Pointer)
                         .gestures(GestureSet::default().tap(argui::ui::TapGesture::default()))
                         .keyboard_activation(KeyboardActivation::EnterOrSpace),
@@ -516,7 +528,10 @@ impl WidgetGallery {
             SelectBehavior::new("backend", "Choose a backend", options, self.select_selected)
                 .open(self.select_presence.is_open())
                 .highlighted(self.select_highlight);
-        if let Some(action) = select.action(event) {
+        if let Some(action) = select
+            .search(event, &mut self.select_search, self.search_clock.elapsed())
+            .or_else(|| select.action(event))
+        {
             match action {
                 SelectAction::Toggle => self.select_presence.set_open(
                     !self.select_presence.is_open(),

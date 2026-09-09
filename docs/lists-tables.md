@@ -8,11 +8,12 @@ List, VList et Table, avec des données neutres.
 
 ```rust
 use argui::ui::Element;
-use argui::widgets::{List, ListState};
+use argui::widgets::{Collection, CollectionItem, List, ListState};
 
 // Conserver cet état dans le composant propriétaire.
 let selection = ListState::default();
-let list = List::new("items", 8)
+let items = Collection::new((0..8).map(|i| CollectionItem::new(i.to_string(), format!("Item {i}")))).unwrap();
+let list = List::new("items", &items)
     .label("Items")
     .selection(&selection, true);
 let element = list.build(theme, |index| Element::text(format!("Item {index}")));
@@ -21,7 +22,7 @@ let element = list.build(theme, |index| Element::text(format!("Item {index}")));
 Comme les autres widgets contrôlés, `List::action(&event)` renvoie le nouvel état
 à conserver ; attacher les listeners Click et Key à la racine. Lorsqu'une action
 est reconnue, empêcher le traitement clavier par défaut, demander le focus sur
-`list.row_key(active)` et notifier le composant. Les descendants interactifs avec
+`"items"` (le conteneur) et notifier le composant. Les descendants interactifs avec
 leur propre clé restent indépendants : leurs événements ne sélectionnent pas la
 ligne. Les labels explicites du contenu sont conservés ; les lignes de texte
 simples reçoivent automatiquement leur nom accessible.
@@ -40,7 +41,7 @@ use argui::widgets::VList;
 // Créer une fois, puis conserver : recréer à chaque rendu perd les mesures.
 let heights = VirtualList::variable(10_000, 40.0, 320.0);
 let list = VList::variable("items", &heights, offset);
-let element = list.build_list(10_000, &selection, true, theme, |index| {
+let element = list.build_list(&items, &selection, true, theme, |index| {
     Element::text(format!("Item {index}"))
 });
 ```
@@ -54,17 +55,22 @@ modèle conservé ; une divergence est rejetée immédiatement.
 
 Conserver l'offset fourni par les événements Scroll. Pour une navigation vers une
 ligne non montée, calculer l'offset avec
-`heights.scroll_to(active, VirtualAlignment::Nearest, offset)`, reconstruire la
+`heights.scroll_to(items.index_of(active).unwrap(), VirtualAlignment::Nearest, offset)`, reconstruire la
 fenêtre puis envoyer `ScrollRequest::offset` et la demande de focus. Pour un
 redimensionnement, `heights = heights.with_viewport(new_height)` conserve les
 mesures. Les effets et la propagation du scroll restent configurables.
 
-Les indices désignent l'ordre actuel. Lors d'une insertion/suppression, appeler
-`ListState::insert/remove` **et** `VirtualList::insert/remove` sur les mêmes plages.
-Pour conserver l'ancrage lors d'une mutation, retenir l'indice de la première
-ligne visible et l'écart à `offset_of(index)`, remapper cet indice puis reconstruire
-l'offset avec le nouvel `offset_of`. Un tri nécessite un remappage applicatif des
-identifiants vers les indices ; le widget ne devine pas l'identité des données.
+`Collection` conserve les identifiants stables et construit son index une seule
+fois lors des changements de données. La sélection et l'ancre restent associées
+aux identifiants après un tri. `ListState::reconcile` supprime les identifiants
+retirés du jeu complet, avant filtrage. Les mesures du moteur restent indexées :
+adapter `VirtualList::insert/remove` aux mutations de données.
+
+Le focus reste sur le conteneur ; `active_descendant` désigne l'option active,
+qui reste montée même hors écran. Le travail de rendu reste limité à la fenêtre
+et à cette option. `List::page_size` active PageUp/PageDown selon le nombre de
+lignes visibles. `List::search` utilise un `Typeahead` conservé et une durée
+monotone fournie par l'appelant, avec un matcher personnalisable.
 
 ## Table
 
@@ -74,7 +80,7 @@ use argui::widgets::{Table, TableColumn};
 let table = Table::new("values", [
     TableColumn::new("Name", 180.0),
     TableColumn::new("Value", 120.0),
-], 8).label("Values").selection(&selection, true);
+], &items).label("Values").selection(&selection, true);
 let element = table.build(theme, |row, column| {
     Element::text(format!("{row}:{column}"))
 });
@@ -98,3 +104,37 @@ Tests : [sélection](../crates/argui-widgets/tests/list.rs),
 [virtualisation](../crates/argui-widgets/tests/vlist.rs),
 [table](../crates/argui-widgets/tests/table.rs),
 [galerie](../crates/argui-widget-gallery/tests/pages/data.rs).
+
+## DataTable
+
+`widget-data-table` expose `DataTableModel<R>`, `DataColumn<R>` et `DataTable`.
+Les colonnes reçoivent des callbacks typés pour la valeur, la comparaison, le
+filtre, le rendu, la validation et l'éditeur. Le modèle recalcule son ordre lors
+d'un changement explicite : filtres, tri stable multiple, puis pagination.
+Le widget emprunte ce modèle et une configuration `VirtualList` correspondant
+à sa page courante. Les colonnes visibles partagent leurs largeurs avec l'en-tête.
+
+L'éditeur conserve un brouillon. `commit_edit` ou `apply(CommitEdit)` renvoie
+un `CellCommit` que le propriétaire applique à ses données ; aucune sauvegarde
+n'est implicite. Une erreur garde l'éditeur ouvert. Échap annule ; Tab valide
+puis déplace la cellule active. La suppression, le filtrage ou une modification
+externe de la valeur d'origine annulent l'édition. Conserver une copie de `model.collection()` avant une transformation, puis
+appeler `model.collection().remap_heights(&previous, &mut heights)` : les mesures
+suivent les identifiants conservés. Cette copie partage le snapshot et ne parcourt
+pas les lignes. Les poignées de colonnes utilisent les gestes et le clavier de
+`SplitPane` ; traiter également les événements Gesture et appliquer l'action
+`ResizeColumn`.
+
+
+Le DataTable contient son propre viewport horizontal : l'en-tête et les lignes
+partagent le même déplacement, y compris après un redimensionnement. Le viewport
+vertical reste limité aux lignes et conserve leur virtualisation.
+
+## TreeView : focus virtualisé
+
+Une seule ligne participe au parcours Tab : la sélection visible, ou la première
+ligne lorsque la sélection est absente. Les autres lignes acceptent le focus
+programmatique. La ligne active reste montée hors de la fenêtre virtuelle ; le
+cache conserve au plus les lignes de cette fenêtre et cette ligne supplémentaire.
+Tab quitte l'arbre ; PageUp/PageDown déplacent la sélection d'une fenêtre visible.
+Le propriétaire applique `TreeAction` et demande le focus sur la nouvelle clé.

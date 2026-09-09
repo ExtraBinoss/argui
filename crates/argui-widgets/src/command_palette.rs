@@ -74,8 +74,9 @@ impl CommandPalette {
                 .menu
                 .items
                 .iter()
-                .find(|item| item.state.enabled)
-                .map(|item| MenuResponse::Invoke(item.invocation));
+                .find(|item| item.state.enabled && item.invocation().is_some())
+                .and_then(|item| item.invocation())
+                .map(MenuResponse::Invoke);
         }
         self.menu.response(event)
     }

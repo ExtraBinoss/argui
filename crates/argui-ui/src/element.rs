@@ -5,7 +5,6 @@ use crate::{
     ScopedEffect, ScrollConfig, Sides, StateName, StateScopeId, StyleCondition, StylePatch,
     StyleTransition, WritingDirection,
 };
-use argui_accessibility::Semantics;
 use argui_core::{Transform2D, TransformOrigin};
 use argui_paint::{
     Border, Color, CornerRadii, Fill, ImageFit, ImageId, ImageSampling, LayerStyle, PaintStyle,
@@ -65,6 +64,8 @@ impl Element {
             active_states: Vec::new(),
             semantics: None,
             semantic_hidden: false,
+            semantic_scope: false,
+            semantic_bindings: crate::SemanticBindings::default(),
             bindings: Vec::new(),
             layer: None,
             effects: Vec::new(),
@@ -132,6 +133,8 @@ impl Element {
             active_states: Vec::new(),
             semantics: None,
             semantic_hidden: false,
+            semantic_scope: false,
+            semantic_bindings: crate::SemanticBindings::default(),
             bindings: Vec::new(),
             layer: None,
             effects: Vec::new(),
@@ -514,18 +517,6 @@ impl Element {
         if active {
             self.active_states.push(state);
         }
-        self
-    }
-
-    #[must_use]
-    pub fn semantics(mut self, semantics: Semantics) -> Self {
-        self.semantics = Some(semantics);
-        self
-    }
-
-    #[must_use]
-    pub fn semantic_hidden(mut self, hidden: bool) -> Self {
-        self.semantic_hidden = hidden;
         self
     }
 

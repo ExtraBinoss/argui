@@ -11,6 +11,72 @@ use argui_ui::{
     ScrollTarget, SelectionCommand, TextSelection, TextSelectionRequest, UiEventKind, UiTree,
 };
 
+#[cfg(feature = "tasks")]
+#[test]
+fn foreign_window_events_do_not_close_hide_or_drain_a_retained_view() {
+    struct Panel;
+    impl Render for Panel {
+        fn render(&mut self, _: &mut Context<Self>) -> Element {
+            Element::text("alive")
+        }
+        fn tasks_ready(&mut self, cx: &mut Context<Self>) {
+            cx.request_animation_frame();
+        }
+    }
+    let main = WindowKey::main();
+    let foreign = WindowKey::new("foreign");
+    let model = argui_runtime::Entity::new(Panel);
+    let mut app = SingleWindowModel::from_entity(model.clone()).unwrap();
+    let before = app.view(&main, Default::default()).unwrap();
+    for event in [
+        argui_platform::PlatformEvent::VisibilityChanged(false),
+        argui_platform::PlatformEvent::Closed,
+    ] {
+        assert!(
+            app.update(&AppEvent::Window {
+                window: foreign.clone(),
+                event
+            })
+            .windows
+            .is_empty()
+        );
+        assert_eq!(app.view(&main, Default::default()).unwrap(), before);
+    }
+    assert!(app.tasks_ready(&foreign).windows.is_empty());
+    assert!(!app.wants_animation_frame(&main));
+    app.tasks_ready(&main);
+    assert!(app.wants_animation_frame(&main));
+    app.tasks_ready(&main);
+    assert!(app.wants_animation_frame(&main));
+    let revision = model.revision();
+    model.update(|_, cx| cx.command(AppCommand::Quit));
+    assert_eq!(model.revision(), revision);
+    assert_eq!(app.tasks_ready(&main).commands, [AppCommand::Quit]);
+}
+
+#[test]
+fn clearing_focus_replaces_a_pending_target_and_is_consumed_only_by_its_window() {
+    struct Panel;
+    impl Render for Panel {
+        fn render(&mut self, _: &mut Context<Self>) -> Element {
+            Element::text("panel")
+        }
+        fn layout_changed(&mut self, _: &LayoutSnapshot, cx: &mut Context<Self>) {
+            cx.request_focus("previous");
+            cx.clear_focus();
+        }
+    }
+    let key = WindowKey::main();
+    let mut app = SingleWindowModel::new(Panel);
+    app.view(&key, WindowEnvironment::default()).unwrap();
+    let update = app.layout_changed(&key, &LayoutSnapshot::default());
+    assert_eq!(update.windows.len(), 1);
+    assert_eq!(update.windows[0].update, ViewUpdate::Paint);
+    assert_eq!(app.take_focus_request(&WindowKey::new("other")), None);
+    assert_eq!(app.take_focus_request(&key), Some(FocusRequest::Clear));
+    assert_eq!(app.take_focus_request(&key), None);
+}
+
 #[test]
 fn app_updates_coalesce_each_window_to_its_strongest_invalidation() {
     let main = WindowKey::main();

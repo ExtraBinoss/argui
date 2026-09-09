@@ -12,6 +12,25 @@ fn view(label: &str, tools: &str) -> Element {
 }
 
 #[test]
+fn retained_leaf_snapshots_hide_private_text_and_republish_privacy_changes() {
+    let leaf = Element::text("private value").text_privacy(argui_ui::TextPrivacy::Password);
+    let mut tree = UiTree::new(leaf.clone());
+    let mut cache = InspectionCache::default();
+    let layout = LayoutOutput::default();
+    let snapshot = cache.snapshot(&tree, &layout).unwrap();
+    assert_eq!(snapshot.nodes[0].summary.as_deref(), Some("Protected text"));
+    assert!(cache.snapshot(&tree, &layout).is_none());
+    tree.update(leaf.clone().text_privacy(argui_ui::TextPrivacy::Public));
+    let snapshot = cache.snapshot(&tree, &layout).unwrap();
+    assert_ne!(snapshot.nodes[0].summary.as_deref(), Some("Protected text"));
+    assert_eq!(snapshot, Inspection::snapshot(&tree, &layout));
+    tree.update(leaf.text_privacy(argui_ui::TextPrivacy::RevealedPassword));
+    let snapshot = cache.snapshot(&tree, &layout).unwrap();
+    assert_eq!(snapshot.nodes[0].summary.as_deref(), Some("Protected text"));
+    assert!(cache.snapshot(&tree, &layout).is_none());
+}
+
+#[test]
 fn tools_updates_do_not_republish_the_application() {
     let mut cache = InspectionCache::default();
     let mut tree = UiTree::new(view("application", "row 1"));

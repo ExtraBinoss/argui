@@ -28,6 +28,13 @@ pub enum Role {
     Option,
     Menu,
     MenuItem,
+    MenuBar,
+    MenuItemCheckBox,
+    MenuItemRadio,
+    ComboBox,
+    Tooltip,
+    Status,
+    AlertDialog,
     Slider,
     Progress,
     Tab,
@@ -82,7 +89,7 @@ pub struct SemanticState {
     pub disabled: bool,
     pub selected: bool,
     pub multiselectable: bool,
-    pub checked: Option<bool>,
+    pub checked: Option<CheckedState>,
     pub expanded: Option<bool>,
     pub required: bool,
     pub read_only: bool,
@@ -104,6 +111,11 @@ pub struct Semantics {
     pub level: Option<u32>,
     pub position_in_set: Option<u32>,
     pub set_size: Option<u32>,
+    pub relations: crate::SemanticRelations,
+    pub grid: crate::GridPosition,
+    pub sort: Option<crate::SortDirection>,
+    pub popup: Option<crate::PopupKind>,
+    pub focus_policy: FocusPolicy,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -140,6 +152,16 @@ impl Semantics {
             level: None,
             position_in_set: None,
             set_size: None,
+            relations: crate::SemanticRelations::new(),
+            grid: crate::GridPosition {
+                row_count: None,
+                column_count: None,
+                row_index: None,
+                column_index: None,
+            },
+            sort: None,
+            popup: None,
+            focus_policy: FocusPolicy::None,
         }
     }
 
@@ -198,5 +220,45 @@ impl Semantics {
         self.position_in_set = Some(position);
         self.set_size = Some(size);
         self
+    }
+}
+
+/// An absent checked value is distinct from a present mixed selection.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum CheckedState {
+    #[default]
+    Unchecked,
+    Checked,
+    Mixed,
+}
+
+impl CheckedState {
+    #[must_use]
+    pub const fn toggled(self) -> Self {
+        match self {
+            Self::Checked => Self::Unchecked,
+            Self::Unchecked | Self::Mixed => Self::Checked,
+        }
+    }
+}
+
+/// Whether an element can receive focus and participate in sequential navigation.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum FocusPolicy {
+    #[default]
+    None,
+    Programmatic,
+    TabStop,
+}
+
+impl FocusPolicy {
+    #[must_use]
+    pub const fn is_focusable(self) -> bool {
+        !matches!(self, Self::None)
+    }
+
+    #[must_use]
+    pub const fn is_tab_stop(self) -> bool {
+        matches!(self, Self::TabStop)
     }
 }

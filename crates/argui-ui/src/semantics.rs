@@ -32,7 +32,9 @@ impl UiTree {
         let focus = focused
             .filter(|focused| nodes.iter().any(|node| node.id == *focused))
             .unwrap_or(root);
-        SemanticTree { root, focus, nodes }
+        let mut semantic = SemanticTree { root, focus, nodes };
+        crate::semantic_relations::resolve(self, &mut semantic);
+        semantic
     }
 }
 
@@ -56,7 +58,21 @@ fn collect(
         *index += descendant_count(element);
         return;
     }
-    let semantics = resolved_semantics(tree, node_id, element, is_root);
+    let semantics = resolved_semantics(tree, node_id, element, is_root).map(|mut semantics| {
+        if let Some(interaction) = &element.interaction {
+            semantics.focus_policy = if interaction.enabled {
+                interaction.focus_policy
+            } else {
+                crate::FocusPolicy::None
+            };
+            if semantics.focus_policy.is_focusable()
+                && !semantics.actions.contains(&SemanticAction::Focus)
+            {
+                semantics.actions.push(SemanticAction::Focus);
+            }
+        }
+        semantics
+    });
     let current = semantics
         .as_ref()
         .map(|_| SemanticNodeId::new(node_id.get()));
@@ -99,7 +115,7 @@ fn resolved_semantics(
                 (!element.text_privacy.protected()).then(|| SemanticValue::Text(value.to_owned()));
             semantics.state.protected = element.text_privacy.protected();
         }
-        semantics.state.disabled = element
+        semantics.state.disabled |= element
             .interaction
             .as_ref()
             .is_some_and(|interaction| !interaction.enabled);

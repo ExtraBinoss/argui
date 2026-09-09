@@ -1,3 +1,6 @@
+#[cfg(all(feature = "tasks", feature = "webview", target_os = "linux"))]
+#[path = "app/gtk.rs"]
+mod gtk_input;
 // Opt-in OS integration: ARGUI_NATIVE_TESTS=1 cargo nextest run -p argui-runtime --all-features --test launch
 #[cfg(all(feature = "tasks", not(target_arch = "wasm32")))]
 mod native {
@@ -15,6 +18,12 @@ mod native {
 
     struct Data {
         phase: usize,
+        scrolled: bool,
+        edited: bool,
+        themed: bool,
+        keys: Vec<argui_core::KeyInput>,
+        pointer: Vec<argui_core::PointerEvent>,
+        wheel: Vec<argui_core::ScrollDelta>,
     }
     type Visits = Rc<RefCell<Vec<(bool, usize, MountId)>>>;
     struct Panel {
@@ -45,47 +54,122 @@ mod native {
     impl Render for Panel {
         fn render(&mut self, cx: &mut Context<Self>) -> Element {
             let phase = cx.read(&self.data, |data| data.phase);
+            if cx.environment().primary == argui_core::Color::BLACK {
+                self.data.update(|data, _| data.themed = true);
+            }
             self.visits
                 .borrow_mut()
                 .push((self.main, phase, cx.mount_id().unwrap()));
             if self.main && phase > self.issued {
                 self.issued = phase;
+                exercise_scroll(phase, cx);
                 eprintln!("native lifecycle phase {phase}");
-                if phase < 8 {
-                    self.schedule();
-                }
-                if phase == 7 {
-                    self.pending.borrow_mut().push(
-                        cx.spawn(
-                            async {
-                                sleep(Duration::from_secs(30)).await;
-                            },
-                            |_, _, _| panic!("closed view callback"),
-                        )
-                        .unwrap(),
-                    );
-                    self.pending.borrow_mut().push(self.data.update(|_, cx| {
-                        cx.spawn(
-                            async {
-                                sleep(Duration::from_secs(30)).await;
-                            },
-                            |_, _, _| panic!("exited application callback"),
-                        )
-                        .unwrap()
-                    }));
-                }
             }
-            Element::text(format!("phase {phase}"))
+            if self.main && phase > 0 && self.pending.borrow().is_empty() {
+                self.pending.borrow_mut().push(
+                    cx.spawn(
+                        async {
+                            sleep(Duration::from_secs(30)).await;
+                        },
+                        |_, _, _| panic!("closed view callback"),
+                    )
+                    .unwrap(),
+                );
+                self.pending.borrow_mut().push(self.data.update(|_, cx| {
+                    cx.spawn(
+                        async {
+                            sleep(Duration::from_secs(30)).await;
+                        },
+                        |_, _, _| panic!("exited application callback"),
+                    )
+                    .unwrap()
+                }));
+            }
+            native_view(phase, cx)
         }
-        fn layout_changed(&mut self, _: &LayoutSnapshot, _: &mut Context<Self>) {
+        fn layout_changed(&mut self, layout: &LayoutSnapshot, _: &mut Context<Self>) {
+            if self.main
+                && layout
+                    .bounds("native-first")
+                    .is_some_and(|bounds| bounds.origin.y < 0.0)
+            {
+                self.data.update(|data, _| data.scrolled = true);
+            }
             if self.main && self.timer.is_none() {
                 eprintln!("native lifecycle initial layout");
                 self.schedule();
             }
         }
     }
+    fn native_view(phase: usize, cx: &mut Context<Panel>) -> Element {
+        use argui_ui::{Axes, FocusPolicy, Interaction, Overflow, TextEditorSpec, length};
+        let editor = Element::text_editor(TextEditorSpec {
+            value: format!("phase {phase}"),
+            placeholder: String::new(),
+            multiline: false,
+            read_only: false,
+            filter: Default::default(),
+            text: Default::default(),
+            placeholder_text: Default::default(),
+            selection: argui_core::Color::WHITE,
+            caret: Default::default(),
+        })
+        .on(cx.listener(argui_ui::EventType::Input, |panel, event, _| {
+            if let argui_ui::UiEventKind::TextChanged(value) = &event.kind
+                && value == "native replacement"
+            {
+                panel.data.update(|data, _| data.edited = true);
+            }
+        }))
+        .keyed("native-editor")
+        .height(length(40.0))
+        .interaction(Interaction::default().focus_policy(FocusPolicy::TabStop));
+        Element::column([
+            Element::text("First")
+                .keyed("native-first")
+                .height(length(500.0))
+                .shrink(0.0),
+            editor.shrink(0.0),
+            Element::text("Last")
+                .keyed("native-last")
+                .height(length(500.0))
+                .shrink(0.0),
+        ])
+        .keyed("native-scroll")
+        .height(length(240.0))
+        .width(length(400.0))
+        .overflow(Axes {
+            x: Overflow::Hidden,
+            y: Overflow::Auto,
+        })
+    }
+    fn exercise_scroll(phase: usize, cx: &mut Context<Panel>) {
+        use argui_core::{Point, Rect, Size};
+        use argui_ui::{ScrollAlignment, ScrollRequest};
+        let request = match phase {
+            1 => ScrollRequest::offset("native-scroll", Point::new(0.0, 80.0)),
+            2 => {
+                cx.request_focus("native-editor");
+                ScrollRequest::rect(
+                    "native-scroll",
+                    Rect::new(Point::new(0.0, 400.0), Size::new(100.0, 80.0)),
+                )
+                .align(ScrollAlignment::Start, ScrollAlignment::Center)
+            }
+            3 => ScrollRequest::reveal("native-last")
+                .align(ScrollAlignment::End, ScrollAlignment::End),
+            4 => ScrollRequest::reveal("native-first"),
+            5 => ScrollRequest::reveal("missing"),
+            6 => ScrollRequest::offset("missing", Point::new(0.0, 10.0)),
+            _ => ScrollRequest::reveal("native-editor"),
+        };
+        cx.scroll(request);
+    }
     struct App {
         issued: usize,
+        edit_issued: bool,
+        theme_issued: bool,
+        timer: Option<TaskHandle>,
         data: Entity<Data>,
         windows: RefCell<HashMap<WindowKey, SingleWindowModel<Panel>>>,
         visits: Visits,
@@ -115,6 +199,26 @@ mod native {
                 return AppUpdate::none();
             }
             self.issued = phase;
+            eprintln!("native lifecycle command {phase}");
+            if phase < 8 {
+                self.timer = Some(self.data.update(|_, cx| {
+                    cx.spawn(
+                        async {
+                            sleep(Duration::from_secs(1)).await;
+                        },
+                        |data, result, cx| {
+                            result.unwrap();
+                            data.phase += 1;
+                            cx.notify();
+                        },
+                    )
+                    .unwrap()
+                }));
+            }
+            #[cfg(all(feature = "webview", target_os = "linux"))]
+            if phase == 6 {
+                crate::gtk_input::send();
+            }
             let auxiliary = WindowKey::new("auxiliary");
             let command = match phase {
                 1 | 5 => AppCommand::OpenWindow(WindowSpec::new(
@@ -133,12 +237,67 @@ mod native {
                 8 => AppCommand::Quit,
                 _ => panic!("unexpected phase"),
             };
-            AppUpdate::none().command(command)
+            let update = AppUpdate::none().command(command);
+            match phase {
+                2 => update.command(AppCommand::SetWindowTitle {
+                    window: WindowKey::main(),
+                    title: "Argui updated lifecycle check".into(),
+                }),
+                3 | 4 => update.command(AppCommand::SetWindowMaximized {
+                    window: WindowKey::main(),
+                    maximized: phase == 3,
+                }),
+                _ => update,
+            }
+        }
+        fn take_ui_commands(&mut self, key: &WindowKey) -> Vec<argui_ui::UiCommand> {
+            if key == &WindowKey::main() && self.issued == 7 && !self.edit_issued {
+                self.edit_issued = true;
+                vec![argui_ui::UiCommand::ReplaceText {
+                    target: "native-editor".into(),
+                    value: "native replacement".into(),
+                }]
+            } else {
+                Vec::new()
+            }
+        }
+        fn take_theme_request(&mut self, key: &WindowKey) -> Option<argui_runtime::ThemeRequest> {
+            if key == &WindowKey::main() && self.issued == 7 && !self.theme_issued {
+                self.theme_issued = true;
+                Some(argui_runtime::ThemeRequest {
+                    primary: Some(argui_core::Color::BLACK),
+                    ..Default::default()
+                })
+            } else {
+                None
+            }
+        }
+        fn take_scroll_request(&mut self, key: &WindowKey) -> Option<argui_ui::ScrollRequest> {
+            self.windows
+                .borrow_mut()
+                .get_mut(key)?
+                .take_scroll_request(key)
+        }
+        fn take_focus_request(&mut self, key: &WindowKey) -> Option<argui_ui::FocusRequest> {
+            self.windows
+                .borrow_mut()
+                .get_mut(key)?
+                .take_focus_request(key)
         }
         fn event_router(&self, key: &WindowKey) -> Option<argui_runtime::AnyEntity> {
             self.windows.borrow().get(key)?.event_router(key)
         }
         fn update(&mut self, event: &AppEvent) -> AppUpdate {
+            if let AppEvent::Window { event, .. } = event {
+                self.data.update(|data, _| match event {
+                    PlatformEvent::Keyboard(input) => data.keys.push(input.clone()),
+                    PlatformEvent::Pointer(input) if input.button.is_some() => {
+                        data.pointer.push(*input)
+                    }
+                    PlatformEvent::PointerScrolled(delta) => data.wheel.push(*delta),
+                    _ => (),
+                });
+            }
             if let AppEvent::Window {
                 window,
                 event: PlatformEvent::Closed,
@@ -159,7 +318,15 @@ mod native {
     }
     pub fn run() {
         let runtime = ModelRuntime::default();
-        let data = runtime.entity(Data { phase: 0 });
+        let data = runtime.entity(Data {
+            phase: 0,
+            scrolled: false,
+            edited: false,
+            themed: false,
+            keys: Vec::new(),
+            pointer: Vec::new(),
+            wheel: Vec::new(),
+        });
         let service = runtime
             .register_service(String::from("application service"))
             .unwrap();
@@ -168,6 +335,7 @@ mod native {
         let closed = Rc::new(RefCell::new(Vec::new()));
         let errors = Rc::new(RefCell::new(Vec::new()));
         let captured = errors.clone();
+        let edited = data.clone();
         let config = ApplicationConfig::new(
             ApplicationIdentity::new(
                 ApplicationId::new("dev.argui.lifecycle").unwrap(),
@@ -193,6 +361,9 @@ mod native {
             ),
             App {
                 issued: 0,
+                edit_issued: false,
+                theme_issued: false,
+                timer: None,
                 data: data.clone(),
                 windows: RefCell::default(),
                 visits: visits.clone(),
@@ -200,6 +371,16 @@ mod native {
                 closed: closed.clone(),
             },
             move |event| match event {
+                RuntimeEvent::Window {
+                    event: argui_runtime::WindowRuntimeEvent::Ui(event),
+                    ..
+                } => {
+                    if let argui_ui::UiEventKind::TextChanged(value) = event.kind
+                        && value == "native replacement"
+                    {
+                        edited.update(|data, _| data.edited = true);
+                    }
+                }
                 RuntimeEvent::RendererFailed(error)
                 | RuntimeEvent::LayoutFailed(error)
                 | RuntimeEvent::CommandFailed(error) => captured.borrow_mut().push(error),
@@ -215,6 +396,39 @@ mod native {
         .unwrap();
         assert!(errors.borrow().is_empty(), "{:?}", errors.borrow());
         assert_eq!(data.read(|data| data.phase), 8);
+        assert!(
+            data.read(|data| data.edited),
+            "native edit command was delivered"
+        );
+        assert!(
+            data.read(|data| data.themed),
+            "theme changes reach the rendered view"
+        );
+        assert!(
+            data.read(|data| data.scrolled),
+            "native scroll requests must change the layout"
+        );
+        #[cfg(all(feature = "webview", target_os = "linux"))]
+        data.read(|data| {
+            crate::gtk_input::assert_pointer(&data.pointer, &data.wheel);
+            let expected: Vec<_> = crate::gtk_input::keys()
+                .into_iter()
+                .flat_map(|(_, key)| {
+                    [
+                        argui_core::KeyState::Pressed,
+                        argui_core::KeyState::Released,
+                    ]
+                    .map(|state| (key.clone(), state))
+                })
+                .collect();
+            assert_eq!(
+                data.keys
+                    .iter()
+                    .map(|input| (input.key.clone(), input.state))
+                    .collect::<Vec<_>>(),
+                expected
+            );
+        });
         let visits = visits.borrow();
         let original = visits
             .iter()

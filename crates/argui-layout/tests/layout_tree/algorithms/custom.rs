@@ -207,7 +207,7 @@ fn regions(include_top: bool) -> Element {
         Element::custom_region(
             key,
             Interaction::default()
-                .focusable(true)
+                .focus_policy(argui_ui::FocusPolicy::TabStop)
                 .cursor(CursorIcon::EwResize)
                 .gestures(
                     GestureSet::EMPTY.pan(

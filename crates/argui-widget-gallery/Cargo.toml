@@ -14,6 +14,7 @@ webview = ["argui/webview"]
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+web-time.workspace = true
 argui = { workspace = true, features = ["widgets-all", "tasks"] }
 argui-image.workspace = true
 argui-effects = { workspace = true, features = ["artistic", "blur", "shadow", "scroll", "liquid-glass"] }
@@ -24,6 +25,3 @@ wasm-bindgen.workspace = true
 
 [lints]
 workspace = true
-
-[dev-dependencies]
-web-time.workspace = true

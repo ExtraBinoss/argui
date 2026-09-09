@@ -97,7 +97,7 @@ pub enum WindowDragBehavior {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Interaction {
     pub enabled: bool,
-    pub focusable: bool,
+    pub focus_policy: crate::FocusPolicy,
     pub cursor: CursorIcon,
     pub gestures: GestureSet,
     pub keyboard_activation: KeyboardActivation,
@@ -108,7 +108,7 @@ impl Default for Interaction {
     fn default() -> Self {
         Self {
             enabled: true,
-            focusable: false,
+            focus_policy: crate::FocusPolicy::None,
             cursor: CursorIcon::Auto,
             gestures: GestureSet::EMPTY,
             keyboard_activation: KeyboardActivation::None,
@@ -130,7 +130,7 @@ impl Interaction {
     pub const fn blocker() -> Self {
         Self {
             enabled: true,
-            focusable: false,
+            focus_policy: crate::FocusPolicy::None,
             cursor: CursorIcon::Auto,
             gestures: GestureSet::EMPTY,
             keyboard_activation: KeyboardActivation::None,
@@ -139,8 +139,8 @@ impl Interaction {
     }
 
     #[must_use]
-    pub const fn focusable(mut self, focusable: bool) -> Self {
-        self.focusable = focusable;
+    pub const fn focus_policy(mut self, policy: crate::FocusPolicy) -> Self {
+        self.focus_policy = policy;
         self
     }
 
@@ -178,7 +178,7 @@ pub struct HitRegion {
     pub shape: HitShape,
     pub slop: Sides<f32>,
     pub enabled: bool,
-    pub focusable: bool,
+    pub focus_policy: crate::FocusPolicy,
     pub cursor: CursorIcon,
     pub gestures: GestureSet,
     pub window_drag: Option<WindowDragBehavior>,
@@ -344,7 +344,7 @@ impl InteractionState {
         if regions
             .iter()
             .find(|region| region.node == target)
-            .is_some_and(|region| region.focusable)
+            .is_some_and(|region| region.focus_policy.is_focusable())
         {
             let focus_changed = self.focused != Some(target);
             self.release_keyboard(&mut update, None);
@@ -360,24 +360,29 @@ impl InteractionState {
     }
 
     pub fn focus_next(&mut self, regions: &[HitRegion], backwards: bool) -> RawUpdate {
-        let focusable = regions
-            .iter()
-            .filter(|region| region.focusable)
-            .map(|region| region.node)
-            .collect::<Vec<_>>();
-        if focusable.is_empty() {
-            return RawUpdate::default();
-        }
         let current = self
             .focused
-            .and_then(|node| focusable.iter().position(|candidate| *candidate == node));
-        let index = match (current, backwards) {
-            (Some(0), true) | (None, true) => focusable.len() - 1,
-            (Some(index), true) => index - 1,
-            (Some(index), false) => (index + 1) % focusable.len(),
-            (None, false) => 0,
+            .and_then(|node| regions.iter().position(|region| region.node == node));
+        let mut candidates = regions
+            .iter()
+            .enumerate()
+            .filter(|(_, region)| region.enabled && region.focus_policy.is_tab_stop());
+        let next = if backwards {
+            candidates
+                .clone()
+                .rev()
+                .find(|(i, _)| current.is_none_or(|current| *i < current))
+                .or_else(|| candidates.next_back())
+        } else {
+            candidates
+                .clone()
+                .find(|(i, _)| current.is_none_or(|current| *i > current))
+                .or_else(|| candidates.clone().next())
         };
-        let next = focusable[index];
+        let Some((_, next)) = next else {
+            return RawUpdate::default();
+        };
+        let next = next.node;
         let mut update = RawUpdate::default();
         if self.focused == Some(next) {
             update.paint_changed = !self.focus_visible;
@@ -411,7 +416,7 @@ impl InteractionState {
     ) -> RawUpdate {
         if !regions
             .iter()
-            .any(|region| region.node == node && region.focusable)
+            .any(|region| region.node == node && region.focus_policy.is_focusable())
             || self.focused == Some(node)
         {
             return RawUpdate::default();

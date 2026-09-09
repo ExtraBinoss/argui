@@ -72,7 +72,7 @@ impl DialogBehavior {
             ),
             DialogPart::Panel => element
                 .keyed(self.panel_key())
-                .interaction(Interaction::blocker().focusable(true))
+                .interaction(Interaction::blocker().focus_policy(argui_ui::FocusPolicy::TabStop))
                 .semantics(
                     Semantics::new(Role::Dialog)
                         .label(self.label.clone())

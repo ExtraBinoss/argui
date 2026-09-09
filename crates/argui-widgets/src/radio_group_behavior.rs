@@ -72,7 +72,11 @@ impl RadioGroupBehavior {
                     self.option_key(index),
                     label,
                     Role::RadioButton,
-                    self.selected == Some(index),
+                    if self.selected == Some(index) {
+                        argui_ui::CheckedState::Checked
+                    } else {
+                        argui_ui::CheckedState::Unchecked
+                    },
                 )
                 .enabled(enabled)
                 .position_in_set((index + 1) as u32, self.options.len() as u32)

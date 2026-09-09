@@ -2,6 +2,16 @@ use argui_runtime::{Context, ModelRuntime, Render, ResourceScope, ServiceAlready
 use std::{cell::Cell, rc::Rc};
 
 struct View;
+
+#[test]
+fn registration_outlives_its_registry_without_retaining_it() {
+    let registration = ModelRuntime::default().register_service(42_u32).unwrap();
+    let consumer = registration.service();
+    assert_eq!(*consumer, 42);
+    drop(registration);
+    assert_eq!(*consumer, 42);
+    assert_eq!(Rc::strong_count(&consumer), 1);
+}
 impl Render for View {
     fn render(&mut self, _: &mut Context<Self>) -> argui_ui::Element {
         argui_ui::Element::text("services")

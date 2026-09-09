@@ -212,12 +212,12 @@ fn touch_selection_exposes_handles_and_empty_documents_stay_empty() {
 fn auto_follows_the_cascade_instead_of_inferring_style_from_interaction() {
     let mut tree = UiTree::new(Element::column([
         Element::container([Element::text("raw interactive text")])
-            .interaction(Interaction::default().focusable(true)),
+            .interaction(Interaction::default().focus_policy(argui_ui::FocusPolicy::TabStop)),
         Element::container([Element::text("hidden")])
-            .interaction(Interaction::default().focusable(true))
+            .interaction(Interaction::default().focus_policy(argui_ui::FocusPolicy::TabStop))
             .user_select(UserSelect::None),
         Element::container([Element::text("reenabled").user_select(UserSelect::Text)])
-            .interaction(Interaction::default().focusable(true))
+            .interaction(Interaction::default().focus_policy(argui_ui::FocusPolicy::TabStop))
             .user_select(UserSelect::None),
     ]));
     let raw = tree.node_id_at(2).unwrap();
@@ -240,16 +240,16 @@ fn accessibility_roles_do_not_change_the_user_select_cascade() {
         Element::column([
             Element::text("selectable document text"),
             Element::container([Element::text("aria button label")])
-                .interaction(Interaction::default().focusable(true))
+                .interaction(Interaction::default().focus_policy(argui_ui::FocusPolicy::TabStop))
                 .semantics(Semantics::new(Role::Button)),
             Element::container([Element::text("widget button label")])
-                .interaction(Interaction::default().focusable(true))
+                .interaction(Interaction::default().focus_policy(argui_ui::FocusPolicy::TabStop))
                 .semantics(Semantics::new(Role::Button))
                 .user_select(UserSelect::None),
         ])
         .interaction(
             Interaction::default()
-                .focusable(true)
+                .focus_policy(argui_ui::FocusPolicy::TabStop)
                 .gestures(GestureSet::EMPTY.tap(TapGesture::default())),
         )
         .semantics(Semantics::new(Role::Window)),

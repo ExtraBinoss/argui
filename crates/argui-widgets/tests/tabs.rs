@@ -96,7 +96,7 @@ fn active_tab_keeps_its_surface_while_hovered() {
             shape: HitShape::Bounds,
             slop: HitTestStyle::default().slop,
             enabled: true,
-            focusable: true,
+            focus_policy: argui_ui::FocusPolicy::TabStop,
             cursor: CursorIcon::Pointer,
             gestures: GestureSet::EMPTY,
             window_drag: None,

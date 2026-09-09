@@ -85,8 +85,12 @@ fn variable_measurements_survive_rebuild_resize_and_selection() {
         19840.0
     );
     let mut state = ListState::default();
-    state.select(20, 1000, true, Default::default());
-    let built = list.build_list(1000, &state, true, theme, row);
+    let items = argui_widgets::Collection::new(
+        (0..1000).map(|i| argui_widgets::CollectionItem::new(i.to_string(), i.to_string())),
+    )
+    .unwrap();
+    state.select(20, &items, true, Default::default());
+    let built = list.build_list(&items, &state, true, theme, row);
     assert!(has(&built, "variable::row::20"));
     assert!(!has(&built, "variable::row::999"));
     assert!(built.children[0].children.len() < 32);

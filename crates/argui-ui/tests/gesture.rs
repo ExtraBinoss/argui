@@ -472,7 +472,7 @@ fn frame_coalesced_pan_keeps_only_the_latest_changed_sample() {
         shape: HitShape::Bounds,
         slop: argui_ui::Sides::default(),
         enabled: true,
-        focusable: false,
+        focus_policy: argui_ui::FocusPolicy::None,
         cursor: argui_ui::CursorIcon::Auto,
         gestures,
         window_drag: None,

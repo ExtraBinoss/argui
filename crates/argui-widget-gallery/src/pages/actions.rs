@@ -30,6 +30,7 @@ fn record_state(enabled: bool) -> ActionState {
 impl ActionsDemo {
     fn items(&self) -> Vec<MenuItem> {
         vec![MenuItem::new(
+            "record",
             ActionInvocation::new(RECORD),
             record_state(!self.disabled),
         )]

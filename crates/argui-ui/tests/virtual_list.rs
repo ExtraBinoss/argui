@@ -93,3 +93,36 @@ fn variable_list_handles_share_retained_measurements_and_structure() {
     first.remove(0..1);
     assert_eq!(second.item_count(), 4);
 }
+
+#[test]
+fn pinned_rows_keep_their_position_without_traversing_the_gap() {
+    for list in [
+        VirtualList::fixed(100_000, 20.0, 200.0),
+        VirtualList::variable(100_000, 20.0, 200.0),
+    ] {
+        let offset = 100_000.0;
+        let window = list.window(offset);
+        for pinned in [0, 99_999, window.range.start, 100_000] {
+            let mut visited = Vec::new();
+            let tree = list.build_pinned("rows", offset, Some(pinned), |index| {
+                visited.push(index);
+                Element::text(index.to_string()).keyed(index.to_string())
+            });
+            let extra = usize::from(pinned < 100_000 && !window.range.contains(&pinned));
+            assert_eq!(visited.len(), window.range.len() + extra);
+            assert!(visited.windows(2).all(|pair| pair[0] < pair[1]));
+            let mut extent = 0.0;
+            for child in &tree.children[0].children {
+                if let Some(key) = &child.key {
+                    let index: usize = key.parse().unwrap();
+                    assert_eq!(extent, list.offset_of(index));
+                    extent += list.item_extent(index).unwrap();
+                } else {
+                    assert!(child.semantic_hidden);
+                    extent += child.style.size.height.value();
+                }
+            }
+            assert_eq!(extent, list.total_extent());
+        }
+    }
+}

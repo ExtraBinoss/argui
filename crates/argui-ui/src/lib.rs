@@ -21,6 +21,7 @@ mod native_content;
 pub use native_content::NativeContent;
 mod event;
 mod focus;
+pub use argui_accessibility::FocusPolicy;
 mod gesture;
 mod identity;
 mod interaction;
@@ -45,7 +46,8 @@ mod virtual_list;
 
 pub use activation::{ActivationSource, ClickEvent};
 pub use argui_accessibility::{
-    LiveRegion, Orientation, Role, SemanticAction, SemanticState, SemanticValue, Semantics,
+    CheckedState, GridPosition, LiveRegion, Orientation, PopupKind, Role, SemanticAction,
+    SemanticState, SemanticValue, Semantics, SortDirection,
 };
 pub use argui_animation::{Motion, MotionBinding, MotionState, Transition, Tween};
 pub use argui_core::{Transform2D, TransformOrigin};
@@ -117,4 +119,9 @@ pub use text_selection::{
 pub use tree::{TreeUpdate, TreeUpdateStats, UiTree};
 pub use virtual_list::{
     MeasurementUpdate, VirtualAlignment, VirtualItem, VirtualList, VirtualWindow,
+};
+
+mod semantic_relations;
+pub use semantic_relations::{
+    SemanticBindings, SemanticDiagnostic, SemanticReferenceError, SemanticTarget,
 };

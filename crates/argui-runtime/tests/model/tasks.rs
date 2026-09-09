@@ -26,6 +26,104 @@ fn runtime() -> (TaskRuntime, mpsc::Receiver<()>) {
 }
 
 #[test]
+fn closing_a_mount_during_update_rejects_work_in_the_existing_context() {
+    let (runtime, _) = runtime();
+    let model = Entity::new(Model::default());
+    model.set_task_runtime(runtime.clone());
+    let mount = model.mount().unwrap();
+    mount
+        .update(|_, cx| {
+            mount.close();
+            assert!(matches!(
+                cx.spawn(async {}, |_, _, _| {}),
+                Err(TaskError::ScopeClosed)
+            ));
+        })
+        .unwrap();
+    assert_eq!(runtime.pending(), 0);
+    let scope = argui_runtime::ResourceScope::default();
+    scope.close();
+    let task = model
+        .update(|_, cx| cx.spawn(std::future::pending::<()>(), |_, _, _| {}))
+        .unwrap();
+    let cancelled = task.cancellation_token();
+    assert!(task.in_scope(&scope).is_err());
+    assert!(cancelled.is_cancelled());
+    runtime.shutdown();
+}
+
+#[test]
+fn view_tasks_obey_explicit_scope_lifetime_without_closing_the_mount() {
+    let (runtime, wake) = runtime();
+    let model = Entity::new(Model::default());
+    model.set_task_runtime(runtime.clone());
+    let mount = model.mount().unwrap();
+    let scope = argui_runtime::ResourceScope::default();
+    let completed = mount
+        .update(|_, cx| {
+            cx.spawn_in(&scope, async { 19 }, |model, result, cx| {
+                model.value = result.unwrap();
+                cx.notify();
+            })
+        })
+        .unwrap()
+        .unwrap();
+    while !completed.is_finished() {
+        wake.recv_timeout(Duration::from_secs(5)).unwrap();
+        runtime.drain();
+    }
+    assert_eq!(model.read(|model| model.value), 19);
+    let cancelled = mount
+        .update(|_, cx| {
+            cx.spawn_in(&scope, std::future::pending::<()>(), |_, _, _| {
+                panic!("closed explicit scope delivered a view callback");
+            })
+        })
+        .unwrap()
+        .unwrap();
+    scope.close();
+    runtime.drain();
+    assert!(cancelled.cancellation_token().is_cancelled());
+    assert!(mount.is_visible());
+    assert_eq!(scope.resource_count(), 0);
+    assert!(matches!(
+        mount
+            .update(|_, cx| { cx.spawn_in(&scope, async {}, |_, _, _| {}) })
+            .unwrap(),
+        Err(TaskError::ScopeClosed)
+    ));
+    while runtime.pending() > 0 {
+        wake.recv_timeout(Duration::from_secs(5)).unwrap();
+        runtime.drain();
+    }
+    assert_eq!(runtime.pending(), 0);
+}
+
+#[test]
+fn closed_mount_rejects_latest_task_and_cancels_previous_slot() {
+    let (runtime, wake) = runtime();
+    let model = Entity::new(Model::default());
+    model.set_task_runtime(runtime.clone());
+    let mount = model.mount().unwrap();
+    let mut slot = TaskSlot::default();
+    mount
+        .spawn_latest(&mut slot, std::future::pending::<()>(), |_, _, _| {})
+        .unwrap();
+    assert!(slot.is_running());
+    mount.close();
+    assert!(matches!(
+        mount.spawn_latest(&mut slot, async {}, |_, _, _| {}),
+        Err(TaskError::ScopeClosed)
+    ));
+    assert!(!slot.is_running());
+    while runtime.pending() > 0 {
+        wake.recv_timeout(Duration::from_secs(5)).unwrap();
+        runtime.drain();
+    }
+    assert_eq!(runtime.pending(), 0);
+}
+
+#[test]
 fn context_tasks_cancel_with_the_view_while_model_tasks_keep_running() {
     let (runtime, wake) = runtime();
     let model = Entity::new(Model::default());

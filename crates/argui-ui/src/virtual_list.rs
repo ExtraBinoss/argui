@@ -295,17 +295,70 @@ impl VirtualList {
         self.item_count = item_count - (end - start);
     }
 
+    /// Reorder retained measurements. New entries (`None`) start at the estimate.
+    /// Call when data changes, before rebuilding mounted rows; all handles share the update.
+    pub fn remap(&mut self, order: impl IntoIterator<Item = Option<usize>>) {
+        match &mut self.extents {
+            Extents::Fixed(_) => self.item_count = order.into_iter().count(),
+            Extents::Variable { estimate, state } => {
+                let mut state = state.borrow_mut();
+                let mut values = Vec::new();
+                let mut measured = Vec::new();
+                for index in order {
+                    values.push(
+                        index
+                            .and_then(|index| state.values.get(index))
+                            .copied()
+                            .unwrap_or(*estimate),
+                    );
+                    measured.push(
+                        index
+                            .and_then(|index| state.measured.get(index))
+                            .copied()
+                            .unwrap_or(false),
+                    );
+                }
+                self.item_count = values.len();
+                state.prefix = Fenwick::from_values(&values);
+                state.values = values;
+                state.measured = measured;
+            }
+        }
+    }
+
     #[must_use]
     pub fn build(
         &self,
         key: impl Into<String>,
         offset: f32,
+        item: impl FnMut(usize) -> Element,
+    ) -> Element {
+        self.build_pinned(key, offset, None, item)
+    }
+
+    /// Keeps one active or edited row mounted outside the visible window.
+    /// Only the window and the pinned row are visited; gaps retain their measured extent.
+    #[must_use]
+    pub fn build_pinned(
+        &self,
+        key: impl Into<String>,
+        offset: f32,
+        pinned: Option<usize>,
         mut item: impl FnMut(usize) -> Element,
     ) -> Element {
         let window = self.window(offset);
-        let mut children = Vec::with_capacity(window.range.len() + 2);
-        children.push(spacer(window.before));
-        children.extend(window.range.map(|index| {
+        let pinned = pinned.filter(|index| *index < self.item_count());
+        let before = pinned.filter(|index| *index < window.range.start);
+        let after = pinned.filter(|index| *index >= window.range.end);
+        let indices = before.into_iter().chain(window.range.clone()).chain(after);
+        let mut children = Vec::with_capacity(window.range.len() + 4);
+        let mut previous_end = None;
+        for index in indices {
+            if previous_end != Some(index) {
+                children.push(spacer(
+                    self.offset_of(index) - self.offset_of(previous_end.unwrap_or(0)),
+                ));
+            }
             let mut element = item(index).shrink(0.0);
             match &self.extents {
                 Extents::Fixed(extent) => element.style.size.height = Dimension::length(*extent),
@@ -317,9 +370,12 @@ impl VirtualList {
                     });
                 }
             }
-            element
-        }));
-        children.push(spacer(window.after));
+            children.push(element);
+            previous_end = Some(index + 1);
+        }
+        children.push(spacer(
+            (window.total - self.offset_of(previous_end.unwrap_or(0))).max(0.0),
+        ));
         Element::column([Element::column(children).shrink(0.0)])
             .keyed(key)
             .height(Dimension::length(self.viewport_extent))

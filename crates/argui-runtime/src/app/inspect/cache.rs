@@ -77,7 +77,9 @@ impl InspectionCache {
         });
         if !same {
             let mut shallow = element.clone();
-            shallow.children.clear();
+            if !shallow.children.is_empty() {
+                shallow.children.clear();
+            }
             let next = Entry {
                 node,
                 depth,
@@ -103,6 +105,7 @@ impl InspectionCache {
 fn same_content(left: &Element, right: &Element) -> bool {
     left.ptr_eq(right)
         || (left.kind == right.kind
+            && left.text_privacy == right.text_privacy
             && left.key == right.key
             && left.style == right.style
             && left.paint == right.paint
