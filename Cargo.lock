@@ -380,6 +380,7 @@ dependencies = [
  "resvg",
  "web-time",
  "wgpu",
+ "winit",
 ]
 
 [[package]]

@@ -227,12 +227,7 @@ impl SurfaceRenderer {
                 maximum: maximum_storage_bytes,
             });
         }
-        let mut effect = EffectGpu::new(&device, target_format, maximum_parameter_words);
-        for definition in renderer_config.effects.definitions() {
-            for (pass_index, pass) in definition.passes.iter().enumerate() {
-                effect.register(&device, definition.id, pass_index, pass.wgsl)?;
-            }
-        }
+        let effect = EffectGpu::new(&device, target_format, maximum_parameter_words);
         let offscreen = TexturePool::new(target_format, 128 * 1024 * 1024);
         let gpu_profiler = GpuProfiler::new(&adapter, &device, &queue, renderer_config.profiling);
 

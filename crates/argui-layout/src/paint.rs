@@ -4,10 +4,12 @@ use argui_paint::{
     VectorPrimitive,
 };
 use argui_ui::{EffectScope, Element, ElementKind, HitRegion, NodeId, PointerEvents, UiTree};
-use std::collections::HashMap;
 
 use crate::{LayoutNode, LayoutOutput, engine::NodeMap, input, scroll};
 
+mod cache;
+use cache::CachedFragment;
+pub(crate) use cache::PaintCache;
 mod effects;
 mod geometry;
 mod portal;
@@ -18,6 +20,7 @@ use effects::{begin_layer, begin_scope, end_layers, scope_count};
 pub(super) struct PaintContext {
     transform: Affine2D,
     clips: ClipChain,
+    clip_bounds: Rect,
     hit_allowed: bool,
     active_portal: Option<NodeId>,
 }
@@ -28,30 +31,6 @@ pub(super) struct ScrollPaintUpdate {
     transform: Affine2D,
     clips: ClipChain,
     interaction_order: usize,
-}
-
-#[derive(Clone, Debug)]
-struct CachedFragment {
-    element: Element,
-    node: LayoutNode,
-    parent: PaintContext,
-    commands: Vec<argui_paint::DisplayCommand>,
-    hit_regions: Vec<HitRegion>,
-    semantic_bounds: Vec<(NodeId, Rect)>,
-    text_orders: Vec<(NodeId, usize)>,
-    scroll_updates: Vec<ScrollPaintUpdate>,
-    cacheable: bool,
-    visual_revision: u64,
-    selection_active: bool,
-    selection_revision: u64,
-}
-
-#[derive(Default, Debug)]
-pub(crate) struct PaintCache {
-    fragments: HashMap<NodeId, CachedFragment>,
-    pub(crate) visited: usize,
-    pub(crate) reused: usize,
-    pub(crate) reused_commands: usize,
 }
 
 pub(crate) fn repaint(
@@ -75,6 +54,7 @@ pub(crate) fn repaint(
         let context = PaintContext {
             transform: Affine2D::IDENTITY,
             clips,
+            clip_bounds: output.viewport,
             hit_allowed: true,
             active_portal: None,
         };
@@ -118,9 +98,8 @@ pub(super) fn paint_node(
     }
     let selection_active = ui.document_selection_intersects(map.index, map.subtree_len);
     if let Some(fragment) = cache.fragments.get(&node.node)
-        && fragment.cacheable
         && fragment.element.ptr_eq(element)
-        && fragment.node == node
+        && fragment.nodes == output.nodes[map.index..map.index + map.subtree_len]
         && fragment.parent == *parent
         && fragment.visual_revision == ui.visual_revision(node.node)
         && (fragment.selection_revision == ui.document_selection_revision()
@@ -136,8 +115,10 @@ pub(super) fn paint_node(
                 region.interaction_order = base + relative;
             }
         }
-        output.display_list.extend(fragment.commands.clone());
-        output.hit_regions.extend(fragment.hit_regions.clone());
+        output
+            .display_list
+            .extend(fragment.commands.iter().cloned());
+        output.hit_regions.extend_from_slice(&fragment.hit_regions);
         output
             .semantic_bounds
             .extend_from_slice(&fragment.semantic_bounds);
@@ -159,6 +140,7 @@ pub(super) fn paint_node(
         portal = PaintContext {
             transform: Affine2D::IDENTITY,
             clips: ClipChain::from_regions([ClipRegion::new(clip, Affine2D::IDENTITY)]),
+            clip_bounds: clip,
             hit_allowed: parent.hit_allowed,
             active_portal: parent.active_portal,
         };
@@ -172,6 +154,7 @@ pub(super) fn paint_node(
     let context = PaintContext {
         transform,
         clips: parent.clips.clone(),
+        clip_bounds: parent.clip_bounds,
         hit_allowed: parent.hit_allowed,
         active_portal: parent.active_portal,
     };
@@ -196,6 +179,14 @@ pub(super) fn paint_node(
     let child_context = PaintContext {
         transform,
         clips: child_clips,
+        clip_bounds: if map.style.overflow.x.clips() || map.style.overflow.y.clips() {
+            context
+                .clip_bounds
+                .intersection(transform.transform_rect(node.bounds))
+                .unwrap_or_default()
+        } else {
+            context.clip_bounds
+        },
         hit_allowed: context.hit_allowed
             && !matches!(
                 element.hit_test.pointer_events,
@@ -261,7 +252,7 @@ pub(super) fn paint_node(
             node.node,
             CachedFragment {
                 element: element.clone(),
-                node,
+                nodes: output.nodes[map.index..map.index + map.subtree_len].to_vec(),
                 parent: parent.clone(),
                 commands: output.display_list.commands()[command_start..].to_vec(),
                 hit_regions: output.hit_regions[hit_start..].to_vec(),
@@ -282,7 +273,6 @@ pub(super) fn paint_node(
                     })
                     .collect(),
                 scroll_updates: scroll_updates[scroll_start..].to_vec(),
-                cacheable,
                 visual_revision: ui.visual_revision(node.node),
                 selection_active,
                 selection_revision: ui.document_selection_revision(),

@@ -12,25 +12,28 @@ base. Elle ne certifie pas toutes les variantes shadcn, ni un audit sur lecteurs
 d'écran réels. **Partiel** reste décoché : une primitive moteur, un comportement
 interne ou une page de démonstration ne suffisent pas à livrer un widget.
 
+Mises à jour Argui du 10 septembre 2026 : [les cinq premiers composants](shadcn-foundations.md),
+puis [Avatar, Empty, Kbd, Progress, AspectRatio et le Separator enrichi](shadcn-display-widgets.md).
+
 ## Checklist complète
 
 - [ ] **Accordion** — absent ; sections contrôlées, navigation clavier et animation à exposer.
-- [ ] **Alert** — absent ; le rôle sémantique existe, sans widget de présentation.
+- [x] **Alert** — `Alert` ; présentation inline standard/destructive, icône et politique d’annonce explicite.
 - [ ] **Alert Dialog** — partiel ; `Dialog` existe, mais pas de contrat de confirmation dédié.
-- [ ] **Aspect Ratio** — partiel ; contrainte de layout disponible, sans composant dédié.
+- [x] **Aspect Ratio** — `AspectRatio` ; réserve la hauteur suivant la largeur et un ratio positif, contenu ajusté au cadre.
 - [ ] **Attachment** — absent ; définir présentation, état de transfert et actions, sans imposer un client mail.
-- [ ] **Avatar** — absent ; images disponibles, fallback et groupe à encapsuler.
-- [ ] **Badge** — absent ; petit composant de présentation à créer.
+- [x] **Avatar** — image chargée ou fallback contrôlé, masque circulaire, taille configurable et nom accessible unique. Groupe non livré.
+- [x] **Badge** — `Badge` ; variantes primary/secondary/destructive/outline/ghost, icônes avant/après et nom accessible unique.
 - [ ] **Breadcrumb** — absent ; liens, séparateurs et élément courant à formaliser.
 - [ ] **Bubble** — absent ; présentation réutilisable à définir.
 - [x] **Button** — [`Button`](../crates/argui-widgets/src/button.rs) ; variantes via le thème, icônes, chargement et activation accessible.
 - [ ] **Button Group** — absent ; disposer des boutons en ligne ne constitue pas encore une API de groupe.
 - [x] **Calendar** — `Calendar` et `CalendarState` ; locale, limites, sélection simple/multiple/plage et navigation clavier.
-- [ ] **Card** — absent ; conteneurs stylables disponibles, API de sections à livrer.
+- [x] **Card** — `Card` ; titre, description, action, contenu et pied de carte optionnels, avec relations accessibles.
 - [ ] **Carousel** — absent ; défilement disponible, pagination, gestes et annonces à coordonner.
 - [ ] **Chart** — absent ; rendu vectoriel disponible, échelles, séries et interactions à concevoir.
 - [x] **Checkbox** — [`Checkbox`](../crates/argui-widgets/src/selection.rs) ; `CheckedState` expose Unchecked, Checked et Mixed ; activation du mode Mixed vers Checked.
-- [ ] **Collapsible** — absent ; API d'ouverture, trigger et contenu à créer.
+- [x] **Collapsible** — ouverture contrôlée, trigger personnalisable, Entrée/Espace, état désactivé et contenu démonté une fois fermé.
 - [ ] **Combobox** — partiel ; `Select` et recherche existent séparément, sans combobox publique dédiée.
 - [x] **Command** — [`CommandPalette`](../crates/argui-widgets/src/command_palette.rs) ; recherche et invocation d'actions. Groupes et variantes avancées restent à examiner.
 - [x] **Context Menu** — `ContextMenu` partage les entrées de `Menu`, avec ancrage au pointeur ou au clavier.
@@ -40,14 +43,14 @@ interne ou une page de démonstration ne suffisent pas à livrer un widget.
 - [ ] **Direction** — partiel ; texte bidi et alignement logique disponibles, sans fournisseur de direction commun aux widgets.
 - [ ] **Drawer** — absent ; panneau gestuel, seuils de fermeture et focus à implémenter.
 - [x] **Dropdown Menu** — [`Menu`](../crates/argui-widgets/src/menu.rs) ; identifiants stables, sous-menus, groupes, entrées checkbox/radio, indicateurs et navigation clavier.
-- [ ] **Empty** — absent ; présentation d'état vide avec contenu/actions à exposer.
+- [x] **Empty** — état vide centré, titre, description, média décoratif et actions libres ; bordure optionnelle.
 - [ ] **Field** — partiel ; labels et erreurs existent sur `Input`, sans composition générique label/aide/erreur/contrôle.
 - [ ] **Hover Card** — absent ; overlay disponible, délais d'ouverture/fermeture et maintien au survol à ajouter.
 - [x] **Input** — [`Input`](../crates/argui-widgets/src/input.rs) ; texte, recherche, password et état contrôlé.
 - [ ] **Input Group** — partiel ; décorations possibles sur `Input`, sans groupe générique de contrôles et boutons associés.
 - [ ] **Input OTP** — absent ; cellules, collage, navigation et saisie unique accessible à concevoir.
 - [ ] **Item** — partiel ; `List` accepte du contenu libre, sans API de parties titre/description/média/actions.
-- [ ] **Kbd** — absent ; composant typographique pour raccourcis à livrer.
+- [x] **Kbd** — touche ou combinaison, une annonce accessible personnalisable ; n'enregistre pas de raccourci.
 - [ ] **Label** — partiel ; nom accessible sur les contrôles, sans label public associé à une cible de focus.
 - [ ] **Marker** — absent ; composant dédié à définir.
 - [x] **Menubar** — focus entre déclencheurs, ouverture des menus, sous-menus et navigation RTL.
@@ -57,13 +60,13 @@ interne ou une page de démonstration ne suffisent pas à livrer un widget.
 - [ ] **Navigation Menu** — absent ; navigation de site/application avec panneaux, focus et état courant à fournir.
 - [ ] **Pagination** — absent ; page courante, bornes et navigation accessible à encapsuler.
 - [x] **Popover** — [`Popover`](../crates/argui-widgets/src/popover.rs) ; ancrage, collisions, fermeture et options de focus.
-- [ ] **Progress** — partiel ; rôle sémantique présent, sans widget déterminé/indéterminé.
+- [x] **Progress** — pourcentage contrôlé, état indéterminé animé quand monté comme entité, mouvement réduit et valeur accessible.
 - [ ] **Questionnaire** — absent ; contrat de questions, réponses et validation à définir après les contrôles de base.
 - [x] **Radio Group** — [`RadioGroup`](../crates/argui-widgets/src/selection.rs) ; sélection exclusive et orientation.
 - [x] **Resizable** — [`SplitPane`](../crates/argui-widgets/src/split_pane.rs) ; séparateur, limites, gestes et clavier. Groupes imbriqués à composer explicitement.
 - [ ] **Scroll Area** — partiel ; [`ScrollConfig`](../crates/argui-ui/src/scroll.rs) et scrollbars dans le moteur, sans widget général `ScrollArea`.
 - [x] **Select** — [`Select`](../crates/argui-widgets/src/select.rs) ; sélection simple contrôlée, overlay et clavier.
-- [ ] **Separator** — partiel ; primitive et séparateur redimensionnable, sans widget décoratif/sémantique générique.
+- [x] **Separator** — `Separator::new` ; orientation configurable et texte centré entre deux traits, décoratif par défaut ou rôle accessible explicite.
 - [ ] **Sheet** — absent ; `Dialog` fournit une base, sans panneau latéral dédié.
 - [ ] **Sidebar** — absent ; la sidebar de la galerie n'est pas un widget public.
 - [ ] **Skeleton** — absent ; formes et animations disponibles, sans composant d'attente.
@@ -94,9 +97,8 @@ pas d'un DSL ni de shadcn.
 
 ## Où concentrer le travail
 
-1. **Petits composants réutilisables** : Separator, Label, Badge, Card, Empty, Kbd,
-   Avatar, Skeleton et Progress. Un fichier de widget et une page sobre par besoin.
-2. **Interactions courantes** : Tooltip, Collapsible/Accordion, Toggle/Toggle Group,
+1. **Petits composants réutilisables** : Label, Skeleton, Breadcrumb et Pagination. Un fichier de widget et une page sobre par besoin.
+2. **Interactions courantes** : Tooltip, Accordion, Toggle/Toggle Group,
    puis Field/Input Group/Combobox. Vérifier clavier, focus et sémantique avant
    d'élargir les variantes visuelles.
 3. **Panneaux** : Sheet, Alert Dialog et Hover Card ; réutiliser les comportements

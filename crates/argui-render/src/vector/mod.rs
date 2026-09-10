@@ -10,6 +10,8 @@ use pipeline::{VectorInstance, VectorPipeline};
 
 use crate::{RendererError, profile::VectorAtlasStats};
 
+const MAX_ATLAS_SIZE: u32 = 2048;
+
 struct RegisteredVector {
     tree: resvg::usvg::Tree,
     size: Size,
@@ -30,7 +32,7 @@ impl VectorGpu {
     #[cfg_attr(coverage_nightly, coverage(off))]
     pub fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
         let pipeline = VectorPipeline::new(device, format);
-        let atlas = VectorAtlas::new(device);
+        let atlas = VectorAtlas::new(device, 256);
         let texture_group = pipeline.texture_group(device, &atlas.view, &atlas.sampler);
         Self {
             pipeline,
@@ -67,14 +69,27 @@ impl VectorGpu {
         scale: f32,
     ) -> Result<bool, RendererError> {
         self.clear_frame_stats();
-        match self.prepare_once(device, queue, display_list, scale) {
-            Err(RendererError::VectorAtlasFull) => {
-                self.atlas.clear();
-                self.variants.clear();
-                self.prepare_once(device, queue, display_list, scale)
-                    .map(|_| true)
+        let mut reset = false;
+        let mut changed = false;
+        loop {
+            match self.prepare_once(device, queue, display_list, scale) {
+                Err(RendererError::VectorAtlasFull) if !reset => {
+                    if self.atlas.size() < MAX_ATLAS_SIZE {
+                        self.atlas = VectorAtlas::new(device, self.atlas.size() * 2);
+                        self.texture_group = self.pipeline.texture_group(
+                            device,
+                            &self.atlas.view,
+                            &self.atlas.sampler,
+                        );
+                    } else {
+                        self.atlas.clear();
+                        reset = true;
+                    }
+                    self.variants.clear();
+                    changed = true;
+                }
+                result => return result.map(|updated| updated || changed),
             }
-            result => result,
         }
     }
 
@@ -214,7 +229,7 @@ fn raster_dimensions(vector: &VectorPrimitive, source: Size, scale: f32) -> [u32
 
 fn pixel_extent(value: f32) -> u32 {
     if value.is_finite() {
-        value.ceil().clamp(1.0, 2040.0) as u32
+        value.ceil().clamp(1.0, (MAX_ATLAS_SIZE - 8) as f32) as u32
     } else {
         1
     }

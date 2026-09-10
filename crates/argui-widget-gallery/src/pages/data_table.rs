@@ -1,22 +1,64 @@
 use argui::{
     core::Point,
     runtime::{Context, Render},
-    ui::{Element, EventType, ScrollRequest, UiEvent, UiEventKind, VirtualAlignment, VirtualList},
+    ui::{
+        Element, EventType, ScrollRequest, UiEvent, UiEventKind, VirtualAlignment, VirtualList,
+        VirtualWindow,
+    },
     widgets::{DataColumn, DataRow, DataTable, DataTableModel, TableColumn, shadcn},
 };
 
+#[derive(Clone)]
+struct Task {
+    title: String,
+    owner: &'static str,
+    status: &'static str,
+    hours: i32,
+}
+
 pub(crate) struct TableDemo {
-    model: DataTableModel<i32>,
+    icons: argui::widgets::WidgetAssets,
+    model: DataTableModel<Task>,
     heights: VirtualList,
     offset: f32,
+    window: Option<VirtualWindow>,
 }
-impl Default for TableDemo {
-    fn default() -> Self {
+impl TableDemo {
+    pub(crate) fn new(icons: &argui::widgets::WidgetAssets) -> Self {
+        let mut title = DataColumn::new("task", TableColumn::new("Task", 280.0), |task: &Task| {
+            task.title.clone()
+        });
+        title.compare = Some(Box::new(|a, b| a.title.cmp(&b.title)));
+        let mut status = DataColumn::new(
+            "status",
+            TableColumn::new("Status", 148.0),
+            |task: &Task| task.status.into(),
+        );
+        status.compare = Some(Box::new(|a, b| a.status.cmp(b.status)));
+        status.render = Some(Box::new(|task, theme| {
+            Element::text(task.status)
+                .text_style(argui::text::TextStyle {
+                    color: theme.foreground,
+                    font_size: 12.0,
+                    line_height: 18.0,
+                    wrap: argui::text::TextWrap::None,
+                    ..Default::default()
+                })
+                .padding(argui::ui::sides(8.0, 3.0))
+                .background(theme.muted)
+                .radius(argui::paint::CornerRadii::all(6.0))
+        }));
+        let mut owner = DataColumn::new(
+            "owner",
+            TableColumn::new("Assignee", 172.0),
+            |task: &Task| task.owner.into(),
+        );
+        owner.compare = Some(Box::new(|a, b| a.owner.cmp(b.owner)));
         let mut column =
-            DataColumn::new("value", TableColumn::new("Value", 240.0), |value: &i32| {
-                value.to_string()
+            DataColumn::new("value", TableColumn::new("Hours", 120.0), |task: &Task| {
+                task.hours.to_string()
             });
-        column.compare = Some(Box::new(i32::cmp));
+        column.compare = Some(Box::new(|a, b| a.hours.cmp(&b.hours)));
         column.validate = Some(Box::new(|_, value| {
             value
                 .parse::<i32>()
@@ -24,18 +66,33 @@ impl Default for TableDemo {
                 .map_err(|_| "Enter an integer".into())
         }));
         Self {
+            icons: icons.clone(),
             model: DataTableModel::new(
                 (0..10_000)
                     .map(|value| DataRow {
                         id: value.to_string(),
-                        value,
+                        value: Task {
+                            title: [
+                                "Audit the design system",
+                                "Build the settings page",
+                                "Review keyboard navigation",
+                                "Update the documentation",
+                                "Polish empty states",
+                                "Ship the component gallery",
+                            ][value as usize % 6]
+                                .into(),
+                            owner: ["Alex Morgan", "Sam Chen", "Jordan Lee"][value as usize % 3],
+                            status: ["In progress", "Done", "Backlog"][value as usize % 3],
+                            hours: value % 24,
+                        },
                     })
                     .collect(),
-                vec![column],
+                vec![title, status, owner, column],
             )
             .expect("unique rows"),
-            heights: VirtualList::variable(10_000, 44.0, 320.0),
+            heights: VirtualList::variable(10_000, 52.0, 364.0),
             offset: 0.0,
+            window: None,
         }
     }
 }
@@ -45,7 +102,9 @@ impl TableDemo {
             && event.target_key() == Some("grid::rows")
         {
             self.offset = offset.y;
-            cx.notify();
+            if self.window.as_ref() != Some(&self.heights.window(self.offset)) {
+                cx.notify();
+            }
             return;
         }
         let Some(action) =
@@ -62,10 +121,13 @@ impl TableDemo {
                     let row = self.model.row(index).expect("current row");
                     DataRow {
                         id: row.id.clone(),
-                        value: if row.id == commit.address.row {
-                            value
-                        } else {
-                            row.value
+                        value: Task {
+                            hours: if row.id == commit.address.row {
+                                value
+                            } else {
+                                row.value.hours
+                            },
+                            ..row.value.clone()
                         },
                     }
                 })
@@ -113,13 +175,30 @@ impl TableDemo {
 impl Render for TableDemo {
     fn render(&mut self, cx: &mut Context<Self>) -> Element {
         let themes = shadcn(cx.environment().primary);
-        DataTable::new("grid", &self.model, &self.heights, self.offset)
-            .build(themes.resolve(cx.environment().color_scheme))
-            .on(cx.listener(EventType::Click, Self::event))
-            .on(cx.listener(EventType::Key, Self::event))
-            .on(cx.listener(EventType::Input, Self::event))
-            .on(cx.listener(EventType::Submit, Self::event))
-            .on(cx.listener(EventType::Scroll, Self::event))
-            .on(cx.listener(EventType::Gesture, Self::event))
+        let theme = themes.resolve(cx.environment().color_scheme);
+        self.window = Some(self.heights.window(self.offset));
+        Element::column([
+            DataTable::new("grid", &self.model, &self.heights, self.offset)
+                .icons(&self.icons)
+                .build(theme),
+            Element::text(format!(
+                "{} of {} rows selected",
+                self.model.selection().selected.len(),
+                self.model.collection().len()
+            ))
+            .text_style(argui::text::TextStyle {
+                color: theme.muted_foreground,
+                font_size: 13.0,
+                line_height: 20.0,
+                ..Default::default()
+            }),
+        ])
+        .gap(12.0)
+        .on(cx.listener(EventType::Click, Self::event))
+        .on(cx.listener(EventType::Key, Self::event))
+        .on(cx.listener(EventType::Input, Self::event))
+        .on(cx.listener(EventType::Submit, Self::event))
+        .on(cx.listener(EventType::Scroll, Self::event))
+        .on(cx.listener(EventType::Gesture, Self::event))
     }
 }

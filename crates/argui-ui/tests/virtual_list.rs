@@ -126,3 +126,17 @@ fn pinned_rows_keep_their_position_without_traversing_the_gap() {
         }
     }
 }
+
+#[test]
+fn virtual_rows_compare_their_measurement_owner_without_scanning_the_collection() {
+    use argui_ui::{TreeUpdate, UiTree};
+    let list = VirtualList::variable(100_000, 30.0, 300.0);
+    let build = |list: &VirtualList| list.build("rows", 0.0, |i| Element::text(i.to_string()));
+    let first = build(&list);
+    assert_eq!(first, build(&list));
+    let mut tree = UiTree::new(first);
+    assert_eq!(tree.update(build(&list)), TreeUpdate::None);
+    // Equal initial sizes must still route future measurements to the replacement owner.
+    let replacement = VirtualList::variable(100_000, 30.0, 300.0);
+    assert_eq!(tree.update(build(&replacement)), TreeUpdate::Layout);
+}

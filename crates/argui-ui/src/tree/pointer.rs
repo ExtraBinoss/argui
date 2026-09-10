@@ -12,7 +12,21 @@ impl UiTree {
         let update = self
             .interaction
             .pointer_moved(PointerEvent::mouse(PointerPhase::Moved, point), regions);
-        self.decorate(update)
+        self.decorate_pointer(update)
+    }
+
+    fn decorate_pointer(&mut self, update: crate::interaction::RawUpdate) -> InteractionUpdate {
+        if update.paint_changed {
+            return self.decorate(update);
+        }
+        InteractionUpdate {
+            events: update
+                .events
+                .into_iter()
+                .flat_map(|(target, kind)| self.event_deliveries(target, kind))
+                .collect(),
+            ..InteractionUpdate::default()
+        }
     }
 
     pub fn pointer_event(
@@ -34,7 +48,7 @@ impl UiTree {
             match event.phase {
                 PointerPhase::Entered | PointerPhase::Moved => {
                     let update = self.interaction.pointer_moved(event, regions);
-                    self.decorate(update)
+                    self.decorate_pointer(update)
                 }
                 PointerPhase::Pressed => {
                     let moved = self

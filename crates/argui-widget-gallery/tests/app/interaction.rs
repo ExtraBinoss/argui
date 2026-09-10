@@ -1,11 +1,7 @@
+use super::pointer_click;
 use argui::{
-    core::{
-        Key, KeyInput, KeyState, Modifiers, Point, PointerButton, PointerEvent, PointerPhase, Rect,
-        Size,
-    },
-    layout::LayoutEngine,
+    core::{Key, KeyInput, KeyState, Modifiers, Point, Rect, Size},
     runtime::{Context, Entity, LayoutBounds, LayoutSnapshot, Mount, Render},
-    text::TextEngine,
     ui::{
         ClickEvent, Element, ElementKind, GestureDelivery, GestureEvent, GestureKind, GesturePhase,
         UiEventKind, UiTree,
@@ -76,38 +72,6 @@ fn dispatch(app: &Mount<WidgetGallery>, key: &str, kind: UiEventKind) {
 
 fn click(app: &Mount<WidgetGallery>, key: &str) {
     dispatch(app, key, UiEventKind::Click(ClickEvent::accessibility()));
-}
-
-fn pointer_click<A: Render>(app: &Mount<A>, key: &str) {
-    let mut tree = UiTree::new(app.render(Default::default()).unwrap());
-    let mut text = TextEngine::new();
-    let output = LayoutEngine::new()
-        .compute(&mut tree, &mut text, Size::new(1_254.0, 707.0))
-        .unwrap();
-    let region = output
-        .hit_regions
-        .iter()
-        .find(|region| tree.key(region.node) == Some(key))
-        .unwrap_or_else(|| panic!("missing hit region {key}"));
-    let point = Point::new(
-        region.bounds.origin.x + region.bounds.size.width * 0.5,
-        region.bounds.origin.y + region.bounds.size.height * 0.5,
-    );
-    for (phase, buttons) in [(PointerPhase::Pressed, 1), (PointerPhase::Released, 0)] {
-        let update = tree.pointer_event(
-            PointerEvent {
-                button: Some(PointerButton::Primary),
-                buttons,
-                ..PointerEvent::mouse(phase, point)
-            },
-            &output.hit_regions,
-        );
-        for event in update.events {
-            if event.should_dispatch() {
-                app.dispatch_event(&event).unwrap();
-            }
-        }
-    }
 }
 
 fn key(key: Key, modifiers: Modifiers) -> UiEventKind {

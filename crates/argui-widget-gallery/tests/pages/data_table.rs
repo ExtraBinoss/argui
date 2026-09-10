@@ -33,6 +33,12 @@ fn grid_demo_edits_validates_sorts_and_keeps_active_rows_mounted() {
         keyed(&app.render(), "grid::cell::1:0value").unwrap(),
         "42"
     ));
+    click(&app, "nav::table");
+    click(&app, "nav::data-table");
+    assert!(contains_text(
+        keyed(&app.render(), "grid::cell::1:0value").unwrap(),
+        "42"
+    ));
     click(&app, "grid::sort::value");
     click(&app, "grid::sort::value");
     keyboard(&app, "grid::resize::value", Key::ArrowRight);
@@ -76,4 +82,23 @@ fn horizontal_scroll_notifications_do_not_change_the_vertical_virtual_window() {
         .map(str::to_owned)
         .collect();
     assert_eq!(before, after);
+}
+
+#[test]
+fn task_table_sorts_each_column_and_keeps_the_numeric_editor_scoped_to_hours() {
+    let app = Entity::new(WidgetGallery::default());
+    click(&app, "nav::data-table");
+    click(&app, "grid::cell::1:0task");
+    for column in ["task", "status", "owner", "value"] {
+        for _ in 0..2 {
+            click(&app, &format!("grid::sort::{column}"));
+            assert!(keyed(&app.render(), "grid").is_some());
+        }
+    }
+    click(&app, "grid::cell::1:0task");
+    keyboard(&app, "grid", Key::Enter);
+    assert!(keyed(&app.render(), "grid::edit::1:0task").is_none());
+    click(&app, "grid::cell::1:0value");
+    keyboard(&app, "grid", Key::Enter);
+    assert!(keyed(&app.render(), "grid::edit::1:0value").is_some());
 }

@@ -18,5 +18,9 @@ web-time.workspace = true
 [dev-dependencies]
 pollster.workspace = true
 
+[target.'cfg(target_os = "linux")'.dev-dependencies]
+# Creates a Wayland window for the native surface integration test.
+winit.workspace = true
+
 [lints]
 workspace = true

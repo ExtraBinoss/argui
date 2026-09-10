@@ -1,7 +1,7 @@
 use argui::{
-    core::{Color, ColorScheme, Key, KeyState, Size},
+    core::{Color, Key, KeyState, Size},
     paint::{Border, BorderWidths, CornerRadii, ImageFit, ImageId},
-    runtime::{Context, Entity, LayoutSnapshot, ThemeRequest, WindowEnvironment},
+    runtime::{Context, Entity, LayoutSnapshot, WindowEnvironment},
     text::{TextColor, TextStyle, TextWrap},
     theme::ThemeMode,
     ui::{
@@ -20,17 +20,9 @@ use argui_image::ImageLibrary;
 use crate::{navigation::Page, pages};
 
 mod interaction;
-
-pub(crate) static PRIMARIES: LazyLock<[Color; 6]> = LazyLock::new(|| {
-    [
-        Color::srgb(0.10, 0.45, 0.91),
-        Color::srgb(0.49, 0.23, 0.93),
-        Color::srgb(0.86, 0.20, 0.45),
-        Color::srgb(0.04, 0.62, 0.48),
-        Color::srgb(0.92, 0.42, 0.08),
-        Color::srgb(0.20, 0.68, 0.94),
-    ]
-});
+mod theme;
+pub(crate) use theme::PRIMARIES;
+use theme::mode_label;
 
 const EDITOR_DEFAULT_SIZE: Size = Size::new(520.0, 170.0);
 
@@ -57,6 +49,7 @@ pub struct WidgetGallery {
     pub(crate) select_highlight: usize,
     pub(crate) select_selected: Option<usize>,
     pub(crate) dialog_open: bool,
+    pub(crate) collapsible_open: bool,
     pub(crate) clicks: u32,
     pub(crate) editor_size: Size,
     editor_resize_start: Size,
@@ -65,7 +58,7 @@ pub struct WidgetGallery {
     pub(crate) glass: Entity<pages::liquid_glass::GlassDemo>,
     pub(crate) menus: Entity<pages::menus::MenusDemo>,
     pub(crate) dates: Entity<pages::dates::DatesDemo>,
-    pub(crate) data_table: Entity<pages::data_table::TableDemo>,
+    pub(crate) data_table: std::cell::OnceCell<Entity<pages::data_table::TableDemo>>,
     pub(crate) toasts: Entity<pages::toast::ToastDemo>,
     pub(crate) data: Entity<pages::data::DataDemo>,
     pub(crate) tasks: Entity<pages::async_tasks::TasksDemo>,
@@ -75,11 +68,12 @@ pub struct WidgetGallery {
     pub(crate) slider_state: RangeState,
     pub(crate) plain_slider_state: RangeState,
     images: ImageLibrary,
-    logo: ImageId,
+    pub(crate) logo: ImageId,
     light_assets: WidgetAssets,
     dark_assets: WidgetAssets,
     accent_assets: WidgetAssets,
     pub(crate) spinner: Entity<Spinner>,
+    pub(crate) progress: std::cell::OnceCell<Entity<pages::progress::ProgressDemo>>,
 }
 
 impl Default for WidgetGallery {
@@ -101,10 +95,10 @@ impl Default for WidgetGallery {
             scroll_demo: Entity::new(pages::scroll_effects::ScrollDemo::default()),
             webview: pages::webview::WebViewDemo::entity(),
             glass: Entity::new(pages::liquid_glass::GlassDemo::default()),
-            menus: Entity::new(pages::menus::MenusDemo::default()),
-            dates: Entity::new(pages::dates::DatesDemo::default()),
-            data_table: Entity::new(pages::data_table::TableDemo::default()),
-            toasts: Entity::new(pages::toast::ToastDemo::default()),
+            menus: Entity::new(pages::menus::MenusDemo::new(&dark_assets)),
+            dates: Entity::new(pages::dates::DatesDemo::new(&dark_assets)),
+            data_table: std::cell::OnceCell::new(),
+            toasts: Entity::new(pages::toast::ToastDemo::new(&dark_assets)),
             data: Entity::new(pages::data::DataDemo::default()),
             tasks: Entity::new(pages::async_tasks::TasksDemo::default()),
             actions: Entity::new(pages::actions::ActionsDemo::default()),
@@ -132,6 +126,7 @@ impl Default for WidgetGallery {
             select_highlight: 0,
             select_selected: Some(0),
             dialog_open: false,
+            collapsible_open: false,
             clicks: 0,
             editor_size: EDITOR_DEFAULT_SIZE,
             editor_resize_start: EDITOR_DEFAULT_SIZE,
@@ -143,6 +138,7 @@ impl Default for WidgetGallery {
             dark_assets,
             accent_assets,
             spinner,
+            progress: std::cell::OnceCell::new(),
         }
     }
 }
@@ -174,6 +170,7 @@ impl WidgetGallery {
             ])
             .grow(1.0)
             .min_height(length(0.0)),
+            cx.entity(&self.toasts),
         ])
         .keyed("gallery-root")
         .width(percent(1.0))
@@ -325,25 +322,6 @@ impl WidgetGallery {
                 y: Overflow::Auto,
             })
             .scroll_config(ScrollConfig::default().scrollbar(theme.scrollbar.clone()))
-    }
-
-    fn theme_request(&self) -> ThemeRequest {
-        ThemeRequest {
-            color_scheme: match self.theme_mode {
-                ThemeMode::Light => Some(ColorScheme::Light),
-                ThemeMode::Dark => Some(ColorScheme::Dark),
-                ThemeMode::System => None,
-            },
-            primary: Some(PRIMARIES[self.primary]),
-        }
-    }
-
-    fn cycle_theme(&mut self) {
-        self.theme_mode = match self.theme_mode {
-            ThemeMode::Light => ThemeMode::Dark,
-            ThemeMode::Dark => ThemeMode::System,
-            ThemeMode::System => ThemeMode::Light,
-        };
     }
 
     fn filtered_pages(&self) -> Vec<Page> {
@@ -585,13 +563,3 @@ pub(crate) fn text(value: impl Into<String>, size: f32, color: TextColor, weight
         ..TextStyle::default()
     })
 }
-
-const fn mode_label(mode: ThemeMode) -> &'static str {
-    match mode {
-        ThemeMode::Light => "Light",
-        ThemeMode::Dark => "Dark",
-        ThemeMode::System => "System",
-    }
-}
-
-use std::sync::LazyLock;

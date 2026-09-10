@@ -85,6 +85,9 @@ impl PortalPainter<'_> {
 }
 
 fn collect<'a>(node: &'a NodeMap, elements: &[&Element], portals: &mut Vec<&'a NodeMap>) {
+    if node.style.display == argui_ui::Display::None {
+        return;
+    }
     if elements[node.index].portal.is_some() {
         portals.push(node);
     }

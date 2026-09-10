@@ -5,7 +5,7 @@ use argui::{
         Context, Entity, LayoutSnapshot, Render,
         tasks::{self, TaskSlot},
     },
-    ui::{ActionState, CheckedState, Element, EventType, UiEvent},
+    ui::{ActionId, ActionInvocation, ActionState, CheckedState, Element, EventType, UiEvent},
     widgets::{
         Button, ContextMenu, Menu, MenuIntent, MenuItem, MenuItemKind, MenuResponse, Menubar,
         MenubarResponse, Typeahead, shadcn,
@@ -15,6 +15,7 @@ use std::time::Duration;
 use web_time::Instant;
 
 pub(crate) struct MenusDemo {
+    icons: argui::widgets::WidgetAssets,
     page: Page,
     open: bool,
     path: Vec<String>,
@@ -29,9 +30,10 @@ pub(crate) struct MenusDemo {
     origin: Instant,
     error: String,
 }
-impl Default for MenusDemo {
-    fn default() -> Self {
+impl MenusDemo {
+    pub(crate) fn new(icons: &argui::widgets::WidgetAssets) -> Self {
         Self {
+            icons: icons.clone(),
             page: Page::Menu,
             open: false,
             path: Vec::new(),
@@ -68,9 +70,15 @@ pub(crate) fn render(
 impl MenusDemo {
     fn menu(&self, key: &str) -> Menu {
         let entries = vec![
+            MenuItem::new(
+                "copy",
+                ActionInvocation::new(ActionId::COPY),
+                ActionState::new("Copy").shortcut(argui::ui::Shortcut::primary("c")),
+            )
+            .icon(self.icons.vector_id(argui::widgets::TablerIcon::Copy)),
             MenuItem::entry(
                 "check",
-                ActionState::new("Checkbox"),
+                ActionState::new("Show details"),
                 MenuItemKind::Checkbox(self.checked),
             ),
             MenuItem::entry("separator", ActionState::new(""), MenuItemKind::Separator),
@@ -100,6 +108,7 @@ impl MenusDemo {
             self.open && (self.page != Page::Menubar || self.active_menu == key),
             entries,
         );
+        menu = menu.icons(&self.icons);
         menu.path = self.path.clone();
         menu
     }
@@ -201,6 +210,7 @@ impl MenusDemo {
                 self.path.clear();
                 cx.notify();
                 let _ = event.prevent_default();
+                event.stop_propagation();
                 return;
             }
             context
@@ -271,7 +281,11 @@ impl Render for MenusDemo {
                 position: self.position,
             }
             .build(
-                Button::new("menu", "Right-click or Shift+F10", theme.outline_button()).build(),
+                Button::new("menu", "Right-click or Shift+F10", theme.outline_button())
+                    .build()
+                    .width(argui::ui::length(360.0))
+                    .max_width(argui::ui::percent(1.0))
+                    .height(argui::ui::length(180.0)),
                 theme,
             ),
             Page::Menubar => Menubar {

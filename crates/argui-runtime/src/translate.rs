@@ -21,6 +21,7 @@ pub(crate) fn key_input(event: KeyEvent, modifiers: Modifiers) -> KeyInput {
     KeyInput {
         key: match event.logical_key {
             WinitKey::Character(value) => Key::Character(value.to_string()),
+            WinitKey::Named(NamedKey::Space) => Key::Character(" ".into()),
             WinitKey::Named(named) => named_key(named),
             _ => Key::Other,
         },

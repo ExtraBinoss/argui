@@ -60,6 +60,9 @@ fn element_tracks(
             rect.origin.y -= track.to.y - track.from.y;
             tracks.push(track);
         }
+        if layout.portals.iter().any(|portal| portal.node == current) {
+            break;
+        }
         cursor = ui.parent_of(current);
     }
     tracks

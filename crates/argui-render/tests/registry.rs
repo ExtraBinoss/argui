@@ -31,6 +31,36 @@ fn registry_requires_namespaces_and_unique_ids() {
 }
 
 #[test]
+fn extending_a_registry_preserves_clones_order_and_validation() {
+    let first = EffectId::new("test.first");
+    let second = EffectId::new("test.second");
+    let original = EffectRegistry::new([definition(first)]).unwrap();
+    let extended = original
+        .clone()
+        .with_definition(definition(second))
+        .unwrap();
+    assert_eq!(
+        extended.definitions(),
+        &[definition(first), definition(second)]
+    );
+    assert_eq!(original.definitions(), &[definition(first)]);
+    assert!(original.get(second).is_none());
+    assert_eq!(extended.get(second), Some(&definition(second)));
+    assert!(matches!(
+        extended.clone().with_definition(definition(first)),
+        Err(argui_render::RendererError::DuplicateEffect("test.first"))
+    ));
+    const INVALID_PASSES: &[EffectPassDefinition] =
+        &[EffectPassDefinition::fragment("main", "invalid shader")];
+    let invalid = EffectDefinition::new(EffectId::new("test.unused"), PARAMETERS, INVALID_PASSES);
+    assert!(matches!(
+        extended.clone().with_definition(invalid),
+        Err(argui_render::RendererError::InvalidShader(_))
+    ));
+    assert_eq!(extended.definitions().len(), 2);
+}
+
+#[test]
 fn instances_are_checked_by_parameter_name_and_type() {
     let definition = definition(EffectId::new("test.effect"));
     assert!(

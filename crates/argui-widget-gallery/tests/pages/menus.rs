@@ -34,7 +34,10 @@ fn menu_pages_share_keyboard_navigation_indicators_and_controlled_selection() {
                 .checked,
             Some(CheckedState::Mixed)
         );
-        assert!(contains_text(keyed(&root, &check).unwrap(), "−"));
+        assert!(matches!(
+            keyed(&root, &check).unwrap().children[0].kind,
+            argui::ui::ElementKind::Vector { .. }
+        ));
         click(&app, &check);
         let root = app.render();
         assert_eq!(
@@ -47,7 +50,10 @@ fn menu_pages_share_keyboard_navigation_indicators_and_controlled_selection() {
                 .checked,
             Some(CheckedState::Checked)
         );
-        assert!(contains_text(keyed(&root, &check).unwrap(), "✓"));
+        assert!(matches!(
+            keyed(&root, &check).unwrap().children[0].kind,
+            argui::ui::ElementKind::Vector { .. }
+        ));
         keyboard(&app, &check, Key::Character("o".into()));
         keyboard(&app, &format!("{key}::item::options"), Key::ArrowRight);
         let radio = format!("{key}::item::second");
@@ -55,7 +61,10 @@ fn menu_pages_share_keyboard_navigation_indicators_and_controlled_selection() {
         let root = app.render();
         let row = keyed(&root, &radio).unwrap();
         assert_eq!(row.semantics.as_ref().unwrap().role, Role::MenuItemRadio);
-        assert!(contains_text(row, "●"));
+        assert!(matches!(
+            row.children[0].kind,
+            argui::ui::ElementKind::Vector { .. }
+        ));
         keyboard(&app, &radio, Key::Escape);
         assert!(keyed(&app.render(), &radio).is_none());
         keyboard(&app, &check, Key::Tab);

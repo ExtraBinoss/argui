@@ -219,7 +219,7 @@ impl EffectDefinition {
 #[derive(Clone, Debug, Default)]
 pub struct EffectRegistry(Arc<EffectRegistryInner>);
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 struct EffectRegistryInner {
     definitions: Vec<EffectDefinition>,
     indices: HashMap<EffectId, usize>,
@@ -229,20 +229,24 @@ impl EffectRegistry {
     pub fn new(
         definitions: impl IntoIterator<Item = EffectDefinition>,
     ) -> Result<Self, RendererError> {
-        let mut ordered = Vec::new();
-        let mut indices = HashMap::new();
+        let mut registry = Self::default();
         for definition in definitions {
-            definition.validate()?;
-            let id = definition.id;
-            if indices.insert(id, ordered.len()).is_some() {
-                return Err(RendererError::DuplicateEffect(id.0));
-            }
-            ordered.push(definition);
+            registry = registry.with_definition(definition)?;
         }
-        Ok(Self(Arc::new(EffectRegistryInner {
-            definitions: ordered,
-            indices,
-        })))
+        Ok(registry)
+    }
+
+    /// Adds one definition without revalidating existing immutable definitions.
+    pub fn with_definition(mut self, definition: EffectDefinition) -> Result<Self, RendererError> {
+        definition.validate()?;
+        let id = definition.id;
+        if self.0.indices.contains_key(&id) {
+            return Err(RendererError::DuplicateEffect(id.0));
+        }
+        let registry = Arc::make_mut(&mut self.0);
+        registry.indices.insert(id, registry.definitions.len());
+        registry.definitions.push(definition);
+        Ok(self)
     }
 
     #[must_use]

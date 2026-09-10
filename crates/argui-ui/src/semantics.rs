@@ -45,7 +45,7 @@ fn collect(
     bounds: &HashMap<NodeId, Rect>,
     scale: f32,
     index: &mut usize,
-    semantic_parent: Option<SemanticNodeId>,
+    semantic_parent: Option<usize>,
     is_root: bool,
     output: &mut Vec<SemanticNode>,
 ) {
@@ -73,9 +73,7 @@ fn collect(
         }
         semantics
     });
-    let current = semantics
-        .as_ref()
-        .map(|_| SemanticNodeId::new(node_id.get()));
+    let current = semantics.as_ref().map(|_| output.len());
     if let Some(semantics) = semantics {
         let id = SemanticNodeId::new(node_id.get());
         output.push(SemanticNode {
@@ -84,10 +82,8 @@ fn collect(
             semantics,
             children: Vec::new(),
         });
-        if let Some(parent) = semantic_parent
-            && let Some(parent) = output.iter_mut().find(|node| node.id == parent)
-        {
-            parent.children.push(id);
+        if let Some(parent) = semantic_parent {
+            output[parent].children.push(id);
         }
     }
     let parent = current.or(semantic_parent);

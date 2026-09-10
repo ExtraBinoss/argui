@@ -197,3 +197,70 @@ fn dispatch(gallery: &Entity<WidgetGallery>, key: &str, kind: UiEventKind) {
         }
     }
 }
+
+fn pointer_click<A: argui::runtime::Render>(app: &argui::runtime::Mount<A>, key: &str) {
+    let mut tree = UiTree::new(app.render(Default::default()).unwrap());
+    let mut text = argui::text::TextEngine::new();
+    let mut engine = argui::layout::LayoutEngine::new();
+    let mut output = engine
+        .compute(&mut tree, &mut text, argui::core::Size::new(1_254.0, 707.0))
+        .unwrap();
+    let target = tree
+        .node_ids()
+        .iter()
+        .copied()
+        .find(|node| tree.key(*node) == Some(key))
+        .unwrap_or_else(|| panic!("missing pointer target {key}"));
+    let mut ancestor = tree.parent_of(target);
+    while let Some(parent) = ancestor {
+        if let Some(region) = output
+            .scroll_regions
+            .iter()
+            .find(|region| region.node == parent)
+        {
+            let bounds = output
+                .nodes
+                .iter()
+                .find(|node| node.node == target)
+                .unwrap()
+                .bounds;
+            let delta = if bounds.origin.y < region.clip.origin.y {
+                bounds.origin.y - region.clip.origin.y
+            } else {
+                (bounds.origin.y + bounds.size.height
+                    - region.clip.origin.y
+                    - region.clip.size.height)
+                    .max(0.0)
+            };
+            let mut offset = tree.scroll_offset(parent);
+            offset.y = (offset.y + delta).clamp(0.0, region.max_offset.y);
+            tree.set_scroll_offset(parent, offset);
+            engine.apply_scroll(&tree, &mut output).unwrap();
+        }
+        ancestor = tree.parent_of(parent);
+    }
+    let region = output
+        .hit_regions
+        .iter()
+        .find(|region| tree.key(region.node) == Some(key))
+        .unwrap_or_else(|| panic!("missing hit region {key}"));
+    let point = Point::new(
+        region.bounds.origin.x + region.bounds.size.width * 0.5,
+        region.bounds.origin.y + region.bounds.size.height * 0.5,
+    );
+    for (phase, buttons) in [(PointerPhase::Pressed, 1), (PointerPhase::Released, 0)] {
+        let update = tree.pointer_event(
+            PointerEvent {
+                button: Some(argui::core::PointerButton::Primary),
+                buttons,
+                ..PointerEvent::mouse(phase, point)
+            },
+            &output.hit_regions,
+        );
+        for event in update.events {
+            if event.should_dispatch() {
+                app.dispatch_event(&event).unwrap();
+            }
+        }
+    }
+}

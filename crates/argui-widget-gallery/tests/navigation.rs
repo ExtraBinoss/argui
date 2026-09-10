@@ -47,7 +47,7 @@ fn navigation_rebuilds_widget_and_example_pages_from_public_events() {
     for (key, heading) in [
         ("nav::calendar", "Calendar"),
         ("nav::date-picker", "Date picker"),
-        ("nav::data-table", "Value"),
+        ("nav::data-table", "Hours"),
         ("nav::toast", "Show notification"),
         ("nav::input", "Input & Search"),
         ("nav::textarea", "Text area"),

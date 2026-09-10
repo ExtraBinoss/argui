@@ -175,3 +175,53 @@ pub use context_menu::ContextMenu;
 mod menubar;
 #[cfg(feature = "menu")]
 pub use menubar::{Menubar, MenubarResponse};
+
+#[cfg(feature = "badge")]
+mod badge;
+#[cfg(feature = "badge")]
+pub use badge::{Badge, BadgeVariant};
+
+#[cfg(feature = "card")]
+mod card;
+#[cfg(feature = "card")]
+pub use card::Card;
+
+#[cfg(feature = "alert")]
+mod alert;
+#[cfg(feature = "alert")]
+pub use alert::{Alert, AlertVariant};
+
+#[cfg(feature = "separator")]
+mod separator;
+#[cfg(feature = "separator")]
+pub use separator::Separator;
+
+#[cfg(feature = "collapsible")]
+mod collapsible;
+#[cfg(feature = "collapsible")]
+pub use collapsible::Collapsible;
+
+#[cfg(feature = "avatar")]
+mod avatar;
+#[cfg(feature = "avatar")]
+pub use avatar::Avatar;
+
+#[cfg(feature = "empty")]
+mod empty;
+#[cfg(feature = "empty")]
+pub use empty::Empty;
+
+#[cfg(feature = "kbd")]
+mod kbd;
+#[cfg(feature = "kbd")]
+pub use kbd::Kbd;
+
+#[cfg(feature = "aspect-ratio")]
+mod aspect_ratio;
+#[cfg(feature = "aspect-ratio")]
+pub use aspect_ratio::AspectRatio;
+
+#[cfg(feature = "progress")]
+mod progress;
+#[cfg(feature = "progress")]
+pub use progress::Progress;

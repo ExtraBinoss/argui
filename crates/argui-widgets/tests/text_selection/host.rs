@@ -343,3 +343,38 @@ fn selection_host_prevents_pointer_default_for_command_press_and_keeps_menu_open
         "argui::selection-menu::copy"
     ));
 }
+
+struct ContextTarget;
+impl Render for ContextTarget {
+    fn render(&mut self, cx: &mut Context<Self>) -> Element {
+        Element::column([Element::text("Target").keyed("context-target")]).on(cx.listener(
+            argui_ui::EventType::ContextMenu,
+            |_, event, _| {
+                assert!(event.prevent_default());
+            },
+        ))
+    }
+}
+
+#[test]
+fn handled_context_menu_does_not_also_open_the_selection_toolbar() {
+    let app = Entity::new(argui_widgets::SelectionHost::new(ContextTarget))
+        .mount()
+        .unwrap();
+    dispatch_key(
+        &app,
+        "context-target",
+        UiEventKind::ContextMenu {
+            position: Point::new(20.0, 24.0),
+            capabilities: SelectionCapabilities {
+                copy: true,
+                select_all: true,
+                ..Default::default()
+            },
+        },
+    );
+    assert!(!has_key(
+        &app.render(WindowEnvironment::default()).unwrap(),
+        "argui::selection-menu"
+    ));
+}

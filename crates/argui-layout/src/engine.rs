@@ -194,6 +194,7 @@ impl LayoutEngine {
     }
 
     fn sync_or_rebuild(&mut self, ui: &UiTree) -> Result<(), LayoutError> {
+        self.paint_cache.retain(ui);
         let Some(root) = self.root.take() else {
             return self.rebuild(ui);
         };
@@ -242,7 +243,7 @@ fn build_node(
         | ElementKind::Image { .. }
         | ElementKind::Vector { .. } => tree.new_leaf_with_context(style, index)?,
         ElementKind::Custom(_) | ElementKind::Container => {
-            let child_ids = children.iter().map(|child| child.id).collect::<Vec<_>>();
+            let child_ids = crate::overlay::layout_children(&children);
             tree.new_with_children(style, &child_ids)?
         }
     };
@@ -390,7 +391,10 @@ fn collect_layout(
     {
         let (content, offset) = match text_scroll {
             Some(metrics) => metrics,
-            None => (content_size(tree, node)?, ui.scroll_offset(node.node)),
+            None => (
+                scroll::content_size(tree, node)?,
+                ui.scroll_offset(node.node),
+            ),
         };
         output.scroll_regions.push(scroll::region(
             node.node,
@@ -496,7 +500,10 @@ fn apply_scroll_layout(
             .iter()
             .find(|region| region.node == node.node)
             .map_or_else(
-                || content_size(tree, node).map(|content| (content, ui.scroll_offset(node.node))),
+                || {
+                    scroll::content_size(tree, node)
+                        .map(|content| (content, ui.scroll_offset(node.node)))
+                },
                 |region| {
                     Ok((
                         region.scroll_content_size(),
@@ -564,27 +571,6 @@ fn sticky_origin(node: &NodeMap, origin: Point, size: Size, container: Option<Re
             .min(container.origin.x + container.size.width - right - size.width);
     }
     result
-}
-
-pub(crate) fn content_size(tree: &LayoutTree, node: &NodeMap) -> Result<Size, LayoutError> {
-    let layout = tree.layout(node.id)?;
-    let mut size = Size::new(
-        layout.size.width.max(layout.scrollable_overflow_rect.right),
-        layout
-            .size
-            .height
-            .max(layout.scrollable_overflow_rect.bottom),
-    );
-    for child in &node.children {
-        let child_layout = tree.layout(child.id)?;
-        size.width = size
-            .width
-            .max(child_layout.location.x + child_layout.size.width + layout.padding.right);
-        size.height = size
-            .height
-            .max(child_layout.location.y + child_layout.size.height + layout.padding.bottom);
-    }
-    Ok(size)
 }
 
 pub(crate) fn flattened(root: &Element) -> Vec<&Element> {

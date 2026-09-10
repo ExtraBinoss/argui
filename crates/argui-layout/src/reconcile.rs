@@ -67,10 +67,7 @@ fn reconcile_node(
             Vec::new(),
         ),
     };
-    let previous_ids = previous_children
-        .iter()
-        .map(|child| child.id)
-        .collect::<Vec<_>>();
+    let previous_ids = crate::overlay::layout_children(&previous_children);
     let mut retained = previous_children
         .into_iter()
         .map(|child| (child.node, child))
@@ -92,7 +89,7 @@ fn reconcile_node(
     for removed in retained.into_values() {
         remove_subtree(tree, removed)?;
     }
-    let child_ids = children.iter().map(|child| child.id).collect::<Vec<_>>();
+    let child_ids = crate::overlay::layout_children(&children);
     if previous_ids != child_ids {
         tree.set_children(id, &child_ids)?;
     }

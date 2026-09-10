@@ -23,16 +23,26 @@ use crate::{
 
 mod action_menu;
 pub(crate) mod actions;
+mod alert;
+mod aspect_ratio;
 pub(crate) mod async_tasks;
+mod avatar;
+mod badge;
 mod buttons;
+mod card;
+mod collapsible;
 pub(crate) mod data;
 pub(crate) mod data_table;
 pub(crate) mod dates;
 pub(crate) mod editing;
+mod empty;
 mod inputs;
+mod kbd;
 pub(crate) mod liquid_glass;
 pub(crate) mod menus;
+pub(crate) mod progress;
 pub(crate) mod scroll_effects;
+mod separator;
 pub(crate) mod timeline;
 pub(crate) mod toast;
 mod typography;
@@ -57,9 +67,27 @@ pub(crate) fn render(
         Page::Calendar | Page::DatePicker => {
             dates::render(&gallery.dates, gallery.page == Page::DatePicker, cx)
         }
-        Page::DataTable => cx.entity(&gallery.data_table),
-        Page::Toast => cx.entity(&gallery.toasts),
+        Page::DataTable => cx.entity(
+            gallery
+                .data_table
+                .get_or_init(|| argui::runtime::Entity::new(data_table::TableDemo::new(assets))),
+        ),
+        Page::Toast => toast::controls(&gallery.toasts, theme, cx),
         Page::List | Page::VList | Page::Table => data::render(&gallery.data, gallery.page, cx),
+        Page::Avatar => avatar::render(theme, gallery.logo),
+        Page::Empty => empty::render(theme, assets, cx),
+        Page::Kbd => kbd::render(theme),
+        Page::AspectRatio => aspect_ratio::render(theme, gallery.logo),
+        Page::Progress => cx.entity(
+            gallery
+                .progress
+                .get_or_init(|| argui::runtime::Entity::new(progress::ProgressDemo::default())),
+        ),
+        Page::Badge => badge::render(theme, assets),
+        Page::Card => card::render(theme, assets, cx),
+        Page::Alert => alert::render(theme, assets),
+        Page::Separator => separator::render(theme),
+        Page::Collapsible => collapsible::render(gallery, theme, assets, cx),
         Page::Button => buttons::render(gallery, theme, cx.entity(&gallery.spinner)),
         Page::Input => inputs::render(gallery, theme, assets),
         Page::TextArea => textarea(
@@ -520,6 +548,16 @@ const fn description(page: Page) -> &'static str {
         Page::Calendar => "Choose dates with arrows and PageUp/PageDown.",
         Page::DatePicker => "Type a date or choose it from the calendar.",
         Page::Toast => "Notifications with a bounded queue and explicit dismissal.",
+        Page::Avatar => "Images and initials with a shared accessible name.",
+        Page::Empty => "Give an empty view a useful message and a next step.",
+        Page::Kbd => "Keycaps and shortcut combinations.",
+        Page::AspectRatio => "Keep content at a consistent width-to-height ratio.",
+        Page::Progress => "Determinate and indeterminate progress, with reduced-motion support.",
+        Page::Badge => "Compact labels with variants and optional icons.",
+        Page::Card => "A surface with a title, description, content, action and footer.",
+        Page::Alert => "Inline messages with accessible announcements.",
+        Page::Separator => "Horizontal and vertical dividers, with optional centered labels.",
+        Page::Collapsible => "Show and hide content with a button, Enter or Space.",
         Page::Button => "Actions with variants, icons, loading and accessible activation.",
         Page::Input => "Controlled single-line and search fields.",
         Page::TextArea => "Multiline editing, scrolling, clipping and resize capture.",

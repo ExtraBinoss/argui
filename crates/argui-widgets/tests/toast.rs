@@ -96,7 +96,10 @@ fn host_announces_errors_and_pauses_for_pointer_or_action_focus() {
         close_label: "Close",
     };
     let themes = shadcn(Color::WHITE);
-    let tree = UiTree::new(host.build(themes.resolve(ColorScheme::Light)));
+    let tree = UiTree::new(host.build(
+        themes.resolve(ColorScheme::Light),
+        &argui_widgets::WidgetAssets::tabler(Color::WHITE),
+    ));
     assert!(
         tree.semantic_tree(&[], 1.0)
             .nodes
@@ -134,4 +137,65 @@ fn host_announces_errors_and_pauses_for_pointer_or_action_focus() {
         ))
         .is_none()
     );
+}
+
+#[test]
+fn notifications_float_at_the_viewport_corner_and_keep_every_variant_readable() {
+    use argui_core::{Color, ColorScheme, Size};
+    use argui_ui::{Element, UiTree};
+    use argui_widgets::{ToastHost, ToastVariant, WidgetAssets, shadcn};
+    let themes = shadcn(Color::from_srgb8(30, 100, 220));
+    let icons = WidgetAssets::tabler(Color::WHITE);
+    for variant in [
+        ToastVariant::Information,
+        ToastVariant::Success,
+        ToastVariant::Warning,
+        ToastVariant::Error,
+    ] {
+        let mut state = ToastState::new(1, 1, sec(0));
+        let mut notification = toast("notice");
+        notification.variant = variant;
+        notification.description = "Your changes have been saved.".into();
+        state.insert(notification, sec(0)).unwrap();
+        let host = ToastHost {
+            key: "host",
+            state: &state,
+            close_label: "Close notification",
+        };
+        for scheme in [ColorScheme::Light, ColorScheme::Dark] {
+            let theme = themes.resolve(scheme);
+            let built = host.build(theme, &icons);
+            assert!(
+                built.children[0]
+                    .layer
+                    .as_ref()
+                    .is_some_and(|layer| !layer.shadows.is_empty())
+            );
+            assert_eq!(
+                built.portal.as_ref().unwrap().layer,
+                argui_ui::WindowLayer::Popover
+            );
+            let mut tree = UiTree::new(Element::column([Element::text("Page"), built]));
+            let mut text = argui_text::TextEngine::new();
+            for width in [320.0, 1000.0] {
+                let output = argui_layout::LayoutEngine::new()
+                    .compute(&mut tree, &mut text, Size::new(width, 720.0))
+                    .unwrap();
+                let host_id = tree
+                    .node_ids()
+                    .iter()
+                    .find(|id| tree.key(**id) == Some("host"))
+                    .unwrap();
+                let bounds = output
+                    .nodes
+                    .iter()
+                    .find(|node| node.node == *host_id)
+                    .unwrap()
+                    .bounds;
+                assert!((bounds.origin.x + bounds.size.width - (width - 24.0)).abs() <= 1.0);
+                assert!((bounds.origin.y + bounds.size.height - 696.0).abs() <= 1.0);
+                assert!(bounds.origin.x >= 24.0);
+            }
+        }
+    }
 }

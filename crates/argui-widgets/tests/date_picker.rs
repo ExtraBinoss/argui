@@ -144,3 +144,27 @@ fn popup_navigation_selects_dates_and_ignores_unrelated_or_released_keys() {
     assert_eq!(selected.state.value, Some(date("2024-03-01")));
     assert!(!selected.state.open);
 }
+
+#[test]
+fn clicking_month_navigation_keeps_the_picker_open_and_the_value_unchanged() {
+    let today = date("2026-09-09");
+    let mut state = DatePickerState::new(Some(today), today, &IsoCalendarLocale);
+    state.open = true;
+    for (part, expected) in [("next", "2026-10-09"), ("previous", "2026-08-09")] {
+        let response = DatePicker::new("date", "Date", &state, today)
+            .action(&event(
+                &format!("date::calendar::{part}"),
+                UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
+            ))
+            .unwrap();
+        assert!(response.state.open);
+        assert!(!response.committed);
+        assert_eq!(response.state.value, Some(today));
+        assert_eq!(response.state.draft, "2026-09-09");
+        assert_eq!(response.state.calendar.active, date(expected));
+        assert_eq!(
+            response.focus,
+            Some(format!("date::calendar::day::{expected}").into())
+        );
+    }
+}

@@ -1,5 +1,7 @@
 use crate::{Button, Checkbox, Input, ToggleAction, ToggleBehavior, WidgetTheme};
 use argui_core::{Key, KeyState};
+use argui_paint::{Border, BorderWidths, CornerRadii, QuadStyle};
+use argui_text::{TextStyle, TextWrap};
 use argui_ui::{
     Element, FocusPolicy, GestureSet, GridPosition, Interaction, Role, SemanticState, Semantics,
     SortDirection, TapGesture, UiEvent, UiEventKind, VirtualList, length,
@@ -31,6 +33,7 @@ pub struct DataTable<'a, R> {
     pub heights: &'a VirtualList,
     pub offset: f32,
     pub select_page_label: String,
+    icons: Option<&'a crate::WidgetAssets>,
 }
 
 impl<'a, R> DataTable<'a, R> {
@@ -48,7 +51,12 @@ impl<'a, R> DataTable<'a, R> {
             heights,
             offset,
             select_page_label: "Select page".into(),
+            icons: None,
         }
+    }
+    pub fn icons(mut self, icons: &'a crate::WidgetAssets) -> Self {
+        self.icons = Some(icons);
+        self
     }
     pub fn cell_key(&self, address: &CellAddress) -> String {
         self.address_key("cell", address)
@@ -88,6 +96,20 @@ impl<'a, R> DataTable<'a, R> {
             "table heights must match the current page"
         );
         let columns: Vec<_> = self.model.visible_columns().collect();
+        let row_border = Border {
+            widths: BorderWidths {
+                bottom: 1.0,
+                ..BorderWidths::all(0.0)
+            },
+            color: theme.border,
+        };
+        let text = TextStyle {
+            color: theme.foreground,
+            font_size: 14.0,
+            line_height: 20.0,
+            wrap: TextWrap::None,
+            ..Default::default()
+        };
         let content_width = columns
             .iter()
             .map(|column| column.presentation.width)
@@ -101,12 +123,46 @@ impl<'a, R> DataTable<'a, R> {
                 .iter()
                 .find(|sort| sort.column == column.id)
                 .map(|sort| sort.direction);
+            let mut style = theme.ghost_button();
+            style.label.color = theme.muted_foreground;
+            style.label.font_size = 13.0;
+            style.layout.padding = argui_ui::sides(12.0, 0.0);
+            let indicator = self
+                .icons
+                .map_or_else(
+                    || {
+                        Element::text(match semantics.sort {
+                            Some(SortDirection::Ascending) => "^",
+                            Some(SortDirection::Descending) => "v",
+                            _ => ":",
+                        })
+                        .text_style(TextStyle {
+                            color: theme.muted_foreground,
+                            ..text.clone()
+                        })
+                    },
+                    |icons| {
+                        icons
+                            .icon(
+                                match semantics.sort {
+                                    Some(SortDirection::Ascending) => crate::TablerIcon::ArrowUp,
+                                    Some(SortDirection::Descending) => crate::TablerIcon::ArrowDown,
+                                    _ => crate::TablerIcon::ArrowsSort,
+                                },
+                                14.0,
+                            )
+                            .vector_color(theme.muted_foreground)
+                    },
+                )
+                .semantic_hidden(true);
             let button = Button::new(
                 format!("{}::sort::{}", self.key, column.id),
                 &column.presentation.label,
-                theme.ghost_button(),
+                style,
             )
+            .trailing(indicator)
             .build()
+            .justify_content(argui_ui::JustifyContent::SPACE_BETWEEN)
             .grow(1.0)
             .min_width(length(0.0));
             let mut separator = crate::SplitPane::new(
@@ -122,9 +178,14 @@ impl<'a, R> DataTable<'a, R> {
             }
             Element::row([button, separator])
                 .width(length(column.presentation.width))
+                .grow(1.0)
                 .shrink(0.0)
                 .semantics(semantics)
         }))
+        .height(length(44.0))
+        .shrink(0.0)
+        .background(theme.muted)
+        .border(row_border)
         .semantics(Semantics::new(Role::Row));
         let pinned = self
             .model
@@ -174,7 +235,7 @@ impl<'a, R> DataTable<'a, R> {
                         }
                     } else {
                         column.render.as_ref().map_or_else(
-                            || Element::text((column.value)(&row.value)),
+                            || Element::text((column.value)(&row.value)).text_style(text.clone()),
                             |render| render(&row.value, theme),
                         )
                     };
@@ -185,17 +246,40 @@ impl<'a, R> DataTable<'a, R> {
                         column_index: Some(column_index as u32 + 1),
                         ..Default::default()
                     };
-                    Element::container([content])
+                    let active = self.model.active.as_ref() == Some(&address);
+                    let mut cell = Element::row([content])
                         .keyed(self.cell_key(&address))
                         .width(length(column.presentation.width))
+                        .grow(1.0)
                         .shrink(0.0)
+                        .min_width(length(0.0))
+                        .padding(argui_ui::sides(12.0, 6.0))
+                        .align_items(argui_ui::AlignItems::CENTER)
                         .interaction(
                             Interaction::default()
                                 .focus_policy(FocusPolicy::None)
                                 .gestures(GestureSet::default().tap(TapGesture::default())),
                         )
-                        .semantics(semantics)
+                        .semantics(semantics);
+                    if active {
+                        cell = cell.border(Border::all(1.0, theme.ring));
+                    }
+                    cell
                 }))
+                .min_height(length(self.heights.estimated_extent()))
+                .background(if self.model.selection().selected.contains(&row.id) {
+                    theme.secondary
+                } else {
+                    theme.card
+                })
+                .border(row_border)
+                .interaction(Interaction::default())
+                .when(
+                    argui_ui::VisualState::Hovered,
+                    argui_ui::StylePatch::from_quad(
+                        QuadStyle::solid(theme.muted).border(row_border),
+                    ),
+                )
                 .keyed(format!("{}::row::{}", self.key, row.id))
                 .semantics(Semantics::new(Role::Row).state(SemanticState {
                     selected: self.model.selection().selected.contains(&row.id),
@@ -210,9 +294,11 @@ impl<'a, R> DataTable<'a, R> {
             ..Default::default()
         };
         let rows = rows
+            .shrink(0.0)
             .scroll_config(argui_ui::ScrollConfig::default().scrollbar(theme.scrollbar.clone()));
         let mut grid = Element::column([header, rows])
             .width(length(content_width))
+            .min_width(argui_ui::percent(1.0))
             .shrink(0.0)
             .keyed(&self.key)
             .semantics(semantics)
@@ -231,6 +317,9 @@ impl<'a, R> DataTable<'a, R> {
                 .keyed(format!("{}::horizontal", self.key))
                 .min_width(length(0.0))
                 .width(argui_ui::percent(1.0))
+                .border(Border::all(1.0, theme.border))
+                .radius(CornerRadii::all(8.0))
+                .background(theme.card)
                 .overflow(argui_ui::Axes {
                     x: argui_ui::Overflow::Auto,
                     y: argui_ui::Overflow::Hidden,
@@ -241,6 +330,7 @@ impl<'a, R> DataTable<'a, R> {
                         .scrollbar(theme.scrollbar.clone()),
                 ),
         ])
+        .gap(12.0)
         .width(argui_ui::percent(1.0))
         .min_width(length(0.0))
         .semantic_scope()

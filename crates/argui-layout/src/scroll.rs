@@ -7,6 +7,34 @@ use argui_ui::{
 
 use crate::engine::NodeMap;
 
+pub(crate) fn content_size(
+    tree: &crate::layout_tree::LayoutTree,
+    node: &NodeMap,
+) -> Result<Size, crate::LayoutError> {
+    let layout = tree.layout(node.id)?;
+    let mut size = Size::new(
+        layout.size.width.max(layout.scrollable_overflow_rect.right),
+        layout
+            .size
+            .height
+            .max(layout.scrollable_overflow_rect.bottom),
+    );
+    for child in node
+        .children
+        .iter()
+        .filter(|child| !crate::overlay::detached(&child.element))
+    {
+        let child_layout = tree.layout(child.id)?;
+        size.width = size
+            .width
+            .max(child_layout.location.x + child_layout.size.width + layout.padding.right);
+        size.height = size
+            .height
+            .max(child_layout.location.y + child_layout.size.height + layout.padding.bottom);
+    }
+    Ok(size)
+}
+
 pub(crate) fn clipped(node: &NodeMap, parent: Option<Rect>, bounds: Rect) -> Option<Rect> {
     if node.style.overflow.x.clips() || node.style.overflow.y.clips() {
         parent.and_then(|clip| clip.intersection(bounds))

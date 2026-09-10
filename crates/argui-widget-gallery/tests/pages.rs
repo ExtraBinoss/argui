@@ -39,6 +39,16 @@ fn all_pages_keep_finite_layout_when_narrow_dark_or_reduced_motion() {
     let mut tree = UiTree::new(app.render());
     for (slug, label) in [
         ("button", "Button"),
+        ("badge", "Badge"),
+        ("avatar", "Avatar"),
+        ("empty", "Empty"),
+        ("kbd", "Kbd"),
+        ("progress", "Progress"),
+        ("aspect-ratio", "Aspect ratio"),
+        ("card", "Card"),
+        ("alert", "Alert"),
+        ("separator", "Separator"),
+        ("collapsible", "Collapsible"),
         ("input", "Input & Search"),
         ("textarea", "Text area"),
         ("checkbox", "Checkbox"),
@@ -109,6 +119,53 @@ fn find_content(element: &Element) -> Option<&Element> {
     element.children.iter().find_map(find_content)
 }
 
+#[test]
+fn compact_display_labels_remain_complete_with_the_gallery_embedded_font() {
+    const FONT: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
+    let app = Entity::new(WidgetGallery::default());
+    let mut text = TextEngine::from_embedded_fonts([FONT], "Noto Sans", "Noto Sans", "Noto Sans");
+    let mut layout = LayoutEngine::new();
+    let mut tree = UiTree::new(app.render());
+    for (page, labels) in [
+        ("separator", ["Or continue with", "Preferences"].as_slice()),
+        (
+            "kbd",
+            ["Search components", "Change theme", "Enter", "Cmd"].as_slice(),
+        ),
+        ("aspect-ratio", ["1 : 1", "4 : 3", "16 : 9"].as_slice()),
+    ] {
+        click(&app, &format!("nav::{page}"));
+        for width in [800.0, 1220.0] {
+            tree.update(app.render());
+            let output = layout
+                .compute(&mut tree, &mut text, Size::new(width, 780.0))
+                .unwrap();
+            let prepared = text.prepare(&output.text, 1.0);
+            for label in labels {
+                let (index, block) = output
+                    .text
+                    .blocks()
+                    .iter()
+                    .enumerate()
+                    .find(|(_, block)| block.content.as_str() == *label)
+                    .unwrap_or_else(|| panic!("missing {label}"));
+                let end = prepared
+                    .glyphs
+                    .iter()
+                    .filter(|glyph| glyph.block == index)
+                    .map(|glyph| glyph.end)
+                    .max();
+                assert_eq!(end, Some(label.len()), "truncated {label} at width {width}");
+                let measured = text.measure(label, &block.style, Some(block.bounds.size.width));
+                assert_eq!(
+                    measured.height, block.style.line_height,
+                    "wrapped {label} at width {width}"
+                );
+            }
+        }
+    }
+}
+
 fn dispatch(app: &Entity<WidgetGallery>, key: &str, kind: UiEventKind) {
     let mut tree = UiTree::new(app.render());
     let node = tree
@@ -160,3 +217,13 @@ mod editing;
 mod menus;
 #[path = "pages/toast.rs"]
 mod toast;
+
+#[path = "pages/card.rs"]
+mod card;
+#[path = "pages/collapsible.rs"]
+mod collapsible;
+
+#[path = "pages/empty.rs"]
+mod empty;
+#[path = "pages/progress.rs"]
+mod progress;

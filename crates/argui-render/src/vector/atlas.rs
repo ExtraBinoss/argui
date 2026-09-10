@@ -4,7 +4,6 @@ use argui_paint::VectorId;
 
 use crate::RendererError;
 
-const ATLAS_SIZE: u32 = 2048;
 const GUTTER: u32 = 2;
 
 #[derive(Clone, Copy, Debug)]
@@ -25,6 +24,7 @@ pub(super) struct VectorAtlas {
     pub view: wgpu::TextureView,
     pub sampler: wgpu::Sampler,
     entries: HashMap<RasterKey, AtlasEntry>,
+    size: u32,
     cursor_x: u32,
     cursor_y: u32,
     row_height: u32,
@@ -32,12 +32,12 @@ pub(super) struct VectorAtlas {
 
 #[cfg_attr(coverage_nightly, coverage(off))]
 impl VectorAtlas {
-    pub fn new(device: &wgpu::Device) -> Self {
+    pub fn new(device: &wgpu::Device, size: u32) -> Self {
         let texture = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("argui-vector-atlas"),
             size: wgpu::Extent3d {
-                width: ATLAS_SIZE,
-                height: ATLAS_SIZE,
+                width: size,
+                height: size,
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
@@ -59,6 +59,7 @@ impl VectorAtlas {
             view,
             sampler,
             entries: HashMap::new(),
+            size,
             cursor_x: GUTTER,
             cursor_y: GUTTER,
             row_height: 0,
@@ -77,12 +78,15 @@ impl VectorAtlas {
     ) -> Result<AtlasEntry, RendererError> {
         let allocated_width = key.width + GUTTER * 2;
         let allocated_height = key.height + GUTTER * 2;
-        if self.cursor_x + allocated_width > ATLAS_SIZE {
+        if allocated_width + GUTTER > self.size || allocated_height + GUTTER > self.size {
+            return Err(RendererError::VectorAtlasFull);
+        }
+        if self.cursor_x + allocated_width > self.size {
             self.cursor_x = GUTTER;
             self.cursor_y += self.row_height;
             self.row_height = 0;
         }
-        if self.cursor_y + allocated_height > ATLAS_SIZE {
+        if self.cursor_y + allocated_height > self.size {
             return Err(RendererError::VectorAtlasFull);
         }
         let padded = pad_pixels(pixels, key.width, key.height);
@@ -111,7 +115,7 @@ impl VectorAtlas {
                 depth_or_array_layers: 1,
             },
         );
-        let divisor = ATLAS_SIZE as f32;
+        let divisor = self.size as f32;
         let entry = AtlasEntry {
             uv: [
                 x as f32 / divisor,
@@ -139,7 +143,11 @@ impl VectorAtlas {
     }
 
     pub const fn allocated_bytes(&self) -> u64 {
-        ATLAS_SIZE as u64 * ATLAS_SIZE as u64 * 4
+        self.size as u64 * self.size as u64 * 4
+    }
+
+    pub const fn size(&self) -> u32 {
+        self.size
     }
 }
 

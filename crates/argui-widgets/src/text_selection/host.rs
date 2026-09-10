@@ -88,7 +88,7 @@ impl<A: Render> Render for SelectionHost<A> {
         for event in EventType::ALL {
             root = root.on(cx
                 .listener(event, |host, event, cx| host.handle_event(event, cx))
-                .capture(true));
+                .capture(event != EventType::ContextMenu));
         }
         root
     }
@@ -206,7 +206,7 @@ impl<A: Render> SelectionHost<A> {
             UiEventKind::ContextMenu {
                 position,
                 capabilities,
-            } => {
+            } if !event.default_prevented() => {
                 if capabilities.cut
                     || capabilities.copy
                     || capabilities.paste

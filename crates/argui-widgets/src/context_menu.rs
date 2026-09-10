@@ -1,6 +1,6 @@
 use crate::{Menu, MenuResponse, WidgetTheme};
 use argui_core::{Key, KeyState, Point, Rect, Size};
-use argui_ui::{DismissPolicy, Element, FloatingPlacement, UiEvent, UiEventKind, WindowLayer};
+use argui_ui::{Element, FloatingPlacement, PortalTarget, UiEvent, UiEventKind};
 
 /// Context-menu presentation reuses the same entries and keyboard policy as Menu.
 pub struct ContextMenu {
@@ -10,28 +10,17 @@ pub struct ContextMenu {
 
 impl ContextMenu {
     pub fn build(&self, target: Element, theme: &WidgetTheme) -> Element {
-        let mut children = vec![target.keyed(&self.menu.key)];
-        if self.menu.open {
-            let placement = FloatingPlacement::default();
-            let mut content = self
-                .menu
-                .content(theme)
-                .keyed(format!("{}::content", self.menu.key))
-                .padding(argui_ui::Sides::length(6.0))
-                .background(theme.background)
-                .focus_scope(Menu::focus_scope());
-            content = if let Some(position) = self.position {
-                content.rect_portal(
-                    WindowLayer::Popover,
-                    Rect::new(position, Size::default()),
-                    placement,
-                )
-            } else {
-                content.anchored_portal(WindowLayer::Popover, &self.menu.key, placement)
+        let mut root = self.menu.build(target, theme);
+        if let Some(position) = self.position
+            && let Some(content) = root.children.get_mut(1)
+            && let Some(portal) = &mut content.portal
+        {
+            portal.target = PortalTarget::Rect {
+                bounds: Rect::new(position, Size::default()),
+                placement: FloatingPlacement::default().offset(2.0),
             };
-            children.push(content.portal_dismiss(DismissPolicy::OutsidePointer));
         }
-        Element::container(children).semantic_scope()
+        root
     }
 
     /// Returns the pointer anchor, or None for keyboard anchoring to the target.

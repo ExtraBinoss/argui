@@ -8,13 +8,14 @@ use argui::{
 };
 
 pub(crate) struct DatesDemo {
+    icons: argui::widgets::WidgetAssets,
     picker: bool,
     today: Date,
     calendar: CalendarState,
     date: DatePickerState,
 }
-impl Default for DatesDemo {
-    fn default() -> Self {
+impl DatesDemo {
+    pub(crate) fn new(icons: &argui::widgets::WidgetAssets) -> Self {
         let epoch = Date::from_calendar_date(1970, Month::January, 1).expect("epoch");
         let days = web_time::SystemTime::now()
             .duration_since(web_time::UNIX_EPOCH)
@@ -28,6 +29,7 @@ impl Default for DatesDemo {
         )
         .unwrap_or(Date::MAX);
         Self {
+            icons: icons.clone(),
             picker: false,
             today,
             calendar: CalendarState::new(today, CalendarSelection::Single(None)),
@@ -80,12 +82,17 @@ impl Render for DatesDemo {
         let themes = shadcn(cx.environment().primary);
         let theme = themes.resolve(cx.environment().color_scheme);
         let content = if self.picker {
-            DatePicker::new("date", "Choose a date", &self.date, self.today).build(theme)
+            DatePicker::new("date", "Choose a date", &self.date, self.today)
+                .icon(
+                    self.icons
+                        .icon(argui::widgets::TablerIcon::Calendar, 18.0)
+                        .vector_color(theme.foreground),
+                )
+                .build(theme)
         } else {
             Calendar::new("calendar", "Calendar", &self.calendar, self.today).build(theme)
         };
         content
-            .width(argui::ui::length(420.0))
             .on(cx.listener(EventType::Click, Self::event))
             .on(cx.listener(EventType::Key, Self::event))
             .on(cx.listener(EventType::Input, Self::event))

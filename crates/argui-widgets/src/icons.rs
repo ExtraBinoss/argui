@@ -3,8 +3,11 @@ use argui_ui::{Dimensions, Element, LayoutStyle, Semantics};
 use argui_vector::parse_svg;
 use icondata_core::IconData;
 use icondata_tb::{
-    TbCheckOutline, TbChevronDownOutline, TbClipboardOutline, TbCopyOutline, TbCutOutline,
-    TbDeviceDesktopOutline, TbLayoutSidebarLeftCollapseOutline, TbLoader2Outline, TbMoonOutline,
+    TbAlertCircleOutline, TbAlertTriangleOutline, TbArrowDownOutline, TbArrowUpOutline,
+    TbArrowsSortOutline, TbCalendarOutline, TbCheckOutline, TbChevronDownOutline,
+    TbChevronLeftOutline, TbChevronRightOutline, TbCircleCheckOutline, TbCircleFilled,
+    TbClipboardOutline, TbCopyOutline, TbCutOutline, TbDeviceDesktopOutline, TbInfoCircleOutline,
+    TbLayoutSidebarLeftCollapseOutline, TbLoader2Outline, TbMinusOutline, TbMoonOutline,
     TbResizeOutline, TbRestoreOutline, TbSearchOutline, TbSelectAllOutline, TbSunOutline,
     TbXOutline,
 };
@@ -27,10 +30,22 @@ pub enum TablerIcon {
     Cut,
     Paste,
     SelectAll,
+    ArrowUp,
+    ArrowDown,
+    ArrowsSort,
+    ChevronLeft,
+    ChevronRight,
+    Calendar,
+    Minus,
+    Circle,
+    Information,
+    Success,
+    Warning,
+    Error,
 }
 
 impl TablerIcon {
-    const ALL: [Self; 15] = [
+    const ALL: [Self; 27] = [
         Self::Search,
         Self::Sun,
         Self::Moon,
@@ -46,6 +61,18 @@ impl TablerIcon {
         Self::Cut,
         Self::Paste,
         Self::SelectAll,
+        Self::ArrowUp,
+        Self::ArrowDown,
+        Self::ArrowsSort,
+        Self::ChevronLeft,
+        Self::ChevronRight,
+        Self::Calendar,
+        Self::Minus,
+        Self::Circle,
+        Self::Information,
+        Self::Success,
+        Self::Warning,
+        Self::Error,
     ];
 
     const fn data(self) -> &'static IconData {
@@ -65,13 +92,26 @@ impl TablerIcon {
             Self::Cut => TbCutOutline,
             Self::Paste => TbClipboardOutline,
             Self::SelectAll => TbSelectAllOutline,
+            Self::ArrowUp => TbArrowUpOutline,
+            Self::ArrowDown => TbArrowDownOutline,
+            Self::ArrowsSort => TbArrowsSortOutline,
+
+            Self::ChevronLeft => TbChevronLeftOutline,
+            Self::ChevronRight => TbChevronRightOutline,
+            Self::Calendar => TbCalendarOutline,
+            Self::Minus => TbMinusOutline,
+            Self::Circle => TbCircleFilled,
+            Self::Information => TbInfoCircleOutline,
+            Self::Success => TbCircleCheckOutline,
+            Self::Warning => TbAlertTriangleOutline,
+            Self::Error => TbAlertCircleOutline,
         }
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct WidgetAssets {
-    ids: [Option<VectorId>; 15],
+    ids: [Option<VectorId>; 27],
     assets: Vec<VectorAsset>,
     color: Color,
 }
@@ -84,7 +124,7 @@ impl WidgetAssets {
 
     #[must_use]
     pub fn tabler_subset(color: Color, requested: impl IntoIterator<Item = TablerIcon>) -> Self {
-        let mut ids = [None; 15];
+        let mut ids = [None; 27];
         let icons = requested
             .into_iter()
             .collect::<std::collections::HashSet<_>>();
@@ -109,6 +149,7 @@ impl WidgetAssets {
                 size: Dimensions::length(size),
                 ..LayoutStyle::default()
             })
+            .shrink(0.0)
             .vector_color(self.color)
             .semantic_hidden(true)
     }

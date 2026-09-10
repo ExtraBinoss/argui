@@ -25,6 +25,7 @@ pub(crate) fn classify_update(
             && (old.has_container_queries() || new.has_container_queries()))
         || old.scroll.is_some() != new.scroll.is_some()
         || old.portal != new.portal
+        || old.virtual_item != new.virtual_item
         || old.children.len() != new.children.len()
         || binding_update == TreeUpdate::Layout
         || state_update == TreeUpdate::Layout

@@ -42,6 +42,21 @@ fn pointer_and_keyboard_opening_use_the_same_menu_with_different_anchors() {
         built.children[1].portal.as_ref().unwrap().target,
         PortalTarget::Rect { .. }
     ));
+    let surface = &built.children[1];
+    assert_eq!(
+        surface.paint.quad.border.unwrap().color,
+        theme.popover_border
+    );
+    assert_eq!(
+        surface.layer.as_ref().unwrap().shadows,
+        theme.overlay_shadows
+    );
+    assert!(surface.focus_scope.as_ref().unwrap().restore);
+    assert_eq!(
+        surface.portal.as_ref().unwrap().dismiss,
+        argui_ui::DismissPolicy::OutsidePointer
+    );
+    assert!(UiTree::new(built).semantic_diagnostics().is_empty());
     menu.position = None;
     let built = menu.build(Element::text("Target"), theme);
     assert!(matches!(

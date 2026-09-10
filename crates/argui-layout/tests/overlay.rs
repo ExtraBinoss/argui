@@ -149,6 +149,87 @@ fn constrained_portal_reflows_its_children() {
 }
 
 #[test]
+fn nested_popovers_do_not_expand_or_scroll_their_ancestors() {
+    let submenu = Element::column([Element::text("First"), Element::text("Second")])
+        .keyed("submenu")
+        .width(length(288.0))
+        .height(length(120.0))
+        .anchored_portal(
+            WindowLayer::Popover,
+            "options",
+            FloatingPlacement::new(Placement::RightStart),
+        );
+    let view = |open: bool| {
+        let menu = Element::column(
+            [
+                Element::text("Copy").height(length(36.0)),
+                Element::text("Options")
+                    .keyed("options")
+                    .height(length(36.0)),
+            ]
+            .into_iter()
+            .chain(open.then(|| submenu.clone())),
+        )
+        .keyed("menu")
+        .width(length(240.0))
+        .overflow(Axes {
+            x: Overflow::Auto,
+            y: Overflow::Auto,
+        })
+        .anchored_portal(
+            WindowLayer::Popover,
+            "trigger",
+            FloatingPlacement::new(Placement::BottomStart),
+        );
+        Element::column([
+            Element::text("Open").keyed("trigger").height(length(40.0)),
+            menu,
+        ])
+        .keyed("page")
+        .width(length(200.0))
+        .height(length(50.0))
+        .overflow(Axes {
+            x: Overflow::Auto,
+            y: Overflow::Auto,
+        })
+    };
+    let mut ui = UiTree::new(view(false));
+    let mut engine = LayoutEngine::new();
+    let mut text = text_engine();
+    for open in [false, true, false, true] {
+        ui.update(view(open));
+        let mut output = engine
+            .compute(&mut ui, &mut text, Size::new(800.0, 600.0))
+            .unwrap();
+        for _ in 0..2 {
+            for key in ["page", "menu"] {
+                let region = output
+                    .scroll_regions
+                    .iter()
+                    .find(|r| ui.key(r.node) == Some(key))
+                    .unwrap();
+                assert_eq!(region.max_offset, Point::default(), "{key}, open={open}");
+            }
+            if open {
+                let menu = output
+                    .portals
+                    .iter()
+                    .find(|p| ui.key(p.node) == Some("menu"))
+                    .unwrap();
+                let submenu = output
+                    .portals
+                    .iter()
+                    .find(|p| ui.key(p.node) == Some("submenu"))
+                    .unwrap();
+                assert!(submenu.bounds.origin.x >= menu.bounds.origin.x + menu.bounds.size.width);
+                assert_eq!(submenu.bounds.size, Size::new(288.0, 120.0));
+            }
+            engine.apply_scroll(&ui, &mut output).unwrap();
+        }
+    }
+}
+
+#[test]
 fn scrollable_overlay_translates_its_input_region_and_scrollbar() {
     let scrollbar = ScrollbarStyle::new(
         ScrollbarPartStyle::new(QuadStyle::solid(Color::srgb(0.1, 0.1, 0.1))),
@@ -255,4 +336,64 @@ fn portal_descendants_receive_hover_and_resolve_their_state_style() {
             .background,
         Some(Fill::Solid(theme.primary.with_alpha(0.20)))
     );
+}
+
+#[test]
+fn floating_layout_preserves_hidden_ancestors_and_can_return_to_normal_flow() {
+    use argui_ui::Display;
+    let view = |hidden, floating| {
+        let mut surface = Element::container([])
+            .keyed("surface")
+            .width(length(80.0))
+            .height(length(70.0))
+            .background(Color::WHITE);
+        if floating {
+            surface = surface.viewport_portal(WindowLayer::Popover, ViewportPlacement::centered());
+        }
+        Element::column([surface])
+            .keyed("parent")
+            .width(length(100.0))
+            .height(length(40.0))
+            .overflow(Axes {
+                x: Overflow::Auto,
+                y: Overflow::Auto,
+            })
+            .display(if hidden {
+                Display::None
+            } else {
+                Display::Block
+            })
+    };
+    let mut ui = UiTree::new(view(false, true));
+    let mut engine = LayoutEngine::new();
+    let mut text = text_engine();
+    for (hidden, floating) in [
+        (false, true),
+        (true, true),
+        (false, true),
+        (false, false),
+        (false, true),
+    ] {
+        ui.update(view(hidden, floating));
+        let layout = engine
+            .compute(&mut ui, &mut text, Size::new(400.0, 300.0))
+            .unwrap();
+        assert_eq!(
+            layout.nodes[1].bounds.size,
+            if hidden {
+                Size::default()
+            } else {
+                Size::new(80.0, 70.0)
+            }
+        );
+        if hidden {
+            assert!(layout.display_list.commands().is_empty());
+        } else {
+            assert_eq!(
+                layout.scroll_regions[0].max_offset.y,
+                if floating { 0.0 } else { 30.0 }
+            );
+        }
+        assert_eq!(engine.retained_node_count(), 2);
+    }
 }

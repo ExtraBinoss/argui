@@ -1,0 +1,122 @@
+[
+  {
+    "cpu_startup_s": 0.5,
+    "rss_mib": 98.38,
+    "pss_mib": 62.29,
+    "private_mib": 54.41,
+    "gpu_resident_mib": 95.52,
+    "features": "default",
+    "variant": "before",
+    "pair": 0
+  },
+  {
+    "cpu_startup_s": 0.36,
+    "rss_mib": 97.58,
+    "pss_mib": 61.42,
+    "private_mib": 53.46,
+    "gpu_resident_mib": 83.23,
+    "features": "default",
+    "variant": "after",
+    "pair": 0
+  },
+  {
+    "cpu_startup_s": 0.38,
+    "rss_mib": 101.46,
+    "pss_mib": 65.72,
+    "private_mib": 57.87,
+    "gpu_resident_mib": 81.36,
+    "features": "default",
+    "variant": "after",
+    "pair": 1
+  },
+  {
+    "cpu_startup_s": 0.53,
+    "rss_mib": 102.47,
+    "pss_mib": 66.44,
+    "private_mib": 58.57,
+    "gpu_resident_mib": 97.39,
+    "features": "default",
+    "variant": "before",
+    "pair": 1
+  },
+  {
+    "cpu_startup_s": 0.43,
+    "rss_mib": 98.23,
+    "pss_mib": 62.18,
+    "private_mib": 54.23,
+    "gpu_resident_mib": 99.4,
+    "features": "default",
+    "variant": "before",
+    "pair": 2
+  },
+  {
+    "cpu_startup_s": 0.42,
+    "rss_mib": 101.43,
+    "pss_mib": 65.57,
+    "private_mib": 57.69,
+    "gpu_resident_mib": 81.23,
+    "features": "default",
+    "variant": "after",
+    "pair": 2
+  },
+  {
+    "cpu_startup_s": 0.84,
+    "rss_mib": 153.71,
+    "pss_mib": 86.53,
+    "private_mib": 71.84,
+    "gpu_resident_mib": 97.4,
+    "features": "all-features",
+    "variant": "before",
+    "pair": 0
+  },
+  {
+    "cpu_startup_s": 0.8,
+    "rss_mib": 152.95,
+    "pss_mib": 85.8,
+    "private_mib": 71.03,
+    "gpu_resident_mib": 81.23,
+    "features": "all-features",
+    "variant": "after",
+    "pair": 0
+  },
+  {
+    "cpu_startup_s": 0.69,
+    "rss_mib": 152.92,
+    "pss_mib": 85.83,
+    "private_mib": 71.11,
+    "gpu_resident_mib": 81.23,
+    "features": "all-features",
+    "variant": "after",
+    "pair": 1
+  },
+  {
+    "cpu_startup_s": 0.9,
+    "rss_mib": 154.12,
+    "pss_mib": 86.88,
+    "private_mib": 72.2,
+    "gpu_resident_mib": 97.65,
+    "features": "all-features",
+    "variant": "before",
+    "pair": 1
+  },
+  {
+    "cpu_startup_s": 0.84,
+    "rss_mib": 153.94,
+    "pss_mib": 86.74,
+    "private_mib": 71.98,
+    "gpu_resident_mib": 97.4,
+    "features": "all-features",
+    "variant": "before",
+    "pair": 2
+  },
+  {
+    "cpu_startup_s": 0.68,
+    "rss_mib": 153.0,
+    "pss_mib": 86.04,
+    "private_mib": 71.29,
+    "gpu_resident_mib": 81.23,
+    "features": "all-features",
+    "variant": "after",
+    "pair": 2
+  }
+]

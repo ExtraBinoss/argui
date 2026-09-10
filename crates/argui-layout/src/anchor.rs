@@ -37,6 +37,7 @@ fn first_visible_keyed<'a>(
 ) -> Option<&'a crate::LayoutNode> {
     node.children
         .iter()
+        .filter(|child| child.element.portal.is_none())
         .flat_map(|child| {
             let own = (!child.element.semantic_hidden && child.element.key.is_some())
                 .then(|| output.nodes.get(child.index))

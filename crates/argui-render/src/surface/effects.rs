@@ -67,7 +67,7 @@ impl EffectPass {
 #[allow(clippy::too_many_arguments)]
 impl SurfaceRenderer {
     pub(super) fn validate_custom_effects(
-        &self,
+        &mut self,
         graph: &EffectGraph,
     ) -> Result<usize, RendererError> {
         let mut additional_passes = 0;
@@ -80,7 +80,10 @@ impl SurfaceRenderer {
             definition.validate_instance(effect)?;
             additional_passes += definition.passes.len().saturating_sub(1);
             if !self.effect.contains(effect.id) {
-                return Err(RendererError::MissingEffect(effect.id.0));
+                for (index, pass) in definition.passes.iter().enumerate() {
+                    self.effect
+                        .register(&self.device, definition.id, index, pass.wgsl)?;
+                }
             }
         }
         Ok(additional_passes)

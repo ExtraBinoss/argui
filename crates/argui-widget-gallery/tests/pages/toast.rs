@@ -30,3 +30,17 @@ fn toast_capacity_is_reported_and_closing_visible_entries_promotes_the_queue() {
     }
     assert!(!contains_text(&app.render(), "Notification 8"));
 }
+
+#[test]
+fn toast_remains_above_the_gallery_after_navigating_to_another_page() {
+    let app = Entity::new(WidgetGallery::default());
+    click(&app, "nav::toast");
+    click(&app, "toast-add");
+    click(&app, "nav::calendar");
+    let root = app.render();
+    assert!(keyed(&root, "toast-add").is_none());
+    assert!(contains_text(&root, "Notification 1"));
+    assert!(keyed(&root, "toasts").unwrap().portal.is_some());
+    click(&app, "toasts::close::1");
+    assert!(!contains_text(&app.render(), "Notification 1"));
+}

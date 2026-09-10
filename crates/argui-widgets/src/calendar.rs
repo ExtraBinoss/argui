@@ -1,7 +1,10 @@
 use crate::{Button, WidgetTheme};
 use argui_core::{Key, KeyState};
+use argui_paint::{Border, CornerRadii};
+use argui_text::{TextStyle, TextWrap};
 use argui_ui::{
-    Element, FocusPolicy, GridPosition, Role, SemanticState, Semantics, UiEvent, UiEventKind,
+    AlignItems, Element, FocusPolicy, GridPosition, JustifyContent, Role, SemanticState, Semantics,
+    Sides, UiEvent, UiEventKind, length, percent,
 };
 use time::{Date, Duration, Weekday};
 
@@ -14,6 +17,9 @@ pub trait CalendarLocale {
     }
     fn first_weekday(&self) -> Weekday;
     fn weekday(&self, weekday: Weekday) -> String;
+    fn short_weekday(&self, weekday: Weekday) -> String {
+        self.weekday(weekday).chars().take(3).collect()
+    }
     fn month(&self, date: Date) -> String;
     fn format(&self, date: Date) -> String;
     fn parse(&self, text: &str) -> Result<Date, String>;
@@ -29,7 +35,7 @@ impl CalendarLocale for IsoCalendarLocale {
         weekday.to_string()
     }
     fn month(&self, date: Date) -> String {
-        format!("{}-{:02}", date.year(), date.month() as u8)
+        format!("{} {}", date.month(), date.year())
     }
     fn format(&self, date: Date) -> String {
         date.to_string()
@@ -72,8 +78,20 @@ impl<'a> Calendar<'a> {
     }
 
     pub fn build(&self, theme: &WidgetTheme) -> Element {
-        self.build_days(theme, |date, _today, _selected| {
-            Element::text(date.day().to_string())
+        self.build_days(theme, |date, _today, selected| {
+            Element::text(date.day().to_string()).text_style(TextStyle {
+                color: if selected {
+                    theme.primary_foreground
+                } else if date.month() != self.state.month().month() {
+                    theme.muted_foreground
+                } else {
+                    theme.foreground
+                },
+                font_size: 14.0,
+                line_height: 20.0,
+                wrap: TextWrap::None,
+                ..Default::default()
+            })
         })
     }
 
@@ -92,10 +110,23 @@ impl<'a> Calendar<'a> {
             for _ in 0..offset {
                 weekday = weekday.next();
             }
-            Element::text(self.locale.weekday(weekday))
-                .grow(1.0)
-                .semantics(Semantics::new(Role::ColumnHeader).label(self.locale.weekday(weekday)))
+            Element::row([
+                Element::text(self.locale.short_weekday(weekday)).text_style(TextStyle {
+                    color: theme.muted_foreground,
+                    font_size: 12.0,
+                    line_height: 20.0,
+                    wrap: TextWrap::None,
+                    ..Default::default()
+                }),
+            ])
+            .justify_content(JustifyContent::CENTER)
+            .height(length(28.0))
+            .flex_basis(length(0.0))
+            .min_width(length(0.0))
+            .grow(1.0)
+            .semantics(Semantics::new(Role::ColumnHeader).label(self.locale.weekday(weekday)))
         }))
+        .gap(4.0)
         .semantics(Semantics::new(Role::Row));
         let rows = (0..6).map(|row| {
             Element::row((0..7).map(|column| {
@@ -104,21 +135,28 @@ impl<'a> Calendar<'a> {
                     .month()
                     .checked_add(Duration::days(row * 7 + column - i64::from(weekday)));
                 let Some(date) = date else {
-                    return Element::container([]).grow(1.0);
+                    return Element::container([]).flex_basis(length(0.0)).grow(1.0);
                 };
                 let selected = self.state.selection.contains(date);
                 let enabled = self.constraints.enabled(date);
-                let mut element = Button::new(
-                    self.day_key(date),
-                    self.locale.format(date),
-                    if selected {
-                        theme.button()
-                    } else {
-                        theme.ghost_button()
-                    },
-                )
-                .enabled(enabled)
-                .build();
+                let mut style = if selected {
+                    theme.button()
+                } else if date == self.today {
+                    theme.secondary_button()
+                } else {
+                    theme.ghost_button()
+                };
+                style.layout.padding = Sides::length(0.0);
+                style.focused = Some(argui_ui::StylePatch::from_quad(
+                    style
+                        .paint
+                        .quad
+                        .clone()
+                        .border(Border::all(2.0, theme.ring)),
+                ));
+                let mut element = Button::new(self.day_key(date), self.locale.format(date), style)
+                    .enabled(enabled)
+                    .build();
                 element.children =
                     vec![day(date, date == self.today, selected).semantic_hidden(true)];
                 if let Some(interaction) = &mut element.interaction {
@@ -140,8 +178,17 @@ impl<'a> Calendar<'a> {
                     column_index: Some(column as u32 + 1),
                     ..Default::default()
                 };
-                element.grow(1.0).semantics(semantics)
+                if !enabled {
+                    element = element.opacity(0.35);
+                }
+                element
+                    .flex_basis(length(0.0))
+                    .min_width(length(0.0))
+                    .grow(1.0)
+                    .semantics(semantics)
             }))
+            .gap(4.0)
+            .shrink(0.0)
             .semantics(Semantics::new(Role::Row))
         });
         let mut semantics = Semantics::new(Role::Grid).label(&self.label);
@@ -151,17 +198,88 @@ impl<'a> Calendar<'a> {
             ..Default::default()
         };
         Element::column([
-            Element::text(self.locale.month(self.state.month())).semantics(
-                Semantics::new(Role::Heading).label(self.locale.month(self.state.month())),
-            ),
-            Element::column(std::iter::once(header).chain(rows)).semantics(semantics),
+            Element::row([
+                self.month_button("previous", "Previous month", "‹", Key::PageUp, theme),
+                Element::text(self.locale.month(self.state.month()))
+                    .text_style(theme.ghost_button().label)
+                    .semantics(
+                        Semantics::new(Role::Heading).label(self.locale.month(self.state.month())),
+                    ),
+                self.month_button("next", "Next month", "›", Key::PageDown, theme),
+            ])
+            .align_items(AlignItems::CENTER)
+            .justify_content(JustifyContent::SPACE_BETWEEN),
+            Element::column(std::iter::once(header).chain(rows))
+                .gap(4.0)
+                .semantics(semantics),
         ])
+        .width(length(300.0))
+        .max_width(percent(1.0))
+        .padding(Sides::length(12.0))
+        .gap(12.0)
+        .background(theme.card)
+        .border(Border::all(1.0, theme.border))
+        .radius(CornerRadii::all(10.0))
         .keyed(&self.key)
         .semantic_scope()
     }
 
+    fn month_button(
+        &self,
+        part: &str,
+        label: &str,
+        glyph: &str,
+        key: Key,
+        theme: &WidgetTheme,
+    ) -> Element {
+        let enabled = self.state.clone().navigate(
+            &key,
+            Default::default(),
+            self.locale.first_weekday(),
+            &self.constraints,
+        );
+        Button::icon(
+            format!("{}::{part}", self.key),
+            label,
+            Element::text(glyph).text_style(TextStyle {
+                font_size: 24.0,
+                line_height: 24.0,
+                color: theme.foreground,
+                wrap: TextWrap::None,
+                ..Default::default()
+            }),
+            theme.ghost_button(),
+        )
+        .enabled(enabled)
+        .build()
+        .width(length(32.0))
+        .height(length(32.0))
+        .padding(Sides::length(0.0))
+        .opacity(if enabled { 1.0 } else { 0.35 })
+    }
+
     pub fn action(&self, event: &UiEvent) -> Option<CalendarState> {
         let key = event.target_key()?;
+        if matches!(event.kind, UiEventKind::Click(_)) {
+            let navigation = if key == format!("{}::previous", self.key) {
+                Some(Key::PageUp)
+            } else if key == format!("{}::next", self.key) {
+                Some(Key::PageDown)
+            } else {
+                None
+            };
+            if let Some(key) = navigation {
+                let mut next = self.state.clone();
+                return next
+                    .navigate(
+                        &key,
+                        Default::default(),
+                        self.locale.first_weekday(),
+                        &self.constraints,
+                    )
+                    .then_some(next);
+            }
+        }
         let date = key
             .strip_prefix(&format!("{}::day::", self.key))
             .and_then(|value| IsoCalendarLocale.parse(value).ok());

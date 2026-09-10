@@ -2,6 +2,16 @@
 pub enum Page {
     #[default]
     Button,
+    Badge,
+    Card,
+    Alert,
+    Separator,
+    Collapsible,
+    Avatar,
+    Empty,
+    Kbd,
+    Progress,
+    AspectRatio,
     Input,
     TextArea,
     Checkbox,
@@ -33,8 +43,18 @@ pub enum Page {
 }
 
 impl Page {
-    pub const ALL: [Self; 29] = [
+    pub const ALL: [Self; 39] = [
         Self::Button,
+        Self::Badge,
+        Self::Card,
+        Self::Alert,
+        Self::Separator,
+        Self::Collapsible,
+        Self::Avatar,
+        Self::Empty,
+        Self::Kbd,
+        Self::Progress,
+        Self::AspectRatio,
         Self::Input,
         Self::TextArea,
         Self::Checkbox,
@@ -68,6 +88,16 @@ impl Page {
     pub const fn category(self) -> &'static str {
         match self {
             Self::Button
+            | Self::Badge
+            | Self::Card
+            | Self::Alert
+            | Self::Separator
+            | Self::Collapsible
+            | Self::Avatar
+            | Self::Empty
+            | Self::Kbd
+            | Self::Progress
+            | Self::AspectRatio
             | Self::Input
             | Self::TextArea
             | Self::Checkbox
@@ -102,6 +132,16 @@ impl Page {
     pub const fn label(self) -> &'static str {
         match self {
             Self::Button => "Button",
+            Self::Badge => "Badge",
+            Self::Card => "Card",
+            Self::Alert => "Alert",
+            Self::Separator => "Separator",
+            Self::Collapsible => "Collapsible",
+            Self::Avatar => "Avatar",
+            Self::Empty => "Empty",
+            Self::Kbd => "Kbd",
+            Self::Progress => "Progress",
+            Self::AspectRatio => "Aspect ratio",
             Self::Input => "Input & Search",
             Self::TextArea => "Text area",
             Self::Checkbox => "Checkbox",
@@ -136,6 +176,16 @@ impl Page {
     pub const fn slug(self) -> &'static str {
         match self {
             Self::Button => "button",
+            Self::Badge => "badge",
+            Self::Card => "card",
+            Self::Alert => "alert",
+            Self::Separator => "separator",
+            Self::Collapsible => "collapsible",
+            Self::Avatar => "avatar",
+            Self::Empty => "empty",
+            Self::Kbd => "kbd",
+            Self::Progress => "progress",
+            Self::AspectRatio => "aspect-ratio",
             Self::Input => "input",
             Self::TextArea => "textarea",
             Self::Checkbox => "checkbox",

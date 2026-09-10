@@ -117,6 +117,11 @@ fn custom_measurement_paint_invalidation_and_state_lifetime() {
         .unwrap();
     assert_eq!(counts.dropped.get(), 1);
     assert!(layout.custom_stats().is_empty());
+    assert_eq!(
+        Rc::strong_count(&counts),
+        1,
+        "removed properties must be released too"
+    );
 }
 #[test]
 fn each_window_owns_its_custom_state_and_invalid_sizes_are_errors() {

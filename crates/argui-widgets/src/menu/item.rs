@@ -15,6 +15,7 @@ pub struct MenuItem {
     pub id: String,
     pub state: ActionState,
     pub kind: MenuItemKind,
+    pub icon: Option<argui_ui::VectorId>,
 }
 
 impl MenuItem {
@@ -23,6 +24,7 @@ impl MenuItem {
             id: id.into(),
             state,
             kind: MenuItemKind::Action(invocation),
+            icon: None,
         }
     }
     pub fn entry(id: impl Into<String>, state: ActionState, kind: MenuItemKind) -> Self {
@@ -30,7 +32,12 @@ impl MenuItem {
             id: id.into(),
             state,
             kind,
+            icon: None,
         }
+    }
+    pub fn icon(mut self, icon: argui_ui::VectorId) -> Self {
+        self.icon = Some(icon);
+        self
     }
     pub fn invocation(&self) -> Option<ActionInvocation> {
         if let MenuItemKind::Action(invocation) = self.kind {
@@ -61,7 +68,30 @@ pub(super) fn level(items: &[MenuItem]) -> Vec<&MenuItem> {
 }
 
 /// Reserve the same leading space for every actionable entry.
-pub(super) fn indicator(kind: &MenuItemKind, theme: &crate::WidgetTheme) -> argui_ui::Element {
+pub(super) fn indicator(
+    item: &MenuItem,
+    theme: &crate::WidgetTheme,
+    icons: Option<&crate::WidgetAssets>,
+) -> argui_ui::Element {
+    use crate::TablerIcon;
+    let kind = &item.kind;
+    let icon = match kind {
+        MenuItemKind::Checkbox(CheckedState::Checked) => Some(TablerIcon::Check),
+        MenuItemKind::Checkbox(CheckedState::Mixed) => Some(TablerIcon::Minus),
+        MenuItemKind::Radio { selected: true, .. } => Some(TablerIcon::Circle),
+        _ => None,
+    };
+    if let Some(id) = icon
+        .and_then(|icon| icons.map(|icons| icons.vector_id(icon)))
+        .or(item.icon)
+    {
+        return argui_ui::Element::vector(id)
+            .width(argui_ui::length(16.0))
+            .height(argui_ui::length(16.0))
+            .shrink(0.0)
+            .vector_color(theme.foreground)
+            .semantic_hidden(true);
+    }
     let mark = match kind {
         MenuItemKind::Checkbox(CheckedState::Checked) => "✓",
         MenuItemKind::Checkbox(CheckedState::Mixed) => "−",

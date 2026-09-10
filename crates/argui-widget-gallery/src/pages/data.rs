@@ -4,7 +4,7 @@ use argui::{
     runtime::{Context, Entity, Render},
     ui::{
         Element, EventType, ScrollRequest, UiEvent, UiEventKind, VirtualAlignment, VirtualList,
-        length,
+        VirtualWindow, length,
     },
     widgets::{Collection, CollectionItem, List, ListState, Table, TableColumn, VList, shadcn},
 };
@@ -15,6 +15,7 @@ pub(crate) struct DataDemo {
     selection: ListState,
     heights: VirtualList,
     offset: f32,
+    window: Option<VirtualWindow>,
 }
 
 impl Default for DataDemo {
@@ -23,8 +24,9 @@ impl Default for DataDemo {
             page: Page::List,
             items: items(8),
             selection: ListState::default(),
-            heights: VirtualList::variable(10_000, 40.0, 320.0),
+            heights: VirtualList::variable(10_000, 40.0, 320.0).overscan(8),
             offset: 0.0,
+            window: None,
         }
     }
 }
@@ -39,6 +41,7 @@ pub(crate) fn render(
             demo.page = page;
             demo.items = items(if page == Page::VList { 10_000 } else { 8 });
             demo.selection = ListState::default();
+            demo.offset = 0.0;
             cx.notify();
         });
     }
@@ -50,7 +53,11 @@ impl DataDemo {
         if let UiEventKind::Scrolled { offset, .. } = event.kind {
             if event.target_key() == Some("data") {
                 self.offset = offset.y;
-                cx.notify();
+                if self.page == Page::VList
+                    && self.window.as_ref() != Some(&self.heights.window(self.offset))
+                {
+                    cx.notify();
+                }
             }
             return;
         }
@@ -83,6 +90,7 @@ impl Render for DataDemo {
     fn render(&mut self, cx: &mut Context<Self>) -> Element {
         let themes = shadcn(cx.environment().primary);
         let theme = themes.resolve(cx.environment().color_scheme);
+        self.window = (self.page == Page::VList).then(|| self.heights.window(self.offset));
         let text_style = argui::text::TextStyle {
             color: theme.foreground,
             font_size: 14.0,

@@ -80,6 +80,7 @@ pub struct DatePicker<'a> {
     pub locale: &'a dyn CalendarLocale,
     pub constraints: CalendarConstraints<'a>,
     pub unavailable_message: &'a str,
+    icon: Option<Element>,
 }
 
 impl<'a> DatePicker<'a> {
@@ -97,7 +98,13 @@ impl<'a> DatePicker<'a> {
             locale: &IsoCalendarLocale,
             constraints: CalendarConstraints::default(),
             unavailable_message: "This date is unavailable",
+            icon: None,
         }
+    }
+
+    pub fn icon(mut self, icon: Element) -> Self {
+        self.icon = Some(icon);
+        self
     }
 
     pub fn input_key(&self) -> String {
@@ -124,38 +131,74 @@ impl<'a> DatePicker<'a> {
 
     pub fn build(&self, theme: &WidgetTheme) -> Element {
         let error_key = format!("{}::error", self.key);
-        let mut input = Input::new(self.input_key(), &self.state.draft, "", theme.input())
-            .label(&self.label)
-            .invalid(self.state.error.is_some())
-            .build();
+        let mut input = Input::new(
+            self.input_key(),
+            &self.state.draft,
+            self.locale.format(self.today),
+            theme.input(),
+        )
+        .label(&self.label)
+        .invalid(self.state.error.is_some())
+        .build()
+        .width(argui_ui::length(0.0))
+        .grow(1.0)
+        .shrink(1.0)
+        .min_width(argui_ui::length(0.0));
         if self.state.open {
             input = input.controls([format!("{}::content", self.popup_key())]);
         }
         if self.state.error.is_some() {
             input = input.described_by([error_key.clone()]);
         }
-        let trigger = Button::new(self.popup_key(), &self.label, theme.outline_button()).build();
+        let mut trigger = Button::new(self.popup_key(), &self.label, theme.outline_button());
+        if let Some(icon) = &self.icon {
+            trigger = trigger.content(icon.clone());
+        }
+        let trigger = trigger.build().padding(argui_ui::Sides::length(8.0));
         let popup = Popover::new(
             self.popup_key(),
             &self.label,
             self.state.open,
             trigger,
-            self.calendar().build(theme),
+            self.calendar()
+                .build(theme)
+                .width(argui_ui::percent(1.0))
+                .background(theme.popover)
+                .border(argui_paint::Border::all(0.0, theme.popover)),
         )
+        .placement(argui_ui::FloatingPlacement::new(
+            argui_ui::Placement::BottomEnd,
+        ))
         .trap_focus(true)
-        .size(360.0, 420.0)
+        .padding(0.0)
+        .size(300.0, 380.0)
         .build(theme);
-        let mut children = vec![Element::row([input, popup])];
+        let mut children = vec![
+            Element::row([input, popup])
+                .gap(8.0)
+                .align_items(argui_ui::AlignItems::CENTER),
+        ];
         if let Some(error) = &self.state.error {
             let mut semantics = Semantics::new(Role::Alert).label(error);
             semantics.live = LiveRegion::Polite;
             children.push(
                 Element::text(error.as_str())
+                    .text_style(argui_text::TextStyle {
+                        color: theme.destructive,
+                        font_size: 13.0,
+                        line_height: 18.0,
+                        ..Default::default()
+                    })
                     .keyed(error_key)
                     .semantics(semantics),
             );
         }
-        Element::column(children).keyed(&self.key).semantic_scope()
+        Element::column(children)
+            .width(argui_ui::length(300.0))
+            .max_width(argui_ui::percent(1.0))
+            .gap(8.0)
+            .keyed(&self.key)
+            .semantic_scope()
     }
 
     pub fn action(&self, event: &UiEvent) -> Option<DatePickerResponse> {
@@ -197,8 +240,9 @@ impl<'a> DatePicker<'a> {
         } else if state.open {
             let calendar = self.calendar();
             let next = calendar.action(event)?;
-            let selected = matches!(event.kind, UiEventKind::Click(_))
-                || matches!(&event.kind, UiEventKind::KeyInput(input) if input.key == Key::Enter || input.key == Key::Character(" ".into()));
+            let selected = key.starts_with(&format!("{}::calendar::day::", self.key))
+                && (matches!(event.kind, UiEventKind::Click(_))
+                    || matches!(&event.kind, UiEventKind::KeyInput(input) if input.key == Key::Enter || input.key == Key::Character(" ".into())));
             if selected {
                 state.draft = self.locale.format(next.active);
                 committed = state.commit(self.locale, &self.constraints, self.unavailable_message);

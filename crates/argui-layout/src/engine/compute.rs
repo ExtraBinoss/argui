@@ -73,13 +73,7 @@ impl LayoutEngine {
         }
         let elements = flattened(ui.root());
         let root = self.root.as_ref().ok_or(LayoutError::MissingRoot)?;
-        restore_portal_styles(
-            &mut self.tree,
-            &self.assets,
-            &elements,
-            ui,
-            &self.nodes_by_index,
-        )?;
+        restore_portal_styles(&mut self.tree, &self.assets, &elements, ui, root, false)?;
         compute_taffy(
             &mut self.tree,
             &self.assets,
@@ -90,9 +84,25 @@ impl LayoutEngine {
             text_engine,
         )?;
         let viewport_rect = Rect::new(Point::default(), viewport);
-        for constraint in
-            crate::overlay::constraints(&self.tree, root, &elements, ui, viewport_rect)?
-        {
+        for (index, element) in elements.iter().enumerate() {
+            if !crate::overlay::detached(element) {
+                continue;
+            }
+            let node = self.nodes_by_index[index];
+            compute_taffy(
+                &mut self.tree,
+                &self.assets,
+                node,
+                viewport,
+                &elements,
+                ui,
+                text_engine,
+            )?;
+            let Some(constraint) =
+                crate::overlay::constraint(&self.tree, root, &elements, ui, viewport_rect, node)?
+            else {
+                continue;
+            };
             let (node, size) = apply_constraint(&mut self.tree, constraint)?;
             compute_taffy(
                 &mut self.tree,
@@ -154,24 +164,23 @@ fn restore_portal_styles(
     assets: &AssetMetrics,
     elements: &[&argui_ui::Element],
     ui: &UiTree,
-    nodes: &[NodeId],
+    map: &super::NodeMap,
+    parent_hidden: bool,
 ) -> Result<(), LayoutError> {
-    for (index, element) in elements.iter().enumerate() {
-        if element.portal.is_none() {
-            continue;
+    let element = elements[map.index];
+    if element.portal.is_some() {
+        let style = assets.layout_style(ui.resolved_layout_style(map.node, element), &element.kind);
+        let mut style = taffy_style(&style);
+        if parent_hidden {
+            style.display = taffy::Display::None;
         }
-        let node = ui
-            .node_id_at(index)
-            .ok_or(LayoutError::MissingNodeIdentity(index))?;
-        let style = assets.layout_style(ui.resolved_layout_style(node, element), &element.kind);
-        let style = taffy_style(&style);
-        let id = nodes
-            .get(index)
-            .copied()
-            .ok_or(LayoutError::MissingNodeIdentity(index))?;
-        if tree.style(id)? != &style {
-            tree.set_style(id, style)?;
+        if tree.style(map.id)? != &style {
+            tree.set_style(map.id, style)?;
         }
+    }
+    let hidden = parent_hidden || tree.style(map.id)?.display == taffy::Display::None;
+    for child in &map.children {
+        restore_portal_styles(tree, assets, elements, ui, child, hidden)?;
     }
     Ok(())
 }

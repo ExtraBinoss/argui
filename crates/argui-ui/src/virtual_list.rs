@@ -25,11 +25,19 @@ pub struct MeasurementUpdate {
     pub corrected_offset: f32,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct VirtualItem {
     index: usize,
     viewport_extent: f32,
     state: Rc<RefCell<VariableExtents>>,
+}
+
+impl PartialEq for VirtualItem {
+    fn eq(&self, other: &Self) -> bool {
+        self.index == other.index
+            && self.viewport_extent == other.viewport_extent
+            && Rc::ptr_eq(&self.state, &other.state)
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]

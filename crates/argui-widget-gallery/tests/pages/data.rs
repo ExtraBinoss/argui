@@ -145,3 +145,158 @@ fn pointer_click(app: &Entity<WidgetGallery>, key: &str) {
         }
     }
 }
+
+#[test]
+fn scrolling_reuses_mounted_rows_until_the_virtual_window_changes() {
+    let app = Entity::new(WidgetGallery::default());
+    for (page, key) in [("vlist", "data"), ("data-table", "grid::rows")] {
+        click(&app, &format!("nav::{page}"));
+        let scroll = |offset| {
+            dispatch(
+                &app,
+                key,
+                UiEventKind::Scrolled {
+                    delta: Point::default(),
+                    offset: Point::new(0.0, offset),
+                },
+            )
+        };
+        let before = app.render();
+        scroll(1.0);
+        let within = app.render();
+        assert!(
+            find(&before, key)
+                .unwrap()
+                .ptr_eq(find(&within, key).unwrap())
+        );
+        scroll(800.0);
+        let next = app.render();
+        assert!(
+            !find(&within, key)
+                .unwrap()
+                .ptr_eq(find(&next, key).unwrap())
+        );
+
+        // Measurements can change spacers even while the visible indices stay the same.
+        let mut ui = UiTree::new(next);
+        LayoutEngine::new()
+            .compute(&mut ui, &mut TextEngine::new(), Size::new(900.0, 700.0))
+            .unwrap();
+        scroll(800.0);
+        let measured = app.render();
+        scroll(800.0);
+        assert!(
+            find(&measured, key)
+                .unwrap()
+                .ptr_eq(find(&app.render(), key).unwrap())
+        );
+    }
+    click(&app, "nav::table");
+    click(&app, "nav::vlist");
+    assert!(find(&app.render(), "data::row::0").is_some());
+}
+
+#[test]
+#[ignore = "Manual CPU profile: run with --cargo-profile release --run-ignored ignored-only"]
+fn profile_virtual_scrolling() {
+    use argui::ui::TreeUpdate;
+    use web_time::Instant;
+    const FONT: &[u8] = include_bytes!("../../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
+    let frames = std::env::var("ARGUI_PROFILE_FRAMES")
+        .ok()
+        .and_then(|value| value.parse::<usize>().ok())
+        .unwrap_or(120);
+    let app = Entity::new(WidgetGallery::default());
+    let mut text = TextEngine::from_embedded_fonts([FONT], "Noto Sans", "Noto Sans", "Noto Sans");
+    for (page, key) in [
+        ("vlist", "data"),
+        ("table", "data"),
+        ("data-table", "grid::rows"),
+    ] {
+        let started = Instant::now();
+        click(&app, &format!("nav::{page}"));
+        let mut ui = UiTree::new(app.render());
+        let mut engine = LayoutEngine::new();
+        let viewport = Size::new(1280.0, 900.0);
+        let mut layout = engine.compute(&mut ui, &mut text, viewport).unwrap();
+        let opened = started.elapsed();
+        let started = Instant::now();
+        let mut layouts = 0;
+        for step in 0..frames {
+            let target = ui
+                .node_ids()
+                .iter()
+                .copied()
+                .find(|node| ui.key(*node) == Some(key))
+                .unwrap();
+            let offset = Point::new(0.0, step as f32 * 4.0);
+            ui.set_scroll_offset(target, offset);
+            for event in ui.event_deliveries(
+                target,
+                UiEventKind::Scrolled {
+                    delta: Point::new(0.0, 4.0),
+                    offset,
+                },
+            ) {
+                if event.should_dispatch() {
+                    app.dispatch_event(&event);
+                }
+            }
+            match ui.update(app.render()) {
+                TreeUpdate::Layout => {
+                    layout = engine.compute(&mut ui, &mut text, viewport).unwrap();
+                    layouts += 1;
+                }
+                _ => engine.apply_scroll(&ui, &mut layout).unwrap(),
+            }
+            ui.pointer_moved(Point::new(380.0, 330.0), &layout.hit_regions);
+        }
+        eprintln!(
+            "{page}: open={:.2}ms, {frames} scroll frames={:.2}ms, layouts={layouts}, nodes={}",
+            opened.as_secs_f64() * 1000.0,
+            started.elapsed().as_secs_f64() * 1000.0,
+            ui.node_ids().len()
+        );
+        assert!(ui.node_ids().len() < 1000);
+    }
+}
+
+#[test]
+fn data_page_text_is_painted_on_the_first_layout_after_navigation() {
+    use argui::paint::DisplayCommand;
+    let app = Entity::new(WidgetGallery::default());
+    let mut ui = UiTree::new(app.render());
+    ui.set_reduced_motion(true);
+    let mut engine = LayoutEngine::new();
+    let mut text = TextEngine::new();
+    for (page, size) in [
+        ("table", Size::new(900.0, 700.0)),
+        ("data-table", Size::new(900.0, 700.0)),
+        ("vlist", Size::new(900.0, 700.0)),
+        ("table", Size::new(600.0, 450.0)),
+        ("data-table", Size::new(600.0, 450.0)),
+        ("table", Size::new(1100.0, 900.0)),
+    ] {
+        click(&app, &format!("nav::{page}"));
+        ui.update(app.render());
+        let warm = engine.compute(&mut ui, &mut text, size).unwrap();
+        let cold = LayoutEngine::new()
+            .compute(&mut ui, &mut text, size)
+            .unwrap();
+        let commands = |layout: &argui::layout::LayoutOutput| {
+            layout
+                .display_list
+                .commands()
+                .iter()
+                .filter(|c| matches!(c, DisplayCommand::Text { .. }))
+                .cloned()
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(
+            commands(&warm),
+            commands(&cold),
+            "{page}: retained text paint differs from a fresh layout"
+        );
+        assert_eq!(warm.text, cold.text, "{page}: stale text geometry");
+    }
+}

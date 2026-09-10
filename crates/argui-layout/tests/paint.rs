@@ -286,3 +286,49 @@ fn vectors_lower_to_the_shared_clipped_transformed_display_list() {
     assert_eq!(vector.opacity, 0.6);
     assert_eq!(vector.clips.regions().len(), 2);
 }
+
+#[test]
+fn cached_rows_keep_their_text_when_preceding_text_is_added_or_removed() {
+    let row = Element::row([Element::text("Item 1")])
+        .keyed("row")
+        .width(length(200.0))
+        .height(length(40.0));
+    let view = |show_label| {
+        Element::column([
+            if show_label {
+                Element::text("Header")
+            } else {
+                Element::container([])
+            }
+            .keyed("header")
+            .height(length(30.0)),
+            row.clone(),
+        ])
+        .width(length(200.0))
+        .height(length(100.0))
+        .overflow(Axes {
+            x: Overflow::Hidden,
+            y: Overflow::Auto,
+        })
+    };
+    let mut ui = UiTree::new(view(false));
+    let mut engine = LayoutEngine::new();
+    let mut text = text_engine();
+    engine
+        .compute(&mut ui, &mut text, Size::new(300.0, 150.0))
+        .unwrap();
+    for show_label in [true, false, true] {
+        ui.update(view(show_label));
+        let mut warm = engine
+            .compute(&mut ui, &mut text, Size::new(300.0, 150.0))
+            .unwrap();
+        let cold = LayoutEngine::new()
+            .compute(&mut ui, &mut text, Size::new(300.0, 150.0))
+            .unwrap();
+        assert_eq!(warm.text, cold.text);
+        assert_eq!(warm.display_list, cold.display_list);
+        engine.repaint(&ui, &mut warm);
+        assert_eq!(warm.display_list, cold.display_list);
+        assert!(warm.paint_stats.reused_subtrees > 0);
+    }
+}

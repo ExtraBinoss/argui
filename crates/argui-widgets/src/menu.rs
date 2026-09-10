@@ -43,6 +43,7 @@ pub struct Menu {
     presence: Option<crate::Presence>,
     pub path: Vec<String>,
     pub rtl: bool,
+    icons: Option<crate::WidgetAssets>,
 }
 
 impl Menu {
@@ -71,7 +72,13 @@ impl Menu {
             presence: None,
             path: Vec::new(),
             rtl: false,
+            icons: None,
         }
+    }
+    #[must_use]
+    pub fn icons(mut self, icons: &crate::WidgetAssets) -> Self {
+        self.icons = Some(icons.clone());
+        self
     }
     /// Retain entry/exit motion; the owner advances this presence each frame.
     #[must_use]
@@ -93,7 +100,7 @@ impl Menu {
         let mut popover = Popover::new(&self.key, &self.label, self.open, trigger, content)
             .trap_focus(false)
             .padding(6.0)
-            .size(340.0, 360.0);
+            .size(240.0, 360.0);
         if let Some(presence) = &self.presence {
             popover = popover.presence(presence);
         }
@@ -123,7 +130,12 @@ impl Menu {
             if let MenuItemKind::Group(children) = &item.kind {
                 let mut group = self.content_level(children, &item.state.label, theme);
                 group.semantics = Some(Semantics::new(Role::Group).label(&item.state.label));
-                return group;
+                return Element::column([
+                    Element::text(item.state.label.as_str())
+                        .text_style(theme.ghost_button().label)
+                        .padding(argui_ui::sides(8.0, 6.0)),
+                    group,
+                ]);
             }
             if matches!(item.kind, MenuItemKind::Separator) {
                 return Element::container([])
@@ -131,29 +143,48 @@ impl Menu {
                     .background(theme.border)
                     .semantics(Semantics::new(Role::Separator));
             }
-            let mut button = Button::new(
-                self.item_key(&item.id),
-                &item.state.label,
-                theme.ghost_button(),
-            )
-            .enabled(item.state.enabled)
-            .leading(item::indicator(&item.kind, theme));
+            let mut style = theme.ghost_button().instant_hover();
+            style.layout.padding = argui_ui::sides(8.0, 0.0);
+            style.label.weight = 400;
+            let mut button = Button::new(self.item_key(&item.id), &item.state.label, style)
+                .enabled(item.state.enabled)
+                .leading(item::indicator(item, theme, self.icons.as_ref()));
             if let Some(shortcut) = &item.state.shortcut {
-                button = button.trailing(
-                    Element::text(shortcut.label()).text_style(theme.ghost_button().label),
-                );
+                button = button.trailing(Element::text(shortcut.label()).text_style(
+                    argui_text::TextStyle {
+                        color: theme.muted_foreground,
+                        font_size: 12.0,
+                        wrap: argui_text::TextWrap::None,
+                        ..theme.ghost_button().label
+                    },
+                ));
             }
             if matches!(item.kind, MenuItemKind::Submenu(_)) {
-                button = button.trailing(
-                    Element::text(if self.rtl { "‹" } else { "›" })
-                        .text_style(theme.ghost_button().label)
-                        .semantic_hidden(true),
-                );
+                button = button.trailing(self.icons.as_ref().map_or_else(
+                    || {
+                        Element::text(if self.rtl { "‹" } else { "›" })
+                            .text_style(theme.ghost_button().label)
+                            .semantic_hidden(true)
+                    },
+                    |icons| {
+                        icons
+                            .icon(
+                                if self.rtl {
+                                    crate::TablerIcon::ChevronLeft
+                                } else {
+                                    crate::TablerIcon::ChevronRight
+                                },
+                                16.0,
+                            )
+                            .vector_color(theme.muted_foreground)
+                    },
+                ));
             }
             let mut element = button
                 .build()
                 .width(percent(1.0))
-                .justify_content(JustifyContent::SPACE_BETWEEN);
+                .justify_content(JustifyContent::START);
+            element.children[1] = element.children[1].clone().grow(1.0);
             element
                 .interaction
                 .as_mut()
