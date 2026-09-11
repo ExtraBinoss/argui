@@ -7,7 +7,11 @@ license.workspace = true
 
 [features]
 default = []
-all = ["avatar", "empty", "kbd", "aspect-ratio", "progress", "badge", "card", "alert", "separator", "collapsible", "data-table", "toast", "date-picker", "calendar", "button", "input", "checkbox", "switch", "radio-group", "tabs", "select", "popover", "dialog", "range", "slider", "spinner", "text-selection", "split-pane", "vlist", "list", "table", "tree-view", "icons", "menu", "command-palette"]
+all = ["label", "skeleton", "breadcrumb", "pagination", "avatar", "empty", "kbd", "aspect-ratio", "progress", "badge", "card", "alert", "separator", "collapsible", "data-table", "toast", "date-picker", "calendar", "button", "input", "checkbox", "switch", "radio-group", "tabs", "select", "popover", "dialog", "range", "slider", "spinner", "text-selection", "split-pane", "vlist", "list", "table", "tree-view", "icons", "menu", "command-palette"]
+label = []
+skeleton = ["dep:argui-runtime"]
+breadcrumb = ["button"]
+pagination = ["button"]
 avatar = []
 empty = []
 kbd = []

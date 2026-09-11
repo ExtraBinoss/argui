@@ -100,3 +100,6 @@ Le gate global échoue sur le renderer et le runtime, déjà sous le seuil de
 du chantier précédent sont toujours présentes dans le workspace. Aucun seuil
 ni exclusion de couverture n'a été modifié. Après communication de ce résultat,
 l'utilisateur a explicitement demandé de committer l'ensemble des changements.
+
+Suite du catalogue : [Label, Skeleton, Breadcrumb et Pagination](shadcn-navigation-widgets.md).
+Pour les prochains contrôles graphiques, utiliser [la procédure Linux invisible](linux_testing.md).

@@ -12,6 +12,10 @@ pub enum Page {
     Kbd,
     Progress,
     AspectRatio,
+    Label,
+    Skeleton,
+    Breadcrumb,
+    Pagination,
     Input,
     TextArea,
     Checkbox,
@@ -43,7 +47,7 @@ pub enum Page {
 }
 
 impl Page {
-    pub const ALL: [Self; 39] = [
+    pub const ALL: [Self; 43] = [
         Self::Button,
         Self::Badge,
         Self::Card,
@@ -55,6 +59,10 @@ impl Page {
         Self::Kbd,
         Self::Progress,
         Self::AspectRatio,
+        Self::Label,
+        Self::Skeleton,
+        Self::Breadcrumb,
+        Self::Pagination,
         Self::Input,
         Self::TextArea,
         Self::Checkbox,
@@ -97,6 +105,10 @@ impl Page {
             | Self::Empty
             | Self::Kbd
             | Self::Progress
+            | Self::Label
+            | Self::Skeleton
+            | Self::Breadcrumb
+            | Self::Pagination
             | Self::AspectRatio
             | Self::Input
             | Self::TextArea
@@ -142,6 +154,10 @@ impl Page {
             Self::Kbd => "Kbd",
             Self::Progress => "Progress",
             Self::AspectRatio => "Aspect ratio",
+            Self::Label => "Label",
+            Self::Skeleton => "Skeleton",
+            Self::Breadcrumb => "Breadcrumb",
+            Self::Pagination => "Pagination",
             Self::Input => "Input & Search",
             Self::TextArea => "Text area",
             Self::Checkbox => "Checkbox",
@@ -186,6 +202,10 @@ impl Page {
             Self::Kbd => "kbd",
             Self::Progress => "progress",
             Self::AspectRatio => "aspect-ratio",
+            Self::Label => "label",
+            Self::Skeleton => "skeleton",
+            Self::Breadcrumb => "breadcrumb",
+            Self::Pagination => "pagination",
             Self::Input => "input",
             Self::TextArea => "textarea",
             Self::Checkbox => "checkbox",
@@ -227,5 +247,65 @@ impl Page {
     pub fn from_navigation_key(key: &str) -> Option<Self> {
         let slug = key.strip_prefix("nav::")?;
         Self::ALL.into_iter().find(|page| page.slug() == slug)
+    }
+}
+
+impl Page {
+    pub const fn description(self) -> &'static str {
+        match self {
+            Self::List => "Selection and keyboard navigation.",
+            Self::VList => "Measured variable-height rows and virtual scrolling.",
+            Self::Table => "Columns and row selection.",
+            Self::Menu => "Nested menus, checkbox and radio entries.",
+            Self::ContextMenu => "Open a menu at the pointer or with Shift+F10.",
+            Self::Menubar => "Move between menus with the arrow keys.",
+            Self::DataTable => "Sort columns, select rows and edit cells with Enter.",
+            Self::Calendar => "Choose dates with arrows and PageUp/PageDown.",
+            Self::DatePicker => "Type a date or choose it from the calendar.",
+            Self::Toast => "Notifications with a bounded queue and explicit dismissal.",
+            Self::Avatar => "Images and initials with a shared accessible name.",
+            Self::Empty => "Give an empty view a useful message and a next step.",
+            Self::Kbd => "Keycaps and shortcut combinations.",
+            Self::AspectRatio => "Keep content at a consistent width-to-height ratio.",
+            Self::Progress => {
+                "Determinate and indeterminate progress, with reduced-motion support."
+            }
+            Self::Label => "Clear labels associated with their controls.",
+            Self::Skeleton => "Soft loading shapes that respect reduced motion.",
+            Self::Breadcrumb => "A trail of links back to the current page’s ancestors.",
+            Self::Pagination => "Page navigation with a compact range and clear boundaries.",
+            Self::Badge => "Compact labels with variants and optional icons.",
+            Self::Card => "A surface with a title, description, content, action and footer.",
+            Self::Alert => "Inline messages with accessible announcements.",
+            Self::Separator => "Horizontal and vertical dividers, with optional centered labels.",
+            Self::Collapsible => "Show and hide content with a button, Enter or Space.",
+            Self::Button => "Actions with variants, icons, loading and accessible activation.",
+            Self::Input => "Controlled single-line and search fields.",
+            Self::TextArea => "Multiline editing, scrolling, clipping and resize capture.",
+            Self::Checkbox => {
+                "Unchecked, checked and mixed states with keyboard and touch activation."
+            }
+            Self::Switch => "Animated binary preferences.",
+            Self::RadioGroup => "Exclusive selection with semantic grouping.",
+            Self::Slider => "Pointer, touch, keyboard and accessibility values.",
+            Self::Tabs => "Roving navigation and one mounted panel.",
+            Self::Select => "Anchored, collision-aware option overlay.",
+            Self::Dialog => "Modal focus containment and restoration.",
+            Self::Layout => "CSS-shaped Block, Flex, Grid, box model and text alignment.",
+            Self::Motion => "Frame-paced feedback and interaction transitions.",
+            Self::Effects => "Custom WGSL through the generic effect registry.",
+            Self::Typography => "Rich spans, decoration, clamping and web-like text selection.",
+            Self::WebView => {
+                "Retained web content, with separate email and webpage security policies."
+            }
+            Self::AsyncTasks => "Owned, cancellable work with event-driven delivery to the UI.",
+            Self::Actions => "One command for buttons, menus, palettes and focused shortcuts.",
+            Self::Editing => {
+                "Transactional undo/redo, Unicode, filtered fields and protected passwords."
+            }
+            Self::CustomTimeline => {
+                "Custom measurement and painting with draggable clips and standard controls."
+            }
+        }
     }
 }

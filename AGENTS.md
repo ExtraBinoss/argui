@@ -2,6 +2,11 @@
 
 Read `docs/code_quality.md` before changing code.
 
+For Linux GUI checks, read [docs/linux_testing.md](docs/linux_testing.md) and use
+`./scripts/linux-hidden-display.sh COMMAND...`. Keep test windows and browsers
+on that private display; inspect saved captures instead of opening windows on
+the user's desktop. A blank capture is a failed visual check.
+
 - Write the least code that cleanly solves the current step.
 - Keep every `.rs` file at 600 physical lines or fewer.
 - Split by responsibility; do not create folders or abstractions speculatively.

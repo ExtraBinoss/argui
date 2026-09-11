@@ -28,6 +28,7 @@ mod aspect_ratio;
 pub(crate) mod async_tasks;
 mod avatar;
 mod badge;
+mod breadcrumb;
 mod buttons;
 mod card;
 mod collapsible;
@@ -38,11 +39,14 @@ pub(crate) mod editing;
 mod empty;
 mod inputs;
 mod kbd;
+mod label;
 pub(crate) mod liquid_glass;
 pub(crate) mod menus;
+mod pagination;
 pub(crate) mod progress;
 pub(crate) mod scroll_effects;
 mod separator;
+pub(crate) mod skeleton;
 pub(crate) mod timeline;
 pub(crate) mod toast;
 mod typography;
@@ -83,6 +87,14 @@ pub(crate) fn render(
                 .progress
                 .get_or_init(|| argui::runtime::Entity::new(progress::ProgressDemo::default())),
         ),
+        Page::Label => label::render(gallery, theme, cx),
+        Page::Breadcrumb => breadcrumb::render(theme, cx),
+        Page::Pagination => pagination::render(gallery, theme, cx),
+        Page::Skeleton => cx.entity(
+            gallery
+                .skeleton
+                .get_or_init(|| argui::runtime::Entity::new(skeleton::SkeletonDemo::default())),
+        ),
         Page::Badge => badge::render(theme, assets),
         Page::Card => card::render(theme, assets, cx),
         Page::Alert => alert::render(theme, assets),
@@ -122,7 +134,12 @@ pub(crate) fn render(
     Element::column([
         Element::column([
             text(gallery.page.label(), 30.0, theme.foreground, 740),
-            text(description(gallery.page), 15.0, theme.muted_foreground, 400),
+            text(
+                gallery.page.description(),
+                15.0,
+                theme.muted_foreground,
+                400,
+            ),
         ])
         .gap(5.0),
         content,
@@ -534,52 +551,4 @@ fn select_options() -> Vec<SelectOption> {
         .into_iter()
         .map(SelectOption::new)
         .collect()
-}
-
-const fn description(page: Page) -> &'static str {
-    match page {
-        Page::List => "Selection and keyboard navigation.",
-        Page::VList => "Measured variable-height rows and virtual scrolling.",
-        Page::Table => "Columns and row selection.",
-        Page::Menu => "Nested menus, checkbox and radio entries.",
-        Page::ContextMenu => "Open a menu at the pointer or with Shift+F10.",
-        Page::Menubar => "Move between menus with the arrow keys.",
-        Page::DataTable => "Sort columns, select rows and edit cells with Enter.",
-        Page::Calendar => "Choose dates with arrows and PageUp/PageDown.",
-        Page::DatePicker => "Type a date or choose it from the calendar.",
-        Page::Toast => "Notifications with a bounded queue and explicit dismissal.",
-        Page::Avatar => "Images and initials with a shared accessible name.",
-        Page::Empty => "Give an empty view a useful message and a next step.",
-        Page::Kbd => "Keycaps and shortcut combinations.",
-        Page::AspectRatio => "Keep content at a consistent width-to-height ratio.",
-        Page::Progress => "Determinate and indeterminate progress, with reduced-motion support.",
-        Page::Badge => "Compact labels with variants and optional icons.",
-        Page::Card => "A surface with a title, description, content, action and footer.",
-        Page::Alert => "Inline messages with accessible announcements.",
-        Page::Separator => "Horizontal and vertical dividers, with optional centered labels.",
-        Page::Collapsible => "Show and hide content with a button, Enter or Space.",
-        Page::Button => "Actions with variants, icons, loading and accessible activation.",
-        Page::Input => "Controlled single-line and search fields.",
-        Page::TextArea => "Multiline editing, scrolling, clipping and resize capture.",
-        Page::Checkbox => "Unchecked, checked and mixed states with keyboard and touch activation.",
-        Page::Switch => "Animated binary preferences.",
-        Page::RadioGroup => "Exclusive selection with semantic grouping.",
-        Page::Slider => "Pointer, touch, keyboard and accessibility values.",
-        Page::Tabs => "Roving navigation and one mounted panel.",
-        Page::Select => "Anchored, collision-aware option overlay.",
-        Page::Dialog => "Modal focus containment and restoration.",
-        Page::Layout => "CSS-shaped Block, Flex, Grid, box model and text alignment.",
-        Page::Motion => "Frame-paced feedback and interaction transitions.",
-        Page::Effects => "Custom WGSL through the generic effect registry.",
-        Page::Typography => "Rich spans, decoration, clamping and web-like text selection.",
-        Page::WebView => "Retained web content, with separate email and webpage security policies.",
-        Page::AsyncTasks => "Owned, cancellable work with event-driven delivery to the UI.",
-        Page::Actions => "One command for buttons, menus, palettes and focused shortcuts.",
-        Page::Editing => {
-            "Transactional undo/redo, Unicode, filtered fields and protected passwords."
-        }
-        Page::CustomTimeline => {
-            "Custom measurement and painting with draggable clips and standard controls."
-        }
-    }
 }

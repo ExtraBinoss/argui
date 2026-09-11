@@ -14,6 +14,7 @@ interne ou une page de démonstration ne suffisent pas à livrer un widget.
 
 Mises à jour Argui du 10 septembre 2026 : [les cinq premiers composants](shadcn-foundations.md),
 puis [Avatar, Empty, Kbd, Progress, AspectRatio et le Separator enrichi](shadcn-display-widgets.md).
+Ajout du 11 septembre 2026 : [Label, Skeleton, Breadcrumb et Pagination](shadcn-navigation-widgets.md).
 
 ## Checklist complète
 
@@ -24,7 +25,7 @@ puis [Avatar, Empty, Kbd, Progress, AspectRatio et le Separator enrichi](shadcn-
 - [ ] **Attachment** — absent ; définir présentation, état de transfert et actions, sans imposer un client mail.
 - [x] **Avatar** — image chargée ou fallback contrôlé, masque circulaire, taille configurable et nom accessible unique. Groupe non livré.
 - [x] **Badge** — `Badge` ; variantes primary/secondary/destructive/outline/ghost, icônes avant/après et nom accessible unique.
-- [ ] **Breadcrumb** — absent ; liens, séparateurs et élément courant à formaliser.
+- [x] **Breadcrumb** — ancêtres activables, identifiants stables, séparateurs personnalisés et page courante décrite ; groupe accessible, sans landmark Navigation.
 - [ ] **Bubble** — absent ; présentation réutilisable à définir.
 - [x] **Button** — [`Button`](../crates/argui-widgets/src/button.rs) ; variantes via le thème, icônes, chargement et activation accessible.
 - [ ] **Button Group** — absent ; disposer des boutons en ligne ne constitue pas encore une API de groupe.
@@ -51,14 +52,14 @@ puis [Avatar, Empty, Kbd, Progress, AspectRatio et le Separator enrichi](shadcn-
 - [ ] **Input OTP** — absent ; cellules, collage, navigation et saisie unique accessible à concevoir.
 - [ ] **Item** — partiel ; `List` accepte du contenu libre, sans API de parties titre/description/média/actions.
 - [x] **Kbd** — touche ou combinaison, une annonce accessible personnalisable ; n'enregistre pas de raccourci.
-- [ ] **Label** — partiel ; nom accessible sur les contrôles, sans label public associé à une cible de focus.
+- [x] **Label** — label visible associé via `labelled_by`, cible de focus sur clic et état désactivé ; sans arrêt Tab supplémentaire.
 - [ ] **Marker** — absent ; composant dédié à définir.
 - [x] **Menubar** — focus entre déclencheurs, ouverture des menus, sous-menus et navigation RTL.
 - [ ] **Message** — absent ; composant de message réutilisable à définir, sans mini-application imposée.
 - [ ] **Message Scroller** — partiel ; `VList` virtualise, mais suivi du bas, chargement antérieur et compteur de nouveautés restent applicatifs.
 - [ ] **Native Select** — absent ; `Select` est rendu par Argui. Pour ce catalogue, reproduire son usage avec un composant Argui ; aucun contrôle système requis.
 - [ ] **Navigation Menu** — absent ; navigation de site/application avec panneaux, focus et état courant à fournir.
-- [ ] **Pagination** — absent ; page courante, bornes et navigation accessible à encapsuler.
+- [x] **Pagination** — navigation contrôlée, bornes, ellipses, désactivation et annonces traduisibles ; groupe accessible, page courante décrite.
 - [x] **Popover** — [`Popover`](../crates/argui-widgets/src/popover.rs) ; ancrage, collisions, fermeture et options de focus.
 - [x] **Progress** — pourcentage contrôlé, état indéterminé animé quand monté comme entité, mouvement réduit et valeur accessible.
 - [ ] **Questionnaire** — absent ; contrat de questions, réponses et validation à définir après les contrôles de base.
@@ -69,7 +70,7 @@ puis [Avatar, Empty, Kbd, Progress, AspectRatio et le Separator enrichi](shadcn-
 - [x] **Separator** — `Separator::new` ; orientation configurable et texte centré entre deux traits, décoratif par défaut ou rôle accessible explicite.
 - [ ] **Sheet** — absent ; `Dialog` fournit une base, sans panneau latéral dédié.
 - [ ] **Sidebar** — absent ; la sidebar de la galerie n'est pas un widget public.
-- [ ] **Skeleton** — absent ; formes et animations disponibles, sans composant d'attente.
+- [x] **Skeleton** — formes décoratives dimensionnables, pulsation liée au montage et mouvement réduit.
 - [x] **Slider** — [`Slider`](../crates/argui-widgets/src/slider.rs) ; valeur, bornes, pas, gestes et clavier. Multi-poignées non livré.
 - [x] **Spinner** — [`Spinner`](../crates/argui-widgets/src/spinner.rs) ; animation liée au montage et mouvement réduit.
 - [x] **Switch** — [`Switch`](../crates/argui-widgets/src/selection.rs) ; booléen animé et activation accessible.
@@ -97,7 +98,7 @@ pas d'un DSL ni de shadcn.
 
 ## Où concentrer le travail
 
-1. **Petits composants réutilisables** : Label, Skeleton, Breadcrumb et Pagination. Un fichier de widget et une page sobre par besoin.
+1. **Composition réutilisable** : Item et Button Group, puis les primitives manquantes de navigation accessible. Label, Skeleton, Breadcrumb et Pagination sont maintenant livrés.
 2. **Interactions courantes** : Tooltip, Accordion, Toggle/Toggle Group,
    puis Field/Input Group/Combobox. Vérifier clavier, focus et sémantique avant
    d'élargir les variantes visuelles.

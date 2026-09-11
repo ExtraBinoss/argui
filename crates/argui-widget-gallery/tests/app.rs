@@ -22,34 +22,29 @@ fn sidebar_fast_hover_has_no_trail_and_keeps_the_active_page_highlighted() {
             argui::core::Size::new(1220.0, 900.0),
         )
         .unwrap();
-    let entries: Vec<_> = [
-        "nav::button",
-        "nav::input",
-        "nav::textarea",
-        "nav::checkbox",
-    ]
-    .into_iter()
-    .map(|key| {
-        let index = tree
-            .node_ids()
-            .iter()
-            .position(|node| tree.key(*node) == Some(key))
-            .unwrap();
-        let node = tree.node_ids()[index];
-        let region = output
-            .hit_regions
-            .iter()
-            .find(|region| region.node == node)
-            .unwrap();
-        (
-            node,
-            index,
-            Point::new(region.bounds.origin.x + 10.0, region.bounds.origin.y + 10.0),
-            tree.resolved_quad(node, tree.element_at(index).unwrap())
-                .background,
-        )
-    })
-    .collect();
+    let entries: Vec<_> = ["nav::button", "nav::badge", "nav::card", "nav::alert"]
+        .into_iter()
+        .map(|key| {
+            let index = tree
+                .node_ids()
+                .iter()
+                .position(|node| tree.key(*node) == Some(key))
+                .unwrap();
+            let node = tree.node_ids()[index];
+            let region = output
+                .hit_regions
+                .iter()
+                .find(|region| region.node == node)
+                .unwrap();
+            (
+                node,
+                index,
+                Point::new(region.bounds.origin.x + 10.0, region.bounds.origin.y + 10.0),
+                tree.resolved_quad(node, tree.element_at(index).unwrap())
+                    .background,
+            )
+        })
+        .collect();
     // Cross several buttons without advancing a frame or waiting for a tween.
     for hovered in [1, 2, 3, 2, 1] {
         tree.pointer_moved(entries[hovered].2, &output.hit_regions);

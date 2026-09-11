@@ -22,6 +22,39 @@ fn text_engine_owns_a_reusable_font_system() {
 }
 
 #[test]
+fn measured_labels_survive_pixel_rounding_without_losing_the_last_glyph() {
+    let mut engine =
+        TextEngine::from_embedded_fonts([NOTO_SANS], "Noto Sans", "Noto Sans", "Noto Sans");
+    let style = TextStyle {
+        font_size: 14.0,
+        line_height: 20.0,
+        wrap: TextWrap::WordOrGlyph,
+        ..TextStyle::default()
+    };
+    for label in [
+        "Components",
+        "Breadcrumb",
+        "Component library",
+        "12",
+        "A shared component library with a longer name",
+    ] {
+        let size = engine.measure(label, &style, None);
+        let mut block = TextBlock::new(label, bounds(0.0, 0.0, size.width.round(), size.height));
+        block.style = style.clone();
+        let prepared = engine.prepare(&TextScene::new().with(block), 1.0);
+        assert_eq!(
+            prepared.glyphs.iter().map(|glyph| glyph.end).max(),
+            Some(label.len()),
+            "{label}"
+        );
+        assert_eq!(
+            engine.measure(label, &style, Some(size.width)).height,
+            style.line_height
+        );
+    }
+}
+
+#[test]
 fn embedded_fonts_shape_rasterize_and_keep_selection_metadata() {
     let mut engine = TextEngine::from_embedded_fonts(
         [NOTO_SANS, NOTO_ARABIC, NOTO_HEBREW],

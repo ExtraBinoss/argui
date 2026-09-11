@@ -43,6 +43,10 @@ fn all_pages_keep_finite_layout_when_narrow_dark_or_reduced_motion() {
         ("avatar", "Avatar"),
         ("empty", "Empty"),
         ("kbd", "Kbd"),
+        ("label", "Label"),
+        ("skeleton", "Skeleton"),
+        ("breadcrumb", "Breadcrumb"),
+        ("pagination", "Pagination"),
         ("progress", "Progress"),
         ("aspect-ratio", "Aspect ratio"),
         ("card", "Card"),
@@ -227,3 +231,12 @@ mod collapsible;
 mod empty;
 #[path = "pages/progress.rs"]
 mod progress;
+
+#[path = "pages/breadcrumb.rs"]
+mod breadcrumb;
+#[path = "pages/label.rs"]
+mod label;
+#[path = "pages/pagination.rs"]
+mod pagination;
+#[path = "pages/skeleton.rs"]
+mod skeleton;

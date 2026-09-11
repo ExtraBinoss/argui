@@ -1,4 +1,20 @@
 //! Optional, accessible widgets built from Argui engine primitives.
+#[cfg(feature = "label")]
+mod label;
+#[cfg(feature = "label")]
+pub use label::Label;
+#[cfg(feature = "skeleton")]
+mod skeleton;
+#[cfg(feature = "skeleton")]
+pub use skeleton::Skeleton;
+#[cfg(feature = "breadcrumb")]
+mod breadcrumb;
+#[cfg(feature = "breadcrumb")]
+pub use breadcrumb::{Breadcrumb, BreadcrumbLink};
+#[cfg(feature = "pagination")]
+mod pagination;
+#[cfg(feature = "pagination")]
+pub use pagination::{Pagination, PaginationLabels};
 #[cfg(feature = "menu")]
 mod menu;
 #[cfg(feature = "menu")]

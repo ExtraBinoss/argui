@@ -104,6 +104,8 @@ impl TextEngine {
             measurement.first_baseline.get_or_insert(run.line_y);
             measurement.last_baseline = Some(run.line_y);
         }
+        // Layout rounds boxes to pixels. Never round intrinsic text below its shaped width.
+        measurement.size.width = measurement.size.width.ceil();
         self.cache.insert_measurement(key, measurement);
         measurement
     }
