@@ -159,3 +159,161 @@ fn explicit_light_mode_and_all_button_variants_keep_shared_dimensions() {
         Color::from_srgb8(9, 9, 11)
     );
 }
+
+#[test]
+fn control_hover_enters_and_leaves_immediately_in_both_themes() {
+    use argui_core::{Point, Size};
+    use argui_layout::LayoutEngine;
+    use argui_text::TextEngine;
+    use argui_ui::{CheckedState, Element, UiTree};
+    use argui_widgets::{
+        Button, Calendar, CalendarSelection, CalendarState, Checkbox, Date, Input, Month,
+        Pagination, RadioGroup, RadioOption, Select, SelectOption, Switch, Tab, Tabs,
+    };
+    let themes = shadcn(Color::srgb(0.2, 0.5, 0.9));
+    let date = Date::from_calendar_date(2026, Month::September, 11).unwrap();
+    let calendar = CalendarState::new(date, CalendarSelection::Single(Some(date)));
+    for scheme in [ColorScheme::Light, ColorScheme::Dark] {
+        let theme = themes.resolve(scheme);
+        for (element, keys) in [
+            (
+                Element::row([
+                    Button::new("a", "A", theme.button()).build(),
+                    Button::new("b", "B", theme.ghost_button()).build(),
+                ]),
+                vec!["a", "b"],
+            ),
+            (
+                Input::new("input", "Editable", "", theme.input()).build(),
+                vec!["input"],
+            ),
+            (
+                Checkbox::new("check", "Updates", CheckedState::Unchecked).build(theme),
+                vec!["check"],
+            ),
+            (
+                Switch::new("switch", "Offline", false).build(theme),
+                vec!["switch"],
+            ),
+            (
+                RadioGroup::new(
+                    "radio",
+                    "Quality",
+                    [RadioOption::new("High"), RadioOption::new("Low")],
+                    Some(0),
+                )
+                .build(theme),
+                vec!["radio::option::0", "radio::option::1"],
+            ),
+            (
+                Tabs::new(
+                    "tabs",
+                    [
+                        Tab::new("A", Element::text("First")),
+                        Tab::new("B", Element::text("Second")),
+                    ],
+                    0,
+                )
+                .build(theme),
+                vec!["tabs::tab::1"],
+            ),
+            (
+                Select::new(
+                    "select",
+                    "Choose",
+                    [SelectOption::new("A"), SelectOption::new("B")],
+                    Some(0),
+                )
+                .build(theme),
+                vec!["select"],
+            ),
+            (
+                Select::new(
+                    "select",
+                    "Choose",
+                    [SelectOption::new("A"), SelectOption::new("B")],
+                    Some(0),
+                )
+                .open(true)
+                .build(theme),
+                vec!["select::option::0", "select::option::1"],
+            ),
+            (
+                Pagination::new("pages", 2, 12).build(theme),
+                vec![
+                    "pages::page::1",
+                    "pages::page::2",
+                    "pages::page::3",
+                    "pages::page::4",
+                ],
+            ),
+            (
+                Calendar::new("calendar", "Date", &calendar, date).build(theme),
+                vec![
+                    "calendar::day::2026-09-09",
+                    "calendar::day::2026-09-10",
+                    "calendar::day::2026-09-11",
+                    "calendar::day::2026-09-12",
+                ],
+            ),
+        ] {
+            let mut tree = UiTree::new(element);
+            let output = LayoutEngine::new()
+                .compute(&mut tree, &mut TextEngine::new(), Size::new(800.0, 600.0))
+                .unwrap();
+            let controls: Vec<_> = keys
+                .iter()
+                .map(|key| {
+                    let (index, &id) = tree
+                        .node_ids()
+                        .iter()
+                        .enumerate()
+                        .find(|(_, id)| tree.key(**id) == Some(key))
+                        .unwrap();
+                    let bounds = output
+                        .hit_regions
+                        .iter()
+                        .find(|region| region.node == id)
+                        .unwrap()
+                        .bounds;
+                    (
+                        index,
+                        id,
+                        Point::new(
+                            bounds.origin.x + bounds.size.width / 2.0,
+                            bounds.origin.y + bounds.size.height / 2.0,
+                        ),
+                        tree.resolved_quad(id, tree.element_at(index).unwrap()),
+                    )
+                })
+                .collect();
+            // Cross adjacent controls without advancing the animation clock.
+            for hovered in (0..controls.len()).chain((0..controls.len()).rev()) {
+                tree.pointer_moved(controls[hovered].2, &output.hit_regions);
+                for (index, (position, id, _, resting)) in controls.iter().enumerate() {
+                    let painted = tree.resolved_quad(*id, tree.element_at(*position).unwrap());
+                    if index == hovered {
+                        assert_ne!(
+                            &painted, resting,
+                            "missing hover: {} in {scheme:?}",
+                            keys[index]
+                        );
+                    } else {
+                        assert_eq!(
+                            &painted, resting,
+                            "hover trail: {} in {scheme:?}",
+                            keys[index]
+                        );
+                    }
+                }
+            }
+            tree.pointer_moved(Point::new(-10.0, -10.0), &output.hit_regions);
+            for (position, id, _, resting) in controls {
+                assert_eq!(
+                    tree.resolved_quad(id, tree.element_at(position).unwrap()),
+                    resting
+                );
+            }
+        }
+    }
+}

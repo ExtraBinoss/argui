@@ -13,7 +13,7 @@ pub(super) fn render(gallery: &WidgetGallery, theme: &WidgetTheme, spinner: Elem
     Element::column([
         preview(
             "Variants",
-            "Every button shares keyboard, pointer, touch and accessibility behavior.",
+            "Click any available button and watch the activation count below.",
             variants(theme, spinner),
             theme,
         ),
@@ -24,7 +24,7 @@ pub(super) fn render(gallery: &WidgetGallery, theme: &WidgetTheme, spinner: Elem
             theme,
         ),
         text(
-            format!("Primary activations: {}", gallery.clicks),
+            format!("Button activations: {}", gallery.clicks),
             13.0,
             theme.muted_foreground,
             500,

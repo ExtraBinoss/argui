@@ -51,7 +51,10 @@ impl InputStyle {
             },
             hovered: StylePatch::from_quad(paint.quad.clone()),
             focused: StylePatch::from_quad(paint.quad.clone()),
-            transition: StyleTransition::default(),
+            transition: crate::theme::instant_hover(
+                StyleTransition::default(),
+                StateSelector::scope(TEXT_FIELD_SCOPE, VisualState::Hovered),
+            ),
             paint,
             text,
             placeholder,

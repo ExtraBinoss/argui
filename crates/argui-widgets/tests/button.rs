@@ -99,8 +99,7 @@ fn button_hover_uses_the_shared_retained_visual_state_path() {
 }
 
 #[test]
-fn rapid_hover_enters_immediately_and_reentry_interrupts_the_soft_exit() {
-    use argui_animation::Time;
+fn rapid_hover_leaves_no_trail_and_ignores_disabled_buttons() {
     let style = ButtonStyle::new(
         PaintStyle::new(QuadStyle::solid(Color::BLACK)),
         TextStyle::default(),
@@ -147,6 +146,10 @@ fn rapid_hover_enters_immediately_and_reentry_interrupts_the_soft_exit() {
             tree.visual_states(nodes[index])
                 .contains(VisualState::Hovered)
         );
+        assert_eq!(
+            background(&tree, nodes[1 - index]),
+            Some(argui_paint::Fill::Solid(Color::BLACK))
+        );
         assert!(
             !tree
                 .visual_states(nodes[1 - index])
@@ -159,16 +162,12 @@ fn rapid_hover_enters_immediately_and_reentry_interrupts_the_soft_exit() {
         background(&tree, nodes[2]),
         Some(argui_paint::Fill::Solid(Color::BLACK))
     );
-    tree.advance_animations(Time::from_nanos(1));
-    tree.advance_animations(Time::from_nanos(60_000_001));
-    let fading = background(&tree, nodes[1]);
-    assert_ne!(fading, Some(argui_paint::Fill::Solid(Color::WHITE)));
-    assert_ne!(fading, Some(argui_paint::Fill::Solid(Color::BLACK)));
-    tree.pointer_moved(Point::new(5.0, 45.0), &regions);
-    assert_eq!(
-        background(&tree, nodes[1]),
-        Some(argui_paint::Fill::Solid(Color::WHITE))
-    );
+    for node in nodes {
+        assert_eq!(
+            background(&tree, node),
+            Some(argui_paint::Fill::Solid(Color::BLACK))
+        );
+    }
 }
 
 #[test]
@@ -225,6 +224,7 @@ fn dense_row_hover_leaves_no_trail_without_advancing_time() {
             TextStyle::default(),
         )
         .hovered(QuadStyle::solid(Color::WHITE))
+        .transition(argui_ui::StyleTransition::default())
         .instant_hover(),
     )
     .build();

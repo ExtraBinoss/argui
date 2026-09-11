@@ -240,3 +240,39 @@ mod label;
 mod pagination;
 #[path = "pages/skeleton.rs"]
 mod skeleton;
+
+#[test]
+fn optional_notifications_and_offline_rendering_toggle_independently() {
+    use argui::ui::CheckedState;
+    let app = Entity::new(WidgetGallery::default());
+    for (page, optional, existing) in [
+        ("checkbox", "check-empty", "accepted"),
+        ("switch", "switch-off", "notifications"),
+    ] {
+        click(&app, &format!("nav::{page}"));
+        for expected in [CheckedState::Checked, CheckedState::Unchecked] {
+            click(&app, optional);
+            let root = app.render();
+            assert_eq!(
+                keyed(&root, optional)
+                    .unwrap()
+                    .semantics
+                    .as_ref()
+                    .unwrap()
+                    .state
+                    .checked,
+                Some(expected)
+            );
+            assert_eq!(
+                keyed(&root, existing)
+                    .unwrap()
+                    .semantics
+                    .as_ref()
+                    .unwrap()
+                    .state
+                    .checked,
+                Some(CheckedState::Checked)
+            );
+        }
+    }
+}

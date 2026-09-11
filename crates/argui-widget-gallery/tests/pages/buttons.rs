@@ -18,3 +18,27 @@ fn button_page_is_present_in_the_public_gallery_tree() {
     let gallery = Entity::new(WidgetGallery::default());
     assert!(contains_text(&gallery.render(), "Actions with variants"));
 }
+
+#[test]
+fn every_available_button_variant_records_its_activation() {
+    let gallery = Entity::new(WidgetGallery::default());
+    for (index, key) in [
+        "demo-button",
+        "secondary",
+        "outline",
+        "ghost",
+        "danger",
+        "button-elevated",
+        "button-lift",
+        "button-shader",
+    ]
+    .iter()
+    .enumerate()
+    {
+        super::click(&gallery, key);
+        assert!(contains_text(
+            &gallery.render(),
+            &format!("Button activations: {}", index + 1)
+        ));
+    }
+}

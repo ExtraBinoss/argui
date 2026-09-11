@@ -67,11 +67,13 @@ Ces options sont propres à la validation locale. Sur cette machine,
 `--use-angle=swiftshader` a produit des captures blanches ou de 1 × 1 pixel,
 alors que l'arbre accessible existait : ces captures ne prouvent rien sur le rendu.
 
-Les PNG sont écrits dans `target/shadcn-navigation/` (`SCREENSHOT_DIR` permet
+Les PNG sont écrits dans `target/widget-interactions/` (`SCREENSHOT_DIR` permet
 de changer la destination). `GALLERY_URL` règle l'adresse de la galerie.
-Le scénario vérifie Label, Breadcrumb, Pagination et Skeleton à 1220 × 780
-et 800 × 720, dans les deux thèmes, puis exerce le pointeur, Entrée, Espace,
-les limites de pagination et l'arrêt de l'animation des Skeleton.
+Le scénario vérifie Label, Breadcrumb, Pagination, Skeleton, Collapsible,
+Menubar, Calendar et Data table à 1220 × 780 et 800 × 720 dans les deux thèmes.
+Il exerce la saisie des deux champs Label, les sections repliables, les actions
+de File et View, la sélection de date et les passages rapides entre cellules,
+puis vérifie Entrée, Espace, les limites de pagination et l'arrêt des Skeleton.
 
 Ouvrir les fichiers de capture avec l'outil de lecture d'images de l'agent,
 sans visionneuse graphique sur le bureau. Vérifier texte complet, contraste,

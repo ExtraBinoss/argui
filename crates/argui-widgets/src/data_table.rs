@@ -8,6 +8,7 @@ use argui_ui::{
 };
 
 mod model;
+const ROW_SCOPE: argui_ui::StateScopeId = argui_ui::StateScopeId::new("data-table-row");
 pub use model::{
     CellAddress, CellCommit, CellEdit, DataColumn, DataPage, DataRow, DataSort, DataTableError,
     DataTableModel,
@@ -274,8 +275,9 @@ impl<'a, R> DataTable<'a, R> {
                 })
                 .border(row_border)
                 .interaction(Interaction::default())
+                .state_scope(ROW_SCOPE)
                 .when(
-                    argui_ui::VisualState::Hovered,
+                    argui_ui::StateSelector::scope(ROW_SCOPE, argui_ui::VisualState::Hovered),
                     argui_ui::StylePatch::from_quad(
                         QuadStyle::solid(theme.muted).border(row_border),
                     ),

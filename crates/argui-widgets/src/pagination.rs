@@ -142,7 +142,7 @@ impl Pagination {
             if let Some(page) = entry {
                 let current = page == self.page;
                 let style = if current {
-                    theme.outline_button()
+                    theme.button()
                 } else {
                     theme.ghost_button()
                 };
@@ -154,7 +154,9 @@ impl Pagination {
                 .content(Element::text(page.to_string()).text_style(TextStyle {
                     font_size: 14.0,
                     line_height: 20.0,
-                    color: if self.enabled {
+                    color: if current {
+                        theme.primary_foreground
+                    } else if self.enabled {
                         theme.foreground
                     } else {
                         theme.muted_foreground

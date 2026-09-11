@@ -348,5 +348,8 @@ fn control_row_content(
                 .radius(CornerRadii::all(6.0))
                 .into(),
         )
-        .transition(StyleTransition::default())
+        .transition(crate::theme::instant_hover(
+            StyleTransition::default(),
+            VisualState::Hovered.into(),
+        ))
 }

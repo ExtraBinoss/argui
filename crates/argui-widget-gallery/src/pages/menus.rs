@@ -29,6 +29,8 @@ pub(crate) struct MenusDemo {
     timer: TaskSlot,
     origin: Instant,
     error: String,
+    notes: u32,
+    status: String,
 }
 impl MenusDemo {
     pub(crate) fn new(icons: &argui::widgets::WidgetAssets) -> Self {
@@ -37,7 +39,7 @@ impl MenusDemo {
             page: Page::Menu,
             open: false,
             path: Vec::new(),
-            checked: CheckedState::Mixed,
+            checked: CheckedState::Checked,
             radio: "first".into(),
             position: None,
             submenu_bounds: None,
@@ -47,6 +49,8 @@ impl MenusDemo {
             timer: TaskSlot::default(),
             origin: Instant::now(),
             error: String::new(),
+            notes: 1,
+            status: "Add a note, then try Show details and Layout.".into(),
         }
     }
 }
@@ -68,32 +72,51 @@ pub(crate) fn render(
     cx.entity(entity)
 }
 impl MenusDemo {
-    fn menu(&self, key: &str) -> Menu {
-        let entries = vec![
+    fn file_entries(&self) -> Vec<MenuItem> {
+        vec![
             MenuItem::new(
-                "copy",
-                ActionInvocation::new(ActionId::COPY),
-                ActionState::new("Copy").shortcut(argui::ui::Shortcut::primary("c")),
+                "new",
+                ActionInvocation::new(ActionId("gallery.note.new")),
+                ActionState::new("New note"),
+            ),
+            MenuItem::new(
+                "duplicate",
+                ActionInvocation::new(ActionId("gallery.note.duplicate")),
+                ActionState::new("Duplicate last note"),
             )
             .icon(self.icons.vector_id(argui::widgets::TablerIcon::Copy)),
+            MenuItem::entry(
+                "file-separator",
+                ActionState::new(""),
+                MenuItemKind::Separator,
+            ),
+            MenuItem::new(
+                "reset",
+                ActionInvocation::new(ActionId("gallery.note.reset")),
+                ActionState::new("Reset notebook"),
+            ),
+        ]
+    }
+
+    fn view_entries(&self) -> Vec<MenuItem> {
+        vec![
             MenuItem::entry(
                 "check",
                 ActionState::new("Show details"),
                 MenuItemKind::Checkbox(self.checked),
             ),
-            MenuItem::entry("separator", ActionState::new(""), MenuItemKind::Separator),
             MenuItem::entry(
                 "options",
-                ActionState::new("Options"),
+                ActionState::new("Layout"),
                 MenuItemKind::Submenu(
-                    ["first", "second"]
+                    [("first", "Comfortable"), ("second", "Compact")]
                         .into_iter()
-                        .map(|id| {
+                        .map(|(id, label)| {
                             MenuItem::entry(
                                 id,
-                                ActionState::new(id),
+                                ActionState::new(label),
                                 MenuItemKind::Radio {
-                                    group: "choice".into(),
+                                    group: "layout".into(),
                                     selected: self.radio == id,
                                 },
                             )
@@ -101,14 +124,31 @@ impl MenusDemo {
                         .collect(),
                 ),
             ),
-        ];
+        ]
+    }
+
+    fn menu(&self, key: &str) -> Menu {
+        let (label, entries) = match key {
+            "first-menu" => ("File", self.file_entries()),
+            "second-menu" => ("View", self.view_entries()),
+            _ => {
+                let mut entries = self.file_entries();
+                entries.push(MenuItem::entry(
+                    "view-separator",
+                    ActionState::new(""),
+                    MenuItemKind::Separator,
+                ));
+                entries.extend(self.view_entries());
+                ("Note actions", entries)
+            }
+        };
         let mut menu = Menu::new(
             key,
-            "Options",
+            label,
             self.open && (self.page != Page::Menubar || self.active_menu == key),
             entries,
-        );
-        menu = menu.icons(&self.icons);
+        )
+        .icons(&self.icons);
         menu.path = self.path.clone();
         menu
     }
@@ -250,7 +290,10 @@ impl MenusDemo {
         };
         if let Some(response) = response {
             self.apply(response, cx);
-            if !matches!(&event.kind, argui::ui::UiEventKind::KeyInput(input) if input.key == argui::core::Key::Tab)
+            // Activation must reach the action scope after the menu closes.
+            if matches!(&event.kind, argui::ui::UiEventKind::KeyInput(input)
+                if !matches!(input.key, argui::core::Key::Tab | argui::core::Key::Enter)
+                    && input.key != argui::core::Key::Character(" ".into()))
             {
                 let _ = event.prevent_default();
             }
@@ -275,17 +318,58 @@ impl Render for MenusDemo {
     fn render(&mut self, cx: &mut Context<Self>) -> Element {
         let themes = shadcn(cx.environment().primary);
         let theme = themes.resolve(cx.environment().color_scheme);
+        let actions = argui::ui::ActionScope::new([
+            cx.on_action(
+                ActionId("gallery.note.new"),
+                ActionState::new("New note"),
+                |demo, _, cx| {
+                    demo.notes += 1;
+                    demo.status = format!("Created note {}.", demo.notes);
+                    demo.open = false;
+                    cx.notify();
+                },
+            ),
+            cx.on_action(
+                ActionId("gallery.note.duplicate"),
+                ActionState::new("Duplicate last note"),
+                |demo, _, cx| {
+                    demo.notes += 1;
+                    demo.status = format!(
+                        "Duplicated note {} into note {}.",
+                        demo.notes - 1,
+                        demo.notes
+                    );
+                    demo.open = false;
+                    cx.notify();
+                },
+            ),
+            cx.on_action(
+                ActionId("gallery.note.reset"),
+                ActionState::new("Reset notebook"),
+                |demo, _, cx| {
+                    demo.notes = 1;
+                    demo.status = "Notebook reset to one note.".into();
+                    demo.open = false;
+                    cx.notify();
+                },
+            ),
+        ])
+        .expect("unique notebook actions");
         let content = match self.page {
             Page::ContextMenu => ContextMenu {
                 menu: self.menu("menu"),
                 position: self.position,
             }
             .build(
-                Button::new("menu", "Right-click or Shift+F10", theme.outline_button())
-                    .build()
-                    .width(argui::ui::length(360.0))
-                    .max_width(argui::ui::percent(1.0))
-                    .height(argui::ui::length(180.0)),
+                Button::new(
+                    "menu",
+                    "Project notes · Right-click or Shift+F10",
+                    theme.outline_button(),
+                )
+                .build()
+                .width(argui::ui::length(360.0))
+                .max_width(argui::ui::percent(1.0))
+                .height(argui::ui::length(180.0)),
                 theme,
             ),
             Page::Menubar => Menubar {
@@ -297,20 +381,55 @@ impl Render for MenusDemo {
             }
             .build(theme),
             _ => self.menu("menu").build(
-                Button::new("trigger", "Open menu", theme.outline_button()).build(),
+                Button::new("trigger", "Note actions", theme.outline_button()).build(),
                 theme,
             ),
         };
-        Element::column([content, Element::text(self.error.as_str())])
-            .on(cx.listener(EventType::Click, Self::event))
-            .on(cx.listener(EventType::Key, Self::event))
-            .on(cx
-                .listener(EventType::PointerEnter, Self::event)
-                .capture(true))
-            .on(cx
-                .listener(EventType::PointerMove, Self::event)
-                .capture(true))
-            .on(cx.listener(EventType::PointerOutside, Self::event))
-            .on(cx.listener(EventType::ContextMenu, Self::event))
+        let notes = Element::column((1..=self.notes).map(|index| {
+            let mut children = vec![crate::app::text(
+                format!("Project note {index}"),
+                15.0,
+                theme.foreground,
+                600,
+            )];
+            if self.checked == CheckedState::Checked {
+                children.push(crate::app::text(
+                    "Design review · Draft",
+                    13.0,
+                    theme.muted_foreground,
+                    400,
+                ));
+            }
+            Element::column(children)
+                .gap(4.0)
+                .padding(argui::ui::Sides::length(if self.radio == "second" {
+                    8.0
+                } else {
+                    16.0
+                }))
+                .border(argui::paint::Border::all(1.0, theme.border))
+                .radius(argui::paint::CornerRadii::all(8.0))
+        }))
+        .keyed("notebook-preview")
+        .gap(8.0);
+        Element::column([
+            content,
+            crate::app::text(&self.status, 13.0, theme.muted_foreground, 400),
+            notes,
+            crate::app::text(&self.error, 13.0, theme.destructive, 400),
+        ])
+        .gap(16.0)
+        .max_width(argui::ui::length(480.0))
+        .action_scope(actions)
+        .on(cx.listener(EventType::Click, Self::event))
+        .on(cx.listener(EventType::Key, Self::event))
+        .on(cx
+            .listener(EventType::PointerEnter, Self::event)
+            .capture(true))
+        .on(cx
+            .listener(EventType::PointerMove, Self::event)
+            .capture(true))
+        .on(cx.listener(EventType::PointerOutside, Self::event))
+        .on(cx.listener(EventType::ContextMenu, Self::event))
     }
 }

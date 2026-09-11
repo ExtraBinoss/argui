@@ -221,3 +221,31 @@ fn multi_digit_pages_remain_complete_with_the_gallery_font() {
         }
     }
 }
+
+#[test]
+fn current_page_is_filled_and_uses_contrasting_text_in_both_themes() {
+    let themes = shadcn(Color::srgb(0.2, 0.5, 0.9));
+    for scheme in [ColorScheme::Light, ColorScheme::Dark] {
+        let theme = themes.resolve(scheme);
+        for page in [1, 2, 6, 12] {
+            let pagination = Pagination::new("pages", page, 12);
+            let root = pagination.build(theme);
+            for child in &root.children {
+                if child.key.as_deref() == Some(&pagination.page_key(page)) {
+                    assert_eq!(
+                        child.paint.quad.background,
+                        Some(argui_paint::Fill::Solid(theme.primary))
+                    );
+                    assert!(
+                        matches!(&child.children[0].kind, argui_ui::ElementKind::Text { style, .. } if style.color == theme.primary_foreground)
+                    );
+                } else if child.key.is_some() {
+                    assert_eq!(
+                        child.paint.quad.background,
+                        Some(argui_paint::Fill::Solid(Color::TRANSPARENT))
+                    );
+                }
+            }
+        }
+    }
+}

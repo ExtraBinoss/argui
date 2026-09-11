@@ -9,7 +9,7 @@ fn menu_pages_share_keyboard_navigation_indicators_and_controlled_selection() {
     for (page, key) in [
         ("menu", "menu"),
         ("context-menu", "menu"),
-        ("menubar", "first-menu"),
+        ("menubar", "second-menu"),
     ] {
         let app = Entity::new(WidgetGallery::default());
         click(&app, &format!("nav::{page}"));
@@ -32,7 +32,7 @@ fn menu_pages_share_keyboard_navigation_indicators_and_controlled_selection() {
                 .unwrap()
                 .state
                 .checked,
-            Some(CheckedState::Mixed)
+            Some(CheckedState::Checked)
         );
         assert!(matches!(
             keyed(&root, &check).unwrap().children[0].kind,
@@ -48,13 +48,10 @@ fn menu_pages_share_keyboard_navigation_indicators_and_controlled_selection() {
                 .unwrap()
                 .state
                 .checked,
-            Some(CheckedState::Checked)
+            Some(CheckedState::Unchecked)
         );
-        assert!(matches!(
-            keyed(&root, &check).unwrap().children[0].kind,
-            argui::ui::ElementKind::Vector { .. }
-        ));
-        keyboard(&app, &check, Key::Character("o".into()));
+        assert!(!contains_text(&root, "Design review · Draft"));
+        keyboard(&app, &check, Key::Character("l".into()));
         keyboard(&app, &format!("{key}::item::options"), Key::ArrowRight);
         let radio = format!("{key}::item::second");
         click(&app, &radio);
@@ -205,4 +202,51 @@ fn submenu_geometry_keeps_diagonal_hover_open_and_cancels_on_entry() {
         )
         .is_some()
     );
+}
+
+#[test]
+fn file_and_view_menus_have_distinct_actions_that_update_the_notebook() {
+    let app = Entity::new(WidgetGallery::default());
+    click(&app, "nav::menubar");
+    assert!(contains_text(&app.render(), "File"));
+    assert!(contains_text(&app.render(), "View"));
+    for (action, message, count) in [
+        ("new", "Created note 2.", 2),
+        ("duplicate", "Duplicated note 2 into note 3.", 3),
+        ("reset", "Notebook reset to one note.", 1),
+    ] {
+        click(&app, "first-menu");
+        assert!(keyed(&app.render(), "first-menu::item::check").is_none());
+        let mut tree = UiTree::new(app.render());
+        let key = format!("first-menu::item::{action}");
+        let node = *tree
+            .node_ids()
+            .iter()
+            .find(|node| tree.key(**node) == Some(&key))
+            .unwrap();
+        for event in tree.event_deliveries(node, UiEventKind::Click(ClickEvent::accessibility())) {
+            if !event.should_dispatch() {
+                continue;
+            }
+            if let UiEventKind::Action(invocation) = event.kind {
+                for delivery in tree.invoke_action(invocation).events {
+                    if delivery.should_dispatch() {
+                        app.dispatch_event(&delivery);
+                    }
+                }
+            } else {
+                app.dispatch_event(&event);
+            }
+        }
+        let root = app.render();
+        assert!(contains_text(&root, message));
+        assert_eq!(
+            keyed(&root, "notebook-preview").unwrap().children.len(),
+            count
+        );
+    }
+    keyboard(&app, "first-menu", Key::ArrowDown);
+    keyboard(&app, "first-menu", Key::ArrowRight);
+    assert!(keyed(&app.render(), "second-menu::item::check").is_some());
+    assert!(keyed(&app.render(), "second-menu::item::new").is_none());
 }

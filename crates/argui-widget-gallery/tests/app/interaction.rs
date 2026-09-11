@@ -172,7 +172,7 @@ fn application_shortcuts_and_control_protocols_drive_real_widget_state() {
     click(&app, "demo-button");
     assert!(contains_text(
         &app.render(Default::default()).unwrap(),
-        "Primary activations: 1"
+        "Button activations: 1"
     ));
 
     click(&app, "nav::checkbox");

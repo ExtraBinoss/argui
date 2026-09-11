@@ -159,3 +159,104 @@ fn horizontal_scroll_keeps_header_and_cells_aligned_after_column_resize() {
         assert_eq!(moved, header);
     }
 }
+
+#[test]
+fn row_hover_stays_on_across_cells_and_editors_then_clears_without_a_frame() {
+    use argui_core::{Point, Size};
+    use argui_layout::LayoutEngine;
+    use argui_text::TextEngine;
+    use argui_widgets::{CellAddress, DataColumn, DataRow, DataTableModel, TableColumn};
+    let themes = shadcn(Color::srgb(0.2, 0.5, 0.9));
+    let mut model = DataTableModel::new(
+        (0..3)
+            .map(|i| DataRow {
+                id: i.to_string(),
+                value: i,
+            })
+            .collect(),
+        ["left", "right"]
+            .map(|id| {
+                let mut column = DataColumn::new(id, TableColumn::new(id, 140.0), |value: &i32| {
+                    value.to_string()
+                });
+                column.validate = Some(Box::new(|_, _| Ok(())));
+                column
+            })
+            .into(),
+    )
+    .unwrap();
+    let address = |row: usize, column: &str| CellAddress {
+        row: row.to_string(),
+        column: column.into(),
+    };
+    let heights = VirtualList::fixed(3, 52.0, 200.0);
+    for editing in [false, true] {
+        if editing {
+            assert!(model.begin_edit(address(0, "right")));
+        }
+        for scheme in [ColorScheme::Light, ColorScheme::Dark] {
+            let theme = themes.resolve(scheme);
+            let table = DataTable::new("table", &model, &heights, 0.0);
+            let mut tree = UiTree::new(table.build(theme));
+            let output = LayoutEngine::new()
+                .compute(&mut tree, &mut TextEngine::new(), Size::new(500.0, 400.0))
+                .unwrap();
+            let rows: Vec<_> = (0..3)
+                .map(|row| {
+                    let key = format!("table::row::{row}");
+                    tree.node_ids()
+                        .iter()
+                        .enumerate()
+                        .find(|(_, node)| tree.key(**node) == Some(&key))
+                        .map(|(index, &id)| (index, id))
+                        .unwrap()
+                })
+                .collect();
+            for row in [0, 1, 2, 1, 0] {
+                for column in ["left", "right"] {
+                    let key = if editing && row == 0 && column == "right" {
+                        table.editor_key(&address(row, column))
+                    } else {
+                        table.cell_key(&address(row, column))
+                    };
+                    let bounds = output
+                        .hit_regions
+                        .iter()
+                        .find(|region| tree.key(region.node) == Some(&key))
+                        .unwrap()
+                        .bounds;
+                    // Test both cell padding and its text/editor, which are separate hit targets.
+                    for x in [2.0, bounds.size.width / 2.0] {
+                        tree.pointer_moved(
+                            Point::new(
+                                bounds.origin.x + x,
+                                bounds.origin.y + bounds.size.height / 2.0,
+                            ),
+                            &output.hit_regions,
+                        );
+                        for (candidate, (index, id)) in rows.iter().enumerate() {
+                            assert_eq!(
+                                tree.resolved_quad(*id, tree.element_at(*index).unwrap())
+                                    .background,
+                                Some(argui_paint::Fill::Solid(if row == candidate {
+                                    theme.muted
+                                } else {
+                                    theme.card
+                                })),
+                                "row {candidate}, pointer over {key}, editing {editing}"
+                            );
+                        }
+                    }
+                }
+            }
+            tree.pointer_moved(Point::new(-10.0, -10.0), &output.hit_regions);
+            for (index, id) in rows {
+                assert_eq!(
+                    tree.resolved_quad(id, tree.element_at(index).unwrap())
+                        .background,
+                    Some(argui_paint::Fill::Solid(theme.card))
+                );
+            }
+        }
+    }
+}

@@ -256,10 +256,14 @@ impl Page {
             Self::List => "Selection and keyboard navigation.",
             Self::VList => "Measured variable-height rows and virtual scrolling.",
             Self::Table => "Columns and row selection.",
-            Self::Menu => "Nested menus, checkbox and radio entries.",
+            Self::Menu => "Add notes, toggle details and choose a comfortable or compact layout.",
             Self::ContextMenu => "Open a menu at the pointer or with Shift+F10.",
-            Self::Menubar => "Move between menus with the arrow keys.",
-            Self::DataTable => "Sort columns, select rows and edit cells with Enter.",
+            Self::Menubar => {
+                "File manages your notebook; View changes its appearance. Try the arrow keys."
+            }
+            Self::DataTable => {
+                "Sort tasks, select rows and edit Hours with Enter. Drag a column edge to resize."
+            }
             Self::Calendar => "Choose dates with arrows and PageUp/PageDown.",
             Self::DatePicker => "Type a date or choose it from the calendar.",
             Self::Toast => "Notifications with a bounded queue and explicit dismissal.",

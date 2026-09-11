@@ -5,7 +5,7 @@ assert.equal(process.env.ARGUI_HIDDEN_DISPLAY, '1', 'Run with scripts/linux-hidd
 assert.equal(process.env.DISPLAY, undefined, 'The desktop X11 display must not be inherited');
 const imported = await import(process.env.PUPPETEER_MODULE ?? 'puppeteer');
 const puppeteer = imported.puppeteer ?? imported.default;
-const output = process.env.SCREENSHOT_DIR ?? 'target/shadcn-navigation';
+const output = process.env.SCREENSHOT_DIR ?? 'target/widget-interactions';
 await mkdir(output, { recursive: true });
 const browser = await puppeteer.launch({
     executablePath: process.env.CHROME_PATH,
@@ -93,6 +93,10 @@ try {
                 ['Breadcrumb', '[role="link"][aria-label="Home"]'],
                 ['Pagination', '[aria-label="Page 1"]'],
                 ['Skeleton', '[aria-label="Loading article"]'],
+                ['Collapsible', '[aria-label="Archived files"]'],
+                ['Menubar', '[role="menubar"]'],
+                ['Calendar', '[role="grid"]'],
+                ['Data table', '[role="grid"]'],
             ]) {
                 await navigate(name);
                 await page.waitForSelector(selector);
@@ -112,8 +116,16 @@ try {
     await page.keyboard.type(' Test');
     await page.waitForFunction(() => document.querySelector('input[aria-labelledby][aria-disabled="false"]')?.value.endsWith(' Test'));
     await pointClick('[aria-label="Workspace ID"]');
-    assert.notEqual(await page.$eval('canvas', element => element.getAttribute('aria-activedescendant')),
-        await page.$eval('input[aria-labelledby][aria-disabled="true"]', element => element.id));
+    const workspace = await page.$eval('[aria-label="Workspace ID"]', label => document.querySelector(`input[aria-labelledby="${label.id}"]`).id);
+    await page.waitForFunction(id => document.querySelector('canvas').getAttribute('aria-activedescendant') === id, {}, workspace);
+    await page.keyboard.down('Control');
+    await page.keyboard.press('a');
+    await page.keyboard.up('Control');
+    await page.keyboard.type('my-workspace');
+    await page.waitForFunction(id => document.getElementById(id)?.value === 'my-workspace', {}, workspace);
+    await navigate('Button');
+    await navigate('Label');
+    assert.equal(await page.$eval('[aria-label="Workspace ID"]', label => document.querySelector(`input[aria-labelledby="${label.id}"]`).value), 'my-workspace');
     await capture('label-focus');
 
     await navigate('Breadcrumb');
@@ -135,6 +147,56 @@ try {
     await pointClick(button('Page 12'));
     assert.equal(await page.$eval(`${results} ${button('Next')}`, element => element.getAttribute('aria-disabled')), 'true');
     await capture('pagination-last');
+
+    await navigate('Collapsible');
+    await pointClick(button('Project files'));
+    await pointClick(button('Archived files'));
+    assert.equal(await page.$eval(button('Archived files'), element => element.getAttribute('aria-expanded')), 'true');
+    await capture('collapsible-expanded');
+    await pointClick(button('Archived files'));
+    assert.equal(await page.$eval(button('Archived files'), element => element.getAttribute('aria-expanded')), 'false');
+
+    await navigate('Menubar');
+    const menuItem = label => `[role="menuitem"][aria-label="${label}"]`;
+    await pointClick(menuItem('File'));
+    await capture('menubar-file');
+    await pointClick(menuItem('New note'));
+    await page.waitForSelector('[aria-label="Project note 2"]');
+    await pointClick(menuItem('View'));
+    await capture('menubar-view');
+    await pointClick('[role="menuitemcheckbox"][aria-label="Show details"]');
+    await page.waitForSelector('[role="menuitemcheckbox"][aria-checked="false"]');
+    await pointClick(menuItem('Layout'));
+    await pointClick('[role="menuitemradio"][aria-label="Compact"]');
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Escape');
+    await settle();
+    await capture('menubar-notebook-compact');
+
+    await navigate('Calendar');
+    const days = await page.$$eval('[role="cell"]', elements => elements.slice(10, 17).map(element => ({ id: element.id, rect: element.getBoundingClientRect().toJSON() })));
+    assert.equal(days.length, 7);
+    for (const { rect } of [...days, ...days.toReversed()]) {
+        await page.mouse.move(rect.x + rect.width / 2, rect.y + rect.height / 2);
+    }
+    await pointClick(`#${days[3].id}`);
+    await page.mouse.move(1100, 700);
+    await settle();
+    assert.equal(await page.$eval(`#${days[3].id}`, element => element.getAttribute('aria-selected')), 'true');
+    await capture('calendar-selected-after-hover');
+
+    await navigate('Data table');
+    const cells = await page.$$eval('[role="cell"]', elements => elements.slice(0, 16).map(element => element.getBoundingClientRect().toJSON()));
+    assert.ok(cells.length >= 12);
+    for (const rect of [...cells, ...cells.toReversed()]) {
+        await page.mouse.move(rect.x + 4, rect.y + rect.height / 2);
+        await page.mouse.move(rect.x + rect.width / 2, rect.y + rect.height / 2);
+    }
+    const cell = cells[4];
+    await page.mouse.move(cell.x + cell.width / 2, cell.y + cell.height / 2);
+    await capture('data-table-row-hover');
+    await page.mouse.move(1100, 700);
+    await capture('data-table-hover-cleared');
 
     const frames = async () => {
         await settle();

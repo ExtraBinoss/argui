@@ -33,10 +33,15 @@ pub struct WidgetGallery {
     pub(crate) theme_mode: ThemeMode,
     pub(crate) primary: usize,
     pub(crate) name: String,
+    pub(crate) workspace_id: String,
     pub(crate) email: String,
+    pub(crate) input_search: String,
+    pub(crate) invalid_email: String,
     pub(crate) notes: String,
     pub(crate) accepted: bool,
     pub(crate) notifications: bool,
+    pub(crate) email_updates: bool,
+    pub(crate) offline_rendering: bool,
     pub(crate) radio: usize,
     pub(crate) slider: f32,
     pub(crate) plain_slider: f32,
@@ -50,6 +55,7 @@ pub struct WidgetGallery {
     pub(crate) select_selected: Option<usize>,
     pub(crate) dialog_open: bool,
     pub(crate) collapsible_open: bool,
+    pub(crate) archived_open: bool,
     pub(crate) clicks: u32,
     pub(crate) result_page: usize,
     pub(crate) skeleton: std::cell::OnceCell<Entity<pages::skeleton::SkeletonDemo>>,
@@ -112,10 +118,15 @@ impl Default for WidgetGallery {
             theme_mode: ThemeMode::System,
             primary: 0,
             name: "Ada Lovelace".into(),
+            workspace_id: "argui-studio".into(),
             email: "ada@example.com".into(),
+            input_search: String::new(),
+            invalid_email: "broken@".into(),
             notes: "Argui widgets stay controlled by your application state.".into(),
             accepted: true,
             notifications: true,
+            email_updates: false,
+            offline_rendering: false,
             radio: 0,
             slider: 64.0,
             plain_slider: 42.0,
@@ -129,6 +140,7 @@ impl Default for WidgetGallery {
             select_selected: Some(0),
             dialog_open: false,
             collapsible_open: false,
+            archived_open: false,
             clicks: 0,
             result_page: 1,
             skeleton: std::cell::OnceCell::new(),
@@ -301,8 +313,7 @@ impl WidgetGallery {
                     theme.button()
                 } else {
                     theme.ghost_button()
-                }
-                .instant_hover();
+                };
                 Button::new(format!("nav::{}", page.slug()), page.label(), style)
                     .build()
                     .width(percent(1.0))
@@ -424,7 +435,10 @@ impl WidgetGallery {
                     self.search_highlight = 0;
                 }
                 Some("name") => self.name.clone_from(value),
+                Some("workspace-id") => self.workspace_id.clone_from(value),
                 Some("email") => self.email.clone_from(value),
+                Some("input-search-demo") => self.input_search.clone_from(value),
+                Some("invalid") => self.invalid_email.clone_from(value),
                 Some("notes") => self.notes.clone_from(value),
                 _ => return,
             }
@@ -447,13 +461,26 @@ impl WidgetGallery {
                     cx.set_theme(self.theme_request());
                     return;
                 }
-                Some("demo-button") => {
+                Some(
+                    "demo-button" | "secondary" | "outline" | "ghost" | "danger"
+                    | "button-elevated" | "button-lift" | "button-shader",
+                ) => {
                     self.clicks = self.clicks.saturating_add(1);
                     cx.notify();
                     return;
                 }
                 Some("accepted") => {
                     self.accepted = !self.accepted;
+                    cx.notify();
+                    return;
+                }
+                Some("check-empty" | "switch-off") => {
+                    let value = if event.target_key() == Some("check-empty") {
+                        &mut self.email_updates
+                    } else {
+                        &mut self.offline_rendering
+                    };
+                    *value = !*value;
                     cx.notify();
                     return;
                 }

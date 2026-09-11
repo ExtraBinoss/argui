@@ -12,13 +12,17 @@ pub(super) fn render(
     cx: &mut Context<WidgetGallery>,
 ) -> Element {
     let label = Label::new("profile-name-label", "Display name", "name");
-    let disabled = Label::new("profile-id-label", "Workspace ID", "workspace-id").enabled(false);
+    let workspace = Label::new("profile-id-label", "Workspace ID", "workspace-id");
     let name =
         label.associate(Input::new("name", &gallery.name, "Your name", theme.input()).build());
-    let id = disabled.associate(
-        Input::new("workspace-id", "argui-studio", "", theme.input())
-            .enabled(false)
-            .build(),
+    let id = workspace.associate(
+        Input::new(
+            "workspace-id",
+            &gallery.workspace_id,
+            "Workspace ID",
+            theme.input(),
+        )
+        .build(),
     );
     super::preview(
         "Make every field clear",
@@ -35,14 +39,17 @@ pub(super) fn render(
                 ),
             ])
             .gap(8.0),
-            Element::column([disabled.build(theme), id]).gap(8.0),
+            Element::column([workspace.build(theme), id]).gap(8.0),
         ])
         .gap(28.0)
         .max_width(length(420.0)),
         theme,
     )
     .on(cx.listener(EventType::Click, move |_, event, cx| {
-        if let Some(target) = label.focus_target(event) {
+        if let Some(target) = label
+            .focus_target(event)
+            .or_else(|| workspace.focus_target(event))
+        {
             cx.request_focus(target);
             event.stop_propagation();
         }

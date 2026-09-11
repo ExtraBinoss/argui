@@ -83,3 +83,23 @@ JavaScript. Sur 650 ms après stabilisation : 37 callbacks d'animation pendant
 le chargement, zéro après chargement, démontage ou mouvement réduit. Le lancement
 natif a été limité volontairement à huit secondes ; il ne remplace pas ces
 vérifications visuelles ni un audit des lecteurs d'écran.
+
+Les exemples sont maintenant entièrement contrôlés pour les deux champs Label
+et les deux sections Collapsible. La page courante de Pagination utilise le fond
+`primary` et le texte `primary_foreground`, comme la date sélectionnée du calendrier.
+
+Les contrôles du thème quittent leur survol immédiatement : boutons, champs,
+onglets, options et lignes de checkbox/switch/radio. Les autres transitions restent
+disponibles ; après une transition de bouton explicite, `instant_hover()` rétablit
+ce comportement. Data table suit le survol de toute la ligne, cellules et éditeurs
+inclus, grâce à une portée d'état par ligne.
+
+Les pages Menu, Context menu et Menubar présentent un carnet de notes : File ajoute,
+duplique ou réinitialise les notes ; View affiche les détails et règle la densité.
+Les commandes passent par leur `ActionScope` et leur activation continue après la
+fermeture du menu. Les captures du scénario élargi sont dans `target/widget-interactions/`.
+Le scénario élargi a produit 42 captures en clair/sombre à deux tailles, sans
+erreur JavaScript. Les 235 tests ciblés des widgets et de la galerie réussissent
+(un test natif optionnel ignoré), dont les croisements sans frame intermédiaire
+et le survol continu des cellules avec ou sans éditeur. Le build WebAssembly
+réussit également ; les contrôles visuels restent sur le compositeur privé.

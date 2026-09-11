@@ -167,6 +167,32 @@ fn mix(left: Color, right: Color, amount: f32) -> Color {
     left.mix(right, amount, ColorInterpolation::Oklab)
 }
 
+#[cfg(any(
+    feature = "button",
+    feature = "input",
+    feature = "tabs",
+    feature = "checkbox",
+    feature = "switch",
+    feature = "radio-group"
+))]
+pub(crate) fn instant_hover(
+    mut transition: argui_ui::StyleTransition,
+    hover: argui_ui::StateSelector,
+) -> argui_ui::StyleTransition {
+    for direction in [
+        argui_ui::TransitionDirection::Enter(hover.into()),
+        argui_ui::TransitionDirection::Exit(hover.into()),
+    ] {
+        transition = transition.rule(
+            argui_ui::TransitionRule::new(argui_ui::Transition::tween(
+                argui_animation::Tween::new(argui_animation::Duration::ZERO),
+            ))
+            .direction(direction),
+        );
+    }
+    transition
+}
+
 impl WidgetTheme {
     /// Rounded floating surface with independent backdrop blur and elevation.
     #[must_use]

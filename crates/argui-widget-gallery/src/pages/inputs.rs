@@ -31,7 +31,7 @@ fn controlled_fields(
 ) -> Element {
     let search = Input::new(
         "input-search-demo",
-        "",
+        &gallery.input_search,
         "Search the GPU graph…",
         theme.input(),
     )
@@ -41,7 +41,7 @@ fn controlled_fields(
     .build();
     preview(
         "Controlled fields",
-        "Labels, descriptions, invalid, read-only and disabled states are semantic and visual.",
+        "Edit your profile, try a search, or correct the sample email. The last two fields demonstrate locked values.",
         Element::column([
             Input::new("name", &gallery.name, "Full name", theme.input())
                 .label("Full name")
@@ -51,9 +51,14 @@ fn controlled_fields(
                 .description("Used only for this local preview")
                 .build(),
             search,
-            Input::new("invalid", "broken@", "Email", theme.input())
+            Input::new("invalid", &gallery.invalid_email, "Email", theme.input())
                 .label("Invalid field")
-                .invalid(true)
+                .invalid(
+                    !gallery
+                        .invalid_email
+                        .split_once('@')
+                        .is_some_and(|(name, domain)| !name.is_empty() && domain.contains('.')),
+                )
                 .build(),
             Input::new("readonly", "Read-only value", "", theme.input())
                 .read_only(true)

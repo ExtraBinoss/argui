@@ -11,7 +11,13 @@ fn project_files_open_close_and_keep_their_state_across_navigation() {
     click(&app, "nav::collapsible");
     assert!(contains_text(&app.render(), "components/button.rs"));
     click(&app, "archived-files::trigger");
-    assert!(!contains_text(&app.render(), "Archive contents"));
+    assert!(contains_text(&app.render(), "archive/button-v1.rs"));
+    assert!(contains_text(&app.render(), "components/button.rs"));
+    click(&app, "nav::label");
+    click(&app, "nav::collapsible");
+    assert!(contains_text(&app.render(), "archive/theme-v1.rs"));
+    click(&app, "archived-files::trigger");
+    assert!(!contains_text(&app.render(), "archive/button-v1.rs"));
     click(&app, "project-files::trigger");
     assert!(!contains_text(&app.render(), "components/button.rs"));
     assert!(!app.read(argui::runtime::Render::wants_animation_frame));

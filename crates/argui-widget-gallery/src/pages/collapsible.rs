@@ -60,22 +60,46 @@ pub(super) fn render(
     }));
     super::preview(
         "A closer look",
-        "Expand the project to browse its components.",
+        "Expand the project or archive to browse its components.",
         Element::column([
             disclosure,
             Collapsible::new(
                 "archived-files",
                 "Archived files",
-                false,
-                Element::text("Archive contents"),
+                gallery.archived_open,
+                Element::column([
+                    file("archive/button-v1.rs", theme),
+                    file("archive/theme-v1.rs", theme),
+                ])
+                .gap(8.0),
             )
-            .enabled(false)
             .indicator(
                 assets
-                    .icon(TablerIcon::ChevronRight, 16.0)
+                    .icon(
+                        if gallery.archived_open {
+                            TablerIcon::ChevronDown
+                        } else {
+                            TablerIcon::ChevronRight
+                        },
+                        16.0,
+                    )
                     .vector_color(theme.foreground),
             )
-            .build(theme),
+            .build(theme)
+            .on(cx.listener(EventType::Click, |gallery, event, cx| {
+                if let Some(open) = Collapsible::new(
+                    "archived-files",
+                    "Archived files",
+                    gallery.archived_open,
+                    Element::container([]),
+                )
+                .action(event)
+                {
+                    gallery.archived_open = open;
+                    event.stop_propagation();
+                    cx.notify();
+                }
+            })),
         ])
         .gap(24.0)
         .max_width(length(480.0)),

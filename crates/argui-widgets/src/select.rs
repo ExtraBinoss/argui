@@ -116,7 +116,10 @@ impl Select {
                 .paint_style(self_theme_input(theme))
                 .when(VisualState::Hovered, theme.input().hovered.clone())
                 .when(VisualState::FocusVisible, theme.input().focused.clone())
-                .transition(theme.input().transition.clone()),
+                .transition(crate::theme::instant_hover(
+                    StyleTransition::default(),
+                    VisualState::Hovered.into(),
+                )),
         );
         let overlay = (self.open || self.presence.as_ref().is_some_and(crate::Presence::visible))
             .then(|| {
@@ -170,7 +173,10 @@ impl Select {
                             .radius(CornerRadii::all(5.0)),
                     ),
                 )
-                .transition(StyleTransition::default()),
+                .transition(crate::theme::instant_hover(
+                    StyleTransition::default(),
+                    VisualState::Hovered.into(),
+                )),
             )
         });
         let list = Element::column(options)

@@ -143,7 +143,7 @@ impl Menu {
                     .background(theme.border)
                     .semantics(Semantics::new(Role::Separator));
             }
-            let mut style = theme.ghost_button().instant_hover();
+            let mut style = theme.ghost_button();
             style.layout.padding = argui_ui::sides(8.0, 0.0);
             style.label.weight = 400;
             let mut button = Button::new(self.item_key(&item.id), &item.state.label, style)

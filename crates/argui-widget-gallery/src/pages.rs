@@ -223,12 +223,12 @@ fn resizable_textarea(
 
 fn checkboxes(gallery: &WidgetGallery, theme: &WidgetTheme, assets: &WidgetAssets) -> Element {
     preview(
-        "Checkbox states",
-        "Space and Enter activate the focused control.",
+        "Team notifications",
+        "Choose which project updates you receive. Space toggles the focused option.",
         Element::column([
             Checkbox::new(
                 "accepted",
-                "Accept the renderer terms",
+                "Notify me when a review is requested",
                 if gallery.accepted {
                     argui::ui::CheckedState::Checked
                 } else {
@@ -239,13 +239,17 @@ fn checkboxes(gallery: &WidgetGallery, theme: &WidgetTheme, assets: &WidgetAsset
             .build(theme),
             Checkbox::new(
                 "check-empty",
-                "Unchecked option",
-                argui::ui::CheckedState::Unchecked,
+                "Send a weekly email digest",
+                if gallery.email_updates {
+                    argui::ui::CheckedState::Checked
+                } else {
+                    argui::ui::CheckedState::Unchecked
+                },
             )
             .build(theme),
             Checkbox::new(
                 "check-disabled",
-                "Disabled option",
+                "Security alerts (required)",
                 argui::ui::CheckedState::Checked,
             )
             .enabled(false)
@@ -258,14 +262,18 @@ fn checkboxes(gallery: &WidgetGallery, theme: &WidgetTheme, assets: &WidgetAsset
 
 fn switches(gallery: &WidgetGallery, theme: &WidgetTheme) -> Element {
     preview(
-        "Switch states",
-        "The thumb transition is built from the same retained state model as every element.",
+        "Rendering preferences",
+        "Enable profiling while you work, or prepare a render without a network connection.",
         Element::column([
             Switch::new("notifications", "GPU profiling", gallery.notifications).build(theme),
-            Switch::new("switch-off", "Offline rendering", false).build(theme),
-            Switch::new("switch-disabled", "Unavailable backend", true)
-                .enabled(false)
-                .build(theme),
+            Switch::new("switch-off", "Offline rendering", gallery.offline_rendering).build(theme),
+            Switch::new(
+                "switch-disabled",
+                "Cloud rendering (connection required)",
+                true,
+            )
+            .enabled(false)
+            .build(theme),
         ])
         .gap(8.0),
         theme,
@@ -275,7 +283,7 @@ fn switches(gallery: &WidgetGallery, theme: &WidgetTheme) -> Element {
 fn radios(gallery: &WidgetGallery, theme: &WidgetTheme) -> Element {
     preview(
         "Quality preset",
-        "Arrow navigation uses spatial focus and activation remains controlled.",
+        "Choose a rendering preset. Use the arrow keys to compare the options.",
         RadioGroup::new(
             "quality",
             "Effect quality",
@@ -294,7 +302,7 @@ fn radios(gallery: &WidgetGallery, theme: &WidgetTheme) -> Element {
 fn sliders(gallery: &WidgetGallery, theme: &WidgetTheme, assets: &WidgetAssets) -> Element {
     preview(
         "Continuous and stepped input",
-        "Drag, tap, arrow keys, Home/End and AccessKit values share one clamping path.",
+        "Drag a slider or use the arrow keys to adjust the value. Home and End reach the limits.",
         Element::column([
             crate::property_slider::render(gallery, theme, assets),
             Slider::new(
@@ -313,7 +321,7 @@ fn sliders(gallery: &WidgetGallery, theme: &WidgetTheme, assets: &WidgetAssets) 
 fn tabs(gallery: &WidgetGallery, theme: &WidgetTheme) -> Element {
     preview(
         "Tabbed settings",
-        "Only the selected panel is mounted and exposed to accessibility.",
+        "Switch categories to explore the available workspace settings.",
         Tabs::new(
             "demo-tabs",
             [
@@ -334,7 +342,7 @@ fn tabs(gallery: &WidgetGallery, theme: &WidgetTheme) -> Element {
 fn selects(gallery: &WidgetGallery, theme: &WidgetTheme, assets: &WidgetAssets) -> Element {
     preview(
         "Backend selection",
-        "The overlay follows its anchor, flips at viewport edges and restores focus on close.",
+        "Choose the backend for your next render. Type a name to jump to an option.",
         Select::new(
             "backend",
             "Choose a backend",

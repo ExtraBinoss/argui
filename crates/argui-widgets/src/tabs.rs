@@ -98,7 +98,10 @@ impl Tabs {
                         VisualState::FocusVisible,
                         resting.border(Border::all(2.0, theme.ring)).into(),
                     )
-                    .transition(StyleTransition::default()),
+                    .transition(crate::theme::instant_hover(
+                        StyleTransition::default(),
+                        VisualState::Hovered.into(),
+                    )),
             )
         });
         let tab_list = behavior.decorate(
