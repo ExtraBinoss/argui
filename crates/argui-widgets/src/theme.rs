@@ -275,9 +275,7 @@ impl WidgetTheme {
     pub fn input(&self) -> InputStyle {
         let mut input = InputStyle::new(PaintStyle::new(quad(self.card, self.border)), self.text());
         input.hovered = quad(self.card, mix(self.border, self.foreground, 0.28)).into();
-        input.focused = quad(self.card, self.primary)
-            .border(Border::all(1.5, self.primary))
-            .into();
+        input.focused = quad(self.card, self.primary).into();
         input.placeholder.color = self.muted_foreground;
         input.selection = self.primary.with_alpha(0.28);
         input.caret = CaretStyle::default();

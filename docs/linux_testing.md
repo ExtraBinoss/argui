@@ -80,6 +80,8 @@ Pour les champs de texte et menus imbriqués, remplacer le scénario par
 Les captures vont dans `target/editor-interactions/`. Ce scénario compare les
 raccourcis à des champs HTML de Chromium puis exerce de vrais doubles/triples
 clics, le glisser par mots, le clic extérieur et Échap dans les sous-menus.
+Il contrôle aussi la stabilité des dimensions et positions des champs pendant
+la saisie et les changements de focus.
 
 Ouvrir les fichiers de capture avec l'outil de lecture d'images de l'agent,
 sans visionneuse graphique sur le bureau. Vérifier texte complet, contraste,

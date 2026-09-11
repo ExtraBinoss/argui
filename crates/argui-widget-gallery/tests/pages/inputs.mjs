@@ -31,6 +31,10 @@ try {
         await pause(350);
     };
     const rect = selector => page.$eval(selector, element => element.getBoundingClientRect().toJSON());
+    const fieldGeometry = () => page.$$eval('input, textarea', elements => elements.map(element => {
+        const { x, y, width, height } = element.getBoundingClientRect();
+        return { x, y, width, height };
+    }));
     const click = async (selector, button = 'left') => {
         const r = await rect(selector);
         assert.ok(r.width > 0 && r.bottom <= 900 && r.right <= 1220, selector);
@@ -48,6 +52,15 @@ try {
     ]) {
         await navigate(name === 'Input' ? 'Input & Search' : name);
         await page.waitForSelector(selector);
+        const restingGeometry = await fieldGeometry();
+        if (name === 'Input') {
+            for (const label of ['Full name', 'Email address', 'Full name']) {
+                await click(`input[aria-label="${label}"]`);
+                await page.keyboard.type(' x');
+                await pause();
+                assert.deepEqual(await fieldGeometry(), restingGeometry, `${label}: stable fields when switching focus and typing`);
+            }
+        }
         const reset = async value => {
             await click(selector);
             await chord(page, 'a', 'Control');
@@ -55,6 +68,7 @@ try {
             await chord(page, 'Home', 'Control');
             await pause();
             assert.equal(await page.$eval(selector, el => el.value), value);
+            assert.deepEqual(await fieldGeometry(), restingGeometry, `${name}: stable fields during typing`);
         };
         const base = name === 'Input' ? 'one,  two! three' : 'abcdef\nx\nabcdef';
         const cases = [
