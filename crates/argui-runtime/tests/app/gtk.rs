@@ -60,6 +60,13 @@ fn buttons() -> [(u32, argui_core::PointerButton, u16); 5] {
 
 fn send_pointer(window: &gtk::Window) {
     use gtk::{gdk, prelude::*};
+    let mut motion = gdk::Event::new(gdk::EventType::MotionNotify)
+        .downcast::<gdk::EventMotion>()
+        .unwrap();
+    motion.as_mut().send_event = 1;
+    motion.as_mut().time = 100;
+    motion.set_device(window.display().default_seat().unwrap().pointer().as_ref());
+    window.emit_by_name::<bool>("motion-notify-event", &[&*motion]);
     for (button, _, _) in buttons() {
         for (kind, signal) in [
             (gdk::EventType::ButtonPress, "button-press-event"),
@@ -85,6 +92,11 @@ fn send_pointer(window: &gtk::Window) {
 
 pub fn assert_pointer(pointer: &[argui_core::PointerEvent], wheel: &[argui_core::ScrollDelta]) {
     use argui_core::{Point, PointerPhase, ScrollDelta};
+    assert!(
+        pointer
+            .iter()
+            .any(|event| event.phase == PointerPhase::Moved)
+    );
     let expected: Vec<_> = buttons()
         .into_iter()
         .flat_map(|(_, button, mask)| {
@@ -97,6 +109,7 @@ pub fn assert_pointer(pointer: &[argui_core::PointerEvent], wheel: &[argui_core:
     assert_eq!(
         pointer
             .iter()
+            .filter(|event| event.button.is_some())
             .map(|event| (event.button, event.phase, event.buttons))
             .collect::<Vec<_>>(),
         expected

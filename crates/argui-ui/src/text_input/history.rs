@@ -168,6 +168,7 @@ impl TextInputState {
         kind: EditKind,
         edit: impl FnOnce(&mut Self) -> EditResult,
     ) -> EditResult {
+        self.goal_x = None;
         if self.protected() {
             return edit(self);
         }
@@ -211,8 +212,10 @@ impl TextInputState {
             return EditResult::default();
         }
         let kind = match &input.key {
-            Key::Backspace => EditKind::Backspace,
-            Key::Delete => EditKind::Delete,
+            Key::Backspace if !input.modifiers.command() && !input.modifiers.alt => {
+                EditKind::Backspace
+            }
+            Key::Delete if !input.modifiers.command() && !input.modifiers.alt => EditKind::Delete,
             Key::Character(_) if !input.modifiers.command() && !input.modifiers.alt => {
                 EditKind::Typing
             }
@@ -242,6 +245,7 @@ impl TextInputState {
         !self.read_only && !self.protected() && !self.history.redo.is_empty()
     }
     pub fn history_step(&mut self, redo: bool) -> EditResult {
+        self.goal_x = None;
         self.history.break_group();
         let preedit = self.preedit.take().is_some();
         if self.read_only || self.protected() {

@@ -3,6 +3,20 @@ use argui_paint::{Border, ClipChain, DisplayList, Fill, Quad, QuadStyle};
 use argui_text::{CaretScroll, CaretStop, TextEngine, TextInputScroll};
 use argui_ui::{CaretStyle, Element, ElementKind, NodeId, UiTree};
 
+mod navigation;
+
+impl crate::LayoutOutput {
+    /// Convert a viewport pointer to layout coordinates for editor hits and captured drags.
+    #[must_use]
+    pub fn local_point(&self, node: NodeId, point: Point) -> Option<Point> {
+        self.hit_regions
+            .iter()
+            .find(|region| region.node == node)
+            .and_then(|region| region.transform.inverse())
+            .map(|inverse| inverse.transform_point(point))
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct TextInputRegion {
     pub node: NodeId,
@@ -114,51 +128,10 @@ impl TextInputRegion {
                     .abs()
                     .total_cmp(&(b.point.x - current.point.x).abs())
             })
-            .map_or(position, |stop| stop.position)
-    }
-
-    #[must_use]
-    pub fn vertical_neighbor(&self, position: TextPosition, up: bool) -> TextPosition {
-        let Some(current) = self
-            .stops
-            .iter()
-            .find(|stop| stop.position == position)
-            .or_else(|| {
-                self.stops
-                    .iter()
-                    .find(|stop| stop.position.index == position.index)
-            })
-        else {
-            return position;
-        };
-        let line_y = self
-            .stops
-            .iter()
-            .filter(|stop| {
-                if up {
-                    stop.point.y < current.point.y - 0.01
-                } else {
-                    stop.point.y > current.point.y + 0.01
-                }
-            })
-            .map(|stop| stop.point.y)
-            .min_by(|a, b| {
-                (a - current.point.y)
-                    .abs()
-                    .total_cmp(&(b - current.point.y).abs())
-            });
-        let Some(line_y) = line_y else {
-            return position;
-        };
-        self.stops
-            .iter()
-            .filter(|stop| (stop.point.y - line_y).abs() < 0.01)
-            .min_by(|a, b| {
-                (a.point.x - current.point.x)
-                    .abs()
-                    .total_cmp(&(b.point.x - current.point.x).abs())
-            })
-            .map_or(position, |stop| stop.position)
+            .map_or_else(
+                || self.adjacent_line_edge(position, left),
+                |stop| stop.position,
+            )
     }
 
     pub(crate) fn translate(&mut self, delta: Point, clip: Rect) {

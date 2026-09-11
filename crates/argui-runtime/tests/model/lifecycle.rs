@@ -3,6 +3,23 @@ use argui_ui::Element;
 use std::{cell::RefCell, rc::Rc};
 
 #[test]
+fn host_visibility_before_first_render_does_not_emit_phantom_mount_events() {
+    let runtime = ModelRuntime::default();
+    let model = runtime.entity(View);
+    let events = Rc::new(RefCell::new(Vec::new()));
+    let log = events.clone();
+    let _subscription =
+        runtime.observe_mounts(move |event| log.borrow_mut().push(event.transition));
+    model.erase().set_host_visible(false);
+    model.erase().set_host_visible(true);
+    runtime.dispatch_pending();
+    assert!(events.borrow().is_empty());
+    let _ = model.render();
+    runtime.dispatch_pending();
+    assert_eq!(&*events.borrow(), &[MountTransition::Mounted]);
+}
+
+#[test]
 fn dropping_a_mount_with_failed_cleanup_preserves_its_model_and_final_event() {
     let runtime = ModelRuntime::new(|| {});
     let model = runtime.entity(View);

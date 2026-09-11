@@ -9,16 +9,19 @@ mod privacy;
 pub use filter::TextInputFilter;
 pub use history::HistoryConfig;
 pub use privacy::TextPrivacy;
+mod navigation;
+mod selection;
 mod states;
 pub(crate) use states::{RetainedInput, TextInputStates};
 
-#[derive(Clone, Default, Eq, PartialEq)]
+#[derive(Clone, Default, PartialEq)]
 pub(crate) struct TextInputState {
     value: String,
     authored_value: String,
     cursor: usize,
     affinity: CaretAffinity,
     anchor: Option<TextPosition>,
+    goal_x: Option<f32>,
     preedit: Option<Preedit>,
     multiline: bool,
     read_only: bool,
@@ -160,6 +163,7 @@ impl TextInputState {
         }
         self.history.clear();
         self.value.clear();
+        self.goal_x = None;
         self.value.push_str(value);
         self.cursor = grapheme_boundary(&self.value, self.cursor.min(self.value.len()));
         self.anchor = self.anchor.and_then(|anchor| {
@@ -221,6 +225,7 @@ impl TextInputState {
         if input.state != KeyState::Pressed {
             return EditResult::default();
         }
+        self.goal_x = None;
         let command = input.modifiers.command();
         if command && let Key::Character(key) = &input.key {
             return self.shortcut(key);
@@ -234,26 +239,13 @@ impl TextInputState {
         let old_cursor = TextPosition::new(self.cursor, self.affinity);
         let mut result = EditResult::default();
         match input.key {
-            Key::ArrowLeft if command || input.modifiers.alt => {
-                self.move_to(previous_word(&self.value, self.cursor));
+            Key::ArrowLeft | Key::ArrowRight | Key::Home | Key::End => self.navigate(input),
+            Key::Backspace if !self.read_only => {
+                result.changed = self.backspace(command || input.modifiers.alt)
             }
-            Key::ArrowRight if command || input.modifiers.alt => {
-                self.move_to(next_word(&self.value, self.cursor));
+            Key::Delete if !self.read_only => {
+                result.changed = self.delete(command || input.modifiers.alt)
             }
-            Key::ArrowLeft => self.move_to(previous_grapheme(&self.value, self.cursor)),
-            Key::ArrowRight => self.move_to(next_grapheme(&self.value, self.cursor)),
-            Key::Home => self.move_to(if self.multiline && !command {
-                line_start(&self.value, self.cursor)
-            } else {
-                0
-            }),
-            Key::End => self.move_to(if self.multiline && !command {
-                line_end(&self.value, self.cursor)
-            } else {
-                self.value.len()
-            }),
-            Key::Backspace if !self.read_only => result.changed = self.backspace(),
-            Key::Delete if !self.read_only => result.changed = self.delete(),
             Key::Enter if self.multiline && !command && !self.read_only => {
                 self.insert("\n");
                 result.changed = true;
@@ -336,6 +328,7 @@ impl TextInputState {
 
     pub fn place_position(&mut self, position: TextPosition, extend: bool) -> EditResult {
         self.history.break_group();
+        self.goal_x = None;
         let old = TextPosition::new(self.cursor, self.affinity);
         self.move_to(self.unmask_index(position.index));
         self.affinity = position.affinity;
@@ -347,6 +340,7 @@ impl TextInputState {
     }
 
     pub fn select(&mut self, selection: TextSelection) -> EditResult {
+        self.goal_x = None;
         self.history.break_group();
         let boundary = |position: TextPosition| {
             TextPosition::new(
@@ -458,11 +452,15 @@ impl TextInputState {
         true
     }
 
-    fn backspace(&mut self) -> bool {
+    fn backspace(&mut self, by_word: bool) -> bool {
         if self.delete_selection() {
             return true;
         }
-        let start = previous_grapheme(&self.value, self.cursor);
+        let start = if by_word {
+            navigation::previous_word(&self.value, self.cursor)
+        } else {
+            previous_grapheme(&self.value, self.cursor)
+        };
         if start == self.cursor {
             return false;
         }
@@ -472,11 +470,15 @@ impl TextInputState {
         true
     }
 
-    fn delete(&mut self) -> bool {
+    fn delete(&mut self, by_word: bool) -> bool {
         if self.delete_selection() {
             return true;
         }
-        let end = next_grapheme(&self.value, self.cursor);
+        let end = if by_word {
+            navigation::next_word(&self.value, self.cursor)
+        } else {
+            next_grapheme(&self.value, self.cursor)
+        };
         if end == self.cursor {
             return false;
         }
@@ -528,21 +530,6 @@ fn next_grapheme(value: &str, cursor: usize) -> usize {
         .grapheme_indices(true)
         .nth(1)
         .map_or(value.len(), |(index, _)| cursor + index)
-}
-
-fn previous_word(value: &str, cursor: usize) -> usize {
-    value[..cursor]
-        .unicode_word_indices()
-        .next_back()
-        .map_or(0, |(index, _)| index)
-}
-
-fn next_word(value: &str, cursor: usize) -> usize {
-    value[cursor..]
-        .unicode_word_indices()
-        .map(|(index, word)| cursor + index + word.len())
-        .next()
-        .unwrap_or(value.len())
 }
 
 fn char_boundary(value: &str, index: usize) -> usize {

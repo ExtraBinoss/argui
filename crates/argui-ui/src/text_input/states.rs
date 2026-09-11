@@ -1,6 +1,6 @@
 use argui_core::{CaretAffinity, TextPosition};
 
-use crate::NodeId;
+use crate::{NodeId, SelectionGranularity};
 
 use super::{EditResult, TextInputFilter, TextInputState, TextSelection};
 
@@ -17,7 +17,14 @@ pub(crate) struct RetainedInput {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct TextInputStates {
     states: Vec<(NodeId, TextInputState)>,
-    drag: Option<NodeId>,
+    drag: Option<TextDrag>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct TextDrag {
+    node: NodeId,
+    granularity: SelectionGranularity,
+    origin: (usize, usize),
 }
 
 impl TextInputStates {
@@ -53,7 +60,7 @@ impl TextInputStates {
         let inputs = inputs.into_iter().collect::<Vec<_>>();
         self.states
             .retain(|(node, _)| inputs.iter().any(|input| input.node == *node));
-        if self.drag.is_some_and(|node| self.get(node).is_none()) {
+        if self.drag.is_some_and(|drag| self.get(drag.node).is_none()) {
             self.drag = None;
         }
         for RetainedInput {
@@ -99,8 +106,32 @@ impl TextInputStates {
         position: TextPosition,
         extend: bool,
     ) -> Option<EditResult> {
-        let result = self.get_mut(node)?.place_position(position, extend);
-        self.drag = Some(node);
+        self.begin_selection(node, position, extend, SelectionGranularity::Character)
+    }
+
+    pub fn begin_selection(
+        &mut self,
+        node: NodeId,
+        position: TextPosition,
+        extend: bool,
+        granularity: SelectionGranularity,
+    ) -> Option<EditResult> {
+        let state = self.get_mut(node)?;
+        let (start, end) = state.unit_range(position, granularity);
+        let result = if granularity == SelectionGranularity::Character {
+            state.place_position(position, extend)
+        } else if extend {
+            let anchor = state.anchor.map_or(state.cursor, |position| position.index);
+            state.select_range(anchor, if start < anchor { start } else { end })
+        } else {
+            state.select_range(start, end)
+        };
+        let origin = state.selection().unwrap_or((state.cursor, state.cursor));
+        self.drag = Some(TextDrag {
+            node,
+            granularity,
+            origin,
+        });
         Some(result)
     }
 
@@ -109,11 +140,17 @@ impl TextInputStates {
     }
 
     pub fn drag_position(&mut self, node: NodeId, position: TextPosition) -> Option<EditResult> {
-        if self.drag != Some(node) {
-            return None;
+        let drag = self.drag.filter(|drag| drag.node == node)?;
+        let state = self.get_mut(node)?;
+        if drag.granularity == SelectionGranularity::Character {
+            return Some(state.place_position(position, true));
         }
-        self.get_mut(node)
-            .map(|state| state.place_position(position, true))
+        let (start, end) = state.unit_range(position, drag.granularity);
+        Some(if start < drag.origin.0 {
+            state.select_range(drag.origin.1, start)
+        } else {
+            state.select_range(drag.origin.0, end.max(drag.origin.1))
+        })
     }
 
     pub fn move_to(&mut self, node: NodeId, index: usize, extend: bool) -> Option<EditResult> {

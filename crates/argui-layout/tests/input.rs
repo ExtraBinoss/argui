@@ -120,58 +120,6 @@ fn hit_testing_and_empty_regions_have_exact_boundaries() {
 }
 
 #[test]
-fn visual_neighbors_follow_lines_directions_and_word_boundaries() {
-    let region = region(vec![
-        stop(0, 0.0, 0.0, true),
-        stop(1, 10.0, 0.0, false),
-        stop(2, 20.0, 0.0, true),
-        stop(3, 0.0, 20.0, true),
-        stop(4, 11.0, 20.0, false),
-        stop(5, 22.0, 20.0, true),
-    ]);
-    let middle = TextPosition::new(1, CaretAffinity::Before);
-    assert_eq!(
-        region.visual_neighbor(middle, true, false),
-        TextPosition::new(0, CaretAffinity::Before)
-    );
-    assert_eq!(
-        region.visual_neighbor(middle, false, true),
-        TextPosition::new(2, CaretAffinity::Before)
-    );
-    assert_eq!(
-        region.vertical_neighbor(middle, false),
-        TextPosition::new(4, CaretAffinity::Before)
-    );
-    assert_eq!(
-        region.vertical_neighbor(TextPosition::new(4, CaretAffinity::Before), true),
-        middle
-    );
-    assert_eq!(region.vertical_neighbor(middle, true), middle);
-    assert_eq!(
-        region.visual_neighbor(TextPosition::new(2, CaretAffinity::Before), false, false),
-        TextPosition::new(2, CaretAffinity::Before)
-    );
-
-    let affinity_fallback = TextPosition::new(1, CaretAffinity::After);
-    assert_eq!(
-        region.visual_neighbor(affinity_fallback, false, false),
-        TextPosition::new(2, CaretAffinity::Before)
-    );
-    let missing = TextPosition::new(99, CaretAffinity::Before);
-    assert_eq!(region.visual_neighbor(missing, false, false), missing);
-    assert_eq!(region.vertical_neighbor(missing, false), missing);
-
-    assert_eq!(
-        region.closest_position(Point::new(19.0, 19.0)),
-        TextPosition::new(2, CaretAffinity::Before)
-    );
-    assert_eq!(
-        region.closest_position(Point::new(9.0, 20.0)),
-        TextPosition::new(4, CaretAffinity::Before)
-    );
-}
-
-#[test]
 fn text_area_shapes_and_clips_scrollable_content_with_a_live_scrollbar() {
     let value = (0..30)
         .map(|line| format!("line {line:02} keeps enough text to exercise wrapping"))
@@ -529,4 +477,88 @@ fn empty_or_degenerate_custom_carets_do_not_emit_invalid_quads() {
             .count();
         assert_eq!(painted, expected, "caret {width} x {height}, empty={empty}");
     }
+}
+
+#[path = "input/navigation.rs"]
+mod navigation;
+
+#[test]
+fn transformed_editor_hits_and_drags_resolve_the_same_text_positions() {
+    use argui_core::Affine2D;
+    let field = |key, value| {
+        Input::new(
+            key,
+            value,
+            "",
+            InputStyle::new(PaintStyle::default(), TextStyle::default()),
+        )
+        .build()
+    };
+    let mut ui = UiTree::new(Element::column([
+        field("first", "other field"),
+        field("second", "alpha beta gamma"),
+    ]));
+    let node = ui.node_ids()[2];
+    let mut output = LayoutEngine::new()
+        .compute(&mut ui, &mut text_engine(), Size::new(400.0, 160.0))
+        .unwrap();
+    let region = output
+        .text_inputs
+        .iter()
+        .find(|region| region.node == node)
+        .unwrap()
+        .clone();
+    let local = region
+        .stops
+        .iter()
+        .find(|stop| stop.position.index == 7)
+        .unwrap()
+        .point;
+    let expected = region.closest_position(local);
+    for transform in [
+        Affine2D::IDENTITY,
+        Affine2D {
+            matrix: [2.0, 0.0, 0.0, 1.5],
+            translation: Point::new(120.0, 45.0),
+        },
+    ] {
+        output
+            .hit_regions
+            .iter_mut()
+            .find(|hit| hit.node == node)
+            .unwrap()
+            .transform = transform;
+        let point = transform.transform_point(local);
+        let mapped = output.local_point(node, point).unwrap();
+        assert!((mapped.x - local.x).hypot(mapped.y - local.y) < 0.001);
+        assert_eq!(region.hit_position(mapped), Some(expected));
+        ui.begin_text_selection(
+            node,
+            region.closest_position(mapped),
+            false,
+            argui_ui::SelectionGranularity::Word,
+        );
+        assert_eq!(ui.text_input_selection(node), Some((6, 10)));
+        // Captured drags may leave the editor while still needing its inverse transform.
+        let outside = Point::new(region.bounds.origin.x - 50.0, local.y);
+        let mapped = output
+            .local_point(node, transform.transform_point(outside))
+            .unwrap();
+        assert!(region.hit_position(mapped).is_none());
+        ui.drag_text_position(node, region.closest_position(mapped));
+        assert_eq!(ui.text_input_selection(node), Some((0, 10)));
+        ui.release_text_cursor();
+    }
+    output
+        .hit_regions
+        .iter_mut()
+        .find(|hit| hit.node == node)
+        .unwrap()
+        .transform = Affine2D {
+        matrix: [0.0; 4],
+        ..Affine2D::IDENTITY
+    };
+    assert!(output.local_point(node, local).is_none());
+    output.hit_regions.retain(|hit| hit.node != node);
+    assert!(output.local_point(node, local).is_none());
 }

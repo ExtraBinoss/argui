@@ -75,6 +75,12 @@ Il exerce la saisie des deux champs Label, les sections repliables, les actions
 de File et View, la sélection de date et les passages rapides entre cellules,
 puis vérifie Entrée, Espace, les limites de pagination et l'arrêt des Skeleton.
 
+Pour les champs de texte et menus imbriqués, remplacer le scénario par
+`node crates/argui-widget-gallery/tests/pages/inputs.mjs` dans la même commande.
+Les captures vont dans `target/editor-interactions/`. Ce scénario compare les
+raccourcis à des champs HTML de Chromium puis exerce de vrais doubles/triples
+clics, le glisser par mots, le clic extérieur et Échap dans les sous-menus.
+
 Ouvrir les fichiers de capture avec l'outil de lecture d'images de l'agent,
 sans visionneuse graphique sur le bureau. Vérifier texte complet, contraste,
 espacement, débordements et états désactivés. Compléter un test de layout avec

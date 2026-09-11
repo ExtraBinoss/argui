@@ -157,7 +157,7 @@ mod native {
                 .align(ScrollAlignment::Start, ScrollAlignment::Center)
             }
             3 => ScrollRequest::reveal("native-last")
-                .align(ScrollAlignment::End, ScrollAlignment::End),
+                .align(ScrollAlignment::End, ScrollAlignment::Nearest),
             4 => ScrollRequest::reveal("native-first"),
             5 => ScrollRequest::reveal("missing"),
             6 => ScrollRequest::offset("missing", Point::new(0.0, 10.0)),
@@ -251,7 +251,7 @@ mod native {
             }
         }
         fn take_ui_commands(&mut self, key: &WindowKey) -> Vec<argui_ui::UiCommand> {
-            if key == &WindowKey::main() && self.issued == 7 && !self.edit_issued {
+            if key == &WindowKey::main() && self.issued == 3 && !self.edit_issued {
                 self.edit_issued = true;
                 vec![argui_ui::UiCommand::ReplaceText {
                     target: "native-editor".into(),
@@ -261,8 +261,9 @@ mod native {
                 Vec::new()
             }
         }
+        // Assert rendered effects during the main window maximize/presentation phase.
         fn take_theme_request(&mut self, key: &WindowKey) -> Option<argui_runtime::ThemeRequest> {
-            if key == &WindowKey::main() && self.issued == 7 && !self.theme_issued {
+            if key == &WindowKey::main() && self.issued == 3 && !self.theme_issued {
                 self.theme_issued = true;
                 Some(argui_runtime::ThemeRequest {
                     primary: Some(argui_core::Color::BLACK),
@@ -291,9 +292,7 @@ mod native {
             if let AppEvent::Window { event, .. } = event {
                 self.data.update(|data, _| match event {
                     PlatformEvent::Keyboard(input) => data.keys.push(input.clone()),
-                    PlatformEvent::Pointer(input) if input.button.is_some() => {
-                        data.pointer.push(*input)
-                    }
+                    PlatformEvent::Pointer(input) => data.pointer.push(*input),
                     PlatformEvent::PointerScrolled(delta) => data.wheel.push(*delta),
                     _ => (),
                 });

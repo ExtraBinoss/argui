@@ -391,49 +391,6 @@ fn reverse_selection_real_delete_and_default_ime_cursor_cover_boundaries() {
 }
 
 #[test]
-fn modifier_and_selection_paths_keep_editing_deterministic() {
-    let (mut tree, region) = tree("one two");
-    focus(&mut tree, &region);
-    let node = region.node;
-    let alt = Modifiers {
-        alt: true,
-        ..Modifiers::default()
-    };
-    let shift = Modifiers {
-        shift: true,
-        ..Modifiers::default()
-    };
-    let command = Modifiers {
-        control: true,
-        ..Modifiers::default()
-    };
-
-    tree.edit_text_input(&key(Key::Home, None, Modifiers::default()));
-    tree.edit_text_input(&key(Key::ArrowRight, None, alt));
-    tree.edit_text_input(&key(Key::ArrowLeft, None, alt));
-    tree.edit_text_input(&key(Key::ArrowRight, None, shift));
-    tree.edit_text_input(&key(Key::ArrowRight, None, shift));
-    assert_eq!(tree.text_input_selection(node), Some((0, 2)));
-    tree.edit_text_input(&key(Key::Backspace, None, Modifiers::default()));
-    assert_eq!(tree.text_input_value(node), Some("e two"));
-
-    assert!(
-        !tree
-            .edit_text_input(&key(Key::Home, None, command))
-            .layout_changed
-    );
-    assert!(
-        !tree
-            .edit_text_input(&key(
-                Key::Character(String::new()),
-                Some(""),
-                Modifiers::default()
-            ))
-            .layout_changed
-    );
-}
-
-#[test]
 fn controlled_value_replaces_internal_state_only_when_it_differs() {
     let (mut tree, region) = tree("seed");
     focus(&mut tree, &region);
@@ -598,3 +555,8 @@ fn targeted_selection_resolves_stable_keys_and_grapheme_boundaries() {
         argui_ui::InteractionUpdate::default()
     );
 }
+
+#[path = "text_input/navigation.rs"]
+mod navigation;
+#[path = "text_input/selection.rs"]
+mod selection;

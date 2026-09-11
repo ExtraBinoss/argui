@@ -53,36 +53,15 @@ impl Application {
                 return;
             }
         }
-        let update = if input.state == KeyState::Pressed
-            && matches!(
-                input.key,
-                Key::ArrowLeft | Key::ArrowRight | Key::ArrowUp | Key::ArrowDown
-            )
-            && let Some(node) = ui.focused_node()
-            && let Some(position) = ui.text_input_position(node)
-            && let Some(region) = layout.text_inputs.iter().find(|region| region.node == node)
-        {
-            let mut update = ui.keyboard_default(input, &layout.hit_regions);
-            let position = match input.key {
-                Key::ArrowLeft | Key::ArrowRight => region.visual_neighbor(
-                    position,
-                    input.key == Key::ArrowLeft,
-                    input.modifiers.command() || input.modifiers.alt,
-                ),
-                Key::ArrowUp | Key::ArrowDown => {
-                    region.vertical_neighbor(position, input.key == Key::ArrowUp)
-                }
-                _ => position,
-            };
-            update.merge(ui.move_text_position(node, position, input.modifiers.shift));
-            update
-        } else {
-            let mut update = ui.keyboard_default(input, &layout.hit_regions);
-            if !(input.state == KeyState::Pressed && input.key == Key::Tab && !input.repeat) {
-                update.merge(ui.edit_text_input(input));
-            }
-            update
-        };
+        let mut update = ui.keyboard_default(input, &layout.hit_regions);
+        if !(input.state == KeyState::Pressed && input.key == Key::Tab && !input.repeat) {
+            let editor_update = ui
+                .focused_node()
+                .and_then(|node| layout.text_inputs.iter().find(|region| region.node == node))
+                .and_then(|region| region.navigate(ui, input))
+                .unwrap_or_else(|| ui.edit_text_input(input));
+            update.merge(editor_update);
+        }
         self.apply_ui_update(update, window, event_loop);
         self.update_ime(window);
     }

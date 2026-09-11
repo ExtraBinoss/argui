@@ -226,6 +226,11 @@ impl Menu {
                     }))
                     .padding(6.0)
                     .build(theme);
+                    // The root menu dismisses the entire chain, including nested portals.
+                    if let Some(content) = element.children.get_mut(1) {
+                        content.portal.as_mut().expect("submenu portal").dismiss =
+                            argui_ui::DismissPolicy::Manual;
+                    }
                     let trigger = &mut element.children[0];
                     let semantics = trigger
                         .semantics

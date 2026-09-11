@@ -544,15 +544,6 @@ impl Application {
     }
 }
 
-fn local_point(layout: &LayoutOutput, node: argui_ui::NodeId, point: Point) -> Option<Point> {
-    layout
-        .hit_regions
-        .iter()
-        .find(|region| region.node == node)
-        .and_then(|region| region.transform.inverse())
-        .map(|inverse| inverse.transform_point(point))
-}
-
 impl Drop for Application {
     fn drop(&mut self) {
         if let Some(model) = &self.model {

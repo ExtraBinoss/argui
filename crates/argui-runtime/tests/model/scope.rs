@@ -117,6 +117,26 @@ struct Source;
 impl EventEmitter<()> for Source {}
 
 #[test]
+fn cancelled_subscription_cannot_be_reactivated_by_attaching_a_new_scope() {
+    let runtime = ModelRuntime::default();
+    let source = runtime.entity(Source);
+    let target = runtime.entity(0);
+    let subscription = target.update(|_, cx| {
+        cx.subscribe(&source, |count, _: &(), _| *count += 1)
+            .unwrap()
+    });
+    subscription.cancel();
+    let scope = ResourceScope::default();
+    let subscription = subscription.in_scope(&scope).unwrap();
+    source.update(|_, cx| cx.emit(()).unwrap());
+    assert_eq!(target.read(|count| *count), 0);
+    assert!(!subscription.is_active());
+    assert_eq!(scope.resource_count(), 0);
+    assert_eq!(source.resources().resource_count(), 0);
+    assert_eq!(target.resources().resource_count(), 0);
+}
+
+#[test]
 fn scopes_cancel_queued_events_and_both_endpoint_registrations_are_removed() {
     let runtime = ModelRuntime::default();
     let source = runtime.entity(Source);

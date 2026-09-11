@@ -2,7 +2,7 @@ use argui_core::{Point, PointerEvent, PointerPhase};
 use argui_platform::{ButtonState, ScrollDelta};
 use argui_ui::{InteractionUpdate, UiTree};
 
-use super::{Application, local_point};
+use super::Application;
 
 #[cfg_attr(coverage_nightly, coverage(off))]
 impl Application {
@@ -90,7 +90,7 @@ impl Application {
                 if region.node != target {
                     return None;
                 }
-                let point = local_point(layout, region.node, point).unwrap_or(point);
+                let point = layout.local_point(region.node, point).unwrap_or(point);
                 region
                     .hit_position(point)
                     .map(|position| (region.node, position))
@@ -162,6 +162,14 @@ impl Application {
             .cloned();
         self.apply_ui_update(update, window, event_loop);
         let default_prevented = pointer_default.is_some_and(|event| event.default_prevented());
+        let granularity = if state == ButtonState::Pressed
+            && !default_prevented
+            && (placement.is_some() || static_placement.is_some())
+        {
+            self.selection_click.next(point, self.pointer_settings)
+        } else {
+            argui_ui::SelectionGranularity::Character
+        };
         if state == ButtonState::Pressed {
             if !default_prevented
                 && let (Some(ui), Some(layout)) = (&mut self.ui_tree, &self.ui_layout)
@@ -173,7 +181,6 @@ impl Application {
             let selection_update = if default_prevented {
                 InteractionUpdate::default()
             } else if let Some(position) = static_placement {
-                let granularity = self.selection_click.next(point, self.pointer_settings);
                 self.ui_tree
                     .as_mut()
                     .map_or_else(InteractionUpdate::default, |ui| {
@@ -195,10 +202,11 @@ impl Application {
             self.apply_ui_update(update, window, event_loop);
         }
         if state == ButtonState::Pressed
+            && !default_prevented
             && let Some((node, position)) = placement
             && let Some(ui) = &mut self.ui_tree
         {
-            let update = ui.place_text_position(node, position, self.modifiers.shift);
+            let update = ui.begin_text_selection(node, position, self.modifiers.shift, granularity);
             self.apply_ui_update(update, window, event_loop);
         }
         self.update_ime(window);
@@ -291,7 +299,7 @@ impl Application {
             && let Some(node) = ui.focused_node()
             && let Some(region) = layout.text_inputs.iter().find(|region| region.node == node)
         {
-            let local = local_point(layout, node, point).unwrap_or(point);
+            let local = layout.local_point(node, point).unwrap_or(point);
             let update = ui.drag_text_position(node, region.closest_position(local));
             self.apply_ui_update(update, window, event_loop);
             return;

@@ -203,6 +203,106 @@ fn nested_menus_open_close_and_toggle_typed_entries() {
 mod intent;
 
 #[test]
+fn outside_click_dismisses_the_root_with_two_submenus_open() {
+    use argui_core::{Point, PointerEvent, PointerPhase, Size};
+    use argui_ui::{EventHandlerId, EventListener, EventOwnerId, EventType};
+    use argui_widgets::MenuItemKind;
+    let child = MenuItem::entry(
+        "leaf",
+        ActionState::new("Leaf"),
+        MenuItemKind::Checkbox(argui_ui::CheckedState::Unchecked),
+    );
+    let inner = MenuItem::entry(
+        "inner",
+        ActionState::new("Inner"),
+        MenuItemKind::Submenu(vec![child]),
+    );
+    let outer = MenuItem::entry(
+        "outer",
+        ActionState::new("Outer"),
+        MenuItemKind::Submenu(vec![inner]),
+    );
+    let mut menu = Menu::new("nested", "Nested", true, vec![outer]);
+    menu.path = vec!["outer".into(), "inner".into()];
+    let themes = shadcn(Color::WHITE);
+    let mut tree = UiTree::new(
+        menu.build(
+            Element::text("Open"),
+            themes.resolve(argui_core::ColorScheme::Light),
+        )
+        .on(EventListener::new(
+            EventType::PointerOutside,
+            EventHandlerId::new(EventOwnerId(1), 0),
+        )),
+    );
+    let mut text = argui_text::TextEngine::from_embedded_fonts(
+        [include_bytes!("../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf").as_slice()],
+        "Noto Sans",
+        "Noto Sans",
+        "Noto Sans",
+    );
+    let layout = argui_layout::LayoutEngine::new()
+        .compute(&mut tree, &mut text, Size::new(1000.0, 600.0))
+        .unwrap();
+    for key in [
+        "nested::item::outer",
+        "nested::item::inner",
+        "nested::item::leaf",
+    ] {
+        let index = tree
+            .node_ids()
+            .iter()
+            .enumerate()
+            .find(|(i, _)| tree.element_at(*i).unwrap().key.as_deref() == Some(key))
+            .unwrap()
+            .0;
+        let bounds = layout
+            .hit_regions
+            .iter()
+            .find(|hit| hit.node == tree.node_ids()[index])
+            .unwrap()
+            .bounds;
+        let point = Point::new(
+            bounds.origin.x + bounds.size.width / 2.0,
+            bounds.origin.y + bounds.size.height / 2.0,
+        );
+        let update = tree.pointer_event(
+            PointerEvent::mouse(PointerPhase::Pressed, point),
+            &layout.hit_regions,
+        );
+        assert!(
+            !update
+                .events
+                .iter()
+                .any(|event| matches!(event.kind, UiEventKind::PointerOutside(_))),
+            "{key}"
+        );
+        tree.pointer_event(
+            PointerEvent::mouse(PointerPhase::Released, point),
+            &layout.hit_regions,
+        );
+    }
+    let update = tree.pointer_event(
+        PointerEvent::mouse(PointerPhase::Pressed, Point::new(950.0, 550.0)),
+        &layout.hit_regions,
+    );
+    let outside = update
+        .events
+        .iter()
+        .find(|event| matches!(event.kind, UiEventKind::PointerOutside(_)))
+        .unwrap();
+    assert_eq!(outside.target_key(), Some("nested::content"));
+    assert_eq!(menu.response(outside), Some(MenuResponse::Close));
+    assert_eq!(
+        menu.response(&event("nested::item::leaf", keyboard(Key::Escape))),
+        Some(MenuResponse::Submenu {
+            path: vec!["outer".into()],
+            focus: "nested::item::inner".into()
+        })
+    );
+}
+
+#[test]
 fn arrow_keys_open_edges_and_tab_dismisses_without_consuming_navigation() {
     for (key, id) in [(Key::ArrowDown, "0"), (Key::ArrowUp, "2")] {
         assert_eq!(

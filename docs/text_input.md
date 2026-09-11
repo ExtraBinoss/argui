@@ -18,6 +18,28 @@ Selection geometry follows each visual line between the anchor and focus stops.
 It therefore remains correct across soft wraps, explicit newlines, and mixed RTL
 runs.
 
+Both editors support double-click word selection, triple-click paragraph
+selection (including its terminating newline), and dragging by the selected
+unit. Shift-click extends the existing anchor. Password double-click selects
+the complete value without exposing its word boundaries.
+
+On Linux, Ctrl+Left/Right moves by word or punctuation; adding Shift extends
+the selection. Ctrl+Backspace/Delete removes the previous/next word, with each
+word deletion as a separate undo transaction. Plain Left/Right collapses an
+existing selection to its corresponding edge. Arrows cross explicit newlines
+and soft wraps. Home/End uses the current visual line, Ctrl+Home/End uses the
+document, and Shift works with both. Up/Down retains the desired column across
+short lines; PageUp/PageDown moves by the editor viewport. Clicking or editing
+resets the retained column. IME composition keeps ownership of navigation.
+
+The shaped-layout entry point is `TextInputRegion::navigate`; its runtime
+caller falls back to `UiTree::edit_text_input` for other keys. This keeps visual
+line policy directly testable with the same font and caret stops as rendering.
+The invisible-browser scenario in `tests/pages/inputs.mjs` under the widget
+gallery compares 22 keyboard sequences against real HTML inputs/textareas,
+then tests pointer selection and nested-menu dismissal. See
+[Linux testing](linux_testing.md) for the private-display launcher.
+
 Caret and selection changes reuse a bounded cache of shaped input buffers. They
 update editing geometry and reposition prepared glyphs without rerunning Taffy
 or rebuilding the complete text scene. Editor scrolling remains stable until
