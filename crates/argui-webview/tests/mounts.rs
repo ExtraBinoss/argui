@@ -1,7 +1,7 @@
 use argui_core::{Point, Rect, Size, Transform2D};
 use argui_layout::{LayoutEngine, LayoutOutput};
 use argui_text::TextEngine;
-use argui_ui::{Element, Position, UiTree, length};
+use argui_ui::{Element, LayerStyle, NativeContent, Position, UiTree, length};
 use argui_webview::{WebView, WebViewSource, WebViewState, resolve_mounts};
 
 fn layout(root: Element) -> (UiTree, LayoutOutput) {
@@ -97,4 +97,100 @@ fn transformed_ancestors_are_not_silently_ignored_by_native_surfaces() {
     assert!(resolve_mounts(&ui, &output, 1)[0].occluded);
     let (ui, output) = layout(Element::text("not native"));
     assert!(resolve_mounts(&ui, &output, 1).is_empty());
+}
+
+#[test]
+fn ancestor_opacity_and_layers_occlude_native_surfaces() {
+    let (_, first_view) = view();
+    let mut parent = Element::column([first_view]);
+    parent.paint.quad.opacity = 0.5;
+    let (ui, output) = layout(parent);
+    assert!(resolve_mounts(&ui, &output, 1)[0].occluded);
+
+    let (_, second_view) = view();
+    let parent = Element::column([second_view]).layer(LayerStyle::new(Rect::default()));
+    let (ui, output) = layout(parent);
+    assert!(resolve_mounts(&ui, &output, 1)[0].occluded);
+}
+
+#[test]
+fn non_webview_native_payloads_do_not_become_webview_mounts() {
+    let (_, view) = view();
+    let foreign = Element::container([])
+        .native_content(NativeContent::new(
+            42,
+            String::from("another native surface"),
+        ))
+        .position(Position::Absolute)
+        .width(length(50.0))
+        .height(length(50.0));
+    let (ui, output) = layout(Element::column([view, foreign]));
+    let mounts = resolve_mounts(&ui, &output, 1);
+    assert_eq!(mounts.len(), 1);
+    assert!(mounts[0].occluded);
+}
+
+#[test]
+fn stale_layout_indices_and_foreign_node_ids_are_ignored() {
+    let (_, view) = view();
+    let overlay = Element::container([])
+        .keyed("overlay")
+        .position(Position::Absolute)
+        .width(length(50.0))
+        .height(length(50.0));
+    let (ui, mut output) = layout(Element::column([view, overlay]));
+    let native_index = output
+        .nodes
+        .iter()
+        .position(|node| {
+            ui.element_at(node.index)
+                .is_some_and(|element| element.native_content.is_some())
+        })
+        .unwrap();
+    let overlay_index = output
+        .nodes
+        .iter()
+        .position(|node| {
+            ui.element_at(node.index)
+                .is_some_and(|element| element.key.as_deref() == Some("overlay"))
+        })
+        .unwrap();
+
+    let foreign_root =
+        Element::column((0..ui.node_ids().len() + 1).map(|_| Element::text("foreign tree node")));
+    let (_, foreign_output) = layout(foreign_root);
+    let foreign_node = foreign_output
+        .nodes
+        .iter()
+        .map(|node| node.node)
+        .find(|node| !ui.node_ids().contains(node))
+        .unwrap();
+    output.nodes[native_index].node = foreign_node;
+    output.nodes[overlay_index].index = usize::MAX;
+
+    let mounts = resolve_mounts(&ui, &output, 1);
+    assert_eq!(mounts.len(), 1);
+    assert!(!mounts[0].occluded);
+}
+
+#[test]
+fn a_later_surface_clipped_away_does_not_occlude_a_webview() {
+    let (_, view) = view();
+    let overlay = Element::container([])
+        .keyed("overlay")
+        .position(Position::Absolute)
+        .width(length(50.0))
+        .height(length(50.0));
+    let (ui, mut output) = layout(Element::column([view, overlay]));
+    let overlay = output
+        .nodes
+        .iter_mut()
+        .find(|node| {
+            ui.element_at(node.index)
+                .is_some_and(|element| element.key.as_deref() == Some("overlay"))
+        })
+        .unwrap();
+    overlay.clip = Some(Rect::new(Point::new(500.0, 500.0), Size::new(5.0, 5.0)));
+
+    assert!(!resolve_mounts(&ui, &output, 1)[0].occluded);
 }

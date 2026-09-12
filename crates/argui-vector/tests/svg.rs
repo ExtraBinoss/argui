@@ -1,7 +1,8 @@
 use argui_paint::VectorId;
-use argui_vector::parse_svg;
+use argui_vector::{VectorError, parse_svg};
 
 const ICON: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><path fill="none" stroke="currentColor" stroke-width="2" d="M9 6l6 6l-6 6"/></svg>"#;
+const EMPTY_SVG: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"/>"#;
 
 #[test]
 fn svg_retains_resolution_independent_source() {
@@ -15,6 +16,24 @@ fn svg_retains_resolution_independent_source() {
 #[test]
 fn invalid_svg_is_rejected() {
     assert!(parse_svg(VectorId(2), b"nope").is_err());
+}
+
+#[test]
+fn svg_without_drawable_nodes_is_retained() {
+    let asset = parse_svg(VectorId(5), EMPTY_SVG).unwrap();
+    assert_eq!(asset.size.width, 24.0);
+    assert_eq!(asset.size.height, 24.0);
+    assert_eq!(&*asset.svg, EMPTY_SVG);
+    assert!(!asset.tintable);
+}
+
+#[test]
+fn zero_sized_svg_is_rejected_by_the_parser() {
+    let svg = br#"<svg xmlns="http://www.w3.org/2000/svg" width="0" height="24"/>"#;
+    assert!(matches!(
+        parse_svg(VectorId(6), svg),
+        Err(VectorError::Svg(_))
+    ));
 }
 
 #[test]

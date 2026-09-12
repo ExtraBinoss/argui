@@ -3,33 +3,52 @@
 use argui::runtime::SingleWindowModel;
 use argui::{
     platform::{ApplicationConfig, ApplicationId, ApplicationIdentity, IconSet, WindowConfig},
-    render::RendererConfig,
-    runtime::run_application_with_text_engine,
+    render::{RendererConfig, RendererError},
 };
 use argui_devtools::DevtoolsApp;
-use argui_showcase::{StateShowcase, text_engine};
+use argui_showcase::StateShowcase;
+
+#[cfg(target_arch = "wasm32")]
+use argui::runtime::run_application_with_text_engine;
+#[cfg(target_arch = "wasm32")]
+use argui_showcase::text_engine;
+#[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
+/// Builds the browser demo's application identity and main window.
+pub fn application_config() -> Result<ApplicationConfig, Box<dyn std::error::Error>> {
+    Ok(ApplicationConfig::new(
+        ApplicationIdentity::new(
+            ApplicationId::new("dev.argui.state")?,
+            "Argui state showcase",
+            IconSet::new(),
+        ),
+        WindowConfig {
+            title: "Argui state showcase".into(),
+            ..WindowConfig::default()
+        },
+    ))
+}
+
+/// Adds the DevTools effects to the browser renderer.
+pub fn renderer_config() -> Result<RendererConfig, RendererError> {
+    argui_devtools::configure_renderer(RendererConfig::default())
+}
+
+/// Creates the state showcase inside the DevTools app.
+pub fn devtools_app() -> DevtoolsApp<SingleWindowModel<StateShowcase>> {
+    DevtoolsApp::new(SingleWindowModel::new(StateShowcase::default()))
+}
+
+#[cfg(target_arch = "wasm32")]
 #[wasm_bindgen(start)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 pub fn start() -> Result<(), JsValue> {
     run_application_with_text_engine(
-        ApplicationConfig::new(
-            ApplicationIdentity::new(
-                ApplicationId::new("dev.argui.state")
-                    .map_err(|error| JsValue::from_str(&error.to_string()))?,
-                "Argui state showcase",
-                IconSet::new(),
-            ),
-            WindowConfig {
-                title: "Argui state showcase".into(),
-                ..WindowConfig::default()
-            },
-        ),
-        argui_devtools::configure_renderer(RendererConfig::default())
-            .map_err(|error| JsValue::from_str(&error.to_string()))?,
+        application_config().map_err(|error| JsValue::from_str(&error.to_string()))?,
+        renderer_config().map_err(|error| JsValue::from_str(&error.to_string()))?,
         text_engine(),
-        DevtoolsApp::new(SingleWindowModel::new(StateShowcase::default())),
+        devtools_app(),
         |_| {},
     )
     .map_err(|error| JsValue::from_str(&error.to_string()))

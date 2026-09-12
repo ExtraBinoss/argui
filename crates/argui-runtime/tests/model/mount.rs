@@ -1,5 +1,5 @@
 use argui_core::ColorScheme;
-use argui_runtime::{Context, Entity, Render, ScopeClosed, WindowEnvironment};
+use argui_runtime::{Context, Entity, LayoutSnapshot, Render, ScopeClosed, WindowEnvironment};
 use argui_ui::{ClickEvent, Element, EventType, UiEventKind, UiTree};
 
 #[derive(Default)]
@@ -62,6 +62,14 @@ fn updates_use_the_target_mount_environment_and_reject_closed_presentations() {
     light.animation_frame(frame).unwrap();
     assert_eq!(
         light.read(|view| view.layouts.clone()),
+        vec![ColorScheme::Light]
+    );
+    assert_eq!(
+        dark.layout_changed(&LayoutSnapshot::default()),
+        Err(ScopeClosed)
+    );
+    assert_eq!(
+        model.read(|view| view.layouts.clone()),
         vec![ColorScheme::Light]
     );
     let result = dark.update(|_, _| panic!("closed mount must not invoke its callback"));

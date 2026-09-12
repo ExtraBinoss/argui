@@ -41,6 +41,10 @@ fn services_are_typed_shared_and_isolated_between_domains() {
         runtime.register_service(Cell::new(3_usize)),
         Err(ServiceAlreadyRegistered)
     ));
+    assert_eq!(
+        ServiceAlreadyRegistered.to_string(),
+        "a service of this type is already registered"
+    );
     assert_eq!(runtime.service::<Cell<usize>>().unwrap().get(), 2);
     first.close();
     assert!(runtime.service::<Cell<usize>>().is_some());

@@ -165,6 +165,52 @@ fn completed_tasks_release_scopes_before_callbacks_with_handles_retained() {
 
 #[test]
 #[cfg(not(target_arch = "wasm32"))]
+fn closing_one_attached_scope_cancels_work_and_releases_all_leases() {
+    use argui_runtime::{Entity, ResourceScope, tasks::TaskRuntime};
+    let (sender, wake) = std::sync::mpsc::channel();
+    let runtime = TaskRuntime::new(move || {
+        let _ = sender.send(());
+    });
+    let model = Entity::new(());
+    model.set_task_runtime(runtime.clone());
+    let first_scope = ResourceScope::default();
+    let second_scope = ResourceScope::default();
+    let mut handle = None;
+    model.update(|_, cx| {
+        handle = Some(
+            cx.spawn(std::future::pending::<()>(), |_, _, _| {
+                panic!("cancelled result must not be delivered");
+            })
+            .unwrap(),
+        );
+    });
+    let handle = handle
+        .unwrap()
+        .in_scope(&first_scope)
+        .unwrap()
+        .in_scope(&second_scope)
+        .unwrap();
+    assert_eq!(model.resources().resource_count(), 1);
+    assert_eq!(first_scope.resource_count(), 1);
+    assert_eq!(second_scope.resource_count(), 1);
+
+    first_scope.close();
+
+    assert!(handle.cancellation_token().is_cancelled());
+    assert!(handle.is_finished());
+    assert_eq!(model.resources().resource_count(), 0);
+    assert_eq!(first_scope.resource_count(), 0);
+    assert_eq!(second_scope.resource_count(), 0);
+    while runtime.pending() > 0 {
+        wake.recv_timeout(std::time::Duration::from_secs(5))
+            .unwrap();
+        runtime.drain();
+    }
+    assert_eq!(runtime.pending(), 0);
+}
+
+#[test]
+#[cfg(not(target_arch = "wasm32"))]
 fn cancellation_and_shutdown_release_all_scope_registrations() {
     use argui_runtime::{Entity, ResourceScope, tasks::TaskRuntime};
     for mode in 0..4 {

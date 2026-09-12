@@ -5,17 +5,12 @@ use argui_paint::{VectorAsset, VectorId};
 pub enum VectorError {
     #[error("SVG parsing failed: {0}")]
     Svg(#[from] usvg::Error),
-    #[error("SVG has no drawable area")]
-    Empty,
 }
 
 pub fn parse_svg(id: VectorId, svg: &[u8]) -> Result<VectorAsset, VectorError> {
     let tree = usvg::Tree::from_data(svg, &usvg::Options::default())?;
     let width = tree.size().width();
     let height = tree.size().height();
-    if width <= 0.0 || height <= 0.0 {
-        return Err(VectorError::Empty);
-    }
     Ok(VectorAsset {
         id,
         size: Size::new(width, height),

@@ -16,6 +16,9 @@ argui = { workspace = true, features = ["tray"] }
 argui-devtools.workspace = true
 argui-showcase.workspace = true
 
+[dev-dependencies]
+web-time.workspace = true
+
 [build-dependencies]
 winresource.workspace = true
 

@@ -3,7 +3,6 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 report="$repo_root/target/coverage-report.json"
-coverage_base="${ARGUI_COVERAGE_BASE:-$(git -C "$repo_root" merge-base HEAD origin/main)}"
 coverage_lock="$repo_root/target/.argui-coverage-lock"
 coverage_target="$repo_root/target/coverage"
 minimum=85
@@ -53,4 +52,4 @@ if [[ -n "${ARGUI_NATIVE_TESTS:-}" ]]; then
     --json --output-path "$report"
 fi
 
-python3 "$repo_root/scripts/coverage-gate.py" "$report" "$minimum" "$coverage_base"
+python3 "$repo_root/scripts/coverage-gate.py" "$report" "$minimum"

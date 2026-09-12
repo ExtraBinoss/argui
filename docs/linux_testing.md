@@ -191,6 +191,6 @@ Ces services privés ne donnent aucun accès aux fenêtres du bureau personnel.
 Conserver les règles de [code_quality.md](code_quality.md) : tests ciblés pendant
 le développement, aucune couverture LLVM concurrente, puis une seule exécution
 de `./scripts/quality.sh` quand l'implémentation est terminée, avant le commit.
-Le lanceur peut envelopper ce script. Conserver le commit de départ du chantier
-dans `ARGUI_COVERAGE_BASE` pour mesurer les crates effectivement modifiées par
-ce chantier ; ne pas changer les seuils pour faire passer un contrôle.
+Le lanceur peut envelopper ce script. Le contrôle mesure toutes les crates du
+workspace, même celles non modifiées par le chantier ; ne pas changer les seuils
+pour faire passer un contrôle.

@@ -28,3 +28,4 @@ workspace = true
 
 [dev-dependencies]
 argui-text.workspace = true
+web-time.workspace = true

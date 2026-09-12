@@ -446,6 +446,7 @@ dependencies = [
  "argui",
  "argui-devtools",
  "argui-showcase",
+ "web-time",
  "winresource",
 ]
 
@@ -514,6 +515,7 @@ dependencies = [
  "url",
  "wasm-bindgen",
  "web-sys",
+ "web-time",
  "wry",
 ]
 

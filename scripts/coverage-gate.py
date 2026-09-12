@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
-"""Enforce coverage globally and in crates changed since the implementation baseline."""
+"""Enforce coverage globally and in every workspace crate."""
 import json
 import re
 from pathlib import Path
-import subprocess
 import sys
 
 METRICS = ("branches", "functions", "lines", "regions")
+
+
+def workspace_crates():
+    # The workspace manifest includes every package under crates/*.
+    return sorted(path.parent.name for path in Path("crates").glob("*/Cargo.toml"))
 
 
 def only_reexports(crate):
@@ -50,15 +54,12 @@ def aggregate(entries):
     }
 
 
-def run(report_path, minimum, baseline):
+def run(report_path, minimum):
     report = json.loads(Path(report_path).read_text())
-    changed = subprocess.check_output(["git", "diff", "--name-only", baseline, "--", "crates/"], text=True).splitlines()
-    changed += subprocess.check_output(["git", "ls-files", "--others", "--exclude-standard", "crates/"], text=True).splitlines()
-    crates = sorted({path.split("/")[1] for path in changed if path.startswith("crates/")})
     files = [entry for data in report["data"] for entry in data["files"]]
     groups = {"workspace": aggregate(files)}
     errors = []
-    for crate in crates:
+    for crate in workspace_crates():
         entries = [entry for entry in files if f"/crates/{crate}/" in entry["filename"].replace("\\", "/")]
         if not entries and only_reexports(crate):
             groups[crate] = {metric: {"count": 0, "covered": 0} for metric in METRICS}
@@ -78,11 +79,11 @@ def run(report_path, minimum, baseline):
             print(f"coverage {name} {metric}: {label}")
             if count and covered * 100 < minimum * count:
                 errors.append(f"{name} {metric}: {percent:.2f}% below {minimum}%")
-    Path(report_path).with_name("coverage-gate.json").write_text(json.dumps({"baseline": baseline, "minimum": minimum, "results": results, "errors": errors}, indent=2) + "\n")
+    Path(report_path).with_name("coverage-gate.json").write_text(json.dumps({"minimum": minimum, "results": results, "errors": errors}, indent=2) + "\n")
     for error in errors:
         print(f"error: {error}", file=sys.stderr)
     return bool(errors)
 
 
 if __name__ == "__main__":
-    sys.exit(run(sys.argv[1], float(sys.argv[2]), sys.argv[3]))
+    sys.exit(run(sys.argv[1], float(sys.argv[2])))

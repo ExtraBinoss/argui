@@ -9,7 +9,7 @@ pass unless every check succeeds.
   most 600 physical lines. Split a file when a responsibility becomes distinct;
   never split it merely to evade the limit.
 - Workspace coverage must be at least 85% independently for lines, functions,
-  LLVM regions, and branches, both globally and for every modified crate.
+  LLVM regions, and branches, both globally and for every workspace crate.
   Crate totals aggregate covered/count values, never file percentages. A metric
   with no instrumentable entries is N/A; a missing crate report fails the gate.
 - Formatting and Clippy warnings fail the check.
@@ -100,19 +100,30 @@ that denominator, LLVM's summary is retained. Functions, lines and regions use
 LLVM's summaries. The aggregation and rejection threshold have regression tests:
 `python3 -m unittest discover -s tests/scripts`.
 
-`ARGUI_NATIVE_TESTS=1` includes the opt-in native lifecycle, GTK input checks
-and the ignored renderer surface integration test. The manual CPU profiling test
-remains excluded. Run this mode on the private display described in
-[linux_testing.md](linux_testing.md).
+`ARGUI_NATIVE_TESTS=1` includes the opt-in native lifecycle, GTK input, WebView
+and packaged application checks, plus the ignored renderer surface integration
+test. The manual CPU profiling test remains excluded. Run this mode on the
+private display described in [linux_testing.md](linux_testing.md).
 This mode defaults to one Nextest worker, since native windows and off-screen
 renderer tests share the display/GPU. `ARGUI_COVERAGE_JOBS` explicitly overrides
-that worker count. It does not start a browser.
+that worker count. Native WebViews use the private display; no standalone browser
+is launched.
+
+The complete Linux gate includes these native checks on the private display:
+
+```sh
+./scripts/linux-hidden-display.sh env ARGUI_NATIVE_TESTS=1 ./scripts/quality.sh
+```
+
+Skipping native tests can leave native crates below the threshold; the gate
+reports that failure instead of treating skipped behavior as covered.
 
 The model-context compilation contracts live in
 `crates/argui-runtime/tests/model/model_context.md` and are included in the public
 API documentation. Rustdoc checks both rejected window capabilities and a valid
 presentation consumer; Nextest remains the runner for behavioral tests.
 
-The coverage baseline defaults to the merge base with `origin/main`. Set
-`ARGUI_COVERAGE_BASE` to the implementation's starting commit when work spans
-multiple commits. The JSON export and gate results remain in `target/` for review.
+The gate checks every package under `crates/`, including applications and crates
+with no changes in the current work. Missing reports fail; a crate containing
+only reexports has no instrumentable code and reports N/A. The JSON export and
+per-crate gate results remain in `target/` for review.
