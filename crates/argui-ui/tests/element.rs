@@ -1,3 +1,5 @@
+#[path = "element/direction.rs"]
+mod direction;
 use argui_text::{TextOverflow, TextStyle};
 use argui_ui::{Color, Element, ElementKind, ImageFit, ImageId, ImageSampling, VectorId};
 

@@ -11,11 +11,18 @@ command -v dbus-run-session >/dev/null
 
 test_runtime="$(mktemp -d "${TMPDIR:-/tmp}/argui-display.XXXXXX")"
 cleanup() {
-    # Desktop portals can leave user-owned FUSE mounts while their bus shuts down.
+    local result=$?
+    trap - EXIT
+    # A portal may unmount itself between mountpoint and fusermount during teardown.
     for mount in "$test_runtime/doc" "$test_runtime/gvfs"; do
-        if mountpoint -q "$mount"; then fusermount3 -uz "$mount"; fi
+        if mountpoint -q "$mount"; then
+            if ! fusermount3 -uz "$mount" && mountpoint -q "$mount"; then
+                result=1
+            fi
+        fi
     done
-    rm -rf -- "$test_runtime"
+    if ! rm -rf -- "$test_runtime"; then result=1; fi
+    exit "$result"
 }
 trap cleanup EXIT
 chmod 700 "$test_runtime"

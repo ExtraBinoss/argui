@@ -114,6 +114,7 @@ pub(super) fn apply_attributes(
             crate::CheckedState::Mixed => "mixed",
         }),
     )?;
+    set_optional_bool(element, "aria-pressed", node.semantics.state.pressed)?;
     set_optional_bool(element, "aria-expanded", node.semantics.state.expanded)?;
     for attribute in [
         "aria-valuetext",
@@ -249,6 +250,7 @@ const fn aria_role(role: Role) -> &'static str {
         Role::Generic => "presentation",
         Role::Window => "application",
         Role::Group => "group",
+        Role::Navigation => "navigation",
         Role::Text => "text",
         Role::Heading => "heading",
         Role::Image => "img",

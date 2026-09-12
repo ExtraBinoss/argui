@@ -208,7 +208,9 @@ impl UiTree {
                 region
             })
             .collect::<Vec<_>>();
-        let raw = self.interaction.focus_pressed(pointer, &scoped);
+        let raw = self
+            .interaction
+            .focus_pressed(pointer, &scoped, active.is_some());
         self.decorate(raw)
     }
 

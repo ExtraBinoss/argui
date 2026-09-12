@@ -165,6 +165,7 @@ impl CustomDescription {
     pub fn create_state(&self) -> CustomState {
         CustomState {
             stats: Cell::new(CustomPhaseStats::default()),
+            paint_cache: RefCell::new(None),
             prepared: Cell::new(None),
             kind: self.0.kind(),
             value: RefCell::new(self.0.state()),
@@ -194,6 +195,18 @@ impl CustomDescription {
             "custom state belongs to another element type"
         );
         let (layout, paint) = self.0.revisions();
+        let mut cache = state.paint_cache.borrow_mut();
+        if let Some(cached) = cache.as_ref()
+            && cached.revisions == (layout, paint)
+            && cached.bounds == context.bounds
+            && cached.transform == context.transform
+            && cached.clips == *context.clips
+        {
+            context
+                .display_list
+                .extend(cached.commands.commands().iter().cloned());
+            return;
+        }
         let key = (layout, paint, context.bounds.size);
         if state.prepared.get() != Some(key) {
             self.0
@@ -206,11 +219,43 @@ impl CustomDescription {
         let mut stats = state.stats.get();
         stats.paints += 1;
         state.stats.set(stats);
-        self.0.paint(state.value.borrow_mut().as_mut(), context);
+        let mut commands = cache
+            .take()
+            .map_or_else(DisplayList::new, |cached| cached.commands);
+        commands.clear();
+        self.0.paint(
+            state.value.borrow_mut().as_mut(),
+            &mut CustomPaintContext {
+                bounds: context.bounds,
+                transform: context.transform,
+                clips: context.clips,
+                display_list: &mut commands,
+            },
+        );
+        context
+            .display_list
+            .extend(commands.commands().iter().cloned());
+        *cache = Some(CachedCustomPaint {
+            revisions: (layout, paint),
+            bounds: context.bounds,
+            transform: context.transform,
+            clips: context.clips.clone(),
+            commands,
+        });
     }
 }
 
+// One bounded fragment per custom node survives a parent fragment's invalidation.
+struct CachedCustomPaint {
+    revisions: (u64, u64),
+    bounds: Rect,
+    transform: Affine2D,
+    clips: ClipChain,
+    commands: DisplayList,
+}
+
 pub struct CustomState {
+    paint_cache: RefCell<Option<CachedCustomPaint>>,
     stats: Cell<CustomPhaseStats>,
     prepared: Cell<Option<(u64, u64, Size)>>,
     kind: TypeId,

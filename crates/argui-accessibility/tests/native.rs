@@ -124,6 +124,7 @@ fn rich_nodes_lower_every_value_state_and_relation() {
             step: Some(2.0),
         })
         .state(SemanticState {
+            pressed: Some(true),
             protected: false,
             disabled: true,
             selected: true,
@@ -283,6 +284,7 @@ fn accesskit_actions_lower_supported_data_and_reject_unknown_actions() {
 fn table_roles_and_multiple_selection_reach_accesskit() {
     for (role, expected) in [
         (Role::Table, accesskit::Role::Table),
+        (Role::Navigation, accesskit::Role::Navigation),
         (Role::Grid, accesskit::Role::Table),
         (Role::Row, accesskit::Role::Row),
         (Role::ColumnHeader, accesskit::Role::ColumnHeader),
@@ -305,6 +307,31 @@ fn table_roles_and_multiple_selection_reach_accesskit() {
         let update = AccessKitTree::full(&tree);
         assert_eq!(update.nodes[0].1.role(), expected);
         assert!(update.nodes[0].1.is_multiselectable());
+    }
+}
+
+#[test]
+fn toggle_buttons_export_both_persistent_pressed_states() {
+    for (pressed, expected) in [
+        (None, None),
+        (Some(false), Some(accesskit::Toggled::False)),
+        (Some(true), Some(accesskit::Toggled::True)),
+    ] {
+        let id = SemanticNodeId::new(1);
+        let tree = SemanticTree {
+            root: id,
+            focus: id,
+            nodes: vec![SemanticNode {
+                id,
+                bounds: Rect::default(),
+                children: vec![],
+                semantics: Semantics::new(Role::Button).state(SemanticState {
+                    pressed,
+                    ..Default::default()
+                }),
+            }],
+        };
+        assert_eq!(AccessKitTree::full(&tree).nodes[0].1.toggled(), expected);
     }
 }
 

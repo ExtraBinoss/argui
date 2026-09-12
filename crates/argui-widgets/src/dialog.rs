@@ -7,6 +7,16 @@ use argui_ui::{
 
 use crate::{DialogBehavior, DialogPart, WidgetTheme};
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum DialogPlacement {
+    #[default]
+    Center,
+    Left,
+    Right,
+    Top,
+    Bottom,
+}
+
 #[derive(Clone, Debug)]
 pub struct Dialog {
     key: String,
@@ -19,6 +29,9 @@ pub struct Dialog {
     panel_paint: Option<PaintStyle>,
     panel_width: f32,
     viewport_margin: f32,
+    placement: DialogPlacement,
+    initial_focus: Option<argui_ui::InitialFocus>,
+    alert: bool,
 }
 
 impl Dialog {
@@ -41,7 +54,28 @@ impl Dialog {
             panel_paint: None,
             panel_width: 480.0,
             viewport_margin: 24.0,
+            placement: DialogPlacement::Center,
+            initial_focus: None,
+            alert: false,
         }
+    }
+
+    #[must_use]
+    pub const fn placement(mut self, placement: DialogPlacement) -> Self {
+        self.placement = placement;
+        self
+    }
+
+    #[must_use]
+    pub fn initial_focus(mut self, focus: argui_ui::InitialFocus) -> Self {
+        self.initial_focus = Some(focus);
+        self
+    }
+
+    #[must_use]
+    pub const fn alert(mut self, alert: bool) -> Self {
+        self.alert = alert;
+        self
     }
 
     #[must_use]
@@ -76,7 +110,10 @@ impl Dialog {
 
     #[must_use]
     pub fn build(self, theme: &WidgetTheme) -> Element {
-        let behavior = DialogBehavior::new(&self.key, &self.label, self.open);
+        let mut behavior = DialogBehavior::new(&self.key, &self.label, self.open).alert(self.alert);
+        if let Some(focus) = self.initial_focus {
+            behavior = behavior.initial_focus(focus);
+        }
         let trigger = behavior.decorate(DialogPart::Trigger, self.trigger);
         let overlay = self.open.then(|| {
             let backdrop_blur = self
@@ -100,7 +137,7 @@ impl Dialog {
                         .radius(CornerRadii::all(12.0)),
                 )
             });
-            let panel = Element::column([self.content])
+            let mut panel = Element::column([self.content])
                 .width(length(self.panel_width.max(0.0)))
                 .max_width(percent(0.90))
                 .padding(argui_ui::Sides::length(24.0))
@@ -108,6 +145,36 @@ impl Dialog {
                 .paint_style(panel_paint)
                 .z_index(1)
                 .layer(theme.overlay_layer(12.0, theme.overlay_blur));
+            panel = panel
+                .max_height(percent(1.0))
+                .overflow(argui_ui::Axes {
+                    x: argui_ui::Overflow::Hidden,
+                    y: argui_ui::Overflow::Auto,
+                })
+                .scroll_config(
+                    argui_ui::ScrollConfig::default()
+                        .propagation(argui_ui::ScrollPropagation::Contain)
+                        .scrollbar(theme.scrollbar.clone()),
+                );
+            let (align, justify) = match self.placement {
+                DialogPlacement::Center => (AlignItems::CENTER, JustifyContent::CENTER),
+                DialogPlacement::Left => {
+                    panel = panel.height(percent(1.0));
+                    (AlignItems::STRETCH, JustifyContent::START)
+                }
+                DialogPlacement::Right => {
+                    panel = panel.height(percent(1.0));
+                    (AlignItems::STRETCH, JustifyContent::END)
+                }
+                DialogPlacement::Top => {
+                    panel = panel.width(percent(1.0)).max_width(percent(1.0));
+                    (AlignItems::START, JustifyContent::CENTER)
+                }
+                DialogPlacement::Bottom => {
+                    panel = panel.width(percent(1.0)).max_width(percent(1.0));
+                    (AlignItems::END, JustifyContent::CENTER)
+                }
+            };
             let panel = behavior.decorate(DialogPart::Panel, panel);
             behavior.decorate(
                 DialogPart::Overlay,
@@ -116,8 +183,8 @@ impl Dialog {
                     .height(percent(1.0))
                     .padding(Sides::length(self.viewport_margin.max(0.0)))
                     .display(Display::Flex)
-                    .align_items(AlignItems::CENTER)
-                    .justify_content(JustifyContent::CENTER)
+                    .align_items(align)
+                    .justify_content(justify)
                     .viewport_portal(WindowLayer::Modal, ViewportPlacement::fill()),
             )
         });

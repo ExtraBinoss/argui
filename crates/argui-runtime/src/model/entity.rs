@@ -166,3 +166,14 @@ impl<T: 'static> Entity<T> {
         read(&self.0.model.value.borrow())
     }
 }
+
+impl super::AnyEntity {
+    pub(crate) fn invalidate(&self) {
+        // AppModel can change outside a component callback (for example a global shortcut).
+        // Its explicit rebuild must invalidate the retained root, not just schedule a frame.
+        (self.store)(ContextEffects {
+            update: ViewUpdate::Rebuild,
+            ..Default::default()
+        });
+    }
+}

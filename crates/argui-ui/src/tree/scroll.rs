@@ -5,6 +5,73 @@ use crate::{InteractionUpdate, NodeId, ScrollRegion, UiEventKind};
 use super::UiTree;
 
 impl UiTree {
+    /// Default keyboard scrolling for a focused viewport. Editors and collection controls
+    /// retain their own arrow-key contracts. Hosts call this after cancelable key delivery.
+    pub fn scroll_keyboard(
+        &mut self,
+        input: &argui_core::KeyInput,
+        regions: &[ScrollRegion],
+    ) -> InteractionUpdate {
+        use argui_core::{Key, KeyState};
+        if input.state != KeyState::Pressed || input.modifiers.command() || input.modifiers.alt {
+            return InteractionUpdate::default();
+        }
+        let Some(node) = self.focused_node() else {
+            return InteractionUpdate::default();
+        };
+        let Some(element) = self.element_for(node) else {
+            return InteractionUpdate::default();
+        };
+        if !self.input_available(node)
+            || matches!(element.kind, crate::ElementKind::TextEditor { .. })
+            || element.semantics.as_ref().is_some_and(|semantics| {
+                !matches!(
+                    semantics.role,
+                    crate::Role::Generic
+                        | crate::Role::Group
+                        | crate::Role::Dialog
+                        | crate::Role::AlertDialog
+                )
+            })
+        {
+            return InteractionUpdate::default();
+        }
+        let Some(region) = regions
+            .iter()
+            .find(|region| region.node == node && region.config.enabled)
+        else {
+            return InteractionUpdate::default();
+        };
+        let previous = self.scroll_offset(node);
+        let mut offset = previous;
+        match &input.key {
+            Key::ArrowUp => offset.y -= 40.0,
+            Key::ArrowDown => offset.y += 40.0,
+            Key::ArrowLeft => offset.x -= 40.0,
+            Key::ArrowRight => offset.x += 40.0,
+            Key::PageUp => offset.y -= region.bounds.size.height * 0.9,
+            Key::PageDown => offset.y += region.bounds.size.height * 0.9,
+            Key::Character(value) if value == " " => {
+                offset.y +=
+                    region.bounds.size.height * if input.modifiers.shift { -0.9 } else { 0.9 }
+            }
+            Key::Home => offset = Point::default(),
+            Key::End => offset = region.max_offset,
+            _ => return InteractionUpdate::default(),
+        }
+        offset.x = offset.x.clamp(0.0, region.max_offset.x.max(0.0));
+        offset.y = offset.y.clamp(0.0, region.max_offset.y.max(0.0));
+        if !self.set_scroll_offset(node, offset) {
+            return InteractionUpdate::default();
+        }
+        self.activate_scrollbar(node, regions);
+        self.scroll_update(crate::scroll::ScrollChange {
+            node,
+            delta: Point::new(offset.x - previous.x, offset.y - previous.y),
+            offset,
+        })
+    }
+
     pub fn wheel_event(
         &mut self,
         point: Point,

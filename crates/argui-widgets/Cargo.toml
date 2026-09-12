@@ -7,7 +7,106 @@ license.workspace = true
 
 [features]
 default = []
-all = ["file-picker", "label", "skeleton", "breadcrumb", "pagination", "avatar", "empty", "kbd", "aspect-ratio", "progress", "badge", "card", "alert", "separator", "collapsible", "data-table", "toast", "date-picker", "calendar", "button", "input", "checkbox", "switch", "radio-group", "tabs", "select", "popover", "dialog", "range", "slider", "spinner", "text-selection", "split-pane", "vlist", "list", "table", "tree-view", "icons", "menu", "context-menu", "menubar", "command-palette", "textarea", "tooltip"]
+all = [
+    "accordion",
+    "alert",
+    "alert-dialog",
+    "aspect-ratio",
+    "attachment",
+    "avatar",
+    "badge",
+    "breadcrumb",
+    "bubble",
+    "button",
+    "button-group",
+    "calendar",
+    "card",
+    "carousel",
+    "chart",
+    "checkbox",
+    "collapsible",
+    "combobox",
+    "command-palette",
+    "context-menu",
+    "data-table",
+    "date-picker",
+    "dialog",
+    "direction",
+    "drawer",
+    "empty",
+    "field",
+    "file-picker",
+    "hover-card",
+    "icons",
+    "input",
+    "input-group",
+    "input-otp",
+    "item",
+    "kbd",
+    "label",
+    "list",
+    "marker",
+    "menu",
+    "menubar",
+    "message",
+    "message-scroller",
+    "native-select",
+    "navigation-menu",
+    "pagination",
+    "popover",
+    "progress",
+    "questionnaire",
+    "radio-group",
+    "range",
+    "scroll-area",
+    "select",
+    "separator",
+    "sheet",
+    "sidebar",
+    "skeleton",
+    "slider",
+    "spinner",
+    "split-pane",
+    "switch",
+    "table",
+    "tabs",
+    "text-selection",
+    "textarea",
+    "toast",
+    "toggle",
+    "toggle-group",
+    "tooltip",
+    "tree-view",
+    "typography",
+    "vlist",
+]
+toggle = ["button"]
+toggle-group = ["toggle"]
+accordion = ["collapsible"]
+button-group = []
+item = []
+field = ["label"]
+input-group = []
+scroll-area = []
+typography = []
+sheet = ["dialog"]
+alert-dialog = ["dialog", "button", "typography"]
+combobox = ["select", "button", "scroll-area"]
+native-select = ["select"]
+input-otp = ["input"]
+direction = []
+bubble = []
+message = []
+marker = ["separator", "typography"]
+attachment = ["item"]
+message-scroller = ["scroll-area", "button"]
+hover-card = ["popover"]
+navigation-menu = ["popover", "button"]
+sidebar = ["sheet", "button"]
+drawer = ["sheet", "button"]
+carousel = ["button"]
+chart = ["button"]
+questionnaire = ["toggle", "input", "typography"]
 file-picker = ["button", "dep:argui-platform", "argui-platform/file-picker", "dep:argui-runtime", "argui-runtime/tasks"]
 label = []
 skeleton = ["dep:argui-runtime"]

@@ -29,6 +29,7 @@ use theme::mode_label;
 const EDITOR_DEFAULT_SIZE: Size = Size::new(520.0, 170.0);
 
 pub struct WidgetGallery {
+    pub(crate) catalogue: std::collections::HashMap<Page, Entity<pages::catalogue::CatalogueDemo>>,
     backdrop: desktop_backdrop::BackdropSettings,
     pub(crate) page: Page,
     pub(crate) search: String,
@@ -107,6 +108,15 @@ impl Default for WidgetGallery {
             17.0,
         ));
         Self {
+            catalogue: pages::catalogue::PAGES
+                .into_iter()
+                .map(|page| {
+                    (
+                        page,
+                        Entity::new(pages::catalogue::CatalogueDemo::new(page)),
+                    )
+                })
+                .collect(),
             backdrop: desktop_backdrop::BackdropSettings::default(),
             scroll_demo: Entity::new(pages::scroll_effects::ScrollDemo::default()),
             webview: pages::webview::WebViewDemo::entity(),

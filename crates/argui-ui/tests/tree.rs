@@ -358,3 +358,6 @@ mod transition;
 
 #[path = "tree/portal.rs"]
 mod portal;
+
+#[path = "tree/focus.rs"]
+mod focus;

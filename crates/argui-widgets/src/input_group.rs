@@ -1,0 +1,54 @@
+use crate::WidgetTheme;
+use argui_paint::{Border, CornerRadii};
+use argui_ui::{AlignItems, Element, Role, Semantics, Sides, length, percent};
+
+/// One input surface with optional leading/trailing content. Controls keep their keys and focus.
+#[derive(Clone, Debug)]
+pub struct InputGroup {
+    pub key: String,
+    pub label: String,
+    pub input: Element,
+    pub leading: Option<Element>,
+    pub trailing: Option<Element>,
+    pub invalid: bool,
+}
+
+impl InputGroup {
+    #[must_use]
+    pub fn new(key: impl Into<String>, label: impl Into<String>, input: Element) -> Self {
+        Self {
+            key: key.into(),
+            label: label.into(),
+            input,
+            leading: None,
+            trailing: None,
+            invalid: false,
+        }
+    }
+
+    #[must_use]
+    pub fn build(self, theme: &WidgetTheme) -> Element {
+        Element::row(
+            self.leading
+                .into_iter()
+                .chain([self.input.grow(1.0).min_width(length(0.0))])
+                .chain(self.trailing),
+        )
+        .keyed(self.key)
+        .width(percent(1.0))
+        .gap(6.0)
+        .padding(Sides::length(4.0))
+        .align_items(AlignItems::CENTER)
+        .background(theme.card)
+        .border(Border::all(
+            1.0,
+            if self.invalid {
+                theme.destructive
+            } else {
+                theme.input_border
+            },
+        ))
+        .radius(CornerRadii::all(8.0))
+        .semantics(Semantics::new(Role::Group).label(self.label))
+    }
+}

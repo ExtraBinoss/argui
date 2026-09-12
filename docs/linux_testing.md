@@ -164,6 +164,14 @@ la conservation de l'alpha et le layout à plusieurs largeurs.
 
 ## Contrôle final
 
+Pour les ajouts du catalogue shadcn, utiliser
+`node crates/argui-widget-gallery/tests/pages/catalogue.mjs` avec le même lanceur
+et les mêmes variables Chromium/Puppeteer. Le scénario capture les 26 nouvelles
+pages et Typography à 1220 × 780 et 800 × 720 en clair/sombre, puis exerce les
+champs, toggles, sélecteurs, panneaux, focus, Hover Card et défilement clavier.
+Inspecter les PNG de `target/catalogue-interactions/`. Le périmètre de chaque
+API est décrit dans [shadcn-lib.md](shadcn-lib.md).
+
 Pour les réglages de flou de bureau, utiliser
 `node crates/argui-widget-gallery/tests/app/desktop_backdrop.mjs` avec le même
 lanceur et les mêmes variables Chromium/Puppeteer. Captures :

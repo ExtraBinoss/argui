@@ -27,6 +27,9 @@ pub struct DialogBehavior {
     key: String,
     label: String,
     open: bool,
+    initial_focus: Option<InitialFocus>,
+    dismiss_on_backdrop: bool,
+    role: Role,
 }
 
 impl DialogBehavior {
@@ -36,7 +39,32 @@ impl DialogBehavior {
             key: key.into(),
             label: label.into(),
             open,
+            initial_focus: None,
+            dismiss_on_backdrop: true,
+            role: Role::Dialog,
         }
+    }
+
+    #[must_use]
+    pub fn initial_focus(mut self, focus: InitialFocus) -> Self {
+        self.initial_focus = Some(focus);
+        self
+    }
+
+    #[must_use]
+    pub const fn dismiss_on_backdrop(mut self, dismiss: bool) -> Self {
+        self.dismiss_on_backdrop = dismiss;
+        self
+    }
+
+    #[must_use]
+    pub const fn alert(mut self, alert: bool) -> Self {
+        self.role = if alert {
+            Role::AlertDialog
+        } else {
+            Role::Dialog
+        };
+        self
     }
 
     #[must_use]
@@ -74,13 +102,15 @@ impl DialogBehavior {
                 .keyed(self.panel_key())
                 .interaction(Interaction::blocker().focus_policy(argui_ui::FocusPolicy::TabStop))
                 .semantics(
-                    Semantics::new(Role::Dialog)
+                    Semantics::new(self.role)
                         .label(self.label.clone())
                         .action(SemanticAction::Focus),
                 ),
-            DialogPart::Overlay => element.focus_scope(FocusScope::modal(InitialFocus::Target(
-                self.panel_key().into(),
-            ))),
+            DialogPart::Overlay => element.focus_scope(FocusScope::modal(
+                self.initial_focus
+                    .clone()
+                    .unwrap_or_else(|| InitialFocus::Target(self.panel_key().into())),
+            )),
         }
     }
 
@@ -92,7 +122,7 @@ impl DialogBehavior {
                 return Some(DialogAction::Open);
             }
             if event_key == Some(self.close_key().as_str())
-                || event_key == Some(self.backdrop_key().as_str())
+                || (self.dismiss_on_backdrop && event_key == Some(self.backdrop_key().as_str()))
             {
                 return Some(DialogAction::Close);
             }

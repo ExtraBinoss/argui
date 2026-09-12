@@ -62,6 +62,9 @@ impl UiTree {
         let mut style = element.style.clone();
         super::transition::apply_layout(&self.transitions, node, &mut style);
         let mut style = crate::binding::resolved_layout(&element.bindings, &style);
+        if let Some(direction) = self.index.direction(node) {
+            style.writing_direction = direction;
+        }
         if let Some(border) = self.resolved_quad(node, element).border {
             style.border = crate::Sides {
                 left: crate::LengthPercentage::length(border.widths.left),

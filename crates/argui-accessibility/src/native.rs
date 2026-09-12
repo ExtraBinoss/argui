@@ -175,6 +175,13 @@ fn lower_node(node: &SemanticNode) -> (NodeId, Node) {
     if node.semantics.state.multiselectable {
         output.set_multiselectable();
     }
+    if let Some(pressed) = node.semantics.state.pressed {
+        output.set_toggled(if pressed {
+            accesskit::Toggled::True
+        } else {
+            accesskit::Toggled::False
+        });
+    }
     if let Some(value) = node.semantics.state.checked {
         output.set_toggled(match value {
             crate::CheckedState::Unchecked => accesskit::Toggled::False,
@@ -231,6 +238,7 @@ const fn lower_role(role: Role) -> AccessRole {
         Role::Generic => AccessRole::GenericContainer,
         Role::Window => AccessRole::Window,
         Role::Group => AccessRole::Group,
+        Role::Navigation => AccessRole::Navigation,
         Role::Text => AccessRole::Label,
         Role::Heading => AccessRole::Heading,
         Role::Image => AccessRole::Image,

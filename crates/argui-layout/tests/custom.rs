@@ -189,3 +189,51 @@ fn keyed_reordering_preserves_state_and_repeated_removal_releases_every_instance
         assert_eq!(engine.retained_node_count(), 1);
     }
 }
+
+#[test]
+fn changing_a_sibling_reuses_custom_commands_but_geometry_and_revisions_invalidate_them() {
+    use argui_ui::{length, sides};
+    let counts = Rc::new(Counts::default());
+    let scene = |color, padding, width| {
+        Element::row([
+            tile(&counts, width, Color::WHITE),
+            Element::container([])
+                .width(length(10.0))
+                .height(length(24.0))
+                .background(color),
+        ])
+        .padding(sides(padding, 0.0))
+    };
+    let mut ui = UiTree::new(scene(Color::WHITE, 0.0, 80.0));
+    let mut layout = LayoutEngine::new();
+    let mut text = TextEngine::new();
+    let first = layout
+        .compute(&mut ui, &mut text, Size::new(240.0, 80.0))
+        .unwrap();
+    assert_eq!(counts.painted.get(), 1);
+    ui.update(scene(Color::BLACK, 0.0, 80.0));
+    let second = layout
+        .compute(&mut ui, &mut text, Size::new(240.0, 80.0))
+        .unwrap();
+    assert_eq!(
+        counts.painted.get(),
+        1,
+        "sibling repaint must reuse custom commands"
+    );
+    assert_ne!(first.display_list, second.display_list);
+    ui.update(scene(Color::BLACK, 5.0, 80.0));
+    let moved = layout
+        .compute(&mut ui, &mut text, Size::new(240.0, 80.0))
+        .unwrap();
+    assert_eq!(
+        counts.painted.get(),
+        2,
+        "absolute bounds change the recorded commands"
+    );
+    assert_ne!(moved.display_list, second.display_list);
+    ui.update(scene(Color::BLACK, 5.0, 100.0));
+    layout
+        .compute(&mut ui, &mut text, Size::new(240.0, 80.0))
+        .unwrap();
+    assert_eq!(counts.painted.get(), 3);
+}

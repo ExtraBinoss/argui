@@ -8,6 +8,7 @@ pub(crate) struct TreeIndex {
     elements: Vec<Element>,
     positions: HashMap<NodeId, usize>,
     selection: Vec<(UserSelect, TextSelectionStyle)>,
+    directions: Vec<Option<crate::WritingDirection>>,
 }
 
 impl TreeIndex {
@@ -16,8 +17,15 @@ impl TreeIndex {
             elements: Vec::with_capacity(ids.len()),
             positions: HashMap::with_capacity(ids.len()),
             selection: Vec::with_capacity(ids.len()),
+            directions: Vec::with_capacity(ids.len()),
         };
-        index.visit(root, ids, UserSelect::Text, TextSelectionStyle::default());
+        index.visit(
+            root,
+            ids,
+            UserSelect::Text,
+            TextSelectionStyle::default(),
+            None,
+        );
         index
     }
 
@@ -27,6 +35,7 @@ impl TreeIndex {
         ids: &[NodeId],
         parent: UserSelect,
         style: TextSelectionStyle,
+        direction: Option<crate::WritingDirection>,
     ) {
         let position = self.elements.len();
         let policy = match element.user_select {
@@ -37,8 +46,10 @@ impl TreeIndex {
         self.positions.insert(ids[position], position);
         self.elements.push(element.clone());
         self.selection.push((policy, style));
+        let direction = element.direction_scope.or(direction);
+        self.directions.push(direction);
         for child in &element.children {
-            self.visit(child, ids, policy, style);
+            self.visit(child, ids, policy, style, direction);
         }
     }
 
@@ -48,6 +59,13 @@ impl TreeIndex {
 
     pub(super) fn element(&self, node: NodeId) -> Option<&Element> {
         self.at(*self.positions.get(&node)?)
+    }
+
+    pub(super) fn direction(&self, node: NodeId) -> Option<crate::WritingDirection> {
+        self.directions
+            .get(*self.positions.get(&node)?)
+            .copied()
+            .flatten()
     }
 
     pub(crate) fn selection(&self, node: NodeId) -> Option<(UserSelect, TextSelectionStyle)> {

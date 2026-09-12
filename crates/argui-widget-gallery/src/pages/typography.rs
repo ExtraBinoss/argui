@@ -15,6 +15,17 @@ use super::preview;
 pub(super) fn render(theme: &WidgetTheme) -> Element {
     Element::column([
         preview(
+            "Typography components",
+            "A consistent scale for headings, paragraphs and supporting text.",
+            Element::column([
+                argui::widgets::Typography::new("A place for your ideas", argui::widgets::TypographyVariant::Heading(2)).build(theme),
+                argui::widgets::Typography::new("Create, refine and share your next project.", argui::widgets::TypographyVariant::Lead).build(theme),
+                argui::widgets::Typography::new("Every detail counts.", argui::widgets::TypographyVariant::Paragraph).build(theme),
+                argui::widgets::Typography::new("Last edited just now", argui::widgets::TypographyVariant::Muted).build(theme),
+            ]).gap(12.0),
+            theme,
+        ),
+        preview(
             "Rich text",
             "One shaped paragraph can mix typography, colors and font metrics without splitting layout nodes.",
             rich_text(theme),

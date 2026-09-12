@@ -374,3 +374,31 @@ fn cached_rows_keep_their_text_when_preceding_text_is_added_or_removed() {
         assert!(warm.paint_stats.reused_subtrees > 0);
     }
 }
+
+#[test]
+fn text_alpha_repaint_refreshes_text_without_layout_or_extra_layers() {
+    let label = |color| {
+        Element::text("Track").text_style(argui_text::TextStyle {
+            color,
+            ..Default::default()
+        })
+    };
+    let mut tree = UiTree::new(label(Color::WHITE));
+    let mut engine = LayoutEngine::new();
+    let mut output = engine
+        .compute(&mut tree, &mut text_engine(), Size::new(240.0, 80.0))
+        .unwrap();
+    let nodes = output.nodes.clone();
+    let color = Color::WHITE.with_alpha(0.32);
+    assert_eq!(tree.update(label(color)), argui_ui::TreeUpdate::Paint);
+    assert!(engine.repaint(&tree, &mut output));
+    assert_eq!(output.nodes, nodes);
+    assert_eq!(output.text.blocks()[0].style.color, color);
+    assert!(
+        output
+            .display_list
+            .commands()
+            .iter()
+            .all(|command| !matches!(command, DisplayCommand::BeginLayer(_)))
+    );
+}

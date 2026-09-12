@@ -336,26 +336,34 @@ impl InteractionState {
         states
     }
 
-    pub fn focus_pressed(&mut self, pointer: PointerId, regions: &[HitRegion]) -> RawUpdate {
-        let mut update = RawUpdate::default();
-        let Some(target) = self.pressed.get(&pointer).copied() else {
-            return update;
+    pub fn focus_pressed(
+        &mut self,
+        pointer: PointerId,
+        regions: &[HitRegion],
+        preserve_on_background: bool,
+    ) -> RawUpdate {
+        let target = self.pressed.get(&pointer).copied().filter(|target| {
+            regions.iter().any(|region| {
+                region.node == *target && region.enabled && region.focus_policy.is_focusable()
+            })
+        });
+        let Some(target) = target else {
+            return if preserve_on_background {
+                RawUpdate::default()
+            } else {
+                self.clear_focus()
+            };
         };
-        if regions
-            .iter()
-            .find(|region| region.node == target)
-            .is_some_and(|region| region.focus_policy.is_focusable())
-        {
-            let focus_changed = self.focused != Some(target);
-            self.release_keyboard(&mut update, None);
-            if focus_changed {
-                if let Some(previous) = self.focused.replace(target) {
-                    update.push(previous, UiEventKind::Blurred);
-                }
-                update.push(target, UiEventKind::Focused);
+        let mut update = RawUpdate::default();
+        let focus_changed = self.focused != Some(target);
+        self.release_keyboard(&mut update, None);
+        if focus_changed {
+            if let Some(previous) = self.focused.replace(target) {
+                update.push(previous, UiEventKind::Blurred);
             }
-            self.focus_visible = false;
+            update.push(target, UiEventKind::Focused);
         }
+        self.focus_visible = false;
         update
     }
 

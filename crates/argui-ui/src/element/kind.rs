@@ -23,6 +23,8 @@ pub struct ElementNode {
     pub native_content: Option<crate::NativeContent>,
     pub desktop_backdrop: Option<crate::DesktopBackdrop>,
     pub style: crate::LayoutStyle,
+    /// Inherited layout direction, with nested scopes overriding their ancestors.
+    pub direction_scope: Option<crate::WritingDirection>,
     pub paint: argui_paint::PaintStyle,
     pub transform: argui_core::Transform2D,
     pub transform_origin: argui_core::TransformOrigin,

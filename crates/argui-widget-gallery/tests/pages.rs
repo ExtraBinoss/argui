@@ -1,5 +1,7 @@
 #[path = "pages/buttons.rs"]
 mod buttons;
+#[path = "pages/catalogue.rs"]
+mod catalogue;
 #[path = "pages/data.rs"]
 mod data;
 #[path = "pages/inputs.rs"]

@@ -87,7 +87,7 @@ pub use button::{Button, ButtonStyle};
 #[cfg(feature = "button")]
 pub use button_behavior::{BUTTON_BUSY, BUTTON_SCOPE, ButtonAction, ButtonBehavior, ButtonPart};
 #[cfg(feature = "dialog")]
-pub use dialog::Dialog;
+pub use dialog::{Dialog, DialogPlacement};
 #[cfg(feature = "dialog")]
 pub use dialog_behavior::{DIALOG_OPEN, DIALOG_SCOPE, DialogAction, DialogBehavior, DialogPart};
 #[cfg(feature = "icons")]
@@ -255,3 +255,158 @@ pub use tooltip::{Tooltip, TooltipHost, TooltipState};
 mod file_picker;
 #[cfg(feature = "file-picker")]
 pub use file_picker::{FilePicker, FilePickerEvent, FilePickerStatus};
+
+#[cfg(any(
+    feature = "accordion",
+    feature = "toggle-group",
+    feature = "combobox",
+    feature = "navigation-menu",
+    feature = "questionnaire"
+))]
+mod choice_navigation;
+#[cfg(any(
+    feature = "accordion",
+    feature = "toggle-group",
+    feature = "combobox",
+    feature = "navigation-menu",
+    feature = "questionnaire"
+))]
+pub use choice_navigation::ChoiceMode;
+
+#[cfg(feature = "toggle")]
+mod toggle;
+#[cfg(feature = "toggle")]
+pub use toggle::Toggle;
+
+#[cfg(feature = "toggle-group")]
+mod toggle_group;
+#[cfg(feature = "toggle-group")]
+pub use toggle_group::{ToggleGroup, ToggleGroupAction};
+
+#[cfg(feature = "accordion")]
+mod accordion;
+#[cfg(feature = "accordion")]
+pub use accordion::{Accordion, AccordionAction, AccordionItem};
+
+#[cfg(feature = "button-group")]
+mod button_group;
+#[cfg(feature = "button-group")]
+pub use button_group::ButtonGroup;
+
+#[cfg(feature = "item")]
+mod item;
+#[cfg(feature = "item")]
+pub use item::Item;
+
+#[cfg(feature = "field")]
+mod field;
+#[cfg(feature = "field")]
+pub use field::Field;
+
+#[cfg(feature = "input-group")]
+mod input_group;
+#[cfg(feature = "input-group")]
+pub use input_group::InputGroup;
+
+#[cfg(feature = "scroll-area")]
+mod scroll_area;
+#[cfg(feature = "scroll-area")]
+pub use scroll_area::ScrollArea;
+
+#[cfg(feature = "typography")]
+mod typography;
+#[cfg(feature = "typography")]
+pub use typography::{Typography, TypographyVariant};
+
+#[cfg(feature = "sheet")]
+mod sheet;
+#[cfg(feature = "sheet")]
+pub use sheet::{Sheet, SheetSide};
+
+#[cfg(feature = "alert-dialog")]
+mod alert_dialog;
+#[cfg(feature = "alert-dialog")]
+pub use alert_dialog::{AlertDialog, AlertDialogAction};
+
+#[cfg(feature = "combobox")]
+mod combobox;
+#[cfg(feature = "combobox")]
+pub use combobox::{Combobox, ComboboxAction};
+
+#[cfg(feature = "native-select")]
+mod native_select;
+#[cfg(feature = "native-select")]
+pub use native_select::NativeSelect;
+
+#[cfg(feature = "input-otp")]
+mod input_otp;
+#[cfg(feature = "input-otp")]
+pub use input_otp::InputOtp;
+
+#[cfg(feature = "direction")]
+mod direction;
+#[cfg(feature = "direction")]
+pub use direction::Direction;
+
+#[cfg(feature = "bubble")]
+mod bubble;
+#[cfg(feature = "bubble")]
+pub use bubble::{Bubble, BubbleVariant};
+
+#[cfg(feature = "message")]
+mod message;
+#[cfg(feature = "message")]
+pub use message::Message;
+
+#[cfg(feature = "marker")]
+mod marker;
+#[cfg(feature = "marker")]
+pub use marker::{Marker, MarkerVariant};
+
+#[cfg(feature = "attachment")]
+mod attachment;
+#[cfg(feature = "attachment")]
+pub use attachment::{Attachment, AttachmentState};
+
+#[cfg(feature = "message-scroller")]
+mod message_scroller;
+#[cfg(feature = "message-scroller")]
+pub use message_scroller::{MessageScrollState, MessageScroller, MessageScrollerAction};
+
+#[cfg(feature = "hover-card")]
+mod hover_card;
+#[cfg(feature = "hover-card")]
+pub use hover_card::{HoverCard, HoverCardState};
+
+#[cfg(feature = "navigation-menu")]
+mod navigation_menu;
+#[cfg(feature = "navigation-menu")]
+pub use navigation_menu::{NavigationItem, NavigationMenu, NavigationMenuAction};
+
+#[cfg(feature = "sidebar")]
+mod sidebar;
+#[cfg(feature = "sidebar")]
+pub use sidebar::{Sidebar, SidebarAction};
+
+#[cfg(feature = "drawer")]
+mod drawer;
+#[cfg(feature = "drawer")]
+pub use drawer::{Drawer, DrawerAction};
+
+#[cfg(feature = "carousel")]
+mod carousel;
+#[cfg(feature = "carousel")]
+pub use carousel::Carousel;
+
+#[cfg(feature = "chart")]
+mod chart;
+#[cfg(feature = "chart")]
+pub use chart::{Chart, ChartError, ChartKind, ChartSeries};
+
+#[cfg(feature = "questionnaire")]
+mod questionnaire;
+#[cfg(feature = "questionnaire")]
+pub use questionnaire::{
+    Question, QuestionAnswer, QuestionChoice, Questionnaire, QuestionnaireAction,
+    QuestionnaireState,
+};

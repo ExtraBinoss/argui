@@ -54,6 +54,7 @@ impl Application {
             }
         }
         let mut update = ui.keyboard_default(input, &layout.hit_regions);
+        update.merge(ui.scroll_keyboard(input, &layout.scroll_regions));
         if !(input.state == KeyState::Pressed && input.key == Key::Tab && !input.repeat) {
             let editor_update = ui
                 .focused_node()

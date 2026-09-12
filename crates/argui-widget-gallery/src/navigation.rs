@@ -2,6 +2,33 @@
 pub enum Page {
     #[default]
     Button,
+    Accordion,
+    AlertDialog,
+    Attachment,
+    Bubble,
+    ButtonGroup,
+    Carousel,
+    Chart,
+    Combobox,
+    Direction,
+    Drawer,
+    Field,
+    HoverCard,
+    InputGroup,
+    InputOtp,
+    Item,
+    Marker,
+    Message,
+    MessageScroller,
+    NativeSelect,
+    NavigationMenu,
+    Questionnaire,
+    ScrollArea,
+    Sheet,
+    Sidebar,
+    Toggle,
+    ToggleGroup,
+
     Badge,
     Card,
     Alert,
@@ -51,35 +78,59 @@ pub enum Page {
 }
 
 impl Page {
-    pub const ALL: [Self; 47] = [
+    pub const ALL: [Self; 73] = [
+        Self::Accordion,
         Self::Alert,
+        Self::AlertDialog,
         Self::AspectRatio,
+        Self::Attachment,
         Self::Avatar,
         Self::Badge,
         Self::Breadcrumb,
+        Self::Bubble,
         Self::Button,
+        Self::ButtonGroup,
         Self::Calendar,
         Self::Card,
+        Self::Carousel,
+        Self::Chart,
         Self::Checkbox,
         Self::Collapsible,
+        Self::Combobox,
         Self::ContextMenu,
         Self::DataTable,
         Self::DatePicker,
         Self::Dialog,
+        Self::Direction,
+        Self::Drawer,
         Self::Empty,
+        Self::Field,
         Self::FilePicker,
+        Self::HoverCard,
         Self::Input,
+        Self::InputGroup,
+        Self::InputOtp,
+        Self::Item,
         Self::Kbd,
         Self::Label,
         Self::List,
+        Self::Marker,
         Self::Menu,
         Self::Menubar,
+        Self::Message,
+        Self::MessageScroller,
+        Self::NativeSelect,
+        Self::NavigationMenu,
         Self::Pagination,
         Self::Popover,
         Self::Progress,
+        Self::Questionnaire,
         Self::RadioGroup,
+        Self::ScrollArea,
         Self::Select,
         Self::Separator,
+        Self::Sheet,
+        Self::Sidebar,
         Self::Skeleton,
         Self::Slider,
         Self::Switch,
@@ -87,6 +138,8 @@ impl Page {
         Self::Tabs,
         Self::TextArea,
         Self::Toast,
+        Self::Toggle,
+        Self::ToggleGroup,
         Self::Tooltip,
         Self::VList,
         Self::LiquidGlass,
@@ -103,7 +156,33 @@ impl Page {
 
     pub const fn category(self) -> &'static str {
         match self {
-            Self::Button
+            Self::Accordion
+            | Self::AlertDialog
+            | Self::Attachment
+            | Self::Bubble
+            | Self::ButtonGroup
+            | Self::Carousel
+            | Self::Chart
+            | Self::Combobox
+            | Self::Direction
+            | Self::Drawer
+            | Self::Field
+            | Self::HoverCard
+            | Self::InputGroup
+            | Self::InputOtp
+            | Self::Item
+            | Self::Marker
+            | Self::Message
+            | Self::MessageScroller
+            | Self::NativeSelect
+            | Self::NavigationMenu
+            | Self::Questionnaire
+            | Self::ScrollArea
+            | Self::Sheet
+            | Self::Sidebar
+            | Self::Toggle
+            | Self::ToggleGroup
+            | Self::Button
             | Self::Badge
             | Self::Card
             | Self::Alert
@@ -154,6 +233,33 @@ impl Page {
 
     pub const fn label(self) -> &'static str {
         match self {
+            Self::Accordion => "Accordion",
+            Self::AlertDialog => "Alert dialog",
+            Self::Attachment => "Attachment",
+            Self::Bubble => "Bubble",
+            Self::ButtonGroup => "Button group",
+            Self::Carousel => "Carousel",
+            Self::Chart => "Chart",
+            Self::Combobox => "Combobox",
+            Self::Direction => "Direction",
+            Self::Drawer => "Drawer",
+            Self::Field => "Field",
+            Self::HoverCard => "Hover card",
+            Self::InputGroup => "Input group",
+            Self::InputOtp => "Input OTP",
+            Self::Item => "Item",
+            Self::Marker => "Marker",
+            Self::Message => "Message",
+            Self::MessageScroller => "Message scroller",
+            Self::NativeSelect => "Native select",
+            Self::NavigationMenu => "Navigation menu",
+            Self::Questionnaire => "Questionnaire",
+            Self::ScrollArea => "Scroll area",
+            Self::Sheet => "Sheet",
+            Self::Sidebar => "Sidebar",
+            Self::Toggle => "Toggle",
+            Self::ToggleGroup => "Toggle group",
+
             Self::Button => "Button",
             Self::Badge => "Badge",
             Self::Card => "Card",
@@ -206,6 +312,33 @@ impl Page {
 
     pub const fn slug(self) -> &'static str {
         match self {
+            Self::Accordion => "accordion",
+            Self::AlertDialog => "alert-dialog",
+            Self::Attachment => "attachment",
+            Self::Bubble => "bubble",
+            Self::ButtonGroup => "button-group",
+            Self::Carousel => "carousel",
+            Self::Chart => "chart",
+            Self::Combobox => "combobox",
+            Self::Direction => "direction",
+            Self::Drawer => "drawer",
+            Self::Field => "field",
+            Self::HoverCard => "hover-card",
+            Self::InputGroup => "input-group",
+            Self::InputOtp => "input-otp",
+            Self::Item => "item",
+            Self::Marker => "marker",
+            Self::Message => "message",
+            Self::MessageScroller => "message-scroller",
+            Self::NativeSelect => "native-select",
+            Self::NavigationMenu => "navigation-menu",
+            Self::Questionnaire => "questionnaire",
+            Self::ScrollArea => "scroll-area",
+            Self::Sheet => "sheet",
+            Self::Sidebar => "sidebar",
+            Self::Toggle => "toggle",
+            Self::ToggleGroup => "toggle-group",
+
             Self::Button => "button",
             Self::Badge => "badge",
             Self::Card => "card",
@@ -272,6 +405,33 @@ impl Page {
 impl Page {
     pub const fn description(self) -> &'static str {
         match self {
+            Self::Accordion => "Expand related sections with the keyboard.",
+            Self::AlertDialog => "Confirm an action with a safe initial focus.",
+            Self::Attachment => "File previews and transfer states.",
+            Self::Bubble => "Conversation surfaces and reactions.",
+            Self::ButtonGroup => "Related actions in a named group.",
+            Self::Carousel => "Browse slides with buttons, arrows or a swipe.",
+            Self::Chart => "Explore series with a zero baseline and accessible data points.",
+            Self::Combobox => "Filter choices while keeping focus in the search field.",
+            Self::Direction => "Share left-to-right or right-to-left layout with nested content.",
+            Self::Drawer => "Drag the handle or use Close to dismiss the panel.",
+            Self::Field => "Labels, help and errors linked to their controls.",
+            Self::HoverCard => "A rich preview on hover or keyboard focus.",
+            Self::InputGroup => "Inputs with attached labels and actions.",
+            Self::InputOtp => "Enter or paste a numeric verification code.",
+            Self::Item => "Reusable rows with media, details and actions.",
+            Self::Marker => "Notes and status markers within a conversation.",
+            Self::Message => "Messages with authors, metadata and actions.",
+            Self::MessageScroller => "Keep your place while new messages arrive.",
+            Self::NativeSelect => "A compact form select drawn by Argui.",
+            Self::NavigationMenu => "Navigate links and explore anchored panels.",
+            Self::Questionnaire => "Answer, skip and submit a sequence of questions.",
+            Self::ScrollArea => "A keyboard-accessible viewport with themed scrollbars.",
+            Self::Sheet => "Modal panels attached to an edge of the window.",
+            Self::Sidebar => "Collapsible navigation with a compact rail.",
+            Self::Toggle => "Press to switch a persistent formatting option.",
+            Self::ToggleGroup => "Select one or several options with roving keyboard focus.",
+
             Self::List => "Selection and keyboard navigation.",
             Self::VList => "Measured variable-height rows and virtual scrolling.",
             Self::Table => "Columns and row selection.",

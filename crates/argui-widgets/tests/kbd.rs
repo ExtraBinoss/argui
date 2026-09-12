@@ -26,3 +26,30 @@ fn chords_have_one_spoken_name_and_separate_compact_noninteractive_keycaps() {
         assert!(output.hit_regions.is_empty());
     }
 }
+
+#[test]
+fn keycap_size_keeps_accessibility_and_bounds_invalid_values() {
+    let palette = shadcn(Color::WHITE);
+    let theme = palette.resolve(ColorScheme::Dark);
+    for (requested, height) in [
+        (16.0, 16.0),
+        (0.0, 12.0),
+        (100.0, 48.0),
+        (f32::NAN, 24.0),
+        (f32::INFINITY, 24.0),
+    ] {
+        let mut tree = UiTree::new(Kbd::new("small", ["W"]).size(requested).build(theme));
+        let output = LayoutEngine::new()
+            .compute(&mut tree, &mut TextEngine::new(), Size::new(320.0, 100.0))
+            .unwrap();
+        assert_eq!(output.nodes[0].bounds.size.height, height);
+        assert!(output.hit_regions.is_empty());
+        assert_eq!(
+            tree.semantic_tree(&output.semantic_bounds, 1.0).nodes[0]
+                .semantics
+                .label
+                .as_deref(),
+            Some("W")
+        );
+    }
+}

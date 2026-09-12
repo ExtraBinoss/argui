@@ -293,7 +293,12 @@ impl Application {
         match update {
             ViewUpdate::None => return,
             ViewUpdate::Paint => self.pending_ui_frame.request_paint(),
-            ViewUpdate::Rebuild => self.pending_ui_frame.request_rebuild(),
+            ViewUpdate::Rebuild => {
+                if let Some(model) = &self.model {
+                    model.invalidate();
+                }
+                self.pending_ui_frame.request_rebuild();
+            }
         }
         if self.presentation_visible
             && let Some(window) = &self.window

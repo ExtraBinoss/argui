@@ -22,6 +22,7 @@ pub(crate) fn classify_update(
         || old.text_history != new.text_history
         || kind_changes_layout(&old.kind, &new.kind)
         || old.style != new.style
+        || old.direction_scope != new.direction_scope
         || old.container_scope != new.container_scope
         || (old.scroll != new.scroll
             && (old.has_container_queries() || new.has_container_queries()))
@@ -154,8 +155,22 @@ fn kind_changes_layout(old: &ElementKind, new: &ElementKind) -> bool {
         (ElementKind::Container, ElementKind::Container)
         | (ElementKind::Image { .. }, ElementKind::Image { .. })
         | (ElementKind::Vector { .. }, ElementKind::Vector { .. }) => false,
-        (ElementKind::Text { .. }, ElementKind::Text { .. })
-        | (ElementKind::TextEditor { .. }, ElementKind::TextEditor { .. }) => old != new,
+        (
+            ElementKind::Text {
+                content: old_content,
+                style: old_style,
+            },
+            ElementKind::Text {
+                content: new_content,
+                style: new_style,
+            },
+        ) => {
+            // Base text color is refreshed by repaint; it cannot change glyph placement.
+            let mut old_metrics = old_style.clone();
+            old_metrics.color = new_style.color;
+            old_content != new_content || old_metrics != *new_style
+        }
+        (ElementKind::TextEditor { .. }, ElementKind::TextEditor { .. }) => old != new,
         _ => true,
     }
 }

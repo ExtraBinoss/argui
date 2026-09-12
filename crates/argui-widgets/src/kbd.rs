@@ -9,6 +9,7 @@ pub struct Kbd {
     key: String,
     keys: Vec<String>,
     label: Option<String>,
+    size: f32,
 }
 
 impl Kbd {
@@ -18,6 +19,7 @@ impl Kbd {
             key: key.into(),
             keys: keys.into_iter().map(Into::into).collect(),
             label: None,
+            size: 24.0,
         }
     }
 
@@ -28,26 +30,35 @@ impl Kbd {
         self
     }
 
+    /// Keycap height in logical pixels; smaller caps also scale their typography and spacing.
+    #[must_use]
+    pub fn size(mut self, size: f32) -> Self {
+        if size.is_finite() {
+            self.size = size.clamp(12.0, 48.0);
+        }
+        self
+    }
+
     #[must_use]
     pub fn build(self, theme: &WidgetTheme) -> Element {
         let label = self.label.unwrap_or_else(|| self.keys.join(" + "));
         Element::row(self.keys.into_iter().map(|key| {
             Element::row([Element::text(key).text_style(TextStyle {
-                font_size: 12.0,
-                line_height: 16.0,
+                font_size: self.size * 0.5,
+                line_height: self.size * 2.0 / 3.0,
                 weight: 500,
                 color: theme.muted_foreground,
                 wrap: TextWrap::None,
                 ..TextStyle::default()
             })])
-            .min_width(length(24.0))
-            .height(length(24.0))
-            .padding(sides(6.0, 2.0))
+            .min_width(length(self.size))
+            .height(length(self.size))
+            .padding(sides(self.size * 0.25, self.size / 12.0))
             .align_items(AlignItems::CENTER)
             .justify_content(JustifyContent::CENTER)
             .background(theme.muted)
             .border(Border::all(1.0, theme.border))
-            .radius(CornerRadii::all(5.0))
+            .radius(CornerRadii::all(self.size * 0.2))
             .semantic_hidden(true)
             .shrink(0.0)
         }))

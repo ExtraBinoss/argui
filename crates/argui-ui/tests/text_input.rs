@@ -1,3 +1,5 @@
+#[path = "text_input/filter.rs"]
+mod filter;
 use argui_core::{
     Affine2D, CaretAffinity, ImeInput, Key, KeyInput, KeyState, Modifiers, Point, Rect, Size,
     TextPosition,

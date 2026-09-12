@@ -40,3 +40,30 @@ fn retaining_equal_subtrees_does_not_hide_semantic_or_layout_edits() {
     assert_eq!(tree.update(next), TreeUpdate::Layout);
     assert_eq!(tree.root().children[0].children.len(), 3);
 }
+
+#[test]
+fn text_color_and_alpha_repaint_but_text_and_font_metrics_still_relayout() {
+    let text = |value: &str, color, size| {
+        Element::text(value).text_style(argui_text::TextStyle {
+            color,
+            font_size: size,
+            ..Default::default()
+        })
+    };
+    let mut tree = UiTree::new(text("Track", Color::WHITE, 14.0));
+    for color in [Color::BLACK, Color::WHITE.with_alpha(0.32), Color::WHITE] {
+        assert_eq!(tree.update(text("Track", color, 14.0)), TreeUpdate::Paint);
+    }
+    assert_eq!(
+        tree.update(text("Track", Color::WHITE, 14.0)),
+        TreeUpdate::None
+    );
+    assert_eq!(
+        tree.update(text("Track", Color::WHITE, 20.0)),
+        TreeUpdate::Layout
+    );
+    assert_eq!(
+        tree.update(text("Other", Color::WHITE, 20.0)),
+        TreeUpdate::Layout
+    );
+}

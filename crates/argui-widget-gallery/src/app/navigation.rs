@@ -14,6 +14,12 @@ use argui::{
 impl WidgetGallery {
     pub(super) fn select_page(&mut self, page: Page) {
         if self.page != page {
+            if let Some(previous) = self.catalogue.get(&self.page) {
+                previous.update(|demo, cx| {
+                    demo.reset_transient();
+                    cx.notify();
+                });
+            }
             if self.page == Page::Tooltip {
                 self.tooltip.update(|demo, cx| {
                     demo.reset();
@@ -44,9 +50,10 @@ impl WidgetGallery {
         .build();
         let mut children = vec![search];
         for category in ["Widgets", "Effects", "Examples"] {
-            let pages = Page::ALL
+            let pages = self
+                .filtered_pages()
                 .into_iter()
-                .filter(|page| page.category() == category && page.matches(&self.search))
+                .filter(|page| page.category() == category)
                 .collect::<Vec<_>>();
             if pages.is_empty() {
                 continue;
@@ -91,10 +98,15 @@ impl WidgetGallery {
     }
 
     fn filtered_pages(&self) -> Vec<Page> {
-        Page::ALL
+        let mut pages: Vec<_> = Page::ALL
             .into_iter()
             .filter(|page| page.matches(&self.search))
-            .collect()
+            .collect();
+        let query = self.search.trim();
+        if !query.is_empty() {
+            pages.sort_by_key(|page| !page.label().eq_ignore_ascii_case(query));
+        }
+        pages
     }
 
     pub(super) fn type_to_search(&mut self, event: &UiEvent, cx: &mut Context<Self>) -> bool {

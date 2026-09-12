@@ -28,6 +28,7 @@ mod badge;
 mod breadcrumb;
 mod buttons;
 mod card;
+pub(crate) mod catalogue;
 mod collapsible;
 pub(crate) mod data;
 pub(crate) mod data_table;
@@ -66,6 +67,32 @@ pub(crate) fn render(
     resize: ResizeListeners,
 ) -> Element {
     let content = match gallery.page {
+        Page::Accordion
+        | Page::AlertDialog
+        | Page::Attachment
+        | Page::Bubble
+        | Page::ButtonGroup
+        | Page::Carousel
+        | Page::Chart
+        | Page::Combobox
+        | Page::Direction
+        | Page::Drawer
+        | Page::Field
+        | Page::HoverCard
+        | Page::InputGroup
+        | Page::InputOtp
+        | Page::Item
+        | Page::Marker
+        | Page::Message
+        | Page::MessageScroller
+        | Page::NativeSelect
+        | Page::NavigationMenu
+        | Page::Questionnaire
+        | Page::ScrollArea
+        | Page::Sheet
+        | Page::Sidebar
+        | Page::Toggle
+        | Page::ToggleGroup => cx.entity(&gallery.catalogue[&gallery.page]),
         Page::Menu | Page::ContextMenu | Page::Menubar => {
             menus::render(&gallery.menus, gallery.page, cx)
         }

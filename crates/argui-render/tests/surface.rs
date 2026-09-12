@@ -16,7 +16,7 @@ use winit::{
     application::ApplicationHandler,
     event::WindowEvent,
     event_loop::{ActiveEventLoop, EventLoop},
-    platform::wayland::EventLoopBuilderExtWayland,
+    platform::{pump_events::EventLoopExtPumpEvents, wayland::EventLoopBuilderExtWayland},
     window::{Window, WindowId},
 };
 
@@ -29,7 +29,7 @@ const PASSES: &[EffectPassDefinition] = &[
 #[test]
 #[ignore = "Native surface integration: requires a dedicated Wayland test display"]
 fn native_surface_grows_its_atlas_recovers_from_capacity_and_uses_custom_effects() {
-    struct TestApp(Option<Arc<Window>>);
+    struct TestApp(Option<Arc<Window>>, bool);
     impl ApplicationHandler for TestApp {
         fn resumed(&mut self, event_loop: &ActiveEventLoop) {
             let window = Arc::new(
@@ -45,24 +45,31 @@ fn native_surface_grows_its_atlas_recovers_from_capacity_and_uses_custom_effects
             self.0 = Some(window);
         }
 
-        fn window_event(&mut self, event_loop: &ActiveEventLoop, _: WindowId, event: WindowEvent) {
-            if matches!(event, WindowEvent::RedrawRequested)
-                && let Some(window) = self.0.take()
-            {
-                exercise(window);
-                event_loop.exit();
-            }
+        fn window_event(&mut self, _: &ActiveEventLoop, _: WindowId, event: WindowEvent) {
+            self.1 |= matches!(event, WindowEvent::RedrawRequested);
         }
     }
-    let event_loop = EventLoop::builder()
+    let mut event_loop = EventLoop::builder()
         .with_wayland()
         .with_any_thread(true)
         .build()
         .unwrap();
-    event_loop.run_app(&mut TestApp(None)).unwrap();
+    let mut app = TestApp(None, false);
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+    while !app.1 {
+        event_loop.pump_app_events(Some(std::time::Duration::from_millis(16)), &mut app);
+        assert!(
+            std::time::Instant::now() < deadline,
+            "window was not configured"
+        );
+    }
+    let window = app.0.as_ref().unwrap().clone();
+    exercise(window, || {
+        event_loop.pump_app_events(Some(std::time::Duration::from_millis(16)), &mut app);
+    });
 }
 
-fn exercise(window: Arc<Window>) {
+fn exercise(window: Arc<Window>, mut pump: impl FnMut()) {
     let effect = EffectId::new("test.half");
     let unused = EffectId::new("test.unused");
     let registry = EffectRegistry::new([
@@ -72,12 +79,15 @@ fn exercise(window: Arc<Window>) {
     .unwrap();
     let size = window.inner_size();
     let mut renderer = pollster::block_on(SurfaceRenderer::new(
-        window,
+        window.clone(),
         size.width,
         size.height,
         RendererConfig::default().profiling(true).effects(registry),
     ))
     .unwrap();
+    let mut render = |renderer: &mut SurfaceRenderer, list: &DisplayList| {
+        render(renderer, list, &window, &mut pump)
+    };
     render(&mut renderer, &DisplayList::new()).unwrap();
     assert_eq!(
         renderer.last_profile().vector_atlas.allocated_bytes,
@@ -149,13 +159,31 @@ fn exercise(window: Arc<Window>) {
     ));
 }
 
-fn render(renderer: &mut SurfaceRenderer, list: &DisplayList) -> Result<(), RendererError> {
+fn render(
+    renderer: &mut SurfaceRenderer,
+    list: &DisplayList,
+    window: &Window,
+    pump: &mut impl FnMut(),
+) -> Result<(), RendererError> {
     let mut text = TextEngine::from_embedded_fonts([], "sans-serif", "serif", "monospace");
-    assert_eq!(
-        renderer.render_ui(&mut text, &PreparedText::default(), list, 1.0)?,
-        RenderStatus::Presented
-    );
-    Ok(())
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+    loop {
+        // A Wayland surface needs configure/frame callbacks between submissions.
+        window.request_redraw();
+        pump();
+        let status =
+            renderer.render_ui_notified(&mut text, &PreparedText::default(), list, 1.0, || {
+                window.pre_present_notify()
+            })?;
+        if status == RenderStatus::Presented {
+            return Ok(());
+        }
+        assert_eq!(status, RenderStatus::Skipped);
+        assert!(
+            std::time::Instant::now() < deadline,
+            "surface did not present within three seconds"
+        );
+    }
 }
 
 fn asset() -> VectorAsset {

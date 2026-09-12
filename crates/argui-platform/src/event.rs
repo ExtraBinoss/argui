@@ -36,7 +36,11 @@ impl PlatformEvent {
     pub const fn requires_redraw(&self) -> bool {
         matches!(
             self,
-            Self::Opened { .. } | Self::Resized { .. } | Self::ScaleFactorChanged(_)
+            Self::Opened { .. }
+                | Self::Resized { .. }
+                | Self::ScaleFactorChanged(_)
+                | Self::Focused(true)
+                | Self::VisibilityChanged(true)
         )
     }
 

@@ -2,7 +2,7 @@ use argui_core::Point;
 use argui_platform::{ImeInput, PlatformEvent, PointerEvent, PointerPhase, ScrollDelta};
 
 #[test]
-fn only_surface_changes_request_a_frame() {
+fn surface_changes_and_returning_to_a_window_request_a_frame() {
     assert!(
         PlatformEvent::Opened {
             width: 800,
@@ -20,6 +20,12 @@ fn only_surface_changes_request_a_frame() {
         .requires_redraw()
     );
     assert!(PlatformEvent::ScaleFactorChanged(2.0).requires_redraw());
+    // A compositor may stop frame callbacks while another window covers the surface.
+    // Re-entry must kick presentation even when no focused widget changes visually.
+    assert!(PlatformEvent::Focused(true).requires_redraw());
+    assert!(PlatformEvent::VisibilityChanged(true).requires_redraw());
+    assert!(!PlatformEvent::Focused(false).requires_redraw());
+    assert!(!PlatformEvent::VisibilityChanged(false).requires_redraw());
     assert!(!PlatformEvent::RedrawRequested.requires_redraw());
     assert!(!PlatformEvent::Suspended.requires_redraw());
     assert!(

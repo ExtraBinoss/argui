@@ -95,6 +95,9 @@ impl Render for WidgetGallery {
         self.handle_layout(layout);
         cx.layout_entity(&self.glass, layout);
         cx.layout_entity(&self.menus, layout);
+        if let Some(page) = self.catalogue.get(&self.page) {
+            cx.layout_entity(page, layout);
+        }
     }
 
     fn image_assets(&self) -> Vec<ImageAsset> {

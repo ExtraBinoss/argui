@@ -55,7 +55,8 @@ mask graphemes and suppress clipboard export/history. Menu and command palette
 widgets are individually opt-in. See [the API guide](docs/actions-editing.md) and
 the **Actions** and **Editing & Password** gallery pages.
 Reusable data widgets are documented in [Lists and tables](docs/lists-tables.md);
-[the shadcn checklist](docs/shadcn-lib.md) tracks the component backlog.
+[the shadcn catalogue](docs/shadcn-lib.md) maps all 64 entries to public APIs,
+feature flags, examples, and their supported scope.
 
 Enable `argui/desktop-backdrop` for native desktop blur through selected UI
 regions, with configurable tint and fallback. See [Desktop backdrops](docs/desktop-backdrops.md)

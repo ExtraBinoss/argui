@@ -3,7 +3,7 @@ use crate::{
     EffectScope, FlexDirection, FlexWrap, HitTestStyle, Interaction, JustifyContent, JustifyItems,
     JustifySelf, LayoutStyle, LengthPercentage, LengthPercentageAuto, MotionProperty, Position,
     ScopedEffect, ScrollConfig, Sides, StateName, StateScopeId, StyleCondition, StylePatch,
-    StyleTransition, WritingDirection,
+    StyleTransition,
 };
 use argui_core::{Transform2D, TransformOrigin};
 use argui_paint::{
@@ -16,6 +16,7 @@ use std::{
     rc::Rc,
 };
 
+mod direction;
 mod kind;
 mod portal;
 pub use kind::{ElementKind, ElementNode, TextEditorSpec};
@@ -53,6 +54,7 @@ impl Element {
             key: None,
             kind: ElementKind::Container,
             style: LayoutStyle::default(),
+            direction_scope: None,
             paint: PaintStyle::default(),
             transform: Transform2D::IDENTITY,
             transform_origin: TransformOrigin::CENTER,
@@ -124,6 +126,7 @@ impl Element {
                 style: TextStyle::default(),
             },
             style: LayoutStyle::default(),
+            direction_scope: None,
             paint: PaintStyle::default(),
             transform: Transform2D::IDENTITY,
             transform_origin: TransformOrigin::CENTER,
@@ -339,12 +342,6 @@ impl Element {
     #[must_use]
     pub fn display(mut self, display: Display) -> Self {
         self.style.display = display;
-        self
-    }
-
-    #[must_use]
-    pub fn writing_direction(mut self, direction: WritingDirection) -> Self {
-        self.style.writing_direction = direction;
         self
     }
 
