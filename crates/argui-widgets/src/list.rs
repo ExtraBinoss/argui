@@ -272,7 +272,7 @@ impl<'a> List<'a> {
 
 // Preserve labels supplied by consumers and the accessible name of a plain text row.
 pub(crate) fn content_semantics(role: Role, element: &Element) -> Semantics {
-    let mut semantics = element.semantics.clone().unwrap_or_default();
+    let mut semantics = element.semantics.as_deref().cloned().unwrap_or_default();
     semantics.role = role;
     if semantics.label.is_none()
         && let argui_ui::ElementKind::Text { content, .. } = &element.kind

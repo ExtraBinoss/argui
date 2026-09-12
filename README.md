@@ -13,7 +13,8 @@ images, scoped GPU effects, and one WGPU renderer for native and web. See the
 [remaining roadmap](docs/roadmap.md).
 
 Performance work includes retained subtree reuse, virtualization, compact tree
-indices, and dense layout storage with separate geometry and cache columns.
+indices, dense layout storage, early dirty-propagation stops, and explicit
+layout boundaries for independently sized scroll content.
 See [the optimization measurements](docs/optimizations.md) for reproducible
 before/after CPU and memory comparisons, workloads, and their limits.
 The [quality gate](docs/code_quality.md) requires at least 85% coverage on each

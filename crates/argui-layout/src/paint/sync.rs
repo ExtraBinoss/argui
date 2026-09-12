@@ -7,9 +7,9 @@ pub(super) fn scroll_config(elements: &[&Element], ui: &UiTree, output: &mut Lay
         if let Some(node) = output.nodes.iter().find(|node| node.node == region.node) {
             let authored = elements[node.index]
                 .scroll
-                .clone()
-                .unwrap_or_else(|| region.config.clone());
-            let mut config = ui.resolved_scroll_config(region.node, &authored);
+                .as_deref()
+                .unwrap_or(&region.config);
+            let mut config = ui.resolved_scroll_config(region.node, authored);
             // Layout determines scrollable axes; repaint must not restore config defaults.
             config.axes = region.config.axes;
             if let (Some(scrollbar), Some(style)) = (&mut region.scrollbar, &config.scrollbar) {

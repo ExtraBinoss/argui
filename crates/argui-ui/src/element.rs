@@ -16,6 +16,7 @@ use std::{
     rc::Rc,
 };
 
+mod boundary;
 mod direction;
 mod kind;
 mod portal;
@@ -49,6 +50,7 @@ impl Element {
     pub fn container(children: impl IntoIterator<Item = Self>) -> Self {
         Self(Rc::new(ElementNode {
             inspectable: true,
+            layout_boundary: false,
             native_content: None,
             desktop_backdrop: None,
             key: None,
@@ -118,6 +120,7 @@ impl Element {
     pub fn text(value: impl Into<TextContent>) -> Self {
         Self(Rc::new(ElementNode {
             inspectable: true,
+            layout_boundary: false,
             native_content: None,
             desktop_backdrop: None,
             key: None,
@@ -543,7 +546,7 @@ impl Element {
 
     #[must_use]
     pub fn layer(mut self, style: LayerStyle) -> Self {
-        self.layer = Some(style);
+        self.layer = Some(Box::new(style));
         self
     }
 
@@ -583,7 +586,7 @@ impl Element {
         if let Some(scrollbar) = &config.scrollbar {
             self.style.scrollbar_width = scrollbar.gutter_width();
         }
-        self.scroll = Some(config);
+        self.scroll = Some(Box::new(config));
         self
     }
 

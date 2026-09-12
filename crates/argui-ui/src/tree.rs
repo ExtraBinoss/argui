@@ -129,6 +129,13 @@ impl UiTree {
         self.layout_dirty
     }
 
+    /// Preorder positions of explicit layout boundaries and portal roots.
+    /// The layout engine uses this sparse list without scanning every element.
+    #[must_use]
+    pub fn layout_root_indices(&self) -> &[usize] {
+        self.index.layout_roots()
+    }
+
     #[must_use]
     pub const fn update_stats(&self) -> TreeUpdateStats {
         self.update_stats
@@ -153,7 +160,7 @@ impl UiTree {
             TreeUpdate::None => return update,
             TreeUpdate::Semantics => {
                 self.root = root;
-                self.sync_animation_registry();
+                self.sync_animation_registry(false);
                 self.focus.sync(
                     &self.root,
                     &self.node_ids,
@@ -164,18 +171,20 @@ impl UiTree {
             }
             TreeUpdate::Paint | TreeUpdate::Scroll => {
                 self.root = root;
-                self.sync_animation_registry();
+                self.sync_animation_registry(false);
             }
             TreeUpdate::Layout => {
                 let node_ids = identity::reconcile_ids(
                     &self.root,
                     &self.node_ids,
+                    self.index.subtree_ends(),
                     &root,
                     &mut self.next_node_id,
                 );
+                let structure_changed = self.node_ids != node_ids;
                 self.node_ids = node_ids;
                 self.root = root;
-                self.sync_animation_registry();
+                self.sync_animation_registry(structure_changed);
                 self.interaction.retain(&self.node_ids);
                 self.pending_gestures
                     .retain(|gesture| self.node_ids.contains(&gesture.target));
@@ -348,9 +357,16 @@ impl UiTree {
         self.text_inputs.sync(inputs);
     }
 
-    fn sync_animation_registry(&mut self) {
-        self.index = index::TreeIndex::new(&self.root, &self.node_ids);
-        self.animations = AnimationRegistry::new(&self.root);
+    fn sync_animation_registry(&mut self, structure_changed: bool) {
+        let bindings_changed = if structure_changed {
+            self.index = index::TreeIndex::new(&self.root, &self.node_ids);
+            true
+        } else {
+            self.index.sync(&self.root)
+        };
+        if bindings_changed {
+            self.animations = AnimationRegistry::new(&self.root);
+        }
     }
 
     #[must_use]

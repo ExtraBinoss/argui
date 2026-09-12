@@ -18,6 +18,7 @@ pub(crate) fn classify_update(
     let binding_update = binding_update(old, new);
     let state_update = state_update(old, new);
     if old.key != new.key
+        || old.layout_boundary != new.layout_boundary
         || old.text_privacy != new.text_privacy
         || old.text_history != new.text_history
         || kind_changes_layout(&old.kind, &new.kind)

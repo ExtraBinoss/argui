@@ -204,7 +204,7 @@ fn custom_surface_accepts_registered_effects_and_clamps_width() {
         .paint(paint.clone())
         .layer(layer.clone())
         .build(theme);
-    assert_eq!(root.children[1].layer.as_ref(), Some(&layer));
+    assert_eq!(root.children[1].layer.as_deref(), Some(&layer));
     assert_eq!(root.children[1].paint, paint);
     assert_eq!(root.children[1].style.max_size.width, argui_ui::length(0.0));
     assert!(

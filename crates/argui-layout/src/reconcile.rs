@@ -55,6 +55,9 @@ fn reconcile_node(
                 None
             }
         });
+    let was_boundary = previous
+        .as_ref()
+        .is_some_and(|node| node.element.layout_boundary);
     let resolved_style =
         assets.layout_style(ui.resolved_layout_style(node, element), &element.kind);
     let (id, previous_children) = match previous {
@@ -86,12 +89,12 @@ fn reconcile_node(
             cursor,
         )?);
     }
+    let child_ids = crate::overlay::layout_children(&children);
+    if previous_ids != child_ids || was_boundary != element.layout_boundary {
+        tree.set_layout_children(id, &child_ids, element.layout_boundary)?;
+    }
     for removed in retained.into_values() {
         remove_subtree(tree, removed)?;
-    }
-    let child_ids = crate::overlay::layout_children(&children);
-    if previous_ids != child_ids {
-        tree.set_children(id, &child_ids)?;
     }
     let subtree_len = 1 + children
         .iter()
@@ -102,7 +105,6 @@ fn reconcile_node(
         index,
         node,
         id,
-        kind: element.kind.clone(),
         style: resolved_style,
         element: element.clone(),
         subtree_len,
@@ -117,13 +119,13 @@ fn reuse_node(
     style: &argui_ui::LayoutStyle,
     index: usize,
 ) -> Result<NodeId, LayoutError> {
-    if previous.style != *style {
+    if previous.style != *style || previous.element.portal != element.portal {
         tree.set_style(previous.id, taffy_style(style))?;
     }
     if previous.index != index && !matches!(element.kind, ElementKind::Container) {
         tree.set_node_context(previous.id, Some(index))?;
     }
-    if intrinsic_measure_changed(&previous.kind, &element.kind) {
+    if intrinsic_measure_changed(&previous.element.kind, &element.kind) {
         tree.mark_dirty(previous.id)?;
     }
     Ok(previous.id)
@@ -143,10 +145,10 @@ fn create_node(
 }
 
 fn remove_subtree(tree: &mut LayoutTree, node: NodeMap) -> Result<(), LayoutError> {
+    tree.remove(node.id)?;
     for child in node.children {
         remove_subtree(tree, child)?;
     }
-    tree.remove(node.id)?;
     Ok(())
 }
 

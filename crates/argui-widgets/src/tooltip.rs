@@ -90,7 +90,7 @@ impl Tooltip {
             .get_or_insert_with(|| Interaction::default().focus_policy(FocusPolicy::TabStop));
         let semantics = trigger
             .semantics
-            .get_or_insert_with(|| Semantics::new(Role::Group));
+            .get_or_insert_with(|| Box::new(Semantics::new(Role::Group)));
         semantics.description = Some(self.description.clone());
         if self.open {
             trigger = trigger.described_by([content_key.clone()]);

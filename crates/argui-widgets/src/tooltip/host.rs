@@ -257,7 +257,7 @@ fn describe(element: &mut Element, key: &str, content_key: &str) -> bool {
     if element.key.as_deref() == Some(key) {
         element
             .semantics
-            .get_or_insert_with(|| argui_ui::Semantics::new(Role::Group));
+            .get_or_insert_with(|| Box::new(argui_ui::Semantics::new(Role::Group)));
         *element = element.clone().described_by([content_key]);
         return true;
     }

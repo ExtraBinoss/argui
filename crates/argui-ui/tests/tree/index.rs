@@ -101,3 +101,55 @@ fn compact_parents_and_selection_owners_follow_nested_scopes_and_stale_ids() {
     assert_eq!(tree.resolved_selection_style(c), outer);
     assert_eq!(tree.resolved_user_select(c), UserSelect::Text);
 }
+
+#[test]
+fn shared_descendants_refresh_inheritance_without_changing_identity() {
+    use argui_core::Color;
+    use argui_ui::TreeUpdate;
+    let leaf = Element::text("shared");
+    let explicit = TextSelectionStyle {
+        background: Color::BLACK,
+        handle: Color::WHITE,
+    };
+    let root = Element::column([
+        Element::column([leaf.clone()]),
+        Element::column([Element::text("override")]).selection_style(explicit),
+    ]);
+    let mut tree = UiTree::new(root);
+    let ids = tree.node_ids().to_vec();
+    let inherited = TextSelectionStyle {
+        background: Color::WHITE,
+        handle: Color::BLACK,
+    };
+    let next = tree
+        .root()
+        .clone()
+        .selection_style(inherited)
+        .user_select(UserSelect::All);
+    assert_eq!(tree.update(next), TreeUpdate::Paint);
+    assert_eq!(tree.node_ids(), ids);
+    assert!(tree.element_at(2).unwrap().ptr_eq(&leaf));
+    assert_eq!(tree.resolved_user_select(ids[2]), UserSelect::All);
+    assert_eq!(tree.resolved_selection_style(ids[2]), inherited);
+    assert_eq!(tree.resolved_selection_style(ids[4]), explicit);
+    let mut next = tree.root().clone();
+    next.selection_style = None;
+    next.user_select = UserSelect::Auto;
+    assert_eq!(tree.update(next), TreeUpdate::Paint);
+    assert_eq!(tree.resolved_user_select(ids[2]), UserSelect::Text);
+    assert_eq!(
+        tree.resolved_selection_style(ids[2]),
+        TextSelectionStyle::default()
+    );
+    assert_eq!(tree.resolved_selection_style(ids[4]), explicit);
+    // Layout input changes also refresh the same slots when topology is stable.
+    let mut next = tree.root().clone();
+    next.children[0].children[0].style.size.width = argui_ui::length(123.0);
+    assert_eq!(tree.update(next), TreeUpdate::Layout);
+    assert_eq!(tree.node_ids(), ids);
+    assert_eq!(
+        tree.element_at(2).unwrap().style.size.width,
+        argui_ui::length(123.0)
+    );
+    assert_eq!(tree.parent_of(ids[2]), Some(ids[1]));
+}

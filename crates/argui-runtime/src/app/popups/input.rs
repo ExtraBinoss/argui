@@ -24,6 +24,20 @@ impl Application {
         let origin = popup.bounds.origin;
         let node = popup.node;
         let native = popup.native.window().clone();
+        // Unmanaged native popups need explicit activation on user input. A
+        // suspended application cannot wait for UI focus to request OS focus.
+        if matches!(
+            &event,
+            WindowEvent::MouseInput {
+                state: winit::event::ElementState::Pressed,
+                ..
+            } | WindowEvent::Touch(winit::event::Touch {
+                phase: winit::event::TouchPhase::Started,
+                ..
+            })
+        ) {
+            popup.native.focus();
+        }
         match &mut event {
             WindowEvent::CloseRequested | WindowEvent::Destroyed => {
                 self.dismiss_popup(node, event_loop);

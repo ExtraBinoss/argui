@@ -139,7 +139,7 @@ impl Menu {
         Element::column(items.iter().map(|item| {
             if let MenuItemKind::Group(children) = &item.kind {
                 let mut group = self.content_level(children, &item.state.label, theme);
-                group.semantics = Some(Semantics::new(Role::Group).label(&item.state.label));
+                group = group.semantics(Semantics::new(Role::Group).label(&item.state.label));
                 return Element::column([
                     Element::text(item.state.label.as_str())
                         .text_style(theme.ghost_button().label)

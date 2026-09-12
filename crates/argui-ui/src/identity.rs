@@ -1,13 +1,6 @@
 use crate::{Element, ElementKind, NodeId};
 use std::collections::{HashMap, HashSet, VecDeque};
 
-#[derive(Debug)]
-struct Existing<'a> {
-    element: &'a Element,
-    id: NodeId,
-    children: Vec<Self>,
-}
-
 pub(crate) fn initial_ids(root: &Element, next: &mut u64) -> Vec<NodeId> {
     let mut ids = Vec::new();
     assign_new(root, next, &mut ids);
@@ -17,68 +10,73 @@ pub(crate) fn initial_ids(root: &Element, next: &mut u64) -> Vec<NodeId> {
 pub(crate) fn reconcile_ids(
     old: &Element,
     old_ids: &[NodeId],
+    old_ends: &[u32],
     new: &Element,
     next: &mut u64,
 ) -> Vec<NodeId> {
-    let mut cursor = 0;
-    let existing = existing_tree(old, old_ids, &mut cursor);
-    let mut ids = Vec::new();
-    reconcile_node(Some(&existing), new, next, &mut ids);
-    ids
+    let mut reconcile = Reconcile {
+        old_ids,
+        old_ends,
+        next,
+        ids: Vec::with_capacity(old_ids.len()),
+    };
+    reconcile.visit(Some((old, 0)), new);
+    reconcile.ids
+}
+
+struct Reconcile<'a> {
+    old_ids: &'a [NodeId],
+    old_ends: &'a [u32],
+    next: &'a mut u64,
+    ids: Vec<NodeId>,
+}
+
+impl Reconcile<'_> {
+    fn visit(&mut self, old: Option<(&Element, usize)>, new: &Element) {
+        let reusable = old.filter(|(element, _)| compatible(element, new));
+        if let Some((element, index)) = reusable
+            && element.ptr_eq(new)
+        {
+            self.ids
+                .extend_from_slice(&self.old_ids[index..self.old_ends[index] as usize]);
+            return;
+        }
+        self.ids
+            .push(reusable.map_or_else(|| allocate(self.next), |(_, index)| self.old_ids[index]));
+        let mut keyed = HashMap::<&str, VecDeque<(&Element, usize)>>::new();
+        let mut children = Vec::new();
+        if let Some((parent, index)) = reusable {
+            let mut cursor = index + 1;
+            for child in &parent.children {
+                children.push((child, cursor));
+                if let Some(key) = child.key.as_deref() {
+                    keyed.entry(key).or_default().push_back((child, cursor));
+                }
+                cursor = self.old_ends[cursor] as usize;
+            }
+        }
+        let mut used = HashSet::new();
+        for (index, child) in new.children.iter().enumerate() {
+            let candidate = match child.key.as_deref() {
+                Some(key) => keyed.get_mut(key).and_then(VecDeque::pop_front),
+                None => children
+                    .get(index)
+                    .copied()
+                    .filter(|(element, _)| element.key.is_none()),
+            }
+            .filter(|(_, index)| !used.contains(index));
+            if let Some((_, index)) = candidate {
+                used.insert(index);
+            }
+            self.visit(candidate, child);
+        }
+    }
 }
 
 fn assign_new(element: &Element, next: &mut u64, ids: &mut Vec<NodeId>) {
     ids.push(allocate(next));
     for child in &element.children {
         assign_new(child, next, ids);
-    }
-}
-
-fn existing_tree<'a>(element: &'a Element, ids: &[NodeId], cursor: &mut usize) -> Existing<'a> {
-    let id = ids[*cursor];
-    *cursor += 1;
-    let children = element
-        .children
-        .iter()
-        .map(|child| existing_tree(child, ids, cursor))
-        .collect();
-    Existing {
-        element,
-        id,
-        children,
-    }
-}
-
-fn reconcile_node(
-    old: Option<&Existing<'_>>,
-    new: &Element,
-    next: &mut u64,
-    ids: &mut Vec<NodeId>,
-) {
-    let reusable = old.filter(|candidate| compatible(candidate.element, new));
-    ids.push(reusable.map_or_else(|| allocate(next), |existing| existing.id));
-
-    let mut keyed = HashMap::<&str, VecDeque<&Existing<'_>>>::new();
-    if let Some(parent) = reusable {
-        for existing in &parent.children {
-            if let Some(key) = existing.element.key.as_deref() {
-                keyed.entry(key).or_default().push_back(existing);
-            }
-        }
-    }
-    let mut used = HashSet::new();
-    for (index, child) in new.children.iter().enumerate() {
-        let candidate = match child.key.as_deref() {
-            Some(key) => keyed.get_mut(key).and_then(VecDeque::pop_front),
-            None => reusable
-                .and_then(|parent| parent.children.get(index))
-                .filter(|existing| existing.element.key.is_none()),
-        }
-        .filter(|existing| !used.contains(&existing.id));
-        if let Some(existing) = candidate {
-            used.insert(existing.id);
-        }
-        reconcile_node(candidate, child, next, ids);
     }
 }
 

@@ -25,7 +25,7 @@ fn popover_accepts_a_complete_effect_layer_without_overwriting_it() {
     )
     .layer(layer.clone())
     .build(themes.resolve(argui_core::ColorScheme::Dark));
-    assert_eq!(root.children[1].layer.as_ref(), Some(&layer));
+    assert_eq!(root.children[1].layer.as_deref(), Some(&layer));
 }
 
 fn event(key: Option<&str>, kind: UiEventKind) -> UiEvent {

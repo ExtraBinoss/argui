@@ -18,6 +18,8 @@ impl std::fmt::Debug for super::Element {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ElementNode {
     pub inspectable: bool,
+    /// Isolates content sizing; see [`super::Element::layout_boundary`] for the contract.
+    pub layout_boundary: bool,
     pub key: Option<String>,
     pub kind: ElementKind,
     pub native_content: Option<crate::NativeContent>,
@@ -35,16 +37,16 @@ pub struct ElementNode {
     pub(crate) state_scope: Option<crate::StateScopeId>,
     pub(crate) container_scope: Option<crate::ContainerScopeId>,
     pub(crate) active_states: Vec<crate::StateName>,
-    pub semantics: Option<argui_accessibility::Semantics>,
+    pub semantics: Option<Box<argui_accessibility::Semantics>>,
     /// Optional hover/focus help, presented by an application tooltip host.
     pub tooltip: Option<String>,
     pub semantic_hidden: bool,
     pub semantic_scope: bool,
     pub semantic_bindings: crate::SemanticBindings,
     pub bindings: Vec<crate::PropertyBinding>,
-    pub layer: Option<argui_paint::LayerStyle>,
+    pub layer: Option<Box<argui_paint::LayerStyle>>,
     pub effects: Vec<crate::ScopedEffect>,
-    pub scroll: Option<crate::ScrollConfig>,
+    pub scroll: Option<Box<crate::ScrollConfig>>,
     pub(crate) virtual_item: Option<crate::VirtualItem>,
     pub portal: Option<crate::Portal>,
     pub focus_scope: Option<crate::FocusScope>,

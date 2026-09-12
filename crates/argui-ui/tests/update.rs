@@ -29,8 +29,9 @@ fn rebuilding_an_animation_retains_unchanged_controls_and_their_descendants() {
 fn retaining_equal_subtrees_does_not_hide_semantic_or_layout_edits() {
     let mut tree = UiTree::new(screen(Color::BLACK));
     let mut next = screen(Color::WHITE);
-    next.children[0].semantics =
-        Some(argui_ui::Semantics::new(argui_ui::Role::Group).label("Mixer"));
+    next.children[0].semantics = Some(Box::new(
+        argui_ui::Semantics::new(argui_ui::Role::Group).label("Mixer"),
+    ));
     assert_eq!(tree.update(next.clone()), TreeUpdate::Paint);
     assert_eq!(
         tree.root().children[0].semantics,

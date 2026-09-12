@@ -409,7 +409,7 @@ fn overlay_scroll_config(map: &NodeMap, element: &Element) -> Option<argui_ui::S
         (false, true) => argui_ui::ScrollAxes::Vertical,
         (true, true) => argui_ui::ScrollAxes::Both,
     };
-    let mut config = element.scroll.clone().unwrap_or_default();
+    let mut config = element.scroll.as_deref().cloned().unwrap_or_default();
     config.axes = axes;
     Some(config)
 }

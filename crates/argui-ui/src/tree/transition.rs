@@ -178,6 +178,10 @@ impl super::UiTree {
     }
 
     pub(super) fn sync_transitions_with(&mut self, reduced_motion: bool) -> TreeUpdate {
+        if !self.index.has_transitions() {
+            self.transitions.entries.clear();
+            return TreeUpdate::None;
+        }
         let interaction = &self.interaction;
         let scroll = &self.scroll;
         let container_sizes = &self.container_sizes;

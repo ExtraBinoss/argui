@@ -128,6 +128,14 @@ try:
     connection.sync()
     time.sleep(0.4)
     assert connection.get_input_focus().focus.id == external.id, 'Dismissing the group must not steal focus back'
+    # Controlled popups remain mounted in this fixture. Explicit user input must
+    # reactivate one after suspension, including clicks outside focusable fields.
+    click(parent, 110, 180)
+    wait_for_focus(parent)
+    external.set_input_focus(X.RevertToParent, X.CurrentTime)
+    connection.sync()
+    time.sleep(0.4)
+    assert connection.get_input_focus().focus.id == external.id, 'Reactivation must not disable dismissal'
 finally:
     if main:
         message = protocol.event.ClientMessage(window=main, client_type=connection.intern_atom("WM_PROTOCOLS"), data=(32, [connection.intern_atom("WM_DELETE_WINDOW"), X.CurrentTime, 0, 0, 0]))

@@ -36,7 +36,7 @@ impl ScrollArea {
     #[must_use]
     pub fn build(self, theme: &WidgetTheme) -> Element {
         let vertical = self.orientation == Orientation::Vertical;
-        Element::column([self.content.shrink(0.0)])
+        Element::layout_boundary(self.content.shrink(0.0))
             .keyed(self.key)
             .width(percent(1.0))
             .min_width(length(0.0))

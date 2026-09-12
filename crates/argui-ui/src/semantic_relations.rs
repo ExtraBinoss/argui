@@ -42,7 +42,7 @@ pub struct SemanticDiagnostic {
 impl Element {
     #[must_use]
     pub fn semantics(mut self, semantics: argui_accessibility::Semantics) -> Self {
-        self.semantics = Some(semantics);
+        self.semantics = Some(Box::new(semantics));
         self
     }
 

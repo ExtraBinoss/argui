@@ -68,7 +68,6 @@ pub(crate) struct NodeMap {
     pub(crate) index: usize,
     pub(crate) node: UiNodeId,
     pub(crate) id: NodeId,
-    pub(crate) kind: ElementKind,
     pub(crate) style: LayoutStyle,
     pub(crate) element: Element,
     pub(crate) subtree_len: usize,
@@ -184,7 +183,8 @@ impl LayoutEngine {
 
     fn rebuild(&mut self, ui: &UiTree) -> Result<(), LayoutError> {
         self.tree = LayoutTree::new();
-        self.tree.reserve_nodes(ui.node_ids().len());
+        self.tree
+            .reserve_nodes(ui.node_ids().len() + ui.layout_root_indices().len());
         let mut next_index = 0;
         self.root = Some(build_node(
             &mut self.tree,
@@ -204,7 +204,8 @@ impl LayoutEngine {
         let Some(root) = self.root.take() else {
             return self.rebuild(ui);
         };
-        self.tree.reserve_nodes(ui.node_ids().len());
+        self.tree
+            .reserve_nodes(ui.node_ids().len() + ui.layout_root_indices().len());
         self.root = Some(crate::reconcile::sync(
             &mut self.tree,
             root,
@@ -252,7 +253,7 @@ fn build_node(
         | ElementKind::Vector { .. } => tree.new_leaf_with_context(style, index)?,
         ElementKind::Custom(_) | ElementKind::Container => {
             let child_ids = crate::overlay::layout_children(&children);
-            tree.new_with_children(style, &child_ids)?
+            tree.new_with_children(style, &child_ids, element.layout_boundary)?
         }
     };
     Ok(NodeMap {
@@ -260,7 +261,6 @@ fn build_node(
         index,
         node,
         id,
-        kind: element.kind.clone(),
         style: resolved_style,
         element: element.clone(),
         subtree_len: 1 + children

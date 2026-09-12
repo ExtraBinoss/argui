@@ -82,7 +82,7 @@ n’introduisent aucune dépendance externe.
 | Questionnaire | [Questionnaire](../crates/argui-widgets/src/questionnaire.rs) | `questionnaire` | Étapes, choix simples/multiples, texte libre, facultatif, validation et réponses retournées au consommateur. |
 | Radio Group | [RadioGroup](../crates/argui-widgets/src/selection.rs) | `radio-group` | sélection exclusive et orientation. |
 | Resizable | [SplitPane](../crates/argui-widgets/src/split_pane.rs) | `split-pane` | séparateur, limites, gestes et clavier. Groupes imbriqués à composer explicitement. |
-| Scroll Area | [ScrollArea](../crates/argui-widgets/src/scroll_area.rs) | `scroll-area` | Viewport horizontal/vertical, roue, gestes, scrollbar et défilement clavier focalisé. |
+| Scroll Area | [ScrollArea](../crates/argui-widgets/src/scroll_area.rs) | `scroll-area` | Viewport horizontal/vertical, roue, gestes, scrollbar et défilement clavier focalisé ; frontière de layout explicite pour isoler les changements internes. |
 | Select | [Select](../crates/argui-widgets/src/select.rs) | `select` | sélection simple contrôlée, overlay et clavier. |
 | Separator | [Separator](../crates/argui-widgets/src/separator.rs) | `separator` | orientation configurable et texte centré entre deux traits, décoratif par défaut ou rôle accessible explicite. |
 | Sheet | [Sheet](../crates/argui-widgets/src/sheet.rs) | `sheet` | Panneau modal attaché à l’un des quatre côtés, focus restauré et contenu défilable. |

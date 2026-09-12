@@ -398,7 +398,9 @@ fn semantic_only_changes_keep_region_identity_and_custom_phase_caches() {
     let ids = ui.node_ids().to_vec();
     let stats = engine.custom_stats();
     let mut updated = regions(true);
-    updated.children[1].semantics = Some(Semantics::new(Role::Slider).label("Renamed handle"));
+    updated.children[1].semantics = Some(Box::new(
+        Semantics::new(Role::Slider).label("Renamed handle"),
+    ));
     assert_eq!(ui.update(updated), TreeUpdate::Semantics);
     engine.repaint(&ui, &mut output);
     assert_eq!(ui.node_ids(), ids);

@@ -11,7 +11,9 @@ pub struct CustomElementStats {
 
 pub(crate) fn stats(root: Option<&NodeMap>) -> Vec<CustomElementStats> {
     fn collect(map: &NodeMap, output: &mut Vec<CustomElementStats>) {
-        if let (ElementKind::Custom(description), Some(state)) = (&map.kind, &map.custom_state) {
+        if let (ElementKind::Custom(description), Some(state)) =
+            (&map.element.kind, &map.custom_state)
+        {
             output.push(CustomElementStats {
                 node: map.node,
                 type_name: description.type_name(),
@@ -30,6 +32,13 @@ pub(crate) fn stats(root: Option<&NodeMap>) -> Vec<CustomElementStats> {
 }
 
 pub(crate) fn validate(element: &argui_ui::Element) -> Result<(), crate::LayoutError> {
+    if element.layout_boundary
+        && (!matches!(element.kind, ElementKind::Container) || element.children.len() != 1)
+    {
+        return Err(crate::LayoutError::InvalidBoundary(
+            "expected a container with one content child",
+        ));
+    }
     for child in &element.children {
         if (matches!(child.kind, ElementKind::Custom(_))
             || matches!(element.kind, ElementKind::Custom(_)))

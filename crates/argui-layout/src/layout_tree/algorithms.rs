@@ -10,7 +10,7 @@ use taffy::{
     },
 };
 
-type Measure<'a> = dyn FnMut(LayoutInput, NodeId, Option<&mut usize>, &Style) -> LayoutOutput + 'a;
+type Measure<'a> = dyn FnMut(LayoutInput, NodeId, Option<usize>, &Style) -> LayoutOutput + 'a;
 struct Computation<'a> {
     error: Option<String>,
     tree: &'a mut LayoutTree,
@@ -22,7 +22,8 @@ impl LayoutTree {
         &mut self,
         root: NodeId,
         available: Size<AvailableSpace>,
-        mut measure: impl FnMut(LayoutInput, NodeId, Option<&mut usize>, &Style) -> LayoutOutput,
+        boundary_input: Option<LayoutInput>,
+        mut measure: impl FnMut(LayoutInput, NodeId, Option<usize>, &Style) -> LayoutOutput,
     ) -> Result<(), crate::LayoutError> {
         self.node(root)?;
         let mut computation = Computation {
@@ -30,15 +31,28 @@ impl LayoutTree {
             tree: self,
             measure: &mut measure,
         };
-        taffy::compute_root_layout(&mut computation, root, available);
+        if let Some(input) = boundary_input {
+            let output = computation.compute(root, input, None);
+            let index = computation.tree.index(root)?;
+            computation.tree.unrounded[index].scrollable_overflow_rect =
+                output.scrollable_overflow_rect;
+        } else {
+            taffy::compute_root_layout(&mut computation, root, available);
+        }
         if let Some(error) = computation.error.take() {
             for cache in &mut computation.tree.caches {
                 cache.clear();
             }
             return Err(crate::LayoutError::Custom(error));
         }
-        taffy::round_layout(&mut computation, root);
+        taffy::round_layout(computation.tree, root);
         Ok(())
+    }
+}
+
+impl LayoutTree {
+    pub(crate) fn round_root(&mut self, root: NodeId) {
+        taffy::round_layout(self, root);
     }
 }
 
@@ -49,6 +63,11 @@ impl Computation<'_> {
         inputs: LayoutInput,
         block: Option<&mut BlockContext<'_>>,
     ) -> LayoutOutput {
+        if inputs.run_mode == RunMode::PerformLayout
+            && let Some(boundary) = self.tree.boundaries.get_mut(&id)
+        {
+            boundary.input = Some(inputs);
+        }
         if inputs.run_mode == RunMode::PerformHiddenLayout {
             return taffy::compute_hidden_layout(self, id);
         }
@@ -72,32 +91,48 @@ impl Computation<'_> {
                 (Display::Flex, false) => taffy::compute_flexbox_layout(tree, id, inputs),
                 (Display::Grid, false) => taffy::compute_grid_layout(tree, id, inputs),
                 (_, true) => {
-                    let node = tree.tree.node_mut(id).expect("live layout node");
-                    (tree.measure)(inputs, id, node.context.as_mut(), &node.style)
+                    let node = tree.tree.node(id).expect("live layout node");
+                    let context = (node.context != super::NONE).then_some(node.context as usize);
+                    (tree.measure)(inputs, id, context, &node.style)
                 }
             }
         })
     }
 }
 
-impl TraversePartialTree for Computation<'_> {
+impl TraversePartialTree for LayoutTree {
     type ChildIter<'a>
         = std::iter::Copied<std::slice::Iter<'a, NodeId>>
     where
         Self: 'a;
     fn child_ids(&self, id: NodeId) -> Self::ChildIter<'_> {
-        self.tree
-            .node(id)
+        self.node(id)
             .expect("live layout node")
             .children
             .iter()
             .copied()
     }
     fn child_count(&self, id: NodeId) -> usize {
-        self.tree.node(id).expect("live layout node").children.len()
+        self.node(id).expect("live layout node").children.len()
     }
     fn get_child_id(&self, id: NodeId, index: usize) -> NodeId {
-        self.tree.node(id).expect("live layout node").children[index]
+        self.node(id).expect("live layout node").children[index]
+    }
+}
+impl TraverseTree for LayoutTree {}
+impl TraversePartialTree for Computation<'_> {
+    type ChildIter<'a>
+        = <LayoutTree as TraversePartialTree>::ChildIter<'a>
+    where
+        Self: 'a;
+    fn child_ids(&self, id: NodeId) -> Self::ChildIter<'_> {
+        self.tree.child_ids(id)
+    }
+    fn child_count(&self, id: NodeId) -> usize {
+        self.tree.child_count(id)
+    }
+    fn get_child_id(&self, id: NodeId, index: usize) -> NodeId {
+        self.tree.get_child_id(id, index)
     }
 }
 impl TraverseTree for Computation<'_> {}
@@ -132,13 +167,13 @@ impl CacheTree for Computation<'_> {
         self.tree.caches[index].clear();
     }
 }
-impl RoundTree for Computation<'_> {
+impl RoundTree for LayoutTree {
     fn get_unrounded_layout(&self, id: NodeId) -> Layout {
-        self.tree.unrounded[self.tree.index(id).expect("live layout node")]
+        self.unrounded[self.index(id).expect("live layout node")]
     }
     fn set_final_layout(&mut self, id: NodeId, layout: &Layout) {
-        let index = self.tree.index(id).expect("live layout node");
-        self.tree.layouts[index] = *layout;
+        let index = self.index(id).expect("live layout node");
+        self.layouts[index] = *layout;
     }
 }
 impl LayoutBlockContainer for Computation<'_> {

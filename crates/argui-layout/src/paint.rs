@@ -333,10 +333,10 @@ fn paint_enter(
             )),
         });
     }
-    if let Some(layer) = element.layer.clone() {
+    if let Some(layer) = &element.layer {
         begin_layer(
             &mut output.display_list,
-            ui.resolved_layer(node.node, element, &layer),
+            ui.resolved_layer(node.node, element, layer),
             visual_bounds,
             node.node,
         );

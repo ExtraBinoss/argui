@@ -282,7 +282,7 @@ fn raw_elements_can_request_custom_effect_help_without_a_task_service() {
     hovered(&host, "leaf", PointerPhase::Entered);
     let root = host.render();
     assert_eq!(tooltips(&root)[0].paint, paint);
-    assert_eq!(tooltips(&root)[0].layer.as_ref(), Some(&layer));
+    assert_eq!(tooltips(&root)[0].layer.as_deref(), Some(&layer));
     assert_eq!(root.children[0].semantic_bindings.described_by.len(), 1);
     let mut ui = UiTree::new(root);
     argui_layout::LayoutEngine::new()

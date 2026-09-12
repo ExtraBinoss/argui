@@ -30,7 +30,7 @@ impl Element {
     #[must_use]
     pub fn filter(mut self, filter: Filter) -> Self {
         self.layer
-            .get_or_insert_with(|| LayerStyle::new(Rect::default()))
+            .get_or_insert_with(|| Box::new(LayerStyle::new(Rect::default())))
             .filters
             .push(filter);
         self
@@ -39,7 +39,7 @@ impl Element {
     #[must_use]
     pub fn mask(mut self, mask: argui_paint::LayerMask) -> Self {
         self.layer
-            .get_or_insert_with(|| LayerStyle::new(Rect::default()))
+            .get_or_insert_with(|| Box::new(LayerStyle::new(Rect::default())))
             .mask = mask;
         self
     }
@@ -48,7 +48,7 @@ impl Element {
     #[must_use]
     pub fn opacity(mut self, opacity: f32) -> Self {
         self.layer
-            .get_or_insert_with(|| LayerStyle::new(Rect::default()))
+            .get_or_insert_with(|| Box::new(LayerStyle::new(Rect::default())))
             .opacity = if opacity.is_finite() {
             opacity.clamp(0.0, 1.0)
         } else {
@@ -113,7 +113,7 @@ impl Element {
     #[must_use]
     pub fn backdrop_filter(mut self, filter: Filter) -> Self {
         self.layer
-            .get_or_insert_with(|| LayerStyle::new(Rect::default()))
+            .get_or_insert_with(|| Box::new(LayerStyle::new(Rect::default())))
             .backdrop_filters
             .push(filter);
         self

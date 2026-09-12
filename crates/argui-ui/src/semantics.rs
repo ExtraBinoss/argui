@@ -103,7 +103,7 @@ fn resolved_semantics(
     element: &Element,
     is_root: bool,
 ) -> Option<Semantics> {
-    if let Some(mut semantics) = element.semantics.clone() {
+    if let Some(mut semantics) = element.semantics.as_deref().cloned() {
         if matches!(element.kind, ElementKind::TextEditor { .. })
             && let Some(value) = tree.text_input_value(node)
         {
