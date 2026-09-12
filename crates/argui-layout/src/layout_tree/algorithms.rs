@@ -32,8 +32,8 @@ impl LayoutTree {
         };
         taffy::compute_root_layout(&mut computation, root, available);
         if let Some(error) = computation.error.take() {
-            for node in computation.tree.nodes.values_mut() {
-                node.cache.clear();
+            for cache in &mut computation.tree.caches {
+                cache.clear();
             }
             return Err(crate::LayoutError::Custom(error));
         }
@@ -53,8 +53,8 @@ impl Computation<'_> {
             return taffy::compute_hidden_layout(self, id);
         }
         taffy::compute_cached_layout(self, id, inputs, |tree, id, inputs| {
-            if tree.tree.nodes[&id].style.display != Display::None
-                && let Some((description, state)) = tree.tree.nodes[&id].custom.clone()
+            if tree.tree.node(id).expect("live layout node").style.display != Display::None
+                && let Some((description, state)) = tree.tree.custom.get(&id).cloned()
             {
                 return match tree.custom_layout(id, inputs, &description, &state) {
                     Ok(output) => output,
@@ -64,7 +64,7 @@ impl Computation<'_> {
                     }
                 };
             }
-            let node = &tree.tree.nodes[&id];
+            let node = tree.tree.node(id).expect("live layout node");
             match (node.style.display, node.children.is_empty()) {
                 (Display::None, _) => taffy::compute_hidden_layout(tree, id),
                 (Display::Block, false) => taffy::compute_block_layout(tree, id, inputs, block),
@@ -72,7 +72,7 @@ impl Computation<'_> {
                 (Display::Flex, false) => taffy::compute_flexbox_layout(tree, id, inputs),
                 (Display::Grid, false) => taffy::compute_grid_layout(tree, id, inputs),
                 (_, true) => {
-                    let node = tree.tree.nodes.get_mut(&id).expect("live layout node");
+                    let node = tree.tree.node_mut(id).expect("live layout node");
                     (tree.measure)(inputs, id, node.context.as_mut(), &node.style)
                 }
             }
@@ -86,13 +86,18 @@ impl TraversePartialTree for Computation<'_> {
     where
         Self: 'a;
     fn child_ids(&self, id: NodeId) -> Self::ChildIter<'_> {
-        self.tree.nodes[&id].children.iter().copied()
+        self.tree
+            .node(id)
+            .expect("live layout node")
+            .children
+            .iter()
+            .copied()
     }
     fn child_count(&self, id: NodeId) -> usize {
-        self.tree.nodes[&id].children.len()
+        self.tree.node(id).expect("live layout node").children.len()
     }
     fn get_child_id(&self, id: NodeId, index: usize) -> NodeId {
-        self.tree.nodes[&id].children[index]
+        self.tree.node(id).expect("live layout node").children[index]
     }
 }
 impl TraverseTree for Computation<'_> {}
@@ -103,14 +108,11 @@ impl LayoutPartialTree for Computation<'_> {
         Self: 'a;
     type CustomIdent = String;
     fn get_core_container_style(&self, id: NodeId) -> &Style {
-        &self.tree.nodes[&id].style
+        &self.tree.node(id).expect("live layout node").style
     }
     fn set_unrounded_layout(&mut self, id: NodeId, layout: &Layout) {
-        self.tree
-            .nodes
-            .get_mut(&id)
-            .expect("live layout node")
-            .unrounded = *layout;
+        let index = self.tree.index(id).expect("live layout node");
+        self.tree.unrounded[index] = *layout;
     }
     fn compute_child_layout(&mut self, id: NodeId, inputs: LayoutInput) -> LayoutOutput {
         self.compute(id, inputs, None)
@@ -118,40 +120,25 @@ impl LayoutPartialTree for Computation<'_> {
 }
 impl CacheTree for Computation<'_> {
     fn cache_get(&mut self, id: NodeId, input: &LayoutInput) -> Option<LayoutOutput> {
-        self.tree
-            .nodes
-            .get_mut(&id)
-            .expect("live layout node")
-            .cache
-            .get(input)
+        let index = self.tree.index(id).expect("live layout node");
+        self.tree.caches[index].get(input)
     }
     fn cache_store(&mut self, id: NodeId, input: &LayoutInput, output: LayoutOutput) {
-        self.tree
-            .nodes
-            .get_mut(&id)
-            .expect("live layout node")
-            .cache
-            .store(input, output);
+        let index = self.tree.index(id).expect("live layout node");
+        self.tree.caches[index].store(input, output);
     }
     fn cache_clear(&mut self, id: NodeId) {
-        self.tree
-            .nodes
-            .get_mut(&id)
-            .expect("live layout node")
-            .cache
-            .clear();
+        let index = self.tree.index(id).expect("live layout node");
+        self.tree.caches[index].clear();
     }
 }
 impl RoundTree for Computation<'_> {
     fn get_unrounded_layout(&self, id: NodeId) -> Layout {
-        self.tree.nodes[&id].unrounded
+        self.tree.unrounded[self.tree.index(id).expect("live layout node")]
     }
     fn set_final_layout(&mut self, id: NodeId, layout: &Layout) {
-        self.tree
-            .nodes
-            .get_mut(&id)
-            .expect("live layout node")
-            .layout = *layout;
+        let index = self.tree.index(id).expect("live layout node");
+        self.tree.layouts[index] = *layout;
     }
 }
 impl LayoutBlockContainer for Computation<'_> {
@@ -164,10 +151,10 @@ impl LayoutBlockContainer for Computation<'_> {
     where
         Self: 'a;
     fn get_block_container_style(&self, id: NodeId) -> &Style {
-        &self.tree.nodes[&id].style
+        &self.tree.node(id).expect("live layout node").style
     }
     fn get_block_child_style(&self, id: NodeId) -> &Style {
-        &self.tree.nodes[&id].style
+        &self.tree.node(id).expect("live layout node").style
     }
     fn compute_block_child_layout(
         &mut self,
@@ -188,10 +175,10 @@ impl LayoutFlexboxContainer for Computation<'_> {
     where
         Self: 'a;
     fn get_flexbox_container_style(&self, id: NodeId) -> &Style {
-        &self.tree.nodes[&id].style
+        &self.tree.node(id).expect("live layout node").style
     }
     fn get_flexbox_child_style(&self, id: NodeId) -> &Style {
-        &self.tree.nodes[&id].style
+        &self.tree.node(id).expect("live layout node").style
     }
 }
 impl LayoutGridContainer for Computation<'_> {
@@ -204,9 +191,9 @@ impl LayoutGridContainer for Computation<'_> {
     where
         Self: 'a;
     fn get_grid_container_style(&self, id: NodeId) -> &Style {
-        &self.tree.nodes[&id].style
+        &self.tree.node(id).expect("live layout node").style
     }
     fn get_grid_child_style(&self, id: NodeId) -> &Style {
-        &self.tree.nodes[&id].style
+        &self.tree.node(id).expect("live layout node").style
     }
 }

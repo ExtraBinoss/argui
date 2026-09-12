@@ -55,11 +55,11 @@ fn native_surface_grows_its_atlas_recovers_from_capacity_and_uses_custom_effects
         .build()
         .unwrap();
     let mut app = TestApp(None, false);
-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+    let deadline = web_time::Instant::now() + std::time::Duration::from_secs(3);
     while !app.1 {
         event_loop.pump_app_events(Some(std::time::Duration::from_millis(16)), &mut app);
         assert!(
-            std::time::Instant::now() < deadline,
+            web_time::Instant::now() < deadline,
             "window was not configured"
         );
     }
@@ -166,7 +166,7 @@ fn render(
     pump: &mut impl FnMut(),
 ) -> Result<(), RendererError> {
     let mut text = TextEngine::from_embedded_fonts([], "sans-serif", "serif", "monospace");
-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+    let deadline = web_time::Instant::now() + std::time::Duration::from_secs(3);
     loop {
         // A Wayland surface needs configure/frame callbacks between submissions.
         window.request_redraw();
@@ -180,7 +180,7 @@ fn render(
         }
         assert_eq!(status, RenderStatus::Skipped);
         assert!(
-            std::time::Instant::now() < deadline,
+            web_time::Instant::now() < deadline,
             "surface did not present within three seconds"
         );
     }

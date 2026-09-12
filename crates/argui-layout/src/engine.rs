@@ -184,6 +184,7 @@ impl LayoutEngine {
 
     fn rebuild(&mut self, ui: &UiTree) -> Result<(), LayoutError> {
         self.tree = LayoutTree::new();
+        self.tree.reserve_nodes(ui.node_ids().len());
         let mut next_index = 0;
         self.root = Some(build_node(
             &mut self.tree,
@@ -192,6 +193,7 @@ impl LayoutEngine {
             ui.root(),
             &mut next_index,
         )?);
+        self.tree.compact();
         self.rebuild_node_index();
         self.revision = Some(ui.revision());
         Ok(())
@@ -202,12 +204,14 @@ impl LayoutEngine {
         let Some(root) = self.root.take() else {
             return self.rebuild(ui);
         };
+        self.tree.reserve_nodes(ui.node_ids().len());
         self.root = Some(crate::reconcile::sync(
             &mut self.tree,
             root,
             &self.assets,
             ui,
         )?);
+        self.tree.compact();
         self.rebuild_node_index();
         self.revision = Some(ui.revision());
         Ok(())

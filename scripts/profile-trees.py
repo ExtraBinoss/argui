@@ -1,0 +1,98 @@
+#!/usr/bin/env python3
+"""Compare already-built release binaries without compilation during timing."""
+
+import argparse
+import hashlib
+import json
+import os
+import re
+import statistics
+import subprocess
+import sys
+from pathlib import Path
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("baseline", type=Path)
+    parser.add_argument("candidate", type=Path)
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--runs", type=int, default=7)
+    parser.add_argument("--cpu", type=int, default=0)
+    parser.add_argument("--gallery", action="store_true", help="also run the gallery's scrolling test binary")
+    parser.add_argument("--gallery-runs", type=int, default=3)
+    args = parser.parse_args()
+    if args.runs < 3 or args.gallery_runs < 3:
+        parser.error("use at least three runs")
+    directories = {"before": args.baseline, "after": args.candidate}
+    cases = [
+        ("tree_profile", ["1000", "100"]),
+        ("tree_profile", ["10000", "100"]),
+        ("tree_profile", ["10000", "10"]),
+        ("layout_profile", ["1000"]),
+        ("layout_profile", ["10000"]),
+    ]
+    if args.gallery:
+        cases.append(("gallery-pages", ["--ignored", "--exact", "data::profile_virtual_scrolling", "--nocapture", "--test-threads=1"]))
+    results = []
+    for binary, workload in cases:
+        runs = args.gallery_runs if binary == "gallery-pages" else args.runs
+        samples = {label: [] for label in directories}
+        # One unrecorded warm-up, then alternating order to limit thermal/order bias.
+        for run in range(runs + 1):
+            labels = list(directories)
+            if run % 2:
+                labels.reverse()
+            for label in labels:
+                print(f"{binary} {workload}: {label} {run}/{runs}", file=sys.stderr, flush=True)
+                command = [
+                    "taskset", "-c", str(args.cpu),
+                    str((directories[label] / binary).resolve()), *workload,
+                ]
+                if binary == "gallery-pages":
+                    measured = subprocess.run(
+                        ["/usr/bin/time", "-f", "RESOURCE %U %M", *command],
+                        env={**os.environ, "ARGUI_PROFILE_FRAMES": "6000"},
+                        capture_output=True, text=True, check=True,
+                    )
+                    value = {}
+                    for page, opened, elapsed, layouts, nodes in re.findall(
+                        r"([\w-]+): open=([\d.]+)ms, 6000 scroll frames=([\d.]+)ms, layouts=(\d+), nodes=(\d+)",
+                        measured.stderr,
+                    ):
+                        value.update({f"{page}_open_ms": float(opened), f"{page}_scroll_ms": float(elapsed), f"{page}_layouts": int(layouts), f"{page}_nodes": int(nodes)})
+                    assert len(value) == 12, measured.stderr
+                    user, rss = re.search(r"RESOURCE ([\d.]+) (\d+)", measured.stderr).groups()
+                    value.update(user_s=float(user), rss_kib=int(rss))
+                else:
+                    value = json.loads(subprocess.check_output(command, text=True))
+                if run:
+                    samples[label].append(value)
+        medians = {
+            label: {key: statistics.median(row[key] for row in rows) for key in rows[0]}
+            for label, rows in samples.items()
+        }
+        result = {"binary": binary, "args": workload, "runs": runs, "medians": medians, "samples": samples}
+        results.append(result)
+        print(json.dumps({key: value for key, value in result.items() if key != "samples"}), flush=True)
+    heap = {}
+    for label, directory in directories.items():
+        heap[label] = {}
+        for name in ("tree", "layout", "churn"):
+            profile = directory / f"{name}-heap.json"
+            if profile.exists():
+                points = json.loads(profile.read_text())["pps"]
+                heap[label][name] = {
+                    key: sum(point[key] for point in points)
+                    for key in ("tb", "tbk", "gb", "eb", "ebk", "rb", "wb")
+                }
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    hashes = {
+        label: {binary: hashlib.sha256((directory / binary).read_bytes()).hexdigest() for binary in {case[0] for case in cases}}
+        for label, directory in directories.items()
+    }
+    args.output.write_text(json.dumps({"cpu": args.cpu, "runs": args.runs, "binary_sha256": hashes, "cases": results, "dhat": heap}, indent=2) + "\n")
+
+
+if __name__ == "__main__":
+    main()

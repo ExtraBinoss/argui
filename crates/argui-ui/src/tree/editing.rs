@@ -2,7 +2,7 @@ use crate::{HistoryConfig, InteractionUpdate, NodeId, UiTree};
 
 impl UiTree {
     pub(crate) fn input_available(&self, node: NodeId) -> bool {
-        let Some(mut index) = self.node_ids.iter().position(|id| *id == node) else {
+        let Some(mut index) = self.index.position(node) else {
             return false;
         };
         loop {
@@ -20,7 +20,7 @@ impl UiTree {
             {
                 return false;
             }
-            let Some(parent) = self.events.parent(index) else {
+            let Some(parent) = self.index.parent(index) else {
                 return true;
             };
             index = parent;

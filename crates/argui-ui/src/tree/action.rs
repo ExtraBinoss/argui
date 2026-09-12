@@ -6,11 +6,7 @@ use crate::{
 impl UiTree {
     fn action_ancestry(&self, origin: Option<NodeId>) -> Result<Vec<usize>, ActionError> {
         let node = origin.or(self.focused_node()).unwrap_or(self.node_ids[0]);
-        let Some(mut index) = self
-            .node_ids
-            .iter()
-            .position(|candidate| *candidate == node)
-        else {
+        let Some(mut index) = self.index.position(node) else {
             return Err(ActionError::StaleOrigin);
         };
         let modal = self.active_modal_scope();
@@ -34,7 +30,7 @@ impl UiTree {
             if Some(self.node_ids[index]) == modal {
                 break;
             }
-            let Some(parent) = self.events.parent(index) else {
+            let Some(parent) = self.index.parent(index) else {
                 break;
             };
             index = parent;
@@ -130,7 +126,7 @@ impl UiTree {
     pub(super) fn default_action(&self, base: &UiEvent) -> Option<UiEvent> {
         let invocation = match &base.kind {
             UiEventKind::Click(_) => {
-                let mut index = self.node_ids.iter().position(|node| *node == base.target)?;
+                let mut index = self.index.position(base.target)?;
                 loop {
                     if let Some(invocation) = self.element_at(index)?.action {
                         break ActionInvocation {
@@ -138,7 +134,7 @@ impl UiTree {
                             ..invocation
                         };
                     }
-                    index = self.events.parent(index)?;
+                    index = self.index.parent(index)?;
                 }
             }
             UiEventKind::KeyInput(input) => {

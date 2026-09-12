@@ -77,7 +77,7 @@ impl UiTree {
         let node_ids = identity::initial_ids(&root, &mut next_node_id);
         let animations = AnimationRegistry::new(&root);
         let focus = FocusRegistry::new(&root, &node_ids);
-        let events = EventRegistry::new(&root);
+        let events = EventRegistry::default();
         let mut tree = Self {
             desktop_backdrop_state: crate::DesktopBackdropState::default(),
             index: index::TreeIndex::new(&root, &node_ids),
@@ -202,7 +202,7 @@ impl UiTree {
                 );
             }
         }
-        self.events.sync(&self.root, &self.node_ids);
+        self.events.sync(&self.index);
         if update == TreeUpdate::Layout {
             self.sync_responsive_registry();
         }
@@ -244,11 +244,8 @@ impl UiTree {
 
     #[must_use]
     pub fn parent_of(&self, node: NodeId) -> Option<NodeId> {
-        let index = self
-            .node_ids
-            .iter()
-            .position(|candidate| *candidate == node)?;
-        self.events
+        let index = self.index.position(node)?;
+        self.index
             .parent(index)
             .and_then(|parent| self.node_ids.get(parent).copied())
     }

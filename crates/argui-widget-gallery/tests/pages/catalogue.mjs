@@ -73,7 +73,12 @@ try {
             await capture(`${scheme}-${width}-otp-complete`);
             await navigate('Combobox');
             await click('[role="combobox"]'); await page.keyboard.type('sv'); await pause();
+            await page.waitForSelector('[role="option"][aria-label="Svelte"]');
             await page.keyboard.press('ArrowDown'); await page.keyboard.press('Enter'); await pause();
+            await page.waitForFunction(() => {
+                const input = document.querySelector('[role="combobox"]');
+                return (input?.value ?? input?.getAttribute('aria-valuetext')) === 'Svelte';
+            });
             assert.equal(await value('[role="combobox"]'), 'Svelte');
             assert.equal(await state('[role="combobox"]', 'aria-expanded'), 'false');
             await navigate('Native select');

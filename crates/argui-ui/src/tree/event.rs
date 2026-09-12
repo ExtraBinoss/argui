@@ -1,8 +1,6 @@
 use std::{cell::Cell, collections::HashMap, rc::Rc};
 
-use crate::{
-    Element, EventHandlerId, EventListener, EventPhase, EventType, NodeId, UiEvent, UiEventKind,
-};
+use crate::{EventHandlerId, EventListener, EventPhase, EventType, NodeId, UiEvent, UiEventKind};
 
 use super::UiTree;
 
@@ -14,35 +12,19 @@ struct ConsumedListener {
 
 #[derive(Clone, Debug, Default)]
 pub(super) struct EventRegistry {
-    parents: Vec<Option<usize>>,
     once: HashMap<ConsumedListener, Rc<Cell<bool>>>,
 }
 
 impl EventRegistry {
-    pub(super) fn new(root: &Element) -> Self {
-        let mut registry = Self::default();
-        collect_parents(root, None, &mut registry.parents);
-        registry
-    }
-
-    pub(super) fn sync(&mut self, root: &Element, ids: &[NodeId]) {
-        self.parents.clear();
-        collect_parents(root, None, &mut self.parents);
+    pub(super) fn sync(&mut self, index: &super::index::TreeIndex) {
         self.once.retain(|consumed, _| {
-            let Some(index) = ids.iter().position(|node| *node == consumed.node) else {
-                return false;
-            };
-            element_at(root, index).is_some_and(|element| {
+            index.element(consumed.node).is_some_and(|element| {
                 element
                     .event_listeners
                     .iter()
                     .any(|listener| listener.handler == consumed.handler && listener.options.once)
             })
         });
-    }
-
-    pub(super) fn parent(&self, index: usize) -> Option<usize> {
-        self.parents.get(index).copied().flatten()
     }
 
     fn once_state(&mut self, node: NodeId, listener: EventListener) -> Option<Rc<Cell<bool>>> {
@@ -64,7 +46,7 @@ impl EventRegistry {
 
 impl UiTree {
     pub fn event_deliveries(&mut self, target: NodeId, kind: UiEventKind) -> Vec<UiEvent> {
-        let Some(target_index) = self.node_ids.iter().position(|node| *node == target) else {
+        let Some(target_index) = self.index.position(target) else {
             return Vec::new();
         };
         if matches!(kind, UiEventKind::Click(_)) && !self.input_available(target) {
@@ -85,10 +67,10 @@ impl UiTree {
                 .map(|state| (state.can_undo(), state.can_redo())),
         );
         let mut ancestry = Vec::new();
-        let mut cursor = self.events.parent(target_index);
+        let mut cursor = self.index.parent(target_index);
         while let Some(index) = cursor {
             ancestry.push(index);
-            cursor = self.events.parent(index);
+            cursor = self.index.parent(index);
         }
         ancestry.reverse();
 
@@ -190,28 +172,4 @@ impl UiTree {
             once,
         )
     }
-}
-
-fn collect_parents(element: &Element, parent: Option<usize>, output: &mut Vec<Option<usize>>) {
-    let index = output.len();
-    output.push(parent);
-    for child in &element.children {
-        collect_parents(child, Some(index), output);
-    }
-}
-
-fn element_at(root: &Element, target: usize) -> Option<&Element> {
-    fn visit<'a>(element: &'a Element, target: usize, index: &mut usize) -> Option<&'a Element> {
-        if *index == target {
-            return Some(element);
-        }
-        *index += 1;
-        for child in &element.children {
-            if let Some(found) = visit(child, target, index) {
-                return Some(found);
-            }
-        }
-        None
-    }
-    visit(root, target, &mut 0)
 }

@@ -8,24 +8,31 @@ mod algorithms;
 
 #[derive(Debug)]
 struct Node {
-    custom: Option<(
-        argui_ui::CustomDescription,
-        std::rc::Rc<argui_ui::CustomState>,
-    )>,
     style: Style,
     context: Option<usize>,
     children: Vec<NodeId>,
     parent: Option<NodeId>,
-    cache: Cache,
-    unrounded: Layout,
-    layout: Layout,
 }
 
 /// Argui owns retained graph storage; Taffy's low-level algorithms own CSS layout.
-/// This boundary permits custom containers to recurse through the same algorithms.
+/// Geometry and measurement caches are dense columns, separate from cold node
+/// metadata. Swap removal keeps storage proportional to the live graph; stable
+/// Taffy IDs go through a small map and never alias a subsequently created node.
 #[derive(Debug, Default)]
 pub(crate) struct LayoutTree {
-    nodes: HashMap<NodeId, Node>,
+    positions: HashMap<NodeId, usize>,
+    ids: Vec<NodeId>,
+    nodes: Vec<Node>,
+    caches: Vec<Cache>,
+    unrounded: Vec<Layout>,
+    layouts: Vec<Layout>,
+    custom: HashMap<
+        NodeId,
+        (
+            argui_ui::CustomDescription,
+            std::rc::Rc<argui_ui::CustomState>,
+        ),
+    >,
     next: usize,
 }
 
@@ -38,7 +45,12 @@ impl LayoutTree {
             std::rc::Rc<argui_ui::CustomState>,
         )>,
     ) -> Result<(), TaffyError> {
-        self.node_mut(id)?.custom = custom;
+        self.index(id)?;
+        if let Some(custom) = custom {
+            self.custom.insert(id, custom);
+        } else {
+            self.custom.remove(&id);
+        }
         Ok(())
     }
     pub(crate) fn len(&self) -> usize {
@@ -47,13 +59,51 @@ impl LayoutTree {
     pub(crate) fn new() -> Self {
         Self::default()
     }
+    // Allocate once for the known tree size; large payloads do not pay for
+    // empty hash buckets. The small ID-to-position map preserves stable IDs.
+    pub(crate) fn reserve_nodes(&mut self, total: usize) {
+        let total = if !self.nodes.is_empty() && total > self.nodes.capacity() {
+            total.saturating_add(total / 4)
+        } else {
+            total
+        };
+        let additional = total.saturating_sub(self.len());
+        self.positions.reserve(additional);
+        self.ids.reserve_exact(additional);
+        self.nodes.reserve_exact(additional);
+        self.caches.reserve_exact(additional);
+        self.unrounded.reserve_exact(additional);
+        self.layouts.reserve_exact(additional);
+    }
+    pub(crate) fn compact(&mut self) {
+        // Reconciliation may temporarily hold removed and newly mounted nodes.
+        // Bound retained slack after it finishes, keeping modest growth room.
+        if self.nodes.capacity() > self.len() + self.len() / 4 {
+            self.ids.shrink_to_fit();
+            self.nodes.shrink_to_fit();
+            self.caches.shrink_to_fit();
+            self.unrounded.shrink_to_fit();
+            self.layouts.shrink_to_fit();
+        }
+        if self.positions.capacity() > self.len().saturating_mul(2) {
+            self.positions.shrink_to_fit();
+        }
+        if self.custom.capacity() > self.custom.len().saturating_mul(2) {
+            self.custom.shrink_to_fit();
+        }
+    }
+    fn index(&self, id: NodeId) -> Result<usize, TaffyError> {
+        self.positions
+            .get(&id)
+            .copied()
+            .ok_or(TaffyError::InvalidInputNode(id))
+    }
     fn node(&self, id: NodeId) -> Result<&Node, TaffyError> {
-        self.nodes.get(&id).ok_or(TaffyError::InvalidInputNode(id))
+        Ok(&self.nodes[self.index(id)?])
     }
     fn node_mut(&mut self, id: NodeId) -> Result<&mut Node, TaffyError> {
-        self.nodes
-            .get_mut(&id)
-            .ok_or(TaffyError::InvalidInputNode(id))
+        let index = self.index(id)?;
+        Ok(&mut self.nodes[index])
     }
     pub(crate) fn new_leaf(&mut self, style: Style) -> Result<NodeId, TaffyError> {
         let id = NodeId::from(self.next);
@@ -61,19 +111,17 @@ impl LayoutTree {
             .next
             .checked_add(1)
             .expect("layout node identities exhausted");
-        self.nodes.insert(
-            id,
-            Node {
-                custom: None,
-                style,
-                context: None,
-                children: Vec::new(),
-                parent: None,
-                cache: Cache::new(),
-                unrounded: Layout::default(),
-                layout: Layout::default(),
-            },
-        );
+        self.positions.insert(id, self.nodes.len());
+        self.ids.push(id);
+        self.nodes.push(Node {
+            style,
+            context: None,
+            children: Vec::new(),
+            parent: None,
+        });
+        self.caches.push(Cache::new());
+        self.unrounded.push(Layout::default());
+        self.layouts.push(Layout::default());
         Ok(id)
     }
     pub(crate) fn new_leaf_with_context(
@@ -101,7 +149,7 @@ impl LayoutTree {
         Ok(&self.node(id)?.style)
     }
     pub(crate) fn layout(&self, id: NodeId) -> Result<&Layout, TaffyError> {
-        Ok(&self.node(id)?.layout)
+        Ok(&self.layouts[self.index(id)?])
     }
     pub(crate) fn set_style(&mut self, id: NodeId, style: Style) -> Result<(), TaffyError> {
         if self.node(id)?.style != style {
@@ -151,10 +199,17 @@ impl LayoutTree {
         self.mark_dirty(id)
     }
     pub(crate) fn remove(&mut self, id: NodeId) -> Result<(), TaffyError> {
-        let node = self
-            .nodes
-            .remove(&id)
-            .ok_or(TaffyError::InvalidInputNode(id))?;
+        let index = self.index(id)?;
+        self.positions.remove(&id);
+        self.custom.remove(&id);
+        self.ids.swap_remove(index);
+        let node = self.nodes.swap_remove(index);
+        self.caches.swap_remove(index);
+        self.unrounded.swap_remove(index);
+        self.layouts.swap_remove(index);
+        if let Some(moved) = self.ids.get(index) {
+            self.positions.insert(*moved, index);
+        }
         if let Some(parent) = node.parent {
             self.node_mut(parent)?.children.retain(|child| *child != id);
             self.mark_dirty(parent)?;
@@ -167,9 +222,9 @@ impl LayoutTree {
     pub(crate) fn mark_dirty(&mut self, id: NodeId) -> Result<(), TaffyError> {
         let mut current = Some(id);
         while let Some(id) = current {
-            let node = self.node_mut(id)?;
-            node.cache.clear();
-            current = node.parent;
+            let index = self.index(id)?;
+            self.caches[index].clear();
+            current = self.nodes[index].parent;
         }
         Ok(())
     }

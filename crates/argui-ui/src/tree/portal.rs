@@ -6,7 +6,7 @@ impl UiTree {
     /// The requested policy is independent of whether the current host supports native popups.
     #[must_use]
     pub fn portal_surface_preference(&self, node: NodeId) -> OverlaySurface {
-        let mut cursor = self.node_ids.iter().position(|id| *id == node);
+        let mut cursor = self.index.position(node);
         while let Some(index) = cursor {
             if let Some(surface) = self
                 .element_at(index)
@@ -15,7 +15,7 @@ impl UiTree {
             {
                 return surface;
             }
-            cursor = self.events.parent(index);
+            cursor = self.index.parent(index);
         }
         OverlaySurface::InWindow
     }
@@ -57,13 +57,13 @@ impl UiTree {
     /// The physical surface containing this element; None is the application's window.
     #[must_use]
     pub fn native_portal_owner(&self, node: NodeId) -> Option<NodeId> {
-        let mut cursor = self.node_ids.iter().position(|id| *id == node);
+        let mut cursor = self.index.position(node);
         while let Some(index) = cursor {
             let node = self.node_ids[index];
             if self.native_portals.contains_key(&node) {
                 return Some(node);
             }
-            cursor = self.events.parent(index);
+            cursor = self.index.parent(index);
         }
         None
     }

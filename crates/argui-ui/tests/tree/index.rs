@@ -48,3 +48,56 @@ fn index_refreshes_for_paint_only_changes_and_explicit_selection_overrides() {
         root(argui_core::Color::BLACK).children[0].paint
     );
 }
+
+#[test]
+fn compact_parents_and_selection_owners_follow_nested_scopes_and_stale_ids() {
+    use argui_core::Color;
+    use argui_ui::{FocusTarget, WritingDirection};
+    let outer = TextSelectionStyle {
+        background: Color::BLACK,
+        handle: Color::WHITE,
+    };
+    let inner = TextSelectionStyle {
+        background: Color::WHITE,
+        handle: Color::BLACK,
+    };
+    let branch = |name: &str, style| {
+        Element::column([Element::text(name).keyed(format!("{name}-leaf"))])
+            .keyed(name)
+            .selection_style(style)
+    };
+    let mut tree = UiTree::new(
+        Element::column([branch("a", inner), branch("b", outer)])
+            .selection_style(outer)
+            .user_select(UserSelect::None)
+            .direction_scope(WritingDirection::Rtl),
+    );
+    let root = tree.node_ids()[0];
+    let a = tree.node_ids()[1];
+    let leaf = tree.node_ids()[2];
+    let b = tree.node_ids()[3];
+    assert_eq!(tree.parent_of(root), None);
+    assert_eq!(tree.parent_of(leaf), Some(a));
+    assert_eq!(tree.resolved_selection_style(leaf), inner);
+    assert_eq!(tree.resolved_user_select(leaf), UserSelect::None);
+    let mut reordered = tree.root().clone();
+    reordered.children.swap(0, 1);
+    reordered.children[1].selection_style = None;
+    reordered.children[1].user_select = UserSelect::All;
+    tree.update(reordered);
+    assert_eq!(tree.parent_of(leaf), Some(a));
+    assert_eq!(tree.parent_of(b), Some(root));
+    assert_eq!(tree.resolved_selection_style(leaf), outer);
+    assert_eq!(tree.resolved_user_select(leaf), UserSelect::All);
+    // Drop an interior subtree, then mount a fresh one at the same dense slots.
+    tree.update(Element::column([branch("b", inner), branch("c", outer)]));
+    assert_eq!(tree.parent_of(a), None);
+    assert_eq!(tree.parent_of(leaf), None);
+    assert!(tree.element_for(leaf).is_none());
+    let c = tree
+        .resolve_node(&FocusTarget::Key("c-leaf".into()))
+        .unwrap();
+    assert_ne!(c, leaf);
+    assert_eq!(tree.resolved_selection_style(c), outer);
+    assert_eq!(tree.resolved_user_select(c), UserSelect::Text);
+}

@@ -15,6 +15,7 @@ taffy.workspace = true
 [dev-dependencies]
 argui-animation.workspace = true
 argui-widgets = { workspace = true, features = ["all"] }
+web-time.workspace = true
 
 [lints]
 workspace = true

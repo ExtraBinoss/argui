@@ -95,7 +95,7 @@ impl UiTree {
     }
 
     fn light_dismiss_outside(&self, hit: Option<NodeId>) -> Option<NodeId> {
-        let hit_index = hit.and_then(|node| self.node_ids.iter().position(|id| *id == node));
+        let hit_index = hit.and_then(|node| self.index.position(node));
         crate::traversal::flattened(self.root())
             .into_iter()
             .enumerate()
@@ -132,7 +132,7 @@ impl UiTree {
             if node == ancestor {
                 return true;
             }
-            let Some(parent) = self.events.parent(node) else {
+            let Some(parent) = self.index.parent(node) else {
                 return false;
             };
             node = parent;

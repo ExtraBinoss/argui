@@ -44,7 +44,7 @@ impl Computation<'_> {
         description: &CustomDescription,
         state: &CustomState,
     ) -> Result<LayoutOutput, String> {
-        let style = self.tree.nodes[&id].style.clone();
+        let style = self.tree.node(id).expect("live layout node").style.clone();
         let padding = style
             .padding
             .resolve_or_zero(inputs.parent_size.width, |_, _| 0.0);
@@ -80,7 +80,7 @@ impl Computation<'_> {
             width: subtract(inputs.known_dimensions.width, inset.left + inset.right),
             height: subtract(inputs.known_dimensions.height, inset.top + inset.bottom),
         };
-        let count = self.tree.nodes[&id].children.len();
+        let count = self.tree.node(id).expect("live layout node").children.len();
         let mut context = Children {
             computation: self,
             parent: id,
@@ -146,7 +146,10 @@ impl Children<'_, '_> {
         Ok(measured)
     }
     fn child(&self, index: usize) -> Result<NodeId, String> {
-        self.computation.tree.nodes[&self.parent]
+        self.computation
+            .tree
+            .node(self.parent)
+            .expect("live layout node")
             .children
             .get(index)
             .copied()
@@ -236,14 +239,9 @@ impl CustomLayoutContext for Children<'_, '_> {
             return Err(error.clone());
         }
         if self.inputs.run_mode == RunMode::PerformLayout {
-            let node = self
-                .computation
-                .tree
-                .nodes
-                .get_mut(&id)
-                .expect("live layout child");
-            let style = &node.style;
-            node.unrounded = Layout {
+            let slot = self.computation.tree.index(id).expect("live layout child");
+            let style = &self.computation.tree.nodes[slot].style;
+            self.computation.tree.unrounded[slot] = Layout {
                 order: index as u32,
                 location: taffy::geometry::Point {
                     x: self.origin.x + bounds.origin.x,
@@ -274,7 +272,12 @@ impl CustomLayoutContext for Children<'_, '_> {
                 },
             };
         }
-        let child_style = &self.computation.tree.nodes[&id].style;
+        let child_style = &self
+            .computation
+            .tree
+            .node(id)
+            .expect("live layout node")
+            .style;
         let clipped = child_style.overflow.x.is_scroll_container()
             || child_style.overflow.y.is_scroll_container()
             || child_style.contain.contains_scrollable_overflow();

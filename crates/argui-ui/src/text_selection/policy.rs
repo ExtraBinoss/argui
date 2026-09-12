@@ -7,14 +7,12 @@ use super::{DocumentTextPoint, SelectionGranularity};
 impl UiTree {
     #[must_use]
     pub fn resolved_user_select(&self, node: NodeId) -> UserSelect {
-        self.selection_context(node)
-            .map_or(UserSelect::None, |value| value.0)
+        self.index.user_select(node)
     }
 
     #[must_use]
     pub fn resolved_selection_style(&self, node: NodeId) -> TextSelectionStyle {
-        self.selection_context(node)
-            .map_or_else(TextSelectionStyle::default, |value| value.1)
+        self.index.selection_style(node)
     }
 
     pub(super) fn expanded_point(
@@ -95,10 +93,6 @@ impl UiTree {
                 TextPosition::new(last.text.len(), CaretAffinity::After),
             )
         }
-    }
-
-    fn selection_context(&self, target: NodeId) -> Option<(UserSelect, TextSelectionStyle)> {
-        self.index.selection(target)
     }
 
     pub(super) fn selectable_text_entries(&self) -> Vec<TextEntry<'_>> {
