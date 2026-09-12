@@ -218,7 +218,7 @@ fn self_theme_input(theme: &WidgetTheme) -> PaintStyle {
 
 fn label_style(color: argui_core::Color) -> TextStyle {
     TextStyle {
-        font_size: 14.0,
+        font_size: 15.0,
         line_height: 20.0,
         color,
         wrap: TextWrap::None,

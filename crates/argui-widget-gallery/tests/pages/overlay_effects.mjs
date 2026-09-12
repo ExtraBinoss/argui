@@ -38,6 +38,37 @@ try {
     const expanded = selector => page.$eval(selector, element => element.getAttribute('aria-expanded'));
     for (const scheme of ['light', 'dark']) {
         await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: scheme }]);
+        const item = label => `[role="menuitem"][aria-label="${label}"]`;
+        for (const name of ['Menu', 'Context menu', 'Menubar']) {
+            await navigate(name);
+            const trigger = name === 'Menubar' ? item('View') : '[aria-label="Note actions"][aria-haspopup="menu"]';
+            await page.mouse.click(...await point(trigger), { button: name === 'Context menu' ? 'right' : 'left' });
+            await pause();
+            await click(item('Layout'));
+            await page.waitForSelector('[role="menuitemradio"][aria-label="Compact"]');
+            await capture(`${scheme}-${name.toLowerCase()}-nested`);
+            await page.mouse.click(1100, 820); await pause();
+            assert.equal(await page.$$eval('[role="menu"]', elements => elements.length), 0);
+        }
+        await navigate('Select');
+        await click(button('Choose a backend'));
+        await page.waitForSelector('[role="listbox"]');
+        await capture(`${scheme}-select`);
+        await page.keyboard.press('Escape'); await pause(350);
+        await navigate('Date picker');
+        await click(button('Choose a date'));
+        await capture(`${scheme}-date-picker`);
+        await page.keyboard.press('Escape'); await pause();
+        await navigate('Toast');
+        await click(button('Show notification'));
+        await page.waitForSelector(button('Close'));
+        await capture(`${scheme}-toast`);
+        await click(button('Close'));
+        await navigate('Dialog');
+        await click(button('Open dialog'));
+        await page.waitForSelector(button('Close dialog'));
+        await capture(`${scheme}-dialog`);
+        await click(button('Close dialog'));
         await navigate('Popover');
         const labels = await page.$$eval('button', elements => elements.filter(el => el.getBoundingClientRect().x === 16).map(el => el.getAttribute('aria-label')));
         const boundary = labels.indexOf('Actions');
@@ -100,7 +131,7 @@ try {
         await capture(`${scheme}-tooltip-keyboard`);
         await page.keyboard.press('Escape'); await pause();
         assert.equal(await tips(), 0);
-        console.log(`${scheme}: alphabetical sidebar, three effect surfaces, popover actions/dismissal, tooltip hover/focus/Escape passed`);
+        console.log(`${scheme}: menus/submenus, select, date picker, toast, dialog, three effect surfaces and tooltip interactions passed`);
     }
     assert.deepEqual(errors, []);
     console.log(JSON.stringify({ screenshots: output, errors }));

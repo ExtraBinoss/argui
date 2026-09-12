@@ -9,12 +9,14 @@ fn floating_surfaces_use_scheme_specific_contrast_without_luminous_shadows() {
     let light = themes.resolve(ColorScheme::Light);
     let dark = themes.resolve(ColorScheme::Dark);
     assert_eq!(light.popover, Color::WHITE);
-    assert_eq!(light.popover_border, Color::BLACK.with_alpha(0.10));
+    assert_eq!(light.popover_border, Color::from_srgb8(212, 212, 216));
     assert_eq!(dark.popover, Color::from_srgb8(24, 24, 27));
     assert_ne!(dark.popover, dark.background);
-    assert_eq!(dark.popover_border, Color::WHITE.with_alpha(0.08));
+    assert_eq!(dark.popover_border, Color::from_srgb8(82, 82, 91));
     for (theme, alpha) in [(light, 0.18), (dark, 0.55)] {
         assert!(theme.foreground.contrast_ratio(theme.popover) >= 4.5);
+        assert!(theme.muted_foreground.contrast_ratio(theme.popover) >= 4.5);
+        assert!(theme.popover_border.contrast_ratio(theme.popover) >= 1.45);
         assert_eq!(
             theme.overlay_shadows[0].color,
             Color::BLACK.with_alpha(alpha)

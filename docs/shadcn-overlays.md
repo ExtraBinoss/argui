@@ -37,7 +37,7 @@ du contenu, filtres d'arrière-plan, masque, ombres et opacité. Aucun preset
 
 ```rust
 let layer = theme.overlay_layer(8.0, 0.0)
-    .backdrop(argui_effects::Blur(6.0).filter());
+    .backdrop(argui_effects::Blur(3.0).filter());
 let popover = Popover::new("settings", "Settings", open, trigger, content)
     .layer(layer)
     .build(&theme);
@@ -47,12 +47,20 @@ Pour voir le flou à travers le fond du panneau, fournir aussi une peinture
 translucide avec `.paint(...)`. Une peinture opaque le masque. `.layer(...)`
 remplace la couche entière, y compris le flou et les ombres par défaut.
 
-Le flou et la teinte sont indépendants. `Blur(6.0)` règle l'intensité du flou ;
+Le flou et la teinte sont indépendants. `Blur(3.0)` règle l'intensité du flou ;
 une valeur plus petite conserve davantage de détails derrière le panneau.
 La couleur fournie à `QuadStyle::solid(...)` règle la teinte, et son
-`.with_alpha(0.60)` règle l'opacité : `0.0` est transparent, `1.0` opaque.
-La démo utilise un flou de `6.0` et une opacité de `0.60` pour une surface légère.
+`.with_alpha(0.90)` règle l'opacité : `0.0` est transparent, `1.0` opaque.
+La démo reprend `theme.overlay_blur` (`3.0`) et une opacité de `0.90`.
+Un flou plus faible ne rend pas une surface plus lisible à lui seul : une
+opacité suffisante évite que le texte derrière concurrence celui du panneau.
 Ces réglages fonctionnent aussi bien pour Popover que pour Tooltip.
+
+Les panneaux ordinaires conservent un fond opaque, une bordure visible dans
+les deux thèmes et une ombre resserrée. Les menus, sous-menus, sélecteurs,
+dialogues, notifications et infobulles partagent `theme.popover`,
+`theme.popover_border` et `theme.overlay_shadows`. Les démos avec effets
+conservent cette bordure ; leur transparence reste une personnalisation locale.
 
 Les presets et les effets propres à l'application utilisent le même `Filter` :
 
@@ -102,4 +110,5 @@ Pour le contrôle graphique invisible, utiliser
 `crates/argui-widget-gallery/tests/pages/overlay_effects.mjs` selon la procédure
 de [linux_testing.md](linux_testing.md). Il vérifie les trois surfaces dans les
 deux thèmes, la saisie, les fermetures, le survol, les passages rapides, Échap,
-Tab et les relations d'accessibilité.
+Tab et les relations d'accessibilité. Il capture aussi les menus et sous-menus,
+les sélecteurs, le calendrier flottant, les dialogues et les notifications.

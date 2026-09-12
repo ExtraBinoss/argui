@@ -85,8 +85,8 @@ impl Tooltip {
         let content = self.open.then(|| {
             Element::column([
                 Element::text(self.description.clone()).text_style(TextStyle {
-                    font_size: 13.0,
-                    line_height: 18.0,
+                    font_size: 14.0,
+                    line_height: 20.0,
                     color: theme.foreground,
                     ..TextStyle::default()
                 }),

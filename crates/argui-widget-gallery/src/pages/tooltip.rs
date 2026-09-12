@@ -15,7 +15,7 @@ const KEYS: [&str; 3] = ["tooltip-save", "tooltip-preview", "tooltip-history"];
 const LABELS: [&str; 3] = ["Save draft", "Preview page", "View history"];
 const DESCRIPTIONS: [&str; 3] = [
     "Save a local copy of your current draft.",
-    "Preview the page before sharing it.",
+    "Preview the page before sharing.",
     "See the previous versions of this project.",
 ];
 

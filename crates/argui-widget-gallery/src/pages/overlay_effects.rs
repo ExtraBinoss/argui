@@ -59,7 +59,7 @@ impl Surface {
         let layer = theme.overlay_layer(8.0, 0.0);
         match self {
             Self::Solid => layer,
-            Self::Frosted => layer.backdrop(argui_effects::Blur(6.0).filter()),
+            Self::Frosted => layer.backdrop(argui_effects::Blur(theme.overlay_blur).filter()),
             Self::Prism => layer.backdrop(Filter::Effect(EffectInstance::new(
                 PRISM,
                 [("strength", EffectValue::F32(0.42))],
@@ -70,8 +70,7 @@ impl Surface {
     pub(crate) fn paint(self, theme: &WidgetTheme) -> PaintStyle {
         let alpha = match self {
             Self::Solid => 1.0,
-            Self::Frosted => 0.60,
-            Self::Prism => 0.68,
+            Self::Frosted | Self::Prism => 0.90,
         };
         PaintStyle::new(
             QuadStyle::solid(theme.popover.with_alpha(alpha))

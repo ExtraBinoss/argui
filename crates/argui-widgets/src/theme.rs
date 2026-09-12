@@ -74,10 +74,10 @@ fn widgets(scheme: ColorScheme, primary: Color) -> WidgetTheme {
     };
     let primary_foreground = contrasting(primary);
     let (popover, popover_border, shadow_alpha, backdrop_alpha) = match scheme {
-        ColorScheme::Light => (Color::WHITE, Color::BLACK.with_alpha(0.10), 0.18, 0.32),
+        ColorScheme::Light => (Color::WHITE, Color::from_srgb8(212, 212, 216), 0.18, 0.32),
         ColorScheme::Dark => (
             Color::from_srgb8(24, 24, 27),
-            Color::WHITE.with_alpha(0.08),
+            Color::from_srgb8(82, 82, 91),
             0.55,
             0.62,
         ),
@@ -112,14 +112,14 @@ fn widgets(scheme: ColorScheme, primary: Color) -> WidgetTheme {
         border,
         input_border: border,
         ring: primary,
-        overlay_blur: 12.0,
+        overlay_blur: 3.0,
         overlay_shadows: vec![Shadow::drop(
-            [0.0, 6.0],
-            14.0,
+            [0.0, 4.0],
+            6.0,
             Color::BLACK.with_alpha(shadow_alpha),
         )],
         dialog_backdrop: Color::BLACK.with_alpha(backdrop_alpha),
-        dialog_backdrop_blur: 4.0,
+        dialog_backdrop_blur: 2.0,
         scrollbar,
     }
 }

@@ -88,6 +88,8 @@ Pour Popover et Tooltip, utiliser
 dans `target/overlay-interactions/` montrent les versions opaques, floutées et
 avec un effet WGSL enregistré, en clair et sombre. Le scénario exerce les
 actions des panneaux, leurs fermetures et les infobulles au survol ou au clavier.
+Il capture aussi les menus et sous-menus, Select, Date picker, Dialog et Toast
+pour contrôler la lisibilité du style commun à toutes les surfaces flottantes.
 
 Ouvrir les fichiers de capture avec l'outil de lecture d'images de l'agent,
 sans visionneuse graphique sur le bureau. Vérifier texte complet, contraste,

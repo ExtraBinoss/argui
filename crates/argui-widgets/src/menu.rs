@@ -145,7 +145,7 @@ impl Menu {
             }
             let mut style = theme.ghost_button();
             style.layout.padding = argui_ui::sides(8.0, 0.0);
-            style.label.weight = 400;
+            style.label.weight = 500;
             let mut button = Button::new(self.item_key(&item.id), &item.state.label, style)
                 .enabled(item.state.enabled)
                 .leading(item::indicator(item, theme, self.icons.as_ref()));

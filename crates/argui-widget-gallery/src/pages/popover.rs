@@ -87,7 +87,7 @@ impl Render for PopoverDemo {
                 text(
                     "Choose who can read these notes.",
                     13.0,
-                    theme.muted_foreground,
+                    theme.foreground,
                     400,
                 ),
                 Switch::new(
