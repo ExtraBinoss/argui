@@ -37,7 +37,7 @@ du contenu, filtres d'arrière-plan, masque, ombres et opacité. Aucun preset
 
 ```rust
 let layer = theme.overlay_layer(8.0, 0.0)
-    .backdrop(argui_effects::Blur(14.0).filter());
+    .backdrop(argui_effects::Blur(6.0).filter());
 let popover = Popover::new("settings", "Settings", open, trigger, content)
     .layer(layer)
     .build(&theme);
@@ -46,6 +46,13 @@ let popover = Popover::new("settings", "Settings", open, trigger, content)
 Pour voir le flou à travers le fond du panneau, fournir aussi une peinture
 translucide avec `.paint(...)`. Une peinture opaque le masque. `.layer(...)`
 remplace la couche entière, y compris le flou et les ombres par défaut.
+
+Le flou et la teinte sont indépendants. `Blur(6.0)` règle l'intensité du flou ;
+une valeur plus petite conserve davantage de détails derrière le panneau.
+La couleur fournie à `QuadStyle::solid(...)` règle la teinte, et son
+`.with_alpha(0.60)` règle l'opacité : `0.0` est transparent, `1.0` opaque.
+La démo utilise un flou de `6.0` et une opacité de `0.60` pour une surface légère.
+Ces réglages fonctionnent aussi bien pour Popover que pour Tooltip.
 
 Les presets et les effets propres à l'application utilisent le même `Filter` :
 
