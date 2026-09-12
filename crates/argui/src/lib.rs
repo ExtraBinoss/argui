@@ -16,32 +16,5 @@ pub use argui_ui as ui;
 pub use argui_vector as vector;
 #[cfg(feature = "webview")]
 pub use argui_webview as webview;
-#[cfg(any(
-    feature = "widgets-all",
-    feature = "widget-list",
-    feature = "widget-table",
-    feature = "widget-data-table",
-    feature = "widget-calendar",
-    feature = "widget-date-picker",
-    feature = "widget-toast",
-    feature = "widget-button",
-    feature = "widget-menu",
-    feature = "widget-command-palette",
-    feature = "widget-input",
-    feature = "widget-checkbox",
-    feature = "widget-switch",
-    feature = "widget-radio-group",
-    feature = "widget-tabs",
-    feature = "widget-select",
-    feature = "widget-popover",
-    feature = "widget-dialog",
-    feature = "widget-range",
-    feature = "widget-slider",
-    feature = "widget-spinner",
-    feature = "widget-text-selection",
-    feature = "widget-split-pane",
-    feature = "widget-vlist",
-    feature = "widget-tree-view",
-    feature = "widget-icons"
-))]
+#[cfg(feature = "argui-widgets")]
 pub use argui_widgets as widgets;

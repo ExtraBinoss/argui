@@ -6,6 +6,28 @@ use argui_ui::{
 };
 use argui_widgets::{Popover, PopoverAction, PopoverBehavior, shadcn};
 
+#[test]
+fn popover_accepts_a_complete_effect_layer_without_overwriting_it() {
+    use argui_paint::{EffectId, EffectInstance, Filter, LayerStyle};
+    let themes = shadcn(Color::WHITE);
+    let layer = LayerStyle::new(Default::default())
+        .backdrop(Filter::Blur(8.0))
+        .filter(Filter::Effect(EffectInstance::new(
+            EffectId::new("test.popover"),
+            [("strength", argui_paint::EffectValue::F32(0.5))],
+        )));
+    let root = Popover::new(
+        "custom",
+        "Custom",
+        true,
+        Element::text("Open"),
+        Element::text("Content"),
+    )
+    .layer(layer.clone())
+    .build(themes.resolve(argui_core::ColorScheme::Dark));
+    assert_eq!(root.children[1].layer.as_ref(), Some(&layer));
+}
+
 fn event(key: Option<&str>, kind: UiEventKind) -> UiEvent {
     let tree = UiTree::new(Element::container([]));
     UiEvent::new(tree.node_ids()[0], key.map(str::to_owned), kind)

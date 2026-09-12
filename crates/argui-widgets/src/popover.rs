@@ -1,4 +1,4 @@
-use argui_paint::{Border, CornerRadii, PaintStyle, QuadStyle};
+use argui_paint::{Border, CornerRadii, LayerStyle, PaintStyle, QuadStyle};
 use argui_ui::{
     AnchorWidth, Axes, DismissPolicy, Element, FloatingPlacement, FocusScope, InitialFocus,
     Overflow, Placement, ScrollConfig, Sides, WindowLayer, length,
@@ -20,6 +20,7 @@ pub struct Popover {
     padding: f32,
     radius: f32,
     backdrop_blur: Option<f32>,
+    layer: Option<LayerStyle>,
     trap_focus: bool,
     presence: Option<crate::Presence>,
 }
@@ -47,6 +48,7 @@ impl Popover {
             padding: 12.0,
             radius: 8.0,
             backdrop_blur: None,
+            layer: None,
             trap_focus: false,
             presence: None,
         }
@@ -86,6 +88,13 @@ impl Popover {
     #[must_use]
     pub const fn backdrop_blur(mut self, radius: f32) -> Self {
         self.backdrop_blur = Some(radius);
+        self
+    }
+
+    /// Replace the panel layer, including its filters, backdrop effects, mask and shadows.
+    #[must_use]
+    pub fn layer(mut self, layer: LayerStyle) -> Self {
+        self.layer = Some(layer);
         self
     }
 
@@ -129,7 +138,10 @@ impl Popover {
                     .anchored_portal(WindowLayer::Popover, self.key.clone(), self.placement)
                     .portal_dismiss(DismissPolicy::OutsidePointer);
                 let blur = self.backdrop_blur.unwrap_or(theme.overlay_blur).max(0.0);
-                content = content.layer(theme.overlay_layer(radius, blur));
+                content = content.layer(
+                    self.layer
+                        .unwrap_or_else(|| theme.overlay_layer(radius, blur)),
+                );
                 content = if self.trap_focus {
                     content.focus_scope(FocusScope::trapped(InitialFocus::First))
                 } else {

@@ -37,9 +37,13 @@ pub fn launch() -> Result<(), Box<dyn std::error::Error>> {
                 ..WindowConfig::default()
             },
         ),
-        argui_devtools::configure_renderer(RendererConfig::default().effects(
-            argui_effects::registry()?.with_definition(pages::scroll_effects::definition())?,
-        ))?,
+        argui_devtools::configure_renderer(
+            RendererConfig::default().effects(
+                argui_effects::registry()?
+                    .with_definition(pages::scroll_effects::definition())?
+                    .with_definition(pages::overlay_effects::definition())?,
+            ),
+        )?,
         text,
         DevtoolsApp::new(argui::runtime::SingleWindowModel::new(
             argui::widgets::SelectionHost::new(WidgetGallery::default()),

@@ -1,13 +1,16 @@
 use argui_paint::{Color, PaintStyle};
 use argui_text::{TextColor, TextOverflow, TextStyle, TextWrap};
 use argui_ui::{
-    AlignItems, Axes, CaretStyle, Element, LayoutStyle, Overflow, Role, ScrollConfig,
-    ScrollPropagation, ScrollbarGutter, ScrollbarStyle, StateSelector, StylePatch, StyleTransition,
+    AlignItems, CaretStyle, Element, LayoutStyle, Role, StateSelector, StylePatch, StyleTransition,
     TextEditorSpec, TextInputFilter, VisualState, percent,
 };
 
+#[cfg(feature = "textarea")]
+use argui_ui::{Axes, Overflow, ScrollConfig, ScrollPropagation, ScrollbarGutter, ScrollbarStyle};
+
 use crate::{TEXT_FIELD_SCOPE, TextFieldBehavior, TextFieldPart};
 
+#[cfg(feature = "input")]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum InputKind {
     #[default]
@@ -94,6 +97,7 @@ impl InputStyle {
     }
 }
 
+#[cfg(feature = "input")]
 #[derive(Clone, Debug, PartialEq)]
 pub struct Input {
     key: String,
@@ -109,6 +113,7 @@ pub struct Input {
     leading: Option<(Element, f32)>,
 }
 
+#[cfg(feature = "input")]
 impl Input {
     #[must_use]
     pub fn new(
@@ -216,6 +221,7 @@ impl Input {
     }
 }
 
+#[cfg(feature = "textarea")]
 #[derive(Clone, Debug, PartialEq)]
 pub struct TextArea {
     key: String,
@@ -227,6 +233,7 @@ pub struct TextArea {
     read_only: bool,
 }
 
+#[cfg(feature = "textarea")]
 impl TextArea {
     #[must_use]
     pub fn new(

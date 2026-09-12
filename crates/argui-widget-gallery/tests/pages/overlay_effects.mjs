@@ -1,0 +1,107 @@
+import assert from 'node:assert/strict';
+import { mkdir } from 'node:fs/promises';
+
+assert.equal(process.env.ARGUI_HIDDEN_DISPLAY, '1', 'Use scripts/linux-hidden-display.sh');
+assert.equal(process.env.DISPLAY, undefined);
+const imported = await import(process.env.PUPPETEER_MODULE ?? 'puppeteer');
+const browser = await (imported.puppeteer ?? imported.default).launch({
+    executablePath: process.env.CHROME_PATH, headless: false,
+    args: ['--ozone-platform=wayland', '--enable-unsafe-webgpu', '--ignore-gpu-blocklist', '--enable-features=Vulkan', '--use-angle=vulkan'],
+});
+const output = process.env.SCREENSHOT_DIR ?? 'target/overlay-interactions';
+await mkdir(output, { recursive: true });
+const pause = (ms = 200) => new Promise(resolve => setTimeout(resolve, ms));
+try {
+    const page = await browser.newPage();
+    const errors = [];
+    page.on('pageerror', error => errors.push(String(error)));
+    page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+    await page.setViewport({ width: 1220, height: 900 });
+    await page.goto(process.env.GALLERY_URL ?? 'http://127.0.0.1:8793/widgets/', { waitUntil: 'networkidle0' });
+    const button = label => `button[aria-label="${label}"]`;
+    const rect = selector => page.$eval(selector, element => element.getBoundingClientRect().toJSON());
+    const point = async selector => {
+        const r = await rect(selector);
+        assert.ok(r.width > 0 && r.bottom <= 900 && r.right <= 1220, selector);
+        return [r.x + r.width / 2, r.y + r.height / 2];
+    };
+    const click = async selector => { await page.mouse.click(...await point(selector)); await pause(); };
+    const navigate = async label => {
+        await page.waitForSelector(button(label));
+        await page.$eval(button(label), element => element.click());
+        await pause(400);
+    };
+    const capture = async name => {
+        const png = await page.screenshot({ path: `${output}/${name}.png` });
+        assert.ok(png.length > 15000, 'Blank capture');
+    };
+    const expanded = selector => page.$eval(selector, element => element.getAttribute('aria-expanded'));
+    for (const scheme of ['light', 'dark']) {
+        await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: scheme }]);
+        await navigate('Popover');
+        const labels = await page.$$eval('button', elements => elements.filter(el => el.getBoundingClientRect().x === 16).map(el => el.getAttribute('aria-label')));
+        const boundary = labels.indexOf('Actions');
+        for (const group of [labels.slice(0, boundary), labels.slice(boundary)]) {
+            assert.deepEqual(group, group.toSorted((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' })));
+        }
+        await capture(`${scheme}-popover-closed`);
+        for (const label of ['Rename project', 'Sharing settings', 'Choose accent']) {
+            const trigger = button(label);
+            await click(trigger);
+            assert.equal(await expanded(trigger), 'true');
+            await capture(`${scheme}-popover-${label}`);
+            if (label === 'Rename project') {
+                await click('input[aria-label="Project name"]');
+                await page.keyboard.down('Control'); await page.keyboard.press('a'); await page.keyboard.up('Control');
+                await page.keyboard.type('Shared notes');
+                await click(button('Save name'));
+                assert.equal(await expanded(trigger), 'false');
+                await click(trigger);
+            } else if (label === 'Sharing settings') {
+                await click('[role="switch"][aria-label="Anyone with the link"]');
+            } else {
+                await click(button('Rose'));
+            }
+            await page.keyboard.press('Escape'); await pause();
+            assert.equal(await expanded(trigger), 'false');
+            await click(trigger);
+            await page.mouse.click(1100, 820); await pause();
+            assert.equal(await expanded(trigger), 'false');
+        }
+        await navigate('Tooltip');
+        const tooltipLabels = ['Save draft', 'Preview page', 'View history'];
+        const tips = () => page.$$eval('[role="tooltip"]', elements => elements.length);
+        for (const label of tooltipLabels) {
+            const trigger = button(label);
+            await page.mouse.move(...await point(trigger));
+            await pause(550);
+            assert.equal(await tips(), 1, `${label}: hover opens`);
+            const id = await page.$eval('[role="tooltip"]', element => element.id);
+            assert.equal(await page.$eval(trigger, element => element.getAttribute('aria-describedby')), id);
+            await capture(`${scheme}-tooltip-${label}`);
+            await page.mouse.move(...await point('[role="tooltip"]'));
+            await pause(200);
+            assert.equal(await tips(), 1, `${label}: content stays hoverable`);
+            await page.mouse.move(1100, 820); await pause(250);
+            assert.equal(await tips(), 0, `${label}: leave closes`);
+        }
+        for (const label of tooltipLabels) await page.mouse.move(...await point(button(label)));
+        await page.mouse.move(1100, 820); await pause(550);
+        assert.equal(await tips(), 0, 'Fast passes leave no tooltip behind');
+        await page.mouse.move(...await point(button('Save draft'))); await pause(550);
+        await page.keyboard.press('Escape'); await pause();
+        assert.equal(await tips(), 0, 'Escape closes hover help while focus is elsewhere');
+        await page.mouse.move(1100, 820); await pause();
+        await click(button('Save draft'));
+        await page.keyboard.press('Tab'); await pause();
+        assert.equal(await tips(), 1, 'Tab shows keyboard help');
+        const focusId = await page.$eval(button('Preview page'), element => element.id);
+        assert.equal(await page.$eval('canvas', element => element.getAttribute('aria-activedescendant')), focusId);
+        await capture(`${scheme}-tooltip-keyboard`);
+        await page.keyboard.press('Escape'); await pause();
+        assert.equal(await tips(), 0);
+        console.log(`${scheme}: alphabetical sidebar, three effect surfaces, popover actions/dismissal, tooltip hover/focus/Escape passed`);
+    }
+    assert.deepEqual(errors, []);
+    console.log(JSON.stringify({ screenshots: output, errors }));
+} finally { await browser.close(); }

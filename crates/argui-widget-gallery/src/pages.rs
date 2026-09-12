@@ -42,13 +42,16 @@ mod kbd;
 mod label;
 pub(crate) mod liquid_glass;
 pub(crate) mod menus;
+pub(crate) mod overlay_effects;
 mod pagination;
+pub(crate) mod popover;
 pub(crate) mod progress;
 pub(crate) mod scroll_effects;
 mod separator;
 pub(crate) mod skeleton;
 pub(crate) mod timeline;
 pub(crate) mod toast;
+pub(crate) mod tooltip;
 mod typography;
 pub(crate) mod webview;
 
@@ -116,6 +119,8 @@ pub(crate) fn render(
         Page::Tabs => tabs(gallery, theme),
         Page::Select => selects(gallery, theme, assets),
         Page::Dialog => dialogs(gallery, theme),
+        Page::Popover => cx.entity(&gallery.popover),
+        Page::Tooltip => cx.entity(&gallery.tooltip),
         Page::Layout => layout_system(theme),
         Page::Motion => motion(theme, cx.entity(&gallery.spinner)),
         Page::Effects => Element::column([

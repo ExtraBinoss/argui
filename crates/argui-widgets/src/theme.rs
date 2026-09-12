@@ -1,19 +1,19 @@
 use argui_core::{Color, ColorInterpolation, ColorScheme};
-#[cfg(any(feature = "button", feature = "input"))]
+#[cfg(any(feature = "button", feature = "input", feature = "textarea"))]
 use argui_paint::{Border, PaintStyle};
 use argui_paint::{CornerRadii, Filter, LayerMask, LayerStyle, QuadStyle, Shadow};
-#[cfg(any(feature = "button", feature = "input"))]
+#[cfg(any(feature = "button", feature = "input", feature = "textarea"))]
 use argui_text::TextStyle;
 use argui_theme::Theme;
 use argui_ui::{ScrollbarPartStyle, ScrollbarStyle, Sides};
 
 #[cfg(feature = "button")]
 use crate::ButtonStyle;
-#[cfg(feature = "input")]
+#[cfg(any(feature = "input", feature = "textarea"))]
 use crate::InputStyle;
 #[cfg(feature = "button")]
 use argui_ui::Dimension;
-#[cfg(feature = "input")]
+#[cfg(any(feature = "input", feature = "textarea"))]
 use argui_ui::{CaretHeight, CaretPrimitive, CaretStyle, CaretVisual};
 
 #[derive(Clone, Debug, PartialEq)]
@@ -147,7 +147,7 @@ fn button_style(
     style
 }
 
-#[cfg(any(feature = "button", feature = "input"))]
+#[cfg(any(feature = "button", feature = "input", feature = "textarea"))]
 fn quad(background: Color, border: Color) -> QuadStyle {
     QuadStyle::solid(background)
         .border(Border::all(1.0, border))
@@ -170,6 +170,7 @@ fn mix(left: Color, right: Color, amount: f32) -> Color {
 #[cfg(any(
     feature = "button",
     feature = "input",
+    feature = "textarea",
     feature = "tabs",
     feature = "checkbox",
     feature = "switch",
@@ -206,7 +207,7 @@ impl WidgetTheme {
         layer
     }
 
-    #[cfg(any(feature = "button", feature = "input"))]
+    #[cfg(any(feature = "button", feature = "input", feature = "textarea"))]
     fn text(&self) -> TextStyle {
         TextStyle {
             font_size: 15.0,
@@ -270,7 +271,7 @@ impl WidgetTheme {
             self.text(),
         )
     }
-    #[cfg(feature = "input")]
+    #[cfg(any(feature = "input", feature = "textarea"))]
     #[must_use]
     pub fn input(&self) -> InputStyle {
         let mut input = InputStyle::new(PaintStyle::new(quad(self.card, self.border)), self.text());

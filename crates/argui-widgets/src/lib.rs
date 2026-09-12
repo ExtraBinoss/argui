@@ -34,7 +34,7 @@ mod dialog;
 mod dialog_behavior;
 #[cfg(feature = "icons")]
 mod icons;
-#[cfg(feature = "input")]
+#[cfg(any(feature = "input", feature = "textarea"))]
 mod input;
 #[cfg(feature = "popover")]
 mod popover;
@@ -60,7 +60,7 @@ mod spinner;
 mod tabs;
 #[cfg(feature = "tabs")]
 mod tabs_behavior;
-#[cfg(feature = "input")]
+#[cfg(any(feature = "input", feature = "textarea"))]
 mod text_field_behavior;
 #[cfg(feature = "text-selection")]
 mod text_selection;
@@ -92,8 +92,12 @@ pub use dialog::Dialog;
 pub use dialog_behavior::{DIALOG_OPEN, DIALOG_SCOPE, DialogAction, DialogBehavior, DialogPart};
 #[cfg(feature = "icons")]
 pub use icons::{TablerIcon, WidgetAssets};
+#[cfg(any(feature = "input", feature = "textarea"))]
+pub use input::InputStyle;
+#[cfg(feature = "textarea")]
+pub use input::TextArea;
 #[cfg(feature = "input")]
-pub use input::{Input, InputKind, InputStyle, TextArea};
+pub use input::{Input, InputKind};
 #[cfg(feature = "popover")]
 pub use popover::Popover;
 #[cfg(feature = "popover")]
@@ -128,7 +132,7 @@ pub use spinner::Spinner;
 pub use tabs::{Tab, Tabs};
 #[cfg(feature = "tabs")]
 pub use tabs_behavior::{TAB_SELECTED, TABS_SCOPE, TabsAction, TabsBehavior, TabsPart};
-#[cfg(feature = "input")]
+#[cfg(any(feature = "input", feature = "textarea"))]
 pub use text_field_behavior::{
     TEXT_FIELD_INVALID, TEXT_FIELD_READ_ONLY, TEXT_FIELD_SCOPE, TextFieldBehavior, TextFieldPart,
 };
@@ -182,14 +186,14 @@ pub use data_table::{
     DataTableAction, DataTableError, DataTableModel,
 };
 
-#[cfg(feature = "menu")]
+#[cfg(feature = "context-menu")]
 mod context_menu;
-#[cfg(feature = "menu")]
+#[cfg(feature = "context-menu")]
 pub use context_menu::ContextMenu;
 
-#[cfg(feature = "menu")]
+#[cfg(feature = "menubar")]
 mod menubar;
-#[cfg(feature = "menu")]
+#[cfg(feature = "menubar")]
 pub use menubar::{Menubar, MenubarResponse};
 
 #[cfg(feature = "badge")]
@@ -241,3 +245,8 @@ pub use aspect_ratio::AspectRatio;
 mod progress;
 #[cfg(feature = "progress")]
 pub use progress::Progress;
+
+#[cfg(feature = "tooltip")]
+mod tooltip;
+#[cfg(feature = "tooltip")]
+pub use tooltip::{Tooltip, TooltipState};

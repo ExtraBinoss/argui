@@ -83,6 +83,12 @@ clics, le glisser par mots, le clic extérieur et Échap dans les sous-menus.
 Il contrôle aussi la stabilité des dimensions et positions des champs pendant
 la saisie et les changements de focus.
 
+Pour Popover et Tooltip, utiliser
+`node crates/argui-widget-gallery/tests/pages/overlay_effects.mjs` : les captures
+dans `target/overlay-interactions/` montrent les versions opaques, floutées et
+avec un effet WGSL enregistré, en clair et sombre. Le scénario exerce les
+actions des panneaux, leurs fermetures et les infobulles au survol ou au clavier.
+
 Ouvrir les fichiers de capture avec l'outil de lecture d'images de l'agent,
 sans visionneuse graphique sur le bureau. Vérifier texte complet, contraste,
 espacement, débordements et états désactivés. Compléter un test de layout avec
