@@ -39,9 +39,8 @@ try {
         await pause(400);
         await click(appearance);
         await capture(`${scheme}-settings`);
-        await click(glass);
-        assert.equal(await page.$eval(glass, element => element.getAttribute('aria-checked')), 'true');
-        await click(fallback);
+        assert.equal(await page.$eval(glass, element => element.getAttribute('aria-disabled')), 'true');
+        assert.equal(await page.$eval(glass, element => element.getAttribute('aria-checked')), 'false');
         for (const label of ['Surface opacity', 'Accent tint', 'Inactive opacity']) {
             const slider = selector('slider', label);
             await click(slider);
@@ -49,6 +48,7 @@ try {
             await page.keyboard.press('ArrowRight'); await pause();
             assert.equal(Number(await page.$eval(slider, element => element.getAttribute('aria-valuenow'))), before + 1);
         }
+        assert.equal(await page.$eval(fallback, element => element.getAttribute('aria-checked')), 'true');
         await page.evaluate(() => {
             document.body.style.background = 'repeating-linear-gradient(35deg, #4c1d95 0 80px, #0284c7 80px 160px, #d97706 160px 240px)';
         });
@@ -57,7 +57,6 @@ try {
         assert.equal(await page.$eval(appearance, element => element.getAttribute('aria-expanded')), 'false');
         await capture(`${scheme}-sidebar`);
         await click(appearance);
-        await click(glass);
         await click(fallback);
         await page.keyboard.press('Escape'); await pause();
         await capture(`${scheme}-disabled`);

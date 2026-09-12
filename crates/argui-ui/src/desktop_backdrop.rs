@@ -4,6 +4,8 @@ use argui_core::Color;
 /// Keep ancestors transparent; this replaces the element's background, not its content.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct DesktopBackdrop {
+    /// Request native blur; when false, only the fallback colors are painted.
+    pub blur: bool,
     pub tint: Color,
     pub inactive_tint: Color,
     pub fallback: Color,
@@ -14,11 +16,19 @@ impl DesktopBackdrop {
     #[must_use]
     pub const fn new(tint: Color, fallback: Color) -> Self {
         Self {
+            blur: true,
             tint,
             inactive_tint: tint,
             fallback,
             inactive_fallback: fallback,
         }
+    }
+
+    /// Disable the compositor effect while keeping the active and inactive fallback colors.
+    #[must_use]
+    pub const fn blur(mut self, enabled: bool) -> Self {
+        self.blur = enabled;
+        self
     }
 
     #[must_use]
@@ -35,14 +45,16 @@ impl DesktopBackdrop {
 
     #[must_use]
     pub const fn color(self, state: DesktopBackdropState) -> Color {
-        if !state.available && !state.focused {
-            self.inactive_fallback
-        } else if !state.available {
-            self.fallback
+        if self.blur && state.available {
+            if state.focused {
+                self.tint
+            } else {
+                self.inactive_tint
+            }
         } else if state.focused {
-            self.tint
+            self.fallback
         } else {
-            self.inactive_tint
+            self.inactive_fallback
         }
     }
 }

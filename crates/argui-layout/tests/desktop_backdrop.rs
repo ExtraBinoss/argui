@@ -65,3 +65,44 @@ fn hidden_backdrops_produce_no_native_regions() {
         .unwrap();
     assert!(output.desktop_backdrops.is_empty());
 }
+
+#[test]
+fn toggling_native_blur_keeps_fallback_paint_without_stale_regions_or_relayout() {
+    let tint = Color::BLACK.with_alpha(0.3);
+    let fallback = Color::WHITE.with_alpha(0.7);
+    let panel = |blur| {
+        Element::container([])
+            .width(length(180.0))
+            .height(length(120.0))
+            .desktop_backdrop(DesktopBackdrop::new(tint, fallback).blur(blur))
+    };
+    let mut ui = UiTree::new(panel(false));
+    ui.set_desktop_backdrop_state(DesktopBackdropState {
+        available: true,
+        focused: true,
+    });
+    let mut engine = LayoutEngine::new();
+    let mut output = engine
+        .compute(&mut ui, &mut TextEngine::new(), Size::new(320.0, 200.0))
+        .unwrap();
+    let nodes = output.nodes.clone();
+    for blur in [false, true, false] {
+        let update = ui.update(panel(blur));
+        assert!(matches!(
+            update,
+            argui_ui::TreeUpdate::None | argui_ui::TreeUpdate::Paint
+        ));
+        engine.repaint(&ui, &mut output);
+        assert_eq!(output.nodes, nodes);
+        assert_eq!(output.desktop_backdrops.len(), usize::from(blur));
+        let expected = Some(Fill::Solid(if blur { tint } else { fallback }));
+        assert!(
+            output
+                .display_list
+                .commands()
+                .iter()
+                .any(|command| matches!(command,
+            DisplayCommand::Quad(quad) if quad.background == expected))
+        );
+    }
+}

@@ -3,7 +3,7 @@ use argui::{
     core::{Color, Key, KeyInput, KeyState},
     paint::Fill,
     runtime::WindowEnvironment,
-    ui::DesktopBackdropState,
+    ui::{CheckedState, DesktopBackdropState},
 };
 
 fn click(gallery: &Entity<WidgetGallery>, key: &str) {
@@ -23,11 +23,26 @@ fn sidebar_glass_is_optional_and_uses_the_public_backdrop_api() {
             .desktop_backdrop
             .is_none()
     );
+    let _ = gallery.render_in(WindowEnvironment {
+        desktop_backdrop_available: true,
+        ..Default::default()
+    });
     click(&gallery, "gallery-appearance");
+    let root = gallery.render();
+    assert!(
+        !find_key(&root, "sidebar-glass")
+            .unwrap()
+            .semantics
+            .as_ref()
+            .unwrap()
+            .state
+            .disabled
+    );
     click(&gallery, "sidebar-glass");
     let root = gallery.render();
     let sidebar = find_key(&root, "gallery-sidebar").unwrap();
     let backdrop = sidebar.desktop_backdrop.unwrap();
+    assert!(backdrop.blur);
     assert_eq!(backdrop.fallback.to_srgba()[3], 1.0);
     assert!((backdrop.tint.to_srgba()[3] - 0.78).abs() < 0.001);
     assert!(backdrop.inactive_tint.to_srgba()[3] > backdrop.tint.to_srgba()[3]);
@@ -52,6 +67,24 @@ fn sidebar_glass_is_optional_and_uses_the_public_backdrop_api() {
         .find(|node| tree.key(node.node) == Some("gallery-content-scroll"))
         .unwrap();
     assert_eq!(content.bounds.origin.x + content.bounds.size.width, 1600.0);
+    dispatch(
+        &gallery,
+        "sidebar-opacity",
+        UiEventKind::KeyInput(KeyInput {
+            key: Key::ArrowRight,
+            state: KeyState::Pressed,
+            text: None,
+            modifiers: Default::default(),
+            repeat: false,
+        }),
+    );
+    let root = gallery.render();
+    let backdrop = find_key(&root, "gallery-sidebar")
+        .unwrap()
+        .desktop_backdrop
+        .unwrap();
+    assert!((backdrop.tint.to_srgba()[3] - 0.79).abs() < 0.001);
+    assert_eq!(backdrop.fallback.to_srgba()[3], 1.0);
     click(&gallery, "sidebar-fallback");
     let root = gallery.render();
     let backdrop = find_key(&root, "gallery-sidebar")
@@ -60,6 +93,14 @@ fn sidebar_glass_is_optional_and_uses_the_public_backdrop_api() {
         .unwrap();
     assert_eq!(backdrop.fallback.to_srgba()[3], backdrop.tint.to_srgba()[3]);
     click(&gallery, "sidebar-glass");
+    let root = gallery.render();
+    let fallback = find_key(&root, "gallery-sidebar")
+        .unwrap()
+        .desktop_backdrop
+        .unwrap();
+    assert!(!fallback.blur);
+    assert_eq!(fallback.fallback, backdrop.fallback);
+    click(&gallery, "sidebar-fallback");
     assert!(
         find_key(&gallery.render(), "gallery-sidebar")
             .unwrap()
@@ -71,10 +112,108 @@ fn sidebar_glass_is_optional_and_uses_the_public_backdrop_api() {
 }
 
 #[test]
+fn unavailable_glass_is_disabled_while_tint_and_transparency_work_independently() {
+    let gallery = Entity::new(WidgetGallery::default());
+    click(&gallery, "gallery-appearance");
+    let root = gallery.render();
+    let glass = find_key(&root, "sidebar-glass").unwrap();
+    let state = &glass.semantics.as_ref().unwrap().state;
+    assert!(state.disabled);
+    assert_eq!(state.checked, Some(CheckedState::Unchecked));
+    assert!(!glass.interaction.as_ref().unwrap().enabled);
+    click(&gallery, "sidebar-glass");
+    assert!(
+        find_key(&gallery.render(), "gallery-sidebar")
+            .unwrap()
+            .desktop_backdrop
+            .is_none()
+    );
+
+    dispatch(
+        &gallery,
+        "sidebar-tint",
+        UiEventKind::KeyInput(KeyInput {
+            key: Key::End,
+            state: KeyState::Pressed,
+            text: None,
+            modifiers: Default::default(),
+            repeat: false,
+        }),
+    );
+    let root = gallery.render();
+    let sidebar = find_key(&root, "gallery-sidebar").unwrap();
+    let backdrop = sidebar.desktop_backdrop.unwrap();
+    assert!(!backdrop.blur);
+    assert_eq!(backdrop.fallback.to_srgba()[3], 1.0);
+    assert_ne!(
+        sidebar.paint.quad.background,
+        Some(Fill::Solid(backdrop.fallback))
+    );
+    click(&gallery, "sidebar-fallback");
+    let root = gallery.render();
+    let backdrop = find_key(&root, "gallery-sidebar")
+        .unwrap()
+        .desktop_backdrop
+        .unwrap();
+    assert!(!backdrop.blur);
+    assert!((backdrop.fallback.to_srgba()[3] - 0.78).abs() < 0.001);
+    click(&gallery, "sidebar-fallback");
+    assert_eq!(
+        find_key(&gallery.render(), "gallery-sidebar")
+            .unwrap()
+            .desktop_backdrop
+            .unwrap()
+            .fallback
+            .to_srgba()[3],
+        1.0
+    );
+}
+
+#[test]
+fn losing_native_support_disables_glass_without_blocking_opacity() {
+    let gallery = Entity::new(WidgetGallery::default());
+    let _ = gallery.render_in(WindowEnvironment {
+        desktop_backdrop_available: true,
+        ..Default::default()
+    });
+    click(&gallery, "gallery-appearance");
+    click(&gallery, "sidebar-glass");
+    let root = gallery.render_in(WindowEnvironment::default());
+    let state = &find_key(&root, "sidebar-glass")
+        .unwrap()
+        .semantics
+        .as_ref()
+        .unwrap()
+        .state;
+    assert!(state.disabled);
+    assert_eq!(state.checked, Some(CheckedState::Unchecked));
+    dispatch(
+        &gallery,
+        "sidebar-opacity",
+        UiEventKind::KeyInput(KeyInput {
+            key: Key::Home,
+            state: KeyState::Pressed,
+            text: None,
+            modifiers: Default::default(),
+            repeat: false,
+        }),
+    );
+    let root = gallery.render();
+    let backdrop = find_key(&root, "gallery-sidebar")
+        .unwrap()
+        .desktop_backdrop
+        .unwrap();
+    assert_eq!(
+        backdrop.color(DesktopBackdropState::default()).to_srgba()[3],
+        0.0
+    );
+}
+
+#[test]
 fn settings_sliders_change_only_background_colors_and_dismiss_cleanly() {
     let gallery = Entity::new(WidgetGallery::default());
     click(&gallery, "gallery-appearance");
-    click(&gallery, "sidebar-glass");
+    click(&gallery, "sidebar-fallback");
     let before = gallery.render();
     for key in [
         "sidebar-opacity",
@@ -125,11 +264,11 @@ fn settings_sliders_change_only_background_colors_and_dismiss_cleanly() {
 }
 
 #[test]
-fn changing_theme_with_glass_updates_navigation_text() {
+fn changing_theme_with_sidebar_transparency_updates_navigation_text() {
     use argui::{animation::Time, core::ColorScheme};
     let gallery = Entity::new(WidgetGallery::default());
     click(&gallery, "gallery-appearance");
-    click(&gallery, "sidebar-glass");
+    click(&gallery, "sidebar-fallback");
     click(&gallery, "gallery-appearance");
     let mut tree = UiTree::new(gallery.render_in(WindowEnvironment {
         color_scheme: ColorScheme::Dark,
@@ -198,9 +337,11 @@ fn fallback_sliders_accept_track_clicks_and_drag_after_layout() {
     }
     let gallery = Entity::new(WidgetGallery::default());
     let mount = gallery.mount().unwrap();
-    for key in ["gallery-appearance", "sidebar-glass", "sidebar-fallback"] {
-        send(&mount, key, UiEventKind::Click(ClickEvent::accessibility()));
-    }
+    send(
+        &mount,
+        "gallery-appearance",
+        UiEventKind::Click(ClickEvent::accessibility()),
+    );
     let mut tree = UiTree::new(mount.render(WindowEnvironment::default()).unwrap());
     let size = Size::new(1220.0, 900.0);
     let layout = argui::layout::LayoutEngine::new()
@@ -246,6 +387,17 @@ fn fallback_sliders_accept_track_clicks_and_drag_after_layout() {
         .unwrap()
         .desktop_backdrop
         .unwrap();
+    assert!(!backdrop.blur);
+    assert_eq!(
+        find_key(&root, "sidebar-fallback")
+            .unwrap()
+            .semantics
+            .as_ref()
+            .unwrap()
+            .state
+            .checked,
+        Some(CheckedState::Checked)
+    );
     assert!((backdrop.fallback.to_srgba()[3] - 0.25).abs() < 0.01);
     assert!(
         (backdrop

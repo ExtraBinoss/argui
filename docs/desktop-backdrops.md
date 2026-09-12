@@ -50,6 +50,9 @@ translucide si l'application accepte explicitement de la transparence sans flou.
 
 Pour activer/désactiver à chaud, ajouter/retirer `.desktop_backdrop(...)` lors du
 rendu et notifier le modèle. Retirer la dernière région désactive l'effet natif.
+Pour conserver la teinte et la transparence sans demander de flou, utiliser
+`glass.blur(false)` : seuls `fallback` et `inactive_fallback` sont peints, même
+si le système dispose du flou natif. `.blur(true)` réactive la demande.
 Le choix du matériau est une propriété de la fenêtre : `Glass`, `Sidebar` et
 `Header` sont des indications sémantiques. Ils peuvent avoir le même rendu sur
 certains systèmes. Une autre fenêtre peut choisir un autre matériau.
@@ -110,10 +113,14 @@ Références : [protocole Wayland](https://gitlab.freedesktop.org/wayland/waylan
 cargo run -p argui-widget-gallery --features desktop-backdrop
 ```
 
-Dans **Appearance → Sidebar appearance**, activer **Desktop glass**. Le panneau
-permet d'ajuster **Surface opacity**, **Accent tint**, **Inactive opacity**, et
-d'autoriser **Allow transparency without blur**. Les deux switches sont éteints
-au lancement. Le contenu principal et la barre du haut restent opaques.
+Dans **Appearance → Sidebar appearance**, **Desktop glass** commande uniquement
+le flou natif et reste grisé et décoché lorsque celui-ci est indisponible.
+**Accent tint** agit directement, sans activer le flou. Modifier **Surface
+opacity** ou **Inactive opacity** active automatiquement la transparence si le
+flou natif n'est pas actif. **Allow transparency without blur** permet aussi
+d'activer ou de désactiver cette transparence indépendamment du flou ; la teinte
+est conservée. Les deux switches sont éteints au lancement. Le contenu principal
+et la barre du haut restent opaques.
 
 Les tests de peinture et de layout vérifient l'invalidation, les clips, les
 transformations, le repli et la conservation de l'opacité du contenu. Le test

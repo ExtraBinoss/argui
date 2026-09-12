@@ -31,6 +31,27 @@ fn native_tint_activity_and_fallback_replace_only_the_background() {
 }
 
 #[test]
+fn disabling_native_blur_preserves_active_and_inactive_fallback_paint() {
+    let active = Color::BLACK.with_alpha(0.4);
+    let inactive = Color::WHITE.with_alpha(0.8);
+    let element = Element::text("Opaque label").desktop_backdrop(
+        DesktopBackdrop::new(Color::TRANSPARENT, active)
+            .inactive_fallback(inactive)
+            .blur(false),
+    );
+    let mut ui = UiTree::new(element.clone());
+    let node = ui.node_ids()[0];
+    for available in [false, true] {
+        for (focused, expected) in [(true, active), (false, inactive)] {
+            ui.set_desktop_backdrop_state(DesktopBackdropState { available, focused });
+            let quad = ui.resolved_quad(node, &element);
+            assert_eq!(quad.background, Some(Fill::Solid(expected)));
+            assert_eq!(quad.opacity, 1.0);
+        }
+    }
+}
+
+#[test]
 fn detached_popup_uses_its_fallback_even_when_the_main_window_has_blur() {
     use argui_core::{Point, Rect, Size};
     use argui_ui::WindowLayer;

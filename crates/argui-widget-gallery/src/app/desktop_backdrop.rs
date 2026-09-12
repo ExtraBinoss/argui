@@ -34,6 +34,10 @@ impl Default for BackdropSettings {
 }
 
 impl BackdropSettings {
+    pub(super) fn has_background(&self) -> bool {
+        self.enabled || self.translucent_fallback || self.tint != 0.0
+    }
+
     pub(super) fn layout_changed(&mut self, layout: &LayoutSnapshot) {
         for (state, (key, label)) in self.sliders.iter_mut().zip(RANGES) {
             state.layout_changed(
@@ -55,6 +59,7 @@ impl BackdropSettings {
                 1.0
             }),
         )
+        .blur(self.enabled)
         .inactive_tint(tint.with_alpha(self.inactive_opacity / 100.0))
         .inactive_fallback(tint.with_alpha(if self.translucent_fallback {
             self.inactive_opacity / 100.0
@@ -84,12 +89,18 @@ impl WidgetGallery {
                 theme.muted_foreground,
                 400,
             ),
-            Switch::new("sidebar-glass", "Desktop glass", self.backdrop.enabled).build(theme),
+            Switch::new(
+                "sidebar-glass",
+                "Desktop glass",
+                self.backdrop.enabled && environment.desktop_backdrop_available,
+            )
+            .enabled(environment.desktop_backdrop_available)
+            .build(theme),
             text(
                 if environment.desktop_backdrop_available {
                     "Native desktop blur is available."
                 } else {
-                    "Desktop blur is unavailable here. Choose a fallback below."
+                    "Desktop blur is unavailable. Tint and transparency still work below."
                 },
                 12.0,
                 theme.muted_foreground,
@@ -123,7 +134,7 @@ impl WidgetGallery {
             .build(theme),
         );
         content.push(text(
-            "Blur strength follows your desktop’s material settings.",
+            "Adjusting opacity enables transparency. Inactive opacity applies when this window loses focus.",
             12.0,
             theme.muted_foreground,
             400,
@@ -153,7 +164,9 @@ impl WidgetGallery {
         } else if matches!(event.kind, UiEventKind::Click(_))
             && event.target_key() == Some("sidebar-glass")
         {
-            self.backdrop.enabled = !self.backdrop.enabled;
+            if cx.environment().desktop_backdrop_available {
+                self.backdrop.enabled = !self.backdrop.enabled;
+            }
         } else if matches!(event.kind, UiEventKind::Click(_))
             && event.target_key() == Some("sidebar-fallback")
         {
@@ -173,6 +186,11 @@ impl WidgetGallery {
                     RangeBehavior::new(key, label, *value, RangeConfig::new(0.0, 100.0, 1.0));
                 if let Some(action) = self.backdrop.sliders[index].update(event, &behavior) {
                     *value = action.value();
+                    if index != 1
+                        && !(self.backdrop.enabled && cx.environment().desktop_backdrop_available)
+                    {
+                        self.backdrop.translucent_fallback = true;
+                    }
                     changed = true;
                     break;
                 }

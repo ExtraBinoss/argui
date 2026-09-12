@@ -320,7 +320,10 @@ fn paint_enter(
     clips_content: bool,
 ) -> usize {
     let visual_bounds = context.transform.transform_rect(node.bounds);
-    if element.desktop_backdrop.is_some() {
+    if element
+        .desktop_backdrop
+        .is_some_and(|backdrop| backdrop.blur)
+    {
         output.desktop_backdrops.push(crate::DesktopBackdropRegion {
             node: node.node,
             shape: context.clips.appended(ClipRegion::rounded(

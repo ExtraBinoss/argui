@@ -83,7 +83,7 @@ impl WidgetGallery {
                 y: Overflow::Auto,
             })
             .scroll_config(ScrollConfig::default().scrollbar(theme.scrollbar.clone()));
-        if self.backdrop.enabled {
+        if self.backdrop.has_background() {
             sidebar = sidebar.desktop_backdrop(self.backdrop.paint(theme));
         }
         sidebar
