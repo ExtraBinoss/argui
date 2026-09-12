@@ -29,31 +29,19 @@ fn dispatch(app: &Entity<WidgetGallery>, key: &str, kind: UiEventKind) {
 }
 
 #[test]
-fn scroll_demo_cycles_presets_parameters_and_virtual_windows() {
+fn scroll_shadow_controls_update_parameters_and_virtual_windows() {
     let app = Entity::new(WidgetGallery::default());
     let click = || UiEventKind::Click(ClickEvent::accessibility());
-    dispatch(&app, "nav::effects", click());
-    for (mode, expected) in [
-        "argui.scroll.edge-fade",
-        "argui.scroll.edge-shadow",
-        "gallery.scroll.progress-tint",
-    ]
-    .into_iter()
-    .enumerate()
-    {
-        dispatch(&app, &format!("scroll-mode-{mode}"), click());
-        let root = app.render();
-        let list = find(&root, "scroll-demo-list").unwrap();
-        assert!(list.children.len() < 40);
-        let argui::paint::Filter::Effect(effect) =
-            &list.scroll.as_ref().unwrap().effects[0].layer.filters[0]
-        else {
-            panic!()
-        };
-        assert_eq!(effect.id.0, expected);
-    }
-    assert!(find(&app.render(), "scroll-width-less").is_none());
-    dispatch(&app, "scroll-mode-0", click());
+    dispatch(&app, "nav::scroll-shadow", click());
+    let root = app.render();
+    let list = find(&root, "scroll-demo-list").unwrap();
+    let argui::paint::Filter::Effect(effect) =
+        &list.scroll.as_ref().unwrap().effects[0].layer.filters[0]
+    else {
+        panic!()
+    };
+    assert_eq!(effect.id, argui_effects::EDGE_SHADOW_ID);
+    assert!(find(&root, "scroll-mode-0").is_none());
     for suffix in ["less", "more"] {
         for _ in 0..7 {
             dispatch(&app, &format!("scroll-width-{suffix}"), click());
@@ -106,7 +94,7 @@ fn scroll_examples_keep_visible_cards_and_real_scrollports_at_narrow_widths() {
     let app = Entity::new(WidgetGallery::default());
     dispatch(
         &app,
-        "nav::effects",
+        "nav::scroll-shadow",
         UiEventKind::Click(ClickEvent::accessibility()),
     );
     let root = app.render();
@@ -186,7 +174,7 @@ fn effects_page_uses_the_available_width_instead_of_the_reading_column_limit() {
     let app = Entity::new(WidgetGallery::default());
     dispatch(
         &app,
-        "nav::effects",
+        "nav::scroll-shadow",
         UiEventKind::Click(ClickEvent::accessibility()),
     );
     for width in [1220.0, 1800.0] {
@@ -226,78 +214,86 @@ fn scrolling_effect_panels_never_moves_the_page_even_at_edges_or_after_row_rebui
     let app = Entity::new(WidgetGallery::default());
     dispatch(
         &app,
-        "nav::effects",
+        "nav::scroll-shadow",
         UiEventKind::Click(ClickEvent::accessibility()),
     );
-    for mode in 0..3 {
-        dispatch(
-            &app,
-            &format!("scroll-mode-{mode}"),
-            UiEventKind::Click(ClickEvent::accessibility()),
-        );
-        let mut tree = UiTree::new(app.render());
-        let mut engine = argui::layout::LayoutEngine::new();
-        let mut text = argui::text::TextEngine::new();
-        let size = argui::core::Size::new(1220.0, 780.0);
-        let mut output = engine.compute(&mut tree, &mut text, size).unwrap();
-        let page = output
+    let mut tree = UiTree::new(app.render());
+    let mut engine = argui::layout::LayoutEngine::new();
+    let mut text = argui::text::TextEngine::new();
+    let size = argui::core::Size::new(1220.0, 780.0);
+    let mut output = engine.compute(&mut tree, &mut text, size).unwrap();
+    let page = output
+        .scroll_regions
+        .iter()
+        .find(|region| tree.key(region.node) == Some("gallery-content-scroll"))
+        .unwrap()
+        .node;
+    for key in ["scroll-demo-list", "scroll-demo-nested"] {
+        // Locate the example after any preceding gallery sections instead
+        // of assuming a fixed page position.
+        let target = output
+            .nodes
+            .iter()
+            .find(|node| tree.key(node.node) == Some(key))
+            .unwrap()
+            .bounds;
+        let page_region = output
             .scroll_regions
             .iter()
-            .find(|region| tree.key(region.node) == Some("gallery-content-scroll"))
-            .unwrap()
-            .node;
-        tree.set_scroll_offset(page, Point::new(0.0, 120.0));
+            .find(|region| region.node == page)
+            .unwrap();
+        let page_offset =
+            (tree.scroll_offset(page).y + target.origin.y - page_region.bounds.origin.y - 24.0)
+                .clamp(0.0, page_region.max_offset.y);
+        tree.set_scroll_offset(page, Point::new(0.0, page_offset));
         engine.apply_scroll(&tree, &mut output).unwrap();
-        for key in ["scroll-demo-list", "scroll-demo-nested"] {
-            let region = output
-                .scroll_regions
-                .iter()
-                .find(|region| tree.key(region.node) == Some(key))
-                .unwrap()
-                .clone();
-            assert_eq!(
-                region.config.propagation,
-                argui::ui::ScrollPropagation::Contain
+        let region = output
+            .scroll_regions
+            .iter()
+            .find(|region| tree.key(region.node) == Some(key))
+            .unwrap()
+            .clone();
+        assert_eq!(
+            region.config.propagation,
+            argui::ui::ScrollPropagation::Contain
+        );
+        for (offset, dy) in [
+            (0.0, 40.0),
+            (0.0, -40.3),
+            (2000.0, -300.7),
+            (region.max_offset.y - 1.0, -500.0),
+            (region.max_offset.y, -500.0),
+        ] {
+            tree.set_scroll_offset(
+                region.node,
+                Point::new(0.0, offset.min(region.max_offset.y)),
             );
-            for (offset, dy) in [
-                (0.0, 40.0),
-                (0.0, -40.3),
-                (2000.0, -300.7),
-                (region.max_offset.y - 1.0, -500.0),
-                (region.max_offset.y, -500.0),
-            ] {
-                tree.set_scroll_offset(
-                    region.node,
-                    Point::new(0.0, offset.min(region.max_offset.y)),
-                );
-                engine.apply_scroll(&tree, &mut output).unwrap();
-                let update = tree.scroll_from(
-                    region.node,
-                    region.bounds.origin,
-                    argui::core::ScrollDelta::Pixels(Point::new(0.25, dy)),
-                    &output.scroll_regions,
-                );
-                let expected =
-                    (offset.min(region.max_offset.y) - dy).clamp(0.0, region.max_offset.y);
-                assert!((tree.scroll_offset(region.node).y - expected).abs() < 0.01);
-                assert_eq!(
-                    tree.scroll_offset(page).y,
-                    120.0,
-                    "mode {mode}, {key}, offset {offset}, delta {dy}"
-                );
-                for event in update.events {
-                    if event.should_dispatch() {
-                        app.dispatch_event(&event);
-                    }
+            engine.apply_scroll(&tree, &mut output).unwrap();
+            let update = tree.scroll_from(
+                region.node,
+                region.bounds.origin,
+                argui::core::ScrollDelta::Pixels(Point::new(0.25, dy)),
+                &output.scroll_regions,
+            );
+            let expected = (offset.min(region.max_offset.y) - dy).clamp(0.0, region.max_offset.y);
+            assert!((tree.scroll_offset(region.node).y - expected).abs() < 0.01);
+            assert_eq!(
+                tree.scroll_offset(page).y,
+                page_offset,
+                "{key}, offset {offset}, delta {dy}"
+            );
+            for event in update.events {
+                if event.should_dispatch() {
+                    app.dispatch_event(&event);
                 }
-                tree.update(app.render());
-                output = engine.compute(&mut tree, &mut text, size).unwrap();
-                assert_eq!(
-                    tree.scroll_offset(page).y,
-                    120.0,
-                    "page moved during a virtual row rebuild"
-                );
             }
+            tree.update(app.render());
+            output = engine.compute(&mut tree, &mut text, size).unwrap();
+            assert_eq!(
+                tree.scroll_offset(page).y,
+                page_offset,
+                "page moved during a virtual row rebuild"
+            );
         }
     }
 }

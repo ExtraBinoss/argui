@@ -22,6 +22,7 @@ fn gallery_navigation_exposes_widget_and_example_sections() {
     let root = gallery.render();
     assert!(contains_text(&root, "Widgets"));
     assert!(contains_text(&root, "Examples"));
+    assert!(contains_text(&root, "Effects"));
     assert!(contains_text(&root, "Button"));
 }
 
@@ -61,7 +62,8 @@ fn navigation_rebuilds_widget_and_example_pages_from_public_events() {
         ("nav::dialog", "Dialog"),
         ("nav::layout", "Web layout"),
         ("nav::motion", "Motion & loading"),
-        ("nav::effects", "GPU effects / WGSL"),
+        ("nav::liquid-glass", "Liquid glass"),
+        ("nav::scroll-shadow", "Scroll shadow"),
         ("nav::typography", "Typography & selection"),
         ("nav::async-tasks", "Search 10,000 draft titles"),
         ("nav::actions", "Left scope"),
@@ -73,4 +75,74 @@ fn navigation_rebuilds_widget_and_example_pages_from_public_events() {
             "missing {heading}"
         );
     }
+}
+
+#[test]
+fn effects_pages_are_separate_and_do_not_compress_the_sidebar() {
+    use argui::{core::Size, layout::LayoutEngine, text::TextEngine};
+    let gallery = Entity::new(WidgetGallery::default());
+    for (page, visible, absent) in [
+        (
+            "nav::liquid-glass",
+            "liquid-glass-demo",
+            "scroll-effects-demo",
+        ),
+        (
+            "nav::scroll-shadow",
+            "scroll-effects-demo",
+            "liquid-glass-demo",
+        ),
+    ] {
+        click_page(&gallery, page);
+        let mut tree = UiTree::new(gallery.render());
+        let keys: Vec<_> = tree
+            .node_ids()
+            .iter()
+            .filter_map(|id| tree.key(*id))
+            .collect();
+        assert!(keys.contains(&visible));
+        assert!(!keys.contains(&absent));
+        assert!(!keys.contains(&"nav::effects"));
+        for width in [640.0, 800.0, 1220.0, 1800.0] {
+            let output = LayoutEngine::new()
+                .compute(&mut tree, &mut TextEngine::new(), Size::new(width, 900.0))
+                .unwrap();
+            let bounds = |key| {
+                output
+                    .nodes
+                    .iter()
+                    .find(|node| tree.key(node.node) == Some(key))
+                    .unwrap()
+                    .bounds
+            };
+            let sidebar = bounds("gallery-sidebar");
+            let content = bounds("gallery-content-scroll");
+            assert_eq!(sidebar.size.width, 260.0);
+            assert_eq!(content.origin.x, sidebar.origin.x + sidebar.size.width);
+            assert!((content.origin.x + content.size.width - width).abs() < 0.1);
+            let demo = bounds(visible);
+            assert!(demo.origin.x >= content.origin.x);
+            assert!(demo.origin.x + demo.size.width <= width);
+        }
+    }
+    let mut tree = UiTree::new(gallery.render());
+    let search = tree
+        .node_ids()
+        .iter()
+        .copied()
+        .find(|node| tree.key(*node) == Some("gallery-search"))
+        .unwrap();
+    for event in tree.event_deliveries(search, UiEventKind::TextChanged("effects".into())) {
+        if event.should_dispatch() {
+            gallery.dispatch_event(&event);
+        }
+    }
+    let tree = UiTree::new(gallery.render());
+    let effects: Vec<_> = tree
+        .node_ids()
+        .iter()
+        .filter_map(|node| tree.key(*node))
+        .filter(|key| key.starts_with("nav::"))
+        .collect();
+    assert_eq!(effects, ["nav::liquid-glass", "nav::scroll-shadow"]);
 }

@@ -40,7 +40,8 @@ pub enum Page {
     Menubar,
     Layout,
     Motion,
-    Effects,
+    LiquidGlass,
+    ScrollShadow,
     Typography,
     WebView,
     AsyncTasks,
@@ -50,7 +51,7 @@ pub enum Page {
 }
 
 impl Page {
-    pub const ALL: [Self; 46] = [
+    pub const ALL: [Self; 47] = [
         Self::Alert,
         Self::AspectRatio,
         Self::Avatar,
@@ -88,11 +89,12 @@ impl Page {
         Self::Toast,
         Self::Tooltip,
         Self::VList,
+        Self::LiquidGlass,
+        Self::ScrollShadow,
         Self::Actions,
         Self::AsyncTasks,
         Self::CustomTimeline,
         Self::Editing,
-        Self::Effects,
         Self::Motion,
         Self::Typography,
         Self::Layout,
@@ -138,9 +140,9 @@ impl Page {
             | Self::ContextMenu
             | Self::Menubar
             | Self::Table => "Widgets",
+            Self::LiquidGlass | Self::ScrollShadow => "Effects",
             Self::Layout
             | Self::Motion
-            | Self::Effects
             | Self::Typography
             | Self::WebView
             | Self::AsyncTasks
@@ -191,7 +193,8 @@ impl Page {
             Self::Menubar => "Menubar",
             Self::Layout => "Web layout",
             Self::Motion => "Motion & loading",
-            Self::Effects => "GPU effects / WGSL",
+            Self::LiquidGlass => "Liquid glass",
+            Self::ScrollShadow => "Scroll shadow",
             Self::Typography => "Typography & selection",
             Self::WebView => "WebView",
             Self::AsyncTasks => "Async tasks",
@@ -242,7 +245,8 @@ impl Page {
             Self::Menubar => "menubar",
             Self::Layout => "layout",
             Self::Motion => "motion",
-            Self::Effects => "effects",
+            Self::LiquidGlass => "liquid-glass",
+            Self::ScrollShadow => "scroll-shadow",
             Self::Typography => "typography",
             Self::WebView => "webview",
             Self::AsyncTasks => "async-tasks",
@@ -319,7 +323,8 @@ impl Page {
             }
             Self::Layout => "CSS-shaped Block, Flex, Grid, box model and text alignment.",
             Self::Motion => "Frame-paced feedback and interaction transitions.",
-            Self::Effects => "Custom WGSL through the generic effect registry.",
+            Self::LiquidGlass => "Scroll colorful palettes behind a floating glass navigation bar.",
+            Self::ScrollShadow => "Edge shadows reveal more content in scrollable views.",
             Self::Typography => "Rich spans, decoration, clamping and web-like text selection.",
             Self::WebView => {
                 "Retained web content, with separate email and webpage security policies."

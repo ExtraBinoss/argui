@@ -110,7 +110,7 @@ impl Default for WidgetGallery {
             backdrop: desktop_backdrop::BackdropSettings::default(),
             scroll_demo: Entity::new(pages::scroll_effects::ScrollDemo::default()),
             webview: pages::webview::WebViewDemo::entity(),
-            glass: Entity::new(pages::liquid_glass::GlassDemo::default()),
+            glass: Entity::new(pages::liquid_glass::GlassDemo::new(&light_assets)),
             menus: Entity::new(pages::menus::MenusDemo::new(&dark_assets)),
             dates: Entity::new(pages::dates::DatesDemo::new(&dark_assets)),
             data_table: std::cell::OnceCell::new(),
@@ -188,6 +188,7 @@ impl WidgetGallery {
                     .keyed("gallery-content-scroll")
                     .background(theme.background)
                     .grow(1.0)
+                    .width(length(0.0))
                     .min_width(length(0.0))
                     .min_height(length(0.0))
                     .padding(Sides::length(30.0))

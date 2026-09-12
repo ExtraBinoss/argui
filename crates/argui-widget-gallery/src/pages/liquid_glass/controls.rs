@@ -1,14 +1,13 @@
 use super::GlassDemo;
 use crate::app::text;
 use argui::{
-    core::Point,
     runtime::{Context, LayoutSnapshot},
     ui::{Element, EventType, FlexWrap, Sides, UiEventKind, length, percent},
     widgets::{Button, RangeBehavior, RangeConfig, Slider, WidgetTheme},
 };
 use argui_effects::LiquidGlass;
 
-pub(super) const COUNT: usize = 11;
+pub(super) const COUNT: usize = 9;
 struct Parameter {
     key: &'static str,
     label: &'static str,
@@ -39,25 +38,11 @@ const PARAMETERS: [Parameter; COUNT] = [
         field: |v| &mut v.tint[3],
     },
     Parameter {
-        key: "glass-ior",
-        label: "Refractive index",
-        unit: "",
-        config: RangeConfig::new(1.0, 2.5, 0.01),
-        field: |v| &mut v.ior,
-    },
-    Parameter {
         key: "glass-edge",
         label: "Rim width",
         unit: "px",
         config: RangeConfig::new(0.0, 64.0, 1.0),
         field: |v| &mut v.edge_width,
-    },
-    Parameter {
-        key: "glass-fresnel",
-        label: "Rim reflection",
-        unit: "",
-        config: RangeConfig::new(0.0, 1.0, 0.01),
-        field: |v| &mut v.fresnel,
     },
     Parameter {
         key: "glass-highlight",
@@ -69,8 +54,8 @@ const PARAMETERS: [Parameter; COUNT] = [
     Parameter {
         key: "glass-chroma",
         label: "Dispersion",
-        unit: "px",
-        config: RangeConfig::new(0.0, 8.0, 0.05),
+        unit: "",
+        config: RangeConfig::new(0.0, 1.0, 0.05),
         field: |v| &mut v.chromatic_aberration,
     },
     Parameter {
@@ -81,35 +66,31 @@ const PARAMETERS: [Parameter; COUNT] = [
         field: |v| &mut v.saturation,
     },
     Parameter {
-        key: "glass-frequency",
-        label: "Noise frequency",
+        key: "glass-brightness",
+        label: "Brightness",
         unit: "",
-        config: RangeConfig::new(0.001, 1.0, 0.001),
-        field: |v| &mut v.frequency,
+        config: RangeConfig::new(-1.0, 1.0, 0.01),
+        field: |v| &mut v.brightness,
     },
     Parameter {
-        key: "glass-turbulence",
-        label: "Noise strength",
+        key: "glass-contrast",
+        label: "Contrast",
         unit: "",
-        config: RangeConfig::new(0.0, 1.0, 0.01),
-        field: |v| &mut v.turbulence,
+        config: RangeConfig::new(0.0, 4.0, 0.05),
+        field: |v| &mut v.contrast,
     },
 ];
 
 impl Parameter {
-    fn enabled(&self, noise: bool) -> bool {
-        !matches!(self.key, "glass-frequency" | "glass-turbulence") || noise
-    }
-    fn behavior(&self, effect: &mut LiquidGlass, noise: bool) -> RangeBehavior {
+    fn behavior(&self, effect: &mut LiquidGlass) -> RangeBehavior {
         RangeBehavior::new(self.key, self.label, *(self.field)(effect), self.config)
-            .enabled(self.enabled(noise))
     }
 }
 
 impl GlassDemo {
     pub(super) fn layout_controls(&mut self, layout: &LayoutSnapshot) {
         for (parameter, state) in PARAMETERS.iter().zip(&mut self.ranges) {
-            state.layout_changed(layout, &parameter.behavior(&mut self.effect, self.noise));
+            state.layout_changed(layout, &parameter.behavior(&mut self.effect));
         }
     }
 
@@ -120,21 +101,29 @@ impl GlassDemo {
                 format!("Effect: {}", if self.enabled { "on" } else { "off" }),
             ),
             ("glass-reset", "Reset settings".into()),
-            ("glass-recenter", "Recenter glass".into()),
+            ("glass-tint-theme", "Tint: theme".into()),
             ("glass-tint-white", "Tint: white".into()),
             ("glass-tint-blue", "Tint: blue".into()),
             ("glass-tint-rose", "Tint: rose".into()),
             (
-                "glass-noise",
-                format!("Noise: {}", if self.noise { "on" } else { "off" }),
+                "glass-depth",
+                format!(
+                    "Depth: {}",
+                    if self.effect.depth_effect {
+                        "on"
+                    } else {
+                        "off"
+                    }
+                ),
             ),
-            ("glass-octaves", format!("Octaves: {}", self.effect.octaves)),
-            ("glass-seed", format!("Seed: {}", self.effect.seed)),
         ];
         let toolbar = Element::row(buttons.into_iter().map(|(key, label)| {
             let selected = matches!(
                 (key, self.tint),
-                ("glass-tint-white", 0) | ("glass-tint-blue", 1) | ("glass-tint-rose", 2)
+                ("glass-tint-theme", 0)
+                    | ("glass-tint-white", 1)
+                    | ("glass-tint-blue", 2)
+                    | ("glass-tint-rose", 3)
             );
             Button::new(
                 key,
@@ -158,11 +147,9 @@ impl GlassDemo {
             };
             Element::column([
                 text(label, 12.0, theme.foreground, 500),
-                Slider::new(parameter.key, parameter.label, value, parameter.config)
-                    .enabled(parameter.enabled(self.noise))
-                    .build(theme),
+                Slider::new(parameter.key, parameter.label, value, parameter.config).build(theme),
             ])
-            .width(length(210.0))
+            .width(length(140.0))
             .grow(1.0)
             .padding(Sides::length(8.0))
             .gap(4.0)
@@ -179,8 +166,7 @@ impl GlassDemo {
         ] {
             root = root.on(cx.listener(kind, |demo, event, cx| {
                 for (parameter, state) in PARAMETERS.iter().zip(&mut demo.ranges) {
-                    if let Some(action) =
-                        state.update(event, &parameter.behavior(&mut demo.effect, demo.noise))
+                    if let Some(action) = state.update(event, &parameter.behavior(&mut demo.effect))
                     {
                         *(parameter.field)(&mut demo.effect) = action.value();
                         cx.notify();
@@ -193,28 +179,27 @@ impl GlassDemo {
                 match event.target_key() {
                     Some("glass-enable") => demo.enabled = !demo.enabled,
                     Some("glass-reset") => {
-                        let defaults = Self::default();
-                        demo.effect = defaults.effect;
-                        demo.tint = defaults.tint;
-                        demo.noise = defaults.noise;
+                        demo.effect = Self::DEFAULT_EFFECT;
+                        demo.tint = 0;
                         demo.enabled = true;
                     }
-                    Some("glass-recenter") => demo.position = Point::new(demo.max_x * 0.5, 105.0),
-                    Some("glass-noise") => {
-                        demo.noise = !demo.noise;
-                        if demo.noise && demo.effect.turbulence == 0.0 {
-                            demo.effect.turbulence = 0.15;
-                        }
-                    }
-                    Some("glass-octaves") => demo.effect.octaves = demo.effect.octaves % 6 + 1,
-                    Some("glass-seed") => demo.effect.seed = demo.effect.seed.wrapping_add(1),
-                    Some(key @ ("glass-tint-white" | "glass-tint-blue" | "glass-tint-rose")) => {
+                    Some("glass-depth") => demo.effect.depth_effect = !demo.effect.depth_effect,
+                    Some(
+                        key @ ("glass-tint-theme" | "glass-tint-white" | "glass-tint-blue"
+                        | "glass-tint-rose"),
+                    ) => {
                         demo.tint = match key {
-                            "glass-tint-blue" => 1,
-                            "glass-tint-rose" => 2,
+                            "glass-tint-white" => 1,
+                            "glass-tint-blue" => 2,
+                            "glass-tint-rose" => 3,
                             _ => 0,
                         };
-                        let rgb = [[1.0, 1.0, 1.0], [0.15, 0.4, 1.0], [1.0, 0.15, 0.3]][demo.tint];
+                        let rgb = [
+                            [0.0, 0.0, 0.0],
+                            [1.0, 1.0, 1.0],
+                            [0.15, 0.4, 1.0],
+                            [1.0, 0.15, 0.3],
+                        ][demo.tint];
                         demo.effect.tint[..3].copy_from_slice(&rgb);
                     }
                     _ => return,

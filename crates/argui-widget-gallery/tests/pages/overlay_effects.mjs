@@ -83,8 +83,9 @@ try {
         await click(button('Close dialog'));
         await navigate('Popover');
         const labels = await page.$$eval('button', elements => elements.filter(el => el.getBoundingClientRect().x === 16).map(el => el.getAttribute('aria-label')));
-        const boundary = labels.indexOf('Actions');
-        for (const group of [labels.slice(0, boundary), labels.slice(boundary)]) {
+        const effects = labels.indexOf('Liquid glass');
+        const examples = labels.indexOf('Actions');
+        for (const group of [labels.slice(0, effects), labels.slice(effects, examples), labels.slice(examples)]) {
             assert.deepEqual(group, group.toSorted((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' })));
         }
         await capture(`${scheme}-popover-closed`);

@@ -14,10 +14,9 @@ fn parameters_are_bounded_finite_and_scale_in_logical_pixels() {
     let glass = LiquidGlass::default()
         .refraction(f32::NAN)
         .blur(f32::INFINITY)
-        .frequency(0.0)
-        .octaves(100)
-        .seed(123)
-        .turbulence(3.0)
+        .depth_effect(false)
+        .brightness(-2.0)
+        .contrast(8.0)
         .tint([f32::NAN, -1.0, 2.0, 0.5])
         .saturation(10.0)
         .highlight(-1.0)
@@ -26,153 +25,210 @@ fn parameters_are_bounded_finite_and_scale_in_logical_pixels() {
     let effect = effect(glass);
     assert_eq!(effect.id, LIQUID_GLASS_ID);
     let words = effect.packed_words();
-    assert_eq!(f32::from_bits(words[0]), 0.0);
-    assert_eq!(f32::from_bits(words[2]), 0.0);
-    assert_eq!(words[7], 6);
-    assert_eq!(words[8], 123);
-    assert_eq!(f32::from_bits(words[9]), 1.0);
-    assert_eq!(f32::from_bits(words[12]), 1.0);
-    assert_eq!(f32::from_bits(words[10]), 0.0);
+    for (index, expected) in [
+        (0, 0.0),
+        (1, 1.0),
+        (2, 0.0),
+        (3, 0.0),
+        (4, 20.0),
+        (5, 4.0),
+        (6, -1.0),
+        (7, 4.0),
+        (9, 0.0),
+        (10, 0.0),
+        (11, 1.0),
+        (12, 0.5),
+    ] {
+        assert_eq!(f32::from_bits(words[index]), expected);
+    }
+    assert_eq!(words[8], 0);
     let Filter::Effect(scaled) = Filter::Effect(effect.clone()).scaled(2.0) else {
         panic!()
     };
-    let scaled = scaled.packed_words();
-    assert_eq!(f32::from_bits(scaled[6]), f32::from_bits(words[6]) * 2.0);
-    assert_eq!(scaled[8], words[8]);
+    assert_eq!(f32::from_bits(scaled.packed_words()[4]), 40.0);
+    assert_eq!(
+        scaled.packed_words()[1],
+        words[1],
+        "dispersion is dimensionless"
+    );
     assert!(effect.parameters.iter().all(|p| match p.value {
         EffectValue::F32(v) | EffectValue::LogicalPixels(v) => v.is_finite(),
         _ => true,
     }));
-    assert!(
-        argui_effects::registry()
-            .unwrap()
-            .definitions()
-            .iter()
-            .any(|d| d.id == LIQUID_GLASS_ID)
+    let registry = argui_effects::registry().unwrap();
+    let definition = registry
+        .definitions()
+        .iter()
+        .find(|d| d.id == LIQUID_GLASS_ID)
+        .unwrap();
+    assert_eq!(
+        definition.passes.iter().map(|p| p.name).collect::<Vec<_>>(),
+        ["blur-x", "blur-y", "glass"]
     );
 }
 
 #[test]
-fn gpu_glass_displaces_source_without_blur_and_seed_changes_the_image() {
+fn gpu_lens_matches_circle_profile_and_composes_blur_color_and_dispersion() {
     let instance = wgpu::Instance::default();
     let Ok(adapter) = pollster::block_on(instance.request_adapter(&Default::default())) else {
         eprintln!("No headless GPU adapter; skipping pixel assertions");
         return;
     };
     let (device, queue) = pollster::block_on(adapter.request_device(&Default::default())).unwrap();
-    let source = [
-        include_str!("../../argui-render/src/shaders/effects/custom_abi_header.wgsl"),
-        include_str!("../src/shaders/effects/liquid_glass.wgsl"),
-        include_str!("../../argui-render/src/shaders/effects/custom_abi_footer.wgsl"),
-    ]
-    .join("\n");
-    let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-        label: None,
-        source: wgpu::ShaderSource::Wgsl(source.into()),
-    });
-    let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: None,
-        layout: None,
-        vertex: wgpu::VertexState {
-            module: &shader,
-            entry_point: Some("vs_main"),
-            buffers: &[],
-            compilation_options: Default::default(),
-        },
-        fragment: Some(wgpu::FragmentState {
-            module: &shader,
-            entry_point: Some("fs_main"),
-            targets: &[Some(wgpu::ColorTargetState {
-                format: wgpu::TextureFormat::Rgba8Unorm,
-                blend: None,
-                write_mask: wgpu::ColorWrites::ALL,
-            })],
-            compilation_options: Default::default(),
-        }),
-        primitive: Default::default(),
-        depth_stencil: None,
-        multisample: Default::default(),
-        multiview_mask: None,
-        cache: None,
-    });
-
+    let registry = argui_effects::registry().unwrap();
+    let definition = registry
+        .definitions()
+        .iter()
+        .find(|d| d.id == LIQUID_GLASS_ID)
+        .unwrap();
+    let pipelines: Vec<_> = definition
+        .passes
+        .iter()
+        .map(|pass| {
+            let source = [
+                include_str!("../../argui-render/src/shaders/effects/custom_abi_header.wgsl"),
+                pass.wgsl,
+                include_str!("../../argui-render/src/shaders/effects/custom_abi_footer.wgsl"),
+            ]
+            .join("\n");
+            let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some(pass.name),
+                source: wgpu::ShaderSource::Wgsl(source.into()),
+            });
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some(pass.name),
+                layout: None,
+                vertex: wgpu::VertexState {
+                    module: &shader,
+                    entry_point: Some("vs_main"),
+                    buffers: &[],
+                    compilation_options: Default::default(),
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &shader,
+                    entry_point: Some("fs_main"),
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: wgpu::TextureFormat::Rgba8Unorm,
+                        blend: None,
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                    compilation_options: Default::default(),
+                }),
+                primitive: Default::default(),
+                depth_stencil: None,
+                multisample: Default::default(),
+                multiview_mask: None,
+                cache: None,
+            })
+        })
+        .collect();
+    let pixels: Vec<u8> = (0..32 * 32)
+        .flat_map(|i| {
+            let (x, y) = (i % 32, i / 32);
+            [
+                if (x / 3 + y / 4) % 2 == 0 { 255 } else { 0 },
+                (x * 255 / 32) as u8,
+                (y * 255 / 32) as u8,
+                255,
+            ]
+        })
+        .collect();
     let base = LiquidGlass::new()
         .refraction(0.0)
         .chromatic_aberration(0.0)
         .blur(0.0)
         .highlight(0.0)
-        .fresnel(0.0)
         .tint([0.0; 4])
-        .turbulence(1.0);
+        .saturation(1.0)
+        .brightness(0.0)
+        .depth_effect(false)
+        .edge_width(8.0);
     let render = |glass| {
         render_pixels(
             &device,
             &queue,
-            &pipeline,
-            32,
+            &pipelines,
             &effect(glass).packed_words(),
+            &pixels,
+            [0.0; 4],
         )
     };
     let identity = render(base);
-    // Every input pixel survives when all optical modifications are disabled.
-    for y in 0..32usize {
-        for x in 0..32usize {
-            let pixel = &identity[y * 256 + x * 4..y * 256 + x * 4 + 4];
-            let expected = [
-                if (x / 3 + y / 4).is_multiple_of(2) {
-                    255
-                } else {
-                    0
-                },
-                (x * 255 / 32) as u8,
-                (y * 255 / 32) as u8,
-                255,
-            ];
-            assert_eq!(pixel, expected);
-        }
+    for y in 0..32 {
+        assert_eq!(
+            &identity[y * 256..y * 256 + 128],
+            &pixels[y * 128..(y + 1) * 128]
+        );
     }
-    let warped = render(base.refraction(20.0).frequency(0.1));
-    let optical = render(base.refraction(12.0).turbulence(0.0));
-    assert_ne!(identity, optical, "curved rim refracts with noise disabled");
-    for y in 10..22usize {
-        for x in 10..22usize {
+    let optical = render(base.refraction(12.0));
+    assert_ne!(identity, optical);
+    // At the left edge the analytic Backdrop gradient points inward. Check the
+    // circle-map amount independently against the input's horizontal ramp.
+    let x = 1.0_f32 - 0.5 / 8.0;
+    let displacement = 12.0 * (1.0 - (1.0 - x * x).sqrt());
+    let lo = displacement.floor() as usize;
+    let t = displacement.fract();
+    let expected = (lo * 255 / 32) as f32 * (1.0 - t) + ((lo + 1) * 255 / 32) as f32 * t;
+    assert!((f32::from(optical[15 * 256 + 1]) - expected).abs() <= 1.0);
+    for y in 10..22 {
+        for x in 10..22 {
             let offset = y * 256 + x * 4;
             assert_eq!(
                 &identity[offset..offset + 4],
                 &optical[offset..offset + 4],
-                "flat center must remain undistorted"
+                "flat center stays sharp"
             );
         }
     }
-    assert_eq!(
-        identity,
-        render(base.refraction(12.0).turbulence(0.0).ior(1.0)),
-        "no optical refraction at IOR 1"
-    );
-    let other = render(base.refraction(20.0).frequency(0.1).seed(17));
+    assert_eq!(identity, render(base.refraction(12.0).edge_width(0.0)));
+    assert_ne!(optical, render(base.refraction(12.0).depth_effect(true)));
     assert_ne!(
-        identity, warped,
-        "refraction must move pixels even with blur disabled"
+        optical,
+        render(base.refraction(12.0).chromatic_aberration(1.0))
     );
-    assert_ne!(warped, other, "seed must change displacement");
+    let blurred = render(base.blur(3.0));
+    assert!(blurred[16 * 256 + 16 * 4] > 30 && blurred[16 * 256 + 16 * 4] < 225);
+    assert_ne!(identity, render(base.highlight(1.0)));
+    assert_ne!(identity, render(base.saturation(0.0)));
     assert_eq!(
-        warped,
-        render(base.refraction(20.0).frequency(0.1)),
-        "deterministic fractal noise"
-    );
-    let tint = render(base.tint([0.0, 0.0, 1.0, 1.0]));
-    assert_eq!(
-        &tint[16 * 256 + 16 * 4..16 * 256 + 16 * 4 + 4],
+        &render(base.tint([0.0, 0.0, 1.0, 1.0]))[16 * 256 + 64..16 * 256 + 68],
         &[0, 0, 255, 255]
     );
+    // Constant premultiplied translucent colors must survive all sampling
+    // operations, including rounded corners, without changing alpha or hue.
+    let translucent = [64, 32, 16, 128].repeat(32 * 32);
+    let output = render_pixels(
+        &device,
+        &queue,
+        &pipelines,
+        &effect(
+            base.refraction(12.0)
+                .blur(4.0)
+                .depth_effect(true)
+                .chromatic_aberration(1.0),
+        )
+        .packed_words(),
+        &translucent,
+        [8.0, 4.0, 12.0, 0.0],
+    );
+    for y in 0..32 {
+        for x in 0..32 {
+            let offset = y * 256 + x * 4;
+            for (actual, expected) in output[offset..offset + 4].iter().zip([64_u8, 32, 16, 128]) {
+                assert!(actual.abs_diff(expected) <= 1, "alpha-safe glass sample");
+            }
+        }
+    }
 }
 fn render_pixels(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
-    pipeline: &wgpu::RenderPipeline,
-    size: u32,
+    pipelines: &[wgpu::RenderPipeline],
     words: &[u32],
+    pixels: &[u8],
+    radii: [f32; 4],
 ) -> Vec<u8> {
+    let size = 32;
     let extent = wgpu::Extent3d {
         width: size,
         height: size,
@@ -193,22 +249,7 @@ fn render_pixels(
     let input = texture(wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST);
     queue.write_texture(
         input.as_image_copy(),
-        &(0..size * size)
-            .flat_map(|i| {
-                let x = i % size;
-                let y = i / size;
-                [
-                    if (x / 3 + y / 4).is_multiple_of(2) {
-                        255
-                    } else {
-                        0
-                    },
-                    (x * 255 / size) as u8,
-                    (y * 255 / size) as u8,
-                    255,
-                ]
-            })
-            .collect::<Vec<_>>(),
+        pixels,
         wgpu::TexelCopyBufferLayout {
             offset: 0,
             bytes_per_row: Some(size * 4),
@@ -216,10 +257,23 @@ fn render_pixels(
         },
         extent,
     );
-    let output = texture(wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC);
-    let input_view = input.create_view(&Default::default());
-    let output_view = output.create_view(&Default::default());
-    let sampler = device.create_sampler(&Default::default());
+    let outputs: Vec<_> = pipelines
+        .iter()
+        .map(|_| {
+            texture(
+                wgpu::TextureUsages::RENDER_ATTACHMENT
+                    | wgpu::TextureUsages::COPY_SRC
+                    | wgpu::TextureUsages::TEXTURE_BINDING,
+            )
+        })
+        .collect();
+    let mut views = vec![input.create_view(&Default::default())];
+    views.extend(outputs.iter().map(|t| t.create_view(&Default::default())));
+    let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+        mag_filter: wgpu::FilterMode::Linear,
+        min_filter: wgpu::FilterMode::Linear,
+        ..Default::default()
+    });
     let mut params = [0.0_f32; 60];
     params[..2].copy_from_slice(&[size as f32; 2]);
     for index in [4, 8, 12, 24] {
@@ -228,6 +282,7 @@ fn render_pixels(
     for index in [16, 20] {
         params[index..index + 4].copy_from_slice(&[0.0, 0.0, 1.0, 1.0]);
     }
+    params[28..32].copy_from_slice(&radii);
     let uniform = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: None,
         contents: &params
@@ -244,32 +299,6 @@ fn render_pixels(
             .collect::<Vec<_>>(),
         usage: wgpu::BufferUsages::STORAGE,
     });
-    let group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-        label: None,
-        layout: &pipeline.get_bind_group_layout(0),
-        entries: &[
-            wgpu::BindGroupEntry {
-                binding: 0,
-                resource: wgpu::BindingResource::TextureView(&input_view),
-            },
-            wgpu::BindGroupEntry {
-                binding: 1,
-                resource: wgpu::BindingResource::TextureView(&input_view),
-            },
-            wgpu::BindGroupEntry {
-                binding: 2,
-                resource: wgpu::BindingResource::Sampler(&sampler),
-            },
-            wgpu::BindGroupEntry {
-                binding: 3,
-                resource: uniform.as_entire_binding(),
-            },
-            wgpu::BindGroupEntry {
-                binding: 4,
-                resource: parameters.as_entire_binding(),
-            },
-        ],
-    });
     let readback = device.create_buffer(&wgpu::BufferDescriptor {
         label: None,
         size: u64::from(size) * 256,
@@ -277,11 +306,37 @@ fn render_pixels(
         mapped_at_creation: false,
     });
     let mut encoder = device.create_command_encoder(&Default::default());
-    {
+    for (index, pipeline) in pipelines.iter().enumerate() {
+        let group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: None,
+            layout: &pipeline.get_bind_group_layout(0),
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&views[index]),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::TextureView(&views[index]),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::Sampler(&sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: uniform.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 4,
+                    resource: parameters.as_entire_binding(),
+                },
+            ],
+        });
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: None,
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: &output_view,
+                view: &views[index + 1],
                 depth_slice: None,
                 resolve_target: None,
                 ops: wgpu::Operations {
@@ -299,7 +354,7 @@ fn render_pixels(
         pass.draw(0..3, 0..1);
     }
     encoder.copy_texture_to_buffer(
-        output.as_image_copy(),
+        outputs.last().unwrap().as_image_copy(),
         wgpu::TexelCopyBufferInfo {
             buffer: &readback,
             layout: wgpu::TexelCopyBufferLayout {

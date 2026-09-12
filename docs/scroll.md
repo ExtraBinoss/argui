@@ -114,9 +114,9 @@ The DevTools enable a subtle fade by default. Pass
 `.scroll_effect(None)` to `DevtoolsApp` or `DevtoolsHost` to disable it, or pass
 `Some(effect)` to replace it. Configure the renderer with
 `argui_devtools::configure_renderer(config)?`; this adds the required presets
-without removing application shader definitions. The gallery's GPU effects
-page includes virtual, horizontal and nested scroll examples and a custom
-progress-driven tint shader.
+without removing application shader definitions. The gallery's **Effects → Scroll shadow**
+page includes virtual, horizontal and nested scroll examples, with live shadow
+width and intensity controls.
 
 For a CPU-only resize comparison, run the DevTools `profiling` example with
 `--resize`, then `--resize --no-scroll-effects`. This does not measure GPU or

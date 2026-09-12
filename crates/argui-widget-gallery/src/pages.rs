@@ -1,8 +1,5 @@
 use argui::{
-    core::{Color, ColorInterpolation, Point, Rect},
-    paint::{
-        Border, CornerRadii, Fill, GradientStop, LayerMask, LayerStyle, LinearGradient, Shadow,
-    },
+    paint::{Border, CornerRadii},
     runtime::Entity,
     text::TextAlign,
     ui::{
@@ -15,7 +12,6 @@ use argui::{
         SelectOption, Slider, Switch, Tab, TablerIcon, Tabs, TextArea, WidgetAssets, WidgetTheme,
     },
 };
-use argui_effects::AnimatedGradient;
 
 use crate::{
     app::{WidgetGallery, text},
@@ -131,12 +127,8 @@ pub(crate) fn render(
         Page::Tooltip => cx.entity(&gallery.tooltip),
         Page::Layout => layout_system(theme),
         Page::Motion => motion(theme, cx.entity(&gallery.spinner)),
-        Page::Effects => Element::column([
-            cx.entity(&gallery.scroll_demo),
-            effects(theme),
-            cx.entity(&gallery.glass),
-        ])
-        .gap(24.0),
+        Page::LiquidGlass => cx.entity(&gallery.glass),
+        Page::ScrollShadow => cx.entity(&gallery.scroll_demo),
         Page::Typography => typography::render(theme),
         Page::WebView => cx.entity(&gallery.webview),
         Page::AsyncTasks => cx.entity(&gallery.tasks),
@@ -158,11 +150,13 @@ pub(crate) fn render(
         content,
     ])
     .width(percent(1.0))
-    .max_width(if gallery.page == Page::Effects {
-        percent(1.0)
-    } else {
-        length(920.0)
-    })
+    .max_width(
+        if matches!(gallery.page, Page::LiquidGlass | Page::ScrollShadow) {
+            percent(1.0)
+        } else {
+            length(920.0)
+        },
+    )
     .gap(24.0)
 }
 
@@ -465,81 +459,6 @@ fn motion(theme: &WidgetTheme, spinner: Element) -> Element {
         .gap(12.0),
         theme,
     )
-}
-
-fn effects(theme: &WidgetTheme) -> Element {
-    let gradient = LinearGradient::new(
-        Point::new(0.0, 0.0),
-        Point::new(1.0, 1.0),
-        ColorInterpolation::Oklab,
-        [
-            GradientStop::new(0.0, theme.primary),
-            GradientStop::new(1.0, Color::srgb(0.65, 0.20, 0.94)),
-        ],
-    )
-    .expect("the gallery gradient stops are sorted");
-    let custom = Element::container([
-        text("Custom WGSL", 20.0, Color::WHITE, 700),
-        text(
-            "Registered by the opt-in argui-effects crate",
-            13.0,
-            Color::WHITE,
-            500,
-        ),
-    ])
-    .width(percent(1.0))
-    .height(length(190.0))
-    .padding(Sides::length(22.0))
-    .gap(7.0)
-    .fill(Fill::Linear(gradient))
-    .radius(CornerRadii::all(16.0))
-    .layer(
-        LayerStyle::new(Rect::default())
-            .filter(AnimatedGradient::new(0.28).filter())
-            .shadow(Shadow::drop(
-                [0.0, 14.0],
-                32.0,
-                Color::srgba(0.0, 0.0, 0.0, 0.28),
-            ))
-            .mask(LayerMask::Rounded(CornerRadii::all(16.0))),
-    );
-    preview(
-        "Opt-in GPU effect registry",
-        "The gallery registers presets and renders every authored color through the same linear GPU pipeline.",
-        Element::column([custom, color_spaces(theme)]).gap(18.0),
-        theme,
-    )
-}
-
-fn color_spaces(theme: &WidgetTheme) -> Element {
-    let samples = [
-        ("OKLab", ColorInterpolation::Oklab),
-        ("linear sRGB", ColorInterpolation::LinearSrgb),
-        ("sRGB", ColorInterpolation::Srgb),
-    ];
-    Element::column(samples.map(|(label, interpolation)| {
-        let gradient = LinearGradient::new(
-            Point::default(),
-            Point::new(1.0, 0.0),
-            interpolation,
-            [
-                GradientStop::new(0.0, Color::from_srgb8(239, 68, 68)),
-                GradientStop::new(1.0, Color::from_srgb8(59, 130, 246)),
-            ],
-        )
-        .expect("the color-space sample stops are sorted");
-        Element::row([
-            text(label, 12.0, theme.muted_foreground, 600).width(length(92.0)),
-            Element::container([])
-                .grow(1.0)
-                .height(length(28.0))
-                .fill(Fill::Linear(gradient))
-                .radius(CornerRadii::all(7.0)),
-        ])
-        .align_items(AlignItems::CENTER)
-        .gap(12.0)
-    }))
-    .gap(8.0)
 }
 
 fn preview(title: &str, description: &str, content: Element, theme: &WidgetTheme) -> Element {

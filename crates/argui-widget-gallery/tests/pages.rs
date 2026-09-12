@@ -70,7 +70,8 @@ fn all_pages_keep_finite_layout_when_narrow_dark_or_reduced_motion() {
         ("tooltip", "Tooltip"),
         ("layout", "Web layout"),
         ("motion", "Motion & loading"),
-        ("effects", "GPU effects / WGSL"),
+        ("liquid-glass", "Liquid glass"),
+        ("scroll-shadow", "Scroll shadow"),
         ("typography", "Typography & selection"),
         ("custom-timeline", "Custom Timeline"),
     ] {

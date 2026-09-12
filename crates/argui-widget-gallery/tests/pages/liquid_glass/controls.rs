@@ -45,19 +45,19 @@ fn parameter(app: &Mount<WidgetGallery>, name: &str) -> EffectValue {
 }
 
 #[test]
-fn sliders_update_shader_parameters_clamp_and_reset_without_moving_pane() {
+fn sliders_update_shader_parameters_clamp_and_reset_without_moving_navigation() {
     let app = Entity::new(WidgetGallery::default()).mount().unwrap();
-    click(&app, "nav::effects");
+    click(&app, "nav::liquid-glass");
     let initial = filter(&app);
     for (key, name, min, max, pixels) in [
         ("glass-strength", "refraction", 0.0, 64.0, true),
         ("glass-blur", "blur", 0.0, 16.0, true),
-        ("glass-ior", "ior", 1.0, 2.5, false),
         ("glass-edge", "edge-width", 0.0, 64.0, true),
-        ("glass-fresnel", "fresnel", 0.0, 1.0, false),
         ("glass-highlight", "highlight", 0.0, 1.0, false),
-        ("glass-chroma", "chromatic-aberration", 0.0, 8.0, true),
+        ("glass-chroma", "chromatic-aberration", 0.0, 1.0, false),
         ("glass-saturation", "saturation", 0.0, 4.0, false),
+        ("glass-brightness", "brightness", -1.0, 1.0, false),
+        ("glass-contrast", "contrast", 0.0, 4.0, false),
     ] {
         for (requested, expected) in [(-100.0, min), (100.0, max)] {
             set(&app, key, requested);
@@ -111,25 +111,18 @@ fn sliders_update_shader_parameters_clamp_and_reset_without_moving_pane() {
 }
 
 #[test]
-fn noise_controls_are_inactive_until_enabled_and_keep_settings_when_toggled() {
+fn depth_and_tint_are_independent_and_reset_restores_enabled_effect() {
     let app = Entity::new(WidgetGallery::default()).mount().unwrap();
-    click(&app, "nav::effects");
+    click(&app, "nav::liquid-glass");
     let initial = filter(&app);
-    set(&app, "glass-frequency", 0.5);
-    set(&app, "glass-turbulence", 0.5);
+    click(&app, "glass-depth");
+    assert_eq!(parameter(&app, "depth-effect"), EffectValue::Bool(true));
+    click(&app, "glass-depth");
     assert_eq!(filter(&app), initial);
-    click(&app, "glass-noise");
-    set(&app, "glass-frequency", 0.5);
-    set(&app, "glass-turbulence", 0.5);
-    assert_eq!(
-        parameter(&app, "wavelength"),
-        EffectValue::LogicalPixels(2.0)
-    );
-    assert_eq!(parameter(&app, "turbulence"), EffectValue::F32(0.5));
-    click(&app, "glass-noise");
-    assert_eq!(parameter(&app, "turbulence"), EffectValue::F32(0.0));
-    click(&app, "glass-noise");
-    assert_eq!(parameter(&app, "turbulence"), EffectValue::F32(0.5));
+    click(&app, "glass-enable");
+    assert!(filter(&app).is_none());
+    click(&app, "glass-reset");
+    assert_eq!(filter(&app), initial);
 }
 
 #[test]
@@ -140,7 +133,7 @@ fn blur_drag_uses_track_geometry_cancels_and_supports_keyboard() {
         ui::{GestureDelivery, GestureEvent, GestureKind, GesturePhase},
     };
     let app = Entity::new(WidgetGallery::default()).mount().unwrap();
-    click(&app, "nav::effects");
+    click(&app, "nav::liquid-glass");
     let initial = parameter(&app, "blur");
     let mut tree = UiTree::new(app.render(Default::default()).unwrap());
     let node = tree

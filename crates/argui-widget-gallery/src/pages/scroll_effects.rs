@@ -1,37 +1,17 @@
 use crate::app::text;
 use argui::{
     core::Color,
-    paint::{Border, CornerRadii, EffectId, EffectInstance, EffectValue, Filter, LayerStyle},
-    render::{EffectDefinition, EffectParameter, EffectParameterType, EffectPassDefinition},
+    paint::{Border, CornerRadii},
     runtime::{Context, Render},
     ui::{
         AlignItems, Axes, Element, EventType, JustifyContent, Overflow, ScrollConfig, ScrollEffect,
-        ScrollMetric, Sides, UiEventKind, length, percent,
+        Sides, UiEventKind, length, percent,
     },
     widgets::{Button, VList, WidgetTheme, shadcn},
 };
-use argui_effects::{EdgeFade, EdgeShadow};
-
-const TINT: EffectId = EffectId::new("gallery.scroll.progress-tint");
-const PARAMETERS: &[EffectParameter] =
-    &[EffectParameter::new("progress", EffectParameterType::Vec2)];
-const PASSES: &[EffectPassDefinition] = &[EffectPassDefinition::fragment(
-    "tint",
-    r"
-fn argui_effect(uv: vec2<f32>, source: vec4<f32>, backdrop: vec4<f32>) -> vec4<f32> {
-    let progress = max(argui_param_f32(0u), argui_param_f32(1u));
-    let tint = argui_srgb_to_linear(vec3<f32>(0.25, 0.55, 1.0));
-    return vec4<f32>(mix(source.rgb, tint, progress * 0.65), source.a);
-}
-",
-)];
-
-pub(crate) fn definition() -> EffectDefinition {
-    EffectDefinition::new(TINT, PARAMETERS, PASSES)
-}
+use argui_effects::EdgeShadow;
 
 pub(crate) struct ScrollDemo {
-    mode: usize,
     width: f32,
     intensity: f32,
     offset: f32,
@@ -40,7 +20,6 @@ pub(crate) struct ScrollDemo {
 impl Default for ScrollDemo {
     fn default() -> Self {
         Self {
-            mode: 0,
             width: 20.0,
             intensity: 1.0,
             offset: 0.0,
@@ -50,16 +29,9 @@ impl Default for ScrollDemo {
 
 impl ScrollDemo {
     fn effect(&self) -> ScrollEffect {
-        match self.mode {
-            0 => EdgeFade::new(self.width).intensity(self.intensity).scroll(),
-            1 => EdgeShadow::new(self.width, Color::srgba(0.0, 0.0, 0.0, 0.65))
-                .intensity(self.intensity)
-                .scroll(),
-            _ => ScrollEffect::new(LayerStyle::new(Default::default()).filter(Filter::Effect(
-                EffectInstance::new(TINT, [("progress", EffectValue::Vec2([0.0; 2]))]),
-            )))
-            .bind(0, "progress", ScrollMetric::Progress),
-        }
+        EdgeShadow::new(self.width, Color::srgba(0.0, 0.0, 0.0, 0.65))
+            .intensity(self.intensity)
+            .scroll()
     }
 
     fn horizontal(&self, theme: &WidgetTheme) -> Element {
@@ -110,70 +82,33 @@ impl Render for ScrollDemo {
     fn render(&mut self, cx: &mut Context<Self>) -> Element {
         let themes = shadcn(cx.environment().primary);
         let theme = themes.resolve(cx.environment().color_scheme);
-        let modes = Element::row(
-            ["Fade", "Shadow", "Custom WGSL"]
-                .into_iter()
-                .enumerate()
-                .map(|(index, label)| {
-                    Button::new(
-                        format!("scroll-mode-{index}"),
-                        label,
-                        if self.mode == index {
-                            theme.button()
-                        } else {
-                            theme.ghost_button()
-                        },
-                    )
-                    .build()
-                }),
-        )
-        .gap(4.0)
-        .flex_wrap(argui::ui::FlexWrap::Wrap);
-        let settings = if self.mode == 2 {
-            text(
-                "The custom shader changes tint with scroll progress.",
-                12.0,
-                theme.muted_foreground,
-                400,
-            )
-        } else {
-            Element::row([
-                setting(
-                    "Width",
-                    &format!("{} px", self.width),
-                    "scroll-width",
-                    theme,
-                ),
-                setting(
-                    "Intensity",
-                    &format!("{:.0}%", self.intensity * 100.0),
-                    "scroll-intensity",
-                    theme,
-                ),
-            ])
-            .gap(16.0)
-            .flex_wrap(argui::ui::FlexWrap::Wrap)
-        };
-        let controls = Element::column([modes, settings])
-            .keyed("scroll-effect-controls")
-            .gap(8.0)
-            .on(cx.listener(EventType::Click, |demo, event, cx| {
-                match event.target_key() {
-                    Some("scroll-mode-0") => demo.mode = 0,
-                    Some("scroll-mode-1") => demo.mode = 1,
-                    Some("scroll-mode-2") => demo.mode = 2,
-                    Some("scroll-width-less") => demo.width = (demo.width - 10.0).max(0.0),
-                    Some("scroll-width-more") => demo.width = (demo.width + 10.0).min(60.0),
-                    Some("scroll-intensity-less") => {
-                        demo.intensity = (demo.intensity - 0.25).max(0.0)
-                    }
-                    Some("scroll-intensity-more") => {
-                        demo.intensity = (demo.intensity + 0.25).min(1.0)
-                    }
-                    _ => return,
-                }
-                cx.notify();
-            }));
+        let controls = Element::row([
+            setting(
+                "Width",
+                &format!("{} px", self.width),
+                "scroll-width",
+                theme,
+            ),
+            setting(
+                "Intensity",
+                &format!("{:.0}%", self.intensity * 100.0),
+                "scroll-intensity",
+                theme,
+            ),
+        ])
+        .gap(16.0)
+        .flex_wrap(argui::ui::FlexWrap::Wrap)
+        .keyed("scroll-effect-controls")
+        .on(cx.listener(EventType::Click, |demo, event, cx| {
+            match event.target_key() {
+                Some("scroll-width-less") => demo.width = (demo.width - 10.0).max(0.0),
+                Some("scroll-width-more") => demo.width = (demo.width + 10.0).min(60.0),
+                Some("scroll-intensity-less") => demo.intensity = (demo.intensity - 0.25).max(0.0),
+                Some("scroll-intensity-more") => demo.intensity = (demo.intensity + 0.25).min(1.0),
+                _ => return,
+            }
+            cx.notify();
+        }));
         let list = VList::new("scroll-demo-list", 32.0, 220.0, self.offset)
             .propagation(argui::ui::ScrollPropagation::Contain)
             .effect(self.effect())
@@ -252,8 +187,8 @@ impl Render for ScrollDemo {
             )
             .scrollbar_gutter(argui::ui::ScrollbarGutter::Stable);
         super::preview(
-            "Scroll-driven effects",
-            "Scroll each panel to reveal the effect at its edges. Compare a fade, a shadow and a custom shader.",
+            "Shadows that follow the content",
+            "A shadow appears only where more content is available. Try the list and the nested views.",
             Element::column([
                 controls,
                 frame(

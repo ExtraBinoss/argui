@@ -154,6 +154,14 @@ saisie dans Input, Textarea et Select. Les captures clair/sombre vont dans
 `target/navigation-interactions/`. Les tests Rust vérifient aussi les couleurs
 intermédiaires des libellés de boutons, les inversions rapides et le mouvement réduit.
 
+Pour Liquid Glass, utiliser
+`node crates/argui-widget-gallery/tests/pages/liquid_glass.mjs`. Le scénario
+vérifie l'enregistrement des icônes, le défilement du contenu derrière la barre
+fixe, les trois sections et les réglages. Les captures dans
+`target/liquid-glass-web/` incluent la barre avant/après scroll et la page entière.
+Les tests Rust comparent aussi la réfraction GPU à la formule du shader source,
+la conservation de l'alpha et le layout à plusieurs largeurs.
+
 ## Contrôle final
 
 Pour les réglages de flou de bureau, utiliser

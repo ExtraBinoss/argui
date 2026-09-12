@@ -43,7 +43,7 @@ impl WidgetGallery {
         .leading(assets.icon(TablerIcon::Search, 16.0), 38.0)
         .build();
         let mut children = vec![search];
-        for category in ["Widgets", "Examples"] {
+        for category in ["Widgets", "Effects", "Examples"] {
             let pages = Page::ALL
                 .into_iter()
                 .filter(|page| page.category() == category && page.matches(&self.search))
@@ -67,6 +67,7 @@ impl WidgetGallery {
         let mut sidebar = Element::column(children)
             .keyed("gallery-sidebar")
             .width(length(260.0))
+            .shrink(0.0)
             .height(percent(1.0))
             .padding(Sides::length(16.0))
             .gap(9.0)
