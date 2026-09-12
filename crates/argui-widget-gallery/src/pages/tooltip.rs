@@ -123,7 +123,7 @@ impl Render for TooltipDemo {
                 )
                 .placement(FloatingPlacement::new(Placement::BottomStart))
                 .max_width(236.0)
-                .paint(surface.paint(theme))
+                .paint(surface.paint(theme, cx.environment().color_scheme))
                 .layer(surface.layer(theme))
                 .build(theme);
                 surface.card(tooltip, theme)

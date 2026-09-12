@@ -34,13 +34,15 @@ impl UiTree {
         event: PointerEvent,
         regions: &[HitRegion],
     ) -> InteractionUpdate {
-        let hit = regions
+        let region = regions
             .iter()
             .rev()
-            .find(|region| region.contains(event.position))
+            .find(|region| region.contains(event.position));
+        // Disabled controls still belong to the panel containing them.
+        let hit_node = region.map(|region| region.node);
+        let hit = region
             .filter(|region| region.enabled)
             .map(|region| (region.node, region.gestures));
-        let hit_node = hit.map(|(node, _)| node);
         let gestures = self.gestures.update(event, hit);
         let mut update = if event.kind == PointerKind::Touch && !event.primary {
             InteractionUpdate::default()

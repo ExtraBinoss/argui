@@ -93,6 +93,9 @@ pour contrôler la lisibilité du style commun à toutes les surfaces flottantes
 Il vérifie aussi les infobulles par défaut de Button, leur retour après un clic
 sans perte de focus, leur fermeture à l'ouverture d'un panneau, et capture les
 deux états du switch dans le popover.
+Il clique dans les titres, descriptions et marges des popovers, active les
+téléchargements dans **Link options**, puis vérifie que les fermetures par
+Échap ou clic extérieur respectent les deux niveaux imbriqués.
 
 Ouvrir les fichiers de capture avec l'outil de lecture d'images de l'agent,
 sans visionneuse graphique sur le bureau. Vérifier texte complet, contraste,

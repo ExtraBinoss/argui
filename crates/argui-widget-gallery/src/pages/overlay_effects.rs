@@ -1,6 +1,6 @@
 use crate::app::text;
 use argui::{
-    core::Color,
+    core::{Color, ColorScheme},
     paint::{
         Border, CornerRadii, EffectId, EffectInstance, EffectValue, Filter, LayerStyle, PaintStyle,
         QuadStyle,
@@ -59,7 +59,7 @@ impl Surface {
         let layer = theme.overlay_layer(8.0, 0.0);
         match self {
             Self::Solid => layer,
-            Self::Frosted => layer.backdrop(argui_effects::Blur(theme.overlay_blur).filter()),
+            Self::Frosted => layer.backdrop(argui_effects::Blur(6.0).filter()),
             Self::Prism => layer.backdrop(Filter::Effect(EffectInstance::new(
                 PRISM,
                 [("strength", EffectValue::F32(0.42))],
@@ -67,10 +67,12 @@ impl Surface {
         }
     }
 
-    pub(crate) fn paint(self, theme: &WidgetTheme) -> PaintStyle {
-        let alpha = match self {
-            Self::Solid => 1.0,
-            Self::Frosted | Self::Prism => 0.90,
+    pub(crate) fn paint(self, theme: &WidgetTheme, scheme: ColorScheme) -> PaintStyle {
+        let alpha = match (self, scheme) {
+            (Self::Solid, _) => 1.0,
+            (Self::Frosted, ColorScheme::Light) => 0.45,
+            (Self::Frosted, ColorScheme::Dark) => 0.84,
+            (Self::Prism, _) => 0.90,
         };
         PaintStyle::new(
             QuadStyle::solid(theme.popover.with_alpha(alpha))
@@ -83,7 +85,7 @@ impl Surface {
         let background = Element::column((0..6).map(|index| {
             Element::row([
                 Element::container([])
-                    .width(length(7.0))
+                    .width(length(28.0))
                     .height(length(22.0))
                     .background(if index % 2 == 0 {
                         Color::from_srgb8(91, 115, 241)

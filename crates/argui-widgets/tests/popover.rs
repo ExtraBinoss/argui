@@ -343,3 +343,116 @@ fn popover_behavior_only_toggles_trigger_and_ignores_non_escape_close_events() {
         Some(PopoverAction::Close)
     );
 }
+
+#[test]
+fn panel_text_padding_and_nested_popovers_are_inside_click_targets() {
+    use argui_core::Size;
+    use argui_ui::{EventHandlerId, EventListener, EventOwnerId, EventType, length};
+    let themes = shadcn(Color::BLACK);
+    let theme = themes.resolve(argui_core::ColorScheme::Light);
+    let build = |nested| {
+        Popover::new(
+            "parent",
+            "Parent",
+            true,
+            Element::text("Open"),
+            Element::column([
+                Element::text("Panel title").keyed("title"),
+                Element::text("Panel description").keyed("description"),
+                Element::text("Unavailable option")
+                    .keyed("disabled")
+                    .interaction(argui_ui::Interaction::default().enabled(false)),
+                Popover::new(
+                    "child",
+                    "Child",
+                    nested,
+                    Element::text("More settings").height(length(30.0)),
+                    Element::text("Nested description").keyed("nested-description"),
+                )
+                .size(180.0, 200.0)
+                .placement(FloatingPlacement::new(Placement::RightStart))
+                .build(theme),
+            ])
+            .gap(12.0),
+        )
+        .build(theme)
+        .on(EventListener::new(
+            EventType::PointerOutside,
+            EventHandlerId::new(EventOwnerId(1), 0),
+        ))
+    };
+    let mut tree = UiTree::new(build(false));
+    let mut engine = argui_layout::LayoutEngine::new();
+    let mut text = argui_text::TextEngine::from_embedded_fonts(
+        [include_bytes!("../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf").as_slice()],
+        "Noto Sans",
+        "Noto Sans",
+        "Noto Sans",
+    );
+    for nested in [false, true] {
+        tree.update(build(nested));
+        let layout = engine
+            .compute(&mut tree, &mut text, Size::new(900.0, 600.0))
+            .unwrap();
+        let bounds = |key| {
+            layout
+                .nodes
+                .iter()
+                .find(|node| tree.key(node.node) == Some(key))
+                .unwrap()
+                .bounds
+        };
+        let targets = if nested {
+            vec![
+                (bounds("nested-description"), None),
+                (bounds("child::content"), None),
+                (bounds("title"), Some("child::content")),
+            ]
+        } else {
+            vec![
+                (bounds("title"), None),
+                (bounds("description"), None),
+                (bounds("disabled"), None),
+                (bounds("parent::content"), None),
+            ]
+        };
+        // The panel's top-left inset exercises padding, outside any child hit region.
+        for (rect, expected) in targets {
+            let point = Point::new(rect.origin.x + 2.0, rect.origin.y + 2.0);
+            let update = tree.pointer_event(
+                PointerEvent::mouse(PointerPhase::Pressed, point),
+                &layout.hit_regions,
+            );
+            let outside = update
+                .events
+                .iter()
+                .find(|event| matches!(event.kind, UiEventKind::PointerOutside(_)));
+            assert_eq!(
+                outside.and_then(UiEvent::target_key),
+                expected,
+                "{point:?}, nested={nested}"
+            );
+            tree.pointer_event(
+                PointerEvent::mouse(PointerPhase::Released, point),
+                &layout.hit_regions,
+            );
+        }
+        let update = tree.pointer_event(
+            PointerEvent::mouse(PointerPhase::Pressed, Point::new(850.0, 550.0)),
+            &layout.hit_regions,
+        );
+        let outside = update
+            .events
+            .iter()
+            .find(|event| matches!(event.kind, UiEventKind::PointerOutside(_)))
+            .unwrap();
+        assert_eq!(
+            outside.target_key(),
+            Some(if nested {
+                "child::content"
+            } else {
+                "parent::content"
+            })
+        );
+    }
+}

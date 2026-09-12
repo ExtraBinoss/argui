@@ -104,8 +104,42 @@ try {
                 assert.equal(await expanded(trigger), 'false');
                 await click(trigger);
             } else if (label === 'Sharing settings') {
+                const panel = '[role="group"][aria-label="Sharing settings"]';
+                const clickInside = async selector => {
+                    const r = await rect(selector);
+                    for (const [x, y] of [[2, 2], [35, 22], [35, 54], [r.width - 3, r.height - 3]]) {
+                        await page.mouse.click(r.x + x, r.y + y); await pause();
+                        assert.equal(await expanded(trigger), 'true', 'Panel text and padding keep the parent open');
+                        assert.ok(await page.$(selector), 'The clicked panel stays open');
+                    }
+                };
+                await clickInside(panel);
                 await click('[role="switch"][aria-label="Anyone with the link"]');
-                await capture(`${scheme}-popover-switch-on`);
+                await capture(`${scheme}-popover-switch-toggled`);
+                const nested = button('Link options');
+                const child = '[role="group"][aria-label="Link options"]';
+                await click(nested);
+                assert.equal(await expanded(nested), 'true');
+                await clickInside(child);
+                const downloads = '[role="switch"][aria-label="Allow downloads"]';
+                const before = await page.$eval(downloads, element => element.getAttribute('aria-checked'));
+                await click(downloads);
+                assert.notEqual(await page.$eval(downloads, element => element.getAttribute('aria-checked')), before);
+                assert.equal(await expanded(trigger), 'true');
+                assert.equal(await tips(), 0, 'Nested popovers suppress automatic help');
+                await capture(`${scheme}-popover-nested`);
+                await page.keyboard.press('Escape'); await pause();
+                assert.equal(await expanded(nested), 'false', 'Escape closes the inner panel first');
+                assert.equal(await expanded(trigger), 'true');
+                await click(nested);
+                const r = await rect(panel);
+                await page.mouse.click(r.x + 35, r.y + 22); await pause();
+                assert.equal(await expanded(nested), 'false', 'Clicking the parent closes only the child');
+                assert.equal(await expanded(trigger), 'true');
+                await click(nested);
+                await page.mouse.click(1100, 820); await pause();
+                assert.equal(await expanded(nested), 'false', 'Outside click closes the top panel');
+                assert.equal(await expanded(trigger), 'true');
             } else {
                 await click(button('Rose'));
             }

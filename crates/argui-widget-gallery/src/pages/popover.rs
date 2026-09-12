@@ -1,6 +1,7 @@
 use argui::{
+    core::{Key, KeyState},
     runtime::{Context, Render},
-    ui::{Element, EventType, FlexWrap, UiEvent, UiEventKind},
+    ui::{Element, EventType, FlexWrap, FloatingPlacement, Placement, UiEvent, UiEventKind},
     widgets::{Button, Input, Popover, PopoverAction, PopoverBehavior, Switch, shadcn},
 };
 
@@ -9,12 +10,15 @@ use crate::app::text;
 
 const KEYS: [&str; 3] = ["popover-project", "popover-sharing", "popover-color"];
 const LABELS: [&str; 3] = ["Rename project", "Sharing settings", "Choose accent"];
+const NESTED: &str = "popover-link-options";
 
 pub(crate) struct PopoverDemo {
     open: Option<usize>,
     name: String,
     saved: String,
     sharing: bool,
+    link_options: bool,
+    downloads: bool,
     color: usize,
 }
 
@@ -25,6 +29,8 @@ impl Default for PopoverDemo {
             name: "Studio notes".into(),
             saved: "Studio notes".into(),
             sharing: false,
+            link_options: false,
+            downloads: false,
             color: 0,
         }
     }
@@ -33,9 +39,34 @@ impl Default for PopoverDemo {
 impl PopoverDemo {
     pub(crate) fn close(&mut self) {
         self.open = None;
+        self.link_options = false;
+    }
+
+    pub(crate) fn dismiss(&mut self, event: &UiEvent) -> bool {
+        if !matches!(&event.kind, UiEventKind::KeyInput(input)
+            if input.key == Key::Escape && input.state == KeyState::Pressed)
+        {
+            return false;
+        }
+        if self.link_options {
+            self.link_options = false;
+            true
+        } else {
+            self.open.take().is_some()
+        }
     }
 
     fn event(&mut self, event: &UiEvent, cx: &mut Context<Self>) {
+        // Address the inner panel before considering the parent.
+        if self.open == Some(1)
+            && let Some(action) =
+                PopoverBehavior::new(NESTED, "Link options", self.link_options).action(event)
+        {
+            self.link_options = action == PopoverAction::Toggle && !self.link_options;
+            event.stop_propagation();
+            cx.notify();
+            return;
+        }
         for (index, key) in KEYS.into_iter().enumerate() {
             if let Some(action) =
                 PopoverBehavior::new(key, LABELS[index], self.open == Some(index)).action(event)
@@ -44,6 +75,7 @@ impl PopoverDemo {
                     PopoverAction::Toggle if self.open != Some(index) => Some(index),
                     _ => None,
                 };
+                self.link_options = false;
                 event.stop_propagation();
                 cx.notify();
                 return;
@@ -53,9 +85,12 @@ impl PopoverDemo {
             (UiEventKind::TextChanged(value), Some("popover-name")) => self.name.clone_from(value),
             (UiEventKind::Click(_), Some("popover-save")) => {
                 self.saved.clone_from(&self.name);
-                self.open = None;
+                self.close();
             }
             (UiEventKind::Click(_), Some("popover-sharing-toggle")) => self.sharing = !self.sharing,
+            (UiEventKind::Click(_), Some("popover-downloads-toggle")) => {
+                self.downloads = !self.downloads
+            }
             (UiEventKind::Click(_), Some(key)) if key.starts_with("popover-accent-") => {
                 self.color = match key {
                     "popover-accent-rose" => 1,
@@ -106,6 +141,43 @@ impl Render for PopoverDemo {
                     theme.foreground,
                     400,
                 ),
+                Popover::new(
+                    NESTED,
+                    "Link options",
+                    self.link_options,
+                    Button::new(NESTED, "Link options", theme.outline_button()).build(),
+                    Element::column([
+                        text("Download permissions", 15.0, theme.foreground, 600),
+                        text(
+                            "Choose what visitors can save.",
+                            13.0,
+                            theme.foreground,
+                            400,
+                        ),
+                        Switch::new(
+                            "popover-downloads-toggle",
+                            "Allow downloads",
+                            self.downloads,
+                        )
+                        .build(theme),
+                        text(
+                            if self.downloads {
+                                "Downloads allowed"
+                            } else {
+                                "View only"
+                            },
+                            13.0,
+                            theme.foreground,
+                            400,
+                        ),
+                    ])
+                    .gap(12.0),
+                )
+                .placement(FloatingPlacement::new(Placement::RightEnd))
+                .size(236.0, 240.0)
+                .paint(Surface::Frosted.paint(theme, cx.environment().color_scheme))
+                .layer(Surface::Frosted.layer(theme))
+                .build(theme),
             ])
             .gap(12.0),
             Element::column([
@@ -147,7 +219,7 @@ impl Render for PopoverDemo {
                         content,
                     )
                     .size(236.0, 300.0)
-                    .paint(surface.paint(theme))
+                    .paint(surface.paint(theme, cx.environment().color_scheme))
                     .layer(surface.layer(theme))
                     .build(theme);
                     surface.card(popover, theme)
@@ -168,7 +240,6 @@ impl Render for PopoverDemo {
         .gap(18.0)
         .on(cx.listener(EventType::Click, Self::event))
         .on(cx.listener(EventType::Input, Self::event))
-        .on(cx.listener(EventType::Key, Self::event))
         .on(cx.listener(EventType::PointerOutside, Self::event))
     }
 }

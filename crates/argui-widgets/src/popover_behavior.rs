@@ -69,9 +69,13 @@ impl PopoverBehavior {
                         .action(SemanticAction::Expand)
                         .action(SemanticAction::Collapse),
                 ),
-            PopoverPart::Content => element
-                .keyed(self.content_key())
-                .semantics(Semantics::new(Role::Group).label(self.label.clone())),
+            PopoverPart::Content => {
+                let mut content = element
+                    .keyed(self.content_key())
+                    .semantics(Semantics::new(Role::Group).label(self.label.clone()));
+                content.interaction.get_or_insert_with(Interaction::blocker);
+                content
+            }
         }
     }
 

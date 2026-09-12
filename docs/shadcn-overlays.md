@@ -7,7 +7,13 @@ La galerie expose **Popover** et **Tooltip** dans sa liste alphabétique, align�
 
 Popover présente trois panneaux : renommer un projet, régler le partage et
 choisir un accent. Le bouton ouvre ou ferme son panneau ; le clic extérieur et
-Échap le ferment. Les champs et boutons du panneau restent interactifs.
+Échap le ferment. Toute la boîte reçoit les clics, y compris le titre, la
+description et les marges : ces clics ne ferment pas le panneau.
+Le partage propose aussi **Link options**, un second popover qui permet
+d'autoriser les téléchargements. Ses clics restent intérieurs au parent.
+Échap ou un clic hors du panneau supérieur ferment ce niveau ; le parent
+reste ouvert jusqu'à sa propre fermeture. L'exemple traite les événements
+du popover enfant avant ceux du parent et réinitialise l'enfant avec le parent.
 
 Tooltip fournit une description au survol ou au focus clavier. `TooltipState`
 attend 350 ms au survol (délai configurable), annule les passages rapides,
@@ -69,8 +75,9 @@ du contenu, filtres d'arrière-plan, masque, ombres et opacité. Aucun preset
 
 ```rust
 let layer = theme.overlay_layer(8.0, 0.0)
-    .backdrop(argui_effects::Blur(3.0).filter());
+    .backdrop(argui_effects::Blur(6.0).filter());
 let popover = Popover::new("settings", "Settings", open, trigger, content)
+    .paint(PaintStyle::new(QuadStyle::solid(theme.popover.with_alpha(opacity))))
     .layer(layer)
     .build(&theme);
 ```
@@ -79,11 +86,14 @@ Pour voir le flou à travers le fond du panneau, fournir aussi une peinture
 translucide avec `.paint(...)`. Une peinture opaque le masque. `.layer(...)`
 remplace la couche entière, y compris le flou et les ombres par défaut.
 
-Le flou et la teinte sont indépendants. `Blur(3.0)` règle l'intensité du flou ;
+Le flou et la teinte sont indépendants. `Blur(6.0)` règle l'intensité du flou ;
 une valeur plus petite conserve davantage de détails derrière le panneau.
 La couleur fournie à `QuadStyle::solid(...)` règle la teinte, et son
-`.with_alpha(0.90)` règle l'opacité : `0.0` est transparent, `1.0` opaque.
-La démo reprend `theme.overlay_blur` (`3.0`) et une opacité de `0.90`.
+`.with_alpha(opacity)` règle l'opacité : `0.0` est transparent, `1.0` opaque.
+La démo floutée utilise un rayon de `6.0`, une opacité de `0.45` en clair et
+de `0.84` en sombre : une teinte blanche trop opaque masque rapidement le flou.
+Les panneaux ordinaires
+conservent `theme.overlay_blur` (`3.0`) et leur peinture opaque.
 Un flou plus faible ne rend pas une surface plus lisible à lui seul : une
 opacité suffisante évite que le texte derrière concurrence celui du panneau.
 Ces réglages fonctionnent aussi bien pour Popover que pour Tooltip.

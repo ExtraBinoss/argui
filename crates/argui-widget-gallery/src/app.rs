@@ -322,6 +322,19 @@ impl WidgetGallery {
 
 impl WidgetGallery {
     fn handle_event(&mut self, event: &UiEvent, cx: &mut Context<Self>) {
+        if self.page == Page::Popover {
+            let dismissed = self.popover.update(|demo, cx| {
+                let dismissed = demo.dismiss(event);
+                if dismissed {
+                    cx.notify();
+                }
+                dismissed
+            });
+            if dismissed {
+                event.stop_propagation();
+                return;
+            }
+        }
         if self.page == Page::Tooltip
             && matches!(&event.kind, UiEventKind::KeyInput(input) if input.key == Key::Escape)
         {
