@@ -80,6 +80,30 @@ fn boolean_and_exclusive_controls_publish_controlled_state() {
 }
 
 #[test]
+fn switch_track_and_thumb_remain_distinct_on_floating_surfaces_in_both_themes() {
+    let themes = shadcn(Color::srgb(0.2, 0.5, 0.9));
+    for scheme in [ColorScheme::Light, ColorScheme::Dark] {
+        let theme = themes.resolve(scheme);
+        for checked in [false, true] {
+            let switch = Switch::new("sharing", "Anyone with the link", checked).build(theme);
+            let track = &switch.children[0];
+            let Some(argui_paint::Fill::Solid(track_color)) = track.paint.quad.background else {
+                panic!("switch track must have a visible fill");
+            };
+            let Some(argui_paint::Fill::Solid(thumb_color)) =
+                track.children[0].paint.quad.background
+            else {
+                panic!("switch thumb must have a visible fill");
+            };
+            assert!(thumb_color.contrast_ratio(track_color) >= 3.0);
+            if !checked {
+                assert!(track_color.contrast_ratio(theme.popover) >= 3.0);
+            }
+        }
+    }
+}
+
+#[test]
 fn switch_thumb_uses_a_retained_transform_transition() {
     let themes = shadcn(Color::srgb(0.2, 0.5, 0.9));
     let theme = themes.resolve(ColorScheme::Dark);

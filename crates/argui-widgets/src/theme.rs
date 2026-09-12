@@ -33,6 +33,8 @@ pub struct WidgetTheme {
     pub destructive_foreground: Color,
     pub border: Color,
     pub input_border: Color,
+    pub switch_unchecked: Color,
+    pub switch_thumb: Color,
     pub ring: Color,
     pub overlay_blur: f32,
     /// Shared floating-panel elevation. Clear this vector to disable shadows.
@@ -111,6 +113,8 @@ fn widgets(scheme: ColorScheme, primary: Color) -> WidgetTheme {
         destructive_foreground: Color::WHITE,
         border,
         input_border: border,
+        switch_unchecked: Color::from_srgb8(113, 113, 122),
+        switch_thumb: Color::WHITE,
         ring: primary,
         overlay_blur: 3.0,
         overlay_shadows: vec![Shadow::drop(

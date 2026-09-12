@@ -38,6 +38,17 @@ try {
     const expanded = selector => page.$eval(selector, element => element.getAttribute('aria-expanded'));
     for (const scheme of ['light', 'dark']) {
         await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: scheme }]);
+        const tips = () => page.$$eval('[role="tooltip"]', elements => elements.length);
+        await navigate('Button');
+        await page.mouse.move(...await point(button('Primary'))); await pause(550);
+        assert.equal(await tips(), 1, 'Buttons show their tooltip by default');
+        await capture(`${scheme}-button-tooltip`);
+        await click(button('Primary'));
+        assert.equal(await tips(), 0, 'Activation dismisses help');
+        await page.mouse.move(1100, 820); await pause(200);
+        await page.mouse.move(...await point(button('Primary'))); await pause(550);
+        assert.equal(await tips(), 1, 'Hover reopens help while the clicked button keeps focus');
+        await page.mouse.move(1100, 820); await pause(200);
         const item = label => `[role="menuitem"][aria-label="${label}"]`;
         for (const name of ['Menu', 'Context menu', 'Menubar']) {
             await navigate(name);
@@ -46,6 +57,7 @@ try {
             await pause();
             await click(item('Layout'));
             await page.waitForSelector('[role="menuitemradio"][aria-label="Compact"]');
+            assert.equal(await tips(), 0, 'Opening a menu suppresses tooltip help');
             await capture(`${scheme}-${name.toLowerCase()}-nested`);
             await page.mouse.click(1100, 820); await pause();
             assert.equal(await page.$$eval('[role="menu"]', elements => elements.length), 0);
@@ -78,8 +90,11 @@ try {
         await capture(`${scheme}-popover-closed`);
         for (const label of ['Rename project', 'Sharing settings', 'Choose accent']) {
             const trigger = button(label);
+            await page.mouse.move(...await point(trigger)); await pause(550);
+            assert.equal(await tips(), 1, `${label}: button tooltip before opening`);
             await click(trigger);
             assert.equal(await expanded(trigger), 'true');
+            assert.equal(await tips(), 0, `${label}: opening hides tooltip`);
             await capture(`${scheme}-popover-${label}`);
             if (label === 'Rename project') {
                 await click('input[aria-label="Project name"]');
@@ -90,6 +105,7 @@ try {
                 await click(trigger);
             } else if (label === 'Sharing settings') {
                 await click('[role="switch"][aria-label="Anyone with the link"]');
+                await capture(`${scheme}-popover-switch-on`);
             } else {
                 await click(button('Rose'));
             }
@@ -101,7 +117,6 @@ try {
         }
         await navigate('Tooltip');
         const tooltipLabels = ['Save draft', 'Preview page', 'View history'];
-        const tips = () => page.$$eval('[role="tooltip"]', elements => elements.length);
         for (const label of tooltipLabels) {
             const trigger = button(label);
             await page.mouse.move(...await point(trigger));
@@ -115,6 +130,12 @@ try {
             assert.equal(await tips(), 1, `${label}: content stays hoverable`);
             await page.mouse.move(1100, 820); await pause(250);
             assert.equal(await tips(), 0, `${label}: leave closes`);
+            await click(trigger);
+            assert.equal(await tips(), 0, `${label}: click dismisses`);
+            await page.mouse.move(1100, 820); await pause(200);
+            await page.mouse.move(...await point(trigger)); await pause(550);
+            assert.equal(await tips(), 1, `${label}: hover after click reopens`);
+            await page.mouse.move(1100, 820); await pause(250);
         }
         for (const label of tooltipLabels) await page.mouse.move(...await point(button(label)));
         await page.mouse.move(1100, 820); await pause(550);

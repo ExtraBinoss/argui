@@ -33,6 +33,8 @@ pub struct ElementNode {
     pub(crate) container_scope: Option<crate::ContainerScopeId>,
     pub(crate) active_states: Vec<crate::StateName>,
     pub semantics: Option<argui_accessibility::Semantics>,
+    /// Optional hover/focus help, presented by an application tooltip host.
+    pub tooltip: Option<String>,
     pub semantic_hidden: bool,
     pub semantic_scope: bool,
     pub semantic_bindings: crate::SemanticBindings,

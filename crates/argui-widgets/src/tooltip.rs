@@ -10,6 +10,9 @@ use argui_ui::{
 
 use crate::WidgetTheme;
 
+mod host;
+pub use host::TooltipHost;
+
 /// A non-interactive description anchored to a trigger. Visibility is controlled by the caller.
 #[derive(Clone, Debug)]
 pub struct Tooltip {
@@ -72,6 +75,8 @@ impl Tooltip {
     pub fn build(self, theme: &WidgetTheme) -> Element {
         let content_key = format!("{}::content", self.key);
         let mut trigger = self.trigger.keyed(self.key.clone());
+        // A controlled tooltip owns this trigger; do not also create automatic help.
+        trigger.tooltip = None;
         trigger
             .interaction
             .get_or_insert_with(|| Interaction::default().focus_policy(FocusPolicy::TabStop));
@@ -83,16 +88,15 @@ impl Tooltip {
             trigger = trigger.described_by([content_key.clone()]);
         }
         let content = self.open.then(|| {
-            Element::column([
-                Element::text(self.description.clone()).text_style(TextStyle {
+            Element::column([Element::text(self.description.clone())
+                .max_width(length((self.max_width - 20.0).max(0.0)))
+                .text_style(TextStyle {
                     font_size: 14.0,
                     line_height: 20.0,
                     color: theme.foreground,
                     ..TextStyle::default()
-                }),
-            ])
+                })])
             .keyed(content_key)
-            .width(length(self.max_width.max(0.0)))
             .max_width(length(self.max_width.max(0.0)))
             .padding(Sides {
                 left: length(10.0),
@@ -123,7 +127,8 @@ pub struct TooltipState {
     content_key: String,
     hovered: [bool; 2],
     focused: bool,
-    dismissed: bool,
+    hover_dismissed: bool,
+    focus_dismissed: bool,
     open: bool,
     delay: Duration,
     deadline: Option<(Duration, bool)>,
@@ -138,7 +143,8 @@ impl TooltipState {
             key,
             hovered: [false; 2],
             focused: false,
-            dismissed: false,
+            hover_dismissed: false,
+            focus_dismissed: false,
             open: false,
             delay: Duration::from_millis(350),
             deadline: None,
@@ -165,7 +171,8 @@ impl TooltipState {
     pub fn reset(&mut self) {
         self.hovered = [false; 2];
         self.focused = false;
-        self.dismissed = false;
+        self.hover_dismissed = false;
+        self.focus_dismissed = false;
         self.open = false;
         self.deadline = None;
     }
@@ -174,7 +181,8 @@ impl TooltipState {
         let previous = (
             self.hovered,
             self.focused,
-            self.dismissed,
+            self.hover_dismissed,
+            self.focus_dismissed,
             self.open,
             self.deadline,
         );
@@ -185,35 +193,44 @@ impl TooltipState {
                 if (trigger || content) && pointer.kind != PointerKind::Touch =>
             {
                 match pointer.phase {
-                    PointerPhase::Entered => self.hovered[usize::from(content)] = true,
-                    PointerPhase::Left | PointerPhase::Cancelled => {
-                        self.hovered[usize::from(content)] = false
+                    PointerPhase::Entered => {
+                        if trigger && !self.hovered[0] {
+                            self.hover_dismissed = false;
+                        }
+                        self.hovered[usize::from(content)] = true;
                     }
-                    PointerPhase::Pressed => self.dismissed = true,
+                    PointerPhase::Left | PointerPhase::Cancelled => {
+                        self.hovered[usize::from(content)] = false;
+                        if trigger {
+                            self.hover_dismissed = false;
+                        }
+                    }
+                    PointerPhase::Pressed => self.dismiss(),
                     _ => return false,
                 }
             }
             UiEventKind::Focused if trigger => self.focused = true,
-            UiEventKind::Blurred if trigger => self.focused = false,
-            UiEventKind::Click(_) if trigger => self.dismissed = true,
+            UiEventKind::Blurred if trigger => {
+                self.focused = false;
+                self.focus_dismissed = false;
+            }
+            UiEventKind::Click(_) if trigger => self.dismiss(),
             UiEventKind::KeyInput(input)
                 if (self.open || self.deadline.is_some())
                     && input.state == KeyState::Pressed
                     && input.key == Key::Escape =>
             {
-                self.dismissed = true
+                self.dismiss();
             }
             _ => return false,
         }
-        let active = self.focused || self.hovered.iter().any(|hovered| *hovered);
-        if !active {
-            self.dismissed = false;
-        }
-        if self.dismissed {
+        let focused = self.focused && !self.focus_dismissed;
+        let hovered = !self.hover_dismissed && self.hovered.iter().any(|hovered| *hovered);
+        if self.hover_dismissed && self.focus_dismissed {
             self.open = false;
             self.deadline = None;
-        } else if active {
-            if self.focused || self.open || self.delay.is_zero() {
+        } else if focused || hovered {
+            if focused || self.open || self.delay.is_zero() {
                 self.open = true;
                 self.deadline = None;
             } else if self.deadline.is_none() {
@@ -228,10 +245,16 @@ impl TooltipState {
         (
             self.hovered,
             self.focused,
-            self.dismissed,
+            self.hover_dismissed,
+            self.focus_dismissed,
             self.open,
             self.deadline,
         ) != previous
+    }
+
+    fn dismiss(&mut self) {
+        self.hover_dismissed = true;
+        self.focus_dismissed = true;
     }
 
     pub fn advance(&mut self, now: Duration) -> bool {

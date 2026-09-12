@@ -46,7 +46,9 @@ pub fn launch() -> Result<(), Box<dyn std::error::Error>> {
         )?,
         text,
         DevtoolsApp::new(argui::runtime::SingleWindowModel::new(
-            argui::widgets::SelectionHost::new(WidgetGallery::default()),
+            argui::widgets::TooltipHost::new(argui::widgets::SelectionHost::new(
+                WidgetGallery::default(),
+            )),
         )),
         |event| {
             use argui::runtime::{RuntimeEvent, WindowRuntimeEvent};

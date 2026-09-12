@@ -249,4 +249,4 @@ pub use progress::Progress;
 #[cfg(feature = "tooltip")]
 mod tooltip;
 #[cfg(feature = "tooltip")]
-pub use tooltip::{Tooltip, TooltipState};
+pub use tooltip::{Tooltip, TooltipHost, TooltipState};

@@ -13,7 +13,7 @@ pub(super) fn render(gallery: &WidgetGallery, theme: &WidgetTheme, spinner: Elem
     Element::column([
         preview(
             "Variants",
-            "Click any available button and watch the activation count below.",
+            "Hover for a tooltip, then click any available button to update the count below.",
             variants(theme, spinner),
             theme,
         ),

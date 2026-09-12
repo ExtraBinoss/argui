@@ -13,16 +13,48 @@ Tooltip fournit une description au survol ou au focus clavier. `TooltipState`
 attend 350 ms au survol (délai configurable), annule les passages rapides,
 permet de déplacer la souris dans la bulle et la ferme 100 ms après la sortie.
 Le focus clavier ouvre immédiatement la bulle. Échap et l'activation du bouton
-la ferment sans déplacer le focus ni consommer l'action du bouton. Le contenu
+la ferment sans déplacer le focus ni consommer l'action du bouton. Un nouveau
+survol peut la rouvrir après un clic, même si le bouton conserve le focus. Le contenu
 porte le rôle `Tooltip`, relié au déclencheur par `described_by`.
 
 L'application transmet ses événements à `TooltipState::update`, y compris
 Échap reçu ailleurs dans la fenêtre lorsqu'une bulle est ouverte. Elle programme
 `advance` à `next_deadline`, puis reconstruit si l'état change. Aucun polling ou
-runtime de tâches n'est imposé par le widget. La galerie utilise `TaskSlot` et
+runtime de tâches n'est nécessaire à `TooltipState` lui-même. La galerie utilise `TaskSlot` et
 annule les timers périmés ; voir `src/pages/tooltip.rs` dans la crate galerie.
 Appeler `reset` et annuler le timer lorsque le déclencheur est retiré ou que sa
 page est masquée, pour ne pas conserver un ancien survol lors de son retour.
+
+## Infobulles automatiques des boutons
+
+`Button` déclare par défaut une infobulle reprenant son libellé. Installer
+`TooltipHost` une fois autour de l'application et activer la feature `tooltip`
+pour les afficher automatiquement ; la galerie le fait déjà. `button` reste
+utilisable seul, sans dépendance au runtime pour afficher ses boutons.
+
+```rust
+let application = TooltipHost::new(MyApplication::default());
+let button = Button::new("save", "Save", theme.button())
+    .tooltip("Save the current draft")
+    .build();
+let quiet = Button::new("cancel", "Cancel", theme.outline_button())
+    .without_tooltip()
+    .build();
+```
+
+La feature `tooltip` fournit le widget contrôlé, son état et le host ; elle
+active le service de tâches du runtime pour programmer les délais sans polling.
+`Element::tooltip(...)` déclare la même aide sur un élément personnalisé.
+Les boutons désactivés ou occupés n'ouvrent pas d'infobulle automatique.
+Un `Tooltip` contrôlé garde la main sur son déclencheur et ne reçoit pas une
+seconde infobulle du host.
+
+Le host ferme l'aide dès qu'un menu, popover ou dialogue apparaît, même si
+l'ouverture vient du code. Les couches vides et les notifications n'empêchent
+pas les infobulles. `TooltipHost::delay`, `paint` et `layer` personnalisent les
+délais, la teinte, les ombres et les effets des infobulles automatiques.
+Avec le menu de sélection de texte, utiliser
+`TooltipHost::new(SelectionHost::new(application))`.
 
 ## Surfaces et effets
 
@@ -55,12 +87,20 @@ La démo reprend `theme.overlay_blur` (`3.0`) et une opacité de `0.90`.
 Un flou plus faible ne rend pas une surface plus lisible à lui seul : une
 opacité suffisante évite que le texte derrière concurrence celui du panneau.
 Ces réglages fonctionnent aussi bien pour Popover que pour Tooltip.
+Ce sont uniquement des valeurs par défaut : `.layer(...)` peut fournir un
+flou plus fort et `.paint(...)` une autre couleur ou opacité, sans limitation
+supplémentaire imposée par le widget.
 
 Les panneaux ordinaires conservent un fond opaque, une bordure visible dans
 les deux thèmes et une ombre resserrée. Les menus, sous-menus, sélecteurs,
 dialogues, notifications et infobulles partagent `theme.popover`,
 `theme.popover_border` et `theme.overlay_shadows`. Les démos avec effets
 conservent cette bordure ; leur transparence reste une personnalisation locale.
+
+Le switch utilise une piste inactive distincte du fond, réglable avec
+`theme.switch_unchecked`, et un curseur inactif réglable avec
+`theme.switch_thumb`. À l'état actif, il reprend `theme.primary` et
+`theme.primary_foreground` pour conserver le contraste avec l'accent choisi.
 
 Les presets et les effets propres à l'application utilisent le même `Filter` :
 

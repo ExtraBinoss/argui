@@ -39,7 +39,7 @@ radio-group = []
 tabs = []
 select = ["input"]
 popover = []
-tooltip = []
+tooltip = ["dep:argui-runtime", "argui-runtime/tasks", "dep:argui-inspect", "dep:web-time"]
 dialog = []
 range = ["dep:argui-runtime"]
 slider = ["range"]
@@ -53,6 +53,7 @@ tree-view = ["vlist", "button"]
 icons = ["dep:argui-vector", "dep:icondata_core", "dep:icondata_tb"]
 
 [dependencies]
+web-time = { workspace = true, optional = true }
 time = { version = "=0.3.44", optional = true, features = ["parsing"] }
 argui-animation.workspace = true
 argui-core.workspace = true

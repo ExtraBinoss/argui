@@ -63,6 +63,7 @@ impl Element {
             container_scope: None,
             active_states: Vec::new(),
             semantics: None,
+            tooltip: None,
             semantic_hidden: false,
             semantic_scope: false,
             semantic_bindings: crate::SemanticBindings::default(),
@@ -132,6 +133,7 @@ impl Element {
             container_scope: None,
             active_states: Vec::new(),
             semantics: None,
+            tooltip: None,
             semantic_hidden: false,
             semantic_scope: false,
             semantic_bindings: crate::SemanticBindings::default(),
@@ -252,6 +254,12 @@ impl Element {
     #[must_use]
     pub fn keyed(mut self, key: impl Into<String>) -> Self {
         self.key = Some(key.into());
+        self
+    }
+
+    #[must_use]
+    pub fn tooltip(mut self, description: impl Into<String>) -> Self {
+        self.tooltip = Some(description.into());
         self
     }
 

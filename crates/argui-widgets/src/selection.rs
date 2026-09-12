@@ -140,7 +140,11 @@ impl Switch {
             .keyed(thumb_key)
             .width(length(18.0))
             .height(length(18.0))
-            .background(theme.primary_foreground)
+            .background(if self.checked {
+                theme.primary_foreground
+            } else {
+                theme.switch_thumb
+            })
             .radius(CornerRadii::all(999.0))
             .when(
                 StateSelector::scope(TOGGLE_SCOPE, TOGGLE_CHECKED),
@@ -158,7 +162,7 @@ impl Switch {
             .background(if self.checked {
                 theme.primary
             } else {
-                theme.muted
+                theme.switch_unchecked
             })
             .radius(CornerRadii::all(999.0))
             .transition(StyleTransition::default())

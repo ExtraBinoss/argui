@@ -90,6 +90,9 @@ avec un effet WGSL enregistré, en clair et sombre. Le scénario exerce les
 actions des panneaux, leurs fermetures et les infobulles au survol ou au clavier.
 Il capture aussi les menus et sous-menus, Select, Date picker, Dialog et Toast
 pour contrôler la lisibilité du style commun à toutes les surfaces flottantes.
+Il vérifie aussi les infobulles par défaut de Button, leur retour après un clic
+sans perte de focus, leur fermeture à l'ouverture d'un panneau, et capture les
+deux états du switch dans le popover.
 
 Ouvrir les fichiers de capture avec l'outil de lecture d'images de l'agent,
 sans visionneuse graphique sur le bureau. Vérifier texte complet, contraste,

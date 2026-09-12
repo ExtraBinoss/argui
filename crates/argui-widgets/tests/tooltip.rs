@@ -9,6 +9,9 @@ use argui_ui::{
 use argui_widgets::{Tooltip, TooltipState, shadcn};
 use std::time::Duration;
 
+#[path = "tooltip/host.rs"]
+mod host;
+
 fn event(key: &str, kind: UiEventKind) -> UiEvent {
     let tree = UiTree::new(Element::container([]));
     UiEvent::new(tree.node_ids()[0], Some(key.into()), kind)
@@ -77,7 +80,7 @@ fn keyboard_focus_is_immediate_and_escape_suppresses_reopening_until_reentry() {
     }
     assert!(!state.is_open());
     state.update(&pointer("tip", PointerPhase::Entered), ms(20));
-    assert_eq!(state.next_deadline(), None);
+    assert_eq!(state.next_deadline(), Some(ms(370)));
     state.update(&pointer("tip", PointerPhase::Left), ms(30));
     state.update(&event("tip", UiEventKind::Blurred), ms(40));
     state.update(&event("tip", UiEventKind::Focused), ms(50));
@@ -106,6 +109,27 @@ fn activation_dismisses_without_eating_button_actions_and_unrelated_events_are_i
     assert!(state.update(&click, ms(7)));
     assert!(!state.is_open());
     assert!(click.should_dispatch());
+}
+
+#[test]
+fn hover_reopens_after_click_without_requiring_the_button_to_lose_focus() {
+    let mut state = TooltipState::new("tip");
+    state.update(&pointer("tip", PointerPhase::Entered), ms(0));
+    assert!(state.advance(ms(350)));
+    state.update(&pointer("tip", PointerPhase::Pressed), ms(360));
+    state.update(&event("tip", UiEventKind::Focused), ms(361));
+    state.update(
+        &event("tip", UiEventKind::Click(ClickEvent::accessibility())),
+        ms(362),
+    );
+    assert!(!state.is_open());
+    state.update(&pointer("tip", PointerPhase::Left), ms(400));
+    assert!(!state.advance(ms(1000)));
+    assert!(!state.is_open());
+    state.update(&pointer("tip", PointerPhase::Entered), ms(1100));
+    assert_eq!(state.next_deadline(), Some(ms(1450)));
+    assert!(state.advance(ms(1450)));
+    assert!(state.is_open());
 }
 
 #[test]

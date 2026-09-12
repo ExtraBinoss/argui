@@ -90,14 +90,17 @@ pub struct Button {
     enabled: bool,
     loading: Option<Element>,
     content: Option<Element>,
+    tooltip: Option<String>,
 }
 
 impl Button {
     #[must_use]
     pub fn new(key: impl Into<String>, label: impl Into<String>, style: ButtonStyle) -> Self {
+        let label = label.into();
         Self {
             key: key.into(),
-            label: label.into(),
+            tooltip: Some(label.clone()),
+            label,
             style,
             leading: None,
             trailing: None,
@@ -148,6 +151,19 @@ impl Button {
         self
     }
 
+    /// Override the default label shown by `TooltipHost` on hover or keyboard focus.
+    #[must_use]
+    pub fn tooltip(mut self, description: impl Into<String>) -> Self {
+        self.tooltip = Some(description.into());
+        self
+    }
+
+    #[must_use]
+    pub fn without_tooltip(mut self) -> Self {
+        self.tooltip = None;
+        self
+    }
+
     #[must_use]
     pub fn build(self) -> Element {
         let loading = self.loading.is_some();
@@ -177,6 +193,7 @@ impl Button {
         if let Some(focused) = self.style.focused {
             element = element.when(VisualState::FocusVisible, focused);
         }
+        element.tooltip = self.tooltip.filter(|_| self.enabled && !loading);
         element
     }
 }
