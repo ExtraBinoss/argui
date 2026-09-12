@@ -33,6 +33,7 @@ impl SelectOption {
 #[derive(Clone, Debug)]
 pub struct Select {
     key: String,
+    surface: Option<argui_ui::OverlaySurface>,
     label: String,
     options: Vec<SelectOption>,
     selected: Option<usize>,
@@ -52,6 +53,7 @@ impl Select {
     ) -> Self {
         Self {
             key: key.into(),
+            surface: None,
             label: label.into(),
             options: options.into_iter().collect(),
             selected,
@@ -84,6 +86,12 @@ impl Select {
     pub fn presence(mut self, presence: &crate::Presence) -> Self {
         self.open = presence.is_open();
         self.presence = Some(presence.clone());
+        self
+    }
+
+    #[must_use]
+    pub const fn surface(mut self, surface: argui_ui::OverlaySurface) -> Self {
+        self.surface = Some(surface);
         self
     }
 
@@ -190,10 +198,14 @@ impl Select {
                     .radius(CornerRadii::all(8.0)),
             ))
             .overflow(Axes {
-                x: Overflow::Hidden,
+                x: Overflow::Auto,
                 y: Overflow::Auto,
             })
-            .scroll_config(ScrollConfig::default().scrollbar(theme.scrollbar.clone()))
+            .scroll_config(
+                ScrollConfig::default()
+                    .propagation(argui_ui::ScrollPropagation::Contain)
+                    .scrollbar(theme.scrollbar.clone()),
+            )
             .anchored_portal(
                 WindowLayer::Popover,
                 self.key.clone(),
@@ -208,7 +220,14 @@ impl Select {
             )))
             .z_index(1_000)
             .layer(theme.overlay_layer(8.0, theme.overlay_blur));
-        behavior.decorate(SelectPart::List, list)
+        behavior.decorate(
+            SelectPart::List,
+            if let Some(surface) = self.surface {
+                list.portal_surface(surface)
+            } else {
+                list
+            },
+        )
     }
 }
 

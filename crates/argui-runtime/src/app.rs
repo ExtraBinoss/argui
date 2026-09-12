@@ -34,6 +34,8 @@ mod lifecycle;
 ))]
 mod native_views;
 mod pointer;
+#[cfg(all(feature = "native-popups", not(target_arch = "wasm32")))]
+mod popups;
 mod preferences;
 mod renderer;
 mod scroll;
@@ -62,6 +64,8 @@ pub(crate) struct Application {
     environment: crate::WindowEnvironment,
     pub(super) renderer_config: RendererConfig,
     window: Option<Rc<dyn crate::host::WindowHost>>,
+    #[cfg(all(feature = "native-popups", not(target_arch = "wasm32")))]
+    popups: popups::Popups,
     #[cfg(all(
         feature = "webview",
         any(
@@ -175,6 +179,8 @@ impl Application {
             environment: crate::WindowEnvironment::default(),
             renderer_config,
             window: None,
+            #[cfg(all(feature = "native-popups", not(target_arch = "wasm32")))]
+            popups: popups::Popups::default(),
             #[cfg(all(
                 feature = "webview",
                 any(

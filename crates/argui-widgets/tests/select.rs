@@ -374,3 +374,23 @@ fn select_can_disable_the_theme_overlay_blur() {
     assert!(layer.backdrop_filters.is_empty());
     assert_eq!(layer.shadows, theme.overlay_shadows);
 }
+
+#[test]
+fn native_preference_is_forwarded_and_host_dismissal_closes_the_controlled_list() {
+    let palette = argui_widgets::shadcn(argui_core::Color::WHITE);
+    let theme = palette.resolve(argui_core::ColorScheme::Light);
+    let options = [SelectOption::new("First")];
+    let select = Select::new("native", "Choose", options.clone(), Some(0))
+        .open(true)
+        .surface(argui_ui::OverlaySurface::PreferNative)
+        .build(theme);
+    assert_eq!(
+        select.children[1].portal.as_ref().unwrap().surface,
+        Some(argui_ui::OverlaySurface::PreferNative)
+    );
+    let behavior = SelectBehavior::new("native", "Choose", options, Some(0)).open(true);
+    assert_eq!(
+        behavior.action(&event(&behavior.list_key(), UiEventKind::DismissRequested)),
+        Some(SelectAction::Close)
+    );
+}

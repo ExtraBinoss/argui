@@ -2,7 +2,7 @@
 use std::sync::Arc;
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use argui_platform::{ApplicationConfig, CloseBehavior, WindowKey, WindowLevel, WindowSpec};
+use argui_platform::{ApplicationConfig, WindowKey, WindowLevel, WindowSpec};
 #[cfg(all(feature = "tray", not(target_arch = "wasm32")))]
 use argui_platform::{TrayAction, TrayEvent};
 use argui_render::RendererConfig;
@@ -387,6 +387,16 @@ impl ApplicationHandler<UserEvent> for MultiApplication {
         window_id: WindowId,
         event: WindowEvent,
     ) {
+        #[cfg(all(feature = "native-popups", not(target_arch = "wasm32")))]
+        if let Some(entry) = self
+            .windows
+            .values_mut()
+            .find(|entry| entry.runtime.is_popup_window(window_id))
+        {
+            entry.runtime.popup_event(event_loop, window_id, event);
+            self.process_pending(event_loop);
+            return;
+        }
         let Some(key) = self
             .by_native
             .get(&crate::host::HostId::Winit(window_id))
@@ -403,20 +413,6 @@ impl ApplicationHandler<UserEvent> for MultiApplication {
             return;
         }
         self.handle_close(&key, event_loop);
-    }
-}
-
-impl MultiApplication {
-    fn handle_close(&mut self, key: &WindowKey, event_loop: &dyn crate::host::LoopControl) {
-        let behavior = self.windows.get(key).map_or(CloseBehavior::Quit, |entry| {
-            entry.spec.window.close_behavior
-        });
-        match behavior {
-            CloseBehavior::Quit => event_loop.exit(),
-            CloseBehavior::CloseWindow => self.close_window(key),
-            CloseBehavior::Hide => self.set_visible(key, false),
-            CloseBehavior::NotifyApp => {}
-        }
     }
 }
 

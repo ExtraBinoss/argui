@@ -66,6 +66,18 @@ pub(crate) fn constraint(
             continue;
         };
         let desired = bounds[map.index].size;
+        let viewport = ui
+            .native_portal_owner(map.node)
+            .and_then(|owner| ui.native_portal_bounds(owner))
+            .unwrap_or(viewport);
+        if map.id == target
+            && let Some(native) = ui.native_portal_bounds(map.node)
+        {
+            return Ok(Some(PortalConstraint::Fill {
+                node: map.id,
+                size: native.size,
+            }));
+        }
         let (constraint, placed) = match &portal.target {
             PortalTarget::Layout => continue,
             PortalTarget::Anchor(anchor) => {
@@ -125,6 +137,7 @@ pub(crate) fn constraint(
                 )
             }
         };
+        let placed = ui.native_portal_bounds(map.node).unwrap_or(placed);
         if map.id == target {
             return Ok(Some(constraint));
         }
@@ -174,6 +187,11 @@ pub(crate) fn resolve(
 ) -> Result<(), LayoutError> {
     let mut overlays = Vec::new();
     collect(root, elements, &mut overlays);
+    let desired_sizes: HashMap<_, _> = output
+        .portals
+        .iter()
+        .map(|portal| (portal.node, portal.desired_size))
+        .collect();
     output.portals.clear();
     let anchors = elements
         .iter()
@@ -185,7 +203,10 @@ pub(crate) fn resolve(
         let Some(portal) = element.portal.as_ref() else {
             continue;
         };
-        let viewport = output.viewport;
+        let viewport = ui
+            .native_portal_owner(map.node)
+            .and_then(|owner| ui.native_portal_bounds(owner))
+            .unwrap_or(output.viewport);
         let desired = output.nodes[map.index].bounds.size;
         let (placed, anchor_key, requested, resolved, available, constrained) = match &portal.target
         {
@@ -200,6 +221,7 @@ pub(crate) fn resolve(
                     requested: None,
                     resolved: None,
                     bounds: current,
+                    desired_size: desired_sizes.get(&map.node).copied().unwrap_or(desired),
                     available_size: viewport.size,
                     constrained_width: false,
                     constrained_height: false,
@@ -210,9 +232,13 @@ pub(crate) fn resolve(
                 let Some(anchor_index) = anchors.get(anchor.key.as_str()).copied() else {
                     continue;
                 };
+                let anchor_bounds = output.nodes[anchor_index].bounds;
+                if anchor_bounds.size.width <= 0.0 || anchor_bounds.size.height <= 0.0 {
+                    continue;
+                }
                 let result = anchor.placement.place(
                     viewport,
-                    output.nodes[anchor_index].bounds,
+                    anchor_bounds,
                     desired,
                     ui.resolved_layout_style(map.node, element)
                         .writing_direction,
@@ -259,6 +285,7 @@ pub(crate) fn resolve(
             }
         };
         let current = output.nodes[map.index].bounds;
+        let placed = ui.native_portal_bounds(map.node).unwrap_or(placed);
         let delta = Point::new(
             placed.origin.x - current.origin.x,
             placed.origin.y - current.origin.y,
@@ -272,6 +299,7 @@ pub(crate) fn resolve(
             requested,
             resolved,
             bounds: placed,
+            desired_size: desired_sizes.get(&map.node).copied().unwrap_or(desired),
             available_size: available,
             constrained_width: constrained.0,
             constrained_height: constrained.1,

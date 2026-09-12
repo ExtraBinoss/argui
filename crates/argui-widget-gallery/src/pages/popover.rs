@@ -14,6 +14,7 @@ const NESTED: &str = "popover-link-options";
 
 pub(crate) struct PopoverDemo {
     open: Option<usize>,
+    native: bool,
     name: String,
     saved: String,
     sharing: bool,
@@ -26,6 +27,7 @@ impl Default for PopoverDemo {
     fn default() -> Self {
         Self {
             open: None,
+            native: false,
             name: "Studio notes".into(),
             saved: "Studio notes".into(),
             sharing: false,
@@ -83,6 +85,10 @@ impl PopoverDemo {
         }
         match (&event.kind, event.target_key()) {
             (UiEventKind::TextChanged(value), Some("popover-name")) => self.name.clone_from(value),
+            (UiEventKind::Click(_), Some("popover-native")) => {
+                self.native = !self.native;
+                self.close();
+            }
             (UiEventKind::Click(_), Some("popover-save")) => {
                 self.saved.clone_from(&self.name);
                 self.close();
@@ -218,6 +224,11 @@ impl Render for PopoverDemo {
                         trigger,
                         content,
                     )
+                    .surface(if self.native {
+                        argui::ui::OverlaySurface::PreferNative
+                    } else {
+                        argui::ui::OverlaySurface::InWindow
+                    })
                     .size(236.0, 300.0)
                     .paint(surface.paint(theme, cx.environment().color_scheme))
                     .layer(surface.layer(theme))
@@ -226,6 +237,7 @@ impl Render for PopoverDemo {
                 });
         Element::column([
             Element::row(cards).flex_wrap(FlexWrap::Wrap).gap(16.0),
+            Switch::new("popover-native", "Allow outside this window", self.native).build(theme),
             text(
                 format!(
                     "Project: {} · Accent: {}",
@@ -241,5 +253,6 @@ impl Render for PopoverDemo {
         .on(cx.listener(EventType::Click, Self::event))
         .on(cx.listener(EventType::Input, Self::event))
         .on(cx.listener(EventType::PointerOutside, Self::event))
+        .on(cx.listener(EventType::Dismiss, Self::event))
     }
 }

@@ -134,3 +134,48 @@ fn nested_link_options_keep_the_parent_open_and_close_one_level_at_a_time() {
     assert!(keyed(&app.render(), parent).is_none());
     dispatch(&app, "gallery-search", escape());
 }
+
+#[test]
+fn native_demo_preference_inherits_to_nested_panels_and_host_dismisses_one_level() {
+    let app = Entity::new(WidgetGallery::default());
+    click(&app, "nav::popover");
+    click(&app, "popover-native");
+    click(&app, "popover-sharing");
+    click(&app, "popover-link-options");
+    let ui = UiTree::new(app.render());
+    for key in ["popover-sharing::content", "popover-link-options::content"] {
+        let node = *ui
+            .node_ids()
+            .iter()
+            .find(|node| ui.key(**node) == Some(key))
+            .unwrap();
+        assert_eq!(
+            ui.portal_surface_preference(node),
+            argui::ui::OverlaySurface::PreferNative
+        );
+    }
+    dispatch(
+        &app,
+        "popover-link-options::content",
+        UiEventKind::DismissRequested,
+    );
+    assert!(keyed(&app.render(), "popover-link-options::content").is_none());
+    assert!(keyed(&app.render(), "popover-sharing::content").is_some());
+    dispatch(
+        &app,
+        "popover-sharing::content",
+        UiEventKind::DismissRequested,
+    );
+    assert!(keyed(&app.render(), "popover-sharing::content").is_none());
+    click(&app, "popover-native");
+    click(&app, "popover-project");
+    assert_eq!(
+        keyed(&app.render(), "popover-project::content")
+            .unwrap()
+            .portal
+            .as_ref()
+            .unwrap()
+            .surface,
+        Some(argui::ui::OverlaySurface::InWindow)
+    );
+}

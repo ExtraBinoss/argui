@@ -86,8 +86,10 @@ impl PopoverBehavior {
                 && matches!(event.kind, UiEventKind::Click(_)))
             .then_some(PopoverAction::Toggle);
         }
-        if matches!(event.kind, UiEventKind::PointerOutside(_))
-            && event.target_key() == Some(self.content_key().as_str())
+        if matches!(
+            event.kind,
+            UiEventKind::PointerOutside(_) | UiEventKind::DismissRequested
+        ) && event.target_key() == Some(self.content_key().as_str())
         {
             return Some(PopoverAction::Close);
         }

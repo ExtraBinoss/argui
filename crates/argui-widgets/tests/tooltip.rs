@@ -249,3 +249,63 @@ fn long_tooltip_descriptions_wrap_without_clipping_the_last_line() {
     );
     assert!(measured.height > block.style.line_height);
 }
+
+#[test]
+fn oversized_tooltip_scrolls_in_the_fallback_viewport_and_accepts_native_dismissal() {
+    use argui_core::Size;
+    use argui_ui::{OverlaySurface, ScrollPropagation};
+    let palette = shadcn(Color::WHITE);
+    let theme = palette.resolve(ColorScheme::Light);
+    let description =
+        "A complete description remains available even when this window is tiny. ".repeat(30);
+    let mut ui = UiTree::new(
+        Tooltip::new("scroll-tip", &description, true, Element::text("Help"))
+            .surface(OverlaySurface::PreferNative)
+            .build(theme),
+    );
+    let layout = argui_layout::LayoutEngine::new()
+        .compute(
+            &mut ui,
+            &mut argui_text::TextEngine::new(),
+            Size::new(220.0, 140.0),
+        )
+        .unwrap();
+    let panel = layout.portals.first().unwrap().node;
+    assert_eq!(
+        ui.portal_surface_preference(panel),
+        OverlaySurface::PreferNative
+    );
+    assert_eq!(ui.native_portal_owner(panel), None);
+    assert!(layout.native_surfaces.is_empty());
+    let scroll = layout
+        .scroll_regions
+        .iter()
+        .find(|region| region.node == panel)
+        .unwrap();
+    assert!(scroll.max_offset.y > 0.0);
+    assert_eq!(scroll.config.propagation, ScrollPropagation::Contain);
+    assert!(
+        scroll
+            .scrollbar
+            .as_ref()
+            .and_then(|bars| bars.vertical)
+            .is_some()
+    );
+    assert_eq!(
+        ui.root().children[0]
+            .semantics
+            .as_ref()
+            .unwrap()
+            .description
+            .as_deref(),
+        Some(description.as_str())
+    );
+    let mut state = TooltipState::new("scroll-tip").delay(Duration::ZERO);
+    state.update(&pointer("scroll-tip", PointerPhase::Entered), ms(0));
+    assert!(state.is_open());
+    state.update(
+        &event("scroll-tip::content", UiEventKind::DismissRequested),
+        ms(1),
+    );
+    assert!(!state.is_open());
+}

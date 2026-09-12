@@ -7,6 +7,7 @@ license.workspace = true
 
 [features]
 default = []
+native-popups = ["argui-platform/native-popups"]
 tasks = ["dep:tokio", "dep:futures-util", "dep:futures-channel", "dep:gloo-timers"]
 tray = ["argui-platform/tray"]
 webview = ["dep:argui-webview", "argui-platform/gtk-host", "dep:tao", "dep:gtk"]
@@ -49,3 +50,9 @@ workspace = true
 name = "launch"
 harness = false
 required-features = ["tasks"]
+
+[[test]]
+name = "native_popups"
+path = "tests/app/popups.rs"
+harness = false
+required-features = ["native-popups"]

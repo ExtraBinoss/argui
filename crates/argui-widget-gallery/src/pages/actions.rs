@@ -143,6 +143,7 @@ impl Render for ActionsDemo {
             EventType::Click,
             EventType::PointerDown,
             EventType::PointerOutside,
+            EventType::Dismiss,
             EventType::Key,
             EventType::Input,
             EventType::Focus,

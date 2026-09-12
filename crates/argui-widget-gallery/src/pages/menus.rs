@@ -430,6 +430,7 @@ impl Render for MenusDemo {
             .listener(EventType::PointerMove, Self::event)
             .capture(true))
         .on(cx.listener(EventType::PointerOutside, Self::event))
+        .on(cx.listener(EventType::Dismiss, Self::event))
         .on(cx.listener(EventType::ContextMenu, Self::event))
     }
 }

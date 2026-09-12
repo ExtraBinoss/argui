@@ -20,6 +20,7 @@ pub enum EventType {
     PointerMove,
     PointerDown,
     PointerOutside,
+    Dismiss,
     PointerUp,
     PointerCancel,
     Click,
@@ -39,13 +40,14 @@ pub enum EventType {
 }
 
 impl EventType {
-    pub const ALL: [Self; 22] = [
+    pub const ALL: [Self; 23] = [
         Self::Action,
         Self::PointerEnter,
         Self::PointerLeave,
         Self::PointerMove,
         Self::PointerDown,
         Self::PointerOutside,
+        Self::Dismiss,
         Self::PointerUp,
         Self::PointerCancel,
         Self::Click,
@@ -191,6 +193,8 @@ pub enum UiEventKind {
     Action(crate::ActionInvocation),
     Pointer(PointerEvent),
     PointerOutside(PointerEvent),
+    /// The native host requested that this overlay close (focus loss or OS dismissal).
+    DismissRequested,
     Click(ClickEvent),
     ContextMenu {
         position: Point,
@@ -238,6 +242,7 @@ impl UiEventKind {
                 PointerPhase::Cancelled => EventType::PointerCancel,
             },
             Self::PointerOutside(_) => EventType::PointerOutside,
+            Self::DismissRequested => EventType::Dismiss,
             Self::Click(_) => EventType::Click,
             Self::ContextMenu { .. } => EventType::ContextMenu,
             Self::GotPointerCapture(_) => EventType::GotPointerCapture,

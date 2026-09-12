@@ -23,6 +23,11 @@ pub enum RuntimeEvent {
     AnimationProfile(AnimationProfile),
     RendererFailed(String),
     LayoutFailed(String),
+    /// A requested native overlay was retained in its parent surface.
+    PopupFallback {
+        node: argui_ui::NodeId,
+        reason: String,
+    },
     Window {
         window: WindowKey,
         event: WindowRuntimeEvent,
@@ -43,6 +48,11 @@ pub enum WindowRuntimeEvent {
     AnimationProfile(AnimationProfile),
     RendererFailed(String),
     LayoutFailed(String),
+    /// A requested native overlay was retained in its parent surface.
+    PopupFallback {
+        node: argui_ui::NodeId,
+        reason: String,
+    },
 }
 
 impl RuntimeEvent {
@@ -56,6 +66,9 @@ impl RuntimeEvent {
             Self::AnimationProfile(event) => WindowRuntimeEvent::AnimationProfile(event),
             Self::RendererFailed(event) => WindowRuntimeEvent::RendererFailed(event),
             Self::LayoutFailed(event) => WindowRuntimeEvent::LayoutFailed(event),
+            Self::PopupFallback { node, reason } => {
+                WindowRuntimeEvent::PopupFallback { node, reason }
+            }
             other => return other,
         };
         Self::Window { window, event }

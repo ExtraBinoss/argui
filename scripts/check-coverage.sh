@@ -12,7 +12,7 @@ if [[ -n "${ARGUI_NATIVE_TESTS:-}" && -z "${ARGUI_COVERAGE_JOBS:-}" ]]; then
   # The native lifecycle shares the display/GPU with off-screen renderer tests.
   coverage_jobs=1
 fi
-boundary_regex='crates/argui-runtime/src/(multi\.rs|animation\.rs|app/(accessibility|frame|lifecycle|preferences|scroll|text_selection|window)\.rs)|crates/argui-render/src/(text/|vector/|image/pipeline\.rs|surface/(configure|effects)\.rs)'
+boundary_regex='crates/argui-runtime/src/(multi\.rs|animation\.rs|app/(accessibility|frame|lifecycle|preferences|scroll|text_selection|window|popups)\.rs|app/popups/input\.rs)|crates/argui-platform/src/popup/(linux|windows|macos)\.rs|crates/argui-render/src/(text/|vector/|image/pipeline\.rs|surface/(configure|effects)\.rs)'
 
 command -v cargo-nextest >/dev/null || {
   echo "error: cargo-nextest is required to run the coverage suite" >&2

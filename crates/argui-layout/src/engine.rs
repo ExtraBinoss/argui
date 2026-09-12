@@ -35,6 +35,7 @@ pub struct LayoutOutput {
     pub display_list: DisplayList,
     pub text: TextScene,
     pub portals: Vec<PortalLayout>,
+    pub native_surfaces: Vec<crate::NativeSurfacePaint>,
     pub paint_stats: PaintStats,
     pub virtualization_changed: bool,
 }
@@ -47,6 +48,7 @@ pub struct PortalLayout {
     pub requested: Option<argui_ui::Placement>,
     pub resolved: Option<argui_ui::Placement>,
     pub bounds: Rect,
+    pub desired_size: Size,
     pub available_size: Size,
     pub constrained_width: bool,
     pub constrained_height: bool,

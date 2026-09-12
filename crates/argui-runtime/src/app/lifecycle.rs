@@ -179,6 +179,11 @@ impl ApplicationHandler<UserEvent> for Application {
         let Some(window) = self.window.clone() else {
             return;
         };
+        #[cfg(all(feature = "native-popups", not(target_arch = "wasm32")))]
+        if self.is_popup_window(window_id) {
+            self.popup_event(event_loop, window_id, event);
+            return;
+        }
         if self.window_id() != Some(crate::host::HostId::Winit(window_id)) {
             return;
         }
@@ -190,7 +195,15 @@ impl ApplicationHandler<UserEvent> for Application {
         }
         let platform_event = match event {
             WindowEvent::CloseRequested => PlatformEvent::CloseRequested,
+            #[cfg(all(feature = "native-popups", not(target_arch = "wasm32")))]
+            WindowEvent::Moved(_) => {
+                self.invalidate_popup_environment();
+                window.request_redraw();
+                return;
+            }
             WindowEvent::Resized(size) => {
+                #[cfg(all(feature = "native-popups", not(target_arch = "wasm32")))]
+                self.invalidate_popup_environment();
                 self.sync_host_visibility();
                 self.pending_window_frame.resize(size.width, size.height);
                 PlatformEvent::Resized {
@@ -199,6 +212,8 @@ impl ApplicationHandler<UserEvent> for Application {
                 }
             }
             WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
+                #[cfg(all(feature = "native-popups", not(target_arch = "wasm32")))]
+                self.invalidate_popup_environment();
                 let size = window.inner_size();
                 self.pending_window_frame.scale_factor(
                     scale_factor as f32,
@@ -311,6 +326,16 @@ impl ApplicationHandler<UserEvent> for Application {
             }
             WindowEvent::Focused(focused) => {
                 self.sync_host_visibility();
+                #[cfg(all(feature = "native-popups", not(target_arch = "wasm32")))]
+                if focused {
+                    self.popups.suspended = false;
+                }
+                #[cfg(all(feature = "native-popups", not(target_arch = "wasm32")))]
+                if !focused && !self.popups.entries.is_empty() {
+                    self.popups.pending_blur = true;
+                    window.request_redraw();
+                    return;
+                }
                 self.window_focus(focused, &window, event_loop);
                 PlatformEvent::Focused(focused)
             }

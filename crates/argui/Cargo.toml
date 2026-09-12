@@ -7,6 +7,7 @@ license.workspace = true
 
 [features]
 default = []
+native-popups = ["argui-runtime/native-popups"]
 tasks = ["argui-runtime/tasks"]
 tray = ["argui-platform/tray", "argui-runtime/tray"]
 widgets-all = ["argui-widgets/all"]

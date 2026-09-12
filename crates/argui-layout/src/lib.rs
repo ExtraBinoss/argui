@@ -13,6 +13,7 @@ mod reconcile;
 mod scroll;
 mod selection;
 mod style;
+mod surface;
 mod text;
 mod virtual_list;
 
@@ -21,3 +22,4 @@ pub use engine::{LayoutEngine, LayoutNode, LayoutOutput, PaintStats, PortalLayou
 pub use error::LayoutError;
 pub use input::TextInputRegion;
 pub use selection::TextRegion;
+pub use surface::NativeSurfacePaint;

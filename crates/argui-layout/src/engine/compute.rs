@@ -84,6 +84,7 @@ impl LayoutEngine {
             text_engine,
         )?;
         let viewport_rect = Rect::new(Point::default(), viewport);
+        let mut desired_sizes = Vec::new();
         for (index, element) in elements.iter().enumerate() {
             if !crate::overlay::detached(element) {
                 continue;
@@ -98,6 +99,11 @@ impl LayoutEngine {
                 ui,
                 text_engine,
             )?;
+            let measured = self.tree.layout(node)?.size;
+            desired_sizes.push((
+                ui.node_id_at(index),
+                Size::new(measured.width, measured.height),
+            ));
             let Some(constraint) =
                 crate::overlay::constraint(&self.tree, root, &elements, ui, viewport_rect, node)?
             else {
@@ -134,6 +140,14 @@ impl LayoutEngine {
             &mut output,
         )?;
         crate::overlay::resolve(&self.tree, root, &elements, ui, &mut output)?;
+        for portal in &mut output.portals {
+            if let Some((_, size)) = desired_sizes
+                .iter()
+                .find(|(node, _)| *node == Some(portal.node))
+            {
+                portal.desired_size = *size;
+            }
+        }
         drop(elements);
         output.virtualization_changed = crate::virtual_list::measure(root, &output, ui);
         let anchored = crate::anchor::apply(&self.scroll_anchors, ui, &output);

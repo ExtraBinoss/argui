@@ -89,6 +89,23 @@ impl Application {
                     .as_ref()
                     .is_some_and(|ui| ui.text_input_value(node).is_some())
             });
+        #[cfg(all(feature = "native-popups", not(target_arch = "wasm32")))]
+        {
+            let caret = self
+                .ui_tree
+                .as_ref()
+                .and_then(argui_ui::UiTree::focused_node)
+                .and_then(|node| {
+                    self.ui_layout.as_ref().and_then(|layout| {
+                        layout.text_inputs.iter().find(|region| region.node == node)
+                    })
+                })
+                .and_then(|region| region.caret);
+            if self.popup_ime(enabled, caret) {
+                window.set_ime_allowed(false);
+                return;
+            }
+        }
         window.set_ime_allowed(enabled);
         if enabled
             && let Some(node) = self

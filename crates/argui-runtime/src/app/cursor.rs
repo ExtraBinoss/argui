@@ -46,7 +46,7 @@ fn cursor_at(regions: &[HitRegion], point: Point) -> CursorIcon {
     }
 }
 
-fn to_winit(cursor: CursorIcon) -> WinitCursorIcon {
+pub(super) fn to_winit(cursor: CursorIcon) -> WinitCursorIcon {
     match cursor {
         CursorIcon::Auto | CursorIcon::Default => WinitCursorIcon::Default,
         CursorIcon::ContextMenu => WinitCursorIcon::ContextMenu,

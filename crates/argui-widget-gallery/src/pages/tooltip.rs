@@ -21,6 +21,7 @@ const DESCRIPTIONS: [&str; 3] = [
 
 pub(crate) struct TooltipDemo {
     tips: [TooltipState; 3],
+    native: bool,
     timer: TaskSlot,
     origin: Instant,
     status: String,
@@ -30,6 +31,7 @@ impl Default for TooltipDemo {
     fn default() -> Self {
         Self {
             tips: KEYS.map(TooltipState::new),
+            native: false,
             timer: TaskSlot::default(),
             origin: Instant::now(),
             status: "Hover a button or reach it with Tab. Escape dismisses the hint.".into(),
@@ -72,6 +74,13 @@ impl TooltipDemo {
     pub(crate) fn dismiss(&mut self, event: &UiEvent) -> bool {
         let now = self.origin.elapsed();
         let mut changed = false;
+        if event.target_key() == Some("tooltip-native")
+            && matches!(event.kind, UiEventKind::Click(_))
+        {
+            self.native = !self.native;
+            self.reset();
+            changed = true;
+        }
         for tip in &mut self.tips {
             changed |= tip.update(event, now);
         }
@@ -84,6 +93,13 @@ impl TooltipDemo {
     fn event(&mut self, event: &UiEvent, cx: &mut Context<Self>) {
         let now = self.origin.elapsed();
         let mut changed = false;
+        if event.target_key() == Some("tooltip-native")
+            && matches!(event.kind, UiEventKind::Click(_))
+        {
+            self.native = !self.native;
+            self.reset();
+            changed = true;
+        }
         for tip in &mut self.tips {
             changed |= tip.update(event, now);
         }
@@ -122,6 +138,11 @@ impl Render for TooltipDemo {
                     trigger,
                 )
                 .placement(FloatingPlacement::new(Placement::BottomStart))
+                .surface(if self.native {
+                    argui::ui::OverlaySurface::PreferNative
+                } else {
+                    argui::ui::OverlaySurface::InWindow
+                })
                 .max_width(236.0)
                 .paint(surface.paint(theme, cx.environment().color_scheme))
                 .layer(surface.layer(theme))
@@ -130,6 +151,8 @@ impl Render for TooltipDemo {
             });
         let mut root = Element::column([
             Element::row(cards).flex_wrap(FlexWrap::Wrap).gap(16.0),
+            argui::widgets::Switch::new("tooltip-native", "Allow outside this window", self.native)
+                .build(theme),
             text(&self.status, 14.0, theme.foreground, 400),
         ])
         .gap(18.0);
@@ -140,6 +163,7 @@ impl Render for TooltipDemo {
             EventType::PointerCancel,
             EventType::Focus,
             EventType::Blur,
+            EventType::Dismiss,
             EventType::Click,
             EventType::Key,
         ] {

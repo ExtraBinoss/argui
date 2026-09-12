@@ -20,9 +20,16 @@ cleanup() {
 trap cleanup EXIT
 chmod 700 "$test_runtime"
 
+backend="${ARGUI_TEST_BACKEND:-wayland}"
+case "$backend" in
+    wayland) test_command=("$@") ;;
+    x11) test_command=("$(dirname "$0")/linux-hidden-x11.sh" "$@") ;;
+    *) echo "Unknown ARGUI_TEST_BACKEND: $backend" >&2; exit 2 ;;
+esac
+
 env -u DISPLAY -u WAYLAND_DISPLAY -u WAYLAND_SOCKET -u DBUS_SESSION_BUS_ADDRESS \
     XDG_RUNTIME_DIR="$test_runtime" GDK_BACKEND=wayland QT_QPA_PLATFORM=wayland GIO_USE_VFS=local \
     dbus-run-session -- mutter --headless --wayland --no-x11 \
     --virtual-monitor="${ARGUI_TEST_MONITOR:-1600x1200@60}" \
     --wayland-display=argui-test -- \
-    env WAYLAND_DISPLAY=argui-test ARGUI_HIDDEN_DISPLAY=1 "$@"
+    env WAYLAND_DISPLAY=argui-test ARGUI_HIDDEN_DISPLAY=1 "${test_command[@]}"

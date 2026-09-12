@@ -98,5 +98,6 @@ impl Render for DatesDemo {
             .on(cx.listener(EventType::Input, Self::event))
             .on(cx.listener(EventType::Submit, Self::event))
             .on(cx.listener(EventType::PointerOutside, Self::event))
+            .on(cx.listener(EventType::Dismiss, Self::event))
     }
 }

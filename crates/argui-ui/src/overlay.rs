@@ -3,7 +3,7 @@ use argui_core::{Point, Rect, Size};
 use crate::{LengthPercentageAuto, Sides, WritingDirection};
 
 mod portal;
-pub use portal::{DismissPolicy, Portal, WindowLayer};
+pub use portal::{DismissPolicy, OverlaySurface, Portal, WindowLayer};
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub enum PortalTarget {

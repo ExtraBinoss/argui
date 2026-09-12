@@ -62,3 +62,27 @@ fn png_icons_decode_and_reject_other_encoded_data() {
     assert_eq!(&*decoded.rgba8, &[12, 34, 56, 255]);
     assert!(AppIcon::from_png(b"not a png").is_err());
 }
+
+#[test]
+fn identity_and_icon_errors_preserve_useful_diagnostics() {
+    assert_eq!(
+        ApplicationId::new("bad").unwrap_err().to_string(),
+        "invalid reverse-DNS application id: bad"
+    );
+    assert_eq!(
+        AppIcon::from_rgba8(0, 1, vec![]).unwrap_err().to_string(),
+        "invalid icon dimensions"
+    );
+    assert_eq!(
+        AppIcon::from_rgba8(1, 1, vec![0]).unwrap_err().to_string(),
+        "invalid icon byte length: expected 4, got 1"
+    );
+    assert!(
+        AppIcon::from_png(b"invalid")
+            .unwrap_err()
+            .to_string()
+            .starts_with("icon decoding failed:")
+    );
+    let icon = AppIcon::from_rgba8(1, 1, vec![20, 30, 40, 255]).unwrap();
+    assert_eq!(IconSet::single(icon.clone()).best_square(256), Some(&icon));
+}

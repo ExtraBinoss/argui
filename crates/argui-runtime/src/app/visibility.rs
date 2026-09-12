@@ -23,6 +23,10 @@ impl Application {
             return;
         }
         self.presentation_visible = visible;
+        #[cfg(all(feature = "native-popups", not(target_arch = "wasm32")))]
+        for popup in &self.popups.entries {
+            popup.native.window().set_visible(visible && popup.shown);
+        }
         if let Some(model) = &self.model {
             model.set_host_visible(visible);
         }

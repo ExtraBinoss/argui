@@ -154,6 +154,7 @@ fn portal_metadata_changes_republish_without_content_changes() {
         resolved: None,
         bounds: Rect::default(),
         available_size: Size::default(),
+        desired_size: Size::default(),
         constrained_width: false,
         constrained_height: false,
     });

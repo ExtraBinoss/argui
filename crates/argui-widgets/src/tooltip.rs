@@ -17,6 +17,7 @@ pub use host::TooltipHost;
 #[derive(Clone, Debug)]
 pub struct Tooltip {
     key: String,
+    surface: Option<argui_ui::OverlaySurface>,
     description: String,
     open: bool,
     trigger: Element,
@@ -36,6 +37,7 @@ impl Tooltip {
     ) -> Self {
         Self {
             key: key.into(),
+            surface: None,
             description: description.into(),
             open,
             trigger,
@@ -72,6 +74,12 @@ impl Tooltip {
     }
 
     #[must_use]
+    pub const fn surface(mut self, surface: argui_ui::OverlaySurface) -> Self {
+        self.surface = Some(surface);
+        self
+    }
+
+    #[must_use]
     pub fn build(self, theme: &WidgetTheme) -> Element {
         let content_key = format!("{}::content", self.key);
         let mut trigger = self.trigger.keyed(self.key.clone());
@@ -89,6 +97,7 @@ impl Tooltip {
         }
         let content = self.open.then(|| {
             Element::column([Element::text(self.description.clone())
+                .shrink(0.0)
                 .max_width(length((self.max_width - 20.0).max(0.0)))
                 .text_style(TextStyle {
                     font_size: 14.0,
@@ -96,6 +105,15 @@ impl Tooltip {
                     color: theme.foreground,
                     ..TextStyle::default()
                 })])
+            .overflow(argui_ui::Axes {
+                x: argui_ui::Overflow::Auto,
+                y: argui_ui::Overflow::Auto,
+            })
+            .scroll_config(
+                argui_ui::ScrollConfig::default()
+                    .propagation(argui_ui::ScrollPropagation::Contain)
+                    .scrollbar(theme.scrollbar.clone()),
+            )
             .keyed(content_key)
             .max_width(length(self.max_width.max(0.0)))
             .padding(Sides {
@@ -116,7 +134,13 @@ impl Tooltip {
             .semantics(Semantics::new(Role::Tooltip).label(self.description))
             .anchored_portal(WindowLayer::Popover, self.key, self.placement)
         });
-        Element::container(std::iter::once(trigger).chain(content))
+        Element::container(std::iter::once(trigger).chain(content.map(|content| {
+            if let Some(surface) = self.surface {
+                content.portal_surface(surface)
+            } else {
+                content
+            }
+        })))
     }
 }
 
@@ -209,6 +233,7 @@ impl TooltipState {
                     _ => return false,
                 }
             }
+            UiEventKind::DismissRequested if content => self.dismiss(),
             UiEventKind::Focused if trigger => self.focused = true,
             UiEventKind::Blurred if trigger => {
                 self.focused = false;

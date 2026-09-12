@@ -149,6 +149,22 @@ try {
             await page.mouse.click(1100, 820); await pause();
             assert.equal(await expanded(trigger), 'false');
         }
+        const nativeToggle = '[role="switch"][aria-label="Allow outside this window"]';
+        const assertInViewport = async selector => {
+            const bounds = await rect(selector);
+            assert.ok(bounds.x >= 0 && bounds.y >= 0 && bounds.right <= 1220 && bounds.bottom <= 900,
+                'PreferNative falls back inside the browser canvas');
+        };
+        await click(nativeToggle);
+        assert.equal(await page.$eval(nativeToggle, el => el.getAttribute('aria-checked')), 'true');
+        await click(button('Sharing settings'));
+        await click(button('Link options'));
+        await assertInViewport('[role="group"][aria-label="Sharing settings"]');
+        await assertInViewport('[role="group"][aria-label="Link options"]');
+        await capture(`${scheme}-popover-native-fallback`);
+        await page.keyboard.press('Escape'); await pause();
+        await page.keyboard.press('Escape'); await pause();
+        await click(nativeToggle);
         await navigate('Tooltip');
         const tooltipLabels = ['Save draft', 'Preview page', 'View history'];
         for (const label of tooltipLabels) {
@@ -186,6 +202,13 @@ try {
         await capture(`${scheme}-tooltip-keyboard`);
         await page.keyboard.press('Escape'); await pause();
         assert.equal(await tips(), 0);
+        await click(nativeToggle);
+        await page.mouse.move(...await point(button('Preview page'))); await pause(550);
+        assert.equal(await tips(), 1);
+        await assertInViewport('[role="tooltip"]');
+        await capture(`${scheme}-tooltip-native-fallback`);
+        await page.mouse.move(1100, 820); await pause(250);
+        await click(nativeToggle);
         console.log(`${scheme}: menus/submenus, select, date picker, toast, dialog, three effect surfaces and tooltip interactions passed`);
     }
     assert.deepEqual(errors, []);

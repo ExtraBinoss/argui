@@ -78,8 +78,8 @@ pub use interaction::{
     PointerEvents, WindowDragBehavior,
 };
 pub use overlay::{
-    AnchorPortal, AnchorWidth, CollisionPolicy, DismissPolicy, FloatingPlacement, PlacedOverlay,
-    Placement, Portal, PortalTarget, ViewportAlign, ViewportPlacement, WindowLayer,
+    AnchorPortal, AnchorWidth, CollisionPolicy, DismissPolicy, FloatingPlacement, OverlaySurface,
+    PlacedOverlay, Placement, Portal, PortalTarget, ViewportAlign, ViewportPlacement, WindowLayer,
 };
 pub use responsive::{ContainerQuery, ContainerScopeId};
 pub use scroll::{ScrollRegion, ScrollbarAxis, ScrollbarGeometry, ScrollbarRegion, scrollbar_at};

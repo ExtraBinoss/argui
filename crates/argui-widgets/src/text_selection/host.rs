@@ -140,7 +140,7 @@ impl<A: Render> SelectionHost<A> {
     fn handle_event(&mut self, event: &UiEvent, cx: &mut Context<Self>) {
         let previous = self.active.clone();
         match &event.kind {
-            UiEventKind::PointerOutside(_)
+            UiEventKind::PointerOutside(_) | UiEventKind::DismissRequested
                 if event.target_key() == Some(self.menu_key.as_str()) =>
             {
                 if self.active.take().is_some() {

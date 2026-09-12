@@ -10,6 +10,8 @@ pub mod gtk_host;
 mod identity;
 #[cfg(all(feature = "tray", not(target_arch = "wasm32")))]
 mod native_tray;
+#[cfg(all(feature = "native-popups", not(target_arch = "wasm32")))]
+pub mod popup;
 mod preferences;
 mod tray;
 #[cfg(target_arch = "wasm32")]

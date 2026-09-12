@@ -9,6 +9,7 @@ use crate::{PopoverBehavior, PopoverPart, WidgetTheme};
 #[derive(Clone, Debug)]
 pub struct Popover {
     key: String,
+    surface: Option<argui_ui::OverlaySurface>,
     label: String,
     open: bool,
     trigger: Element,
@@ -36,6 +37,7 @@ impl Popover {
     ) -> Self {
         Self {
             key: key.into(),
+            surface: None,
             label: label.into(),
             open,
             trigger,
@@ -112,6 +114,12 @@ impl Popover {
     }
 
     #[must_use]
+    pub const fn surface(mut self, surface: argui_ui::OverlaySurface) -> Self {
+        self.surface = Some(surface);
+        self
+    }
+
+    #[must_use]
     pub fn build(self, theme: &WidgetTheme) -> Element {
         let behavior = PopoverBehavior::new(&self.key, &self.label, self.open);
         let trigger = behavior.decorate(PopoverPart::Trigger, self.trigger);
@@ -131,12 +139,19 @@ impl Popover {
                     .padding(Sides::length(self.padding.max(0.0)))
                     .paint_style(paint)
                     .overflow(Axes {
-                        x: Overflow::Hidden,
+                        x: Overflow::Auto,
                         y: Overflow::Auto,
                     })
-                    .scroll_config(ScrollConfig::default().scrollbar(theme.scrollbar.clone()))
+                    .scroll_config(
+                        ScrollConfig::default()
+                            .propagation(argui_ui::ScrollPropagation::Contain)
+                            .scrollbar(theme.scrollbar.clone()),
+                    )
                     .anchored_portal(WindowLayer::Popover, self.key.clone(), self.placement)
                     .portal_dismiss(DismissPolicy::OutsidePointer);
+                if let Some(surface) = self.surface {
+                    content = content.portal_surface(surface);
+                }
                 let blur = self.backdrop_blur.unwrap_or(theme.overlay_blur).max(0.0);
                 content = content.layer(
                     self.layer

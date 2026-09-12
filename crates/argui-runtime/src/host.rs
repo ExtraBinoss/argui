@@ -197,9 +197,29 @@ impl<T: WindowHost + ?Sized> WindowHost for std::rc::Rc<T> {
 
 pub(crate) trait LoopControl {
     fn exit(&self);
+    #[cfg(all(feature = "native-popups", not(target_arch = "wasm32")))]
+    fn popup(
+        &self,
+        _parent: &Window,
+        _kind: argui_platform::popup::PopupKind,
+        _environment: argui_platform::popup::PopupEnvironment,
+        _bounds: argui_core::Rect,
+    ) -> Result<argui_platform::popup::NativePopup, argui_platform::popup::PopupUnavailable> {
+        Err(argui_platform::popup::PopupUnavailable::UnsupportedBackend)
+    }
 }
 
 impl LoopControl for winit::event_loop::ActiveEventLoop {
+    #[cfg(all(feature = "native-popups", not(target_arch = "wasm32")))]
+    fn popup(
+        &self,
+        parent: &Window,
+        kind: argui_platform::popup::PopupKind,
+        environment: argui_platform::popup::PopupEnvironment,
+        bounds: argui_core::Rect,
+    ) -> Result<argui_platform::popup::NativePopup, argui_platform::popup::PopupUnavailable> {
+        argui_platform::popup::NativePopup::create(self, parent, kind, environment, bounds)
+    }
     fn exit(&self) {
         self.exit();
     }

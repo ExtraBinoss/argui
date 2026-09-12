@@ -7,6 +7,7 @@ license.workspace = true
 
 [features]
 default = []
+native-popups = ["dep:x11rb", "dep:objc2", "objc2-app-kit/NSWindow", "objc2-app-kit/NSGraphics", "objc2-app-kit/NSView", "objc2-app-kit/NSScreen", "windows/Win32_UI_WindowsAndMessaging", "windows/Win32_Graphics_Gdi"]
 tray = ["dep:ksni", "dep:tray-icon"]
 gtk-host = ["dep:gtk", "dep:tao", "dep:wayland-client", "dep:wayland-backend", "dep:raw-window-handle"]
 
@@ -20,6 +21,7 @@ arboard.workspace = true
 
 [target.'cfg(target_os = "linux")'.dependencies]
 ashpd.workspace = true
+x11rb = { version = "=0.13.2", optional = true }
 futures-util.workspace = true
 ksni = { workspace = true, optional = true }
 pollster.workspace = true
@@ -34,6 +36,7 @@ windows = { workspace = true, features = ["UI_ViewManagement"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2-app-kit.workspace = true
+objc2 = { version = "=0.6.4", optional = true }
 
 [target.'cfg(any(target_os = "windows", target_os = "macos"))'.dependencies]
 tray-icon = { workspace = true, optional = true }

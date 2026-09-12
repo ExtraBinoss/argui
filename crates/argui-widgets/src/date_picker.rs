@@ -81,6 +81,7 @@ pub struct DatePicker<'a> {
     pub constraints: CalendarConstraints<'a>,
     pub unavailable_message: &'a str,
     icon: Option<Element>,
+    surface: Option<argui_ui::OverlaySurface>,
 }
 
 impl<'a> DatePicker<'a> {
@@ -99,7 +100,14 @@ impl<'a> DatePicker<'a> {
             constraints: CalendarConstraints::default(),
             unavailable_message: "This date is unavailable",
             icon: None,
+            surface: None,
         }
+    }
+
+    #[must_use]
+    pub fn surface(mut self, surface: argui_ui::OverlaySurface) -> Self {
+        self.surface = Some(surface);
+        self
     }
 
     pub fn icon(mut self, icon: Element) -> Self {
@@ -155,7 +163,7 @@ impl<'a> DatePicker<'a> {
             trigger = trigger.content(icon.clone());
         }
         let trigger = trigger.build().padding(argui_ui::Sides::length(8.0));
-        let popup = Popover::new(
+        let mut popup = Popover::new(
             self.popup_key(),
             &self.label,
             self.state.open,
@@ -171,8 +179,11 @@ impl<'a> DatePicker<'a> {
         ))
         .trap_focus(true)
         .padding(0.0)
-        .size(300.0, 380.0)
-        .build(theme);
+        .size(300.0, 380.0);
+        if let Some(surface) = self.surface {
+            popup = popup.surface(surface);
+        }
+        let popup = popup.build(theme);
         let mut children = vec![
             Element::row([input, popup])
                 .gap(8.0)

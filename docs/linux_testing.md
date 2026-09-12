@@ -37,6 +37,43 @@ au plus le démarrage ; il ne remplace ni l'inspection de captures ni les tests
 de comportement. La taille virtuelle se règle avec `ARGUI_TEST_MONITOR`, par
 exemple `1920x1200@60` ; la valeur par défaut est `1600x1200@60`.
 
+## X11 natif dans le même environnement privé
+
+`ARGUI_TEST_BACKEND=x11` démarre un **Xwayland avec son propre framebuffer**
+dans le compositeur Wayland privé. Le helper `scripts/linux-hidden-x11.sh`
+choisit un numéro de display libre avec `-displayfd`, désactive TCP et retire
+le socket Wayland de l’environnement de l’application testée. Il termine
+uniquement le PID Xwayland qu’il a lui-même lancé. Ne pas lancer ce helper seul.
+
+```sh
+# Galerie native X11, sans fenêtre sur le bureau personnel.
+ARGUI_TEST_BACKEND=x11 ./scripts/linux-hidden-display.sh \
+  timeout 20s target/debug/argui-widget-gallery
+
+# Ce test crée lui-même son compositeur et son serveur X privés.
+ARGUI_NATIVE_TESTS=1 cargo nextest run -p argui-runtime --all-features \
+  --test native_popups
+```
+
+Prérequis supplémentaires : `Xwayland`, Python avec `python-xlib` et Pillow.
+Le driver vérifie le PID du serveur et son environnement privé avant d’injecter
+les événements XTest. La souris et le clavier synthétiques restent dans ce
+serveur X ; aucune capture d’entrée ni autorisation de bureau distant sur la
+session utilisateur n’est nécessaire.
+
+Le mode rootless de Xwayland ne fournit pas de capture globale exploitable et
+peut demander un portail d’entrée pour XTest. Garder donc le serveur rootful
+isolé du helper pour ces tests ; ne pas connecter le driver au Xwayland de la
+session. Les commandes de déconnexion, redémarrage du bureau ou arrêt global
+de processus ne font pas partie de cette procédure.
+
+Le test `native_popups` vérifie le débordement, `WM_TRANSIENT_FOR` imbriqué,
+la saisie et la sélection par raccourci, les clics, le scroll et la perte de
+focus. Il enregistre le framebuffer réel dans `target/native-popups/` :
+`outside-window.png`, `native-selection.png` et `native-scroll.png`.
+Inspecter ces PNG ; le fond noir autour des trois fenêtres est l’espace vide
+du serveur privé, pas une capture du bureau de l’utilisateur.
+
 ## Galerie WebGPU et captures
 
 Construire et servir la galerie dans un terminal, puis lancer le scénario

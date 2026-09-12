@@ -7,6 +7,15 @@ use crate::{
 };
 
 impl Element {
+    /// Overrides the presentation preference inherited by this portal and its descendants.
+    #[must_use]
+    pub fn portal_surface(mut self, surface: crate::OverlaySurface) -> Self {
+        if let Some(portal) = &mut self.portal {
+            portal.surface = Some(surface);
+        }
+        self
+    }
+
     /// Clips content to the element's bounds and sets its rounded surface corners.
     /// Geometric clipping does not require an offscreen compositing layer.
     #[must_use]

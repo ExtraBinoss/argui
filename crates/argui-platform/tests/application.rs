@@ -53,3 +53,30 @@ fn application_configs_validate_their_optional_tray() {
         });
     assert!(invalid.validate().is_err());
 }
+
+#[test]
+fn invalid_configuration_diagnostics_identify_the_offending_window_or_tray() {
+    use argui_platform::{ApplicationConfigError, PreferenceOverrides};
+    let config = ApplicationConfig::new(identity(), WindowConfig::default()).with_preferences(
+        PreferenceOverrides {
+            color_scheme: Some(argui_core::ColorScheme::Dark),
+            ..Default::default()
+        },
+    );
+    assert_eq!(
+        config.preferences.color_scheme,
+        Some(argui_core::ColorScheme::Dark)
+    );
+    assert_eq!(
+        ApplicationConfigError::EmptyWindowKey.to_string(),
+        "window keys cannot be empty"
+    );
+    assert_eq!(
+        ApplicationConfigError::DuplicateWindowKey(WindowKey::new("settings")).to_string(),
+        "duplicate window key: settings"
+    );
+    assert_eq!(
+        ApplicationConfigError::InvalidTray("duplicate action".into()).to_string(),
+        "duplicate action"
+    );
+}

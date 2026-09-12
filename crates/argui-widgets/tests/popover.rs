@@ -456,3 +456,52 @@ fn panel_text_padding_and_nested_popovers_are_inside_click_targets() {
         );
     }
 }
+
+#[test]
+fn surface_preference_is_optional_and_os_dismissal_targets_only_its_panel() {
+    let palette = shadcn(Color::WHITE);
+    let theme = palette.resolve(argui_core::ColorScheme::Light);
+    let build = || {
+        Popover::new(
+            "native",
+            "Settings",
+            true,
+            Element::text("Open"),
+            Element::text("Panel"),
+        )
+    };
+    assert_eq!(
+        build().build(theme).children[1]
+            .portal
+            .as_ref()
+            .unwrap()
+            .surface,
+        None
+    );
+    let native = build()
+        .surface(argui_ui::OverlaySurface::PreferNative)
+        .build(theme);
+    assert_eq!(
+        native.children[1].portal.as_ref().unwrap().surface,
+        Some(argui_ui::OverlaySurface::PreferNative)
+    );
+    let behavior = PopoverBehavior::new("native", "Settings", true);
+    assert_eq!(
+        behavior.action(&event(
+            Some("other::content"),
+            UiEventKind::DismissRequested
+        )),
+        None
+    );
+    assert_eq!(
+        behavior.action(&event(
+            Some("native::content"),
+            UiEventKind::DismissRequested
+        )),
+        Some(PopoverAction::Close)
+    );
+    assert_eq!(
+        UiEventKind::DismissRequested.event_type(),
+        argui_ui::EventType::Dismiss
+    );
+}

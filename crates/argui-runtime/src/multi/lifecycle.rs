@@ -1,6 +1,6 @@
 use super::MultiApplication;
 use crate::AppEvent;
-use argui_platform::WindowKey;
+use argui_platform::{CloseBehavior, WindowKey};
 
 impl MultiApplication {
     #[cfg_attr(coverage_nightly, coverage(off))]
@@ -51,6 +51,24 @@ impl MultiApplication {
             && !std::thread::panicking()
         {
             std::panic::resume_unwind(payload);
+        }
+    }
+}
+
+impl MultiApplication {
+    pub(super) fn handle_close(
+        &mut self,
+        key: &WindowKey,
+        event_loop: &dyn crate::host::LoopControl,
+    ) {
+        let behavior = self.windows.get(key).map_or(CloseBehavior::Quit, |entry| {
+            entry.spec.window.close_behavior
+        });
+        match behavior {
+            CloseBehavior::Quit => event_loop.exit(),
+            CloseBehavior::CloseWindow => self.close_window(key),
+            CloseBehavior::Hide => self.set_visible(key, false),
+            CloseBehavior::NotifyApp => {}
         }
     }
 }

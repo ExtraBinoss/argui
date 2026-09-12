@@ -1,5 +1,8 @@
 # Overlay geometry
 
+For the optional cross-platform native popup API, automatic overflow, backend
+support and web fallback, see [native-popovers.md](native-popovers.md).
+
 ## Retained enter and exit animations
 
 `argui_widgets::Presence` is shared by selection toolbars, Select and Popover.

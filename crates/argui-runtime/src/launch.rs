@@ -151,11 +151,14 @@ fn launch(mut application: Application) -> Result<(), RuntimeError> {
     application.fatal_error.take().map_or(Ok(()), Err)
 }
 
-#[cfg(all(
-    not(target_arch = "wasm32"),
-    not(all(feature = "webview", target_os = "linux"))
-))]
+#[cfg(not(target_arch = "wasm32"))]
 fn launch_multi(mut application: MultiApplication) -> Result<(), RuntimeError> {
+    #[cfg(all(feature = "webview", target_os = "linux"))]
+    if std::env::var_os("WAYLAND_DISPLAY").is_some()
+        && std::env::var("GDK_BACKEND").map_or(true, |backend| backend != "x11")
+    {
+        return crate::multi::gtk::launch(application);
+    }
     let event_loop = EventLoop::<UserEvent>::with_user_event()
         .build()
         .map_err(PlatformError::from)?;
@@ -165,11 +168,6 @@ fn launch_multi(mut application: MultiApplication) -> Result<(), RuntimeError> {
         .run_app(&mut application)
         .map_err(PlatformError::from)?;
     application.fatal_error.take().map_or(Ok(()), Err)
-}
-
-#[cfg(all(feature = "webview", target_os = "linux"))]
-fn launch_multi(application: MultiApplication) -> Result<(), RuntimeError> {
-    crate::multi::gtk::launch(application)
 }
 
 #[cfg(target_arch = "wasm32")]

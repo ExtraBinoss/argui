@@ -13,6 +13,7 @@ pub(super) fn paint(
     cache: &mut PaintCache,
     scroll_updates: &mut Vec<ScrollPaintUpdate>,
 ) {
+    output.native_surfaces.clear();
     let mut portals = Vec::new();
     collect(root, elements, &mut portals);
     portals.sort_by_key(|node| {
@@ -45,6 +46,9 @@ pub(super) fn paint(
     ] {
         painter.layer(&portals, layer);
     }
+    for surface in &mut painter.output.native_surfaces {
+        surface.localize();
+    }
 }
 
 struct PortalPainter<'a> {
@@ -70,8 +74,32 @@ impl PortalPainter<'_> {
     }
 
     fn node(&mut self, node: &NodeMap, active_portal: Option<NodeId>) {
+        if active_portal.is_some()
+            && !self
+                .output
+                .portals
+                .iter()
+                .any(|portal| portal.node == node.node)
+        {
+            return;
+        }
         let mut context = self.context.clone();
         context.active_portal = active_portal;
+        let owner = self.ui.native_portal_owner(node.node);
+        let native = owner.and_then(|owner| {
+            self.ui
+                .native_portal_bounds(owner)
+                .map(|bounds| (owner, bounds))
+        });
+        let main_commands = native.map(|(_, bounds)| {
+            context.clip_bounds = bounds;
+            context.clips =
+                argui_paint::ClipChain::from_regions(vec![argui_paint::ClipRegion::new(
+                    bounds,
+                    argui_core::Affine2D::IDENTITY,
+                )]);
+            std::mem::take(&mut self.output.display_list)
+        });
         paint_node(
             node,
             self.elements,
@@ -81,6 +109,25 @@ impl PortalPainter<'_> {
             self.cache,
             self.scroll_updates,
         );
+        if let Some((owner, bounds)) = native {
+            let commands = std::mem::replace(&mut self.output.display_list, main_commands.unwrap());
+            if let Some(surface) = self
+                .output
+                .native_surfaces
+                .iter_mut()
+                .find(|surface| surface.node == owner)
+            {
+                surface
+                    .display_list
+                    .extend(commands.commands().iter().cloned());
+            } else {
+                self.output.native_surfaces.push(crate::NativeSurfacePaint {
+                    node: owner,
+                    bounds,
+                    display_list: commands,
+                });
+            }
+        }
     }
 }
 

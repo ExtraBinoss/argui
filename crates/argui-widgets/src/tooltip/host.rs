@@ -23,6 +23,7 @@ pub struct TooltipHost<A: Render> {
     delay: Duration,
     paint: Option<PaintStyle>,
     layer: Option<LayerStyle>,
+    surface: Option<argui_ui::OverlaySurface>,
 }
 
 impl<A: Render> TooltipHost<A> {
@@ -43,6 +44,7 @@ impl<A: Render> TooltipHost<A> {
             delay: Duration::from_millis(350),
             paint: None,
             layer: None,
+            surface: None,
         }
     }
 
@@ -62,6 +64,12 @@ impl<A: Render> TooltipHost<A> {
     #[must_use]
     pub fn layer(mut self, layer: LayerStyle) -> Self {
         self.layer = Some(layer);
+        self
+    }
+
+    #[must_use]
+    pub fn surface(mut self, surface: argui_ui::OverlaySurface) -> Self {
+        self.surface = Some(surface);
         self
     }
 
@@ -152,6 +160,9 @@ impl<A: Render> Render for TooltipHost<A> {
             if let Some(layer) = &self.layer {
                 tooltip = tooltip.layer(layer.clone());
             }
+            if let Some(surface) = self.surface {
+                tooltip = tooltip.surface(surface);
+            }
             let panel = tooltip
                 .build(themes.resolve(environment.color_scheme))
                 .children[1]
@@ -165,6 +176,7 @@ impl<A: Render> Render for TooltipHost<A> {
             EventType::PointerCancel,
             EventType::Focus,
             EventType::Blur,
+            EventType::Dismiss,
             EventType::Click,
             EventType::Key,
         ] {

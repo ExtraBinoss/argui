@@ -153,3 +153,39 @@ fn leaving_overlay_pages_resets_hover_focus_and_open_panels() {
     click(&app, "nav::popover");
     assert!(keyed(&app.render(), "popover-project::content").is_none());
 }
+
+#[test]
+fn native_tooltip_demo_resets_help_when_changing_surfaces_and_handles_host_dismissal() {
+    let app = Entity::new(WidgetGallery::default());
+    click(&app, "nav::tooltip");
+    dispatch(&app, "tooltip-preview", UiEventKind::Focused);
+    click(&app, "tooltip-native");
+    assert!(keyed(&app.render(), "tooltip-preview::content").is_none());
+    dispatch(&app, "tooltip-preview", UiEventKind::Focused);
+    assert_eq!(
+        keyed(&app.render(), "tooltip-preview::content")
+            .unwrap()
+            .portal
+            .as_ref()
+            .unwrap()
+            .surface,
+        Some(argui::ui::OverlaySurface::PreferNative)
+    );
+    dispatch(
+        &app,
+        "tooltip-preview::content",
+        UiEventKind::DismissRequested,
+    );
+    assert!(keyed(&app.render(), "tooltip-preview::content").is_none());
+    click(&app, "tooltip-native");
+    dispatch(&app, "tooltip-save", UiEventKind::Focused);
+    assert_eq!(
+        keyed(&app.render(), "tooltip-save::content")
+            .unwrap()
+            .portal
+            .as_ref()
+            .unwrap()
+            .surface,
+        Some(argui::ui::OverlaySurface::InWindow)
+    );
+}

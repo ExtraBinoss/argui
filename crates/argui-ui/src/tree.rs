@@ -14,6 +14,7 @@ mod event;
 mod focus;
 mod index;
 mod pointer;
+mod portal;
 mod resolve;
 mod responsive;
 mod scroll;
@@ -65,6 +66,7 @@ pub struct UiTree {
     reduced_motion: bool,
     events: EventRegistry,
     pending_gestures: Vec<crate::GestureEvent>,
+    native_portals: std::collections::HashMap<NodeId, argui_core::Rect>,
 }
 
 impl UiTree {
@@ -98,6 +100,7 @@ impl UiTree {
             reduced_motion: false,
             events,
             pending_gestures: Vec::new(),
+            native_portals: Default::default(),
         };
         tree.sync_text_inputs();
         tree.sync_responsive_registry();
@@ -351,7 +354,8 @@ impl UiTree {
         self.animations = AnimationRegistry::new(&self.root);
     }
 
-    fn element_for(&self, node: NodeId) -> Option<&Element> {
+    #[must_use]
+    pub fn element_for(&self, node: NodeId) -> Option<&Element> {
         self.index.element(node)
     }
 

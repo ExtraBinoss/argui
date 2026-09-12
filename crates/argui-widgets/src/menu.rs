@@ -41,6 +41,7 @@ pub struct Menu {
     pub open: bool,
     pub items: Vec<MenuItem>,
     presence: Option<crate::Presence>,
+    surface: Option<argui_ui::OverlaySurface>,
     pub path: Vec<String>,
     pub rtl: bool,
     icons: Option<crate::WidgetAssets>,
@@ -70,10 +71,16 @@ impl Menu {
             open,
             items,
             presence: None,
+            surface: None,
             path: Vec::new(),
             rtl: false,
             icons: None,
         }
+    }
+    #[must_use]
+    pub fn surface(mut self, surface: argui_ui::OverlaySurface) -> Self {
+        self.surface = Some(surface);
+        self
     }
     #[must_use]
     pub fn icons(mut self, icons: &crate::WidgetAssets) -> Self {
@@ -101,6 +108,9 @@ impl Menu {
             .trap_focus(false)
             .padding(6.0)
             .size(240.0, 360.0);
+        if let Some(surface) = self.surface {
+            popover = popover.surface(surface);
+        }
         if let Some(presence) = &self.presence {
             popover = popover.presence(presence);
         }

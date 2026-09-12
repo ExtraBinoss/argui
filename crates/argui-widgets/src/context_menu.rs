@@ -9,6 +9,12 @@ pub struct ContextMenu {
 }
 
 impl ContextMenu {
+    #[must_use]
+    pub fn surface(mut self, surface: argui_ui::OverlaySurface) -> Self {
+        self.menu = self.menu.surface(surface);
+        self
+    }
+
     pub fn build(&self, target: Element, theme: &WidgetTheme) -> Element {
         let mut root = self.menu.build(target, theme);
         if let Some(position) = self.position

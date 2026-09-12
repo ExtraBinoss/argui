@@ -353,6 +353,7 @@ dependencies = [
  "gtk",
  "image",
  "ksni",
+ "objc2 0.6.4",
  "objc2-app-kit 0.3.2",
  "pollster",
  "raw-window-handle",
@@ -365,6 +366,7 @@ dependencies = [
  "web-sys",
  "windows 0.62.2",
  "winit",
+ "x11rb",
 ]
 
 [[package]]
