@@ -20,7 +20,8 @@ pub(super) fn scroll_config(elements: &[&Element], ui: &UiTree, output: &mut Lay
     }
 }
 
-pub(super) fn text_colors(elements: &[&Element], ui: &UiTree, output: &mut LayoutOutput) {
+pub(super) fn text_colors(elements: &[&Element], ui: &UiTree, output: &mut LayoutOutput) -> bool {
+    let mut changed = false;
     for node in &output.nodes {
         let Some(text_index) = node.text_index else {
             continue;
@@ -37,6 +38,7 @@ pub(super) fn text_colors(elements: &[&Element], ui: &UiTree, output: &mut Layou
                     .is_some_and(|value| value.is_empty())
                 {
                     if let Some(block) = output.text.blocks_mut().get_mut(text_index) {
+                        changed |= block.style.color != placeholder_text.color;
                         block.style.color = placeholder_text.color;
                     }
                     continue;
@@ -52,7 +54,10 @@ pub(super) fn text_colors(elements: &[&Element], ui: &UiTree, output: &mut Layou
             }
         };
         if let Some(block) = output.text.blocks_mut().get_mut(text_index) {
-            block.style.color = ui.resolved_text_color(node.node, color);
+            let color = ui.resolved_text_color(node.node, color);
+            changed |= block.style.color != color;
+            block.style.color = color;
         }
     }
+    changed
 }

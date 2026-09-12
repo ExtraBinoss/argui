@@ -16,6 +16,15 @@ Mises à jour Argui du 10 septembre 2026 : [les cinq premiers composants](shadcn
 puis [Avatar, Empty, Kbd, Progress, AspectRatio et le Separator enrichi](shadcn-display-widgets.md).
 Ajout du 11 septembre 2026 : [Label, Skeleton, Breadcrumb et Pagination](shadcn-navigation-widgets.md).
 
+Dans la galerie, taper du texte depuis le fond de page ou un bouton démarre
+une recherche et place le curseur après le premier caractère dans le champ.
+Entrée ouvre le résultat sélectionné ; Échap efface la recherche et rend le
+focus à la galerie. Input, Textarea, éditeurs intégrés, menus et sélecteurs
+conservent leur saisie et leurs raccourcis. Ctrl/Cmd+K reste disponible.
+La couleur des libellés de Button suit désormais la transition de leur style,
+y compris lors d'un changement de page et d'une inversion rapide. Le survol
+reste immédiat et le mouvement réduit termine les transitions sans animation.
+
 ## Checklist complète
 
 - [ ] **Accordion** — absent ; sections contrôlées, navigation clavier et animation à exposer.

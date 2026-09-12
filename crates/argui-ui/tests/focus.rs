@@ -570,3 +570,25 @@ fn closing_a_nonmodal_scope_preserves_focus_that_already_left_it() {
     tree.sync_focus(&[region(trigger, 0.0), region(next, 100.0)], None);
     assert_eq!(tree.focused_node(), Some(next));
 }
+
+#[test]
+fn focus_requests_wait_for_layout_and_clear_cancels_deferred_focus() {
+    let mut tree = UiTree::new(control("button").focus_scope(FocusScope {
+        initial: Some(InitialFocus::First),
+        ..FocusScope::restoring().restore(false)
+    }));
+    let node = tree.node_id_at(0).unwrap();
+    let regions = [region(node, 0.0)];
+    tree.window_focused(&[]);
+    assert!(tree.focused_node().is_none());
+    tree.sync_focus(&regions, None);
+    assert_eq!(tree.focused_node(), Some(node));
+    tree.sync_focus(&[], Some(FocusRequest::Clear));
+    tree.sync_focus(&[], Some(FocusRequest::Focus("button".into())));
+    tree.sync_focus(&regions, None);
+    assert_eq!(tree.focused_node(), Some(node));
+    tree.sync_focus(&[], Some(FocusRequest::Focus("button".into())));
+    tree.sync_focus(&[], Some(FocusRequest::Clear));
+    tree.sync_focus(&regions, None);
+    assert!(tree.focused_node().is_none());
+}

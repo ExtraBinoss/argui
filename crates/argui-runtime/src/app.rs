@@ -512,8 +512,10 @@ impl Application {
     }
 
     pub(super) fn repaint(&mut self) {
-        if let (Some(ui), Some(layout)) = (&self.ui_tree, &mut self.ui_layout) {
-            self.layout_engine.repaint(ui, layout);
+        if let (Some(ui), Some(layout)) = (&self.ui_tree, &mut self.ui_layout)
+            && self.layout_engine.repaint(ui, layout)
+        {
+            self.prepared_text = Some(self.text_engine.prepare(&layout.text, self.scale_factor));
         }
         self.publish_inspection();
         self.paint_inspection_highlight();

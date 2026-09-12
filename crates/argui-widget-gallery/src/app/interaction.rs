@@ -82,6 +82,7 @@ impl Render for WidgetGallery {
                 .set_open(self.select_presence.is_open(), true);
         }
         let mut root = self.render_element(cx);
+        self.navigation_root = root.clone();
         for event_type in EventType::ALL {
             root = root.on(cx
                 .listener(event_type, WidgetGallery::handle_event)

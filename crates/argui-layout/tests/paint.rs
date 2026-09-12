@@ -82,10 +82,12 @@ fn paint_only_text_color_updates_without_reshaping() {
         .compute(&mut ui, &mut text_engine(), Size::new(200.0, 80.0))
         .unwrap();
     let bounds = output.text.blocks()[0].bounds;
+    assert!(!layout.repaint(&ui, &mut output));
 
     let update = ui.pointer_moved(Point::new(10.0, 10.0), &output.hit_regions);
     assert!(update.paint_changed);
-    layout.repaint(&ui, &mut output);
+    assert!(layout.repaint(&ui, &mut output));
+    assert!(!layout.repaint(&ui, &mut output));
 
     assert_eq!(output.text.blocks()[0].bounds, bounds);
     assert_eq!(

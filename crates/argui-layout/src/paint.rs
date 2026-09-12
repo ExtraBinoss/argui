@@ -38,7 +38,7 @@ pub(crate) fn repaint(
     ui: &UiTree,
     output: &mut LayoutOutput,
     cache: &mut PaintCache,
-) {
+) -> bool {
     let elements = crate::engine::flattened(ui.root());
     output.display_list.clear();
     output.hit_regions.clear();
@@ -47,7 +47,7 @@ pub(crate) fn repaint(
     cache.reused = 0;
     cache.reused_commands = 0;
     sync::scroll_config(&elements, ui, output);
-    sync::text_colors(&elements, ui, output);
+    let text_changed = sync::text_colors(&elements, ui, output);
     let clips = ClipChain::from_regions([ClipRegion::new(output.viewport, Affine2D::IDENTITY)]);
     if let Some(root) = root {
         let mut scroll_updates = Vec::new();
@@ -73,6 +73,7 @@ pub(crate) fn repaint(
         reused_subtrees: cache.reused,
         reused_commands: cache.reused_commands,
     };
+    text_changed
 }
 
 pub(super) fn paint_node(

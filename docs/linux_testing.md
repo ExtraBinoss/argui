@@ -109,6 +109,14 @@ CPU faibles ne suffisent pas à prouver une bonne performance. Voir les limites
 déjà observées dans [widget-gallery-performance.md](widget-gallery-performance.md).
 Les tests de lecteurs d'écran natifs restent distincts des assertions DOM.
 
+Pour la navigation et la recherche directe, utiliser
+`node crates/argui-widget-gallery/tests/app/navigation.mjs`. Le scénario tape
+dès le lancement, depuis un bouton puis depuis le fond de page, vérifie le
+premier caractère, l'ordre du texte, le focus, Entrée et Échap, et conserve la
+saisie dans Input, Textarea et Select. Les captures clair/sombre vont dans
+`target/navigation-interactions/`. Les tests Rust vérifient aussi les couleurs
+intermédiaires des libellés de boutons, les inversions rapides et le mouvement réduit.
+
 ## Contrôle final
 
 Conserver les règles de [code_quality.md](code_quality.md) : tests ciblés pendant

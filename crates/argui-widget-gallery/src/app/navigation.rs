@@ -1,11 +1,12 @@
 use super::{WidgetGallery, text};
 use crate::navigation::Page;
 use argui::{
-    core::{Key, KeyState},
+    core::{CaretAffinity, Key, KeyState, TextPosition},
     paint::{Border, BorderWidths},
+    runtime::Context,
     ui::{
-        Axes, Element, JustifyContent, Overflow, ScrollConfig, Sides, UiEvent, UiEventKind, length,
-        percent,
+        Axes, Element, ElementKind, JustifyContent, Overflow, Role, ScrollConfig, Sides,
+        TextSelection, UiEvent, UiEventKind, length, percent,
     },
     widgets::{Button, Input, InputKind, TablerIcon, WidgetAssets, WidgetTheme},
 };
@@ -38,7 +39,7 @@ impl WidgetGallery {
         )
         .kind(InputKind::Search)
         .label("Search components")
-        .description("Ctrl or Command K")
+        .description("Type anywhere outside an editor, or press Ctrl or Command K")
         .leading(assets.icon(TablerIcon::Search, 16.0), 38.0)
         .build();
         let mut children = vec![search];
@@ -90,6 +91,49 @@ impl WidgetGallery {
             .collect()
     }
 
+    pub(super) fn type_to_search(&mut self, event: &UiEvent, cx: &mut Context<Self>) -> bool {
+        let UiEventKind::KeyInput(input) = &event.kind else {
+            return false;
+        };
+        if input.state != KeyState::Pressed || input.modifiers.command() || input.modifiers.alt {
+            return false;
+        }
+        if event.target_key() == Some("gallery-search") && input.key == Key::Escape {
+            self.search.clear();
+            self.search_highlight = 0;
+            cx.request_focus("gallery-root");
+            cx.notify();
+            let _ = event.prevent_default();
+            event.stop_propagation();
+            return true;
+        }
+        let Key::Character(key) = &input.key else {
+            return false;
+        };
+        let text = input.text.as_deref().unwrap_or(key);
+        if text.trim().is_empty() || text.chars().any(char::is_control) {
+            return false;
+        }
+        if !event
+            .target_key()
+            .and_then(|key| searchable_target(&self.navigation_root, key))
+            .unwrap_or(false)
+        {
+            return false;
+        }
+        self.search = text.into();
+        self.search_highlight = 0;
+        cx.request_focus("gallery-search");
+        cx.select_text(
+            "gallery-search",
+            TextSelection::Caret(TextPosition::new(self.search.len(), CaretAffinity::After)),
+        );
+        cx.notify();
+        let _ = event.prevent_default();
+        event.stop_propagation();
+        true
+    }
+
     pub(super) fn update_search_keys(&mut self, event: &UiEvent) -> Option<Page> {
         if event.target_key() != Some("gallery-search") {
             return None;
@@ -117,4 +161,37 @@ impl WidgetGallery {
         }
         None
     }
+}
+
+fn searchable_target(element: &Element, key: &str) -> Option<bool> {
+    let target = if element.key.as_deref() == Some(key) {
+        Some(true)
+    } else {
+        element
+            .children
+            .iter()
+            .find_map(|child| searchable_target(child, key))
+    }?;
+    let owns_typing = matches!(
+        element.kind,
+        ElementKind::TextEditor { .. } | ElementKind::Custom(_)
+    ) || element.native_content.is_some()
+        || (element.portal.is_some() && element.focus_scope.is_some())
+        || element.semantics.as_ref().is_some_and(|semantics| {
+            semantics.state.expanded.is_some()
+                || matches!(
+                    semantics.role,
+                    Role::TextInput
+                        | Role::TextArea
+                        | Role::SearchInput
+                        | Role::ComboBox
+                        | Role::Menu
+                        | Role::MenuBar
+                        | Role::ListBox
+                        | Role::List
+                        | Role::Tree
+                        | Role::Grid
+                )
+        });
+    Some(target && !owns_typing)
 }

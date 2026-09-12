@@ -10,6 +10,8 @@ use argui_widget_gallery::WidgetGallery;
 
 #[path = "app/interaction.rs"]
 mod interaction;
+#[path = "app/navigation.rs"]
+mod navigation;
 
 #[test]
 fn sidebar_fast_hover_has_no_trail_and_keeps_the_active_page_highlighted() {

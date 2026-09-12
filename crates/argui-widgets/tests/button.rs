@@ -10,6 +10,57 @@ use argui_widgets::{
 };
 
 #[test]
+fn changing_button_variants_interpolates_label_color_and_retargets_without_a_jump() {
+    use argui_animation::Time;
+    let themes = shadcn(Color::from_srgb8(25, 100, 230));
+    let theme = themes.resolve(ColorScheme::Light);
+    let view = |selected| {
+        Button::new(
+            "page",
+            "Page",
+            if selected {
+                theme.button()
+            } else {
+                theme.ghost_button()
+            },
+        )
+        .build()
+    };
+    let mut tree = UiTree::new(view(false));
+    let color = |tree: &UiTree| {
+        let node = tree.node_ids()[1];
+        let ElementKind::Text { style, .. } = &tree.element_at(1).unwrap().kind else {
+            panic!("button label");
+        };
+        tree.resolved_text_color(node, style.color)
+    };
+    let resting = color(&tree);
+    tree.update(view(true));
+    assert_eq!(
+        color(&tree),
+        resting,
+        "selection must not snap the label to white"
+    );
+    tree.advance_animations(Time::from_nanos(1));
+    tree.advance_animations(Time::from_nanos(60_000_001));
+    let halfway = color(&tree);
+    assert_ne!(halfway, resting);
+    assert_ne!(halfway, theme.primary_foreground);
+    tree.update(view(false));
+    assert_eq!(
+        color(&tree),
+        halfway,
+        "a rapid reversal starts at the current color"
+    );
+    tree.advance_animations(Time::from_nanos(60_000_002));
+    tree.advance_animations(Time::from_nanos(180_000_002));
+    assert_eq!(color(&tree), resting);
+    tree.set_reduced_motion(true);
+    tree.update(view(true));
+    assert_eq!(color(&tree), theme.primary_foreground);
+}
+
+#[test]
 fn button_exposes_variants_content_and_busy_state() {
     let theme = shadcn(Color::srgb(0.2, 0.5, 0.9));
     let theme = theme.resolve(ColorScheme::Dark);

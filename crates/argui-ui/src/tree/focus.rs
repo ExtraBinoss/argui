@@ -323,6 +323,11 @@ impl UiTree {
             });
         }
         for intent in intents {
+            // A web window can receive focus before its first nonzero layout.
+            if regions.is_empty() && !matches!(intent, FocusIntent::Clear) {
+                self.focus.pending.push(intent);
+                continue;
+            }
             let active = self.focus.active_trap();
             let (target, visible) = match intent {
                 FocusIntent::First { scope, visible } => {
@@ -337,6 +342,7 @@ impl UiTree {
                     visible,
                 ),
                 FocusIntent::Clear if active.is_none() => {
+                    self.focus.pending.clear();
                     let raw = self.interaction.clear_focus();
                     update.merge(self.decorate(raw));
                     continue;

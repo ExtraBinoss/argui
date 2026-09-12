@@ -164,8 +164,9 @@ impl LayoutEngine {
         Ok(())
     }
 
-    pub fn repaint(&mut self, ui: &UiTree, output: &mut LayoutOutput) {
-        paint::repaint(self.root.as_ref(), ui, output, &mut self.paint_cache);
+    /// Repaints retained primitives and returns whether prepared text needs refreshing.
+    pub fn repaint(&mut self, ui: &UiTree, output: &mut LayoutOutput) -> bool {
+        paint::repaint(self.root.as_ref(), ui, output, &mut self.paint_cache)
     }
 
     pub fn update_text_inputs(

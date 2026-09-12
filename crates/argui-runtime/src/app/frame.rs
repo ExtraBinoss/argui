@@ -280,6 +280,11 @@ impl Application {
             (self.on_event)(RuntimeEvent::ViewUpdated(tree_update));
         }
         self.sync_accessibility();
+        if self.sync_animations()
+            && let Some(window) = &self.window
+        {
+            window.request_redraw();
+        }
         tree_update
     }
 }

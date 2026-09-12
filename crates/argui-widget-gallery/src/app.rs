@@ -31,6 +31,7 @@ pub struct WidgetGallery {
     pub(crate) page: Page,
     pub(crate) search: String,
     search_highlight: usize,
+    navigation_root: Element,
     pub(crate) theme_mode: ThemeMode,
     pub(crate) primary: usize,
     pub(crate) name: String,
@@ -120,6 +121,7 @@ impl Default for WidgetGallery {
             page: Page::Button,
             search: String::new(),
             search_highlight: 0,
+            navigation_root: Element::container([]),
             theme_mode: ThemeMode::System,
             primary: 0,
             name: "Ada Lovelace".into(),
@@ -194,6 +196,10 @@ impl WidgetGallery {
             cx.entity(&self.toasts),
         ])
         .keyed("gallery-root")
+        .focus_scope(argui::ui::FocusScope {
+            initial: Some(argui::ui::InitialFocus::Target("gallery-root".into())),
+            ..argui::ui::FocusScope::restoring().restore(false)
+        })
         .width(percent(1.0))
         .height(percent(1.0))
         .background(theme.background)
@@ -346,6 +352,9 @@ impl WidgetGallery {
         }
         if self.handle_shortcuts(event, cx) {
             event.stop_propagation();
+            return;
+        }
+        if self.type_to_search(event, cx) {
             return;
         }
         if let Some(page) = self.update_search_keys(event) {
