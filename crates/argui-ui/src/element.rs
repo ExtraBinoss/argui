@@ -49,6 +49,7 @@ impl Element {
         Self(Rc::new(ElementNode {
             inspectable: true,
             native_content: None,
+            desktop_backdrop: None,
             key: None,
             kind: ElementKind::Container,
             style: LayoutStyle::default(),
@@ -116,6 +117,7 @@ impl Element {
         Self(Rc::new(ElementNode {
             inspectable: true,
             native_content: None,
+            desktop_backdrop: None,
             key: None,
             kind: ElementKind::Text {
                 content: value.into(),

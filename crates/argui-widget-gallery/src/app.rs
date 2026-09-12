@@ -19,6 +19,7 @@ use argui_image::ImageLibrary;
 
 use crate::{navigation::Page, pages};
 
+mod desktop_backdrop;
 mod interaction;
 mod navigation;
 mod theme;
@@ -28,6 +29,7 @@ use theme::mode_label;
 const EDITOR_DEFAULT_SIZE: Size = Size::new(520.0, 170.0);
 
 pub struct WidgetGallery {
+    backdrop: desktop_backdrop::BackdropSettings,
     pub(crate) page: Page,
     pub(crate) search: String,
     search_highlight: usize,
@@ -85,6 +87,7 @@ pub struct WidgetGallery {
     dark_assets: WidgetAssets,
     accent_assets: WidgetAssets,
     pub(crate) spinner: Entity<Spinner>,
+    pub(crate) file_picker: std::cell::OnceCell<Entity<pages::file_picker::FilePickerDemo>>,
     pub(crate) progress: std::cell::OnceCell<Entity<pages::progress::ProgressDemo>>,
 }
 
@@ -104,6 +107,7 @@ impl Default for WidgetGallery {
             17.0,
         ));
         Self {
+            backdrop: desktop_backdrop::BackdropSettings::default(),
             scroll_demo: Entity::new(pages::scroll_effects::ScrollDemo::default()),
             webview: pages::webview::WebViewDemo::entity(),
             glass: Entity::new(pages::liquid_glass::GlassDemo::default()),
@@ -161,6 +165,7 @@ impl Default for WidgetGallery {
             dark_assets,
             accent_assets,
             spinner,
+            file_picker: std::cell::OnceCell::new(),
             progress: std::cell::OnceCell::new(),
         }
     }
@@ -169,18 +174,19 @@ impl Default for WidgetGallery {
 impl WidgetGallery {
     fn view(
         &self,
-        _environment: WindowEnvironment,
+        environment: WindowEnvironment,
         theme: &WidgetTheme,
         assets: &WidgetAssets,
         cx: &mut Context<Self>,
         resize: pages::ResizeListeners,
     ) -> Element {
         Element::column([
-            self.topbar(theme, assets),
+            self.topbar(theme, assets, environment),
             Element::row([
                 self.sidebar(theme, assets),
-                pages::render(self, theme, assets, cx, resize)
+                Element::container([pages::render(self, theme, assets, cx, resize)])
                     .keyed("gallery-content-scroll")
+                    .background(theme.background)
                     .grow(1.0)
                     .min_width(length(0.0))
                     .min_height(length(0.0))
@@ -202,7 +208,7 @@ impl WidgetGallery {
         })
         .width(percent(1.0))
         .height(percent(1.0))
-        .background(theme.background)
+        .background(Color::TRANSPARENT)
         .interaction(
             Interaction::default()
                 .focus_policy(argui::ui::FocusPolicy::TabStop)
@@ -220,7 +226,12 @@ impl WidgetGallery {
         .inspectable(true)
     }
 
-    fn topbar(&self, theme: &WidgetTheme, assets: &WidgetAssets) -> Element {
+    fn topbar(
+        &self,
+        theme: &WidgetTheme,
+        assets: &WidgetAssets,
+        environment: WindowEnvironment,
+    ) -> Element {
         let mode_icon = match self.theme_mode {
             ThemeMode::Light => TablerIcon::Sun,
             ThemeMode::Dark => TablerIcon::Moon,
@@ -277,7 +288,12 @@ impl WidgetGallery {
         )
         .leading(assets.icon(mode_icon, 17.0))
         .build();
-        Element::row([brand, Element::row([swatches, theme_button]).gap(14.0)])
+        let mut controls = vec![swatches];
+        if cfg!(feature = "desktop-backdrop") {
+            controls.push(self.backdrop_controls(theme, environment));
+        }
+        controls.push(theme_button);
+        Element::row([brand, Element::row(controls).gap(10.0)])
             .height(length(64.0))
             .padding(Sides {
                 left: length(22.0),
@@ -328,6 +344,9 @@ impl WidgetGallery {
 
 impl WidgetGallery {
     fn handle_event(&mut self, event: &UiEvent, cx: &mut Context<Self>) {
+        if self.backdrop_event(event, cx) {
+            return;
+        }
         if self.page == Page::Popover {
             let dismissed = self.popover.update(|demo, cx| {
                 let dismissed = demo.dismiss(event);
@@ -521,6 +540,7 @@ impl WidgetGallery {
     }
 
     fn handle_layout(&mut self, layout: &LayoutSnapshot) {
+        self.backdrop.layout_changed(layout);
         crate::property_slider::layout_changed(self, layout);
         let behavior = RangeBehavior::new(
             "plain-slider",

@@ -250,3 +250,8 @@ pub use progress::Progress;
 mod tooltip;
 #[cfg(feature = "tooltip")]
 pub use tooltip::{Tooltip, TooltipHost, TooltipState};
+
+#[cfg(feature = "file-picker")]
+mod file_picker;
+#[cfg(feature = "file-picker")]
+pub use file_picker::{FilePicker, FilePickerEvent, FilePickerStatus};

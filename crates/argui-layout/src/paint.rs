@@ -3,7 +3,7 @@ use argui_paint::{
     Border, ClipChain, ClipRegion, Color, DisplayList, ImagePrimitive, Quad, QuadStyle,
     VectorPrimitive,
 };
-use argui_ui::{EffectScope, Element, ElementKind, HitRegion, NodeId, PointerEvents, UiTree};
+use argui_ui::{EffectScope, Element, ElementKind, NodeId, PointerEvents, UiTree};
 
 use crate::{LayoutNode, LayoutOutput, engine::NodeMap, input, scroll};
 
@@ -43,6 +43,7 @@ pub(crate) fn repaint(
     output.display_list.clear();
     output.hit_regions.clear();
     output.semantic_bounds.clear();
+    output.desktop_backdrops.clear();
     cache.visited = 0;
     cache.reused = 0;
     cache.reused_commands = 0;
@@ -103,6 +104,7 @@ pub(super) fn paint_node(
         && fragment.nodes == output.nodes[map.index..map.index + map.subtree_len]
         && fragment.parent == *parent
         && fragment.visual_revision == ui.visual_revision(node.node)
+        && fragment.backdrop_state == ui.desktop_backdrop_state()
         && (fragment.selection_revision == ui.document_selection_revision()
             || (!fragment.selection_active && !selection_active))
     {
@@ -121,6 +123,9 @@ pub(super) fn paint_node(
             .extend(fragment.commands.iter().cloned());
         output.hit_regions.extend_from_slice(&fragment.hit_regions);
         output
+            .desktop_backdrops
+            .extend_from_slice(&fragment.desktop_backdrops);
+        output
             .semantic_bounds
             .extend_from_slice(&fragment.semantic_bounds);
         for update in &fragment.scroll_updates {
@@ -133,6 +138,7 @@ pub(super) fn paint_node(
     }
     let command_start = output.display_list.len();
     let semantic_start = output.semantic_bounds.len();
+    let backdrop_start = output.desktop_backdrops.len();
     let hit_start = output.hit_regions.len();
     let scroll_start = scroll_updates.len();
     let portal;
@@ -275,6 +281,8 @@ pub(super) fn paint_node(
                     .collect(),
                 scroll_updates: scroll_updates[scroll_start..].to_vec(),
                 visual_revision: ui.visual_revision(node.node),
+                desktop_backdrops: output.desktop_backdrops[backdrop_start..].to_vec(),
+                backdrop_state: ui.desktop_backdrop_state(),
                 selection_active,
                 selection_revision: ui.document_selection_revision(),
             },
@@ -312,6 +320,16 @@ fn paint_enter(
     clips_content: bool,
 ) -> usize {
     let visual_bounds = context.transform.transform_rect(node.bounds);
+    if element.desktop_backdrop.is_some() {
+        output.desktop_backdrops.push(crate::DesktopBackdropRegion {
+            node: node.node,
+            shape: context.clips.appended(ClipRegion::rounded(
+                node.bounds,
+                context.transform,
+                ui.resolved_quad(node.node, element).radii,
+            )),
+        });
+    }
     if let Some(layer) = element.layer.clone() {
         begin_layer(
             &mut output.display_list,
@@ -328,7 +346,7 @@ fn paint_enter(
         visual_bounds,
         node.node,
     );
-    push_hit_region(element, node, output, context);
+    geometry::push_hit_region(element, node, output, context);
     push_quad(
         ui,
         ui.resolved_quad(node.node, element),
@@ -548,41 +566,4 @@ fn push_vector(
         transform: context.transform,
         clips: context.clips.clone(),
     });
-}
-
-fn push_hit_region(
-    element: &Element,
-    node: LayoutNode,
-    output: &mut LayoutOutput,
-    context: &PaintContext,
-) {
-    let own_allowed = context.hit_allowed
-        && !matches!(
-            element.hit_test.pointer_events,
-            PointerEvents::None | PointerEvents::ContentsOnly
-        );
-    let listens_to_pointer = element
-        .event_listeners
-        .iter()
-        .any(|listener| listener.event.requires_hit_test());
-    if own_allowed && (element.interaction.is_some() || listens_to_pointer) {
-        let interaction = element.interaction.clone().unwrap_or_default();
-        output.hit_regions.push(HitRegion {
-            node: node.node,
-            bounds: node.bounds,
-            transform: context.transform,
-            clips: context.clips.clone(),
-            shape: element.hit_test.shape,
-            slop: element.hit_test.slop,
-            enabled: interaction.enabled,
-            focus_policy: if interaction.enabled {
-                interaction.focus_policy
-            } else {
-                argui_ui::FocusPolicy::None
-            },
-            cursor: interaction.cursor,
-            gestures: interaction.gestures,
-            window_drag: interaction.window_drag,
-        });
-    }
 }

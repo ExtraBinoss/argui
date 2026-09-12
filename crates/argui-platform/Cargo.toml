@@ -7,27 +7,34 @@ license.workspace = true
 
 [features]
 default = []
+file-picker = ["dep:rfd", "dep:futures-channel"]
+desktop-backdrop = ["dep:argui-paint", "dep:x11rb", "dep:wayland-client", "dep:wayland-backend", "dep:wayland-protocols", "dep:wayland-protocols-plasma", "dep:objc2", "dep:objc2-foundation", "dep:objc2-quartz-core", "dep:objc2-core-graphics", "objc2-app-kit/NSView", "objc2-app-kit/NSWindow", "objc2-app-kit/NSVisualEffectView", "objc2-app-kit/NSAppearance", "objc2-app-kit/objc2-quartz-core", "windows/Win32_Graphics_Dwm", "windows/Win32_UI_Controls"]
 native-popups = ["dep:x11rb", "dep:objc2", "objc2-app-kit/NSWindow", "objc2-app-kit/NSGraphics", "objc2-app-kit/NSView", "objc2-app-kit/NSScreen", "windows/Win32_UI_WindowsAndMessaging", "windows/Win32_Graphics_Gdi"]
 tray = ["dep:ksni", "dep:tray-icon"]
 gtk-host = ["dep:gtk", "dep:tao", "dep:wayland-client", "dep:wayland-backend", "dep:raw-window-handle"]
 
 [dependencies]
+rfd = { version = "=0.17.2", optional = true }
 argui-core.workspace = true
+argui-paint = { workspace = true, optional = true }
 image.workspace = true
 winit.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 arboard.workspace = true
+futures-channel = { version = "=0.3.34", optional = true }
+pollster.workspace = true
 
 [target.'cfg(target_os = "linux")'.dependencies]
 ashpd.workspace = true
 x11rb = { version = "=0.13.2", optional = true }
 futures-util.workspace = true
 ksni = { workspace = true, optional = true }
-pollster.workspace = true
 gtk = { version = "=0.18.2", optional = true }
 tao = { version = "=0.37.0", features = ["rwh_06"], optional = true }
 wayland-client = { version = "=0.31.15", optional = true }
+wayland-protocols = { version = "=0.32.13", features = ["client", "staging"], optional = true }
+wayland-protocols-plasma = { version = "=0.3.12", features = ["client"], optional = true }
 wayland-backend = { version = "=0.3.17", features = ["client_system"], optional = true }
 raw-window-handle = { version = "=0.6.2", optional = true }
 
@@ -37,6 +44,9 @@ windows = { workspace = true, features = ["UI_ViewManagement"] }
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2-app-kit.workspace = true
 objc2 = { version = "=0.6.4", optional = true }
+objc2-foundation = { version = "=0.3.2", default-features = false, features = ["std", "NSGeometry", "objc2-core-foundation"], optional = true }
+objc2-quartz-core = { version = "=0.3.2", default-features = false, features = ["std", "CALayer", "CAShapeLayer", "objc2-core-graphics", "objc2-core-foundation"], optional = true }
+objc2-core-graphics = { version = "=0.3.2", default-features = false, features = ["std", "CGGeometry", "CGPath"], optional = true }
 
 [target.'cfg(any(target_os = "windows", target_os = "macos"))'.dependencies]
 tray-icon = { workspace = true, optional = true }
@@ -49,3 +59,9 @@ web-sys = { workspace = true, features = ["Clipboard", "Document", "Element", "H
 
 [lints]
 workspace = true
+
+[[test]]
+name = "native_desktop_backdrop"
+path = "tests/desktop_backdrop/linux.rs"
+harness = false
+required-features = ["desktop-backdrop"]

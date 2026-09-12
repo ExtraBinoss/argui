@@ -6,6 +6,10 @@ placement, le défilement et les interactions restent gérés par Argui. Les
 adaptateurs OS ne s’occupent que des fenêtres, de leur propriétaire et de la
 zone de travail. Un échec de création ou de rendu entraîne un repli interne.
 
+Le flou du bureau derrière une fenêtre est une fonctionnalité distincte : voir
+[desktop-backdrops.md](desktop-backdrops.md) pour l'API, les réglages et les
+adaptateurs Linux/Windows/macOS.
+
 ## Activer la fonctionnalité
 
 Aucune feature n’est activée par défaut. Choisir les widgets séparément ;

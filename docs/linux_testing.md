@@ -156,6 +156,38 @@ intermédiaires des libellés de boutons, les inversions rapides et le mouvement
 
 ## Contrôle final
 
+Pour les réglages de flou de bureau, utiliser
+`node crates/argui-widget-gallery/tests/app/desktop_backdrop.mjs` avec le même
+lanceur et les mêmes variables Chromium/Puppeteer. Captures :
+`target/desktop-backdrop/`. Le scénario vérifie aussi que le canvas conserve
+l'alpha. L'API et les limites par OS sont dans
+[desktop-backdrops.md](desktop-backdrops.md).
+
+Pour capturer une fenêtre **native Wayland**, le helper suivant utilise les
+services ScreenCast/RemoteDesktop du **Mutter privé** et son propre PipeWire :
+
+```sh
+./scripts/linux-hidden-display.sh timeout --signal=INT --kill-after=3s 55s \
+  python3 scripts/linux-wayland-capture.py \
+  --output target/desktop-backdrop/wayland \
+  --click settings:1110:260 --click glass:884:385 \
+  --click transparency:884:664 --click sidebar:1110:260 \
+  -- target/debug/argui-widget-gallery
+```
+
+Prérequis : Python/PyGObject/Pillow, GStreamer avec `pipewiresrc`, PipeWire et
+WirePlumber. Le profil WirePlumber `policy` n'ouvre aucun périphérique audio,
+Bluetooth ou caméra. Le socket, la configuration et l'état restent privés.
+Le helper termine uniquement ses propres enfants. Il refuse un display non
+privé et une capture sans contenu contrasté ; inspecter néanmoins chaque PNG.
+
+Les clics sont exprimés en coordonnées du moniteur virtuel de 1600 × 1200 ;
+contrôler d'abord `initial.png` si la taille ou la décoration a changé. Le helper
+emploie des mouvements relatifs sur le moniteur privé : les mouvements absolus
+du stream ScreenCast ont été ignorés sur Mutter headless 50.4. `--settle` règle
+le délai initial (25 secondes par défaut, pour laisser démarrer les portails).
+Ces services privés ne donnent aucun accès aux fenêtres du bureau personnel.
+
 Conserver les règles de [code_quality.md](code_quality.md) : tests ciblés pendant
 le développement, aucune couverture LLVM concurrente, puis une seule exécution
 de `./scripts/quality.sh` quand l'implémentation est terminée, avant le commit.

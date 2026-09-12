@@ -23,6 +23,7 @@ pub enum RuntimeEvent {
     AnimationProfile(AnimationProfile),
     RendererFailed(String),
     LayoutFailed(String),
+    DesktopBackdropUnavailable(String),
     /// A requested native overlay was retained in its parent surface.
     PopupFallback {
         node: argui_ui::NodeId,
@@ -48,6 +49,7 @@ pub enum WindowRuntimeEvent {
     AnimationProfile(AnimationProfile),
     RendererFailed(String),
     LayoutFailed(String),
+    DesktopBackdropUnavailable(String),
     /// A requested native overlay was retained in its parent surface.
     PopupFallback {
         node: argui_ui::NodeId,
@@ -66,6 +68,9 @@ impl RuntimeEvent {
             Self::AnimationProfile(event) => WindowRuntimeEvent::AnimationProfile(event),
             Self::RendererFailed(event) => WindowRuntimeEvent::RendererFailed(event),
             Self::LayoutFailed(event) => WindowRuntimeEvent::LayoutFailed(event),
+            Self::DesktopBackdropUnavailable(reason) => {
+                WindowRuntimeEvent::DesktopBackdropUnavailable(reason)
+            }
             Self::PopupFallback { node, reason } => {
                 WindowRuntimeEvent::PopupFallback { node, reason }
             }

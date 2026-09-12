@@ -7,6 +7,7 @@ license.workspace = true
 
 [features]
 default = []
+desktop-backdrop = ["argui-platform/desktop-backdrop"]
 native-popups = ["argui-platform/native-popups"]
 tasks = ["dep:tokio", "dep:futures-util", "dep:futures-channel", "dep:gloo-timers"]
 tray = ["argui-platform/tray"]

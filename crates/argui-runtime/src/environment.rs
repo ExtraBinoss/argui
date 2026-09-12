@@ -7,6 +7,8 @@ pub struct WindowEnvironment {
     pub primary: Color,
     pub reduced_motion: bool,
     pub high_contrast: bool,
+    /// Native desktop blur is available and permitted for this window.
+    pub desktop_backdrop_available: bool,
 }
 
 impl Default for WindowEnvironment {
@@ -16,6 +18,7 @@ impl Default for WindowEnvironment {
             primary: Color::srgb(0.10, 0.45, 0.91),
             reduced_motion: false,
             high_contrast: false,
+            desktop_backdrop_available: false,
         }
     }
 }

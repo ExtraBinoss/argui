@@ -7,7 +7,8 @@ license.workspace = true
 
 [features]
 default = []
-all = ["label", "skeleton", "breadcrumb", "pagination", "avatar", "empty", "kbd", "aspect-ratio", "progress", "badge", "card", "alert", "separator", "collapsible", "data-table", "toast", "date-picker", "calendar", "button", "input", "checkbox", "switch", "radio-group", "tabs", "select", "popover", "dialog", "range", "slider", "spinner", "text-selection", "split-pane", "vlist", "list", "table", "tree-view", "icons", "menu", "context-menu", "menubar", "command-palette", "textarea", "tooltip"]
+all = ["file-picker", "label", "skeleton", "breadcrumb", "pagination", "avatar", "empty", "kbd", "aspect-ratio", "progress", "badge", "card", "alert", "separator", "collapsible", "data-table", "toast", "date-picker", "calendar", "button", "input", "checkbox", "switch", "radio-group", "tabs", "select", "popover", "dialog", "range", "slider", "spinner", "text-selection", "split-pane", "vlist", "list", "table", "tree-view", "icons", "menu", "context-menu", "menubar", "command-palette", "textarea", "tooltip"]
+file-picker = ["button", "dep:argui-platform", "argui-platform/file-picker", "dep:argui-runtime", "argui-runtime/tasks"]
 label = []
 skeleton = ["dep:argui-runtime"]
 breadcrumb = ["button"]
@@ -53,6 +54,7 @@ tree-view = ["vlist", "button"]
 icons = ["dep:argui-vector", "dep:icondata_core", "dep:icondata_tb"]
 
 [dependencies]
+argui-platform = { workspace = true, optional = true }
 web-time = { workspace = true, optional = true }
 time = { version = "=0.3.44", optional = true, features = ["parsing"] }
 argui-animation.workspace = true

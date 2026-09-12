@@ -37,6 +37,8 @@ impl Application {
         self.sync_native_views();
         #[cfg(all(feature = "native-popups", not(target_arch = "wasm32")))]
         self.sync_popups(event_loop);
+        #[cfg(all(feature = "desktop-backdrop", not(target_arch = "wasm32")))]
+        self.sync_desktop_backdrop();
         self.refresh_cursor(&window);
         self.render(event_loop);
         #[cfg(all(feature = "native-popups", not(target_arch = "wasm32")))]

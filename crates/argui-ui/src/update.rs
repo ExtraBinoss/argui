@@ -2,7 +2,7 @@ use crate::{BindingImpact, Element, ElementKind, TreeUpdate, TreeUpdateStats};
 
 pub(crate) fn classify_update(
     old: &Element,
-    new: &Element,
+    new: &mut Element,
     stats: &mut TreeUpdateStats,
 ) -> TreeUpdate {
     stats.visited += 1;
@@ -11,6 +11,8 @@ pub(crate) fn classify_update(
         return TreeUpdate::None;
     }
     if old == new {
+        // Equal descriptions keep the retained allocation used by the paint cache.
+        *new = old.clone();
         return TreeUpdate::None;
     }
     let binding_update = binding_update(old, new);
@@ -35,7 +37,7 @@ pub(crate) fn classify_update(
     let children = old
         .children
         .iter()
-        .zip(&new.children)
+        .zip(&mut new.children)
         .map(|(old, new)| classify_update(old, new, stats))
         .max_by_key(|update| update_priority(*update))
         .unwrap_or(TreeUpdate::None);
@@ -70,6 +72,7 @@ fn visual_changed(old: &Element, new: &Element) -> bool {
     old.inspectable != new.inspectable
         || old.kind != new.kind
         || old.paint != new.paint
+        || old.desktop_backdrop != new.desktop_backdrop
         || old.transform != new.transform
         || old.transform_origin != new.transform_origin
         || old.interaction != new.interaction

@@ -13,6 +13,8 @@ pub(super) struct CachedFragment {
     pub(super) commands: Vec<argui_paint::DisplayCommand>,
     pub(super) hit_regions: Vec<HitRegion>,
     pub(super) semantic_bounds: Vec<(NodeId, Rect)>,
+    pub(super) desktop_backdrops: Vec<crate::DesktopBackdropRegion>,
+    pub(super) backdrop_state: argui_ui::DesktopBackdropState,
     pub(super) text_orders: Vec<(NodeId, usize)>,
     pub(super) scroll_updates: Vec<ScrollPaintUpdate>,
     pub(super) visual_revision: u64,

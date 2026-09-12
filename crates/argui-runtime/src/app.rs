@@ -15,6 +15,8 @@ use web_time::Instant;
 
 mod accessibility;
 mod cursor;
+#[cfg(all(feature = "desktop-backdrop", not(target_arch = "wasm32")))]
+mod desktop_backdrop;
 mod frame;
 #[cfg(all(feature = "webview", target_os = "linux"))]
 mod gtk;
@@ -64,6 +66,8 @@ pub(crate) struct Application {
     environment: crate::WindowEnvironment,
     pub(super) renderer_config: RendererConfig,
     window: Option<Rc<dyn crate::host::WindowHost>>,
+    #[cfg(all(feature = "desktop-backdrop", not(target_arch = "wasm32")))]
+    desktop_backdrop: Option<argui_platform::desktop_backdrop::NativeBackdrop>,
     #[cfg(all(feature = "native-popups", not(target_arch = "wasm32")))]
     popups: popups::Popups,
     #[cfg(all(
@@ -179,6 +183,8 @@ impl Application {
             environment: crate::WindowEnvironment::default(),
             renderer_config,
             window: None,
+            #[cfg(all(feature = "desktop-backdrop", not(target_arch = "wasm32")))]
+            desktop_backdrop: None,
             #[cfg(all(feature = "native-popups", not(target_arch = "wasm32")))]
             popups: popups::Popups::default(),
             #[cfg(all(
@@ -533,6 +539,8 @@ impl Application {
         window: &dyn crate::host::WindowHost,
         event_loop: &dyn crate::host::LoopControl,
     ) {
+        #[cfg(all(feature = "desktop-backdrop", not(target_arch = "wasm32")))]
+        self.focus_desktop_backdrop(focused);
         if !focused {
             self.scroll_inertia.cancel();
             self.flush_pointer_scroll(window, event_loop);

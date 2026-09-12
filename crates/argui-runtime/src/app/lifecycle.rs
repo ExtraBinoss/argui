@@ -27,6 +27,10 @@ impl Application {
         if let Some(tree) = &mut self.ui_tree {
             tree.set_pointer_settings(self.pointer_settings);
             tree.set_reduced_motion(self.environment.reduced_motion);
+            tree.set_desktop_backdrop_state(argui_ui::DesktopBackdropState {
+                available: self.environment.desktop_backdrop_available,
+                ..argui_ui::DesktopBackdropState::default()
+            });
         }
     }
 }
@@ -57,6 +61,8 @@ impl ApplicationHandler<UserEvent> for Application {
                 let size = window.inner_size();
                 self.scale_factor = window.scale_factor() as f32;
                 self.initialize_preference_snapshot(window.theme());
+                #[cfg(all(feature = "desktop-backdrop", not(target_arch = "wasm32")))]
+                self.initialize_desktop_backdrop(window.clone());
                 self.initialize_model_tree();
                 self.update_viewport(size.width, size.height);
                 if !self.prepare_or_exit(event_loop) {

@@ -40,6 +40,13 @@ impl UiTree {
     pub fn resolved_quad(&self, node: NodeId, element: &Element) -> QuadStyle {
         let mut resolved = element.paint.quad.clone();
         super::transition::apply_quad(&self.transitions, node, &mut resolved);
+        if let Some(backdrop) = element.desktop_backdrop {
+            // Detached popup surfaces currently paint opaquely; their material must fall back
+            // independently of the main window's compositor capability.
+            let mut state = self.desktop_backdrop_state;
+            state.available &= self.native_portal_owner(node).is_none();
+            resolved.background = Some(argui_paint::Fill::Solid(backdrop.color(state)));
+        }
         crate::binding::resolved_quad(&element.bindings, resolved)
     }
 

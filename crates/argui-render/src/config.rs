@@ -6,6 +6,8 @@ pub enum SurfaceAlphaMode {
     #[default]
     Opaque,
     Transparent,
+    /// Use alpha when supported, otherwise keep an opaque surface.
+    PreferTransparent,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -97,7 +99,7 @@ impl RendererConfig {
     #[must_use]
     pub fn surface_alpha(mut self, mode: SurfaceAlphaMode) -> Self {
         self.surface_alpha = mode;
-        if mode == SurfaceAlphaMode::Transparent {
+        if mode != SurfaceAlphaMode::Opaque {
             self.clear_color = Color::TRANSPARENT;
         }
         self

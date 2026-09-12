@@ -1,5 +1,6 @@
 //! Dependency-light types shared by Argui crates.
 
+mod backdrop;
 mod color;
 mod environment;
 mod geometry;
@@ -7,6 +8,7 @@ mod input;
 mod keyboard;
 mod text;
 
+pub use backdrop::BackdropMaterial;
 pub use color::{Color, ColorInterpolation, ParseColorError};
 pub use environment::ColorScheme;
 pub use geometry::{Affine2D, Point, Rect, Size, Transform2D, TransformOrigin};

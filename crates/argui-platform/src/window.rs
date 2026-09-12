@@ -120,6 +120,8 @@ pub struct WindowConfig {
     pub decorations: bool,
     pub resizable: bool,
     pub transparent: bool,
+    /// Opt in to desktop effects. Regions are supplied by Element::desktop_backdrop.
+    pub desktop_backdrop: Option<argui_core::BackdropMaterial>,
     pub native_shadow: bool,
     pub level: WindowLevel,
     pub append_to_document: bool,
@@ -137,6 +139,7 @@ impl Default for WindowConfig {
             decorations: true,
             resizable: true,
             transparent: false,
+            desktop_backdrop: None,
             native_shadow: false,
             level: WindowLevel::Normal,
             append_to_document: true,
@@ -154,14 +157,16 @@ impl WindowConfig {
             .with_title(self.title)
             .with_decorations(self.decorations)
             .with_resizable(self.resizable)
-            .with_transparent(self.transparent)
+            .with_transparent(self.transparent || self.desktop_backdrop.is_some())
             .with_window_level(self.level.into());
 
         #[cfg(target_os = "windows")]
         let attributes = {
             use winit::platform::windows::WindowAttributesExtWindows;
 
-            attributes.with_undecorated_shadow(self.native_shadow)
+            attributes
+                .with_undecorated_shadow(self.native_shadow)
+                .with_no_redirection_bitmap(self.transparent || self.desktop_backdrop.is_some())
         };
 
         #[cfg(target_os = "macos")]

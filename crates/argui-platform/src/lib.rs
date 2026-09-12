@@ -3,8 +3,12 @@
 
 mod application;
 mod clipboard;
+#[cfg(all(feature = "desktop-backdrop", not(target_arch = "wasm32")))]
+pub mod desktop_backdrop;
 mod error;
 mod event;
+#[cfg(feature = "file-picker")]
+pub mod file_picker;
 #[cfg(all(feature = "gtk-host", target_os = "linux"))]
 pub mod gtk_host;
 mod identity;

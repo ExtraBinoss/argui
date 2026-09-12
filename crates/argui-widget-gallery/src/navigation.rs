@@ -9,6 +9,7 @@ pub enum Page {
     Collapsible,
     Avatar,
     Empty,
+    FilePicker,
     Kbd,
     Progress,
     AspectRatio,
@@ -49,7 +50,7 @@ pub enum Page {
 }
 
 impl Page {
-    pub const ALL: [Self; 45] = [
+    pub const ALL: [Self; 46] = [
         Self::Alert,
         Self::AspectRatio,
         Self::Avatar,
@@ -65,6 +66,7 @@ impl Page {
         Self::DatePicker,
         Self::Dialog,
         Self::Empty,
+        Self::FilePicker,
         Self::Input,
         Self::Kbd,
         Self::Label,
@@ -107,6 +109,7 @@ impl Page {
             | Self::Collapsible
             | Self::Avatar
             | Self::Empty
+            | Self::FilePicker
             | Self::Kbd
             | Self::Progress
             | Self::Label
@@ -157,6 +160,7 @@ impl Page {
             Self::Collapsible => "Collapsible",
             Self::Avatar => "Avatar",
             Self::Empty => "Empty",
+            Self::FilePicker => "File picker",
             Self::Kbd => "Kbd",
             Self::Progress => "Progress",
             Self::AspectRatio => "Aspect ratio",
@@ -207,6 +211,7 @@ impl Page {
             Self::Collapsible => "collapsible",
             Self::Avatar => "avatar",
             Self::Empty => "empty",
+            Self::FilePicker => "file-picker",
             Self::Kbd => "kbd",
             Self::Progress => "progress",
             Self::AspectRatio => "aspect-ratio",
@@ -279,6 +284,9 @@ impl Page {
             Self::Toast => "Notifications with a bounded queue and explicit dismissal.",
             Self::Avatar => "Images and initials with a shared accessible name.",
             Self::Empty => "Give an empty view a useful message and a next step.",
+            Self::FilePicker => {
+                "Choose files, folders or a save destination in your system’s native dialog."
+            }
             Self::Kbd => "Keycaps and shortcut combinations.",
             Self::AspectRatio => "Keep content at a consistent width-to-height ratio.",
             Self::Progress => {

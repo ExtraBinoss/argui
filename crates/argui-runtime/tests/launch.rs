@@ -343,6 +343,7 @@ mod native {
             ),
             WindowConfig {
                 title: "Argui lifecycle check".into(),
+                desktop_backdrop: Some(argui_core::BackdropMaterial::Sidebar),
                 ..Default::default()
             },
         );

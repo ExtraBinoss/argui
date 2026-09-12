@@ -117,6 +117,7 @@ impl Application {
             primary: self.environment.primary,
             reduced_motion: preferences.reduced_motion.value,
             high_contrast: preferences.high_contrast.value,
+            desktop_backdrop_available: self.environment.desktop_backdrop_available,
         };
         let animation_update = self.ui_tree.as_mut().map_or(TreeUpdate::None, |tree| {
             tree.set_reduced_motion(preferences.reduced_motion.value)

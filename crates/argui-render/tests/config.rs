@@ -45,6 +45,8 @@ fn renderer_defaults_to_vsync_and_a_discrete_gpu() {
 
 #[test]
 fn transparent_surface_configuration_uses_a_transparent_clear() {
+    let optional = RendererConfig::default().surface_alpha(SurfaceAlphaMode::PreferTransparent);
+    assert_eq!(optional.clear_color, argui_core::Color::TRANSPARENT);
     let config = RendererConfig::default().surface_alpha(SurfaceAlphaMode::Transparent);
     assert_eq!(config.surface_alpha, SurfaceAlphaMode::Transparent);
     assert_eq!(config.clear_color, argui_core::Color::TRANSPARENT);

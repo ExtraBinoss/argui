@@ -42,6 +42,46 @@ fn plain_elements_keep_one_combined_quad_and_no_layers() {
 }
 
 #[test]
+fn freshly_rebuilt_static_controls_reuse_paint_while_their_sibling_animates() {
+    let screen = |color| {
+        Element::row([
+            Element::column([Element::text("Gain"), Element::text("55 %")]).keyed("controls"),
+            Element::container([])
+                .keyed("needle")
+                .width(length(40.0))
+                .height(length(40.0))
+                .background(color),
+        ])
+        .overflow(Axes {
+            x: Overflow::Hidden,
+            y: Overflow::Auto,
+        })
+    };
+    let mut ui = UiTree::new(screen(Color::BLACK));
+    let mut engine = LayoutEngine::new();
+    let mut text = text_engine();
+    let mut output = engine
+        .compute(&mut ui, &mut text, Size::new(200.0, 80.0))
+        .unwrap();
+    let nodes = output.nodes.clone();
+    let hit_regions = output.hit_regions.clone();
+    let text_before = output.text.clone();
+    for color in [Color::WHITE, Color::BLACK, Color::WHITE] {
+        assert_eq!(ui.update(screen(color)), argui_ui::TreeUpdate::Paint);
+        assert!(!engine.repaint(&ui, &mut output));
+        assert!(output.paint_stats.reused_subtrees >= 1);
+        assert!(output.paint_stats.reused_commands >= 2);
+        assert_eq!(output.nodes, nodes);
+        assert_eq!(output.hit_regions, hit_regions);
+        assert_eq!(output.text, text_before);
+        assert!(output.display_list.commands().iter().any(|command| {
+            matches!(command, DisplayCommand::Quad(quad)
+                if quad.background == Some(argui_paint::Fill::Solid(color)))
+        }));
+    }
+}
+
+#[test]
 fn pointer_event_policy_controls_own_and_descendant_regions() {
     let output_for = |pointer_events| {
         let child = Element::container([])

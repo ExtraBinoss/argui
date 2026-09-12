@@ -11,10 +11,31 @@ fn default_window_is_a_decorated_resizable_surface() {
     assert!(config.decorations);
     assert!(config.resizable);
     assert!(!config.transparent);
+    assert_eq!(config.desktop_backdrop, None);
     assert!(!config.native_shadow);
     assert_eq!(config.level, WindowLevel::Normal);
     assert!(config.append_to_document);
     let _attributes = config.into_attributes();
+}
+
+#[test]
+fn desktop_materials_opt_into_window_transparency() {
+    assert_eq!(
+        argui_core::BackdropMaterial::default(),
+        argui_core::BackdropMaterial::Glass
+    );
+    for material in [
+        argui_core::BackdropMaterial::Glass,
+        argui_core::BackdropMaterial::Sidebar,
+        argui_core::BackdropMaterial::Header,
+    ] {
+        let attributes = WindowConfig {
+            desktop_backdrop: Some(material),
+            ..WindowConfig::default()
+        }
+        .into_attributes();
+        assert!(attributes.transparent);
+    }
 }
 
 #[test]

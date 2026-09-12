@@ -34,6 +34,8 @@ pub fn launch() -> Result<(), Box<dyn std::error::Error>> {
                 title: "Argui Widget Gallery".into(),
                 width: 1220.0,
                 height: 780.0,
+                desktop_backdrop: cfg!(feature = "desktop-backdrop")
+                    .then_some(argui::core::BackdropMaterial::Sidebar),
                 ..WindowConfig::default()
             },
         ),

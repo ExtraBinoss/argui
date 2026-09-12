@@ -49,6 +49,7 @@ fn navigation_rebuilds_widget_and_example_pages_from_public_events() {
         ("nav::date-picker", "Date picker"),
         ("nav::data-table", "Hours"),
         ("nav::toast", "Show notification"),
+        ("nav::file-picker", "Choose export destination"),
         ("nav::input", "Input & Search"),
         ("nav::textarea", "Text area"),
         ("nav::checkbox", "Checkbox"),

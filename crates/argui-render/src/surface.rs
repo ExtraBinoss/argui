@@ -84,6 +84,10 @@ pub struct SurfaceRenderer {
 
 #[cfg_attr(coverage_nightly, coverage(off))]
 impl SurfaceRenderer {
+    #[must_use]
+    pub fn is_transparent(&self) -> bool {
+        self.surface_config.alpha_mode == wgpu::CompositeAlphaMode::PreMultiplied
+    }
     #[cfg_attr(coverage_nightly, coverage(off))]
     pub async fn new(
         target: impl Into<SurfaceTarget<'static>>,
@@ -91,7 +95,7 @@ impl SurfaceRenderer {
         height: u32,
         renderer_config: RendererConfig,
     ) -> Result<Self, RendererError> {
-        let instance = wgpu::Instance::default();
+        let instance = configure::instance();
         let surface = instance
             .create_surface(target)
             .map_err(|error| RendererError::SurfaceCreation(error.to_string()))?;

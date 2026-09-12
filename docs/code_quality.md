@@ -100,7 +100,10 @@ that denominator, LLVM's summary is retained. Functions, lines and regions use
 LLVM's summaries. The aggregation and rejection threshold have regression tests:
 `python3 -m unittest discover -s tests/scripts`.
 
-`ARGUI_NATIVE_TESTS=1` includes the opt-in native lifecycle and GTK input checks.
+`ARGUI_NATIVE_TESTS=1` includes the opt-in native lifecycle, GTK input checks
+and the ignored renderer surface integration test. The manual CPU profiling test
+remains excluded. Run this mode on the private display described in
+[linux_testing.md](linux_testing.md).
 This mode defaults to one Nextest worker, since native windows and off-screen
 renderer tests share the display/GPU. `ARGUI_COVERAGE_JOBS` explicitly overrides
 that worker count. It does not start a browser.

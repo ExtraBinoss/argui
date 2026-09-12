@@ -46,6 +46,8 @@ impl Application {
         self.initialize_gtk_webviews(host.platform.container().clone());
         self.scale_factor = scale;
         self.initialize_preference_snapshot(None);
+        #[cfg(feature = "desktop-backdrop")]
+        self.initialize_desktop_backdrop(host.platform.canvas());
         self.initialize_model_tree();
         self.update_viewport(width, height);
         if !self.prepare_or_exit(control) {

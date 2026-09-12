@@ -3,6 +3,7 @@ use argui::{
     paint::{
         Border, CornerRadii, Fill, GradientStop, LayerMask, LayerStyle, LinearGradient, Shadow,
     },
+    runtime::Entity,
     text::TextAlign,
     ui::{
         AlignItems, CursorIcon, Element, EventListener, FlexWrap, GestureCapture, GestureSet,
@@ -37,6 +38,7 @@ pub(crate) mod data_table;
 pub(crate) mod dates;
 pub(crate) mod editing;
 mod empty;
+pub(crate) mod file_picker;
 mod inputs;
 mod kbd;
 mod label;
@@ -82,6 +84,12 @@ pub(crate) fn render(
         Page::Toast => toast::controls(&gallery.toasts, theme, cx),
         Page::List | Page::VList | Page::Table => data::render(&gallery.data, gallery.page, cx),
         Page::Avatar => avatar::render(theme, gallery.logo),
+        Page::FilePicker => {
+            let picker = gallery
+                .file_picker
+                .get_or_init(|| Entity::new(file_picker::FilePickerDemo::default()));
+            cx.entity(picker)
+        }
         Page::Empty => empty::render(theme, assets, cx),
         Page::Kbd => kbd::render(theme),
         Page::AspectRatio => aspect_ratio::render(theme, gallery.logo),

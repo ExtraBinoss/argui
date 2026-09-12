@@ -71,3 +71,5 @@ native `--fail-under-branches` option yet.
 
 Rust 1.89 is the workspace minimum because it is the highest current dependency
 MSRV (`cosmic-text`). Development may use a newer stable compiler.
+
+`argui-platform` owns optional `rfd` 0.17.2 for native file dialogs and browser file selection. Its native result delivery uses `futures-channel` 0.3.34 and `pollster` 1.0.1; widgets depend only on the public platform interface.

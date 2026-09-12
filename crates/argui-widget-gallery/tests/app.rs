@@ -8,6 +8,8 @@ use argui::{
 };
 use argui_widget_gallery::WidgetGallery;
 
+#[path = "app/desktop_backdrop.rs"]
+mod desktop_backdrop;
 #[path = "app/interaction.rs"]
 mod interaction;
 #[path = "app/navigation.rs"]

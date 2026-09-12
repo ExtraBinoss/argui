@@ -20,6 +20,8 @@ impl Application {
             .clone()
             .surface_alpha(if self.window_config.transparent {
                 SurfaceAlphaMode::Transparent
+            } else if self.window_config.desktop_backdrop.is_some() {
+                SurfaceAlphaMode::PreferTransparent
             } else {
                 SurfaceAlphaMode::Opaque
             })
@@ -65,6 +67,15 @@ impl Application {
     ) {
         match renderer {
             Ok(mut renderer) => {
+                #[cfg(all(feature = "desktop-backdrop", not(target_arch = "wasm32")))]
+                if self.window_config.desktop_backdrop.is_some() && !renderer.is_transparent() {
+                    self.desktop_backdrop = None;
+                    self.environment.desktop_backdrop_available = false;
+                    self.pending_ui_frame.request_rebuild();
+                    (self.on_event)(RuntimeEvent::DesktopBackdropUnavailable(
+                        "the GPU surface is opaque".into(),
+                    ));
+                }
                 if self.renderer_device.borrow().is_none() {
                     *self.renderer_device.borrow_mut() = Some(renderer.device_handle());
                 }

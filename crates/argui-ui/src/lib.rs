@@ -10,6 +10,8 @@ pub use editing::UiCommand;
 mod binding;
 mod caret;
 mod cursor;
+mod desktop_backdrop;
+pub use desktop_backdrop::{DesktopBackdrop, DesktopBackdropState};
 mod custom;
 pub use custom::{
     CustomConstraints, CustomDescription, CustomElement, CustomLayoutContext, CustomMeasurement,

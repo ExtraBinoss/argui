@@ -36,6 +36,7 @@ pub struct LayoutOutput {
     pub text: TextScene,
     pub portals: Vec<PortalLayout>,
     pub native_surfaces: Vec<crate::NativeSurfacePaint>,
+    pub desktop_backdrops: Vec<crate::DesktopBackdropRegion>,
     pub paint_stats: PaintStats,
     pub virtualization_changed: bool,
 }

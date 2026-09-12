@@ -7,6 +7,9 @@ license.workspace = true
 
 [features]
 default = []
+file-picker = ["argui-platform/file-picker"]
+widget-file-picker = ["argui-widgets/file-picker"]
+desktop-backdrop = ["argui-runtime/desktop-backdrop"]
 native-popups = ["argui-runtime/native-popups"]
 tasks = ["argui-runtime/tasks"]
 tray = ["argui-platform/tray", "argui-runtime/tray"]

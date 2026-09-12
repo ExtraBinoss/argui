@@ -12,7 +12,7 @@ if [[ -n "${ARGUI_NATIVE_TESTS:-}" && -z "${ARGUI_COVERAGE_JOBS:-}" ]]; then
   # The native lifecycle shares the display/GPU with off-screen renderer tests.
   coverage_jobs=1
 fi
-boundary_regex='crates/argui-runtime/src/(multi\.rs|animation\.rs|app/(accessibility|frame|lifecycle|preferences|scroll|text_selection|window|popups)\.rs|app/popups/input\.rs)|crates/argui-platform/src/popup/(linux|windows|macos)\.rs|crates/argui-render/src/(text/|vector/|image/pipeline\.rs|surface/(configure|effects)\.rs)'
+boundary_regex='crates/argui-platform/src/file_picker/native\.rs|crates/argui-runtime/src/(multi\.rs|animation\.rs|app/(accessibility|frame|lifecycle|preferences|scroll|text_selection|window|popups|desktop_backdrop)\.rs|app/popups/input\.rs)|crates/argui-platform/src/desktop_backdrop/(linux(\.rs|/(wayland|x11)\.rs)|windows\.rs|macos\.rs)|crates/argui-platform/src/popup/(linux|windows|macos)\.rs|crates/argui-render/src/(text/|vector/|image/pipeline\.rs|surface/(configure|effects)\.rs)'
 
 command -v cargo-nextest >/dev/null || {
   echo "error: cargo-nextest is required to run the coverage suite" >&2
@@ -39,5 +39,18 @@ CARGO_TARGET_DIR="$coverage_target" CARGO_INCREMENTAL=0 \
   --jobs "$coverage_jobs" --status-level fail --final-status-level fail \
   --success-output never --failure-output immediate-final \
   --json --output-path "$report"
+
+if [[ -n "${ARGUI_NATIVE_TESTS:-}" ]]; then
+  # Include the opt-in GPU integration without running the manual CPU benchmark.
+  CARGO_TARGET_DIR="$coverage_target" CARGO_INCREMENTAL=0 \
+    CARGO_PROFILE_TEST_OPT_LEVEL=0 CARGO_PROFILE_TEST_DEBUG=0 \
+    cargo +nightly llvm-cov nextest \
+    --workspace --all-features --lib --tests --branch --no-report \
+    --jobs "$coverage_jobs" --run-ignored only \
+    -E 'package(argui-render) & binary(surface)'
+  CARGO_TARGET_DIR="$coverage_target" cargo +nightly llvm-cov report \
+    --ignore-filename-regex "$boundary_regex" \
+    --json --output-path "$report"
+fi
 
 python3 "$repo_root/scripts/coverage-gate.py" "$report" "$minimum" "$coverage_base"

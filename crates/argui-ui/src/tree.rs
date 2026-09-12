@@ -44,6 +44,7 @@ pub struct TreeUpdateStats {
 
 #[derive(Clone, Debug)]
 pub struct UiTree {
+    pub(crate) desktop_backdrop_state: crate::DesktopBackdropState,
     root: Element,
     node_ids: Vec<NodeId>,
     pub(crate) index: index::TreeIndex,
@@ -78,6 +79,7 @@ impl UiTree {
         let focus = FocusRegistry::new(&root, &node_ids);
         let events = EventRegistry::new(&root);
         let mut tree = Self {
+            desktop_backdrop_state: crate::DesktopBackdropState::default(),
             index: index::TreeIndex::new(&root, &node_ids),
             root,
             node_ids,
@@ -136,9 +138,9 @@ impl UiTree {
         self.update(root) != TreeUpdate::None
     }
 
-    pub fn update(&mut self, root: Element) -> TreeUpdate {
+    pub fn update(&mut self, mut root: Element) -> TreeUpdate {
         let mut stats = TreeUpdateStats::default();
-        let update = classify_update(&self.root, &root, &mut stats);
+        let update = classify_update(&self.root, &mut root, &mut stats);
         self.update_stats = stats;
         let focused_before = self.interaction.focused();
         let focus_visible_before = focused_before.is_some_and(|node| {

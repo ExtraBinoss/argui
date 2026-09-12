@@ -3,6 +3,8 @@
 mod anchor;
 mod assets;
 mod custom;
+mod desktop_backdrop;
+pub use desktop_backdrop::DesktopBackdropRegion;
 mod engine;
 mod error;
 mod input;

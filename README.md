@@ -57,6 +57,10 @@ the **Actions** and **Editing & Password** gallery pages.
 Reusable data widgets are documented in [Lists and tables](docs/lists-tables.md);
 [the shadcn checklist](docs/shadcn-lib.md) tracks the component backlog.
 
+Enable `argui/desktop-backdrop` for native desktop blur through selected UI
+regions, with configurable tint and fallback. See [Desktop backdrops](docs/desktop-backdrops.md)
+and the gallery's **Appearance** controls.
+
 ## Optional WebView
 
 `argui-webview` provides retained sessions, a bounded native-view cache and a
@@ -114,3 +118,5 @@ session when switching messages. The default cache retains two native views:
 ```sh
 GDK_BACKEND=wayland cargo run -p argui-widget-gallery --features webview
 ```
+
+Native file selection and the optional widget: [File picker](docs/file-picker.md).

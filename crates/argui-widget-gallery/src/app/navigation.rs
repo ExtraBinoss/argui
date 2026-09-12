@@ -64,7 +64,8 @@ impl WidgetGallery {
                     .justify_content(JustifyContent::START)
             }));
         }
-        Element::column(children)
+        let mut sidebar = Element::column(children)
+            .keyed("gallery-sidebar")
             .width(length(260.0))
             .height(percent(1.0))
             .padding(Sides::length(16.0))
@@ -81,7 +82,11 @@ impl WidgetGallery {
                 x: Overflow::Hidden,
                 y: Overflow::Auto,
             })
-            .scroll_config(ScrollConfig::default().scrollbar(theme.scrollbar.clone()))
+            .scroll_config(ScrollConfig::default().scrollbar(theme.scrollbar.clone()));
+        if self.backdrop.enabled {
+            sidebar = sidebar.desktop_backdrop(self.backdrop.paint(theme));
+        }
+        sidebar
     }
 
     fn filtered_pages(&self) -> Vec<Page> {
