@@ -117,6 +117,13 @@ impl<A: Render> DevtoolsHost<A> {
         }
         if key == "__devtools-opacity" {
             let node = self.inspector.selected()?;
+            if self
+                .inspector
+                .property_enabled(node, StyleProperty::Opacity)
+                == Some(false)
+            {
+                return Some(ViewUpdate::None);
+            }
             let StyleValue::Number(value) =
                 current_value(&self.inspector, node, StyleProperty::Opacity)?
             else {
@@ -145,6 +152,14 @@ impl<A: Render> DevtoolsHost<A> {
                 return Some(ViewUpdate::None);
             }
             let index = index.parse().ok()?;
+            if self.inspector.property_enabled(node, property) == Some(false)
+                && matches!(
+                    event.kind,
+                    UiEventKind::TextChanged(_) | UiEventKind::Submitted(_)
+                )
+            {
+                return Some(ViewUpdate::None);
+            }
             match &event.kind {
                 UiEventKind::TextChanged(text) | UiEventKind::Submitted(text) => {
                     let mut style = current_value(&self.inspector, node, property)?;
@@ -201,11 +216,8 @@ impl<A: Render> DevtoolsHost<A> {
                 self.property_editing.color = None;
             } else {
                 let value = current_value(&self.inspector, node, property)?;
-                self.property_editing.color = Some((
-                    node,
-                    property,
-                    ColorPickerState::new(color_value(&value).unwrap_or(Color::TRANSPARENT)),
-                ));
+                self.property_editing.color =
+                    Some((node, property, ColorPickerState::new(color_value(&value)?)));
             }
             return Some(ViewUpdate::Rebuild);
         }

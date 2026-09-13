@@ -306,7 +306,7 @@ fn reset_property(element: &mut Element, property: StyleProperty) {
     match property {
         StyleProperty::Background => element.override_background(None),
         StyleProperty::Border => element.override_border(None),
-        StyleProperty::Opacity => element.paint.quad.opacity = 1.0,
+        StyleProperty::Opacity => element.override_paint_opacity(1.0),
         StyleProperty::Overflow => {
             element.style.overflow = Axes {
                 x: Overflow::Visible,
@@ -344,7 +344,7 @@ fn apply_property_value(element: &mut Element, property: StyleProperty, value: &
             element.override_border(element.paint.quad.border);
         }
         (StyleProperty::Opacity, StyleValue::Number(value)) => {
-            element.paint.quad.opacity = value.clamp(0.0, 1.0);
+            element.override_paint_opacity(*value);
         }
         (StyleProperty::Transform, StyleValue::Parameters(fields)) => {
             let values = field_values(fields);

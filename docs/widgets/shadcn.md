@@ -204,6 +204,12 @@ validée lors d'une annulation.
 
 ## Capacités complémentaires
 
+`AnimatedText` (`animated-text`, ou `widget-animated-text` dans la façade) anime
+uniquement les caractères modifiés : roulement de chiffres, glissement ou fondu.
+La page **Animated text** exerce `10 → 11`, les retenues, les diminutions et les
+changements rapides. Les frames intermédiaires réutilisent le layout et le widget
+cesse de demander des frames au repos. Voir [l’API et ses limites](../ui/animation.md).
+
 `ColorPicker` (`color-picker`, ou `widget-color-picker` dans la façade) est un
 éditeur réutilisable avec pad saturation/valeur, teinte, opacité sur damier et
 champs HEX, RGB, HSL ou HSV. `ColorPickerState` conserve la teinte dans les gris,

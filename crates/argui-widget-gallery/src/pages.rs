@@ -21,6 +21,7 @@ use crate::{
 mod action_menu;
 pub(crate) mod actions;
 mod alert;
+pub(crate) mod animated_text;
 mod aspect_ratio;
 pub(crate) mod async_tasks;
 mod avatar;
@@ -147,6 +148,11 @@ pub(crate) fn render(
         Page::Checkbox => checkboxes(gallery, theme, assets),
         Page::Switch => switches(gallery, theme),
         Page::RadioGroup => radios(gallery, theme),
+        Page::AnimatedText => cx.entity(
+            gallery
+                .animated_text
+                .get_or_init(|| Entity::new(animated_text::AnimatedTextDemo::default())),
+        ),
         Page::ColorPicker => cx.entity(
             gallery
                 .color_picker

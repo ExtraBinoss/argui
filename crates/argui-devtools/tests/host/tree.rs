@@ -75,7 +75,7 @@ fn selected_nodes_receive_reversible_typed_style_overrides() {
 }
 
 #[test]
-fn elements_render_selection_highlight_and_every_style_control() {
+fn elements_render_selection_and_only_authored_style_controls() {
     let host = Entity::new(populated_host()).mount().unwrap();
     let inspector = host.read(|tools| tools.inspector());
     change_tools(&host, |tools| {
@@ -86,7 +86,7 @@ fn elements_render_selection_highlight_and_every_style_control() {
     });
     let view = host.render(Default::default()).unwrap();
     assert!(contains_text(&view, "Reset overrides"));
-    assert!(contains_key(&view, "__devtools-style-effects"));
+    assert!(!contains_key(&view, "__devtools-style-effects"));
 
     for property in StyleProperty::ALL {
         change_tools(&host, |tools| {

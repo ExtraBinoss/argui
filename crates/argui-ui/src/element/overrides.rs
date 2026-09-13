@@ -3,11 +3,19 @@ use argui_paint::{Border, Fill};
 use crate::{Element, PropertyBinding, PropertyKey};
 
 impl Element {
+    /// Replace paint opacity in every visual state, removing its motion binding.
+    pub fn override_paint_opacity(&mut self, opacity: f32) {
+        self.paint.quad.opacity = opacity.clamp(0.0, 1.0);
+        self.remove_overridden_states(&[PropertyKey::Opacity]);
+        self.bindings
+            .retain(|binding| !matches!(binding, PropertyBinding::Opacity(_)));
+    }
+
     /// Replace the background in every visual state, removing its motion bindings.
     /// Other properties keep their conditional styles and transitions.
     pub fn override_background(&mut self, background: Option<Fill>) {
         self.paint.quad.background = background;
-        self.remove_color_states(&[PropertyKey::Background, PropertyKey::BackgroundColor]);
+        self.remove_overridden_states(&[PropertyKey::Background, PropertyKey::BackgroundColor]);
         self.bindings.retain(|binding| {
             !matches!(
                 binding,
@@ -22,7 +30,7 @@ impl Element {
     /// Replace the border in every visual state, removing its motion bindings.
     pub fn override_border(&mut self, border: Option<Border>) {
         self.paint.quad.border = border;
-        self.remove_color_states(&[
+        self.remove_overridden_states(&[
             PropertyKey::Border,
             PropertyKey::BorderColor,
             PropertyKey::BorderWidths,
@@ -35,7 +43,7 @@ impl Element {
         });
     }
 
-    fn remove_color_states(&mut self, properties: &[PropertyKey]) {
+    fn remove_overridden_states(&mut self, properties: &[PropertyKey]) {
         self.conditional_styles.remove(properties);
         if let Some(transition) = &mut self.style_transition {
             transition.make_immediate(properties);

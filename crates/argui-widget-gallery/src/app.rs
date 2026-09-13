@@ -90,6 +90,7 @@ pub struct WidgetGallery {
     pub(crate) spinner: Entity<Spinner>,
     pub(crate) file_picker: std::cell::OnceCell<Entity<pages::file_picker::FilePickerDemo>>,
     pub(crate) progress: std::cell::OnceCell<Entity<pages::progress::ProgressDemo>>,
+    pub(crate) animated_text: std::cell::OnceCell<Entity<pages::animated_text::AnimatedTextDemo>>,
     pub(crate) color_picker: std::cell::OnceCell<Entity<pages::color_picker::ColorPickerDemo>>,
 }
 
@@ -126,6 +127,7 @@ impl Default for WidgetGallery {
             dates: Entity::new(pages::dates::DatesDemo::new(&dark_assets)),
             data_table: std::cell::OnceCell::new(),
             color_picker: std::cell::OnceCell::new(),
+            animated_text: std::cell::OnceCell::new(),
             popover: Entity::new(pages::popover::PopoverDemo::default()),
             tooltip: Entity::new(pages::tooltip::TooltipDemo::default()),
             toasts: Entity::new(pages::toast::ToastDemo::new(&dark_assets)),

@@ -119,13 +119,14 @@ impl PopupBackend for Backend {
     fn focus(window: &Window) {
         if let Ok(id) = xid(window)
             && let Ok((connection, _)) = x11rb::connect(None)
-        {
-            let _ = connection.set_input_focus(
+            && let Ok(request) = connection.set_input_focus(
                 x11rb::protocol::xproto::InputFocus::PARENT,
                 id,
                 x11rb::CURRENT_TIME,
-            );
-            let _ = connection.flush();
+            )
+        {
+            // Complete activation before closing this short-lived X connection.
+            let _ = request.check();
         }
     }
 }

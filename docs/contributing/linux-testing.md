@@ -172,6 +172,17 @@ les propriétés après scroll, le thème en temps réel, les formats de couleur
 Resources en clair/sombre et à largeur réduite. Le scénario vérifie aussi les
 pixels du dégradé sRGB, les gestes du pad, l'opacité au clavier et la couleur
 réellement appliquée à l'application.
+Le scénario vérifie aussi que le logo sans fond ne propose pas de faux éditeur
+de couleur, que sa checkbox d’opacité modifie les pixels et que le champ numérique
+reste fixe pendant le glissement.
+
+Pour le texte animé, utiliser
+`node crates/argui-widget-gallery/tests/pages/animated_text.mjs` avec le même
+lanceur. Les captures de `target/animated-text-interactions/` montrent les trois
+effets, les retenues, les diminutions et le layout étroit dans les deux thèmes.
+L’horloge du navigateur de test ralentit temporairement pour capturer une frame
+intermédiaire malgré le délai de lecture GPU. Les tests Rust vérifient séparément
+le timing réel, la réutilisation du layout et l’arrêt des demandes de frames.
 
 Pour la galerie native et sa fenêtre DevTools détachée :
 

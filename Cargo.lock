@@ -553,6 +553,7 @@ dependencies = [
  "icondata_core",
  "icondata_tb",
  "time",
+ "unicode-segmentation",
  "web-time",
 ]
 

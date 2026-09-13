@@ -54,9 +54,7 @@ pub(super) fn property_editor<A>(
         .gap(6.0),
     ];
     let color = color_value(&value);
-    if let Some(color) =
-        color.or((property == StyleProperty::Background).then_some(Color::TRANSPARENT))
-    {
+    if let Some(color) = color {
         rows.push(color_editor(node, property, color, tools, theme, enabled));
     }
     if let StyleValue::Length(dimension) = &value {
@@ -107,28 +105,37 @@ pub(super) fn property_editor<A>(
         );
     }
     if property == StyleProperty::Opacity
-        && let StyleValue::Number(value) = &value
+        && let StyleValue::Number(opacity) = &value
     {
         rows.push(
-            Slider::new(
-                "__devtools-opacity",
-                "Opacity",
-                *value,
-                RangeConfig::new(0.0, 1.0, 0.01),
-            )
-            .enabled(enabled)
-            .build(theme),
+            Element::row([
+                Slider::new(
+                    "__devtools-opacity",
+                    "Opacity",
+                    *opacity,
+                    RangeConfig::new(0.0, 1.0, 0.01),
+                )
+                .enabled(enabled)
+                .build(theme)
+                .width(length(0.0))
+                .min_width(length(0.0))
+                .grow(1.0),
+                numeric_input(node, property, 0, &value.fields()[0], tools, theme, enabled)
+                    .width(length(76.0))
+                    .min_width(length(76.0))
+                    .max_width(length(76.0)),
+            ])
+            .align_items(AlignItems::CENTER)
+            .gap(10.0),
         );
     }
     let fields = value.fields();
-    if fields.is_empty()
-        && property != StyleProperty::Background
-        && !matches!(value, StyleValue::Length(_))
-    {
+    if fields.is_empty() && !matches!(value, StyleValue::Length(_)) {
         rows.push(Element::text(value.summary()).text_style(text(11.0, theme.muted_foreground)));
     }
     for (index, field) in fields.into_iter().enumerate() {
-        if matches!(value, StyleValue::Srgba(_) | StyleValue::Length(_))
+        if property == StyleProperty::Opacity
+            || matches!(value, StyleValue::Srgba(_) | StyleValue::Length(_))
             || color.is_some() && ["red", "green", "blue", "alpha"].contains(&field.label.as_str())
         {
             continue;
@@ -191,13 +198,19 @@ fn numeric_input<A>(
         .draft
         .as_ref()
         .filter(|draft| draft.0 == key);
-    let formatted = format!("{:.3}", field.value)
-        .trim_end_matches('0')
-        .trim_end_matches('.')
-        .to_owned();
+    let formatted = if property == StyleProperty::Opacity {
+        format!("{:.2}", field.value)
+    } else {
+        format!("{:.3}", field.value)
+            .trim_end_matches('0')
+            .trim_end_matches('.')
+            .to_owned()
+    };
     let invalid = draft.is_some_and(|draft| draft.2);
     let mut style = theme.input();
     style.text.font_size = 12.0;
+    style.text.family = argui_text::FontFamily::Monospace;
+    style.text.align = argui_text::TextAlign::Right;
     style.layout.padding = Sides::length(6.0);
     Input::new(
         &key,

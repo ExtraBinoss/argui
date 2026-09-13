@@ -28,7 +28,7 @@ The current override API covers background, border, opacity, overflow,
 transform, layer, effects, width and height. Available numeric fields can be
 edited with validation; incomplete input preserves the last valid value. Width
 and height keep Auto/px/% modes beside their numeric input. Opacity has a slider
-and overflow has choices. Background/border colors show a swatch over a
+and a fixed-width value on the same row. Overflow has choices. Background/border colors show a swatch over a
 transparency checkerboard; clicking it opens a ColorPicker popover in the window.
 Dragging and typing apply immediately. Escape or clicking outside closes the
 popover while preserving the last valid color. Each property has an
@@ -36,9 +36,17 @@ enable control and an independent reset. Unsupported values remain summaries. Th
 editor for every authored style property. The exact types live in
 [`StyleProperty` and `StyleValue`](../../crates/argui-inspect/src/lib.rs).
 
+The panel shows authored properties and active or disabled overrides. An image
+without a background no longer offers a fictitious transparent fill; a gradient
+remains a summary instead of opening a solid-color picker. Paint opacity also
+remains available for images, vectors and elements with their own fill or border.
+It affects their own paint; layer opacity affects a whole subtree. Unchecking
+opacity removes that property, restoring its default of 1; rechecking restores
+the edited value. Disabled fields ignore trailing gesture and text events.
+
 Overrides are owned by the inspector and applied before layout/paint lowering;
-they never mutate application state. Background and border overrides take
-precedence over hover/pressed styles and color animation bindings, while unrelated
+they never mutate application state. Background, border and paint opacity overrides take
+precedence over hover/pressed styles and their animation bindings, while unrelated
 state properties continue to work. Clearing overrides restores authored styles.
 Editing one preview element does not change its siblings or the gallery picker.
 Each property selects the appropriate invalidation path.

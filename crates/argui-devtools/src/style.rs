@@ -85,6 +85,30 @@ pub(crate) fn sidebar<A>(
         ),
     ];
     for (section, (label, properties)) in groups.into_iter().enumerate() {
+        let properties: Vec<_> = node
+            .properties
+            .iter()
+            .filter(|snapshot| {
+                properties.contains(&snapshot.property)
+                    && (snapshot.authored
+                        || tools
+                            .inspector
+                            .property_enabled(node.id, snapshot.property)
+                            .is_some()
+                        || snapshot.property == StyleProperty::Opacity
+                            && (matches!(node.kind.as_str(), "image" | "vector")
+                                || node.properties.iter().any(|property| {
+                                    property.authored
+                                        && matches!(
+                                            property.property,
+                                            StyleProperty::Background | StyleProperty::Border
+                                        )
+                                })))
+            })
+            .collect();
+        if properties.is_empty() {
+            continue;
+        }
         rows.push(section_header(
             section,
             label,
@@ -94,14 +118,8 @@ pub(crate) fn sidebar<A>(
             theme,
         ));
         if tools.sections[section] {
-            for property in properties {
-                if let Some(snapshot) = node
-                    .properties
-                    .iter()
-                    .find(|snapshot| snapshot.property == *property)
-                {
-                    rows.push(property_editor(node.id, snapshot, tools, theme));
-                }
+            for snapshot in properties {
+                rows.push(property_editor(node.id, snapshot, tools, theme));
             }
         }
     }

@@ -8,6 +8,7 @@ license.workspace = true
 [features]
 default = []
 all = [
+    "animated-text",
     "accordion",
     "alert",
     "alert-dialog",
@@ -82,6 +83,7 @@ all = [
     "vlist",
 ]
 toggle = ["button"]
+animated-text = ["dep:argui-runtime", "dep:unicode-segmentation"]
 toggle-group = ["toggle"]
 accordion = ["collapsible"]
 button-group = []
@@ -155,6 +157,7 @@ tree-view = ["vlist", "button"]
 icons = ["dep:argui-vector", "dep:icondata_core", "dep:icondata_tb"]
 
 [dependencies]
+unicode-segmentation = { workspace = true, optional = true }
 argui-platform = { workspace = true, optional = true }
 web-time = { workspace = true, optional = true }
 time = { version = "=0.3.44", optional = true, features = ["parsing"] }

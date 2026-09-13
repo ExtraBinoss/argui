@@ -69,3 +69,23 @@ fn removing_colors_keeps_unrelated_state_properties_and_bindings() {
     element.override_border(None);
     assert!(!element.has_state_animation());
 }
+
+#[test]
+fn disabling_and_reenabling_opacity_overrides_state_and_motion_values() {
+    let authored = Element::image(argui_ui::ImageId(1))
+        .paint_opacity(0.4)
+        .active_state(ACTIVE, true)
+        .when(ACTIVE, StylePatch::new().set(property::Opacity, 0.2))
+        .transition(StyleTransition::default())
+        .bind(property::Opacity, Motion::new(0.1));
+    let mut tree = UiTree::new(authored.clone());
+    let node = tree.node_ids()[0];
+    for opacity in [0.3, 1.0, 0.3] {
+        let mut edited = authored.clone();
+        edited.override_paint_opacity(opacity);
+        tree.update(edited);
+        assert_eq!(tree.resolved_quad(node, tree.root()).opacity, opacity);
+    }
+    tree.update(authored);
+    assert_eq!(tree.resolved_quad(node, tree.root()).opacity, 0.1);
+}

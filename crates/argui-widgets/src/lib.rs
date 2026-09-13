@@ -1,4 +1,8 @@
 //! Optional, accessible widgets built from Argui engine primitives.
+#[cfg(feature = "animated-text")]
+mod animated_text;
+#[cfg(feature = "animated-text")]
+pub use animated_text::{AnimatedText, TextAnimation};
 #[cfg(feature = "color-picker")]
 mod color_picker;
 #[cfg(feature = "color-picker")]

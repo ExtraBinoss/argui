@@ -1,3 +1,5 @@
+#[path = "pages/animated_text.rs"]
+mod animated_text;
 #[path = "pages/buttons.rs"]
 mod buttons;
 #[path = "pages/catalogue.rs"]
@@ -68,6 +70,7 @@ fn all_pages_keep_finite_layout_when_narrow_dark_or_reduced_motion() {
         ("radio-group", "Radio group"),
         ("slider", "Slider"),
         ("color-picker", "Color picker"),
+        ("animated-text", "Animated text"),
         ("tabs", "Tabs"),
         ("select", "Select"),
         ("dialog", "Dialog"),

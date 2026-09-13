@@ -283,3 +283,101 @@ fn color_popover_is_in_window_and_dismisses_without_reverting_live_edits() {
         panel
     ));
 }
+
+#[test]
+fn images_keep_opacity_but_hide_absent_fills_borders_and_effects() {
+    let host = Entity::new(editors()).mount().unwrap();
+    let inspector = host.read(|tools| tools.inspector());
+    let mut snapshot = inspector.tree();
+    snapshot.nodes[1].kind = "image".into();
+    for property in &mut snapshot.nodes[1].properties {
+        property.authored = false;
+    }
+    inspector.publish_tree(snapshot.clone());
+    let view = host.render(Default::default()).unwrap();
+    assert!(contains_key(&view, "__devtools-style-opacity"));
+    for property in ["background", "border", "width", "overflow", "effects"] {
+        assert!(!contains_key(
+            &view,
+            &format!("__devtools-style-{property}")
+        ));
+    }
+    snapshot.nodes[1].kind = "container".into();
+    inspector.publish_tree(snapshot);
+    host.update(|_, cx| cx.notify()).unwrap();
+    assert!(!contains_key(
+        &host.render(Default::default()).unwrap(),
+        "__devtools-style-opacity"
+    ));
+}
+
+#[test]
+fn disabled_opacity_rejects_stale_drag_and_text_events_and_can_be_reenabled() {
+    let host = Entity::new(editors()).mount().unwrap();
+    let inspector = host.read(|tools| tools.inspector());
+    let update = |event: UiEvent| change_tools(&host, |tools| tools.update(&event));
+    update(event(
+        "__devtools-value-2-opacity-0",
+        UiEventKind::TextChanged("0.3".into()),
+    ));
+    update(click("__devtools-style-opacity"));
+    assert_eq!(
+        inspector.property_enabled(InspectNodeId(2), StyleProperty::Opacity),
+        Some(false)
+    );
+    update(event(
+        "__devtools-value-2-opacity-0",
+        UiEventKind::TextChanged("0.8".into()),
+    ));
+    update(event(
+        "__devtools-opacity",
+        UiEventKind::KeyInput(argui_core::KeyInput {
+            key: argui_core::Key::End,
+            state: argui_core::KeyState::Pressed,
+            modifiers: Default::default(),
+            text: None,
+            repeat: false,
+        }),
+    ));
+    assert_eq!(
+        inspector.property_enabled(InspectNodeId(2), StyleProperty::Opacity),
+        Some(false)
+    );
+    assert_eq!(
+        inspector.property_value(InspectNodeId(2), StyleProperty::Opacity),
+        Some(StyleValue::Number(0.3))
+    );
+    assert!(contains_key(
+        &host.render(Default::default()).unwrap(),
+        "__devtools-style-opacity"
+    ));
+    update(click("__devtools-style-opacity"));
+    assert_eq!(
+        inspector.property_enabled(InspectNodeId(2), StyleProperty::Opacity),
+        Some(true)
+    );
+}
+
+#[test]
+fn gradients_remain_summaries_and_do_not_open_a_fictitious_solid_color_picker() {
+    let host = Entity::new(editors()).mount().unwrap();
+    let inspector = host.read(|tools| tools.inspector());
+    let mut snapshot = inspector.tree();
+    snapshot.nodes[1]
+        .properties
+        .iter_mut()
+        .find(|property| property.property == StyleProperty::Background)
+        .unwrap()
+        .value = StyleValue::Summary("linear gradient · 2 stops".into());
+    inspector.publish_tree(snapshot);
+    let root = host.render(Default::default()).unwrap();
+    assert!(contains_key(&root, "__devtools-style-background"));
+    assert!(!contains_key(&root, "__devtools-swatch-2-background"));
+    change_tools(&host, |tools| {
+        tools.update(&click("__devtools-swatch-2-background"))
+    });
+    assert!(!contains_key(
+        &host.render(Default::default()).unwrap(),
+        "__devtools-color-2-background::field::0"
+    ));
+}

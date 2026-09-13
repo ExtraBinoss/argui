@@ -181,7 +181,10 @@ fn render(
         assert_eq!(status, RenderStatus::Skipped);
         assert!(
             web_time::Instant::now() < deadline,
-            "surface did not present within three seconds"
+            "surface did not present within three seconds: {} commands, atlas {:?}, size {:?}",
+            list.commands().len(),
+            renderer.last_profile().vector_atlas,
+            window.inner_size(),
         );
     }
 }

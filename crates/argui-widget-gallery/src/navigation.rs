@@ -51,6 +51,7 @@ pub enum Page {
     RadioGroup,
     Slider,
     ColorPicker,
+    AnimatedText,
     Tabs,
     Select,
     Dialog,
@@ -79,10 +80,11 @@ pub enum Page {
 }
 
 impl Page {
-    pub const ALL: [Self; 74] = [
+    pub const ALL: [Self; 75] = [
         Self::Accordion,
         Self::Alert,
         Self::AlertDialog,
+        Self::AnimatedText,
         Self::AspectRatio,
         Self::Attachment,
         Self::Avatar,
@@ -205,6 +207,7 @@ impl Page {
             | Self::Checkbox
             | Self::Switch
             | Self::RadioGroup
+            | Self::AnimatedText
             | Self::ColorPicker
             | Self::Slider
             | Self::Tabs
@@ -284,6 +287,7 @@ impl Page {
             Self::Checkbox => "Checkbox",
             Self::Switch => "Switch",
             Self::RadioGroup => "Radio group",
+            Self::AnimatedText => "Animated text",
             Self::ColorPicker => "Color picker",
             Self::Slider => "Slider",
             Self::Tabs => "Tabs",
@@ -364,6 +368,7 @@ impl Page {
             Self::Checkbox => "checkbox",
             Self::Switch => "switch",
             Self::RadioGroup => "radio-group",
+            Self::AnimatedText => "animated-text",
             Self::ColorPicker => "color-picker",
             Self::Slider => "slider",
             Self::Tabs => "tabs",
@@ -478,6 +483,9 @@ impl Page {
             }
             Self::Switch => "Animated binary preferences.",
             Self::RadioGroup => "Exclusive selection with semantic grouping.",
+            Self::AnimatedText => {
+                "Rolling digits, sliding labels and quiet fades; unchanged characters stay still."
+            }
             Self::ColorPicker => {
                 "Precise color editing with opacity, a saturation pad and HEX/RGB/HSL/HSV fields."
             }

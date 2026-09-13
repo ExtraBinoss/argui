@@ -10,7 +10,7 @@ const browser = await (imported.puppeteer ?? imported.default).launch({
 });
 const output = process.env.SCREENSHOT_DIR ?? 'target/devtools-interactions';
 await mkdir(output, { recursive: true });
-const pause = (ms = 250) => new Promise(resolve => setTimeout(resolve, ms));
+const pause = (ms = 400) => new Promise(resolve => setTimeout(resolve, ms));
 try {
     for (const scheme of ['dark', 'light']) {
         const page = await browser.newPage();
@@ -57,9 +57,10 @@ try {
         // Navigate a virtualized offscreen sidebar entry through its accessible action.
         await page.$eval(button('Color picker'), el => el.click()); await pause();
         const hex = 'input[aria-label="Accent color HEX"]';
+        await page.waitForSelector(hex);
         await fill(hex, '#FF0000FF');
         for (const [mode, field] of [['RGB', 'R'], ['HSL', 'H °'], ['HSV', 'H °'], ['HEX', 'HEX']]) {
-            await click(button(mode)); assert.ok(await page.$(`input[aria-label="Accent color ${field}"]`));
+            await click(button(mode)); await page.waitForSelector(`input[aria-label="Accent color ${field}"]`);
         }
         const pad = await rect('[role=group][aria-label^="Saturation "]');
         const color = await capture('color-picker');
@@ -148,6 +149,37 @@ try {
         await page.mouse.up(); await page.mouse.move(1100, 850); await pause();
         const stylesHover = await capture('styles-hover');
         assert.deepEqual(await pixel(stylesHover, 1100, 150), scheme === 'light' ? [255, 255, 255] : [9, 9, 11], 'Style controls leave the application unobscured');
+        // Images expose real sizing/paint controls, without a fake transparent background.
+        await fill(filter, 'image');
+        await click('[role=treeitem][aria-label^="image"]');
+        assert.equal(await page.$('[role=checkbox][aria-label="background"]'), null);
+        assert.equal(await page.$('[role=checkbox][aria-label="border"]'), null);
+        const opacityInput = 'input[aria-label="opacity value"]';
+        const opacityToggle = '[role=checkbox][aria-label="opacity"]';
+        const logo = await rect('[role=img]');
+        const logoPoint = [logo.x + logo.width / 2, logo.y + logo.height / 2];
+        await fill(opacityInput, '0.3');
+        await page.mouse.move(900, 700); await pause();
+        const translucent = await capture('image-opacity');
+        await click(opacityToggle);
+        assert.equal(await page.$eval(opacityToggle, el => el.getAttribute('aria-checked')), 'false');
+        const disabled = await capture('image-opacity-disabled');
+        assert.notDeepEqual(await pixel(translucent, ...logoPoint), await pixel(disabled, ...logoPoint), 'Disabling opacity restores opaque image pixels');
+        await click(opacityToggle);
+        const restored = await capture('image-opacity-restored');
+        assert.deepEqual(await pixel(restored, ...logoPoint), await pixel(translucent, ...logoPoint));
+        const inputBounds = await rect(opacityInput);
+        const opacitySlider = await (await page.$$('[role=slider][aria-label="Opacity"]')).at(-1).evaluate(el => el.getBoundingClientRect().toJSON());
+        assert.ok(Math.abs(inputBounds.y - opacitySlider.y) < 10, 'Opacity slider and value share one row');
+        await page.mouse.move(opacitySlider.x + 10, opacitySlider.y + opacitySlider.height / 2);
+        await page.mouse.down();
+        for (const ratio of [.1, .5, .9, .25, .75]) {
+            await page.mouse.move(opacitySlider.x + opacitySlider.width * ratio, opacitySlider.y + opacitySlider.height / 2);
+            await pause();
+            assert.deepEqual(await rect(opacityInput), inputBounds, 'Dragging keeps the numeric input fixed');
+            assert.match(await value(opacityInput), /^0\.\d{2}$/);
+        }
+        await capture('image-opacity-dragging'); await page.mouse.up(); await pause();
         await click('[role=tab][aria-label="Theme"]'); await click(button('Light'));
         const light = await capture('theme-light-preview');
         assert.deepEqual(await pixel(light, 1100, 150), [255, 255, 255]);
