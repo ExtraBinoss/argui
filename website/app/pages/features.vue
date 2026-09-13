@@ -42,7 +42,7 @@ const features = [
     <div class="feature-evidence">
       <Cpu :size="20" />
       <p>{{ t('stats.evidence') }}</p>
-      <ActionLink :to="sourceUrl('docs/performance/footprint.md')" external variant="text">
+      <ActionLink :to="sourceUrl('docs/performance/optimizations.md')" external variant="text">
         {{ t('features.performanceLink') }}
       </ActionLink>
     </div>

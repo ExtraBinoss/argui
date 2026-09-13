@@ -1,57 +1,29 @@
-# Remaining roadmap
+# Roadmap
 
-This page tracks open work. Current APIs belong in the [documentation index](README.md);
-measured improvements and their limits belong in [performance](performance/optimizations.md).
-The presence of an API or passing semantic tests does not establish visual,
-screen-reader, or cross-platform correctness.
+Current features are documented in the [guides](README.md). This page tracks
+work that remains open; it is not a release schedule.
 
-## Application testing and platform validation
+## Coming next
 
-- Provide a public application test harness for input, focus, window lifecycle,
-  a controlled clock and asynchronous delivery. Internal engine tests already
-  exercise these contracts, but applications still assemble their own harness.
-- Extend native and browser scenarios for independent windows, hide/show,
-  close/reopen, cancellation and cleanup during failures. Keep per-platform
-  evidence distinct from source-level ownership tests.
-- Audit real screen readers and IMEs, including bidi editing, modal focus,
-  virtualized controls and protected text, on Linux, Windows, macOS and Web.
-- Expand deterministic rendering comparisons for transforms, masks, gradients,
-  shadows, refraction and custom effects. Follow the [private-display procedure](contributing/linux-testing.md).
+- **Hot reload:** shorten the edit-and-preview loop for Rust interfaces.
+- **Internationalization:** application-level locale management and translated copy.
+  Direction-aware layout and configurable widget labels already exist.
 
-## APIs to extend when required by applications
+## Platform coverage
 
-- Internal and system drag-and-drop with typed payloads, allowed operations,
-  cancellation and explicit platform capabilities.
-- Native application menus connected to the existing action system; configurable
-  shortcut sequences and conflict diagnostics.
-- Before/after geometry transitions for insertion, removal and reordering.
-  Explicit animated layout properties already exist in the [animation API](ui/animation.md).
-- A structured rich-document editor, if needed. Current rich-text display and
-  controlled text editing do not supply that document model.
-- Broader DevTools property editors and accessibility validation. Expand/collapse,
-  primitive numeric editing and a detached native tools window already exist;
-  see [DevTools](contributing/devtools.md) for their current scope.
+- Extend native Windows and macOS interaction, installation and rendering checks.
+- Validate real screen readers and IMEs across desktop and web, including
+  bidirectional text, modal focus and virtualized controls.
+- Add native Wayland popovers behind the existing surface preference API.
+- Expand CI across supported operating systems and feature combinations.
 
-## Performance
+## Application APIs
 
-Keep comparisons reproducible and tied to a real workload. The retained tree,
-layout caches, dirty propagation and explicit layout boundaries are implemented.
-Some passes still assemble global output; do not claim that every update costs
-only the changed subtree. Prioritize remaining work using the
-[CPU and memory evidence](performance/optimizations.md), including gallery components.
-Compare equivalent traces on native backends and WebGPU before changing
-rendering quality or pass composition defaults.
+- A public application test harness for input, focus, lifecycle and asynchronous work.
+- Typed drag-and-drop and native application menus connected to scoped actions.
+- Geometry transitions for insertion, removal and reordering.
+- A documented compatibility policy as the public API stabilizes.
 
-## Distribution
-
-Prepare root license files, a compatibility policy, a release changelog,
-publishable internal dependencies and a CI matrix for supported platforms and
-feature combinations. Validate a consumer in a separate repository using only
-its required features. The workspace remains experimental.
-
-An optional DSL comes after the Rust contracts stabilize. Its parser and tooling
-must lower into the same public elements, styles, effects and animations without
-adding a dependency from the runtime or renderer back to the DSL.
-
-Every implementation must preserve idle behavior and pass the
-[contribution gate](contributing/code-quality.md).
+Performance work follows [measured workloads](performance/optimizations.md).
+A future optional DSL must produce the same public elements without becoming
+a dependency of the renderer or runtime.

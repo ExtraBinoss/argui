@@ -89,7 +89,7 @@ const components = [
       <p class="metrics-evidence">
         {{ t('stats.evidence') }}
         <a
-          :href="sourceUrl('docs/performance/footprint.md')"
+          :href="sourceUrl('docs/performance/optimizations.md')"
           target="_blank"
           rel="noopener noreferrer"
         >

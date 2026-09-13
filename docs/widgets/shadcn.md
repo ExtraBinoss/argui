@@ -1,230 +1,192 @@
-# Catalogue Argui / shadcn/ui
+# Widget catalogue
 
-État du **12 septembre 2026**, comparé aux **64 entrées** du
-[catalogue officiel shadcn/ui](https://ui.shadcn.com/docs/components).
-Les variantes Base UI, Radix UI et React Aria ne sont comptées qu’une fois.
-Les blocks, recettes de formulaires et registres communautaires sont hors inventaire.
+Browse the [live components](https://extrabinoss.github.io/argui/components) or
+open an implementation below. The catalogue maps familiar shadcn/ui component
+names to Argui's Rust APIs and describes their supported scope. It does not
+promise parity with every React variant or replace real screen-reader testing.
 
-**Les 64 entrées disposent d’une API publique Argui couvrant leur usage principal.**
-Ce relevé décrit le périmètre livré, pas une équivalence de toutes les variantes
-React ni une certification par des lecteurs d’écran réels. Les limites figurent
-explicitement dans la dernière colonne.
+## APIs and features
 
-## API et périmètre
+Enable the listed feature in [argui-widgets](../../crates/argui-widgets/Cargo.toml),
+or prefix it with `widget-` in [argui](../../crates/argui/Cargo.toml).
+`all` / `widgets-all` enables this collection. Defaults are empty, and the
+updater dialog is a separate opt-in.
 
-Chaque lien ouvre l’implémentation. La feature indiquée s’active dans
-[`argui-widgets`](../../crates/argui-widgets/Cargo.toml), ou avec le préfixe `widget-`
-dans la façade [`argui`](../../crates/argui/Cargo.toml). `all` (ou `widgets-all`
-dans la façade) les active ensemble ; les 27 ajouts
-n’introduisent aucune dépendance externe.
-
-| shadcn/ui | API Argui | Feature | Périmètre livré et limites |
+| Component | Public API | Feature | Supported behavior and limits |
 | --- | --- | --- | --- |
-| Accordion | [Accordion](../../crates/argui-widgets/src/accordion.rs) | `accordion` | Sections contrôlées simples/multiples, flèches/Home/End et désactivation ; ouverture sans animation. |
-| Alert | [Alert](../../crates/argui-widgets/src/alert.rs) | `alert` | présentation inline standard/destructive, icône et politique d’annonce explicite. |
-| Alert Dialog | [AlertDialog](../../crates/argui-widgets/src/alert_dialog.rs) | `alert-dialog` | Confirmation modale, focus initial sur Annuler, clic extérieur ignoré et action de confirmation distincte. |
-| Aspect Ratio | [AspectRatio](../../crates/argui-widgets/src/aspect_ratio.rs) | `aspect-ratio` | réserve la hauteur suivant la largeur et un ratio positif, contenu ajusté au cadre. |
-| Attachment | [Attachment](../../crates/argui-widgets/src/attachment.rs) | `attachment` | Fichier, média, actions, cinq états de transfert et pourcentage ; transfert fourni par l’application. |
-| Avatar | [Avatar](../../crates/argui-widgets/src/avatar.rs) | `avatar` | image chargée ou fallback contrôlé, masque circulaire, taille configurable et nom accessible unique. Groupe non livré. |
-| Badge | [Badge](../../crates/argui-widgets/src/badge.rs) | `badge` | variantes primary/secondary/destructive/outline/ghost, icônes avant/après et nom accessible unique. |
-| Breadcrumb | [Breadcrumb](../../crates/argui-widgets/src/breadcrumb.rs) | `breadcrumb` | ancêtres activables, identifiants stables, séparateurs personnalisés et page courante décrite ; groupe accessible, sans landmark Navigation. |
-| Bubble | [Bubble](../../crates/argui-widgets/src/bubble.rs) | `bubble` | Sept variantes, alignement et réactions ; contenu libre, couleurs de texte à choisir selon le fond. |
-| Button | [Button](../../crates/argui-widgets/src/button.rs) | `button` | variantes via le thème, icônes, chargement et activation accessible. |
-| Button Group | [ButtonGroup](../../crates/argui-widgets/src/button_group.rs) | `button-group` | Groupe nommé horizontal/vertical ; chaque bouton conserve son arrêt Tab. |
-| Calendar | [Calendar](../../crates/argui-widgets/src/calendar.rs) | `calendar` | `Calendar` et `CalendarState` ; locale, limites, sélection simple/multiple/plage et navigation clavier. |
-| Card | [Card](../../crates/argui-widgets/src/card.rs) | `card` | titre, description, action, contenu et pied de carte optionnels, avec relations accessibles. |
-| Carousel | [Carousel](../../crates/argui-widgets/src/carousel.rs) | `carousel` | Diapositive contrôlée, boutons, clavier, balayage, boucle optionnelle et annonce ; sans lecture automatique. |
-| Chart | [Chart](../../crates/argui-widgets/src/chart.rs) | `chart` | Barres et lignes multi-séries, échelle incluant zéro, légende et points accessibles activables ; autres tracés non fournis. |
-| Checkbox | [Checkbox](../../crates/argui-widgets/src/selection.rs) | `checkbox` | `CheckedState` expose Unchecked, Checked et Mixed ; activation du mode Mixed vers Checked. |
-| Collapsible | [Collapsible](../../crates/argui-widgets/src/collapsible.rs) | `collapsible` | ouverture contrôlée, trigger personnalisable, Entrée/Espace, état désactivé et contenu démonté une fois fermé. |
-| Combobox | [Combobox](../../crates/argui-widgets/src/combobox.rs) | `combobox` | Recherche éditable, filtrage, options désactivées, descendant actif et sélection clavier ; sélection simple. |
-| Command | [CommandPalette](../../crates/argui-widgets/src/command_palette.rs) | `command-palette` | recherche et invocation d'actions. Groupes et variantes avancées restent à examiner. |
-| Context Menu | [ContextMenu](../../crates/argui-widgets/src/context_menu.rs) | `context-menu` | `ContextMenu` partage les entrées de `Menu`, avec ancrage au pointeur ou au clavier. |
-| Data Table | [DataTable](../../crates/argui-widgets/src/data_table.rs) | `data-table` | modèle typé, filtres, tri multiple stable, pagination, colonnes visibles, virtualisation et édition contrôlée ; en-têtes alignés au défilement. |
-| Date Picker | [DatePicker](../../crates/argui-widgets/src/date_picker.rs) | `date-picker` | saisie localisable, brouillon contrôlé, validation et calendrier réutilisé. |
-| Dialog | [Dialog](../../crates/argui-widgets/src/dialog.rs) | `dialog` | Modal, piège et restauration du focus, focus initial configurable, placement et contenu défilable. |
-| Direction | [Direction](../../crates/argui-widgets/src/direction.rs) | `direction` | Direction de layout héritée avec scopes imbriqués ; paramètre rtl des contrôleurs clavier explicite. |
-| Drawer | [Drawer](../../crates/argui-widgets/src/drawer.rs) | `drawer` | Panneau bas modal, poignée gestuelle, seuil de distance/vitesse et annulation ; sans positions intermédiaires. |
-| Dropdown Menu | [Menu](../../crates/argui-widgets/src/menu.rs) | `menu` | identifiants stables, sous-menus, groupes, entrées checkbox/radio, indicateurs et navigation clavier. |
-| Empty | [Empty](../../crates/argui-widgets/src/empty.rs) | `empty` | état vide centré, titre, description, média décoratif et actions libres ; bordure optionnelle. |
-| Field | [Field](../../crates/argui-widgets/src/field.rs) | `field` | Label, aide, erreur, requis et désactivation associés à la clé du contrôle ; validation applicative. |
-| Hover Card | [HoverCard](../../crates/argui-widgets/src/hover_card.rs) | `hover-card` | Aperçu interactif non modal, délais, maintien au survol entre déclencheur et contenu, focus et fermeture. |
-| Input | [Input](../../crates/argui-widgets/src/input.rs) | `input` | texte, recherche, password et état contrôlé. |
-| Input Group | [InputGroup](../../crates/argui-widgets/src/input_group.rs) | `input-group` | Surface commune avec éditeur, décorations et actions avant/après. |
-| Input OTP | [InputOtp](../../crates/argui-widgets/src/input_otp.rs) | `input-otp` | Un éditeur de 1 à 16 chiffres ASCII espacés, filtre avant mutation et complétion ; pas de cases indépendantes ni récupération SMS. |
-| Item | [Item](../../crates/argui-widgets/src/item.rs) | `item` | Titre, description, média et actions sur une ligne réutilisable. |
-| Kbd | [Kbd](../../crates/argui-widgets/src/kbd.rs) | `kbd` | touche ou combinaison, une annonce accessible personnalisable ; n'enregistre pas de raccourci. |
-| Label | [Label](../../crates/argui-widgets/src/label.rs) | `label` | label visible associé via `labelled_by`, cible de focus sur clic et état désactivé ; sans arrêt Tab supplémentaire. |
-| Marker | [Marker](../../crates/argui-widgets/src/marker.rs) | `marker` | Note inline, bordée ou séparatrice, icône et annonce opt-in. |
-| Menubar | [Menubar](../../crates/argui-widgets/src/menubar.rs) | `menubar` | focus entre déclencheurs, ouverture des menus, sous-menus et navigation RTL. |
-| Message | [Message](../../crates/argui-widgets/src/message.rs) | `message` | Auteur, avatar, en-tête, contenu et pied ; alignement configurable. |
-| Message Scroller | [MessageScroller](../../crates/argui-widgets/src/message_scroller.rs) | `message-scroller` | Suivi du bas, pause pendant la lecture, compteur, retour au dernier et conservation du décalage lors d’un ajout en tête. |
-| Native Select | [NativeSelect](../../crates/argui-widgets/src/native_select.rs) | `native-select` | Sélecteur compact dessiné par Argui, requis/désactivé, clavier et recherche ; aucun contrôle OS. |
-| Navigation Menu | [NavigationMenu](../../crates/argui-widgets/src/navigation_menu.rs) | `navigation-menu` | Landmark Navigation, actions, panneaux, page courante et navigation clavier. |
-| Pagination | [Pagination](../../crates/argui-widgets/src/pagination.rs) | `pagination` | navigation contrôlée, bornes, ellipses, désactivation et annonces traduisibles ; groupe accessible, page courante décrite. |
-| Popover | [Popover](../../crates/argui-widgets/src/popover.rs) | `popover` | ancrage, collisions, fermeture et options de focus. |
-| Progress | [Progress](../../crates/argui-widgets/src/progress.rs) | `progress` | pourcentage contrôlé, état indéterminé animé quand monté comme entité, mouvement réduit et valeur accessible. |
-| Questionnaire | [Questionnaire](../../crates/argui-widgets/src/questionnaire.rs) | `questionnaire` | Étapes, choix simples/multiples, texte libre, facultatif, validation et réponses retournées au consommateur. |
-| Radio Group | [RadioGroup](../../crates/argui-widgets/src/selection.rs) | `radio-group` | sélection exclusive et orientation. |
-| Resizable | [SplitPane](../../crates/argui-widgets/src/split_pane.rs) | `split-pane` | séparateur, limites, gestes et clavier. Groupes imbriqués à composer explicitement. |
-| Scroll Area | [ScrollArea](../../crates/argui-widgets/src/scroll_area.rs) | `scroll-area` | Viewport horizontal/vertical, roue, gestes, scrollbar et défilement clavier focalisé ; frontière de layout explicite pour isoler les changements internes. |
-| Select | [Select](../../crates/argui-widgets/src/select.rs) | `select` | sélection simple contrôlée, overlay et clavier. |
-| Separator | [Separator](../../crates/argui-widgets/src/separator.rs) | `separator` | orientation configurable et texte centré entre deux traits, décoratif par défaut ou rôle accessible explicite. |
-| Sheet | [Sheet](../../crates/argui-widgets/src/sheet.rs) | `sheet` | Panneau modal attaché à l’un des quatre côtés, focus restauré et contenu défilable. |
-| Sidebar | [Sidebar](../../crates/argui-widgets/src/sidebar.rs) | `sidebar` | Navigation étendue, rail replié ou Sheet mobile ; breakpoint choisi par l’application. |
-| Skeleton | [Skeleton](../../crates/argui-widgets/src/skeleton.rs) | `skeleton` | formes décoratives dimensionnables, pulsation liée au montage et mouvement réduit. |
-| Slider | [Slider](../../crates/argui-widgets/src/slider.rs) | `slider` | valeur, bornes, pas, gestes et clavier. Multi-poignées non livré. |
-| Spinner | [Spinner](../../crates/argui-widgets/src/spinner.rs) | `spinner` | animation liée au montage et mouvement réduit. |
-| Switch | [Switch](../../crates/argui-widgets/src/selection.rs) | `switch` | booléen animé et activation accessible. |
-| Table | [Table](../../crates/argui-widgets/src/table.rs) | `table` | en-têtes, cellules, largeurs communes, sélection et navigation par ligne. Pas de datagrid complet. |
-| Tabs | [Tabs](../../crates/argui-widgets/src/tabs.rs) | `tabs` | sélection, navigation et montage du panneau actif. |
-| Textarea | [TextArea](../../crates/argui-widgets/src/input.rs) | `textarea` | édition multiligne et scroll. Le redimensionnement se compose avec les gestes publics. |
-| Toast | [Toast](../../crates/argui-widgets/src/toast.rs) | `toast` | file contrôlée, durée, pause au survol/focus, annonces et actions. |
-| Toggle | [Toggle](../../crates/argui-widgets/src/toggle.rs) | `toggle` | Bouton à état persistant pressed, désactivation et variantes visuelles. |
-| Toggle Group | [ToggleGroup](../../crates/argui-widgets/src/toggle_group.rs) | `toggle-group` | Sélection simple/multiple, orientation, RTL et focus itinérant. |
-| Tooltip | [Tooltip](../../crates/argui-widgets/src/tooltip.rs) | `tooltip` | Délais, focus/survol, relation descriptive, contenu survolable, effets et présentation native optionnelle. |
-| Typography | [Typography](../../crates/argui-widgets/src/typography.rs) | `typography` | Titres h1–h6, paragraphe, lead, large, small, muted, code et citation ; texte riche disponible dans le moteur. |
+| Accordion | [Accordion](../../crates/argui-widgets/src/accordion.rs) | `accordion` | Controlled single/multiple sections, arrow/Home/End navigation and disabled states; opening is not animated. |
+| Alert | [Alert](../../crates/argui-widgets/src/alert.rs) | `alert` | Inline standard/destructive presentation, icon and explicit announcement policy. |
+| Alert Dialog | [AlertDialog](../../crates/argui-widgets/src/alert_dialog.rs) | `alert-dialog` | Modal confirmation, initial Cancel focus, ignored outside clicks and a distinct confirmation action. |
+| Aspect Ratio | [AspectRatio](../../crates/argui-widgets/src/aspect_ratio.rs) | `aspect-ratio` | Reserves height from width and a positive aspect ratio; fits content to the frame. |
+| Attachment | [Attachment](../../crates/argui-widgets/src/attachment.rs) | `attachment` | File metadata, media, actions, five transfer states and progress; the application owns the transfer. |
+| Avatar | [Avatar](../../crates/argui-widgets/src/avatar.rs) | `avatar` | Loaded image or controlled fallback, circular clip, size and a single accessible name; no avatar group. |
+| Badge | [Badge](../../crates/argui-widgets/src/badge.rs) | `badge` | Primary/secondary/destructive/outline/ghost variants, leading/trailing icons and an accessible name. |
+| Breadcrumb | [Breadcrumb](../../crates/argui-widgets/src/breadcrumb.rs) | `breadcrumb` | Actionable ancestors, stable IDs, custom separators and a described current page; accessible group without a Navigation landmark. |
+| Bubble | [Bubble](../../crates/argui-widgets/src/bubble.rs) | `bubble` | Seven variants, alignment and reactions; content is arbitrary and must use suitable foreground colors. |
+| Button | [Button](../../crates/argui-widgets/src/button.rs) | `button` | Theme variants, icons, loading state and accessible activation. |
+| Button Group | [ButtonGroup](../../crates/argui-widgets/src/button_group.rs) | `button-group` | Named horizontal/vertical group; each button keeps its own Tab stop. |
+| Calendar | [Calendar](../../crates/argui-widgets/src/calendar.rs) | `calendar` | Calendar and retained CalendarState, locale, bounds, single/multiple/range selection and keyboard navigation. |
+| Card | [Card](../../crates/argui-widgets/src/card.rs) | `card` | Optional title, description, actions, content and footer with accessible relationships. |
+| Carousel | [Carousel](../../crates/argui-widgets/src/carousel.rs) | `carousel` | Controlled slide, buttons, keyboard, swiping, optional looping and announcements; no autoplay. |
+| Chart | [Chart](../../crates/argui-widgets/src/chart.rs) | `chart` | Multi-series bars and lines, a zero-inclusive scale, legend and actionable accessible points; other plots are not provided. |
+| Checkbox | [Checkbox](../../crates/argui-widgets/src/selection.rs) | `checkbox` | CheckedState supports Unchecked, Checked and Mixed; activating Mixed moves to Checked. |
+| Collapsible | [Collapsible](../../crates/argui-widgets/src/collapsible.rs) | `collapsible` | Controlled opening, custom trigger, Enter/Space, disabled state and unmounted closed content. |
+| Combobox | [Combobox](../../crates/argui-widgets/src/combobox.rs) | `combobox` | Editable search, filtering, disabled options, active descendant and keyboard selection; single selection. |
+| Command | [CommandPalette](../../crates/argui-widgets/src/command_palette.rs) | `command-palette` | Action search and invocation; advanced grouping and variants remain limited. |
+| Context Menu | [ContextMenu](../../crates/argui-widgets/src/context_menu.rs) | `context-menu` | Shared Menu entries with pointer or keyboard anchoring. |
+| Data Table | [DataTable](../../crates/argui-widgets/src/data_table.rs) | `data-table` | Typed model, filters, stable multi-column sorting, pagination, visible columns, virtualization and controlled editing; headers track scrolling. |
+| Date Picker | [DatePicker](../../crates/argui-widgets/src/date_picker.rs) | `date-picker` | Localizable input, controlled draft, validation and a reused calendar. |
+| Dialog | [Dialog](../../crates/argui-widgets/src/dialog.rs) | `dialog` | Modal focus trapping/restoration, configurable initial focus, placement and scrollable content. |
+| Direction | [Direction](../../crates/argui-widgets/src/direction.rs) | `direction` | Inherited layout direction with nested scopes; keyboard controllers take an explicit rtl setting. |
+| Drawer | [Drawer](../../crates/argui-widgets/src/drawer.rs) | `drawer` | Modal bottom panel, drag handle, distance/velocity thresholds and cancellation; no intermediate snap positions. |
+| Dropdown Menu | [Menu](../../crates/argui-widgets/src/menu.rs) | `menu` | Stable IDs, submenus, groups, checkbox/radio entries, indicators and keyboard navigation. |
+| Empty | [Empty](../../crates/argui-widgets/src/empty.rs) | `empty` | Centered empty state, title, description, decorative media and arbitrary actions; optional border. |
+| Field | [Field](../../crates/argui-widgets/src/field.rs) | `field` | Label, help, error, required and disabled states linked to a control key; the application owns validation. |
+| Hover Card | [HoverCard](../../crates/argui-widgets/src/hover_card.rs) | `hover-card` | Interactive nonmodal preview, delays, pointer movement between trigger/content, focus and dismissal. |
+| Input | [Input](../../crates/argui-widgets/src/input.rs) | `input` | Controlled text, search and password input. |
+| Input Group | [InputGroup](../../crates/argui-widgets/src/input_group.rs) | `input-group` | Shared surface with an editor, decorations and leading/trailing actions. |
+| Input OTP | [InputOtp](../../crates/argui-widgets/src/input_otp.rs) | `input-otp` | One editor for 1–16 spaced ASCII digits, filtering before mutation and completion; no separate inputs or SMS retrieval. |
+| Item | [Item](../../crates/argui-widgets/src/item.rs) | `item` | Reusable row with title, description, media and actions. |
+| Kbd | [Kbd](../../crates/argui-widgets/src/kbd.rs) | `kbd` | Key or key combination with a customizable announcement; does not register shortcuts. |
+| Label | [Label](../../crates/argui-widgets/src/label.rs) | `label` | Visible label linked through labelled_by, click-to-focus and disabled state; no extra Tab stop. |
+| Marker | [Marker](../../crates/argui-widgets/src/marker.rs) | `marker` | Inline, bordered or divider note with an optional icon and announcement. |
+| Menubar | [Menubar](../../crates/argui-widgets/src/menubar.rs) | `menubar` | Trigger focus, menus, submenus and RTL keyboard navigation. |
+| Message | [Message](../../crates/argui-widgets/src/message.rs) | `message` | Author, avatar, header, content and footer with configurable alignment. |
+| Message Scroller | [MessageScroller](../../crates/argui-widgets/src/message_scroller.rs) | `message-scroller` | Follow-bottom behavior, pause while reading, unread count, jump-to-latest and preserved offset when prepending. |
+| Native Select | [NativeSelect](../../crates/argui-widgets/src/native_select.rs) | `native-select` | Compact Argui-rendered selector with required/disabled states, keyboard navigation and search; not an OS control. |
+| Navigation Menu | [NavigationMenu](../../crates/argui-widgets/src/navigation_menu.rs) | `navigation-menu` | Navigation landmark, actions, panels, current page and keyboard navigation. |
+| Pagination | [Pagination](../../crates/argui-widgets/src/pagination.rs) | `pagination` | Controlled navigation, bounds, ellipses, disabled state and translatable announcements; accessible group with a described current page. |
+| Popover | [Popover](../../crates/argui-widgets/src/popover.rs) | `popover` | Anchoring, collision handling, dismissal and focus options. |
+| Progress | [Progress](../../crates/argui-widgets/src/progress.rs) | `progress` | Controlled percentage, indeterminate animation when mounted as an Entity, reduced motion and accessible value. |
+| Questionnaire | [Questionnaire](../../crates/argui-widgets/src/questionnaire.rs) | `questionnaire` | Steps, single/multiple choice, free text, optional answers and validation; returns answers to the application. |
+| Radio Group | [RadioGroup](../../crates/argui-widgets/src/selection.rs) | `radio-group` | Exclusive selection and configurable orientation. |
+| Resizable | [SplitPane](../../crates/argui-widgets/src/split_pane.rs) | `split-pane` | Divider, limits, gestures and keyboard resizing; compose nested groups explicitly. |
+| Scroll Area | [ScrollArea](../../crates/argui-widgets/src/scroll_area.rs) | `scroll-area` | Horizontal/vertical viewport, wheel and gesture input, scrollbars and focused keyboard scrolling; explicit layout boundary for internal changes. |
+| Select | [Select](../../crates/argui-widgets/src/select.rs) | `select` | Controlled single selection, overlay and keyboard navigation. |
+| Separator | [Separator](../../crates/argui-widgets/src/separator.rs) | `separator` | Configurable orientation and centered label; decorative by default, with an optional accessible role. |
+| Sheet | [Sheet](../../crates/argui-widgets/src/sheet.rs) | `sheet` | Modal panel on any of the four edges, focus restoration and scrollable content. |
+| Sidebar | [Sidebar](../../crates/argui-widgets/src/sidebar.rs) | `sidebar` | Expanded navigation, collapsed rail or a mobile Sheet; the application chooses the breakpoint. |
+| Skeleton | [Skeleton](../../crates/argui-widgets/src/skeleton.rs) | `skeleton` | Sized decorative shapes, mount-owned pulse animation and reduced motion. |
+| Slider | [Slider](../../crates/argui-widgets/src/slider.rs) | `slider` | Value, bounds, step, gestures and keyboard control; multiple thumbs are not provided. |
+| Spinner | [Spinner](../../crates/argui-widgets/src/spinner.rs) | `spinner` | Mount-owned animation and reduced motion. |
+| Switch | [Switch](../../crates/argui-widgets/src/selection.rs) | `switch` | Animated boolean control with accessible activation. |
+| Table | [Table](../../crates/argui-widgets/src/table.rs) | `table` | Headers, cells, shared column widths, row selection and navigation; use DataTable for advanced data operations. |
+| Tabs | [Tabs](../../crates/argui-widgets/src/tabs.rs) | `tabs` | Selection, navigation and mounting of the active panel. |
+| Textarea | [TextArea](../../crates/argui-widgets/src/input.rs) | `textarea` | Multiline editing and scrolling; compose resizing with public gestures. |
+| Toast | [Toast](../../crates/argui-widgets/src/toast.rs) | `toast` | Controlled queue, duration, hover/focus pause, announcements and actions. |
+| Toggle | [Toggle](../../crates/argui-widgets/src/toggle.rs) | `toggle` | Persistent pressed state, disabled state and visual variants. |
+| Toggle Group | [ToggleGroup](../../crates/argui-widgets/src/toggle_group.rs) | `toggle-group` | Single/multiple selection, orientation, RTL and roving focus. |
+| Tooltip | [Tooltip](../../crates/argui-widgets/src/tooltip.rs) | `tooltip` | Delays, hover/focus, descriptive relationships, hoverable content, effects and optional native presentation. |
+| Typography | [Typography](../../crates/argui-widgets/src/typography.rs) | `typography` | Headings h1–h6, paragraph, lead, large, small, muted, code and quote styles; the engine also supports rich text. |
 
-## Intégration
+## Integration
 
-Les widgets suivent le même contrat : construire la vue avec le
-thème, transmettre les événements à `action`, appliquer l’action à l’état retenu
-et notifier l’entité. Transmettre les demandes de focus au runtime. Les modèles
-ne font ni requêtes réseau, ni transferts, ni envois de réponses.
+Build the view with its theme, forward events to `action`, apply the returned
+action to retained state and notify the owning entity. Forward focus requests
+to the runtime. Widget models do not perform network transfers or submit answers.
 
-Exemples complets, répartis par responsabilité :
+Complete examples:
 
-- [Formulaires](../../crates/argui-widget-gallery/src/pages/catalogue/forms.rs) :
-  Field, Input Group, OTP, Combobox, Native Select et Questionnaire.
-- [Navigation](../../crates/argui-widget-gallery/src/pages/catalogue/navigation.rs) :
-  Accordion, toggles, Button Group, Navigation Menu, Sidebar et Direction.
-- [Surfaces](../../crates/argui-widget-gallery/src/pages/catalogue/surfaces.rs) :
-  Sheet, Alert Dialog, Drawer, Carousel, Chart et Hover Card.
-- [Conversation et contenu](../../crates/argui-widget-gallery/src/pages/catalogue/conversation.rs) :
-  Attachment, Bubble, Item, Marker, Message, Message Scroller et Scroll Area.
-- [Typography](../../crates/argui-widget-gallery/src/pages/typography.rs) : styles
-  publics et primitives de texte riche/sélection.
+- [Forms](../../crates/argui-widget-gallery/src/pages/catalogue/forms.rs): Field,
+  Input Group, OTP, Combobox, Native Select and Questionnaire.
+- [Navigation](../../crates/argui-widget-gallery/src/pages/catalogue/navigation.rs):
+  Accordion, toggles, Button Group, Navigation Menu, Sidebar and Direction.
+- [Surfaces](../../crates/argui-widget-gallery/src/pages/catalogue/surfaces.rs):
+  Sheet, Alert Dialog, Drawer, Carousel, Chart and Hover Card.
+- [Conversation](../../crates/argui-widget-gallery/src/pages/catalogue/conversation.rs):
+  Attachment, Bubble, Item, Marker, Message, Message Scroller and Scroll Area.
+- [Typography](../../crates/argui-widget-gallery/src/pages/typography.rs): text styles,
+  rich text and selection.
 
-Pour Hover Card, conserver `HoverCardState`, transmettre Focus/Blur/Key en capture
-sur le panneau et planifier `advance` à `next_deadline` avec un `TaskSlot`.
-Aucun polling permanent n’est nécessaire. Pour Message Scroller, fournir les
-mesures de layout à `appended`/`prepended`, transmettre les événements de lecture
-à `observe`, puis appliquer les `ScrollRequest` retournées. La virtualisation,
-les ancres de tours de conversation et le streaming réseau restent à composer.
+Keep `HoverCardState`, capture Focus/Blur/Key on the panel and schedule `advance`
+at `next_deadline` through a `TaskSlot`. For MessageScroller, provide layout
+measurements to `appended`/`prepended`, pass reading events to `observe` and
+apply returned `ScrollRequest`s. Virtualization and network streaming are
+application responsibilities.
 
-Direction hérite dans le **layout** et autorise un scope imbriqué contraire.
-Les contrôleurs de collection conservent leur paramètre `rtl` pour interpréter
-les flèches : l’application doit le régler selon la même direction. Le moteur
-reste indépendant des widgets, de shadcn et de tout futur DSL.
+Direction inherits through layout and supports opposing nested scopes. Set
+collection controllers' `rtl` parameter to the same direction for arrow-key
+interpretation. The engine stays independent of widgets and any future DSL.
 
-Dans la galerie, rechercher par le nom affiché ; un nom exact passe devant une
-correspondance partielle (Select avant Native Select). Ctrl/Cmd+K focalise la
-recherche. La saisie depuis le fond ou un bouton la démarre directement ; les
-éditeurs et collections conservent leurs propres raccourcis.
+## Composition contracts
 
-## Validation reproductible
+### Content and disclosure
 
-Les [tests de widgets](../../crates/argui-widgets/tests/) couvrent actions, limites,
-états désactivés, relations accessibles, gestes et layout. Les
-[tests de galerie](../../crates/argui-widget-gallery/tests/pages/catalogue.rs)
-parcourent les pages du catalogue en clair/sombre à deux tailles, contrôlent les
-relations et exercent les états retenus.
+Card and Empty connect title/description to their accessible group while their
+actions retain focus. Badge is noninteractive. Decorative media should not
+produce duplicate announcements. Use `Alert::live(LiveRegion::Off)` for an
+already-present persistent alert that should not announce dynamically.
 
-Le scénario [catalogue.mjs](../../crates/argui-widget-gallery/tests/pages/catalogue.mjs)
-exerce le canvas WebGPU à 1220 × 780 et 800 × 720 dans les deux thèmes : captures
-des pages, boutons, navigation clavier, champs, OTP, sélecteurs, modales,
-restauration du focus, Hover Card et scroll. Les PNG sont enregistrés dans
-`target/catalogue-interactions/` et doivent être inspectés. Une capture blanche
-échoue. Voir [la procédure Linux](../contributing/linux-testing.md) pour le build et le display
-privé ; le navigateur ne doit jamais utiliser le bureau personnel.
+Collapsible unmounts closed content. `trigger_key()` and `content_key()` identify
+its parts. The application retains data and restores focus when closing a
+section containing the focused control. Height changes are not animated.
 
-Le contrôle d’acceptation est celui de [code_quality.md](../contributing/code-quality.md), avec
-85 % minimum sur chaque métrique globale et par crate, et les tests natifs activés.
-Les artefacts de couverture dans `target/` portent les résultats de l’exécution,
-sans recopier un ancien total de tests comme preuve actuelle.
+Separator is horizontal by default; a vertical separator needs a parent with
+a defined height. `label` centers text. `decorative(false)` exposes its role
+and orientation without announcing children twice.
 
-## Contrats de composition
+### Images and loading
 
-Les [exemples de galerie](../../crates/argui-widget-gallery/src/pages/) montrent les
-constructeurs complets. Les règles suivantes complètent le tableau sans recopier
-chaque page de démonstration.
+`Avatar::image` receives an already-loaded `Option<ImageId>`; the application
+chooses the image or fallback. AspectRatio requires a finite positive ratio;
+clip its frame when needed. Kbd describes keys without registering shortcuts;
+`label` supplies a spoken name for symbols.
 
-### Contenu et disclosure
+Mount `Entity<Progress>` or `Entity<Skeleton>` with `cx.entity` for animation.
+Calling `build` directly is static. `Progress::set_value` takes a percentage
+clamped to 0–100; `None` or a non-finite value selects indeterminate progress.
+Reduced motion, unmounting and `Skeleton::set_animated(false)` stop frame requests.
+Announce loading on the parent group instead of every decorative shape.
 
-`Card` et `Empty` relient titre et description à leur groupe accessible ; leurs
-actions gardent leur focus. `Badge` est non interactif. Éviter les annonces doubles
-pour les médias et icônes décoratifs. Pour une alerte persistante déjà affichée à
-l'ouverture, choisir explicitement `Alert::live(LiveRegion::Off)` si aucune
-annonce dynamique n'est souhaitée.
+### Labels and navigation
 
-`Collapsible` conserve un état contrôlé et démonte le contenu fermé. Ses clés
-`trigger_key()` et `content_key()` ciblent les parties ; l'application conserve
-les données et restaure le focus si elle ferme une section contenant le contrôle
-focalisé. L'ouverture n'anime pas la hauteur.
+`Label::associate` sets the control key and replaces its direct name with
+`labelled_by`. Keep both in one accessible scope with matching enabled states,
+and forward `focus_target(event)` to the runtime. Clicking focuses without
+changing the control value.
 
-`Separator::new(key)` est horizontal. L'orientation verticale nécessite un
-parent de hauteur définie. `label` centre un texte ; `decorative(false)` publie
-le rôle et l'orientation sans faire annoncer les enfants une seconde fois.
+`Breadcrumb::action` returns a unique ancestor ID for application navigation.
+`Pagination::action` returns an available destination. Pages start at 1; an
+empty total produces page 0 and disabled buttons. At most seven entries appear
+between previous/next. `PaginationLabels` provides translated announcements.
+Both widgets currently expose a named group and current-page description,
+without `aria-current`.
 
-### Images et chargement
+`Menu::submenu_content_key` identifies the geometry anchor for MenuIntent.
+Supply bounds after layout, update the pointer-corridor deadline during movement
+and cancel its task when closing. `CalendarLocale::rtl` controls horizontal
+navigation. DatePicker scopes events and restores the committed date on cancel.
 
-`Avatar::image` reçoit un `Option<ImageId>` déjà chargé : l'application choisit
-l'image ou le fallback, sans téléchargement implicite. `AspectRatio` exige un
-ratio fini strictement positif ; appliquer un clip au cadre si nécessaire.
-`Kbd` décrit les touches, sans enregistrer de raccourci ; `label` permet de donner
-un nom vocal aux symboles.
+## Additional widgets
 
-Pour animer Progress indéterminé ou Skeleton, monter `Entity<Progress>` ou
-`Entity<Skeleton>` avec `cx.entity`. Un appel direct à `build` reste statique.
-`Progress::set_value` reçoit un pourcentage borné à 0–100 ; `None` ou une valeur
-non finie produit l'état indéterminé. Le mouvement réduit et le démontage arrêtent
-les demandes de frames ; `Skeleton::set_animated(false)` aussi. Annoncer le
-chargement sur le groupe parent plutôt que sur chaque forme décorative.
+**AnimatedText** (`animated-text`) animates changed characters through rolling,
+sliding or fading, reuses layout between intermediate frames and stops requesting
+frames at rest. See [animation](../ui/animation.md).
 
-### Labels et navigation
+**ColorPicker** (`color-picker`) includes saturation/value, hue, checkerboard
+opacity and HEX/RGB/HSL/HSV fields. `ColorPickerState` retains hue through gray,
+captured gestures and invalid drafts without replacing the last valid color.
+Call `layout_changed(key, snapshot)` after layout, then `update(key, event)`;
+`true` requests a rebuild. Compare `color()` before/after to publish only changes.
+Use `set_color`, `set_format` and `set_enabled` for external state. Arrow keys
+adjust sliders and the pad; Shift refines pad steps to 0.1%, and Escape discards
+an invalid draft.
 
-`Label::associate` assigne la clé du contrôle et remplace son nom direct par
-`labelled_by`. Monter le label et le contrôle dans le même scope accessible,
-conserver le même état `enabled` et transmettre `focus_target(event)` au runtime.
-Le clic focalise le contrôle sans modifier sa valeur.
+See dedicated guides for [lists and tables](lists-tables.md),
+[overlays](overlays.md), [native popovers](../platform/native-popovers.md),
+[file pickers](../platform/file-picker.md), [WebViews](../platform/webview.md),
+[desktop backdrops](../platform/desktop-backdrops.md) and
+[application updates](../platform/updater.md).
 
-`Breadcrumb::action` retourne un identifiant d'ancêtre ; l'application décide
-de la navigation. Les identifiants doivent être uniques. `Pagination::action`
-retourne une destination visible et active. Les pages commencent à 1 ; un total
-nul produit une page courante 0 et des boutons désactivés. Le rendu est borné à
-sept entrées entre précédent/suivant. `PaginationLabels` traduit les annonces.
-Ces deux widgets publient actuellement un groupe nommé et une description de la
-page courante, sans `aria-current`.
+## Validation
 
-`Menu::submenu_content_key` fournit l'ancre de géométrie pour `MenuIntent`.
-Livrer les bounds après layout, actualiser le délai du corridor au déplacement
-du pointeur et annuler la tâche à la fermeture. `CalendarLocale::rtl` règle la
-navigation horizontale ; DatePicker scope ses événements et restaure la date
-validée lors d'une annulation.
+[Widget tests](../../crates/argui-widgets/tests/) cover actions, limits, disabled
+states, accessible relationships, gestures and layout. The
+[gallery tests](../../crates/argui-widget-gallery/tests/pages/catalogue.rs) exercise
+retained states in light/dark themes and at two viewport sizes.
 
-## Capacités complémentaires
-
-`AnimatedText` (`animated-text`, ou `widget-animated-text` dans la façade) anime
-uniquement les caractères modifiés : roulement de chiffres, glissement ou fondu.
-La page **Animated text** exerce `10 → 11`, les retenues, les diminutions et les
-changements rapides. Les frames intermédiaires réutilisent le layout et le widget
-cesse de demander des frames au repos. Voir [l’API et ses limites](../ui/animation.md).
-
-`ColorPicker` (`color-picker`, ou `widget-color-picker` dans la façade) est un
-éditeur réutilisable avec pad saturation/valeur, teinte, opacité sur damier et
-champs HEX, RGB, HSL ou HSV. `ColorPickerState` conserve la teinte dans les gris,
-les gestes capturés et le texte invalide sans écraser la dernière couleur valide.
-Livrer `layout_changed(key, snapshot)` après layout puis `update(key, event)` ;
-un retour `true` demande de reconstruire la vue, et comparer `color()` avant/après
-permet de publier seulement les changements de couleur. `set_color` reçoit une
-valeur externe, `set_format` change les champs et `set_enabled` désactive l'éditeur.
-Les flèches règlent les deux sliders et le pad, Maj affine le pad à 0,1 %, et
-Échap abandonne un brouillon invalide. La page **Color picker** de la galerie
-montre une intégration complète et un bouton de prévisualisation.
-Ce widget complémentaire ne modifie pas le décompte des 64 entrées shadcn.
-
-Les [listes et tables](lists-tables.md), [overlays](overlays.md),
-[popups natifs](../platform/native-popovers.md), [fichiers](../platform/file-picker.md),
-[WebViews](../platform/webview.md) et [fonds de bureau](../platform/desktop-backdrops.md) ont leurs
-propres guides. List, VList, TreeView, ColorPicker, FilePicker, WebView et les effets de verre
-ne sont pas comptés comme des entrées supplémentaires du catalogue shadcn.
+The [browser scenario](../../crates/argui-widget-gallery/tests/pages/catalogue.mjs)
+covers actual WebGPU output, navigation, input, modals, focus restoration,
+Hover Card and scrolling. Inspect its captures in `target/catalogue-interactions/`;
+a blank image fails. Use the [private Linux display](../contributing/linux-testing.md)
+and the [quality gate](../contributing/code-quality.md).

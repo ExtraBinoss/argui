@@ -1,24 +1,40 @@
-# Documentation Argui
+# Argui documentation
 
-Les guides décrivent les contrats actuels et leurs limites. Les anciens plans de
-livraison et bilans de chantier restent consultables dans l'historique Git.
-Les commandes se lancent depuis la racine du dépôt.
+Start with the [live components](https://extrabinoss.github.io/argui/components)
+and [getting started guide](https://extrabinoss.github.io/argui/get-started).
+These guides cover the current Rust APIs, supported behavior and platform limits.
+Run commands from the repository root unless a guide says otherwise.
 
-Commencer par l'[architecture](architecture.md), le [catalogue des widgets](widgets/shadcn.md)
-ou les [modèles et présentations](runtime/models.md). La [roadmap](roadmap.md)
-contient uniquement les travaux ouverts. Les exemples complets sont dans la
-[Widget Gallery](../crates/argui-widget-gallery/src/pages/).
+## Build an application
 
-| Sujet | Guides |
+| Topic | Guides |
 | --- | --- |
-| Runtime | [Modèles, ownership, cycle de vie et services](runtime/models.md) · [Tâches asynchrones](runtime/tasks.md) |
-| UI | [Interaction, focus et accessibilité](ui/interaction.md) · [Styles et thèmes](ui/styling.md) · [Animation](ui/animation.md) · [Actions et édition](ui/editing.md) · [Scroll et virtualisation](ui/scroll.md) · [Éléments personnalisés](ui/custom-elements.md) |
-| Widgets | [Catalogue shadcn et contrats de composition](widgets/shadcn.md) · [Listes et tables](widgets/lists-tables.md) · [Overlays et placement](widgets/overlays.md) |
-| Plateformes | [Application, fenêtres et tray](platform/application.md) · [WebView](platform/webview.md) · [Sélection de fichiers](platform/file-picker.md) · [Fonds de bureau](platform/desktop-backdrops.md) · [Popovers natifs](platform/native-popovers.md) · [Mises à jour](platform/updater.md) |
-| Rendu | [Primitives, couleurs, images et SVG](rendering/primitives.md) · [Effets GPU](rendering/effects.md) |
-| Performance | [Optimisations CPU/RAM et mesures](performance/optimizations.md) · [Empreinte des applications et de la galerie](performance/footprint.md) |
-| Contribution | [Qualité, dépendances et préparation](contributing/code-quality.md) · [Tests graphiques Linux](contributing/linux-testing.md) · [DevTools et profiling](contributing/devtools.md) |
+| State and runtime | [Models, ownership and services](runtime/models.md) · [Asynchronous tasks](runtime/tasks.md) |
+| Layout and interaction | [Styling and themes](ui/styling.md) · [Focus, input and accessibility](ui/interaction.md) · [Scroll and virtualization](ui/scroll.md) |
+| UI composition | [Animation](ui/animation.md) · [Actions and editing](ui/editing.md) · [Custom elements](ui/custom-elements.md) |
+| Widgets | [Component catalogue](widgets/shadcn.md) · [Lists and tables](widgets/lists-tables.md) · [Overlays and placement](widgets/overlays.md) |
+| Rendering | [Primitives, colors, images and SVG](rendering/primitives.md) · [GPU effects](rendering/effects.md) |
 
-Les mesures de performance conservent leurs conditions, baselines et limites.
-Leurs [données brutes](performance/data/) sont séparées des guides. Les résultats
-d'une ancienne campagne ne remplacent pas une validation de la version courante.
+## Integrate with the platform
+
+| Topic | Guide |
+| --- | --- |
+| Application identity, windows and tray | [Application setup](platform/application.md) |
+| Native and browser web content | [WebView](platform/webview.md) |
+| System file selection | [File picker](platform/file-picker.md) |
+| Blur behind window regions | [Desktop backdrops](platform/desktop-backdrops.md) |
+| Popovers outside the window | [Native popovers](platform/native-popovers.md) |
+| Signed application updates | [Updater engine and dialog](platform/updater.md) |
+
+## Understand and contribute
+
+- [Architecture](architecture.md): crate boundaries and how the retained runtime works.
+- [Performance](performance/optimizations.md): measured costs, raw data and reproducible workloads.
+- [DevTools](contributing/devtools.md): inspection, live editing and profiling.
+- [Code quality](contributing/code-quality.md): dependencies, source rules, tests and coverage.
+- [Linux graphical testing](contributing/linux-testing.md): isolated displays and browser captures.
+- [Releases](contributing/releases.md): crates.io publication, GitHub releases and branch protection.
+- [Website](../website/README.md): Nuxt development and GitHub Pages deployment.
+- [Roadmap](roadmap.md): planned capabilities and remaining validation.
+
+Complete widget integrations live in the [gallery source](../crates/argui-widget-gallery/src/pages/).

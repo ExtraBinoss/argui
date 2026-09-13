@@ -1,123 +1,100 @@
-# Argui — Another Rust GUI
+<p align="center">
+  <a href="https://extrabinoss.github.io/argui/">
+    <img src="https://raw.githubusercontent.com/ExtraBinoss/argui/main/website/public/argui-icon.png" width="88" height="88" alt="Argui">
+  </a>
+</p>
 
-Build fast, accessible interfaces in Rust. Argui combines a retained UI tree,
-GPU rendering, modular widgets and native platform integrations across Linux,
-macOS, Windows and the web. The same renderer runs natively and through
-WebAssembly/WebGPU.
+<h1 align="center">Argui</h1>
 
-[Website and live components](https://extrabinoss.github.io/argui/) ·
-[Documentation](docs/README.md) ·
-[Contributing](docs/contributing/code-quality.md) ·
-[Releases](docs/contributing/releases.md)
+<p align="center">
+  Fast, accessible interfaces. Written in Rust.<br>
+  Native on Linux, macOS and Windows. At home on the web.
+</p>
 
-Argui is experimental. Its core builds on `winit`, `wgpu`, `cosmic-text` and
-`taffy`, with an optional WebView and no required JavaScript frontend.
+<p align="center">
+  <a href="https://extrabinoss.github.io/argui/">Website</a> ·
+  <a href="https://extrabinoss.github.io/argui/components">Live components</a> ·
+  <a href="docs/README.md">Documentation</a> ·
+  <a href="https://extrabinoss.github.io/argui/get-started">Get started</a>
+</p>
 
-The repository provides a retained UI tree, responsive layout, shaped text and
-editing, interaction, scrolling, animation, transforms, gradients, decoded
-images, scoped GPU effects, and one WGPU renderer for native and web. See the
-[visual primitive contracts](docs/rendering/primitives.md), the
-[color contract](docs/rendering/primitives.md#color), and the
-[overlay geometry API](docs/widgets/overlays.md#overlay-geometry), or the
-[remaining roadmap](docs/roadmap.md).
+<p align="center">
+  <a href="https://github.com/ExtraBinoss/argui/actions/workflows/ci.yml"><img src="https://github.com/ExtraBinoss/argui/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
+  <a href="LICENSE-MIT"><img src="https://img.shields.io/badge/license-MIT%20%2F%20Apache--2.0-1a73e8" alt="MIT or Apache-2.0"></a>
+</p>
 
-Performance work includes retained subtree reuse, virtualization, compact tree
-indices, dense layout storage, early dirty-propagation stops, and explicit
-layout boundaries for independently sized scroll content.
-See [the optimization measurements](docs/performance/optimizations.md) for reproducible
-before/after CPU and memory comparisons, workloads, and their limits.
-The [quality gate](docs/contributing/code-quality.md) requires at least 85% coverage on each
-metric, both across the workspace and within every crate.
+[![The Argui widget gallery](https://raw.githubusercontent.com/ExtraBinoss/argui/main/website/public/gallery-preview.webp)](https://extrabinoss.github.io/argui/components)
 
-```sh
-cargo nextest run --workspace --all-features
-./scripts/quality.sh
-cargo run -p argui --example window
-cargo run -p argui --example text
-cargo run -p argui --example layout
-cargo run -p argui --example state
-cargo run -p argui --example spotlight
-cargo run -p argui-perf-showcase --example perf
-./scripts/serve-web.sh
-```
+## Build your interface in Rust
 
-The native `state` example and the web build launch the same `StateShowcase`
-Rust application from `argui-showcase`; only their tiny platform entrypoints
-differ. Both wrap it in the optional `DevtoolsHost`, whose resizable Elements
-and Profiling dock is itself composed from normal Argui widgets. Applications
-that do not want inspection simply launch their `Render` component directly. Its fonts are
-embedded because browsers do not expose system font files
-to WASM. Argui itself ships no mandatory font; each application supplies the
-assets and generic-family mapping it wants.
+Argui brings a retained UI tree, GPU rendering and a growing widget collection
+to one Rust API. Compose your interface, keep state in models and let the
+runtime update what changed. The same rendering stack runs on desktop and
+WebAssembly with WebGPU.
 
-The `layout` example uses the retained `UiTree` API. Taffy computes logical
-rectangles from the current viewport and Cosmic Text supplies intrinsic text
-measurement, so native-window and browser resizing share the same reflow path.
+- **Responsive by design.** Flex and grid layout, light and dark themes, animation and virtualized lists.
+- **Accessible controls.** Keyboard navigation, focus, text editing, native AccessKit integration and browser semantics.
+- **GPU effects.** Custom WGSL shaders, gradients, shadows, blur and liquid glass.
+- **Native integrations.** Multiple windows, file pickers, trays, WebViews and popovers that can extend beyond the window on supported backends.
+- **Optional updates.** A signed update engine with a separate, reusable progress dialog.
+- **Inspect as you build.** Element inspection, live styles, theme editing and profiling through optional DevTools.
 
-The state showcase embeds a transparent PNG and a JPEG. `argui-image` is an
-optional decoding boundary; the renderer receives validated RGBA assets and
-does not depend on a file format or filesystem.
+Widgets and platform integrations are enabled individually. Idle interfaces do
+not request animation frames. Read the [performance measurements](docs/performance/optimizations.md)
+for workloads, memory figures and reproduction commands.
 
-Browse the [documentation index](docs/README.md) for API guides, platform
-integration, performance evidence and contributor instructions.
+## Try it
 
-## Optional asynchronous tasks
-
-Enable `argui/updater` for the UI-independent application update engine and
-`argui/widget-updater` separately for its optional dialog. The gallery's `updater`
-feature demonstrates version notes, download progress, cancellation and installation
-states. See [application updates](docs/platform/updater.md) for signed feeds and
-the supported desktop package formats.
-
-Enable `argui/tasks` for owned, cancellable asynchronous tasks independently
-of WebView support: Tokio on native and browser futures on Web.
-See [the task contract](docs/runtime/tasks.md) and **Examples → Async tasks** in the gallery.
-
-## Actions and editing
-
-Scoped actions share commands across buttons, keyboard shortcuts, menus and
-palettes. Text editors retain bounded transactional undo/redo; Password fields
-mask graphemes and suppress clipboard export/history. Menu and command palette
-widgets are individually opt-in. See [the API guide](docs/ui/editing.md) and
-the **Actions** and **Editing & Password** gallery pages.
-Reusable data widgets are documented in [Lists and tables](docs/widgets/lists-tables.md);
-[the shadcn catalogue](docs/widgets/shadcn.md) maps all 64 entries to public APIs,
-feature flags, examples, and their supported scope.
-
-Enable `argui/desktop-backdrop` for native desktop blur through selected UI
-regions, with configurable tint and fallback. See [Desktop backdrops](docs/platform/desktop-backdrops.md)
-and the gallery's **Appearance** controls.
-
-## Optional WebView
-
-`argui-webview` provides retained sessions, a bounded native-view cache and a
-Wry backend on desktop and a sandboxed iframe backend on the web. Enable the
-`webview` feature on `argui` for its re-export.
-The runtime mounts native content from the retained layout. WebView-enabled
-Linux applications use the GTK/Tao Wayland host; ordinary applications retain
-Winit. See [the integration status and security model](docs/platform/webview.md).
-
-`./scripts/serve-widget-gallery.sh` enables WebView support automatically.
-Open **Examples → WebView → Email** at `/widgets/` to render sanitized email
-HTML in the browser. Webpage mode can embed only sites that permit iframes.
-The script also starts the separate-origin relay for the Webpage **isolated /
-compatible** toggle. Its origin allowlist and typed popup/download permissions
-are documented in [WebView configuration](docs/platform/webview.md#explicit-webpage-permissions).
-
-Linux build prerequisites and host limitations are in
-[WebView setup](docs/platform/webview.md#linux-build-dependencies).
-Native file selection and its optional widget are documented in
-[File picker](docs/platform/file-picker.md).
-
-## Website
-
-The [Nuxt website](website/README.md) presents the library, features and component
-catalogue in English. Its Components page embeds the real WebAssembly gallery
-and links each component to its Rust implementation.
+Explore the [live gallery](https://extrabinoss.github.io/argui/components), or run it locally:
 
 ```sh
-cd website
-pnpm install --frozen-lockfile
-pnpm gallery:build
-pnpm dev
+git clone https://github.com/ExtraBinoss/argui.git
+cd argui
+cargo run -p argui-widget-gallery --all-features
 ```
+
+Use Rust 1.98 or newer. Linux builds with all features also need the
+[native dependencies](docs/platform/webview.md#linux-build-dependencies).
+
+## Compose a view
+
+Add only the widgets your application uses:
+
+```toml
+[dependencies]
+argui = { git = "https://github.com/ExtraBinoss/argui", features = ["widget-button"] }
+```
+
+```rust
+use argui::{
+    ui::Element,
+    widgets::{Button, WidgetTheme},
+};
+
+fn view(theme: &WidgetTheme) -> Element {
+    Element::row([
+        Button::new("save", "Save changes", theme.button()).build(),
+        Button::new("cancel", "Cancel", theme.ghost_button()).build(),
+    ])
+    .gap(10.0)
+}
+```
+
+Continue with [models and state](docs/runtime/models.md), the
+[widget catalogue](docs/widgets/shadcn.md) or the [complete examples](crates/argui/examples/).
+The Git dependency works today; registry releases follow the [release workflow](docs/contributing/releases.md).
+
+## Where things stand
+
+Argui is under active development and its APIs are still evolving.
+**Hot reload and internationalization are coming next.** See the
+[roadmap](docs/roadmap.md) and individual platform guides for current support.
+
+Contributions go through pull requests. Start with the
+[contributor guide](docs/contributing/code-quality.md); every crate must meet
+the 85% floor for lines, functions, regions and branches. Cargo builds use at
+most six jobs. The [website](website/README.md) lives in `website/`.
+
+## License
+
+Dual-licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your option.

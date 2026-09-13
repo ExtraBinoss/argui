@@ -107,7 +107,7 @@ LLVM's summaries. The aggregation and rejection threshold have regression tests:
 `ARGUI_NATIVE_TESTS=1` includes the opt-in native lifecycle, GTK input, WebView
 and packaged application checks, plus the ignored renderer surface integration
 test. The manual CPU profiling test remains excluded. Run this mode on the
-private display described in [linux_testing.md](linux-testing.md).
+private display described in [Linux graphical testing](linux-testing.md).
 This mode defaults to one Nextest worker, since native windows and off-screen
 renderer tests share the display/GPU. `ARGUI_COVERAGE_JOBS` explicitly overrides
 that worker count. Native WebViews use the private display; no standalone browser

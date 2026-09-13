@@ -1,73 +1,66 @@
 # File picker
 
-La feature `file-picker` expose les dialogues système sans dépendre des widgets :
+The `file-picker` feature exposes system dialogs independently of widgets:
 
 ```toml
-argui = { path = "../argui", features = ["file-picker"] }
+argui = { git = "https://github.com/ExtraBinoss/argui", features = ["file-picker"] }
 ```
 
 ```rust
 use argui::platform::file_picker::{FileDialog, FileFilter, FilePickerMode};
 
 let selected = FileDialog::new(FilePickerMode::Files)
-    .title("Choisir des images")
+    .title("Choose images")
     .filter(FileFilter::new("Images", ["png", "jpg", "webp"]))
     .open()
     .await?;
 
 if let Some(files) = selected {
     for file in files {
-        // Sur desktop : file.path() fournit un Path, sans conversion UTF-8 imposée.
+        // On desktop, file.path() returns a Path without requiring UTF-8.
         println!("{}", file.file_name());
     }
 }
 ```
 
-Modes : `File`, `Files`, `Folder`, `Folders`, `Save`. Les options communes sont
-le titre, les filtres d'extensions, le dossier initial et le nom proposé.
-`Save` sélectionne une destination ; il n'écrit et ne crée aucun fichier.
-L'application reste responsable des opérations d'entrée/sortie et de leurs erreurs.
-Les filtres guident la sélection ; ils ne valident pas le contenu d'un fichier.
+Modes are `File`, `Files`, `Folder`, `Folders` and `Save`. Shared options include
+title, extension filters, initial directory and suggested name. `Save` selects
+a destination without creating or writing a file. Your application owns I/O
+and its errors. Filters guide selection; they do not validate file contents.
 
-`FileDialog::parent(Arc<W>)` associe une fenêtre implémentant les traits
-`HasWindowHandle` et `HasDisplayHandle`. Le propriétaire est conservé jusqu'à
-la fin du dialogue natif, même si le consommateur abandonne son résultat.
-L'API fonctionne aussi sans parent explicite ; le widget utilise alors un
-dialogue autonome. Passer un parent dans sa configuration pour une relation modale.
+`FileDialog::parent(Arc<W>)` accepts a window implementing `HasWindowHandle` and
+`HasDisplayHandle`. The owner remains retained until the native dialog finishes,
+even if its result is abandoned. Without a parent the dialog is standalone;
+provide one when you need a modal ownership relationship.
 
-`FileDialogBackend` est l'interface commune. `NativeFileDialog`, le fournisseur
-par défaut, utilise [RFD 0.17.2](https://docs.rs/rfd/0.17.2/rfd/), qui possède déjà
-les adaptateurs OS. Une application peut fournir son propre backend via
-`open_with`, ou `.backend(...)` sur le widget.
+`FileDialogBackend` is the shared interface. The default `NativeFileDialog` uses
+[RFD](https://docs.rs/rfd/0.17.2/rfd/). Supply another backend through `open_with`
+or the widget's `.backend(...)`.
 
-| Système | Dialogue |
+| Platform | Dialog |
 | --- | --- |
-| Linux Wayland / X11 | XDG Desktop Portal et le sélecteur du bureau ; RFD peut utiliser Zenity en repli. Installer un backend de portail avec FileChooser et Zenity pour ce repli. |
-| Windows | Dialogues COM `IFileOpenDialog` / `IFileSaveDialog`. |
-| macOS | Panneaux AppKit `NSOpenPanel` / `NSSavePanel`. L'application et sa boucle d'événements doivent fonctionner sur le thread principal. |
-| Web | Sélection simple/multiple via le sélecteur de fichiers du navigateur. Les dossiers et destinations d'enregistrement retournent `UnsupportedMode`. |
+| Linux Wayland/X11 | XDG Desktop Portal with the desktop's chooser; RFD can fall back to Zenity. Install a portal backend providing FileChooser and Zenity for fallback. |
+| Windows | COM `IFileOpenDialog` / `IFileSaveDialog`. |
+| macOS | AppKit `NSOpenPanel` / `NSSavePanel`; the application event loop must run on the main thread. |
+| Web | Browser single/multiple file selection. Folder and save-destination modes return `UnsupportedMode`. |
 
-Les appels ne bloquent pas la boucle Argui. Sur le web, lancer depuis une action
-utilisateur pour conserver l'autorisation d'ouverture du navigateur. Sur desktop,
-le travail conserve les handles natifs jusqu'à la réponse du système.
-Abandonner la future annule la réception du résultat, pas nécessairement le
-panneau déjà présenté par le système.
+Calls do not block Argui's event loop. In a browser, start them from a user action
+to preserve browser permission to open the chooser. Dropping the future stops
+receiving its result but does not necessarily close an already presented dialog.
 
-`FileDialogResult` distingue une sélection, une absence de sélection et une
-configuration ou un lancement impossible. **RFD ne distingue pas l'annulation
-utilisateur de tous les échecs internes du dialogue** : `Ok(None)` veut dire
-« aucun fichier retourné », et ne constitue pas une preuve d'annulation.
-Les chaînes contenant NUL, les noms qui sont des chemins et les filtres invalides
-sont rejetés avant tout appel natif.
+`FileDialogResult` distinguishes a selection, no selection and configuration or
+launch errors. RFD cannot distinguish user cancellation from every internal
+failure: `Ok(None)` means no files were returned. NUL-containing strings,
+filenames containing paths and invalid filters are rejected before native calls.
 
 ## Widget
 
 ```toml
-argui = { path = "../argui", features = ["widget-file-picker"] }
+argui = { git = "https://github.com/ExtraBinoss/argui", features = ["widget-file-picker"] }
 ```
 
-`widgets-all` et `argui-widgets/all` l'incluent ; toutes ces features sont
-inactives par défaut. L'API seule ne charge pas les widgets ni leurs tâches.
+`widgets-all` and `argui-widgets/all` also include it. All are disabled by
+default; the dialog API alone does not load widgets or their tasks.
 
 ```rust
 use argui::{
@@ -75,32 +68,32 @@ use argui::{
     widgets::FilePicker,
 };
 
-// Dans le contexte d'un composant, conserver cette Entity dans son état :
+// Create once in your component and retain the Entity in its state.
 let picker = cx.new_entity(FilePicker::new(
     "project-folder",
-    "Choisir le projet",
-    FileDialog::new(FilePickerMode::Folder).title("Dossier du projet"),
+    "Choose a project",
+    FileDialog::new(FilePickerMode::Folder).title("Project folder"),
 ));
-// Puis, dans render :
+// Inside render:
 let element = cx.entity(&picker);
 ```
 
-Le composant installe le clic, l'activation clavier et l'accessibilité. Il montre
-les sélections réelles et les erreurs, bloque les doubles ouvertures et conserve
-la sélection précédente quand aucun nouveau choix n'est retourné.
-`selection()`, `status()` et `is_open()` permettent de lire son état ; `open(cx)`
-permet aussi de le déclencher depuis une commande. `build(theme, cx)` accepte
-un thème explicite. `FilePickerEvent::{Selected, Dismissed, Failed}` s'écoute avec
-`cx.subscribe(&picker, callback)` ; conserver la `Subscription` retournée.
-Les abonnés et le composant doivent appartenir au même `ModelRuntime`.
+The component handles clicks, keyboard activation and accessibility. It displays
+actual selections and errors, prevents duplicate openings and keeps the previous
+selection when no new choice is returned. Read state through `selection()`,
+`status()` and `is_open()`, or open from a command with `open(cx)`.
+`build(theme, cx)` accepts an explicit theme.
 
-La galerie contient **File picker** dans la liste alphabétique, avec cinq
-exemples : document, images multiples, dossier, dossiers multiples et destination
-d'export. Le dernier exemple ne modifie pas le fichier choisi.
+Subscribe to `FilePickerEvent::{Selected, Dismissed, Failed}` with
+`cx.subscribe(&picker, callback)` and retain the returned `Subscription`.
+Subscribers and the component must share a `ModelRuntime`.
+
+The gallery's File picker page demonstrates all five modes. The export example
+selects a destination without modifying the chosen file.
 
 ## Validation
 
-Les tests isolent le fournisseur natif : propagation des options, validations,
-sélection réelle, fermeture sans changement, erreurs, double activation et absence
-d'exécuteur. Ils ne prennent pas de captures du bureau. L'ouverture visuelle et
-le choix des fichiers se vérifient manuellement dans la galerie sur chaque OS.
+Tests isolate the native provider and cover option forwarding, validation,
+selection, unchanged dismissal, errors, duplicate activation and a missing
+executor. They do not capture the desktop. Check native appearance and file
+selection in the gallery on each operating system.

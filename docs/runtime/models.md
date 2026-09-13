@@ -193,35 +193,32 @@ Behavioral coverage lives in the runtime's
 [model tests](../../crates/argui-runtime/tests/model/), including lifecycle,
 visibility, scope cleanup and host dispatch.
 
-## Services partagés
+## Shared services
 
-Un `ModelRuntime` constitue un domaine explicite. `register_service(value)`
-publie un service par type et renvoie une `ServiceRegistration<T>` à conserver.
-Une seconde inscription du même type échoue sans remplacer la première.
-Deux domaines indépendants ne voient jamais leurs services respectifs.
+A `ModelRuntime` defines an explicit domain. `register_service(value)` publishes
+one service per type and returns a `ServiceRegistration<T>` to retain. Duplicate
+registration fails without replacing the original. Independent runtimes never
+resolve each other's services.
 
-L'application possède les inscriptions, directement dans ses champs ou via
-`ResourceScope::own`. Dans ce second cas, elle conserve également la
-`ResourceLease` renvoyée. Fermer la portée retire les services du registre.
-Fermer seulement une vue ne retire pas un service appartenant à l'application.
+The application owns registrations directly or through `ResourceScope::own`.
+In the latter case, retain the returned `ResourceLease` as well. Closing that
+scope removes its services; closing a view does not remove application-owned
+services.
 
-`ModelRuntime::service::<T>()`, `ModelContext::service::<T>()` et
-`Context::service::<T>()` renvoient `Option<Rc<T>>`. L'utilisation du service
-ne conserve aucun emprunt du registre. Un contexte détaché ou un service absent
-renvoie `None`, sans recherche globale ni création implicite.
+`ModelRuntime::service::<T>()`, `ModelContext::service::<T>()` and
+`Context::service::<T>()` return `Option<Rc<T>>` without retaining a registry
+borrow. A detached context or missing service returns `None`; there is no
+global lookup or implicit creation.
 
-La suppression de l'inscription empêche les nouvelles résolutions, mais les
-consommateurs ayant déjà obtenu un `Rc<T>` peuvent terminer leur travail. Elle
-ne constitue donc pas une révocation des références existantes : si un service
-doit arrêter ses opérations, son contrat doit prévoir explicitement cet arrêt.
-Le registre conserve des références faibles ; un service contenant des modèles
-ne forme pas à lui seul un cycle registre → service → modèle → runtime.
+Removing a registration prevents new lookups, but existing `Rc<T>` consumers
+can finish their work. A service that must stop existing operations needs an
+explicit shutdown contract. The registry stores weak references, so a service
+containing models does not itself create a registry/service/model/runtime cycle.
 
-Les services ne remplacent pas les modèles observables. Une boîte mail peut
-publier un service de synchronisation, tandis que ses messages restent dans des
-`Entity` du même runtime, observées par les différentes vues. Résoudre un service
-n'ajoute pas de dépendance de rendu ; les notifications passent par les modèles.
+Services complement observable models. A mailbox can register a synchronization
+service while messages remain in `Entity` values observed by its views. Resolving
+a service creates no render dependency; notifications still flow through models.
 
-Tests de référence : `crates/argui-runtime/tests/model/services.rs` couvre
-l'identité partagée entre montages, les contextes modèle/vue, les domaines
-indépendants, les doublons, le retrait par portée et les cycles de rétention.
+The [service tests](../../crates/argui-runtime/tests/model/services.rs) cover
+shared identity, model/view contexts, isolated domains, duplicates, scoped
+removal and retention cycles.

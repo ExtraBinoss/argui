@@ -1,26 +1,26 @@
-# Mises à jour d'application
+# Application updates
 
-`argui-updater` est un moteur sans UI, sans runtime asynchrone imposé et sans
-requête réseau implicite. L'application lance une vérification dans sa tâche de
-démarrage, puis décide quand télécharger, installer et fermer ses fenêtres.
+`argui-updater` checks, downloads and installs signed application updates. It is
+independent of the UI and does not require an async runtime. Your application
+starts the check, forwards state changes and decides when to install or exit.
 
-| Besoin | Feature |
+| Capability | Feature |
 | --- | --- |
-| Moteur et backend natif via la façade | `argui/updater` |
-| Moteur seul avec backend personnalisé | `argui-updater`, sans feature |
-| Backend HTTPS et installation desktop en dépendance directe | `argui-updater/native` |
-| Dialogue réutilisable | `argui/widget-updater` ou `argui-widgets/updater` |
-| Page de démonstration dans la galerie | `argui-widget-gallery/updater` |
+| Engine and native backend through the facade | `argui/updater` |
+| Engine with your own backend | `argui-updater`, with no features |
+| HTTPS downloads and desktop installation | `argui-updater/native` |
+| Reusable dialog | `argui/widget-updater` or `argui-widgets/updater` |
+| Interactive gallery example | `argui-widget-gallery/updater` |
 
-Le dialogue n'active pas le réseau ni l'installation native. Il est explicitement
-optionnel, y compris avec `widgets-all`. Le moteur commun et le dialogue compilent
-sur WebAssembly ; le backend natif est disponible uniquement hors du navigateur.
-Les mises à jour d'une application web restent celles de son déploiement web.
+The dialog does not enable networking or installation. It is explicitly opt-in,
+including alongside `widgets-all`. The shared engine and dialog compile to
+WebAssembly; native installation is only available outside the browser. Web
+applications receive updates through their normal deployment.
 
-## Au lancement
+## Check at startup
 
-L'exemple compilable `crates/argui-updater/examples/startup.rs` effectue une
-vérification sur un worker et transmet les états par canal, sans installation :
+The [startup example](../../crates/argui-updater/examples/startup.rs) checks on a
+worker and sends states through a channel, without installing anything:
 
 ```sh
 cargo run -p argui-updater --features native --example startup -- https://updates.example.com/stable/latest.json update.pub
@@ -30,170 +30,151 @@ cargo run -p argui-updater --features native --example startup -- https://update
 use argui::updater::{Updater, http::{Config, HttpBackend}, install::NativeInstaller};
 
 let config = Config::new(
-    env!("CARGO_PKG_VERSION"), // la version de l'application appelante
+    env!("CARGO_PKG_VERSION"), // Your application's version.
     "https://updates.example.com/stable/latest.json",
     include_str!("update.pub"),
 )?;
 let mut updater = Updater::new(HttpBackend::new(config, NativeInstaller::detect()?)?);
-// Dans un worker de démarrage : callback vers le canal d'événements de l'application.
-let available = updater.check(|state| { /* transmettre state.clone() à l'UI */ })?;
+// Run on a startup worker; forward cloned states to your application's UI thread.
+let available = updater.check(|state| eprintln!("{state:?}"))?;
 # Ok::<(), argui::updater::Error>(())
 ```
 
-Les opérations sont **bloquantes** : ne pas les appeler depuis `Render::render`,
-un callback de clic ou directement dans une tâche async. `Context::spawn_blocking`
-avec `argui/tasks` permet de les exécuter sur un worker. Conserver son `TaskHandle`
-dans le modèle et conserver le moteur retourné par la tâche pour la prochaine
-opération. Le callback s'exécute sur le worker : transmettre une copie de `State`
-au thread UI, sans capturer d'`Entity` dans le worker. La tâche de démarrage doit
-être déclenchée une seule fois, pas à chaque rendu.
+Operations are **blocking**. Run them on a worker, such as
+`Context::spawn_blocking` with `argui/tasks`. Keep its `TaskHandle` in the model
+and retain the returned engine for the next operation. Callbacks execute on the
+worker: send a cloned `State` to the UI thread instead of capturing an `Entity`.
+Start the task once, rather than from each render or directly inside an async task.
 
-Après la vérification, `download(&CancellationToken, callback)` télécharge et
-authentifie le paquet ; `install(callback)` effectue l'installation explicitement.
-Une nouvelle vérification invalide le téléchargement précédent. L'installation
-exige un paquet vérifié et ne peut pas être répétée avec le même paquet. En cas
-d'échec d'installation, télécharger de nouveau avant de réessayer.
+After checking, `download(&CancellationToken, callback)` downloads and verifies
+the package. `install(callback)` starts installation explicitly. A new check
+invalidates the previous download. Installation requires a verified package and
+consumes it; download again before retrying a failed installation.
 
-`CancellationToken::cancel()` peut être appelé depuis le thread UI. Le backend
-vérifie l'annulation entre les lectures réseau et le moteur rejette également un
-résultat arrivé après l'annulation. Une lecture réseau déjà bloquée peut attendre
-le timeout configuré. Créer un nouveau token pour réessayer. Une installation
-commencée n'est pas annulable ; fermer le dialogue ne l'interrompt pas.
+`CancellationToken::cancel()` can run on the UI thread. The backend checks it
+between network reads, and the engine also rejects a result delivered after
+cancellation. A blocked read may wait for the configured timeout. Use a new
+token for a retry. Installation cannot be cancelled once started; closing the
+dialog does not stop it.
 
-## Publier une version
+## Publish an application update
 
-L'hébergeur est libre : fichier statique sur un CDN, stockage objet, asset d'une
-release GitHub, ou API renvoyant ce JSON. Aucun compte Argui n'est nécessaire.
-Pour distinguer les canaux, utiliser des adresses différentes, par exemple
-`/stable/latest.json` et `/beta/latest.json`.
+Host the manifest on a CDN, object store, GitHub release or any API returning
+this JSON. No Argui account is needed. Use separate URLs for channels, such as
+`/stable/latest.json` and `/beta/latest.json`.
 
 ```json
 {
   "version": "1.2.0",
-  "notes": "Démarrage plus rapide et corrections clavier.",
+  "notes": "Faster startup and keyboard fixes.",
   "platforms": {
     "linux-x86_64": {
       "url": "https://updates.example.com/1.2.0/MyApp.AppImage",
-      "signature": "CONTENU COMPLET DU FICHIER MyApp.AppImage.minisig",
+      "signature": "FULL CONTENTS OF MyApp.AppImage.minisig",
       "format": "app-image"
     },
     "macos-aarch64": {
       "url": "https://updates.example.com/1.2.0/MyApp.app.tar.gz",
-      "signature": "CONTENU COMPLET DU FICHIER MyApp.app.tar.gz.minisig",
+      "signature": "FULL CONTENTS OF MyApp.app.tar.gz.minisig",
       "format": "app-bundle"
     },
     "windows-x86_64": {
       "url": "https://updates.example.com/1.2.0/MyApp.msi",
-      "signature": "CONTENU COMPLET DU FICHIER MyApp.msi.minisig",
+      "signature": "FULL CONTENTS OF MyApp.msi.minisig",
       "format": "msi"
     }
   }
 }
 ```
 
-Les clés de plateforme sont `std::env::consts::OS` + `-` +
-`std::env::consts::ARCH`. `Config::target` peut préciser un ABI ou une variante
-de paquet si plusieurs distributions partagent le même OS et la même architecture.
-Une API peut renvoyer `204 No Content` lorsqu'aucune mise à jour n'est disponible.
-Un artefact manquant pour la cible constitue une erreur explicite.
+Platform keys combine `std::env::consts::OS`, `-` and `std::env::consts::ARCH`.
+Set `Config::target` to distinguish an ABI or package variant. An API may return
+`204 No Content` when no update is available. A missing target artifact is an error.
 
-La comparaison suit la précédence SemVer : pas de downgrade, pas de mise à jour
-pour une différence de métadonnées `+build`. Les préversions sont ignorées par
-défaut ; utiliser `Config::allow_prerelease = true` pour un canal de test.
+Comparison follows SemVer precedence: no downgrades, and no update for a
+`+build` metadata difference. Prereleases are ignored unless
+`Config::allow_prerelease = true`.
 
-Créer une clé Minisign et signer les **octets exacts** servis par l'hébergeur :
+Create a Minisign key and sign the **exact bytes** served by your host:
 
 ```sh
 minisign -G -p update.pub -s update.key
 minisign -Sm MyApp.AppImage -s update.key
 ```
 
-Distribuer `update.pub` avec l'application ; garder la clé privée dans la chaîne
-de publication. La valeur `signature` est le contenu texte du `.minisig`, avec
-ses retours à la ligne encodés par le sérialiseur JSON. Il ne s'agit pas d'un hash
-ni du chemin du fichier. Les signatures Minisign modernes préhachées permettent
-la vérification par morceaux. Une signature manquante, ancienne ou invalide
-interdit l'installation.
+Bundle `update.pub` with the application and keep the private key in your release
+pipeline. `signature` contains the complete `.minisig` text, with newlines escaped
+by your JSON serializer. Modern prehashed Minisign signatures support incremental
+verification. Missing, legacy or invalid signatures prevent installation.
 
-Le backend utilise HTTPS, y compris après redirection ; HTTP est accepté seulement
-sur une adresse IP loopback pour les tests. Les URLs contenant des identifiants
-sont refusées. Le manifeste est limité à 1 Mio. Les téléchargements sont écrits
-dans un fichier temporaire privé, par blocs de 64 Kio, avec une limite par défaut
-de 1 Gio. `Config::max_download_bytes` et `Config::timeout` sont configurables
-(timeout total de 300 secondes, connexion de 15 secondes maximum).
-Les fichiers temporaires incomplets et les paquets abandonnés sont supprimés.
+Downloads require HTTPS, including redirects. HTTP is accepted only on loopback
+IP addresses for tests; URLs containing credentials are rejected. Manifests are
+limited to 1 MiB. Downloads use private temporary files, 64 KiB chunks and a
+1 GiB default limit. Configure `max_download_bytes` and `timeout` as needed;
+the default total timeout is 300 seconds, with a 15-second connection limit.
+Incomplete downloads and abandoned packages are deleted.
 
-Toutes les dépendances de transport et d'installation appartiennent uniquement
-à `argui-updater/native` : Reqwest pour HTTP/TLS, Serde/JSON et SemVer pour le
-manifeste, `minisign-verify` pour l'authenticité, `tempfile` pour les fichiers de
-staging, `tar`/`flate2` pour les bundles, et `self-replace` pour l'exécutable Windows.
+Transport and installation dependencies belong to `argui-updater/native`:
+Reqwest, Serde/JSON, SemVer, `minisign-verify`, `tempfile`, `tar`, `flate2` and
+`self-replace`.
 
 ## Installation
 
-| Format | Installation prise en charge |
+| Format | Supported behavior |
 | --- | --- |
-| `executable` | Binaire autonome Windows, Linux ou macOS. Remplacement atomique sur Unix ; `self-replace` gère l'exécutable en cours d'utilisation sous Windows. |
-| `app-image` | AppImage Linux brute. `APPIMAGE` identifie le fichier externe au montage ; permissions conservées. |
-| `app-bundle` | Archive `.app.tar.gz` contenant un unique bundle du même nom, avec `Contents/MacOS`. Le bundle entier est remplacé, ressources incluses. |
-| `nsis` | Installateur Windows `.exe` lancé directement. Son propre mode d'installation et son interface restent ceux configurés par l'éditeur. |
-| `msi` | Installateur Windows via `msiexec /i … /passive /norestart`. |
+| `executable` | Standalone Windows, Linux or macOS binary. Atomic replacement on Unix; `self-replace` handles the running executable on Windows. |
+| `app-image` | Raw Linux AppImage. `APPIMAGE` identifies the outer file; permissions are preserved. |
+| `app-bundle` | `.app.tar.gz` containing one same-named bundle with `Contents/MacOS`. Replaces the whole bundle, including resources. |
+| `nsis` | Launches a Windows `.exe` installer using its publisher-configured interface and installation mode. |
+| `msi` | Launches `msiexec /i … /passive /norestart`. |
 
-`NativeInstaller::detect()` reconnaît le binaire courant, les AppImage et les
-ancêtres `.app`. `Destination` permet de fournir explicitement l'installation.
-Le format doit correspondre à cette destination. Les archives de bundle sont
-extraites dans un répertoire temporaire sur le même système de fichiers ; le
-bundle précédent est restauré si le renommage final échoue. Si la restauration
-échoue aussi, l'erreur indique le chemin de la sauvegarde conservée.
+`NativeInstaller::detect()` recognizes the running binary, AppImages and `.app`
+ancestors. Use `Destination` for an explicit installation location. Package
+format and destination must match. Bundle extraction uses a temporary directory
+on the same filesystem. If the final rename fails, the old bundle is restored;
+if restoration also fails, the error reports the retained backup path.
 
-Le moteur ne ferme pas le processus et ne lance pas d'élévation. Les permissions
-doivent permettre la modification de l'installation. Après `RestartRequired`,
-l'application doit sauvegarder son état et redémarrer normalement. Après
-`InstallerLaunched`, elle doit sauvegarder puis quitter pour laisser l'installateur
-terminer ; le succès du lancement ne signifie pas que l'installation est terminée.
-Le fichier temporaire d'un installateur Windows lancé est conservé, puisqu'il
-doit survivre au processus appelant ; sa suppression relève du nettoyage des
-fichiers temporaires du système.
+The engine does not terminate the process or request privilege elevation. The
+application needs permission to modify its installation. After `RestartRequired`,
+save state and restart normally. After `InstallerLaunched`, save state and exit
+so the installer can finish. Launch success does not mean installation completed.
+A launched Windows installer's temporary file remains available after the caller
+exits; operating-system temporary-file cleanup owns its eventual removal.
 
-Pour DEB/RPM, Flatpak, Snap et les stores, fournir un `Installer` ou un `Backend`
-adapté au gestionnaire de distribution. Ne pas remplacer directement les fichiers
-gérés par ces systèmes. La signature Minisign du téléchargement ne remplace pas
-la signature de code ni la notarisation requise par la distribution de l'app.
+For DEB/RPM, Flatpak, Snap and stores, implement an `Installer` or `Backend` for
+that distribution system. Download signatures do not replace platform code
+signing or notarization.
 
-## Dialogue optionnel
+## Optional dialog
 
-`UpdateDialog::new(key, &state, open, trigger).build(theme)` produit un dialogue
-contrôlé, avec les notes de version, le statut, la barre accessible et les quantités
-en MB décimaux (`1 MB = 1 000 000 octets`). Une taille absente ou nulle donne une
-barre indéterminée et uniquement la quantité déjà reçue. Aucun faux pourcentage
-n'est calculé dans ce cas.
+`UpdateDialog::new(key, &state, open, trigger).build(theme)` creates a controlled
+dialog with release notes, status and accessible progress. Download amounts use
+decimal MB (`1 MB = 1,000,000 bytes`). An absent or zero total shows an
+indeterminate bar and the received amount, without inventing a percentage.
 
-`dialog.action(event)` retourne une intention à traiter dans le modèle :
+Forward `EventType::Click` and `EventType::Key` to `dialog.action(event)` and
+handle the returned intent in your model:
 
-| Action | Traitement |
+| Action | Application handling |
 | --- | --- |
-| `Open` / `Close` | Modifier la visibilité du dialogue. |
-| `Check` | Lancer `updater.check` sur le worker. |
-| `Download` | Créer un token et lancer `updater.download` sur le worker. |
-| `Cancel` | Annuler le token de téléchargement. |
-| `Install` | Lancer `updater.install` après sauvegarde de l'état de l'application. |
+| `Open` / `Close` | Change dialog visibility. |
+| `Check` | Run `updater.check` on the worker. |
+| `Download` | Create a token and run `updater.download` on the worker. |
+| `Cancel` | Cancel the download token. |
+| `Install` | Save application state, then run `updater.install`. |
 
-Échap et le clic sur le fond ferment le dialogue. Son action primaire dépend
-de l'état : téléchargement, annulation, installation ou nouvelle vérification.
-La vérification et l'installation ne proposent aucune action primaire concurrente.
-Le dialogue ne contient aucun appel réseau ou système.
+Escape and backdrop clicks close the dialog. Its primary action follows the
+current state; checking and installing do not expose a concurrent primary
+action. The dialog itself makes no network or operating-system calls.
 
-Relayer les événements `EventType::Click` et `EventType::Key` vers `dialog.action`
-pour traiter aussi Échap. L'exemple de galerie montre le branchement complet.
-
-La galerie fournit une prévisualisation interactive des états, avec une progression
-simulée clairement annoncée, et n'installe rien sur la machine :
+The gallery demonstrates clearly labelled simulated progress and does not install
+anything on your machine:
 
 ```sh
 cargo run -p argui-widget-gallery --features updater
 ```
 
-Les tests du moteur utilisent un serveur HTTP local et un artefact signé connu,
-sans dépendre d'un hébergeur externe. Les tests d'installation remplacent des
-fichiers et bundles temporaires. Les installations Windows et l'exécution d'une
-application macOS mise à jour doivent aussi être validées sur ces OS avant une
-distribution publique ; les tests exécutés sur Linux ne les remplacent pas.
+Engine tests use a local HTTP server and a known signed artifact. Installer
+tests replace temporary files and bundles. Windows installation and execution
+of an updated macOS app still need validation on those operating systems.
+For releasing the Argui crates themselves, see [Releases](../contributing/releases.md).
