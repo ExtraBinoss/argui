@@ -1,4 +1,4 @@
-//! Headless retained-tree benchmark. See docs/optimizations.md for the protocol.
+//! Headless retained-tree benchmark. See docs/performance/optimizations.md for the protocol.
 use std::{hint::black_box, mem::size_of};
 use web_time::Instant;
 

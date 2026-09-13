@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 class ShadcnCatalogueTests(unittest.TestCase):
     def test_all_64_entries_link_to_exported_apis_and_forwarded_features(self):
-        document = ROOT / "docs/shadcn-lib.md"
+        document = ROOT / "docs/widgets/shadcn.md"
         rows = re.findall(
             r"^\| ([^|]+) \| \[([^]]+)\]\(([^)]+)\) \| `([^`]+)` \|",
             document.read_text(),

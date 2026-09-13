@@ -7,17 +7,17 @@ means compiling the same renderer to WebAssembly/WebGPU.
 The repository provides a retained UI tree, responsive layout, shaped text and
 editing, interaction, scrolling, animation, transforms, gradients, decoded
 images, scoped GPU effects, and one WGPU renderer for native and web. See the
-[visual primitive contracts](docs/visual_primitives.md), the
-[color contract](docs/color.md), and the
-[overlay geometry API](docs/overlays.md), or the
+[visual primitive contracts](docs/rendering/primitives.md), the
+[color contract](docs/rendering/primitives.md#color), and the
+[overlay geometry API](docs/widgets/overlays.md#overlay-geometry), or the
 [remaining roadmap](docs/roadmap.md).
 
 Performance work includes retained subtree reuse, virtualization, compact tree
 indices, dense layout storage, early dirty-propagation stops, and explicit
 layout boundaries for independently sized scroll content.
-See [the optimization measurements](docs/optimizations.md) for reproducible
+See [the optimization measurements](docs/performance/optimizations.md) for reproducible
 before/after CPU and memory comparisons, workloads, and their limits.
-The [quality gate](docs/code_quality.md) requires at least 85% coverage on each
+The [quality gate](docs/contributing/code-quality.md) requires at least 85% coverage on each
 metric, both across the workspace and within every crate.
 
 ```sh
@@ -49,25 +49,28 @@ The state showcase embeds a transparent PNG and a JPEG. `argui-image` is an
 optional decoding boundary; the renderer receives validated RGBA assets and
 does not depend on a file format or filesystem.
 
+Browse the [documentation index](docs/README.md) for API guides, platform
+integration, performance evidence and contributor instructions.
+
 ## Optional asynchronous tasks
 
 Enable `argui/tasks` for owned, cancellable asynchronous tasks independently
 of WebView support: Tokio on native and browser futures on Web.
-See [the task contract](docs/tasks.md) and **Examples → Async tasks** in the gallery.
+See [the task contract](docs/runtime/tasks.md) and **Examples → Async tasks** in the gallery.
 
 ## Actions and editing
 
 Scoped actions share commands across buttons, keyboard shortcuts, menus and
 palettes. Text editors retain bounded transactional undo/redo; Password fields
 mask graphemes and suppress clipboard export/history. Menu and command palette
-widgets are individually opt-in. See [the API guide](docs/actions-editing.md) and
+widgets are individually opt-in. See [the API guide](docs/ui/editing.md) and
 the **Actions** and **Editing & Password** gallery pages.
-Reusable data widgets are documented in [Lists and tables](docs/lists-tables.md);
-[the shadcn catalogue](docs/shadcn-lib.md) maps all 64 entries to public APIs,
+Reusable data widgets are documented in [Lists and tables](docs/widgets/lists-tables.md);
+[the shadcn catalogue](docs/widgets/shadcn.md) maps all 64 entries to public APIs,
 feature flags, examples, and their supported scope.
 
 Enable `argui/desktop-backdrop` for native desktop blur through selected UI
-regions, with configurable tint and fallback. See [Desktop backdrops](docs/desktop-backdrops.md)
+regions, with configurable tint and fallback. See [Desktop backdrops](docs/platform/desktop-backdrops.md)
 and the gallery's **Appearance** controls.
 
 ## Optional WebView
@@ -77,55 +80,16 @@ Wry backend on desktop and a sandboxed iframe backend on the web. Enable the
 `webview` feature on `argui` for its re-export.
 The runtime mounts native content from the retained layout. WebView-enabled
 Linux applications use the GTK/Tao Wayland host; ordinary applications retain
-Winit. See [the integration status and security model](docs/webview.md).
+Winit. See [the integration status and security model](docs/platform/webview.md).
 
 `./scripts/serve-widget-gallery.sh` enables WebView support automatically.
 Open **Examples → WebView → Email** at `/widgets/` to render sanitized email
 HTML in the browser. Webpage mode can embed only sites that permit iframes.
 The script also starts the separate-origin relay for the Webpage **isolated /
 compatible** toggle. Its origin allowlist and typed popup/download permissions
-are documented in [WebView configuration](docs/webview.md#explicit-webpage-permissions).
+are documented in [WebView configuration](docs/platform/webview.md#explicit-webpage-permissions).
 
-Its Wry backend needs GTK 3 and WebKitGTK 4.1 development packages on Linux.
-These WebView-specific
-packages are not required by the current Winit/WGPU renderer, including its
-Wayland backend, or by the WebAssembly gallery.
-
-Fedora:
-
-```sh
-sudo dnf install pkgconf-pkg-config gtk3-devel webkit2gtk4.1-devel libsoup3-devel javascriptcoregtk4.1-devel
-```
-
-Ubuntu / Debian:
-
-```sh
-sudo apt install pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev
-```
-
-The package manager installs the required transitive development dependencies.
-Check that Cargo's native build dependencies can discover them:
-
-```sh
-pkg-config --modversion gtk+-3.0 webkit2gtk-4.1 javascriptcoregtk-4.1 libsoup-3.0
-```
-
-No shell restart or `source` command is needed after a standard system-package
-installation. Runtime libraries alone are insufficient: the development
-packages provide the metadata used by `pkg-config`. Installing WebKitGTK 6.0
-for GTK 4 does not replace WebKitGTK 4.1 for this integration.
-
-With Wry, embedding under native Wayland requires a GTK container; a Winit
-window handle alone only supports the Linux X11 embedding path. Installing
-these packages prepares the build environment but does not itself add that
-host to Argui. See [Wry's platform requirements](https://docs.rs/wry/latest/wry/).
-
-Open **Examples → WebView** in the native gallery for the **Email** and
-**Webpage** tabs. The latter loads Google; the former reuses a restricted HTML
-session when switching messages. The default cache retains two native views:
-
-```sh
-GDK_BACKEND=wayland cargo run -p argui-widget-gallery --features webview
-```
-
-Native file selection and the optional widget: [File picker](docs/file-picker.md).
+Linux build prerequisites and host limitations are in
+[WebView setup](docs/platform/webview.md#linux-build-dependencies).
+Native file selection and its optional widget are documented in
+[File picker](docs/platform/file-picker.md).
