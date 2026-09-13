@@ -52,6 +52,22 @@
             "integration_id": 15368
           },
           {
+            "context": "Desktop compile (Windows)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Desktop compile (macOS)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Mobile cross-check",
+            "integration_id": 15368
+          },
+          {
+            "context": "Crates.io archives",
+            "integration_id": 15368
+          },
+          {
             "context": "Website",
             "integration_id": 15368
           }

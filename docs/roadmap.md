@@ -3,19 +3,18 @@
 Current features are documented in the [guides](README.md). This page tracks
 work that remains open; it is not a release schedule.
 
-## Coming next
-
-- **Hot reload:** shorten the edit-and-preview loop for Rust interfaces.
-- **Internationalization:** application-level locale management and translated copy.
-  Direction-aware layout and configurable widget labels already exist.
-
 ## Platform coverage
 
-- Extend native Windows and macOS interaction, installation and rendering checks.
+- [ ] Complete Android support: run the `argui-android` Widget Gallery shell on
+  emulator and device, add insets and platform services, then ship signed APK/AAB artifacts.
+- [ ] Complete iOS support: run the `argui-ios` Widget Gallery shell in simulator
+  and on device, add insets and platform services, then ship signed archives.
+- Extend native Windows and macOS interaction, installation and rendering tests
+  beyond their complete-workspace CI compilation.
 - Validate real screen readers and IMEs across desktop and web, including
   bidirectional text, modal focus and virtualized controls.
 - Add native Wayland popovers behind the existing surface preference API.
-- Expand CI across supported operating systems and feature combinations.
+- Expand device-level Android and iOS CI beyond the existing cross-compilation.
 
 ## Application APIs
 

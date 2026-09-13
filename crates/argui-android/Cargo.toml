@@ -1,0 +1,20 @@
+[package]
+name = "argui-android"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+description = "Android NativeActivity bootstrap for Argui applications"
+
+[target.'cfg(target_os = "android")'.dependencies]
+argui-platform.workspace = true
+argui-render.workspace = true
+argui-runtime.workspace = true
+argui-text.workspace = true
+winit = { workspace = true, features = ["android-native-activity"] }
+
+[lints]
+workspace = true

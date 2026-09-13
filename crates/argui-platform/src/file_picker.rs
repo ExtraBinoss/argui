@@ -3,7 +3,48 @@ use std::{future::Future, path::PathBuf, pin::Pin, sync::Arc};
 use winit::raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 
 mod native;
+#[cfg(any(
+    target_arch = "wasm32",
+    target_os = "linux",
+    target_os = "windows",
+    target_os = "macos"
+))]
 pub use rfd::FileHandle as PickedFile;
+
+#[cfg(all(
+    not(target_arch = "wasm32"),
+    not(any(target_os = "linux", target_os = "windows", target_os = "macos"))
+))]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PickedFile(PathBuf);
+
+#[cfg(all(
+    not(target_arch = "wasm32"),
+    not(any(target_os = "linux", target_os = "windows", target_os = "macos"))
+))]
+impl PickedFile {
+    #[must_use]
+    pub fn path(&self) -> &std::path::Path {
+        &self.0
+    }
+
+    #[must_use]
+    pub fn file_name(&self) -> String {
+        self.0
+            .file_name()
+            .map_or_else(String::new, |name| name.to_string_lossy().into_owned())
+    }
+}
+
+#[cfg(all(
+    not(target_arch = "wasm32"),
+    not(any(target_os = "linux", target_os = "windows", target_os = "macos"))
+))]
+impl From<PathBuf> for PickedFile {
+    fn from(path: PathBuf) -> Self {
+        Self(path)
+    }
+}
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum FilePickerMode {
@@ -18,7 +59,15 @@ impl FilePickerMode {
     /// Browsers support opening files; desktop folders and save destinations require native APIs.
     #[must_use]
     pub const fn supported(self) -> bool {
-        !cfg!(target_arch = "wasm32") || matches!(self, Self::File | Self::Files)
+        if cfg!(target_arch = "wasm32") {
+            matches!(self, Self::File | Self::Files)
+        } else {
+            cfg!(any(
+                target_os = "linux",
+                target_os = "windows",
+                target_os = "macos"
+            ))
+        }
     }
 }
 

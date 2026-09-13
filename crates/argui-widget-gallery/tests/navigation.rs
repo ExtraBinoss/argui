@@ -60,6 +60,8 @@ fn navigation_rebuilds_widget_and_example_pages_from_public_events() {
         ("nav::tabs", "Tabs"),
         ("nav::select", "Select"),
         ("nav::dialog", "Dialog"),
+        ("nav::hot-reload", "State-preserving Rust patches"),
+        ("nav::i18n", "Live Fluent catalogs"),
         ("nav::layout", "Web layout"),
         ("nav::motion", "Motion & loading"),
         ("nav::liquid-glass", "Liquid glass"),

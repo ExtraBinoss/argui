@@ -31,7 +31,10 @@ impl WindowFactory for GtkLoop<'_> {
 
 pub(crate) fn launch(mut application: MultiApplication) -> Result<(), RuntimeError> {
     let mut event_loop = EventLoopBuilder::<UserEvent>::with_user_event().build();
-    application.set_event_proxy(event_loop.create_proxy());
+    let proxy = event_loop.create_proxy();
+    #[cfg(all(feature = "hot-reload", debug_assertions))]
+    crate::hot_reload::connect(proxy.clone().into());
+    application.set_event_proxy(proxy);
     event_loop.run_return(|event, target, control| {
         *control = ControlFlow::Wait;
         let context = GtkLoop {
@@ -97,6 +100,10 @@ pub(crate) fn launch(mut application: MultiApplication) -> Result<(), RuntimeErr
             }
             Event::UserEvent(UserEvent::ModelsReady) => {
                 application.models_ready(&context);
+            }
+            #[cfg(all(feature = "hot-reload", debug_assertions))]
+            Event::UserEvent(UserEvent::HotReload { generation }) => {
+                application.hot_reload(generation);
             }
             Event::UserEvent(UserEvent::NativeInput { window }) => {
                 if let Some(entry) = application.windows.get_mut(&window) {

@@ -11,13 +11,13 @@ impl fmt::Display for ClipboardError {
 
 impl Error for ClipboardError {}
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
 #[derive(Default)]
 pub struct Clipboard {
     inner: Option<arboard::Clipboard>,
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
 #[cfg_attr(coverage_nightly, coverage(off))]
 impl Clipboard {
     #[must_use]
@@ -41,9 +41,39 @@ impl Clipboard {
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
 fn error(error: arboard::Error) -> ClipboardError {
     ClipboardError(error.to_string())
+}
+
+#[cfg(all(
+    not(target_arch = "wasm32"),
+    not(any(target_os = "linux", target_os = "windows", target_os = "macos"))
+))]
+#[derive(Default)]
+pub struct Clipboard;
+
+#[cfg(all(
+    not(target_arch = "wasm32"),
+    not(any(target_os = "linux", target_os = "windows", target_os = "macos"))
+))]
+impl Clipboard {
+    #[must_use]
+    pub const fn new() -> Self {
+        Self
+    }
+
+    pub fn read_text(&mut self) -> Result<String, ClipboardError> {
+        Err(ClipboardError(
+            "clipboard integration is unavailable on this target".into(),
+        ))
+    }
+
+    pub fn write_text(&mut self, _text: String) -> Result<(), ClipboardError> {
+        Err(ClipboardError(
+            "clipboard integration is unavailable on this target".into(),
+        ))
+    }
 }
 
 #[cfg(target_arch = "wasm32")]

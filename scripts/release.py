@@ -37,6 +37,36 @@ def run(*args, capture=False):
     return result.stdout.strip() if capture else None
 
 
+def publication_order(packages):
+    """Return publishable packages after their internal dependencies."""
+    by_name = {package['name']: package for package in packages}
+    dependencies = {}
+    for name, package in by_name.items():
+        dependencies[name] = {
+            dependency['name']
+            for dependency in package['dependencies']
+            if dependency['kind'] != 'dev'
+            and dependency.get('path') is not None
+            and dependency['name'] in by_name
+        }
+    if any('argui' in required for name, required in dependencies.items() if name != 'argui'):
+        raise ValueError('argui must remain the final facade in the publication graph')
+
+    remaining = set(by_name)
+    ordered = []
+    while remaining:
+        ready = [name for name in remaining if not dependencies[name] & remaining]
+        if not ready:
+            cycle = ', '.join(sorted(remaining))
+            raise ValueError(f'Internal dependency cycle: {cycle}')
+        # The root facade is a leaf. Holding it until every internal crate has
+        # been packaged makes the release contract explicit and deterministic.
+        name = min(ready, key=lambda candidate: (candidate == 'argui', candidate))
+        ordered.append(name)
+        remaining.remove(name)
+    return ordered
+
+
 def workspace():
     manifest = tomllib.loads((ROOT / 'Cargo.toml').read_text())
     current = manifest['workspace']['package']['version']
@@ -58,7 +88,16 @@ def workspace():
                 raise ValueError(f'{name}: unpublished dependency {dep["name"]}')
             if dep['req'] != f'^{current}':
                 raise ValueError(f'{name}: {dep["name"]} must require version {current}')
-    return current, sorted(publishable)
+    return current, publication_order(publishable.values())
+
+
+def package_archives():
+    current, names = workspace()
+    args = ['cargo', 'package', '--locked', '--all-features', '--allow-dirty']
+    for name in names:
+        args.extend(['--package', name])
+    run(*args)
+    print(f'Verified {len(names)} crates.io archives at version {current}')
 
 
 def registry_versions(name):
@@ -101,8 +140,8 @@ def release_plan(base, fetch=registry_versions):
     sha = run('git', 'rev-parse', 'HEAD', capture=True)
     result = {'release': False, 'version': current, 'sha': sha, 'tag': f'v{current}',
               'packages': [], 'all_packages': names}
-    if '[RELEASE]' not in run('git', 'show', '-s', '--format=%B', 'HEAD', capture=True):
-        return result | {'reason': 'The latest commit has no [RELEASE] marker'}
+    if '[PUBLISH]' not in run('git', 'show', '-s', '--format=%B', 'HEAD', capture=True):
+        return result | {'reason': 'The latest commit has no [PUBLISH] marker'}
     if not re.fullmatch(r'[0-9a-f]{40}', base) or base == '0' * 40:
         raise ValueError('A real pre-push commit SHA is required to compare versions')
     run('git', 'merge-base', '--is-ancestor', base, sha)
@@ -145,7 +184,9 @@ def publish(plan):
         for name in plan['packages']:
             args.extend(['--package', name])
         run(*args, '--dry-run')
-        run(*args)
+        for name in plan['packages']:
+            run('cargo', 'publish', '--registry', 'crates-io', '--locked',
+                '--all-features', '--package', name)
     # GitHub must never announce a release whose crates are not available yet.
     for attempt in range(12):
         pending = pending_packages(plan['all_packages'], plan['version'])
@@ -180,6 +221,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest='command', required=True)
     commands.add_parser('check')
+    commands.add_parser('package')
     commands.add_parser('bump').add_argument('version')
     for name in ('plan', 'publish'):
         command = commands.add_parser(name)
@@ -188,6 +230,9 @@ def main():
     if args.command == 'check':
         current, names = workspace()
         print(f'Validated {len(names)} publishable crates at version {current}')
+        print('Publication order: ' + ' -> '.join(names))
+    elif args.command == 'package':
+        package_archives()
     elif args.command == 'bump':
         bump(args.version)
     else:

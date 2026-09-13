@@ -9,9 +9,9 @@ Run commands from the repository root unless a guide says otherwise.
 
 | Topic | Guides |
 | --- | --- |
-| State and runtime | [Models, ownership and services](runtime/models.md) · [Asynchronous tasks](runtime/tasks.md) |
+| State and runtime | [Models, ownership and services](runtime/models.md) · [Asynchronous tasks](runtime/tasks.md) · [Hot reload](hot-reload.md) |
 | Layout and interaction | [Styling and themes](ui/styling.md) · [Focus, input and accessibility](ui/interaction.md) · [Scroll and virtualization](ui/scroll.md) |
-| UI composition | [Animation](ui/animation.md) · [Actions and editing](ui/editing.md) · [Custom elements](ui/custom-elements.md) |
+| UI composition | [Localization](i18n.md) · [Animation](ui/animation.md) · [Actions and editing](ui/editing.md) · [Custom elements](ui/custom-elements.md) |
 | Widgets | [Component catalogue](widgets/shadcn.md) · [Lists and tables](widgets/lists-tables.md) · [Overlays and placement](widgets/overlays.md) |
 | Rendering | [Primitives, colors, images and SVG](rendering/primitives.md) · [GPU effects](rendering/effects.md) |
 
@@ -20,6 +20,7 @@ Run commands from the repository root unless a guide says otherwise.
 | Topic | Guide |
 | --- | --- |
 | Application identity, windows and tray | [Application setup](platform/application.md) |
+| Native Android and iOS | [Mobile integration](native-mobile.md) |
 | Native and browser web content | [WebView](platform/webview.md) |
 | System file selection | [File picker](platform/file-picker.md) |
 | Blur behind window regions | [Desktop backdrops](platform/desktop-backdrops.md) |
@@ -28,6 +29,7 @@ Run commands from the repository root unless a guide says otherwise.
 
 ## Understand and contribute
 
+- [Repository structure](repo/structure.md): every crate, platform boundary, dependency and publication order.
 - [Architecture](architecture.md): crate boundaries and how the retained runtime works.
 - [Performance](performance/optimizations.md): measured costs, raw data and reproducible workloads.
 - [DevTools](contributing/devtools.md): inspection, live editing and profiling.

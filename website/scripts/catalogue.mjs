@@ -14,6 +14,8 @@ const sourceOverrides = {
   'liquid-glass': 'pages/liquid_glass',
   'scroll-shadow': 'pages/scroll_effects',
   typography: 'typography',
+  'hot-reload': 'pages/hot_reload',
+  i18n: 'pages/i18n',
   webview: 'pages/webview',
   'async-tasks': 'pages/async_tasks',
   actions: 'pages/actions',

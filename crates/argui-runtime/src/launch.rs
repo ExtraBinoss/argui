@@ -4,6 +4,9 @@ use argui_text::{TextEngine, TextScene};
 use argui_ui::UiTree;
 use winit::event_loop::{ControlFlow, EventLoop};
 
+#[cfg(target_os = "android")]
+use winit::platform::android::{EventLoopBuilderExtAndroid, activity::AndroidApp};
+
 use crate::{
     AppModel, Render, RuntimeError, RuntimeEvent, app::Application, application::SingleWindowModel,
     event::UserEvent, multi::MultiApplication,
@@ -34,6 +37,42 @@ pub fn run_application_with_text_engine(
         app,
         on_event,
     )?)
+}
+
+/// Run an application from Android's `android_main` entry point.
+#[cfg(target_os = "android")]
+#[cfg_attr(coverage_nightly, coverage(off))]
+pub fn run_android_application(
+    android_app: AndroidApp,
+    config: ApplicationConfig,
+    renderer: RendererConfig,
+    app: impl AppModel,
+    on_event: impl FnMut(RuntimeEvent) + 'static,
+) -> Result<(), RuntimeError> {
+    run_android_application_with_text_engine(
+        android_app,
+        config,
+        renderer,
+        TextEngine::new(),
+        app,
+        on_event,
+    )
+}
+
+/// Run an application with embedded fonts from Android's `android_main` entry point.
+#[cfg(target_os = "android")]
+#[cfg_attr(coverage_nightly, coverage(off))]
+pub fn run_android_application_with_text_engine(
+    android_app: AndroidApp,
+    config: ApplicationConfig,
+    renderer: RendererConfig,
+    text_engine: TextEngine,
+    app: impl AppModel,
+    on_event: impl FnMut(RuntimeEvent) + 'static,
+) -> Result<(), RuntimeError> {
+    let application =
+        MultiApplication::new_with_text_engine(config, renderer, Some(text_engine), app, on_event)?;
+    launch_android(android_app, application)
 }
 
 #[cfg_attr(coverage_nightly, coverage(off))]
@@ -143,7 +182,10 @@ fn launch(mut application: Application) -> Result<(), RuntimeError> {
     let event_loop = EventLoop::<UserEvent>::with_user_event()
         .build()
         .map_err(PlatformError::from)?;
-    application.set_event_proxy(event_loop.create_proxy());
+    let proxy = event_loop.create_proxy();
+    #[cfg(all(feature = "hot-reload", debug_assertions))]
+    crate::hot_reload::connect(proxy.clone().into());
+    application.set_event_proxy(proxy);
     event_loop.set_control_flow(ControlFlow::Wait);
     event_loop
         .run_app(&mut application)
@@ -152,7 +194,7 @@ fn launch(mut application: Application) -> Result<(), RuntimeError> {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-fn launch_multi(mut application: MultiApplication) -> Result<(), RuntimeError> {
+fn launch_multi(application: MultiApplication) -> Result<(), RuntimeError> {
     #[cfg(all(feature = "webview", target_os = "linux"))]
     if std::env::var_os("WAYLAND_DISPLAY").is_some()
         && std::env::var("GDK_BACKEND").map_or(true, |backend| backend != "x11")
@@ -162,7 +204,29 @@ fn launch_multi(mut application: MultiApplication) -> Result<(), RuntimeError> {
     let event_loop = EventLoop::<UserEvent>::with_user_event()
         .build()
         .map_err(PlatformError::from)?;
-    application.set_event_proxy(event_loop.create_proxy());
+    run_event_loop(event_loop, application)
+}
+
+#[cfg(target_os = "android")]
+fn launch_android(
+    android_app: AndroidApp,
+    application: MultiApplication,
+) -> Result<(), RuntimeError> {
+    let mut builder = EventLoop::<UserEvent>::with_user_event();
+    builder.with_android_app(android_app);
+    let event_loop = builder.build().map_err(PlatformError::from)?;
+    run_event_loop(event_loop, application)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn run_event_loop(
+    event_loop: EventLoop<UserEvent>,
+    mut application: MultiApplication,
+) -> Result<(), RuntimeError> {
+    let proxy = event_loop.create_proxy();
+    #[cfg(all(feature = "hot-reload", debug_assertions))]
+    crate::hot_reload::connect(proxy.clone().into());
+    application.set_event_proxy(proxy);
     event_loop.set_control_flow(ControlFlow::Wait);
     event_loop
         .run_app(&mut application)

@@ -13,6 +13,7 @@ readme = "README.md"
 
 [workspace.dependencies]
 argui = { path = "crates/argui", version = "0.1.0" }
+argui-android = { path = "crates/argui-android", version = "0.1.0" }
 argui-accessibility = { path = "crates/argui-accessibility", version = "0.1.0" }
 argui-animation = { path = "crates/argui-animation", version = "0.1.0" }
 argui-core = { path = "crates/argui-core", version = "0.1.0" }
@@ -20,6 +21,8 @@ argui-devtools = { path = "crates/argui-devtools", version = "0.1.0" }
 argui-effects = { path = "crates/argui-effects", version = "0.1.0" }
 argui-layout = { path = "crates/argui-layout", version = "0.1.0" }
 argui-image = { path = "crates/argui-image", version = "0.1.0" }
+argui-i18n = { path = "crates/argui-i18n", version = "0.1.0" }
+argui-ios = { path = "crates/argui-ios", version = "0.1.0" }
 argui-inspect = { path = "crates/argui-inspect", version = "0.1.0" }
 argui-paint = { path = "crates/argui-paint", version = "0.1.0" }
 argui-platform = { path = "crates/argui-platform", version = "0.1.0" }
@@ -38,7 +41,10 @@ bytemuck = { version = "=1.25.2", features = ["derive"] }
 arboard = { version = "=3.6.1", default-features = false, features = ["wayland-data-control"] }
 base64 = "=0.22.1"
 cosmic-text = { version = "=0.19.0", default-features = false }
-futures-util = "=0.3.31"
+futures-util = "=0.3.34"
+fluent-bundle = "=0.16.0"
+fluent-langneg = "=0.13.1"
+dioxus-devtools = "=0.7.10"
 naga = { version = "=30.0.1", features = ["wgsl-in"] }
 pollster = "=1.0.1"
 taffy = { version = "=0.14.0", default-features = false, features = ["std", "taffy_tree", "flexbox", "grid", "block_layout", "content_size"] }
@@ -61,6 +67,7 @@ serde = { version = "=1.0.229", features = ["derive"] }
 serde_json = "=1.0.151"
 sysinfo = { version = "=0.37.2", default-features = false }
 unicode-segmentation = "=1.13.3"
+unic-langid = { version = "=0.9.6", features = ["macros"] }
 image = { version = "=0.25.10", default-features = false, features = ["png", "jpeg"] }
 ksni = { version = "=0.3.6", default-features = false, features = ["async-io", "blocking"] }
 tray-icon = { version = "=0.24.2", default-features = false }

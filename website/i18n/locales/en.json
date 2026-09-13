@@ -43,8 +43,6 @@
   "features": {
     "title": "Built for the whole application.",
     "available": "Available",
-    "soon": "Coming soon",
-    "roadmap": "Next in Argui.",
     "performance": {
       "title": "Work only when it changes.",
       "body": "Retained subtrees, explicit dirty tracking and virtualized lists keep repeated work out of the frame. Idle views do not request continuous redraws."
@@ -70,12 +68,12 @@
       "body": "A WGPU renderer for desktop and WebAssembly. Native window integration on Linux, macOS and Windows; WebGPU in the browser."
     },
     "hotReload": {
-      "title": "Hot reload",
-      "body": "A shorter loop between changing your Rust interface and seeing the result. Planned for the library."
+      "title": "Keep state while Rust changes.",
+      "body": "Optional Subsecond hot patching refreshes render functions, handlers and application callbacks in native debug builds while retaining live model state."
     },
     "i18n": {
       "title": "Internationalization",
-      "body": "Application-wide localization support is on the roadmap. The library's full i18n integration is not shipped yet."
+      "body": "Optional Fluent catalogs provide locale negotiation, message fallback, variables, plurals and writing direction for native and WebAssembly applications."
     },
     "source": "Explore the implementation",
     "performanceLink": "Performance measurements",

@@ -69,7 +69,7 @@ prerendered. Nothing is deployed by these commands.
   provide locale-specific catalogue copy when translating those pages.
 - The memory number is the measured Linux release gallery's private memory,
   not process RSS or a guarantee for every application. Its source is linked
-  next to the number. Library hot reload and full i18n remain marked coming soon.
+  next to the number.
 
 ## Verify
 

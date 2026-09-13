@@ -8,6 +8,7 @@ publish = false
 
 [features]
 default = []
+hot-reload = ["argui/hot-reload"]
 updater = ["argui/widget-updater", "dep:argui-updater"]
 all-smi = ["argui-devtools/all-smi"]
 desktop-backdrop = ["argui/desktop-backdrop"]
@@ -15,11 +16,11 @@ native-popups = ["argui/native-popups"]
 webview = ["argui/webview"]
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = ["cdylib", "rlib", "staticlib"]
 
 [dependencies]
 web-time.workspace = true
-argui = { workspace = true, features = ["widgets-all", "tasks"] }
+argui = { workspace = true, features = ["i18n", "widgets-all", "tasks"] }
 argui-image.workspace = true
 argui-updater = { workspace = true, optional = true }
 argui-effects = { workspace = true, features = ["artistic", "blur", "shadow", "scroll", "liquid-glass"] }
@@ -27,6 +28,12 @@ argui-devtools.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen.workspace = true
+
+[target.'cfg(target_os = "android")'.dependencies]
+argui-android.workspace = true
+
+[target.'cfg(target_os = "ios")'.dependencies]
+argui-ios.workspace = true
 
 [lints]
 workspace = true

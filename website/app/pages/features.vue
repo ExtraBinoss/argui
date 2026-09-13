@@ -22,6 +22,8 @@ const features = [
   { key: 'popovers', icon: PanelTop, path: 'docs/widgets/overlays.md' },
   { key: 'updater', icon: RefreshCw, path: 'docs/platform/updater.md' },
   { key: 'platforms', icon: Globe, path: 'docs/architecture.md' },
+  { key: 'hotReload', icon: RotateCw, path: 'docs/hot-reload.md' },
+  { key: 'i18n', icon: Languages, path: 'docs/i18n.md' },
 ]
 </script>
 <template>
@@ -46,23 +48,6 @@ const features = [
         {{ t('features.performanceLink') }}
       </ActionLink>
     </div>
-    <section class="roadmap-section">
-      <h2>{{ t('features.roadmap') }}</h2>
-      <div class="roadmap-grid">
-        <article
-          v-for="item in [
-            { key: 'hotReload', icon: RotateCw },
-            { key: 'i18n', icon: Languages },
-          ]"
-          :key="item.key"
-        >
-          <component :is="item.icon" :size="24" :stroke-width="1.5" />
-          <span class="soon-badge">{{ t('features.soon') }}</span>
-          <h3>{{ t(`features.${item.key}.title`) }}</h3>
-          <p>{{ t(`features.${item.key}.body`) }}</p>
-        </article>
-      </div>
-    </section>
     <p class="experimental-note">{{ t('features.experimental') }}</p>
     <ActionLink to="/get-started">{{ t('nav.start') }}</ActionLink>
   </main>

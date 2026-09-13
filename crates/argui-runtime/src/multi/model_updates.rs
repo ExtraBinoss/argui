@@ -2,6 +2,13 @@ use super::MultiApplication;
 use crate::host::WindowFactory;
 
 impl MultiApplication {
+    #[cfg(all(feature = "hot-reload", debug_assertions, not(target_arch = "wasm32")))]
+    pub(super) fn hot_reload(&mut self, generation: u64) {
+        for entry in self.windows.values_mut() {
+            crate::hot_reload::notify(&mut entry.runtime, generation);
+        }
+    }
+
     pub(super) fn collect_app_commands(&mut self, updates: &mut Vec<crate::AppUpdate>) {
         for entry in self.windows.values_mut() {
             let commands = std::mem::take(&mut entry.runtime.pending_app_commands);

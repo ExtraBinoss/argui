@@ -44,7 +44,16 @@ impl<T: 'static> Entity<T> {
         if self.0.presentation.resources.is_closed() {
             return super::ContextEffects::default();
         }
-        self.update_view(|value, cx| value.tasks_ready(cx));
+        self.update_view(|value, cx| {
+            #[cfg(all(feature = "hot-reload", debug_assertions, not(target_arch = "wasm32")))]
+            crate::hot_reload::tasks_ready(value, cx);
+            #[cfg(not(all(
+                feature = "hot-reload",
+                debug_assertions,
+                not(target_arch = "wasm32")
+            )))]
+            value.tasks_ready(cx);
+        });
         let mut effects = self.take_effects();
         let children: Vec<_> = self
             .0

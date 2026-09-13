@@ -67,6 +67,8 @@ pub enum Page {
     Menu,
     ContextMenu,
     Menubar,
+    HotReload,
+    I18n,
     Layout,
     Motion,
     LiquidGlass,
@@ -82,7 +84,7 @@ pub enum Page {
 }
 
 impl Page {
-    pub const ALL: [Self; 75 + cfg!(feature = "updater") as usize] = [
+    pub const ALL: [Self; 77 + cfg!(feature = "updater") as usize] = [
         Self::Accordion,
         Self::Alert,
         Self::AlertDialog,
@@ -154,6 +156,8 @@ impl Page {
         Self::AsyncTasks,
         Self::CustomTimeline,
         Self::Editing,
+        Self::HotReload,
+        Self::I18n,
         Self::Motion,
         Self::Typography,
         Self::Layout,
@@ -233,6 +237,8 @@ impl Page {
             | Self::Table => "Widgets",
             Self::LiquidGlass | Self::ScrollShadow => "Effects",
             Self::Layout
+            | Self::HotReload
+            | Self::I18n
             | Self::Motion
             | Self::Typography
             | Self::WebView
@@ -311,6 +317,8 @@ impl Page {
             Self::Menu => "Menu",
             Self::ContextMenu => "Context menu",
             Self::Menubar => "Menubar",
+            Self::HotReload => "Hot reload",
+            Self::I18n => "Internationalization",
             Self::Layout => "Web layout",
             Self::Motion => "Motion & loading",
             Self::LiquidGlass => "Liquid glass",
@@ -394,6 +402,8 @@ impl Page {
             Self::Menu => "menu",
             Self::ContextMenu => "context-menu",
             Self::Menubar => "menubar",
+            Self::HotReload => "hot-reload",
+            Self::I18n => "i18n",
             Self::Layout => "layout",
             Self::Motion => "motion",
             Self::LiquidGlass => "liquid-glass",
@@ -507,6 +517,8 @@ impl Page {
             Self::Tooltip => {
                 "Helpful descriptions on hover or keyboard focus, with customizable surfaces."
             }
+            Self::HotReload => "Patch Rust UI code while preserving live application state.",
+            Self::I18n => "Switch Fluent catalogs, plurals, fallback copy and writing direction.",
             Self::Layout => "CSS-shaped Block, Flex, Grid, box model and text alignment.",
             Self::Motion => "Frame-paced feedback and interaction transitions.",
             Self::LiquidGlass => "Scroll colorful palettes behind a floating glass navigation bar.",

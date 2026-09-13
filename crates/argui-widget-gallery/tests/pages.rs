@@ -8,6 +8,10 @@ mod catalogue;
 mod color_picker;
 #[path = "pages/data.rs"]
 mod data;
+#[path = "pages/hot_reload.rs"]
+mod hot_reload;
+#[path = "pages/i18n.rs"]
+mod i18n;
 #[path = "pages/inputs.rs"]
 mod inputs;
 #[path = "pages/liquid_glass.rs"]
@@ -79,6 +83,8 @@ fn all_pages_keep_finite_layout_when_narrow_dark_or_reduced_motion() {
         ("dialog", "Dialog"),
         ("popover", "Popover"),
         ("tooltip", "Tooltip"),
+        ("hot-reload", "Hot reload"),
+        ("i18n", "Internationalization"),
         ("layout", "Web layout"),
         ("motion", "Motion & loading"),
         ("liquid-glass", "Liquid glass"),

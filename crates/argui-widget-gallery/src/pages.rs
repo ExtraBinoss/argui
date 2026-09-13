@@ -38,6 +38,8 @@ pub(crate) mod dates;
 pub(crate) mod editing;
 mod empty;
 pub(crate) mod file_picker;
+pub(crate) mod hot_reload;
+pub(crate) mod i18n;
 mod inputs;
 mod kbd;
 mod label;
@@ -166,6 +168,8 @@ pub(crate) fn render(
         Page::Dialog => dialogs(gallery, theme),
         Page::Popover => cx.entity(&gallery.popover),
         Page::Tooltip => cx.entity(&gallery.tooltip),
+        Page::HotReload => cx.entity(&gallery.hot_reload),
+        Page::I18n => cx.entity(&gallery.i18n),
         Page::Layout => layout_system(theme),
         Page::Motion => motion(theme, cx.entity(&gallery.spinner)),
         Page::LiquidGlass => cx.entity(&gallery.glass),

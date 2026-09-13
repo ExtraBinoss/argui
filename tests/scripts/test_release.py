@@ -74,8 +74,8 @@ class ReleasePolicyTests(unittest.TestCase):
     def test_marker_and_version_increase_are_both_required(self):
         for version, message, expected in [
             ('0.1.1', 'Normal change', False),
-            ('0.1.0', '[RELEASE] unchanged', False),
-            ('0.1.1', '[RELEASE] Argui 0.1.1', True),
+            ('0.1.0', '[PUBLISH] unchanged', False),
+            ('0.1.1', '[PUBLISH] Argui 0.1.1', True),
         ]:
             with self.subTest(version=version, message=message), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
@@ -90,7 +90,7 @@ class ReleasePolicyTests(unittest.TestCase):
         for version, tagged in [('0.0.9', False), ('0.1.1', True)]:
             with self.subTest(version=version), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
-                base, git = self.make_history(root, version, '[RELEASE] version')
+                base, git = self.make_history(root, version, '[PUBLISH] version')
                 if tagged:
                     git('tag', f'v{version}', base)
                 with patch.object(release, 'ROOT', root), patch.object(release, 'workspace', return_value=(version, ['argui'])):
@@ -100,7 +100,7 @@ class ReleasePolicyTests(unittest.TestCase):
     def test_invalid_push_base_cannot_be_treated_as_first_release(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            self.make_history(root, '0.1.1', '[RELEASE] version')
+            self.make_history(root, '0.1.1', '[PUBLISH] version')
             with patch.object(release, 'ROOT', root), patch.object(release, 'workspace', return_value=('0.1.1', ['argui'])):
                 for base in ['0' * 40, 'HEAD~1', '--help']:
                     with self.subTest(base=base), self.assertRaises(ValueError):
@@ -118,6 +118,51 @@ class ReleasePolicyTests(unittest.TestCase):
                 with patch.object(release, 'ROOT', root), patch.object(release, 'run', return_value=json.dumps(metadata)):
                     with self.assertRaises(ValueError):
                         release.workspace()
+
+    def test_publication_order_follows_dependencies_and_keeps_facade_last(self):
+        def package(name, *dependencies):
+            return {
+                'name': name,
+                'dependencies': [
+                    {'name': dependency, 'path': f'../{dependency}', 'kind': None}
+                    for dependency in dependencies
+                ],
+            }
+
+        packages = [
+            package('argui', 'argui-render', 'argui-widgets'),
+            package('argui-widgets', 'argui-core'),
+            package('argui-image', 'argui-core'),
+            package('argui-render', 'argui-core'),
+            package('argui-core'),
+        ]
+        order = release.publication_order(packages)
+        self.assertLess(order.index('argui-core'), order.index('argui-render'))
+        self.assertLess(order.index('argui-core'), order.index('argui-widgets'))
+        self.assertEqual(order[-1], 'argui')
+
+    def test_publication_order_rejects_cycles_and_facade_dependents(self):
+        dependency = lambda name: {'name': name, 'path': f'../{name}', 'kind': None}
+        with self.assertRaises(ValueError):
+            release.publication_order([
+                {'name': 'argui-a', 'dependencies': [dependency('argui-b')]},
+                {'name': 'argui-b', 'dependencies': [dependency('argui-a')]},
+            ])
+        with self.assertRaises(ValueError):
+            release.publication_order([
+                {'name': 'argui', 'dependencies': []},
+                {'name': 'argui-extension', 'dependencies': [dependency('argui')]},
+            ])
+
+    def test_package_verifies_every_archive_in_publication_order(self):
+        names = ['argui-core', 'argui-render', 'argui']
+        with patch.object(release, 'workspace', return_value=('0.1.0', names)), \
+                patch.object(release, 'run') as run:
+            release.package_archives()
+        self.assertEqual(run.call_args.args, (
+            'cargo', 'package', '--locked', '--all-features', '--allow-dirty',
+            '--package', 'argui-core', '--package', 'argui-render', '--package', 'argui',
+        ))
 
     def test_unchanged_version_never_runs_a_publisher(self):
         with patch.object(release, 'run') as run:
@@ -154,6 +199,22 @@ class ReleasePolicyTests(unittest.TestCase):
         self.assertEqual(calls[2][0:4], ('gh', 'release', 'create', plan['tag']))
         self.assertIn(plan['sha'], calls[2])
         self.assertIn('--prerelease', calls[2])
+
+    def test_cargo_publishes_one_crate_at_a_time_in_planned_order(self):
+        plan = {'release': True, 'packages': ['argui-core', 'argui-render', 'argui'],
+                'all_packages': ['argui-core', 'argui-render', 'argui'],
+                'version': '0.1.1', 'tag': 'v0.1.1', 'sha': 'a' * 40}
+        with patch.dict(release.os.environ, {'CARGO_REGISTRY_TOKEN': 'test-only'}), \
+                patch.object(release, 'run') as run, \
+                patch.object(release, 'pending_packages', return_value=[]), \
+                patch.object(release.subprocess, 'run', return_value=Mock(returncode=0)):
+            release.publish(plan)
+        calls = [call.args for call in run.call_args_list]
+        self.assertIn('--dry-run', calls[0])
+        self.assertEqual(
+            [call[call.index('--package') + 1] for call in calls[1:]],
+            plan['packages'],
+        )
 
     def test_completed_release_does_not_upload_or_create_a_duplicate(self):
         plan = {'release': True, 'packages': [], 'all_packages': ['argui'],

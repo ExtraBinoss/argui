@@ -1,5 +1,8 @@
 # Architecture
 
+For a complete workspace inventory, direct dependency table and crates.io
+order, see [workspace crates and dependencies](repo/structure.md).
+
 Argui is retained-mode with selective immediate GPU recording: the UI tree and
 widget state persist between frames. Paint passes reuse cached subtree fragments
 and assemble an ordered display list; some assembly work still spans the tree.
@@ -36,6 +39,8 @@ collaboration. `argui-core` contains dependency-light shared primitives, and
   the ordered display list shared by native and web.
 - `argui-text`: shaping, bidi, fallback, line breaking, cursor geometry, and
   glyph preparation through `cosmic-text`.
+- `argui-i18n`: renderer-independent Fluent catalogs, locale negotiation,
+  message fallback, formatting, and writing-direction metadata.
 - `argui-render`: WGPU resources, batching, atlases, clips, layers, filters, and
   surface presentation.
 - `argui-runtime`: the composition root connecting the window, retained UI,
@@ -119,6 +124,13 @@ invalidate dependent presentations and their ancestor composition paths.
 `UiTree` uses pointer equality to skip shared descendants, and keyed
 reconciliation preserves stable identities in linear sibling work. See the
 [application state model](runtime/models.md).
+
+The optional native `hot-reload` feature resolves each `Render` hook and
+`AppModel` callback through Subsecond in debug builds. After a patch, the
+runtime advances a generation, invalidates each window and rejects render-cache
+entries from older generations while retaining the model instances. The bridge
+is compiled out of release and WebAssembly code. See the
+[hot-reload guide](hot-reload.md).
 
 `DevtoolsHost<A>` decorates the retained application boundary without changing
 `A`. It gives the application the remaining docked viewport, delegates assets, shaders,

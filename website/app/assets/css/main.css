@@ -771,43 +771,6 @@ code {
 .feature-evidence .action-link {
   font-size: 12px;
 }
-.roadmap-section {
-  padding-top: 72px;
-}
-.roadmap-section h2 {
-  margin-bottom: 30px;
-}
-.roadmap-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
-}
-.roadmap-grid article {
-  position: relative;
-  border: 1px dashed var(--border);
-  border-radius: 6px;
-  padding: 32px;
-}
-.soon-badge {
-  position: absolute;
-  top: 29px;
-  right: 28px;
-  border: 1px solid var(--border);
-  color: var(--muted);
-  padding: 5px 8px;
-  border-radius: 4px;
-  font-size: 11px;
-}
-.roadmap-grid h3 {
-  font-size: 25px;
-  letter-spacing: -0.7px;
-  margin: 27px 0 12px;
-}
-.roadmap-grid p {
-  color: var(--muted);
-  font-size: 14px;
-  max-width: 430px;
-}
 .experimental-note {
   color: var(--muted);
   font-size: 12px;
@@ -1061,9 +1024,6 @@ code {
   .feature-evidence .action-link {
     margin-left: 38px;
   }
-  .roadmap-section {
-    padding-top: 45px;
-  }
 }
 @media (max-width: 540px) {
   .desktop-nav {
@@ -1213,9 +1173,6 @@ code {
   }
   .page-heading p {
     font-size: 15px;
-  }
-  .roadmap-grid {
-    grid-template-columns: 1fr;
   }
   .start-steps section {
     grid-template-columns: 1fr;

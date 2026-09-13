@@ -306,6 +306,15 @@
     "gallery": "File picker"
   },
   {
+    "slug": "hot-reload",
+    "name": "Hot reload",
+    "description": "Patch Rust UI code while preserving live application state.",
+    "source": "crates/argui-widget-gallery/src/pages/hot_reload.rs",
+    "feature": null,
+    "category": "Examples",
+    "gallery": "Hot reload"
+  },
+  {
     "slug": "hover-card",
     "name": "Hover card",
     "description": "A rich preview on hover or keyboard focus.",
@@ -349,6 +358,15 @@
     "feature": "input-otp",
     "category": "Components",
     "gallery": "Input OTP"
+  },
+  {
+    "slug": "i18n",
+    "name": "Internationalization",
+    "description": "Switch Fluent catalogs, plurals, fallback copy and writing direction.",
+    "source": "crates/argui-widget-gallery/src/pages/i18n.rs",
+    "feature": null,
+    "category": "Examples",
+    "gallery": "Internationalization"
   },
   {
     "slug": "item",

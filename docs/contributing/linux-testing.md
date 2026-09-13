@@ -98,6 +98,7 @@ Paths below are relative to `crates/argui-widget-gallery/tests/` unless noted.
 | Catalogue | `pages/catalogue.mjs` | Forms, navigation, modal surfaces, Hover Card and scrolling in both themes. |
 | Color picker | `pages/color_picker.mjs` | Immediate preview colors, alpha input, stable geometry and GPU color checks. |
 | Animated text | `pages/animated_text.mjs` | Changed digits, carries, fades, intermediate frames and narrow layouts. |
+| Localization | `pages/i18n.mjs` | Fluent locale switching, plurals, fallback copy and Arabic RTL layout. |
 | Updates | `pages/updater.mjs` | Notes, download amounts, unknown totals, cancellation, installation states and errors. |
 | Liquid glass | `pages/liquid_glass.mjs` | Refraction, controls and content scrolling behind the glass. |
 | Scroll effects | `pages/scroll_effects.mjs` | Vertical and horizontal edges and light-theme contrast. |

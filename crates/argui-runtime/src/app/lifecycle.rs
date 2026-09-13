@@ -98,6 +98,22 @@ impl ApplicationHandler<UserEvent> for Application {
     }
 
     fn suspended(&mut self, _event_loop: &ActiveEventLoop) {
+        #[cfg(target_os = "android")]
+        {
+            // Android destroys the native window while the activity is suspended.
+            // Drop the WGPU surface first, then the Winit window. The shared device
+            // remains available for the surface created by the next `resumed` event.
+            *self.renderer.borrow_mut() = super::RendererState::Loading;
+            self.window = None;
+            self.accessibility = None;
+            self.semantic_snapshot = None;
+            self.renderer_announced = false;
+            self.pointer = None;
+            self.pointer_buttons = 0;
+            self.touch_points.clear();
+            self.primary_touch = None;
+            self.touch_selection = None;
+        }
         (self.on_event)(RuntimeEvent::Platform(PlatformEvent::Suspended));
     }
 
@@ -116,6 +132,10 @@ impl ApplicationHandler<UserEvent> for Application {
         {
             match event {
                 UserEvent::ModelsReady => self.models_ready(event_loop),
+                #[cfg(all(feature = "hot-reload", debug_assertions))]
+                UserEvent::HotReload { generation } => {
+                    crate::hot_reload::notify(self, generation);
+                }
                 #[cfg(feature = "tasks")]
                 UserEvent::TasksReady => {
                     if let Some(tasks) = &self.tasks {

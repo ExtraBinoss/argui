@@ -18,16 +18,18 @@ tray = ["dep:ksni", "dep:tray-icon"]
 gtk-host = ["dep:gtk", "dep:tao", "dep:wayland-client", "dep:wayland-backend", "dep:raw-window-handle"]
 
 [dependencies]
-rfd = { version = "=0.17.2", optional = true }
 argui-core.workspace = true
 argui-paint = { workspace = true, optional = true }
 image.workspace = true
 winit.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-arboard.workspace = true
 futures-channel = { version = "=0.3.34", optional = true }
 pollster.workspace = true
+
+[target.'cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))'.dependencies]
+arboard.workspace = true
+rfd = { version = "=0.17.2", optional = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 ashpd.workspace = true
@@ -57,6 +59,7 @@ tray-icon = { workspace = true, optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 base64.workspace = true
+rfd = { version = "=0.17.2", optional = true }
 wasm-bindgen.workspace = true
 wasm-bindgen-futures.workspace = true
 web-sys = { workspace = true, features = ["Clipboard", "Document", "Element", "HtmlCanvasElement", "HtmlHeadElement", "MediaQueryList", "Navigator", "Node", "NodeList", "Window"] }

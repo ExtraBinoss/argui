@@ -1,0 +1,22 @@
+[package]
+name = "argui-i18n"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+description = "Fluent localization and locale negotiation for Argui applications"
+
+[dependencies]
+fluent-bundle.workspace = true
+fluent-langneg.workspace = true
+thiserror.workspace = true
+unic-langid.workspace = true
+
+[dev-dependencies]
+argui-ui.workspace = true
+
+[lints]
+workspace = true

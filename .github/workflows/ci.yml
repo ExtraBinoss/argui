@@ -92,6 +92,79 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+  desktop:
+    name: Desktop compile (${{ matrix.name }})
+    needs: security
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows
+            runner: windows-2025
+            cache: windows
+          - name: macOS
+            runner: macos-15
+            cache: macos
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        with:
+          toolchain: '1.98.0'
+      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
+        with:
+          key: desktop-${{ matrix.cache }}
+      - name: Compile the complete workspace
+        run: cargo check --workspace --all-targets --all-features --locked
+
+  mobile:
+    name: Mobile cross-check
+    needs: security
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        with:
+          toolchain: '1.98.0'
+          targets: aarch64-linux-android,aarch64-apple-ios
+      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
+        with:
+          key: mobile-cross-check
+      - name: Check every supported Android capability and gallery entry point
+        run: |
+          cargo check --locked --target aarch64-linux-android -p argui --features android,i18n,tasks,widgets-all,devtools
+          cargo check --locked --target aarch64-linux-android -p argui-widget-gallery --lib
+      - name: Check every supported iOS capability and gallery entry point
+        run: |
+          cargo check --locked --target aarch64-apple-ios -p argui --features ios,i18n,tasks,widgets-all,devtools
+          cargo check --locked --target aarch64-apple-ios -p argui-widget-gallery --lib
+
+  packages:
+    name: Crates.io archives
+    needs: security
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Install Linux build dependencies
+        run: ./scripts/install-linux-ci.sh
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        with:
+          toolchain: '1.98.0'
+      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
+        with:
+          key: crates-io-archives
+      - name: Package and compile every publishable crate archive
+        run: python3 scripts/release.py package
+
   website:
     name: Website
     needs: security
@@ -163,11 +236,11 @@ jobs:
 
   release:
     name: Publish crates and GitHub release
-    needs: [security, quality, website]
+    needs: [security, quality, desktop, mobile, packages, website]
     if: >-
       github.event_name == 'push' && github.ref == 'refs/heads/main' &&
       github.repository == 'ExtraBinoss/argui' && github.actor == 'ExtraBinoss' &&
-      contains(github.event.head_commit.message, '[RELEASE]')
+      contains(github.event.head_commit.message, '[PUBLISH]')
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
@@ -190,7 +263,7 @@ jobs:
           key: release
       - name: Check the version and publish missing crates
         env:
-          RELEASE_BASE: ${{ github.event.before }}
+          PUBLISH_BASE: ${{ github.event.before }}
           CARGO_REGISTRY_TOKEN: ${{ secrets.CRATE_REGISTRY_TOKEN || secrets.CARGO_REGISTRY_TOKEN }}
           GH_TOKEN: ${{ github.token }}
-        run: python3 scripts/release.py publish --base "$RELEASE_BASE"
+        run: python3 scripts/release.py publish --base "$PUBLISH_BASE"

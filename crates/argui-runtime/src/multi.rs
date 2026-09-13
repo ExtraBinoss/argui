@@ -91,12 +91,16 @@ impl MultiApplication {
         config
             .validate()
             .map_err(|error| RuntimeError::Configuration(error.to_string()))?;
+        #[cfg(all(feature = "hot-reload", debug_assertions, not(target_arch = "wasm32")))]
+        let model = crate::hot_reload::app_model(model);
+        #[cfg(not(all(feature = "hot-reload", debug_assertions, not(target_arch = "wasm32"))))]
+        let model: Box<dyn AppModel> = Box::new(model);
         Ok(Self {
             config,
             renderer_config,
             initial_text_engine: text_engine,
             renderer_device: Rc::new(RefCell::new(None)),
-            model: Rc::new(RefCell::new(Box::new(model))),
+            model: Rc::new(RefCell::new(model)),
             pending: Rc::new(RefCell::new(Vec::new())),
             callback: Rc::new(RefCell::new(Box::new(on_event))),
             windows: HashMap::new(),
@@ -313,6 +317,10 @@ impl MultiApplication {
 impl ApplicationHandler<UserEvent> for MultiApplication {
     #[cfg_attr(coverage_nightly, coverage(off))]
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        #[cfg(target_os = "android")]
+        if self.resume_android_windows(event_loop) {
+            return;
+        }
         #[cfg(target_arch = "wasm32")]
         if let Err(error) = argui_platform::apply_web_identity(&self.config.identity) {
             self.emit(RuntimeEvent::CommandFailed(error));
@@ -329,11 +337,8 @@ impl ApplicationHandler<UserEvent> for MultiApplication {
     fn exiting(&mut self, _event_loop: &ActiveEventLoop) {
         self.shutdown();
     }
-
     fn suspended(&mut self, event_loop: &ActiveEventLoop) {
-        for entry in self.windows.values_mut() {
-            entry.runtime.suspended(event_loop);
-        }
+        self.suspend_windows(event_loop);
     }
 
     #[cfg_attr(coverage_nightly, coverage(off))]
@@ -341,6 +346,8 @@ impl ApplicationHandler<UserEvent> for MultiApplication {
         let _ = event_loop;
         match event {
             UserEvent::ModelsReady => self.models_ready(event_loop),
+            #[cfg(all(feature = "hot-reload", debug_assertions, not(target_arch = "wasm32")))]
+            UserEvent::HotReload { generation } => self.hot_reload(generation),
             #[cfg(feature = "tasks")]
             UserEvent::TasksReady => self.tasks_ready(event_loop),
             #[cfg(all(feature = "webview", target_os = "linux"))]

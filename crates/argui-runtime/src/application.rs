@@ -338,16 +338,16 @@ impl<A: Render> AppModel for SingleWindowModel<A> {
     }
 
     fn image_assets(&self) -> Vec<ImageAsset> {
-        self.app.entity.read(Render::image_assets)
+        self.app.entity.erase().image_assets()
     }
 
     fn vector_assets(&self) -> Vec<VectorAsset> {
-        self.app.entity.read(Render::vector_assets)
+        self.app.entity.erase().vector_assets()
     }
 
     fn inspector(&self, window: &WindowKey) -> Option<InspectorHandle> {
         (window == &self.window)
-            .then(|| self.app.entity.read(Render::inspector))
+            .then(|| self.app.entity.erase().inspector())
             .flatten()
     }
 

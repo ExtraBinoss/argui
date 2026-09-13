@@ -30,8 +30,10 @@ type HandlerDispatch = dyn Fn(EventHandlerId, &UiEvent) -> ContextEffects;
 type Observer = Rc<dyn Fn(&ModelRuntime)>;
 
 mod entity;
+mod entity_api;
 mod host;
 pub use entity::EntityId;
+use entity_api::with_event_handler;
 use host::ModelRuntimeVisitor;
 pub use host::shutdown_presentations;
 mod dispatch;
@@ -289,12 +291,6 @@ fn update_environment(
     current.replace(next.clone()) != *next && used.get()
 }
 
-fn with_event_handler(event: &UiEvent, dispatch: &mut dyn FnMut(EventHandlerId)) {
-    if let Some(handler) = event.current_handler() {
-        dispatch(handler);
-    }
-}
-
 pub trait Render: 'static {
     #[cfg(feature = "tasks")]
     fn tasks_ready(&mut self, _cx: &mut Context<Self>)
@@ -378,9 +374,57 @@ impl<T: Render> Entity<T> {
             frame: Rc::new(move |value| frame.dispatch_frame(value)),
             layout: Rc::new(move |snapshot| layout.dispatch_layout(snapshot)),
             owns: Rc::new(move |owner| owns.owns(owner)),
-            image_assets: Rc::new(move || image_assets.read(Render::image_assets)),
-            vector_assets: Rc::new(move || vector_assets.read(Render::vector_assets)),
-            inspector: Rc::new(move || inspector.read(Render::inspector)),
+            image_assets: Rc::new(move || {
+                image_assets.read(|value| {
+                    #[cfg(all(
+                        feature = "hot-reload",
+                        debug_assertions,
+                        not(target_arch = "wasm32")
+                    ))]
+                    return crate::hot_reload::image_assets(value);
+
+                    #[cfg(not(all(
+                        feature = "hot-reload",
+                        debug_assertions,
+                        not(target_arch = "wasm32")
+                    )))]
+                    value.image_assets()
+                })
+            }),
+            vector_assets: Rc::new(move || {
+                vector_assets.read(|value| {
+                    #[cfg(all(
+                        feature = "hot-reload",
+                        debug_assertions,
+                        not(target_arch = "wasm32")
+                    ))]
+                    return crate::hot_reload::vector_assets(value);
+
+                    #[cfg(not(all(
+                        feature = "hot-reload",
+                        debug_assertions,
+                        not(target_arch = "wasm32")
+                    )))]
+                    value.vector_assets()
+                })
+            }),
+            inspector: Rc::new(move || {
+                inspector.read(|value| {
+                    #[cfg(all(
+                        feature = "hot-reload",
+                        debug_assertions,
+                        not(target_arch = "wasm32")
+                    ))]
+                    return crate::hot_reload::inspector(value);
+
+                    #[cfg(not(all(
+                        feature = "hot-reload",
+                        debug_assertions,
+                        not(target_arch = "wasm32")
+                    )))]
+                    value.inspector()
+                })
+            }),
             take_effects: Rc::new(move || take_effects.take_effects()),
         }
     }
@@ -413,13 +457,18 @@ impl<T: Render> Entity<T> {
             environment,
             ..Context::default()
         };
-        let element = self
-            .0
-            .model
-            .value
-            .borrow_mut()
-            .render(&mut cx)
-            .semantic_scope();
+        let element = {
+            let mut value = self.0.model.value.borrow_mut();
+            #[cfg(all(feature = "hot-reload", debug_assertions, not(target_arch = "wasm32")))]
+            let element = crate::hot_reload::render(&mut *value, &mut cx);
+            #[cfg(not(all(
+                feature = "hot-reload",
+                debug_assertions,
+                not(target_arch = "wasm32")
+            )))]
+            let element = value.render(&mut cx);
+            element.semantic_scope()
+        };
         if self.0.presentation.resources.is_closed() {
             return Element::container([]);
         }
@@ -473,14 +522,24 @@ impl<T: Render> Entity<T> {
 
     pub(crate) fn wants_frame(&self) -> bool {
         self.0.presentation.is_visible()
-            && (self.0.model.value.borrow().wants_animation_frame()
-                || self
-                    .0
-                    .presentation
-                    .children
-                    .borrow()
-                    .iter()
-                    .any(|child| (child.wants_frame)()))
+            && ({
+                let value = self.0.model.value.borrow();
+                #[cfg(all(feature = "hot-reload", debug_assertions, not(target_arch = "wasm32")))]
+                let wants_frame = crate::hot_reload::wants_animation_frame(&*value);
+                #[cfg(not(all(
+                    feature = "hot-reload",
+                    debug_assertions,
+                    not(target_arch = "wasm32")
+                )))]
+                let wants_frame = value.wants_animation_frame();
+                wants_frame
+            } || self
+                .0
+                .presentation
+                .children
+                .borrow()
+                .iter()
+                .any(|child| (child.wants_frame)()))
     }
 
     fn dispatch_frame(&self, frame: Frame) -> ContextEffects {
@@ -503,11 +562,12 @@ impl<T: Render> Entity<T> {
             environment: self.0.presentation.environment.borrow().clone(),
             ..Context::default()
         };
-        self.0
-            .model
-            .value
-            .borrow_mut()
-            .animation_frame(frame, &mut cx);
+        let mut value = self.0.model.value.borrow_mut();
+        #[cfg(all(feature = "hot-reload", debug_assertions, not(target_arch = "wasm32")))]
+        crate::hot_reload::animation_frame(&mut *value, frame, &mut cx);
+        #[cfg(not(all(feature = "hot-reload", debug_assertions, not(target_arch = "wasm32"))))]
+        value.animation_frame(frame, &mut cx);
+        drop(value);
         merge_effects(&mut effects, cx.effects);
         self.0.model.signal.apply_update(effects.update);
         effects
@@ -523,72 +583,13 @@ impl<T: Render> Entity<T> {
             environment: self.0.presentation.environment.borrow().clone(),
             ..Context::default()
         };
-        self.0
-            .model
-            .value
-            .borrow_mut()
-            .layout_changed(layout, &mut cx);
+        let mut value = self.0.model.value.borrow_mut();
+        #[cfg(all(feature = "hot-reload", debug_assertions, not(target_arch = "wasm32")))]
+        crate::hot_reload::layout_changed(&mut *value, layout, &mut cx);
+        #[cfg(not(all(feature = "hot-reload", debug_assertions, not(target_arch = "wasm32"))))]
+        value.layout_changed(layout, &mut cx);
+        drop(value);
         self.0.model.signal.apply_update(cx.effects.update);
         cx.effects
-    }
-}
-
-impl<T: 'static> WeakEntity<T> {
-    #[must_use]
-    pub fn upgrade(&self) -> Option<Entity<T>> {
-        if let Some(presentation) = self.presentation.upgrade() {
-            return Some(Entity(presentation));
-        }
-        self.model.upgrade().map(|model| {
-            Entity(Rc::new(EntityCell {
-                presentation: Presentation::new(model.signal.clone()),
-                model,
-            }))
-        })
-    }
-}
-
-impl AnyEntity {
-    #[must_use]
-    pub fn ptr_eq(&self, other: &Self) -> bool {
-        Rc::ptr_eq(&self.identity, &other.identity)
-    }
-
-    pub(crate) fn render(&self, environment: WindowEnvironment) -> Element {
-        (self.render)(environment)
-    }
-
-    pub(crate) fn event(&self, event: &UiEvent) {
-        with_event_handler(event, &mut |handler| {
-            (self.store)((self.dispatch_handler)(handler, event));
-        });
-    }
-
-    pub(crate) fn animation_frame(&self, frame: Frame) {
-        (self.store)((self.frame)(frame));
-    }
-
-    pub(crate) fn layout_changed(&self, layout: &LayoutSnapshot) {
-        (self.store)((self.layout)(layout));
-    }
-
-    pub(crate) fn wants_frame(&self) -> bool {
-        (self.wants_frame)()
-    }
-
-    pub(crate) fn image_assets(&self) -> Vec<ImageAsset> {
-        (self.image_assets)()
-    }
-
-    pub(crate) fn vector_assets(&self) -> Vec<VectorAsset> {
-        (self.vector_assets)()
-    }
-
-    pub(crate) fn inspector(&self) -> Option<InspectorHandle> {
-        (self.inspector)()
-    }
-
-    pub(crate) fn take_effects(&self) -> ContextEffects {
-        (self.take_effects)()
     }
 }

@@ -1,8 +1,33 @@
 use super::MultiApplication;
 use crate::AppEvent;
 use argui_platform::{CloseBehavior, WindowKey};
+use winit::{application::ApplicationHandler, event_loop::ActiveEventLoop};
 
 impl MultiApplication {
+    #[cfg(target_os = "android")]
+    pub(super) fn resume_android_windows(&mut self, event_loop: &ActiveEventLoop) -> bool {
+        if self.windows.is_empty() {
+            return false;
+        }
+        self.by_native.clear();
+        for (key, entry) in &mut self.windows {
+            entry.runtime.resumed(event_loop);
+            if let Some(window_id) = entry.runtime.window_id() {
+                self.by_native.insert(window_id, key.clone());
+            }
+        }
+        self.process_pending(event_loop);
+        true
+    }
+
+    pub(super) fn suspend_windows(&mut self, event_loop: &ActiveEventLoop) {
+        for entry in self.windows.values_mut() {
+            entry.runtime.suspended(event_loop);
+        }
+        #[cfg(target_os = "android")]
+        self.by_native.clear();
+    }
+
     #[cfg_attr(coverage_nightly, coverage(off))]
     pub(super) fn close_window(&mut self, key: &WindowKey) {
         if let Some(entry) = self.windows.remove(key) {
