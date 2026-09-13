@@ -3,23 +3,60 @@ use argui_inspect::FrameRecord;
 use argui_ui::{Element, Sides, length, percent};
 use argui_widgets::WidgetTheme;
 
+pub(super) fn cpu_stages(frame: &FrameRecord, theme: &WidgetTheme) -> Element {
+    let total = frame.total_cpu();
+    let mut rows = vec![
+        Element::text(format!("CPU stages · {:.2} ms total", millis(total)))
+            .text_style(text(12.0, theme.foreground)),
+    ];
+    for (label, duration) in [
+        ("Model", frame.model),
+        ("Surface", frame.surface),
+        ("Tree", frame.tree),
+        ("Layout", frame.layout),
+        ("Paint", frame.paint),
+        ("Render encoding", frame.render_cpu),
+    ] {
+        let ratio = if total.is_zero() {
+            0.0
+        } else {
+            duration.as_secs_f64() / total.as_secs_f64()
+        };
+        rows.push(
+            Element::column([
+                Element::row([
+                    Element::text(label)
+                        .text_style(text(11.0, theme.muted_foreground))
+                        .grow(1.0),
+                    Element::text(format!(
+                        "{:.2} ms · {:.1}%",
+                        millis(duration),
+                        ratio * 100.0
+                    ))
+                    .text_style(text(11.0, theme.foreground)),
+                ])
+                .gap(8.0),
+                Element::container([Element::container([])
+                    .width(percent(ratio as f32))
+                    .height(length(3.0))
+                    .background(theme.primary)])
+                .width(percent(1.0))
+                .height(length(3.0))
+                .background(theme.muted)
+                .semantic_hidden(true),
+            ])
+            .gap(4.0),
+        );
+    }
+    Element::column(rows)
+        .gap(8.0)
+        .padding(Sides::length(10.0))
+        .background(theme.card)
+}
+
 pub(super) fn details(frame: &FrameRecord, theme: &WidgetTheme) -> Element {
     Element::column([
-        section(
-            "CPU stages",
-            [
-                ("Model", format!("{:.2} ms", millis(frame.model))),
-                ("Surface", format!("{:.2} ms", millis(frame.surface))),
-                ("Tree", format!("{:.2} ms", millis(frame.tree))),
-                ("Layout", format!("{:.2} ms", millis(frame.layout))),
-                ("Paint", format!("{:.2} ms", millis(frame.paint))),
-                (
-                    "Render encoding",
-                    format!("{:.2} ms", millis(frame.render_cpu)),
-                ),
-            ],
-            theme,
-        ),
+        cpu_stages(frame, theme),
         section(
             "Rendering & memory",
             [

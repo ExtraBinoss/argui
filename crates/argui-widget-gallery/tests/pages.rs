@@ -2,6 +2,8 @@
 mod buttons;
 #[path = "pages/catalogue.rs"]
 mod catalogue;
+#[path = "pages/color_picker.rs"]
+mod color_picker;
 #[path = "pages/data.rs"]
 mod data;
 #[path = "pages/inputs.rs"]
@@ -65,6 +67,7 @@ fn all_pages_keep_finite_layout_when_narrow_dark_or_reduced_motion() {
         ("switch", "Switch"),
         ("radio-group", "Radio group"),
         ("slider", "Slider"),
+        ("color-picker", "Color picker"),
         ("tabs", "Tabs"),
         ("select", "Select"),
         ("dialog", "Dialog"),

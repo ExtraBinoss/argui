@@ -1,7 +1,7 @@
 //! Native GTK host used by WebView-enabled applications on Wayland.
 
 use gtk::prelude::*;
-use std::{cell::Cell, sync::Arc};
+use std::sync::Arc;
 use tao::{
     event_loop::EventLoopWindowTarget,
     platform::unix::{WindowBuilderExtUnix, WindowExtUnix},
@@ -17,7 +17,6 @@ pub struct GtkWindow {
     window: Arc<Window>,
     container: gtk::Fixed,
     canvas: Arc<GtkCanvas>,
-    origin: Cell<(i32, i32)>,
     css: gtk::CssProvider,
 }
 
@@ -57,11 +56,16 @@ impl GtkWindow {
             .pack_start(&container, true, true, 0);
         container.show_all();
         let canvas = Arc::new(GtkCanvas::new(window.clone())?);
+        let weak_canvas = Arc::downgrade(&canvas);
+        native.connect_unmap(move |_| {
+            if let Some(canvas) = weak_canvas.upgrade() {
+                canvas.detach();
+            }
+        });
         Ok(Self {
             window,
             container,
             canvas,
-            origin: Cell::new((i32::MIN, i32::MIN)),
             css,
         })
     }
@@ -122,10 +126,13 @@ impl GtkWindow {
     }
 
     pub fn sync_canvas(&self) -> Result<(), String> {
+        if !self.window.gtk_window().is_mapped() {
+            return Ok(());
+        }
         let allocation = self.container.allocation();
-        let origin = (allocation.x(), allocation.y());
-        if self.origin.replace(origin) != origin {
-            self.canvas.place(origin.0, origin.1)?;
+        if self.canvas.place(allocation.x(), allocation.y())? {
+            // GTK owns parent commits and must first acknowledge the compositor's configure.
+            self.window.gtk_window().queue_draw();
         }
         self.canvas.dispatch_pending()
     }

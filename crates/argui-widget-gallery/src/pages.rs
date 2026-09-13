@@ -30,6 +30,7 @@ mod buttons;
 mod card;
 pub(crate) mod catalogue;
 mod collapsible;
+pub(crate) mod color_picker;
 pub(crate) mod data;
 pub(crate) mod data_table;
 pub(crate) mod dates;
@@ -146,6 +147,11 @@ pub(crate) fn render(
         Page::Checkbox => checkboxes(gallery, theme, assets),
         Page::Switch => switches(gallery, theme),
         Page::RadioGroup => radios(gallery, theme),
+        Page::ColorPicker => cx.entity(
+            gallery
+                .color_picker
+                .get_or_init(|| Entity::new(color_picker::ColorPickerDemo::default())),
+        ),
         Page::Slider => sliders(gallery, theme, assets),
         Page::Tabs => tabs(gallery, theme),
         Page::Select => selects(gallery, theme, assets),

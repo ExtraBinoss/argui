@@ -18,6 +18,7 @@ argui-accessibility.workspace = true
 argui-inspect.workspace = true
 argui-animation.workspace = true
 argui-core.workspace = true
+argui-theme.workspace = true
 argui-layout.workspace = true
 argui-paint.workspace = true
 argui-platform.workspace = true

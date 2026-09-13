@@ -11,6 +11,7 @@ use argui_ui::{Axes, Dimension, Element, ElementKind, NodeId, Overflow, UiTree};
 use super::Application;
 
 mod cache;
+mod memory;
 mod values;
 pub use cache::InspectionCache;
 
@@ -22,7 +23,7 @@ impl Application {
         let mut root = self
             .model
             .as_ref()
-            .map(|model| model.render(self.environment))?;
+            .map(|model| model.render(self.environment.clone()))?;
         #[cfg(all(feature = "webview", target_os = "linux"))]
         if let Some(host) = self.window.as_ref().and_then(|window| window.gtk()) {
             let radius = host.platform.corner_radius();
@@ -57,6 +58,9 @@ impl Application {
         else {
             return;
         };
+        if inspector.take_memory_request() {
+            inspector.publish_memory(Inspection::memory(tree, &self.layout_engine, layout));
+        }
         if inspector.enabled()
             && let Some(mut snapshot) = self.inspection_cache.snapshot(tree, layout)
         {
@@ -366,6 +370,20 @@ fn apply_property_value(element: &mut Element, property: StyleProperty, value: &
         }
         (StyleProperty::Height, StyleValue::Length(value)) => {
             element.style.size.height = inspect_length(*value);
+        }
+        (StyleProperty::Overflow, StyleValue::Choice(value)) => {
+            let parse = |value: &str| match value.trim() {
+                "Visible" => Some(Overflow::Visible),
+                "Hidden" => Some(Overflow::Hidden),
+                "Auto" => Some(Overflow::Auto),
+                "Scroll" => Some(Overflow::Scroll),
+                _ => None,
+            };
+            if let Some((x, y)) = value.split_once('/')
+                && let (Some(x), Some(y)) = (parse(x), parse(y))
+            {
+                element.style.overflow = Axes { x, y };
+            }
         }
         _ => {}
     }

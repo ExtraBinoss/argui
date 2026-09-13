@@ -81,6 +81,29 @@ impl GradientStops {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct BilinearGradient {
+    /// Interpolation space shared by both axes, with premultiplied alpha.
+    pub interpolation: ColorInterpolation,
+    corners: Arc<[Color; 4]>,
+}
+
+impl BilinearGradient {
+    /// Corners in top-left, top-right, bottom-left, bottom-right order.
+    #[must_use]
+    pub fn new(corners: [Color; 4], interpolation: ColorInterpolation) -> Self {
+        Self {
+            interpolation,
+            corners: Arc::new(corners),
+        }
+    }
+
+    #[must_use]
+    pub fn corners(&self) -> &[Color; 4] {
+        &self.corners
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct LinearGradient {
     /// Relative coordinates where `(0, 0)` is the top-left of the primitive.
     pub start: Point,

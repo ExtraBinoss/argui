@@ -12,8 +12,14 @@ use argui_ui::{
     Element, EventType, GestureEvent, GestureKind, GesturePhase, UiEvent, UiEventKind, UiTree,
 };
 
+#[path = "host/input.rs"]
+mod input;
 #[path = "host/interaction.rs"]
 mod interaction;
+#[path = "host/properties.rs"]
+mod properties;
+#[path = "host/theme.rs"]
+mod theme;
 #[path = "host/tree.rs"]
 mod tree;
 
@@ -136,7 +142,7 @@ fn dock_controls_cover_filter_scroll_pause_clear_and_resize() {
     assert!(matches!(
         change_tools(&host, |tools| tools.take_clipboard_request()),
         Some(argui_ui::ClipboardRequest::Write(trace))
-            if trace.contains("argui-gpu-trace-v2")
+            if trace.contains("argui-gpu-trace-v3")
     ));
     assert_eq!(
         change_tools(&host, |tools| tools.take_clipboard_request()),
@@ -550,9 +556,9 @@ fn settle(host: &argui_runtime::Mount<DevtoolsHost<App>>) {
     }
 }
 
-fn change_tools<R>(
-    host: &argui_runtime::Mount<DevtoolsHost<App>>,
-    change: impl FnOnce(&mut DevtoolsHost<App>) -> R,
+fn change_tools<A: Render, R>(
+    host: &argui_runtime::Mount<DevtoolsHost<A>>,
+    change: impl FnOnce(&mut DevtoolsHost<A>) -> R,
 ) -> R {
     host.update(|tools, cx| {
         cx.notify();

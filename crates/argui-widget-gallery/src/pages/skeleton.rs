@@ -34,7 +34,7 @@ impl Default for SkeletonDemo {
 
 impl Render for SkeletonDemo {
     fn render(&mut self, cx: &mut Context<Self>) -> Element {
-        let themes = shadcn(cx.environment().primary);
+        let themes = shadcn(cx.environment());
         let theme = themes.resolve(cx.environment().color_scheme);
         let content = if self.loaded {
             Element::column([

@@ -118,7 +118,14 @@ fn fill_color(quad: Quad, local: vec2<f32>) -> vec4<f32> {
         let axis = quad.fill_geometry.zw - quad.fill_geometry.xy;
         return gradient_color(quad, dot(uv - quad.fill_geometry.xy, axis) / max(dot(axis, axis), 0.00001));
     }
-    return gradient_color(quad, length((uv - quad.fill_geometry.xy) / max(quad.fill_geometry.zw, vec2(0.00001))));
+    if quad.params.y < 2.5 {
+        return gradient_color(quad, length((uv - quad.fill_geometry.xy) / max(quad.fill_geometry.zw, vec2(0.00001))));
+    }
+    let start = quad.gradient_meta.x;
+    let position = clamp(uv, vec2(0.0), vec2(1.0));
+    let top = mix(gradient_stops[start].color, gradient_stops[start + 1u].color, position.x);
+    let bottom = mix(gradient_stops[start + 2u].color, gradient_stops[start + 3u].color, position.x);
+    return gradient_to_linear(mix(top, bottom, position.y), quad.gradient_meta.z);
 }
 
 // Evaluate the SDF one framebuffer pixel away using the inverse affine basis.

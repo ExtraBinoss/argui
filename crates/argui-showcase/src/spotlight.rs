@@ -93,7 +93,7 @@ impl AppModel for SpotlightShowcase {
 
 impl SpotlightShowcase {
     fn window(&self, environment: WindowEnvironment) -> Element {
-        let theme = shadcn(environment.primary);
+        let theme = shadcn(&environment);
         let theme = theme.resolve(environment.color_scheme);
         let panel = Element::column([
             self.title_bar(theme),

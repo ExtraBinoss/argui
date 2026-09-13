@@ -3,6 +3,7 @@ mod host;
 mod icons;
 mod presentation;
 mod style;
+pub mod telemetry;
 mod view;
 pub use app::DevtoolsApp;
 pub use presentation::DockMode;

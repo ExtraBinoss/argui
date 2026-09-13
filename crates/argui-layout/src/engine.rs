@@ -13,6 +13,9 @@ use taffy::NodeId;
 
 mod compute;
 
+mod storage;
+pub use storage::LayoutStorage;
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct LayoutNode {
     pub index: usize,

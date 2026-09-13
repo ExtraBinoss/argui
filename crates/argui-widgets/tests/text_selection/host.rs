@@ -276,7 +276,7 @@ fn selection_host_reduced_motion_mounts_immediately_and_global_command_uses_no_t
         reduced_motion: true,
         ..WindowEnvironment::default()
     };
-    let _ = app.render(environment).unwrap();
+    let _ = app.render(environment.clone()).unwrap();
     dispatch(
         &app,
         UiEventKind::DocumentSelectionChanged {
@@ -286,7 +286,7 @@ fn selection_host_reduced_motion_mounts_immediately_and_global_command_uses_no_t
             dragging: false,
         },
     );
-    let rendered = app.render(environment).unwrap();
+    let rendered = app.render(environment.clone()).unwrap();
     assert!(has_key(&rendered, "argui::selection-menu"));
     assert!(!app.read(Render::wants_animation_frame));
 
@@ -294,10 +294,10 @@ fn selection_host_reduced_motion_mounts_immediately_and_global_command_uses_no_t
         &app,
         "argui::selection-menu::copy",
         UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
-        environment,
+        environment.clone(),
     );
     assert!(!has_key(
-        &app.render(environment).unwrap(),
+        &app.render(environment.clone()).unwrap(),
         "argui::selection-menu"
     ));
 }

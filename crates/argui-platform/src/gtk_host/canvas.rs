@@ -45,11 +45,20 @@ delegate_noop!(Globals: ignore wl_region::WlRegion);
 
 pub struct GtkCanvas {
     surface: wl_surface::WlSurface,
-    subsurface: wl_subsurface::WlSubsurface,
-    parent: wl_surface::WlSurface,
+    subcompositor: wl_subcompositor::WlSubcompositor,
+    attachment: std::sync::Mutex<Option<Attachment>>,
     queue: std::sync::Mutex<wayland_client::EventQueue<Globals>>,
-    _connection: Connection,
+    connection: Connection,
     window: Arc<tao::window::Window>,
+}
+struct Attachment {
+    subsurface: wl_subsurface::WlSubsurface,
+    position: (i32, i32),
+}
+impl Drop for Attachment {
+    fn drop(&mut self) {
+        self.subsurface.destroy();
+    }
 }
 impl GtkCanvas {
     #[allow(unsafe_code)]
@@ -61,28 +70,12 @@ impl GtkCanvas {
         else {
             return Err("the GTK WGPU host currently requires a native Wayland display".into());
         };
-        let RawWindowHandle::Wayland(parent) = window
-            .window_handle()
-            .map_err(|error| error.to_string())?
-            .as_raw()
-        else {
-            return Err("the GTK WGPU host currently requires a native Wayland display".into());
-        };
-        // The retained Tao window owns GTK's display and parent surface for this canvas's lifetime.
+        // The retained Tao window owns GTK's display. Its parent surface lasts only until unmap.
         // Only newly created proxies are managed by this guest backend; it never disconnects GTK.
         let backend = unsafe {
             wayland_backend::client::Backend::from_foreign_display(display.display.as_ptr().cast())
         };
         let connection = Connection::from_backend(backend);
-        let parent_id = unsafe {
-            wayland_backend::client::ObjectId::from_ptr(
-                wl_surface::WlSurface::interface(),
-                parent.surface.as_ptr().cast(),
-            )
-            .map_err(|error| error.to_string())?
-        };
-        let parent = wl_surface::WlSurface::from_id(&connection, parent_id)
-            .map_err(|error| error.to_string())?;
         let mut queue = connection.new_event_queue();
         let handle = queue.handle();
         connection.display().get_registry(&handle, ());
@@ -92,32 +85,85 @@ impl GtkCanvas {
             .map_err(|error| error.to_string())?;
         let compositor = globals.compositor.ok_or("Wayland compositor unavailable")?;
         let surface = compositor.create_surface(&handle, ());
-        let subsurface = globals
+        let subcompositor = globals
             .subcompositor
-            .ok_or("Wayland subcompositor unavailable")?
-            .get_subsurface(&surface, &parent, &handle, ());
-        subsurface.set_desync();
-        subsurface.set_position(0, 0);
-        subsurface.place_below(&parent);
+            .ok_or("Wayland subcompositor unavailable")?;
         let empty = compositor.create_region(&handle, ());
         surface.set_input_region(Some(&empty));
         empty.destroy();
-        parent.commit();
         connection.flush().map_err(|error| error.to_string())?;
-        Ok(Self {
+        let canvas = Self {
             surface,
-            subsurface,
-            parent,
+            subcompositor,
+            attachment: std::sync::Mutex::new(None),
             queue: std::sync::Mutex::new(queue),
-            _connection: connection,
+            connection,
             window,
-        })
+        };
+        canvas.place(0, 0)?;
+        Ok(canvas)
     }
 
-    pub fn place(&self, x: i32, y: i32) -> Result<(), String> {
-        self.subsurface.set_position(x, y);
-        self.parent.commit();
-        self._connection.flush().map_err(|error| error.to_string())
+    /// Return whether GTK must commit the changed child placement on its next frame.
+    pub fn place(&self, x: i32, y: i32) -> Result<bool, String> {
+        let mut attachment = self.attachment.lock().map_err(|error| error.to_string())?;
+        if let Some(attachment) = attachment.as_mut() {
+            if attachment.position == (x, y) {
+                return Ok(false);
+            }
+            attachment.subsurface.set_position(x, y);
+            attachment.position = (x, y);
+        } else {
+            let parent = self.parent()?;
+            let handle = self
+                .queue
+                .lock()
+                .map_err(|error| error.to_string())?
+                .handle();
+            let subsurface = self
+                .subcompositor
+                .get_subsurface(&self.surface, &parent, &handle, ());
+            subsurface.set_desync();
+            subsurface.set_position(x, y);
+            subsurface.place_below(&parent);
+            *attachment = Some(Attachment {
+                subsurface,
+                position: (x, y),
+            });
+        }
+        self.connection
+            .flush()
+            .map(|_| true)
+            .map_err(|error| error.to_string())
+    }
+
+    pub(super) fn detach(&self) {
+        self.attachment
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .take();
+    }
+
+    #[allow(unsafe_code)]
+    fn parent(&self) -> Result<wl_surface::WlSurface, String> {
+        let RawWindowHandle::Wayland(parent) = self
+            .window
+            .window_handle()
+            .map_err(|error| error.to_string())?
+            .as_raw()
+        else {
+            return Err("the GTK WGPU host currently requires a native Wayland display".into());
+        };
+        // Called on GTK's thread while mapped; unmap clears the attachment before it is reused.
+        let parent_id = unsafe {
+            wayland_backend::client::ObjectId::from_ptr(
+                wl_surface::WlSurface::interface(),
+                parent.surface.as_ptr().cast(),
+            )
+            .map_err(|error| error.to_string())?
+        };
+        wl_surface::WlSurface::from_id(&self.connection, parent_id)
+            .map_err(|error| error.to_string())
     }
 
     pub fn dispatch_pending(&self) -> Result<(), String> {
@@ -152,7 +198,7 @@ impl HasDisplayHandle for GtkCanvas {
 }
 impl Drop for GtkCanvas {
     fn drop(&mut self) {
-        self.subsurface.destroy();
+        self.detach();
         self.surface.destroy();
     }
 }

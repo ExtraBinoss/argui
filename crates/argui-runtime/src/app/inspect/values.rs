@@ -62,6 +62,7 @@ fn background(element: &Element) -> StyleValue {
         Some(Fill::Radial(gradient)) => {
             StyleValue::Summary(format!("radial gradient · {} stops", gradient.stops.len()))
         }
+        Some(Fill::Bilinear(_)) => StyleValue::Summary("bilinear gradient · 4 corners".into()),
         None => StyleValue::Summary("none".into()),
     }
 }

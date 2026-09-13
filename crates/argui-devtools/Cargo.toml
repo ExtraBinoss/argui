@@ -5,6 +5,10 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 
+[features]
+default = []
+all-smi = []
+
 [dependencies]
 argui-animation.workspace = true
 argui-effects = { workspace = true, features = ["scroll"] }
@@ -18,12 +22,16 @@ argui-text.workspace = true
 argui-theme.workspace = true
 argui-ui.workspace = true
 argui-vector.workspace = true
-argui-widgets = { workspace = true, features = ["button", "input", "checkbox", "tabs", "select", "split-pane", "vlist", "tree-view"] }
+argui-widgets = { workspace = true, features = ["button", "input", "checkbox", "tabs", "select", "split-pane", "vlist", "tree-view", "color-picker", "slider", "collapsible"] }
 icondata_core.workspace = true
 icondata_tb.workspace = true
+serde_json.workspace = true
+web-time.workspace = true
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+sysinfo = { workspace = true, features = ["system"] }
 
 [dev-dependencies]
-web-time.workspace = true
 argui-layout.workspace = true
 argui-showcase.workspace = true
 

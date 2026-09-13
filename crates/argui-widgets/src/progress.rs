@@ -98,7 +98,7 @@ impl Progress {
 impl Render for Progress {
     fn render(&mut self, cx: &mut Context<Self>) -> Element {
         self.reduced_motion = cx.environment().reduced_motion;
-        let themes = shadcn(cx.environment().primary);
+        let themes = shadcn(cx.environment());
         self.build(themes.resolve(cx.environment().color_scheme))
     }
 

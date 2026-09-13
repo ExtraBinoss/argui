@@ -45,12 +45,23 @@ pub struct WidgetTheme {
 }
 
 #[must_use]
-pub fn shadcn(primary: Color) -> Theme<WidgetTheme> {
-    Theme::new(
-        widgets(ColorScheme::Light, primary),
-        widgets(ColorScheme::Dark, primary),
-    )
+pub fn shadcn(source: impl argui_theme::ThemeSource) -> Theme<WidgetTheme> {
+    let overrides = source.theme_overrides();
+    let primary = match overrides.and_then(|tokens| tokens.get("primary")) {
+        Some(argui_theme::ThemeValue::Color(color)) => color,
+        _ => source.primary_color(),
+    };
+    let resolve = |scheme| {
+        let mut theme = widgets(scheme, primary);
+        if let Some(overrides) = overrides {
+            theme.apply_overrides(overrides);
+        }
+        theme
+    };
+    Theme::new(resolve(ColorScheme::Light), resolve(ColorScheme::Dark))
 }
+
+mod tokens;
 
 fn widgets(scheme: ColorScheme, primary: Color) -> WidgetTheme {
     let (background, card, foreground, muted, muted_foreground, border, destructive) = match scheme

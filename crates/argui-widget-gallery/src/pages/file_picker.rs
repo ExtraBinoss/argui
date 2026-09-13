@@ -69,7 +69,7 @@ impl Default for FilePickerDemo {
 }
 impl Render for FilePickerDemo {
     fn render(&mut self, cx: &mut Context<Self>) -> Element {
-        let themes = shadcn(cx.environment().primary);
+        let themes = shadcn(cx.environment());
         let theme = themes.resolve(cx.environment().color_scheme);
         Element::column(self.pickers.iter().map(|(title, description, picker)| {
             Element::column([

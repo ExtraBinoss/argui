@@ -225,6 +225,7 @@ impl Application {
                         texture_bytes: profile.texture_pool.allocated_bytes
                             + profile.vector_atlas.allocated_bytes,
                         vector_atlas_entries: profile.vector_atlas.entries,
+                        vector_atlas_bytes: profile.vector_atlas.allocated_bytes,
                         vector_atlas_hits: profile.vector_atlas.hits_this_frame,
                         vector_rasterizations: profile.vector_atlas.rasterizations_this_frame,
                         adapter: adapter_record(&profile.adapter),

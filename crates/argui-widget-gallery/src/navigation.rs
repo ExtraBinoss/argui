@@ -50,6 +50,7 @@ pub enum Page {
     Switch,
     RadioGroup,
     Slider,
+    ColorPicker,
     Tabs,
     Select,
     Dialog,
@@ -78,7 +79,7 @@ pub enum Page {
 }
 
 impl Page {
-    pub const ALL: [Self; 73] = [
+    pub const ALL: [Self; 74] = [
         Self::Accordion,
         Self::Alert,
         Self::AlertDialog,
@@ -96,6 +97,7 @@ impl Page {
         Self::Chart,
         Self::Checkbox,
         Self::Collapsible,
+        Self::ColorPicker,
         Self::Combobox,
         Self::ContextMenu,
         Self::DataTable,
@@ -203,6 +205,7 @@ impl Page {
             | Self::Checkbox
             | Self::Switch
             | Self::RadioGroup
+            | Self::ColorPicker
             | Self::Slider
             | Self::Tabs
             | Self::Select
@@ -281,6 +284,7 @@ impl Page {
             Self::Checkbox => "Checkbox",
             Self::Switch => "Switch",
             Self::RadioGroup => "Radio group",
+            Self::ColorPicker => "Color picker",
             Self::Slider => "Slider",
             Self::Tabs => "Tabs",
             Self::Select => "Select",
@@ -360,6 +364,7 @@ impl Page {
             Self::Checkbox => "checkbox",
             Self::Switch => "switch",
             Self::RadioGroup => "radio-group",
+            Self::ColorPicker => "color-picker",
             Self::Slider => "slider",
             Self::Tabs => "tabs",
             Self::Select => "select",
@@ -473,6 +478,9 @@ impl Page {
             }
             Self::Switch => "Animated binary preferences.",
             Self::RadioGroup => "Exclusive selection with semantic grouping.",
+            Self::ColorPicker => {
+                "Precise color editing with opacity, a saturation pad and HEX/RGB/HSL/HSV fields."
+            }
             Self::Slider => "Pointer, touch, keyboard and accessibility values.",
             Self::Tabs => "Roving navigation and one mounted panel.",
             Self::Select => "Anchored, collision-aware option overlay.",

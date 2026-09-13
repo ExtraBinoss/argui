@@ -13,6 +13,8 @@ use crate::host::{DevtoolsHost, Tab};
 mod dashboard;
 mod graph;
 mod profiling;
+mod resources;
+mod theme_editor;
 pub(crate) use dashboard::DetailCache;
 mod toolbar;
 use toolbar::{icon_label_button, small_button, toggle_button, toolbar};
@@ -130,6 +132,7 @@ pub(crate) fn dock<A>(tools: &DevtoolsHost<A>, height: f32, theme: &WidgetTheme)
     let body = match tools.tab {
         Tab::Elements => elements_tab(tools, theme),
         Tab::Profiling => dashboard::panel(tools, theme),
+        Tab::Theme => theme_editor::panel(tools, theme),
     };
     Element::column([
         toolbar(tools, theme),
@@ -138,6 +141,8 @@ pub(crate) fn dock<A>(tools: &DevtoolsHost<A>, height: f32, theme: &WidgetTheme)
             .min_height(length(0.0))
             .min_width(length(0.0)),
     ])
+    .keyed("__devtools-panel")
+    .interaction(Interaction::default().focus_policy(argui_ui::FocusPolicy::Programmatic))
     .height(length(height))
     .min_width(length(0.0))
     .grow(1.0)
@@ -183,6 +188,9 @@ fn elements_tab<A>(tools: &DevtoolsHost<A>, theme: &WidgetTheme) -> Element {
             )
             .focused(StylePatch::new().set(property::BackgroundColor, theme.muted)),
         )
+        .kind(argui_widgets::InputKind::Search)
+        .label("Filter elements")
+        .description("Type from the tree or press Control or Command F")
         .build();
         let tree = Element::column([search, list.grow(1.0).shrink(1.0)])
             .grow(1.0)
@@ -204,7 +212,16 @@ fn elements_tab<A>(tools: &DevtoolsHost<A>, theme: &WidgetTheme) -> Element {
                 tree
             }
         } else {
-            Element::row([tree, properties]).min_height(length(0.0))
+            tools
+                .properties_splitter
+                .build(
+                    tree,
+                    tools.properties_splitter.separator(theme),
+                    properties,
+                    tools.panel_width(),
+                    240.0,
+                )
+                .min_height(length(0.0))
         }
     })
 }

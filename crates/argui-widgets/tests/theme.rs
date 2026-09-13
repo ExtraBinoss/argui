@@ -3,6 +3,9 @@ use argui_theme::ThemeMode;
 use argui_ui::{Dimension, sides};
 use argui_widgets::shadcn;
 
+#[path = "theme/tokens.rs"]
+mod tokens;
+
 #[test]
 fn floating_surfaces_use_scheme_specific_contrast_without_luminous_shadows() {
     let themes = shadcn(Color::BLACK);

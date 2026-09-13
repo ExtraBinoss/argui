@@ -191,7 +191,7 @@ impl<T: Render> Context<T> {
     #[must_use]
     pub fn environment(&self) -> WindowEnvironment {
         self.environment_read.set(true);
-        self.environment
+        self.environment.clone()
     }
 
     pub fn request_paint(&mut self) {
@@ -282,11 +282,11 @@ fn inherit_environment_use(parent: &Cell<bool>, child: &Cell<bool>) {
 }
 
 fn update_environment(
-    current: &Cell<WindowEnvironment>,
+    current: &RefCell<WindowEnvironment>,
     used: &Cell<bool>,
-    next: WindowEnvironment,
+    next: &WindowEnvironment,
 ) -> bool {
-    current.replace(next) != next && used.get()
+    current.replace(next.clone()) != *next && used.get()
 }
 
 fn with_event_handler(event: &UiEvent, dispatch: &mut dyn FnMut(EventHandlerId)) {
@@ -387,7 +387,8 @@ impl<T: Render> Entity<T> {
 
     #[must_use]
     pub fn render(&self) -> Element {
-        self.render_in(self.0.presentation.environment.get())
+        let environment = self.0.presentation.environment.borrow().clone();
+        self.render_in(environment)
     }
 
     #[must_use]
@@ -400,7 +401,7 @@ impl<T: Render> Entity<T> {
         let environment_changed = update_environment(
             &self.0.presentation.environment,
             &self.0.presentation.environment_used,
-            environment,
+            &environment,
         );
         if let Some(element) = self.0.presentation.cache.reusable(environment_changed) {
             return element;
@@ -499,7 +500,7 @@ impl<T: Render> Entity<T> {
         }
         let mut cx = Context {
             entity: Some(self.downgrade()),
-            environment: self.0.presentation.environment.get(),
+            environment: self.0.presentation.environment.borrow().clone(),
             ..Context::default()
         };
         self.0
@@ -519,7 +520,7 @@ impl<T: Render> Entity<T> {
         let _transaction = self.0.model.runtime.enter();
         let mut cx = Context {
             entity: Some(self.downgrade()),
-            environment: self.0.presentation.environment.get(),
+            environment: self.0.presentation.environment.borrow().clone(),
             ..Context::default()
         };
         self.0

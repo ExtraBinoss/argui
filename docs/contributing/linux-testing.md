@@ -164,6 +164,29 @@ la conservation de l'alpha et le layout à plusieurs largeurs.
 
 ## Contrôle final
 
+Pour les DevTools et ColorPicker, utiliser
+`node crates/argui-devtools/tests/view.mjs` avec le lanceur et les variables
+Chromium/Puppeteer ci-dessus. Les captures dans `target/devtools-interactions/`
+montrent le survol sans sélection, la recherche directe, les deux séparateurs,
+les propriétés après scroll, le thème en temps réel, les formats de couleur et
+Resources en clair/sombre et à largeur réduite. Le scénario vérifie aussi les
+pixels du dégradé sRGB, les gestes du pad, l'opacité au clavier et la couleur
+réellement appliquée à l'application.
+
+Pour la galerie native et sa fenêtre DevTools détachée :
+
+```sh
+cargo build -p argui-widget-gallery --release --all-features
+ARGUI_TEST_BACKEND=x11 ./scripts/linux-hidden-display.sh \
+  python3 crates/argui-devtools/tests/app.py
+```
+
+Les captures sont dans `target/devtools-native/`. `--sensors` active aussi
+all-smi si son exécutable est dans le `PATH`. `--seconds 10` ajoute des mesures
+CPU/RSS par état ; ne pas le faire pendant une compilation ou un autre test.
+`--binary` et `--output` permettent de conserver des comparaisons avant/après,
+et `--baseline` limite les actions aux panneaux présents dans l'ancienne version.
+
 Pour les ajouts du catalogue shadcn, utiliser
 `node crates/argui-widget-gallery/tests/pages/catalogue.mjs` avec le même lanceur
 et les mêmes variables Chromium/Puppeteer. Le scénario capture les 26 nouvelles

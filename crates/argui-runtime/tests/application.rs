@@ -219,10 +219,10 @@ fn window_adapters_retain_independent_mounts_of_one_shared_entity() {
         color_scheme: ColorScheme::Dark,
         ..Default::default()
     };
-    let first_view = first.view(&window, dark).unwrap();
+    let first_view = first.view(&window, dark.clone()).unwrap();
     let second_view = second.view(&window, WindowEnvironment::default()).unwrap();
     assert_ne!(first_view, second_view);
-    assert_eq!(first.view(&window, dark).unwrap(), first_view);
+    assert_eq!(first.view(&window, dark.clone()).unwrap(), first_view);
     assert_eq!(model.resources().resource_count(), 2);
     drop(first);
     assert_eq!(model.resources().resource_count(), 1);

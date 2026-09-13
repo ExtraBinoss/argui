@@ -83,7 +83,7 @@ impl ToastDemo {
 impl Render for ToastDemo {
     fn render(&mut self, cx: &mut Context<Self>) -> Element {
         self.schedule(cx);
-        let themes = shadcn(cx.environment().primary);
+        let themes = shadcn(cx.environment());
         let theme = themes.resolve(cx.environment().color_scheme);
         ToastHost {
             key: "toasts",

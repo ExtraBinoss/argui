@@ -37,6 +37,13 @@ application can raise or lower the explicit GPU-memory/work budget. Gradient
 geometry and individual stops can bind to typed motions without rebuilding the
 element tree.
 
+`Fill::Bilinear(BilinearGradient::new([top_left, top_right, bottom_left,
+bottom_right], interpolation))` interpolates four premultiplied corners in the
+chosen color space. The ColorPicker uses sRGB interpolation for its HSV pad:
+white/hue at the top, black at the bottom. It uses one quad and four entries in
+the same gradient buffer. Corner storage is shared; adding this fill preserves
+the size of `Fill`. Bilinear style transitions currently switch discretely.
+
 ## Images
 
 The renderer contract is a validated `ImageAsset`: stable `ImageId`, dimensions,
@@ -147,5 +154,5 @@ path. General SVG path morphing is not part of this API.
 
 `RenderProfile::vector_atlas` reports entry count, cache hits, rasterizations and
 allocated bytes for the current frame. DevTools records the same counters in
-strict `argui-gpu-trace-v2` traces, making resize thrashing visible on Linux,
+strict `argui-gpu-trace-v3` traces, making resize thrashing visible on Linux,
 Windows, macOS and WebGPU.

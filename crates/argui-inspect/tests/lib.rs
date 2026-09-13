@@ -403,7 +403,7 @@ fn gpu_trace_rejects_unknown_versions_fields_and_enum_values() {
     inspector.record_ui(FrameRecord::default());
     let json = inspector.trace_json().unwrap();
 
-    let wrong_version = json.replace("argui-gpu-trace-v2", "argui-gpu-trace-v1");
+    let wrong_version = json.replace("argui-gpu-trace-v3", "argui-gpu-trace-v1");
     assert!(inspector.import_trace_json(&wrong_version).is_err());
 
     let unknown_field = json.replacen("{", "{\"unknown\":true,", 1);
@@ -550,7 +550,7 @@ fn trace_errors_display_and_duration_saturation_are_stable() {
 
     let invalid = imported.import_trace_json("not json").unwrap_err();
     assert!(invalid.to_string().contains("invalid Argui GPU trace JSON"));
-    let wrong = json.replace("argui-gpu-trace-v2", "other");
+    let wrong = json.replace("argui-gpu-trace-v3", "other");
     let unsupported = imported.import_trace_json(&wrong).unwrap_err();
     assert!(
         unsupported

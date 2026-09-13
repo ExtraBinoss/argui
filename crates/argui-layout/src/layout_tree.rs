@@ -49,6 +49,15 @@ pub(crate) struct LayoutTree {
 }
 
 impl LayoutTree {
+    pub(crate) fn storage(&self) -> crate::LayoutStorage {
+        crate::LayoutStorage {
+            metadata_bytes: self.nodes.capacity() * size_of::<Node>()
+                + self.ids.capacity() * size_of::<NodeId>(),
+            cache_bytes: self.caches.capacity() * size_of::<Cache>(),
+            geometry_bytes: (self.unrounded.capacity() + self.layouts.capacity())
+                * size_of::<Layout>(),
+        }
+    }
     pub(crate) fn set_custom(
         &mut self,
         id: NodeId,

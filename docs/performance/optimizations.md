@@ -483,3 +483,57 @@ numbers use a different baseline and must not be added to this study's percentag
 The [roadmap](../roadmap.md) tracks further validation and performance work.
 Benchmark size should always distinguish total model rows from the nodes
 actually present in the UI tree.
+
+## DevTools resource collection and editing
+
+The DevTools expansion adds a reusable color editor, scoped live themes, hover
+highlighting, resizable property panes and process/device telemetry. It is a
+feature expansion, not a demonstrated reduction in whole-process RAM.
+[Raw samples and exclusions](data/devtools-resources.json) compare this revision
+with `1e78722` on Linux 7.1.12, Core Ultra 5 125H and Intel Arc/Meteor Lake.
+
+Two valid alternating native pairs used the real release gallery, all features,
+a 1220 × 1000 private X11 window, and ten seconds per pane after settling.
+No builds or other tests ran concurrently. A third pair was excluded because its
+baseline click did not activate Profiling; its captures showed Elements instead.
+The driver now checks the active pane and rejects a stopped loading spinner.
+Numbers below are means across the two valid runs, with 100% CPU representing
+one logical CPU. The Buttons page contains a continuously animated spinner.
+
+| Native state | RSS before → after | Process CPU before → after |
+| --- | ---: | ---: |
+| Tools closed | 148.2 → 159.5 MiB | 60.2 → 66.0% |
+| Elements | 170.3 → 171.1 MiB | 87.6 → 92.4% |
+| Profiling overview | 186.9 → 183.3 MiB | 92.9 → 98.1% |
+| Resources, process sampling enabled | — → 185.5 MiB | — → 100.2% |
+
+These measurements do not establish an overall CPU/RAM improvement. Closed RSS
+increased by 11.3 MiB in this small sample; allocation and driver attribution is
+not established. Native timing varied substantially between launches. Within
+the candidate runs, changing Profiling overview to Resources added about
+2.2 MiB RSS and 2.1 percentage points of process CPU on average. That includes
+the resource panel, process sampler and changed renderer workload; it does not
+isolate the sampler alone or include an external all-smi process.
+
+The existing renderer-free `argui-devtools` profiling example also ran in three
+alternating pairs, with 40 warm-up ticks and 200 recorded ticks per state.
+Median run p95 CPU was 0.281 → 0.182 ms closed, 0.386 → 0.287 ms in Elements,
+and 10.410 → 8.568 ms in Profiling. These synthetic results omit native GPU
+submission/presentation and do not explain away the native overhead above.
+
+Costs are constrained structurally and tested: no process collection before
+Resources is selected, no new request while closed/paused/on another pane,
+at most one worker request in flight, and at most one sample per second.
+GPU sensors require a separate explicit opt-in. UI/layout/paint capacity counters
+read Vec capacities without traversing nodes, and the color pad uses one GPU
+quad with four shared corners; adding `Fill::Bilinear` preserves `size_of::<Fill>()`.
+The collector never inserts a heap scan or vendor query into a render pass.
+RSS mapping categories sum to measured resident memory; known Argui capacities
+and GPU allocations are kept separate to avoid false totals.
+
+Reproduce with the commands in [DevTools](../contributing/devtools.md#cost-and-reproduction)
+and the [native driver](../contributing/linux-testing.md#contrôle-final).
+Save each release binary before switching revisions and inspect the captures.
+The optional all-smi adapter detected this machine's GPU, but its driver readings
+were all zero; these are shown as unavailable, with raw fields retained. No
+cross-platform sensor completeness or Windows/macOS execution is claimed.

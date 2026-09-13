@@ -9,6 +9,7 @@ use argui_runtime::Inspection;
 use argui_ui::{Axes, Dimension, EffectScope, Element, ElementKind, Interaction, Overflow, UiTree};
 
 mod cache;
+mod memory;
 
 #[test]
 fn custom_phase_diagnostics_report_retained_work_and_ignore_removed_nodes() {
@@ -131,6 +132,45 @@ fn numeric_overrides_replace_authored_values_without_mutating_the_source() {
         inspector.property_value(node, StyleProperty::Transform),
         Some(StyleValue::Parameters(_))
     ));
+}
+
+#[test]
+fn overflow_overrides_apply_both_axes_and_reset_to_authored_styles() {
+    let source = fully_styled();
+    let tree = UiTree::new(source.clone());
+    let node = InspectNodeId(tree.node_ids()[0].get());
+    let inspector = InspectorHandle::default();
+    for (choice, expected) in [
+        (
+            "Visible / Hidden",
+            Axes {
+                x: Overflow::Visible,
+                y: Overflow::Hidden,
+            },
+        ),
+        (
+            "Auto / Scroll",
+            Axes {
+                x: Overflow::Auto,
+                y: Overflow::Scroll,
+            },
+        ),
+        ("invalid", source.style.overflow),
+        ("Auto / invalid", source.style.overflow),
+    ] {
+        inspector.set_property_value(
+            node,
+            StyleProperty::Overflow,
+            StyleValue::Choice(choice.into()),
+        );
+        let mut changed = source.clone();
+        Inspection::apply_overrides(&mut changed, &tree, &inspector);
+        assert_eq!(changed.style.overflow, expected);
+    }
+    inspector.clear_property_override(node, StyleProperty::Overflow);
+    let mut restored = source.clone();
+    Inspection::apply_overrides(&mut restored, &tree, &inspector);
+    assert_eq!(restored.style.overflow, source.style.overflow);
 }
 
 #[test]

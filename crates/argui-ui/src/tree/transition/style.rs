@@ -286,7 +286,7 @@ fn gradient_values(background: &Fill, values: &mut Vec<StylePropertyValue>) {
             (GradientPointTarget::RadialRadius, gradient.radius),
             &gradient.stops,
         ),
-        Fill::Solid(_) => return,
+        Fill::Solid(_) | Fill::Bilinear(_) => return,
     };
     values.push(value(
         PropertyKey::GradientPoint(first.0),

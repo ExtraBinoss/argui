@@ -119,6 +119,13 @@ impl UiTree {
         &self.node_ids
     }
 
+    /// Allocated capacity of dense traversal columns and stable IDs, sampled in
+    /// O(1). Excludes hash tables, shared element descriptions and nested payloads.
+    #[must_use]
+    pub fn index_storage_bytes(&self) -> usize {
+        self.node_ids.capacity() * size_of::<NodeId>() + self.index.column_bytes()
+    }
+
     #[must_use]
     pub const fn revision(&self) -> u64 {
         self.revision

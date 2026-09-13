@@ -21,6 +21,16 @@ pub(crate) struct TreeIndex {
 }
 
 impl TreeIndex {
+    pub(super) fn column_bytes(&self) -> usize {
+        self.elements.capacity() * size_of::<Element>()
+            + (self.parents.capacity()
+                + self.subtree_ends.capacity()
+                + self.selection_owners.capacity())
+                * size_of::<u32>()
+            + self.selection.capacity() * size_of::<UserSelect>()
+            + self.directions.capacity() * size_of::<Option<WritingDirection>>()
+            + self.layout_roots.capacity() * size_of::<usize>()
+    }
     pub(super) fn new(root: &Element, ids: &[NodeId]) -> Self {
         assert!(
             ids.len() < NONE as usize,

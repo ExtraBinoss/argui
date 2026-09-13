@@ -2,18 +2,20 @@ use super::*;
 use argui_inspect::StyleProperty;
 use argui_ui::UiEventKind;
 
-pub(super) fn style_value_key(key: &str) -> Option<(StyleProperty, usize)> {
-    let suffix = key.strip_prefix("__devtools-value-")?;
-    let (_, suffix) = suffix.split_once('-')?;
-    let (label, field) = suffix.rsplit_once('-')?;
-    let property = StyleProperty::ALL
-        .into_iter()
-        .find(|property| property.label() == label)?;
-    Some((property, field.parse().ok()?))
-}
-
 impl<A: Render> DevtoolsHost<A> {
     pub(super) fn update_tools(&mut self, event: &UiEvent) -> Option<ViewUpdate> {
+        if let Some(update) = self.navigation_input(event) {
+            return Some(update);
+        }
+        if self.theme_editing.update(event) {
+            if let Some(clipboard) = self.theme_editing.clipboard.take() {
+                self.clipboard = Some(clipboard);
+            }
+            return Some(ViewUpdate::Rebuild);
+        }
+        if let Some(update) = self.property_input(event) {
+            return Some(update);
+        }
         let key = event.target_key()?;
         if let UiEventKind::Scrolled { offset, .. } = event.kind
             && key == "__devtools-gpu-passes"
@@ -48,6 +50,7 @@ impl<A: Render> DevtoolsHost<A> {
                             .parse()
                             .ok()
                             .map(InspectNodeId);
+                        self.property_editing = properties::PropertyEditing::default();
                         self.inspector.select(id);
                         self.show_properties = id.is_some();
                         if let Some(id) = id {
@@ -150,6 +153,7 @@ impl<A: Render> DevtoolsHost<A> {
                 }) => {
                     self.picker_hovered = None;
                     self.picker_point = None;
+                    self.tree_hovered = None;
                     self.inspector.set_hovered(None);
                     ViewUpdate::Paint
                 }
@@ -164,6 +168,7 @@ impl<A: Render> DevtoolsHost<A> {
                     self.picking = false;
                     self.picker_hovered = None;
                     self.picker_point = None;
+                    self.tree_hovered = None;
                     self.inspector.set_hovered(None);
                     self.tab = Tab::Elements;
                     ViewUpdate::Rebuild
@@ -208,32 +213,6 @@ impl<A: Render> DevtoolsHost<A> {
             self.tree_offset = 0.0;
             return Some(ViewUpdate::Rebuild);
         }
-        if let UiEventKind::TextChanged(value) = &event.kind
-            && let Some((property, field)) = style_value_key(key)
-        {
-            let Some(node) = self.inspector.selected() else {
-                return Some(ViewUpdate::None);
-            };
-            let authored = self
-                .inspector
-                .node(node)
-                .and_then(|candidate| {
-                    candidate
-                        .properties
-                        .into_iter()
-                        .find(|candidate| candidate.property == property)
-                })
-                .map(|property| property.value);
-            let mut style = self.inspector.property_value(node, property).or(authored);
-            if let (Some(style), Ok(value)) = (&mut style, value.parse::<f32>())
-                && style.set_field(field, value)
-            {
-                self.inspector
-                    .set_property_value(node, property, style.clone());
-                return Some(ViewUpdate::Rebuild);
-            }
-            return Some(ViewUpdate::None);
-        }
         if !matches!(event.kind, UiEventKind::Click(_)) {
             return key.starts_with("__devtools").then_some(ViewUpdate::None);
         }
@@ -244,6 +223,7 @@ impl<A: Render> DevtoolsHost<A> {
                 self.picking = false;
                 self.picker_hovered = None;
                 self.picker_point = None;
+                self.tree_hovered = None;
                 self.inspector.set_hovered(None);
                 self.sheet_motion
                     .retarget(if self.open { 1.0 } else { 0.0 });
@@ -253,6 +233,7 @@ impl<A: Render> DevtoolsHost<A> {
                 self.picking = !self.picking;
                 self.picker_hovered = None;
                 self.picker_point = None;
+                self.tree_hovered = None;
                 self.inspector.set_hovered(None);
                 self.tab = Tab::Elements;
             }
@@ -260,10 +241,43 @@ impl<A: Render> DevtoolsHost<A> {
                 self.tab = Tab::Elements;
                 self.inspector.set_gpu_profiling(false);
             }
+            "__devtools-theme" => {
+                self.tab = Tab::Theme;
+                self.tree_hovered = None;
+                self.inspector.set_hovered(None);
+                self.inspector.set_gpu_profiling(false);
+            }
             "__devtools-profile-overview" => self.profile_panel = 0,
             "__devtools-profile-gpu" => self.profile_panel = 1,
             "__devtools-profile-details" => self.profile_panel = 2,
+            "__devtools-profile-resources" => self.profile_panel = 3,
+            "__devtools-device-telemetry" => {
+                self.telemetry.devices_enabled = !self.telemetry.devices_enabled;
+                if !self.telemetry.devices_enabled {
+                    self.telemetry.snapshot.devices.clear();
+                }
+            }
+            _ if key.starts_with("__devtools-memory-category-") => {
+                let name = key
+                    .trim_start_matches("__devtools-memory-category-")
+                    .trim_end_matches("::trigger")
+                    .to_owned();
+                if !self.telemetry.expanded.remove(&name) {
+                    self.telemetry.expanded.insert(name);
+                }
+            }
+            _ if key.starts_with("__devtools-device-details-") => {
+                let name = key
+                    .trim_start_matches("__devtools-device-details-")
+                    .trim_end_matches("::trigger")
+                    .to_owned();
+                if !self.telemetry.expanded.remove(&name) {
+                    self.telemetry.expanded.insert(name);
+                }
+            }
             "__devtools-profiling" => {
+                self.tree_hovered = None;
+                self.inspector.set_hovered(None);
                 self.inspector.set_gpu_profiling(true);
                 self.tab = Tab::Profiling;
                 self.inspector
@@ -288,7 +302,10 @@ impl<A: Render> DevtoolsHost<A> {
                 self.refresh_profile_details();
             }
             "__devtools-back" => self.show_properties = false,
-            "__devtools-reset" => self.inspector.clear_overrides(),
+            "__devtools-reset" => {
+                self.inspector.clear_overrides();
+                self.property_editing = properties::PropertyEditing::default();
+            }
             "__devtools-copy" => {
                 if let Ok(trace) = self.inspector.trace_json() {
                     self.clipboard = Some(ClipboardRequest::Write(trace));
@@ -322,6 +339,7 @@ impl<A: Render> DevtoolsHost<A> {
                 self.refresh_profile_details();
             }
             _ if key.starts_with("__devtools-style-") => {
+                self.property_editing = properties::PropertyEditing::default();
                 let Some(node) = self.inspector.selected() else {
                     return Some(ViewUpdate::None);
                 };

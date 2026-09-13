@@ -39,17 +39,23 @@ fn selected_nodes_receive_reversible_typed_style_overrides() {
     });
     assert!(contains_key(
         &host.render(Default::default()).unwrap(),
-        "__devtools-value-42-background-0"
+        "__devtools-swatch-42-background"
     ));
     change_tools(&host, |tools| {
         tools.update(&event(
-            "__devtools-value-42-background-0",
-            UiEventKind::TextChanged("0.9".into()),
+            "__devtools-swatch-42-background",
+            UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
+        ))
+    });
+    change_tools(&host, |tools| {
+        tools.update(&event(
+            "__devtools-color-42-background::field::0",
+            UiEventKind::TextChanged("#ff3366".into()),
         ))
     });
     assert!(matches!(
         inspector.property_value(InspectNodeId(42), StyleProperty::Background),
-        Some(StyleValue::Srgba([red, _, _, _])) if red == 0.9
+        Some(StyleValue::Srgba([red, _, _, _])) if (red - 1.0).abs() < 0.0001
     ));
     change_tools(&host, |tools| {
         tools.update(&event(

@@ -98,10 +98,10 @@ fn mounts_share_data_but_keep_caches_environments_and_event_owners_independent()
         ..Default::default()
     };
     let light = WindowEnvironment::default();
-    let first = left.render(dark).unwrap();
-    let other = right.render(light).unwrap();
+    let first = left.render(dark.clone()).unwrap();
+    let other = right.render(light.clone()).unwrap();
     assert_ne!(first, other);
-    assert_eq!(left.render(dark).unwrap(), first);
+    assert_eq!(left.render(dark.clone()).unwrap(), first);
     assert_eq!(model.read(|view| view.renders), 2);
     let mut tree = UiTree::new(first);
     let events = tree.event_deliveries(
@@ -116,8 +116,8 @@ fn mounts_share_data_but_keep_caches_environments_and_event_owners_independent()
         left.dispatch_event(event).unwrap();
     }
     assert_eq!(model.read(|view| (view.clicks, view.dark_clicks)), (1, 1));
-    let _ = left.render(dark).unwrap();
-    let _ = right.render(light).unwrap();
+    let _ = left.render(dark.clone()).unwrap();
+    let _ = right.render(light.clone()).unwrap();
     assert_eq!(model.read(|view| view.renders), 4);
 }
 
@@ -193,8 +193,8 @@ fn nested_mounts_are_distinct_reused_and_released_without_destroying_child_data(
         ..Default::default()
     };
     let light = WindowEnvironment::default();
-    let left = first.render(dark).unwrap();
-    let _ = second.render(light).unwrap();
+    let left = first.render(dark.clone()).unwrap();
+    let _ = second.render(light.clone()).unwrap();
     assert_eq!(child.read(|view| view.renders), 2);
     assert_eq!(child.resources().resource_count(), 2);
     first.layout_changed(&Default::default()).unwrap();
@@ -204,7 +204,7 @@ fn nested_mounts_are_distinct_reused_and_released_without_destroying_child_data(
         [ColorScheme::Dark, ColorScheme::Light]
     );
     parent.update(|_, cx| cx.notify());
-    assert!(first.render(dark).unwrap().ptr_eq(&left));
+    assert!(first.render(dark.clone()).unwrap().ptr_eq(&left));
     assert_eq!(child.read(|view| view.renders), 2);
     let mut tree = UiTree::new(left);
     let events = tree.event_deliveries(
@@ -223,7 +223,7 @@ fn nested_mounts_are_distinct_reused_and_released_without_destroying_child_data(
         parent.visible = false;
         cx.notify();
     });
-    let _ = first.render(dark).unwrap();
+    let _ = first.render(dark.clone()).unwrap();
     assert_eq!(child.resources().resource_count(), 1);
     drop(second);
     assert_eq!(child.resources().resource_count(), 0);
@@ -261,14 +261,14 @@ fn tracked_dependencies_only_rebuild_the_mount_that_reads_them() {
         ..Default::default()
     };
     let light_env = WindowEnvironment::default();
-    let _ = dark.render(dark_env).unwrap();
-    let original = light.render(light_env).unwrap();
+    let _ = dark.render(dark_env.clone()).unwrap();
+    let original = light.render(light_env.clone()).unwrap();
     dark_source.update(|value, cx| {
         *value += 1;
         cx.notify();
     });
-    let _ = dark.render(dark_env).unwrap();
-    assert!(light.render(light_env).unwrap().ptr_eq(&original));
+    let _ = dark.render(dark_env.clone()).unwrap();
+    assert!(light.render(light_env.clone()).unwrap().ptr_eq(&original));
     assert_eq!(model.read(|model| model.renders), [1, 2]);
     assert_eq!(model.revision(), 0);
     drop(dark);
@@ -277,7 +277,7 @@ fn tracked_dependencies_only_rebuild_the_mount_that_reads_them() {
         *value += 1;
         cx.notify();
     });
-    let _ = light.render(light_env).unwrap();
+    let _ = light.render(light_env.clone()).unwrap();
     assert_eq!(model.read(|model| model.renders), [2, 2]);
 }
 

@@ -133,7 +133,7 @@ impl<T: Render> Entity<T> {
         };
         let mut cx = Context {
             entity: Some(self.downgrade()),
-            environment: self.0.presentation.environment.get(),
+            environment: self.0.presentation.environment.borrow().clone(),
             event_target: Some(event.current_target()),
             ..Context::default()
         };

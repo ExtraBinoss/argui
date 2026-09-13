@@ -42,14 +42,14 @@ fn main() {
         reduced_motion: true,
         ..Default::default()
     };
-    let mut ui = UiTree::new(app.render_in(environment));
+    let mut ui = UiTree::new(app.render_in(environment.clone()));
     dispatch(
         &app,
         &mut ui,
         &format!("nav::{page}"),
         UiEventKind::Click(ClickEvent::accessibility()),
     );
-    ui.update(app.render_in(environment));
+    ui.update(app.render_in(environment.clone()));
     ui.set_reduced_motion(true);
     let mut engine = LayoutEngine::new();
     const FONT: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
@@ -76,7 +76,7 @@ fn main() {
             UiEventKind::Click(ClickEvent::accessibility())
         };
         dispatch(&app, &mut ui, key, event);
-        match ui.update(app.render_in(environment)) {
+        match ui.update(app.render_in(environment.clone())) {
             TreeUpdate::Layout => {
                 output = engine.compute(&mut ui, &mut text, viewport).unwrap();
                 layouts += 1;

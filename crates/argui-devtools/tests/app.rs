@@ -1,3 +1,6 @@
+#[path = "app/rendering.rs"]
+mod rendering;
+
 use std::{cell::RefCell, rc::Rc, sync::Arc};
 
 use argui_animation::{Duration, Frame, Time};
@@ -182,12 +185,12 @@ fn target_open_and_window_selection_are_explicit() {
         reduced_motion: true,
         ..WindowEnvironment::default()
     };
-    let target_view = app.view(&target, environment).expect("target view");
+    let target_view = app.view(&target, environment.clone()).expect("target view");
     assert!(contains_key(&target_view, "__devtools-app-root"));
     assert!(contains_text(&target_view, "application:canvas"));
     let other = WindowKey::new("other");
     assert!(contains_text(
-        &app.view(&other, environment).expect("other view"),
+        &app.view(&other, environment.clone()).expect("other view"),
         "application:other"
     ));
     assert!(contains_key(

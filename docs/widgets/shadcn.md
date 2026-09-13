@@ -204,8 +204,21 @@ validée lors d'une annulation.
 
 ## Capacités complémentaires
 
+`ColorPicker` (`color-picker`, ou `widget-color-picker` dans la façade) est un
+éditeur réutilisable avec pad saturation/valeur, teinte, opacité sur damier et
+champs HEX, RGB, HSL ou HSV. `ColorPickerState` conserve la teinte dans les gris,
+les gestes capturés et le texte invalide sans écraser la dernière couleur valide.
+Livrer `layout_changed(key, snapshot)` après layout puis `update(key, event)` ;
+un retour `true` demande de reconstruire la vue, et comparer `color()` avant/après
+permet de publier seulement les changements de couleur. `set_color` reçoit une
+valeur externe, `set_format` change les champs et `set_enabled` désactive l'éditeur.
+Les flèches règlent les deux sliders et le pad, Maj affine le pad à 0,1 %, et
+Échap abandonne un brouillon invalide. La page **Color picker** de la galerie
+montre une intégration complète et un bouton de prévisualisation.
+Ce widget complémentaire ne modifie pas le décompte des 64 entrées shadcn.
+
 Les [listes et tables](lists-tables.md), [overlays](overlays.md),
 [popups natifs](../platform/native-popovers.md), [fichiers](../platform/file-picker.md),
 [WebViews](../platform/webview.md) et [fonds de bureau](../platform/desktop-backdrops.md) ont leurs
-propres guides. List, VList, TreeView, FilePicker, WebView et les effets de verre
+propres guides. List, VList, TreeView, ColorPicker, FilePicker, WebView et les effets de verre
 ne sont pas comptés comme des entrées supplémentaires du catalogue shadcn.

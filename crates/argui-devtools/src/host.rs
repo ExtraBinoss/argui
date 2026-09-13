@@ -7,7 +7,10 @@ use argui_ui::{ClipboardRequest, Element, EventType, UiEvent};
 
 use crate::{icons::DevtoolsIcons, view};
 
+mod input;
 mod interaction;
+pub(crate) mod properties;
+pub(crate) mod theme;
 mod tree;
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -15,6 +18,7 @@ pub(crate) enum Tab {
     #[default]
     Elements,
     Profiling,
+    Theme,
 }
 
 pub(crate) struct ProfileExtents {
@@ -50,6 +54,12 @@ pub struct DevtoolsHost<A> {
     pub(crate) tree_rows: std::cell::RefCell<argui_widgets::TreeViewCache>,
     pub(crate) collapsed: std::collections::BTreeSet<String>,
     pending_focus: Option<argui_ui::FocusRequest>,
+    pending_selection: Option<argui_ui::TextSelectionRequest>,
+    tree_hovered: Option<InspectNodeId>,
+    pub(crate) properties_splitter: argui_widgets::SplitPane,
+    pub(crate) property_editing: properties::PropertyEditing,
+    pub(crate) theme_editing: theme::ThemeEditing,
+    pub(crate) telemetry: crate::telemetry::Telemetry,
     pub(crate) sections: [bool; 3],
     pub(crate) section_progress: [f32; 3],
     pub(crate) sheet_progress: f32,
@@ -106,6 +116,19 @@ impl<A: Render> DevtoolsHost<A> {
             tree_rows: std::cell::RefCell::default(),
             collapsed: tree::collapsed(),
             pending_focus: None,
+            pending_selection: None,
+            tree_hovered: None,
+            property_editing: properties::PropertyEditing::default(),
+            theme_editing: theme::ThemeEditing::default(),
+            telemetry: crate::telemetry::Telemetry::default(),
+            properties_splitter: argui_widgets::SplitPane::new(
+                "__devtools-properties-splitter",
+                argui_widgets::SplitAxis::Horizontal,
+                360.0,
+                260.0,
+                5000.0,
+            )
+            .trailing(true),
             sections: [true, true, true],
             section_progress: [1.0; 3],
             sheet_progress: 0.0,
@@ -159,6 +182,8 @@ impl<A: Render> DevtoolsHost<A> {
 
     pub(crate) fn set_open_immediate(&mut self, open: bool) {
         self.open = open;
+        self.tree_hovered = None;
+        self.inspector.set_hovered(None);
         self.inspector.set_recording(open);
         self.sheet_progress = if open { 1.0 } else { 0.0 };
         self.sheet_motion = sheet_spring(self.sheet_progress);
@@ -167,6 +192,21 @@ impl<A: Render> DevtoolsHost<A> {
     #[must_use]
     pub fn inspector(&self) -> InspectorHandle {
         self.inspector.clone()
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[must_use]
+    pub fn device_telemetry(
+        mut self,
+        provider: impl crate::telemetry::DeviceTelemetryProvider,
+    ) -> Self {
+        self.telemetry.provider(provider);
+        self
+    }
+
+    #[must_use]
+    pub fn telemetry_snapshot(&self) -> &crate::telemetry::TelemetrySnapshot {
+        &self.telemetry.snapshot
     }
 
     fn reveal_tree_node(&mut self, node: InspectNodeId) {
@@ -218,12 +258,21 @@ impl<A: Render> DevtoolsHost<A> {
         let dock_unmounted = self.dock_presence.advance(frame.elapsed);
         let mut profile = false;
         if self.open && self.tab == Tab::Profiling && !self.inspector.paused() {
+            if self.profile_panel == 3 {
+                let sampled = self.telemetry.advance(std::time::Duration::from_secs_f64(
+                    frame.elapsed.as_secs_f64(),
+                ));
+                if sampled {
+                    self.inspector.request_memory_sample();
+                }
+                profile |= sampled;
+            }
             self.profile_refresh += frame.elapsed;
             self.detail_refresh += frame.elapsed;
             if self.profile_refresh >= argui_animation::Duration::from_millis(100) {
                 self.profile_refresh = argui_animation::Duration::ZERO;
                 if self.selected_frame.is_none() {
-                    profile = self
+                    profile |= self
                         .inspector
                         .sync_frames(&mut self.profile_frames, &mut self.frame_cursor);
                     if self.detail_refresh >= argui_animation::Duration::from_millis(500) {
@@ -276,6 +325,8 @@ impl<A: Render> DevtoolsHost<A> {
     /// Update inspector geometry without delivering layout to the application.
     /// Application layout delivery belongs to the retained parent presentation.
     pub fn inspect_layout(&mut self, layout: &LayoutSnapshot) -> ViewUpdate {
+        self.property_editing.layout_changed(layout);
+        self.theme_editing.layout_changed(layout);
         let changed = self.measure_profile(layout);
         self.viewport = layout.viewport;
         if let Some(bounds) = layout.bounds("__devtools-tree") {
@@ -318,18 +369,23 @@ impl<A: Render> DevtoolsHost<A> {
     pub fn take_scroll_request(&mut self) -> Option<ScrollRequest> {
         self.pending_scroll.take()
     }
+
+    pub fn take_text_selection_request(&mut self) -> Option<argui_ui::TextSelectionRequest> {
+        self.pending_selection.take()
+    }
 }
 
 impl<A: Render> Render for DevtoolsHost<A> {
     fn render(&mut self, cx: &mut Context<Self>) -> Element {
         let environment = cx.environment();
+        self.theme_editing.capture(&environment);
         self.reduced_motion = environment.reduced_motion;
         if self.reduced_motion {
             self.dock_presence
                 .set_open(self.dock_presence.is_open(), true);
         }
-        let app = cx.entity(&self.app);
-        let themes = argui_widgets::shadcn(environment.primary);
+        let app = cx.entity_in(&self.app, self.theme_editing.environment());
+        let themes = argui_widgets::shadcn(&environment);
         let mut root = view::host(self, app, themes.resolve(environment.color_scheme), None);
         for event in EventType::ALL {
             root = root.on(cx
@@ -345,6 +401,9 @@ impl<A: Render> Render for DevtoolsHost<A> {
                     }
                     if let Some(request) = host.pending_scroll.take() {
                         cx.scroll(request);
+                    }
+                    if let Some(request) = host.pending_selection.take() {
+                        cx.select_text(request.target, request.selection);
                     }
                 })
                 .capture(true));

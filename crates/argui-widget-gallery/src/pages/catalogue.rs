@@ -102,7 +102,7 @@ impl CatalogueDemo {
     }
 
     fn event(&mut self, event: &UiEvent, cx: &mut Context<Self>) {
-        let palette = shadcn(cx.environment().primary);
+        let palette = shadcn(cx.environment());
         let theme = palette.resolve(cx.environment().color_scheme);
         let handled = match self.page {
             Page::Field
@@ -140,7 +140,7 @@ impl CatalogueDemo {
 
 impl Render for CatalogueDemo {
     fn render(&mut self, cx: &mut Context<Self>) -> Element {
-        let palette = shadcn(cx.environment().primary);
+        let palette = shadcn(cx.environment());
         let theme = palette.resolve(cx.environment().color_scheme);
         let view = match self.page {
             Page::Field

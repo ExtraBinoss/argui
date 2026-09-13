@@ -98,8 +98,19 @@ renderer-wide contract.
 
 The runtime exposes `WindowEnvironment` through `Context::environment()`. It
 contains the effective color scheme, reduced-motion preference, and
-high-contrast preference. Components that read it are retained and rebuilt when
+high-contrast preference, plus optional shared `ThemeOverrides`. It is `Clone`;
+an environment without overrides allocates no token map. Components that read it are retained and rebuilt when
 the environment changes; unrelated component caches remain valid.
+
+Resolve widgets with `let environment = cx.environment(); let themes =
+shadcn(&environment); let theme = themes.resolve(environment.color_scheme);`.
+`shadcn` accepts any `ThemeSource`, including a plain primary `Color` when scoped
+tokens are not needed. `WidgetTheme::tokens()` exposes the editable palette;
+`apply_overrides` applies typed `ThemeValue::Color`/`Number` entries. Primary
+overrides also derive the matching foreground unless explicitly overridden.
+`Context::entity_in(&entity, environment)` scopes an environment to a mounted
+child and its descendants. The [DevTools Theme tab](../contributing/devtools.md#live-theme)
+uses this to preview tokens without changing the inspector's own palette.
 
 System mode uses Winit theme notifications on Windows, macOS, and Web. Linux
 reads and continuously watches the XDG desktop portal. An unknown or explicitly

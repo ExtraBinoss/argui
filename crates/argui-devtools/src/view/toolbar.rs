@@ -8,8 +8,16 @@ use argui_widgets::{Button, ButtonStyle, TabsBehavior, TabsPart, WidgetTheme};
 pub(super) fn toolbar<A>(tools: &DevtoolsHost<A>, theme: &WidgetTheme) -> Element {
     let tabs = TabsBehavior::new(
         "__devtools-tabs",
-        [("Elements".into(), true), ("Profiling".into(), true)],
-        usize::from(tools.tab == Tab::Profiling),
+        [
+            ("Elements".into(), true),
+            ("Profiling".into(), true),
+            ("Theme".into(), true),
+        ],
+        match tools.tab {
+            Tab::Elements => 0,
+            Tab::Profiling => 1,
+            Tab::Theme => 2,
+        },
     );
     let tab = |index, key, label, active| {
         tabs.decorate(
@@ -44,7 +52,11 @@ pub(super) fn toolbar<A>(tools: &DevtoolsHost<A>, theme: &WidgetTheme) -> Elemen
             .transform(argui_core::Transform2D::IDENTITY.rotate(std::f32::consts::FRAC_PI_2)),
     )
     .build(theme)
-    .width(length(118.0));
+    .width(length(if tools.dock_mode == crate::DockMode::Detached {
+        168.0
+    } else {
+        118.0
+    }));
     Element::row([
         picker,
         tabs.decorate(
@@ -62,6 +74,7 @@ pub(super) fn toolbar<A>(tools: &DevtoolsHost<A>, theme: &WidgetTheme) -> Elemen
                     "Profiling",
                     tools.tab == Tab::Profiling,
                 ),
+                tab(2, "__devtools-theme", "Theme", tools.tab == Tab::Theme),
             ])
             .gap(4.0),
         ),

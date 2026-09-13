@@ -1,14 +1,17 @@
 use argui_core::Transform2D;
-use argui_inspect::{InspectNodeId, NodeSnapshot, PropertySnapshot, StyleProperty};
+use argui_inspect::{InspectNodeId, NodeSnapshot, StyleProperty};
 use argui_paint::{CornerRadii, PaintStyle, QuadStyle, VectorId};
 use argui_text::{TextColor, TextStyle, TextWrap};
 use argui_ui::{
     AlignItems, Axes, Element, LayoutStyle, Overflow, ScrollConfig, ScrollbarPartStyle,
     ScrollbarStyle, Sides, StylePatch, length, property, sides,
 };
-use argui_widgets::{Button, ButtonStyle, Checkbox, Input, InputStyle, WidgetTheme};
+use argui_widgets::{Button, ButtonStyle, WidgetTheme};
 
 use crate::host::DevtoolsHost;
+
+mod properties;
+use properties::property_editor;
 
 pub(crate) fn sidebar<A>(
     selected: Option<InspectNodeId>,
@@ -18,18 +21,29 @@ pub(crate) fn sidebar<A>(
 ) -> Element {
     let Some(node) = selected.and_then(|id| nodes.iter().find(|node| node.id == id)) else {
         return Element::text("Select an element to inspect its styles")
-            .width(if tools.panel_width() < 640.0 {
-                argui_ui::percent(1.0)
-            } else {
-                length(340.0)
-            })
+            .width(argui_ui::percent(1.0))
+            .min_width(length(0.0))
             .padding(Sides::length(16.0))
             .background(theme.card)
             .text_style(text(13.0, theme.muted_foreground));
     };
     let mut rows = vec![
-        Element::text(format!("{}  {:?}", node.kind, node.bounds))
-            .text_style(text(13.0, theme.foreground)),
+        Element::text(format!(
+            "{}{}",
+            node.kind,
+            node.key
+                .as_ref()
+                .map_or(String::new(), |key| format!("  #{key}"))
+        ))
+        .text_style(text(13.0, theme.foreground)),
+        Element::text(format!(
+            "{:.1} × {:.1} px · x {:.1} · y {:.1}",
+            node.bounds.size.width,
+            node.bounds.size.height,
+            node.bounds.origin.x,
+            node.bounds.origin.y
+        ))
+        .text_style(text(11.0, theme.muted_foreground)),
         button("__devtools-reset", "Reset overrides", false, theme),
     ];
     if let Some(portal) = &node.portal {
@@ -92,7 +106,8 @@ pub(crate) fn sidebar<A>(
         }
     }
     Element::column(rows)
-        .width(length(340.0))
+        .width(argui_ui::percent(1.0))
+        .min_width(length(0.0))
         .padding(Sides::length(12.0))
         .gap(7.0)
         .background(theme.card)
@@ -101,84 +116,6 @@ pub(crate) fn sidebar<A>(
             y: Overflow::Auto,
         })
         .scroll_config(ScrollConfig::default().scrollbar(scrollbar(theme)))
-}
-
-fn property_editor<A>(
-    node: InspectNodeId,
-    snapshot: &PropertySnapshot,
-    tools: &DevtoolsHost<A>,
-    theme: &WidgetTheme,
-) -> Element {
-    let property = snapshot.property;
-    let enabled = tools
-        .inspector
-        .property_enabled(node, property)
-        .unwrap_or(true);
-    let value = tools
-        .inspector
-        .property_value(node, property)
-        .unwrap_or_else(|| snapshot.value.clone());
-    let mut rows = vec![
-        Checkbox::new(
-            format!("__devtools-style-{}", property.label()),
-            property.label(),
-            if enabled {
-                argui_ui::CheckedState::Checked
-            } else {
-                argui_ui::CheckedState::Unchecked
-            },
-        )
-        .build(theme),
-    ];
-    let fields = value.fields();
-    if fields.is_empty() {
-        rows.push(
-            Element::text(value.summary())
-                .padding(sides(8.0, 4.0))
-                .text_style(text(11.0, theme.muted_foreground)),
-        );
-    } else {
-        rows.extend(fields.into_iter().enumerate().map(|(index, field)| {
-            Element::row([
-                Element::text(field.label)
-                    .grow(1.0)
-                    .text_style(text(11.0, theme.muted_foreground)),
-                number_input(
-                    &format!("__devtools-value-{}-{}-{index}", node.0, property.label()),
-                    field.value,
-                    theme,
-                ),
-            ])
-            .align_items(AlignItems::CENTER)
-            .gap(6.0)
-            .padding(sides(8.0, 2.0))
-        }));
-    }
-    Element::column(rows)
-        .gap(3.0)
-        .background(theme.background)
-        .radius(CornerRadii::all(5.0))
-}
-
-fn number_input(key: &str, value: f32, theme: &WidgetTheme) -> Element {
-    Input::new(
-        key,
-        format_number(value),
-        "0",
-        InputStyle::new(
-            PaintStyle::new(QuadStyle::solid(theme.card).radius(CornerRadii::all(4.0))),
-            text(11.0, theme.foreground),
-        )
-        .focused(StylePatch::new().set(property::BackgroundColor, theme.muted)),
-    )
-    .build()
-    .width(length(92.0))
-    .padding(sides(7.0, 4.0))
-}
-
-fn format_number(value: f32) -> String {
-    let value = format!("{value:.3}");
-    value.trim_end_matches('0').trim_end_matches('.').to_owned()
 }
 
 fn section_header(

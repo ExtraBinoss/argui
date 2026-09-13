@@ -1,12 +1,15 @@
 use argui_core::{Affine2D, Color, Rect};
 
-use crate::{ClipChain, ImageFit, ImageId, ImageSampling, LinearGradient, RadialGradient};
+use crate::{
+    BilinearGradient, ClipChain, ImageFit, ImageId, ImageSampling, LinearGradient, RadialGradient,
+};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Fill {
     Solid(Color),
     Linear(LinearGradient),
     Radial(RadialGradient),
+    Bilinear(BilinearGradient),
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]

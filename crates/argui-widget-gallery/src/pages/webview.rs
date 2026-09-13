@@ -220,7 +220,7 @@ impl WebViewDemo {
 impl Render for WebViewDemo {
     fn render(&mut self, cx: &mut Context<Self>) -> Element {
         let environment = cx.environment();
-        let themes = shadcn(environment.primary);
+        let themes = shadcn(&environment);
         let theme = themes.resolve(environment.color_scheme);
         let mut root = Tabs::new(
             "webview-tabs",

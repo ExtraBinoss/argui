@@ -161,7 +161,7 @@ impl TimelineView {
 
 impl Render for TimelineView {
     fn render(&mut self, cx: &mut Context<Self>) -> Element {
-        let themes = shadcn(cx.environment().primary);
+        let themes = shadcn(cx.environment());
         let theme = themes.resolve(cx.environment().color_scheme);
         let clips = cx.read(&self.clips, |clips| *clips);
         let zoom_out = Button::new(self.key("zoom-out"), "Zoom −", theme.ghost_button())

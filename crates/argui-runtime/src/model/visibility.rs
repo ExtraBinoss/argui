@@ -60,6 +60,18 @@ impl<T: Render> Context<T> {
         self.entity_visible(entity, true)
     }
 
+    /// Render a child with a scoped environment, inherited by its descendants.
+    pub fn entity_in<U: Render>(
+        &mut self,
+        entity: &Entity<U>,
+        environment: crate::WindowEnvironment,
+    ) -> Element {
+        let parent = std::mem::replace(&mut self.environment, environment);
+        let element = self.entity(entity);
+        self.environment = parent;
+        element
+    }
+
     /// Retains a child while hidden, without rendering or accepting UI input.
     /// Omitting this call on a later render unmounts the child instead.
     pub fn entity_visible<U: Render>(&mut self, entity: &Entity<U>, visible: bool) -> Element {
@@ -78,7 +90,7 @@ impl<T: Render> Context<T> {
         }
         #[cfg(feature = "tasks")]
         self.inherit_tasks(&entity);
-        let element = entity.render_in(self.environment);
+        let element = entity.render_in(self.environment.clone());
         inherit_environment_use(
             &self.environment_read,
             &entity.0.presentation.environment_used,

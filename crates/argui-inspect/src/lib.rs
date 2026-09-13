@@ -3,6 +3,8 @@ use std::{cell::RefCell, collections::VecDeque, rc::Rc, time::Duration};
 use argui_core::{Point, Rect};
 
 mod frames;
+mod memory;
+pub use memory::MemorySnapshot;
 mod trace;
 pub use frames::FrameCursor;
 
@@ -257,6 +259,7 @@ pub struct FrameRecord {
     pub textures: usize,
     pub reused_textures: usize,
     pub texture_bytes: u64,
+    pub vector_atlas_bytes: u64,
     pub vector_atlas_entries: usize,
     pub vector_atlas_hits: usize,
     pub vector_rasterizations: usize,
@@ -281,6 +284,8 @@ pub enum Invalidation {
 
 #[derive(Clone, Debug)]
 struct InspectorState {
+    memory: Option<MemorySnapshot>,
+    memory_requested: bool,
     tree: TreeSnapshot,
     frames: VecDeque<FrameRecord>,
     capacity: usize,
@@ -309,6 +314,8 @@ impl InspectorHandle {
     #[must_use]
     pub fn new(capacity: usize) -> Self {
         Self(Rc::new(RefCell::new(InspectorState {
+            memory: None,
+            memory_requested: false,
             tree: TreeSnapshot::default(),
             frames: VecDeque::with_capacity(capacity),
             capacity,
@@ -368,6 +375,7 @@ impl InspectorHandle {
             frame.textures = record.textures;
             frame.reused_textures = record.reused_textures;
             frame.texture_bytes = record.texture_bytes;
+            frame.vector_atlas_bytes = record.vector_atlas_bytes;
             frame.vector_atlas_entries = record.vector_atlas_entries;
             frame.vector_atlas_hits = record.vector_atlas_hits;
             frame.vector_rasterizations = record.vector_rasterizations;
@@ -534,6 +542,14 @@ impl InspectorHandle {
 
     pub fn clear_overrides(&self) {
         self.0.borrow_mut().overrides.clear();
+    }
+
+    /// Restore the authored value and enabled state of a single property.
+    pub fn clear_property_override(&self, node: InspectNodeId, property: StyleProperty) {
+        self.0
+            .borrow_mut()
+            .overrides
+            .retain(|entry| entry.node != node || entry.property != property);
     }
 
     pub fn trace_json(&self) -> Result<String, TraceError> {

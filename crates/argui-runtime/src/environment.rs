@@ -1,7 +1,7 @@
 use argui_core::{Color, ColorScheme};
 
 /// Read-only platform and application state for the window currently being rendered.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct WindowEnvironment {
     pub color_scheme: ColorScheme,
     pub primary: Color,
@@ -9,6 +9,8 @@ pub struct WindowEnvironment {
     pub high_contrast: bool,
     /// Native desktop blur is available and permitted for this window.
     pub desktop_backdrop_available: bool,
+    /// Optional theme tokens; no map is allocated in ordinary environments.
+    pub theme_overrides: Option<std::sync::Arc<argui_theme::ThemeOverrides>>,
 }
 
 impl Default for WindowEnvironment {
@@ -19,7 +21,17 @@ impl Default for WindowEnvironment {
             reduced_motion: false,
             high_contrast: false,
             desktop_backdrop_available: false,
+            theme_overrides: None,
         }
+    }
+}
+
+impl argui_theme::ThemeSource for WindowEnvironment {
+    fn primary_color(&self) -> Color {
+        self.primary
+    }
+    fn theme_overrides(&self) -> Option<&argui_theme::ThemeOverrides> {
+        self.theme_overrides.as_deref()
     }
 }
 

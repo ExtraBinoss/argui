@@ -1,3 +1,5 @@
+mod rendering;
+
 use std::cell::RefCell;
 
 use argui_animation::Frame;
@@ -58,6 +60,16 @@ impl<M: AppModel> DevtoolsApp<M> {
     pub fn open(mut self, open: bool) -> Self {
         let tools = self.tools.get_mut();
         tools.set_open_immediate(open);
+        self
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[must_use]
+    pub fn device_telemetry(
+        mut self,
+        provider: impl crate::telemetry::DeviceTelemetryProvider,
+    ) -> Self {
+        self.tools.get_mut().telemetry.provider(provider);
         self
     }
 
@@ -151,36 +163,7 @@ impl<M: AppModel> DevtoolsApp<M> {
 
 impl<M: AppModel> AppModel for DevtoolsApp<M> {
     fn view(&self, window: &WindowKey, environment: WindowEnvironment) -> Option<Element> {
-        {
-            let mut tools = self.tools.borrow_mut();
-            tools.reduced_motion = environment.reduced_motion;
-            if tools.reduced_motion {
-                let open = tools.dock_presence.is_open();
-                tools.dock_presence.set_open(open, true);
-            }
-        }
-        let themes = argui_widgets::shadcn(environment.primary);
-        let theme = themes.resolve(environment.color_scheme);
-        if window == &self.detached {
-            let tools = self.tools.borrow();
-            return Some(view::dock(
-                &tools,
-                tools.viewport.size.height.max(1.0),
-                theme,
-            ));
-        }
-        let app = self.app.view(window, environment)?;
-        if window != &self.target {
-            return Some(app);
-        }
-        let tools = self.tools.borrow();
-        let mut root = view::host(&tools, app, theme, None);
-        if let Some(error) = &self.error {
-            root.children.push(Element::text(format!(
-                "Could not open developer tools window: {error}"
-            )));
-        }
-        Some(root)
+        self.view_window(window, environment)
     }
 
     fn event_router(&self, window: &WindowKey) -> Option<AnyEntity> {
@@ -285,6 +268,8 @@ impl<M: AppModel> AppModel for DevtoolsApp<M> {
         let tools = self.tools.get_mut();
         let mut changed = false;
         if panel_window {
+            tools.property_editing.layout_changed(layout);
+            tools.theme_editing.layout_changed(layout);
             changed = tools.viewport != layout.viewport;
             changed |= tools.measure_profile(layout);
             tools.viewport = layout.viewport;
@@ -360,7 +345,14 @@ impl<M: AppModel> AppModel for DevtoolsApp<M> {
         }
     }
     fn take_text_selection_request(&mut self, window: &WindowKey) -> Option<TextSelectionRequest> {
-        self.app.take_text_selection_request(window)
+        if window == self.tools_window() {
+            self.tools
+                .get_mut()
+                .take_text_selection_request()
+                .or_else(|| self.app.take_text_selection_request(window))
+        } else {
+            self.app.take_text_selection_request(window)
+        }
     }
 
     fn take_ui_commands(&mut self, window: &WindowKey) -> Vec<argui_ui::UiCommand> {

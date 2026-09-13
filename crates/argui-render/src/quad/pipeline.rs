@@ -106,6 +106,13 @@ impl QuadInstance {
                 ];
                 self.set_stops(gradient.stops.as_slice(), gradient.interpolation, stops);
             }
+            Some(Fill::Bilinear(gradient)) => {
+                self.params[1] = 3.0;
+                let corners = gradient
+                    .corners()
+                    .map(|color| argui_paint::GradientStop::new(0.0, color));
+                self.set_stops(&corners, gradient.interpolation, stops);
+            }
             None => {}
         }
     }

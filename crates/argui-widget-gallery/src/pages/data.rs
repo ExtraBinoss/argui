@@ -88,7 +88,7 @@ impl DataDemo {
 
 impl Render for DataDemo {
     fn render(&mut self, cx: &mut Context<Self>) -> Element {
-        let themes = shadcn(cx.environment().primary);
+        let themes = shadcn(cx.environment());
         let theme = themes.resolve(cx.environment().color_scheme);
         self.window = (self.page == Page::VList).then(|| self.heights.window(self.offset));
         let text_style = argui::text::TextStyle {

@@ -9,6 +9,27 @@ fn stop(offset: f32) -> GradientStop {
 }
 
 #[test]
+fn bilinear_corners_share_storage_without_increasing_the_fill_size() {
+    use argui_paint::{BilinearGradient, ColorInterpolation, Fill};
+    let corners = [
+        Color::WHITE,
+        Color::srgb(1.0, 0.0, 0.0),
+        Color::BLACK,
+        Color::TRANSPARENT,
+    ];
+    let gradient = BilinearGradient::new(corners, ColorInterpolation::Srgb);
+    assert_eq!(gradient.corners(), &corners);
+    assert!(std::ptr::eq(gradient.corners(), gradient.clone().corners()));
+    assert_eq!(gradient.interpolation, ColorInterpolation::Srgb);
+    // Existing gradient storage plus the discriminant, rounded to pointer alignment.
+    let alignment = align_of::<Fill>();
+    assert_eq!(
+        size_of::<Fill>(),
+        (size_of::<LinearGradient>() + 1).div_ceil(alignment) * alignment
+    );
+}
+
+#[test]
 fn gradients_accept_runtime_generated_and_many_stops() {
     let stops = GradientStops::from_vec((0..32).map(|i| stop(i as f32 / 31.0)).collect())
         .expect("generated stops are valid");

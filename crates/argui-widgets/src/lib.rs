@@ -1,4 +1,8 @@
 //! Optional, accessible widgets built from Argui engine primitives.
+#[cfg(feature = "color-picker")]
+mod color_picker;
+#[cfg(feature = "color-picker")]
+pub use color_picker::{ColorFormat, ColorPicker, ColorPickerState};
 #[cfg(feature = "label")]
 mod label;
 #[cfg(feature = "label")]

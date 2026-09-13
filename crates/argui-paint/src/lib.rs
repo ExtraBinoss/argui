@@ -17,6 +17,6 @@ pub use style::{
 };
 pub use vector::{VectorAsset, VectorId, VectorPrimitive};
 pub use visual::{
-    ClipChain, ClipRegion, GradientError, GradientStop, GradientStops, ImageAsset, ImageAssetError,
-    ImageFit, ImageId, ImageSampling, LinearGradient, RadialGradient,
+    BilinearGradient, ClipChain, ClipRegion, GradientError, GradientStop, GradientStops,
+    ImageAsset, ImageAssetError, ImageFit, ImageId, ImageSampling, LinearGradient, RadialGradient,
 };

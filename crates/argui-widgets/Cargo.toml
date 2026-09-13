@@ -25,6 +25,7 @@ all = [
     "chart",
     "checkbox",
     "collapsible",
+    "color-picker",
     "combobox",
     "command-palette",
     "context-menu",
@@ -143,6 +144,7 @@ tooltip = ["dep:argui-runtime", "argui-runtime/tasks", "dep:argui-inspect", "dep
 dialog = []
 range = ["dep:argui-runtime"]
 slider = ["range"]
+color-picker = ["range", "input", "button"]
 spinner = ["dep:argui-runtime"]
 text-selection = ["button", "icons", "dep:argui-runtime", "dep:argui-inspect"]
 split-pane = []

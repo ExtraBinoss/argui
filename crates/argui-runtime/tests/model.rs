@@ -471,7 +471,7 @@ mod entity_tests {
                 reads,
             });
             let _ = entity.render_in(WindowEnvironment::default());
-            let _ = entity.render_in(dark);
+            let _ = entity.render_in(dark.clone());
             assert_eq!(renders.get(), expected);
         }
     }

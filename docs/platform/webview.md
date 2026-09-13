@@ -215,6 +215,13 @@ are driven on the UI thread, with the parent window retained until after the
 renderer is dropped. No `Send`/`Sync` implementations or raw owned pointers are
 introduced. The parent-surface lifetime remains explicit in the canvas owner;
 this boundary requires native lifecycle testing in addition to the pure tests.
+GTK destroys its parent `wl_surface` when a window is hidden, even while the Tao
+window stays alive ([GTK implementation](https://github.com/GNOME/gtk/blob/gtk-3-24/gdk/wayland/gdkwindow-wayland.c)).
+The host drops its subsurface attachment on GTK unmap and attaches the retained
+WGPU child to the current parent when mapped again. Parent commits stay under
+GTK's frame scheduling so its configure acknowledgement precedes presentation.
+The native lifecycle check covers that transition,
+including resize, close/reopen and the retained presentation model.
 
 GTK's client allocation determines the child origin and logical size, including
 decoration offsets. Scale is applied only to the swapchain dimensions. The

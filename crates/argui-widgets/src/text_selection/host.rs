@@ -116,7 +116,7 @@ impl<A: Render> Render for SelectionHost<A> {
 impl<A: Render> SelectionHost<A> {
     fn compose(&self, mut root: Element, environment: WindowEnvironment) -> Element {
         if let Some(selection) = self.active.as_ref().or(self.closing.as_ref()) {
-            let theme = shadcn(environment.primary);
+            let theme = shadcn(&environment);
             let mut toolbar = TextSelectionToolbar::new(
                 &self.menu_key,
                 selection.bounds,

@@ -102,7 +102,7 @@ impl<T: 'static> Entity<T> {
         let mut cx = Context {
             entity: Some(self.downgrade()),
             owner: Some((self.0.presentation.id, observer)),
-            environment: self.0.presentation.environment.get(),
+            environment: self.0.presentation.environment.borrow().clone(),
             ..Context::default()
         };
         let result = update(&mut self.0.model.value.borrow_mut(), &mut cx);

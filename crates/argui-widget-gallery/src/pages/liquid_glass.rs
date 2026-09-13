@@ -299,7 +299,7 @@ impl Render for GlassDemo {
         self.layout_controls(layout);
     }
     fn render(&mut self, cx: &mut Context<Self>) -> Element {
-        let themes = shadcn(cx.environment().primary);
+        let themes = shadcn(cx.environment());
         let theme = themes.resolve(cx.environment().color_scheme);
         let phone = Element::container([self.feed(theme), self.navbar(theme, cx)])
             .keyed("liquid-glass-stage")

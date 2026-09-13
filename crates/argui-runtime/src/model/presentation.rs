@@ -26,7 +26,7 @@ pub(super) struct Presentation<T> {
     pub(super) pending: RefCell<ContextEffects>,
     pub(super) children: RefCell<Vec<AnyEntity>>,
     pub(super) event_routes: RefCell<Vec<AnyEntity>>,
-    pub(super) environment: Cell<WindowEnvironment>,
+    pub(super) environment: RefCell<WindowEnvironment>,
     pub(super) environment_used: Cell<bool>,
     pub(super) handlers: RefCell<HandlerRegistry<T>>,
 }
@@ -51,7 +51,7 @@ impl<T> Presentation<T> {
             pending: RefCell::default(),
             children: RefCell::default(),
             event_routes: RefCell::default(),
-            environment: Cell::default(),
+            environment: RefCell::default(),
             environment_used: Cell::new(false),
             handlers: RefCell::new(HandlerRegistry::default()),
         }

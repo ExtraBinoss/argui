@@ -12,7 +12,7 @@ use crate::pages::ResizeListeners;
 impl WidgetGallery {
     pub(super) fn render_element(&mut self, cx: &mut Context<Self>) -> Element {
         let environment = cx.environment();
-        let themes = shadcn(environment.primary);
+        let themes = shadcn(&environment);
         let theme = themes.resolve(environment.color_scheme);
         let assets = match environment.color_scheme {
             ColorScheme::Light => &self.light_assets,
@@ -96,6 +96,9 @@ impl Render for WidgetGallery {
         cx.layout_entity(&self.glass, layout);
         cx.layout_entity(&self.menus, layout);
         if let Some(page) = self.catalogue.get(&self.page) {
+            cx.layout_entity(page, layout);
+        }
+        if let Some(page) = self.color_picker.get() {
             cx.layout_entity(page, layout);
         }
     }

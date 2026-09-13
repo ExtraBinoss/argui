@@ -145,7 +145,7 @@ impl StateShowcase {
         environment: WindowEnvironment,
         resize_listener: Option<argui_ui::EventListener>,
     ) -> Element {
-        let themes = shadcn(environment.primary);
+        let themes = shadcn(&environment);
         let widgets = themes.resolve(environment.color_scheme);
         let assets = match environment.color_scheme {
             argui_core::ColorScheme::Light => &self.light_assets,

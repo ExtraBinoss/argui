@@ -113,6 +113,13 @@ pub(super) fn panel<A>(tools: &DevtoolsHost<A>, theme: &WidgetTheme) -> Element 
             .min_height(length(0.0))
     };
     let details = || {
+        if tools.profile_panel == 3 {
+            return scroll(
+                "__devtools-resources-body",
+                super::resources::panel(tools, frame, theme),
+                theme,
+            );
+        }
         let content = detail_content(tools, theme);
         if tools.profile_panel == 2 {
             scroll("__devtools-profile-details-body", content, theme)
@@ -140,6 +147,12 @@ pub(super) fn panel<A>(tools: &DevtoolsHost<A>, theme: &WidgetTheme) -> Element 
             "__devtools-profile-details",
             "Frame details",
             tools.profile_panel == 2,
+            theme,
+        ),
+        small_button(
+            "__devtools-profile-resources",
+            "Resources",
+            tools.profile_panel == 3,
             theme,
         ),
     ])

@@ -49,6 +49,11 @@ pub struct DisplayList {
 }
 
 impl DisplayList {
+    /// Allocated command capacity, excluding shared and nested command payloads.
+    #[must_use]
+    pub fn storage_bytes(&self) -> usize {
+        self.commands.capacity() * size_of::<DisplayCommand>()
+    }
     #[must_use]
     pub const fn new() -> Self {
         Self {

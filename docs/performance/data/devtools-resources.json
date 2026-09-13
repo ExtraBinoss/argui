@@ -1,0 +1,248 @@
+{
+  "date": "2026-09-13",
+  "baseline": "1e78722",
+  "candidate": "DevTools implementation in this revision",
+  "platform": "7.1.12-200.fc44.x86_64",
+  "cpu": "Intel Core Ultra 5 125H",
+  "gpu": "Intel Arc Graphics (Meteor Lake)",
+  "profile": "release --all-features",
+  "viewport": [
+    1220,
+    1000
+  ],
+  "native_seconds_per_phase": 10,
+  "native_sampling": "0.5 second intervals after startup and two seconds settling per pane; all-smi disabled; no concurrent builds or tests",
+  "native_runs": [
+    {
+      "run": "0-before",
+      "samples": [
+        {
+          "phase": "closed",
+          "cpu_percent": 60.241812336976196,
+          "rss_mib": 149.762890625,
+          "pss_mib": 99.153125,
+          "private_mib": 90.770703125,
+          "gpu_resident_mib": 89.02
+        },
+        {
+          "phase": "elements",
+          "cpu_percent": 82.02984009479955,
+          "rss_mib": 171.9873046875,
+          "pss_mib": 122.80234375,
+          "private_mib": 113.014453125,
+          "gpu_resident_mib": 155.4
+        },
+        {
+          "phase": "profiling",
+          "cpu_percent": 96.4758367829806,
+          "rss_mib": 184.9869140625,
+          "pss_mib": 135.8052734375,
+          "private_mib": 126.0142578125,
+          "gpu_resident_mib": 155.4
+        }
+      ]
+    },
+    {
+      "run": "1-after",
+      "samples": [
+        {
+          "phase": "closed",
+          "cpu_percent": 60.222834468768674,
+          "rss_mib": 155.7052734375,
+          "pss_mib": 106.431982421875,
+          "private_mib": 96.5880859375,
+          "gpu_resident_mib": 91.02
+        },
+        {
+          "phase": "elements",
+          "cpu_percent": 89.51408569415483,
+          "rss_mib": 166.1822265625,
+          "pss_mib": 116.87919921875,
+          "private_mib": 107.0361328125,
+          "gpu_resident_mib": 155.4
+        },
+        {
+          "phase": "profiling",
+          "cpu_percent": 97.824144250354,
+          "rss_mib": 177.8544921875,
+          "pss_mib": 128.53779296875,
+          "private_mib": 118.6943359375,
+          "gpu_resident_mib": 155.4
+        },
+        {
+          "phase": "resources",
+          "cpu_percent": 100.71711785847496,
+          "rss_mib": 180.0685546875,
+          "pss_mib": 130.7529296875,
+          "private_mib": 120.9083984375,
+          "gpu_resident_mib": 155.4
+        }
+      ]
+    },
+    {
+      "run": "2-after",
+      "samples": [
+        {
+          "phase": "closed",
+          "cpu_percent": 71.8444272673402,
+          "rss_mib": 163.3462890625,
+          "pss_mib": 112.569091796875,
+          "private_mib": 101.6857421875,
+          "gpu_resident_mib": 91.02
+        },
+        {
+          "phase": "elements",
+          "cpu_percent": 95.26214981845895,
+          "rss_mib": 176.0513671875,
+          "pss_mib": 124.867822265625,
+          "private_mib": 114.1068359375,
+          "gpu_resident_mib": 123.21
+        },
+        {
+          "phase": "profiling",
+          "cpu_percent": 98.35278206621602,
+          "rss_mib": 188.6654296875,
+          "pss_mib": 137.858984375,
+          "private_mib": 128.1427734375,
+          "gpu_resident_mib": 155.4
+        },
+        {
+          "phase": "resources",
+          "cpu_percent": 99.67911699341025,
+          "rss_mib": 190.918359375,
+          "pss_mib": 138.755126953125,
+          "private_mib": 129.0091796875,
+          "gpu_resident_mib": 155.4
+        }
+      ]
+    },
+    {
+      "run": "3-before",
+      "samples": [
+        {
+          "phase": "closed",
+          "cpu_percent": 60.102503707197094,
+          "rss_mib": 146.6876953125,
+          "pss_mib": 93.6017578125,
+          "private_mib": 86.5080078125,
+          "gpu_resident_mib": 89.02
+        },
+        {
+          "phase": "elements",
+          "cpu_percent": 93.16239772901899,
+          "rss_mib": 168.6,
+          "pss_mib": 114.23330078125,
+          "private_mib": 106.24453125,
+          "gpu_resident_mib": 123.21
+        },
+        {
+          "phase": "profiling",
+          "cpu_percent": 89.24990883376702,
+          "rss_mib": 188.756640625,
+          "pss_mib": 134.45771484375,
+          "private_mib": 126.46875,
+          "gpu_resident_mib": 157.41
+        }
+      ]
+    },
+    {
+      "run": "4-before",
+      "samples": [
+        {
+          "phase": "closed",
+          "cpu_percent": 68.21643934256508,
+          "rss_mib": 164.8826171875,
+          "pss_mib": 110.6541015625,
+          "private_mib": 102.5888671875,
+          "gpu_resident_mib": 93.02
+        },
+        {
+          "phase": "elements",
+          "cpu_percent": 13.91958221164574,
+          "rss_mib": 191.0087890625,
+          "pss_mib": 138.67255859375,
+          "private_mib": 131.403515625,
+          "gpu_resident_mib": 129.22
+        },
+        {
+          "phase": "profiling",
+          "cpu_percent": 37.614220179549086,
+          "rss_mib": 199.6072265625,
+          "pss_mib": 146.584814453125,
+          "private_mib": 139.4435546875,
+          "gpu_resident_mib": 161.41
+        }
+      ]
+    },
+    {
+      "run": "5-after",
+      "samples": [
+        {
+          "phase": "closed",
+          "cpu_percent": 51.709115955537555,
+          "rss_mib": 151.3453125,
+          "pss_mib": 98.1796875,
+          "private_mib": 90.8853515625,
+          "gpu_resident_mib": 89.02
+        },
+        {
+          "phase": "elements",
+          "cpu_percent": 90.21329760257191,
+          "rss_mib": 171.133984375,
+          "pss_mib": 118.304736328125,
+          "private_mib": 111.243359375,
+          "gpu_resident_mib": 157.41
+        },
+        {
+          "phase": "profiling",
+          "cpu_percent": 48.83294251089243,
+          "rss_mib": 195.6357421875,
+          "pss_mib": 142.804443359375,
+          "private_mib": 135.7193359375,
+          "gpu_resident_mib": 161.41
+        },
+        {
+          "phase": "resources",
+          "cpu_percent": 21.158013187910303,
+          "rss_mib": 200.6279296875,
+          "pss_mib": 147.830078125,
+          "private_mib": 140.7021484375,
+          "gpu_resident_mib": 161.41
+        }
+      ]
+    }
+  ],
+  "cpu_runs": [
+    {
+      "run": "cpu-0-before",
+      "output": "Closed: model p95=0.336 ms \u00b7 layout/paint p95=0.957 ms\nClosed: CPU p50=0.880 ms p95=1.278 ms p99=2.048 ms\nElements: model p95=0.363 ms \u00b7 layout/paint p95=1.020 ms\nElements: CPU p50=1.241 ms p95=1.490 ms p99=2.022 ms\nProfiling: model p95=2.492 ms \u00b7 layout/paint p95=8.125 ms\nProfiling: CPU p50=0.629 ms p95=10.617 ms p99=13.828 ms\n"
+    },
+    {
+      "run": "cpu-1-after",
+      "output": "Closed: model p95=0.066 ms \u00b7 layout/paint p95=0.165 ms\nClosed: CPU p50=0.167 ms p95=0.229 ms p99=0.262 ms\nElements: model p95=0.066 ms \u00b7 layout/paint p95=0.200 ms\nElements: CPU p50=0.197 ms p95=0.287 ms p99=0.314 ms\nProfiling: model p95=2.675 ms \u00b7 layout/paint p95=8.523 ms\nProfiling: CPU p50=0.725 ms p95=11.201 ms p99=13.315 ms\n"
+    },
+    {
+      "run": "cpu-2-after",
+      "output": "Closed: model p95=0.053 ms \u00b7 layout/paint p95=0.124 ms\nClosed: CPU p50=0.153 ms p95=0.180 ms p99=0.215 ms\nElements: model p95=0.050 ms \u00b7 layout/paint p95=0.139 ms\nElements: CPU p50=0.140 ms p95=0.208 ms p99=0.227 ms\nProfiling: model p95=2.401 ms \u00b7 layout/paint p95=6.883 ms\nProfiling: CPU p50=0.504 ms p95=8.568 ms p99=14.999 ms\n"
+    },
+    {
+      "run": "cpu-3-before",
+      "output": "Closed: model p95=0.089 ms \u00b7 layout/paint p95=0.181 ms\nClosed: CPU p50=0.166 ms p95=0.267 ms p99=0.298 ms\nElements: model p95=0.105 ms \u00b7 layout/paint p95=0.251 ms\nElements: CPU p50=0.302 ms p95=0.386 ms p99=0.449 ms\nProfiling: model p95=1.645 ms \u00b7 layout/paint p95=5.198 ms\nProfiling: CPU p50=0.417 ms p95=6.757 ms p99=8.616 ms\n"
+    },
+    {
+      "run": "cpu-4-before",
+      "output": "Closed: model p95=0.089 ms \u00b7 layout/paint p95=0.191 ms\nClosed: CPU p50=0.226 ms p95=0.281 ms p99=0.311 ms\nElements: model p95=0.086 ms \u00b7 layout/paint p95=0.183 ms\nElements: CPU p50=0.219 ms p95=0.295 ms p99=0.322 ms\nProfiling: model p95=2.443 ms \u00b7 layout/paint p95=7.146 ms\nProfiling: CPU p50=0.474 ms p95=10.410 ms p99=15.789 ms\n"
+    },
+    {
+      "run": "cpu-5-after",
+      "output": "Closed: model p95=0.051 ms \u00b7 layout/paint p95=0.126 ms\nClosed: CPU p50=0.145 ms p95=0.182 ms p99=0.208 ms\nElements: model p95=0.065 ms \u00b7 layout/paint p95=0.196 ms\nElements: CPU p50=0.178 ms p95=0.293 ms p99=0.334 ms\nProfiling: model p95=1.806 ms \u00b7 layout/paint p95=6.143 ms\nProfiling: CPU p50=0.507 ms p95=7.803 ms p99=16.286 ms\n"
+    }
+  ],
+  "aggregate_native_runs": [
+    "0-before",
+    "1-after",
+    "2-after",
+    "3-before"
+  ],
+  "excluded_pair": "4-before missed the Profiling tab activation (confirmed in capture); 4-before and its paired 5-after are retained for audit but excluded from aggregate comparisons. Driver now rejects inactive panes and stopped spinner presentation."
+}

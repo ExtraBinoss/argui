@@ -152,7 +152,7 @@ impl<A: Render> Render for TooltipHost<A> {
             && let Some(description) = candidate(&root, key)
         {
             let environment = cx.environment();
-            let themes = crate::shadcn(environment.primary);
+            let themes = crate::shadcn(&environment);
             let mut tooltip = Tooltip::new(key, description, true, Element::container([]));
             if let Some(paint) = &self.paint {
                 tooltip = tooltip.paint(paint.clone());

@@ -48,7 +48,7 @@ impl Render for ActionsDemo {
 
     fn render(&mut self, cx: &mut Context<Self>) -> Element {
         self.menu.sync(cx);
-        let themes = shadcn(cx.environment().primary);
+        let themes = shadcn(cx.environment());
         let theme = themes.resolve(cx.environment().color_scheme);
         let mut panels = Vec::new();
         for (key, label, value) in [
