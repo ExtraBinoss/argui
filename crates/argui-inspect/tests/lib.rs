@@ -45,6 +45,7 @@ fn frame_history_is_bounded_pauseable_and_clearable() {
 fn overrides_are_reversible_and_selection_is_stable() {
     let inspector = InspectorHandle::default();
     let node = InspectNodeId(7);
+    assert!(inspector.overridden_nodes().is_empty());
     inspector.select(Some(node));
     assert_eq!(inspector.selected(), Some(node));
     assert!(!inspector.toggle(node, StyleProperty::Background));
@@ -53,7 +54,10 @@ fn overrides_are_reversible_and_selection_is_stable() {
         Some(false)
     );
     assert!(inspector.toggle(node, StyleProperty::Background));
+    inspector.toggle(node, StyleProperty::Opacity);
+    assert_eq!(inspector.overridden_nodes(), [node].into_iter().collect());
     inspector.clear_overrides();
+    assert!(inspector.overridden_nodes().is_empty());
     assert_eq!(
         inspector.property_enabled(node, StyleProperty::Background),
         None

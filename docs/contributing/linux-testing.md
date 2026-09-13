@@ -178,6 +178,16 @@ reste fixe pendant le glissement. Les captures comparent aussi les pixels du
 préfixe `0.` pendant des déplacements rapides : sa ligne doit tenir dans le champ
 sans défilement vertical pour remettre le curseur en vue.
 
+Pour vérifier le retard des prévisualisations du ColorPicker, utiliser
+`node crates/argui-widget-gallery/tests/pages/color_picker.mjs` avec le même
+lanceur. Le scénario fige temporairement l'horloge d'animation pendant les gestes
+et compare les pixels du bouton, du carré et du fond modifié depuis les DevTools.
+Il vérifie aussi que le pad et le popover restent fixes. Les captures clair/sombre
+vont dans `target/color-picker-interactions/`. Cette vérification détecte une
+transition qui retarde la couleur ; elle ne mesure pas la latence de présentation.
+Les mesures CPU reproductibles sont dans
+[optimizations.md](../performance/optimizations.md#color-picker-interaction-cost).
+
 Pour le texte animé, utiliser
 `node crates/argui-widget-gallery/tests/pages/animated_text.mjs` avec le même
 lanceur. Les captures de `target/animated-text-interactions/` montrent les trois

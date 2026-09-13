@@ -1,4 +1,5 @@
 mod input;
+mod paint;
 mod values;
 mod view;
 

@@ -1,13 +1,13 @@
-use argui_core::{Color, ColorInterpolation, Point, Transform2D};
-use argui_paint::{BilinearGradient, Border, CornerRadii, Fill, GradientStop, LinearGradient};
+use argui_core::{Color, ColorInterpolation, Point};
+use argui_paint::{BilinearGradient, CornerRadii, Fill, GradientStop, LinearGradient};
 use argui_text::TextStyle;
 use argui_ui::{
     AlignItems, Element, FocusPolicy, GestureCapture, GestureDelivery, GestureSet, Interaction,
-    LengthPercentageAuto, PanGesture, Role, SemanticState, Semantics, Sides, StylePatch,
-    UserSelect, VisualState, auto, length, percent,
+    PanGesture, Role, SemanticState, Semantics, Sides, StylePatch, UserSelect, VisualState, length,
+    percent,
 };
 
-use super::{ColorFormat, ColorPicker, values::hsv_to_rgb};
+use super::{ColorFormat, ColorPicker, paint::Decoration, values::hsv_to_rgb};
 use crate::{Button, Input, RangeBehavior, RangePart, WidgetTheme};
 
 impl ColorPicker<'_> {
@@ -108,9 +108,7 @@ impl ColorPicker<'_> {
     fn pad(&self, theme: &WidgetTheme) -> Element {
         let [h, s, v] = self.state.hsv;
         let [r, g, b] = hsv_to_rgb([h, 1.0, 1.0]);
-        let marker = thumb(self.state.color(), 14.0)
-            .absolute(position(s, 1.0 - v))
-            .transform(Transform2D::IDENTITY.translate(-7.0, -7.0));
+        let marker = marker(self.state.color(), 14.0, s, 1.0 - v);
         Element::container([marker]).keyed(format!("{}::pad", self.key))
             .width(percent(1.0)).height(length(160.0))
             .fill(Fill::Bilinear(BilinearGradient::new(
@@ -135,11 +133,12 @@ impl ColorPicker<'_> {
         theme: &WidgetTheme,
         alpha: bool,
     ) -> Element {
-        let marker = thumb(theme.card, 16.0)
-            .absolute(position(behavior.ratio(), 0.5))
-            .transform(Transform2D::IDENTITY.translate(-8.0, -8.0));
+        let marker = marker(theme.card, 16.0, behavior.ratio(), 0.5);
         let background = if alpha {
-            checkerboard()
+            Element::custom(Decoration::Checkerboard)
+                .width(percent(1.0))
+                .height(length(16.0))
+                .semantic_hidden(true)
         } else {
             Element::container([])
         };
@@ -173,23 +172,15 @@ impl ColorPicker<'_> {
     }
 }
 
-fn position(x: f32, y: f32) -> Sides<LengthPercentageAuto> {
-    Sides {
-        left: LengthPercentageAuto::percent(x),
-        top: LengthPercentageAuto::percent(y),
-        right: auto(),
-        bottom: auto(),
-    }
-}
-
-fn thumb(color: Color, size: f32) -> Element {
-    Element::container([])
-        .width(length(size))
-        .height(length(size))
-        .background(color)
-        .border(Border::all(2.0, Color::WHITE))
-        .radius(CornerRadii::all(999.0))
-        .semantic_hidden(true)
+fn marker(color: Color, diameter: f32, x: f32, y: f32) -> Element {
+    Element::custom(Decoration::Marker {
+        color,
+        diameter,
+        position: Point::new(x, y),
+    })
+    .absolute(Sides::length(0.0))
+    .hit_test(argui_ui::HitTestStyle::default().pointer_events(argui_ui::PointerEvents::None))
+    .semantic_hidden(true)
 }
 
 fn label_text(value: &str, color: Color, size: f32) -> Element {
@@ -198,24 +189,6 @@ fn label_text(value: &str, color: Color, size: f32) -> Element {
         color,
         ..TextStyle::default()
     })
-}
-
-fn checkerboard() -> Element {
-    Element::column((0..2).map(|row| {
-        Element::row((0..16).map(|col| {
-            Element::container([])
-                .grow(1.0)
-                .height(length(8.0))
-                .background(if (row + col) % 2 == 0 {
-                    Color::from_srgb8(230, 230, 230)
-                } else {
-                    Color::from_srgb8(170, 170, 170)
-                })
-        }))
-        .width(percent(1.0))
-    }))
-    .width(percent(1.0))
-    .semantic_hidden(true)
 }
 
 fn hue_gradient() -> Fill {

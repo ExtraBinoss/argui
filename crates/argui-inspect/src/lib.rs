@@ -543,6 +543,17 @@ impl InspectorHandle {
         self.0.borrow_mut().overrides.clear();
     }
 
+    /// Nodes with edited or disabled properties; allows hosts to retain untouched subtrees.
+    #[must_use]
+    pub fn overridden_nodes(&self) -> std::collections::HashSet<InspectNodeId> {
+        self.0
+            .borrow()
+            .overrides
+            .iter()
+            .map(|entry| entry.node)
+            .collect()
+    }
+
     /// Restore the authored value and enabled state of a single property.
     pub fn clear_property_override(&self, node: InspectNodeId, property: StyleProperty) {
         self.0

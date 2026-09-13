@@ -12,6 +12,49 @@ fn view(label: &str, tools: &str) -> Element {
 }
 
 #[test]
+fn applying_one_color_override_preserves_unedited_allocations_and_idle_roots() {
+    use argui_inspect::{InspectNodeId, InspectorHandle, StyleProperty, StyleValue};
+    let original = Element::row([
+        Element::column([
+            Element::text("target").keyed("target"),
+            Element::text("sibling"),
+        ]),
+        Element::column([Element::text("unrelated")]),
+    ]);
+    let tree = UiTree::new(original.clone());
+    let inspector = InspectorHandle::default();
+    let mut root = original.clone();
+    Inspection::apply_overrides(&mut root, &tree, &inspector);
+    assert!(
+        root.ptr_eq(&original),
+        "no overrides must allocate no replacement descriptions"
+    );
+    let node = InspectNodeId(tree.node_ids()[2].get());
+    inspector.set_property_value(
+        node,
+        StyleProperty::Background,
+        StyleValue::Srgba([1.0, 0.0, 0.0, 1.0]),
+    );
+    Inspection::apply_overrides(&mut root, &tree, &inspector);
+    assert!(!root.ptr_eq(&original));
+    assert!(root.children[1].ptr_eq(&original.children[1]));
+    assert!(root.children[0].children[1].ptr_eq(&original.children[0].children[1]));
+    assert_eq!(
+        root.children[0].children[0].paint.quad.background,
+        Some(argui_paint::Fill::Solid(Color::srgb(1.0, 0.0, 0.0)))
+    );
+    assert_eq!(original.children[0].children[0].paint.quad.background, None);
+    inspector.clear_overrides();
+    inspector.toggle(InspectNodeId(u64::MAX), StyleProperty::Background);
+    let mut untouched = original.clone();
+    Inspection::apply_overrides(&mut untouched, &tree, &inspector);
+    assert!(
+        untouched.ptr_eq(&original),
+        "stale targets must preserve the root"
+    );
+}
+
+#[test]
 fn retained_leaf_snapshots_hide_private_text_and_republish_privacy_changes() {
     let leaf = Element::text("private value").text_privacy(argui_ui::TextPrivacy::Password);
     let mut tree = UiTree::new(leaf.clone());

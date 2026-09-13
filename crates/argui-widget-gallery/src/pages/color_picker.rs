@@ -41,7 +41,13 @@ impl Render for ColorPickerDemo {
             Button::new(
                 "color-preview",
                 "Live button preview",
-                preview_theme.button(),
+                preview_theme
+                    .button()
+                    .transition(argui::ui::StyleTransition::new(
+                        argui::ui::Transition::tween(argui::animation::Tween::new(
+                            argui::animation::Duration::ZERO,
+                        )),
+                    )),
             )
             .build(),
             Element::container([])

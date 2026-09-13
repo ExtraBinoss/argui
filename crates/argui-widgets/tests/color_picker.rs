@@ -7,6 +7,8 @@ use argui_widgets::{ColorFormat, ColorPicker, ColorPickerState, shadcn};
 
 #[path = "color_picker/input.rs"]
 mod input;
+#[path = "color_picker/paint.rs"]
+mod paint;
 
 fn event(key: &str, kind: UiEventKind) -> UiEvent {
     UiEvent::new(

@@ -149,7 +149,13 @@ impl Inspection {
         tree: &UiTree,
         inspector: &argui_inspect::InspectorHandle,
     ) {
-        apply_tree_overrides(root, tree.node_ids(), inspector, &mut 0);
+        let edited = inspector.overridden_nodes();
+        if !edited.is_empty()
+            && let Some(changed) =
+                apply_tree_overrides(root, tree.node_ids(), inspector, &edited, &mut 0)
+        {
+            *root = changed;
+        }
     }
 }
 
@@ -541,16 +547,24 @@ fn set_filter_value(target: &mut f32, value: Option<f32>) {
 }
 
 fn apply_tree_overrides(
-    element: &mut Element,
+    element: &Element,
     ids: &[NodeId],
     inspector: &argui_inspect::InspectorHandle,
+    edited: &std::collections::HashSet<InspectNodeId>,
     cursor: &mut usize,
-) {
-    if let Some(node) = ids.get(*cursor).copied() {
-        apply_overrides(element, node, inspector);
+) -> Option<Element> {
+    let mut changed = None;
+    if let Some(node) = ids.get(*cursor).copied()
+        && edited.contains(&InspectNodeId(node.get()))
+    {
+        let next = changed.insert(element.clone());
+        apply_overrides(next, node, inspector);
     }
     *cursor += 1;
-    for child in &mut element.children {
-        apply_tree_overrides(child, ids, inspector, cursor);
+    for (index, child) in element.children.iter().enumerate() {
+        if let Some(next) = apply_tree_overrides(child, ids, inspector, edited, cursor) {
+            changed.get_or_insert_with(|| element.clone()).children[index] = next;
+        }
     }
+    changed
 }

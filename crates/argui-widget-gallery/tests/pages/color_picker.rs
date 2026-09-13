@@ -1,6 +1,34 @@
 use super::*;
 
 #[test]
+fn live_button_color_matches_the_swatch_without_advancing_the_animation_clock() {
+    let gallery = Entity::new(WidgetGallery::default());
+    click(&gallery, "nav::color-picker");
+    let mut tree = UiTree::new(gallery.render());
+    tree.advance_animations(argui::animation::Time::ZERO);
+    for value in ["#FF0000FF", "#00FF00FF", "#0000FF80"] {
+        dispatch(
+            &gallery,
+            "gallery-color::field::0",
+            UiEventKind::TextChanged(value.into()),
+        );
+        tree.update(gallery.render());
+        let node = tree
+            .node_ids()
+            .iter()
+            .copied()
+            .find(|node| tree.key(*node) == Some("color-preview"))
+            .unwrap();
+        let swatch = keyed(tree.root(), "color-preview-swatch").unwrap();
+        assert_eq!(
+            tree.resolved_quad(node, tree.element_for(node).unwrap())
+                .background,
+            swatch.paint.quad.background
+        );
+    }
+}
+
+#[test]
 fn color_picker_updates_its_preview_switches_formats_and_survives_navigation() {
     let gallery = Entity::new(WidgetGallery::default());
     click(&gallery, "nav::color-picker");

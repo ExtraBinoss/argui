@@ -537,3 +537,70 @@ Save each release binary before switching revisions and inspect the captures.
 The optional all-smi adapter detected this machine's GPU, but its driver readings
 were all zero; these are shown as unavailable, with raw fields retained. No
 cross-platform sensor completeness or Windows/macOS execution is claimed.
+
+## Color picker interaction cost
+
+Measured on 2026-09-13 against `d756e88`, on the same Linux/Core Ultra 5 125H
+machine with Rust 1.98.0. [Raw samples](data/color-picker.json) retain three
+alternating before/after runs. Each run replays real gallery or DevTools gestures
+at 1220 × 1000, with 40 warm-up updates and 300 measured updates per case.
+No build or graphical test ran concurrently. Both binaries use the release
+profile, all features, and the same example:
+
+```sh
+cargo run -p argui-widget-gallery --example color_picker_profile --release --all-features
+```
+
+To reproduce the baseline, build that example against `d756e88` and save its
+binary before building the candidate. The replay includes event dispatch,
+rendering the element descriptions, applying overrides, reconciliation, layout,
+text preparation and publishing the inspection snapshot. It excludes GPU work,
+native event-loop scheduling and presentation. Motion is reduced in both CPU
+runs to isolate computation; the separate visual checks use normal motion.
+
+| Interaction | Median update, before → after | Change | p95 update, before → after |
+| --- | ---: | ---: | ---: |
+| Gallery saturation/value pad | 4.163 → 3.348 ms | −19.6% | 15.621 → 13.994 ms |
+| Gallery hue slider | 3.976 → 3.340 ms | −16.0% | 15.047 → 13.921 ms |
+| DevTools background popover | 7.766 → 5.744 ms | −26.0% | 25.218 → 20.536 ms |
+| DevTools Theme picker | 8.754 → 8.391 ms | −4.1% | 25.812 → 24.895 ms |
+
+Each cell is the median of the three run statistics. Timings vary between
+launches: Theme's median change is small and its third pair regressed, so this
+does not establish a dependable Theme speedup. Median process CPU for the four
+cases together, including setup and warm-up, was 11.657 → 9.850 seconds (−15.5%).
+These numbers do not establish a rendered frame rate or input-to-display latency.
+
+Three costs were removed:
+
+- The gallery's **Live button preview** inherited a 120 ms button color
+  transition. A captured baseline showed the target swatch color immediately,
+  but the button reached it only at 120 ms. Its preview style now resolves the
+  new color without interpolation. Tests check the resolved color and GPU pixels
+  without advancing the animation clock, including repeated pad gestures.
+- Applying DevTools overrides previously accessed every element mutably,
+  copying shared descriptions even with no overrides. The empty case now
+  returns immediately; with overrides, only edited nodes and their ancestors
+  are copied. Tests check that untouched branches retain their allocations.
+- A transparency checkerboard used 35 layout nodes. One custom decoration now
+  paints the same 32 quads. Marker position and color changes invalidate paint
+  without changing marker geometry in the layout tree. A regression test checks
+  that movement preserving the formatted input value needs no new layout.
+
+| Retained workload | UI nodes, before → after | Counted capacity bytes, before → after |
+| --- | ---: | ---: |
+| Gallery picker | 295 → 261 | 470,338 → 430,150 (−8.5%) |
+| DevTools background popover | 525 → 467 | 866,662 → 748,954 (−13.6%) |
+| DevTools Theme picker | 516 → 448 | 857,016 → 727,488 (−15.1%) |
+
+These counters cover UI indices and retained layout/output/paint buffers, not
+total heap or process RSS. They omit element descriptions, custom state/paint
+caches, fonts, assets and GPU allocations. They therefore do not measure the
+net process-memory effect of moving the decorations into custom painting.
+
+All four full-drag cases still requested layout on 300/300 measured updates:
+changing the displayed HEX/RGB text remains a layout input. The change makes
+those updates cheaper and removes unnecessary marker-only layout work; it does
+not eliminate layout during color editing. WebGPU checks on the private Linux
+display also cover hue/alpha input, stable popover bounds and live application
+colors in both themes. See [Linux testing](../contributing/linux-testing.md).
