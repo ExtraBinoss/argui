@@ -149,15 +149,15 @@ def release_plan(base, fetch=registry_versions):
     old = previous['workspace']['package']['version']
     if version_key(current) < version_key(old):
         raise ValueError(f'Version decreased from {old} to {current}')
-    if current == old:
-        return result | {'reason': f'Workspace version {current} did not change'}
     tag = subprocess.run(['git', 'rev-parse', '--verify', f'refs/tags/v{current}^{{commit}}'],
                          cwd=ROOT, text=True, capture_output=True)
     if tag.returncode == 0 and tag.stdout.strip() != sha:
         raise ValueError(f'Tag v{current} already points to another commit')
     pending = pending_packages(names, current, fetch)
+    reason = (f'Publishing current workspace version {current}' if current == old else
+              f'Version increased from {old} to {current}')
     return result | {'release': True, 'packages': pending, 'previous': old,
-                     'reason': f'Version increased from {old} to {current}'}
+                     'reason': reason}
 
 
 def bump(value):

@@ -219,9 +219,9 @@ fn view(theme: &WidgetTheme) -> Element {
 Continue with [models and state](docs/runtime/models.md),
 [localization](docs/i18n.md), [hot reload](docs/hot-reload.md), the
 [widget catalogue](docs/widgets/shadcn.md) or the [complete examples](crates/argui/examples/).
-The Git dependency works today. A version bump in a final `[PUBLISH]` commit on
-`main` lets the protected CI publish the crates in dependency order; see the
-[release workflow](docs/contributing/releases.md).
+The Git dependency works today. A final `[PUBLISH]` commit on `main` lets the
+protected CI publish the current version in dependency order; later releases
+also bump that version. See the [release workflow](docs/contributing/releases.md).
 
 ## Where things stand
 

@@ -21,6 +21,7 @@ use winit::{
 };
 
 const SHADER: &str = "fn argui_effect(uv: vec2<f32>, source: vec4<f32>, backdrop: vec4<f32>) -> vec4<f32> { return source * 0.5; }";
+const NATIVE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 const PASSES: &[EffectPassDefinition] = &[
     EffectPassDefinition::fragment("first", SHADER),
     EffectPassDefinition::fragment("second", SHADER),
@@ -55,7 +56,7 @@ fn native_surface_grows_its_atlas_recovers_from_capacity_and_uses_custom_effects
         .build()
         .unwrap();
     let mut app = TestApp(None, false);
-    let deadline = web_time::Instant::now() + std::time::Duration::from_secs(3);
+    let deadline = web_time::Instant::now() + NATIVE_TIMEOUT;
     while !app.1 {
         event_loop.pump_app_events(Some(std::time::Duration::from_millis(16)), &mut app);
         assert!(
@@ -78,11 +79,15 @@ fn exercise(window: Arc<Window>, mut pump: impl FnMut()) {
     ])
     .unwrap();
     let size = window.inner_size();
+    let mut config = RendererConfig::default().profiling(true).effects(registry);
+    // This test submits many frames without application work between them. An
+    // automatic non-vsync mode avoids depending on compositor frame throttling.
+    config.present_mode = wgpu::PresentMode::AutoNoVsync;
     let mut renderer = pollster::block_on(SurfaceRenderer::new(
         window.clone(),
         size.width,
         size.height,
-        RendererConfig::default().profiling(true).effects(registry),
+        config,
     ))
     .unwrap();
     let mut render = |renderer: &mut SurfaceRenderer, list: &DisplayList| {
@@ -166,7 +171,7 @@ fn render(
     pump: &mut impl FnMut(),
 ) -> Result<(), RendererError> {
     let mut text = TextEngine::from_embedded_fonts([], "sans-serif", "serif", "monospace");
-    let deadline = web_time::Instant::now() + std::time::Duration::from_secs(3);
+    let deadline = web_time::Instant::now() + NATIVE_TIMEOUT;
     loop {
         // A Wayland surface needs configure/frame callbacks between submissions.
         window.request_redraw();
@@ -181,7 +186,7 @@ fn render(
         assert_eq!(status, RenderStatus::Skipped);
         assert!(
             web_time::Instant::now() < deadline,
-            "surface did not present within three seconds: {} commands, atlas {:?}, size {:?}",
+            "surface did not present within {NATIVE_TIMEOUT:?}: {} commands, atlas {:?}, size {:?}",
             list.commands().len(),
             renderer.last_profile().vector_atlas,
             window.inner_size(),

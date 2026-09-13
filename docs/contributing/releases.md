@@ -27,29 +27,30 @@ have matching registry versions; repository-only development dependencies stay
 path-only so Cargo strips them from published manifests.
 
 ```sh
-python3 scripts/release.py bump 0.1.1
 python3 scripts/release.py check
 python3 scripts/release.py package
-./scripts/linux-hidden-display.sh env ARGUI_NATIVE_TESTS=1 ./scripts/quality.sh
 # Stage the reviewed changes, then check staged files and all existing commits.
-git add Cargo.toml Cargo.lock
+git add --all
 ./scripts/check-secrets.sh
-git commit -m '[PUBLISH] Argui 0.1.1'
+./scripts/linux-hidden-display.sh env ARGUI_NATIVE_TESTS=1 ./scripts/quality.sh
+git commit -m '[PUBLISH] Argui 0.1.0'
 git push origin main
 ```
 
-Choose a SemVer version greater than the current workspace version. Prereleases
-such as `0.2.0-beta.1` are supported; build metadata is not used for releases.
-`bump` updates the workspace, internal dependency requirements and lockfile.
-For a multi-commit push, the **last commit** must contain `[PUBLISH]` and the version
-must exceed the version at the pre-push commit. A marker without a version change
-finishes without publishing. An ordinary commit never publishes, even if it
-changes the version.
+The initial release may publish the current workspace version, as in the v0.1.0
+example. For later releases, run `python3 scripts/release.py bump VERSION` first
+and choose a SemVer version greater than every published version. Prereleases
+such as `0.2.0-beta.1` are supported; build metadata is not used. `bump` updates
+the workspace, internal dependency requirements and lockfile. For a multi-commit
+push, the **last commit** must contain `[PUBLISH]`. An ordinary commit never
+publishes, even if it changes the version.
 
 The release job accepts only a push to this repository's `main` by `ExtraBinoss`.
 It checks the registry before uploading, rejects downgrades, yanked versions,
 foreign crate ownership and tags belonging to other commits. Registry errors fail
-the job; they are never treated as permission to publish.
+the job; they are never treated as permission to publish. Repeating a `[PUBLISH]`
+commit for a version already present is idempotent: existing crate versions are
+skipped.
 
 The release script reads Cargo metadata and computes a deterministic topological
 order. `package` creates and compiles all 23 archives together with all features,

@@ -71,10 +71,10 @@ class ReleasePolicyTests(unittest.TestCase):
         git('commit', '--allow-empty', '-qm', message)
         return base, git
 
-    def test_marker_and_version_increase_are_both_required(self):
+    def test_marker_publishes_current_or_increased_version(self):
         for version, message, expected in [
             ('0.1.1', 'Normal change', False),
-            ('0.1.0', '[PUBLISH] unchanged', False),
+            ('0.1.0', '[PUBLISH] initial 0.1.0', True),
             ('0.1.1', '[PUBLISH] Argui 0.1.1', True),
         ]:
             with self.subTest(version=version, message=message), tempfile.TemporaryDirectory() as directory:
