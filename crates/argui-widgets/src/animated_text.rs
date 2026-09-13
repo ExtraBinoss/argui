@@ -7,6 +7,8 @@ use unicode_segmentation::UnicodeSegmentation;
 
 use crate::{WidgetTheme, shadcn};
 
+mod reel;
+
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum TextAnimation {
     /// Digits roll through intermediate values; other graphemes slide once.
@@ -42,6 +44,7 @@ pub struct AnimatedText {
 struct Column {
     content: Element,
     distance: f32,
+    resize: bool,
 }
 
 impl AnimatedText {
@@ -119,6 +122,17 @@ impl AnimatedText {
         self.value = value;
         if self.reduced_motion || self.duration == Duration::ZERO {
             self.finish();
+        } else if self.animation == TextAnimation::Fade
+            && self.is_animating()
+            && self.value == self.from
+        {
+            // Reverse a toggled status at its current opacity instead of queueing another fade.
+            std::mem::swap(&mut self.from, &mut self.to);
+            self.progress = 1.0 - (1.0 - (1.0 - self.progress).powi(3)).cbrt();
+            self.cached_style = None;
+            if !self.is_animating() {
+                self.finish();
+            }
         } else if !self.is_animating() {
             self.start();
         }
@@ -189,22 +203,37 @@ impl AnimatedText {
                 return column.content.clone();
             }
             let mut content = column.content.clone();
-            let position = if self.animation == TextAnimation::Fade {
-                f32::from(self.progress >= 0.5)
+            let position = if column.distance < 0.0 {
+                1.0 - eased
             } else {
                 eased
             };
-            content.children[0].transform = Transform2D::IDENTITY.translate(
-                0.0,
-                if column.distance < 0.0 {
-                    column.distance * (1.0 - position)
-                } else {
-                    -column.distance * position
-                },
-            );
+            let mut reel = if column.resize {
+                Element::custom_container(
+                    reel::ReelLayout { position },
+                    content.children[0].children.iter().cloned(),
+                )
+                .shrink(0.0)
+            } else {
+                content.children[0].clone()
+            };
             if self.animation == TextAnimation::Fade {
-                content = content.opacity((2.0 * self.progress - 1.0).abs());
+                // Crossfade at one baseline, without an empty frame or GPU layers per glyph.
+                for (index, glyph) in reel.children.iter_mut().enumerate() {
+                    if let argui_ui::ElementKind::Text { style, .. } = &mut glyph.kind {
+                        let alpha = if index == 0 { 1.0 - eased } else { eased };
+                        style.color = style
+                            .color
+                            .with_alpha(style.color.to_linear_rgba()[3] * alpha);
+                    }
+                    glyph.transform =
+                        Transform2D::IDENTITY.translate(0.0, -(index as f32) * column.distance);
+                }
+            } else {
+                reel.transform =
+                    Transform2D::IDENTITY.translate(0.0, -column.distance.abs() * position);
             }
+            content.children[0] = reel;
             content
         }))
         .keyed(self.key.clone())
@@ -245,6 +274,7 @@ impl AnimatedText {
                     return Column {
                         content: glyph(to).keyed(key).semantic_hidden(true),
                         distance: 0.0,
+                        resize: false,
                     };
                 }
                 let mut reel = vec![from.to_owned(), to.to_owned()];
@@ -279,6 +309,10 @@ impl AnimatedText {
                 Column {
                     content,
                     distance: if backwards { -distance } else { distance },
+                    resize: !(from.len() == 1
+                        && from.as_bytes()[0].is_ascii_digit()
+                        && to.len() == 1
+                        && to.as_bytes()[0].is_ascii_digit()),
                 }
             })
             .collect()

@@ -37,7 +37,11 @@ fn mounted_nested_counters_receive_frames_and_render_intermediate_positions() {
     let y = counter.children[1].children[0].transform.translation.y;
     assert!(y < 0.0 && y > -55.0, "intermediate reel position: {y}");
     let fade = keyed(&middle, "animated-Fade").unwrap();
-    let alpha = fade.children[1].layer.as_ref().unwrap().opacity;
+    let argui::ui::ElementKind::Text { style, .. } = &fade.children[1].children[0].children[1].kind
+    else {
+        panic!("incoming digit")
+    };
+    let alpha = style.color.to_linear_rgba()[3];
     assert!(alpha > 0.0 && alpha < 1.0);
     gallery
         .animation_frame(Frame {

@@ -53,7 +53,8 @@ add and accumulate composition in stable `(priority, order)` order.
 Enable `widget-animated-text` on `argui` (or `animated-text` on `argui-widgets`).
 `AnimatedText` animates only changing Unicode graphemes: `10 → 11` keeps the
 first digit still. `TextAnimation::Roll` passes through intermediate digits,
-`Slide` moves directly to the next character, and `Fade` fades out then in.
+`Slide` moves directly to the next character, and `Fade` crossfades both
+characters at the same baseline, without a blank midpoint.
 The **Animated text** gallery page demonstrates all three, carries and reversals.
 
 ```rust
@@ -72,12 +73,16 @@ positions; use `align_end(false)` for labels. `text_style` replaces the default
 theme-colored monospace style; `font_size` sizes that default style. The widget
 is single-line and aligns grapheme positions, without parsing locale-specific
 number formatting. Updates during a transition coalesce into the latest target
-for the following transition. Mounted entities honor reduced motion automatically;
+for the following transition; toggling a fade back reverses its current opacity
+immediately. Mounted entities honor reduced motion automatically;
 manual hosts can use `set_reduced_motion`, `advance` and `build`.
 
-Intermediate frames change transforms/layer opacity and reuse layout. Unchanged
-columns are shared, completed reels are released, and idle entities request no
-frames. One accessible text node exposes the requested value; intermediate
+Digit substitutions reuse layout; appearing, disappearing and nonnumeric columns
+interpolate their measured widths during the transition. This prevents the final
+horizontal jump on `100 → 99` and accommodates proportional status labels.
+Fades change text alpha directly without allocating effect layers per glyph.
+Unchanged columns are shared, completed reels are released, and idle entities
+request no frames. One accessible text node exposes the requested value; intermediate
 digits are hidden. `unicode-segmentation` is an optional dependency owned by
 this widget to keep combining characters and emoji intact.
 

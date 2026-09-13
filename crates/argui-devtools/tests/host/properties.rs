@@ -381,3 +381,60 @@ fn gradients_remain_summaries_and_do_not_open_a_fictitious_solid_color_picker() 
         "__devtools-color-2-background::field::0"
     ));
 }
+
+#[test]
+fn opacity_updates_keep_the_numeric_glyphs_and_caret_on_one_baseline() {
+    let host = Entity::new(editors()).mount().unwrap();
+    let inspector = host.read(|tools| tools.inspector());
+    let input = |value| {
+        inspector.set_property_value(
+            InspectNodeId(2),
+            StyleProperty::Opacity,
+            StyleValue::Number(value),
+        );
+        change_tools(&host, |_| ());
+        let root = host.render(Default::default()).unwrap();
+        let mut pending = vec![&root];
+        while let Some(element) = pending.pop() {
+            if element.key.as_deref() == Some("__devtools-value-2-opacity-0") {
+                return Element::row([element.clone()]);
+            }
+            pending.extend(element.children.iter());
+        }
+        panic!("opacity input");
+    };
+    let mut tree = UiTree::new(input(0.11));
+    let mut engine = argui_layout::LayoutEngine::new();
+    let mut text = argui_showcase::text_engine();
+    let mut expected = None;
+    for value in [0.11, 0.88, 0.22, 0.77, 0.33, 0.66, 0.44, 0.55, 0.99] {
+        tree.update(input(value));
+        let mut layout = engine
+            .compute(&mut tree, &mut text, Size::new(200.0, 50.0))
+            .unwrap();
+        for _ in 0..2 {
+            let region = &layout.text_inputs[0];
+            assert_eq!(
+                region.scroll_y, 0.0,
+                "slider updates must not scroll the line to reveal its caret"
+            );
+            assert!(region.content_size.height <= region.viewport.size.height);
+            let prepared = text.prepare(&layout.text, 1.0);
+            let prefix = prepared
+                .glyphs
+                .iter()
+                .take(2)
+                .map(|glyph| (glyph.x, glyph.y, glyph.key))
+                .collect::<Vec<_>>();
+            if let Some(expected) = &expected {
+                assert_eq!(
+                    &prefix, expected,
+                    "the unchanged 0. prefix must keep identical raster positions"
+                );
+            } else {
+                expected = Some(prefix);
+            }
+            engine.update_text_inputs(&mut tree, &mut text, &mut layout);
+        }
+    }
+}

@@ -173,11 +173,31 @@ try {
         assert.ok(Math.abs(inputBounds.y - opacitySlider.y) < 10, 'Opacity slider and value share one row');
         await page.mouse.move(opacitySlider.x + 10, opacitySlider.y + opacitySlider.height / 2);
         await page.mouse.down();
-        for (const ratio of [.1, .5, .9, .25, .75]) {
-            await page.mouse.move(opacitySlider.x + opacitySlider.width * ratio, opacitySlider.y + opacitySlider.height / 2);
-            await pause();
+        let prefixPixels;
+        for (const ratio of [.11, .88, .22, .77, .33]) {
+            await page.mouse.move(opacitySlider.x + opacitySlider.width * ratio, opacitySlider.y + opacitySlider.height / 2, { steps: 8 });
+            await pause(50);
             assert.deepEqual(await rect(opacityInput), inputBounds, 'Dragging keeps the numeric input fixed');
             assert.match(await value(opacityInput), /^0\.\d{2}$/);
+            const png = await capture(`opacity-drag-${ratio}`);
+            const prefix = await page.evaluate(async ({ png, bounds, scheme }) => {
+                const bitmap = await createImageBitmap(await (await fetch(`data:image/png;base64,${png}`)).blob());
+                const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+                const cx = canvas.getContext('2d'); cx.drawImage(bitmap, 0, 0);
+                const x = bounds.x + 10, y = bounds.y + 5;
+                const width = bounds.width - 22, height = bounds.height - 10;
+                const data = cx.getImageData(x, y, width, height).data;
+                let first = width;
+                for (let i = 0; i < data.length; i += 4) {
+                    const ink = scheme === 'dark' ? Math.min(...data.slice(i, i + 3)) > 90 : Math.max(...data.slice(i, i + 3)) < 150;
+                    if (ink) first = Math.min(first, (i / 4) % width);
+                }
+                // Stop before the antialiased edge of the following, changing digit.
+                return { x: x + first, pixels: [...cx.getImageData(x + first, y, 9, height).data] };
+            }, { png, bounds: inputBounds, scheme });
+            assert.ok(prefix.x < inputBounds.right - 20, 'Visible numeric prefix');
+            if (prefixPixels) assert.deepEqual(prefix, prefixPixels, 'The 0. glyphs keep identical pixels while dragging rapidly');
+            else prefixPixels = prefix;
         }
         await capture('image-opacity-dragging'); await page.mouse.up(); await pause();
         await click('[role=tab][aria-label="Theme"]'); await click(button('Light'));

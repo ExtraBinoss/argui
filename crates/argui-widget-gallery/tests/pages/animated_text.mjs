@@ -25,6 +25,9 @@ try {
             window.setAnimationTestSpeed = speed => {
                 logical = clock(); physical = now(); scale = speed;
             };
+            window.advanceAnimationTestClock = ms => {
+                logical = clock() + ms; physical = now();
+            };
         });
         await page.setViewport({ width: 1220, height: 900 });
         await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: scheme }]);
@@ -79,9 +82,37 @@ try {
         await click('99 / 100'); await pause(600);
         await click('99 / 100'); await pause(100); await capture('carry'); await pause(600);
         assert.equal((await counters('100')).length, 3);
-        await click('−1'); await pause(100); await capture('reverse'); await pause(600);
+        await page.evaluate(() => window.setAnimationTestSpeed(0));
+        await click('−1'); await pause(100);
+        await page.evaluate(() => window.advanceAnimationTestClock(200)); await pause(100);
+        await capture('reverse');
+        await page.evaluate(() => window.advanceAnimationTestClock(219)); await pause(100);
+        const nearEnd = await capture('reverse-near-end');
+        await page.evaluate(() => window.advanceAnimationTestClock(1)); await pause(100);
+        const completed = await capture('reverse-complete');
+        const cleanupChanges = await page.evaluate(async ({ nearEnd, completed, roll }) => {
+            const read = async png => {
+                const bitmap = await createImageBitmap(await (await fetch(`data:image/png;base64,${png}`)).blob());
+                const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+                const cx = canvas.getContext('2d'); cx.drawImage(bitmap, 0, 0);
+                return cx.getImageData(roll.x, roll.y, roll.width, roll.height).data;
+            };
+            const a = await read(nearEnd), b = await read(completed);
+            let changed = 0;
+            for (let i = 0; i < a.length; i += 4) {
+                if (Math.max(...[0, 1, 2].map(c => Math.abs(a[i + c] - b[i + c]))) > 10) changed++;
+            }
+            return changed;
+        }, { nearEnd, completed, roll });
+        assert.ok(cleanupChanges < 10, `100 → 99 settles before cleanup (${cleanupChanges} changed pixels)`);
         assert.equal((await counters('99')).length, 3);
-        await click('Toggle saved status'); await pause(120); await capture('status-fade'); await pause(600);
+        await click('Toggle saved status'); await pause(100);
+        await page.evaluate(() => window.advanceAnimationTestClock(210)); await pause(100);
+        await capture('status-fade');
+        await click('Toggle saved status'); await pause(100); await capture('status-reverse');
+        await page.evaluate(() => window.setAnimationTestSpeed(1)); await pause(600);
+        assert.equal((await counters('Draft')).length, 1);
+        await click('Toggle saved status'); await pause(600);
         assert.equal((await counters('Saved')).length, 1);
         await page.emulateMediaFeatures([
             { name: 'prefers-color-scheme', value: scheme },

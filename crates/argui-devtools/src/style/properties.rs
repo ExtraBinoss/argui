@@ -209,6 +209,8 @@ fn numeric_input<A>(
     let invalid = draft.is_some_and(|draft| draft.2);
     let mut style = theme.input();
     style.text.font_size = 12.0;
+    // Fit the 30px control's content box; a taller line scrolls to reveal the caret.
+    style.text.line_height = 16.0;
     style.text.family = argui_text::FontFamily::Monospace;
     style.text.align = argui_text::TextAlign::Right;
     style.layout.padding = Sides::length(6.0);

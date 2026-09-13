@@ -110,7 +110,20 @@ fn slide_fade_and_reduced_motion_respect_timing_and_stop_at_rest() {
         label.advance(Duration::from_millis(200));
         let middle = label.build(theme);
         if animation == TextAnimation::Fade {
-            assert_eq!(middle.children[0].layer.as_ref().unwrap().opacity, 0.0);
+            let reel = &middle.children[0].children[0];
+            let alphas = reel
+                .children
+                .iter()
+                .map(|glyph| {
+                    let ElementKind::Text { style, .. } = &glyph.kind else {
+                        panic!("text")
+                    };
+                    assert!(glyph.layer.is_none());
+                    style.color.to_linear_rgba()[3]
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(alphas, [0.125, 0.875]);
+            assert_eq!(reel.children[1].transform.translation.y, -30.0);
         }
         label.set_reduced_motion(true);
         assert!(!label.is_animating());
@@ -128,6 +141,64 @@ fn slide_fade_and_reduced_motion_respect_timing_and_stop_at_rest() {
         ..Default::default()
     });
     entity.read(|label| assert!(!label.wants_animation_frame()));
+}
+
+#[test]
+fn changing_character_widths_converge_before_transition_cleanup() {
+    let palette = shadcn(Color::WHITE);
+    let theme = palette.resolve(ColorScheme::Dark);
+    let font = include_bytes!("../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
+    let mut text =
+        TextEngine::from_embedded_fonts([font.as_slice()], "Noto Sans", "Noto Sans", "Noto Sans");
+    for animation in [
+        TextAnimation::Roll,
+        TextAnimation::Slide,
+        TextAnimation::Fade,
+    ] {
+        for (from, to) in [
+            ("100", "99"),
+            ("99", "100"),
+            ("Saved", "Draft"),
+            ("Draft", "Saved"),
+            ("", "1"),
+            ("1", ""),
+        ] {
+            let mut label = AnimatedText::new("value", from)
+                .font_size(44.0)
+                .animation(animation);
+            let mut engine = LayoutEngine::new();
+            let mut tree = UiTree::new(Element::row([label.build(theme)]));
+            let mut bounds = |label: &mut AnimatedText| {
+                tree.update(Element::row([label.build(theme)]));
+                engine
+                    .compute(&mut tree, &mut text, Size::new(400.0, 100.0))
+                    .unwrap()
+                    .nodes[1]
+                    .bounds
+            };
+            let before = bounds(&mut label);
+            label.set_text(to);
+            let start = bounds(&mut label);
+            assert_eq!(
+                start.size.width, before.size.width,
+                "{animation:?}: {from} → {to} starts at the displayed width"
+            );
+            label.advance(Duration::from_millis(70));
+            let middle = bounds(&mut label);
+            label.advance(Duration::from_millis(349));
+            let near_end = bounds(&mut label);
+            label.advance(Duration::from_millis(1));
+            let end = bounds(&mut label);
+            assert!(
+                (near_end.size.width - end.size.width).abs() <= 1.0,
+                "{animation:?}: {from} → {to} must not jump on cleanup: {near_end:?} → {end:?}"
+            );
+            if (end.size.width - before.size.width).abs() > 4.0 {
+                assert!(middle.size.width > before.size.width.min(end.size.width));
+                assert!(middle.size.width < before.size.width.max(end.size.width));
+            }
+        }
+    }
 }
 
 #[test]
@@ -152,4 +223,51 @@ fn an_idle_window_does_not_skip_the_first_animation_frame() {
     assert!(!label.wants_animation_frame());
     label.animation_frame(frame, &mut cx);
     assert_eq!(label.value(), "11");
+}
+
+#[test]
+fn a_status_fade_reverses_immediately_without_an_opacity_jump_or_queued_transition() {
+    fn alphas(element: &Element) -> Vec<(String, f32)> {
+        let mut result = match &element.kind {
+            ElementKind::Text { content, style } => {
+                vec![(content.as_str().into(), style.color.to_linear_rgba()[3])]
+            }
+            _ => Vec::new(),
+        };
+        result.extend(element.children.iter().flat_map(alphas));
+        result.sort_by(|a, b| a.0.cmp(&b.0));
+        result
+    }
+    let palette = shadcn(Color::WHITE);
+    let theme = palette.resolve(ColorScheme::Dark);
+    let mut label = AnimatedText::new("status", "Draft")
+        .animation(TextAnimation::Fade)
+        .align_end(false);
+    label.set_text("Saved");
+    label.advance(Duration::from_millis(100));
+    let before = alphas(&label.build(theme));
+    label.set_text("Draft");
+    let reversed = alphas(&label.build(theme));
+    for ((before_text, before_alpha), (after_text, after_alpha)) in before.iter().zip(&reversed) {
+        assert_eq!(before_text, after_text);
+        assert!((before_alpha - after_alpha).abs() < 0.00001);
+    }
+    label.advance(Duration::from_millis(200));
+    assert!(
+        alphas(&label.build(theme))
+            .iter()
+            .find(|(text, _)| text == "D")
+            .unwrap()
+            .1
+            > reversed.iter().find(|(text, _)| text == "D").unwrap().1
+    );
+    label.advance(Duration::from_millis(220));
+    assert!(!label.is_animating());
+    assert_eq!(texts(&label.build(theme)).join(""), "Draft");
+    label.set_text("Saved");
+    label.set_text("Draft");
+    assert!(
+        !label.is_animating(),
+        "a reversal before the first frame cancels immediately"
+    );
 }
