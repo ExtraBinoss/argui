@@ -65,8 +65,9 @@ fn collect_element<'a>(
     if element.style_transition.is_some() || !element.conditional_styles.is_empty() {
         output.push(NodeSpec {
             target: TransitionTarget::Element(node),
+            element: Some((element, (context.scroll_for)(node))),
             matched: matched.clone(),
-            values: target_values(element, &matched, (context.scroll_for)(node)),
+            values: Vec::new(),
             transition: element.style_transition.as_ref(),
         });
     }
@@ -93,7 +94,7 @@ fn collect_element<'a>(
     context.states.exit(*index, scope_stack);
 }
 
-fn target_values(
+pub(super) fn target_values(
     element: &Element,
     matched: &[StyleCondition],
     scroll: Point,
@@ -192,10 +193,17 @@ fn apply_target(
 fn base_values(element: &Element, scroll: Point) -> Vec<StylePropertyValue> {
     let quad = &element.paint.quad;
     let mut values = quad_values(quad);
-    values.push(value(
-        PropertyKey::LayoutStyle,
-        StateValue::LayoutStyle(Box::new(element.style.clone())),
-    ));
+    // Scalar transitions resolve on top of the element's current layout. Only a
+    // whole-style conditional override needs a retained base to return to.
+    if element
+        .conditional_styles
+        .contains(PropertyKey::LayoutStyle)
+    {
+        values.push(value(
+            PropertyKey::LayoutStyle,
+            StateValue::LayoutStyle(Box::new(element.style.clone())),
+        ));
+    }
     values.push(value(
         PropertyKey::Transform,
         StateValue::Transform(element.transform),

@@ -64,6 +64,80 @@ fn layout_transitions_report_indices_and_disappear_after_removal() {
 }
 
 #[test]
+fn base_layout_changes_keep_scalar_transitions_and_discrete_fields() {
+    let element = Element::container([])
+        .width(length(100.0))
+        .transition(transition());
+    let mut tree = UiTree::new(element.clone());
+    let node = tree.node_ids()[0];
+    let mut changed = element.width(length(200.0));
+    changed.style.flex_direction = argui_ui::FlexDirection::Column;
+    tree.update(changed.clone());
+    tree.advance_animations(Time::from_nanos(1));
+    tree.advance_animations(Time::from_nanos(50_000_001));
+    let resolved = tree.resolved_layout_style(node, tree.root());
+    assert_eq!(resolved.size.width, length(150.0));
+    assert_eq!(resolved.flex_direction, argui_ui::FlexDirection::Column);
+    assert_eq!(changed.style.size.width, length(200.0));
+    tree.advance_animations(Time::from_nanos(100_000_001));
+    assert_eq!(tree.resolved_layout_style(node, tree.root()), changed.style);
+    assert!(!tree.wants_animation_frame());
+}
+
+#[test]
+fn whole_layout_override_returns_to_the_latest_base_after_hover() {
+    let mut patch = argui_ui::LayoutStyle::default();
+    patch.size.width = length(240.0);
+    patch.flex_direction = argui_ui::FlexDirection::Column;
+    let element = Element::container([])
+        .width(length(100.0))
+        .interaction(Interaction::default())
+        .when(
+            VisualState::Hovered,
+            StylePatch::new().layout(patch.clone()),
+        )
+        .transition(transition());
+    let mut tree = UiTree::new(element.clone());
+    let node = tree.node_ids()[0];
+    tree.pointer_moved(Point::new(10.0, 10.0), &[region(node)]);
+    assert_eq!(tree.resolved_layout_style(node, tree.root()), patch);
+    let changed = element.width(length(180.0));
+    tree.update(changed.clone());
+    assert_eq!(tree.resolved_layout_style(node, tree.root()), patch);
+    tree.pointer_left();
+    assert_eq!(tree.resolved_layout_style(node, tree.root()), changed.style);
+    assert!(!tree.wants_animation_frame());
+}
+
+#[test]
+fn shared_description_keeps_running_transition_and_responds_to_hover_exit() {
+    let child = Element::container([])
+        .keyed("animated")
+        .interaction(Interaction::default())
+        .when(
+            VisualState::Hovered,
+            StylePatch::new().set(property::Opacity, 0.0),
+        )
+        .transition(transition());
+    let mut tree = UiTree::new(Element::column([child.clone(), Element::text("before")]));
+    let node = tree.node_ids()[1];
+    tree.pointer_moved(Point::new(10.0, 10.0), &[region(node)]);
+    tree.advance_animations(Time::from_nanos(1));
+    tree.advance_animations(Time::from_nanos(50_000_001));
+    let opacity = |tree: &UiTree| tree.resolved_quad(node, &tree.root().children[0]).opacity;
+    assert!((opacity(&tree) - 0.5).abs() < 0.001);
+    tree.update(Element::column([child.clone(), Element::text("after")]));
+    assert!(tree.root().children[0].ptr_eq(&child));
+    assert!((opacity(&tree) - 0.5).abs() < 0.001);
+    tree.advance_animations(Time::from_nanos(75_000_001));
+    assert!((opacity(&tree) - 0.25).abs() < 0.001);
+    tree.pointer_left();
+    tree.set_reduced_motion(true);
+    assert_eq!(opacity(&tree), 1.0);
+    assert!(!tree.wants_animation_frame());
+}
+
+#[test]
 fn authored_changes_retarget_then_reduced_motion_finishes_the_new_target() {
     let element = |opacity| {
         Element::container([])

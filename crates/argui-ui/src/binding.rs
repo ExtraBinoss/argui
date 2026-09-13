@@ -251,8 +251,7 @@ pub(crate) fn resolved_quad(bindings: &[PropertyBinding], mut base: QuadStyle) -
     base
 }
 
-pub(crate) fn resolved_layout(bindings: &[PropertyBinding], base: &LayoutStyle) -> LayoutStyle {
-    let mut style = base.clone();
+pub(crate) fn resolved_layout(bindings: &[PropertyBinding], mut style: LayoutStyle) -> LayoutStyle {
     for binding in bindings {
         let PropertyBinding::Layout(target, binding) = binding else {
             continue;

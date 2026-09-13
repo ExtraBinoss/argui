@@ -29,6 +29,7 @@ pub(super) struct TransitionRegistry {
 #[derive(Clone, Debug)]
 struct NodeTransition {
     target: TransitionTarget,
+    element: Option<(Element, Point)>,
     matched: Vec<StyleCondition>,
     values: Vec<AnimatedProperty>,
     revision: u64,
@@ -85,7 +86,18 @@ impl TransitionRegistry {
         let mut update = TreeUpdate::None;
         let targets: HashSet<_> = specs.iter().map(|spec| spec.target).collect();
         self.entries.retain(|target, _| targets.contains(target));
-        for spec in specs {
+        for mut spec in specs {
+            if let Some((element, scroll)) = spec.element {
+                if self.entries.get(&spec.target).is_some_and(|entry| {
+                    entry.matched == spec.matched
+                        && entry.element.as_ref().is_some_and(|(previous, offset)| {
+                            previous.ptr_eq(element) && *offset == scroll
+                        })
+                }) {
+                    continue;
+                }
+                spec.values = style::target_values(element, &spec.matched, scroll);
+            }
             let Some(entry) = self.entries.get_mut(&spec.target) else {
                 self.entries.insert(spec.target, NodeTransition::new(spec));
                 continue;
@@ -213,6 +225,7 @@ impl super::UiTree {
 
 struct NodeSpec<'a> {
     target: TransitionTarget,
+    element: Option<(&'a Element, Point)>,
     matched: Vec<StyleCondition>,
     values: Vec<ResolvedProperty>,
     transition: Option<&'a crate::StyleTransition>,
@@ -228,6 +241,9 @@ impl NodeTransition {
     fn new(spec: NodeSpec<'_>) -> Self {
         Self {
             target: spec.target,
+            element: spec
+                .element
+                .map(|(element, scroll)| (element.clone(), scroll)),
             matched: spec.matched,
             revision: 0,
             values: spec
@@ -244,6 +260,9 @@ impl NodeTransition {
     }
 
     fn sync(&mut self, spec: NodeSpec<'_>, reduced_motion: bool) -> TreeUpdate {
+        self.element = spec
+            .element
+            .map(|(element, scroll)| (element.clone(), scroll));
         self.values.retain(|property| {
             spec.values
                 .iter()

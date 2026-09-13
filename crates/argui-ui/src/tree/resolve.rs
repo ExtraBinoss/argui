@@ -61,7 +61,7 @@ impl UiTree {
     pub fn resolved_layout_style(&self, node: NodeId, element: &Element) -> LayoutStyle {
         let mut style = element.style.clone();
         super::transition::apply_layout(&self.transitions, node, &mut style);
-        let mut style = crate::binding::resolved_layout(&element.bindings, &style);
+        let mut style = crate::binding::resolved_layout(&element.bindings, style);
         if let Some(direction) = self.index.direction(node) {
             style.writing_direction = direction;
         }

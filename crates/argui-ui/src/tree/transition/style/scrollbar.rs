@@ -71,6 +71,7 @@ fn push<'a>(
     }
     output.push(NodeSpec {
         target,
+        element: None,
         matched: matched(part, states, &matches),
         values: target_values(part, states, &matches),
         transition: part.transition.as_ref(),

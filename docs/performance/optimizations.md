@@ -604,3 +604,43 @@ those updates cheaper and removes unnecessary marker-only layout work; it does
 not eliminate layout during color editing. WebGPU checks on the private Linux
 display also cover hue/alpha input, stable popover bounds and live application
 colors in both themes. See [Linux testing](../contributing/linux-testing.md).
+
+### Transition cost in development builds
+
+The follow-up investigation of native pad dragging uses the **development**
+profile used by `cargo run -p argui-widget-gallery`. Against `93227a3`, two
+alternating pairs of the same CPU replay on 2026-09-13 give:
+
+| Interaction | Median update, before → after |
+| --- | ---: |
+| Gallery pad | 4.323 → 3.079 ms |
+| Gallery hue | 3.657 → 3.043 ms |
+| DevTools background | 8.006 → 6.037 ms |
+| DevTools Theme | 10.455 → 8.363 ms |
+
+Each cell takes the median of the two run medians. Total process CPU, including
+setup and warm-up, averages **12.710 → 10.334 seconds (−18.7%)**. Retired CPU
+instructions average **30.398 → 25.183 billion (−17.2%)**; each pair shows this
+instruction reduction. Wall times vary between launches, so these results do
+not establish a corresponding reduction in native input-to-display latency.
+[Raw runs and the profiling command](data/color-picker-transitions.json) retain
+the individual timings and counters. Both binaries use all features, CPU 3,
+40 warm-up updates and 300 measured updates per case. No build or GUI test runs
+concurrently. The replay excludes rendering and presentation on the GPU.
+
+Transition targets are reused when the shared element description, matched
+conditions and scroll offset are unchanged. Hover changes, ancestor conditions,
+responsive rules and authored edits still invalidate the targets; running
+motions continue advancing. Whole layout styles are retained only for rules
+that override a whole layout, and resolving layout bindings consumes the already
+owned style instead of copying it again. Tests cover scalar interpolation,
+shared descriptions during motion and restoration of the latest base after a
+whole-style hover override.
+
+This is a CPU optimization. All four cases still need layout on 300/300 updates
+because the displayed text changes. No process RAM saving is claimed: transition
+entries now retain a shared description and scroll offset, while unnecessary
+whole-style copies disappear. Native capture checks exercise pad dragging and
+the live color preview; their compositor/capture delay is not a calibrated
+measurement of the physical screen. The remaining reported thumb lag is not
+considered resolved by these CPU numbers alone.
