@@ -82,7 +82,10 @@ its `list`; headers and virtual spacers remain part of the same scroll extent.
 Nothing is enabled implicitly on application lists.
 
 `EdgeFade` changes content alpha rather than painting the background color over
-it. `EdgeShadow` shades the content toward a configurable color. Both expose
+it. `EdgeShadow` composites a configurable color over the viewport, including
+transparent gaps between children. Choose its color from the current theme;
+the gallery uses its foreground at 22% alpha on light surfaces and 6% on dark
+surfaces to keep both axes visible without a bright halo. Both expose
 width in logical pixels, intensity and `[left, top, right, bottom]` strengths.
 Their `.filter()` methods also work on ordinary layers without scrolling.
 `.scroll_with(threshold, ramp)` controls reveal distance; `.scroll()` uses a

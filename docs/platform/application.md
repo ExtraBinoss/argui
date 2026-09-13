@@ -21,6 +21,23 @@ The runtime applies this information to Wayland app-id, X11 WM_CLASS, supported
 Winit window icons, the browser document title, and browser favicon links. A
 tray inherits the application icons unless it supplies an override.
 
+## Renderer loading state
+
+GPU initialization is asynchronous. The runtime's event callback receives
+`RuntimeEvent::RendererReady` when its renderer becomes available, or
+`RuntimeEvent::RendererFailed(message)` on initialization failure. With multiple
+windows, these arrive as `RuntimeEvent::Window` carrying the corresponding
+`WindowRuntimeEvent` and window key. `AppModel` also receives
+`AppEvent::WindowReady` for its views.
+
+A host can use these events to dismiss its own loading indicator; Argui does
+not impose an interface for it. The widget gallery forwards readiness and
+failure on the web with `argui:renderer-state`, a `CustomEvent` whose
+`detail.state` is `ready` or `error`. The Nuxt preview shows its loader before
+fetching WASM and waits for this event before revealing the gallery.
+`RendererReady` reports renderer initialization, not a guarantee that the first
+frame has already been presented.
+
 ## Packaging
 
 Argui does not duplicate an application packager. Keep the values in

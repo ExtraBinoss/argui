@@ -1,0 +1,197 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_BUILD_JOBS: '6'
+  BINARYEN_CORES: '6'
+  CARGO_TERM_COLOR: always
+
+jobs:
+  security:
+    name: Security
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install verified Gitleaks and Actionlint
+        run: |
+          curl -fsSL --retry 3 -o /tmp/gitleaks.tar.gz https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+          echo '551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  /tmp/gitleaks.tar.gz' | sha256sum -c -
+          sudo tar -xzf /tmp/gitleaks.tar.gz -C /usr/local/bin gitleaks
+          curl -fsSL --retry 3 -o /tmp/actionlint.tar.gz https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz
+          echo '8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  /tmp/actionlint.tar.gz' | sha256sum -c -
+          sudo tar -xzf /tmp/actionlint.tar.gz -C /usr/local/bin actionlint
+      - name: Scan full Git history for secrets
+        run: ./scripts/check-secrets.sh
+      - name: Check workflows and release policy
+        run: |
+          actionlint
+          python3 -m unittest discover -s tests/scripts
+
+  quality:
+    name: Rust quality
+    needs: security
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      ARGUI_NATIVE_TESTS: '1'
+      ARGUI_COVERAGE_TOOLCHAIN: nightly-2026-08-21
+      LIBGL_ALWAYS_SOFTWARE: '1'
+      CARGO_INCREMENTAL: '0'
+      CARGO_PROFILE_DEV_DEBUG: '0'
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Free space for native and instrumented Rust artifacts
+        run: sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
+      - name: Install Linux build and private-display dependencies
+        run: ./scripts/install-linux-ci.sh
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        with:
+          toolchain: '1.98.0'
+          components: rustfmt, clippy
+          targets: wasm32-unknown-unknown
+      - name: Install pinned coverage toolchain
+        run: rustup toolchain install "$ARGUI_COVERAGE_TOOLCHAIN" --profile minimal --component llvm-tools-preview
+      - uses: taiki-e/install-action@3f74d7c16a4242f1c95561e98edc25d36adb4375 # v2
+        with:
+          tool: cargo-nextest@0.9.143,cargo-llvm-cov@0.9.0
+      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
+        with:
+          key: quality
+          cache-on-failure: true
+          cache-targets: false
+      - name: Validate registry manifests
+        run: python3 scripts/release.py check
+      - name: Run the complete 85% quality gate on a private display
+        run: ./scripts/linux-hidden-display.sh ./scripts/quality.sh
+      - name: Save coverage results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: coverage
+          path: |
+            target/coverage-gate.json
+            target/coverage-report.json
+          retention-days: 7
+          if-no-files-found: ignore
+
+  website:
+    name: Website
+    needs: security
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      NUXT_APP_BASE_URL: /argui/
+      NUXT_PUBLIC_SITE_URL: https://extrabinoss.github.io/argui
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+        with:
+          package_json_file: website/package.json
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          cache: pnpm
+          cache-dependency-path: website/pnpm-lock.yaml
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        with:
+          toolchain: '1.98.0'
+          targets: wasm32-unknown-unknown
+      - uses: taiki-e/install-action@3f74d7c16a4242f1c95561e98edc25d36adb4375 # v2
+        with:
+          tool: wasm-pack@0.15.0
+      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
+        with:
+          key: website-wasm
+      - name: Install website dependencies
+        run: pnpm --dir website install --frozen-lockfile
+      - name: Check the website
+        run: |
+          pnpm --dir website format:check
+          pnpm --dir website typecheck
+          pnpm --dir website test
+      - name: Build the real WASM gallery and static site
+        run: |
+          pnpm --dir website gallery:build
+          pnpm --dir website generate
+          pnpm --dir website test:generated
+      - name: Upload GitHub Pages site
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4
+        with:
+          path: website/.output/public
+
+  pages:
+    name: Deploy website
+    needs: [security, website]
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    concurrency:
+      group: github-pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
+
+  release:
+    name: Publish crates and GitHub release
+    needs: [security, quality, website]
+    if: >-
+      github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+      github.repository == 'ExtraBinoss/argui' && github.actor == 'ExtraBinoss' &&
+      contains(github.event.head_commit.message, '[RELEASE]')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    concurrency:
+      group: crates-io
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        with:
+          toolchain: '1.98.0'
+      - name: Install native build dependencies
+        run: ./scripts/install-linux-ci.sh
+      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
+        with:
+          key: release
+      - name: Check the version and publish missing crates
+        env:
+          RELEASE_BASE: ${{ github.event.before }}
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CRATE_REGISTRY_TOKEN || secrets.CARGO_REGISTRY_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/release.py publish --base "$RELEASE_BASE"

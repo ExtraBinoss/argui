@@ -297,3 +297,49 @@ fn scrolling_effect_panels_never_moves_the_page_even_at_edges_or_after_row_rebui
         }
     }
 }
+
+#[test]
+fn every_scroll_axis_uses_the_current_theme_shadow_color() {
+    use argui::{
+        core::ColorScheme,
+        paint::{EffectValue, Filter},
+        runtime::WindowEnvironment,
+    };
+    let app = Entity::new(WidgetGallery::default());
+    dispatch(
+        &app,
+        "nav::scroll-shadow",
+        UiEventKind::Click(ClickEvent::accessibility()),
+    );
+    for color_scheme in [ColorScheme::Light, ColorScheme::Dark] {
+        let environment = WindowEnvironment {
+            color_scheme,
+            ..Default::default()
+        };
+        let themes = argui::widgets::shadcn(&environment);
+        let expected = themes.resolve(color_scheme).foreground.with_alpha(
+            if color_scheme == ColorScheme::Light {
+                0.22
+            } else {
+                0.06
+            },
+        );
+        let root = app.render_in(environment);
+        for key in [
+            "scroll-demo-list",
+            "scroll-horizontal",
+            "scroll-demo-nested",
+        ] {
+            let scroll = find(&root, key).unwrap().scroll.as_ref().unwrap();
+            let Filter::Effect(effect) = &scroll.effects[0].layer.filters[0] else {
+                panic!()
+            };
+            assert!(
+                effect
+                    .parameters
+                    .iter()
+                    .any(|parameter| parameter.value == EffectValue::Color(expected))
+            );
+        }
+    }
+}

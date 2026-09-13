@@ -4,6 +4,10 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+description = "Optional native webview integration for Argui applications"
 
 [dependencies]
 argui-core.workspace = true
@@ -27,5 +31,5 @@ web-sys = { workspace = true, features = ["HtmlCanvasElement"] }
 workspace = true
 
 [dev-dependencies]
-argui-text.workspace = true
+argui-text = { path = "../argui-text" }
 web-time.workspace = true

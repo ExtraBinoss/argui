@@ -1,0 +1,9 @@
+node_modules/
+.nuxt/
+.output/
+dist
+.data/
+.env
+public/gallery/pkg/
+public/gallery/browser-shortcuts.js
+test-results/

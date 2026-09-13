@@ -50,6 +50,17 @@ pub fn launch() -> Result<(), Box<dyn std::error::Error>> {
         )),
         |event| {
             use argui::runtime::{RuntimeEvent, WindowRuntimeEvent};
+            #[cfg(target_arch = "wasm32")]
+            if matches!(
+                &event,
+                RuntimeEvent::RendererReady
+                    | RuntimeEvent::Window {
+                        event: WindowRuntimeEvent::RendererReady,
+                        ..
+                    }
+            ) {
+                renderer_state("ready");
+            }
             let error = match event {
                 RuntimeEvent::RendererFailed(message)
                 | RuntimeEvent::LayoutFailed(message)
@@ -64,7 +75,10 @@ pub fn launch() -> Result<(), Box<dyn std::error::Error>> {
             };
             if let Some(error) = error {
                 #[cfg(target_arch = "wasm32")]
-                browser_error(&error);
+                {
+                    renderer_state("error");
+                    browser_error(&error);
+                }
                 #[cfg(not(target_arch = "wasm32"))]
                 eprintln!("{error}");
             }
@@ -81,9 +95,20 @@ extern "C" {
 }
 
 #[cfg(target_arch = "wasm32")]
+#[wasm_bindgen::prelude::wasm_bindgen(
+    inline_js = "export function renderer_state(state) { window.dispatchEvent(new CustomEvent('argui:renderer-state', { detail: { state } })); }"
+)]
+extern "C" {
+    fn renderer_state(state: &str);
+}
+
+#[cfg(target_arch = "wasm32")]
 #[wasm_bindgen::prelude::wasm_bindgen(start)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 pub fn start() -> Result<(), wasm_bindgen::JsValue> {
-    std::panic::set_hook(Box::new(|info| browser_error(&info.to_string())));
+    std::panic::set_hook(Box::new(|info| {
+        renderer_state("error");
+        browser_error(&info.to_string());
+    }));
     launch().map_err(|error| wasm_bindgen::JsValue::from_str(&error.to_string()))
 }

@@ -29,7 +29,15 @@ pub(super) fn toolbar<A>(tools: &DevtoolsHost<A>, theme: &WidgetTheme) -> Elemen
     let picker = Button::icon(
         "__devtools-picker",
         "Select element",
-        icon_element(tools.icons.target, 18.0),
+        icon_element(
+            tools.icons.target,
+            18.0,
+            if tools.picking {
+                theme.primary_foreground
+            } else {
+                theme.foreground
+            },
+        ),
         if tools.picking {
             theme.button()
         } else {
@@ -47,8 +55,7 @@ pub(super) fn toolbar<A>(tools: &DevtoolsHost<A>, theme: &WidgetTheme) -> Elemen
     .presence(&tools.dock_presence)
     .highlighted(tools.dock_highlight)
     .trailing(
-        icon_element(tools.icons.chevron, 14.0)
-            .vector_color(theme.foreground)
+        icon_element(tools.icons.chevron, 14.0, theme.foreground)
             .transform(argui_core::Transform2D::IDENTITY.rotate(std::f32::consts::FRAC_PI_2)),
     )
     .build(theme)
@@ -83,7 +90,7 @@ pub(super) fn toolbar<A>(tools: &DevtoolsHost<A>, theme: &WidgetTheme) -> Elemen
         Button::icon(
             "__devtools-toggle",
             "Close developer tools",
-            Element::text("×"),
+            Element::text("×").text_style(text(18.0, theme.foreground)),
             theme.ghost_button(),
         )
         .build()
@@ -138,7 +145,11 @@ pub(super) fn small_button(key: &str, label: &str, active: bool, theme: &WidgetT
             property::BackgroundColor,
             if active { theme.primary } else { theme.border },
         ))
-        .pressed(StylePatch::new().set(property::BackgroundColor, theme.primary))
+        .pressed(
+            StylePatch::new()
+                .set(property::BackgroundColor, theme.primary)
+                .set(property::TextColor, theme.primary_foreground),
+        )
         .focused(StylePatch::new().set(property::BorderColor, theme.ring)),
     )
     .build()
@@ -151,7 +162,7 @@ pub(super) fn icon_label_button(
     theme: &WidgetTheme,
 ) -> Element {
     Button::new(key, label, theme.ghost_button())
-        .leading(icon_element(icon, 16.0))
+        .leading(icon_element(icon, 16.0, theme.foreground))
         .build()
         .padding(sides(9.0, 5.0))
 }

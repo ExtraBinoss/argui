@@ -1,0 +1,749 @@
+[
+  {
+    "slug": "accordion",
+    "name": "Accordion",
+    "description": "Expand related sections with the keyboard.",
+    "source": "crates/argui-widgets/src/accordion.rs",
+    "feature": "accordion",
+    "category": "Components",
+    "gallery": "Accordion"
+  },
+  {
+    "slug": "actions",
+    "name": "Actions",
+    "description": "One command for buttons, menus, palettes and focused shortcuts.",
+    "source": "crates/argui-widget-gallery/src/pages/actions.rs",
+    "feature": null,
+    "category": "Examples",
+    "gallery": "Actions"
+  },
+  {
+    "slug": "alert",
+    "name": "Alert",
+    "description": "Inline messages with accessible announcements.",
+    "source": "crates/argui-widgets/src/alert.rs",
+    "feature": "alert",
+    "category": "Components",
+    "gallery": "Alert"
+  },
+  {
+    "slug": "alert-dialog",
+    "name": "Alert dialog",
+    "description": "Confirm an action with a safe initial focus.",
+    "source": "crates/argui-widgets/src/alert_dialog.rs",
+    "feature": "alert-dialog",
+    "category": "Components",
+    "gallery": "Alert dialog"
+  },
+  {
+    "slug": "animated-text",
+    "name": "Animated text",
+    "description": "Rolling digits, sliding labels and quiet fades; unchanged characters stay still.",
+    "source": "crates/argui-widgets/src/animated_text.rs",
+    "feature": "animated-text",
+    "category": "Components",
+    "gallery": "Animated text"
+  },
+  {
+    "slug": "aspect-ratio",
+    "name": "Aspect ratio",
+    "description": "Keep content at a consistent width-to-height ratio.",
+    "source": "crates/argui-widgets/src/aspect_ratio.rs",
+    "feature": "aspect-ratio",
+    "category": "Components",
+    "gallery": "Aspect ratio"
+  },
+  {
+    "slug": "async-tasks",
+    "name": "Async tasks",
+    "description": "Owned, cancellable work with event-driven delivery to the UI.",
+    "source": "crates/argui-widget-gallery/src/pages/async_tasks.rs",
+    "feature": null,
+    "category": "Examples",
+    "gallery": "Async tasks"
+  },
+  {
+    "slug": "attachment",
+    "name": "Attachment",
+    "description": "File previews and transfer states.",
+    "source": "crates/argui-widgets/src/attachment.rs",
+    "feature": "attachment",
+    "category": "Components",
+    "gallery": "Attachment"
+  },
+  {
+    "slug": "avatar",
+    "name": "Avatar",
+    "description": "Images and initials with a shared accessible name.",
+    "source": "crates/argui-widgets/src/avatar.rs",
+    "feature": "avatar",
+    "category": "Components",
+    "gallery": "Avatar"
+  },
+  {
+    "slug": "badge",
+    "name": "Badge",
+    "description": "Compact labels with variants and optional icons.",
+    "source": "crates/argui-widgets/src/badge.rs",
+    "feature": "badge",
+    "category": "Components",
+    "gallery": "Badge"
+  },
+  {
+    "slug": "breadcrumb",
+    "name": "Breadcrumb",
+    "description": "A trail of links back to the current page’s ancestors.",
+    "source": "crates/argui-widgets/src/breadcrumb.rs",
+    "feature": "breadcrumb",
+    "category": "Components",
+    "gallery": "Breadcrumb"
+  },
+  {
+    "slug": "bubble",
+    "name": "Bubble",
+    "description": "Conversation surfaces and reactions.",
+    "source": "crates/argui-widgets/src/bubble.rs",
+    "feature": "bubble",
+    "category": "Components",
+    "gallery": "Bubble"
+  },
+  {
+    "slug": "button",
+    "name": "Button",
+    "description": "Actions with variants, icons, loading and accessible activation.",
+    "source": "crates/argui-widgets/src/button.rs",
+    "feature": "button",
+    "category": "Components",
+    "gallery": "Button"
+  },
+  {
+    "slug": "button-group",
+    "name": "Button group",
+    "description": "Related actions in a named group.",
+    "source": "crates/argui-widgets/src/button_group.rs",
+    "feature": "button-group",
+    "category": "Components",
+    "gallery": "Button group"
+  },
+  {
+    "slug": "calendar",
+    "name": "Calendar",
+    "description": "Choose dates with arrows and PageUp/PageDown.",
+    "source": "crates/argui-widgets/src/calendar.rs",
+    "feature": "calendar",
+    "category": "Components",
+    "gallery": "Calendar"
+  },
+  {
+    "slug": "card",
+    "name": "Card",
+    "description": "A surface with a title, description, content, action and footer.",
+    "source": "crates/argui-widgets/src/card.rs",
+    "feature": "card",
+    "category": "Components",
+    "gallery": "Card"
+  },
+  {
+    "slug": "carousel",
+    "name": "Carousel",
+    "description": "Browse slides with buttons, arrows or a swipe.",
+    "source": "crates/argui-widgets/src/carousel.rs",
+    "feature": "carousel",
+    "category": "Components",
+    "gallery": "Carousel"
+  },
+  {
+    "slug": "chart",
+    "name": "Chart",
+    "description": "Explore series with a zero baseline and accessible data points.",
+    "source": "crates/argui-widgets/src/chart.rs",
+    "feature": "chart",
+    "category": "Components",
+    "gallery": "Chart"
+  },
+  {
+    "slug": "checkbox",
+    "name": "Checkbox",
+    "description": "Unchecked, checked and mixed states with keyboard and touch activation.",
+    "source": "crates/argui-widgets/src/selection.rs",
+    "feature": "checkbox",
+    "category": "Components",
+    "gallery": "Checkbox"
+  },
+  {
+    "slug": "collapsible",
+    "name": "Collapsible",
+    "description": "Show and hide content with a button, Enter or Space.",
+    "source": "crates/argui-widgets/src/collapsible.rs",
+    "feature": "collapsible",
+    "category": "Components",
+    "gallery": "Collapsible"
+  },
+  {
+    "slug": "color-picker",
+    "name": "Color picker",
+    "description": "Precise color editing with opacity, a saturation pad and HEX/RGB/HSL/HSV fields.",
+    "source": "crates/argui-widgets/src/color_picker.rs",
+    "feature": "color-picker",
+    "category": "Components",
+    "gallery": "Color picker"
+  },
+  {
+    "slug": "combobox",
+    "name": "Combobox",
+    "description": "Filter choices while keeping focus in the search field.",
+    "source": "crates/argui-widgets/src/combobox.rs",
+    "feature": "combobox",
+    "category": "Components",
+    "gallery": "Combobox"
+  },
+  {
+    "slug": "command-palette",
+    "name": "Command palette",
+    "description": "Search and invoke actions from a keyboard-friendly palette.",
+    "source": "crates/argui-widgets/src/command_palette.rs",
+    "feature": "command-palette",
+    "category": "Components",
+    "gallery": "Actions"
+  },
+  {
+    "slug": "context-menu",
+    "name": "Context menu",
+    "description": "Open a menu at the pointer or with Shift+F10.",
+    "source": "crates/argui-widgets/src/context_menu.rs",
+    "feature": "context-menu",
+    "category": "Components",
+    "gallery": "Context menu"
+  },
+  {
+    "slug": "custom-timeline",
+    "name": "Custom Timeline",
+    "description": "Custom measurement and painting with draggable clips and standard controls.",
+    "source": "crates/argui-widget-gallery/src/pages/timeline.rs",
+    "feature": null,
+    "category": "Examples",
+    "gallery": "Custom Timeline"
+  },
+  {
+    "slug": "data-table",
+    "name": "Data table",
+    "description": "Sort tasks, select rows and edit Hours with Enter. Drag a column edge to resize.",
+    "source": "crates/argui-widgets/src/data_table.rs",
+    "feature": "data-table",
+    "category": "Components",
+    "gallery": "Data table"
+  },
+  {
+    "slug": "date-picker",
+    "name": "Date picker",
+    "description": "Type a date or choose it from the calendar.",
+    "source": "crates/argui-widgets/src/date_picker.rs",
+    "feature": "date-picker",
+    "category": "Components",
+    "gallery": "Date picker"
+  },
+  {
+    "slug": "dialog",
+    "name": "Dialog",
+    "description": "Modal focus containment and restoration.",
+    "source": "crates/argui-widgets/src/dialog.rs",
+    "feature": "dialog",
+    "category": "Components",
+    "gallery": "Dialog"
+  },
+  {
+    "slug": "direction",
+    "name": "Direction",
+    "description": "Share left-to-right or right-to-left layout with nested content.",
+    "source": "crates/argui-widgets/src/direction.rs",
+    "feature": "direction",
+    "category": "Components",
+    "gallery": "Direction"
+  },
+  {
+    "slug": "drawer",
+    "name": "Drawer",
+    "description": "Drag the handle or use Close to dismiss the panel.",
+    "source": "crates/argui-widgets/src/drawer.rs",
+    "feature": "drawer",
+    "category": "Components",
+    "gallery": "Drawer"
+  },
+  {
+    "slug": "editing",
+    "name": "Editing & Password",
+    "description": "Transactional undo/redo, Unicode, filtered fields and protected passwords.",
+    "source": "crates/argui-widget-gallery/src/pages/editing.rs",
+    "feature": null,
+    "category": "Examples",
+    "gallery": "Editing & Password"
+  },
+  {
+    "slug": "empty",
+    "name": "Empty",
+    "description": "Give an empty view a useful message and a next step.",
+    "source": "crates/argui-widgets/src/empty.rs",
+    "feature": "empty",
+    "category": "Components",
+    "gallery": "Empty"
+  },
+  {
+    "slug": "field",
+    "name": "Field",
+    "description": "Labels, help and errors linked to their controls.",
+    "source": "crates/argui-widgets/src/field.rs",
+    "feature": "field",
+    "category": "Components",
+    "gallery": "Field"
+  },
+  {
+    "slug": "file-picker",
+    "name": "File picker",
+    "description": "Choose files, folders or a save destination in your system’s native dialog.",
+    "source": "crates/argui-widgets/src/file_picker.rs",
+    "feature": "file-picker",
+    "category": "Components",
+    "gallery": "File picker"
+  },
+  {
+    "slug": "hover-card",
+    "name": "Hover card",
+    "description": "A rich preview on hover or keyboard focus.",
+    "source": "crates/argui-widgets/src/hover_card.rs",
+    "feature": "hover-card",
+    "category": "Components",
+    "gallery": "Hover card"
+  },
+  {
+    "slug": "icons",
+    "name": "Icons",
+    "description": "Vector icons registered once and shared across widgets.",
+    "source": "crates/argui-widgets/src/icons.rs",
+    "feature": "icons",
+    "category": "Components",
+    "gallery": "Button"
+  },
+  {
+    "slug": "input",
+    "name": "Input & Search",
+    "description": "Controlled single-line and search fields.",
+    "source": "crates/argui-widgets/src/input.rs",
+    "feature": "input",
+    "category": "Components",
+    "gallery": "Input & Search"
+  },
+  {
+    "slug": "input-group",
+    "name": "Input group",
+    "description": "Inputs with attached labels and actions.",
+    "source": "crates/argui-widgets/src/input_group.rs",
+    "feature": "input-group",
+    "category": "Components",
+    "gallery": "Input group"
+  },
+  {
+    "slug": "input-otp",
+    "name": "Input OTP",
+    "description": "Enter or paste a numeric verification code.",
+    "source": "crates/argui-widgets/src/input_otp.rs",
+    "feature": "input-otp",
+    "category": "Components",
+    "gallery": "Input OTP"
+  },
+  {
+    "slug": "item",
+    "name": "Item",
+    "description": "Reusable rows with media, details and actions.",
+    "source": "crates/argui-widgets/src/item.rs",
+    "feature": "item",
+    "category": "Components",
+    "gallery": "Item"
+  },
+  {
+    "slug": "kbd",
+    "name": "Kbd",
+    "description": "Keycaps and shortcut combinations.",
+    "source": "crates/argui-widgets/src/kbd.rs",
+    "feature": "kbd",
+    "category": "Components",
+    "gallery": "Kbd"
+  },
+  {
+    "slug": "label",
+    "name": "Label",
+    "description": "Clear labels associated with their controls.",
+    "source": "crates/argui-widgets/src/label.rs",
+    "feature": "label",
+    "category": "Components",
+    "gallery": "Label"
+  },
+  {
+    "slug": "liquid-glass",
+    "name": "Liquid glass",
+    "description": "Scroll colorful palettes behind a floating glass navigation bar.",
+    "source": "crates/argui-widget-gallery/src/pages/liquid_glass.rs",
+    "feature": null,
+    "category": "Examples",
+    "gallery": "Liquid glass"
+  },
+  {
+    "slug": "list",
+    "name": "List",
+    "description": "Selection and keyboard navigation.",
+    "source": "crates/argui-widgets/src/list.rs",
+    "feature": "list",
+    "category": "Components",
+    "gallery": "List"
+  },
+  {
+    "slug": "marker",
+    "name": "Marker",
+    "description": "Notes and status markers within a conversation.",
+    "source": "crates/argui-widgets/src/marker.rs",
+    "feature": "marker",
+    "category": "Components",
+    "gallery": "Marker"
+  },
+  {
+    "slug": "menu",
+    "name": "Menu",
+    "description": "Add notes, toggle details and choose a comfortable or compact layout.",
+    "source": "crates/argui-widgets/src/menu.rs",
+    "feature": "menu",
+    "category": "Components",
+    "gallery": "Menu"
+  },
+  {
+    "slug": "menubar",
+    "name": "Menubar",
+    "description": "File manages your notebook; View changes its appearance. Try the arrow keys.",
+    "source": "crates/argui-widgets/src/menubar.rs",
+    "feature": "menubar",
+    "category": "Components",
+    "gallery": "Menubar"
+  },
+  {
+    "slug": "message",
+    "name": "Message",
+    "description": "Messages with authors, metadata and actions.",
+    "source": "crates/argui-widgets/src/message.rs",
+    "feature": "message",
+    "category": "Components",
+    "gallery": "Message"
+  },
+  {
+    "slug": "message-scroller",
+    "name": "Message scroller",
+    "description": "Keep your place while new messages arrive.",
+    "source": "crates/argui-widgets/src/message_scroller.rs",
+    "feature": "message-scroller",
+    "category": "Components",
+    "gallery": "Message scroller"
+  },
+  {
+    "slug": "motion",
+    "name": "Motion & loading",
+    "description": "Frame-paced feedback and interaction transitions.",
+    "source": "crates/argui-widget-gallery/src/pages.rs",
+    "feature": null,
+    "category": "Examples",
+    "gallery": "Motion & loading"
+  },
+  {
+    "slug": "native-select",
+    "name": "Native select",
+    "description": "A compact form select drawn by Argui.",
+    "source": "crates/argui-widgets/src/native_select.rs",
+    "feature": "native-select",
+    "category": "Components",
+    "gallery": "Native select"
+  },
+  {
+    "slug": "navigation-menu",
+    "name": "Navigation menu",
+    "description": "Navigate links and explore anchored panels.",
+    "source": "crates/argui-widgets/src/navigation_menu.rs",
+    "feature": "navigation-menu",
+    "category": "Components",
+    "gallery": "Navigation menu"
+  },
+  {
+    "slug": "pagination",
+    "name": "Pagination",
+    "description": "Page navigation with a compact range and clear boundaries.",
+    "source": "crates/argui-widgets/src/pagination.rs",
+    "feature": "pagination",
+    "category": "Components",
+    "gallery": "Pagination"
+  },
+  {
+    "slug": "popover",
+    "name": "Popover",
+    "description": "Interactive panels with solid, blurred and custom effect surfaces.",
+    "source": "crates/argui-widgets/src/popover.rs",
+    "feature": "popover",
+    "category": "Components",
+    "gallery": "Popover"
+  },
+  {
+    "slug": "progress",
+    "name": "Progress",
+    "description": "Determinate and indeterminate progress, with reduced-motion support.",
+    "source": "crates/argui-widgets/src/progress.rs",
+    "feature": "progress",
+    "category": "Components",
+    "gallery": "Progress"
+  },
+  {
+    "slug": "questionnaire",
+    "name": "Questionnaire",
+    "description": "Answer, skip and submit a sequence of questions.",
+    "source": "crates/argui-widgets/src/questionnaire.rs",
+    "feature": "questionnaire",
+    "category": "Components",
+    "gallery": "Questionnaire"
+  },
+  {
+    "slug": "radio-group",
+    "name": "Radio group",
+    "description": "Exclusive selection with semantic grouping.",
+    "source": "crates/argui-widgets/src/selection.rs",
+    "feature": "radio-group",
+    "category": "Components",
+    "gallery": "Radio group"
+  },
+  {
+    "slug": "range",
+    "name": "Range",
+    "description": "Shared value, bounds, step and gesture behavior for range controls.",
+    "source": "crates/argui-widgets/src/range.rs",
+    "feature": "range",
+    "category": "Components",
+    "gallery": null
+  },
+  {
+    "slug": "scroll-area",
+    "name": "Scroll area",
+    "description": "A keyboard-accessible viewport with themed scrollbars.",
+    "source": "crates/argui-widgets/src/scroll_area.rs",
+    "feature": "scroll-area",
+    "category": "Components",
+    "gallery": "Scroll area"
+  },
+  {
+    "slug": "scroll-shadow",
+    "name": "Scroll shadow",
+    "description": "Edge shadows reveal more content in scrollable views.",
+    "source": "crates/argui-widget-gallery/src/pages/scroll_effects.rs",
+    "feature": null,
+    "category": "Examples",
+    "gallery": "Scroll shadow"
+  },
+  {
+    "slug": "select",
+    "name": "Select",
+    "description": "Anchored, collision-aware option overlay.",
+    "source": "crates/argui-widgets/src/select.rs",
+    "feature": "select",
+    "category": "Components",
+    "gallery": "Select"
+  },
+  {
+    "slug": "separator",
+    "name": "Separator",
+    "description": "Horizontal and vertical dividers, with optional centered labels.",
+    "source": "crates/argui-widgets/src/separator.rs",
+    "feature": "separator",
+    "category": "Components",
+    "gallery": "Separator"
+  },
+  {
+    "slug": "sheet",
+    "name": "Sheet",
+    "description": "Modal panels attached to an edge of the window.",
+    "source": "crates/argui-widgets/src/sheet.rs",
+    "feature": "sheet",
+    "category": "Components",
+    "gallery": "Sheet"
+  },
+  {
+    "slug": "sidebar",
+    "name": "Sidebar",
+    "description": "Collapsible navigation with a compact rail.",
+    "source": "crates/argui-widgets/src/sidebar.rs",
+    "feature": "sidebar",
+    "category": "Components",
+    "gallery": "Sidebar"
+  },
+  {
+    "slug": "skeleton",
+    "name": "Skeleton",
+    "description": "Soft loading shapes that respect reduced motion.",
+    "source": "crates/argui-widgets/src/skeleton.rs",
+    "feature": "skeleton",
+    "category": "Components",
+    "gallery": "Skeleton"
+  },
+  {
+    "slug": "slider",
+    "name": "Slider",
+    "description": "Pointer, touch, keyboard and accessibility values.",
+    "source": "crates/argui-widgets/src/slider.rs",
+    "feature": "slider",
+    "category": "Components",
+    "gallery": "Slider"
+  },
+  {
+    "slug": "spinner",
+    "name": "Spinner",
+    "description": "A loading indicator that respects reduced motion.",
+    "source": "crates/argui-widgets/src/spinner.rs",
+    "feature": "spinner",
+    "category": "Components",
+    "gallery": "Motion & loading"
+  },
+  {
+    "slug": "split-pane",
+    "name": "Split pane",
+    "description": "Resizable panels with limits, pointer gestures and keyboard control.",
+    "source": "crates/argui-widgets/src/split_pane.rs",
+    "feature": "split-pane",
+    "category": "Components",
+    "gallery": null
+  },
+  {
+    "slug": "switch",
+    "name": "Switch",
+    "description": "Animated binary preferences.",
+    "source": "crates/argui-widgets/src/selection.rs",
+    "feature": "switch",
+    "category": "Components",
+    "gallery": "Switch"
+  },
+  {
+    "slug": "table",
+    "name": "Table",
+    "description": "Columns and row selection.",
+    "source": "crates/argui-widgets/src/table.rs",
+    "feature": "table",
+    "category": "Components",
+    "gallery": "Table"
+  },
+  {
+    "slug": "tabs",
+    "name": "Tabs",
+    "description": "Roving navigation and one mounted panel.",
+    "source": "crates/argui-widgets/src/tabs.rs",
+    "feature": "tabs",
+    "category": "Components",
+    "gallery": "Tabs"
+  },
+  {
+    "slug": "textarea",
+    "name": "Text area",
+    "description": "Multiline editing, scrolling, clipping and resize capture.",
+    "source": "crates/argui-widgets/src/input.rs",
+    "feature": "textarea",
+    "category": "Components",
+    "gallery": "Text area"
+  },
+  {
+    "slug": "text-selection",
+    "name": "Text selection",
+    "description": "Selection surfaces and contextual actions for retained text.",
+    "source": "crates/argui-widgets/src/text_selection.rs",
+    "feature": "text-selection",
+    "category": "Components",
+    "gallery": "Typography & selection"
+  },
+  {
+    "slug": "toast",
+    "name": "Toast",
+    "description": "Notifications with a bounded queue and explicit dismissal.",
+    "source": "crates/argui-widgets/src/toast.rs",
+    "feature": "toast",
+    "category": "Components",
+    "gallery": "Toast"
+  },
+  {
+    "slug": "toggle",
+    "name": "Toggle",
+    "description": "Press to switch a persistent formatting option.",
+    "source": "crates/argui-widgets/src/toggle.rs",
+    "feature": "toggle",
+    "category": "Components",
+    "gallery": "Toggle"
+  },
+  {
+    "slug": "toggle-group",
+    "name": "Toggle group",
+    "description": "Select one or several options with roving keyboard focus.",
+    "source": "crates/argui-widgets/src/toggle_group.rs",
+    "feature": "toggle-group",
+    "category": "Components",
+    "gallery": "Toggle group"
+  },
+  {
+    "slug": "tooltip",
+    "name": "Tooltip",
+    "description": "Helpful descriptions on hover or keyboard focus, with customizable surfaces.",
+    "source": "crates/argui-widgets/src/tooltip.rs",
+    "feature": "tooltip",
+    "category": "Components",
+    "gallery": "Tooltip"
+  },
+  {
+    "slug": "tree-view",
+    "name": "Tree view",
+    "description": "Hierarchical navigation with virtualized rows and keyboard actions.",
+    "source": "crates/argui-widgets/src/tree_view.rs",
+    "feature": "tree-view",
+    "category": "Components",
+    "gallery": null
+  },
+  {
+    "slug": "typography",
+    "name": "Typography & selection",
+    "description": "Rich spans, decoration, clamping and web-like text selection.",
+    "source": "crates/argui-widgets/src/typography.rs",
+    "feature": "typography",
+    "category": "Components",
+    "gallery": "Typography & selection"
+  },
+  {
+    "slug": "updater",
+    "name": "Updater",
+    "description": "Optional update dialog with download progress, verification and installation states.",
+    "source": "crates/argui-widgets/src/updater.rs",
+    "feature": "updater",
+    "category": "Components",
+    "gallery": "Updater"
+  },
+  {
+    "slug": "vlist",
+    "name": "VList",
+    "description": "Measured variable-height rows and virtual scrolling.",
+    "source": "crates/argui-widgets/src/vlist.rs",
+    "feature": "vlist",
+    "category": "Components",
+    "gallery": "VList"
+  },
+  {
+    "slug": "layout",
+    "name": "Web layout",
+    "description": "CSS-shaped Block, Flex, Grid, box model and text alignment.",
+    "source": "crates/argui-widget-gallery/src/pages.rs",
+    "feature": null,
+    "category": "Examples",
+    "gallery": "Web layout"
+  },
+  {
+    "slug": "webview",
+    "name": "WebView",
+    "description": "Retained web content, with separate email and webpage security policies.",
+    "source": "crates/argui-widget-gallery/src/pages/webview.rs",
+    "feature": null,
+    "category": "Examples",
+    "gallery": "WebView"
+  }
+]

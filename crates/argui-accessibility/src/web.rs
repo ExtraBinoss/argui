@@ -8,17 +8,18 @@ use web_sys::{
 
 use crate::{
     SemanticAction, SemanticNode, SemanticNodeId, SemanticPatch, SemanticRequest, SemanticTree,
-    SemanticValue,
+    SemanticValue, Semantics,
 };
 
 mod attributes;
-use attributes::{apply_attributes, html_tag};
+use attributes::{apply_attributes, apply_bounds, html_tag};
 
 type EventHandler = Closure<dyn FnMut(Event)>;
 
 struct DomNode {
     element: Element,
-    actions: Vec<SemanticAction>,
+    semantics: Semantics,
+    bounds: Option<[f64; 4]>,
     _handlers: Vec<EventHandler>,
 }
 
@@ -27,6 +28,7 @@ pub struct DomTree {
     root: HtmlElement,
     nodes: HashMap<SemanticNodeId, DomNode>,
     snapshot: SemanticTree,
+    bounds: Option<[f64; 4]>,
     on_action: std::rc::Rc<dyn Fn(SemanticRequest)>,
 }
 
@@ -76,6 +78,7 @@ impl DomTree {
             root,
             nodes: HashMap::new(),
             snapshot: snapshot.clone(),
+            bounds: None,
             on_action: std::rc::Rc::new(on_action),
         };
         tree.position_root()?;
@@ -94,14 +97,13 @@ impl DomTree {
         Ok(true)
     }
 
-    fn position_root(&self) -> Result<(), JsValue> {
+    fn position_root(&mut self) -> Result<(), JsValue> {
         let rect = self.canvas.get_bounding_client_rect();
-        let style = self.root.style();
-        style.set_property("left", &format!("{}px", rect.left()))?;
-        style.set_property("top", &format!("{}px", rect.top()))?;
-        style.set_property("width", &format!("{}px", rect.width()))?;
-        style.set_property("height", &format!("{}px", rect.height()))?;
-        Ok(())
+        apply_bounds(
+            &self.root,
+            &mut self.bounds,
+            [rect.left(), rect.top(), rect.width(), rect.height()],
+        )
     }
 
     fn apply_full(&mut self, tree: &SemanticTree) -> Result<(), JsValue> {
@@ -133,7 +135,7 @@ impl DomTree {
         let tag = html_tag(node.semantics.role);
         let replace = self.nodes.get(&node.id).is_some_and(|current| {
             current.element.tag_name().to_ascii_lowercase() != tag
-                || current.actions != node.semantics.actions
+                || current.semantics.actions != node.semantics.actions
         });
         if replace && let Some(previous) = self.nodes.remove(&node.id) {
             previous.element.remove();
@@ -151,43 +153,47 @@ impl DomTree {
                 &element,
                 std::rc::Rc::clone(&self.on_action),
             )?;
+            apply_attributes(&element, node, &self.root.id())?;
+            let style = element.unchecked_ref::<HtmlElement>().style();
+            style.set_property("position", "absolute")?;
+            style.set_property("opacity", "0.001")?;
+            style.set_property("pointer-events", "none")?;
             self.nodes.insert(
                 node.id,
                 DomNode {
                     element,
-                    actions: node.semantics.actions.clone(),
+                    semantics: node.semantics.clone(),
+                    bounds: None,
                     _handlers: handlers,
                 },
             );
         }
-        let current = &self.nodes[&node.id].element;
-        apply_attributes(
-            current,
-            node,
-            self.canvas.width(),
-            self.canvas.height(),
-            &self.root.id(),
-        )
+        let current = self.nodes.get_mut(&node.id).expect("upserted DOM node");
+        if current.semantics != node.semantics {
+            apply_attributes(&current.element, node, &self.root.id())?;
+            current.semantics = node.semantics.clone();
+        }
+        Ok(())
     }
 
-    fn attach_children(&self, tree: &SemanticTree) -> Result<(), JsValue> {
+    fn attach_children(&mut self, tree: &SemanticTree) -> Result<(), JsValue> {
         let scale = self
             .canvas
             .owner_document()
             .and_then(|document| document.default_view())
             .map_or(1.0, |window| window.device_pixel_ratio());
         for (id, bounds) in tree.parent_relative_bounds() {
-            if let Some(element) = self
-                .nodes
-                .get(&id)
-                .and_then(|node| node.element.dyn_ref::<HtmlElement>())
-            {
-                element
-                    .style()
-                    .set_property("left", &format!("{}px", f64::from(bounds.origin.x) / scale))?;
-                element
-                    .style()
-                    .set_property("top", &format!("{}px", f64::from(bounds.origin.y) / scale))?;
+            if let Some(node) = self.nodes.get_mut(&id) {
+                apply_bounds(
+                    node.element.unchecked_ref::<HtmlElement>(),
+                    &mut node.bounds,
+                    [
+                        f64::from(bounds.origin.x) / scale,
+                        f64::from(bounds.origin.y) / scale,
+                        (f64::from(bounds.size.width) / scale).max(1.0),
+                        (f64::from(bounds.size.height) / scale).max(1.0),
+                    ],
+                )?;
             }
         }
         let root = self
@@ -201,9 +207,16 @@ impl DomTree {
             let Some(parent) = self.nodes.get(&node.id) else {
                 continue;
             };
+            let mut cursor = parent.element.first_child();
             for child in &node.children {
                 if let Some(child) = self.nodes.get(child) {
-                    parent.element.append_child(&child.element)?;
+                    if cursor.as_ref() == Some(child.element.as_ref()) {
+                        cursor = child.element.next_sibling();
+                    } else {
+                        parent
+                            .element
+                            .insert_before(&child.element, cursor.as_ref())?;
+                    }
                 }
             }
         }

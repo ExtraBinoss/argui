@@ -4,9 +4,14 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+description = "Feature-gated accessible widgets for Argui interfaces"
 
 [features]
 default = []
+updater = ["dialog", "button", "progress", "dep:argui-updater"]
 all = [
     "animated-text",
     "accordion",
@@ -169,12 +174,13 @@ argui-runtime = { workspace = true, optional = true }
 argui-text.workspace = true
 argui-theme.workspace = true
 argui-ui.workspace = true
+argui-updater = { workspace = true, optional = true }
 argui-vector = { workspace = true, optional = true }
 icondata_core = { workspace = true, optional = true }
 icondata_tb = { workspace = true, optional = true }
 
 [dev-dependencies]
-argui-layout.workspace = true
+argui-layout = { path = "../argui-layout" }
 
 [lints]
 workspace = true

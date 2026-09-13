@@ -4,9 +4,15 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+description = "A modular Rust UI library for fast, accessible native and WebAssembly interfaces"
 
 [features]
 default = []
+updater = ["dep:argui-updater", "argui-updater/native"]
+widget-updater = ["argui-widgets/updater"]
 file-picker = ["argui-platform/file-picker"]
 widget-file-picker = ["argui-widgets/file-picker"]
 desktop-backdrop = ["argui-runtime/desktop-backdrop"]
@@ -103,14 +109,15 @@ argui-runtime.workspace = true
 argui-text.workspace = true
 argui-theme.workspace = true
 argui-ui.workspace = true
+argui-updater = { workspace = true, optional = true }
 argui-vector.workspace = true
 argui-widgets = { workspace = true, optional = true }
 argui-webview = { workspace = true, optional = true }
 
 [dev-dependencies]
-argui-devtools.workspace = true
-argui-showcase.workspace = true
-argui-widgets = { workspace = true, features = ["all"] }
+argui-devtools = { path = "../argui-devtools" }
+argui-showcase = { path = "../argui-showcase" }
+argui-widgets = { path = "../argui-widgets", features = ["all"] }
 
 [lints]
 workspace = true

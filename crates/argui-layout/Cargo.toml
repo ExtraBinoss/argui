@@ -4,6 +4,10 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+description = "Flexbox and grid layout integration for Argui"
 
 [dependencies]
 argui-core.workspace = true
@@ -13,8 +17,8 @@ argui-ui.workspace = true
 taffy.workspace = true
 
 [dev-dependencies]
-argui-animation.workspace = true
-argui-widgets = { workspace = true, features = ["all"] }
+argui-animation = { path = "../argui-animation" }
+argui-widgets = { path = "../argui-widgets", features = ["all"] }
 web-time.workspace = true
 
 [lints]

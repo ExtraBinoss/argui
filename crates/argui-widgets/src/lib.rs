@@ -418,3 +418,8 @@ pub use questionnaire::{
     Question, QuestionAnswer, QuestionChoice, Questionnaire, QuestionnaireAction,
     QuestionnaireState,
 };
+
+#[cfg(feature = "updater")]
+mod updater;
+#[cfg(feature = "updater")]
+pub use updater::{UpdateAction, UpdateDialog};

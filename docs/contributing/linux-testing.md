@@ -220,6 +220,14 @@ champs, toggles, sélecteurs, panneaux, focus, Hover Card et défilement clavier
 Inspecter les PNG de `target/catalogue-interactions/`. Le périmètre de chaque
 API est décrit dans [shadcn-lib.md](../widgets/shadcn.md).
 
+Pour le dialogue de mise à jour, compiler la galerie avec `--all-features`, puis
+utiliser `node crates/argui-widget-gallery/tests/pages/updater.mjs` avec le même
+lanceur et les variables Chromium/Puppeteer ci-dessus. Les captures clair/sombre
+dans `target/updater-interactions/` montrent la nouvelle version, les MB reçus,
+la taille inconnue, l'annulation, la vérification, l'installation, l'erreur et le
+dialogue étroit. Le scénario vérifie aussi Échap et la nouvelle tentative.
+Il utilise la prévisualisation annoncée dans la galerie et n'installe aucun paquet.
+
 Pour les réglages de flou de bureau, utiliser
 `node crates/argui-widget-gallery/tests/app/desktop_backdrop.mjs` avec le même
 lanceur et les mêmes variables Chromium/Puppeteer. Captures :
@@ -258,3 +266,12 @@ de `./scripts/quality.sh` quand l'implémentation est terminée, avant le commit
 Le lanceur peut envelopper ce script. Le contrôle mesure toutes les crates du
 workspace, même celles non modifiées par le chantier ; ne pas changer les seuils
 pour faire passer un contrôle.
+
+For web scroll regressions, run `crates/argui-accessibility/tests/web.mjs` and
+`crates/argui-widget-gallery/tests/pages/scroll_effects.mjs` with the same private
+launcher and Chromium variables. Their `GALLERY_URL` defaults to the website's
+`http://127.0.0.1:3100/gallery/index.html`. The first checks DOM stability, focus,
+row order and accessibility actions; the second saves light/dark vertical and
+horizontal edge effects and DevTools toolbar captures in `target/scroll-shadow-web/`.
+The repeatable VList CPU scenario and measurement limits are documented in
+[optimizations.md](../performance/optimizations.md#web-vlist-accessibility-synchronization).

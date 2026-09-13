@@ -178,15 +178,17 @@ fn elements_tab<A>(tools: &DevtoolsHost<A>, theme: &WidgetTheme) -> Element {
         let list = tools
             .tree_view(&nodes, selected_key.as_deref())
             .build_cached(theme, &mut tools.tree_rows.borrow_mut());
+        let mut search_style = InputStyle::new(
+            PaintStyle::new(QuadStyle::solid(theme.card).radius(CornerRadii::all(5.0))),
+            text(12.0, theme.foreground),
+        )
+        .focused(StylePatch::new().set(property::BackgroundColor, theme.muted));
+        search_style.placeholder.color = theme.muted_foreground;
         let search = Input::new(
             "__devtools-search",
             &tools.search,
             "Filter elements…",
-            InputStyle::new(
-                PaintStyle::new(QuadStyle::solid(theme.card).radius(CornerRadii::all(5.0))),
-                text(12.0, theme.foreground),
-            )
-            .focused(StylePatch::new().set(property::BackgroundColor, theme.muted)),
+            search_style,
         )
         .kind(argui_widgets::InputKind::Search)
         .label("Filter elements")
@@ -322,8 +324,9 @@ pub(crate) fn profiling_list_config(item_count: usize, viewport: f32) -> Virtual
     argui_widgets::VList::new("__devtools-frames", 28.0, viewport, 0.0).config(item_count)
 }
 
-fn icon_element(icon: VectorId, size: f32) -> Element {
+fn icon_element(icon: VectorId, size: f32, color: Color) -> Element {
     Element::vector(icon)
+        .vector_color(color)
         .width(length(size))
         .height(length(size))
         .shrink(0.0)

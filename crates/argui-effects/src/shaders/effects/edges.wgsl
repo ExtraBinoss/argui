@@ -18,7 +18,11 @@ fn argui_effect(uv: vec2<f32>, source: vec4<f32>, backdrop: vec4<f32>) -> vec4<f
     }
     if argui_param_bool(18u) {
         let color = vec4<f32>(argui_param_f32(14u), argui_param_f32(15u), argui_param_f32(16u), argui_param_f32(17u));
-        return vec4<f32>(mix(source.rgb, color.rgb, amount * color.a), source.a);
+        // Composite the shadow over the entire viewport, including transparent gaps.
+        let shadow_alpha = clamp(amount * color.a, 0.0, 1.0);
+        let alpha = shadow_alpha + source.a * (1.0 - shadow_alpha);
+        let rgb = color.rgb * shadow_alpha + source.rgb * source.a * (1.0 - shadow_alpha);
+        return vec4<f32>(rgb / max(alpha, 0.000001), alpha);
     }
     // The custom-effect ABI handles premultiplication on input/output.
     return vec4<f32>(source.rgb, source.a * (1.0 - amount));

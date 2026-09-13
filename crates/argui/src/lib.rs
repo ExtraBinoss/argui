@@ -13,6 +13,8 @@ pub use argui_runtime as runtime;
 pub use argui_text as text;
 pub use argui_theme as theme;
 pub use argui_ui as ui;
+#[cfg(feature = "updater")]
+pub use argui_updater as updater;
 pub use argui_vector as vector;
 #[cfg(feature = "webview")]
 pub use argui_webview as webview;

@@ -5,8 +5,6 @@ use web_sys::{Element, HtmlElement, HtmlInputElement, HtmlTextAreaElement};
 pub(super) fn apply_attributes(
     element: &Element,
     node: &SemanticNode,
-    canvas_width: u32,
-    canvas_height: u32,
     id_prefix: &str,
 ) -> Result<(), JsValue> {
     let relations = &node.semantics.relations;
@@ -180,26 +178,24 @@ pub(super) fn apply_attributes(
         "aria-setsize",
         node.semantics.set_size.map(f64::from),
     )?;
-    let scale_x = f64::from(canvas_width.max(1));
-    let scale_y = f64::from(canvas_height.max(1));
-    let canvas_rect = element
-        .owner_document()
-        .and_then(|document| document.default_view())
-        .map_or(1.0, |window| window.device_pixel_ratio());
-    let x = f64::from(node.bounds.origin.x) / canvas_rect;
-    let y = f64::from(node.bounds.origin.y) / canvas_rect;
-    let width = f64::from(node.bounds.size.width) / canvas_rect;
-    let height = f64::from(node.bounds.size.height) / canvas_rect;
-    let style = element.dyn_ref::<HtmlElement>().map(HtmlElement::style);
-    if let Some(style) = style {
-        style.set_property("position", "absolute")?;
-        style.set_property("left", &format!("{}px", x.min(scale_x)))?;
-        style.set_property("top", &format!("{}px", y.min(scale_y)))?;
-        style.set_property("width", &format!("{}px", width.max(1.0)))?;
-        style.set_property("height", &format!("{}px", height.max(1.0)))?;
-        style.set_property("opacity", "0.001")?;
-        style.set_property("pointer-events", "none")?;
+    Ok(())
+}
+
+pub(super) fn apply_bounds(
+    element: &HtmlElement,
+    previous: &mut Option<[f64; 4]>,
+    bounds: [f64; 4],
+) -> Result<(), JsValue> {
+    if *previous == Some(bounds) {
+        return Ok(());
     }
+    let style = element.style();
+    for (index, name) in ["left", "top", "width", "height"].iter().enumerate() {
+        if previous.is_none_or(|old| old[index] != bounds[index]) {
+            style.set_property(name, &format!("{}px", bounds[index]))?;
+        }
+    }
+    *previous = Some(bounds);
     Ok(())
 }
 

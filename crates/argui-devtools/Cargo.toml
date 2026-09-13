@@ -4,6 +4,10 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+description = "Interactive inspection and debugging tools for Argui applications"
 
 [features]
 default = []
@@ -32,8 +36,8 @@ web-time.workspace = true
 sysinfo = { workspace = true, features = ["system"] }
 
 [dev-dependencies]
-argui-layout.workspace = true
-argui-showcase.workspace = true
+argui-layout = { path = "../argui-layout" }
+argui-showcase = { path = "../argui-showcase" }
 
 [lints]
 workspace = true

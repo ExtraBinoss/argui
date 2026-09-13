@@ -644,3 +644,44 @@ whole-style copies disappear. Native capture checks exercise pad dragging and
 the live color preview; their compositor/capture delay is not a calibrated
 measurement of the physical screen. The remaining reported thumb lag is not
 considered resolved by these CPU numbers alone.
+
+
+## Web VList accessibility synchronization
+
+The Chromium profile on 2026-09-13 identified DOM synchronization as a web-only
+scroll cost. `DomTree` appended every semantic child again on each update and
+rewrote every node's position, even when its order and parent-relative bounds
+were unchanged. Bounds-only updates also rewrote all ARIA attributes.
+
+The adapter now preserves sibling order with a cursor, moving only inserted or
+reordered children. It caches the last CSS bounds and semantics for each live
+node, writes changed bounds once in parent coordinates, and only updates ARIA
+when semantics change. Removed nodes release their caches and event handlers.
+This retains the full accessible tree and assistive-technology focus.
+
+The reproducible scenario is
+`crates/argui-widget-gallery/tests/pages/data.mjs`. Run with the private-display
+launcher, `CHROME_PATH`, `PUPPETEER_MODULE` and `PROFILE_LABEL=before` or `after`.
+It records two runs of 100 wheel inputs over the 10,000-item variable-height list,
+CPU profiles, animation-frame intervals and real captures in `target/web-vlist/`.
+The comparison used the same `wasm-pack --dev --all-features` configuration,
+Chromium 152 with Vulkan WebGPU, and a 1220 × 900 viewport. No compilation or
+other validation ran concurrently with the recordings.
+
+| Sampled self time | Before (two runs) | After (two runs) |
+| --- | --- | --- |
+| `appendChild` | 190 / 149 ms | 0 / 0 ms |
+| CSS `setProperty` | 62 / 65 ms | 12 / 8 ms |
+| `TextDecoder.decode` | 188 / 119 ms | 18 / 17 ms |
+
+Both versions mounted only 23–24 rows in the sampled final states. The frame
+median remained 16.7 ms. The first after-run's p95 improved from 34.8 to 18.7 ms,
+but the second after-run reached 65.8 ms versus 33.4 ms before. These noisy
+private-compositor samples establish reduced DOM work, not a stable end-to-end
+latency or FPS guarantee. Profiles include browser scheduling and GC, and do
+not measure input-to-present latency. The website separately uses a release
+WASM build; its optimization gain is not included in this comparison.
+
+`crates/argui-accessibility/tests/web.mjs` checks that real scrolling replaces
+virtual rows without detaching navigation or losing direct DOM focus. It also
+checks row order, visible bounds, removed nodes and accessible button actions.

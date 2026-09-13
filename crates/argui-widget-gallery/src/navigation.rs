@@ -77,10 +77,12 @@ pub enum Page {
     Actions,
     Editing,
     CustomTimeline,
+    #[cfg(feature = "updater")]
+    Updater,
 }
 
 impl Page {
-    pub const ALL: [Self; 75] = [
+    pub const ALL: [Self; 75 + cfg!(feature = "updater") as usize] = [
         Self::Accordion,
         Self::Alert,
         Self::AlertDialog,
@@ -156,10 +158,14 @@ impl Page {
         Self::Typography,
         Self::Layout,
         Self::WebView,
+        #[cfg(feature = "updater")]
+        Self::Updater,
     ];
 
     pub const fn category(self) -> &'static str {
         match self {
+            #[cfg(feature = "updater")]
+            Self::Updater => "Examples",
             Self::Accordion
             | Self::AlertDialog
             | Self::Attachment
@@ -315,6 +321,8 @@ impl Page {
             Self::Actions => "Actions",
             Self::Editing => "Editing & Password",
             Self::CustomTimeline => "Custom Timeline",
+            #[cfg(feature = "updater")]
+            Self::Updater => "Updater",
         }
     }
 
@@ -396,6 +404,8 @@ impl Page {
             Self::Actions => "actions",
             Self::Editing => "editing",
             Self::CustomTimeline => "custom-timeline",
+            #[cfg(feature = "updater")]
+            Self::Updater => "updater",
         }
     }
 
@@ -509,6 +519,10 @@ impl Page {
             Self::Actions => "One command for buttons, menus, palettes and focused shortcuts.",
             Self::Editing => {
                 "Transactional undo/redo, Unicode, filtered fields and protected passwords."
+            }
+            #[cfg(feature = "updater")]
+            Self::Updater => {
+                "Optional update dialog with download progress, verification and installation states."
             }
             Self::CustomTimeline => {
                 "Custom measurement and painting with draggable clips and standard controls."

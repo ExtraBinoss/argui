@@ -52,6 +52,9 @@ collaboration. `argui-core` contains dependency-light shared primitives, and
 - `argui-image` and `argui-vector`: optional asset decoding and validation.
 - `argui-effects`: optional effect definitions; the renderer executes their passes.
 - `argui-webview`: optional retained native WebViews and browser frames.
+- `argui-updater`: optional update transactions, signed downloads and desktop
+  installation adapters, independent of the renderer, runtime and UI. The
+  controlled update dialog belongs to the separate `argui-widgets/updater` feature.
 - `argui`: deliberate re-exports; application code should start here.
 - `argui-showcase`: non-published example application shared unchanged by the
   native and WASM launchers; it is not part of the framework dependency graph.

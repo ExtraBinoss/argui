@@ -76,6 +76,8 @@ pub struct WidgetGallery {
     pub(crate) tooltip: Entity<pages::tooltip::TooltipDemo>,
     pub(crate) toasts: Entity<pages::toast::ToastDemo>,
     pub(crate) data: Entity<pages::data::DataDemo>,
+    #[cfg(feature = "updater")]
+    pub(crate) updater: std::cell::OnceCell<Entity<pages::updater::UpdaterDemo>>,
     pub(crate) tasks: Entity<pages::async_tasks::TasksDemo>,
     pub(crate) actions: Entity<pages::actions::ActionsDemo>,
     pub(crate) editing: Entity<pages::editing::EditingDemo>,
@@ -132,6 +134,8 @@ impl Default for WidgetGallery {
             tooltip: Entity::new(pages::tooltip::TooltipDemo::default()),
             toasts: Entity::new(pages::toast::ToastDemo::new(&dark_assets)),
             data: Entity::new(pages::data::DataDemo::default()),
+            #[cfg(feature = "updater")]
+            updater: std::cell::OnceCell::new(),
             tasks: Entity::new(pages::async_tasks::TasksDemo::default()),
             actions: Entity::new(pages::actions::ActionsDemo::default()),
             editing: Entity::new(pages::editing::EditingDemo::default()),

@@ -4,6 +4,10 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+description = "Image decoding, caching and resource management for Argui"
 
 [dependencies]
 argui-paint.workspace = true

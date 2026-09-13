@@ -4,6 +4,10 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+description = "Retained interface elements, styles and events for Argui"
 
 [dependencies]
 argui-accessibility.workspace = true
@@ -16,7 +20,7 @@ unicode-segmentation.workspace = true
 web-time.workspace = true
 
 [dev-dependencies]
-argui-widgets = { workspace = true, features = ["all"] }
+argui-widgets = { path = "../argui-widgets", features = ["all"] }
 
 [lints]
 workspace = true

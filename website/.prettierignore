@@ -1,0 +1,8 @@
+node_modules
+.nuxt
+.output
+public/gallery/pkg
+public/gallery/browser-shortcuts.js
+app/data/catalogue.json
+pnpm-lock.yaml
+test-results

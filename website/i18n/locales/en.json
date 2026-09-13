@@ -1,0 +1,171 @@
+{
+  "nav": {
+    "home": "Argui home",
+    "features": "Features",
+    "components": "Components",
+    "start": "Get started",
+    "github": "GitHub",
+    "menu": "Toggle navigation",
+    "skip": "Skip to content",
+    "light": "Use light theme",
+    "dark": "Use dark theme"
+  },
+  "home": {
+    "title": "Build interfaces.",
+    "titleAccent": "Keep it native.",
+    "intro": "A Rust UI library for applications that feel right. From the first button to the whole window.",
+    "gallery": "Explore components",
+    "code": "Start building",
+    "platforms": "Linux · macOS · Windows · Web",
+    "preview": "The real thing. Built with Argui.",
+    "openGallery": "Open the gallery",
+    "previewAlt": "Argui's WebAssembly widget gallery showing interactive button variants and GPU hover effects",
+    "foundation": "A small footprint.\nRoom for big ideas.",
+    "foundationBody": "A retained UI tree, shaped text and a GPU renderer. The parts you need to build an application, with the freedom to make it yours.",
+    "allFeatures": "See all features",
+    "componentsTitle": "Good building blocks.",
+    "browseAll": "Browse all components",
+    "codeTitle": "Rust, all the way down.",
+    "codeBody": "Compose your interface with typed building blocks. Enable the widgets you need, and keep application state in your hands.",
+    "closing": "Your next interface\nstarts here.",
+    "closingLink": "Get started with Argui"
+  },
+  "stats": {
+    "memory": "MiB private memory",
+    "memoryValue": "56",
+    "idle": "Event-driven rendering",
+    "idleValue": "Idle means idle",
+    "renderer": "Native + WebAssembly",
+    "rendererValue": "One renderer",
+    "evidence": "Measured on Linux with the release gallery. Memory depends on features and workload.",
+    "link": "Read the measurements"
+  },
+  "features": {
+    "title": "Built for the whole application.",
+    "available": "Available",
+    "soon": "Coming soon",
+    "roadmap": "Next in Argui.",
+    "performance": {
+      "title": "Work only when it changes.",
+      "body": "Retained subtrees, explicit dirty tracking and virtualized lists keep repeated work out of the frame. Idle views do not request continuous redraws."
+    },
+    "accessibility": {
+      "title": "Accessibility is part of the tree.",
+      "body": "Semantic roles, accessible names, keyboard navigation, focus management and reduced-motion support are built into the widgets."
+    },
+    "shaders": {
+      "title": "Give pixels a little personality.",
+      "body": "GPU effects, gradients, blur and custom WGSL shaders share the renderer. Apply effects to a surface, a component or a whole layer."
+    },
+    "popovers": {
+      "title": "Beyond the window.",
+      "body": "Opt-in native popup surfaces let menus, tooltips and popovers extend beyond application window bounds, with platform-specific hosting."
+    },
+    "updater": {
+      "title": "Keep your application current.",
+      "body": "An optional update engine checks signed feeds, downloads with progress and hands off installation. Add the separate dialog feature when you want a ready-made UI."
+    },
+    "platforms": {
+      "title": "The same UI, in more places.",
+      "body": "A WGPU renderer for desktop and WebAssembly. Native window integration on Linux, macOS and Windows; WebGPU in the browser."
+    },
+    "hotReload": {
+      "title": "Hot reload",
+      "body": "A shorter loop between changing your Rust interface and seeing the result. Planned for the library."
+    },
+    "i18n": {
+      "title": "Internationalization",
+      "body": "Application-wide localization support is on the roadmap. The library's full i18n integration is not shipped yet."
+    },
+    "source": "Explore the implementation",
+    "performanceLink": "Performance measurements",
+    "experimental": "Argui is experimental and actively developed. Follow the repository for API changes and platform progress."
+  },
+  "components": {
+    "title": "All widgets gallery",
+    "search": "Search components",
+    "clear": "Clear search",
+    "empty": "No components found.",
+    "reset": "Clear your search",
+    "list": "Component navigation",
+    "browse": "Browse components",
+    "widgets": "Components",
+    "examples": "Examples",
+    "count": "{count} components & examples",
+    "galleryBody": "The Argui application, running in your browser. Pick a component and try it out.",
+    "source": "Source",
+    "feature": "Feature",
+    "enable": "Enable this component",
+    "preview": "Interactive example",
+    "fullSource": "View source on GitHub",
+    "implementation": "Read the implementation",
+    "related": "Keep exploring",
+    "all": "All components",
+    "noDemo": "This building block is available in the library. Explore its implementation or browse the full gallery for composed examples.",
+    "exampleSource": "Explore the Rust example",
+    "updaterNote": "The gallery demonstrates update states with sample data. Native downloads and installation are provided by the separate updater engine.",
+    "integration": "Use the feature on the Argui facade, or enable the same feature without the widget- prefix in argui-widgets."
+  },
+  "gallery": {
+    "scroll": "Scroll horizontally to explore the full gallery.",
+    "launch": "Launch interactive gallery",
+    "launchComponent": "Try {name}",
+    "hint": "Runs locally in your browser with WebAssembly and WebGPU.",
+    "downloading": "Loading the WebAssembly gallery…",
+    "loading": "Starting the Argui renderer…",
+    "ready": "Live · WebAssembly",
+    "label": "Argui interactive widget gallery",
+    "newTab": "Open in a new tab",
+    "retry": "Try again",
+    "unsupported": "This browser could not start the WebGPU gallery.",
+    "fallback": "You can still explore every component's source, or run the gallery locally with Cargo.",
+    "failure": "The gallery could not load. Please try again.",
+    "timeout": "The gallery is taking longer than expected to start.",
+    "continue": "Keep waiting",
+    "stop": "Stop gallery",
+    "escape": "The gallery is an embedded application. Use the link above to open it on its own."
+  },
+  "code": {
+    "copy": "Copy code",
+    "copied": "Copied",
+    "failed": "Could not copy. Select the code to copy it manually."
+  },
+  "start": {
+    "title": "Make something native.",
+    "intro": "Start with the gallery, then bring the pieces you need into your own Rust application.",
+    "run": "Run the gallery",
+    "runBody": "Clone the repository and run the native widget gallery. Cargo builds with a maximum of six parallel jobs in this repository.",
+    "add": "Add Argui",
+    "addBody": "Argui is in active development. Use the Git dependency and select individual widget features for your application.",
+    "compose": "Compose a view",
+    "composeBody": "A small, typed view using the same Button and Element APIs as the gallery.",
+    "next": "Take the next step",
+    "examples": "Application examples",
+    "docs": "Documentation",
+    "linux": "Linux setup",
+    "web": "WebAssembly gallery",
+    "prerequisites": "Install Rust and the native dependencies for your platform. The Linux setup guide covers the optional WebView and native integrations."
+  },
+  "footer": {
+    "description": "Another Rust GUI.",
+    "source": "Source code",
+    "docs": "Documentation",
+    "license": "MIT / Apache-2.0",
+    "note": "Made for people who care how software feels."
+  },
+  "error": {
+    "title": "This page isn't here.",
+    "body": "Explore the components, or head back to the beginning.",
+    "home": "Back to home"
+  },
+  "meta": {
+    "home": "Argui — Native interfaces, pure Rust",
+    "description": "Build native Rust interfaces with accessible widgets, GPU rendering, custom shaders and optional application updates. Explore the live WebAssembly gallery.",
+    "features": "Features",
+    "components": "Components",
+    "start": "Get started",
+    "featuresDescription": "Explore Argui's Rust UI engine: accessibility, retained rendering, WGSL shaders, native popovers, desktop updates and the upcoming roadmap.",
+    "componentsDescription": "Explore Argui components and Rust source files, with a live WebAssembly and WebGPU widget gallery.",
+    "startDescription": "Get started with Argui: run the native widget gallery, add the Rust library and compose your first view."
+  }
+}

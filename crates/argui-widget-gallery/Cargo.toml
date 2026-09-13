@@ -8,6 +8,7 @@ publish = false
 
 [features]
 default = []
+updater = ["argui/widget-updater", "dep:argui-updater"]
 all-smi = ["argui-devtools/all-smi"]
 desktop-backdrop = ["argui/desktop-backdrop"]
 native-popups = ["argui/native-popups"]
@@ -20,6 +21,7 @@ crate-type = ["cdylib", "rlib"]
 web-time.workspace = true
 argui = { workspace = true, features = ["widgets-all", "tasks"] }
 argui-image.workspace = true
+argui-updater = { workspace = true, optional = true }
 argui-effects = { workspace = true, features = ["artistic", "blur", "shadow", "scroll", "liquid-glass"] }
 argui-devtools.workspace = true
 

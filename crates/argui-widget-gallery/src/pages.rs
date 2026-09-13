@@ -54,6 +54,8 @@ pub(crate) mod timeline;
 pub(crate) mod toast;
 pub(crate) mod tooltip;
 mod typography;
+#[cfg(feature = "updater")]
+pub(crate) mod updater;
 pub(crate) mod webview;
 
 pub(crate) struct ResizeListeners {
@@ -174,6 +176,12 @@ pub(crate) fn render(
         Page::Actions => cx.entity(&gallery.actions),
         Page::Editing => cx.entity(&gallery.editing),
         Page::CustomTimeline => cx.entity(&gallery.timeline),
+        #[cfg(feature = "updater")]
+        Page::Updater => cx.entity(
+            gallery
+                .updater
+                .get_or_init(|| Entity::new(updater::UpdaterDemo::default())),
+        ),
     };
     Element::column([
         Element::column([

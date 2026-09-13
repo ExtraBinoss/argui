@@ -64,7 +64,14 @@ fn gpu_edge_shader_preserves_center_alpha_and_scales_fade_width() {
             let Filter::Effect(effect) = filter.scaled(scale) else {
                 panic!()
             };
-            let pixels = render_pixels(&device, &queue, &pipeline, size, &effect.packed_words());
+            let pixels = render_pixels(
+                &device,
+                &queue,
+                &pipeline,
+                size,
+                &effect.packed_words(),
+                [255, 0, 0, 255],
+            );
             let pixel = |x: u32, y: u32| {
                 &pixels[(y * 256 + x * 4) as usize..(y * 256 + x * 4 + 4) as usize]
             };
@@ -77,6 +84,37 @@ fn gpu_edge_shader_preserves_center_alpha_and_scales_fade_width() {
             assert!(half[0] > 110 && half[0] < 160, "half width: {half:?}");
         }
     }
+    // The shadow must cover empty gaps as well as opaque content on every axis.
+    for edge in 0..4 {
+        let mut strengths = [0.0; 4];
+        strengths[edge] = 1.0;
+        let Filter::Effect(effect) =
+            EdgeShadow::new(8.0, Color::srgb(0.0, 0.0, 1.0).with_alpha(0.5))
+                .strengths(strengths)
+                .filter()
+        else {
+            panic!()
+        };
+        for input in [[0, 0, 0, 0], [128, 0, 0, 128], [255, 0, 0, 255]] {
+            let pixels = render_pixels(
+                &device,
+                &queue,
+                &pipeline,
+                32,
+                &effect.packed_words(),
+                input,
+            );
+            let (x, y) = [(0, 16), (16, 0), (31, 16), (16, 31)][edge];
+            let pixel = &pixels[y * 256 + x * 4..y * 256 + x * 4 + 4];
+            assert!(
+                (i16::from(pixel[2]) - 128).abs() <= 2,
+                "blue overlay: {pixel:?}"
+            );
+            assert!((i16::from(pixel[0]) - i16::from(input[0]) / 2).abs() <= 2);
+            assert!((i16::from(pixel[3]) - (128 + i16::from(input[3]) / 2)).abs() <= 2);
+            assert_eq!(&pixels[16 * 256 + 16 * 4..16 * 256 + 16 * 4 + 4], &input);
+        }
+    }
 }
 
 fn render_pixels(
@@ -85,6 +123,7 @@ fn render_pixels(
     pipeline: &wgpu::RenderPipeline,
     size: u32,
     words: &[u32],
+    input_pixel: [u8; 4],
 ) -> Vec<u8> {
     let extent = wgpu::Extent3d {
         width: size,
@@ -106,7 +145,7 @@ fn render_pixels(
     let input = texture(wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST);
     queue.write_texture(
         input.as_image_copy(),
-        &[255, 0, 0, 255].repeat((size * size) as usize),
+        &input_pixel.repeat((size * size) as usize),
         wgpu::TexelCopyBufferLayout {
             offset: 0,
             bytes_per_row: Some(size * 4),

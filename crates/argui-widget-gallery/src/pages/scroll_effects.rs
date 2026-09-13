@@ -1,6 +1,5 @@
 use crate::app::text;
 use argui::{
-    core::Color,
     paint::{Border, CornerRadii},
     runtime::{Context, Render},
     ui::{
@@ -28,8 +27,13 @@ impl Default for ScrollDemo {
 }
 
 impl ScrollDemo {
-    fn effect(&self) -> ScrollEffect {
-        EdgeShadow::new(self.width, Color::srgba(0.0, 0.0, 0.0, 0.65))
+    fn effect(&self, theme: &WidgetTheme) -> ScrollEffect {
+        let alpha = if theme.foreground.relative_luminance() > 0.5 {
+            0.06
+        } else {
+            0.22
+        };
+        EdgeShadow::new(self.width, theme.foreground.with_alpha(alpha))
             .intensity(self.intensity)
             .scroll()
     }
@@ -72,7 +76,7 @@ impl ScrollDemo {
         .scroll_config(
             ScrollConfig::default()
                 .scrollbar(theme.scrollbar.clone())
-                .effect(self.effect()),
+                .effect(self.effect(theme)),
         )
         .scrollbar_gutter(argui::ui::ScrollbarGutter::Stable)
     }
@@ -111,7 +115,7 @@ impl Render for ScrollDemo {
         }));
         let list = VList::new("scroll-demo-list", 32.0, 220.0, self.offset)
             .propagation(argui::ui::ScrollPropagation::Contain)
-            .effect(self.effect())
+            .effect(self.effect(theme))
             .build(10_000, theme, |index| {
                 let mut style = theme.ghost_button().instant_hover();
                 style.layout.justify_content = Some(JustifyContent::START);
@@ -183,7 +187,7 @@ impl Render for ScrollDemo {
                 ScrollConfig::default()
                     .propagation(argui::ui::ScrollPropagation::Contain)
                     .scrollbar(theme.scrollbar.clone())
-                    .effect(self.effect()),
+                    .effect(self.effect(theme)),
             )
             .scrollbar_gutter(argui::ui::ScrollbarGutter::Stable);
         super::preview(

@@ -71,6 +71,10 @@ unbounded caches, and abstractions created for hypothetical future work.
 
 ## Commands
 
+The project limits Cargo to six parallel build jobs in `.cargo/config.toml` and
+Nextest to six simultaneous tests in `.config/nextest.toml`. Native graphical
+coverage still uses one test worker to avoid competition on its private display.
+
 ```sh
 ./scripts/check-rust-size.sh
 ./scripts/check-test-layout.sh

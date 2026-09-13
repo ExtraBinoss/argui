@@ -6,6 +6,7 @@ report="$repo_root/target/coverage-report.json"
 coverage_lock="$repo_root/target/.argui-coverage-lock"
 coverage_target="$repo_root/target/coverage"
 minimum=85
+coverage_toolchain="${ARGUI_COVERAGE_TOOLCHAIN:-nightly}"
 coverage_jobs="${ARGUI_COVERAGE_JOBS:-6}"
 if [[ -n "${ARGUI_NATIVE_TESTS:-}" && -z "${ARGUI_COVERAGE_JOBS:-}" ]]; then
   # The native lifecycle shares the display/GPU with off-screen renderer tests.
@@ -28,11 +29,11 @@ fi
 trap 'rmdir "$coverage_lock" 2>/dev/null || true' EXIT
 # Old feature/build variants contain duplicate coverage maps even after their
 # raw profiles are removed. Keep dependency caches, but discard workspace maps.
-CARGO_TARGET_DIR="$coverage_target" cargo +nightly llvm-cov clean --workspace
+CARGO_TARGET_DIR="$coverage_target" cargo "+$coverage_toolchain" llvm-cov clean --workspace
 echo "coverage: running workspace library and integration tests"
 CARGO_TARGET_DIR="$coverage_target" CARGO_INCREMENTAL=0 \
   CARGO_PROFILE_TEST_OPT_LEVEL=0 CARGO_PROFILE_TEST_DEBUG=0 \
-  cargo +nightly llvm-cov nextest \
+  cargo "+$coverage_toolchain" llvm-cov nextest \
   --workspace --all-features --lib --tests --branch --no-clean \
   --ignore-filename-regex "$boundary_regex" \
   --jobs "$coverage_jobs" --status-level fail --final-status-level fail \
@@ -43,11 +44,11 @@ if [[ -n "${ARGUI_NATIVE_TESTS:-}" ]]; then
   # Include the opt-in GPU integration without running the manual CPU benchmark.
   CARGO_TARGET_DIR="$coverage_target" CARGO_INCREMENTAL=0 \
     CARGO_PROFILE_TEST_OPT_LEVEL=0 CARGO_PROFILE_TEST_DEBUG=0 \
-    cargo +nightly llvm-cov nextest \
+    cargo "+$coverage_toolchain" llvm-cov nextest \
     --workspace --all-features --lib --tests --branch --no-report \
     --jobs "$coverage_jobs" --run-ignored only \
     -E 'package(argui-render) & binary(surface)'
-  CARGO_TARGET_DIR="$coverage_target" cargo +nightly llvm-cov report \
+  CARGO_TARGET_DIR="$coverage_target" cargo "+$coverage_toolchain" llvm-cov report \
     --ignore-filename-regex "$boundary_regex" \
     --json --output-path "$report"
 fi

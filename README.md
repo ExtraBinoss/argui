@@ -1,8 +1,17 @@
 # Argui — Another Rust GUI
 
-An experimental, native-first Rust UI core built around `winit`, `wgpu`,
-`cosmic-text`, and `taffy`. No mandatory WebView or TypeScript frontend. Web support
-means compiling the same renderer to WebAssembly/WebGPU.
+Build fast, accessible interfaces in Rust. Argui combines a retained UI tree,
+GPU rendering, modular widgets and native platform integrations across Linux,
+macOS, Windows and the web. The same renderer runs natively and through
+WebAssembly/WebGPU.
+
+[Website and live components](https://extrabinoss.github.io/argui/) ·
+[Documentation](docs/README.md) ·
+[Contributing](docs/contributing/code-quality.md) ·
+[Releases](docs/contributing/releases.md)
+
+Argui is experimental. Its core builds on `winit`, `wgpu`, `cosmic-text` and
+`taffy`, with an optional WebView and no required JavaScript frontend.
 
 The repository provides a retained UI tree, responsive layout, shaped text and
 editing, interaction, scrolling, animation, transforms, gradients, decoded
@@ -54,6 +63,12 @@ integration, performance evidence and contributor instructions.
 
 ## Optional asynchronous tasks
 
+Enable `argui/updater` for the UI-independent application update engine and
+`argui/widget-updater` separately for its optional dialog. The gallery's `updater`
+feature demonstrates version notes, download progress, cancellation and installation
+states. See [application updates](docs/platform/updater.md) for signed feeds and
+the supported desktop package formats.
+
 Enable `argui/tasks` for owned, cancellable asynchronous tasks independently
 of WebView support: Tokio on native and browser futures on Web.
 See [the task contract](docs/runtime/tasks.md) and **Examples → Async tasks** in the gallery.
@@ -93,3 +108,16 @@ Linux build prerequisites and host limitations are in
 [WebView setup](docs/platform/webview.md#linux-build-dependencies).
 Native file selection and its optional widget are documented in
 [File picker](docs/platform/file-picker.md).
+
+## Website
+
+The [Nuxt website](website/README.md) presents the library, features and component
+catalogue in English. Its Components page embeds the real WebAssembly gallery
+and links each component to its Rust implementation.
+
+```sh
+cd website
+pnpm install --frozen-lockfile
+pnpm gallery:build
+pnpm dev
+```

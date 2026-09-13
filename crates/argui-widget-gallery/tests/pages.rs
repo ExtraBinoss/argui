@@ -20,6 +20,9 @@ mod scroll_effects;
 mod timeline;
 #[path = "pages/tooltip.rs"]
 mod tooltip;
+#[cfg(feature = "updater")]
+#[path = "pages/updater.rs"]
+mod updater;
 #[path = "pages/webview.rs"]
 mod webview;
 

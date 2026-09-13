@@ -66,7 +66,7 @@ fn tabler(id: VectorId, icon: &IconData) -> VectorAsset {
 
 fn tabler_svg(icon: &IconData) -> String {
     format!(
-        r##"<svg xmlns="http://www.w3.org/2000/svg" width="{}" height="{}" viewBox="{}" fill="{}" stroke="#d9e3f2" stroke-width="{}" stroke-linecap="{}" stroke-linejoin="{}">{}</svg>"##,
+        r##"<svg xmlns="http://www.w3.org/2000/svg" width="{}" height="{}" viewBox="{}" fill="{}" stroke="currentColor" stroke-width="{}" stroke-linecap="{}" stroke-linejoin="{}">{}</svg>"##,
         icon.width.unwrap_or("24"),
         icon.height.unwrap_or("24"),
         icon.view_box.unwrap_or("0 0 24 24"),

@@ -9,6 +9,8 @@ use argui_ui::{Element, UiEvent, UiEventKind, UiTree};
 
 #[path = "view/dashboard.rs"]
 mod dashboard;
+#[path = "view/toolbar.rs"]
+mod toolbar;
 
 fn event(key: &str) -> UiEvent {
     let tree = UiTree::new(Element::container([]));

@@ -371,6 +371,11 @@ fn host_animation_and_layout_delegation_keep_the_app_viewport_explicit() {
     );
     assert!(host.read(|tools| tools.image_assets()).is_empty());
     assert_eq!(host.read(|tools| tools.vector_assets()).len(), 8);
+    assert!(
+        host.read(|tools| tools.vector_assets())
+            .iter()
+            .all(|asset| asset.tintable)
+    );
     assert!(host.read(Render::inspector).is_some());
 }
 
