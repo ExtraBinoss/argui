@@ -3,6 +3,10 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
+command -v rg >/dev/null || {
+  echo "error: ripgrep is required for source structure checks" >&2
+  exit 1
+}
 
 echo "quality: source structure"
 ./scripts/check-rust-size.sh

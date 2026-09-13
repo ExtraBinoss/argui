@@ -77,7 +77,6 @@ jobs:
         with:
           key: quality
           cache-on-failure: true
-          cache-targets: false
       - name: Validate registry manifests
         run: python3 scripts/release.py check
       - name: Run the complete 85% quality gate on a private display

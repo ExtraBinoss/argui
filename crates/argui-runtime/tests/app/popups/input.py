@@ -88,6 +88,8 @@ def capture(name):
 
 try:
     main, parent, nested = wait_for_windows()
+    # Mapping the surfaces precedes the end of their initial frame processing.
+    time.sleep(0.4)
     # This bare test server has no WM to activate the application on launch.
     main.set_input_focus(X.RevertToParent, X.CurrentTime)
     connection.sync()
@@ -97,7 +99,6 @@ try:
     while not ready.exists() and time.monotonic() < deadline:
         time.sleep(0.05)
     assert ready.exists(), 'Runtime processed the initial application activation'
-    time.sleep(0.4)
     mx, my = origin(main)
     px, py = origin(parent)
     nx, ny = origin(nested)

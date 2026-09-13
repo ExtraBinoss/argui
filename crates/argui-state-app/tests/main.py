@@ -80,6 +80,20 @@ def wait_for_profiles(target, seconds):
             events.wait(min(remaining, 0.1))
 
 
+def wait_for_idle():
+    # Let resize activity settle before testing shutdown from an idle window.
+    deadline = time.monotonic() + 5
+    with events:
+        while time.monotonic() < deadline:
+            previous = counts.copy()
+            events.wait_for(lambda: counts != previous or app.poll() is not None, timeout=0.25)
+            if app.poll() is not None:
+                raise AssertionError(f"app exited before becoming idle: {lines!r}")
+            if counts == previous:
+                return
+    raise AssertionError(f"profiled app did not become idle: {counts}")
+
+
 reader = threading.Thread(target=read_profiles, daemon=True)
 reader.start()
 try:
@@ -102,6 +116,7 @@ try:
     resized = window.get_geometry()
     assert resized.width > original.width and resized.height > original.height
     wait_for_profiles(next_frame, 20)
+    wait_for_idle()
 
     message = protocol.event.ClientMessage(
         window=window,
