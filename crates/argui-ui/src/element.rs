@@ -19,6 +19,7 @@ use std::{
 mod boundary;
 mod direction;
 mod kind;
+mod overrides;
 mod portal;
 pub use kind::{ElementKind, ElementNode, TextEditorSpec};
 

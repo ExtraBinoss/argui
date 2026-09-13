@@ -29,12 +29,22 @@ fn hovering_tree_rows_highlights_without_selecting_or_rebuilding() {
     assert_eq!(host.update(&entered), ViewUpdate::None);
     assert_eq!(
         host.update(&event(
+            "__devtools-properties",
+            pointer(PointerPhase::Entered, Point::default())
+        )),
+        ViewUpdate::Paint
+    );
+    assert_eq!(inspector.highlighted(), None);
+    assert_eq!(inspector.selected(), Some(InspectNodeId(1)));
+    host.update(&entered);
+    assert_eq!(
+        host.update(&event(
             "__devtools-node-2",
             pointer(PointerPhase::Left, Point::default())
         )),
         ViewUpdate::Paint
     );
-    assert_eq!(inspector.highlighted(), Some(InspectNodeId(1)));
+    assert_eq!(inspector.highlighted(), None);
     assert_eq!(
         host.update(&event(
             "__devtools-node-invalid",

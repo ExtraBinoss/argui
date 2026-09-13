@@ -3,6 +3,9 @@ mod direction;
 use argui_text::{TextOverflow, TextStyle};
 use argui_ui::{Color, Element, ElementKind, ImageFit, ImageId, ImageSampling, VectorId};
 
+#[path = "element/overrides.rs"]
+mod overrides;
+
 #[path = "element/portal.rs"]
 mod portal;
 

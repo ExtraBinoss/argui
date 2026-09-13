@@ -22,7 +22,7 @@ argui-text.workspace = true
 argui-theme.workspace = true
 argui-ui.workspace = true
 argui-vector.workspace = true
-argui-widgets = { workspace = true, features = ["button", "input", "checkbox", "tabs", "select", "split-pane", "vlist", "tree-view", "color-picker", "slider", "collapsible"] }
+argui-widgets = { workspace = true, features = ["button", "input", "checkbox", "tabs", "select", "split-pane", "vlist", "tree-view", "color-picker", "slider", "collapsible", "popover"] }
 icondata_core.workspace = true
 icondata_tb.workspace = true
 serde_json.workspace = true

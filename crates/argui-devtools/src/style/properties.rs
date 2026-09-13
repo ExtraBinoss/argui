@@ -1,8 +1,12 @@
 use argui_core::Color;
 use argui_inspect::{InspectNodeId, PropertySnapshot, StyleProperty, StyleUnit, StyleValue};
 use argui_paint::{Border, CornerRadii};
-use argui_ui::{AlignItems, Element, Sides, length, percent};
-use argui_widgets::{Button, Checkbox, ColorPicker, Input, RangeConfig, Slider, WidgetTheme};
+use argui_ui::{
+    AlignItems, Element, FloatingPlacement, OverlaySurface, Placement, Sides, length, percent,
+};
+use argui_widgets::{
+    Button, Checkbox, ColorPicker, Input, Popover, RangeConfig, Slider, WidgetTheme,
+};
 
 use super::text;
 use crate::host::{DevtoolsHost, properties::color_value};
@@ -55,26 +59,35 @@ pub(super) fn property_editor<A>(
     {
         rows.push(color_editor(node, property, color, tools, theme, enabled));
     }
-    if let StyleValue::Length(length) = &value {
-        rows.push(
-            Element::row(
-                [
-                    ("auto", "Auto", StyleUnit::Auto),
-                    ("px", "px", StyleUnit::Px),
-                    ("percent", "%", StyleUnit::Percent),
-                ]
-                .map(|(suffix, label, unit)| {
-                    compact_button(
-                        format!("__devtools-unit-{}-{}-{suffix}", node.0, property.label()),
-                        label,
-                        length.unit == unit,
-                        theme,
-                    )
-                    .enabled(enabled)
-                    .build()
-                }),
+    if let StyleValue::Length(dimension) = &value {
+        let mut controls = [
+            ("auto", "Auto", StyleUnit::Auto),
+            ("px", "px", StyleUnit::Px),
+            ("percent", "%", StyleUnit::Percent),
+        ]
+        .map(|(suffix, label, unit)| {
+            compact_button(
+                format!("__devtools-unit-{}-{}-{suffix}", node.0, property.label()),
+                label,
+                dimension.unit == unit,
+                theme,
             )
-            .gap(4.0),
+            .enabled(enabled)
+            .build()
+        })
+        .to_vec();
+        if let Some(field) = value.fields().first() {
+            controls.push(
+                numeric_input(node, property, 0, field, tools, theme, enabled)
+                    .width(length(0.0))
+                    .min_width(length(0.0))
+                    .grow(1.0),
+            );
+        }
+        rows.push(
+            Element::row(controls)
+                .align_items(AlignItems::CENTER)
+                .gap(4.0),
         );
     }
     if property == StyleProperty::Overflow {
@@ -108,45 +121,19 @@ pub(super) fn property_editor<A>(
         );
     }
     let fields = value.fields();
-    if fields.is_empty() && property != StyleProperty::Background {
+    if fields.is_empty()
+        && property != StyleProperty::Background
+        && !matches!(value, StyleValue::Length(_))
+    {
         rows.push(Element::text(value.summary()).text_style(text(11.0, theme.muted_foreground)));
     }
     for (index, field) in fields.into_iter().enumerate() {
-        if matches!(value, StyleValue::Srgba(_))
+        if matches!(value, StyleValue::Srgba(_) | StyleValue::Length(_))
             || color.is_some() && ["red", "green", "blue", "alpha"].contains(&field.label.as_str())
         {
             continue;
         }
-        let key = format!("__devtools-value-{}-{}-{index}", node.0, property.label());
-        let draft = tools
-            .property_editing
-            .draft
-            .as_ref()
-            .filter(|draft| draft.0 == key);
-        let formatted = format!("{:.3}", field.value)
-            .trim_end_matches('0')
-            .trim_end_matches('.')
-            .to_owned();
-        let invalid = draft.is_some_and(|draft| draft.2);
-        let mut style = theme.input();
-        style.text.font_size = 12.0;
-        style.layout.padding = Sides::length(6.0);
-        let input = Input::new(
-            &key,
-            draft.map_or(formatted, |draft| draft.1.clone()),
-            "0",
-            style,
-        )
-        .label(format!("{} {}", property.label(), field.label))
-        .invalid(invalid)
-        .enabled(enabled)
-        .description(if invalid {
-            "Enter a finite value within this property's range"
-        } else {
-            "Changes apply immediately"
-        })
-        .build()
-        .width(length(104.0));
+        let input = numeric_input(node, property, index, &field, tools, theme, enabled);
         rows.push(
             Element::row([
                 Element::text(field.label)
@@ -157,12 +144,24 @@ pub(super) fn property_editor<A>(
             .align_items(AlignItems::CENTER)
             .gap(8.0),
         );
-        if invalid {
-            rows.push(
-                Element::text("Invalid value; last valid value preserved")
-                    .text_style(text(11.0, theme.destructive)),
-            );
-        }
+    }
+    if tools
+        .property_editing
+        .draft
+        .as_ref()
+        .is_some_and(|(key, _, invalid)| {
+            *invalid
+                && key.starts_with(&format!(
+                    "__devtools-value-{}-{}-",
+                    node.0,
+                    property.label()
+                ))
+        })
+    {
+        rows.push(
+            Element::text("Invalid value; last valid value preserved")
+                .text_style(text(11.0, theme.destructive)),
+        );
     }
     Element::column(rows)
         .gap(7.0)
@@ -177,6 +176,48 @@ pub(super) fn property_editor<A>(
         .radius(CornerRadii::all(8.0))
 }
 
+fn numeric_input<A>(
+    node: InspectNodeId,
+    property: StyleProperty,
+    index: usize,
+    field: &argui_inspect::StyleField,
+    tools: &DevtoolsHost<A>,
+    theme: &WidgetTheme,
+    enabled: bool,
+) -> Element {
+    let key = format!("__devtools-value-{}-{}-{index}", node.0, property.label());
+    let draft = tools
+        .property_editing
+        .draft
+        .as_ref()
+        .filter(|draft| draft.0 == key);
+    let formatted = format!("{:.3}", field.value)
+        .trim_end_matches('0')
+        .trim_end_matches('.')
+        .to_owned();
+    let invalid = draft.is_some_and(|draft| draft.2);
+    let mut style = theme.input();
+    style.text.font_size = 12.0;
+    style.layout.padding = Sides::length(6.0);
+    Input::new(
+        &key,
+        draft.map_or(formatted, |draft| draft.1.clone()),
+        "0",
+        style,
+    )
+    .label(format!("{} {}", property.label(), field.label))
+    .invalid(invalid)
+    .enabled(enabled)
+    .description(if invalid {
+        "Enter a finite value within this property's range"
+    } else {
+        "Changes apply immediately"
+    })
+    .build()
+    .width(length(104.0))
+    .height(length(30.0))
+}
+
 fn color_editor<A>(
     node: InspectNodeId,
     property: StyleProperty,
@@ -186,41 +227,71 @@ fn color_editor<A>(
     enabled: bool,
 ) -> Element {
     let [r, g, b, a] = color.to_srgba8();
-    let swatch = Element::container([])
-        .width(length(24.0))
-        .height(length(24.0))
-        .background(color)
-        .border(Border::all(1.0, theme.border))
-        .radius(CornerRadii::all(4.0));
+    let swatch = Element::column(
+        [true, false]
+            .into_iter()
+            .map(|alternate| {
+                Element::row([true, false].map(|light| {
+                    Element::container([])
+                        .grow(1.0)
+                        .height(percent(1.0))
+                        .background(if light == alternate {
+                            Color::WHITE
+                        } else {
+                            Color::srgb(0.65, 0.65, 0.65)
+                        })
+                }))
+                .height(percent(0.5))
+            })
+            .chain(std::iter::once(
+                Element::container([])
+                    .absolute(argui_ui::sides(0.0, 0.0))
+                    .width(percent(1.0))
+                    .height(percent(1.0))
+                    .background(color),
+            )),
+    )
+    .width(length(24.0))
+    .height(length(24.0))
+    .shrink(0.0)
+    .overflow(argui_ui::Axes {
+        x: argui_ui::Overflow::Hidden,
+        y: argui_ui::Overflow::Hidden,
+    })
+    .border(Border::all(1.0, theme.border))
+    .radius(CornerRadii::all(4.0));
     let open = tools
         .property_editing
         .color
         .as_ref()
         .filter(|(id, prop, _)| (*id, *prop) == (node, property));
-    let mut rows = vec![
-        compact_button(
-            format!("__devtools-swatch-{}-{}", node.0, property.label()),
-            &format!("#{r:02X}{g:02X}{b:02X}{a:02X}"),
-            open.is_some(),
-            theme,
-        )
+    let key = format!("__devtools-swatch-{}-{}", node.0, property.label());
+    let label = format!("#{r:02X}{g:02X}{b:02X}{a:02X}");
+    let trigger = compact_button(key.clone(), &label, open.is_some(), theme)
         .leading(swatch)
         .enabled(enabled)
         .build()
-        .width(percent(1.0)),
-    ];
-    if let Some((_, _, state)) = open {
-        rows.push(
+        .width(percent(1.0))
+        .height(length(36.0));
+    if !enabled {
+        return trigger;
+    }
+    let content = open.map_or_else(
+        || Element::container([]),
+        |(_, _, state)| {
             ColorPicker::new(
                 format!("__devtools-color-{}-{}", node.0, property.label()),
                 property.label(),
                 state,
             )
-            .build(theme),
-        );
-    }
-    Element::column(rows)
-        .gap(8.0)
+            .build(theme)
+        },
+    );
+    Popover::new(key, label, open.is_some(), trigger, content)
+        .placement(FloatingPlacement::new(Placement::TopEnd).offset(8.0))
+        .surface(OverlaySurface::InWindow)
+        .size(300.0, 430.0)
+        .build(theme)
         .width(percent(1.0))
         .min_width(length(0.0))
 }
@@ -232,6 +303,7 @@ fn compact_button(key: String, label: &str, active: bool, theme: &WidgetTheme) -
         theme.ghost_button()
     };
     style.layout.padding = Sides::length(6.0);
+    style.layout.size.height = length(30.0);
     style.label.font_size = 11.0;
     Button::new(key, label, style)
 }

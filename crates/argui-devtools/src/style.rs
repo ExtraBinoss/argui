@@ -106,6 +106,8 @@ pub(crate) fn sidebar<A>(
         }
     }
     Element::column(rows)
+        .keyed("__devtools-properties")
+        .interaction(argui_ui::Interaction::blocker())
         .width(argui_ui::percent(1.0))
         .min_width(length(0.0))
         .padding(Sides::length(12.0))

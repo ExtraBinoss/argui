@@ -144,7 +144,7 @@ fn portal_metadata_and_collapsible_style_sections_follow_snapshot_state() {
     assert!(contains_text(&constrained, "Portal overlay"));
     assert!(contains_text(&constrained, "constrained"));
     assert!(contains_key(&constrained, "__devtools-value-7-width-0"));
-    assert!(contains_text(&constrained, "auto"));
+    assert!(contains_key(&constrained, "__devtools-unit-7-height-auto"));
 
     assert_eq!(
         host.update(|tools, cx| {

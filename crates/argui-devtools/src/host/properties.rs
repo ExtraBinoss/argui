@@ -78,6 +78,18 @@ pub(crate) fn color_value(value: &StyleValue) -> Option<Color> {
 impl<A: Render> DevtoolsHost<A> {
     pub(super) fn property_input(&mut self, event: &UiEvent) -> Option<ViewUpdate> {
         let key = event.target_key()?;
+        if let Some((node, property, _)) = &self.property_editing.color {
+            let behavior = argui_widgets::PopoverBehavior::new(
+                format!("__devtools-swatch-{}-{}", node.0, property.label()),
+                "",
+                true,
+            );
+            if behavior.action(event) == Some(argui_widgets::PopoverAction::Close) {
+                self.property_editing.color = None;
+                let _ = event.prevent_default();
+                return Some(ViewUpdate::Rebuild);
+            }
+        }
         if let Some((node, property, color)) = &mut self.property_editing.color {
             let color_key = format!("__devtools-color-{}-{}", node.0, property.label());
             if self.inspector.selected() == Some(*node) && color.update(&color_key, event) {
@@ -175,7 +187,9 @@ impl<A: Render> DevtoolsHost<A> {
         }
         if let Some(target) = key.strip_prefix("__devtools-swatch-") {
             let (node, property) = property_target(target)?;
-            if self.inspector.selected() != Some(node) {
+            if self.inspector.selected() != Some(node)
+                || self.inspector.property_enabled(node, property) == Some(false)
+            {
                 return Some(ViewUpdate::None);
             }
             if self

@@ -338,6 +338,15 @@ pub(crate) struct ConditionalStyles {
 }
 
 impl ConditionalStyles {
+    pub(crate) fn remove(&mut self, properties: &[PropertyKey]) {
+        for rule in &mut self.rules {
+            rule.style
+                .values
+                .retain(|value| !properties.contains(&value.key));
+        }
+        self.rules.retain(|rule| !rule.style.values.is_empty());
+    }
+
     pub(crate) const fn new() -> Self {
         Self { rules: Vec::new() }
     }
@@ -481,6 +490,19 @@ pub struct StyleTransition {
 }
 
 impl StyleTransition {
+    pub(crate) fn make_immediate(&mut self, properties: &[PropertyKey]) {
+        self.rules
+            .retain(|rule| !rule.property.is_some_and(|key| properties.contains(&key)));
+        for &property in properties {
+            self.rules.push(
+                TransitionRule::new(Transition::tween(argui_animation::Tween::new(
+                    argui_animation::Duration::ZERO,
+                )))
+                .property(property),
+            );
+        }
+    }
+
     #[must_use]
     pub const fn new(default: Transition) -> Self {
         Self {

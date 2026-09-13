@@ -432,8 +432,7 @@ impl InspectorHandle {
 
     #[must_use]
     pub fn highlighted(&self) -> Option<InspectNodeId> {
-        let state = self.0.borrow();
-        state.hovered.or(state.selected)
+        self.0.borrow().hovered
     }
 
     /// Returns the visually foremost inspected node containing `point`.

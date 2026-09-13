@@ -26,6 +26,10 @@ fn color_picker_updates_its_preview_switches_formats_and_survives_navigation() {
         panic!("preview color");
     };
     assert_eq!(color.to_srgba8(), [255, 64, 255, 128]);
+    assert_eq!(
+        keyed(&root, "color-preview").unwrap().paint.quad.background,
+        Some(argui::paint::Fill::Solid(color))
+    );
     click(&gallery, "color-enabled");
     assert!(
         !keyed(&gallery.render(), "gallery-color::pad")
@@ -116,4 +120,8 @@ fn mounted_gallery_delivers_pad_bounds_to_the_lazy_page() {
     let [r, g, b, _] = color.to_srgba();
     assert!((r.max(g).max(b) - 0.5).abs() < 0.001);
     assert!((r.min(g).min(b) - 0.25).abs() < 0.001);
+    assert_eq!(
+        keyed(&root, "color-preview").unwrap().paint.quad.background,
+        Some(argui::paint::Fill::Solid(color))
+    );
 }

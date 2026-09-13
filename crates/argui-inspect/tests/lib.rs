@@ -331,14 +331,16 @@ fn every_style_value_exposes_edits_and_summaries_consistently() {
 }
 
 #[test]
-fn hovered_highlight_temporarily_takes_priority_over_selection() {
+fn hovered_highlight_clears_without_changing_selection() {
     let inspector = InspectorHandle::default();
     inspector.select(Some(InspectNodeId(1)));
-    assert_eq!(inspector.highlighted(), Some(InspectNodeId(1)));
+    assert_eq!(inspector.highlighted(), None);
+    assert_eq!(inspector.selected(), Some(InspectNodeId(1)));
     inspector.set_hovered(Some(InspectNodeId(2)));
     assert_eq!(inspector.highlighted(), Some(InspectNodeId(2)));
     inspector.set_hovered(None);
-    assert_eq!(inspector.highlighted(), Some(InspectNodeId(1)));
+    assert_eq!(inspector.highlighted(), None);
+    assert_eq!(inspector.selected(), Some(InspectNodeId(1)));
 }
 
 #[test]

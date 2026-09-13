@@ -14,8 +14,9 @@ the in-canvas dock. The frontend consists of ordinary Argui widgets.
 ## Elements and styles
 
 The virtualized tree supports search, expand/collapse, stable selection and
-keyboard navigation. Hovering or selecting a row highlights the corresponding
-bounds immediately; hovering does not change selection or rebuild the app tree.
+keyboard navigation. Hovering a row highlights its bounds immediately without changing selection or
+rebuilding the app tree. Leaving the tree clears the highlight, so property
+controls never cover the inspected page with its selected ancestor’s outline.
 Typing from the tree or panel focuses **Filter elements** and preserves the first
 character. Ctrl/Cmd+F focuses and selects the filter; property inputs keep their
 own keyboard input. The divider between the tree and properties supports dragging
@@ -26,14 +27,20 @@ elements are excluded from the application tree by default.
 The current override API covers background, border, opacity, overflow,
 transform, layer, effects, width and height. Available numeric fields can be
 edited with validation; incomplete input preserves the last valid value. Width
-and height expose Auto/px/% modes, opacity has a slider, overflow has choices,
-and background/border colors use the reusable ColorPicker. Each property has an
+and height keep Auto/px/% modes beside their numeric input. Opacity has a slider
+and overflow has choices. Background/border colors show a swatch over a
+transparency checkerboard; clicking it opens a ColorPicker popover in the window.
+Dragging and typing apply immediately. Escape or clicking outside closes the
+popover while preserving the last valid color. Each property has an
 enable control and an independent reset. Unsupported values remain summaries. This is not an
 editor for every authored style property. The exact types live in
 [`StyleProperty` and `StyleValue`](../../crates/argui-inspect/src/lib.rs).
 
 Overrides are owned by the inspector and applied before layout/paint lowering;
-they never mutate application state. Clearing them restores authored values.
+they never mutate application state. Background and border overrides take
+precedence over hover/pressed styles and color animation bindings, while unrelated
+state properties continue to work. Clearing overrides restores authored styles.
+Editing one preview element does not change its siblings or the gallery picker.
 Each property selects the appropriate invalidation path.
 
 ## Live theme

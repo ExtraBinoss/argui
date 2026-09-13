@@ -304,8 +304,8 @@ fn apply_overrides(
 
 fn reset_property(element: &mut Element, property: StyleProperty) {
     match property {
-        StyleProperty::Background => element.paint.quad.background = None,
-        StyleProperty::Border => element.paint.quad.border = None,
+        StyleProperty::Background => element.override_background(None),
+        StyleProperty::Border => element.override_border(None),
         StyleProperty::Opacity => element.paint.quad.opacity = 1.0,
         StyleProperty::Overflow => {
             element.style.overflow = Axes {
@@ -324,8 +324,8 @@ fn reset_property(element: &mut Element, property: StyleProperty) {
 fn apply_property_value(element: &mut Element, property: StyleProperty, value: &StyleValue) {
     match (property, value) {
         (StyleProperty::Background, StyleValue::Srgba([red, green, blue, alpha])) => {
-            element.paint.quad.background =
-                Some(Fill::Solid(Color::srgba(*red, *green, *blue, *alpha)));
+            element
+                .override_background(Some(Fill::Solid(Color::srgba(*red, *green, *blue, *alpha))));
         }
         (StyleProperty::Border, StyleValue::Parameters(fields)) => {
             if let Some(border) = &mut element.paint.quad.border {
@@ -341,6 +341,7 @@ fn apply_property_value(element: &mut Element, property: StyleProperty, value: &
                 set_if_present(&mut alpha, &values, "alpha");
                 border.color = Color::srgba(red, green, blue, alpha);
             }
+            element.override_border(element.paint.quad.border);
         }
         (StyleProperty::Opacity, StyleValue::Number(value)) => {
             element.paint.quad.opacity = value.clamp(0.0, 1.0);

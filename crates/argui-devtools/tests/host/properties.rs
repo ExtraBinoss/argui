@@ -227,3 +227,59 @@ fn color_editor_preserves_border_width_and_opacity_slider_keeps_editor_input_loc
         Some(false)
     );
 }
+
+#[test]
+fn color_popover_is_in_window_and_dismisses_without_reverting_live_edits() {
+    let host = Entity::new(editors()).mount().unwrap();
+    let inspector = host.read(|tools| tools.inspector());
+    let update = |event: UiEvent| change_tools(&host, |tools| tools.update(&event));
+    let trigger = "__devtools-swatch-2-background";
+    let panel = "__devtools-swatch-2-background::content";
+    for dismiss in [
+        event(panel, UiEventKind::DismissRequested),
+        event(
+            trigger,
+            UiEventKind::KeyInput(argui_core::KeyInput {
+                key: argui_core::Key::Escape,
+                state: argui_core::KeyState::Pressed,
+                modifiers: Default::default(),
+                text: None,
+                repeat: false,
+            }),
+        ),
+        click(trigger),
+    ] {
+        update(click(trigger));
+        let view = host.render(Default::default()).unwrap();
+        let content = super::input::find_element(&view, panel).unwrap();
+        assert_eq!(
+            content.portal.as_ref().unwrap().surface,
+            Some(argui_ui::OverlaySurface::InWindow)
+        );
+        update(event(
+            "__devtools-color-2-background::field::0",
+            UiEventKind::TextChanged("#00FF0080".into()),
+        ));
+        update(dismiss);
+        assert!(!contains_key(
+            &host.render(Default::default()).unwrap(),
+            panel
+        ));
+        let StyleValue::Srgba(rgba) = inspector
+            .property_value(InspectNodeId(2), StyleProperty::Background)
+            .unwrap()
+        else {
+            panic!("color")
+        };
+        assert_eq!(
+            argui_core::Color::srgba(rgba[0], rgba[1], rgba[2], rgba[3]).to_srgba8(),
+            [0, 255, 0, 128]
+        );
+    }
+    update(click("__devtools-style-background"));
+    update(click(trigger));
+    assert!(!contains_key(
+        &host.render(Default::default()).unwrap(),
+        panel
+    ));
+}
