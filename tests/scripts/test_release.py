@@ -43,6 +43,29 @@ class ReleasePolicyTests(unittest.TestCase):
             self.assertEqual(release.registry_versions('argui'), [])
         error.close()
 
+    def test_rate_limited_publish_waits_until_the_registry_retry_time(self):
+        limited = Mock(
+            returncode=101,
+            stdout='',
+            stderr=('status 429 Too Many Requests: try again after '
+                    'Thu, 01 Jan 1970 00:01:40 GMT and see the rate limits'),
+        )
+        published = Mock(returncode=0, stdout='published\n', stderr='')
+        with patch.object(release.subprocess, 'run', side_effect=[limited, published]) as run, \
+                patch.object(release.time, 'time', return_value=90), \
+                patch.object(release.time, 'sleep') as sleep:
+            release.publish_package('argui-core')
+        self.assertEqual(run.call_count, 2)
+        sleep.assert_called_once_with(15)
+
+    def test_publish_does_not_retry_non_rate_limit_failures(self):
+        failed = Mock(returncode=101, stdout='', stderr='authentication failed')
+        with patch.object(release.subprocess, 'run', return_value=failed), \
+                patch.object(release.time, 'sleep') as sleep:
+            with self.assertRaises(subprocess.CalledProcessError):
+                release.publish_package('argui-core')
+        sleep.assert_not_called()
+
     def test_foreign_crate_cannot_be_skipped_as_our_published_version(self):
         for owner, accepted in [('ExtraBinoss', True), ('another-account', False)]:
             versions = [{'num': '0.1.1', 'yanked': False}]
@@ -216,17 +239,16 @@ class ReleasePolicyTests(unittest.TestCase):
                 'version': '0.1.1-beta.1', 'tag': 'v0.1.1-beta.1', 'sha': 'a' * 40}
         with patch.dict(release.os.environ, {'CARGO_REGISTRY_TOKEN': 'test-only'}), \
                 patch.object(release, 'run') as run, \
+                patch.object(release, 'publish_package') as publish_package, \
                 patch.object(release, 'pending_packages', return_value=[]), \
                 patch.object(release.subprocess, 'run', return_value=Mock(returncode=1)):
             release.publish(plan)
         calls = [call.args for call in run.call_args_list]
         self.assertIn('--dry-run', calls[0])
-        self.assertEqual(calls[1][0:2], ('cargo', 'publish'))
-        self.assertNotIn('--dry-run', calls[1])
-        self.assertIn('--no-verify', calls[1])
-        self.assertEqual(calls[2][0:4], ('gh', 'release', 'create', plan['tag']))
-        self.assertIn(plan['sha'], calls[2])
-        self.assertIn('--prerelease', calls[2])
+        publish_package.assert_called_once_with('argui')
+        self.assertEqual(calls[1][0:4], ('gh', 'release', 'create', plan['tag']))
+        self.assertIn(plan['sha'], calls[1])
+        self.assertIn('--prerelease', calls[1])
 
     def test_cargo_publishes_one_crate_at_a_time_in_planned_order(self):
         plan = {'release': True, 'packages': ['argui-core', 'argui-render', 'argui'],
@@ -234,16 +256,15 @@ class ReleasePolicyTests(unittest.TestCase):
                 'version': '0.1.1', 'tag': 'v0.1.1', 'sha': 'a' * 40}
         with patch.dict(release.os.environ, {'CARGO_REGISTRY_TOKEN': 'test-only'}), \
                 patch.object(release, 'run') as run, \
+                patch.object(release, 'publish_package') as publish_package, \
                 patch.object(release, 'pending_packages', return_value=[]), \
                 patch.object(release.subprocess, 'run', return_value=Mock(returncode=0)):
             release.publish(plan)
-        calls = [call.args for call in run.call_args_list]
-        self.assertIn('--dry-run', calls[0])
+        self.assertIn('--dry-run', run.call_args_list[0].args)
         self.assertEqual(
-            [call[call.index('--package') + 1] for call in calls[1:]],
+            [call.args[0] for call in publish_package.call_args_list],
             plan['packages'],
         )
-        self.assertTrue(all('--no-verify' in call for call in calls[1:]))
 
     def test_completed_release_does_not_upload_or_create_a_duplicate(self):
         plan = {'release': True, 'packages': [], 'all_packages': ['argui'],

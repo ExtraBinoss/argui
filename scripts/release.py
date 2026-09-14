@@ -2,6 +2,7 @@
 """Validate coordinated crate versions and publish an explicit release commit."""
 
 import argparse
+from email.utils import parsedate_to_datetime
 import json
 import os
 from pathlib import Path
@@ -17,6 +18,7 @@ import urllib.request
 ROOT = Path(__file__).resolve().parent.parent
 REGISTRY = 'https://crates.io/api/v1/crates/'
 VERSION = re.compile(r'(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z.-]+))?')
+RATE_LIMIT_RETRY = re.compile(r'try again after (.+?) and see')
 
 
 def version_key(value):
@@ -141,6 +143,40 @@ def pending_packages(names, current, fetch=registry_versions):
     return pending
 
 
+def rate_limit_delay(message, now=None):
+    if '429 Too Many Requests' not in message:
+        return None
+    match = RATE_LIMIT_RETRY.search(message)
+    if not match:
+        return 600
+    try:
+        available_at = parsedate_to_datetime(match.group(1)).timestamp()
+    except (TypeError, ValueError, OverflowError):
+        return 600
+    current_time = time.time() if now is None else now()
+    return max(5, int(available_at - current_time) + 5)
+
+
+def publish_package(name):
+    args = ('cargo', 'publish', '--registry', 'crates-io', '--locked',
+            '--all-features', '--no-verify', '--package', name)
+    for attempt in range(5):
+        result = subprocess.run(args, cwd=ROOT, text=True, capture_output=True)
+        if result.stdout:
+            print(result.stdout, end='')
+        if result.stderr:
+            print(result.stderr, end='', file=sys.stderr)
+        if result.returncode == 0:
+            return
+        delay = rate_limit_delay(result.stderr)
+        if delay is None or attempt == 4:
+            raise subprocess.CalledProcessError(
+                result.returncode, args, output=result.stdout, stderr=result.stderr
+            )
+        print(f'crates.io rate limit for {name}; retrying in {delay} seconds', flush=True)
+        time.sleep(delay)
+
+
 def release_plan(base, fetch=registry_versions):
     current, names = workspace()
     sha = run('git', 'rev-parse', 'HEAD', capture=True)
@@ -191,8 +227,7 @@ def publish(plan):
             args.extend(['--package', name])
         run(*args, '--dry-run')
         for name in plan['packages']:
-            run('cargo', 'publish', '--registry', 'crates-io', '--locked',
-                '--all-features', '--no-verify', '--package', name)
+            publish_package(name)
     # GitHub must never announce a release whose crates are not available yet.
     for attempt in range(12):
         pending = pending_packages(plan['all_packages'], plan['version'])
