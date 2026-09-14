@@ -186,7 +186,7 @@ def publish(plan):
         run(*args, '--dry-run')
         for name in plan['packages']:
             run('cargo', 'publish', '--registry', 'crates-io', '--locked',
-                '--all-features', '--package', name)
+                '--all-features', '--no-verify', '--package', name)
     # GitHub must never announce a release whose crates are not available yet.
     for attempt in range(12):
         pending = pending_packages(plan['all_packages'], plan['version'])

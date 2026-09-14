@@ -196,6 +196,7 @@ class ReleasePolicyTests(unittest.TestCase):
         self.assertIn('--dry-run', calls[0])
         self.assertEqual(calls[1][0:2], ('cargo', 'publish'))
         self.assertNotIn('--dry-run', calls[1])
+        self.assertIn('--no-verify', calls[1])
         self.assertEqual(calls[2][0:4], ('gh', 'release', 'create', plan['tag']))
         self.assertIn(plan['sha'], calls[2])
         self.assertIn('--prerelease', calls[2])
@@ -215,6 +216,7 @@ class ReleasePolicyTests(unittest.TestCase):
             [call[call.index('--package') + 1] for call in calls[1:]],
             plan['packages'],
         )
+        self.assertTrue(all('--no-verify' in call for call in calls[1:]))
 
     def test_completed_release_does_not_upload_or_create_a_duplicate(self):
         plan = {'release': True, 'packages': [], 'all_packages': ['argui'],
