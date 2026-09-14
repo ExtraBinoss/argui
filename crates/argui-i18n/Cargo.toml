@@ -16,7 +16,7 @@ thiserror.workspace = true
 unic-langid.workspace = true
 
 [dev-dependencies]
-argui-ui.workspace = true
+argui-ui = { path = "../argui-ui" }
 
 [lints]
 workspace = true

@@ -82,7 +82,13 @@ def workspace():
             if not package[field]:
                 raise ValueError(f'{name}: missing {field}')
         for dep in package['dependencies']:
-            if dep['kind'] == 'dev' or dep.get('path') is None:
+            if dep.get('path') is None:
+                continue
+            if dep['kind'] == 'dev':
+                if dep['name'] in publishable and dep['req'] != '*':
+                    raise ValueError(
+                        f'{name}: internal dev dependency {dep["name"]} must be path-only'
+                    )
                 continue
             if dep['name'] not in publishable:
                 raise ValueError(f'{name}: unpublished dependency {dep["name"]}')

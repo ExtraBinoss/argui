@@ -119,6 +119,33 @@ class ReleasePolicyTests(unittest.TestCase):
                     with self.assertRaises(ValueError):
                         release.workspace()
 
+    def test_manifest_validation_rejects_versioned_internal_dev_dependencies(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'Cargo.toml').write_text('[workspace.package]\nversion = "0.1.0"\n')
+            package = dict(version='0.1.0', publish=None, description='Argui', license='MIT',
+                           repository='repo', homepage='site', readme='README.md')
+            metadata = {
+                'workspace_members': ['argui-core', 'argui-i18n'],
+                'packages': [
+                    package | {'id': 'argui-core', 'name': 'argui-core', 'dependencies': []},
+                    package | {
+                        'id': 'argui-i18n',
+                        'name': 'argui-i18n',
+                        'dependencies': [{
+                            'name': 'argui-core',
+                            'req': '^0.1.0',
+                            'path': '../argui-core',
+                            'kind': 'dev',
+                        }],
+                    },
+                ],
+            }
+            with patch.object(release, 'ROOT', root), \
+                    patch.object(release, 'run', return_value=json.dumps(metadata)):
+                with self.assertRaisesRegex(ValueError, 'must be path-only'):
+                    release.workspace()
+
     def test_publication_order_follows_dependencies_and_keeps_facade_last(self):
         def package(name, *dependencies):
             return {
