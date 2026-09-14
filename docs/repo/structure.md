@@ -13,8 +13,8 @@ that owns the API they need.
 | Windows | none | `argui::runtime::run_application` | Complete workspace compile on Windows |
 | macOS | none | `argui::runtime::run_application` | Complete workspace compile on macOS |
 | WebAssembly | none | A `cdylib` with `#[wasm_bindgen(start)]` | Complete WASM compile and browser gallery build |
-| Android | `android` | `argui::android::android_main!` | Supported feature set and gallery cross-compile |
-| iOS | `ios` | `argui::ios::ios_main!` | Supported feature set and gallery cross-compile |
+| Android | `argui-android` dependency | `argui_android::android_main!` | Feature cross-check plus Widget Gallery APK/AAB build |
+| iOS | `argui-ios` dependency | `argui_ios::ios_main!` | Feature cross-check plus XCFramework/Simulator app build |
 
 Cargo selects Linux, Windows, macOS and browser implementations through target
 specific dependencies in `argui-platform`, `argui-runtime` and the integration
@@ -22,10 +22,14 @@ crates. They share Winit lifecycle code, so an extra facade for each desktop OS
 would contain only re-exports. Android and iOS have dedicated crates because
 their native shells require distinct ABI entry points and lifecycle setup.
 
-The `android` and `ios` features expose those entry crates through the main
-facade. Other feature flags select capabilities such as Fluent localization,
+The mobile entry crates are explicit dependencies, so `argui --all-features`
+does not select Android or iOS and carries no mobile-only dependencies. Feature
+flags on the main facade select capabilities such as Fluent localization,
 widgets, tasks or desktop services; they do not replace Cargo target detection.
 See the [mobile guide](../native-mobile.md) for APK/AAB and Xcode integration.
+The reusable native shells live under `mobile/android` and `mobile/ios`; the
+root scripts build them without moving shared application code out of the
+Widget Gallery crate.
 
 ## Dependency layers
 
@@ -36,7 +40,7 @@ flowchart BT
     ui[UI · layout · themes · widgets] --> facade
     runtime[Runtime · renderer · platform] --> facade
     integrations[i18n · DevTools · updater · WebView] --> facade
-    mobile[Android · iOS entry crates] --> facade
+    mobile[Android · iOS entry crates] --> apps
     apps[Gallery · demos · showcases] --> facade
 ```
 
@@ -73,7 +77,7 @@ workspace; external crates and development-only dependencies are omitted.
 | `argui-ios` | Public | iOS static-library and C ABI bootstrap | `argui-runtime` |
 | `argui-widgets` | Public | Individually gated accessible widgets | `argui-animation`, `argui-core`, `argui-inspect`, `argui-paint`, `argui-platform`, `argui-runtime`, `argui-text`, `argui-theme`, `argui-ui`, optional `argui-updater`, `argui-vector` |
 | `argui-devtools` | Public | Inspection, style editing, profiling and showcase UI | `argui-animation`, `argui-core`, `argui-effects`, `argui-inspect`, `argui-paint`, `argui-platform`, `argui-render`, `argui-runtime`, `argui-text`, `argui-theme`, `argui-ui`, `argui-vector`, `argui-widgets` |
-| `argui` | Public | Stable application facade and feature routing | `argui-accessibility`, `argui-animation`, `argui-core`, `argui-layout`, `argui-paint`, `argui-platform`, `argui-render`, `argui-runtime`, `argui-text`, `argui-theme`, `argui-ui`, `argui-vector`; optional `argui-android`, `argui-devtools`, `argui-i18n`, `argui-ios`, `argui-updater`, `argui-webview`, `argui-widgets` |
+| `argui` | Public | Stable application facade and feature routing | `argui-accessibility`, `argui-animation`, `argui-core`, `argui-layout`, `argui-paint`, `argui-platform`, `argui-render`, `argui-runtime`, `argui-text`, `argui-theme`, `argui-ui`, `argui-vector`; optional `argui-devtools`, `argui-i18n`, `argui-updater`, `argui-webview`, `argui-widgets` |
 | `argui-showcase` | Private | Shared sample application used by native and web launchers | `argui-animation`, `argui-core`, `argui-image`, `argui-paint`, `argui-platform`, `argui-runtime`, `argui-text`, `argui-theme`, `argui-ui`, `argui-widgets` |
 | `argui-widget-gallery` | Private | Interactive component, i18n, DevTools and mobile integration gallery | `argui`, `argui-android`, `argui-devtools`, `argui-effects`, `argui-image`, `argui-ios`, optional `argui-updater` |
 | `argui-web-demo` | Private | WebAssembly launcher for the shared showcase | `argui`, `argui-devtools`, `argui-showcase` |

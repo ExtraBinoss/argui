@@ -52,6 +52,7 @@ jobs:
     env:
       ARGUI_NATIVE_TESTS: '1'
       ARGUI_COVERAGE_TOOLCHAIN: nightly-2026-08-21
+      ARGUI_KEEP_COVERAGE_ARTIFACTS: '1'
       LIBGL_ALWAYS_SOFTWARE: '1'
       CARGO_INCREMENTAL: '0'
       CARGO_PROFILE_DEV_DEBUG: '0'
@@ -138,12 +139,104 @@ jobs:
           key: mobile-cross-check
       - name: Check every supported Android capability and gallery entry point
         run: |
-          cargo check --locked --target aarch64-linux-android -p argui --features android,i18n,tasks,widgets-all,devtools
+          cargo check --locked --target aarch64-linux-android -p argui -p argui-android \
+            --features argui/i18n,argui/tasks,argui/widgets-all,argui/devtools
           cargo check --locked --target aarch64-linux-android -p argui-widget-gallery --lib
       - name: Check every supported iOS capability and gallery entry point
         run: |
-          cargo check --locked --target aarch64-apple-ios -p argui --features ios,i18n,tasks,widgets-all,devtools
+          cargo check --locked --target aarch64-apple-ios -p argui -p argui-ios \
+            --features argui/i18n,argui/tasks,argui/widgets-all,argui/devtools
           cargo check --locked --target aarch64-apple-ios -p argui-widget-gallery --lib
+
+  android-package:
+    name: Android APK and AAB
+    needs: [security, mobile]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        with:
+          toolchain: '1.98.0'
+          targets: aarch64-linux-android
+      - uses: taiki-e/install-action@3f74d7c16a4242f1c95561e98edc25d36adb4375 # v2
+        with:
+          tool: cargo-ndk@4.1.2
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
+        with:
+          key: android-package
+          cache-workspace-crates: true
+          cache-on-failure: true
+      - name: Configure the pinned Gradle wrapper and cache
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
+        with:
+          cache-provider: basic
+      - name: Build the ARM64 debug APK and release AAB
+        env:
+          ARGUI_ANDROID_ABIS: arm64-v8a
+        run: |
+          ./scripts/android-gallery.sh apk --no-daemon
+          ./scripts/android-gallery.sh aab --no-daemon
+          test -f mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          test -f mobile/android/app/build/outputs/bundle/release/app-release.aab
+          unzip -l mobile/android/app/build/outputs/apk/debug/app-debug.apk | grep -F 'lib/arm64-v8a/libmain.so'
+          unzip -l mobile/android/app/build/outputs/bundle/release/app-release.aab | grep -F 'base/lib/arm64-v8a/libmain.so'
+      - name: Upload installable Android packages
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: argui-widget-gallery-android
+          path: |
+            mobile/android/app/build/outputs/apk/debug/app-debug.apk
+            mobile/android/app/build/outputs/bundle/release/app-release.aab
+          compression-level: 0
+          retention-days: 14
+          if-no-files-found: error
+
+  ios-package:
+    name: iOS XCFramework and Simulator app
+    needs: security
+    runs-on: macos-15
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        with:
+          toolchain: '1.98.0'
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios
+      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
+        with:
+          key: ios-package
+          cache-workspace-crates: true
+          cache-on-failure: true
+      - name: Build the XCFramework and unsigned Simulator app
+        run: |
+          ./scripts/ios-widget-gallery.sh all
+          test -d mobile/ios/build/ArguiWidgetGallery.xcframework
+          app='mobile/ios/build/DerivedData/Build/Products/Debug-iphonesimulator/ArguiWidgetGallery.app'
+          test -x "$app/ArguiWidgetGallery"
+          ditto -c -k --sequesterRsrc --keepParent \
+            mobile/ios/build/ArguiWidgetGallery.xcframework \
+            mobile/ios/build/ArguiWidgetGallery-xcframework.zip
+          ditto -c -k --sequesterRsrc --keepParent \
+            "$app" mobile/ios/build/ArguiWidgetGallery-simulator.zip
+      - name: Upload reusable iOS artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: argui-widget-gallery-ios
+          path: |
+            mobile/ios/build/ArguiWidgetGallery-xcframework.zip
+            mobile/ios/build/ArguiWidgetGallery-simulator.zip
+          compression-level: 0
+          retention-days: 14
+          if-no-files-found: error
 
   packages:
     name: Crates.io archives
@@ -161,7 +254,10 @@ jobs:
           toolchain: '1.98.0'
       - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
         with:
-          key: crates-io-archives
+          shared-key: linux-distribution
+          add-job-id-key: false
+          cache-workspace-crates: true
+          cache-on-failure: true
       - name: Package and compile every publishable crate archive
         run: python3 scripts/release.py package
 
@@ -236,7 +332,7 @@ jobs:
 
   release:
     name: Publish crates and GitHub release
-    needs: [security, quality, desktop, mobile, packages, website]
+    needs: [security, quality, desktop, mobile, android-package, ios-package, packages, website]
     if: >-
       github.event_name == 'push' && github.ref == 'refs/heads/main' &&
       github.repository == 'ExtraBinoss/argui' && github.actor == 'ExtraBinoss' &&
@@ -260,7 +356,9 @@ jobs:
         run: ./scripts/install-linux-ci.sh
       - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
         with:
-          key: release
+          shared-key: linux-distribution
+          add-job-id-key: false
+          cache-workspace-crates: true
       - name: Check the version and publish missing crates
         env:
           PUBLISH_BASE: ${{ github.event.before }}

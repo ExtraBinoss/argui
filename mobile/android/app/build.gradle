@@ -1,0 +1,101 @@
+plugins {
+    id 'com.android.application'
+}
+
+abstract class CargoNdkBuild extends Exec {
+    @OutputDirectory
+    abstract DirectoryProperty getOutputDirectory()
+}
+
+def repositoryRoot = rootProject.projectDir.toPath().resolve('../..').normalize().toFile()
+def cargoManifest = new File(repositoryRoot, 'Cargo.toml')
+def requestedAbis = providers.gradleProperty('arguiAbis')
+        .orElse(providers.environmentVariable('ARGUI_ANDROID_ABIS'))
+        .getOrElse('arm64-v8a,x86_64')
+        .split(',')
+        .collect { it.trim() }
+        .findAll { !it.isEmpty() }
+def supportedAbis = ['arm64-v8a', 'x86_64']
+if (requestedAbis.isEmpty() || requestedAbis.any { !supportedAbis.contains(it) }) {
+    throw new GradleException("arguiAbis must contain arm64-v8a and/or x86_64; got ${requestedAbis}")
+}
+
+android {
+    namespace = 'dev.argui.widgetgallery'
+    compileSdk = 36
+    ndkVersion = '28.2.13676358'
+
+    defaultConfig {
+        applicationId = 'dev.argui.widgetgallery'
+        minSdk = 26
+        targetSdk = 36
+        versionCode = 1
+        versionName = '0.2.0'
+        ndk {
+            abiFilters(*requestedAbis)
+        }
+    }
+
+    buildTypes {
+        debug {
+            applicationIdSuffix = '.debug'
+        }
+        release {
+            minifyEnabled = false
+        }
+    }
+}
+
+def registerRustBuild = { String variant, boolean optimized ->
+    tasks.register("buildArguiRust${variant.capitalize()}", CargoNdkBuild) {
+        workingDir repositoryRoot
+        inputs.file(cargoManifest)
+        inputs.file(new File(repositoryRoot, 'Cargo.lock'))
+        inputs.dir(new File(repositoryRoot, 'crates'))
+        inputs.dir(new File(repositoryRoot, '.cargo'))
+        inputs.property('androidAbis', requestedAbis)
+        inputs.property('androidApiLevel', 26)
+        inputs.property('androidNdkVersion', '28.2.13676358')
+        inputs.property('releaseProfile', optimized)
+
+        doFirst {
+            def rustOutput = outputDirectory.get().asFile
+            rustOutput.deleteDir()
+            rustOutput.mkdirs()
+            def command = ['cargo', 'ndk']
+            requestedAbis.each { abi -> command.addAll(['-t', abi]) }
+            command.addAll(['--platform', '26', '-o', rustOutput.absolutePath,
+                            'build', '--locked', '--manifest-path', cargoManifest.absolutePath,
+                            '--package', 'argui-widget-gallery', '--lib'])
+            if (optimized) {
+                command.add('--release')
+            }
+            setCommandLine(command)
+        }
+        doLast {
+            def rustOutput = outputDirectory.get().asFile
+            requestedAbis.each { abi ->
+                def galleryLibrary = new File(rustOutput, "${abi}/libargui_widget_gallery.so")
+                if (!galleryLibrary.isFile()) {
+                    throw new GradleException("cargo-ndk did not produce ${galleryLibrary}")
+                }
+                def nativeActivityLibrary = new File(rustOutput, "${abi}/libmain.so")
+                if (!galleryLibrary.renameTo(nativeActivityLibrary)) {
+                    throw new GradleException("could not rename ${galleryLibrary} to ${nativeActivityLibrary}")
+                }
+            }
+        }
+    }
+}
+
+registerRustBuild('debug', false)
+registerRustBuild('release', true)
+
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        def task = tasks.named("buildArguiRust${variant.name.capitalize()}", CargoNdkBuild)
+        variant.sources.jniLibs.addGeneratedSourceDirectory(task, { rustTask ->
+            rustTask.outputDirectory
+        })
+    }
+}

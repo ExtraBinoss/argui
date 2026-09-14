@@ -51,7 +51,7 @@ impl WindowHost for GtkHost {
     fn request_redraw(&self) {
         self.platform.native().request_redraw();
     }
-    fn inner_size(&self) -> PhysicalSize<u32> {
+    fn drawable_size(&self) -> PhysicalSize<u32> {
         let (width, height, _) = self.platform.client_size();
         PhysicalSize::new(width, height)
     }

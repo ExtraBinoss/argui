@@ -1,5 +1,5 @@
 use argui_animation::{Duration, Frame, Time};
-use argui_core::{Color, ColorScheme, Point, PointerId};
+use argui_core::{Color, ColorScheme, Insets, Point, PointerId};
 use argui_inspect::InspectorHandle;
 use argui_platform::{WindowConfig, WindowKey, WindowSpec};
 use argui_runtime::{
@@ -99,6 +99,66 @@ fn app_updates_keep_commands_and_explicit_tray_changes() {
         .tray_changed();
     assert_eq!(update.commands, vec![AppCommand::OpenWindow(spec)]);
     assert!(update.tray_changed);
+}
+
+#[test]
+fn safe_area_insets_reach_render_context_and_invalidate_cached_views() {
+    use std::{cell::Cell, rc::Rc};
+
+    struct Probe(Rc<Cell<usize>>, Rc<Cell<Insets>>);
+    impl Render for Probe {
+        fn render(&mut self, cx: &mut Context<Self>) -> Element {
+            self.0.set(self.0.get() + 1);
+            self.1.set(cx.environment().safe_area_insets);
+            Element::container([])
+        }
+    }
+
+    let renders = Rc::new(Cell::new(0));
+    let seen = Rc::new(Cell::new(Insets::ZERO));
+    let entity = argui_runtime::Entity::new(Probe(renders.clone(), seen.clone()));
+    let first = Insets::new(18.0, 0.0, 24.0, 0.0);
+    let second = Insets::new(30.0, 3.0, 22.0, 4.0);
+
+    let _ = entity.render_in(WindowEnvironment {
+        safe_area_insets: first,
+        ..WindowEnvironment::default()
+    });
+    assert_eq!(seen.get(), first);
+    let _ = entity.render_in(WindowEnvironment {
+        safe_area_insets: second,
+        ..WindowEnvironment::default()
+    });
+    assert_eq!(seen.get(), second);
+    assert_eq!(renders.get(), 2);
+}
+
+#[test]
+fn safe_area_command_can_inject_or_restore_platform_insets() {
+    let injected = Insets::new(24.0, 0.0, 28.0, 0.0);
+    let key = WindowKey::main();
+    assert_eq!(
+        AppUpdate::none()
+            .command(AppCommand::SetSafeAreaInsets {
+                window: key.clone(),
+                insets: Some(injected),
+            })
+            .command(AppCommand::SetSafeAreaInsets {
+                window: key,
+                insets: None,
+            })
+            .commands,
+        [
+            AppCommand::SetSafeAreaInsets {
+                window: WindowKey::main(),
+                insets: Some(injected),
+            },
+            AppCommand::SetSafeAreaInsets {
+                window: WindowKey::main(),
+                insets: None,
+            },
+        ]
+    );
 }
 
 #[test]

@@ -5,6 +5,7 @@ mod color;
 mod environment;
 mod geometry;
 mod input;
+mod insets;
 mod keyboard;
 mod text;
 
@@ -15,5 +16,6 @@ pub use geometry::{Affine2D, Point, Rect, Size, Transform2D, TransformOrigin};
 pub use input::{
     PointerButton, PointerEvent, PointerId, PointerKind, PointerPhase, PointerSettings, ScrollDelta,
 };
+pub use insets::Insets;
 pub use keyboard::{ImeInput, Key, KeyInput, KeyState, Modifiers};
 pub use text::{CaretAffinity, TextPosition};

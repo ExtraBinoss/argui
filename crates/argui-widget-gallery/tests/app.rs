@@ -1,6 +1,6 @@
 use argui::{
-    core::{Point, PointerEvent, PointerId, PointerPhase},
-    runtime::Entity,
+    core::{Insets, Point, PointerEvent, PointerId, PointerPhase},
+    runtime::{Entity, WindowEnvironment},
     ui::{
         ClickEvent, Element, GestureDelivery, GestureEvent, GestureKind, GesturePhase, UiEventKind,
         UiTree, length,
@@ -96,6 +96,21 @@ fn gallery_app_builds_a_searchable_public_root() {
     let root = gallery.render();
     assert!(has_key(&root, "gallery-root"));
     assert!(has_key(&root, "gallery-search"));
+}
+
+#[test]
+fn gallery_root_respects_native_safe_area_insets() {
+    let gallery = Entity::new(WidgetGallery::default());
+    let root = gallery.render_in(WindowEnvironment {
+        safe_area_insets: Insets::new(24.0, 8.0, 34.0, 6.0),
+        ..WindowEnvironment::default()
+    });
+
+    assert_eq!(root.style.padding.top, length(24.0));
+    assert_eq!(root.style.padding.right, length(8.0));
+    assert_eq!(root.style.padding.bottom, length(34.0));
+    assert_eq!(root.style.padding.left, length(6.0));
+    assert!(has_key(&root, "gallery-root"));
 }
 
 #[test]

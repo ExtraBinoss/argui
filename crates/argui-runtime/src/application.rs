@@ -40,6 +40,11 @@ pub enum AppCommand {
         window: WindowKey,
         title: String,
     },
+    /// Set an explicit safe-area override, or return to native detection with `None`.
+    SetSafeAreaInsets {
+        window: WindowKey,
+        insets: Option<argui_core::Insets>,
+    },
     MinimizeWindow(WindowKey),
     SetWindowMaximized {
         window: WindowKey,

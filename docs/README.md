@@ -21,6 +21,7 @@ Run commands from the repository root unless a guide says otherwise.
 | --- | --- |
 | Application identity, windows and tray | [Application setup](platform/application.md) |
 | Native Android and iOS | [Mobile integration](native-mobile.md) |
+| Safe areas and system UI | [Window insets](platform/window-insets.md) |
 | Native and browser web content | [WebView](platform/webview.md) |
 | System file selection | [File picker](platform/file-picker.md) |
 | Blur behind window regions | [Desktop backdrops](platform/desktop-backdrops.md) |

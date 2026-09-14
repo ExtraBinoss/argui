@@ -26,7 +26,13 @@ if ! mkdir "$coverage_lock" 2>/dev/null; then
   echo "error: another Argui coverage run is already active" >&2
   exit 1
 fi
-trap 'rmdir "$coverage_lock" 2>/dev/null || true' EXIT
+cleanup() {
+  rmdir "$coverage_lock" 2>/dev/null || true
+  if [[ -z "${ARGUI_KEEP_COVERAGE_ARTIFACTS:-}" ]]; then
+    cargo clean --target-dir "$coverage_target" >/dev/null 2>&1 || true
+  fi
+}
+trap cleanup EXIT
 # Old feature/build variants contain duplicate coverage maps even after their
 # raw profiles are removed. Keep dependency caches, but discard workspace maps.
 CARGO_TARGET_DIR="$coverage_target" cargo "+$coverage_toolchain" llvm-cov clean --workspace

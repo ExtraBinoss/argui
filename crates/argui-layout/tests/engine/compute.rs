@@ -13,6 +13,29 @@ fn text_engine() -> TextEngine {
 }
 
 #[test]
+fn safe_area_builder_keeps_layout_content_inside_system_insets() {
+    let mut ui = UiTree::new(
+        Element::container([Element::container([])
+            .keyed("content")
+            .width(length(60.0))
+            .height(length(40.0))])
+        .safe_area(argui_core::Insets::new(21.0, 23.0, 25.0, 17.0))
+        .width(percent(1.0))
+        .height(percent(1.0)),
+    );
+    let output = LayoutEngine::new()
+        .compute(&mut ui, &mut text_engine(), Size::new(300.0, 200.0))
+        .unwrap();
+
+    assert_eq!(output.nodes[0].bounds.size, Size::new(300.0, 200.0));
+    assert_eq!(
+        output.nodes[1].bounds.origin,
+        argui_core::Point::new(17.0, 21.0)
+    );
+    assert_eq!(output.nodes[1].bounds.size, Size::new(260.0, 40.0));
+}
+
+#[test]
 fn container_query_reflows_before_paint_and_reacts_to_resize() {
     let scope = ContainerScopeId::new("panel");
     let base = Element::row([

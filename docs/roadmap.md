@@ -5,16 +5,16 @@ work that remains open; it is not a release schedule.
 
 ## Platform coverage
 
-- [ ] Complete Android support: run the `argui-android` Widget Gallery shell on
-  emulator and device, add insets and platform services, then ship signed APK/AAB artifacts.
-- [ ] Complete iOS support: run the `argui-ios` Widget Gallery shell in simulator
-  and on device, add insets and platform services, then ship signed archives.
+- [ ] Complete Android support: validate the packaged Widget Gallery on emulator
+  and device, add platform services, then ship owner-signed APK/AAB artifacts.
+- [ ] Complete iOS support: validate the packaged Widget Gallery in Simulator
+  and on device, add platform services, then ship signed archives to TestFlight.
 - Extend native Windows and macOS interaction, installation and rendering tests
   beyond their complete-workspace CI compilation.
 - Validate real screen readers and IMEs across desktop and web, including
   bidirectional text, modal focus and virtualized controls.
 - Add native Wayland popovers behind the existing surface preference API.
-- Expand device-level Android and iOS CI beyond the existing cross-compilation.
+- Expand Android/iOS packaging CI with emulator and physical-device smoke tests.
 
 ## Application APIs
 

@@ -29,8 +29,8 @@
 
 Argui brings a retained UI tree, GPU rendering and a growing widget collection
 to one Rust API. Compose your interface, keep state in models and let the
-runtime update what changed. The same rendering stack runs on desktop and
-WebAssembly with WebGPU.
+runtime update what changed. The same rendering stack runs on desktop,
+WebAssembly and the opt-in Android/iOS shells.
 
 - **Responsive by design.** Flex and grid layout, light and dark themes, animation and virtualized lists.
 - **Accessible controls.** Keyboard navigation, focus, text editing, native AccessKit integration and browser semantics.
@@ -50,17 +50,17 @@ for workloads, memory figures and reproduction commands.
 
 - [x] Retained application models, scoped state, tasks and multi-window commands
 - [x] Flexbox, grid, scrolling, virtualization and responsive layout
-- [x] WGPU rendering on native desktop and WebAssembly
+- [x] WGPU rendering on desktop, Android, iOS and WebAssembly
 - [x] Text shaping, editing, selection, bidirectional text and IME input
 - [x] Mouse, touch, keyboard, focus and accessible semantics
 - [x] Light/dark themes, animation, images, SVG and custom WGSL effects
 - [x] Fluent localization through the optional `i18n` feature
 - [x] State-preserving Subsecond patches through the optional `hot-reload` feature
 - [x] Optional DevTools, file picker, updater, WebView, tray, native popovers and desktop backdrop
-- [x] Android and iOS bootstrap crates plus compile-checked Widget Gallery entry points
+- [x] Android/iOS bootstrap crates, safe areas and packaged Widget Gallery CI artifacts
 
-The public integration flags are `android`, `ios`, `i18n`, `hot-reload`, `tasks`,
-`devtools`, `devtools-all-smi`, `file-picker`, `updater`, `widget-updater`,
+The public integration flags are `i18n`, `hot-reload`, `tasks`, `devtools`,
+`devtools-all-smi`, `file-picker`, `updater`, `widget-updater`,
 `webview`, `tray`, `native-popups`, `desktop-backdrop` and `widgets-all`.
 `argui-effects` additionally exposes `artistic`, `blur`, `color`, `liquid-glass`,
 `refraction`, `scroll` and `shadow`. Every flag is opt-in; `argui` has no default
@@ -70,9 +70,9 @@ feature bundle.
 
 | Need | Feature(s) | Targets |
 | --- | --- | --- |
-| Core runtime, WGPU renderer, layout and text | none | Linux, Windows, macOS, WebAssembly |
-| Android native entry point | `android` | Android; required for the facade launcher |
-| iOS native entry point | `ios` | iOS; required for the facade launcher |
+| Core runtime, WGPU renderer, layout and text | none | All supported targets |
+| Android native entry point | add `argui-android` | Android only; fully opt-in |
+| iOS native entry point | add `argui-ios` | iOS only; fully opt-in |
 | Fluent locale negotiation, messages and plurals | `i18n` | All targets |
 | Async model tasks | `tasks` | All targets |
 | Every widget | `widgets-all` | All targets |
@@ -92,19 +92,21 @@ not need an OS feature. A focused application can enable capabilities directly:
 
 ```toml
 [dependencies]
-argui = { git = "https://github.com/ExtraBinoss/argui", default-features = false, features = [
+argui = { version = "0.2.0", default-features = false, features = [
   "i18n", "tasks", "widget-button", "widget-input",
 ] }
 ```
 
-For mobile, add the native entry feature to the same dependency:
+For mobile, add the platform entry crate as a separate dependency:
 
 ```toml
 # Android
-argui = { git = "https://github.com/ExtraBinoss/argui", features = ["android", "i18n", "widgets-all"] }
+argui = { version = "0.2.0", features = ["i18n", "widgets-all"] }
+argui-android = "0.2.0"
 
 # iOS
-argui = { git = "https://github.com/ExtraBinoss/argui", features = ["ios", "i18n", "widgets-all"] }
+argui = { version = "0.2.0", features = ["i18n", "widgets-all"] }
+argui-ios = "0.2.0"
 ```
 
 Available widget flags are `widget-accordion`, `widget-alert`,
@@ -134,10 +136,13 @@ Available widget flags are `widget-accordion`, `widget-alert`,
 - [x] Windows native implementation and complete-workspace CI compile
 - [x] macOS native implementation and complete-workspace CI compile
 - [x] WebAssembly application and browser gallery
-- [ ] Android release support — `argui-android` and its native gallery entry now
-  compile; emulator/device validation, mobile services and packaging remain
-- [ ] iOS release support — `argui-ios` and its native gallery entry now compile;
-  Xcode simulator/device validation, mobile services and signing remain
+- [x] Android debug APK and unsigned release AAB built by CI
+- [x] iOS XCFramework and unsigned Simulator app built by CI
+- [x] Shared logical-pixel safe-area API with Android and iOS detection
+- [ ] Android production release support — physical-device validation, mobile
+  services and owner-managed Play signing remain
+- [ ] iOS production release support — simulator/device validation, mobile
+  services, archive signing and TestFlight remain
 
 Follow the [native mobile integration guide](docs/native-mobile.md) for the
 current Android/iOS architecture, build commands and completion checklist. The
@@ -198,7 +203,7 @@ Add only the widgets your application uses:
 
 ```toml
 [dependencies]
-argui = { git = "https://github.com/ExtraBinoss/argui", features = ["widget-button"] }
+argui = { version = "0.2.0", features = ["widget-button"] }
 ```
 
 ```rust
@@ -219,9 +224,9 @@ fn view(theme: &WidgetTheme) -> Element {
 Continue with [models and state](docs/runtime/models.md),
 [localization](docs/i18n.md), [hot reload](docs/hot-reload.md), the
 [widget catalogue](docs/widgets/shadcn.md) or the [complete examples](crates/argui/examples/).
-The Git dependency works today. A final `[PUBLISH]` commit on `main` lets the
-protected CI publish the current version in dependency order; later releases
-also bump that version. See the [release workflow](docs/contributing/releases.md).
+The protected CI publishes `[PUBLISH]` commits in dependency order and creates
+the matching GitHub release. See the
+[release workflow](docs/contributing/releases.md).
 
 ## Where things stand
 

@@ -52,7 +52,7 @@ pub use argui_accessibility::{
     SemanticState, SemanticValue, Semantics, SortDirection,
 };
 pub use argui_animation::{Motion, MotionBinding, MotionState, Transition, Tween};
-pub use argui_core::{Transform2D, TransformOrigin};
+pub use argui_core::{Insets, Transform2D, TransformOrigin};
 pub use argui_paint::{
     BlendMode, Border, BorderWidths, Color, CornerRadii, EffectArgument, EffectId, EffectInstance,
     EffectValue, Fill, Filter, GradientStop, ImageAsset, ImageFit, ImageId, ImageSampling,

@@ -21,6 +21,7 @@ mod direction;
 mod kind;
 mod overrides;
 mod portal;
+mod safe_area;
 pub use kind::{ElementKind, ElementNode, TextEditorSpec};
 
 #[derive(Clone)]

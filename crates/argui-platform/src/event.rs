@@ -20,6 +20,7 @@ pub enum PlatformEvent {
         height: u32,
     },
     ScaleFactorChanged(f64),
+    SafeAreaChanged(crate::Insets),
     PreferencesChanged(crate::SystemPreferences),
     Pointer(PointerEvent),
     PointerScrolled(ScrollDelta),
@@ -39,6 +40,7 @@ impl PlatformEvent {
             Self::Opened { .. }
                 | Self::Resized { .. }
                 | Self::ScaleFactorChanged(_)
+                | Self::SafeAreaChanged(_)
                 | Self::Focused(true)
                 | Self::VisibilityChanged(true)
         )

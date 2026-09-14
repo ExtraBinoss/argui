@@ -18,6 +18,9 @@ use crate::{
 
 use super::Application;
 
+#[path = "safe_area.rs"]
+mod safe_area;
+
 impl Application {
     pub(super) fn initialize_model_tree(&mut self) {
         if self.model.is_none() {
@@ -58,9 +61,10 @@ impl ApplicationHandler<UserEvent> for Application {
                 self.initialize_browser_webviews(&window);
                 #[cfg(all(feature = "webview", any(target_os = "windows", target_os = "macos")))]
                 self.initialize_winit_webviews(window.clone());
-                let size = window.inner_size();
+                let size = crate::host::WindowHost::drawable_size(&window);
                 self.scale_factor = window.scale_factor() as f32;
                 self.initialize_preference_snapshot(window.theme());
+                self.refresh_safe_area_insets(&window, self.scale_factor);
                 #[cfg(all(feature = "desktop-backdrop", not(target_arch = "wasm32")))]
                 self.initialize_desktop_backdrop(window.clone());
                 self.initialize_model_tree();
@@ -115,6 +119,15 @@ impl ApplicationHandler<UserEvent> for Application {
             self.touch_selection = None;
         }
         (self.on_event)(RuntimeEvent::Platform(PlatformEvent::Suspended));
+    }
+
+    fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
+        #[cfg(target_os = "android")]
+        if let Some(window) = self.window.clone() {
+            // Winit currently consumes Android ContentRectChanged without
+            // forwarding it, so sample once after each platform event batch.
+            self.refresh_safe_area_insets(window.as_ref(), self.scale_factor);
+        }
     }
 
     fn user_event(&mut self, event_loop: &ActiveEventLoop, event: UserEvent) {
@@ -213,6 +226,14 @@ impl ApplicationHandler<UserEvent> for Application {
         if self.window_id() != Some(crate::host::HostId::Winit(window_id)) {
             return;
         }
+        let safe_area_scale = match &event {
+            WindowEvent::ScaleFactorChanged { scale_factor, .. } => Some(*scale_factor as f32),
+            WindowEvent::Resized(_) | WindowEvent::RedrawRequested => Some(self.scale_factor),
+            _ => None,
+        };
+        if let Some(scale_factor) = safe_area_scale {
+            self.refresh_safe_area_insets(window.as_ref(), scale_factor);
+        }
         #[cfg(not(target_arch = "wasm32"))]
         if let Some(adapter) = &mut self.accessibility
             && let Some(native) = window.winit()
@@ -227,10 +248,11 @@ impl ApplicationHandler<UserEvent> for Application {
                 window.request_redraw();
                 return;
             }
-            WindowEvent::Resized(size) => {
+            WindowEvent::Resized(_) => {
                 #[cfg(all(feature = "native-popups", not(target_arch = "wasm32")))]
                 self.invalidate_popup_environment();
                 self.sync_host_visibility();
+                let size = window.drawable_size();
                 self.pending_window_frame.resize(size.width, size.height);
                 PlatformEvent::Resized {
                     width: size.width,
@@ -240,7 +262,7 @@ impl ApplicationHandler<UserEvent> for Application {
             WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
                 #[cfg(all(feature = "native-popups", not(target_arch = "wasm32")))]
                 self.invalidate_popup_environment();
-                let size = window.inner_size();
+                let size = window.drawable_size();
                 self.pending_window_frame.scale_factor(
                     scale_factor as f32,
                     size.width,

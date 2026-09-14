@@ -1,4 +1,4 @@
-use argui_core::{Color, ColorScheme};
+use argui_core::{Color, ColorScheme, Insets};
 
 /// Read-only platform and application state for the window currently being rendered.
 #[derive(Clone, Debug, PartialEq)]
@@ -9,6 +9,8 @@ pub struct WindowEnvironment {
     pub high_contrast: bool,
     /// Native desktop blur is available and permitted for this window.
     pub desktop_backdrop_available: bool,
+    /// Safe region supplied by the platform in logical pixels.
+    pub safe_area_insets: Insets,
     /// Optional theme tokens; no map is allocated in ordinary environments.
     pub theme_overrides: Option<std::sync::Arc<argui_theme::ThemeOverrides>>,
 }
@@ -21,6 +23,7 @@ impl Default for WindowEnvironment {
             reduced_motion: false,
             high_contrast: false,
             desktop_backdrop_available: false,
+            safe_area_insets: Insets::ZERO,
             theme_overrides: None,
         }
     }

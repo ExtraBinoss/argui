@@ -11,10 +11,8 @@ description = "A modular Rust UI library for fast, accessible native and WebAsse
 
 [features]
 default = []
-android = ["dep:argui-android"]
 hot-reload = ["argui-runtime/hot-reload"]
 i18n = ["dep:argui-i18n"]
-ios = ["dep:argui-ios"]
 updater = ["dep:argui-updater", "argui-updater/native"]
 widget-updater = ["argui-widgets/updater"]
 file-picker = ["argui-platform/file-picker"]
@@ -101,13 +99,11 @@ devtools-all-smi = ["devtools", "argui-devtools/all-smi"]
 webview = ["dep:argui-webview", "argui-runtime/webview"]
 
 [dependencies]
-argui-android = { workspace = true, optional = true }
 argui-accessibility.workspace = true
 argui-animation.workspace = true
 argui-core.workspace = true
 argui-devtools = { workspace = true, optional = true }
 argui-i18n = { workspace = true, optional = true }
-argui-ios = { workspace = true, optional = true }
 argui-layout.workspace = true
 argui-paint.workspace = true
 argui-platform.workspace = true

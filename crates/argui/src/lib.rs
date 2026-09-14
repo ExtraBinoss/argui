@@ -1,16 +1,12 @@
 //! The small public facade for Argui.
 
 pub use argui_accessibility as accessibility;
-#[cfg(feature = "android")]
-pub use argui_android as android;
 pub use argui_animation as animation;
 pub use argui_core as core;
 #[cfg(feature = "devtools")]
 pub use argui_devtools as devtools;
 #[cfg(feature = "i18n")]
 pub use argui_i18n as i18n;
-#[cfg(feature = "ios")]
-pub use argui_ios as ios;
 pub use argui_layout as layout;
 pub use argui_paint as paint;
 pub use argui_platform as platform;

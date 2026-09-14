@@ -15,6 +15,16 @@ fn default_window_is_a_decorated_resizable_surface() {
     assert!(!config.native_shadow);
     assert_eq!(config.level, WindowLevel::Normal);
     assert!(config.append_to_document);
+    assert_eq!(config.safe_area_insets, None);
+    let _attributes = config.into_attributes();
+}
+
+#[test]
+fn window_safe_area_override_uses_logical_insets() {
+    let insets = argui_platform::Insets::new(24.0, 0.0, 30.0, 0.0);
+    let config = WindowConfig::default().with_safe_area_insets(insets);
+
+    assert_eq!(config.safe_area_insets, Some(insets));
     let _attributes = config.into_attributes();
 }
 
@@ -60,6 +70,17 @@ fn capabilities_expose_real_backend_limits() {
     }
     assert!(WindowBackend::Windows.capabilities().native_shadow);
     assert!(WindowBackend::MacOs.capabilities().native_shadow);
+
+    for backend in [WindowBackend::Android, WindowBackend::Ios] {
+        let capabilities = backend.capabilities();
+        assert_eq!(capabilities.backend, backend);
+        assert!(!capabilities.native_drag);
+        assert!(!capabilities.native_shadow);
+        assert!(!capabilities.minimize);
+        assert!(!capabilities.maximize);
+        assert!(!capabilities.window_level);
+        assert!(!capabilities.mouse_passthrough);
+    }
 
     assert_eq!(
         WindowBackend::Web.capabilities(),

@@ -58,6 +58,8 @@ impl From<WindowLevel> for winit::window::WindowLevel {
 pub enum WindowBackend {
     Windows,
     MacOs,
+    Android,
+    Ios,
     X11,
     Wayland,
     Web,
@@ -128,6 +130,9 @@ pub struct WindowConfig {
     pub web_parent_id: Option<String>,
     pub close_behavior: CloseBehavior,
     pub pointer: argui_core::PointerSettings,
+    /// Explicit safe-area override in logical pixels. `None` uses native
+    /// insets where Winit exposes them and zero elsewhere.
+    pub safe_area_insets: Option<argui_core::Insets>,
 }
 
 impl Default for WindowConfig {
@@ -146,11 +151,18 @@ impl Default for WindowConfig {
             web_parent_id: None,
             close_behavior: CloseBehavior::Quit,
             pointer: argui_core::PointerSettings::default(),
+            safe_area_insets: None,
         }
     }
 }
 
 impl WindowConfig {
+    #[must_use]
+    pub fn with_safe_area_insets(mut self, insets: argui_core::Insets) -> Self {
+        self.safe_area_insets = Some(insets);
+        self
+    }
+
     #[must_use]
     pub fn into_attributes(self) -> WindowAttributes {
         let attributes = WindowAttributes::default()
@@ -247,6 +259,16 @@ fn window_backend(_window: &Window) -> WindowBackend {
     WindowBackend::MacOs
 }
 
+#[cfg(target_os = "android")]
+fn window_backend(_window: &Window) -> WindowBackend {
+    WindowBackend::Android
+}
+
+#[cfg(target_os = "ios")]
+fn window_backend(_window: &Window) -> WindowBackend {
+    WindowBackend::Ios
+}
+
 #[cfg(target_os = "linux")]
 fn window_backend(window: &Window) -> WindowBackend {
     use winit::raw_window_handle::{HasWindowHandle, RawWindowHandle};
@@ -262,6 +284,8 @@ fn window_backend(window: &Window) -> WindowBackend {
     target_arch = "wasm32",
     target_os = "windows",
     target_os = "macos",
+    target_os = "android",
+    target_os = "ios",
     target_os = "linux"
 )))]
 fn window_backend(_window: &Window) -> WindowBackend {

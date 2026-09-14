@@ -33,7 +33,7 @@ impl Application {
         window: &Arc<Window>,
         event_loop: &ActiveEventLoop,
     ) {
-        let size = window.inner_size();
+        let size = crate::host::WindowHost::drawable_size(window);
         let shared = self.renderer_device.borrow().clone();
         let config = self.surface_renderer_config();
         let renderer = shared.map_or_else(
@@ -241,7 +241,7 @@ impl Application {
                 Ok(())
             }
             Ok(RenderStatus::Reconfigure) => {
-                let size = window.inner_size();
+                let size = crate::host::WindowHost::drawable_size(&window);
                 renderer.resize(size.width, size.height);
                 window.request_redraw();
                 Ok(())

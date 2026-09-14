@@ -44,6 +44,11 @@ impl MultiApplication {
                     window.set_title(&title);
                 }
             }
+            AppCommand::SetSafeAreaInsets { window, insets } => {
+                if let Some(entry) = self.windows.get_mut(&window) {
+                    entry.runtime.set_safe_area_insets(insets);
+                }
+            }
             AppCommand::MinimizeWindow(key) => {
                 self.with_window_capability(
                     &key,

@@ -169,6 +169,10 @@ impl Application {
         }
         Self {
             pending_app_commands: Vec::new(),
+            environment: crate::WindowEnvironment {
+                safe_area_insets: window_config.safe_area_insets.unwrap_or_default(),
+                ..crate::WindowEnvironment::default()
+            },
             window_config,
             identity: None,
             window_key: argui_platform::WindowKey::main(),
@@ -180,7 +184,6 @@ impl Application {
             preferences: argui_platform::SystemPreferences::default(),
             system_color_scheme: None,
             theme_request: crate::ThemeRequest::default(),
-            environment: crate::WindowEnvironment::default(),
             renderer_config,
             window: None,
             #[cfg(all(feature = "desktop-backdrop", not(target_arch = "wasm32")))]

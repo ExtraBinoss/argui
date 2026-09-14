@@ -230,6 +230,8 @@ impl SpotlightShowcase {
         let backend = match capabilities.backend {
             WindowBackend::Windows => "Windows",
             WindowBackend::MacOs => "macOS",
+            WindowBackend::Android => "Android",
+            WindowBackend::Ios => "iOS",
             WindowBackend::X11 => "Linux · X11",
             WindowBackend::Wayland => "Linux · Wayland",
             WindowBackend::Web => "Web",

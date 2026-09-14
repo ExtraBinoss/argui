@@ -4,6 +4,9 @@ pub(crate) use event_loop::EventProxy;
 #[cfg(all(feature = "webview", target_os = "linux"))]
 pub(crate) mod gtk;
 
+use argui_core::Insets;
+#[cfg(any(target_os = "android", target_os = "ios"))]
+use argui_core::{Point, Rect, Size};
 use argui_platform::WindowCapabilities;
 use winit::{
     dpi::{LogicalPosition, LogicalSize, PhysicalSize},
@@ -29,7 +32,12 @@ pub(crate) trait WindowHost {
     fn set_window_level(&self, level: winit::window::WindowLevel);
     fn set_cursor_hittest(&self, enabled: bool) -> Result<(), String>;
     fn request_redraw(&self);
-    fn inner_size(&self) -> PhysicalSize<u32>;
+    /// Physical drawable extent. iOS uses Winit's outer bounds because its
+    /// inner bounds describe the safe area rather than the full surface.
+    fn drawable_size(&self) -> PhysicalSize<u32>;
+    fn safe_area_insets(&self, _scale_factor: f32) -> Option<Insets> {
+        None
+    }
     fn pre_present_notify(&self);
     fn set_cursor(&self, cursor: CursorIcon);
     fn set_ime_allowed(&self, allowed: bool);
@@ -82,8 +90,30 @@ impl WindowHost for Arc<Window> {
     fn request_redraw(&self) {
         self.as_ref().request_redraw();
     }
-    fn inner_size(&self) -> PhysicalSize<u32> {
-        self.as_ref().inner_size()
+    fn drawable_size(&self) -> PhysicalSize<u32> {
+        #[cfg(target_os = "ios")]
+        {
+            self.as_ref().outer_size()
+        }
+        #[cfg(not(target_os = "ios"))]
+        {
+            self.as_ref().inner_size()
+        }
+    }
+    fn safe_area_insets(&self, scale_factor: f32) -> Option<Insets> {
+        #[cfg(target_os = "android")]
+        {
+            android_safe_area_insets(self.as_ref(), scale_factor)
+        }
+        #[cfg(target_os = "ios")]
+        {
+            ios_safe_area_insets(self.as_ref(), scale_factor)
+        }
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
+        {
+            let _ = scale_factor;
+            None
+        }
     }
     fn pre_present_notify(&self) {
         self.as_ref().pre_present_notify();
@@ -157,8 +187,11 @@ impl<T: WindowHost + ?Sized> WindowHost for std::rc::Rc<T> {
     fn request_redraw(&self) {
         self.as_ref().request_redraw();
     }
-    fn inner_size(&self) -> PhysicalSize<u32> {
-        self.as_ref().inner_size()
+    fn drawable_size(&self) -> PhysicalSize<u32> {
+        self.as_ref().drawable_size()
+    }
+    fn safe_area_insets(&self, scale_factor: f32) -> Option<Insets> {
+        self.as_ref().safe_area_insets(scale_factor)
     }
     fn pre_present_notify(&self) {
         self.as_ref().pre_present_notify();
@@ -193,6 +226,47 @@ impl<T: WindowHost + ?Sized> WindowHost for std::rc::Rc<T> {
     ) -> Result<(), argui_render::RendererError> {
         self.as_ref().recreate_surface(renderer)
     }
+}
+
+#[cfg(target_os = "android")]
+fn android_safe_area_insets(window: &Window, scale_factor: f32) -> Option<Insets> {
+    use winit::platform::android::WindowExtAndroid;
+
+    let size = window.inner_size();
+    let content = window.content_rect();
+    Insets::try_from_physical_rects(
+        Rect::new(
+            Point::default(),
+            Size::new(size.width as f32, size.height as f32),
+        ),
+        Rect::new(
+            Point::new(content.left as f32, content.top as f32),
+            Size::new(
+                content.right as f32 - content.left as f32,
+                content.bottom as f32 - content.top as f32,
+            ),
+        ),
+        scale_factor,
+    )
+}
+
+#[cfg(target_os = "ios")]
+fn ios_safe_area_insets(window: &Window, scale_factor: f32) -> Option<Insets> {
+    let outer_position = window.outer_position().ok()?;
+    let safe_position = window.inner_position().ok()?;
+    let outer_size = window.outer_size();
+    let safe_size = window.inner_size();
+    Insets::try_from_physical_rects(
+        Rect::new(
+            Point::new(outer_position.x as f32, outer_position.y as f32),
+            Size::new(outer_size.width as f32, outer_size.height as f32),
+        ),
+        Rect::new(
+            Point::new(safe_position.x as f32, safe_position.y as f32),
+            Size::new(safe_size.width as f32, safe_size.height as f32),
+        ),
+        scale_factor,
+    )
 }
 
 pub(crate) trait LoopControl {

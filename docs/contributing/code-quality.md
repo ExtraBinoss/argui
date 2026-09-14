@@ -91,7 +91,10 @@ normal checks stay on stable; only this measurement uses `cargo +nightly`.
 Coverage uses Nextest, disables incremental artifacts, and overrides the test
 profile with `opt-level=0` and no debug symbols so LLVM measures Argui's source
 branches without invalidating the stable interactive build cache. Instrumented
-artifacts live in `target/coverage/`; the coverage lock rejects concurrent runs.
+artifacts live temporarily in `target/coverage/`; the coverage lock rejects
+concurrent runs. Local gates delete those instrumented binaries after preserving
+`target/coverage-report.json`. CI sets `ARGUI_KEEP_COVERAGE_ARTIFACTS=1` so its
+Rust cache can reuse dependencies on the next run.
 Before measuring, workspace instrumentation artifacts are cleaned while dependency
 caches are retained, so old feature variants cannot add duplicate uncovered maps.
 

@@ -20,6 +20,10 @@ fn surface_changes_and_returning_to_a_window_request_a_frame() {
         .requires_redraw()
     );
     assert!(PlatformEvent::ScaleFactorChanged(2.0).requires_redraw());
+    assert!(
+        PlatformEvent::SafeAreaChanged(argui_platform::Insets::new(10.0, 0.0, 20.0, 0.0))
+            .requires_redraw()
+    );
     // A compositor may stop frame callbacks while another window covers the surface.
     // Re-entry must kick presentation even when no focused widget changes visually.
     assert!(PlatformEvent::Focused(true).requires_redraw());

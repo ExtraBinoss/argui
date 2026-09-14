@@ -12,6 +12,7 @@ use crate::pages::ResizeListeners;
 impl WidgetGallery {
     pub(super) fn render_element(&mut self, cx: &mut Context<Self>) -> Element {
         let environment = cx.environment();
+        let safe_area_insets = environment.safe_area_insets;
         let themes = shadcn(&environment);
         let theme = themes.resolve(environment.color_scheme);
         let assets = match environment.color_scheme {
@@ -44,6 +45,7 @@ impl WidgetGallery {
                 textarea_reset: resize_reset_listener,
             },
         )
+        .safe_area(safe_area_insets)
     }
 
     fn resize_editor(&mut self, gesture: argui::ui::GestureEvent, cx: &mut Context<Self>) {
