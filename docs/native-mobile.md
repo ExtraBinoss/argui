@@ -91,8 +91,8 @@ name = "main"
 crate-type = ["cdylib"]
 
 [dependencies]
-argui = { version = "0.2.0", features = ["widgets-all"] }
-argui-android = "0.2.0"
+argui = { version = "0.2.1", features = ["widgets-all"] }
+argui-android = "0.2.1"
 ```
 
 The library name is `main` because the Android manifest below loads
@@ -187,8 +187,8 @@ The final iOS application crate owns a static library:
 crate-type = ["staticlib"]
 
 [dependencies]
-argui = { version = "0.2.0", features = ["widgets-all"] }
-argui-ios = "0.2.0"
+argui = { version = "0.2.1", features = ["widgets-all"] }
+argui-ios = "0.2.1"
 ```
 
 Use the normal Argui launcher and export one function for Xcode:

@@ -59,6 +59,7 @@ fn frames_visit_only_active_children_and_stop_after_their_last_frame() {
         children: [Entity<Child>; 2],
         active: Rc<Cell<bool>>,
     }
+
     impl Render for Parent {
         fn render(&mut self, cx: &mut Context<Self>) -> Element {
             Element::column(self.children.iter().map(|child| cx.entity(child)))
@@ -210,6 +211,7 @@ fn context_exposes_environment_children_and_invalidation_without_internal_state(
     assert_eq!(context.view_update(), ViewUpdate::Paint);
     context.set_theme(ThemeRequest::default());
     assert_eq!(context.view_update(), ViewUpdate::Rebuild);
+    context.route_events_to(Entity::new(PlainRender).erase());
 }
 
 #[test]
@@ -303,6 +305,15 @@ mod entity_tests {
         }
     }
 
+    struct Routed(Entity<Child>);
+    impl Render for Routed {
+        fn render(&mut self, cx: &mut Context<Self>) -> Element {
+            let element = self.0.render();
+            cx.route_events_to(self.0.erase());
+            element
+        }
+    }
+
     fn unkeyed_event() -> UiEvent {
         UiEvent::new(
             UiTree::new(Element::container([])).node_id_at(0).unwrap(),
@@ -363,6 +374,18 @@ mod entity_tests {
         assert_eq!(child_events.get(), 1);
         assert_eq!(parent_events.get(), 0);
         assert!(deliveries[0].propagation_stopped());
+    }
+
+    #[test]
+    fn routed_subtrees_dispatch_through_the_declared_event_owner() {
+        let events = Rc::new(Cell::new(0));
+        let root = Entity::new(Routed(Entity::new(Child {
+            events: events.clone(),
+            stop: false,
+        })));
+        let deliveries = dispatch_click(&root, "deep-child");
+        assert_eq!(events.get(), 1);
+        assert!(deliveries.iter().any(UiEvent::should_dispatch));
     }
 
     #[test]

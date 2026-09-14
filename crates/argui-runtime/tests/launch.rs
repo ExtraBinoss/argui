@@ -21,6 +21,7 @@ mod native {
         scrolled: bool,
         edited: bool,
         themed: bool,
+        safe_area: bool,
         keys: Vec<argui_core::KeyInput>,
         pointer: Vec<argui_core::PointerEvent>,
         wheel: Vec<argui_core::ScrollDelta>,
@@ -30,6 +31,9 @@ mod native {
         data: Entity<Data>,
         main: bool,
         issued: usize,
+        layout_rebuilt: bool,
+        virtual_resets: usize,
+        list: argui_ui::VirtualList,
         timer: Option<TaskHandle>,
         visits: Visits,
         pending: Rc<RefCell<Vec<TaskHandle>>>,
@@ -54,6 +58,13 @@ mod native {
     impl Render for Panel {
         fn render(&mut self, cx: &mut Context<Self>) -> Element {
             let phase = cx.read(&self.data, |data| data.phase);
+            if self.virtual_resets > 0 {
+                self.virtual_resets -= 1;
+                self.list = argui_ui::VirtualList::variable(3, 120.0, 240.0);
+            }
+            if cx.environment().safe_area_insets.top == 11.0 {
+                self.data.update(|data, _| data.safe_area = true);
+            }
             if cx.environment().primary == argui_core::Color::BLACK {
                 self.data.update(|data, _| data.themed = true);
             }
@@ -85,9 +96,9 @@ mod native {
                     .unwrap()
                 }));
             }
-            native_view(phase, cx)
+            native_view(phase, cx, &self.list)
         }
-        fn layout_changed(&mut self, layout: &LayoutSnapshot, _: &mut Context<Self>) {
+        fn layout_changed(&mut self, layout: &LayoutSnapshot, cx: &mut Context<Self>) {
             if self.main
                 && layout
                     .bounds("native-first")
@@ -99,10 +110,16 @@ mod native {
                 eprintln!("native lifecycle initial layout");
                 self.schedule();
             }
+            if self.main && !self.layout_rebuilt {
+                self.layout_rebuilt = true;
+                self.virtual_resets = 2;
+                cx.scroll(argui_ui::ScrollRequest::reveal("native-editor"));
+                cx.notify();
+            }
         }
     }
-    fn native_view(phase: usize, cx: &mut Context<Panel>) -> Element {
-        use argui_ui::{Axes, FocusPolicy, Interaction, Overflow, TextEditorSpec, length};
+    fn native_view(phase: usize, cx: &mut Context<Panel>, list: &argui_ui::VirtualList) -> Element {
+        use argui_ui::{FocusPolicy, Interaction, TextEditorSpec, length};
         let editor = Element::text_editor(TextEditorSpec {
             value: format!("phase {phase}"),
             placeholder: String::new(),
@@ -124,24 +141,16 @@ mod native {
         .keyed("native-editor")
         .height(length(40.0))
         .interaction(Interaction::default().focus_policy(FocusPolicy::TabStop));
-        Element::column([
-            Element::text("First")
+        list.build("native-scroll", 0.0, |index| match index {
+            0 => Element::text("First")
                 .keyed("native-first")
-                .height(length(500.0))
-                .shrink(0.0),
-            editor.shrink(0.0),
-            Element::text("Last")
+                .height(length(500.0)),
+            1 => editor.clone(),
+            _ => Element::text("Last")
                 .keyed("native-last")
-                .height(length(500.0))
-                .shrink(0.0),
-        ])
-        .keyed("native-scroll")
-        .height(length(240.0))
-        .width(length(400.0))
-        .overflow(Axes {
-            x: Overflow::Hidden,
-            y: Overflow::Auto,
+                .height(length(500.0)),
         })
+        .width(length(400.0))
     }
     fn exercise_scroll(phase: usize, cx: &mut Context<Panel>) {
         use argui_core::{Point, Rect, Size};
@@ -184,6 +193,9 @@ mod native {
                     data: self.data.clone(),
                     main: key == &WindowKey::main(),
                     issued: 0,
+                    layout_rebuilt: false,
+                    virtual_resets: 0,
+                    list: argui_ui::VirtualList::variable(3, 120.0, 240.0),
                     timer: None,
                     visits: self.visits.clone(),
                     pending: self.pending.clone(),
@@ -239,10 +251,15 @@ mod native {
             };
             let update = AppUpdate::none().command(command);
             match phase {
-                2 => update.command(AppCommand::SetWindowTitle {
-                    window: WindowKey::main(),
-                    title: "Argui updated lifecycle check".into(),
-                }),
+                2 => update
+                    .command(AppCommand::SetWindowTitle {
+                        window: WindowKey::main(),
+                        title: "Argui updated lifecycle check".into(),
+                    })
+                    .command(AppCommand::SetSafeAreaInsets {
+                        window: WindowKey::main(),
+                        insets: Some(argui_core::Insets::new(11.0, 1.0, 2.0, 3.0)),
+                    }),
                 3 | 4 => update.command(AppCommand::SetWindowMaximized {
                     window: WindowKey::main(),
                     maximized: phase == 3,
@@ -322,6 +339,7 @@ mod native {
             scrolled: false,
             edited: false,
             themed: false,
+            safe_area: false,
             keys: Vec::new(),
             pointer: Vec::new(),
             wheel: Vec::new(),
@@ -405,6 +423,10 @@ mod native {
             "theme changes reach the rendered view"
         );
         assert!(
+            data.read(|data| data.safe_area),
+            "safe-area changes reach the rendered view"
+        );
+        assert!(
             data.read(|data| data.scrolled),
             "native scroll requests must change the layout"
         );
@@ -465,6 +487,61 @@ mod native {
         );
     }
 }
+
+#[cfg(not(target_arch = "wasm32"))]
+mod model_free {
+    use argui_platform::WindowConfig;
+
+    pub fn run() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        if std::env::var_os("ARGUI_MODEL_FREE_TEST_CHILD").is_none() {
+            let success = root
+                .join("target/native-launch")
+                .join(format!("success-{}", std::process::id()));
+            std::fs::create_dir_all(success.parent().unwrap()).unwrap();
+            let _ = std::fs::remove_file(&success);
+            let status = std::process::Command::new(root.join("scripts/linux-hidden-display.sh"))
+                .env("ARGUI_TEST_BACKEND", "x11")
+                .env("ARGUI_MODEL_FREE_TEST_CHILD", "1")
+                .env("ARGUI_MODEL_FREE_TEST_SUCCESS", &success)
+                .current_dir(&root)
+                .arg("timeout")
+                .arg("20s")
+                .arg(std::env::current_exe().unwrap())
+                .status()
+                .unwrap();
+            assert!(
+                status.success() || success.exists(),
+                "hidden model-free launch test failed"
+            );
+            let _ = std::fs::remove_file(success);
+            return;
+        }
+        let driver = std::thread::spawn(move || {
+            std::process::Command::new("python3")
+                .arg(root.join("crates/argui-runtime/tests/launch/close.py"))
+                .current_dir(root)
+                .status()
+                .unwrap()
+        });
+        argui_runtime::run(
+            WindowConfig {
+                title: "Argui model-free launch test".into(),
+                ..Default::default()
+            },
+            Default::default(),
+            |_| {},
+        )
+        .unwrap();
+        assert!(driver.join().unwrap().success());
+        std::fs::write(
+            std::env::var_os("ARGUI_MODEL_FREE_TEST_SUCCESS").unwrap(),
+            "passed",
+        )
+        .unwrap();
+    }
+}
+
 fn main() {
     let enabled = std::env::var_os("ARGUI_NATIVE_TESTS").is_some();
     if std::env::args().any(|argument| argument == "--list") {
@@ -478,6 +555,11 @@ fn main() {
     }
     #[cfg(all(feature = "tasks", not(target_arch = "wasm32")))]
     if enabled {
-        native::run();
+        if std::env::var_os("ARGUI_MODEL_FREE_TEST_CHILD").is_some() {
+            model_free::run();
+        } else {
+            native::run();
+            model_free::run();
+        }
     }
 }

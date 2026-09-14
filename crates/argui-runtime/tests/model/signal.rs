@@ -22,6 +22,33 @@ fn cancelling_observation_before_dispatch_leaves_the_receiver_clean() {
 }
 
 #[test]
+fn dropping_an_observer_before_dispatch_discards_its_queued_invalidation() {
+    let runtime = argui_runtime::ModelRuntime::new(|| {});
+    let source = runtime.entity(0);
+    let receiver = runtime.entity(0);
+    let subscription = receiver.update(|_, cx| cx.observe(&source)).unwrap();
+    runtime.transaction(|| {
+        source.update(|_, cx| cx.notify());
+        drop(receiver);
+    });
+    runtime.dispatch_pending();
+    assert_eq!(runtime.pending_invalidations(), 0);
+    assert!(!subscription.is_active());
+}
+
+#[test]
+fn cancelling_after_the_source_is_dropped_is_inert() {
+    let runtime = argui_runtime::ModelRuntime::new(|| {});
+    let source = runtime.entity(0);
+    let receiver = runtime.entity(0);
+    let subscription = receiver.update(|_, cx| cx.observe(&source)).unwrap();
+    drop(source);
+    subscription.cancel();
+    assert!(!subscription.is_active());
+    assert_eq!(runtime.pending_invalidations(), 0);
+}
+
+#[test]
 fn data_revision_tracks_notifications_without_a_render_implementation() {
     let model = Entity::new(0);
     assert_eq!(model.revision(), 0);

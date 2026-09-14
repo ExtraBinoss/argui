@@ -166,6 +166,39 @@ struct Parent {
     child: Entity<View>,
     visible: bool,
 }
+
+struct Siblings {
+    first: Entity<View>,
+    second: Entity<View>,
+    absent: Entity<View>,
+}
+impl Render for Siblings {
+    fn layout_changed(&mut self, layout: &LayoutSnapshot, cx: &mut Context<Self>) {
+        cx.layout_entity(&self.first, layout);
+        cx.layout_entity(&self.absent, layout);
+    }
+    fn render(&mut self, cx: &mut Context<Self>) -> Element {
+        Element::row([cx.entity(&self.first), cx.entity(&self.second)])
+    }
+}
+
+#[test]
+fn child_layout_targets_only_mounts_of_the_requested_model() {
+    let first = Entity::new(View::default());
+    let second = Entity::new(View::default());
+    let absent = Entity::new(View::default());
+    let parent = Entity::new(Siblings {
+        first: first.clone(),
+        second: second.clone(),
+        absent: absent.clone(),
+    });
+    let mount = parent.mount().unwrap();
+    let _ = mount.render(WindowEnvironment::default()).unwrap();
+    mount.layout_changed(&LayoutSnapshot::default()).unwrap();
+    assert_eq!(first.read(|view| view.layouts.len()), 1);
+    assert!(second.read(|view| view.layouts.is_empty()));
+    assert!(absent.read(|view| view.layouts.is_empty()));
+}
 impl Render for Parent {
     fn layout_changed(&mut self, layout: &argui_runtime::LayoutSnapshot, cx: &mut Context<Self>) {
         cx.layout_entity(&self.child, layout);

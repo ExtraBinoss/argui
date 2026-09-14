@@ -205,7 +205,7 @@ dependencies = [
 
 [[package]]
 name = "argui"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "argui-accessibility",
  "argui-animation",
@@ -224,7 +224,7 @@ dependencies = [
 
 [[package]]
 name = "argui-accessibility"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "accesskit",
  "argui-core",
@@ -234,14 +234,14 @@ dependencies = [
 
 [[package]]
 name = "argui-animation"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "argui-core",
 ]
 
 [[package]]
 name = "argui-core"
-version = "0.2.0"
+version = "0.2.1"
 
 [[package]]
 name = "argui-example-ai-harness"
@@ -254,7 +254,7 @@ dependencies = [
 
 [[package]]
 name = "argui-inspect"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "argui-core",
  "serde",
@@ -263,7 +263,7 @@ dependencies = [
 
 [[package]]
 name = "argui-layout"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "argui-core",
  "argui-paint",
@@ -274,14 +274,14 @@ dependencies = [
 
 [[package]]
 name = "argui-paint"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "argui-core",
 ]
 
 [[package]]
 name = "argui-platform"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "arboard",
  "argui-core",
@@ -300,7 +300,7 @@ dependencies = [
 
 [[package]]
 name = "argui-render"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "argui-core",
  "argui-paint",
@@ -314,7 +314,7 @@ dependencies = [
 
 [[package]]
 name = "argui-runtime"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "accesskit",
  "accesskit_winit",
@@ -341,7 +341,7 @@ dependencies = [
 
 [[package]]
 name = "argui-text"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "argui-core",
  "cosmic-text",
@@ -350,14 +350,14 @@ dependencies = [
 
 [[package]]
 name = "argui-theme"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "argui-core",
 ]
 
 [[package]]
 name = "argui-ui"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "argui-accessibility",
  "argui-animation",
@@ -371,7 +371,7 @@ dependencies = [
 
 [[package]]
 name = "argui-vector"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "argui-core",
  "argui-paint",
@@ -381,7 +381,7 @@ dependencies = [
 
 [[package]]
 name = "argui-widgets"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "argui-animation",
  "argui-core",
