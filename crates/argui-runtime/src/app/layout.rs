@@ -9,23 +9,11 @@ impl Application {
         event_loop: &dyn crate::host::LoopControl,
     ) -> Result<(), RuntimeError> {
         if let Some(mut layout) = self.compute_ui_layout()? {
-            if layout.virtualization_changed {
-                if let Some(root) = self.inspected_view()
-                    && let Some(ui) = &mut self.ui_tree
-                {
-                    ui.update(root);
-                }
-                let Some(next) = self.compute_ui_layout()? else {
-                    return Ok(());
-                };
-                layout = next;
-                if layout.virtualization_changed {
-                    self.pending_ui_frame.request_rebuild();
-                    if let Some(window) = &self.window {
-                        window.request_redraw();
-                    }
-                }
-            }
+            let refresh = layout.virtualization_changed;
+            let Some(next) = self.refresh_layout(layout, refresh, true)? else {
+                return Ok(());
+            };
+            layout = next;
             let snapshot = LayoutSnapshot {
                 viewport: layout.viewport,
                 nodes: layout
@@ -54,31 +42,16 @@ impl Application {
                 scroll_request = effects.scroll.take();
                 self.apply_model_effects(effects, event_loop);
             }
-            if rebuild && let Some(root) = self.inspected_view() {
-                if let Some(ui) = &mut self.ui_tree {
-                    ui.update(root);
-                }
-                let Some(next) = self.compute_ui_layout()? else {
+            let Some(next) = self.refresh_layout(layout, rebuild, false)? else {
+                return Ok(());
+            };
+            layout = next;
+            if rebuild {
+                let refresh = layout.virtualization_changed;
+                let Some(next) = self.refresh_layout(layout, refresh, true)? else {
                     return Ok(());
                 };
                 layout = next;
-                if layout.virtualization_changed {
-                    if let Some(root) = self.inspected_view()
-                        && let Some(ui) = &mut self.ui_tree
-                    {
-                        ui.update(root);
-                    }
-                    let Some(next) = self.compute_ui_layout()? else {
-                        return Ok(());
-                    };
-                    layout = next;
-                    if layout.virtualization_changed {
-                        self.pending_ui_frame.request_rebuild();
-                        if let Some(window) = &self.window {
-                            window.request_redraw();
-                        }
-                    }
-                }
             }
             self.ui_layout = Some(layout);
             if let Some(request) = scroll_request {
@@ -105,6 +78,33 @@ impl Application {
             .compute(ui, &mut self.text_engine, self.viewport)
             .map(Some)
             .map_err(Into::into)
+    }
+
+    fn refresh_layout(
+        &mut self,
+        layout: LayoutOutput,
+        refresh: bool,
+        request_if_unsettled: bool,
+    ) -> Result<Option<LayoutOutput>, RuntimeError> {
+        if !refresh {
+            return Ok(Some(layout));
+        }
+        if let Some(root) = self.inspected_view() {
+            self.ui_tree
+                .as_mut()
+                .expect("a computed layout retains its UI tree")
+                .update(root);
+        }
+        let Some(layout) = self.compute_ui_layout()? else {
+            return Ok(None);
+        };
+        if request_if_unsettled && layout.virtualization_changed {
+            self.pending_ui_frame.request_rebuild();
+            if let Some(window) = &self.window {
+                window.request_redraw();
+            }
+        }
+        Ok(Some(layout))
     }
 
     pub(super) fn update_viewport(&mut self, width: u32, height: u32) {
