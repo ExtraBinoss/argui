@@ -91,11 +91,15 @@ impl WindowHost for Arc<Window> {
         self.as_ref().request_redraw();
     }
     fn drawable_size(&self) -> PhysicalSize<u32> {
-        #[cfg(target_os = "ios")]
+        #[cfg(target_arch = "wasm32")]
+        {
+            argui_platform::web_drawable_size(self.as_ref())
+        }
+        #[cfg(all(not(target_arch = "wasm32"), target_os = "ios"))]
         {
             self.as_ref().outer_size()
         }
-        #[cfg(not(target_os = "ios"))]
+        #[cfg(all(not(target_arch = "wasm32"), not(target_os = "ios")))]
         {
             self.as_ref().inner_size()
         }

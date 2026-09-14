@@ -1,8 +1,15 @@
-use argui_paint::{Border, Fill};
+use argui_paint::{Border, CornerRadii, Fill};
 
 use crate::{Element, PropertyBinding, PropertyKey};
 
 impl Element {
+    pub(super) fn override_radii(&mut self, radii: CornerRadii) {
+        self.paint.quad.radii = radii;
+        self.remove_overridden_states(&[PropertyKey::CornerRadii]);
+        self.bindings
+            .retain(|binding| !matches!(binding, PropertyBinding::CornerRadii(_)));
+    }
+
     /// Replace paint opacity in every visual state, removing its motion binding.
     pub fn override_paint_opacity(&mut self, opacity: f32) {
         self.paint.quad.opacity = opacity.clamp(0.0, 1.0);

@@ -1,7 +1,10 @@
 /target/
+/app_examples/target/
+/app_examples/*/target/
 *.profraw
 lcov.info
 coverage/
 /web/pkg/
 /web/widgets/pkg/
+/web/examples/*/pkg/
 __pycache__/

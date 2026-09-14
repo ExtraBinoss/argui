@@ -9,15 +9,6 @@
     "gallery": "Accordion"
   },
   {
-    "slug": "actions",
-    "name": "Actions",
-    "description": "One command for buttons, menus, palettes and focused shortcuts.",
-    "source": "crates/argui-widget-gallery/src/pages/actions.rs",
-    "feature": null,
-    "category": "Examples",
-    "gallery": "Actions"
-  },
-  {
     "slug": "alert",
     "name": "Alert",
     "description": "Inline messages with accessible announcements.",
@@ -43,6 +34,15 @@
     "feature": "animated-text",
     "category": "Components",
     "gallery": "Animated text"
+  },
+  {
+    "slug": "motion",
+    "name": "Animation lab",
+    "description": "Springs, resizing, corner radii, Oklab colors and composed transforms.",
+    "source": "crates/argui-widget-gallery/src/pages/motion.rs",
+    "feature": null,
+    "category": "Examples",
+    "gallery": "Animation lab"
   },
   {
     "slug": "aspect-ratio",
@@ -459,15 +459,6 @@
     "gallery": "Message scroller"
   },
   {
-    "slug": "motion",
-    "name": "Motion & loading",
-    "description": "Frame-paced feedback and interaction transitions.",
-    "source": "crates/argui-widget-gallery/src/pages.rs",
-    "feature": null,
-    "category": "Examples",
-    "gallery": "Motion & loading"
-  },
-  {
     "slug": "native-select",
     "name": "Native select",
     "description": "A compact form select drawn by Argui.",
@@ -618,7 +609,7 @@
     "source": "crates/argui-widgets/src/spinner.rs",
     "feature": "spinner",
     "category": "Components",
-    "gallery": "Motion & loading"
+    "gallery": "Button"
   },
   {
     "slug": "split-pane",

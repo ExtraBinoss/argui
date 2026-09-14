@@ -1,0 +1,33 @@
+{
+  "measured_on": "2026-09-14",
+  "environment": {
+    "os": "Fedora Linux 44, kernel 7.2.4-200.fc44.x86_64",
+    "cpu": "Intel Core Ultra 5 125H",
+    "browser": "Google Chrome 153.0.8010.36",
+    "rust": "rustc 1.98.0"
+  },
+  "method": {
+    "profile": "wasm-pack --release with wasm-opt",
+    "server": "local static HTTP server",
+    "loads_per_app": 5,
+    "http_cache": "disabled",
+    "interval": "navigation start to Argui renderer ready with the target semantic node present",
+    "viewport_css_pixels": [1120, 700]
+  },
+  "applications": {
+    "ai_harness": {
+      "wasm_bytes": 6448372,
+      "ready_ms": [296.9, 388.1, 283.2, 457.7, 264.1],
+      "median_ready_ms": 296.9,
+      "minimum_ready_ms": 264.1,
+      "maximum_ready_ms": 457.7
+    },
+    "widget_gallery": {
+      "wasm_bytes": 10314122,
+      "ready_ms": [919.8, 589.6, 789.2, 990.9, 718.3],
+      "median_ready_ms": 789.2,
+      "minimum_ready_ms": 589.6,
+      "maximum_ready_ms": 990.9
+    }
+  }
+}

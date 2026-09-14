@@ -124,8 +124,7 @@ fn selection_lifecycle_covers_extension_reverse_ranges_and_release() {
         first,
         TextPosition::new(2, CaretAffinity::After),
     ));
-    assert!(tree.document_selection_dragging());
-    tree.release_document_selection();
+    assert!(!tree.document_selection_dragging());
 
     tree.begin_document_selection(
         DocumentTextPoint::new(middle, TextPosition::new(3, CaretAffinity::After)),
@@ -136,6 +135,26 @@ fn selection_lifecycle_covers_extension_reverse_ranges_and_release() {
     assert!(tree.clear_document_selection().paint_changed);
     assert!(!tree.has_document_selection());
     assert!(!tree.document_selection_intersects(0, usize::MAX));
+}
+
+#[test]
+fn word_selection_ignores_stationary_web_pointer_moves_and_drags_by_words() {
+    let mut tree = UiTree::new(Element::text("alpha beta gamma"));
+    let text = tree.node_id_at(0).unwrap();
+    let point =
+        |index| DocumentTextPoint::new(text, TextPosition::new(index, CaretAffinity::After));
+
+    tree.begin_document_selection(point(7), false, SelectionGranularity::Word);
+    assert_eq!(tree.selected_document_text().as_deref(), Some("beta"));
+
+    tree.drag_document_selection(point(7));
+    assert_eq!(tree.selected_document_text().as_deref(), Some("beta"));
+
+    tree.drag_document_selection(point(13));
+    assert_eq!(tree.selected_document_text().as_deref(), Some("beta gamma"));
+    tree.release_document_selection();
+    tree.drag_document_selection(point(1));
+    assert_eq!(tree.selected_document_text().as_deref(), Some("beta gamma"));
 }
 
 #[test]

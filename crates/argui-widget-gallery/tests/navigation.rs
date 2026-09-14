@@ -63,12 +63,11 @@ fn navigation_rebuilds_widget_and_example_pages_from_public_events() {
         ("nav::hot-reload", "State-preserving Rust patches"),
         ("nav::i18n", "Live Fluent catalogs"),
         ("nav::layout", "Web layout"),
-        ("nav::motion", "Motion & loading"),
+        ("nav::motion", "Animation laboratory"),
         ("nav::liquid-glass", "Liquid glass"),
         ("nav::scroll-shadow", "Scroll shadow"),
         ("nav::typography", "Typography & selection"),
         ("nav::async-tasks", "Search 10,000 draft titles"),
-        ("nav::actions", "Left scope"),
         ("nav::editing", "Unicode text"),
     ] {
         click_page(&gallery, key);

@@ -5,8 +5,8 @@ use argui::{
     paint::{Border, BorderWidths},
     runtime::Context,
     ui::{
-        Axes, Element, ElementKind, JustifyContent, Overflow, Role, ScrollConfig, Sides,
-        TextSelection, UiEvent, UiEventKind, length, percent,
+        Axes, Element, ElementKind, JustifyContent, Overflow, Role, ScrollAxes, ScrollConfig,
+        Semantics, Sides, TextSelection, UiEvent, UiEventKind, length, percent,
     },
     widgets::{Button, Input, InputKind, TablerIcon, WidgetAssets, WidgetTheme},
 };
@@ -37,18 +37,7 @@ impl WidgetGallery {
     }
 
     pub(super) fn sidebar(&self, theme: &WidgetTheme, assets: &WidgetAssets) -> Element {
-        let search = Input::new(
-            "gallery-search",
-            self.search.clone(),
-            "Search components…",
-            theme.input(),
-        )
-        .kind(InputKind::Search)
-        .label("Search components")
-        .description("Type anywhere outside an editor, or press Ctrl or Command K")
-        .leading(assets.icon(TablerIcon::Search, 16.0), 38.0)
-        .build();
-        let mut children = vec![search];
+        let mut children = vec![self.search_input(theme, assets)];
         for category in ["Widgets", "Effects", "Examples"] {
             let pages = self
                 .filtered_pages()
@@ -59,17 +48,11 @@ impl WidgetGallery {
                 continue;
             }
             children.push(text(category, 11.0, theme.muted_foreground, 700));
-            children.extend(pages.into_iter().map(|page| {
-                let style = if page == self.page {
-                    theme.button()
-                } else {
-                    theme.ghost_button()
-                };
-                Button::new(format!("nav::{}", page.slug()), page.label(), style)
-                    .build()
-                    .width(percent(1.0))
-                    .justify_content(JustifyContent::START)
-            }));
+            children.extend(
+                pages
+                    .into_iter()
+                    .map(|page| self.navigation_button(page, theme, true)),
+            );
         }
         let mut sidebar = Element::column(children)
             .keyed("gallery-sidebar")
@@ -95,6 +78,106 @@ impl WidgetGallery {
             sidebar = sidebar.desktop_backdrop(self.backdrop.paint(theme));
         }
         sidebar
+    }
+
+    pub(super) fn mobile_navigation(&self, theme: &WidgetTheme, assets: &WidgetAssets) -> Element {
+        let mut items = vec![self.theme_button(theme, assets)];
+        for category in ["Widgets", "Effects", "Examples"] {
+            let pages = self
+                .filtered_pages()
+                .into_iter()
+                .filter(|page| page.category() == category)
+                .collect::<Vec<_>>();
+            if pages.is_empty() {
+                continue;
+            }
+            items.push(
+                text(category, 11.0, theme.muted_foreground, 700)
+                    .padding(Sides::length(8.0))
+                    .shrink(0.0),
+            );
+            items.extend(
+                pages
+                    .into_iter()
+                    .map(|page| self.navigation_button(page, theme, false)),
+            );
+        }
+        let strip = Element::row(items)
+            .keyed("gallery-mobile-navigation-strip")
+            .padding(Sides {
+                left: length(12.0),
+                right: length(12.0),
+                top: length(4.0),
+                bottom: length(8.0),
+            })
+            .gap(6.0)
+            .align_items(argui::ui::AlignItems::CENTER)
+            .shrink(0.0);
+        let navigation = Element::layout_boundary(strip)
+            .keyed("gallery-mobile-navigation")
+            .width(percent(1.0))
+            .height(length(52.0))
+            .overflow(Axes {
+                x: Overflow::Auto,
+                y: Overflow::Hidden,
+            })
+            .scroll_config(
+                ScrollConfig::default()
+                    .axes(ScrollAxes::Horizontal)
+                    .scrollbar(theme.scrollbar.clone()),
+            )
+            .semantics(Semantics::new(Role::Navigation).label("Component navigation"));
+        Element::column([
+            Element::container([self.search_input(theme, assets)])
+                .padding(Sides {
+                    left: length(12.0),
+                    right: length(12.0),
+                    top: length(10.0),
+                    bottom: length(4.0),
+                })
+                .width(percent(1.0)),
+            navigation,
+        ])
+        .keyed("gallery-mobile-header")
+        .width(percent(1.0))
+        .background(theme.card)
+        .border(Border {
+            widths: BorderWidths {
+                bottom: 1.0,
+                ..BorderWidths::default()
+            },
+            color: theme.border,
+        })
+    }
+
+    fn search_input(&self, theme: &WidgetTheme, assets: &WidgetAssets) -> Element {
+        Input::new(
+            "gallery-search",
+            self.search.clone(),
+            "Search components…",
+            theme.input(),
+        )
+        .kind(InputKind::Search)
+        .label("Search components")
+        .description("Type anywhere outside an editor, or press Ctrl or Command K")
+        .leading(assets.icon(TablerIcon::Search, 16.0), 38.0)
+        .build()
+    }
+
+    fn navigation_button(&self, page: Page, theme: &WidgetTheme, full_width: bool) -> Element {
+        let style = if page == self.page {
+            theme.button()
+        } else {
+            theme.ghost_button()
+        };
+        let mut button = Button::new(format!("nav::{}", page.slug()), page.label(), style)
+            .build()
+            .shrink(0.0)
+            .justify_content(JustifyContent::START);
+        if full_width {
+            button = button.width(percent(1.0));
+        }
+        button
     }
 
     fn filtered_pages(&self) -> Vec<Page> {

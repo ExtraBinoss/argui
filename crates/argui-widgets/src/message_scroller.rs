@@ -26,11 +26,11 @@ impl MessageScrollState {
     /// User scrolls or reading interactions suspend following; reaching the live edge resumes it.
     pub fn observe(&mut self, event: &UiEvent, viewport_key: &str, maximum: f32) {
         if event.target_key() == Some(viewport_key)
-            && let UiEventKind::Scrolled { offset, .. } = event.kind
+            && let UiEventKind::Scrolled { delta, offset } = event.kind
         {
             self.offset = offset.y.max(0.0);
             self.maximum = maximum.max(0.0);
-            self.following = self.maximum - self.offset <= 8.0;
+            self.following = delta.y >= 0.0 && self.maximum - self.offset <= 8.0;
             if self.following {
                 self.unread = 0;
             }

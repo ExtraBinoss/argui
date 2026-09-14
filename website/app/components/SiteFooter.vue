@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ArrowUpRight } from '@lucide/vue'
-import { repository, sourceUrl } from '~/data/project'
+import { discord, repository, sourceUrl } from '~/data/project'
 const { t } = useI18n()
 </script>
 <template>
@@ -17,6 +17,10 @@ const { t } = useI18n()
       </a>
       <a :href="repository" target="_blank" rel="noopener noreferrer">
         {{ t('footer.source') }}
+        <ArrowUpRight :size="13" />
+      </a>
+      <a :href="discord" target="_blank" rel="noopener noreferrer">
+        {{ t('footer.discord') }}
         <ArrowUpRight :size="13" />
       </a>
       <span>{{ t('footer.license') }}</span>

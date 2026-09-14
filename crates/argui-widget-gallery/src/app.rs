@@ -1,18 +1,14 @@
 use argui::{
     core::{Color, Key, KeyState, Size},
-    paint::{Border, BorderWidths, CornerRadii, ImageFit, ImageId},
-    runtime::{Context, Entity, LayoutSnapshot, WindowEnvironment},
+    paint::ImageId,
+    runtime::{Context, Entity, LayoutSnapshot},
     text::{TextColor, TextStyle, TextWrap},
     theme::ThemeMode,
-    ui::{
-        AlignItems, Axes, CursorIcon, Element, GestureSet, Interaction, JustifyContent,
-        KeyboardActivation, Overflow, Role, ScrollConfig, ScrollRequest, SemanticAction, Semantics,
-        Sides, UiEvent, UiEventKind, length, percent,
-    },
+    ui::{Element, ScrollRequest, UiEvent, UiEventKind},
     widgets::{
-        Button, DialogAction, DialogBehavior, RadioGroupAction, RadioGroupBehavior, RangeBehavior,
+        DialogAction, DialogBehavior, RadioGroupAction, RadioGroupBehavior, RangeBehavior,
         RangeConfig, RangeState, SelectAction, SelectBehavior, SelectOption, Spinner, TablerIcon,
-        TabsAction, TabsBehavior, WidgetAssets, WidgetTheme,
+        TabsAction, TabsBehavior, WidgetAssets,
     },
 };
 use argui_image::ImageLibrary;
@@ -21,6 +17,7 @@ use crate::{navigation::Page, pages};
 
 mod desktop_backdrop;
 mod interaction;
+mod layout;
 mod navigation;
 mod theme;
 pub(crate) use theme::PRIMARIES;
@@ -35,6 +32,7 @@ pub struct WidgetGallery {
     pub(crate) search: String,
     search_highlight: usize,
     navigation_root: Element,
+    compact: bool,
     pub(crate) theme_mode: ThemeMode,
     pub(crate) primary: usize,
     pub(crate) name: String,
@@ -79,7 +77,7 @@ pub struct WidgetGallery {
     #[cfg(feature = "updater")]
     pub(crate) updater: std::cell::OnceCell<Entity<pages::updater::UpdaterDemo>>,
     pub(crate) tasks: Entity<pages::async_tasks::TasksDemo>,
-    pub(crate) actions: Entity<pages::actions::ActionsDemo>,
+    pub(crate) motion: Entity<pages::motion::MotionDemo>,
     pub(crate) editing: Entity<pages::editing::EditingDemo>,
     pub(crate) hot_reload: Entity<pages::hot_reload::HotReloadDemo>,
     pub(crate) i18n: Entity<pages::i18n::I18nDemo>,
@@ -139,7 +137,7 @@ impl Default for WidgetGallery {
             #[cfg(feature = "updater")]
             updater: std::cell::OnceCell::new(),
             tasks: Entity::new(pages::async_tasks::TasksDemo::default()),
-            actions: Entity::new(pages::actions::ActionsDemo::default()),
+            motion: Entity::new(pages::motion::MotionDemo::default()),
             editing: Entity::new(pages::editing::EditingDemo::default()),
             hot_reload: Entity::new(pages::hot_reload::HotReloadDemo::default()),
             i18n: Entity::new(pages::i18n::I18nDemo::default()),
@@ -148,6 +146,7 @@ impl Default for WidgetGallery {
             search: String::new(),
             search_highlight: 0,
             navigation_root: Element::container([]),
+            compact: false,
             theme_mode: ThemeMode::System,
             primary: 0,
             name: "Ada Lovelace".into(),
@@ -194,148 +193,6 @@ impl Default for WidgetGallery {
 }
 
 impl WidgetGallery {
-    fn view(
-        &self,
-        environment: WindowEnvironment,
-        theme: &WidgetTheme,
-        assets: &WidgetAssets,
-        cx: &mut Context<Self>,
-        resize: pages::ResizeListeners,
-    ) -> Element {
-        Element::column([
-            self.topbar(theme, assets, environment),
-            Element::row([
-                self.sidebar(theme, assets),
-                Element::container([pages::render(self, theme, assets, cx, resize)])
-                    .keyed("gallery-content-scroll")
-                    .background(theme.background)
-                    .grow(1.0)
-                    .width(length(0.0))
-                    .min_width(length(0.0))
-                    .min_height(length(0.0))
-                    .padding(Sides::length(30.0))
-                    .overflow(Axes {
-                        x: Overflow::Hidden,
-                        y: Overflow::Auto,
-                    })
-                    .scroll_config(ScrollConfig::default().scrollbar(theme.scrollbar.clone())),
-            ])
-            .grow(1.0)
-            .min_height(length(0.0)),
-            cx.entity(&self.toasts),
-        ])
-        .keyed("gallery-root")
-        .focus_scope(argui::ui::FocusScope {
-            initial: Some(argui::ui::InitialFocus::Target("gallery-root".into())),
-            ..argui::ui::FocusScope::restoring().restore(false)
-        })
-        .width(percent(1.0))
-        .height(percent(1.0))
-        .background(Color::TRANSPARENT)
-        .interaction(
-            Interaction::default()
-                .focus_policy(argui::ui::FocusPolicy::TabStop)
-                .gestures(GestureSet::default().tap(argui::ui::TapGesture::default())),
-        )
-        .semantics(
-            Semantics::new(Role::Window)
-                .label("Argui Widget Gallery")
-                .description(format!(
-                    "{} theme, {} page",
-                    mode_label(self.theme_mode),
-                    self.page.label()
-                )),
-        )
-        .inspectable(true)
-    }
-
-    fn topbar(
-        &self,
-        theme: &WidgetTheme,
-        assets: &WidgetAssets,
-        environment: WindowEnvironment,
-    ) -> Element {
-        let mode_icon = match self.theme_mode {
-            ThemeMode::Light => TablerIcon::Sun,
-            ThemeMode::Dark => TablerIcon::Moon,
-            ThemeMode::System => TablerIcon::System,
-        };
-        let brand = Element::row([
-            Element::image(self.logo)
-                .image_fit(ImageFit::Contain)
-                .width(length(34.0))
-                .height(length(34.0))
-                .semantics(Semantics::new(Role::Image).label("Argui Astra logo")),
-            Element::column([
-                text("ARGUI", 16.0, theme.foreground, 750),
-                text("Widget Gallery", 12.0, theme.muted_foreground, 500),
-            ])
-            .gap(1.0),
-        ])
-        .align_items(AlignItems::CENTER)
-        .gap(10.0);
-        let swatches = Element::row(PRIMARIES.iter().enumerate().map(|(index, color)| {
-            Element::container([])
-                .keyed(format!("primary::{index}"))
-                .width(length(if self.primary == index { 20.0 } else { 16.0 }))
-                .height(length(if self.primary == index { 20.0 } else { 16.0 }))
-                .background(*color)
-                .border(Border::all(
-                    if self.primary == index { 2.0 } else { 1.0 },
-                    if self.primary == index {
-                        theme.foreground
-                    } else {
-                        theme.border
-                    },
-                ))
-                .radius(CornerRadii::all(999.0))
-                .interaction(
-                    Interaction::default()
-                        .focus_policy(argui::ui::FocusPolicy::TabStop)
-                        .cursor(CursorIcon::Pointer)
-                        .gestures(GestureSet::default().tap(argui::ui::TapGesture::default()))
-                        .keyboard_activation(KeyboardActivation::EnterOrSpace),
-                )
-                .semantics(
-                    Semantics::new(Role::Button)
-                        .label(format!("Primary color {}", index + 1))
-                        .action(SemanticAction::Click),
-                )
-        }))
-        .gap(8.0)
-        .align_items(AlignItems::CENTER);
-        let theme_button = Button::new(
-            "theme-mode",
-            mode_label(self.theme_mode),
-            theme.ghost_button(),
-        )
-        .leading(assets.icon(mode_icon, 17.0))
-        .build();
-        let mut controls = vec![swatches];
-        if cfg!(feature = "desktop-backdrop") {
-            controls.push(self.backdrop_controls(theme, environment));
-        }
-        controls.push(theme_button);
-        Element::row([brand, Element::row(controls).gap(10.0)])
-            .height(length(64.0))
-            .padding(Sides {
-                left: length(22.0),
-                right: length(126.0),
-                top: length(12.0),
-                bottom: length(12.0),
-            })
-            .align_items(AlignItems::CENTER)
-            .justify_content(JustifyContent::SPACE_BETWEEN)
-            .background(theme.card)
-            .border(Border {
-                widths: BorderWidths {
-                    bottom: 1.0,
-                    ..BorderWidths::default()
-                },
-                color: theme.border,
-            })
-    }
-
     fn select_options() -> Vec<SelectOption> {
         ["Vulkan", "DirectX 12", "Metal", "WebGPU"]
             .into_iter()

@@ -210,15 +210,23 @@ impl VirtualList {
                         .min(item_count),
                 )
             }
-            Extents::Variable { .. } => {
+            Extents::Variable { estimate, .. } => {
                 let last = self
                     .extents
                     .lower_bound((offset + self.viewport_extent).min(total), item_count)
                     .saturating_add(1)
                     .min(item_count);
+                // Keep a stable mounted window while the pointer moves through nearby
+                // variable rows. Remounting at every row boundary forces fresh text
+                // shaping during a fast scroll; an estimate-sized chunk amortizes that
+                // work while `last` still guarantees every visible row is present.
+                let visible = (self.viewport_extent / estimate).ceil() as usize;
+                let chunk = visible.saturating_add(1).max(1);
+                let anchor = first / chunk * chunk;
                 (
-                    first.saturating_sub(self.overscan),
-                    last.saturating_add(self.overscan).min(item_count),
+                    anchor.saturating_sub(self.overscan),
+                    last.max(anchor.saturating_add(chunk).saturating_add(visible))
+                        .min(item_count),
                 )
             }
         };
@@ -275,13 +283,21 @@ impl VirtualList {
             Extents::Fixed(_) => {}
             Extents::Variable { estimate, state } => {
                 let mut state = state.borrow_mut();
-                state
-                    .values
-                    .splice(index..index, std::iter::repeat_n(*estimate, count));
-                state
-                    .measured
-                    .splice(index..index, std::iter::repeat_n(false, count));
-                state.prefix = Fenwick::from_values(&state.values);
+                if index == item_count {
+                    for _ in 0..count {
+                        state.values.push(*estimate);
+                        state.measured.push(false);
+                        state.prefix.push(*estimate);
+                    }
+                } else {
+                    state
+                        .values
+                        .splice(index..index, std::iter::repeat_n(*estimate, count));
+                    state
+                        .measured
+                        .splice(index..index, std::iter::repeat_n(false, count));
+                    state.prefix = Fenwick::from_values(&state.values);
+                }
             }
         }
         self.item_count = item_count.saturating_add(count);
@@ -497,6 +513,14 @@ impl Fenwick {
             self.tree[cursor] += delta;
             cursor += cursor & cursor.wrapping_neg();
         }
+    }
+
+    fn push(&mut self, value: f32) {
+        let position = self.tree.len();
+        let width = position & position.wrapping_neg();
+        let start = position - width;
+        let previous = self.sum(position - 1) - self.sum(start);
+        self.tree.push(previous + value);
     }
 
     fn sum(&self, end: usize) -> f32 {

@@ -186,13 +186,21 @@ impl Application {
             phase == TouchPhase::Started,
             &layout.scroll_regions,
         );
-        let physics = layout
+        let config = layout
             .scroll_regions
             .iter()
             .find(|region| Some(region.node) == target)
-            .map_or(ScrollPhysics::Direct, |region| region.config.physics);
+            .map(|region| &region.config);
+        let physics = config.map_or(ScrollPhysics::Direct, |config| config.physics);
+        let inertia_delta = match delta {
+            ScrollDelta::Lines(lines) => {
+                let line_size = config.map_or(40.0, |config| config.line_size.max(0.0));
+                ScrollDelta::Pixels(Point::new(lines.x * line_size, lines.y * line_size))
+            }
+            ScrollDelta::Pixels(_) => delta,
+        };
         self.scroll_inertia.observe(ScrollSample {
-            delta,
+            delta: inertia_delta,
             phase,
             now: Instant::now(),
             target,

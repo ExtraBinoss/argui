@@ -68,6 +68,26 @@ fn clip_gradient(clip: Clip, local: vec2<f32>, distance: f32) -> vec2<f32> {
     );
 }
 
+fn srgb_to_linear_channel(value: f32) -> f32 {
+    return select(
+        value / 12.92,
+        pow((value + 0.055) / 1.055, 2.4),
+        value > 0.04045,
+    );
+}
+
+// Glyph masks encode geometric coverage. Correct that coverage with the sRGB
+// transfer curve while colors remain in the renderer's linear working space.
+// The two branches are complementary, so dark-on-light and light-on-dark text
+// retain the same apparent stroke weight.
+fn text_coverage(mask: f32, color: vec3<f32>) -> f32 {
+    let lightness = dot(color, vec3(0.2126, 0.7152, 0.0722));
+    let light_on_dark = lightness > 0.21404114;
+    let light_coverage = srgb_to_linear_channel(mask);
+    let dark_coverage = 1.0 - srgb_to_linear_channel(1.0 - mask);
+    return select(dark_coverage, light_coverage, light_on_dark);
+}
+
 @fragment
 fn fragment(input: VertexOutput) -> @location(0) vec4<f32> {
     let pixel = input.position.xy + viewport.origin;
@@ -90,5 +110,6 @@ fn fragment(input: VertexOutput) -> @location(0) vec4<f32> {
     if input.mode > 0.5 {
         return sampled * vec4(1.0, 1.0, 1.0, input.color.a * clip_coverage);
     }
-    return sampled * input.color * vec4(1.0, 1.0, 1.0, clip_coverage);
+    let coverage = text_coverage(sampled.a, input.color.rgb);
+    return vec4(input.color.rgb, input.color.a * coverage * clip_coverage);
 }

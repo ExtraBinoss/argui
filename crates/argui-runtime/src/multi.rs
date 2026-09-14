@@ -506,6 +506,10 @@ impl WindowModel {
             window: self.key.clone(),
             event: event.clone(),
         });
+        self.record_and_forward(update, cx);
+    }
+
+    fn record_and_forward(&mut self, update: AppUpdate, cx: &mut Context<Self>) {
         request_update(cx, self.record(update));
         self.forward_requests(cx);
     }
@@ -543,9 +547,9 @@ impl Render for WindowModel {
     #[cfg(feature = "tasks")]
     fn tasks_ready(&mut self, cx: &mut Context<Self>) {
         let update = self.model.borrow_mut().tasks_ready(&self.key);
-        request_update(cx, self.record(update));
-        self.forward_requests(cx);
+        self.record_and_forward(update, cx);
     }
+
     fn render(&mut self, cx: &mut Context<Self>) -> Element {
         let mut root = self
             .view(cx.environment())
@@ -563,21 +567,17 @@ impl Render for WindowModel {
         }
         root
     }
-
     fn animation_frame(&mut self, frame: argui_animation::Frame, cx: &mut Context<Self>) {
         let update = self.model.borrow_mut().animation_frame(&self.key, frame);
-        request_update(cx, self.record(update));
+        self.record_and_forward(update, cx);
     }
-
     fn wants_animation_frame(&self) -> bool {
         self.model.borrow().wants_animation_frame(&self.key)
     }
-
     fn layout_changed(&mut self, layout: &LayoutSnapshot, cx: &mut Context<Self>) {
         let update = self.model.borrow_mut().layout_changed(&self.key, layout);
-        request_update(cx, self.record(update));
+        self.record_and_forward(update, cx);
     }
-
     fn image_assets(&self) -> Vec<argui_paint::ImageAsset> {
         self.model.borrow().image_assets()
     }

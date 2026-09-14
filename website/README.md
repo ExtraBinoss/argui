@@ -29,6 +29,13 @@ Browsers without a usable WebGPU adapter get an explanation and retain access
 to the component source. The updater in the browser uses sample states;
 native installation belongs to `argui-updater`.
 
+Argui canvases have no browser border or focus outline by default. Applications
+that want a keyboard focus ring can opt in with:
+
+```js
+document.documentElement.classList.add('argui-show-canvas-focus-ring')
+```
+
 ## Build and SEO
 
 Set `NUXT_PUBLIC_SITE_URL` to the final public origin before building. The site
@@ -94,8 +101,9 @@ PUPPETEER_MODULE=/path/to/puppeteer.js \
 with `pnpm dev --port 3100` or set it to another local server. Screenshots are
 saved to `website/test-results/`. The scenario exercises themes, reloads,
 mobile navigation, search, deep links, clipboard, the real WASM Button, the
-no-WebGPU fallback, missing pages and hydration warnings. The live gallery keeps
-its usable desktop viewport inside a horizontally scrollable frame on small
-screens. Inspect the PNGs.
+no-WebGPU fallback, missing pages and hydration warnings. The live gallery and
+application examples adapt their Argui layout to the frame width on small screens.
+The scenario also verifies horizontal touch navigation and the absence of page-level
+horizontal overflow. Inspect the PNGs.
 Set `UPDATE_ASSETS=1` to refresh the committed gallery preview and social card
 from actual browser captures. No browser is opened on the user's desktop.

@@ -21,7 +21,7 @@ pub(crate) fn classify_update(
         || old.layout_boundary != new.layout_boundary
         || old.text_privacy != new.text_privacy
         || old.text_history != new.text_history
-        || kind_changes_layout(&old.kind, &new.kind)
+        || kind_changes_layout(old, new)
         || old.style != new.style
         || old.direction_scope != new.direction_scope
         || old.container_scope != new.container_scope
@@ -150,8 +150,8 @@ pub(crate) fn strongest_update(left: TreeUpdate, right: TreeUpdate) -> TreeUpdat
     }
 }
 
-fn kind_changes_layout(old: &ElementKind, new: &ElementKind) -> bool {
-    match (old, new) {
+fn kind_changes_layout(old: &Element, new: &Element) -> bool {
+    match (&old.kind, &new.kind) {
         (ElementKind::Custom(old), ElementKind::Custom(new)) => !old.same_layout(new),
         (ElementKind::Container, ElementKind::Container)
         | (ElementKind::Image { .. }, ElementKind::Image { .. })
@@ -169,9 +169,19 @@ fn kind_changes_layout(old: &ElementKind, new: &ElementKind) -> bool {
             // Base text color is refreshed by repaint; it cannot change glyph placement.
             let mut old_metrics = old_style.clone();
             old_metrics.color = new_style.color;
-            old_content != new_content || old_metrics != *new_style
+            old_metrics != *new_style
+                || (old_content != new_content && !fixed_nonselectable_text(old, new))
         }
         (ElementKind::TextEditor { .. }, ElementKind::TextEditor { .. }) => old != new,
         _ => true,
     }
+}
+
+fn fixed_nonselectable_text(old: &Element, new: &Element) -> bool {
+    old.user_select == crate::UserSelect::None
+        && new.user_select == crate::UserSelect::None
+        && old.style.size.width != crate::Dimension::auto()
+        && old.style.size.height != crate::Dimension::auto()
+        && new.style.size.width != crate::Dimension::auto()
+        && new.style.size.height != crate::Dimension::auto()
 }

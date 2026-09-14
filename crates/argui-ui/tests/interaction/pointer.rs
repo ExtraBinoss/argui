@@ -112,3 +112,76 @@ fn replacing_capture_releases_the_previous_target_and_same_capture_is_idempotent
         UiEventKind::GotPointerCapture(pointer)
     );
 }
+
+#[test]
+fn secondary_touches_do_not_replace_primary_interaction_capture() {
+    let mut tree = UiTree::new(interactive("touch"));
+    let node = tree.node_id_at(0).unwrap();
+    let regions = [region(node)];
+    let touch = |id, phase, primary| PointerEvent {
+        id: PointerId::new(id),
+        kind: PointerKind::Touch,
+        phase,
+        position: Point::new(30.0, 20.0),
+        button: Some(PointerButton::Primary),
+        buttons: 1,
+        pressure: None,
+        primary,
+        modifiers: argui_core::Modifiers::default(),
+        timestamp: std::time::Duration::ZERO,
+    };
+
+    let pressed = tree.pointer_event(touch(1, PointerPhase::Pressed, true), &regions);
+    assert!(pressed.events.iter().any(|event| matches!(
+        event.kind,
+        UiEventKind::Pointer(PointerEvent {
+            phase: PointerPhase::Pressed,
+            ..
+        })
+    )));
+    assert!(
+        tree.pointer_event(touch(2, PointerPhase::Pressed, false), &regions)
+            .events
+            .is_empty()
+    );
+    assert!(tree.visual_states(node).contains(VisualState::Hovered));
+    assert!(tree.visual_states(node).contains(VisualState::Pressed));
+    let cancelled = tree.pointer_event(touch(1, PointerPhase::Cancelled, true), &regions);
+    assert!(cancelled.events.iter().any(|event| matches!(
+        event.kind,
+        UiEventKind::Pointer(PointerEvent {
+            phase: PointerPhase::Cancelled,
+            ..
+        })
+    )));
+    assert!(
+        cancelled
+            .events
+            .iter()
+            .all(|event| event.kind != UiEventKind::Click(argui_ui::ClickEvent::accessibility()))
+    );
+    assert_eq!(tree.visual_states(node), VisualStates::NONE);
+    assert!(
+        tree.pointer_event(touch(1, PointerPhase::Cancelled, true), &regions)
+            .events
+            .is_empty()
+    );
+
+    tree.pointer_event(touch(3, PointerPhase::Pressed, true), &regions);
+    let released = tree.pointer_event(touch(3, PointerPhase::Released, true), &regions);
+    assert!(
+        released
+            .events
+            .iter()
+            .any(|event| matches!(event.kind, UiEventKind::Click(_)))
+    );
+    assert!(released.events.iter().any(|event| matches!(
+        event.kind,
+        UiEventKind::Pointer(PointerEvent {
+            phase: PointerPhase::Left,
+            kind: PointerKind::Touch,
+            ..
+        })
+    )));
+    assert_eq!(tree.visual_states(node), VisualStates::NONE);
+}

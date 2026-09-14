@@ -2,12 +2,14 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
     <title>Argui WebGPU interaction demo</title>
     <link rel="icon" href="data:,">
     <style>
-      html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #0e1117; }
-      canvas { display: block; width: 100vw; height: 100vh; }
+      html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; overscroll-behavior: none; background: #0e1117; }
+      html { height: 100dvh; }
+      canvas { display: block; width: 100%; height: 100%; border: 0; outline: none; touch-action: none; }
+      html.argui-show-canvas-focus-ring canvas:focus-visible { outline: 2px solid Highlight; outline-offset: -2px; }
     </style>
   </head>
   <body>

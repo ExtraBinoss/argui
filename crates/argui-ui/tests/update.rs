@@ -1,4 +1,4 @@
-use argui_ui::{Color, Element, TreeUpdate, UiTree, length};
+use argui_ui::{Color, Element, TreeUpdate, UiTree, UserSelect, length};
 
 fn screen(color: Color) -> Element {
     Element::row([
@@ -65,6 +65,35 @@ fn text_color_and_alpha_repaint_but_text_and_font_metrics_still_relayout() {
     );
     assert_eq!(
         tree.update(text("Other", Color::WHITE, 20.0)),
+        TreeUpdate::Layout
+    );
+
+    let fixed = |value| {
+        Element::text(value)
+            .width(length(120.0))
+            .height(length(24.0))
+            .user_select(UserSelect::None)
+    };
+    let mut fixed_tree = UiTree::new(fixed("Old"));
+    fixed_tree.mark_layout_clean();
+    assert_eq!(fixed_tree.update(fixed("New value")), TreeUpdate::Paint);
+    assert!(!fixed_tree.layout_dirty());
+    assert_eq!(
+        UiTree::new(fixed("Old").height(argui_ui::Dimension::auto()))
+            .update(fixed("New").height(argui_ui::Dimension::auto())),
+        TreeUpdate::Layout
+    );
+    assert_eq!(
+        UiTree::new(
+            Element::text("Old")
+                .width(length(120.0))
+                .height(length(24.0))
+        )
+        .update(
+            Element::text("New")
+                .width(length(120.0))
+                .height(length(24.0))
+        ),
         TreeUpdate::Layout
     );
 }

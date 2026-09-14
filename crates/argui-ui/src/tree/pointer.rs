@@ -71,6 +71,12 @@ impl UiTree {
                         .pointer_moved(with_phase(event, PointerPhase::Moved), regions);
                     let mut moved = self.decorate(moved);
                     moved.merge(self.primary_released_for(event));
+                    if event.kind == PointerKind::Touch {
+                        let left = self
+                            .interaction
+                            .pointer_left(with_phase(event, PointerPhase::Left));
+                        moved.merge(self.decorate(left));
+                    }
                     moved
                 }
                 PointerPhase::Left => {
@@ -79,7 +85,14 @@ impl UiTree {
                 }
                 PointerPhase::Cancelled => {
                     let update = self.interaction.primary_cancelled(event);
-                    self.decorate(update)
+                    let mut update = self.decorate(update);
+                    if event.kind == PointerKind::Touch {
+                        let left = self
+                            .interaction
+                            .pointer_left(with_phase(event, PointerPhase::Left));
+                        update.merge(self.decorate(left));
+                    }
+                    update
                 }
             }
         };

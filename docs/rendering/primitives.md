@@ -62,12 +62,6 @@ GPU texture residency is bounded by `RendererConfig::image_cache_bytes` (64 MiB
 by default). Registration fails explicitly if an asset cannot fit; normal
 non-image scenes allocate no image texture.
 
-## Showcase
-
-Run `cargo run -p argui --example state` or `./scripts/serve-web.sh`. Both launch
-the same Rust `StateShowcase`, including a generated 12-stop gradient, transformed
-content, the supplied transparent PNG, and the supplied JPEG.
-
 ## Color
 
 Argui has one color contract on native WGPU and WebGPU. Application colors are

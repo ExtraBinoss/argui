@@ -1,6 +1,5 @@
 use crate::{
-    AnyEntity, LayoutBounds, LayoutSnapshot, RuntimeError, RuntimeEvent, ScrollRequest, ViewUpdate,
-    animation::RuntimeAnimations,
+    AnyEntity, RuntimeError, RuntimeEvent, ScrollRequest, ViewUpdate, animation::RuntimeAnimations,
 };
 use argui_core::{Point, PointerId, Size};
 use argui_inspect::InspectorHandle;
@@ -21,6 +20,7 @@ mod frame;
 #[cfg(all(feature = "webview", target_os = "linux"))]
 mod gtk;
 mod inspect;
+mod layout;
 mod model_updates;
 mod visibility;
 pub use inspect::{Inspection, InspectionCache};
@@ -310,119 +310,18 @@ impl Application {
         }
     }
 
-    fn prepare_text(&mut self) -> Result<(), RuntimeError> {
-        if let Some(mut layout) = self.compute_ui_layout()? {
-            if layout.virtualization_changed {
-                if let Some(root) = self.inspected_view()
-                    && let Some(ui) = &mut self.ui_tree
-                {
-                    ui.update(root);
-                }
-                let Some(next) = self.compute_ui_layout()? else {
-                    return Ok(());
-                };
-                layout = next;
-                if layout.virtualization_changed {
-                    self.pending_ui_frame.request_rebuild();
-                    if let Some(window) = &self.window {
-                        window.request_redraw();
-                    }
-                }
-            }
-            let snapshot = LayoutSnapshot {
-                viewport: layout.viewport,
-                nodes: layout
-                    .nodes
-                    .iter()
-                    .map(|node| LayoutBounds {
-                        node: node.node,
-                        key: self
-                            .ui_tree
-                            .as_ref()
-                            .and_then(|ui| ui.key(node.node))
-                            .map(ToOwned::to_owned),
-                        bounds: node.bounds,
-                    })
-                    .collect(),
-            };
-            let rebuild = self.model.as_ref().is_some_and(|model| {
-                model.layout_changed(&snapshot);
-                let effects = model.take_effects();
-                self.pending_app_commands.extend(effects.commands);
-                effects.update == ViewUpdate::Rebuild
-            });
-            if rebuild && let Some(root) = self.inspected_view() {
-                if let Some(ui) = &mut self.ui_tree {
-                    ui.update(root);
-                }
-                let Some(next) = self.compute_ui_layout()? else {
-                    return Ok(());
-                };
-                layout = next;
-                if layout.virtualization_changed {
-                    if let Some(root) = self.inspected_view()
-                        && let Some(ui) = &mut self.ui_tree
-                    {
-                        ui.update(root);
-                    }
-                    let Some(next) = self.compute_ui_layout()? else {
-                        return Ok(());
-                    };
-                    layout = next;
-                    if layout.virtualization_changed {
-                        self.pending_ui_frame.request_rebuild();
-                        if let Some(window) = &self.window {
-                            window.request_redraw();
-                        }
-                    }
-                }
-            }
-            self.ui_layout = Some(layout);
-            self.publish_inspection();
-            self.paint_inspection_highlight();
-        }
-        let scene = self
-            .ui_layout
-            .as_ref()
-            .map(|layout| &layout.text)
-            .or(self.text_scene.as_ref());
-        self.prepared_text = scene.map(|scene| self.text_engine.prepare(scene, self.scale_factor));
-        Ok(())
-    }
-
-    fn compute_ui_layout(&mut self) -> Result<Option<LayoutOutput>, RuntimeError> {
-        let Some(ui) = &mut self.ui_tree else {
-            return Ok(None);
-        };
-        self.layout_engine
-            .compute(ui, &mut self.text_engine, self.viewport)
-            .map(Some)
-            .map_err(Into::into)
-    }
-
-    fn update_viewport(&mut self, width: u32, height: u32) {
-        self.viewport = Size::new(
-            width as f32 / self.scale_factor,
-            height as f32 / self.scale_factor,
-        );
-    }
-
-    pub(super) fn prepare_or_exit(&mut self, event_loop: &dyn crate::host::LoopControl) -> bool {
-        if let Err(error) = self.prepare_text() {
-            (self.on_event)(RuntimeEvent::LayoutFailed(error.to_string()));
-            self.fatal_error = Some(error);
-            event_loop.exit();
-            return false;
-        }
-        true
-    }
-
     pub(super) fn apply_ui_update(
         &mut self,
         mut update: InteractionUpdate,
         window: &dyn crate::host::WindowHost,
         event_loop: &dyn crate::host::LoopControl,
     ) {
+        // A scroll listener may rebuild a virtualized subtree. Reposition the
+        // current layout first so scroll anchoring captures the user's new
+        // position instead of restoring the position from the previous frame.
+        if update.scroll_changed && self.scroll_or_exit(event_loop) {
+            update.scroll_changed = false;
+        }
         for event in &mut update.events {
             if let argui_ui::UiEventKind::DocumentSelectionChanged { bounds, .. } = &mut event.kind
                 && bounds.is_none()

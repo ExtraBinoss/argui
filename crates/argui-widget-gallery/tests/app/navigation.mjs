@@ -112,4 +112,57 @@ try {
         console.log(`${scheme}: direct search, focus, shortcuts, editors, typeahead and selection passed`);
         await page.close();
     }
+    const mobile = await browser.newPage();
+    const mobileErrors = [];
+    mobile.on('pageerror', error => mobileErrors.push(String(error)));
+    await mobile.setViewport({ width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+    await mobile.goto(process.env.GALLERY_URL ?? 'http://127.0.0.1:8793/widgets/', { waitUntil: 'networkidle0' });
+    await mobile.waitForSelector('[role="navigation"][aria-label="Component navigation"]');
+    const viewport = await mobile.$eval('canvas', canvas => {
+        const rect = canvas.getBoundingClientRect();
+        return { width: rect.width, height: rect.height };
+    });
+    assert.deepEqual(viewport, { width: 390, height: 844 });
+    const navigation = await mobile.$eval(
+        '[role="navigation"][aria-label="Component navigation"]',
+        element => element.getBoundingClientRect().toJSON(),
+    );
+    const visibleNavigationLabels = () => mobile.$$eval(
+        '[role="navigation"][aria-label="Component navigation"] button[aria-label]',
+        (buttons, bounds) => buttons
+            .filter(button => {
+                const rect = button.getBoundingClientRect();
+                return rect.width > 20 && rect.bottom > bounds.top && rect.top < bounds.bottom
+                    && rect.right > bounds.left && rect.left < bounds.right;
+            })
+            .map(button => button.getAttribute('aria-label')),
+        navigation,
+    );
+    const before = await visibleNavigationLabels();
+    const client = await mobile.createCDPSession();
+    const y = navigation.y + navigation.height / 2;
+    await client.send('Input.dispatchTouchEvent', {
+        type: 'touchStart',
+        touchPoints: [{ x: 340, y }],
+    });
+    for (const x of [290, 240, 190, 140, 90, 50]) {
+        await client.send('Input.dispatchTouchEvent', {
+            type: 'touchMove',
+            touchPoints: [{ x, y }],
+        });
+        await pause(20);
+    }
+    await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await pause(350);
+    const after = await visibleNavigationLabels();
+    assert.notDeepEqual(
+        after,
+        before,
+        `A horizontal finger swipe must reveal other navigation buttons (${before} → ${after})`,
+    );
+    const mobilePng = await mobile.screenshot({ path: `${output}/mobile-navigation.png` });
+    assert.ok(mobilePng.length > 15000, 'Blank mobile capture');
+    assert.deepEqual(mobileErrors, []);
+    console.log('mobile: dynamic viewport and horizontal touch navigation passed');
+    await mobile.close();
 } finally { await browser.close(); }

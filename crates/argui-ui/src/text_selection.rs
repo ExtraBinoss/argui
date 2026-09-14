@@ -81,10 +81,16 @@ pub struct SelectionCapabilities {
 #[derive(Clone, Debug, Default)]
 pub(crate) struct DocumentSelectionState {
     pub(crate) selection: Option<DocumentTextSelection>,
-    pub(crate) dragging: bool,
+    drag: Option<DocumentSelectionDrag>,
     pub(crate) touch_handles: bool,
     pub(crate) revision: u64,
     scope: Option<NodeId>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct DocumentSelectionDrag {
+    granularity: SelectionGranularity,
+    origin: DocumentTextSelection,
 }
 
 impl Element {
@@ -114,7 +120,7 @@ impl UiTree {
 
     #[must_use]
     pub const fn document_selection_dragging(&self) -> bool {
-        self.document_selection.dragging
+        self.document_selection.drag.is_some()
     }
 
     #[must_use]
@@ -170,34 +176,63 @@ impl UiTree {
         } else {
             scope
         };
+        let selection = DocumentTextSelection {
+            anchor,
+            focus: opposite,
+        };
         self.set_document_selection(
-            DocumentTextSelection {
-                anchor,
-                focus: opposite,
-            },
-            true,
+            selection,
+            Some(DocumentSelectionDrag {
+                granularity,
+                origin: selection,
+            }),
         )
     }
 
     pub fn drag_document_selection(&mut self, point: DocumentTextPoint) -> InteractionUpdate {
-        let Some(selection) = self.document_selection.selection else {
+        let Some(drag) = self.document_selection.drag else {
             return InteractionUpdate::default();
         };
         let point = self.clamp_to_selection_scope(point);
-        self.set_document_selection(
+        let selection = if drag.granularity == SelectionGranularity::Character {
             DocumentTextSelection {
+                anchor: drag.origin.anchor,
                 focus: point,
-                ..selection
-            },
-            true,
-        )
+            }
+        } else {
+            let Some((start, end, _)) = self.expanded_point(point, drag.granularity) else {
+                return InteractionUpdate::default();
+            };
+            let anchor_before_focus =
+                self.document_order(drag.origin.anchor) <= self.document_order(drag.origin.focus);
+            let (origin_start, origin_end) = if anchor_before_focus {
+                (drag.origin.anchor, drag.origin.focus)
+            } else {
+                (drag.origin.focus, drag.origin.anchor)
+            };
+            if self.document_order(start) < self.document_order(origin_start) {
+                DocumentTextSelection {
+                    anchor: origin_end,
+                    focus: start,
+                }
+            } else {
+                DocumentTextSelection {
+                    anchor: origin_start,
+                    focus: if self.document_order(end) > self.document_order(origin_end) {
+                        end
+                    } else {
+                        origin_end
+                    },
+                }
+            }
+        };
+        self.set_document_selection(selection, Some(drag))
     }
 
     pub fn release_document_selection(&mut self) -> InteractionUpdate {
-        if !self.document_selection.dragging {
+        if self.document_selection.drag.take().is_none() {
             return InteractionUpdate::default();
         }
-        self.document_selection.dragging = false;
         self.document_selection_update(false)
     }
 
@@ -205,7 +240,7 @@ impl UiTree {
         if self.document_selection.selection.take().is_none() {
             return InteractionUpdate::default();
         }
-        self.document_selection.dragging = false;
+        self.document_selection.drag = None;
         self.document_selection.touch_handles = false;
         self.document_selection.revision = self.document_selection.revision.wrapping_add(1);
         self.document_selection.scope = None;
@@ -232,7 +267,7 @@ impl UiTree {
                     TextPosition::new(last.text.len(), CaretAffinity::After),
                 ),
             },
-            false,
+            None,
         )
     }
 
@@ -384,15 +419,15 @@ impl UiTree {
     fn set_document_selection(
         &mut self,
         selection: DocumentTextSelection,
-        dragging: bool,
+        drag: Option<DocumentSelectionDrag>,
     ) -> InteractionUpdate {
         if self.document_selection.selection == Some(selection)
-            && self.document_selection.dragging == dragging
+            && self.document_selection.drag == drag
         {
             return InteractionUpdate::default();
         }
         self.document_selection.selection = Some(selection);
-        self.document_selection.dragging = dragging;
+        self.document_selection.drag = drag;
         self.document_selection.revision = self.document_selection.revision.wrapping_add(1);
         self.document_selection_update(true)
     }
@@ -410,7 +445,7 @@ impl UiTree {
                             text: self.selected_document_text(),
                             bounds: None,
                             touch: self.document_selection.touch_handles,
-                            dragging: self.document_selection.dragging,
+                            dragging: self.document_selection.drag.is_some(),
                         },
                     )
                 }),

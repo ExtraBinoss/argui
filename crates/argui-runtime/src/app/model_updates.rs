@@ -34,7 +34,7 @@ impl Application {
         self.apply_model_effects(effects, control);
     }
 
-    fn apply_model_effects(
+    pub(crate) fn apply_model_effects(
         &mut self,
         effects: crate::model::effects::ContextEffects,
         control: &dyn LoopControl,

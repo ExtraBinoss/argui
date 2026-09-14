@@ -76,7 +76,6 @@ pub enum Page {
     Typography,
     WebView,
     AsyncTasks,
-    Actions,
     Editing,
     CustomTimeline,
     #[cfg(feature = "updater")]
@@ -84,7 +83,7 @@ pub enum Page {
 }
 
 impl Page {
-    pub const ALL: [Self; 77 + cfg!(feature = "updater") as usize] = [
+    pub const ALL: [Self; 76 + cfg!(feature = "updater") as usize] = [
         Self::Accordion,
         Self::Alert,
         Self::AlertDialog,
@@ -152,7 +151,6 @@ impl Page {
         Self::VList,
         Self::LiquidGlass,
         Self::ScrollShadow,
-        Self::Actions,
         Self::AsyncTasks,
         Self::CustomTimeline,
         Self::Editing,
@@ -243,7 +241,6 @@ impl Page {
             | Self::Typography
             | Self::WebView
             | Self::AsyncTasks
-            | Self::Actions
             | Self::Editing
             | Self::CustomTimeline => "Examples",
         }
@@ -320,13 +317,12 @@ impl Page {
             Self::HotReload => "Hot reload",
             Self::I18n => "Internationalization",
             Self::Layout => "Web layout",
-            Self::Motion => "Motion & loading",
+            Self::Motion => "Animation lab",
             Self::LiquidGlass => "Liquid glass",
             Self::ScrollShadow => "Scroll shadow",
             Self::Typography => "Typography & selection",
             Self::WebView => "WebView",
             Self::AsyncTasks => "Async tasks",
-            Self::Actions => "Actions",
             Self::Editing => "Editing & Password",
             Self::CustomTimeline => "Custom Timeline",
             #[cfg(feature = "updater")]
@@ -411,7 +407,6 @@ impl Page {
             Self::Typography => "typography",
             Self::WebView => "webview",
             Self::AsyncTasks => "async-tasks",
-            Self::Actions => "actions",
             Self::Editing => "editing",
             Self::CustomTimeline => "custom-timeline",
             #[cfg(feature = "updater")]
@@ -520,7 +515,9 @@ impl Page {
             Self::HotReload => "Patch Rust UI code while preserving live application state.",
             Self::I18n => "Switch Fluent catalogs, plurals, fallback copy and writing direction.",
             Self::Layout => "CSS-shaped Block, Flex, Grid, box model and text alignment.",
-            Self::Motion => "Frame-paced feedback and interaction transitions.",
+            Self::Motion => {
+                "Springs, resizing, corner radii, Oklab colors and composed transforms."
+            }
             Self::LiquidGlass => "Scroll colorful palettes behind a floating glass navigation bar.",
             Self::ScrollShadow => "Edge shadows reveal more content in scrollable views.",
             Self::Typography => "Rich spans, decoration, clamping and web-like text selection.",
@@ -528,7 +525,6 @@ impl Page {
                 "Retained web content, with separate email and webpage security policies."
             }
             Self::AsyncTasks => "Owned, cancellable work with event-driven delivery to the UI.",
-            Self::Actions => "One command for buttons, menus, palettes and focused shortcuts.",
             Self::Editing => {
                 "Transactional undo/redo, Unicode, filtered fields and protected passwords."
             }

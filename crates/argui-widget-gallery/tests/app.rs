@@ -1,6 +1,6 @@
 use argui::{
     core::{Insets, Point, PointerEvent, PointerId, PointerPhase},
-    runtime::{Entity, WindowEnvironment},
+    runtime::{Entity, LayoutSnapshot, WindowEnvironment},
     ui::{
         ClickEvent, Element, GestureDelivery, GestureEvent, GestureKind, GesturePhase, UiEventKind,
         UiTree, length,
@@ -111,6 +111,50 @@ fn gallery_root_respects_native_safe_area_insets() {
     assert_eq!(root.style.padding.bottom, length(34.0));
     assert_eq!(root.style.padding.left, length(6.0));
     assert!(has_key(&root, "gallery-root"));
+}
+
+#[test]
+fn narrow_gallery_uses_a_horizontal_header_and_compact_content() {
+    let gallery = Entity::new(WidgetGallery::default());
+    let mount = gallery.mount().unwrap();
+    assert!(has_key(
+        &mount.render(WindowEnvironment::default()).unwrap(),
+        "gallery-sidebar"
+    ));
+
+    resize_gallery(&mount, 390.0, 844.0);
+    let compact = mount.render(WindowEnvironment::default()).unwrap();
+    assert!(!has_key(&compact, "gallery-sidebar"));
+    let navigation = find_key(&compact, "gallery-mobile-navigation").unwrap();
+    assert_eq!(navigation.style.overflow.x, argui::ui::Overflow::Auto);
+    assert_eq!(navigation.style.overflow.y, argui::ui::Overflow::Hidden);
+    assert_eq!(
+        navigation.scroll.as_ref().map(|config| config.axes),
+        Some(argui::ui::ScrollAxes::Horizontal)
+    );
+    assert!(has_key(navigation, "nav::button"));
+    assert!(has_key(navigation, "theme-mode"));
+    let content = find_key(&compact, "gallery-content-scroll").unwrap();
+    assert_eq!(content.style.padding.left, length(14.0));
+    assert_eq!(content.style.padding.right, length(14.0));
+    assert_eq!(content.style.overflow.x, argui::ui::Overflow::Auto);
+
+    resize_gallery(&mount, 900.0, 700.0);
+    let desktop = mount.render(WindowEnvironment::default()).unwrap();
+    assert!(has_key(&desktop, "gallery-sidebar"));
+    assert!(!has_key(&desktop, "gallery-mobile-navigation"));
+}
+
+fn resize_gallery(mount: &argui::runtime::Mount<WidgetGallery>, width: f32, height: f32) {
+    mount
+        .layout_changed(&LayoutSnapshot {
+            viewport: argui::core::Rect::new(
+                Point::default(),
+                argui::core::Size::new(width, height),
+            ),
+            nodes: Vec::new(),
+        })
+        .unwrap();
 }
 
 #[test]

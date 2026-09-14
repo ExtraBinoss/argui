@@ -6,4 +6,5 @@ dist
 .env
 public/gallery/pkg/
 public/gallery/browser-shortcuts.js
+public/examples/*/pkg/
 test-results/

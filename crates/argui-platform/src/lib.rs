@@ -43,7 +43,7 @@ pub use tray::{
     TrayAction, TrayConfig, TrayConfigError, TrayEvent, TrayItemId, TrayMenuItem, TrayPointerButton,
 };
 #[cfg(target_arch = "wasm32")]
-pub use web_identity::{apply_web_identity, attach_web_canvas};
+pub use web_identity::{apply_web_identity, attach_web_canvas, web_drawable_size};
 pub use window::{
     CloseBehavior, WindowBackend, WindowCapabilities, WindowConfig, WindowKey, WindowLevel,
     WindowSpec, window_capabilities,

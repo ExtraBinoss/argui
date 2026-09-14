@@ -26,8 +26,18 @@ pub(super) fn text_colors(elements: &[&Element], ui: &UiTree, output: &mut Layou
         let Some(text_index) = node.text_index else {
             continue;
         };
-        let color = match &elements[node.index].kind {
-            ElementKind::Text { style, .. } => style.color,
+        let Some(block) = output.text.blocks_mut().get_mut(text_index) else {
+            continue;
+        };
+        match &elements[node.index].kind {
+            ElementKind::Text { content, style } => {
+                let style = ui.resolved_text_style(node.node, style);
+                changed |= block.content != *content || block.style != style;
+                if block.content != *content {
+                    block.content = content.clone();
+                }
+                block.style = style;
+            }
             ElementKind::TextEditor {
                 text,
                 placeholder_text,
@@ -37,13 +47,13 @@ pub(super) fn text_colors(elements: &[&Element], ui: &UiTree, output: &mut Layou
                     .text_input_display(node.node)
                     .is_some_and(|value| value.is_empty())
                 {
-                    if let Some(block) = output.text.blocks_mut().get_mut(text_index) {
-                        changed |= block.style.color != placeholder_text.color;
-                        block.style.color = placeholder_text.color;
-                    }
+                    changed |= block.style.color != placeholder_text.color;
+                    block.style.color = placeholder_text.color;
                     continue;
                 } else {
-                    text.color
+                    let color = ui.resolved_text_color(node.node, text.color);
+                    changed |= block.style.color != color;
+                    block.style.color = color;
                 }
             }
             ElementKind::Custom(_)
@@ -52,11 +62,6 @@ pub(super) fn text_colors(elements: &[&Element], ui: &UiTree, output: &mut Layou
             | ElementKind::Vector { .. } => {
                 continue;
             }
-        };
-        if let Some(block) = output.text.blocks_mut().get_mut(text_index) {
-            let color = ui.resolved_text_color(node.node, color);
-            changed |= block.style.color != color;
-            block.style.color = color;
         }
     }
     changed

@@ -61,19 +61,22 @@ impl Application {
     pub(super) fn animate(
         &mut self,
         window: &dyn crate::host::WindowHost,
-        _event_loop: &dyn crate::host::LoopControl,
+        event_loop: &dyn crate::host::LoopControl,
     ) {
         let Some(frame) = self.animations.frame() else {
             return;
         };
         let model_started = Instant::now();
-        let model_update = self.model.as_ref().map_or(ViewUpdate::None, |model| {
+        let effects = self.model.as_ref().map(|model| {
             model.animation_frame(frame);
-            let effects = model.take_effects();
-            self.pending_app_commands.extend(effects.commands);
-            effects.update
+            model.take_effects()
         });
-        let rebuild = model_update == ViewUpdate::Rebuild;
+        let model_update = effects
+            .as_ref()
+            .map_or(ViewUpdate::None, |effects| effects.update);
+        if let Some(effects) = effects {
+            self.apply_model_effects(effects, event_loop);
+        }
         let model_time = model_started.elapsed();
         let paint_started = Instant::now();
         let tree_animation = self
@@ -91,7 +94,7 @@ impl Application {
                 scroll_changed: tree_animation == TreeUpdate::Scroll,
                 ..InteractionUpdate::default()
             },
-            rebuild,
+            false,
         );
         self.sync_animations();
         if self.animations.scheduler.needs_frame() {

@@ -1,13 +1,56 @@
 #[path = "element/direction.rs"]
 mod direction;
+use argui_paint::CornerRadii;
 use argui_text::{TextOverflow, TextStyle};
-use argui_ui::{Color, Element, ElementKind, ImageFit, ImageId, ImageSampling, Insets, VectorId};
+use argui_ui::{
+    Color, Element, ElementKind, ImageFit, ImageId, ImageSampling, Insets, StateName, StylePatch,
+    UiTree, VectorId, property,
+};
 
 #[path = "element/overrides.rs"]
 mod overrides;
 
 #[path = "element/portal.rs"]
 mod portal;
+
+const HOVERED: StateName = StateName::new("hovered-test");
+
+#[test]
+fn final_radius_is_inherited_by_existing_visual_states() {
+    let final_radius = CornerRadii::all(19.0);
+    let state_radius = CornerRadii::all(7.0);
+    let element = Element::container([])
+        .when(
+            HOVERED,
+            StylePatch::new().set(property::CornerRadii, state_radius.as_array()),
+        )
+        .active_state(HOVERED, true)
+        .radius(final_radius);
+    let tree = UiTree::new(element);
+
+    assert_eq!(
+        tree.resolved_quad(tree.node_ids()[0], tree.root()).radii,
+        final_radius
+    );
+}
+
+#[test]
+fn state_radius_authored_after_final_radius_remains_explicit() {
+    let state_radius = CornerRadii::all(7.0);
+    let element = Element::container([])
+        .radius(CornerRadii::all(19.0))
+        .when(
+            HOVERED,
+            StylePatch::new().set(property::CornerRadii, state_radius.as_array()),
+        )
+        .active_state(HOVERED, true);
+    let tree = UiTree::new(element);
+
+    assert_eq!(
+        tree.resolved_quad(tree.node_ids()[0], tree.root()).radii,
+        state_radius
+    );
+}
 
 #[test]
 fn media_and_text_specific_builders_only_change_matching_elements() {

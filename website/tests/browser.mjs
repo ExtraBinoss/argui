@@ -35,6 +35,10 @@ try {
     { name: 'prefers-reduced-motion', value: 'reduce' },
   ])
   const screenshot = async (name) => {
+    await page.evaluate(() => {
+      scrollTo(0, 0)
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+    })
     await pause(500)
     const image = await page.screenshot({ path: resolve(output, `${name}.png`), fullPage: true })
     assert.ok(image.length > 15000, `Blank capture: ${name}`)
@@ -70,6 +74,14 @@ try {
     'Home does not eagerly boot WASM',
   )
   assert.ok(await page.$eval('meta[name="description"]', (element) => element.content.length > 50))
+  assert.equal(
+    await page.$eval('.discord-link img', (element) => new URL(element.src).pathname),
+    '/discord.svg',
+  )
+  assert.notEqual(
+    await page.$eval('.github-stars svg', (element) => getComputedStyle(element).color),
+    await page.$eval('.github-stars', (element) => getComputedStyle(element).color),
+  )
   await page.waitForFunction(() => {
     const image = document.querySelector('.preview-window img')
     return image?.complete && image.naturalWidth > 0
@@ -107,6 +119,17 @@ try {
     'page',
   )
   await page.type('.component-search input', 'colour-does-not-exist')
+  const focusedSearch = await page.$eval('.component-search', (element) => {
+    const bounds = element.getBoundingClientRect()
+    const content = document.querySelector('#main-content').getBoundingClientRect()
+    const style = getComputedStyle(element)
+    return {
+      inside: bounds.left >= content.left && bounds.right <= content.right,
+      outline: style.outlineStyle,
+      inset: style.boxShadow.includes('inset'),
+    }
+  })
+  assert.deepEqual(focusedSearch, { inside: true, outline: 'none', inset: true })
   await page.waitForSelector('.search-empty')
   await page.click('.search-empty button')
   await page.type('.component-search input', 'updater')
@@ -148,7 +171,11 @@ try {
     buffer: [canvas.width, canvas.height],
     css: [canvas.clientWidth, canvas.clientHeight],
     scale: devicePixelRatio,
+    border: getComputedStyle(canvas).borderStyle,
+    outline: getComputedStyle(canvas).outlineStyle,
   }))
+  assert.equal(canvasSize.border, 'none')
+  assert.equal(canvasSize.outline, 'none')
   for (let axis = 0; axis < 2; axis++)
     assert.ok(
       Math.abs(canvasSize.buffer[axis] - canvasSize.css[axis] * canvasSize.scale) <= 1,
@@ -169,7 +196,112 @@ try {
   await page.click('.gallery-launch button')
   await page.waitForSelector('.status-dot.live', { timeout: 90_000 })
 
-  await page.setViewport({ width: 390, height: 844 })
+  await page.setViewport({ width: 1000, height: 820 })
+  await page.goto(`${origin}/examples`, { waitUntil: 'networkidle0' })
+  assert.equal(await page.$$('.app-example-list button').then((items) => items.length), 2)
+  assert.equal(await page.$$('.more-example-grid a').then((items) => items.length), 4)
+  assert.match(await page.$eval('.app-example-list', (element) => element.textContent), /0\.30 s/)
+  assert.match(await page.$eval('.app-example-list', (element) => element.textContent), /0\.79 s/)
+  await page.click('.app-example-list button:nth-child(2)')
+  await page.waitForFunction(() =>
+    document.querySelector('.gallery-status')?.textContent.includes('Widget Gallery'),
+  )
+  assert.equal(
+    await page.$eval('.app-example-list button:nth-child(2)', (element) =>
+      element.getAttribute('aria-selected'),
+    ),
+    'true',
+  )
+  assert.match(await page.$eval('iframe', (element) => element.src), /\/gallery\/index\.html/)
+  await page.click('.app-example-list button:first-child')
+  await page.waitForFunction(() =>
+    document.querySelector('.gallery-status')?.textContent.includes('AI streaming harness'),
+  )
+  await page.waitForSelector('.status-dot.live', { timeout: 90_000 })
+  const desktopExampleFrame = await (await page.$('iframe')).contentFrame()
+  await desktopExampleFrame.waitForSelector('input[aria-label="Prompt"]')
+  const harnessLayout = async (example) =>
+    example.evaluate(() => {
+      const prompt = document.querySelector('input[aria-label="Prompt"]').getBoundingClientRect()
+      const send = document.querySelector('button[aria-label="Send"]').getBoundingClientRect()
+      const canvasElement = document.querySelector('canvas')
+      const canvas = canvasElement.getBoundingClientRect()
+      return {
+        prompt: prompt.toJSON(),
+        send: send.toJSON(),
+        canvas: {
+          ...canvas.toJSON(),
+          bufferWidth: canvasElement.width,
+          bufferHeight: canvasElement.height,
+          scale: devicePixelRatio,
+        },
+        labels: [...document.querySelectorAll('[aria-label]')].map((element) =>
+          element.getAttribute('aria-label'),
+        ),
+      }
+    })
+  const assertHarnessLayout = (layout) => {
+    assert.ok(layout.prompt.width > layout.send.width * 2.8, 'The prompt keeps the 80% share')
+    assert.ok(layout.prompt.right <= layout.send.left, 'The prompt and Send button do not overlap')
+    assert.ok(
+      layout.send.right <= layout.canvas.right + 1,
+      'The Send button stays inside the canvas',
+    )
+    assert.ok(
+      Math.abs(
+        layout.prompt.y + layout.prompt.height / 2 - (layout.send.y + layout.send.height / 2),
+      ) <= 4,
+      'The prompt and Send button share a centered row',
+    )
+    assert.ok(
+      Math.abs(layout.canvas.bufferWidth - layout.canvas.width * layout.canvas.scale) <= 1,
+      'The canvas backing width follows the browser scale',
+    )
+    assert.ok(
+      Math.abs(layout.canvas.bufferHeight - layout.canvas.height * layout.canvas.scale) <= 1,
+      'The canvas backing height follows the browser scale',
+    )
+  }
+  const desktopHarness = await harnessLayout(desktopExampleFrame)
+  assertHarnessLayout(desktopHarness)
+  assert.equal(
+    await desktopExampleFrame.$eval('input[aria-label="Prompt"]', (element) => element.value),
+    'What is an LLM?',
+  )
+  assert.ok(desktopHarness.labels.includes('Live telemetry'))
+  assert.equal(await desktopExampleFrame.$('button[aria-label="Stop"]'), null)
+  assert.equal(await desktopExampleFrame.$('button[aria-label="Clear"]'), null)
+  await desktopExampleFrame.$eval('button[aria-label="Send"]', (element) => element.click())
+  await desktopExampleFrame.waitForSelector('button[aria-label="Restart"]')
+  await pause(850)
+  const desktopFrameBounds = await page.$eval('iframe', (element) =>
+    element.getBoundingClientRect().toJSON(),
+  )
+  await page.mouse.move(
+    desktopFrameBounds.x + desktopHarness.prompt.x + desktopHarness.prompt.width / 2,
+    desktopFrameBounds.y + desktopHarness.prompt.y - 100,
+  )
+  await page.mouse.wheel({ deltaY: -180 })
+  await desktopExampleFrame.waitForSelector('button[aria-label="Go to latest message"]')
+  const latest = await desktopExampleFrame.$eval(
+    'button[aria-label="Go to latest message"]',
+    (element) => element.getBoundingClientRect().toJSON(),
+  )
+  assert.ok(
+    Math.abs(
+      latest.x + latest.width / 2 - (desktopHarness.canvas.x + desktopHarness.canvas.width / 2),
+    ) <= 2,
+    'The latest-message arrow is centered in the app',
+  )
+  await screenshot('app-example-desktop-streaming')
+
+  await page.setViewport({
+    width: 390,
+    height: 844,
+    deviceScaleFactor: 2,
+    isMobile: true,
+    hasTouch: true,
+  })
   await page.goto(origin, { waitUntil: 'networkidle0' })
   await screenshot('home-mobile')
   await page.click('.mobile-menu-toggle')
@@ -189,15 +321,48 @@ try {
   await page.waitForSelector('.status-dot.live', { timeout: 90_000 })
   const mobileFrame = await (await page.$('iframe')).contentFrame()
   await mobileFrame.waitForSelector('button[aria-label="Dialog"]')
-  assert.equal(await mobileFrame.evaluate(() => innerWidth), 760)
-  assert.ok(
+  const responsiveFrame = await page.$eval('iframe', (element) => ({
+    frame: element.clientWidth,
+    stage: element.parentElement.clientWidth,
+  }))
+  assert.equal(responsiveFrame.frame, responsiveFrame.stage)
+  assert.ok(responsiveFrame.frame <= 390)
+  assert.equal(
     await page.$eval('.gallery-stage', (element) => element.scrollWidth > element.clientWidth),
+    false,
   )
-  await page.$eval('.gallery-stage', (element) => {
-    element.scrollLeft = 260
-  })
+  await mobileFrame.waitForSelector('[role="navigation"][aria-label="Component navigation"]')
   await screenshot('component-mobile-live')
   await page.click('button[aria-label="Stop gallery"]')
+
+  await page.goto(`${origin}/examples`, { waitUntil: 'networkidle0' })
+  await page.waitForSelector('.status-dot.live', { timeout: 90_000 })
+  const exampleFrame = await (await page.$('iframe')).contentFrame()
+  await exampleFrame.waitForSelector('input[aria-label="Prompt"]')
+  assert.ok(
+    await exampleFrame.$eval('canvas', (canvas) => canvas.clientWidth <= innerWidth),
+    'The app example canvas fits its mobile viewport',
+  )
+  const mobileHarness = await harnessLayout(exampleFrame)
+  assertHarnessLayout(mobileHarness)
+  assert.ok(!mobileHarness.labels.includes('Live telemetry'))
+  const mobileSend = await exampleFrame.$('button[aria-label="Send"]')
+  if (mobileSend) await mobileSend.evaluate((element) => element.click())
+  await exampleFrame.waitForSelector('button[aria-label="Restart"]')
+  await pause(600)
+  const visibleMessageWidth = await exampleFrame.$$eval('[aria-label][role="text"]', (elements) =>
+    Math.max(
+      ...elements.map((element) => {
+        const bounds = element.getBoundingClientRect()
+        return bounds.width > 1 && bounds.y > 60 ? bounds.width : 0
+      }),
+    ),
+  )
+  assert.ok(
+    visibleMessageWidth >= mobileHarness.canvas.width * 0.7,
+    'Streamed VList messages keep the available mobile width',
+  )
+  await screenshot('app-example-mobile-live')
 
   const response = await page.goto(`${origin}/components/does-not-exist`, {
     waitUntil: 'networkidle0',
@@ -249,15 +414,13 @@ try {
     dispatchEvent(new CustomEvent('argui:renderer-state', { detail: { state: 'error' } })),
   )
   await loading.waitForFunction(() =>
-    document.querySelector('.gallery-launch')?.textContent.includes('could not start'),
+    document.querySelector('.gallery-launch')?.textContent.includes('WebGPU is unavailable'),
   )
-  await loading.click('.gallery-launch button')
-  await loading.waitForSelector('.status-dot.live', { timeout: 90_000 })
-  await loading.click('.component-nav-group a[href="/components/checkbox"]')
-  await loading.waitForFunction(() => location.pathname === '/components/checkbox')
-  await loading.waitForSelector('.status-dot.live', { timeout: 90_000 })
-  const checkbox = await (await loading.$('iframe')).contentFrame()
-  await checkbox.waitForSelector('[role="checkbox"]')
+  await loading.click('.browser-setting button')
+  await loading.waitForFunction(() =>
+    document.querySelector('.browser-setting button')?.textContent.includes('Copied'),
+  )
+  assert.equal(await loading.evaluate(() => navigator.clipboard.readText()), 'chrome://gpu')
   await loading.close()
 
   const fallback = await browser.newPage()
@@ -266,8 +429,13 @@ try {
   )
   await fallback.goto(`${origin}/components`, { waitUntil: 'networkidle0' })
   await fallback.waitForFunction(
-    () => document.querySelector('.gallery-launch')?.textContent.includes('could not start'),
+    () => document.querySelector('.gallery-launch')?.textContent.includes('WebGPU is unavailable'),
     { timeout: 30_000 },
+  )
+  assert.match(await fallback.$eval('.gallery-launch', (element) => element.textContent), /Chrome/)
+  assert.match(
+    await fallback.$eval('.gallery-launch', (element) => element.textContent),
+    /chrome:\/\/gpu/,
   )
   assert.equal(await fallback.$$('iframe').then((items) => items.length), 0)
   await fallback.close()

@@ -10,7 +10,7 @@ const sourceOverrides = {
   'radio-group': 'selection',
   textarea: 'input',
   layout: 'pages',
-  motion: 'pages',
+  motion: 'pages/motion',
   'liquid-glass': 'pages/liquid_glass',
   'scroll-shadow': 'pages/scroll_effects',
   typography: 'typography',
@@ -18,7 +18,6 @@ const sourceOverrides = {
   i18n: 'pages/i18n',
   webview: 'pages/webview',
   'async-tasks': 'pages/async_tasks',
-  actions: 'pages/actions',
   editing: 'pages/editing',
   'custom-timeline': 'pages/timeline',
 }
@@ -30,7 +29,7 @@ const extraWidgets = [
     'Actions',
   ],
   ['range', 'Range', 'Shared value, bounds, step and gesture behavior for range controls.', null],
-  ['spinner', 'Spinner', 'A loading indicator that respects reduced motion.', 'Motion & loading'],
+  ['spinner', 'Spinner', 'A loading indicator that respects reduced motion.', 'Button'],
   [
     'split-pane',
     'Split pane',

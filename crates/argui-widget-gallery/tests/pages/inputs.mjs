@@ -109,6 +109,7 @@ try {
         const y = name === 'Input' ? r.y + r.height / 2 : r.y + 24;
         await pause(650);
         for (let i = 1; i <= 2; i++) await page.mouse.click(x, y, { clickCount: i });
+        await pause(700);
         await capture(`${name.toLowerCase()}-word-selected`);
         await page.keyboard.type('X');
         await pause();

@@ -199,6 +199,21 @@ p {
   gap: 7px;
   font-size: 13px;
 }
+.github-stars {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.github-stars svg {
+  color: #e0a11b;
+  fill: currentColor;
+}
+.discord-link img {
+  width: 20px;
+  height: 15px;
+}
 .mobile-menu-toggle,
 .mobile-navigation {
   display: none;
@@ -906,6 +921,9 @@ code {
   .header-actions {
     gap: 12px;
   }
+  .github-name {
+    display: none;
+  }
   .hero {
     padding-top: 64px;
   }
@@ -1044,7 +1062,7 @@ code {
     font-size: 15px;
   }
   .header-actions {
-    gap: 12px;
+    gap: 7px;
   }
   .hero {
     padding-top: 48px;

@@ -16,6 +16,8 @@ mod i18n;
 mod inputs;
 #[path = "pages/liquid_glass.rs"]
 mod liquid_glass;
+#[path = "pages/motion.rs"]
+mod motion;
 #[path = "pages/popover.rs"]
 mod popover;
 #[path = "pages/scroll_effects.rs"]
@@ -86,7 +88,7 @@ fn all_pages_keep_finite_layout_when_narrow_dark_or_reduced_motion() {
         ("hot-reload", "Hot reload"),
         ("i18n", "Internationalization"),
         ("layout", "Web layout"),
-        ("motion", "Motion & loading"),
+        ("motion", "Animation lab"),
         ("liquid-glass", "Liquid glass"),
         ("scroll-shadow", "Scroll shadow"),
         ("typography", "Typography & selection"),
@@ -231,8 +233,6 @@ fn keyed<'a>(root: &'a Element, key: &str) -> Option<&'a Element> {
         root.children.iter().find_map(|child| keyed(child, key))
     }
 }
-#[path = "pages/actions.rs"]
-mod actions;
 #[path = "pages/async_tasks.rs"]
 mod async_tasks;
 #[path = "pages/data_table.rs"]

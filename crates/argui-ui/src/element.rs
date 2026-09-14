@@ -477,7 +477,7 @@ impl Element {
 
     #[must_use]
     pub fn radius(mut self, radii: CornerRadii) -> Self {
-        self.paint.quad.radii = radii;
+        self.override_radii(radii);
         self
     }
 

@@ -15,7 +15,8 @@
   <a href="https://extrabinoss.github.io/argui/">Website</a> ·
   <a href="https://extrabinoss.github.io/argui/components">Live components</a> ·
   <a href="docs/README.md">Documentation</a> ·
-  <a href="https://extrabinoss.github.io/argui/get-started">Get started</a>
+  <a href="https://extrabinoss.github.io/argui/get-started">Get started</a> ·
+  <a href="https://discord.gg/xY9CWSc65">Discord</a>
 </p>
 
 <p align="center">
@@ -24,6 +25,24 @@
 </p>
 
 [![The Argui widget gallery](https://raw.githubusercontent.com/ExtraBinoss/argui/main/website/public/gallery-preview.webp)](https://extrabinoss.github.io/argui/components)
+
+## Try it
+
+Explore the [live gallery](https://extrabinoss.github.io/argui/components), or run it locally:
+
+```sh
+git clone https://github.com/ExtraBinoss/argui.git
+cd argui
+cargo run -p argui-widget-gallery --all-features
+```
+
+For state-preserving Rust patches, install Dioxus CLI and run the gallery with
+`dx serve --package argui-widget-gallery --features hot-reload --hot-patch`.
+The [hot-reload guide](docs/hot-reload.md) explains the executable layout and
+the changes that still require a restart.
+
+Use Rust 1.98 or newer. Linux builds with all features also need the
+[native dependencies](docs/platform/webview.md#linux-build-dependencies).
 
 ## Build your interface in Rust
 
@@ -179,23 +198,22 @@ converted with 1 MiB = 1,048,576 bytes; stripped values come from a copied
 binary processed by GNU `strip`. This measures the executable itself and
 excludes shared system libraries and installer compression.
 
-## Try it
+### Release WebAssembly startup
 
-Explore the [live gallery](https://extrabinoss.github.io/argui/components), or run it locally:
+The optimized browser applications also reach their first usable frame in less
+than one second on the measured machine:
 
-```sh
-git clone https://github.com/ExtraBinoss/argui.git
-cd argui
-cargo run -p argui-widget-gallery --all-features
-```
+| Application | Release `.wasm` | Median to ready | Five-run range |
+| --- | ---: | ---: | ---: |
+| AI streaming harness | 6.15 MiB | 0.30 s | 0.26–0.46 s |
+| Widget Gallery | 9.84 MiB | 0.79 s | 0.59–0.99 s |
 
-For state-preserving Rust patches, install Dioxus CLI and run the gallery with
-`dx serve --package argui-widget-gallery --features hot-reload --hot-patch`.
-The [hot-reload guide](docs/hot-reload.md) explains the executable layout and
-the changes that still require a restart.
-
-Use Rust 1.98 or newer. Linux builds with all features also need the
-[native dependencies](docs/platform/webview.md#linux-build-dependencies).
+These are five cache-disabled loads from a local static server in Chrome
+153.0.8010.36 on Linux, measured from navigation start until the release
+renderer announced readiness and its target semantic node existed. The machine
+uses an Intel Core Ultra 5 125H. Remote startup also depends on transfer speed,
+HTTP compression and browser caching. The [raw measurements](docs/performance/data/wasm-startup.json)
+record every sample and the exact environment.
 
 ## Compose a view
 
@@ -221,7 +239,8 @@ fn view(theme: &WidgetTheme) -> Element {
 }
 ```
 
-Continue with [models and state](docs/runtime/models.md),
+Continue with the product-shaped [example applications](app_examples/),
+[models and state](docs/runtime/models.md),
 [localization](docs/i18n.md), [hot reload](docs/hot-reload.md), the
 [widget catalogue](docs/widgets/shadcn.md) or the [complete examples](crates/argui/examples/).
 The protected CI publishes `[PUBLISH]` commits in dependency order and creates
@@ -230,15 +249,11 @@ the matching GitHub release. See the
 
 ## Where things stand
 
-Argui is under active development and its APIs are still evolving.
-**Fluent internationalization and native hot reload are available as optional
-features.** See the
-[roadmap](docs/roadmap.md) and individual platform guides for current support.
-
 Contributions go through pull requests. Start with the
 [contributor guide](docs/contributing/code-quality.md); every crate must meet
 the 85% floor for lines, functions, regions and branches. Cargo builds use at
-most six jobs. The [website](website/README.md) lives in `website/`.
+most six jobs. Join the [Argui Discord](https://discord.gg/xY9CWSc65) to discuss
+the project. The [website](website/README.md) lives in `website/`.
 
 ## License
 

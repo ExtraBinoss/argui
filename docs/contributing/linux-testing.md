@@ -90,23 +90,24 @@ explicitly when using a different server. Most accept `SCREENSHOT_DIR` as well.
 Replace the final script in the command above with the scenario you need.
 Paths below are relative to `crates/argui-widget-gallery/tests/` unless noted.
 
-| Area | Script | What it exercises |
-| --- | --- | --- |
-| Common controls | `pages.mjs` | Labels, breadcrumbs, pagination, skeletons, collapsibles, menus, calendar and data tables. |
-| Editors and menus | `pages/inputs.mjs` | Shortcuts, word selection, dragging, nested menus and stable field bounds. |
-| Overlays | `pages/overlay_effects.mjs` | Popovers, tooltips, effects, focus, dismissal and native-surface fallback. |
-| Catalogue | `pages/catalogue.mjs` | Forms, navigation, modal surfaces, Hover Card and scrolling in both themes. |
-| Color picker | `pages/color_picker.mjs` | Immediate preview colors, alpha input, stable geometry and GPU color checks. |
-| Animated text | `pages/animated_text.mjs` | Changed digits, carries, fades, intermediate frames and narrow layouts. |
-| Localization | `pages/i18n.mjs` | Fluent locale switching, plurals, fallback copy and Arabic RTL layout. |
-| Updates | `pages/updater.mjs` | Notes, download amounts, unknown totals, cancellation, installation states and errors. |
-| Liquid glass | `pages/liquid_glass.mjs` | Refraction, controls and content scrolling behind the glass. |
-| Scroll effects | `pages/scroll_effects.mjs` | Vertical and horizontal edges and light-theme contrast. |
-| Virtual lists | `pages/data.mjs` | Wheel replay, visible rows, CPU profiles and frame intervals. |
-| Navigation | `app/navigation.mjs` | Search, first-key input, keyboard navigation and retained editor shortcuts. |
-| Desktop backdrop | `app/desktop_backdrop.mjs` | Transparency controls, fallback and canvas alpha. |
-| Accessibility | `crates/argui-accessibility/tests/web.mjs` from the repository root | DOM stability, focus, virtual row replacement, order and accessible actions. |
-| DevTools | `crates/argui-devtools/tests/view.mjs` from the repository root | Inspection, panes, themes, color editing and resource controls. |
+| Area                        | Script                                                              | What it exercises                                                                                       |
+| --------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Common controls             | `pages.mjs`                                                         | Labels, breadcrumbs, pagination, skeletons, collapsibles, menus, calendar and data tables.              |
+| Editors and menus           | `pages/inputs.mjs`                                                  | Shortcuts, word selection, dragging, nested menus and stable field bounds.                              |
+| Overlays                    | `pages/overlay_effects.mjs`                                         | Popovers, tooltips, effects, focus, dismissal and native-surface fallback.                              |
+| Catalogue                   | `pages/catalogue.mjs`                                               | Forms, navigation, modal surfaces, Hover Card and scrolling in both themes.                             |
+| Color picker                | `pages/color_picker.mjs`                                            | Immediate preview colors, alpha input, stable geometry and GPU color checks.                            |
+| Animated text               | `pages/animated_text.mjs`                                           | Changed digits, carries, fades, intermediate frames and narrow layouts.                                 |
+| Animation and wheel physics | `pages/motion.mjs`                                                  | Starts every animation, then verifies content/sidebar wheel input and momentum while frames are active. |
+| Localization                | `pages/i18n.mjs`                                                    | Fluent locale switching, plurals, fallback copy and Arabic RTL layout.                                  |
+| Updates                     | `pages/updater.mjs`                                                 | Notes, download amounts, unknown totals, cancellation, installation states and errors.                  |
+| Liquid glass                | `pages/liquid_glass.mjs`                                            | Refraction, controls and content scrolling behind the glass.                                            |
+| Scroll effects              | `pages/scroll_effects.mjs`                                          | Vertical and horizontal edges and light-theme contrast.                                                 |
+| Virtual lists               | `pages/data.mjs`                                                    | Wheel replay, visible rows, CPU profiles and frame intervals.                                           |
+| Navigation                  | `app/navigation.mjs`                                                | Search, first-key input, keyboard navigation and retained editor shortcuts.                             |
+| Desktop backdrop            | `app/desktop_backdrop.mjs`                                          | Transparency controls, fallback and canvas alpha.                                                       |
+| Accessibility               | `crates/argui-accessibility/tests/web.mjs` from the repository root | DOM stability, focus, virtual row replacement, order and accessible actions.                            |
+| DevTools                    | `crates/argui-devtools/tests/view.mjs` from the repository root     | Inspection, panes, themes, color editing and resource controls.                                         |
 
 Inspect the saved PNGs for text, contrast, spacing, clipping and disabled states.
 Argui may retain DOM focus on the canvas: check `aria-activedescendant` and the

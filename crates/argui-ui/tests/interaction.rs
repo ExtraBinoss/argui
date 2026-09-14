@@ -400,58 +400,6 @@ fn interaction_updates_merge_every_dirty_signal_and_latest_clipboard_request() {
 }
 
 #[test]
-fn secondary_touches_do_not_replace_primary_interaction_capture() {
-    let mut tree = UiTree::new(interactive("touch"));
-    let node = tree.node_id_at(0).unwrap();
-    let regions = [region(node)];
-    let touch = |id, phase, primary| PointerEvent {
-        id: PointerId::new(id),
-        kind: PointerKind::Touch,
-        phase,
-        position: Point::new(30.0, 20.0),
-        button: Some(PointerButton::Primary),
-        buttons: 1,
-        pressure: None,
-        primary,
-        modifiers: argui_core::Modifiers::default(),
-        timestamp: std::time::Duration::ZERO,
-    };
-
-    let pressed = tree.pointer_event(touch(1, PointerPhase::Pressed, true), &regions);
-    assert!(pressed.events.iter().any(|event| matches!(
-        event.kind,
-        UiEventKind::Pointer(PointerEvent {
-            phase: PointerPhase::Pressed,
-            ..
-        })
-    )));
-    assert!(
-        tree.pointer_event(touch(2, PointerPhase::Pressed, false), &regions)
-            .events
-            .is_empty()
-    );
-    let cancelled = tree.pointer_event(touch(1, PointerPhase::Cancelled, true), &regions);
-    assert!(cancelled.events.iter().any(|event| matches!(
-        event.kind,
-        UiEventKind::Pointer(PointerEvent {
-            phase: PointerPhase::Cancelled,
-            ..
-        })
-    )));
-    assert!(
-        cancelled
-            .events
-            .iter()
-            .all(|event| event.kind != UiEventKind::Click(argui_ui::ClickEvent::accessibility()))
-    );
-    assert!(
-        tree.pointer_event(touch(1, PointerPhase::Cancelled, true), &regions)
-            .events
-            .is_empty()
-    );
-}
-
-#[test]
 fn explicit_pointer_capture_retargets_motion_and_reports_every_release() {
     let mut tree = UiTree::new(Element::row([interactive("first"), interactive("second")]));
     let first = tree.node_id_at(1).unwrap();

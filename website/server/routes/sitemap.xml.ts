@@ -6,6 +6,7 @@ export default defineEventHandler((event) => {
     '/',
     '/features',
     '/get-started',
+    '/examples',
     '/components',
     ...catalogue.map((item) => `/components/${item.slug}`),
   ]

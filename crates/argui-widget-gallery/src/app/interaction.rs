@@ -94,6 +94,11 @@ impl Render for WidgetGallery {
     }
 
     fn layout_changed(&mut self, layout: &LayoutSnapshot, cx: &mut Context<Self>) {
+        let compact = layout.viewport_size().width < 720.0;
+        if self.compact != compact {
+            self.compact = compact;
+            cx.notify();
+        }
         self.handle_layout(layout);
         cx.layout_entity(&self.glass, layout);
         cx.layout_entity(&self.menus, layout);

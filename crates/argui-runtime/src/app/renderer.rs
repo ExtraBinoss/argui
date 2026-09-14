@@ -108,7 +108,7 @@ impl Application {
         window: &Arc<Window>,
         _event_loop: &ActiveEventLoop,
     ) {
-        let size = window.inner_size();
+        let size = crate::host::WindowHost::drawable_size(window);
         let window = Arc::clone(window);
         let renderer = Rc::clone(&self.renderer);
         let renderer_device = Rc::clone(&self.renderer_device);
@@ -135,7 +135,7 @@ impl Application {
                     if renderer_device.borrow().is_none() {
                         *renderer_device.borrow_mut() = Some(surface.device_handle());
                     }
-                    let current_size = window.inner_size();
+                    let current_size = crate::host::WindowHost::drawable_size(&window);
                     surface.resize(current_size.width, current_size.height);
                     register_images(&mut surface, &image_assets).and_then(|()| {
                         register_vectors(&mut surface, &vector_assets)?;

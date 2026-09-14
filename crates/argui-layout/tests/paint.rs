@@ -8,7 +8,8 @@ use argui_paint::{Border, Color, DisplayCommand, ImageFit, LayerStyle, VectorId}
 use argui_text::TextEngine;
 use argui_ui::{
     Axes, CornerRadii, CursorIcon, Element, HitTestStyle, ImageId, Interaction, Overflow,
-    PointerEvents, StylePatch, Transform2D, TransformOrigin, UiTree, VisualState, length, property,
+    PointerEvents, StylePatch, Transform2D, TransformOrigin, UiTree, UserSelect, VisualState,
+    length, property,
 };
 
 const NOTO_SANS: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
@@ -134,6 +135,36 @@ fn paint_only_text_color_updates_without_reshaping() {
         output.text.blocks()[0].style.color,
         Color::srgb(0.9, 0.2, 0.3)
     );
+}
+
+#[test]
+fn fixed_nonselectable_text_content_reshapes_without_layout() {
+    let label = |content| {
+        Element::text(content)
+            .width(length(140.0))
+            .height(length(30.0))
+            .user_select(UserSelect::None)
+    };
+    let mut ui = UiTree::new(label("Old"));
+    let mut layout = LayoutEngine::new();
+    let mut output = layout
+        .compute(&mut ui, &mut text_engine(), Size::new(200.0, 80.0))
+        .unwrap();
+    let bounds = output.text.blocks()[0].bounds;
+    ui.mark_layout_clean();
+
+    assert_eq!(
+        ui.update(label("New retained label")),
+        argui_ui::TreeUpdate::Paint
+    );
+    assert!(!ui.layout_dirty());
+    assert!(layout.repaint(&ui, &mut output));
+    assert_eq!(
+        output.text.blocks()[0].content.as_str(),
+        "New retained label"
+    );
+    assert_eq!(output.text.blocks()[0].bounds, bounds);
+    assert!(output.text_regions.is_empty());
 }
 
 #[test]

@@ -29,17 +29,21 @@ export default defineNuxtConfig({
         '/',
         '/features',
         '/get-started',
+        '/examples',
         '/components',
         '/sitemap.xml',
         '/robots.txt',
         ...catalogue.map((item) => `/components/${item.slug}`),
       ],
-      ignore: ['/gallery'],
+      ignore: ['/gallery', '/examples/ai-harness'],
     },
     compressPublicAssets: true,
   },
   routeRules: {
     '/gallery/**': {
+      headers: { 'X-Robots-Tag': 'noindex', 'Cross-Origin-Resource-Policy': 'same-origin' },
+    },
+    '/examples/ai-harness/**': {
       headers: { 'X-Robots-Tag': 'noindex', 'Cross-Origin-Resource-Policy': 'same-origin' },
     },
   },

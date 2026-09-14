@@ -3,9 +3,8 @@ use argui::{
     runtime::Entity,
     text::TextAlign,
     ui::{
-        AlignItems, CursorIcon, Element, EventListener, FlexWrap, GestureCapture, GestureSet,
-        Interaction, JustifyContent, PanGesture, Position, Sides, auto, evenly_sized_tracks,
-        length, percent,
+        AlignItems, CursorIcon, Element, EventListener, GestureCapture, GestureSet, Interaction,
+        JustifyContent, PanGesture, Position, Sides, auto, evenly_sized_tracks, length, percent,
     },
     widgets::{
         Button, Checkbox, Dialog, DialogBehavior, RadioGroup, RadioOption, RangeConfig, Select,
@@ -18,8 +17,6 @@ use crate::{
     navigation::Page,
 };
 
-mod action_menu;
-pub(crate) mod actions;
 mod alert;
 pub(crate) mod animated_text;
 mod aspect_ratio;
@@ -45,6 +42,7 @@ mod kbd;
 mod label;
 pub(crate) mod liquid_glass;
 pub(crate) mod menus;
+pub(crate) mod motion;
 pub(crate) mod overlay_effects;
 mod pagination;
 pub(crate) mod popover;
@@ -171,13 +169,12 @@ pub(crate) fn render(
         Page::HotReload => cx.entity(&gallery.hot_reload),
         Page::I18n => cx.entity(&gallery.i18n),
         Page::Layout => layout_system(theme),
-        Page::Motion => motion(theme, cx.entity(&gallery.spinner)),
+        Page::Motion => cx.entity(&gallery.motion),
         Page::LiquidGlass => cx.entity(&gallery.glass),
         Page::ScrollShadow => cx.entity(&gallery.scroll_demo),
         Page::Typography => typography::render(theme),
         Page::WebView => cx.entity(&gallery.webview),
         Page::AsyncTasks => cx.entity(&gallery.tasks),
-        Page::Actions => cx.entity(&gallery.actions),
         Page::Editing => cx.entity(&gallery.editing),
         Page::CustomTimeline => cx.entity(&gallery.timeline),
         #[cfg(feature = "updater")]
@@ -494,22 +491,6 @@ fn layout_tile(label: impl Into<String>, theme: &WidgetTheme) -> Element {
         .justify_content(JustifyContent::CENTER)
         .background(theme.primary)
         .radius(CornerRadii::all(7.0))
-}
-
-fn motion(theme: &WidgetTheme, spinner: Element) -> Element {
-    preview(
-        "Motion and loading",
-        "The spinner requests presentation frames only while mounted; reduced-motion stays still.",
-        Element::row([
-            Button::new("loading-example", "Compiling shaders", theme.button())
-                .loading(spinner)
-                .build(),
-            Button::new("motion-hover", "Hover and press", theme.outline_button()).build(),
-        ])
-        .flex_wrap(FlexWrap::Wrap)
-        .gap(12.0),
-        theme,
-    )
 }
 
 fn preview(title: &str, description: &str, content: Element, theme: &WidgetTheme) -> Element {

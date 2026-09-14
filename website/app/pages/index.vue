@@ -36,7 +36,6 @@ const components = [
         </h1>
         <div class="hero-intro">
           <p>{{ t('home.intro') }}</p>
-          <p class="platform-list">{{ t('home.platforms') }}</p>
         </div>
       </div>
       <div class="hero-actions">
@@ -51,7 +50,6 @@ const components = [
             <span />
             <span />
             <code>argui-widget-gallery</code>
-            <span class="window-platform">Rust → WebAssembly</span>
           </div>
           <img
             :src="asset('gallery-preview.webp')"

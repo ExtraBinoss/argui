@@ -12,6 +12,7 @@ const routes = [
   '/',
   '/features',
   '/get-started',
+  '/examples',
   '/components',
   ...catalogue.map((item) => `/components/${item.slug}`),
 ]
@@ -37,19 +38,24 @@ for (const item of catalogue) {
 const sitemap = await readFile(resolve(output, 'sitemap.xml'), 'utf8')
 assert.equal((sitemap.match(/<loc>/g) ?? []).length, origin ? routes.length : 0)
 assert.ok(!sitemap.includes('/gallery/'))
+assert.ok(!sitemap.includes('/examples/ai-harness/'))
 const robots = await readFile(resolve(output, 'robots.txt'), 'utf8')
 assert.ok(robots.includes(`Disallow: ${base}gallery/`))
+assert.ok(robots.includes(`Disallow: ${base}examples/ai-harness/`))
 assert.equal(robots.includes('Sitemap:'), Boolean(origin))
 for (const asset of [
   'gallery/index.html',
   'gallery/bridge.js',
-  'gallery/browser-shortcuts.js',
+  'preview-bridge.js',
+  'browser-shortcuts.js',
   'gallery/pkg/argui_widget_gallery_bg.wasm',
+  'examples/ai-harness/index.html',
+  'examples/ai-harness/pkg/argui_example_ai_harness_bg.wasm',
   'gallery-preview.webp',
   'social.png',
   '404.html',
 ])
   await access(resolve(output, asset))
 console.log(
-  `Verified ${routes.length} prerendered pages, source links, SEO metadata, sitemap, robots and gallery assets.`,
+  `Verified ${routes.length} prerendered pages, source links, SEO metadata, sitemap, robots and WASM previews.`,
 )

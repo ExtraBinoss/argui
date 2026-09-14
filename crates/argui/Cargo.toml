@@ -118,7 +118,6 @@ argui-widgets = { workspace = true, optional = true }
 argui-webview = { workspace = true, optional = true }
 
 [dev-dependencies]
-argui-devtools = { path = "../argui-devtools" }
 argui-showcase = { path = "../argui-showcase" }
 argui-widgets = { path = "../argui-widgets", features = ["all"] }
 

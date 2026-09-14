@@ -119,5 +119,6 @@ See [preferences](interaction.md#system-preferences) and
 
 Explicit layout-property animation is supported. Captured before/after geometry
 transitions for insertion, removal and reordering remain in the
-[roadmap](../roadmap.md). The [state showcase](../../crates/argui-showcase/src/)
-and [animation tests](../../crates/argui-animation/tests/) exercise the current API.
+[roadmap](../roadmap.md). The Widget Gallery's
+[Motion Lab](../../crates/argui-widget-gallery/src/pages/motion.rs) and
+[animation tests](../../crates/argui-animation/tests/) exercise the current API.

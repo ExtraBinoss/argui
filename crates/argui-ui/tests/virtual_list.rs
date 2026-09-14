@@ -52,6 +52,19 @@ fn visible_windows_stay_stable_inside_a_scroll_chunk() {
 }
 
 #[test]
+fn variable_windows_stay_mounted_across_nearby_fast_scroll_offsets() {
+    let mut list = VirtualList::variable(10_000, 72.0, 360.0).overscan(4);
+    for index in 0..18 {
+        list.measure(index, 56.0 + (index % 4) as f32 * 19.0, 0.0);
+    }
+
+    let first = list.window(360.0);
+    let nearby = list.window(430.0);
+    assert_eq!(first.range, nearby.range);
+    assert!(first.range.len() < 32);
+}
+
+#[test]
 fn bounded_lists_can_retain_every_row_for_paint_only_scrolling() {
     let list = VirtualList::fixed(109, 28.0, 236.0).overscan(109);
 
@@ -90,6 +103,10 @@ fn variable_list_handles_share_retained_measurements_and_structure() {
     assert_eq!(second.item_extent(1), Some(24.0));
     second.insert(3, 2);
     assert_eq!(first.item_count(), 5);
+    assert_eq!(first.total_extent(), 64.0);
+    assert_eq!(first.offset_of(5), 64.0);
+    second.measure(4, 18.0, 0.0);
+    assert_eq!(first.total_extent(), 72.0);
     first.remove(0..1);
     assert_eq!(second.item_count(), 4);
 }

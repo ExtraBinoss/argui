@@ -1,4 +1,5 @@
 export const repository = 'https://github.com/ExtraBinoss/argui'
+export const discord = 'https://discord.gg/xY9CWSc65'
 export const sourceUrl = (path: string) => `${repository}/blob/main/${path}`
 export const composeExample = `use argui::{
     ui::Element,

@@ -30,6 +30,20 @@ fn appends_respect_reading_position_and_history_insertion_preserves_the_anchor()
         &event(
             "chat",
             UiEventKind::Scrolled {
+                delta: Point::new(0.0, -1.0),
+                offset: Point::new(0.0, 199.0),
+            },
+        ),
+        "chat",
+        200.0,
+    );
+    assert!(!state.following);
+    assert!(state.appended("chat", 1, 201.0).is_none());
+    state.latest("chat");
+    state.observe(
+        &event(
+            "chat",
+            UiEventKind::Scrolled {
                 delta: Point::default(),
                 offset: Point::new(0.0, 40.0),
             },
