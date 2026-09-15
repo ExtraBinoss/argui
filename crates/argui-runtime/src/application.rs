@@ -137,10 +137,14 @@ fn strongest(left: ViewUpdate, right: ViewUpdate) -> ViewUpdate {
 
 pub trait AppModel: 'static {
     /// Takes pending UI commands for a window. The default implementation has none.
+    ///
+    /// `_window` identifies the window whose pending commands are requested.
     fn take_ui_commands(&mut self, _window: &WindowKey) -> Vec<argui_ui::UiCommand> {
         Vec::new()
     }
     /// Handles completed work associated with the window and returns its effects.
+    ///
+    /// `_window` identifies the window whose completed work is being delivered.
     fn tasks_ready(&mut self, _window: &WindowKey) -> AppUpdate {
         AppUpdate::none()
     }
@@ -149,6 +153,8 @@ pub trait AppModel: 'static {
     fn view(&self, window: &WindowKey, environment: WindowEnvironment) -> Option<Element>;
 
     /// Returns the retained entity that should receive routed UI events, if any.
+    ///
+    /// `_window` identifies the window whose event router is requested.
     fn event_router(&self, _window: &WindowKey) -> Option<crate::AnyEntity> {
         None
     }
@@ -168,11 +174,16 @@ pub trait AppModel: 'static {
     }
 
     /// Returns whether the application needs animation frames for the window.
+    ///
+    /// `_window` identifies the window whose animation demand is queried.
     fn wants_animation_frame(&self, _window: &WindowKey) -> bool {
         false
     }
 
     /// Handles a new layout snapshot for the window.
+    ///
+    /// `_window` identifies the window whose layout changed; `_layout` is its new
+    /// layout snapshot.
     fn layout_changed(&mut self, _window: &WindowKey, _layout: &LayoutSnapshot) -> AppUpdate {
         AppUpdate::none()
     }
@@ -193,31 +204,43 @@ pub trait AppModel: 'static {
     }
 
     /// Returns the inspection handle for the window, if inspection is enabled.
+    ///
+    /// `_window` identifies the window whose inspector is requested.
     fn inspector(&self, _window: &WindowKey) -> Option<InspectorHandle> {
         None
     }
 
     /// Takes a pending clipboard request for the window, if present.
+    ///
+    /// `_window` identifies the window whose request is taken.
     fn take_clipboard_request(&mut self, _window: &WindowKey) -> Option<ClipboardRequest> {
         None
     }
 
     /// Takes a pending scroll request for the window, if present.
+    ///
+    /// `_window` identifies the window whose request is taken.
     fn take_scroll_request(&mut self, _window: &WindowKey) -> Option<ScrollRequest> {
         None
     }
 
     /// Takes a pending focus request for the window, if present.
+    ///
+    /// `_window` identifies the window whose request is taken.
     fn take_focus_request(&mut self, _window: &WindowKey) -> Option<FocusRequest> {
         None
     }
 
     /// Takes a pending text-selection request for the window, if present.
+    ///
+    /// `_window` identifies the window whose request is taken.
     fn take_text_selection_request(&mut self, _window: &WindowKey) -> Option<TextSelectionRequest> {
         None
     }
 
     /// Takes a pending theme request for the window, if present.
+    ///
+    /// `_window` identifies the window whose request is taken.
     fn take_theme_request(&mut self, _window: &WindowKey) -> Option<ThemeRequest> {
         None
     }

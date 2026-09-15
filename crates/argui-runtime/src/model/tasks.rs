@@ -84,7 +84,9 @@ impl<T: 'static> Entity<T> {
         self.0.presentation.cache.apply_update(effects.update);
         self.0.presentation.visible_effects(effects)
     }
-    /// Attach an event-driven executor before invoking a component's task-producing methods.
+    /// Attaches an event-driven executor before invoking a component's task-producing methods.
+    ///
+    /// `runtime` is cloned onto this entity and its routed descendants.
     pub fn set_task_runtime(&self, runtime: TaskRuntime) {
         self.0.model.runtime.set_task_runtime(runtime.clone());
         for child in self

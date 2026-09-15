@@ -16,8 +16,9 @@ formatting, Clippy, WebAssembly, public API examples, and coverage.
   deprecated paths, or speculative abstractions.
 - Do not commit `TODO`, `FIXME`, `todo!`, `unimplemented!`, or placeholder
   implementations.
-- Document every new function and method with accurate Rustdoc. Explain
-  parameters and return values; add `# Errors` and `# Panics` when applicable.
+- Document every new function and method with accurate Rustdoc, and update it
+  whenever the signature or behavior changes. Explain parameters and return
+  values; add `# Errors` and `# Panics` when applicable.
 - Make ownership, dirty state, and cache bounds explicit. An idle UI must do no
   work.
 

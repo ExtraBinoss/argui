@@ -206,7 +206,7 @@ impl<T: Render> Context<T> {
 pub trait Render: 'static {
     /// Handles asynchronous task completions for this component.
     ///
-    /// `cx` collects any effects requested while processing those completions.
+    /// `_cx` collects any effects requested while processing those completions.
     #[cfg(feature = "tasks")]
     fn tasks_ready(&mut self, _cx: &mut Context<Self>)
     where
@@ -223,7 +223,8 @@ pub trait Render: 'static {
 
     /// Advances component state for an animation `frame`.
     ///
-    /// `cx` records any effects requested while handling the frame.
+    /// `_frame` is the current animation timing information; `_cx` records any
+    /// effects requested while handling it.
     fn animation_frame(&mut self, _frame: Frame, _cx: &mut Context<Self>)
     where
         Self: Sized,
@@ -237,7 +238,7 @@ pub trait Render: 'static {
 
     /// Notifies the component that its layout has changed.
     ///
-    /// `layout` is the latest geometry snapshot; `cx` records resulting effects.
+    /// `_layout` is the latest geometry snapshot; `_cx` records resulting effects.
     fn layout_changed(&mut self, _layout: &LayoutSnapshot, _cx: &mut Context<Self>)
     where
         Self: Sized,
