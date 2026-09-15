@@ -12,9 +12,12 @@ pub fn is_android() -> bool {
 
 /// Generate the unmangled `android_main` symbol required by `NativeActivity`.
 ///
-/// The supplied function receives [`AndroidApp`] and returns `Result<(), E>`,
+/// The supplied function receives `AndroidApp` and returns `Result<(), E>`,
 /// where `E` implements `Display`. Android's glue catches a panic at this FFI
 /// boundary and reports it to logcat.
+///
+/// # Panics
+/// The generated entry point panics when the launch function returns an error.
 #[macro_export]
 macro_rules! android_main {
     ($launch:path) => {
@@ -40,7 +43,17 @@ use {
     argui_text::TextEngine,
 };
 
-/// Run an Argui model from Android's `android_main` callback.
+/// Runs an Argui model from Android's `android_main` callback.
+///
+/// # Arguments
+/// * `android_app` — activity handle supplied by Android.
+/// * `config` — platform identity, window, tray, and preference settings.
+/// * `renderer` — GPU renderer configuration.
+/// * `app` — application model.
+/// * `on_event` — callback for runtime events.
+///
+/// # Errors
+/// Returns an error if runtime setup or application execution fails.
 #[cfg(target_os = "android")]
 pub fn run_application(
     android_app: AndroidApp,
@@ -52,7 +65,18 @@ pub fn run_application(
     argui_runtime::run_android_application(android_app, config, renderer, app, on_event)
 }
 
-/// Run an Argui model with an application-owned text engine on Android.
+/// Runs an Argui model with an application-owned text engine on Android.
+///
+/// # Arguments
+/// * `android_app` — activity handle supplied by Android.
+/// * `config` — platform identity, window, tray, and preference settings.
+/// * `renderer` — GPU renderer configuration.
+/// * `text_engine` — text engine used for shaping and rasterization.
+/// * `app` — application model.
+/// * `on_event` — callback for runtime events.
+///
+/// # Errors
+/// Returns an error if runtime setup or application execution fails.
 #[cfg(target_os = "android")]
 pub fn run_application_with_text_engine(
     android_app: AndroidApp,

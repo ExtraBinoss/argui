@@ -13,7 +13,6 @@ const base = process.env.NUXT_APP_BASE_URL ?? '/'
 const routes = [
   '/',
   '/features',
-  '/get-started',
   '/examples',
   '/docs',
   ...docs.map((slug) => `/docs/${slug}`),
@@ -35,6 +34,8 @@ for (const route of routes) {
     assert.ok(html.includes(`${origin}/social.png`), `Missing social preview: ${route}`)
   } else assert.ok(!html.includes('rel="canonical"'), 'Do not invent a production domain')
 }
+const legacyStart = await readFile(resolve(output, 'get-started/index.html'), 'utf8')
+assert.ok(legacyStart.includes('/docs/start/installation'), 'The legacy start page must redirect')
 for (const item of catalogue) {
   const html = await readFile(resolve(output, 'components', item.slug, 'index.html'), 'utf8')
   assert.ok(html.includes(item.source), `Missing server-rendered source: ${item.slug}`)
@@ -42,15 +43,21 @@ for (const item of catalogue) {
 for (const slug of docs) {
   const html = await readFile(resolve(output, 'docs', slug, 'index.html'), 'utf8')
   assert.ok(html.includes('Compiled example'), `Missing live example: ${slug}`)
+  assert.ok(
+    html.includes('app_examples/docs-examples/src/examples/'),
+    `Missing exact source: ${slug}`,
+  )
   assert.ok(html.includes('Reference files'), `Missing reference files: ${slug}`)
 }
 const sitemap = await readFile(resolve(output, 'sitemap.xml'), 'utf8')
 assert.equal((sitemap.match(/<loc>/g) ?? []).length, origin ? routes.length : 0)
 assert.ok(!sitemap.includes('/gallery/'))
 assert.ok(!sitemap.includes('/examples/ai-harness/'))
+assert.ok(!sitemap.includes('/examples/docs/'))
 const robots = await readFile(resolve(output, 'robots.txt'), 'utf8')
 assert.ok(robots.includes(`Disallow: ${base}gallery/`))
 assert.ok(robots.includes(`Disallow: ${base}examples/ai-harness/`))
+assert.ok(robots.includes(`Disallow: ${base}examples/docs/`))
 assert.equal(robots.includes('Sitemap:'), Boolean(origin))
 for (const asset of [
   'gallery/index.html',
@@ -60,6 +67,8 @@ for (const asset of [
   'gallery/pkg/argui_widget_gallery_bg.wasm',
   'examples/ai-harness/index.html',
   'examples/ai-harness/pkg/argui_example_ai_harness_bg.wasm',
+  'examples/docs/index.html',
+  'examples/docs/pkg/argui_example_docs_bg.wasm',
   'gallery-preview.webp',
   'social.png',
   '404.html',

@@ -47,10 +47,11 @@ watch(
       <NuxtLink to="/" :aria-label="t('nav.home')"><BrandLogo /></NuxtLink>
       <nav class="desktop-nav" :aria-label="t('nav.menu')">
         <NuxtLink to="/features">{{ t('nav.features') }}</NuxtLink>
-        <NuxtLink to="/docs">{{ t('nav.docs') }}</NuxtLink>
+        <OnboardingTooltip :message="t('nav.newHere')" storage-key="argui-docs-onboarding">
+          <NuxtLink to="/docs">{{ t('nav.docs') }}</NuxtLink>
+        </OnboardingTooltip>
         <NuxtLink to="/components">{{ t('nav.components') }}</NuxtLink>
         <NuxtLink to="/examples">{{ t('nav.examples') }}</NuxtLink>
-        <NuxtLink to="/get-started">{{ t('nav.start') }}</NuxtLink>
       </nav>
       <div class="header-actions">
         <button
@@ -99,10 +100,11 @@ watch(
       @keydown.esc="open = false"
     >
       <NuxtLink to="/features">{{ t('nav.features') }}</NuxtLink>
-      <NuxtLink to="/docs">{{ t('nav.docs') }}</NuxtLink>
+      <OnboardingTooltip :message="t('nav.newHere')" storage-key="argui-docs-onboarding">
+        <NuxtLink to="/docs">{{ t('nav.docs') }}</NuxtLink>
+      </OnboardingTooltip>
       <NuxtLink to="/components">{{ t('nav.components') }}</NuxtLink>
       <NuxtLink to="/examples">{{ t('nav.examples') }}</NuxtLink>
-      <NuxtLink to="/get-started">{{ t('nav.start') }}</NuxtLink>
       <a :href="discord" target="_blank" rel="noopener noreferrer">{{ t('nav.discord') }}</a>
     </nav>
   </header>

@@ -1,4 +1,5 @@
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+/// Presentation location for the DevTools panel.
 pub enum DockMode {
     #[default]
     Bottom,

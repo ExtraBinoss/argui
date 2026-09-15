@@ -13,6 +13,16 @@ use crate::{
 };
 
 #[cfg_attr(coverage_nightly, coverage(off))]
+/// Runs a multi-window application with the default text engine.
+///
+/// # Arguments
+/// * `config` — application and window configuration.
+/// * `renderer` — GPU renderer configuration shared by the application.
+/// * `app` — application model that supplies windows and handles events.
+/// * `on_event` — callback for runtime events emitted by the host.
+///
+/// # Errors
+/// Returns an error if the platform event loop or application host cannot be initialized or run.
 pub fn run_application(
     config: ApplicationConfig,
     renderer: RendererConfig,
@@ -23,6 +33,17 @@ pub fn run_application(
 }
 
 #[cfg_attr(coverage_nightly, coverage(off))]
+/// Runs a multi-window application using the supplied text engine.
+///
+/// # Arguments
+/// * `config` — application and window configuration.
+/// * `renderer` — GPU renderer configuration shared by the application.
+/// * `text_engine` — text engine used to shape and render application text.
+/// * `app` — application model that supplies windows and handles events.
+/// * `on_event` — callback for runtime events emitted by the host.
+///
+/// # Errors
+/// Returns an error if the application host or platform event loop cannot be initialized or run.
 pub fn run_application_with_text_engine(
     config: ApplicationConfig,
     renderer: RendererConfig,
@@ -40,6 +61,16 @@ pub fn run_application_with_text_engine(
 }
 
 /// Run an application from Android's `android_main` entry point.
+///
+/// # Arguments
+/// * `android_app` — Android activity handle provided by the platform entry point.
+/// * `config` — application and window configuration.
+/// * `renderer` — GPU renderer configuration.
+/// * `app` — application model that supplies windows and handles events.
+/// * `on_event` — callback for runtime events emitted by the host.
+///
+/// # Errors
+/// Returns an error if the event loop or application host cannot be initialized or run.
 #[cfg(target_os = "android")]
 #[cfg_attr(coverage_nightly, coverage(off))]
 pub fn run_android_application(
@@ -60,6 +91,17 @@ pub fn run_android_application(
 }
 
 /// Run an application with embedded fonts from Android's `android_main` entry point.
+///
+/// # Arguments
+/// * `android_app` — Android activity handle provided by the platform entry point.
+/// * `config` — application and window configuration.
+/// * `renderer` — GPU renderer configuration.
+/// * `text_engine` — text engine used by the application.
+/// * `app` — application model that supplies windows and handles events.
+/// * `on_event` — callback for runtime events emitted by the host.
+///
+/// # Errors
+/// Returns an error if the event loop or application host cannot be initialized or run.
 #[cfg(target_os = "android")]
 #[cfg_attr(coverage_nightly, coverage(off))]
 pub fn run_android_application_with_text_engine(
@@ -76,6 +118,15 @@ pub fn run_android_application_with_text_engine(
 }
 
 #[cfg_attr(coverage_nightly, coverage(off))]
+/// Runs a window using the platform's default text engine.
+///
+/// # Arguments
+/// * `window` — configuration for the window to create.
+/// * `renderer` — GPU renderer configuration.
+/// * `on_event` — callback for runtime events emitted by the host.
+///
+/// # Errors
+/// Returns an error if the event loop or window cannot be initialized or run.
 pub fn run(
     window: WindowConfig,
     renderer: RendererConfig,
@@ -93,6 +144,16 @@ pub fn run(
 }
 
 #[cfg_attr(coverage_nightly, coverage(off))]
+/// Runs a window that displays only a text scene using the default text engine.
+///
+/// # Arguments
+/// * `window` — configuration for the window to create.
+/// * `renderer` — GPU renderer configuration.
+/// * `scene` — text scene to display.
+/// * `on_event` — callback for runtime events emitted by the host.
+///
+/// # Errors
+/// Returns an error if the platform event loop or window cannot be initialized or run.
 pub fn run_with_text(
     window: WindowConfig,
     renderer: RendererConfig,
@@ -103,6 +164,17 @@ pub fn run_with_text(
 }
 
 #[cfg_attr(coverage_nightly, coverage(off))]
+/// Runs a window that displays a text scene with the supplied text engine.
+///
+/// # Arguments
+/// * `window` — configuration for the window to create.
+/// * `renderer` — GPU renderer configuration.
+/// * `text_engine` — text engine used to shape and render the scene.
+/// * `scene` — text scene to display.
+/// * `on_event` — callback for runtime events emitted by the host.
+///
+/// # Errors
+/// Returns an error if the platform event loop or window cannot be initialized or run.
 pub fn run_with_text_engine(
     window: WindowConfig,
     renderer: RendererConfig,
@@ -122,6 +194,16 @@ pub fn run_with_text_engine(
 }
 
 #[cfg_attr(coverage_nightly, coverage(off))]
+/// Runs a window displaying a UI tree with the default text engine.
+///
+/// # Arguments
+/// * `window` — configuration for the window to create.
+/// * `renderer` — GPU renderer configuration.
+/// * `ui` — UI tree to display.
+/// * `on_event` — callback for runtime events emitted by the host.
+///
+/// # Errors
+/// Returns an error if the platform event loop or window cannot be initialized or run.
 pub fn run_ui(
     window: WindowConfig,
     renderer: RendererConfig,
@@ -132,6 +214,17 @@ pub fn run_ui(
 }
 
 #[cfg_attr(coverage_nightly, coverage(off))]
+/// Runs a window displaying a UI tree with the supplied text engine.
+///
+/// # Arguments
+/// * `window` — configuration for the window to create.
+/// * `renderer` — GPU renderer configuration.
+/// * `text_engine` — text engine used to shape and render UI text.
+/// * `ui` — UI tree to display.
+/// * `on_event` — callback for runtime events emitted by the host.
+///
+/// # Errors
+/// Returns an error if the platform event loop or window cannot be initialized or run.
 pub fn run_ui_with_text_engine(
     window: WindowConfig,
     renderer: RendererConfig,
@@ -151,6 +244,16 @@ pub fn run_ui_with_text_engine(
 }
 
 #[cfg_attr(coverage_nightly, coverage(off))]
+/// Runs a single-window render model using the default text engine.
+///
+/// # Arguments
+/// * `config` — application and window configuration.
+/// * `renderer` — GPU renderer configuration.
+/// * `app` — model that renders the window contents.
+/// * `on_event` — callback for runtime events emitted by the host.
+///
+/// # Errors
+/// Returns an error if the application host or platform event loop cannot be initialized or run.
 pub fn run_app(
     config: ApplicationConfig,
     renderer: RendererConfig,
@@ -161,6 +264,17 @@ pub fn run_app(
 }
 
 #[cfg_attr(coverage_nightly, coverage(off))]
+/// Runs a single-window render model using the supplied text engine.
+///
+/// # Arguments
+/// * `config` — application and window configuration.
+/// * `renderer` — GPU renderer configuration.
+/// * `text_engine` — text engine used to render text in the window.
+/// * `app` — model that renders the window contents.
+/// * `on_event` — callback for runtime events emitted by the host.
+///
+/// # Errors
+/// Returns an error if the application host or platform event loop cannot be initialized or run.
 pub fn run_app_with_text_engine(
     config: ApplicationConfig,
     renderer: RendererConfig,

@@ -9,10 +9,12 @@ pub struct FrameCursor {
 
 impl InspectorHandle {
     /// Enables detailed renderer measurements independently of tree inspection.
+    /// `enabled` controls whether subsequent frames request GPU profiling.
     pub fn set_gpu_profiling(&self, enabled: bool) {
         self.0.borrow_mut().gpu_profiling = enabled;
     }
 
+    /// Reports whether GPU profiling is enabled and recording is active.
     #[must_use]
     pub fn gpu_profiling(&self) -> bool {
         let state = self.0.borrow();
@@ -20,6 +22,8 @@ impl InspectorHandle {
     }
 
     /// Synchronizes new frames and delayed render results without cloning unchanged records.
+    /// `destination` is updated in place; `cursor` tracks the last synchronized history position.
+    /// Returns whether the destination changed.
     pub fn sync_frames(
         &self,
         destination: &mut Vec<FrameRecord>,
@@ -53,6 +57,7 @@ impl InspectorHandle {
     }
 
     /// Whether tree inspection is attached, independently of recording pause.
+    /// Returns `true` when recording is enabled.
     #[must_use]
     pub fn enabled(&self) -> bool {
         self.0.borrow().recording

@@ -5,6 +5,8 @@ impl Element {
     /// baseline calculations. Give the wrapper a height or external constraints:
     /// content contributes no intrinsic size; padding and borders still apply.
     ///
+    /// * `content` — subtree whose intrinsic sizing is isolated from its ancestors.
+    ///
     /// The content uses the wrapper's normal layout style, padding and border.
     /// Both axes must remain clipped or scrollable. UI ancestry, events,
     /// semantics and inherited styles are preserved across the layout boundary.

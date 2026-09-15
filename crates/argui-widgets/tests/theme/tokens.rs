@@ -1,6 +1,6 @@
 use argui_core::{Color, ColorScheme};
 use argui_theme::{ThemeOverrides, ThemeSource, ThemeValue};
-use argui_widgets::shadcn;
+use argui_widgets::{default_theme, shadcn};
 
 struct Source(ThemeOverrides);
 impl ThemeSource for Source {
@@ -42,4 +42,10 @@ fn every_exposed_token_updates_its_widget_theme_and_primary_regenerates_contrast
         shadcn(&source).resolve(ColorScheme::Dark).primary,
         Color::BLACK
     );
+}
+
+#[test]
+fn default_theme_is_the_clear_name_for_the_shadcn_compatible_palette() {
+    let primary = Color::srgb(0.2, 0.5, 0.8);
+    assert_eq!(default_theme(primary), shadcn(primary));
 }

@@ -12,16 +12,27 @@ mod state;
 pub use state::{CalendarConstraints, CalendarSelection, CalendarState};
 
 pub trait CalendarLocale {
+    /// Returns whether this locale uses right-to-left layout.
     fn rtl(&self) -> bool {
         false
     }
+    /// Returns the first weekday used to lay out the calendar grid.
     fn first_weekday(&self) -> Weekday;
+    /// Formats a full weekday name for `weekday`.
     fn weekday(&self, weekday: Weekday) -> String;
+    /// Formats a compact weekday name; defaults to the first three characters.
     fn short_weekday(&self, weekday: Weekday) -> String {
         self.weekday(weekday).chars().take(3).collect()
     }
+    /// Formats the month containing `date` for the calendar heading.
     fn month(&self, date: Date) -> String;
+    /// Formats `date` for day labels and input values.
     fn format(&self, date: Date) -> String;
+    /// Parses a date from user-provided `text`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a message when the input cannot be parsed as a date.
     fn parse(&self, text: &str) -> Result<Date, String>;
 }
 
@@ -57,6 +68,10 @@ pub struct Calendar<'a> {
 }
 
 impl<'a> Calendar<'a> {
+    /// Creates a calendar identified by `key`, labelled for accessibility, and anchored to `state`.
+    ///
+    /// `today` marks the current date in the rendered grid.
+    /// `label` supplies the accessible calendar name.
     pub fn new(
         key: impl Into<String>,
         label: impl Into<String>,
@@ -73,10 +88,13 @@ impl<'a> Calendar<'a> {
         }
     }
 
+    /// Returns the interaction key used for `date`'s day cell.
     pub fn day_key(&self, date: Date) -> String {
         format!("{}::day::{date}", self.key)
     }
 
+    /// Builds the calendar with localized headings and themed day controls.
+    /// `theme` supplies the calendar's colors and text styles.
     pub fn build(&self, theme: &WidgetTheme) -> Element {
         self.build_days(theme, |date, _today, selected| {
             Element::text(date.day().to_string()).text_style(TextStyle {
@@ -96,6 +114,9 @@ impl<'a> Calendar<'a> {
     }
 
     /// Custom day content retains the same semantics, identity and keyboard behavior.
+    ///
+    /// `day` receives the date, whether it is today, and whether it is selected.
+    /// `theme` supplies the surrounding calendar styling.
     pub fn build_days(
         &self,
         theme: &WidgetTheme,
@@ -258,6 +279,8 @@ impl<'a> Calendar<'a> {
         .opacity(if enabled { 1.0 } else { 0.35 })
     }
 
+    /// Applies a calendar interaction to a cloned state and returns it when changed.
+    /// `event` is the UI interaction to interpret.
     pub fn action(&self, event: &UiEvent) -> Option<CalendarState> {
         let key = event.target_key()?;
         if matches!(event.kind, UiEventKind::Click(_)) {

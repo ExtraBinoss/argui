@@ -48,6 +48,9 @@ struct Column {
 }
 
 impl AnimatedText {
+    /// Creates an animated text value, initially displaying `value` without a transition.
+    ///
+    /// `key` identifies the element and `value` is its initial text.
     #[must_use]
     pub fn new(key: impl Into<String>, value: impl Into<String>) -> Self {
         let value = value.into();
@@ -70,6 +73,8 @@ impl AnimatedText {
     }
 
     #[must_use]
+    /// Selects the transition used for changed graphemes.
+    /// `animation` chooses the transition effect.
     pub fn animation(mut self, animation: TextAnimation) -> Self {
         self.animation = animation;
         self.cached_style = None;
@@ -77,12 +82,14 @@ impl AnimatedText {
     }
 
     #[must_use]
+    /// Sets the duration of each transition.
     pub const fn duration(mut self, duration: Duration) -> Self {
         self.duration = duration;
         self
     }
 
     /// Align numeric places from the right (default), or text positions from the left.
+    /// `align_end` selects right alignment when `true` and left alignment when `false`.
     #[must_use]
     pub fn align_end(mut self, align_end: bool) -> Self {
         self.align_end = align_end;
@@ -91,6 +98,7 @@ impl AnimatedText {
     }
 
     /// Default text uses the theme foreground and a monospace family for stable digits.
+    /// `style` overrides that default text style.
     #[must_use]
     pub fn text_style(mut self, style: TextStyle) -> Self {
         self.style = Some(style);
@@ -99,6 +107,11 @@ impl AnimatedText {
     }
 
     #[must_use]
+    /// Sets the default font size to `size`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `size` is not finite and strictly positive.
     pub fn font_size(mut self, size: f32) -> Self {
         assert!(
             size.is_finite() && size > 0.0,
@@ -110,10 +123,12 @@ impl AnimatedText {
     }
 
     #[must_use]
+    /// Returns the latest requested text value.
     pub fn value(&self) -> &str {
         &self.value
     }
 
+    /// Replaces the requested value, starting or coalescing a transition as needed.
     pub fn set_text(&mut self, value: impl Into<String>) {
         let value = value.into();
         if self.value == value {
@@ -138,6 +153,7 @@ impl AnimatedText {
         }
     }
 
+    /// Sets reduced-motion behavior and immediately finishes any active transition when enabled.
     pub fn set_reduced_motion(&mut self, reduced: bool) {
         self.reduced_motion = reduced;
         if reduced && (self.is_animating() || self.to != self.value) {
@@ -146,11 +162,13 @@ impl AnimatedText {
     }
 
     #[must_use]
+    /// Returns whether the current transition is incomplete.
     pub fn is_animating(&self) -> bool {
         self.progress < 1.0
     }
 
     /// Advance only while animating. No clocks, timers or background work remain at rest.
+    /// `elapsed` is the time since the previous advance; returns whether the animation changed.
     pub fn advance(&mut self, elapsed: Duration) -> bool {
         if !self.is_animating() || elapsed == Duration::ZERO {
             return false;
@@ -184,6 +202,7 @@ impl AnimatedText {
     }
 
     #[must_use]
+    /// Builds the current frame using `theme` for default text styling.
     pub fn build(&mut self, theme: &WidgetTheme) -> Element {
         let mut style = self.style.clone().unwrap_or_else(|| TextStyle {
             font_size: self.font_size,

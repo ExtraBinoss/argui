@@ -117,12 +117,18 @@ pub struct WidgetAssets {
 }
 
 impl WidgetAssets {
+    /// Builds an asset bundle containing every embedded Tabler icon in `color`.
     #[must_use]
     pub fn tabler(color: Color) -> Self {
         Self::tabler_subset(color, TablerIcon::ALL)
     }
 
     #[must_use]
+    /// Builds a themed bundle containing only the requested `TablerIcon` assets; `color` tints the generated icons.
+    ///
+    /// # Panics
+    ///
+    /// Panics if embedded Tabler icon data cannot be parsed as SVG.
     pub fn tabler_subset(color: Color, requested: impl IntoIterator<Item = TablerIcon>) -> Self {
         let mut ids = [None; 27];
         let icons = requested
@@ -143,6 +149,7 @@ impl WidgetAssets {
     }
 
     #[must_use]
+    /// Creates a decorative icon element at `size` logical pixels.
     pub fn icon(&self, icon: TablerIcon, size: f32) -> Element {
         Element::vector(self.vector_id(icon))
             .layout_style(LayoutStyle {
@@ -155,11 +162,17 @@ impl WidgetAssets {
     }
 
     #[must_use]
+    /// Returns the vector asset id for an icon included in this bundle.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `icon` was not requested when this bundle was created.
     pub const fn vector_id(&self, icon: TablerIcon) -> VectorId {
         self.ids[icon as usize].expect("requested icon must be included in WidgetAssets")
     }
 
     #[must_use]
+    /// Creates an icon with an accessible image label at `size` logical pixels.
     pub fn labeled_icon(&self, icon: TablerIcon, size: f32, label: impl Into<String>) -> Element {
         self.icon(icon, size)
             .semantic_hidden(false)
@@ -167,6 +180,7 @@ impl WidgetAssets {
     }
 
     #[must_use]
+    /// Returns the vector assets to register with the renderer.
     pub fn assets(&self) -> &[VectorAsset] {
         &self.assets
     }

@@ -3,7 +3,9 @@ use argui_core::Insets;
 use crate::{Element, Sides, length};
 
 impl Element {
-    /// Wrap this element in padding for the supplied logical-pixel safe area.
+    /// Wraps this element in padding for the supplied logical-pixel safe area.
+    ///
+    /// * `insets` — safe-area distances from the top, right, bottom, and left edges.
     #[must_use]
     pub fn safe_area(self, insets: Insets) -> Self {
         let insets = Insets::new(

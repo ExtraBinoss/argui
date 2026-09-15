@@ -24,6 +24,10 @@ pub enum Position {
     Sticky,
 }
 
+/// Creates equal horizontal and vertical inset sides from logical lengths.
+///
+/// * `horizontal` — length used for the left and right sides.
+/// * `vertical` — length used for the top and bottom sides.
 #[must_use]
 pub fn sides<T>(horizontal: f32, vertical: f32) -> Sides<T>
 where
@@ -48,11 +52,13 @@ pub enum Overflow {
 }
 
 impl Overflow {
+    /// Returns whether this overflow mode clips content to its bounds.
     #[must_use]
     pub const fn clips(self) -> bool {
         !matches!(self, Self::Visible)
     }
 
+    /// Returns whether this overflow mode enables scroll input.
     #[must_use]
     pub const fn scrolls(self) -> bool {
         matches!(self, Self::Auto | Self::Scroll)

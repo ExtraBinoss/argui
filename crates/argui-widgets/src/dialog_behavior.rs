@@ -33,6 +33,8 @@ pub struct DialogBehavior {
 }
 
 impl DialogBehavior {
+    /// Creates dialog behavior for an identified, labelled dialog with current `open` state.
+    /// `key` derives interaction keys; `label` is the dialog's accessible name.
     #[must_use]
     pub fn new(key: impl Into<String>, label: impl Into<String>, open: bool) -> Self {
         Self {
@@ -46,18 +48,21 @@ impl DialogBehavior {
     }
 
     #[must_use]
+    /// Sets the target that receives focus when the dialog opens.
     pub fn initial_focus(mut self, focus: InitialFocus) -> Self {
         self.initial_focus = Some(focus);
         self
     }
 
     #[must_use]
+    /// Sets whether a backdrop interaction requests dismissal; `dismiss` controls this policy.
     pub const fn dismiss_on_backdrop(mut self, dismiss: bool) -> Self {
         self.dismiss_on_backdrop = dismiss;
         self
     }
 
     #[must_use]
+    /// Sets alert-dialog semantics.
     pub const fn alert(mut self, alert: bool) -> Self {
         self.role = if alert {
             Role::AlertDialog
@@ -68,26 +73,31 @@ impl DialogBehavior {
     }
 
     #[must_use]
+    /// Returns the state key of the dialog trigger.
     pub fn trigger_key(&self) -> String {
         format!("{}::trigger", self.key)
     }
 
     #[must_use]
+    /// Returns the state key of the dialog close control.
     pub fn close_key(&self) -> String {
         format!("{}::close", self.key)
     }
 
     #[must_use]
+    /// Returns the state key of the dialog panel.
     pub fn panel_key(&self) -> String {
         format!("{}::panel", self.key)
     }
 
     #[must_use]
+    /// Returns the state key of the dialog backdrop.
     pub fn backdrop_key(&self) -> String {
         format!("{}::backdrop", self.key)
     }
 
     #[must_use]
+    /// Applies the matching dialog interaction semantics to `element`; `part` identifies its dialog role.
     pub fn decorate(&self, part: DialogPart, element: Element) -> Element {
         match part {
             DialogPart::Root => element
@@ -115,6 +125,7 @@ impl DialogBehavior {
     }
 
     #[must_use]
+    /// Interprets `event` as an opening or dismissal action when it targets this dialog.
     pub fn action(&self, event: &UiEvent) -> Option<DialogAction> {
         let event_key = event.target_key();
         if matches!(event.kind, UiEventKind::Click(_)) {

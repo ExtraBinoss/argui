@@ -23,6 +23,8 @@ impl Default for MessageScrollState {
 }
 
 impl MessageScrollState {
+    /// Updates scroll retention from `event` for the viewport identified by `viewport_key`.
+    /// `maximum` is the greatest valid vertical scroll offset.
     /// User scrolls or reading interactions suspend following; reaching the live edge resumes it.
     pub fn observe(&mut self, event: &UiEvent, viewport_key: &str, maximum: f32) {
         if event.target_key() == Some(viewport_key)
@@ -45,6 +47,8 @@ impl MessageScrollState {
     }
 
     /// Call once per append (zero for a streaming update), after measuring the new content.
+    /// Handles `count` appended messages in the scroller identified by `key`.
+    /// `maximum` is the new greatest scroll offset.
     pub fn appended(&mut self, key: &str, count: usize, maximum: f32) -> Option<ScrollRequest> {
         self.maximum = maximum.max(0.0);
         if self.following {
@@ -56,6 +60,7 @@ impl MessageScrollState {
     }
 
     /// Preserve the visible content when measured history is inserted above it.
+    /// Preserves visible content after insertion; `key` identifies the scroller and `added_height` is the inserted height.
     pub fn prepended(&mut self, key: &str, added_height: f32) -> ScrollRequest {
         let added = added_height.max(0.0);
         self.offset += added;
@@ -63,6 +68,7 @@ impl MessageScrollState {
         ScrollRequest::offset(key, Point::new(0.0, self.offset))
     }
 
+    /// Requests scrolling to the latest edge of the viewport identified by `key`.
     pub fn latest(&mut self, key: &str) -> ScrollRequest {
         self.following = true;
         self.unread = 0;
@@ -70,6 +76,7 @@ impl MessageScrollState {
         ScrollRequest::offset(key, Point::new(0.0, self.maximum))
     }
 
+    /// Requests a scroll to the message identified by `message_key`.
     pub fn jump(&mut self, message_key: impl Into<String>) -> ScrollRequest {
         self.following = false;
         ScrollRequest::reveal(message_key.into())
@@ -98,6 +105,7 @@ pub struct MessageScroller {
 }
 
 impl MessageScroller {
+    /// Creates a scroller identified by `key`, named accessibly by `label`, around `content`.
     #[must_use]
     pub fn new(key: impl Into<String>, label: impl Into<String>, content: Element) -> Self {
         Self {
@@ -114,6 +122,7 @@ impl MessageScroller {
     }
 
     #[must_use]
+    /// Returns a message-scroller action when `event` targets its controls.
     pub fn action(&self, event: &UiEvent) -> Option<MessageScrollerAction> {
         if self.has_earlier
             && ButtonBehavior::new(format!("{}::earlier", self.key), &self.earlier_label)
@@ -131,6 +140,7 @@ impl MessageScroller {
     }
 
     #[must_use]
+    /// Builds the message scroller and its controls using `theme`.
     pub fn build(self, theme: &WidgetTheme) -> Element {
         let history = self.has_earlier.then(|| {
             Button::new(

@@ -26,16 +26,24 @@ mod unsupported;
 use unsupported::Backend;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Native window style requested for a popup surface.
 pub enum PopupKind {
+    /// Short-lived informational tooltip.
     Tooltip,
+    /// Context or command menu.
     Menu,
+    /// Anchored popover panel.
     Popover,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Reason a native popup could not be queried or created.
 pub enum PopupUnavailable {
+    /// The current window backend has no native popup API.
     UnsupportedBackend,
+    /// Parent or screen geometry could not be determined.
     UnknownGeometry,
+    /// A native platform operation failed.
     Platform(String),
 }
 
@@ -53,12 +61,18 @@ impl std::error::Error for PopupUnavailable {}
 /// Converts between desktop physical pixels and the owning UI tree's logical coordinates.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct PopupEnvironment {
+    /// Physical screen origin of the owning window.
     pub origin: Point,
+    /// Physical pixels per logical coordinate.
     pub scale: f32,
+    /// Usable screen rectangle in the logical coordinate space.
     pub work_area: Rect,
 }
 
 impl PopupEnvironment {
+    /// Builds a logical-coordinate environment from physical screen geometry.
+    /// Returns `None` for non-finite, non-positive, or invalid geometry.
+    /// `origin` is the physical parent origin, `scale` is pixels per logical unit, and `work_area` is the usable physical screen rectangle.
     #[must_use]
     pub fn from_physical(origin: Point, scale: f32, work_area: Rect) -> Option<Self> {
         if !scale.is_finite()
@@ -92,6 +106,7 @@ impl PopupEnvironment {
     }
 
     /// Accept physical pixel rounding before layout to avoid alternating sizes at fractional DPI.
+    /// `bounds` is the popup rectangle in logical coordinates.
     #[must_use]
     pub fn snap(self, bounds: Rect) -> Rect {
         let position = self.position(bounds);
@@ -109,6 +124,7 @@ impl PopupEnvironment {
     }
 
     #[must_use]
+    /// Converts logical popup bounds to a rounded physical screen position.
     pub fn position(self, bounds: Rect) -> PhysicalPosition<i32> {
         PhysicalPosition::new(
             (self.origin.x + bounds.origin.x * self.scale).round() as i32,
@@ -117,6 +133,7 @@ impl PopupEnvironment {
     }
 
     #[must_use]
+    /// Converts logical popup bounds to a rounded physical size of at least one pixel.
     pub fn size(self, bounds: Rect) -> PhysicalSize<u32> {
         PhysicalSize::new(
             (bounds.size.width * self.scale).round().max(1.0) as u32,
@@ -147,6 +164,10 @@ pub struct NativePopup {
 
 #[cfg_attr(coverage_nightly, coverage(off))]
 impl NativePopup {
+    /// Resolves the parent's screen origin, scale, and usable work area.
+    ///
+    /// # Errors
+    /// Returns an error if the backend cannot query usable geometry.
     pub fn environment(parent: &Window) -> Result<PopupEnvironment, PopupUnavailable> {
         let area = Backend::work_area(parent)?;
         let origin = parent
@@ -160,6 +181,11 @@ impl NativePopup {
         .ok_or(PopupUnavailable::UnknownGeometry)
     }
 
+    /// Creates a hidden native popup owned by `parent` at the supplied logical bounds.
+    ///
+    /// # Errors
+    /// Returns an error if the backend rejects the popup, creation fails, or ownership attachment fails.
+    /// `event_loop` creates the OS window; `parent` owns it; `kind`, `environment`, and `bounds` define its style and placement.
     pub fn create(
         event_loop: &ActiveEventLoop,
         parent: &Window,
@@ -186,14 +212,18 @@ impl NativePopup {
     }
 
     #[must_use]
+    /// Returns the native popup window.
     pub fn window(&self) -> &Arc<Window> {
         &self.window
     }
 
+    /// Requests focus for the popup window.
     pub fn focus(&self) {
         Backend::focus(&self.window);
     }
 
+    /// Moves and resizes the popup to the supplied logical bounds.
+    /// `environment` supplies the current screen conversion and `bounds` is the desired logical rectangle.
     pub fn reposition(&self, environment: PopupEnvironment, bounds: Rect) {
         self.window.set_outer_position(environment.position(bounds));
         let size = environment.size(bounds);

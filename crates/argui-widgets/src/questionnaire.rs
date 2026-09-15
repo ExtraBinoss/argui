@@ -22,6 +22,8 @@ pub struct Question {
 }
 
 impl Question {
+    /// Creates a required single-choice question with freeform input enabled.
+    /// `id` is its stable identity and `prompt` is displayed to the participant.
     #[must_use]
     pub fn new(id: impl Into<String>, prompt: impl Into<String>) -> Self {
         Self {
@@ -74,6 +76,7 @@ pub enum QuestionnaireAction {
 }
 
 impl QuestionnaireState {
+    /// Applies a generated action to the retained answers and navigation state.
     pub fn apply(&mut self, action: &QuestionnaireAction) {
         self.submitted = false;
         match action {
@@ -114,6 +117,8 @@ pub struct Questionnaire {
 }
 
 impl Questionnaire {
+    /// Creates a multi-step questionnaire from questions in display order.
+    /// `key` scopes the generated question and control identities.
     #[must_use]
     pub fn new(key: impl Into<String>, questions: impl IntoIterator<Item = Question>) -> Self {
         Self {
@@ -131,6 +136,7 @@ impl Questionnaire {
 
     /// Reject duplicate identifiers and invalid retained answers before submission.
     #[must_use]
+    /// Returns question identities that prevent submission due to invalid answers or duplicate ids.
     pub fn invalid_questions(&self) -> BTreeSet<String> {
         let mut seen = BTreeSet::new();
         self.questions
@@ -154,6 +160,7 @@ impl Questionnaire {
     }
 
     #[must_use]
+    /// Interprets `event` as an answer, navigation, skip or submission action.
     pub fn action(&self, event: &UiEvent) -> Option<QuestionnaireAction> {
         let index = self.state.active.min(self.questions.len().checked_sub(1)?);
         let question = &self.questions[index];
@@ -245,6 +252,7 @@ impl Questionnaire {
     }
 
     #[must_use]
+    /// Builds the active questionnaire step and controls using `theme` for styling.
     pub fn build(&self, theme: &WidgetTheme) -> Element {
         let index = self
             .state

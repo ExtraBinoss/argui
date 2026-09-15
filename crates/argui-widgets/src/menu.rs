@@ -48,6 +48,14 @@ pub struct Menu {
 }
 
 impl Menu {
+    /// Creates a controlled menu with unique item identities.
+    ///
+    /// `key` identifies the menu, `label` names it accessibly, `open` sets visibility,
+    /// and `items` supplies its entries.
+    ///
+    /// # Panics
+    ///
+    /// Panics if any item identity is repeated anywhere in the menu tree.
     #[must_use]
     pub fn new(
         key: impl Into<String>,
@@ -78,11 +86,13 @@ impl Menu {
         }
     }
     #[must_use]
+    /// Sets the overlay surface policy.
     pub fn surface(mut self, surface: argui_ui::OverlaySurface) -> Self {
         self.surface = Some(surface);
         self
     }
     #[must_use]
+    /// Supplies the icon assets used by menu entries; `icons` provides those assets.
     pub fn icons(mut self, icons: &crate::WidgetAssets) -> Self {
         self.icons = Some(icons.clone());
         self
@@ -95,6 +105,11 @@ impl Menu {
         self
     }
     #[must_use]
+    /// Builds the menu attached to `trigger`, using `theme` for styling.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the constructed popover does not expose the trigger semantics required by the menu.
     pub fn build(&self, trigger: Element, theme: &WidgetTheme) -> Element {
         self.with_content(trigger, self.content(theme), theme)
     }
@@ -273,6 +288,7 @@ impl Menu {
         Some(self.item_key(&item.id).into())
     }
 
+    /// Returns the content key for the submenu identified by `id`.
     pub fn submenu_content_key(&self, id: &str) -> String {
         format!("{}::content", self.item_key(id))
     }
@@ -306,6 +322,9 @@ impl Menu {
             None
         }
     }
+    /// Returns a focus response when printable input matches an enabled entry.
+    ///
+    /// `event` is processed using retained typeahead `search` at monotonic time `now`.
     pub fn search(
         &self,
         event: &UiEvent,
@@ -339,6 +358,7 @@ impl Menu {
         Some(MenuResponse::Focus(self.item_key(&items[found].id).into()))
     }
     #[must_use]
+    /// Interprets `event` as a menu focus, open, close, invocation or selection response.
     pub fn response(&self, event: &UiEvent) -> Option<MenuResponse> {
         if matches!(event.kind, UiEventKind::KeyInput(_))
             && !event

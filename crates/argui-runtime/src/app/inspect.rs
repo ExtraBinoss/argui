@@ -99,7 +99,10 @@ impl Application {
 pub struct Inspection;
 
 impl Inspection {
-    /// Adds extension diagnostics only when the inspector requests a snapshot.
+    /// Adds extension diagnostics to matching nodes in an inspection snapshot.
+    ///
+    /// `snapshot` is the snapshot to update; `stats` contains custom layout-element
+    /// measurements to attach to nodes with matching identifiers.
     pub fn custom_stats(snapshot: &mut TreeSnapshot, stats: &[argui_layout::CustomElementStats]) {
         for stats in stats {
             if let Some(node) = snapshot
@@ -121,6 +124,9 @@ impl Inspection {
     }
 
     /// Builds an inspectable snapshot from a retained tree and its layout.
+    ///
+    /// `tree` supplies the retained elements and node identifiers; `layout` supplies
+    /// their current geometry.
     #[must_use]
     pub fn snapshot(tree: &UiTree, layout: &argui_layout::LayoutOutput) -> TreeSnapshot {
         let mut nodes = Vec::new();
@@ -143,7 +149,10 @@ impl Inspection {
         }
     }
 
-    /// Applies the enabled inspector overrides to the matching retained nodes.
+    /// Applies enabled inspector overrides to matching nodes in `root`.
+    ///
+    /// `tree` provides node identifiers used to match overrides, and `inspector`
+    /// supplies the active override values.
     pub fn apply_overrides(
         root: &mut Element,
         tree: &UiTree,

@@ -23,6 +23,7 @@ pub enum EffectParameterType {
 }
 
 impl EffectParameterType {
+    /// Returns the number of 32-bit words in this parameter's packed representation.
     #[must_use]
     pub const fn words(self) -> usize {
         match self {
@@ -60,6 +61,8 @@ pub struct EffectParameter {
 }
 
 impl EffectParameter {
+    /// Creates a named parameter with its expected value type.
+    /// * `name` — shader-visible parameter name; `parameter_type` — expected value type.
     #[must_use]
     pub const fn new(name: &'static str, parameter_type: EffectParameterType) -> Self {
         Self {
@@ -85,6 +88,9 @@ pub struct EffectPassDefinition {
 }
 
 impl EffectPassDefinition {
+    /// Creates a fragment-shader pass that reads the source image.
+    /// Declares the input images consumed by this pass.
+    /// * `name` — pass identifier; `wgsl` — WGSL fragment-shader source.
     #[must_use]
     pub const fn fragment(name: &'static str, wgsl: &'static str) -> Self {
         Self {
@@ -95,12 +101,16 @@ impl EffectPassDefinition {
         }
     }
 
+    /// Sets the image inputs consumed by this pass.
+    /// * `inputs` — image inputs read by this pass.
     #[must_use]
     pub const fn inputs(mut self, inputs: &'static [EffectInput]) -> Self {
         self.inputs = inputs;
         self
     }
 
+    /// Sets the downsampling divisor for this pass; zero is treated as one.
+    /// * `divisor` — divisor applied to the pass resolution.
     #[must_use]
     pub const fn downsampled(mut self, divisor: u32) -> Self {
         self.scale_divisor = if divisor == 0 { 1 } else { divisor };
@@ -116,6 +126,8 @@ pub struct EffectDefinition {
 }
 
 impl EffectDefinition {
+    /// Creates an effect definition from its identifier, ordered parameters, and passes.
+    /// * `id` — effect identifier; `parameters` — ordered parameter schema; `passes` — render passes.
     #[must_use]
     pub const fn new(
         id: EffectId,
@@ -129,6 +141,10 @@ impl EffectDefinition {
         }
     }
 
+    /// Validates identifiers, parameter names, pass definitions, and shader source.
+    ///
+    /// # Errors
+    /// Returns a renderer error if the definition is malformed or shader source is invalid.
     pub fn validate(&self) -> Result<(), RendererError> {
         if self.id.0.is_empty() || !self.id.0.contains('.') {
             return Err(RendererError::InvalidEffectDefinition(format!(
@@ -176,6 +192,10 @@ impl EffectDefinition {
         Ok(())
     }
 
+    /// Checks that an instance's ordered arguments match this definition's schema.
+    ///
+    /// # Errors
+    /// Returns a renderer error if argument count, names, or value types do not match.
     pub fn validate_instance(&self, instance: &EffectInstance) -> Result<(), RendererError> {
         if instance.parameters.len() != self.parameters.len() {
             return Err(RendererError::InvalidEffectParameters {
@@ -207,6 +227,7 @@ impl EffectDefinition {
         Ok(())
     }
 
+    /// Returns the total packed word count for all parameters.
     #[must_use]
     pub fn parameter_words(&self) -> usize {
         self.parameters
@@ -226,6 +247,11 @@ struct EffectRegistryInner {
 }
 
 impl EffectRegistry {
+    /// Creates a registry after validating every definition and checking identifiers are unique.
+    ///
+    /// # Errors
+    /// Returns a renderer error if a definition is invalid or an identifier is duplicated.
+    /// * `definitions` — effect definitions to validate and register.
     pub fn new(
         definitions: impl IntoIterator<Item = EffectDefinition>,
     ) -> Result<Self, RendererError> {
@@ -237,6 +263,9 @@ impl EffectRegistry {
     }
 
     /// Adds one definition without revalidating existing immutable definitions.
+    ///
+    /// # Errors
+    /// Returns a renderer error if the definition is invalid or its identifier is already registered.
     pub fn with_definition(mut self, definition: EffectDefinition) -> Result<Self, RendererError> {
         definition.validate()?;
         let id = definition.id;
@@ -249,6 +278,7 @@ impl EffectRegistry {
         Ok(self)
     }
 
+    /// Returns the definition registered for `id`, if present.
     #[must_use]
     pub fn get(&self, id: EffectId) -> Option<&EffectDefinition> {
         self.0
@@ -257,11 +287,13 @@ impl EffectRegistry {
             .map(|index| &self.0.definitions[*index])
     }
 
+    /// Returns all definitions in registration order.
     #[must_use]
     pub fn definitions(&self) -> &[EffectDefinition] {
         &self.0.definitions
     }
 
+    /// Returns whether the registry contains no effect definitions.
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.0.definitions.is_empty()

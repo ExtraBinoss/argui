@@ -3,21 +3,33 @@ use std::{fmt, sync::Arc};
 type CustomFunction = dyn Fn(f32) -> f32 + Send + Sync + 'static;
 
 #[derive(Clone, Default)]
+/// Maps normalized animation progress to eased progress.
 pub enum Easing {
+    /// Linear interpolation with no easing.
     #[default]
     Linear,
+    /// Cubic Bézier easing curve.
     CubicBezier(CubicBezier),
+    /// Discrete step easing.
     Steps(Steps),
+    /// Piecewise-linear easing defined by stops.
     PiecewiseLinear(Box<[LinearStop]>),
+    /// User-provided easing function.
     Custom(Arc<CustomFunction>),
 }
 
 impl Easing {
+    /// Wraps a thread-safe custom function as an easing curve.
     #[must_use]
     pub fn custom(function: impl Fn(f32) -> f32 + Send + Sync + 'static) -> Self {
         Self::Custom(Arc::new(function))
     }
 
+    /// Creates piecewise-linear easing from sorted stops spanning input zero to one.
+    ///
+    /// # Errors
+    /// Returns [`EasingError::InvalidStops`] if stops are missing, unsorted, outside
+    /// the normalized input interval, or contain non-finite coordinates.
     pub fn piecewise_linear(stops: impl Into<Vec<LinearStop>>) -> Result<Self, EasingError> {
         let stops = stops.into();
         if stops.len() < 2
@@ -35,6 +47,7 @@ impl Easing {
         Ok(Self::PiecewiseLinear(stops.into_boxed_slice()))
     }
 
+    /// Evaluates the easing curve at normalized `progress`, clamped to zero through one.
     #[must_use]
     pub fn sample(&self, progress: f32) -> f32 {
         let progress = progress.clamp(0.0, 1.0);
@@ -77,6 +90,7 @@ impl PartialEq for Easing {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
+/// Cubic Bézier easing curve with endpoints fixed at (0, 0) and (1, 1).
 pub struct CubicBezier {
     x1: f32,
     y1: f32,
@@ -85,6 +99,12 @@ pub struct CubicBezier {
 }
 
 impl CubicBezier {
+    /// Creates a curve from its two control points.
+    /// * `x1`, `y1` — first control point; `x2`, `y2` — second control point.
+    ///
+    /// # Errors
+    /// Returns [`EasingError::InvalidBezier`] if any coordinate is non-finite or
+    /// either control-point x coordinate is outside zero through one.
     pub fn new(x1: f32, y1: f32, x2: f32, y2: f32) -> Result<Self, EasingError> {
         if [x1, y1, x2, y2].iter().any(|value| !value.is_finite())
             || !(0.0..=1.0).contains(&x1)
@@ -95,6 +115,7 @@ impl CubicBezier {
         Ok(Self { x1, y1, x2, y2 })
     }
 
+    /// Evaluates the curve at normalized `progress`, clamped to zero through one.
     #[must_use]
     pub fn sample(self, progress: f32) -> f32 {
         let progress = progress.clamp(0.0, 1.0);
@@ -125,20 +146,32 @@ fn cubic(parameter: f32, first: f32, second: f32) -> f32 {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Placement of jumps in a [`Steps`] easing curve.
 pub enum StepPosition {
+    /// Jump at the start of each interval.
     JumpStart,
+    /// Jump at the end of each interval.
     JumpEnd,
+    /// Omit jumps at both endpoints.
     JumpNone,
+    /// Include jumps at both endpoints.
     JumpBoth,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Step-based easing with a jump count and endpoint policy.
 pub struct Steps {
     count: u32,
     position: StepPosition,
 }
 
 impl Steps {
+    /// Creates a step curve with `count` jumps and the selected endpoint policy.
+    /// * `position` — policy for jump behavior at interval boundaries.
+    ///
+    /// # Errors
+    /// Returns [`EasingError::InvalidSteps`] when the count is zero, or when
+    /// `JumpNone` is used with fewer than two jumps.
     pub fn new(count: u32, position: StepPosition) -> Result<Self, EasingError> {
         if count == 0 || (position == StepPosition::JumpNone && count == 1) {
             return Err(EasingError::InvalidSteps);
@@ -146,6 +179,7 @@ impl Steps {
         Ok(Self { count, position })
     }
 
+    /// Evaluates the step curve at normalized `progress`, clamped to zero through one.
     #[must_use]
     pub fn sample(self, progress: f32) -> f32 {
         let progress = progress.clamp(0.0, 1.0);
@@ -160,12 +194,16 @@ impl Steps {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
+/// Input/output pair defining a point on piecewise-linear easing.
 pub struct LinearStop {
+    /// Input progress coordinate.
     pub input: f32,
+    /// Output progress coordinate.
     pub output: f32,
 }
 
 impl LinearStop {
+    /// Creates a stop from its input and output coordinates.
     #[must_use]
     pub const fn new(input: f32, output: f32) -> Self {
         Self { input, output }
@@ -187,9 +225,13 @@ fn sample_stops(stops: &[LinearStop], progress: f32) -> f32 {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Error returned when easing parameters are invalid.
 pub enum EasingError {
+    /// Bézier control points are invalid.
     InvalidBezier,
+    /// Step count or position is invalid.
     InvalidSteps,
+    /// Piecewise-linear stops are invalid.
     InvalidStops,
 }
 

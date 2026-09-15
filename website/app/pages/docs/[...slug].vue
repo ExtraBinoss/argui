@@ -2,7 +2,6 @@
 import { ArrowLeft, ArrowRight, CheckCircle2, Clock3, ExternalLink, PlayCircle } from '@lucide/vue'
 import { docs, findDoc } from '~/data/docs'
 import { sourceUrl } from '~/data/project'
-import catalogue from '~/data/catalogue.json'
 
 definePageMeta({
   validate: (route) => {
@@ -20,11 +19,6 @@ const guide = computed(() => findDoc(slug.value))
 const position = computed(() => docs.findIndex((item) => item.slug === slug.value))
 const previous = computed(() => docs[position.value - 1])
 const next = computed(() => docs[position.value + 1])
-const demoSlug = computed(
-  () =>
-    catalogue.find((item) => item.name === guide.value?.demo || item.gallery === guide.value?.demo)
-      ?.slug ?? 'button',
-)
 usePageSeo(
   () => guide.value?.title ?? 'Documentation',
   () => guide.value?.description ?? '',
@@ -55,7 +49,7 @@ usePageSeo(
       <a v-for="section in guide.sections" :key="section.id" :href="`#${section.id}`">
         {{ section.title }}
       </a>
-      <a href="#live-example">Live WebAssembly example</a>
+      <a href="#live-example">Exact-source WebAssembly example</a>
     </nav>
 
     <section
@@ -103,16 +97,17 @@ usePageSeo(
           </span>
           <h2 id="live-heading">{{ guide.demoTitle }}</h2>
           <p>
-            This is the real Argui gallery running locally in your browser with WebAssembly and
-            WebGPU.
+            The Rust file below is imported verbatim by this page and compiled into the WebAssembly
+            application running underneath it.
           </p>
         </div>
-        <NuxtLink :to="`/components/${demoSlug}`">
-          Open focused page
-          <ArrowRight :size="15" />
-        </NuxtLink>
+        <a :href="sourceUrl(guide.example.path)" target="_blank" rel="noopener noreferrer">
+          Open exact source
+          <ExternalLink :size="15" />
+        </a>
       </div>
-      <GalleryFrame :component="guide.demo" />
+      <CodeBlock :filename="guide.example.path" :code="guide.example.source" />
+      <DocsExampleFrame :example="guide.example.id" :title="guide.demoTitle" />
     </section>
 
     <nav class="docs-pagination" aria-label="Previous and next guides">

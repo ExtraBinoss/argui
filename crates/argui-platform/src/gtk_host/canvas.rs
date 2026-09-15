@@ -43,6 +43,7 @@ delegate_noop!(Globals: ignore wl_subsurface::WlSubsurface);
 delegate_noop!(Globals: ignore wl_surface::WlSurface);
 delegate_noop!(Globals: ignore wl_region::WlRegion);
 
+/// Wayland subsurface used as the GTK host's WGPU rendering canvas.
 pub struct GtkCanvas {
     surface: wl_surface::WlSurface,
     subcompositor: wl_subcompositor::WlSubcompositor,
@@ -106,6 +107,13 @@ impl GtkCanvas {
     }
 
     /// Return whether GTK must commit the changed child placement on its next frame.
+    /// Places or rescales this canvas beneath the GTK parent surface.
+    ///
+    /// Returns whether the host needs to commit the changed child placement.
+    ///
+    /// # Errors
+    /// Returns an error if Wayland synchronization or placement fails.
+    /// `x` and `y` are parent-surface coordinates; `scale` is the buffer scale.
     pub fn place(&self, x: i32, y: i32, scale: i32) -> Result<bool, String> {
         let scale = scale.max(1);
         let mut attachment = self.attachment.lock().map_err(|error| error.to_string())?;
@@ -176,6 +184,10 @@ impl GtkCanvas {
             .map_err(|error| error.to_string())
     }
 
+    /// Dispatches queued Wayland events for this canvas.
+    ///
+    /// # Errors
+    /// Returns an error if locking or dispatching the Wayland queue fails.
     pub fn dispatch_pending(&self) -> Result<(), String> {
         self.queue
             .lock()

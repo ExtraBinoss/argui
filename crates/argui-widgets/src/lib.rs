@@ -146,7 +146,7 @@ pub use text_field_behavior::{
 };
 #[cfg(feature = "text-selection")]
 pub use text_selection::{SelectionHost, TextSelectionToolbar};
-pub use theme::{WidgetTheme, shadcn};
+pub use theme::{WidgetTheme, default_theme, shadcn};
 #[cfg(any(feature = "checkbox", feature = "switch", feature = "radio-group"))]
 pub use toggle_behavior::{TOGGLE_CHECKED, TOGGLE_SCOPE, ToggleAction, ToggleBehavior, TogglePart};
 

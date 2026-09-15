@@ -11,6 +11,13 @@ pub use presentation::DockMode;
 pub use host::DevtoolsHost;
 
 /// Adds the DevTools' graphic effects without replacing application shaders.
+///
+/// `config` is returned with the edge-fade and edge-shadow effects registered when absent.
+///
+/// # Errors
+///
+/// Returns a renderer error if the effect registry cannot be loaded or a definition
+/// cannot be added to the supplied configuration.
 pub fn configure_renderer(
     mut config: argui_render::RendererConfig,
 ) -> Result<argui_render::RendererConfig, argui_render::RendererError> {

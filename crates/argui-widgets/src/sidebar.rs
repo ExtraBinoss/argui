@@ -23,6 +23,8 @@ pub struct Sidebar {
 }
 
 impl Sidebar {
+    /// Creates a labelled sidebar around `content`.
+    /// `key` identifies the sidebar and `label` names its trigger.
     #[must_use]
     pub fn new(key: impl Into<String>, label: impl Into<String>, content: Element) -> Self {
         Self {
@@ -40,6 +42,7 @@ impl Sidebar {
     }
 
     #[must_use]
+    /// Returns an open or close action when `event` targets the sidebar.
     pub fn action(&self, event: &UiEvent) -> Option<SidebarAction> {
         if self.mobile {
             return crate::DialogBehavior::new(&self.key, &self.label, self.open)
@@ -52,6 +55,11 @@ impl Sidebar {
     }
 
     #[must_use]
+    /// Builds the sidebar using `theme` for its control and surface styling.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the generated toggle control is missing its expected semantic state.
     pub fn build(self, theme: &WidgetTheme) -> Element {
         let mut toggle = Button::new(
             format!("{}::toggle", self.key),

@@ -1,141 +1,91 @@
 # Overlays and tooltips
 
-`Popover` presents controlled anchored content. Its trigger toggles the panel;
-Escape and outside clicks dismiss it. Clicks on the title, description, padding
-or nested popovers remain inside the panel. Handle nested popover events before
-their parent and reset child state when the parent closes.
+`Popover` presents controlled content anchored to a trigger. Escape and outside
+click dismiss it. Events inside nested popovers remain inside; handle the child
+before its parent and clear child state when the parent closes.
 
-`TooltipState` provides hover and keyboard help. Its default hover delay is
-350 ms, with 100 ms before closing after pointer exit. Moving into the tooltip
-keeps it open; keyboard focus opens it immediately. Escape and button activation
-close it without moving focus or consuming the button's action. A later hover
-can reopen it while the trigger keeps focus. Content has the Tooltip role and
-is connected with `described_by`.
+`TooltipState` opens from hover after 350 ms or immediately from keyboard focus.
+It waits 100 ms after pointer exit so the pointer can enter the tooltip. Escape
+and trigger activation close it without changing focus.
 
-Forward events to `TooltipState::update`, including Escape elsewhere in the
-window while a tooltip is open. Schedule `advance` at `next_deadline` and rebuild
-when state changes. The state itself requires no polling or task runtime. Reset
-it and cancel its timer when the trigger is removed or its page is hidden.
-The [gallery example](../../crates/argui-widget-gallery/src/pages/tooltip.rs)
-uses a `TaskSlot` for owned, cancellable timers.
+Forward relevant events to `TooltipState::update`, schedule `advance` at
+`next_deadline`, and rebuild when state changes. Reset the state and cancel its
+timer when the trigger unmounts. No polling is required.
 
-## Automatic button tooltips
+## Automatic button help
 
-Buttons declare their label as a tooltip by default. Enable the `tooltip`
-feature and wrap the application in `TooltipHost` to display them automatically.
-The `button` feature remains usable on its own.
+Enable the tooltip widget and wrap the application in `TooltipHost`:
 
-```rust
-let application = TooltipHost::new(MyApplication::default());
-let button = Button::new("save", "Save", theme.button())
+```rust,ignore
+let app = TooltipHost::new(MyApplication::default());
+let save = Button::new("save", "Save", theme.button())
     .tooltip("Save the current draft")
     .build();
-let quiet = Button::new("cancel", "Cancel", theme.outline_button())
+let cancel = Button::new("cancel", "Cancel", theme.outline_button())
     .without_tooltip()
     .build();
 ```
 
-`tooltip` includes the controlled widget, state and host, enabling runtime tasks
-for deadline scheduling. Custom elements can declare `Element::tooltip(...)`.
-Disabled or busy buttons do not open automatic tooltips. A controlled Tooltip
-owns its trigger and does not receive a second host tooltip.
+Buttons use their label as default help. Disabled or busy buttons do not open a
+tooltip. A controlled `Tooltip` suppresses the host tooltip for its trigger.
+The host dismisses help when a menu, popover, or dialog opens.
 
-The host dismisses help when a menu, popover or dialog appears, including an
-opening initiated by code. Empty layers and notifications do not block tooltips.
-Customize automatic help through `TooltipHost::delay`, `paint` and `layer`.
-With text selection, use `TooltipHost::new(SelectionHost::new(application))`.
+`TooltipHost::delay`, `paint`, and `layer` customize the shared behavior.
+With text selection, compose `TooltipHost::new(SelectionHost::new(app))`.
 
 ## Surfaces and effects
 
-`Popover::layer` and `Tooltip::layer` accept a full `LayerStyle`: content and
-backdrop filters, masks, shadows and opacity. Widgets do not depend on effect
-presets. Set a translucent paint to reveal a backdrop filter; opaque paint hides
-it. `.layer(...)` replaces the complete layer, including default shadows.
+`Popover::layer` and `Tooltip::layer` accept `LayerStyle`: filters, backdrop
+filters, mask, shadows, and opacity. Widgets do not register effect presets.
 
-```rust
+```rust,ignore
 let layer = theme.overlay_layer(8.0, 0.0)
     .backdrop(argui_effects::Blur(6.0).filter());
 let popover = Popover::new("settings", "Settings", open, trigger, content)
-    .paint(PaintStyle::new(QuadStyle::solid(theme.popover.with_alpha(opacity))))
+    .paint(PaintStyle::new(QuadStyle::solid(
+        theme.popover.with_alpha(0.82),
+    )))
     .layer(layer)
     .build(&theme);
 ```
 
-Blur strength and tint are independent. `Blur(6.0)` controls filtering;
-`QuadStyle::solid(...)` controls color, and `with_alpha` controls opacity from
-transparent `0.0` to opaque `1.0`. Choose enough opacity to keep foreground text
-readable in either theme.
+Backdrop blur needs translucent paint to remain visible. Keep enough opacity for
+text contrast in both themes. Calling `layer` replaces the complete layer,
+including default shadows. Custom WGSL effects use the same filter API; see
+[GPU effects](../rendering/effects.md).
 
-Ordinary menus, popovers, dialogs, toasts and tooltips share `theme.popover`,
-`theme.popover_border` and `theme.overlay_shadows`. Transparent effects are local
-customizations. Custom WGSL effects use the same filter API as presets:
-
-```rust
-let filter = Filter::Effect(EffectInstance::new(
-    MY_EFFECT,
-    [("strength", EffectValue::F32(0.4))],
-));
-let layer = theme.overlay_layer(8.0, 0.0).backdrop(filter);
-let tooltip = Tooltip::new("help", "Preview your changes", open, trigger)
-    .layer(layer)
-    .build(&theme);
-```
-
-Register the definition before launch with
-`RendererConfig::effects(argui_effects::registry()?.with_definition(definition)?)`.
-See [GPU effects](../rendering/effects.md) and the
-[complete example](../../crates/argui-widget-gallery/src/pages/overlay_effects.rs).
-
-## Independent features
-
-`argui` and `argui-widgets` use `default = []`. Select widgets explicitly:
+## Feature selection
 
 ```toml
-argui = { git = "https://github.com/ExtraBinoss/argui", features = ["widget-popover", "widget-tooltip"] }
+argui = { version = "0.2.1", features = [
+  "widget-popover",
+  "widget-tooltip",
+] }
 ```
 
-`argui/widgets-all` and `argui-widgets/all` enable the general widget collection;
-the updater dialog remains separately opt-in. Composed widgets enable their
-building blocks: ContextMenu and Menubar use Menu. TextArea has its own
-`textarea` feature, independent of Input. The facade uses the `widget-` prefix.
+`widgets-all` enables the general collection; the updater dialog stays
+separate. Composed widgets enable their required building blocks. The facade
+uses `widget-*`; direct `argui-widgets` features omit that prefix.
 
-`python3 scripts/check-widget-features.py` checks each feature from an external
-consumer and then checks empty/full configurations. The browser scenario
-`crates/argui-widget-gallery/tests/pages/overlay_effects.mjs` covers themes,
-surface effects, editing, dismissal, timing, focus and accessible relationships.
-Run it through the [private Linux display](../contributing/linux-testing.md).
+`python3 scripts/check-widget-features.py` checks isolated and full feature
+sets.
 
-## Overlay geometry
+## Enter and exit
 
-For the optional cross-platform native popup API, automatic overflow, backend
-support and web fallback, see [native-popovers.md](../platform/native-popovers.md).
+`Presence` is shared by selection toolbars, Select, and Popover. Keep it in the
+owning model, call `set_open(open, reduced_motion)`, and pass it to the widget.
+It is the source of truth for whether exiting content remains mounted.
 
-### Retained enter and exit animations
+Advance it once per application animation callback. Request paint while it
+moves; rebuild when exit completes; return `presence.animating()` from
+`wants_animation_frame`. Exiting content has no pointer targets, focus scope,
+enabled controls, or semantic exposure. Reduced motion settles it immediately.
 
-`argui_widgets::Presence` is shared by selection toolbars, Select and Popover.
-Keep it in the owning component, call `set_open(open, reduced_motion)` on state
-changes, and pass `.presence(&presence)` to the widget builder. Presence is the
-source of truth for its open state; do not combine it with a separate `.open()`.
+## Placement
 
-Advance it once in the owner's animation callback with `advance(frame.elapsed)`.
-A `true` result means the exit completed and requires rebuilding to unmount;
-otherwise request paint only. Return `presence.animating()` from
-`wants_animation_frame()`. The gallery's backend Select and the devtools dock
-Select implement this pattern. Reduced motion should also finish presence when
-the environment changes, not only when the menu opens.
+Placement uses logical pixels and final layout bounds:
 
-The shared timings are 140 ms in and 100 ms out, with opacity and a 4 px
-translation. Exiting overlays are retained visually but have no pointer targets,
-focus scope, enabled controls or accessibility exposure. Reopening reverses from
-the current progress. No animation frame is required once settled.
-
-### Placement
-
-Overlay placement is renderer-independent and uses logical pixels. The runtime
-passes a `LayoutSnapshot` to `Render::layout_changed` after Taffy finishes. It
-contains the canvas `viewport` and bounds addressable by stable element key:
-
-```rust
+```rust,ignore
 fn layout_changed(&mut self, layout: &LayoutSnapshot, cx: &mut Context<Self>) {
     let Some(anchor) = layout.bounds("menu-button") else {
         return;
@@ -145,28 +95,21 @@ fn layout_changed(&mut self, layout: &LayoutSnapshot, cx: &mut Context<Self>) {
         .gap(8.0)
         .margin(12.0)
         .place(layout.viewport, anchor, Size::new(360.0, 480.0));
-    if self.menu == Some(placed) {
-        return;
+    if self.menu != Some(placed) {
+        self.menu = Some(placed);
+        cx.notify();
     }
-    self.menu = Some(placed);
-    cx.notify();
 }
 ```
 
-The calculator tries the preferred side, its opposite, then perpendicular
-sides. It clamps cross-axis alignment to the viewport. `PlacedOverlay` contains
-the selected side, final bounds, and `max_size`; use the latter to constrain a
-scrollable menu or popover when its desired content cannot fit.
+The calculator tries the preferred side, its opposite, then perpendicular sides,
+and clamps cross-axis alignment to the viewport. `PlacedOverlay::max_size`
+constrains content that cannot fit. The runtime permits one bounded second
+layout pass for this feedback.
 
-Calling `Context::notify()` permits one bounded second layout pass. This avoids layout
-loops while allowing the selected side and maximum content size to affect the
-Rust tree. The same mechanism is a direct lowering target for a future DSL.
+Use `Interaction::blocker()` when a surface must stop click-through. Passive
+visual overlays can omit it. Scrollable overlays normally use
+`ScrollChaining::Contain` so an edge gesture does not scroll content behind.
 
-Pointer occlusion remains explicit. Apply `Interaction::blocker()` to a popover
-surface when it must prevent hover/click-through. Leave it absent for visual
-overlays such as passive tooltips that intentionally behave like
-`pointer-events: none`.
-
-Scrollable overlays normally use `ScrollChaining::Contain`. At a content edge,
-the wheel or touchpad gesture is then consumed instead of scrolling an ancestor
-behind the overlay. The default `Auto` policy preserves normal nested chaining.
+Native surfaces outside the parent window have separate support and fallback
+rules in [native popovers](../platform/native-popovers.md).

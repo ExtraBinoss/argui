@@ -1,67 +1,61 @@
 # Application updates
 
-`argui-updater` checks, downloads and installs signed application updates. It is
-independent of the UI and does not require an async runtime. Your application
-starts the check, forwards state changes and decides when to install or exit.
+`argui-updater` checks, downloads, verifies, and installs application updates.
+It is UI-independent and blocking; run operations on a worker and forward cloned
+`State` values to the UI thread.
 
 | Capability | Feature |
 | --- | --- |
-| Engine and native backend through the facade | `argui/updater` |
-| Engine with your own backend | `argui-updater`, with no features |
-| HTTPS downloads and desktop installation | `argui-updater/native` |
-| Reusable dialog | `argui/widget-updater` or `argui-widgets/updater` |
-| Interactive gallery example | `argui-widget-gallery/updater` |
+| Engine through the facade | `argui/updater` |
+| Custom backend | `argui-updater` with no feature |
+| HTTPS and desktop installation | `argui-updater/native` |
+| Controlled dialog | `argui/widget-updater` |
 
-The dialog does not enable networking or installation. It is explicitly opt-in,
-including alongside `widgets-all`. The shared engine and dialog compile to
-WebAssembly; native installation is only available outside the browser. Web
-applications receive updates through their normal deployment.
+The dialog does not enable networking. WebAssembly can use the engine and
+dialog, but normal web deployment owns browser application updates.
 
-## Check at startup
-
-The [startup example](../../crates/argui-updater/examples/startup.rs) checks on a
-worker and sends states through a channel, without installing anything:
-
-```sh
-cargo run -p argui-updater --features native --example startup -- https://updates.example.com/stable/latest.json update.pub
-```
+## Application flow
 
 ```rust,no_run
-use argui::updater::{Updater, http::{Config, HttpBackend}, install::NativeInstaller};
+use argui::updater::{
+    Updater,
+    http::{Config, HttpBackend},
+    install::NativeInstaller,
+};
 
 let config = Config::new(
-    env!("CARGO_PKG_VERSION"), // Your application's version.
+    env!("CARGO_PKG_VERSION"),
     "https://updates.example.com/stable/latest.json",
     include_str!("update.pub"),
 )?;
-let mut updater = Updater::new(HttpBackend::new(config, NativeInstaller::detect()?)?);
-// Run on a startup worker; forward cloned states to your application's UI thread.
+let backend = HttpBackend::new(config, NativeInstaller::detect()?)?;
+let mut updater = Updater::new(backend);
 let available = updater.check(|state| eprintln!("{state:?}"))?;
 # Ok::<(), argui::updater::Error>(())
 ```
 
-Operations are **blocking**. Run them on a worker, such as
-`Context::spawn_blocking` with `argui/tasks`. Keep its `TaskHandle` in the model
-and retain the returned engine for the next operation. Callbacks execute on the
-worker: send a cloned `State` to the UI thread instead of capturing an `Entity`.
-Start the task once, rather than from each render or directly inside an async task.
+Run `check`, `download`, and `install` through
+`Context::spawn_blocking` or another worker. Keep the updater for the next
+operation and keep the task handle in the model.
 
-After checking, `download(&CancellationToken, callback)` downloads and verifies
-the package. `install(callback)` starts installation explicitly. A new check
-invalidates the previous download. Installation requires a verified package and
-consumes it; download again before retrying a failed installation.
+The valid sequence is:
 
-`CancellationToken::cancel()` can run on the UI thread. The backend checks it
-between network reads, and the engine also rejects a result delivered after
-cancellation. A blocked read may wait for the configured timeout. Use a new
-token for a retry. Installation cannot be cancelled once started; closing the
-dialog does not stop it.
+1. `check(callback)`;
+2. `download(&CancellationToken, callback)`;
+3. `install(callback)`.
 
-## Publish an application update
+A new check invalidates a previous download. Installation consumes a verified
+package. Download cancellation is cooperative between network reads; use a new
+token for retry. Installation cannot be cancelled after it starts.
 
-Host the manifest on a CDN, object store, GitHub release or any API returning
-this JSON. No Argui account is needed. Use separate URLs for channels, such as
-`/stable/latest.json` and `/beta/latest.json`.
+The runnable engine example checks without installing:
+
+```sh
+cargo run -p argui-updater --features native --example startup -- \
+  https://updates.example.com/stable/latest.json update.pub
+```
+
+## Manifest and signatures
 
 ```json
 {
@@ -70,111 +64,66 @@ this JSON. No Argui account is needed. Use separate URLs for channels, such as
   "platforms": {
     "linux-x86_64": {
       "url": "https://updates.example.com/1.2.0/MyApp.AppImage",
-      "signature": "FULL CONTENTS OF MyApp.AppImage.minisig",
+      "signature": "FULL .minisig CONTENT",
       "format": "app-image"
-    },
-    "macos-aarch64": {
-      "url": "https://updates.example.com/1.2.0/MyApp.app.tar.gz",
-      "signature": "FULL CONTENTS OF MyApp.app.tar.gz.minisig",
-      "format": "app-bundle"
-    },
-    "windows-x86_64": {
-      "url": "https://updates.example.com/1.2.0/MyApp.msi",
-      "signature": "FULL CONTENTS OF MyApp.msi.minisig",
-      "format": "msi"
     }
   }
 }
 ```
 
-Platform keys combine `std::env::consts::OS`, `-` and `std::env::consts::ARCH`.
-Set `Config::target` to distinguish an ABI or package variant. An API may return
-`204 No Content` when no update is available. A missing target artifact is an error.
+Platform keys default to `OS-ARCH`; `Config::target` can select a package or
+ABI variant. SemVer controls ordering. Prereleases require
+`allow_prerelease = true`; build metadata alone does not trigger an update.
 
-Comparison follows SemVer precedence: no downgrades, and no update for a
-`+build` metadata difference. Prereleases are ignored unless
-`Config::allow_prerelease = true`.
-
-Create a Minisign key and sign the **exact bytes** served by your host:
+Sign the exact hosted bytes with Minisign:
 
 ```sh
 minisign -G -p update.pub -s update.key
 minisign -Sm MyApp.AppImage -s update.key
 ```
 
-Bundle `update.pub` with the application and keep the private key in your release
-pipeline. `signature` contains the complete `.minisig` text, with newlines escaped
-by your JSON serializer. Modern prehashed Minisign signatures support incremental
-verification. Missing, legacy or invalid signatures prevent installation.
+Embed the public key and protect the private key in the release pipeline.
+Missing, legacy, or invalid signatures stop installation. Platform signing and
+notarization remain separate requirements.
 
-Downloads require HTTPS, including redirects. HTTP is accepted only on loopback
-IP addresses for tests; URLs containing credentials are rejected. Manifests are
-limited to 1 MiB. Downloads use private temporary files, 64 KiB chunks and a
-1 GiB default limit. Configure `max_download_bytes` and `timeout` as needed;
-the default total timeout is 300 seconds, with a 15-second connection limit.
-Incomplete downloads and abandoned packages are deleted.
+Downloads require HTTPS, including redirects. Loopback HTTP is accepted for
+tests. URLs with credentials are rejected. Defaults limit manifests to 1 MiB,
+downloads to 1 GiB, connection time to 15 seconds, and total time to 300 seconds.
+Temporary and incomplete packages are deleted.
 
-Transport and installation dependencies belong to `argui-updater/native`:
-Reqwest, Serde/JSON, SemVer, `minisign-verify`, `tempfile`, `tar`, `flate2` and
-`self-replace`.
+## Native installation
 
-## Installation
-
-| Format | Supported behavior |
+| Format | Behavior |
 | --- | --- |
-| `executable` | Standalone Windows, Linux or macOS binary. Atomic replacement on Unix; `self-replace` handles the running executable on Windows. |
-| `app-image` | Raw Linux AppImage. `APPIMAGE` identifies the outer file; permissions are preserved. |
-| `app-bundle` | `.app.tar.gz` containing one same-named bundle with `Contents/MacOS`. Replaces the whole bundle, including resources. |
-| `nsis` | Launches a Windows `.exe` installer using its publisher-configured interface and installation mode. |
-| `msi` | Launches `msiexec /i … /passive /norestart`. |
+| `executable` | replace a standalone Linux, Windows, or macOS executable |
+| `app-image` | replace the running Linux AppImage |
+| `app-bundle` | replace a same-named macOS `.app` from `.tar.gz` |
+| `nsis` | launch a Windows NSIS executable |
+| `msi` | launch `msiexec /passive /norestart` |
 
-`NativeInstaller::detect()` recognizes the running binary, AppImages and `.app`
-ancestors. Use `Destination` for an explicit installation location. Package
-format and destination must match. Bundle extraction uses a temporary directory
-on the same filesystem. If the final rename fails, the old bundle is restored;
-if restoration also fails, the error reports the retained backup path.
+`NativeInstaller::detect()` finds the running executable, AppImage, or macOS
+bundle. `Destination` selects an explicit path. App bundle replacement keeps a
+backup and reports its path if rollback also fails.
 
-The engine does not terminate the process or request privilege elevation. The
-application needs permission to modify its installation. After `RestartRequired`,
-save state and restart normally. After `InstallerLaunched`, save state and exit
-so the installer can finish. Launch success does not mean installation completed.
-A launched Windows installer's temporary file remains available after the caller
-exits; operating-system temporary-file cleanup owns its eventual removal.
-
-For DEB/RPM, Flatpak, Snap and stores, implement an `Installer` or `Backend` for
-that distribution system. Download signatures do not replace platform code
-signing or notarization.
+The engine does not elevate privileges or exit the application. After
+`RestartRequired`, save state and restart. After `InstallerLaunched`, save
+state and exit so the installer can finish. Other package systems implement the
+`Installer` or `Backend` trait.
 
 ## Optional dialog
 
-`UpdateDialog::new(key, &state, open, trigger).build(theme)` creates a controlled
-dialog with release notes, status and accessible progress. Download amounts use
-decimal MB (`1 MB = 1,000,000 bytes`). An absent or zero total shows an
-indeterminate bar and the received amount, without inventing a percentage.
+`UpdateDialog::new(key, &state, open, trigger).build(theme)` renders controlled
+release notes, status, and progress. Forward Click and Key events to
+`dialog.action(event)` and handle `Open`, `Close`, `Check`, `Download`,
+`Cancel`, and `Install` in the owning model.
 
-Forward `EventType::Click` and `EventType::Key` to `dialog.action(event)` and
-handle the returned intent in your model:
-
-| Action | Application handling |
-| --- | --- |
-| `Open` / `Close` | Change dialog visibility. |
-| `Check` | Run `updater.check` on the worker. |
-| `Download` | Create a token and run `updater.download` on the worker. |
-| `Cancel` | Cancel the download token. |
-| `Install` | Save application state, then run `updater.install`. |
-
-Escape and backdrop clicks close the dialog. Its primary action follows the
-current state; checking and installing do not expose a concurrent primary
-action. The dialog itself makes no network or operating-system calls.
-
-The gallery demonstrates clearly labelled simulated progress and does not install
-anything on your machine:
+The dialog never performs network or OS work. Unknown totals use indeterminate
+progress. The gallery example simulates the complete state machine:
 
 ```sh
 cargo run -p argui-widget-gallery --features updater
 ```
 
-Engine tests use a local HTTP server and a known signed artifact. Installer
-tests replace temporary files and bundles. Windows installation and execution
-of an updated macOS app still need validation on those operating systems.
-For releasing the Argui crates themselves, see [Releases](../contributing/releases.md).
+Engine tests use a local server and signed fixture. Installer tests replace
+temporary files and bundles. Windows installer completion and execution of an
+updated macOS bundle still require validation on those systems.

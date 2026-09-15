@@ -129,6 +129,7 @@ pub struct SemanticRequest {
 }
 
 impl Semantics {
+    /// Creates semantics for `role`, with optional metadata unset and default state.
     #[must_use]
     pub const fn new(role: Role) -> Self {
         Self {
@@ -169,24 +170,28 @@ impl Semantics {
         }
     }
 
+    /// Sets the accessible label.
     #[must_use]
     pub fn label(mut self, label: impl Into<String>) -> Self {
         self.label = Some(label.into());
         self
     }
 
+    /// Sets the accessible description.
     #[must_use]
     pub fn description(mut self, description: impl Into<String>) -> Self {
         self.description = Some(description.into());
         self
     }
 
+    /// Sets the semantic value exposed by this element.
     #[must_use]
     pub fn value(mut self, value: SemanticValue) -> Self {
         self.value = Some(value);
         self
     }
 
+    /// Adds an available action if it is not already present.
     #[must_use]
     pub fn action(mut self, action: SemanticAction) -> Self {
         if !self.actions.contains(&action) {
@@ -195,30 +200,39 @@ impl Semantics {
         self
     }
 
+    /// Replaces the element's semantic state.
     #[must_use]
     pub fn state(mut self, state: SemanticState) -> Self {
         self.state = state;
         self
     }
 
+    /// Sets the live-region announcement behavior.
     #[must_use]
     pub const fn live(mut self, live: LiveRegion) -> Self {
         self.live = live;
         self
     }
 
+    /// Sets the element's layout orientation.
     #[must_use]
     pub const fn orientation(mut self, orientation: Orientation) -> Self {
         self.orientation = Some(orientation);
         self
     }
 
+    /// Sets the heading level.
     #[must_use]
     pub const fn level(mut self, level: u32) -> Self {
         self.level = Some(level);
         self
     }
 
+    /// Sets the one-based position and total size of this item in its set.
+    ///
+    /// # Arguments
+    /// * `position` — one-based position within the set.
+    /// * `size` — total number of items in the set.
     #[must_use]
     pub const fn position_in_set(mut self, position: u32, size: u32) -> Self {
         self.position_in_set = Some(position);
@@ -237,6 +251,7 @@ pub enum CheckedState {
 }
 
 impl CheckedState {
+    /// Toggles unchecked to checked, and checked to unchecked; mixed becomes checked.
     #[must_use]
     pub const fn toggled(self) -> Self {
         match self {
@@ -256,11 +271,13 @@ pub enum FocusPolicy {
 }
 
 impl FocusPolicy {
+    /// Returns whether this policy permits programmatic or sequential focus.
     #[must_use]
     pub const fn is_focusable(self) -> bool {
         !matches!(self, Self::None)
     }
 
+    /// Returns whether this policy participates in sequential tab navigation.
     #[must_use]
     pub const fn is_tab_stop(self) -> bool {
         matches!(self, Self::TabStop)

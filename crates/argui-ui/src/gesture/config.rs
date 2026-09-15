@@ -59,30 +59,41 @@ impl Default for PanGesture {
 }
 
 impl PanGesture {
+    /// Sets the axis or axes on which this pan recognizer responds.
     #[must_use]
     pub const fn axis(mut self, axis: PanAxis) -> Self {
         self.axis = axis;
         self
     }
 
+    /// Starts the pan as soon as it receives a press.
     #[must_use]
     pub const fn immediate(mut self) -> Self {
         self.threshold = 0.0;
         self
     }
 
+    /// Sets the movement distance required to start the pan.
+    ///
+    /// * `threshold` — required pointer movement in logical pixels.
     #[must_use]
     pub const fn threshold(mut self, threshold: f32) -> Self {
         self.threshold = threshold;
         self
     }
 
+    /// Sets whether the pan captures its pointer when pressed.
+    ///
+    /// * `capture` — pointer capture policy for this pan.
     #[must_use]
     pub const fn capture(mut self, capture: GestureCapture) -> Self {
         self.capture = capture;
         self
     }
 
+    /// Sets whether pan updates are delivered immediately or coalesced per frame.
+    ///
+    /// * `delivery` — update delivery strategy.
     #[must_use]
     pub const fn delivery(mut self, delivery: GestureDelivery) -> Self {
         self.delivery = delivery;
@@ -106,6 +117,9 @@ impl Default for PinchGesture {
 }
 
 impl PinchGesture {
+    /// Sets whether pinch updates are delivered immediately or coalesced per frame.
+    ///
+    /// * `delivery` — update delivery strategy.
     #[must_use]
     pub const fn delivery(mut self, delivery: GestureDelivery) -> Self {
         self.delivery = delivery;
@@ -129,6 +143,9 @@ impl Default for RotationGesture {
 }
 
 impl RotationGesture {
+    /// Sets whether rotation updates are delivered immediately or coalesced per frame.
+    ///
+    /// * `delivery` — update delivery strategy.
     #[must_use]
     pub const fn delivery(mut self, delivery: GestureDelivery) -> Self {
         self.delivery = delivery;
@@ -145,6 +162,7 @@ pub struct GestureSet {
 }
 
 impl GestureSet {
+    /// An empty set with no enabled recognizers.
     pub const EMPTY: Self = Self {
         tap: None,
         pan: None,
@@ -152,30 +170,43 @@ impl GestureSet {
         rotation: None,
     };
 
+    /// Enables tap recognition with the supplied thresholds.
+    ///
+    /// * `gesture` — tap recognition configuration.
     #[must_use]
     pub const fn tap(mut self, gesture: TapGesture) -> Self {
         self.tap = Some(gesture);
         self
     }
 
+    /// Enables pan recognition with the supplied axis and thresholds.
+    ///
+    /// * `gesture` — pan recognition configuration.
     #[must_use]
     pub const fn pan(mut self, gesture: PanGesture) -> Self {
         self.pan = Some(gesture);
         self
     }
 
+    /// Enables pinch recognition with the supplied threshold.
+    ///
+    /// * `gesture` — pinch recognition configuration.
     #[must_use]
     pub const fn pinch(mut self, gesture: PinchGesture) -> Self {
         self.pinch = Some(gesture);
         self
     }
 
+    /// Enables rotation recognition with the supplied threshold.
+    ///
+    /// * `gesture` — rotation recognition configuration.
     #[must_use]
     pub const fn rotation(mut self, gesture: RotationGesture) -> Self {
         self.rotation = Some(gesture);
         self
     }
 
+    /// Returns whether pan recognition captures the pointer on press.
     #[must_use]
     pub const fn captures_on_press(self) -> bool {
         matches!(
@@ -187,6 +218,7 @@ impl GestureSet {
         )
     }
 
+    /// Returns whether this set contains any enabled recognizer.
     #[must_use]
     pub const fn is_empty(self) -> bool {
         self.tap.is_none() && self.pan.is_none() && self.pinch.is_none() && self.rotation.is_none()

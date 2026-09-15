@@ -1,23 +1,35 @@
 use argui_core::{Color, Point, Rect, Size, Transform2D};
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+/// Rule for combining an animation value with the current composed value.
 pub enum Composition {
+    /// Replaces the current value.
     #[default]
     Replace,
+    /// Adds the contribution to the current value.
     Add,
+    /// Adds the contribution multiplied by one plus its completed iteration count.
     Accumulate,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
+/// An animation value and the metadata used to compose it with others.
 pub struct Contribution<T> {
+    /// Value produced by the animation.
     pub value: T,
+    /// Rule applied when combining this contribution.
     pub composition: Composition,
+    /// Priority used to order contributions; lower values are applied first.
     pub priority: i32,
+    /// Stable order among contributions with equal priority.
     pub order: u64,
+    /// Number of fully completed iterations used by accumulation.
     pub completed_iterations: u64,
 }
 
 impl<T> Contribution<T> {
+    /// Creates a replacement contribution with no completed iterations.
+    /// * `value` — contribution value; `priority` — composition priority; `order` — stable tie-break order.
     #[must_use]
     pub const fn replace(value: T, priority: i32, order: u64) -> Self {
         Self {
@@ -30,13 +42,19 @@ impl<T> Contribution<T> {
     }
 }
 
+/// Arithmetic operations required to combine animation contributions.
 pub trait Compose: Copy {
+    /// Adds a contribution to this value.
     fn add(self, contribution: Self) -> Self;
 
+    /// Scales this value by `factor`.
     fn scale(self, factor: f32) -> Self;
 }
 
 #[must_use]
+/// Combines contributions into `base` in ascending priority and order.
+///
+/// The slice is sorted in place before applying the selected composition rule.
 pub fn compose<T: Compose>(base: T, contributions: &mut [Contribution<T>]) -> T {
     contributions.sort_by_key(|item| (item.priority, item.order));
     contributions

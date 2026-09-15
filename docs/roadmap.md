@@ -24,5 +24,3 @@ work that remains open; it is not a release schedule.
 - A documented compatibility policy as the public API stabilizes.
 
 Performance work follows [measured workloads](performance/optimizations.md).
-A future optional DSL must produce the same public elements without becoming
-a dependency of the renderer or runtime.

@@ -455,6 +455,13 @@
   padding-top: 10px;
   scroll-margin-top: 104px;
 }
+.docs-live-example > .code-block {
+  margin-bottom: 18px;
+}
+.docs-example-frame .gallery-stage {
+  height: min(440px, 65dvh);
+  min-height: 320px;
+}
 .docs-live-heading {
   display: flex;
   align-items: end;

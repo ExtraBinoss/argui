@@ -4,6 +4,13 @@ use crate::tasks::{TaskError, TaskFuture, TaskHandle, TaskOutput, TaskRuntime, T
 impl<T: 'static> super::Mount<T> {
     /// Work owned by this exact presentation and its model. Delivery never
     /// recreates a dead presentation through a weak model reference.
+    ///
+    /// `future` computes a result; `on_complete` applies that result to the model
+    /// and context when the work is delivered. Returns a handle for cancellation.
+    ///
+    /// # Errors
+    /// Returns a task error if the mount/model is closed, no executor is attached,
+    /// or the executor cannot accept the task.
     pub fn spawn<F>(
         &self,
         future: F,
@@ -20,6 +27,13 @@ impl<T: 'static> super::Mount<T> {
             .update_view(|_, cx| cx.spawn(future, on_complete))
     }
 
+    /// Replaces the operation in `slot` with work owned by this mount.
+    ///
+    /// `slot` tracks the replaceable operation; `future` computes its result and
+    /// `on_complete` handles delivery.
+    ///
+    /// # Errors
+    /// Returns a task error if spawning the replacement fails.
     pub fn spawn_latest<F>(
         &self,
         slot: &mut TaskSlot,
@@ -89,12 +103,22 @@ impl AnyEntity {
     pub(crate) fn take_task_effects(&self) -> super::effects::ContextEffects {
         (self.task_effects)()
     }
+    /// Attaches the executor used for tasks started by this entity and its children.
+    ///
+    /// `runtime` is the event-driven task executor to share.
     pub fn set_task_runtime(&self, runtime: TaskRuntime) {
         (self.tasks)(runtime);
     }
 }
 impl<T: 'static> Context<T> {
     /// The operation ends with its presentation, model owner or explicit scope.
+    ///
+    /// `scope` adds an external lifetime bound; `future` computes the result;
+    /// `on_complete` handles delivery. Returns a task handle.
+    ///
+    /// # Errors
+    /// Returns a task error if a scope is closed, no executor is attached, or the
+    /// executor cannot accept the task.
     pub fn spawn_in<F>(
         &mut self,
         scope: &super::ResourceScope,
@@ -113,6 +137,14 @@ impl<T: 'static> Context<T> {
             .map_err(|_| TaskError::ScopeClosed)
     }
 
+    /// Spawns asynchronous work owned by this presentation and model.
+    ///
+    /// `future` computes a result; `on_complete` handles it in the model context.
+    /// Returns a handle that can cancel the task.
+    ///
+    /// # Errors
+    /// Returns a task error if this context is detached, its owner is closed, no
+    /// executor is attached, or the executor cannot accept the task.
     pub fn spawn<F>(
         &mut self,
         future: F,
@@ -176,6 +208,14 @@ impl<T: 'static> Context<T> {
 
     /// Cooperative cancellation only: an already-running blocking function cannot be killed.
     #[cfg(not(target_arch = "wasm32"))]
+    /// Runs blocking work on the native blocking executor.
+    ///
+    /// `work` receives a cooperative cancellation token; `on_complete` handles its
+    /// result in the model context. Returns a handle that can cancel delivery.
+    ///
+    /// # Errors
+    /// Returns a task error if this context is detached, its owner is closed, no
+    /// executor is attached, or the executor cannot accept the task.
     pub fn spawn_blocking<R: Send + 'static>(
         &mut self,
         work: impl FnOnce(crate::tasks::CancellationToken) -> R + Send + 'static,
@@ -204,6 +244,13 @@ impl<T: 'static> Context<T> {
             presentation_owned,
         )
     }
+    /// Replaces the operation in `slot` with newly spawned work.
+    ///
+    /// `slot` tracks the replaceable task; `future` computes its result and
+    /// `on_complete` handles delivery.
+    ///
+    /// # Errors
+    /// Returns a task error if spawning the replacement fails.
     pub fn spawn_latest<F>(
         &mut self,
         slot: &mut TaskSlot,

@@ -13,6 +13,8 @@ pub struct Toggle {
 }
 
 impl Toggle {
+    /// Creates a controlled toggle with accessible `label` and initial `pressed` state.
+    /// `key` identifies the button.
     #[must_use]
     pub fn new(key: impl Into<String>, label: impl Into<String>, pressed: bool) -> Self {
         Self {
@@ -25,6 +27,7 @@ impl Toggle {
     }
 
     #[must_use]
+    /// Returns the requested pressed state when `event` activates this enabled toggle.
     pub fn action(&self, event: &UiEvent) -> Option<bool> {
         ButtonBehavior::new(&self.key, &self.label)
             .enabled(self.enabled)
@@ -33,6 +36,7 @@ impl Toggle {
     }
 
     #[must_use]
+    /// Builds the toggle using `theme` for its current-state styling.
     pub fn build(&self, theme: &WidgetTheme) -> Element {
         let style = if self.pressed {
             theme.secondary_button()

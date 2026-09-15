@@ -38,6 +38,10 @@ pub struct DataTable<'a, R> {
 }
 
 impl<'a, R> DataTable<'a, R> {
+    /// Creates a data-table presentation over a retained model.
+    ///
+    /// `key` identifies the table, `model` provides rows and columns, `heights` retains row
+    /// measurements, and `offset` sets the initial scroll position.
     pub fn new(
         key: impl Into<String>,
         model: &'a DataTableModel<R>,
@@ -55,13 +59,17 @@ impl<'a, R> DataTable<'a, R> {
             icons: None,
         }
     }
+    /// Supplies vector assets for built-in table controls.
+    /// `icons` provides the assets used to render those controls.
     pub fn icons(mut self, icons: &'a crate::WidgetAssets) -> Self {
         self.icons = Some(icons);
         self
     }
+    /// Returns the element key for the cell at `address`.
     pub fn cell_key(&self, address: &CellAddress) -> String {
         self.address_key("cell", address)
     }
+    /// Returns the text-editor key for an editable cell at `address`.
     pub fn editor_key(&self, address: &CellAddress) -> String {
         self.address_key("edit", address)
     }
@@ -90,6 +98,11 @@ impl<'a, R> DataTable<'a, R> {
             column: column.into(),
         })
     }
+    /// Builds the table and controls using `theme` for their styling.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the virtual-list measurements do not match the current page row count.
     pub fn build(&self, theme: &WidgetTheme) -> Element {
         assert_eq!(
             self.heights.item_count(),
@@ -337,6 +350,7 @@ impl<'a, R> DataTable<'a, R> {
         .min_width(length(0.0))
         .semantic_scope()
     }
+    /// Interprets `event` as a table selection, edit, sort, paging or resize action.
     pub fn action(&self, event: &UiEvent) -> Option<DataTableAction> {
         let key = event.target_key()?;
         if let Some(column) = key.strip_prefix(&format!("{}::resize::", self.key))

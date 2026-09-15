@@ -27,6 +27,8 @@ impl UiTree {
         }
     }
     /// Safe copy for telemetry; owner callbacks still receive the actual edit.
+    ///
+    /// * `event` — event to copy and redact if its target is protected.
     #[must_use]
     pub fn inspect_event(&self, event: &crate::UiEvent) -> crate::UiEvent {
         let mut event = event.clone();
@@ -47,12 +49,18 @@ impl UiTree {
         }
         event
     }
+    /// Returns whether a text input is in a protected privacy mode.
+    ///
+    /// * `node` — text-input node to query.
     #[must_use]
     pub fn text_input_protected(&self, node: NodeId) -> bool {
         self.text_inputs
             .get(node)
             .is_some_and(super::super::text_input::TextInputState::protected)
     }
+    /// Returns whether undo is currently available for a text input.
+    ///
+    /// * `node` — text-input node to query.
     #[must_use]
     pub fn can_undo(&self, node: NodeId) -> bool {
         self.input_available(node)
@@ -61,6 +69,9 @@ impl UiTree {
                 .get(node)
                 .is_some_and(super::super::text_input::TextInputState::can_undo)
     }
+    /// Returns whether redo is currently available for a text input.
+    ///
+    /// * `node` — text-input node to query.
     #[must_use]
     pub fn can_redo(&self, node: NodeId) -> bool {
         self.input_available(node)
@@ -69,20 +80,37 @@ impl UiTree {
                 .get(node)
                 .is_some_and(super::super::text_input::TextInputState::can_redo)
     }
+    /// Returns whether a text input has an active IME composition.
+    ///
+    /// * `node` — text-input node to query.
     #[must_use]
     pub fn text_input_composing(&self, node: NodeId) -> bool {
         self.text_inputs
             .get(node)
             .is_some_and(super::super::text_input::TextInputState::composing)
     }
+    /// Sets history limits for an existing text input.
+    ///
+    /// * `node` — text-input node to configure.
+    /// * `config` — transaction and byte limits to apply.
     pub fn configure_text_history(&mut self, node: NodeId, config: HistoryConfig) {
         if let Some(state) = self.text_inputs.get_mut(node) {
             state.configure_history(config);
         }
     }
+    /// Undoes the latest retained edit for a text input.
+    ///
+    /// * `node` — text-input node to edit.
+    ///
+    /// Returns the interaction update, which is empty if undo is unavailable.
     pub fn undo_text_input(&mut self, node: NodeId) -> InteractionUpdate {
         self.edit_history(node, false)
     }
+    /// Reapplies the next retained edit for a text input.
+    ///
+    /// * `node` — text-input node to edit.
+    ///
+    /// Returns the interaction update, which is empty if redo is unavailable.
     pub fn redo_text_input(&mut self, node: NodeId) -> InteractionUpdate {
         self.edit_history(node, true)
     }

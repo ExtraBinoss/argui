@@ -7,6 +7,7 @@ use std::rc::{Rc, Weak};
 pub struct MountId(pub(super) usize);
 impl MountId {
     #[must_use]
+    /// Returns the numeric value of this presentation identity.
     pub fn get(self) -> usize {
         self.0
     }
@@ -30,7 +31,12 @@ impl<T: 'static> super::Context<T> {
 }
 
 impl<T: Render> super::Context<T> {
-    /// Deliver layout only to this parent's retained presentations of the model.
+    /// Delivers layout only to this parent's retained presentations of `model`.
+    ///
+    /// `model` identifies the child model; `layout` contains the new layout snapshot.
+    ///
+    /// # Panics
+    /// Panics when called outside a retained parent context.
     pub fn layout_entity<U: Render>(&mut self, model: &Entity<U>, layout: &super::LayoutSnapshot) {
         let parent = self
             .entity
@@ -108,6 +114,7 @@ impl<T> Clone for WeakMount<T> {
 }
 impl<T> WeakMount<T> {
     #[must_use]
+    /// Upgrades to a strong handle if this exact presentation is still alive.
     pub fn upgrade(&self) -> Option<Mount<T>> {
         self.0.upgrade().map(|cell| Mount {
             entity: Entity(cell),
@@ -116,6 +123,10 @@ impl<T> WeakMount<T> {
 }
 
 impl<T: Render> Entity<T> {
+    /// Creates a new independently retained presentation of this shared model.
+    ///
+    /// # Errors
+    /// Returns [`super::ScopeClosed`] if the model's resources have already closed.
     pub fn mount(&self) -> Result<Mount<T>, super::ScopeClosed> {
         let _transaction = self.0.model.runtime.enter();
         let presentation = Presentation::new(self.0.model.signal.clone());
@@ -143,6 +154,9 @@ impl<T: Render> Entity<T> {
 impl<T: 'static> Mount<T> {
     /// Advance one bounded batch in each model domain currently attached to this
     /// presentation. Custom hosts call this on a model wake, outside rendering.
+    ///
+    /// # Panics
+    /// Propagates a panic raised by a dispatched listener or lifecycle callback.
     pub fn dispatch_models(&self) {
         let mut runtimes = Vec::new();
         self.entity.collect_model_runtimes(&mut runtimes);
@@ -153,10 +167,25 @@ impl<T: 'static> Mount<T> {
 
     /// Read the shared model retained by this handle, even after unmounting.
     /// This does not grant access to the presentation's services.
+    ///
+    /// `read` computes a result from the shared model value; that result is returned.
+    ///
+    /// # Panics
+    /// Propagates a panic raised by `read` or a conflicting reentrant mutable borrow.
     pub fn read<R>(&self, read: impl FnOnce(&T) -> R) -> R {
         self.entity.read(read)
     }
 
+    /// Updates the model through this presentation's context.
+    ///
+    /// `update` receives mutable model state and context; its result is returned when
+    /// the presentation is open.
+    ///
+    /// # Errors
+    /// Returns [`super::ScopeClosed`] if this presentation has closed.
+    ///
+    /// # Panics
+    /// Propagates a panic raised by `update` or a conflicting model borrow.
     pub fn update<R>(
         &self,
         update: impl FnOnce(&mut T, &mut super::Context<T>) -> R,
@@ -166,24 +195,31 @@ impl<T: 'static> Mount<T> {
         }
         Ok(self.entity.update_view(update))
     }
-    /// End this presentation immediately, even if handles remain retained.
+    /// Ends this presentation immediately, even if handles remain retained.
+    ///
+    /// # Panics
+    /// Resumes the first panic raised by a registered cleanup after cleanup completes.
     pub fn close(&self) {
         let _transaction = self.entity.0.model.runtime.enter();
         self.resources().close();
     }
     #[must_use]
+    /// Returns this presentation's identity.
     pub fn id(&self) -> MountId {
         MountId(self.entity.0.presentation.id.get())
     }
     #[must_use]
+    /// Returns the identity of the shared model presented by this mount.
     pub fn model_id(&self) -> EntityId {
         self.entity.id()
     }
     #[must_use]
+    /// Returns the resource scope owned by this presentation.
     pub fn resources(&self) -> &ResourceScope {
         &self.entity.0.presentation.resources
     }
     #[must_use]
+    /// Creates a weak handle that does not retain this presentation.
     pub fn downgrade(&self) -> WeakMount<T> {
         WeakMount(Rc::downgrade(&self.entity.0))
     }
@@ -191,11 +227,20 @@ impl<T: 'static> Mount<T> {
 
 impl<T: Render> Mount<T> {
     /// Retains this exact presentation for a type-erased host.
+    /// Returns a cloneable handle that preserves presentation identity.
     pub fn erase(&self) -> super::AnyEntity {
         self.entity.erase()
     }
 
     /// Deliver a frame to this live presentation using its window context.
+    ///
+    /// `frame` describes the animation step being delivered.
+    ///
+    /// # Errors
+    /// Returns [`super::ScopeClosed`] if the presentation has closed.
+    ///
+    /// # Panics
+    /// Propagates a panic raised by the component's animation callback.
     pub fn animation_frame(&self, frame: argui_animation::Frame) -> Result<(), super::ScopeClosed> {
         if self.resources().is_closed() {
             return Err(super::ScopeClosed);
@@ -204,6 +249,15 @@ impl<T: Render> Mount<T> {
         Ok(())
     }
 
+    /// Delivers a new layout snapshot to this presentation.
+    ///
+    /// `layout` contains the current geometry.
+    ///
+    /// # Errors
+    /// Returns [`super::ScopeClosed`] if the presentation has closed.
+    ///
+    /// # Panics
+    /// Propagates a panic raised by the component's layout callback.
     pub fn layout_changed(&self, layout: &super::LayoutSnapshot) -> Result<(), super::ScopeClosed> {
         if self.resources().is_closed() {
             return Err(super::ScopeClosed);
@@ -212,12 +266,28 @@ impl<T: Render> Mount<T> {
         Ok(())
     }
 
+    /// Renders this presentation in `environment`.
+    ///
+    /// Returns the retained subtree, or an empty container if the mount is hidden.
+    ///
+    /// # Errors
+    /// Returns [`super::ScopeClosed`] if the presentation has closed.
+    ///
+    /// # Panics
+    /// Propagates a panic raised while rendering the component.
     pub fn render(&self, environment: WindowEnvironment) -> Result<Element, super::ScopeClosed> {
         if self.resources().is_closed() {
             return Err(super::ScopeClosed);
         }
         Ok(self.entity.render_in(environment))
     }
+    /// Dispatches the current listener in `event` to this presentation.
+    ///
+    /// # Errors
+    /// Returns [`super::ScopeClosed`] if the presentation has closed.
+    ///
+    /// # Panics
+    /// Propagates a panic raised by the event handler.
     pub fn dispatch_event(&self, event: &UiEvent) -> Result<(), super::ScopeClosed> {
         if self.resources().is_closed() {
             return Err(super::ScopeClosed);

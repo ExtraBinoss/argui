@@ -8,16 +8,25 @@ use std::{
 /// Presentation transitions, delivered after the enclosing model transaction.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MountTransition {
+    /// A presentation became mounted.
     Mounted,
-    VisibilityChanged { visible: bool },
+    /// A mounted presentation changed visibility.
+    VisibilityChanged {
+        /// Whether the presentation is visible after the transition.
+        visible: bool,
+    },
+    /// A mounted presentation was closed.
     Unmounted,
 }
 
 /// A historical transition. IDs do not retain or recreate the model or mount.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct MountEvent {
+    /// Identity of the shared model.
     pub model: EntityId,
+    /// Identity of the presentation that changed.
     pub mount: MountId,
+    /// Transition that occurred.
     pub transition: MountTransition,
 }
 
@@ -130,9 +139,12 @@ impl ModelRuntime {
     /// Observe future transitions in this domain. Dropping/cancelling the returned
     /// subscription also cancels queued delivery. Use weak model handles in callbacks
     /// when the subscription owner itself is retained by that model.
+    ///
+    /// `callback` receives each transition queued after registration.
     pub fn observe_mounts(&self, callback: impl Fn(MountEvent) + 'static) -> Subscription {
         self.lifecycle().subscribe(callback)
     }
+    /// Returns the number of lifecycle event deliveries waiting in this runtime.
     #[must_use]
     pub fn pending_mount_events(&self) -> usize {
         self.lifecycle().pending()

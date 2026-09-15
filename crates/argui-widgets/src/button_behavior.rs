@@ -26,6 +26,9 @@ pub struct ButtonBehavior {
 }
 
 impl ButtonBehavior {
+    /// Creates enabled, idle button behavior with the given identity and accessible label.
+    ///
+    /// `key` identifies matching events; `label` is exposed to accessibility consumers.
     #[must_use]
     pub fn new(key: impl Into<String>, label: impl Into<String>) -> Self {
         Self {
@@ -37,18 +40,22 @@ impl ButtonBehavior {
     }
 
     #[must_use]
+    /// Sets whether interactions with the button are enabled.
     pub const fn enabled(mut self, enabled: bool) -> Self {
         self.enabled = enabled;
         self
     }
 
     #[must_use]
+    /// Sets whether the button is busy and must reject activation.
     pub const fn busy(mut self, busy: bool) -> Self {
         self.busy = busy;
         self
     }
 
     #[must_use]
+    /// Adds button semantics and interaction behavior to `element`.
+    /// `part` selects whether this element is the button's trigger or content.
     pub fn decorate(&self, part: ButtonPart, element: Element) -> Element {
         if part == ButtonPart::Content {
             return element.semantic_hidden(true);
@@ -92,6 +99,7 @@ impl ButtonBehavior {
     }
 
     #[must_use]
+    /// Returns an activation action when `event` clicks this enabled, idle button.
     pub fn action(&self, event: &UiEvent) -> Option<ButtonAction> {
         (event.target_key() == Some(self.key.as_str())
             && matches!(event.kind, UiEventKind::Click(_))

@@ -29,6 +29,7 @@ impl Default for Presence {
 impl Presence {
     /// Keep content immediately readable while retaining entry movement and exit fading.
     #[must_use]
+    /// Sets whether entry motion fades in the content; `enabled` controls that fade.
     pub fn fade_in(mut self, enabled: bool) -> Self {
         self.fade_in = enabled;
         if self.open && !enabled {
@@ -39,10 +40,12 @@ impl Presence {
     }
 
     #[must_use]
+    /// Returns the requested open state.
     pub const fn is_open(&self) -> bool {
         self.open
     }
 
+    /// Sets visibility from `open`, applying an immediate transition when `reduced_motion` is enabled.
     pub fn set_open(&mut self, open: bool, reduced_motion: bool) {
         self.open = open;
         if open && !self.fade_in {
@@ -56,17 +59,19 @@ impl Presence {
     }
 
     #[must_use]
+    /// Returns whether content should remain mounted, including during exit motion.
     pub fn visible(&self) -> bool {
         self.open || self.progress > 0.0 || self.fade_progress > 0.0
     }
 
     #[must_use]
+    /// Returns whether the retained transition has not reached its target.
     pub fn animating(&self) -> bool {
         let target = if self.open { 1.0 } else { 0.0 };
         self.progress != target || self.fade_progress != target
     }
 
-    /// Returns true when the mounted state changes, requiring reconciliation.
+    /// Advances the transition by `elapsed`; returns true when mounted visibility changes.
     pub fn advance(&mut self, elapsed: Duration) -> bool {
         if !self.animating() {
             return false;
@@ -90,6 +95,7 @@ impl Presence {
     }
 
     #[must_use]
+    /// Binds the transition to `element` and disables interaction while it is closed.
     pub fn decorate(&self, mut element: Element) -> Element {
         element = element
             .opacity(1.0)

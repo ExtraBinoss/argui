@@ -1,15 +1,23 @@
 use argui_core::{Color, Point, Rect, Size, Transform2D};
 use std::fmt;
 
+/// Value supporting the arithmetic and magnitude operations needed by physics.
 pub trait MotionValue: Copy + PartialEq {
+    /// Returns the additive zero value.
     fn zero() -> Self;
 
+    /// Adds another value component-wise.
+    /// * `other` — value to add to this one.
     fn add(self, other: Self) -> Self;
 
+    /// Subtracts another value component-wise.
+    /// * `other` — value to subtract from this one.
     fn subtract(self, other: Self) -> Self;
 
+    /// Scales every component by `factor`.
     fn scale(self, factor: f64) -> Self;
 
+    /// Returns the value's Euclidean magnitude.
     fn magnitude(self) -> f64;
 }
 
@@ -231,12 +239,19 @@ fn map_color(left: Color, right: Color, operation: impl Fn(f32, f32) -> f32) -> 
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Error returned when spring, decay, or inertia parameters are invalid.
 pub enum PhysicsError {
+    /// Spring mass is not finite and positive.
     InvalidMass,
+    /// Spring stiffness is not finite and positive.
     InvalidStiffness,
+    /// Spring damping is not finite and non-negative.
     InvalidDamping,
+    /// A rest threshold is not finite and non-negative.
     InvalidRestThreshold,
+    /// Decay rate is not finite and positive.
     InvalidDecay,
+    /// Inertia bounds are not finite and ordered.
     InvalidBounds,
 }
 

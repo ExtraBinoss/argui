@@ -1,152 +1,110 @@
-# Visual primitives and color
+# Visual primitives
 
-Visual primitives stay renderer-independent. `argui-ui` exposes ergonomic
-builders, `argui-paint` records immutable commands, and `argui-render` uploads
-only visible frame data to WGPU. Native and WASM consume the same display list.
+`argui-ui` exposes builders, `argui-paint` records immutable
+renderer-independent commands, and `argui-render` uploads visible frame data to
+WGPU. Native and WebAssembly use the same display list.
 
 ## Transforms
 
-`Transform2D` provides translation, scale, rotation, skew, and a normalized
-`TransformOrigin`. Transforms compose through the retained tree and apply to
-quads, text, images, exact nested clips, effect layers, and hit testing. They
-run after Taffy layout, so animating a transform never recomputes layout.
+`Transform2D` supports translation, scale, rotation, skew, and normalized
+`TransformOrigin`. Transforms apply after layout to quads, text, images, vectors,
+clips, effects, and hit testing, so animation does not rerun Taffy.
 
-The type implements `Interpolate` and `MotionValue`. It therefore works with
-typed keyframes, property-bound motions, springs, decay, and
-velocity-preserving spring retargeting without a transform-specific timing
-engine.
+The type implements `Interpolate` and `MotionValue` and works with keyframes,
+springs, decay, and velocity-preserving retargeting.
 
-## Gradients
+## Fills and gradients
 
-`Fill` is shared by every painted element. A linear or radial gradient can
-therefore fill a container, button, card, or any composed widget:
+`Fill` can be solid, linear, radial, or bilinear. Every painted element uses the
+same type.
 
-```rust
+```rust,ignore
 let stops = GradientStops::from_vec(generated_stops)?;
 let fill = Fill::Linear(LinearGradient::with_stops(
     Point::new(0.0, 0.0),
     Point::new(1.0, 0.0),
     stops,
-))
+));
 ```
 
-There is no fixed per-gradient stop count. Stops are stored in shared immutable
-memory on the CPU and packed into one storage buffer per frame. The total is
-bounded by `RendererConfig::gradient_stop_capacity` (65,536 by default), so an
-application can raise or lower the explicit GPU-memory/work budget. Gradient
-geometry and individual stops can bind to typed motions without rebuilding the
-element tree.
+Gradient stops use shared immutable CPU storage and one frame storage buffer.
+`RendererConfig::gradient_stop_capacity` bounds the total; its default is
+65,536. Geometry and stops can bind to typed motions.
 
-`Fill::Bilinear(BilinearGradient::new([top_left, top_right, bottom_left,
-bottom_right], interpolation))` interpolates four premultiplied corners in the
-chosen color space. The ColorPicker uses sRGB interpolation for its HSV pad:
-white/hue at the top, black at the bottom. It uses one quad and four entries in
-the same gradient buffer. Corner storage is shared; adding this fill preserves
-the size of `Fill`. Bilinear style transitions currently switch discretely.
-
-## Images
-
-The renderer contract is a validated `ImageAsset`: stable `ImageId`, dimensions,
-and RGBA8 pixels. The optional `argui-image` crate decodes PNG and JPEG with only
-those two codec features enabled. Applications may instead supply pixels from
-another decoder, an asset pack, or generated content.
-
-`argui_image::ImageLibrary::insert` generates an opaque handle and stores the
-decoded asset, so application code never invents numeric IDs. Applications
-return the library assets once from `Render::image_assets`; both native and WASM
-launchers register them automatically. `Element::image` supports
-`Fill`, `Contain`, and `Cover`, linear or nearest sampling, rounded corners,
-nested clipping, opacity, transforms, overlays, and effect layers.
-
-GPU texture residency is bounded by `RendererConfig::image_cache_bytes` (64 MiB
-by default). Registration fails explicitly if an asset cannot fit; normal
-non-image scenes allocate no image texture.
+`BilinearGradient` interpolates four premultiplied corners. The ColorPicker's
+HSV pad uses one bilinear quad: white/hue at the top and black at the bottom.
 
 ## Color
 
-Argui has one color contract on native WGPU and WebGPU. Application colors are
-authored in sRGB, converted once to extended linear sRGB, and remain linear
-through painting and effects. An sRGB render target performs the final display
-encoding. Display-P3, HDR, and ICC profiles are not part of this contract.
+Visual colors are authored in sRGB and converted once to extended linear sRGB.
+Painting and effects remain linear; an sRGB surface performs final display
+encoding.
 
-Use `Color::srgb`, `Color::srgba`, the 8-bit constructors, or `Color::from_hex`
-for visual colors. `Color::linear_rgb` and `Color::linear_rgba` are explicit
-low-level constructors for renderer math and shader data. `to_srgba` is for
-serialization and editing; `to_linear_rgba` is for GPU uploads.
+- Use `Color::srgb`, `srgba`, 8-bit constructors, or `from_hex` for authored
+  colors.
+- Use `linear_rgb` or `linear_rgba` only for renderer math and shader data.
+- Use `to_srgba` for editing and serialization.
+- Use `to_linear_rgba` for GPU upload.
 
-Primitive shaders output straight linear RGBA and normal WGPU blending creates
-premultiplied linear intermediate textures. Built-in compositing, blur, shadows,
-and blend modes preserve that representation. Custom `argui_effect` functions
-receive and return straight linear RGBA; the generated ABI converts to and from
-the renderer's premultiplied intermediate representation.
+Gradients choose `Oklab`, `LinearSrgb`, or `Srgb` interpolation and use
+premultiplied alpha to avoid dark transparent fringes. Widget state colors and
+typed color motions default to OKLab.
 
-Gradients declare `ColorInterpolation::Oklab`, `LinearSrgb`, or `Srgb` at
-construction. Stops are interpolated with premultiplied alpha to avoid dark
-fringes, then converted to linear sRGB before rendering. Widget state colors and
-typed color keyframes use OKLab interpolation by default.
+Primitive shaders output straight linear RGBA. WGPU blending stores premultiplied
+linear intermediate textures. Custom effects receive straight linear RGBA
+through an ABI that converts to and from those intermediates.
 
-Decoded image pixels and rasterized SVG atlases use sRGB textures. Glyph atlases
-remain linear coverage masks and receive their linear text color in the shader.
+Image and rasterized SVG textures use sRGB sampling. Glyph atlases store coverage;
+the text shader applies the renderer's text-coverage transfer and linear text
+color before blending. Display-P3, HDR, and ICC color management are outside the
+current contract.
 
-## Vector rendering
+## Images
 
-`argui-vector` validates immutable SVG resources with `usvg` and retains their
-resolution-independent source. Applications register the resulting
-`VectorAsset` values through `Render::vector_assets`. `Element::vector(id)` then
-emits a normal display-list primitive with `ImageFit`, paint-time color,
-opacity, transforms, clips, z-order, layers and effects.
+`ImageAsset` contains a stable `ImageId`, dimensions, and RGBA8 pixels.
+`argui-image` optionally decodes PNG and JPEG; applications can register pixels
+from another decoder.
 
-```rust
+```rust,ignore
+let id = image_library.insert(include_bytes!("photo.jpg"))?;
+let image = Element::image(id).image_fit(ImageFit::Cover);
+```
+
+Return registered assets from `Render::image_assets`. `Element::image`
+supports Fill, Contain, Cover, sampling choice, rounded clips, opacity,
+transforms, overlays, and effects.
+
+`RendererConfig::image_cache_bytes` bounds GPU residency at 64 MiB by default.
+A scene without images allocates no image texture.
+
+## Vectors
+
+`argui-vector` parses SVG into immutable `VectorAsset` values:
+
+```rust,ignore
 let mut vectors = VectorLibrary::new();
 let id = vectors.insert_svg(include_bytes!("icon.svg"))?;
 
-Element::vector(id)
+let icon = Element::vector(id)
     .vector_fit(ImageFit::Contain)
     .vector_color(theme.foreground)
     .width(Length::Px(24.0))
     .height(Length::Px(24.0));
 ```
 
-### Raster and GPU boundary
+Return assets from `Render::vector_assets`. The renderer retains the parsed SVG,
+rasterizes requested physical sizes on first use, and packs them into one bounded
+sRGB atlas. Nearby sizes reuse a cached variant. At capacity, visible content
+can repack the atlas; a frame that still cannot fit fails explicitly.
 
-`argui-render` parses each registered source into a retained `resvg` tree. The
-first request for a physical-size variant rasterizes it with tiny-skia's
-antialiased SVG renderer. That RGBA result is uploaded into a shared sRGB WGPU
-atlas, initially 256×256. Later frames reuse resident variants without parsing
-or rasterizing their SVG again.
+`currentColor` SVGs become alpha masks and take
+`Element::vector_color`, so theme changes update instance data without
+rerasterizing. Other SVGs preserve authored colors. External resources and
+system-font lookup are disabled.
 
-The atlas grows from 256 KiB up to 16 MiB (2048×2048), with transparent two-pixel
-gutters so linear sampling cannot leak adjacent icons. Nearby requested sizes
-reuse the closest cached variant within explicit quality hysteresis. Growth
-updates the texture binding and current frame's coordinates. At capacity, the
-atlas can be recycled from visible content; a frame that cannot fit fails
-explicitly. Memory stays bounded on native WGPU and WebGPU.
+Vector elements share transforms, opacity, clips, layers, and effects with other
+primitives. General SVG path morphing is not part of the vector asset API; use
+crossfade or transform animation between assets.
 
-Adjacent vector commands share one render batch regardless of asset identity.
-The common vector WGSL pipeline applies instance transforms, rounded clip-chain
-coverage, opacity and tint without creating per-icon pipelines or bind groups.
-
-### Color and static SVG features
-
-SVGs authored with `currentColor` become alpha masks. Their RGB color is supplied
-by `Element::vector_color`, so light/dark themes and interaction states update a
-small instance record without duplicating or rerasterizing the asset. SVGs
-without `currentColor` preserve their authored colors.
-
-The retained static path accepts the shapes, curves, strokes, transforms,
-gradients, opacity, clipping, masks and filters supported by the configured
-`usvg`/`resvg` build. Font resolution, system fonts and external resource lookup
-are intentionally not part of the icon renderer.
-
-### Animation
-
-Vector elements use the same paint-time transform and opacity bindings as other
-primitives, so rotation, scale, translation and fades stay on the retained GPU
-path. General SVG path morphing is not part of this API.
-
-### Profiling
-
-`RenderProfile::vector_atlas` reports entry count, cache hits, rasterizations and
-allocated bytes for the current frame. DevTools records the same counters in
-strict `argui-gpu-trace-v3` traces, making resize thrashing visible on Linux,
-Windows, macOS and WebGPU.
+`RenderProfile::vector_atlas` reports entries, hits, rasterizations, and
+allocated bytes. DevTools records the same values in GPU traces.

@@ -36,6 +36,7 @@ pub struct Pagination {
 }
 
 impl Pagination {
+    /// Creates one-based pagination for `total` pages, clamping `page` to the available range; `key` scopes its controls.
     #[must_use]
     pub fn new(key: impl Into<String>, page: usize, total: usize) -> Self {
         Self {
@@ -48,38 +49,45 @@ impl Pagination {
     }
 
     #[must_use]
+    /// Returns the currently selected one-based page.
     pub const fn page(&self) -> usize {
         self.page
     }
 
     #[must_use]
+    /// Sets whether pagination controls can be activated; `enabled` controls availability.
     pub const fn enabled(mut self, enabled: bool) -> Self {
         self.enabled = enabled;
         self
     }
 
     #[must_use]
+    /// Replaces the accessible labels used by pagination controls.
     pub fn labels(mut self, labels: PaginationLabels) -> Self {
         self.labels = labels;
         self
     }
 
     #[must_use]
+    /// Returns the interaction key for `page`.
     pub fn page_key(&self, page: usize) -> String {
         format!("{}::page::{page}", self.key)
     }
 
     #[must_use]
+    /// Returns the interaction key for the previous-page control.
     pub fn previous_key(&self) -> String {
         format!("{}::previous", self.key)
     }
 
     #[must_use]
+    /// Returns the interaction key for the next-page control.
     pub fn next_key(&self) -> String {
         format!("{}::next", self.key)
     }
 
     #[must_use]
+    /// Returns the requested page index when `event` activates a pagination control.
     pub fn action(&self, event: &UiEvent) -> Option<usize> {
         if !self.enabled {
             return None;
@@ -131,6 +139,7 @@ impl Pagination {
     }
 
     #[must_use]
+    /// Builds the pagination controls using `theme` for their appearance.
     pub fn build(&self, theme: &WidgetTheme) -> Element {
         let mut children = vec![self.navigation_button(
             self.previous_key(),

@@ -15,6 +15,9 @@ pub enum UiCommand {
 }
 
 impl UiTree {
+    /// Applies a deferred UI command and returns resulting interaction updates.
+    ///
+    /// * `command` — action, selection command, or text replacement to process.
     pub fn apply_command(&mut self, command: UiCommand) -> InteractionUpdate {
         match command {
             UiCommand::Action(invocation) => self.invoke_action(invocation),

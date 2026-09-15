@@ -13,6 +13,10 @@ pub struct VectorId(pub u64);
 static NEXT_VECTOR_ID: AtomicU64 = AtomicU64::new(1);
 
 impl VectorId {
+    /// Allocates a process-local opaque vector handle.
+    ///
+    /// # Panics
+    /// Panics if the process-local vector handle space is exhausted.
     #[must_use]
     pub fn fresh() -> Self {
         let id = NEXT_VECTOR_ID.fetch_add(1, Ordering::Relaxed);

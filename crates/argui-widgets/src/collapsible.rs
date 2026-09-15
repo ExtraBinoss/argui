@@ -16,6 +16,10 @@ pub struct Collapsible {
 }
 
 impl Collapsible {
+    /// Creates a controlled disclosure with a trigger label and panel content.
+    ///
+    /// `key` identifies the disclosure, `open` supplies its current state, and `content`
+    /// is mounted only while it is open.
     #[must_use]
     pub fn new(
         key: impl Into<String>,
@@ -35,6 +39,8 @@ impl Collapsible {
     }
 
     #[must_use]
+    /// Sets whether the disclosure trigger can be activated.
+    /// `enabled` determines whether the trigger accepts activation.
     pub const fn enabled(mut self, enabled: bool) -> Self {
         self.enabled = enabled;
         self
@@ -48,17 +54,20 @@ impl Collapsible {
     }
 
     #[must_use]
+    /// Adds a decorative indicator to the trigger.
     pub fn indicator(mut self, indicator: Element) -> Self {
         self.indicator = Some(indicator);
         self
     }
 
     #[must_use]
+    /// Returns the state key used by the disclosure trigger.
     pub fn trigger_key(&self) -> String {
         format!("{}::trigger", self.key)
     }
 
     #[must_use]
+    /// Returns the state key used by the disclosure panel.
     pub fn content_key(&self) -> String {
         format!("{}::content", self.key)
     }
@@ -73,6 +82,7 @@ impl Collapsible {
     }
 
     #[must_use]
+    /// Builds the disclosure using `theme` for trigger styling.
     pub fn build(self, theme: &WidgetTheme) -> Element {
         let trigger_key = self.trigger_key();
         let content_key = self.content_key();

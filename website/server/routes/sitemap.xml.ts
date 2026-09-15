@@ -6,7 +6,6 @@ export default defineEventHandler((event) => {
   const paths = [
     '/',
     '/features',
-    '/get-started',
     '/examples',
     '/docs',
     ...docs.map((guide) => `/docs/${guide.slug}`),

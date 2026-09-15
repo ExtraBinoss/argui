@@ -13,6 +13,8 @@ pub struct Slider {
 }
 
 impl Slider {
+    /// Creates a slider with the supplied label, value, bounds and step size.
+    /// `key` identifies the control and `config` supplies its numeric range and step settings.
     #[must_use]
     pub fn new(
         key: impl Into<String>,
@@ -26,12 +28,14 @@ impl Slider {
     }
 
     #[must_use]
+    /// Sets whether the slider can be changed; `enabled` controls interaction availability.
     pub fn enabled(mut self, enabled: bool) -> Self {
         self.behavior = self.behavior.enabled(enabled);
         self
     }
 
     #[must_use]
+    /// Builds the slider using `theme` for its track and thumb.
     pub fn build(self, theme: &WidgetTheme) -> Element {
         let ratio = self.behavior.ratio();
         let fill = Element::container([])

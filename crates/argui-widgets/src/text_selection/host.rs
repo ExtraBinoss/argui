@@ -25,6 +25,7 @@ pub struct SelectionHost<A: Render> {
 }
 
 impl<A: Render> SelectionHost<A> {
+    /// Wraps a render application with text-selection toolbar presentation.
     #[must_use]
     pub fn new(application: A) -> Self {
         Self {
@@ -48,12 +49,14 @@ impl<A: Render> SelectionHost<A> {
     }
 
     #[must_use]
+    /// Sets the key used to identify the selection toolbar menu.
     pub fn menu_key(mut self, key: impl Into<String>) -> Self {
         self.menu_key = key.into();
         self
     }
 
     #[must_use]
+    /// Sets the filter applied behind the selection toolbar.
     pub fn backdrop_filter(mut self, filter: Filter) -> Self {
         self.backdrop = Some(filter);
         self

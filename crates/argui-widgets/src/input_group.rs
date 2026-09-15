@@ -14,6 +14,7 @@ pub struct InputGroup {
 }
 
 impl InputGroup {
+    /// Creates an input group identified by `key`, named `label`, and containing `input`.
     #[must_use]
     pub fn new(key: impl Into<String>, label: impl Into<String>, input: Element) -> Self {
         Self {
@@ -27,6 +28,7 @@ impl InputGroup {
     }
 
     #[must_use]
+    /// Builds the group using `theme` for its label styling.
     pub fn build(self, theme: &WidgetTheme) -> Element {
         Element::row(
             self.leading

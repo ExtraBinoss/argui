@@ -96,6 +96,7 @@ pub struct EffectTarget {
 }
 
 impl PropertyBinding {
+    /// Returns which part of the UI must be invalidated when this binding changes.
     #[must_use]
     pub const fn impact(&self) -> BindingImpact {
         match self {
@@ -105,6 +106,7 @@ impl PropertyBinding {
         }
     }
 
+    /// Returns the animation track used by this property binding.
     #[must_use]
     pub fn track(&self) -> &dyn MotionTrack {
         match self {
@@ -179,10 +181,15 @@ impl EffectMotion {
     }
 }
 
+/// Sealed mapping from an animatable property marker to its value and binding type.
 pub trait MotionProperty: private::Sealed {
+    /// Value type animated or set by this property.
     type Value;
 
     #[doc(hidden)]
+    /// Converts this property and motion binding into the internal binding representation.
+    ///
+    /// * `binding` — motion applied to the property value.
     fn into_binding(self, binding: MotionBinding<Self::Value>) -> PropertyBinding;
 }
 

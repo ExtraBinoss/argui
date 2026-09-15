@@ -32,6 +32,11 @@ pub struct PreparedText {
 }
 
 impl PreparedText {
+    /// Repositions the glyphs and decorations belonging to one prepared block.
+    ///
+    /// * `block` — block index used when the text was prepared.
+    /// * `origin` — new logical origin of the block.
+    /// * `clip` — new logical clipping rectangle.
     pub fn reposition_block(
         &mut self,
         block: usize,

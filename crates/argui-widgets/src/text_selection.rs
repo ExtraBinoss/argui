@@ -22,6 +22,7 @@ pub struct TextSelectionToolbar {
 }
 
 impl TextSelectionToolbar {
+    /// Creates a toolbar; `key_prefix` scopes its controls, `selection` and `viewport` position it, and `capabilities` enables actions.
     #[must_use]
     pub fn new(
         key_prefix: impl Into<String>,
@@ -40,6 +41,7 @@ impl TextSelectionToolbar {
     }
 
     #[must_use]
+    /// Supplies icons used for toolbar actions.
     pub fn icons(mut self, icons: &WidgetAssets) -> Self {
         self.icons = Some(icons.clone());
         self
@@ -47,12 +49,14 @@ impl TextSelectionToolbar {
 
     /// The caller registers custom effects in the renderer's effect registry.
     #[must_use]
+    /// Sets the filter applied behind the toolbar.
     pub fn backdrop_filter(mut self, filter: Filter) -> Self {
         self.backdrop = Some(filter);
         self
     }
 
     #[must_use]
+    /// Builds the toolbar using `theme` for its surface and action styling.
     pub fn build(self, theme: &WidgetTheme) -> Element {
         let commands = [
             ("cut", "Cut", self.capabilities.cut),

@@ -13,7 +13,11 @@ pub struct ScrollGesture {
 
 impl ScrollGesture {
     /// Selects a target after 180 ms of inactivity or an explicit gesture start.
-    /// Hosts should pass a monotonic timestamp and not feed synthetic inertia here.
+    /// `point` is the pointer position, `now` a monotonic timestamp, `started`
+    /// marks an explicit new gesture, and `regions` are current scroll regions.
+    /// Do not feed synthetic inertia here.
+    ///
+    /// Returns the retained target, if one was hit and remains present.
     pub fn target(
         &mut self,
         point: Point,

@@ -14,6 +14,10 @@ the user's desktop. A blank capture is a failed visual check.
   under `src/`.
 - Add dependencies only to the crate that uses them.
 - Keep the renderer/runtime independent from any future DSL.
+- Document every new function and method with accurate Rustdoc, and update that
+  documentation whenever its signature or behavior changes. Explain the
+  purpose of each parameter and return value, and document applicable errors
+  and panics.
 - During implementation, run only the directly affected crate/tests and measure
   behavior with `cargo nextest run --all-features`. Keep feature flags identical
   between targeted runs so Cargo reuses one artifact variant. Do not repeatedly

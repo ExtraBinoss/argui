@@ -57,7 +57,15 @@ impl UiTree {
         }
         Ok(None)
     }
-    /// Live availability; call again when presenting a menu rather than retaining stale state.
+    /// Returns the current label and availability for an action invocation.
+    /// Query again when presenting a menu rather than retaining stale state.
+    ///
+    /// * `invocation` — action identifier and optional origin node.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ActionError::StaleOrigin`] when the origin is no longer in the tree,
+    /// or [`ActionError::Unavailable`] when the action cannot be resolved in scope.
     pub fn action_state(&self, invocation: ActionInvocation) -> Result<ActionState, ActionError> {
         if let Some((_, binding)) = self.action_binding(invocation)? {
             return Ok(binding.state.clone());
@@ -89,6 +97,9 @@ impl UiTree {
         })
         .enabled(enabled))
     }
+    /// Invokes an enabled action and returns its event or selection-command update.
+    ///
+    /// * `invocation` — action identifier and optional origin node.
     pub fn invoke_action(&mut self, invocation: ActionInvocation) -> InteractionUpdate {
         if !self
             .action_state(invocation)

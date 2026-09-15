@@ -18,6 +18,11 @@ pub struct Menubar<'a> {
 }
 
 impl Menubar<'_> {
+    /// Builds the configured menus in a horizontal menubar using `theme` for their controls.
+    ///
+    /// # Panics
+    ///
+    /// Panics if a built menu trigger is missing its expected interaction or semantic data.
     pub fn build(&self, theme: &WidgetTheme) -> Element {
         Element::row(self.menus.iter().enumerate().map(|(index, menu)| {
             let mut menu = menu.clone();
@@ -43,6 +48,7 @@ impl Menubar<'_> {
         .keyed(self.key)
         .semantics(Semantics::new(Role::MenuBar).label(self.label))
     }
+    /// Interprets `event` as a menubar focus change or nested menu response.
     pub fn response(&self, event: &UiEvent) -> Option<MenubarResponse> {
         let key = event.target_key()?;
         let current = self

@@ -32,6 +32,7 @@ pub struct ServiceRegistration<T: 'static> {
 
 impl<T: 'static> ServiceRegistration<T> {
     #[must_use]
+    /// Returns another shared owner of the registered service value.
     pub fn service(&self) -> Rc<T> {
         self.value.clone()
     }
@@ -47,6 +48,12 @@ impl<T: 'static> Drop for ServiceRegistration<T> {
 impl super::ModelRuntime {
     /// Publish one typed service in this domain. The caller explicitly owns its
     /// registration; another runtime cannot see it and there is no global fallback.
+    ///
+    /// `value` is the service value to publish.
+    ///
+    /// # Errors
+    /// Returns [`ServiceAlreadyRegistered`] if this runtime already has a live
+    /// registration for the same concrete type.
     pub fn register_service<T: 'static>(
         &self,
         value: T,
@@ -67,6 +74,8 @@ impl super::ModelRuntime {
     }
 
     #[must_use]
+    /// Looks up a service of type `T` in this runtime.
+    /// Returns `None` if no live registration exists.
     pub fn service<T: 'static>(&self) -> Option<Rc<T>> {
         self.services()
             .0
@@ -81,6 +90,7 @@ impl super::ModelRuntime {
 impl<T: 'static> super::Context<T> {
     /// Resolve an application service without borrowing the registry during use.
     #[must_use]
+    /// Returns `None` when this context is detached or the service is not registered.
     pub fn service<S: 'static>(&self) -> Option<Rc<S>> {
         self.entity.as_ref()?.upgrade()?.runtime().service()
     }

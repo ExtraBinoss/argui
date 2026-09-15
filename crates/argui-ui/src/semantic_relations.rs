@@ -40,12 +40,15 @@ pub struct SemanticDiagnostic {
 }
 
 impl Element {
+    /// Sets the accessibility semantics exposed for this element.
     #[must_use]
     pub fn semantics(mut self, semantics: argui_accessibility::Semantics) -> Self {
         self.semantics = Some(Box::new(semantics));
         self
     }
 
+    /// Hides or exposes this element and its descendants in the accessibility tree.
+    /// * `hidden` — whether this semantic subtree is hidden.
     #[must_use]
     pub fn semantic_hidden(mut self, hidden: bool) -> Self {
         self.semantic_hidden = hidden;
@@ -61,6 +64,9 @@ impl Element {
         self
     }
 
+    /// Associates accessible labels with elements identified by scoped keys.
+    /// `targets` are keys of the elements that label this element.
+    /// * `targets` — scoped keys of elements that label this element.
     #[must_use]
     pub fn labelled_by(
         mut self,
@@ -69,6 +75,9 @@ impl Element {
         self.semantic_bindings.labelled_by = targets.into_iter().map(Into::into).collect();
         self
     }
+    /// Associates descriptive text with elements identified by scoped keys.
+    /// `targets` are keys of the elements that describe this element.
+    /// * `targets` — scoped keys of elements that describe this element.
     #[must_use]
     pub fn described_by(
         mut self,
@@ -77,6 +86,9 @@ impl Element {
         self.semantic_bindings.described_by = targets.into_iter().map(Into::into).collect();
         self
     }
+    /// Declares elements identified by scoped keys as controlled by this element.
+    /// `targets` are keys of the controlled elements.
+    /// * `targets` — scoped keys of elements controlled by this element.
     #[must_use]
     pub fn controls(
         mut self,
@@ -85,6 +97,9 @@ impl Element {
         self.semantic_bindings.controls = targets.into_iter().map(Into::into).collect();
         self
     }
+    /// Sets the active descendant by its key within the semantic scope.
+    /// `target` is the key of the active descendant element.
+    /// * `target` — scoped key of the active descendant element.
     #[must_use]
     pub fn active_descendant(mut self, target: impl Into<SemanticTarget>) -> Self {
         self.semantic_bindings.active_descendant = Some(target.into());

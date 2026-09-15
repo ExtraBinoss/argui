@@ -44,6 +44,10 @@ pub struct TextInputScroll {
 }
 
 impl TextInputScroll {
+    /// Creates a text-input scroll policy with an offset and caret visibility mode.
+    ///
+    /// * `offset` — current horizontal and vertical content offset.
+    /// * `caret` — whether to reveal the caret or preserve the offset.
     #[must_use]
     pub const fn new(offset: Point, caret: CaretScroll) -> Self {
         Self { offset, caret }
@@ -60,6 +64,16 @@ struct VisualCluster {
 }
 
 impl TextEngine {
+    /// Shapes text for editing and computes caret, selection, and scrolling geometry.
+    ///
+    /// * `text` — displayed editor text.
+    /// * `style` — editor text style.
+    /// * `viewport` — available input size in logical pixels.
+    /// * `cursor` — caret position and affinity in the displayed text.
+    /// * `selection` — optional anchor and focus positions.
+    /// * `scroll` — current offset and caret reveal policy.
+    ///
+    /// Returns caret stops, selection rectangles, content size, and resolved offsets.
     pub fn input_layout(
         &mut self,
         text: &str,

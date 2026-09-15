@@ -12,6 +12,7 @@ pub struct NavigationItem {
 }
 
 impl NavigationItem {
+    /// Creates a navigation entry with a stable `id` and display `label`.
     #[must_use]
     pub fn new(id: impl Into<String>, label: impl Into<String>) -> Self {
         Self {
@@ -42,6 +43,8 @@ pub struct NavigationMenu {
 }
 
 impl NavigationMenu {
+    /// Creates a controlled navigation menu from its ordered items.
+    /// `key` identifies the menu and `label` names it accessibly.
     #[must_use]
     pub fn new(
         key: impl Into<String>,
@@ -58,11 +61,13 @@ impl NavigationMenu {
     }
 
     #[must_use]
+    /// Returns the element key for the item identified by `id`.
     pub fn item_key(&self, id: &str) -> String {
         format!("{}::item::{id}", self.key)
     }
 
     #[must_use]
+    /// Returns the navigation action requested by `event`, if any.
     pub fn action(&self, event: &UiEvent) -> Option<NavigationMenuAction> {
         let key = event.target_key()?;
         if self.open.is_some()
@@ -112,6 +117,11 @@ impl NavigationMenu {
     }
 
     #[must_use]
+    /// Builds the navigation menu using `theme` for its appearance.
+    ///
+    /// # Panics
+    ///
+    /// Panics if generated navigation controls are missing their expected semantics or interaction data.
     pub fn build(&self, theme: &WidgetTheme) -> Element {
         Element::row(self.items.iter().map(|item| {
             let key = self.item_key(&item.id);

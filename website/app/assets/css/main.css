@@ -665,6 +665,26 @@ pre {
   line-height: 1.85;
   tab-size: 4;
 }
+.highlighted-code {
+  max-height: 520px;
+  overflow: auto;
+}
+.highlighted-code .shiki {
+  min-width: max-content;
+  background: transparent !important;
+}
+.highlighted-code .shiki span {
+  color: var(--shiki-light);
+  font-style: var(--shiki-light-font-style);
+  font-weight: var(--shiki-light-font-weight);
+  text-decoration: var(--shiki-light-text-decoration);
+}
+[data-theme='dark'] .highlighted-code .shiki span {
+  color: var(--shiki-dark);
+  font-style: var(--shiki-dark-font-style);
+  font-weight: var(--shiki-dark-font-weight);
+  text-decoration: var(--shiki-dark-text-decoration);
+}
 code {
   font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
 }

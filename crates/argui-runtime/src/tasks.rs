@@ -12,11 +12,17 @@ mod spawn;
 pub use spawn::{TaskFuture, TaskOutput};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Failure encountered while scheduling or delivering asynchronous work.
 pub enum TaskError {
+    /// A model or presentation resource scope closed before work could be started.
     ScopeClosed,
+    /// No task executor was available or the task owner had been detached.
     Unavailable,
+    /// The runtime could not reserve capacity for another task.
     CapacityExceeded,
+    /// The executor could not be initialized or used.
     Runtime(String),
+    /// The future or blocking work panicked before producing a result.
     Panicked,
 }
 impl std::fmt::Display for TaskError {
@@ -27,12 +33,15 @@ impl std::fmt::Display for TaskError {
 impl std::error::Error for TaskError {}
 
 #[derive(Clone, Debug, Default)]
+/// Shared cancellation state that task code can check cooperatively.
 pub struct CancellationToken(Arc<AtomicBool>);
 impl CancellationToken {
+    /// Returns whether cancellation has been requested.
     #[must_use]
     pub fn is_cancelled(&self) -> bool {
         self.0.load(Ordering::Acquire)
     }
+    /// Marks this token as cancelled.
     pub fn cancel(&self) {
         self.0.store(true, Ordering::Release);
     }
@@ -62,6 +71,11 @@ pub struct TaskHandle {
 impl TaskHandle {
     /// Also cancel when this UI-owned resource scope ends. Existing owner and
     /// handle cancellation remain in force.
+    ///
+    /// `scope` is the resource scope that owns the additional cancellation hook.
+    ///
+    /// # Errors
+    /// Returns [`crate::ScopeClosed`] if the scope has already been closed.
     pub fn in_scope(self, scope: &crate::ResourceScope) -> Result<Self, crate::ScopeClosed> {
         if scope.is_closed() {
             return Err(crate::ScopeClosed);
@@ -83,16 +97,19 @@ impl TaskHandle {
         self.scopes.borrow_mut().push(lease);
         Ok(self)
     }
+    /// Cancels the task and releases any resource-scope registrations.
     pub fn cancel(&self) {
         self.state.cancel();
         let leases = std::mem::take(&mut *self.scopes.borrow_mut());
         drop(leases);
     }
     #[must_use]
+    /// Reports whether this task has completed or has been cancelled.
     pub fn is_finished(&self) -> bool {
         !self.state.active()
     }
     #[must_use]
+    /// Returns a token that task code can use to observe cancellation.
     pub fn cancellation_token(&self) -> CancellationToken {
         self.state.token.clone()
     }
@@ -123,10 +140,12 @@ pub struct TaskSlot {
     handle: Option<TaskHandle>,
 }
 impl TaskSlot {
+    /// Cancels and removes the operation currently stored in this slot.
     pub fn cancel(&mut self) {
         self.handle = None;
     }
     #[must_use]
+    /// Returns whether this slot contains a task that has not completed.
     pub fn is_running(&self) -> bool {
         self.handle.as_ref().is_some_and(|task| !task.is_finished())
     }
@@ -135,6 +154,9 @@ impl TaskSlot {
     }
 }
 
+/// Suspends the current task for at least the requested duration.
+///
+/// `duration` is the interval to wait before resuming.
 pub async fn sleep(duration: std::time::Duration) {
     #[cfg(not(target_arch = "wasm32"))]
     tokio::time::sleep(duration).await;
@@ -148,6 +170,7 @@ pub async fn sleep(duration: std::time::Duration) {
         }
     }
 }
+/// Yields execution so other ready work can run before this task resumes.
 pub async fn yield_now() {
     #[cfg(not(target_arch = "wasm32"))]
     tokio::task::yield_now().await;

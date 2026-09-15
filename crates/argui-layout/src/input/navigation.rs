@@ -6,6 +6,12 @@ use super::TextInputRegion;
 
 impl TextInputRegion {
     /// Resolve visual movement against shaped lines; word/document commands use editor text.
+    ///
+    /// * `ui` — tree containing the focused editor and its current selection.
+    /// * `input` — pressed navigation key and modifiers.
+    ///
+    /// Returns `None` when this region cannot handle the input, or the interaction
+    /// update for a handled navigation key.
     pub fn navigate(&self, ui: &mut UiTree, input: &KeyInput) -> Option<InteractionUpdate> {
         if input.state != KeyState::Pressed
             || ui.focused_node() != Some(self.node)

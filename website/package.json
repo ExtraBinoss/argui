@@ -7,13 +7,14 @@
     "node": ">=22.12.0"
   },
   "scripts": {
-    "dev": "nuxt dev --host 127.0.0.1",
-    "build": "node scripts/catalogue.mjs && node scripts/gallery.mjs --check && nuxt build",
-    "generate": "node scripts/catalogue.mjs && node scripts/gallery.mjs --check && nuxt generate",
+    "dev": "node scripts/docs-examples.mjs && nuxt dev --host 127.0.0.1",
+    "build": "node scripts/catalogue.mjs && node scripts/docs-examples.mjs && node scripts/gallery.mjs --check && nuxt build",
+    "generate": "node scripts/catalogue.mjs && node scripts/docs-examples.mjs && node scripts/gallery.mjs --check && nuxt generate",
     "preview": "nuxt preview --host 127.0.0.1",
     "postinstall": "nuxt prepare",
     "typecheck": "nuxt typecheck",
     "catalogue": "node scripts/catalogue.mjs",
+    "docs:generate": "node scripts/docs-examples.mjs",
     "gallery:build": "node scripts/gallery.mjs",
     "gallery:copy": "node scripts/gallery.mjs --copy",
     "test": "node --test tests/*.test.mjs",
@@ -28,6 +29,7 @@
     "@pinia/nuxt": "^1.0.2",
     "nuxt": "^4.5.2",
     "pinia": "^4.0.3",
+    "shiki": "^4.4.3",
     "vue": "^3.5.42"
   },
   "devDependencies": {

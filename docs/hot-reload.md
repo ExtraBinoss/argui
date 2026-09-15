@@ -6,7 +6,7 @@ optional Cargo feature and is absent from default builds.
 
 ```toml
 [dependencies]
-argui = { git = "https://github.com/ExtraBinoss/argui", features = ["hot-reload"] }
+argui = { version = "0.2.1", features = ["hot-reload"] }
 ```
 
 Install the matching Dioxus CLI and start the executable with hot patching:

@@ -1,4 +1,7 @@
+import { docExampleSources } from './doc-example-sources.generated'
+
 export type DocCode = { filename: string; code: string }
+export type DocExample = { id: string; path: string; source: string }
 export type DocSection = {
   id: string
   title: string
@@ -15,11 +18,17 @@ export type DocGuide = {
   minutes: number
   title: string
   description: string
-  demo: string
+  example: DocExample
   demoTitle: string
   sources: string[]
   sections: DocSection[]
 }
+
+const example = (id: string, filename: keyof typeof docExampleSources): DocExample => ({
+  id,
+  path: `app_examples/docs-examples/src/examples/${filename}.rs`,
+  source: docExampleSources[filename],
+})
 
 const dependency = `[dependencies]
 argui = { version = "0.2.1", features = ["widget-button"] }`
@@ -62,7 +71,7 @@ struct Counter {
 
 impl Render for Counter {
     fn render(&mut self, cx: &mut Context<Self>) -> Element {
-        let palette = shadcn(cx.environment());
+        let palette = default_theme(cx.environment());
         let theme = palette.resolve(cx.environment().color_scheme);
 
         Element::column([
@@ -169,7 +178,7 @@ export const docs: DocGuide[] = [
     title: 'Install Argui',
     description:
       'Create a Rust project, select only the features you use, and prepare desktop and WebAssembly targets.',
-    demo: 'Button',
+    example: example('installation', 'installation'),
     demoTitle: 'Your first compiled Argui control',
     sources: ['Cargo.toml', 'crates/argui/Cargo.toml', 'README.md'],
     sections: [
@@ -214,7 +223,7 @@ export const docs: DocGuide[] = [
     minutes: 8,
     title: 'Create your first window',
     description: 'Launch a native or browser window and render one retained Argui element.',
-    demo: 'Web layout',
+    example: example('first-window', 'first_window'),
     demoTitle: 'A compiled responsive application window',
     sources: [
       'crates/argui/examples/window.rs',
@@ -234,9 +243,10 @@ export const docs: DocGuide[] = [
         id: 'configuration',
         title: 'Configure identity and window',
         paragraphs: [
-          'ApplicationIdentity gives the application a stable reverse-domain identifier, display name, and icons. WindowConfig controls logical width, height, decorations, transparency, and whether a web canvas is appended to the document.',
+          'ApplicationIdentity gives the application a stable reverse-domain identifier, display name, and icons. WindowConfig documents each public field in cargo doc and your IDE, including logical size, decorations, transparency, canvas attachment, pointer behavior, safe areas, and initial focus.',
+          'focus_on_launch defaults to true on native targets and false on WebAssembly. The Web default keeps an embedded canvas from taking focus and moving the surrounding page while it loads; clicks and touches still focus it normally.',
         ],
-        note: 'Use a unique application ID such as com.company.product. Do not change it between releases if the operating system should recognize the same application.',
+        note: 'Use with_focus_on_launch(true) for a full-page Web app that should accept keyboard input immediately. Leave it disabled for examples embedded in a scrollable site.',
       },
       {
         id: 'errors',
@@ -254,7 +264,7 @@ export const docs: DocGuide[] = [
     minutes: 10,
     title: 'Compose an interface',
     description: 'Build rows, columns, text, and widgets as a typed Rust tree.',
-    demo: 'Button',
+    example: example('elements', 'elements'),
     demoTitle: 'Composition with real Argui buttons',
     sources: [
       'crates/argui/examples/layout.rs',
@@ -298,7 +308,7 @@ export const docs: DocGuide[] = [
     title: 'Build a counter with state',
     description:
       'Store application state in a model, handle a click, and invalidate only the presentation that changed.',
-    demo: 'Hot reload',
+    example: example('counter', 'counter'),
     demoTitle: 'A compiled counter running in WebAssembly',
     sources: ['crates/argui-widget-gallery/src/pages/hot_reload.rs', 'docs/runtime/models.md'],
     sections: [
@@ -335,7 +345,7 @@ export const docs: DocGuide[] = [
     title: 'Responsive layout',
     description:
       'Use Flexbox, Grid, constraints, wrapping, and container queries without device-specific branches.',
-    demo: 'Web layout',
+    example: example('layout', 'layout'),
     demoTitle: 'Resize this compiled responsive layout',
     sources: [
       'crates/argui/examples/layout.rs',
@@ -379,7 +389,7 @@ export const docs: DocGuide[] = [
     title: 'Events and interaction',
     description:
       'Handle pointer, keyboard, text, focus, and accessibility actions through one typed event system.',
-    demo: 'Button',
+    example: example('events', 'events'),
     demoTitle: 'Pointer, keyboard, and accessible activation',
     sources: [
       'docs/ui/interaction.md',
@@ -418,12 +428,14 @@ export const docs: DocGuide[] = [
     minutes: 15,
     title: 'Style and theme',
     description:
-      'Apply typed paint and layout values, resolve theme tokens, and respond to visual state.',
-    demo: 'Card',
-    demoTitle: 'A themed component compiled to WebAssembly',
+      'Choose a color scheme and accent, override widget tokens, and apply typed visual state.',
+    example: example('styling', 'styling'),
+    demoTitle: 'An interactive theme configurator compiled to WebAssembly',
     sources: [
       'docs/ui/styling.md',
       'crates/argui-theme/src/lib.rs',
+      'crates/argui-theme/src/tokens.rs',
+      'crates/argui-widgets/src/theme.rs',
       'crates/argui-widget-gallery/src/app/theme.rs',
     ],
     sections: [
@@ -440,17 +452,28 @@ export const docs: DocGuide[] = [
       },
       {
         id: 'theme',
-        title: 'Resolve tokens from the environment',
+        title: 'Start from the default theme',
         paragraphs: [
-          'Widgets use a WidgetTheme resolved from the presentation environment. The environment carries the effective color scheme, reduced-motion preference, high contrast, scale factor, and safe area.',
+          'default_theme(cx.environment()) builds matching light and dark WidgetTheme palettes. Resolve the active color scheme, then pass derived styles such as theme.button() or theme.input() to widgets.',
         ],
+        code: {
+          filename: 'src/view.rs',
+          code: 'let themes = default_theme(cx.environment());\nlet theme = themes.resolve(cx.environment().color_scheme);\n\nButton::new("save", "Save", theme.button()).build()',
+        },
       },
       {
-        id: 'states',
-        title: 'Patch only what changes',
+        id: 'tokens',
+        title: 'Override any token',
         paragraphs: [
-          'Element::when applies typed StylePatch values for hover, press, focus, disabled state, named scopes, or container conditions. Paint-only changes reuse layout and shaped text.',
+          'ThemeOverrides is a sparse, typed map. Override only the colors or numeric effects your product owns; every other value continues to follow the default light or dark palette.',
         ],
+        bullets: [
+          'Surfaces: background, card, popover, muted, and borders',
+          'Content: foreground, muted foreground, and destructive colors',
+          'Controls: primary, secondary, focus ring, input, switch, and scrollbar values',
+          'Effects: overlay blur, shadows, and dialog backdrop',
+        ],
+        note: 'The interactive example switches system, light, and dark palettes; changes the accent; then installs several token overrides together so their effect is visible immediately.',
       },
     ],
   },
@@ -462,7 +485,7 @@ export const docs: DocGuide[] = [
     title: 'Accessibility from the start',
     description:
       'Give controls stable semantics, keyboard behavior, focus, and useful touch targets.',
-    demo: 'Input & Search',
+    example: example('accessibility', 'accessibility'),
     demoTitle: 'An accessible input in the browser semantic tree',
     sources: [
       'crates/argui/examples/accessibility.rs',
@@ -499,6 +522,46 @@ export const docs: DocGuide[] = [
     ],
   },
   {
+    slug: 'essentials/animation',
+    category: 'Essentials',
+    level: 'Intermediate',
+    minutes: 14,
+    title: 'Animation and motion',
+    description:
+      'Compose transforms, layout morphs, color, vector transitions, and GPU aura effects in smooth loops.',
+    example: example('animation', 'animation'),
+    demoTitle: 'Six responsive motion patterns running together',
+    sources: [
+      'docs/ui/animation.md',
+      'docs/rendering/effects.md',
+      'crates/argui-widget-gallery/src/pages/motion.rs',
+    ],
+    sections: [
+      {
+        id: 'frame',
+        title: 'Drive one coherent frame',
+        paragraphs: [
+          'A component opts into animation frames only while motion is active. One time value can coordinate translation, rotation, scale, layout, radii, Oklab color, opacity, and GPU layers without independent timers drifting apart.',
+        ],
+      },
+      {
+        id: 'practical',
+        title: 'Compose practical motion',
+        paragraphs: [
+          'Use short loops to communicate status and longer one-shot transitions for state changes. The live lab combines a text aura, a layout morph, a vector crossfade, a sequenced loader, and a status pulse alongside a full composed transform.',
+        ],
+      },
+      {
+        id: 'responsive',
+        title: 'Keep motion responsive and interruptible',
+        paragraphs: [
+          'The control bar remains visible while the cards scroll inside the Argui canvas. Cards wrap into one column on narrow viewports, scrolling stays available while every loop runs, and Pause stops frame requests immediately.',
+        ],
+        note: 'Reduced-motion preferences disable the loops and present a stable frame automatically.',
+      },
+    ],
+  },
+  {
     slug: 'advanced/tasks',
     category: 'Advanced',
     level: 'Intermediate',
@@ -506,7 +569,7 @@ export const docs: DocGuide[] = [
     title: 'Asynchronous tasks',
     description:
       'Run cancellable work, keep completion on the UI thread, and prevent stale results.',
-    demo: 'Async tasks',
+    example: example('tasks', 'tasks'),
     demoTitle: 'Cancellable search over 10,000 rows',
     sources: ['crates/argui-widget-gallery/src/pages/async_tasks.rs', 'docs/runtime/tasks.md'],
     sections: [
@@ -546,7 +609,7 @@ export const docs: DocGuide[] = [
     title: 'Lists, tables, and large data',
     description:
       'Render collections with stable identity and virtualize data that should not all be laid out at once.',
-    demo: 'Data table',
+    example: example('data', 'data'),
     demoTitle: 'A sortable, selectable data table',
     sources: [
       'docs/widgets/lists-tables.md',
@@ -589,7 +652,7 @@ export const docs: DocGuide[] = [
     title: 'Dialogs, menus, and overlays',
     description:
       'Build focus-safe overlay surfaces and optionally host them outside the native window bounds.',
-    demo: 'Dialog',
+    example: example('overlays', 'overlays'),
     demoTitle: 'A modal dialog with focus management',
     sources: [
       'docs/widgets/overlays.md',
@@ -622,45 +685,6 @@ export const docs: DocGuide[] = [
     ],
   },
   {
-    slug: 'advanced/animation',
-    category: 'Advanced',
-    level: 'Intermediate',
-    minutes: 17,
-    title: 'Animation and GPU effects',
-    description:
-      'Animate typed properties and add optional WGSL effects without turning an idle UI into a render loop.',
-    demo: 'Animation lab',
-    demoTitle: 'Tweens, springs, inertia, and keyframes',
-    sources: [
-      'docs/ui/animation.md',
-      'docs/rendering/effects.md',
-      'crates/argui-widget-gallery/src/pages/motion.rs',
-    ],
-    sections: [
-      {
-        id: 'properties',
-        title: 'Animate the property, not the widget',
-        paragraphs: [
-          'Transitions bind to typed paint, transform, scroll, or layout properties. Tracks stay beside stable NodeIds, so a rebuilt view retargets from the currently presented value instead of jumping or restarting.',
-        ],
-      },
-      {
-        id: 'preferences',
-        title: 'Respect reduced motion',
-        paragraphs: [
-          'The presentation environment reports reduced motion. Active transitions finish at their typed target and future transitions do not schedule intermediate frames while the preference remains active.',
-        ],
-      },
-      {
-        id: 'effects',
-        title: 'Register effects once',
-        paragraphs: [
-          'argui-effects supplies optional shader groups for blur, color, liquid glass, refraction, scroll, and shadow. Custom WGSL definitions are validated when the renderer registry is configured, not hidden inside a view helper.',
-        ],
-      },
-    ],
-  },
-  {
     slug: 'advanced/i18n',
     category: 'Advanced',
     level: 'Intermediate',
@@ -668,7 +692,7 @@ export const docs: DocGuide[] = [
     title: 'Localization and RTL',
     description:
       'Embed Fluent catalogs, negotiate locales, format plurals, and keep layout direction consistent.',
-    demo: 'Internationalization',
+    example: example('i18n', 'i18n'),
     demoTitle: 'English, French, Arabic, plurals, and RTL',
     sources: [
       'docs/i18n.md',
@@ -711,7 +735,7 @@ export const docs: DocGuide[] = [
     title: 'The Argui mental model',
     description:
       'Understand models, presentations, retained elements, layout, paint, semantics, and host boundaries.',
-    demo: 'Web layout',
+    example: example('mental-model', 'mental_model'),
     demoTitle: 'The retained pipeline in a running application',
     sources: ['docs/architecture.md', 'docs/runtime/models.md', 'docs/rendering/primitives.md'],
     sections: [
@@ -750,7 +774,7 @@ export const docs: DocGuide[] = [
     title: 'Structure a real application',
     description:
       'Organize models, views, services, and platform edges without coupling your product to the renderer.',
-    demo: 'Async tasks',
+    example: example('project-structure', 'project_structure'),
     demoTitle: 'A model, task, view, and virtual list working together',
     sources: [
       'app_examples/fake-ai-harness/src/app.rs',
@@ -793,7 +817,7 @@ export const docs: DocGuide[] = [
     title: 'Write clean Argui code',
     description:
       'Keep state authoritative, views readable, updates bounded, and feature costs visible.',
-    demo: 'Data table',
+    example: example('clean-code', 'clean_code'),
     demoTitle: 'A larger feature split into focused state and view code',
     sources: [
       'docs/contributing/code-quality.md',
@@ -839,7 +863,7 @@ export const docs: DocGuide[] = [
     title: 'Create a custom element',
     description:
       'Own custom measurement and paint while keeping children, interaction, semantics, and invalidation in Argui.',
-    demo: 'Custom Timeline',
+    example: example('custom-elements', 'custom_elements'),
     demoTitle: 'A draggable custom timeline rendered in WebAssembly',
     sources: [
       'docs/ui/custom-elements.md',

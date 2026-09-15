@@ -217,6 +217,9 @@ impl super::UiTree {
         })
     }
 
+    /// Returns the visual revision associated with a node.
+    ///
+    /// * `node` — retained node identifier.
     #[must_use]
     pub fn visual_revision(&self, node: NodeId) -> u64 {
         self.transitions.revision(node)

@@ -28,6 +28,8 @@ pub struct PopoverBehavior {
 }
 
 impl PopoverBehavior {
+    /// Creates interaction behavior for a labelled popover with current `open` state.
+    /// `key` identifies the popover and `label` is its accessible name.
     #[must_use]
     pub fn new(key: impl Into<String>, label: impl Into<String>, open: bool) -> Self {
         Self {
@@ -38,11 +40,14 @@ impl PopoverBehavior {
     }
 
     #[must_use]
+    /// Returns the interaction key used by the popover content.
     pub fn content_key(&self) -> String {
         format!("{}::content", self.key)
     }
 
     #[must_use]
+    /// Applies the matching trigger or content semantics to `element`.
+    /// `part` selects which popover role is applied.
     pub fn decorate(&self, part: PopoverPart, element: Element) -> Element {
         match part {
             PopoverPart::Root => element
@@ -80,6 +85,7 @@ impl PopoverBehavior {
     }
 
     #[must_use]
+    /// Returns an open or close action when `event` targets this popover.
     pub fn action(&self, event: &UiEvent) -> Option<PopoverAction> {
         if !self.open {
             return (event.target_key() == Some(self.key.as_str())

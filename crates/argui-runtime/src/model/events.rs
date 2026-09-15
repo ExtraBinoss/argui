@@ -10,10 +10,15 @@ use std::{
 pub trait EventEmitter<E: 'static>: 'static {}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Failure to connect or deliver a typed model event.
 pub enum EventError {
+    /// An entity or presentation resource scope is closed.
     ScopeClosed,
+    /// The operation was requested without an entity-backed context.
     DetachedContext,
+    /// The source and receiver belong to different model runtimes.
     DifferentRuntime,
+    /// The runtime's bounded event queue cannot accept more work.
     CapacityExceeded,
 }
 impl std::fmt::Display for EventError {
@@ -33,6 +38,12 @@ type Callback = Rc<dyn Fn(&dyn Any)>;
 impl<T: 'static> super::Mount<T> {
     /// Retain the returned handle for as long as this presentation should receive
     /// events. Closing the mount also detaches it, including queued deliveries.
+    ///
+    /// `source` is the entity that emits `E`; `callback` handles each delivered event.
+    ///
+    /// # Errors
+    /// Returns [`EventError::ScopeClosed`] if this mount's resource scope has closed,
+    /// or the corresponding context error if the entities cannot be connected.
     pub fn subscribe<S, E>(
         &self,
         source: &Entity<S>,
@@ -92,6 +103,12 @@ impl<T: 'static> Context<T> {
     /// Invalidates only this presentation when the source calls `notify`.
     /// Retain the returned handle; unmounting also detaches the observation.
     /// Use `read` for dependencies that follow the latest render's reads.
+    ///
+    /// `source` is the entity whose notifications should invalidate this presentation.
+    ///
+    /// # Errors
+    /// Returns an error when the context is detached, the entities belong to different
+    /// runtimes, or either owning scope has closed.
     pub fn observe<S: 'static>(&mut self, source: &Entity<S>) -> Result<Subscription, EventError> {
         self.observe_owned(source, true)
     }
@@ -131,6 +148,13 @@ impl<T: 'static> Context<T> {
 
     /// Reads a model and tracks this render's dependency. Rebuilding without this
     /// read detaches the dependency; a cached render keeps it alive.
+    ///
+    /// `source` is the model to read; `read` computes a result from its shared value,
+    /// which is returned unchanged.
+    ///
+    /// # Panics
+    /// Panics when called outside an entity render context or when either model's
+    /// resource scope has closed, or when the models belong to different runtimes.
     pub fn read<S: 'static, R>(&mut self, source: &Entity<S>, read: impl FnOnce(&S) -> R) -> R {
         let target = self
             .entity
@@ -163,6 +187,13 @@ impl<T: 'static> Context<T> {
 
     /// Subscribe for this presentation's lifetime, bounded additionally by the
     /// returned handle and both model owners. Queued delivery is cancelled too.
+    ///
+    /// `source` emits the event type `E`; `callback` handles each event with mutable
+    /// access to this model and its context.
+    ///
+    /// # Errors
+    /// Returns an error if the context is detached, the entities use different runtimes,
+    /// or either owning scope has closed.
     pub fn subscribe<S, E>(
         &mut self,
         source: &Entity<S>,
@@ -220,6 +251,12 @@ impl<T: 'static> Context<T> {
 
     /// Captures current listeners. Later subscribers do not receive earlier events.
     /// Cancellation before delivery suppresses even an already queued callback.
+    ///
+    /// `event` is delivered to listeners registered for its concrete type.
+    ///
+    /// # Errors
+    /// Returns an error when this context is detached or its resource scope is closed,
+    /// or if event delivery exceeds runtime capacity.
     pub fn emit<E: 'static>(&mut self, event: E) -> Result<(), EventError>
     where
         T: EventEmitter<E>,

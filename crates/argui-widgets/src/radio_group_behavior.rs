@@ -25,6 +25,8 @@ pub struct RadioGroupBehavior {
 }
 
 impl RadioGroupBehavior {
+    /// Creates group behavior from labelled options, enabled flags and selected source index.
+    /// `key` identifies the group and `label` is its accessible name.
     #[must_use]
     pub fn new(
         key: impl Into<String>,
@@ -42,17 +44,20 @@ impl RadioGroupBehavior {
     }
 
     #[must_use]
+    /// Sets the layout and keyboard-navigation orientation.
     pub const fn orientation(mut self, orientation: Orientation) -> Self {
         self.orientation = orientation;
         self
     }
 
     #[must_use]
+    /// Returns the interaction key for the option at `index`.
     pub fn option_key(&self, index: usize) -> String {
         format!("{}::option::{index}", self.key)
     }
 
     #[must_use]
+    /// Applies radio-group semantics and behavior to `element` for `part`.
     pub fn decorate(&self, part: RadioGroupPart, element: Element) -> Element {
         match part {
             RadioGroupPart::Root => element.semantics(
@@ -86,6 +91,7 @@ impl RadioGroupBehavior {
     }
 
     #[must_use]
+    /// Returns a selection action when `event` activates an enabled option.
     pub fn action(&self, event: &UiEvent) -> Option<RadioGroupAction> {
         if !matches!(event.kind, UiEventKind::Click(_)) {
             return None;

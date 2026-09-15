@@ -6,13 +6,18 @@ use crate::Rect;
 /// adapter decides which system regions to include.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Insets {
+    /// Distance from the top edge.
     pub top: f32,
+    /// Distance from the right edge.
     pub right: f32,
+    /// Distance from the bottom edge.
     pub bottom: f32,
+    /// Distance from the left edge.
     pub left: f32,
 }
 
 impl Insets {
+    /// Insets with all edges equal to zero.
     pub const ZERO: Self = Self {
         top: 0.0,
         right: 0.0,
@@ -20,6 +25,7 @@ impl Insets {
         left: 0.0,
     };
 
+    /// Creates insets in top, right, bottom, left order.
     #[must_use]
     pub const fn new(top: f32, right: f32, bottom: f32, left: f32) -> Self {
         Self {
@@ -35,6 +41,7 @@ impl Insets {
     /// Platform APIs can report an empty safe rectangle while a native window
     /// is being created. Treat that as unavailable until a later update rather
     /// than interpreting it as the whole window being obscured.
+    /// * `scale_factor` — physical-to-logical pixel scale.
     #[must_use]
     pub fn try_from_physical_rects(window: Rect, safe: Rect, scale_factor: f32) -> Option<Self> {
         let coordinates = [
@@ -62,6 +69,7 @@ impl Insets {
 
     /// Derive logical insets from a physical window rectangle and its safe
     /// subrectangle. Coordinates in both rectangles use the same screen space.
+    /// * `scale_factor` — physical-to-logical pixel scale.
     #[must_use]
     pub fn from_physical_rects(window: Rect, safe: Rect, scale_factor: f32) -> Self {
         let scale_factor = if scale_factor.is_finite() && scale_factor > 0.0 {
@@ -86,11 +94,13 @@ impl Insets {
     }
 
     #[must_use]
+    /// Returns the combined left and right inset.
     pub const fn horizontal(self) -> f32 {
         self.left + self.right
     }
 
     #[must_use]
+    /// Returns the combined top and bottom inset.
     pub const fn vertical(self) -> f32 {
         self.top + self.bottom
     }

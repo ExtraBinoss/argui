@@ -47,6 +47,7 @@ impl Drop for Inner {
 pub struct ResourceScope(Rc<Inner>);
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// An operation attempted to register or use a resource after its scope closed.
 pub struct ScopeClosed;
 impl std::fmt::Display for ScopeClosed {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -56,19 +57,34 @@ impl std::fmt::Display for ScopeClosed {
 impl std::error::Error for ScopeClosed {}
 
 impl ResourceScope {
+    /// Closes this shared scope and releases its registered resources.
+    /// Closing an already closed scope has no effect.
+    ///
+    /// # Panics
+    /// Resumes the first panic raised by a registered cleanup after all cleanups run.
     pub fn close(&self) {
         self.0.close();
     }
     #[must_use]
+    /// Returns whether this scope has been closed.
     pub fn is_closed(&self) -> bool {
         self.0.closed.get()
     }
     #[must_use]
+    /// Returns the number of cleanup registrations that remain active.
     pub fn resource_count(&self) -> usize {
         self.0.resources.borrow().len()
     }
 
     /// Runs cleanup when either the scope closes or the returned lease is dropped.
+    ///
+    /// `cleanup` is the one-shot action to run at the end of the registration.
+    ///
+    /// # Errors
+    /// Returns [`ScopeClosed`] if this scope has already closed.
+    ///
+    /// # Panics
+    /// Panics if the resource registration identity space is exhausted.
     pub fn defer(&self, cleanup: impl FnOnce() + 'static) -> Result<ResourceLease, ScopeClosed> {
         if self.is_closed() {
             return Err(ScopeClosed);
@@ -86,6 +102,11 @@ impl ResourceScope {
     }
 
     /// Owns an arbitrary resource until either the scope or its lease ends.
+    ///
+    /// `resource` is dropped when the scope closes or the returned lease is dropped.
+    ///
+    /// # Errors
+    /// Returns [`ScopeClosed`] if this scope has already closed.
     pub fn own<T: 'static>(&self, resource: T) -> Result<ResourceLease, ScopeClosed> {
         self.defer(move || drop(resource))
     }
@@ -108,6 +129,7 @@ impl ResourceLease {
     }
 
     #[must_use]
+    /// Returns whether this lease still owns an active cleanup registration.
     pub fn is_active(&self) -> bool {
         self.scope
             .upgrade()

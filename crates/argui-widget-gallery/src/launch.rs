@@ -119,6 +119,11 @@ fn handle_event(event: RuntimeEvent) {
     }
 }
 
+/// Launches the native widget gallery with its DevTools inspection panel.
+///
+/// # Errors
+///
+/// Returns an error if application configuration or startup fails.
 pub fn launch() -> Result<(), Box<dyn std::error::Error>> {
     let application = application()?;
     run_application_with_text_engine(
@@ -132,6 +137,11 @@ pub fn launch() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[cfg(target_os = "android")]
+/// Launches the gallery using the supplied Android application handle.
+///
+/// # Errors
+///
+/// Returns an error if configuration or Android runtime startup fails.
 pub fn launch_android(
     android_app: argui_android::AndroidApp,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -150,6 +160,11 @@ pub fn launch_android(
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen::prelude::wasm_bindgen(start)]
 #[cfg_attr(coverage_nightly, coverage(off))]
+/// Starts the gallery in a WebAssembly browser runtime.
+///
+/// # Errors
+///
+/// Returns a JavaScript error if browser runtime startup fails.
 pub fn start() -> Result<(), wasm_bindgen::JsValue> {
     std::panic::set_hook(Box::new(|info| {
         renderer_state("error");

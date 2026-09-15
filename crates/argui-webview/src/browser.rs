@@ -37,6 +37,7 @@ extern "C" {
     fn dispose_timer(this: &WakeTimer);
 }
 
+/// Browser DOM-backed implementation of the WebView pool backend.
 pub struct BrowserBackend {
     hosts: HashMap<u64, web_sys::HtmlCanvasElement>,
     wake: Rc<dyn Fn()>,
@@ -46,6 +47,7 @@ pub struct BrowserBackend {
 }
 
 impl BrowserBackend {
+    /// Creates a browser backend and a callback used to wake its host.
     pub fn new(wake: impl Fn() + 'static) -> Self {
         let wake: Rc<dyn Fn()> = Rc::new(wake);
         let callback_wake = wake.clone();
@@ -59,14 +61,19 @@ impl BrowserBackend {
             views: Default::default(),
         }
     }
+    /// Associates a host ID with its canvas element.
+    /// `id` identifies the host and `canvas` is the DOM canvas attached to it.
     pub fn register_host(&mut self, id: u64, canvas: web_sys::HtmlCanvasElement) {
         self.hosts.insert(id, canvas);
     }
     /// Schedule one redraw at the next pool eviction, rather than polling while idle.
+    /// Schedules a wake after the optional maintenance delay.
+    /// `after` is the delay before the callback is invoked, if any.
     pub fn schedule_maintenance(&self, after: Option<std::time::Duration>) {
         self.timer
             .schedule(after.map_or(-1.0, |duration| duration.as_secs_f64() * 1000.0));
     }
+    /// Applies rectangular clipping to browser elements for these mounts.
     pub fn sync_clips(&self, mounts: &[(crate::WebViewMount, Option<argui_core::Rect>)]) {
         let mut views = self.views.borrow_mut();
         views.retain(|_, view| view.strong_count() > 0);

@@ -14,6 +14,9 @@ pub fn is_ios() -> bool {
 ///
 /// The launch function takes no arguments and returns `Result<(), E>`, where
 /// `E` implements `Display`. Pass the generated function name to Xcode's `main`.
+///
+/// # Panics
+/// The generated entry point panics when the launch function returns an error.
 #[macro_export]
 macro_rules! ios_main {
     ($name:ident, $launch:path) => {

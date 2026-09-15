@@ -6,8 +6,18 @@ that do not use them.
 
 ## [Unreleased]
 
+### Added
+
+- Added `default_theme` as the clear public name for Argui's standard widget
+  palette while keeping `shadcn` as a compatible alias.
+- Added an interactive documentation site whose lessons display and run their
+  exact Rust source as dedicated WebAssembly examples, including a complete
+  light/dark, accent and token override configurator.
+
 ### Fixed
 
+- Prevented Web canvases from taking focus and moving an embedding page while
+  they load; full-page apps can opt in through `WindowConfig::focus_on_launch`.
 - Kept Winit's AppKit content view attached when enabling the macOS desktop
   backdrop, so the Metal surface remains visible with `--all-features`.
 - Applied GTK's integer buffer scale to the Wayland WebView canvas, preventing

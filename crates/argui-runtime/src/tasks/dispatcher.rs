@@ -65,10 +65,16 @@ impl Drop for Inner {
 pub struct TaskRuntime(Rc<Inner>);
 impl TaskRuntime {
     #[cfg(not(target_arch = "wasm32"))]
+    /// Creates a task dispatcher whose completion wake can run on a native host.
+    ///
+    /// `wake` schedules a later call to [`Self::drain`] when completions are ready.
     pub fn new(wake: impl Fn() + Send + Sync + 'static) -> Self {
         Self::with_wake(Arc::new(wake))
     }
     #[cfg(target_arch = "wasm32")]
+    /// Creates a browser task dispatcher with a local completion wake callback.
+    ///
+    /// `wake` schedules a later call to [`Self::drain`] when completions are ready.
     pub fn new(wake: impl Fn() + 'static) -> Self {
         Self::with_wake(Rc::new(wake))
     }
@@ -101,11 +107,13 @@ impl TaskRuntime {
         }))
     }
     #[must_use]
+    /// Returns the number of registered tasks awaiting completion or cancellation.
     pub fn pending(&self) -> usize {
         self.0.entries.borrow().len()
     }
 
     /// Stop accepting work and cancel all deliveries, even if owners outlive the host.
+    /// Repeated calls have no additional effect.
     pub fn shutdown(&self) {
         self.0.closed.set(true);
         let entries = std::mem::take(&mut *self.0.entries.borrow_mut());
@@ -121,6 +129,10 @@ impl TaskRuntime {
     }
 
     /// Deliver at most 64 completions, without keeping a registry borrow over callbacks.
+    /// Requeues the wake callback if more completions remain.
+    ///
+    /// # Panics
+    /// Propagates a panic raised by a task completion callback or the wake callback.
     pub fn drain(&self) {
         self.0
             .wake_pending

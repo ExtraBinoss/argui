@@ -9,6 +9,13 @@ pub struct Catalog {
 
 impl Catalog {
     /// Parses one Fluent resource for `locale`.
+    ///
+    /// # Arguments
+    /// * `locale` — language identifier associated with the resource.
+    /// * `source` — Fluent source text.
+    ///
+    /// # Errors
+    /// Returns an error if the source has invalid Fluent syntax or duplicate entries.
     pub fn parse(
         locale: LanguageIdentifier,
         source: impl Into<String>,
@@ -19,6 +26,14 @@ impl Catalog {
     /// Parses and combines several Fluent resources for one locale.
     ///
     /// Message and term identifiers must be unique across the resources.
+    ///
+    /// # Arguments
+    /// * `locale` — language identifier shared by all resources.
+    /// * `sources` — Fluent source texts to parse and combine.
+    ///
+    /// # Errors
+    /// Returns an error if a resource has invalid syntax or an identifier duplicates one already
+    /// present in the combined catalog.
     pub fn from_resources<S, I>(
         locale: LanguageIdentifier,
         sources: I,
@@ -44,6 +59,7 @@ impl Catalog {
 
     /// Locale represented by this catalog.
     #[must_use]
+    /// Returns the language identifier represented by this catalog.
     pub const fn locale(&self) -> &LanguageIdentifier {
         &self.locale
     }
@@ -72,11 +88,13 @@ impl CatalogError {
     }
 
     #[must_use]
+    /// Returns the locale associated with the catalog error.
     pub const fn locale(&self) -> &LanguageIdentifier {
         &self.locale
     }
 
     #[must_use]
+    /// Returns the Fluent syntax or duplicate-entry problems collected for this error.
     pub fn problems(&self) -> &[FluentError] {
         &self.problems
     }

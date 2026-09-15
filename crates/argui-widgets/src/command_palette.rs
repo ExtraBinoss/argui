@@ -10,6 +10,10 @@ pub struct CommandPalette {
 }
 
 impl CommandPalette {
+    /// Creates an action menu filtered by the supplied query.
+    ///
+    /// `key` identifies the menu, `open` sets its visibility, `query` filters labels,
+    /// and `items` supplies the candidate commands.
     #[must_use]
     pub fn new(
         key: impl Into<String>,
@@ -29,15 +33,18 @@ impl CommandPalette {
         }
     }
     #[must_use]
+    /// Sets the retained presence state used to animate the menu.
     pub fn presence(mut self, presence: &crate::Presence) -> Self {
         self.menu = self.menu.presence(presence);
         self
     }
     #[must_use]
+    /// Returns the state key for the search input.
     pub fn query_key(&self) -> String {
         format!("{}::query", self.menu.key)
     }
     #[must_use]
+    /// Builds the palette around `trigger`, using `theme` for its controls.
     pub fn build(&self, trigger: Element, theme: &WidgetTheme) -> Element {
         self.menu.with_content(
             trigger,
@@ -62,6 +69,7 @@ impl CommandPalette {
         )
     }
     #[must_use]
+    /// Returns the invoked menu response for `event`, if any.
     pub fn response(&self, event: &UiEvent) -> Option<MenuResponse> {
         if self.menu.open
             && event.target_key() == Some(self.query_key().as_str())

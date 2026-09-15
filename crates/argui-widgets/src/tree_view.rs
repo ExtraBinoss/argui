@@ -35,6 +35,7 @@ pub struct TreeView<'a> {
 }
 
 impl TreeView<'_> {
+    /// Returns source indices visible after applying collapsed ancestors.
     #[must_use]
     pub fn visible_indices(&self) -> Vec<usize> {
         let mut hidden_below = None;
@@ -58,6 +59,7 @@ impl TreeView<'_> {
     }
 
     #[must_use]
+    /// Interprets `event` as selecting, expanding or collapsing a tree node.
     pub fn action(&self, event: &UiEvent) -> Option<TreeAction> {
         let index = self
             .nodes
@@ -120,6 +122,8 @@ impl TreeView<'_> {
         }
     }
 
+    /// Returns a selection action for a visible node matching printable input.
+    /// `event` is the printable input; `search` retains typeahead state and `now` supplies the monotonic timestamp.
     pub fn search(
         &self,
         event: &UiEvent,
@@ -151,6 +155,7 @@ impl TreeView<'_> {
     }
 
     #[must_use]
+    /// Builds the visible tree rows using `theme` for their controls.
     pub fn build(&self, theme: &WidgetTheme) -> Element {
         let visible = self.visible_indices();
         let active = self.active_position(&visible);

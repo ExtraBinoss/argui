@@ -40,6 +40,9 @@ pub struct SelectBehavior {
 }
 
 impl SelectBehavior {
+    /// Creates behavior for a controlled select with its options and selected source index.
+    ///
+    /// `key` identifies the control and `label` is its accessible name.
     #[must_use]
     pub fn new(
         key: impl Into<String>,
@@ -58,28 +61,33 @@ impl SelectBehavior {
     }
 
     #[must_use]
+    /// Sets whether option-list interactions are currently open.
     pub const fn open(mut self, open: bool) -> Self {
         self.open = open;
         self
     }
 
     #[must_use]
+    /// Sets the currently highlighted source option index.
     pub const fn highlighted(mut self, highlighted: usize) -> Self {
         self.highlighted = highlighted;
         self
     }
 
     #[must_use]
+    /// Returns the interaction key for option `index`.
     pub fn option_key(&self, index: usize) -> String {
         format!("{}::option::{index}", self.key)
     }
 
     #[must_use]
+    /// Returns the interaction key for the option list.
     pub fn list_key(&self) -> String {
         format!("{}::list", self.key)
     }
 
     #[must_use]
+    /// Adds select semantics and interactions to `element` for `part`.
     pub fn decorate(&self, part: SelectPart, element: Element) -> Element {
         match part {
             SelectPart::Root => element
@@ -158,6 +166,7 @@ impl SelectBehavior {
     }
 
     #[must_use]
+    /// Interprets `event` as an open, close, highlight or selection action.
     pub fn action(&self, event: &UiEvent) -> Option<SelectAction> {
         if self.open
             && matches!(
@@ -204,6 +213,8 @@ impl SelectBehavior {
         }
     }
 
+    /// Returns a highlight action for `event` when printable input matches an enabled option.
+    /// `search` retains typeahead state and `now` supplies its monotonic timestamp.
     pub fn search(
         &self,
         event: &UiEvent,

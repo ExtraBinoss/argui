@@ -14,6 +14,8 @@ pub struct Avatar {
 }
 
 impl Avatar {
+    /// Creates an avatar with an accessible label and fallback text.
+    /// `key` identifies the element, `label` is its accessible name, and `fallback` is shown without an image.
     #[must_use]
     pub fn new(
         key: impl Into<String>,
@@ -37,6 +39,7 @@ impl Avatar {
     }
 
     #[must_use]
+    /// Sets the avatar's square size in logical pixels.
     pub fn size(mut self, size: f32) -> Self {
         self.size = if size.is_finite() {
             size.max(1.0)
@@ -47,6 +50,7 @@ impl Avatar {
     }
 
     #[must_use]
+    /// Builds the avatar using `theme` for its fallback and border colors.
     pub fn build(self, theme: &WidgetTheme) -> Element {
         let child = self.image.map_or_else(
             || {

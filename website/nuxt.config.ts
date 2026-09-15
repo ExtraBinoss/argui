@@ -1,6 +1,6 @@
 import { env } from 'node:process'
 import catalogue from './app/data/catalogue.json'
-import { docs } from './app/data/docs'
+import { docRoutes } from './app/data/doc-routes'
 const baseURL = env.NUXT_APP_BASE_URL ?? '/'
 
 export default defineNuxtConfig({
@@ -32,21 +32,28 @@ export default defineNuxtConfig({
         '/get-started',
         '/examples',
         '/docs',
-        ...docs.map((guide) => `/docs/${guide.slug}`),
+        ...docRoutes.map((slug) => `/docs/${slug}`),
         '/components',
         '/sitemap.xml',
         '/robots.txt',
         ...catalogue.map((item) => `/components/${item.slug}`),
       ],
-      ignore: ['/gallery', '/examples/ai-harness'],
+      ignore: ['/gallery', '/examples/ai-harness', '/examples/docs'],
     },
     compressPublicAssets: true,
   },
   routeRules: {
+    '/get-started': { redirect: { to: '/docs/start/installation', statusCode: 301 } },
+    '/docs/advanced/animation': {
+      redirect: { to: '/docs/essentials/animation', statusCode: 301 },
+    },
     '/gallery/**': {
       headers: { 'X-Robots-Tag': 'noindex', 'Cross-Origin-Resource-Policy': 'same-origin' },
     },
     '/examples/ai-harness/**': {
+      headers: { 'X-Robots-Tag': 'noindex', 'Cross-Origin-Resource-Policy': 'same-origin' },
+    },
+    '/examples/docs/**': {
       headers: { 'X-Robots-Tag': 'noindex', 'Cross-Origin-Resource-Policy': 'same-origin' },
     },
   },

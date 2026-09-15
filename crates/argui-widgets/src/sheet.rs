@@ -23,6 +23,8 @@ pub struct Sheet {
 }
 
 impl Sheet {
+    /// Creates a controlled sheet with a labelled trigger and panel content.
+    /// `key` identifies the sheet, `open` supplies visibility, and `label` names it accessibly.
     #[must_use]
     pub fn new(
         key: impl Into<String>,
@@ -43,11 +45,13 @@ impl Sheet {
     }
 
     #[must_use]
+    /// Returns an open or close action when `event` targets the sheet.
     pub fn action(&self, event: &UiEvent) -> Option<DialogAction> {
         DialogBehavior::new(&self.key, &self.label, self.open).action(event)
     }
 
     #[must_use]
+    /// Builds the sheet using `theme` for the panel and backdrop.
     pub fn build(self, theme: &WidgetTheme) -> Element {
         Dialog::new(self.key, self.label, self.open, self.trigger, self.content)
             .panel_width(self.width)

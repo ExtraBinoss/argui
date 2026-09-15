@@ -1,6 +1,9 @@
 /// A complete, script-free document for the browser's restricted email frame.
 /// The backend additionally applies sandboxing and intercepts all link clicks.
 #[must_use]
+/// Wraps sanitized email HTML in the restricted document shell used by backends.
+///
+/// `html` is markup that should already have passed through the HTML sanitizer.
 pub fn email_document(html: &str) -> String {
     let body = ammonia::Builder::default()
         .url_schemes(["https", "http"].into_iter().collect())

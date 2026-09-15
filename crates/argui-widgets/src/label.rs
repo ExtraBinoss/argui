@@ -17,6 +17,7 @@ pub struct Label {
 }
 
 impl Label {
+    /// Creates a label associated with the control identified by `target`; `key` identifies the label and `text` is its visible content.
     #[must_use]
     pub fn new(key: impl Into<String>, text: impl Into<String>, target: impl Into<String>) -> Self {
         Self {
@@ -29,6 +30,7 @@ impl Label {
 
     /// Keep this flag in sync with the associated control's enabled state.
     #[must_use]
+    /// Sets whether activation of the label can focus its target.
     pub const fn enabled(mut self, enabled: bool) -> Self {
         self.enabled = enabled;
         self
@@ -36,6 +38,7 @@ impl Label {
 
     /// Assigns the target key and accessible label, preserving other control properties.
     #[must_use]
+    /// Associates the label's accessible name with `control`.
     pub fn associate(&self, mut control: Element) -> Element {
         if let Some(semantics) = &mut control.semantics {
             semantics.label = None;
@@ -46,6 +49,7 @@ impl Label {
     }
 
     #[must_use]
+    /// Returns the target key when `event` activates this label.
     pub fn focus_target(&self, event: &UiEvent) -> Option<&str> {
         (self.enabled
             && event.target_key() == Some(self.key.as_str())
@@ -54,6 +58,7 @@ impl Label {
     }
 
     #[must_use]
+    /// Builds the label using `theme` for its text style.
     pub fn build(&self, theme: &WidgetTheme) -> Element {
         Element::text(self.text.clone())
             .keyed(self.key.clone())

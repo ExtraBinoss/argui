@@ -10,6 +10,7 @@ pub struct LayoutStorage {
 }
 
 impl LayoutEngine {
+    /// Reports capacities of dense layout storage owned by this engine.
     #[must_use]
     pub fn storage(&self) -> LayoutStorage {
         let mut storage = self.tree.storage();

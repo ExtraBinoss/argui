@@ -1,3 +1,4 @@
+//! Interactive catalog of Argui widgets, behaviors, and design examples.
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
 mod app;

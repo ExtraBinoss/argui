@@ -16,6 +16,8 @@ pub struct RenderObjectId {
 }
 
 impl RenderObjectId {
+    /// Creates an object identifier in the supplied profiling domain.
+    /// * `value` — object identity within `domain`.
     #[must_use]
     pub const fn new(domain: ProfileDomain, value: u64) -> Self {
         Self { domain, value }
@@ -26,6 +28,8 @@ impl RenderObjectId {
 pub struct EffectId(pub &'static str);
 
 impl EffectId {
+    /// Creates an effect identifier from a namespaced static name.
+    /// * `namespaced_name` — stable namespaced effect name.
     #[must_use]
     pub const fn new(namespaced_name: &'static str) -> Self {
         Self(namespaced_name)
@@ -48,6 +52,8 @@ pub enum EffectValue {
 }
 
 impl EffectValue {
+    /// Scales logical-pixel values by `factor`; leaves other value kinds unchanged.
+    /// * `factor` — multiplier for logical-pixel values.
     #[must_use]
     pub fn scaled(&self, factor: f32) -> Self {
         match self {
@@ -56,6 +62,7 @@ impl EffectValue {
         }
     }
 
+    /// Appends this value's packed 32-bit representation to `words`.
     pub fn write_words(&self, words: &mut Vec<u32>) {
         match self {
             Self::F32(value) | Self::LogicalPixels(value) => words.push(value.to_bits()),
@@ -83,6 +90,8 @@ pub struct EffectArgument {
 }
 
 impl EffectArgument {
+    /// Creates a named effect parameter.
+    /// * `name` — parameter name; `value` — parameter value.
     #[must_use]
     pub const fn new(name: &'static str, value: EffectValue) -> Self {
         Self { name, value }
@@ -103,6 +112,8 @@ pub struct EffectInstance {
 }
 
 impl EffectInstance {
+    /// Creates an effect instance from an identifier and ordered parameter values.
+    /// * `id` — effect identifier; `parameters` — ordered effect parameter values.
     #[must_use]
     pub fn new<I, A>(id: EffectId, parameters: I) -> Self
     where
@@ -116,12 +127,14 @@ impl EffectInstance {
         }
     }
 
+    /// Sets the effect's bounds expansion in logical pixels, clamped at zero.
     #[must_use]
     pub fn expansion(mut self, pixels: f32) -> Self {
         self.expansion = pixels.max(0.0);
         self
     }
 
+    /// Packs parameter values into 32-bit words in parameter order.
     #[must_use]
     pub fn packed_words(&self) -> Vec<u32> {
         let mut words = Vec::new();
@@ -140,6 +153,7 @@ pub struct Refraction {
 }
 
 impl Refraction {
+    /// Creates a refraction effect with the given strength.
     #[must_use]
     pub const fn new(strength: f32) -> Self {
         Self {
@@ -149,6 +163,7 @@ impl Refraction {
         }
     }
 
+    /// Sets chromatic aberration amount.
     #[must_use]
     pub const fn chromatic_aberration(mut self, amount: f32) -> Self {
         self.chromatic_aberration = amount;
@@ -170,6 +185,7 @@ pub enum Filter {
 }
 
 impl Filter {
+    /// Returns the bounds expansion required by this filter.
     #[must_use]
     pub fn expansion(&self) -> f32 {
         match self {
@@ -179,6 +195,8 @@ impl Filter {
         }
     }
 
+    /// Scales logical dimensions while preserving dimensionless filter values.
+    /// * `factor` — multiplier applied to logical dimensions.
     #[must_use]
     pub fn scaled(&self, factor: f32) -> Self {
         match self {
@@ -224,6 +242,8 @@ pub struct Shadow {
 }
 
 impl Shadow {
+    /// Creates an offset drop shadow with zero spread.
+    /// * `offset` — horizontal and vertical displacement; `blur` — blur radius; `color` — shadow color.
     #[must_use]
     pub const fn drop(offset: [f32; 2], blur: f32, color: Color) -> Self {
         Self {
@@ -235,23 +255,28 @@ impl Shadow {
         }
     }
 
+    /// Creates a centered glow shadow.
+    /// * `blur` — blur radius; `color` — glow color.
     #[must_use]
     pub const fn glow(blur: f32, color: Color) -> Self {
         Self::drop([0.0, 0.0], blur, color)
     }
 
+    /// Sets the blur radius.
     #[must_use]
     pub const fn blur(mut self, radius: f32) -> Self {
         self.blur = radius;
         self
     }
 
+    /// Sets the spread radius.
     #[must_use]
     pub const fn spread(mut self, radius: f32) -> Self {
         self.spread = radius;
         self
     }
 
+    /// Sets whether the shadow is inset.
     #[must_use]
     pub const fn inset(mut self, inset: bool) -> Self {
         self.inset = inset;
@@ -280,6 +305,7 @@ pub struct LayerStyle {
 }
 
 impl LayerStyle {
+    /// Creates a layer covering `bounds` with default compositing settings.
     #[must_use]
     pub const fn new(bounds: Rect) -> Self {
         Self {
@@ -294,48 +320,58 @@ impl LayerStyle {
         }
     }
 
+    /// Adds a foreground filter.
     #[must_use]
     pub fn filter(mut self, filter: Filter) -> Self {
         self.filters.push(filter);
         self
     }
 
+    /// Adds a filter applied to the backdrop behind the layer.
     #[must_use]
     pub fn backdrop(mut self, filter: Filter) -> Self {
         self.backdrop_filters.push(filter);
         self
     }
 
+    /// Adds a shadow to the layer.
     #[must_use]
     pub fn shadow(mut self, shadow: Shadow) -> Self {
         self.shadows.push(shadow);
         self
     }
 
+    /// Sets layer opacity.
     #[must_use]
     pub const fn opacity(mut self, opacity: f32) -> Self {
         self.opacity = opacity;
         self
     }
 
+    /// Sets the blend mode used when compositing the layer.
+    /// * `blend_mode` — compositing blend mode.
     #[must_use]
     pub const fn blend(mut self, blend_mode: BlendMode) -> Self {
         self.blend_mode = blend_mode;
         self
     }
 
+    /// Sets the mask applied to the layer.
     #[must_use]
     pub const fn mask(mut self, mask: LayerMask) -> Self {
         self.mask = mask;
         self
     }
 
+    /// Associates a stable object identifier for profiling.
+    /// * `profile` — stable profiling identity for the layer.
     #[must_use]
     pub const fn profile(mut self, profile: RenderObjectId) -> Self {
         self.profile = Some(profile);
         self
     }
 
+    /// Returns whether the style requires an offscreen compositing pass.
     #[must_use]
     pub fn requires_offscreen(&self) -> bool {
         self.opacity != 1.0
@@ -346,6 +382,7 @@ impl LayerStyle {
             || self.mask != LayerMask::None
     }
 
+    /// Returns layer bounds expanded for foreground filters and shadows.
     #[must_use]
     pub fn expanded_bounds(&self) -> Rect {
         let mut expansion = self.foreground_expansion();
@@ -368,16 +405,19 @@ impl LayerStyle {
         )
     }
 
+    /// Returns bounds expanded for foreground filters only.
     #[must_use]
     pub fn foreground_expansion(&self) -> f32 {
         self.filters.iter().map(Filter::expansion).sum()
     }
 
+    /// Returns bounds expanded for foreground filters only.
     #[must_use]
     pub fn foreground_bounds(&self) -> Rect {
         outset(self.bounds, self.foreground_expansion())
     }
 
+    /// Returns a copy with logical dimensions and effects scaled by `factor`.
     #[must_use]
     pub fn scaled(&self, factor: f32) -> Self {
         let mut scaled = self.clone();

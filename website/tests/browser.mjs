@@ -73,6 +73,25 @@ try {
     0,
     'Home does not eagerly boot WASM',
   )
+  assert.equal(
+    await page.$$('.desktop-nav a[href="/get-started"]').then((items) => items.length),
+    0,
+  )
+  assert.equal(
+    await page.$eval('.desktop-nav .onboarding-tooltip > a', (element) =>
+      element.textContent.trim(),
+    ),
+    'Docs',
+  )
+  assert.match(
+    await page.$eval('.desktop-nav .onboarding-tooltip-message', (element) => element.textContent),
+    /New\? Start here/,
+  )
+  assert.equal(
+    await page.$eval('.hero-actions .action-primary', (element) => new URL(element.href).pathname),
+    '/docs/start/installation',
+  )
+  assert.match(await page.$eval('.component-teaser h2', (element) => element.textContent), /74\+/)
   assert.ok(await page.$eval('meta[name="description"]', (element) => element.content.length > 50))
   assert.equal(
     await page.$eval('.discord-link img', (element) => new URL(element.src).pathname),
@@ -94,10 +113,12 @@ try {
   await page.waitForFunction(() => document.documentElement.dataset.theme === 'dark')
   await page.click('.theme-button')
 
-  for (const path of ['/features', '/get-started']) {
+  for (const path of ['/features']) {
     await page.goto(origin + path, { waitUntil: 'networkidle0' })
     await screenshot(path.slice(1))
   }
+  await page.goto(`${origin}/get-started`, { waitUntil: 'networkidle0' })
+  assert.equal(new URL(page.url()).pathname, '/docs/start/installation')
   await browser
     .defaultBrowserContext()
     .overridePermissions(origin, ['clipboard-read', 'clipboard-sanitized-write'])
@@ -121,7 +142,29 @@ try {
   await page.goto(`${origin}/docs/start/first-window`, { waitUntil: 'networkidle0' })
   assert.equal(await page.$$('.docs-sources a').then((items) => items.length), 3)
   assert.match(await page.$eval('.docs-live-example', (element) => element.textContent), /Compiled/)
+  assert.match(
+    await page.$eval('.docs-live-example iframe', (element) => element.src),
+    /\/examples\/docs\/index\.html\?example=first-window$/,
+  )
+  await page.waitForSelector('.docs-live-example .status-dot.live', { timeout: 90_000 })
+  assert.equal(
+    await page.$eval('.docs-live-example iframe', (element) => document.activeElement === element),
+    false,
+    'An embedded Web canvas must not take focus while it loads',
+  )
+  const docsFrame = await (await page.$('.docs-live-example iframe')).contentFrame()
+  await docsFrame.waitForSelector('[aria-label="Hello from Argui"]')
   await screenshot('docs-guide-desktop')
+
+  await page.goto(`${origin}/docs/essentials/styling`, { waitUntil: 'networkidle0' })
+  await page.waitForSelector('.docs-live-example .status-dot.live', { timeout: 90_000 })
+  const themeFrame = await (await page.$('.docs-live-example iframe')).contentFrame()
+  await themeFrame.waitForSelector('button[aria-label="Dark"]')
+  await themeFrame.$eval('button[aria-label="Dark"]', (element) => element.click())
+  await themeFrame.$eval('button[aria-label="Violet"]', (element) => element.click())
+  await themeFrame.$eval('button[aria-label="Override tokens"]', (element) => element.click())
+  await themeFrame.waitForSelector('button[aria-label="Reset tokens"]')
+  await screenshot('docs-theme-configurator')
 
   await page.goto(`${origin}/components/`, { waitUntil: 'networkidle0' })
   assert.equal(

@@ -15,6 +15,7 @@ pub struct Empty {
 }
 
 impl Empty {
+    /// Creates an empty-state presentation with a title; `key` scopes the elements and `title` is the primary message.
     #[must_use]
     pub fn new(key: impl Into<String>, title: impl Into<String>) -> Self {
         Self {
@@ -28,6 +29,7 @@ impl Empty {
     }
 
     #[must_use]
+    /// Adds explanatory text beneath the title; `description` supplies the supporting copy.
     pub fn description(mut self, description: impl Into<String>) -> Self {
         self.description = Some(description.into());
         self
@@ -35,24 +37,28 @@ impl Empty {
 
     /// Decorative media. Put meaningful or interactive content in `content` instead.
     #[must_use]
+    /// Adds media above the empty-state text.
     pub fn media(mut self, media: Element) -> Self {
         self.media = Some(media);
         self
     }
 
     #[must_use]
+    /// Adds supplementary content below the text.
     pub fn content(mut self, content: Element) -> Self {
         self.content = Some(content);
         self
     }
 
     #[must_use]
+    /// Sets whether the empty state has a visible border; `bordered` controls the surface outline.
     pub const fn bordered(mut self, bordered: bool) -> Self {
         self.bordered = bordered;
         self
     }
 
     #[must_use]
+    /// Builds the empty state using `theme` for its text and surface colors.
     pub fn build(self, theme: &WidgetTheme) -> Element {
         let title_key = format!("{}::title", self.key);
         let description_key = format!("{}::description", self.key);

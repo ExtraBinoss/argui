@@ -27,12 +27,14 @@ pub struct TooltipHost<A: Render> {
 }
 
 impl<A: Render> TooltipHost<A> {
+    /// Wraps `application` with automatic tooltip event handling.
     #[must_use]
     pub fn new(application: A) -> Self {
         Self::from_entity(Entity::new(application))
     }
 
     #[must_use]
+    /// Wraps an existing application entity with automatic tooltip handling.
     pub fn from_entity(application: Entity<A>) -> Self {
         Self {
             application,
@@ -49,12 +51,14 @@ impl<A: Render> TooltipHost<A> {
     }
 
     #[must_use]
+    /// Sets the delay before automatically showing a tooltip.
     pub fn delay(mut self, delay: Duration) -> Self {
         self.delay = delay;
         self
     }
 
     #[must_use]
+    /// Replaces the default tooltip paint style.
     pub fn paint(mut self, paint: PaintStyle) -> Self {
         self.paint = Some(paint);
         self
@@ -62,12 +66,14 @@ impl<A: Render> TooltipHost<A> {
 
     /// Customize the surface with any foreground/backdrop filter or registered effect.
     #[must_use]
+    /// Replaces the tooltip panel layer.
     pub fn layer(mut self, layer: LayerStyle) -> Self {
         self.layer = Some(layer);
         self
     }
 
     #[must_use]
+    /// Sets the overlay surface policy for automatic tooltips.
     pub fn surface(mut self, surface: argui_ui::OverlaySurface) -> Self {
         self.surface = Some(surface);
         self

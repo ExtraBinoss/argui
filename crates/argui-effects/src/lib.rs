@@ -34,6 +34,10 @@ pub use refraction::Refraction;
 #[cfg(feature = "shadow")]
 pub use shadow::{DropShadow, Glow};
 
+/// Builds a registry containing the effect definitions enabled by crate features.
+///
+/// # Errors
+/// Returns the renderer's registry-construction error if definitions are invalid.
 pub fn registry() -> Result<EffectRegistry, RendererError> {
     let definitions: Vec<EffectDefinition> = Vec::new();
     #[cfg(feature = "artistic")]

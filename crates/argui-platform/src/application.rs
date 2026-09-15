@@ -3,14 +3,21 @@ use std::collections::HashSet;
 use crate::{ApplicationIdentity, PreferenceOverrides, TrayConfig, WindowKey, WindowSpec};
 
 #[derive(Clone, Debug, PartialEq)]
+/// Validated application-wide platform configuration.
 pub struct ApplicationConfig {
+    /// Identity metadata for windows and platform integrations.
     pub identity: ApplicationIdentity,
+    /// Configured application windows, including the main window.
     pub windows: Vec<WindowSpec>,
+    /// Optional system-tray configuration.
     pub tray: Option<TrayConfig>,
+    /// Explicit overrides for operating-system preferences.
     pub preferences: PreferenceOverrides,
 }
 
 impl ApplicationConfig {
+    /// Creates an application configuration with a single main window.
+    /// `identity` supplies app metadata; `main_window` configures that window.
     #[must_use]
     pub fn new(identity: ApplicationIdentity, main_window: crate::WindowConfig) -> Self {
         Self {
@@ -22,23 +29,33 @@ impl ApplicationConfig {
     }
 
     #[must_use]
+    /// Adds a secondary window to this application.
+    /// `window` is appended to the configured window list.
     pub fn with_window(mut self, window: WindowSpec) -> Self {
         self.windows.push(window);
         self
     }
 
     #[must_use]
+    /// Configures the application's system-tray menu.
+    /// `tray` is the desired system-tray configuration.
     pub fn with_tray(mut self, tray: TrayConfig) -> Self {
         self.tray = Some(tray);
         self
     }
 
     #[must_use]
+    /// Sets overrides for preferences detected from the operating system.
+    /// `preferences` contains optional explicit settings.
     pub const fn with_preferences(mut self, preferences: PreferenceOverrides) -> Self {
         self.preferences = preferences;
         self
     }
 
+    /// Checks that window keys are unique and any tray configuration is valid.
+    ///
+    /// # Errors
+    /// Returns an error for an empty or duplicate window key, or an invalid tray configuration.
     pub fn validate(&self) -> Result<(), ApplicationConfigError> {
         let mut keys = HashSet::new();
         for window in &self.windows {
@@ -60,9 +77,13 @@ impl ApplicationConfig {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Error returned by [`ApplicationConfig::validate`].
 pub enum ApplicationConfigError {
+    /// A window has an empty key.
     EmptyWindowKey,
+    /// Two windows use the same key.
     DuplicateWindowKey(WindowKey),
+    /// The tray configuration failed validation.
     InvalidTray(String),
 }
 

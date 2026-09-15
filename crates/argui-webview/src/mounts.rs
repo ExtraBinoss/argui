@@ -4,6 +4,11 @@ use argui_ui::{ElementKind, UiTree};
 
 /// Resolves native rectangles from the same retained layout as the GPU renderer.
 /// Partially clipped or covered native surfaces are hidden, not painted above overlays.
+///
+/// # Arguments
+/// * `ui` — retained UI tree containing WebView slots.
+/// * `layout` — layout calculated for that tree.
+/// * `host` — identity of the native host that owns the mounts.
 #[must_use]
 pub fn resolve_mounts(ui: &UiTree, layout: &LayoutOutput, host: u64) -> Vec<WebViewMount> {
     resolve_clipped_mounts(ui, layout, host)
@@ -17,6 +22,11 @@ pub fn resolve_mounts(ui: &UiTree, layout: &LayoutOutput, host: u64) -> Vec<WebV
 }
 
 /// DOM surfaces support rectangular clipping without resizing their document viewport.
+///
+/// # Arguments
+/// * `ui` — retained UI tree containing WebView slots.
+/// * `layout` — layout calculated for that tree.
+/// * `host` — identity of the native host that owns the mounts.
 #[must_use]
 pub fn resolve_clipped_mounts(
     ui: &UiTree,

@@ -26,6 +26,7 @@ pub struct EffectQualitySettings {
 }
 
 impl EffectQuality {
+    /// Returns numeric settings corresponding to this quality preset.
     #[must_use]
     pub const fn settings(self) -> EffectQualitySettings {
         match self {
@@ -78,24 +79,32 @@ impl Default for RendererConfig {
 }
 
 impl RendererConfig {
+    /// Sets the maximum number of frames queued for presentation, clamped to 1–3.
+    /// * `frames` — requested frame latency; values are clamped to the supported range.
     #[must_use]
     pub fn maximum_frame_latency(mut self, frames: u32) -> Self {
         self.maximum_frame_latency = frames.clamp(1, 3);
         self
     }
 
+    /// Enables or disables renderer profiling.
+    /// * `enabled` — whether frame profiling is active.
     #[must_use]
     pub fn profiling(mut self, enabled: bool) -> Self {
         self.profiling = enabled;
         self
     }
 
+    /// Sets the color used to clear the render target.
+    /// * `color` — clear color.
     #[must_use]
     pub fn clear_color(mut self, color: Color) -> Self {
         self.clear_color = color;
         self
     }
 
+    /// Sets surface transparency behavior; non-opaque modes use a transparent clear color.
+    /// * `mode` — alpha compositing mode for the surface.
     #[must_use]
     pub fn surface_alpha(mut self, mode: SurfaceAlphaMode) -> Self {
         self.surface_alpha = mode;
@@ -105,24 +114,32 @@ impl RendererConfig {
         self
     }
 
+    /// Sets the image cache budget in bytes.
+    /// * `bytes` — maximum cache budget in bytes.
     #[must_use]
     pub fn image_cache_bytes(mut self, bytes: usize) -> Self {
         self.image_cache_bytes = bytes;
         self
     }
 
+    /// Sets capacity reserved for gradient stops.
+    /// * `stops` — reserved number of gradient stops.
     #[must_use]
     pub fn gradient_stop_capacity(mut self, stops: usize) -> Self {
         self.gradient_stop_capacity = stops;
         self
     }
 
+    /// Sets the registry of custom effects available to the renderer.
+    /// * `effects` — registry of effect definitions.
     #[must_use]
     pub fn effects(mut self, effects: EffectRegistry) -> Self {
         self.effects = effects;
         self
     }
 
+    /// Sets the rendering quality preset used for effects.
+    /// * `quality` — quality preset controlling effect resolution and cost.
     #[must_use]
     pub fn effect_quality(mut self, quality: EffectQuality) -> Self {
         self.effect_quality = quality;

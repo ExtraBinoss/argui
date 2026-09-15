@@ -26,6 +26,9 @@ pub struct DataColumn<R> {
 }
 
 impl<R> DataColumn<R> {
+    /// Creates a column with a stable id, presentation and value formatter.
+    ///
+    /// `value` converts a row into the text used for filtering and display by default.
     pub fn new(
         id: impl Into<String>,
         presentation: TableColumn,
@@ -107,6 +110,11 @@ pub struct DataTableModel<R> {
 }
 
 impl<R> DataTableModel<R> {
+    /// Creates a retained table model from rows and columns.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for duplicate row or column ids, or invalid column width limits.
     pub fn new(rows: Vec<DataRow<R>>, columns: Vec<DataColumn<R>>) -> Result<Self, DataTableError> {
         let row_indices = index_rows(&rows)?;
         let mut column_indices = HashMap::new();
@@ -146,23 +154,34 @@ impl<R> DataTableModel<R> {
         model.rebuild();
         Ok(model)
     }
+    /// Returns the current visible row collection in display order.
     pub fn collection(&self) -> &Collection {
         &self.collection
     }
+    /// Iterates over columns that are not hidden, preserving source order.
     pub fn visible_columns(&self) -> impl DoubleEndedIterator<Item = &DataColumn<R>> {
         self.columns
             .iter()
             .filter(|column| !self.hidden.contains(&column.id))
     }
+    /// Returns the row at the filtered and sorted `index`, if present.
     pub fn row(&self, index: usize) -> Option<&DataRow<R>> {
         self.order.get(index).map(|&index| &self.rows[index])
     }
+    /// Returns the number of rows remaining after filtering, before pagination.
     pub fn filtered_count(&self) -> usize {
         self.filtered_count
     }
+    /// Returns the active sort sequence.
     pub fn sort(&self) -> &[DataSort] {
         &self.sorts
     }
+    /// Replaces the sort sequence and rebuilds the visible row order.
+    /// `sorts` lists the columns and directions in sort-priority order.
+    ///
+    /// # Errors
+    ///
+    /// Returns `UnknownColumn` if a sort references a missing column.
     pub fn set_sort(&mut self, sorts: Vec<DataSort>) -> Result<(), DataTableError> {
         for sort in &sorts {
             self.require_column(&sort.column)?;
@@ -171,6 +190,11 @@ impl<R> DataTableModel<R> {
         self.rebuild();
         Ok(())
     }
+    /// Sets or clears the filter query for a column, then rebuilds the visible rows.
+    ///
+    /// # Errors
+    ///
+    /// Returns `UnknownColumn` if `column` is not part of this model.
     pub fn set_filter(&mut self, column: &str, query: String) -> Result<(), DataTableError> {
         self.require_column(column)?;
         if query.is_empty() {
@@ -181,10 +205,16 @@ impl<R> DataTableModel<R> {
         self.rebuild();
         Ok(())
     }
+    /// Sets the optional page window and rebuilds the visible row collection.
     pub fn set_page(&mut self, page: Option<DataPage>) {
         self.page = page;
         self.rebuild();
     }
+    /// Sets whether `column` is hidden, clearing active edits in it when necessary.
+    ///
+    /// # Errors
+    ///
+    /// Returns `UnknownColumn` if `column` is not part of this model.
     pub fn set_hidden(&mut self, column: &str, hidden: bool) -> Result<(), DataTableError> {
         self.require_column(column)?;
         if hidden {
@@ -210,6 +240,11 @@ impl<R> DataTableModel<R> {
         }
         Ok(())
     }
+    /// Sets a column width, clamped to its configured limits, and returns the applied width.
+    ///
+    /// # Errors
+    ///
+    /// Returns `UnknownColumn` for an unknown column or `InvalidWidth` for non-finite `width`.
     pub fn resize(&mut self, column: &str, width: f32) -> Result<f32, DataTableError> {
         let index = self.require_column(column)?;
         let column = &mut self.columns[index];
@@ -221,6 +256,11 @@ impl<R> DataTableModel<R> {
         self.resizing = None;
         Ok(width)
     }
+    /// Replaces all source rows and removes selection for identities no longer present.
+    ///
+    /// # Errors
+    ///
+    /// Returns `DuplicateRow` when the replacement contains repeated row ids.
     pub fn replace_rows(&mut self, rows: Vec<DataRow<R>>) -> Result<(), DataTableError> {
         let indices = index_rows(&rows)?;
         self.rows = rows;
@@ -231,6 +271,8 @@ impl<R> DataTableModel<R> {
         self.rebuild();
         Ok(())
     }
+    /// Selects or deselects every row currently in the visible page collection.
+    /// `selected` chooses whether the visible rows are added to or removed from selection.
     pub fn select_page(&mut self, selected: bool) {
         for row in self.collection.items() {
             if selected {
@@ -241,9 +283,11 @@ impl<R> DataTableModel<R> {
         }
         self.refresh_selected();
     }
+    /// Returns the retained row selection state.
     pub fn selection(&self) -> &ListState {
         &self.selection
     }
+    /// Replaces selection, dropping identities that do not exist in the source rows.
     pub fn set_selection(&mut self, mut selection: ListState) {
         selection
             .selected
@@ -259,6 +303,7 @@ impl<R> DataTableModel<R> {
             .filter(|id| self.collection.index_of(id).is_some())
             .count();
     }
+    /// Returns the checked state of the select-visible-page control.
     pub fn page_checked(&self) -> argui_ui::CheckedState {
         if self.page_selected == 0 {
             argui_ui::CheckedState::Unchecked
@@ -268,10 +313,12 @@ impl<R> DataTableModel<R> {
             argui_ui::CheckedState::Mixed
         }
     }
+    /// Returns the active cell edit, if one is in progress.
     pub fn edit(&self) -> Option<&CellEdit> {
         self.edit.as_ref()
     }
 
+    /// Starts editing `address` when the cell exists, is visible and has a validator.
     pub fn begin_edit(&mut self, address: CellAddress) -> bool {
         let Some(&row) = self.row_indices.get(&address.row) else {
             return false;
@@ -296,6 +343,7 @@ impl<R> DataTableModel<R> {
         true
     }
     /// Produces a controlled update request; persistence belongs to the caller.
+    /// A validation failure remains available in the active edit's `error` field.
     pub fn commit_edit(&mut self) -> Option<CellCommit> {
         let edit = self.edit.as_mut()?;
         let row = &self.rows[*self.row_indices.get(&edit.address.row)?].value;
@@ -315,6 +363,12 @@ impl<R> DataTableModel<R> {
             value: edit.draft,
         })
     }
+    /// Applies a table interaction and returns any validated edit commit.
+    /// `action` is the interaction to apply to the current table state.
+    ///
+    /// # Errors
+    ///
+    /// Returns `UnknownColumn` for actions that reference a missing column.
     pub fn apply(
         &mut self,
         action: super::DataTableAction,

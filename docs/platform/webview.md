@@ -1,115 +1,104 @@
 # WebView integration
 
-`argui-webview` supplies retained sessions, a bounded residency pool, a layout
-slot, a desktop Wry backend and a browser iframe backend. Enable its re-export
-with `argui`'s `webview` feature.
-The runtime mounts these slots automatically from the retained layout. On
-Linux, WebView-enabled application launches use GTK/Tao with a dedicated WGPU
-Wayland subsurface; the same runtime handles layout, input, animations and
-Devtools. The Windows/macOS Wry attachment uses the Winit host and still needs
-platform validation. The GTK host currently requires native Wayland, not X11.
+`argui-webview` provides retained WebView sessions, a bounded residency pool,
+an Argui layout slot, native Wry views, and browser iframes. Enable the
+`argui/webview` feature.
 
-Run `GDK_BACKEND=wayland cargo run -p argui-widget-gallery --features webview`
-and open **Examples → WebView**, then **Email** or **Webpage**. For the web,
-run `./scripts/serve-widget-gallery.sh` and open `/widgets/`; the script enables
-the same feature automatically.
+| Host | Backend | Status |
+| --- | --- | --- |
+| Linux Wayland | GTK 3, WebKitGTK 4.1, Tao/Wry | implemented and tested |
+| Windows and macOS | Winit/Wry | compiles; native behavior needs platform validation |
+| WebAssembly | retained iframe above the canvas | implemented and browser-tested |
+| Linux X11 | — | unsupported by the GTK host |
 
-## Linux build dependencies
+```sh
+GDK_BACKEND=wayland cargo run -p argui-widget-gallery --features webview
+./scripts/serve-widget-gallery.sh
+```
 
-Its Wry backend needs GTK 3 and WebKitGTK 4.1 development packages on Linux.
-These WebView-specific
-packages are not required by the current Winit/WGPU renderer, including its
-Wayland backend, or by the WebAssembly gallery.
+Open **Examples → WebView** in the gallery.
+
+## Linux dependencies
 
 Fedora:
 
 ```sh
-sudo dnf install pkgconf-pkg-config gtk3-devel webkit2gtk4.1-devel libsoup3-devel javascriptcoregtk4.1-devel
+sudo dnf install pkgconf-pkg-config gtk3-devel webkit2gtk4.1-devel \
+  libsoup3-devel javascriptcoregtk4.1-devel
 ```
 
-Ubuntu / Debian:
+Ubuntu or Debian:
 
 ```sh
 sudo apt install pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev
 ```
 
-The package manager installs the required transitive development dependencies.
-Check that Cargo's native build dependencies can discover them:
+These development packages are needed only when the WebView feature is enabled.
 
-```sh
-pkg-config --modversion gtk+-3.0 webkit2gtk-4.1 javascriptcoregtk-4.1 libsoup-3.0
+## Retained sessions
+
+Create `WebViewState` outside `render()`, then place its view in the element
+tree:
+
+```rust,ignore
+let state = WebViewState::new(WebViewSource::url("https://example.com")?);
+let element = WebView::new(&state).build();
 ```
 
-No shell restart or `source` command is needed after a standard system-package
-installation. Runtime libraries alone are insufficient: the development
-packages provide the metadata used by `pkg-config`. Installing WebKitGTK 6.0
-for GTK 4 does not replace WebKitGTK 4.1 for this integration.
+The runtime reads final layout bounds and mounts the native or browser view above
+the canvas. Bounds follow canvas scaling and page movement. Unsupported
+transforms or occluding Argui layers hide the native content conservatively.
 
-## Browser backend
+The pool keeps at most two native views by default. Inactive entries expire
+after 30 seconds or are evicted least-recently-used. Visible entries are never
+evicted to create capacity. `next_expiry()` is the next event-loop deadline;
+do not poll the pool.
 
-The browser mounts retained iframe elements above the owning canvas. Bounds
-follow Argui layout and canvas CSS scaling/offsets; rectangular clipping does
-not resize the document. Covered or unsupported transformed surfaces are hidden
-conservatively. DOM scroll/resize observers are event-driven and removed on
-eviction, as are document listeners. One cancellable timer wakes the runtime at
-the next idle eviction; no continuous rendering or polling is added.
+Session identity and source survive eviction. Browser DOM state and unsaved
+forms do not. `release()` blocks remounting until `load()` or `reload()`.
+Close pool entries before destroying their window.
 
-Email uses sanitized `srcdoc`, a restrictive CSP, and `sandbox="allow-same-origin"`
-without `allow-scripts`, forms, popups, downloads or top navigation. Same-origin
-access is granted only so the trusted parent can intercept link clicks; email
-scripts remain forbidden both by sandbox and CSP. HTTP/HTTPS links emit
-`NavigationRequested` and the gallery opens them in its separate Webpage session.
-Context-menu navigation is suppressed for restricted emails. Remote images and
-tracking requests are blocked, and referrers are disabled.
+## Content policies
 
-The default isolated Webpage mode permits scripts/forms but omits `allow-same-origin`, so embedded
-pages cannot access the application's DOM. It exposes no application IPC and
-does not grant camera, microphone, geolocation or clipboard permissions. Sites
-may refuse embedding via CSP/X-Frame-Options; this cannot be bypassed. Browser
-restrictions also prevent reliable inspection of cross-origin navigation,
-titles and load errors, so the backend does not emit a false `Loaded` success
-for remote pages. Unlike native incognito views, browser frames do not guarantee
-an isolated cookie/profile store. Popups and downloads are blocked by default.
+| Source | Default policy |
+| --- | --- |
+| Email HTML | sanitized `srcdoc`; scripts, forms, frames, downloads, popups, remote resources, and top navigation blocked |
+| Webpage | scripts and forms allowed; same-origin access, application IPC, permissions, downloads, and popups blocked |
 
-## Explicit webpage permissions
+Blocked links emit `NavigationRequested`. The application decides whether to
+open them. Validate URLs and capture model owners weakly in callbacks.
 
-`WebViewState::with_options` validates immutable session permissions. Existing
-`WebViewState::new` callers retain the restrictive defaults. Email options cannot
-enable scripts, compatible origins, popups or downloads.
+Email HTML is sanitized with Ammonia and a restrictive CSP. Native HTML is served
+through a private protocol. Inline styles are removed; this is a safe document
+viewer rather than a complete email renderer.
 
-```rust
-use argui::webview::{PopupPolicy, WebCompatibility, WebViewOptions, WebViewSource, WebViewState};
+Browser pages may refuse framing through CSP or `X-Frame-Options`. Cross-origin
+browser restrictions also prevent dependable title, navigation, and load-error
+inspection. Argui does not report a false remote `Loaded` event.
 
-fn webpage(url: &str, trusted_relay_url: &str) -> Result<WebViewState, argui::webview::WebViewError> {
-    WebViewState::with_options(
-        WebViewSource::url(url)?,
-        WebViewOptions::webpage()
-            .compatibility(WebCompatibility::compatible(trusted_relay_url)?)
-            .popups(PopupPolicy::Block)
-            .allow_downloads(false),
-    )
-}
+## Explicit webpage options
+
+`WebViewState::with_options` validates immutable permissions:
+
+```rust,ignore
+let state = WebViewState::with_options(
+    WebViewSource::url(url)?,
+    WebViewOptions::webpage()
+        .compatibility(WebCompatibility::compatible(relay_url)?)
+        .popups(PopupPolicy::Block)
+        .allow_downloads(false),
+)?;
 ```
 
-On the browser, `PopupPolicy::Sandboxed` permits new windows that inherit the
-sandbox; `External` explicitly permits them to escape it. Browser popup blockers
-and user-activation requirements still apply. Downloads require explicit opt-in
-and remain subject to browser policy. On native Wry, downloads use the engine's
-download destination when enabled. Non-blocking popup policies return
-`UnsupportedOptions`: Argui does not currently guarantee policy inheritance for
-native popup windows. Wry already preserves website origins, so the compatibility
-setting only affects the browser backend.
+Browser `PopupPolicy::Sandboxed` keeps the popup sandboxed; `External` allows
+it to escape. Native Wry rejects non-blocking popup policies because inheritance
+cannot be guaranteed. Downloads require explicit opt-in and remain subject to
+browser or OS policy. Email sessions cannot loosen their restricted policy.
 
-### Compatible mode and deployment
-
-Compatible mode uses **two frames**: a trusted relay on a distinct origin, then
-the website. The inner frame permits scripts/forms and preserves the site's
-origin, allowing origin-dependent APIs such as localStorage. This is not a new
-browser engine: third-party cookies, authentication and embedding remain subject
-to browser and website restrictions. Sites refusing frames still cannot load.
-
-Run the supplied relay, configuring the actual application, relay and target
-origins (these values are examples, not engine exceptions):
+Compatible browser mode uses a trusted relay on a separate HTTPS origin so the
+inner page keeps its own origin. It can support origin-dependent APIs such as
+`localStorage`, but cannot bypass third-party cookie, authentication, or
+framing restrictions.
 
 ```sh
 python3 crates/argui-webview/src/browser/relay/server.py \
@@ -118,126 +107,34 @@ python3 crates/argui-webview/src/browser/relay/server.py \
   --port 8082 --allowed-origin https://example.com
 ```
 
-The gallery script starts this relay automatically. In **WebView → Webpage**,
-use **Mode: isolated / compatible** to compare retained sessions. Configure
-`ARGUI_WEBVIEW_ALLOWED_ORIGINS` as a space-separated origin list before running
-the script, or set `ARGUI_WEBVIEW_RELAY_URL` to an already deployed trusted relay.
-The URL is compile-time gallery configuration; without it the mode control is
-absent. An invalid or unreachable relay emits an error, never a silent fallback.
+The included server is a development reference. A production relay must keep
+its response CSP, exact HTTP(S) allowlist, message origin checks, and dedicated
+origin. It never proxies destination pages or grants Argui IPC.
 
-For production, host the relay at the root of a dedicated HTTPS origin behind
-your HTTP server/reverse proxy. The included Python server is a development and
-reference server, not a hardened production service. Preserve its response CSP
-and other security headers, and serve `config.js` from trusted deployment
-configuration. Configure the application's own CSP `frame-src` to permit the
-relay. Do not host user-controlled scripts/content on the relay origin or source
-its URL/configuration from untrusted content.
+## Linux surface boundary
 
-The relay enforces an explicit HTTP(S) origin allowlist through both request
-validation and **server response CSP**, including redirects. Application and relay
-hosts cannot appear in the website list, even with different ports or schemes.
-Allow all required destination origins explicitly; wildcards are rejected.
-Messages are checked against the exact sending window, origin and protocol.
-This relay only embeds pages: it never proxies websites, strips their protection
-headers or grants website code an Argui IPC API. Its `accepted` response confirms
-navigation configuration, not that the website rendered successfully.
+The Linux host gives WGPU a Wayland subsurface below GTK's WebKit child. GTK
+remains the input owner; the WGPU child has an empty input region. The canvas is
+reattached when GTK recreates its parent surface after hide/show.
 
-Relay verification:
+`gtk_host/canvas.rs` contains the narrow unsafe boundary for borrowed GTK
+display/surface handles. The Tao window owns the foreign handles; Argui owns only
+its child surface. WGPU retains the child until the swapchain is dropped. This
+lifetime needs native lifecycle tests and must not spread into UI or renderer
+data types.
+
+## Verification
 
 ```sh
 python3 crates/argui-webview/tests/browser/relay/server.py
 node crates/argui-webview/tests/browser/relay/client.mjs
+
+CHROME_PATH=/path/to/chrome \
+PUPPETEER_MODULE=/path/to/puppeteer/puppeteer.js \
+node crates/argui-webview/tests/browser/dom.mjs
 ```
 
-The browser test uses the real relay and locally served websites to check
-origin-preserving storage, retained state, reload, rejected messages, allowlisted
-navigation and server-CSP rejection of redirects to the application.
-
-Browser DOM integration checks: `node crates/argui-webview/tests/browser/dom.mjs`
-with Puppeteer installed, or `PUPPETEER_MODULE` pointing to an existing module
-exporting it, and `CHROME_PATH` set to a Chrome executable. Rust tests exercise
-the shared sanitizer, mounts, navigation handlers and cache policy.
-The end-to-end WASM test is
-`node crates/argui-widget-gallery/tests/pages/webview.mjs`, with the same browser
-environment and `GALLERY_URL` pointing at the running gallery. It also checks
-30-second idle eviction and state preservation after native DOM recreation.
-
-## Retained content
-
-Create `WebViewState` outside `render()`, then build `WebView::new(&state).build()`.
-The widget carries an opaque `NativeContent` payload; the runtime resolves its
-bounds into `WebViewMount` records. Custom hosts can drive `WebViewPool` directly.
-The pool uses the same `WebViewBackend`/`NativeWebView` contract on every OS.
-The GTK backend accepts coordinates relative to its registered client container.
-
-The default pool retains at most two native views. Inactive instances expire
-after 30 seconds, or are evicted least-recently-used when a slot is needed.
-`next_expiry()` is the event-loop deadline; do not poll an idle pool. An overlay
-sets `occluded` without removing the mount, retaining the instance without
-painting it or allowing it to receive native input. Visible views are never
-evicted to make room: exceeding the limit returns `CapacityExceeded`.
-
-Session identity and the latest source survive eviction. Browser DOM, script
-state and unsaved forms do not. `release()` prevents remounting until a new
-`load()` or `reload()`. Close a host's pool entries before destroying its window.
-The counters describe native instances, not total browser-process memory.
-
-## HTML restrictions
-
-HTML is sanitized with Ammonia and served through a private custom protocol
-with a response CSP. Scripts, frames, forms and remote resources are disabled.
-Inline styles are currently stripped by the sanitizer; this is a conservative
-HTML viewer, not a complete email formatting pipeline. Native JavaScript is
-also disabled. Browser and HTML sessions cannot change security policy in place.
-All native sessions currently use incognito mode; persistent account profiles
-and explicitly enabled remote email images are not implemented yet.
-
-Popups and disallowed navigations produce `NavigationRequested`; automatic
-downloads are denied unless explicitly enabled for webpages, and new permission
-grants are denied. No application IPC handler is
-installed. The application must decide whether to open external links.
-
-## Wayland surface ownership and unsafe boundary
-
-The Linux host uses GTK3/Tao for the parent and Wry container, and a distinct
-Wayland subsurface for WGPU. Presenting WGPU directly to GTK's surface was tested
-and failed with `Explicit Sync only supported on dmabuf buffers`: GTK's SHM
-buffers collided with Vulkan's explicit-sync surface state. XWayland and CPU
-readback are not used as substitutes.
-
-The platform's `gtk_host/canvas.rs` has a narrowly scoped unsafe allowance:
-borrowing GTK's foreign display/surface and implementing the raw window handle.
-The retained Tao window owns those handles; the guest Wayland backend must not
-disconnect GTK's display or destroy GTK's parent surface. The canvas owns and
-destroys only its subsurface and child surface. Its `Arc` is retained by WGPU,
-so those proxies outlive the swapchain. Creation, presentation and destruction
-are driven on the UI thread, with the parent window retained until after the
-renderer is dropped. No `Send`/`Sync` implementations or raw owned pointers are
-introduced. The parent-surface lifetime remains explicit in the canvas owner;
-this boundary requires native lifecycle testing in addition to the pure tests.
-GTK destroys its parent `wl_surface` when a window is hidden, even while the Tao
-window stays alive ([GTK implementation](https://github.com/GNOME/gtk/blob/gtk-3-24/gdk/wayland/gdkwindow-wayland.c)).
-The host drops its subsurface attachment on GTK unmap and attaches the retained
-WGPU child to the current parent when mapped again. Parent commits stay under
-GTK's frame scheduling so its configure acknowledgement precedes presentation.
-The native lifecycle check covers that transition,
-including resize, close/reopen and the retained presentation model.
-
-GTK's client allocation determines the child origin and logical size, including
-decoration offsets. Scale is applied only to the swapchain dimensions. The
-child has an empty input region so GTK remains the sole input dispatcher.
-Rounded lower corners are rendered using Argui's existing quad primitive over
-a transparent surface, not by changing or copying browser pixels.
-
-GTK child events are handled by WebKit before propagation is stopped, so Tao's
-toplevel resize handlers never receive child-local mouse coordinates. Argui
-queries pointer coordinates against the toplevel GDK window, clears its hover
-when entering native content, and relinquishes keyboard focus while WebKit owns
-it. Clicking an Argui control focuses the canvas again.
-
-Blocked links and popup requests emit `NavigationRequested`. Applications can
-register `WebViewState::on_navigation_requested` to handle them without polling;
-the callback runs outside the session borrow and events remain available through
-`drain_events`. Validate the requested URL and capture owners weakly. The gallery
-accepts only HTTP/HTTPS and opens these links in its retained Webpage session,
-leaving the Email session's restrictive policy unchanged.
+`crates/argui-widget-gallery/tests/pages/webview.mjs` covers the complete
+WebAssembly path with `GALLERY_URL` pointing to the running gallery. Rust tests
+cover sanitization, navigation, mounts, options, and cache policy. Run browser
+and native checks through the [private Linux display](../contributing/linux-testing.md).

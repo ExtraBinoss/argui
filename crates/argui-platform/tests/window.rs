@@ -15,8 +15,19 @@ fn default_window_is_a_decorated_resizable_surface() {
     assert!(!config.native_shadow);
     assert_eq!(config.level, WindowLevel::Normal);
     assert!(config.append_to_document);
+    assert_eq!(config.focus_on_launch, cfg!(not(target_arch = "wasm32")));
     assert_eq!(config.safe_area_insets, None);
-    let _attributes = config.into_attributes();
+    let attributes = config.into_attributes();
+    assert_eq!(attributes.active, cfg!(not(target_arch = "wasm32")));
+}
+
+#[test]
+fn initial_focus_is_configurable() {
+    let attributes = WindowConfig::default()
+        .with_focus_on_launch(false)
+        .into_attributes();
+
+    assert!(!attributes.active);
 }
 
 #[test]

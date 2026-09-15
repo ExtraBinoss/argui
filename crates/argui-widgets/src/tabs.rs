@@ -12,6 +12,7 @@ pub struct Tab {
 }
 
 impl Tab {
+    /// Creates a tab with a trigger `label` and its panel element.
     #[must_use]
     pub fn new(label: impl Into<String>, panel: Element) -> Self {
         Self {
@@ -22,6 +23,8 @@ impl Tab {
     }
 
     #[must_use]
+    /// Sets whether this tab can be selected.
+    /// `enabled` controls whether the tab is interactive.
     pub const fn enabled(mut self, enabled: bool) -> Self {
         self.enabled = enabled;
         self
@@ -36,6 +39,8 @@ pub struct Tabs {
 }
 
 impl Tabs {
+    /// Creates a controlled tab set with tabs in display order and selected source index.
+    /// `key` identifies the set and `label` names it accessibly.
     #[must_use]
     pub fn new(
         key: impl Into<String>,
@@ -50,6 +55,7 @@ impl Tabs {
     }
 
     #[must_use]
+    /// Builds the tab triggers and selected panel using `theme` for styling.
     pub fn build(self, theme: &WidgetTheme) -> Element {
         let selected = self.selected.min(self.tabs.len().saturating_sub(1));
         let behavior = TabsBehavior::new(

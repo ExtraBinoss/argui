@@ -11,6 +11,8 @@ pub struct AccordionItem {
 }
 
 impl AccordionItem {
+    /// Creates an item with a stable identity, trigger label and panel content.
+    /// `id` identifies the item, `label` names its trigger, and `content` is shown in its panel.
     #[must_use]
     pub fn new(id: impl Into<String>, label: impl Into<String>, content: Element) -> Self {
         Self {
@@ -39,6 +41,8 @@ pub struct Accordion {
 }
 
 impl Accordion {
+    /// Creates an accordion from items in their display order.
+    /// `key` identifies the accordion; `items` supplies its controlled disclosures.
     #[must_use]
     pub fn new(key: impl Into<String>, items: impl IntoIterator<Item = AccordionItem>) -> Self {
         Self {
@@ -60,11 +64,13 @@ impl Accordion {
     }
 
     #[must_use]
+    /// Returns the state key for the trigger belonging to `id`.
     pub fn trigger_key(&self, id: &str) -> String {
         format!("{}::item::{id}::trigger", self.key)
     }
 
     #[must_use]
+    /// Interprets `event` as an accordion action when it targets an enabled item.
     pub fn action(&self, event: &UiEvent) -> Option<AccordionAction> {
         let index = self
             .items
@@ -103,6 +109,7 @@ impl Accordion {
     }
 
     #[must_use]
+    /// Builds the accordion using `theme` for its item styling.
     pub fn build(&self, theme: &WidgetTheme) -> Element {
         Element::column(self.items.iter().map(|item| {
             self.disclosure(item)

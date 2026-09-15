@@ -5,6 +5,9 @@ use argui_core::{KeyInput, Point, PointerEvent, PointerId, PointerPhase, Rect, S
 use crate::{ClickEvent, Element, NodeId, SelectionCapabilities, SemanticAction, SemanticValue};
 
 impl Element {
+    /// Registers an event listener on this element.
+    ///
+    /// * `listener` — event type, handler identity, and listener options.
     #[must_use]
     pub fn on(mut self, listener: EventListener) -> Self {
         self.event_listeners.push(listener);
@@ -40,6 +43,7 @@ pub enum EventType {
 }
 
 impl EventType {
+    /// Event kinds that can be emitted by the UI event system.
     pub const ALL: [Self; 23] = [
         Self::Action,
         Self::PointerEnter,
@@ -66,6 +70,7 @@ impl EventType {
         Self::SelectionChange,
     ];
 
+    /// Returns whether dispatch for this event type depends on pointer hit testing.
     #[must_use]
     pub const fn requires_hit_test(self) -> bool {
         matches!(
@@ -99,18 +104,23 @@ pub struct EventListenerOptions {
 }
 
 impl EventListenerOptions {
+    /// Enables capture phase delivery for this listener.
     #[must_use]
     pub const fn capture(mut self, capture: bool) -> Self {
         self.capture = capture;
         self
     }
 
+    /// Marks this listener passive, disallowing default prevention.
     #[must_use]
     pub const fn passive(mut self, passive: bool) -> Self {
         self.passive = passive;
         self
     }
 
+    /// Marks this listener for delivery only once.
+    ///
+    /// * `once` — whether to remove the listener after its first delivery.
     #[must_use]
     pub const fn once(mut self, once: bool) -> Self {
         self.once = once;
@@ -128,18 +138,24 @@ pub struct EventHandlerId {
 }
 
 impl EventHandlerId {
+    /// Creates a handler identity from an owner and its local slot.
+    ///
+    /// * `owner` — identity of the registering owner.
+    /// * `slot` — handler slot within that owner.
     #[doc(hidden)]
     #[must_use]
     pub const fn new(owner: EventOwnerId, slot: u32) -> Self {
         Self { owner, slot }
     }
 
+    /// Returns the owner associated with this handler.
     #[doc(hidden)]
     #[must_use]
     pub const fn owner(self) -> EventOwnerId {
         self.owner
     }
 
+    /// Returns this handler's owner-local slot.
     #[doc(hidden)]
     #[must_use]
     pub const fn slot(self) -> u32 {
@@ -155,6 +171,10 @@ pub struct EventListener {
 }
 
 impl EventListener {
+    /// Creates a listener for an event and handler.
+    ///
+    /// * `event` — event type to receive.
+    /// * `handler` — registered event handler identity.
     #[doc(hidden)]
     #[must_use]
     pub const fn new(event: EventType, handler: EventHandlerId) -> Self {
@@ -169,18 +189,23 @@ impl EventListener {
         }
     }
 
+    /// Enables or disables capture phase delivery.
     #[must_use]
     pub const fn capture(mut self, capture: bool) -> Self {
         self.options.capture = capture;
         self
     }
 
+    /// Enables or disables passive listener behavior.
     #[must_use]
     pub const fn passive(mut self, passive: bool) -> Self {
         self.options.passive = passive;
         self
     }
 
+    /// Enables or disables one-time delivery.
+    ///
+    /// * `once` — whether to remove the listener after its first delivery.
     #[must_use]
     pub const fn once(mut self, once: bool) -> Self {
         self.options.once = once;
@@ -229,6 +254,7 @@ pub enum UiEventKind {
 }
 
 impl UiEventKind {
+    /// Returns the event type corresponding to this event payload.
     #[must_use]
     pub const fn event_type(&self) -> EventType {
         match self {
@@ -260,6 +286,7 @@ impl UiEventKind {
         }
     }
 
+    /// Returns whether this event propagates through ancestors.
     #[must_use]
     pub const fn bubbles(&self) -> bool {
         !matches!(
@@ -276,6 +303,7 @@ impl UiEventKind {
         )
     }
 
+    /// Returns whether a handler may prevent the default action for this event.
     #[must_use]
     pub const fn cancelable(&self) -> bool {
         matches!(
@@ -344,6 +372,13 @@ impl PartialEq for UiEvent {
 }
 
 impl UiEvent {
+    /// Creates an event targeted at a node, optionally recording its key.
+    ///
+    /// # Arguments
+    ///
+    /// * `target` — node where dispatch begins.
+    /// * `key` — stable element key, if the target has one.
+    /// * `kind` — event payload and semantic event type.
     #[must_use]
     pub fn new(target: NodeId, key: Option<String>, kind: UiEventKind) -> Self {
         Self {
@@ -389,47 +424,56 @@ impl UiEvent {
         }
     }
 
+    /// Returns the node currently receiving this event during dispatch.
     #[must_use]
     pub const fn current_target(&self) -> NodeId {
         self.current_target
     }
 
+    /// Returns the handler currently receiving this event, when available.
     #[doc(hidden)]
     #[must_use]
     pub const fn current_handler(&self) -> Option<EventHandlerId> {
         self.current_handler
     }
 
+    /// Returns the key of the original target, if it had one.
     #[must_use]
     pub fn target_key(&self) -> Option<&str> {
         self.target_key.as_deref()
     }
 
+    /// Returns the key of the current dispatch target, if it had one.
     #[must_use]
     pub fn current_key(&self) -> Option<&str> {
         self.current_key.as_deref()
     }
 
+    /// Returns the current phase of event propagation.
     #[must_use]
     pub const fn phase(&self) -> EventPhase {
         self.phase
     }
 
+    /// Returns the event type represented by this event.
     #[must_use]
     pub const fn event_type(&self) -> EventType {
         self.kind.event_type()
     }
 
+    /// Returns whether this event bubbles through ancestors.
     #[must_use]
     pub const fn bubbles(&self) -> bool {
         self.kind.bubbles()
     }
 
+    /// Returns whether default handling can be prevented for this event.
     #[must_use]
     pub const fn cancelable(&self) -> bool {
         self.kind.cancelable()
     }
 
+    /// Stops propagation after the current target finishes handling the event.
     pub fn stop_propagation(&self) {
         if self.control.propagation_target.get().is_none() {
             self.control
@@ -438,11 +482,15 @@ impl UiEvent {
         }
     }
 
+    /// Stops propagation and prevents remaining handlers on the current target.
     pub fn stop_immediate_propagation(&self) {
         self.stop_propagation();
         self.control.immediate_target.set(Some(self.current_target));
     }
 
+    /// Requests cancellation of the default action.
+    ///
+    /// Returns `true` if the event is cancelable and the listener is not passive.
     #[must_use]
     pub fn prevent_default(&self) -> bool {
         if self.cancelable() && !self.passive {
@@ -453,17 +501,20 @@ impl UiEvent {
         }
     }
 
+    /// Returns whether a listener prevented the default action.
     #[must_use]
     pub fn default_prevented(&self) -> bool {
         self.control.default_prevented.get()
     }
 
+    /// Returns whether propagation has been stopped.
     #[must_use]
     pub fn propagation_stopped(&self) -> bool {
         self.control.propagation_target.get().is_some()
     }
 
     #[doc(hidden)]
+    /// Returns whether this event should continue dispatching to the next listener.
     pub fn should_dispatch(&self) -> bool {
         if self.default_action {
             return !self.control.default_prevented.replace(true);
@@ -493,12 +544,12 @@ impl UiEvent {
     pub(crate) fn set_history(&mut self, history: Option<(bool, bool)>) {
         self.history = history;
     }
-    /// Undo/redo availability for the target editor at event creation.
+    /// Returns undo and redo availability for the target editor when the event was created.
     #[must_use]
     pub const fn edit_history(&self) -> Option<(bool, bool)> {
         self.history
     }
-    /// Focus at event creation, before a pointer default moves it to a menu trigger.
+    /// Returns focus at event creation, before a pointer default can move it to a trigger.
     #[must_use]
     pub const fn focused_node(&self) -> Option<NodeId> {
         self.focused_node

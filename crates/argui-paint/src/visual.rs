@@ -12,6 +12,7 @@ pub struct GradientStop {
 }
 
 impl GradientStop {
+    /// Creates a gradient stop at normalized `offset` with `color`.
     #[must_use]
     pub const fn new(offset: f32, color: Color) -> Self {
         Self { offset, color }
@@ -43,10 +44,20 @@ impl std::error::Error for GradientError {}
 pub struct GradientStops(Arc<[GradientStop]>);
 
 impl GradientStops {
+    /// Creates validated stops from a fixed-size array.
+    ///
+    /// # Errors
+    /// Returns a gradient error if there are fewer than two stops, offsets are
+    /// outside zero through one, or the stops are not sorted.
     pub fn new<const N: usize>(stops: [GradientStop; N]) -> Result<Self, GradientError> {
         Self::from_vec(Vec::from(stops))
     }
 
+    /// Creates validated stops from a vector.
+    ///
+    /// # Errors
+    /// Returns a gradient error if there are fewer than two stops, offsets are
+    /// outside zero through one, or the stops are not sorted.
     pub fn from_vec(stops: Vec<GradientStop>) -> Result<Self, GradientError> {
         if stops.len() < 2 {
             return Err(GradientError::TooFewStops);
@@ -64,16 +75,19 @@ impl GradientStops {
         Ok(Self(stops.into()))
     }
 
+    /// Returns the stops in their validated order.
     #[must_use]
     pub fn as_slice(&self) -> &[GradientStop] {
         &self.0
     }
 
+    /// Returns the number of stops.
     #[must_use]
     pub fn len(&self) -> usize {
         self.0.len()
     }
 
+    /// Returns whether the collection contains no stops.
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
@@ -89,6 +103,8 @@ pub struct BilinearGradient {
 
 impl BilinearGradient {
     /// Corners in top-left, top-right, bottom-left, bottom-right order.
+    /// Creates a bilinear gradient from top-left, top-right, bottom-left, bottom-right colors.
+    /// * `corners` — colors in top-left, top-right, bottom-left, bottom-right order; `interpolation` — color space.
     #[must_use]
     pub fn new(corners: [Color; 4], interpolation: ColorInterpolation) -> Self {
         Self {
@@ -97,6 +113,7 @@ impl BilinearGradient {
         }
     }
 
+    /// Returns the four corner colors in construction order.
     #[must_use]
     pub fn corners(&self) -> &[Color; 4] {
         &self.corners
@@ -113,6 +130,11 @@ pub struct LinearGradient {
 }
 
 impl LinearGradient {
+    /// Creates a linear gradient from endpoints, color space, and validated stops.
+    /// * `start`, `end` — gradient endpoints; `interpolation` — color space; `stops` — stop array.
+    ///
+    /// # Errors
+    /// Returns a gradient error if the stop array is invalid.
     pub fn new<const N: usize>(
         start: Point,
         end: Point,
@@ -127,6 +149,8 @@ impl LinearGradient {
         ))
     }
 
+    /// Creates a linear gradient using an existing validated stop collection.
+    /// * `start`, `end` — gradient endpoints; `interpolation` — color space; `stops` — color stops.
     pub fn with_stops(
         start: Point,
         end: Point,
@@ -152,6 +176,11 @@ pub struct RadialGradient {
 }
 
 impl RadialGradient {
+    /// Creates an elliptical radial gradient from center, radii, color space, and stops.
+    /// * `center` — gradient center; `radius` — horizontal and vertical radii; `interpolation` — color space.
+    ///
+    /// # Errors
+    /// Returns a gradient error if the stop array is invalid.
     pub fn new<const N: usize>(
         center: Point,
         radius: Point,
@@ -166,6 +195,8 @@ impl RadialGradient {
         ))
     }
 
+    /// Creates a radial gradient using an existing validated stop collection.
+    /// * `center` — gradient center; `radius` — horizontal and vertical radii; `interpolation` — color space; `stops` — color stops.
     pub fn with_stops(
         center: Point,
         radius: Point,
@@ -189,6 +220,9 @@ static NEXT_IMAGE_ID: AtomicU64 = AtomicU64::new(1);
 impl ImageId {
     /// Allocates a process-local opaque handle. Asset libraries normally call
     /// this on behalf of applications.
+    ///
+    /// # Panics
+    /// Panics if the process-local image handle space is exhausted.
     #[must_use]
     pub fn fresh() -> Self {
         let id = NEXT_IMAGE_ID.fetch_add(1, Ordering::Relaxed);
@@ -206,6 +240,13 @@ pub struct ImageAsset {
 }
 
 impl ImageAsset {
+    /// Creates an RGBA8 image asset after checking its dimensions and byte length.
+    ///
+    /// # Errors
+    /// Returns [`ImageAssetError::InvalidDimensions`] if the byte length cannot be
+    /// represented, or [`ImageAssetError::InvalidByteLength`] if the buffer does not
+    /// contain exactly four bytes per pixel.
+    /// * `id` — image identity; `width`, `height` — pixel dimensions; `rgba8` — row-major RGBA bytes.
     pub fn rgba8(
         id: ImageId,
         width: u32,
@@ -232,6 +273,7 @@ impl ImageAsset {
         })
     }
 
+    /// Returns the number of bytes in the pixel buffer.
     #[must_use]
     pub fn byte_len(&self) -> usize {
         self.rgba8.len()
@@ -275,6 +317,8 @@ pub struct ClipRegion {
 }
 
 impl ClipRegion {
+    /// Creates an unrounded clip region in the supplied transform.
+    /// * `bounds` — local clipping rectangle; `transform` — transform into surface coordinates.
     #[must_use]
     pub const fn new(bounds: Rect, transform: Affine2D) -> Self {
         Self {
@@ -284,6 +328,8 @@ impl ClipRegion {
         }
     }
 
+    /// Creates a clip region with per-corner radii.
+    /// * `bounds` — local clipping rectangle; `transform` — surface transform; `radii` — corner radii.
     #[must_use]
     pub const fn rounded(bounds: Rect, transform: Affine2D, radii: crate::CornerRadii) -> Self {
         Self {
@@ -293,6 +339,7 @@ impl ClipRegion {
         }
     }
 
+    /// Returns whether `point` lies inside the transformed rounded region.
     #[must_use]
     pub fn contains(self, point: Point) -> bool {
         self.transform.inverse().is_some_and(|inverse| {
@@ -330,11 +377,14 @@ fn rounded_rect_contains(bounds: Rect, radii: crate::CornerRadii, point: Point) 
 pub struct ClipChain(Arc<[ClipRegion]>);
 
 impl ClipChain {
+    /// Creates a clip chain from an existing shared region collection.
+    /// * `regions` — clip regions to retain in the chain.
     #[must_use]
     pub fn from_regions(regions: impl Into<Arc<[ClipRegion]>>) -> Self {
         Self(regions.into())
     }
 
+    /// Returns a copy of the chain with `region` appended.
     #[must_use]
     pub fn appended(&self, region: ClipRegion) -> Self {
         let mut regions = self.0.to_vec();
@@ -342,11 +392,13 @@ impl ClipChain {
         Self(regions.into())
     }
 
+    /// Returns the regions in clipping order.
     #[must_use]
     pub fn regions(&self) -> &[ClipRegion] {
         &self.0
     }
 
+    /// Returns whether any region has an empty or non-positive extent.
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.0
@@ -354,6 +406,7 @@ impl ClipChain {
             .any(|region| region.bounds.size.width <= 0.0 || region.bounds.size.height <= 0.0)
     }
 
+    /// Returns whether `point` lies within every region in the chain.
     #[must_use]
     pub fn contains(&self, point: Point) -> bool {
         !self.is_empty() && self.0.iter().all(|clip| clip.contains(point))

@@ -4,6 +4,10 @@ use crate::{NodeId, OverlaySurface, UiTree};
 
 impl UiTree {
     /// The requested policy is independent of whether the current host supports native popups.
+    ///
+    /// * `node` — portal node whose requested surface is queried.
+    ///
+    /// Returns the requested surface, defaulting to the in-window surface.
     #[must_use]
     pub fn portal_surface_preference(&self, node: NodeId) -> OverlaySurface {
         let mut cursor = self.index.position(node);
@@ -21,6 +25,11 @@ impl UiTree {
     }
 
     /// Install geometry accepted by the native host, in the owning tree's logical coordinates.
+    ///
+    /// * `node` — portal node receiving native geometry.
+    /// * `bounds` — logical bounds accepted by the host, or `None` to clear them.
+    ///
+    /// Returns whether the stored geometry changed; invalid or non-portal bounds are cleared.
     pub fn set_native_portal(&mut self, node: NodeId, bounds: Option<Rect>) -> bool {
         self.native_portals
             .retain(|id, _| self.node_ids.contains(id));
@@ -49,12 +58,19 @@ impl UiTree {
         true
     }
 
+    /// Returns the accepted native bounds for a portal node, if present.
+    ///
+    /// * `node` — portal node to query.
     #[must_use]
     pub fn native_portal_bounds(&self, node: NodeId) -> Option<Rect> {
         self.native_portals.get(&node).copied()
     }
 
     /// The physical surface containing this element; None is the application's window.
+    ///
+    /// * `node` — node whose owning native portal is queried.
+    ///
+    /// Returns the nearest native portal node containing `node`, if any.
     #[must_use]
     pub fn native_portal_owner(&self, node: NodeId) -> Option<NodeId> {
         let mut cursor = self.index.position(node);

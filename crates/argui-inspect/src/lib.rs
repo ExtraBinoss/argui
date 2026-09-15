@@ -1,20 +1,27 @@
-use std::{cell::RefCell, collections::VecDeque, rc::Rc, time::Duration};
+use std::{cell::RefCell, collections::VecDeque, rc::Rc};
 
 use argui_core::{Point, Rect};
 
 mod frames;
 mod memory;
+mod records;
 pub use memory::MemorySnapshot;
 mod trace;
 pub use frames::FrameCursor;
+pub use records::{
+    AdapterRecord, FrameRecord, GpuFrameRecord, GpuPassRecord, Invalidation, NodeSnapshot,
+    PortalSnapshot, PropertySnapshot, TreeSnapshot,
+};
 
 use trace::TraceDocument;
 pub use trace::{TRACE_VERSION, TraceError};
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+/// Stable identifier for a node in an inspected tree.
 pub struct InspectNodeId(pub u64);
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+/// Style attributes that can be overridden in an inspection session.
 pub enum StyleProperty {
     Background,
     Border,
@@ -28,6 +35,7 @@ pub enum StyleProperty {
 }
 
 impl StyleProperty {
+    /// All inspectable style properties in display order.
     pub const ALL: [Self; 9] = [
         Self::Background,
         Self::Border,
@@ -40,6 +48,7 @@ impl StyleProperty {
         Self::Height,
     ];
 
+    /// Returns the lowercase label used for this property in inspector controls.
     pub const fn label(self) -> &'static str {
         match self {
             Self::Background => "background",
@@ -56,6 +65,7 @@ impl StyleProperty {
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+/// Unit used by an editable style length.
 pub enum StyleUnit {
     #[default]
     Auto,
@@ -64,18 +74,21 @@ pub enum StyleUnit {
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
+/// Numeric length value paired with its unit.
 pub struct StyleLength {
     pub value: f32,
     pub unit: StyleUnit,
 }
 
 #[derive(Clone, Debug, PartialEq)]
+/// Editable scalar exposed for a structured style value.
 pub struct StyleField {
     pub label: String,
     pub value: f32,
 }
 
 #[derive(Clone, Debug, PartialEq)]
+/// Serializable or editable representation of an inspected style value.
 pub enum StyleValue {
     Length(StyleLength),
     Number(f32),
@@ -86,6 +99,7 @@ pub enum StyleValue {
 }
 
 impl StyleValue {
+    /// Returns the editable scalar fields represented by this value.
     #[must_use]
     pub fn fields(&self) -> Vec<StyleField> {
         match self {
@@ -119,6 +133,7 @@ impl StyleValue {
         }
     }
 
+    /// Updates the editable field at `index` to `value`, returning `false` when unsupported.
     pub fn set_field(&mut self, index: usize, value: f32) -> bool {
         match self {
             Self::Length(length) if index == 0 && length.unit != StyleUnit::Auto => {
@@ -145,6 +160,7 @@ impl StyleValue {
         }
     }
 
+    /// Formats the value for compact display in inspector tools.
     #[must_use]
     pub fn summary(&self) -> String {
         match self {
@@ -161,125 +177,6 @@ impl StyleValue {
             Self::Choice(value) | Self::Summary(value) => value.clone(),
         }
     }
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct PropertySnapshot {
-    pub property: StyleProperty,
-    pub authored: bool,
-    pub value: StyleValue,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct PortalSnapshot {
-    pub layer: String,
-    pub anchor: Option<String>,
-    pub requested: Option<String>,
-    pub resolved: Option<String>,
-    pub available_size: argui_core::Size,
-    pub constrained_width: bool,
-    pub constrained_height: bool,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct NodeSnapshot {
-    pub id: InspectNodeId,
-    pub parent: Option<InspectNodeId>,
-    pub depth: usize,
-    pub key: Option<String>,
-    pub kind: String,
-    pub summary: Option<String>,
-    pub bounds: Rect,
-    pub clip: Option<Rect>,
-    pub z_index: i32,
-    pub portal: Option<PortalSnapshot>,
-    pub visible: bool,
-    pub painted: bool,
-    pub interactive: bool,
-    pub child_count: usize,
-    pub properties: Vec<PropertySnapshot>,
-}
-
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct TreeSnapshot {
-    pub revision: u64,
-    pub nodes: Vec<NodeSnapshot>,
-}
-
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct AdapterRecord {
-    pub name: String,
-    pub vendor: u32,
-    pub device: u32,
-    pub device_type: String,
-    pub driver: String,
-    pub driver_info: String,
-    pub backend: String,
-    pub features: String,
-    pub timestamp_queries: bool,
-    pub max_texture_dimension_2d: u32,
-    pub max_buffer_size: u64,
-    pub max_storage_buffer_binding_size: u64,
-    pub max_bind_groups: u32,
-}
-
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct GpuPassRecord {
-    pub label: String,
-    pub start: Duration,
-    pub duration: Duration,
-    pub pixels: u64,
-    pub object_domain: Option<String>,
-    pub object_id: Option<u64>,
-}
-
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct GpuFrameRecord {
-    pub sequence: u64,
-    pub total: Duration,
-    pub passes: Vec<GpuPassRecord>,
-}
-
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct FrameRecord {
-    pub interval: Duration,
-    pub model: Duration,
-    pub surface: Duration,
-    pub tree: Duration,
-    pub layout: Duration,
-    pub paint: Duration,
-    pub render_cpu: Duration,
-    pub resize_events: u32,
-    pub update: Invalidation,
-    pub layers: usize,
-    pub passes: usize,
-    pub offscreen_pixels: u64,
-    pub cached_layers: usize,
-    pub damaged_pixels: u64,
-    pub textures: usize,
-    pub reused_textures: usize,
-    pub texture_bytes: u64,
-    pub vector_atlas_bytes: u64,
-    pub vector_atlas_entries: usize,
-    pub vector_atlas_hits: usize,
-    pub vector_rasterizations: usize,
-    pub adapter: AdapterRecord,
-    pub gpu: Option<GpuFrameRecord>,
-}
-
-impl FrameRecord {
-    #[must_use]
-    pub fn total_cpu(&self) -> Duration {
-        self.model + self.surface + self.tree + self.layout + self.paint + self.render_cpu
-    }
-}
-
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub enum Invalidation {
-    #[default]
-    None,
-    Paint,
-    Layout,
 }
 
 #[derive(Clone, Debug)]
@@ -311,6 +208,7 @@ struct StyleOverride {
 pub struct InspectorHandle(Rc<RefCell<InspectorState>>);
 
 impl InspectorHandle {
+    /// Creates a shared inspector session retaining at most `capacity` frame records.
     #[must_use]
     pub fn new(capacity: usize) -> Self {
         Self(Rc::new(RefCell::new(InspectorState {
@@ -330,24 +228,29 @@ impl InspectorHandle {
         })))
     }
 
+    /// Replaces the current inspected tree snapshot with `tree`.
     pub fn publish_tree(&self, tree: TreeSnapshot) {
         self.0.borrow_mut().tree = tree;
     }
 
+    /// Clones and returns the current inspected tree snapshot.
     #[must_use]
     pub fn tree(&self) -> TreeSnapshot {
         self.0.borrow().tree.clone()
     }
 
+    /// Runs `read` against the current tree without cloning the snapshot and returns its result.
     pub fn with_tree<T>(&self, read: impl FnOnce(&TreeSnapshot) -> T) -> T {
         read(&self.0.borrow().tree)
     }
 
+    /// Returns a clone of the node with `id`, if it is present in the tree.
     #[must_use]
     pub fn node(&self, id: InspectNodeId) -> Option<NodeSnapshot> {
         self.with_tree(|tree| tree.nodes.iter().find(|node| node.id == id).cloned())
     }
 
+    /// Records a UI-side frame, dropping the oldest record when the history is full.
     pub fn record_ui(&self, record: FrameRecord) {
         let mut state = self.0.borrow_mut();
         if state.paused || !state.recording || state.capacity == 0 {
@@ -360,6 +263,7 @@ impl InspectorHandle {
         state.frame_sequence = state.frame_sequence.wrapping_add(1);
     }
 
+    /// Adds renderer measurements to the latest UI frame, or records `record` if none exists.
     pub fn record_render(&self, record: FrameRecord) {
         let mut state = self.0.borrow_mut();
         if state.paused || !state.recording || state.capacity == 0 {
@@ -387,55 +291,66 @@ impl InspectorHandle {
         }
     }
 
+    /// Returns a copy of the retained frame history in chronological order.
     #[must_use]
     pub fn frames(&self) -> Vec<FrameRecord> {
         self.0.borrow().frames.iter().cloned().collect()
     }
 
+    /// Removes all retained frame records and starts a new synchronization epoch.
     pub fn clear_frames(&self) {
         let mut state = self.0.borrow_mut();
         state.frames.clear();
         state.frame_epoch = state.frame_epoch.wrapping_add(1);
     }
 
+    /// Pauses or resumes inspector recording.
+    /// `paused` is `true` to suspend recording and `false` to resume it.
     pub fn set_paused(&self, paused: bool) {
         self.0.borrow_mut().paused = paused;
     }
 
+    /// Reports whether recording is paused.
     #[must_use]
     pub fn paused(&self) -> bool {
         self.0.borrow().paused
     }
 
+    /// Enables or disables frame recording.
     pub fn set_recording(&self, recording: bool) {
         self.0.borrow_mut().recording = recording;
     }
 
+    /// Reports whether recording is enabled and not paused.
     #[must_use]
     pub fn recording(&self) -> bool {
         let state = self.0.borrow();
         state.recording && !state.paused
     }
 
+    /// Selects `node` for inspection, or clears the selection when it is `None`.
     pub fn select(&self, node: Option<InspectNodeId>) {
         self.0.borrow_mut().selected = node;
     }
 
+    /// Returns the currently selected node, if any.
     #[must_use]
     pub fn selected(&self) -> Option<InspectNodeId> {
         self.0.borrow().selected
     }
 
+    /// Sets the node currently under the inspector pointer, or clears it with `None`.
     pub fn set_hovered(&self, node: Option<InspectNodeId>) {
         self.0.borrow_mut().hovered = node;
     }
 
+    /// Returns the currently hovered node, if any.
     #[must_use]
     pub fn highlighted(&self) -> Option<InspectNodeId> {
         self.0.borrow().hovered
     }
 
-    /// Returns the visually foremost inspected node containing `point`.
+    /// Returns the visually foremost inspected node containing `point` within `viewport`.
     /// Later nodes win equal stacking levels, matching retained paint order;
     /// deeper nodes win inside the same branch.
     #[must_use]
@@ -443,7 +358,7 @@ impl InspectorHandle {
         self.hit_stack(point, viewport).into_iter().next()
     }
 
-    /// Returns every inspected node under `point`, ordered from the most useful
+    /// Returns every inspected node under `point` within `viewport`, ordered from the most useful
     /// visual target to structural fallbacks.
     #[must_use]
     pub fn hit_stack(&self, point: Point, viewport: Rect) -> Vec<InspectNodeId> {
@@ -474,6 +389,7 @@ impl InspectorHandle {
         nodes.into_iter().rev().map(|(_, node)| node.id).collect()
     }
 
+    /// Enables or disables the override for this node/property, returning its new enabled state.
     pub fn toggle(&self, node: InspectNodeId, property: StyleProperty) -> bool {
         let mut state = self.0.borrow_mut();
         if let Some(entry) = state
@@ -494,6 +410,8 @@ impl InspectorHandle {
         }
     }
 
+    /// Returns whether an override is enabled, or `None` if no override exists.
+    /// `node` is the inspected node and `property` is the style attribute to query.
     #[must_use]
     pub fn property_enabled(&self, node: InspectNodeId, property: StyleProperty) -> Option<bool> {
         self.0.borrow().overrides.iter().find_map(|entry| {
@@ -501,6 +419,7 @@ impl InspectorHandle {
         })
     }
 
+    /// Sets and enables `value` as the explicit override for `node`'s `property`.
     pub fn set_property_value(
         &self,
         node: InspectNodeId,
@@ -525,6 +444,8 @@ impl InspectorHandle {
         }
     }
 
+    /// Returns the explicit override value, if one has been set.
+    /// `node` is the inspected node and `property` is the style attribute to query.
     #[must_use]
     pub fn property_value(
         &self,
@@ -539,11 +460,13 @@ impl InspectorHandle {
             .and_then(|entry| entry.value.clone())
     }
 
+    /// Removes every style override from the inspection session.
     pub fn clear_overrides(&self) {
         self.0.borrow_mut().overrides.clear();
     }
 
     /// Nodes with edited or disabled properties; allows hosts to retain untouched subtrees.
+    /// Returns the IDs of all nodes with an override entry.
     #[must_use]
     pub fn overridden_nodes(&self) -> std::collections::HashSet<InspectNodeId> {
         self.0
@@ -555,6 +478,7 @@ impl InspectorHandle {
     }
 
     /// Restore the authored value and enabled state of a single property.
+    /// Removes the override for one node/property pair, if present.
     pub fn clear_property_override(&self, node: InspectNodeId, property: StyleProperty) {
         self.0
             .borrow_mut()
@@ -562,6 +486,11 @@ impl InspectorHandle {
             .retain(|entry| entry.node != node || entry.property != property);
     }
 
+    /// Serializes the current tree metadata, selection, and frame history as pretty JSON.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TraceError::InvalidJson`] if the trace cannot be serialized.
     pub fn trace_json(&self) -> Result<String, TraceError> {
         let state = self.0.borrow();
         serde_json::to_string_pretty(&TraceDocument::capture(
@@ -573,6 +502,16 @@ impl InspectorHandle {
         .map_err(|error| TraceError::InvalidJson(error.to_string()))
     }
 
+    /// Imports a trace's tree metadata, selected node, and frame history from JSON.
+    ///
+    /// # Arguments
+    ///
+    /// * `json` — JSON text previously produced by this crate's trace format.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TraceError::InvalidJson`] for malformed data and
+    /// [`TraceError::UnsupportedVersion`] when the format version is unknown.
     pub fn import_trace_json(&self, json: &str) -> Result<(), TraceError> {
         let document: TraceDocument = serde_json::from_str(json)
             .map_err(|error| TraceError::InvalidJson(error.to_string()))?;

@@ -15,6 +15,7 @@ impl EntityId {
     }
 
     #[must_use]
+    /// Returns the numeric value of this process-unique identity.
     pub const fn get(self) -> usize {
         self.0
     }
@@ -22,6 +23,7 @@ impl EntityId {
 
 impl<T: 'static> Entity<T> {
     #[must_use]
+    /// Returns this entity's stable identity.
     pub fn id(&self) -> EntityId {
         self.0.model.id
     }
@@ -34,16 +36,24 @@ impl<T: 'static> Entity<T> {
     }
 
     #[must_use]
+    /// Creates a new entity with its own model runtime.
+    ///
+    /// `value` is the initial model state.
+    ///
+    /// # Panics
+    /// Panics if the process exhausts the available entity identity values.
     pub fn new(value: T) -> Self {
         ModelRuntime::default().entity(value)
     }
 
     #[must_use]
+    /// Returns the runtime shared by this entity and related entities.
     pub fn runtime(&self) -> ModelRuntime {
         self.0.model.runtime.clone()
     }
 
     #[must_use]
+    /// Returns the scope that owns resources associated with this model.
     pub fn resources(&self) -> &ResourceScope {
         &self.0.model.resources
     }
@@ -66,6 +76,7 @@ impl<T: 'static> Entity<T> {
     }
 
     #[must_use]
+    /// Creates a non-owning reference that can later be upgraded.
     pub fn downgrade(&self) -> WeakEntity<T> {
         WeakEntity {
             model: Rc::downgrade(&self.0.model),
@@ -73,6 +84,14 @@ impl<T: 'static> Entity<T> {
         }
     }
 
+    /// Mutates the model inside a runtime transaction.
+    ///
+    /// `update` receives mutable model state and its restricted model context; its
+    /// return value is returned unchanged.
+    ///
+    /// # Panics
+    /// Propagates a panic from `update`; reentrant access that conflicts with the
+    /// active mutable model borrow also panics.
     pub fn update<R>(&self, update: impl FnOnce(&mut T, &mut ModelContext<'_, T>) -> R) -> R {
         self.update_model(|value, cx| update(value, &mut ModelContext::new(cx)))
     }
@@ -161,6 +180,12 @@ impl<T: 'static> Entity<T> {
         effects
     }
 
+    /// Reads the current model value without changing it.
+    ///
+    /// `read` receives a shared reference to the model and computes the result.
+    ///
+    /// # Panics
+    /// Propagates a panic from `read` or a conflicting reentrant mutable borrow.
     pub fn read<R>(&self, read: impl FnOnce(&T) -> R) -> R {
         let _transaction = self.0.model.runtime.enter();
         read(&self.0.model.value.borrow())

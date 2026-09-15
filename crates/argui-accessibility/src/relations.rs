@@ -10,6 +10,7 @@ pub struct SemanticRelations {
 }
 
 impl SemanticRelations {
+    /// Creates an empty set of semantic node relationships.
     pub const fn new() -> Self {
         Self {
             labelled_by: Vec::new(),

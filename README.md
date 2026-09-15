@@ -16,7 +16,7 @@
   <a href="https://extrabinoss.github.io/argui/components">Live components</a> ·
   <a href="https://extrabinoss.github.io/argui/docs">Documentation</a> ·
   <a href="CHANGELOG.md">Changelog</a> ·
-  <a href="https://extrabinoss.github.io/argui/get-started">Get started</a> ·
+  <a href="https://extrabinoss.github.io/argui/docs/start/installation">Get started</a> ·
   <a href="https://discord.gg/xY9CWSc65">Discord</a>
 </p>
 
@@ -47,8 +47,9 @@ For state-preserving Rust patches, install Dioxus CLI and run the gallery with
 The [hot-reload guide](docs/hot-reload.md) explains the executable layout and
 the changes that still require a restart.
 
-Use Rust 1.98 or newer. Linux builds with all features also need the
-[native dependencies](docs/platform/webview.md#linux-build-dependencies).
+The minimum Rust version is declared in the workspace
+[Cargo manifest](Cargo.toml). Linux builds with all features also need the
+[native dependencies](docs/platform/webview.md#linux-dependencies).
 
 ## Build your interface in Rust
 
@@ -256,10 +257,11 @@ the matching GitHub release. See the
 ## Where things stand
 
 Contributions go through pull requests. Start with the
-[contributor guide](docs/contributing/code-quality.md); every crate must meet
-the 85% floor for lines, functions, regions and branches. Cargo builds use at
-most six jobs. Join the [Argui Discord](https://discord.gg/xY9CWSc65) to discuss
-the project. The [website](website/README.md) lives in `website/`.
+[repository documentation](docs/README.md), then follow the
+[development guide](docs/contributing/development.md) and
+[quality gate](docs/contributing/code-quality.md). Every crate must meet the 85%
+floor for lines, functions, regions and branches. Join the
+[Argui Discord](https://discord.gg/xY9CWSc65) to discuss the project.
 
 ## License
 

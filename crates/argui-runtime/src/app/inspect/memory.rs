@@ -2,7 +2,10 @@ use super::Inspection;
 use argui_ui::{NodeId, UiTree};
 
 impl Inspection {
-    /// Read dense buffer capacities without walking nodes, maps or shared data.
+    /// Reads retained memory capacities without walking nodes or shared data.
+    ///
+    /// `tree`, `engine`, and `output` provide the retained UI, layout storage, and
+    /// most recent layout output whose capacities are measured.
     #[must_use]
     pub fn memory(
         tree: &UiTree,

@@ -16,19 +16,26 @@ pub mod http;
 pub mod install;
 
 #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
+/// Errors produced by the update transaction and its backends.
 pub enum Error {
     #[error("update cancelled")]
+    /// The operation observed a cancellation request.
     Cancelled,
     #[error("{0}")]
+    /// An operation was called before its required prior state.
     InvalidState(&'static str),
     #[error("{0}")]
+    /// A backend operation failed.
     Backend(String),
 }
 
 impl Error {
+    /// Converts a backend error to the updater's owned error type.
+    /// `error` is formatted into an owned message.
     pub fn backend(error: impl std::fmt::Display) -> Self {
         Self::Backend(error.to_string())
     }
 }
 
+/// Result type used by updater operations and backend implementations.
 pub type Result<T> = std::result::Result<T, Error>;

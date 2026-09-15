@@ -29,6 +29,8 @@ pub struct ToggleBehavior {
 }
 
 impl ToggleBehavior {
+    /// Creates toggle behavior with identity, accessible name, role and checked state.
+    /// `key` identifies matching events; `label` is the accessible name.
     #[must_use]
     pub fn new(
         key: impl Into<String>,
@@ -47,23 +49,27 @@ impl ToggleBehavior {
     }
 
     #[must_use]
+    /// Sets whether this toggle can be activated; `enabled` controls interaction availability.
     pub const fn enabled(mut self, enabled: bool) -> Self {
         self.enabled = enabled;
         self
     }
 
     #[must_use]
+    /// Supplies this option's one-based `position` in a set of `size` entries.
     pub const fn position_in_set(mut self, position: u32, size: u32) -> Self {
         self.position = Some((position, size));
         self
     }
 
     #[must_use]
+    /// Returns whether this toggle is enabled.
     pub const fn is_enabled(&self) -> bool {
         self.enabled
     }
 
     #[must_use]
+    /// Applies toggle interaction and semantics to `element` for `part`.
     pub fn decorate(&self, part: TogglePart, element: Element) -> Element {
         if part != TogglePart::Root {
             return element.semantic_hidden(true);
@@ -108,6 +114,7 @@ impl ToggleBehavior {
     }
 
     #[must_use]
+    /// Returns the checked-state action when `event` activates this enabled toggle.
     pub fn action(&self, event: &UiEvent) -> Option<ToggleAction> {
         (self.enabled
             && event.target_key() == Some(self.key.as_str())

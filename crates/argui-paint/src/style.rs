@@ -21,6 +21,8 @@ pub struct CornerRadii {
 }
 
 impl CornerRadii {
+    /// Creates equal radii for all four corners.
+    /// * `radius` — radius assigned to every corner.
     #[must_use]
     pub const fn all(radius: f32) -> Self {
         Self {
@@ -31,6 +33,7 @@ impl CornerRadii {
         }
     }
 
+    /// Returns radii in top-left, top-right, bottom-right, bottom-left order.
     #[must_use]
     pub const fn as_array(self) -> [f32; 4] {
         [
@@ -41,6 +44,7 @@ impl CornerRadii {
         ]
     }
 
+    /// Scales every corner radius by `factor`.
     #[must_use]
     pub const fn scaled(self, factor: f32) -> Self {
         Self {
@@ -61,6 +65,8 @@ pub struct BorderWidths {
 }
 
 impl BorderWidths {
+    /// Creates equal border widths on all edges.
+    /// * `width` — width assigned to each edge.
     #[must_use]
     pub const fn all(width: f32) -> Self {
         Self {
@@ -71,6 +77,7 @@ impl BorderWidths {
         }
     }
 
+    /// Returns widths in left, right, top, bottom order.
     #[must_use]
     pub const fn as_array(self) -> [f32; 4] {
         [self.left, self.right, self.top, self.bottom]
@@ -84,6 +91,7 @@ pub struct Border {
 }
 
 impl Border {
+    /// Creates a border with equal width on every edge and the supplied color.
     #[must_use]
     pub const fn all(width: f32, color: Color) -> Self {
         Self {
@@ -113,6 +121,8 @@ impl Default for QuadStyle {
 }
 
 impl QuadStyle {
+    /// Creates a style with a solid background and no border.
+    /// * `color` — solid background color.
     #[must_use]
     pub const fn solid(color: Color) -> Self {
         Self {
@@ -123,24 +133,28 @@ impl QuadStyle {
         }
     }
 
+    /// Sets the border.
     #[must_use]
     pub const fn border(mut self, border: Border) -> Self {
         self.border = Some(border);
         self
     }
 
+    /// Sets the corner radii.
     #[must_use]
     pub const fn radius(mut self, radii: CornerRadii) -> Self {
         self.radii = radii;
         self
     }
 
+    /// Sets the quad opacity.
     #[must_use]
     pub const fn opacity(mut self, opacity: f32) -> Self {
         self.opacity = opacity;
         self
     }
 
+    /// Returns whether a background or border is present.
     #[must_use]
     pub const fn is_visible(&self) -> bool {
         self.background.is_some() || self.border.is_some()
@@ -153,11 +167,13 @@ pub struct PaintStyle {
 }
 
 impl PaintStyle {
+    /// Creates a paint style from a quad style.
     #[must_use]
     pub const fn new(quad: QuadStyle) -> Self {
         Self { quad }
     }
 
+    /// Returns whether the contained quad style is visible.
     #[must_use]
     pub const fn is_visible(&self) -> bool {
         self.quad.is_visible()

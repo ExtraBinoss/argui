@@ -5,6 +5,10 @@ use crate::{Element, LayoutStyle, NodeId, ScrollConfig};
 use super::UiTree;
 
 impl UiTree {
+    /// Resolves a text style by applying current tree color state to `style`.
+    ///
+    /// * `node` — node whose style state is applied.
+    /// * `style` — authored text style.
     #[must_use]
     pub fn resolved_text_style(
         &self,
@@ -16,6 +20,10 @@ impl UiTree {
         style
     }
 
+    /// Resolves a text color through active transitions.
+    ///
+    /// * `node` — node whose transitions are applied.
+    /// * `color` — authored color.
     #[must_use]
     pub fn resolved_text_color(
         &self,
@@ -26,6 +34,10 @@ impl UiTree {
         color
     }
 
+    /// Resolves a vector color through active transitions.
+    ///
+    /// * `node` — node whose transitions are applied.
+    /// * `color` — authored color.
     #[must_use]
     pub fn resolved_vector_color(
         &self,
@@ -36,6 +48,10 @@ impl UiTree {
         color
     }
 
+    /// Resolves an element's quad paint style, transitions, and property bindings.
+    ///
+    /// * `node` — retained node identifier.
+    /// * `element` — element whose authored paint style is resolved.
     #[must_use]
     pub fn resolved_quad(&self, node: NodeId, element: &Element) -> QuadStyle {
         let mut resolved = element.paint.quad.clone();
@@ -50,6 +66,10 @@ impl UiTree {
         crate::binding::resolved_quad(&element.bindings, resolved)
     }
 
+    /// Resolves an element transform using active transitions and bindings.
+    ///
+    /// * `node` — retained node identifier.
+    /// * `element` — element whose authored transform is resolved.
     #[must_use]
     pub fn resolved_transform(&self, node: NodeId, element: &Element) -> argui_core::Transform2D {
         let mut transform = element.transform;
@@ -57,6 +77,10 @@ impl UiTree {
         crate::binding::resolved_transform(&element.bindings, transform)
     }
 
+    /// Resolves an element layout style using transitions, bindings, direction, and borders.
+    ///
+    /// * `node` — retained node identifier.
+    /// * `element` — element whose authored layout style is resolved.
     #[must_use]
     pub fn resolved_layout_style(&self, node: NodeId, element: &Element) -> LayoutStyle {
         let mut style = element.style.clone();
@@ -76,6 +100,10 @@ impl UiTree {
         style
     }
 
+    /// Resolves a scroll configuration's animated scrollbar styles.
+    ///
+    /// * `node` — retained scroll-container node.
+    /// * `config` — authored scroll configuration.
     #[must_use]
     pub fn resolved_scroll_config(&self, node: NodeId, config: &ScrollConfig) -> ScrollConfig {
         let mut resolved = config.clone();
@@ -99,6 +127,11 @@ impl UiTree {
         resolved
     }
 
+    /// Resolves a layer style using active transitions and element bindings.
+    ///
+    /// * `node` — retained node identifier.
+    /// * `element` — element providing property bindings.
+    /// * `layer` — authored layer style.
     #[must_use]
     pub fn resolved_layer(
         &self,

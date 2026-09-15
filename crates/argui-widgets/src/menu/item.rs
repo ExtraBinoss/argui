@@ -19,6 +19,7 @@ pub struct MenuItem {
 }
 
 impl MenuItem {
+    /// Creates an actionable entry with stable `id`, action `invocation`, and accessible `state`.
     pub fn new(id: impl Into<String>, invocation: ActionInvocation, state: ActionState) -> Self {
         Self {
             id: id.into(),
@@ -27,6 +28,7 @@ impl MenuItem {
             icon: None,
         }
     }
+    /// Creates a menu entry with stable `id`, accessible `state`, and supplied `kind`.
     pub fn entry(id: impl Into<String>, state: ActionState, kind: MenuItemKind) -> Self {
         Self {
             id: id.into(),
@@ -35,10 +37,12 @@ impl MenuItem {
             icon: None,
         }
     }
+    /// Sets the vector icon displayed beside this entry.
     pub fn icon(mut self, icon: argui_ui::VectorId) -> Self {
         self.icon = Some(icon);
         self
     }
+    /// Returns the action invocation for actionable entries.
     pub fn invocation(&self) -> Option<ActionInvocation> {
         if let MenuItemKind::Action(invocation) = self.kind {
             Some(invocation)
@@ -46,9 +50,11 @@ impl MenuItem {
             None
         }
     }
+    /// Returns whether this entry can be activated.
     pub fn enabled(&self) -> bool {
         self.state.enabled && !matches!(self.kind, MenuItemKind::Group(_) | MenuItemKind::Separator)
     }
+    /// Returns submenu or group children, or an empty slice for leaf entries.
     pub fn children(&self) -> &[MenuItem] {
         match &self.kind {
             MenuItemKind::Submenu(items) | MenuItemKind::Group(items) => items,

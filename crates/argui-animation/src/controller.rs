@@ -8,13 +8,19 @@ use std::{
 };
 
 #[derive(Clone, Debug, PartialEq)]
+/// Parameters for a finite, eased transition between two values.
 pub struct Tween {
+    /// Active interpolation duration.
     pub duration: Duration,
+    /// Delay before interpolation begins.
     pub delay: Duration,
+    /// Easing curve applied during interpolation.
     pub easing: Easing,
 }
 
 impl Tween {
+    /// Creates a tween of `duration` with no delay and linear easing.
+    /// Sets the delay before interpolation begins.
     #[must_use]
     pub const fn new(duration: Duration) -> Self {
         Self {
@@ -24,12 +30,14 @@ impl Tween {
         }
     }
 
+    /// Sets the delay before interpolation begins.
     #[must_use]
     pub const fn delay(mut self, delay: Duration) -> Self {
         self.delay = delay;
         self
     }
 
+    /// Sets the interpolation easing curve.
     #[must_use]
     pub fn easing(mut self, easing: Easing) -> Self {
         self.easing = easing;
@@ -38,26 +46,39 @@ impl Tween {
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+/// Lifecycle state of a [`Motion`].
 pub enum MotionState {
+    /// No animation has been started or a value was set directly.
     #[default]
     Idle,
+    /// The motion is advancing.
     Running,
+    /// The motion is paused.
     Paused,
+    /// The motion reached its target.
     Finished,
+    /// The motion was canceled.
     Canceled,
 }
 
+/// Cloneable, shared control handle for an animated value.
 #[derive(Clone)]
 pub struct Motion<T>(Arc<Mutex<MotionInner<T>>>);
 
 #[derive(Clone, Debug, PartialEq)]
+/// Associates a motion with its composition rule and priority.
 pub struct MotionBinding<T> {
+    /// Motion supplying the animated value.
     pub motion: Motion<T>,
+    /// How this value combines with other contributions.
     pub composition: Composition,
+    /// Composition priority; lower values are applied first.
     pub priority: i32,
 }
 
 impl<T> MotionBinding<T> {
+    /// Creates a binding using replacement composition and priority zero.
+    /// * `motion` — motion whose value and playback this binding exposes.
     #[must_use]
     pub fn new(motion: Motion<T>) -> Self {
         Self {
@@ -67,12 +88,14 @@ impl<T> MotionBinding<T> {
         }
     }
 
+    /// Sets the contribution composition rule.
     #[must_use]
     pub const fn composition(mut self, composition: Composition) -> Self {
         self.composition = composition;
         self
     }
 
+    /// Sets the contribution priority.
     #[must_use]
     pub const fn priority(mut self, priority: i32) -> Self {
         self.priority = priority;
@@ -126,6 +149,7 @@ impl<T> Motion<T> {
         self.0.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
+    /// Creates an idle motion initialized to `value`.
     #[must_use]
     pub fn new(value: T) -> Self
     where
@@ -142,6 +166,7 @@ impl<T> Motion<T> {
         })))
     }
 
+    /// Returns the current animated value.
     #[must_use]
     pub fn value(&self) -> T
     where
@@ -150,6 +175,7 @@ impl<T> Motion<T> {
         self.lock().value.clone()
     }
 
+    /// Returns the motion's current target.
     #[must_use]
     pub fn target(&self) -> T
     where
@@ -158,26 +184,31 @@ impl<T> Motion<T> {
         self.lock().target.clone()
     }
 
+    /// Returns the current lifecycle state.
     #[must_use]
     pub fn state(&self) -> MotionState {
         self.lock().state
     }
 
+    /// Returns whether the motion is currently running.
     #[must_use]
     pub fn is_active(&self) -> bool {
         self.state() == MotionState::Running
     }
 
+    /// Returns the number of completed timeline iterations.
     #[must_use]
     pub fn completed_iterations(&self) -> u64 {
         self.lock().completed_iterations
     }
 
+    /// Returns a stable identity for this shared motion handle.
     #[must_use]
     pub fn identity(&self) -> usize {
         Arc::as_ptr(&self.0).cast::<()>() as usize
     }
 
+    /// Replaces the current value and target, stopping any active animation.
     pub fn set(&self, value: T)
     where
         T: Clone,
@@ -191,6 +222,7 @@ impl<T> Motion<T> {
         inner.completed_iterations = 0;
     }
 
+    /// Cancels the current animation without changing the current value.
     pub fn cancel(&self) {
         let mut inner = self.lock();
         inner.driver = Driver::None;
@@ -198,6 +230,7 @@ impl<T> Motion<T> {
         inner.last_frame = None;
     }
 
+    /// Moves directly to the target and marks the motion finished.
     pub fn finish(&self)
     where
         T: Clone,
@@ -209,6 +242,7 @@ impl<T> Motion<T> {
         inner.last_frame = None;
     }
 
+    /// Pauses a running motion.
     pub fn pause(&self) {
         let mut inner = self.lock();
         if inner.state != MotionState::Running {
@@ -221,6 +255,7 @@ impl<T> Motion<T> {
         inner.state = MotionState::Paused;
     }
 
+    /// Resumes a paused motion; time spent paused is excluded from playback.
     pub fn resume(&self) {
         let mut inner = self.lock();
         if inner.state == MotionState::Paused {
@@ -230,6 +265,7 @@ impl<T> Motion<T> {
         }
     }
 
+    /// Starts the supplied timeline on this motion.
     pub fn play(&self, timeline: Timeline<T>)
     where
         T: Clone + Interpolate,
@@ -245,6 +281,7 @@ impl<T> Motion<T> {
 }
 
 impl<T: Clone + Interpolate + PartialEq> Motion<T> {
+    /// Animates the current value toward `target` using `tween`.
     pub fn animate_to(&self, target: T, tween: Tween) {
         let mut inner = self.lock();
         if tween.duration == Duration::ZERO {
@@ -265,11 +302,16 @@ impl<T: Clone + Interpolate + PartialEq> Motion<T> {
         inner.completed_iterations = 0;
     }
 
+    /// Sets `from` immediately and begins a new tween toward `target`.
     pub fn restart(&self, from: T, target: T, tween: Tween) {
         self.set(from);
         self.animate_to(target, tween);
     }
 
+    /// Samples the motion at `now`, returning whether its value changed.
+    ///
+    /// # Errors
+    /// Returns a timing error if the tween cannot be represented as a valid timeline.
     pub fn advance(&self, now: Time) -> Result<bool, TimingError> {
         let mut inner = self.lock();
         if inner.state != MotionState::Running {
@@ -328,6 +370,7 @@ impl<T: Clone + Interpolate + PartialEq> Motion<T> {
 }
 
 impl<T: MotionValue> Motion<T> {
+    /// Returns the current spring velocity, or the zero value for non-spring drivers.
     #[must_use]
     pub fn velocity(&self) -> T {
         match &self.lock().driver {
@@ -336,6 +379,11 @@ impl<T: MotionValue> Motion<T> {
         }
     }
 
+    /// Springs the current value toward `target` using `config`.
+    ///
+    /// # Errors
+    /// Returns a physics error if the spring configuration is invalid.
+    /// * `config` — spring physics and settling thresholds.
     pub fn spring_to(&self, target: T, config: SpringConfig) -> Result<(), crate::PhysicsError> {
         let mut inner = self.lock();
         let velocity = match &inner.driver {
@@ -359,6 +407,11 @@ impl<T: MotionValue> Motion<T> {
         Ok(())
     }
 
+    /// Sets `from` immediately and starts a spring toward `target`.
+    ///
+    /// # Errors
+    /// Returns a physics error if the spring configuration is invalid.
+    /// * `config` — spring physics and settling thresholds.
     pub fn restart_spring(
         &self,
         from: T,
@@ -369,6 +422,7 @@ impl<T: MotionValue> Motion<T> {
         self.spring_to(target, config)
     }
 
+    /// Advances a spring-driven motion at `now`, returning whether its value changed.
     pub fn advance_spring(&self, now: Time) -> bool {
         let mut inner = self.lock();
         if inner.state != MotionState::Running {
@@ -395,11 +449,17 @@ impl<T: MotionValue> Motion<T> {
     }
 }
 
+/// Type-erased operations used by animation scheduling.
 pub trait MotionTrack {
+    /// Returns the stable identity of this track.
     fn identity(&self) -> usize;
+    /// Returns whether this track is active.
     fn is_active(&self) -> bool;
+    /// Advances the track at `now`, returning whether its value changed.
     fn advance(&self, now: Time) -> bool;
+    /// Moves the track to its target and marks it finished.
     fn finish(&self);
+    /// Cancels the track without moving it to its target.
     fn cancel(&self);
 }
 

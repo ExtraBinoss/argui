@@ -1,16 +1,23 @@
 use argui_core::ColorScheme;
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+/// Origin from which a resolved system preference was obtained.
 pub enum PreferenceSource {
+    /// Explicit application override.
     Override,
+    /// Detected operating-system or browser setting.
     System,
+    /// Library fallback because no value was supplied or detected.
     #[default]
     Default,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Preference value together with its source.
 pub struct ResolvedPreference<T> {
+    /// Resolved preference value.
     pub value: T,
+    /// Source used to resolve the value.
     pub source: PreferenceSource,
 }
 
@@ -24,20 +31,29 @@ impl<T: Default> Default for ResolvedPreference<T> {
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+/// Explicit overrides for system appearance and accessibility settings.
 pub struct PreferenceOverrides {
+    /// Preferred color scheme, if overridden.
     pub color_scheme: Option<ColorScheme>,
+    /// Reduced-motion preference, if overridden.
     pub reduced_motion: Option<bool>,
+    /// High-contrast preference, if overridden.
     pub high_contrast: Option<bool>,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+/// Current resolved appearance and accessibility settings.
 pub struct SystemPreferences {
+    /// Resolved color scheme.
     pub color_scheme: ResolvedPreference<ColorScheme>,
+    /// Resolved reduced-motion setting.
     pub reduced_motion: ResolvedPreference<bool>,
+    /// Resolved high-contrast setting.
     pub high_contrast: ResolvedPreference<bool>,
 }
 
 impl SystemPreferences {
+    /// Detects system settings and resolves them against explicit overrides.
     #[must_use]
     pub fn detect(overrides: PreferenceOverrides) -> Self {
         let system = system_preferences();
@@ -49,6 +65,7 @@ impl SystemPreferences {
     }
 
     /// Publishes the current preferences and subsequent native system changes.
+    /// `overrides` takes precedence over detected values; `publish` receives each resolved snapshot.
     #[cfg(not(target_arch = "wasm32"))]
     #[cfg_attr(coverage_nightly, coverage(off))]
     pub fn watch(overrides: PreferenceOverrides, mut publish: impl FnMut(Self) + Send + 'static) {

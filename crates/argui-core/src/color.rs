@@ -1,20 +1,29 @@
 use core::fmt;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
+/// An RGBA color stored in linear-light sRGB coordinates.
 pub struct Color([f32; 4]);
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+/// Color space used when interpolating color channels.
 pub enum ColorInterpolation {
+    /// Perceptually uniform Oklab coordinates.
     #[default]
     Oklab,
+    /// Linear-light sRGB coordinates.
     LinearSrgb,
+    /// Gamma-encoded sRGB coordinates.
     Srgb,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Error returned when parsing a hexadecimal color string fails.
 pub enum ParseColorError {
+    /// The input does not start with `#`.
     MissingHash,
+    /// The input has a number of hexadecimal digits other than 3, 4, 6, or 8.
     InvalidLength,
+    /// One or more digits are not hexadecimal.
     InvalidDigit,
 }
 
@@ -35,15 +44,24 @@ impl fmt::Display for ParseColorError {
 impl std::error::Error for ParseColorError {}
 
 impl Color {
+    /// Fully transparent black.
     pub const TRANSPARENT: Self = Self::linear_rgba(0.0, 0.0, 0.0, 0.0);
+    /// Opaque black.
     pub const BLACK: Self = Self::linear_rgb(0.0, 0.0, 0.0);
+    /// Opaque white.
     pub const WHITE: Self = Self::linear_rgb(1.0, 1.0, 1.0);
 
+    /// Creates an opaque color from gamma-encoded sRGB channels.
+    /// Each channel is expected in the conventional 0.0–1.0 range.
+    /// * `red`, `green`, `blue` — gamma-encoded color channels.
     #[must_use]
     pub fn srgb(red: f32, green: f32, blue: f32) -> Self {
         Self::srgba(red, green, blue, 1.0)
     }
 
+    /// Creates a color from gamma-encoded sRGB channels and alpha.
+    /// Channels are expected in the conventional 0.0–1.0 range.
+    /// * `red`, `green`, `blue` — gamma-encoded color channels; `alpha` — opacity.
     #[must_use]
     pub fn srgba(red: f32, green: f32, blue: f32, alpha: f32) -> Self {
         Self::linear_rgba(
@@ -54,21 +72,29 @@ impl Color {
         )
     }
 
+    /// Creates an opaque color from linear-light sRGB channels.
+    /// * `red`, `green`, `blue` — linear-light color channels.
     #[must_use]
     pub const fn linear_rgb(red: f32, green: f32, blue: f32) -> Self {
         Self::linear_rgba(red, green, blue, 1.0)
     }
 
+    /// Creates a color from linear-light sRGB channels and alpha.
+    /// * `red`, `green`, `blue` — linear-light color channels; `alpha` — opacity.
     #[must_use]
     pub const fn linear_rgba(red: f32, green: f32, blue: f32, alpha: f32) -> Self {
         Self([red, green, blue, alpha])
     }
 
+    /// Creates an opaque color from 8-bit gamma-encoded sRGB channels.
+    /// * `red`, `green`, `blue` — 8-bit gamma-encoded color channels.
     #[must_use]
     pub fn from_srgb8(red: u8, green: u8, blue: u8) -> Self {
         Self::from_srgba8(red, green, blue, u8::MAX)
     }
 
+    /// Creates a color from 8-bit gamma-encoded sRGB channels and alpha.
+    /// * `red`, `green`, `blue` — 8-bit gamma-encoded channels; `alpha` — 8-bit opacity.
     #[must_use]
     pub fn from_srgba8(red: u8, green: u8, blue: u8, alpha: u8) -> Self {
         Self::srgba(
@@ -79,6 +105,11 @@ impl Color {
         )
     }
 
+    /// Parses `#RGB`, `#RGBA`, `#RRGGBB`, or `#RRGGBBAA` notation.
+    /// * `value` — hexadecimal color string to parse.
+    ///
+    /// # Errors
+    /// Returns [`ParseColorError`] when the hash prefix, length, or digits are invalid.
     pub fn from_hex(value: &str) -> Result<Self, ParseColorError> {
         let digits = value
             .strip_prefix('#')
@@ -119,11 +150,13 @@ impl Color {
     }
 
     #[must_use]
+    /// Returns the stored linear-light RGBA channels.
     pub const fn to_linear_rgba(self) -> [f32; 4] {
         self.0
     }
 
     #[must_use]
+    /// Converts the color to gamma-encoded sRGB channels and alpha.
     pub fn to_srgba(self) -> [f32; 4] {
         let [red, green, blue, alpha] = self.0;
         [
@@ -135,16 +168,19 @@ impl Color {
     }
 
     #[must_use]
+    /// Converts the color to 8-bit gamma-encoded sRGB and alpha channels.
     pub fn to_srgba8(self) -> [u8; 4] {
         self.to_srgba().map(unit_to_byte)
     }
 
     #[must_use]
+    /// Returns this color with `alpha`, preserving its RGB channels.
     pub const fn with_alpha(self, alpha: f32) -> Self {
         Self([self.0[0], self.0[1], self.0[2], alpha])
     }
 
     #[must_use]
+    /// Interpolates toward `target` by `progress` in the chosen color space.
     pub fn mix(self, target: Self, progress: f32, space: ColorInterpolation) -> Self {
         let alpha = lerp(self.0[3], target.0[3], progress);
         let left = coordinates(self, space);
@@ -162,12 +198,15 @@ impl Color {
     }
 
     #[must_use]
+    /// Returns RGB coordinates in `space`, followed by the alpha channel.
     pub fn to_interpolation_components(self, space: ColorInterpolation) -> [f32; 4] {
         let coordinates = coordinates(self, space);
         [coordinates[0], coordinates[1], coordinates[2], self.0[3]]
     }
 
     #[must_use]
+    /// Creates a color from RGB coordinates in `space` and an alpha channel.
+    /// * `components` — red, green, blue, and alpha interpolation components.
     pub fn from_interpolation_components(components: [f32; 4], space: ColorInterpolation) -> Self {
         from_coordinates(
             [components[0], components[1], components[2]],
@@ -177,11 +216,13 @@ impl Color {
     }
 
     #[must_use]
+    /// Returns relative luminance using the linear-light sRGB coefficients.
     pub fn relative_luminance(self) -> f32 {
         0.2126 * self.0[0] + 0.7152 * self.0[1] + 0.0722 * self.0[2]
     }
 
     #[must_use]
+    /// Returns the WCAG contrast ratio between this color and `other`.
     pub fn contrast_ratio(self, other: Self) -> f32 {
         let lighter = self.relative_luminance().max(other.relative_luminance());
         let darker = self.relative_luminance().min(other.relative_luminance());

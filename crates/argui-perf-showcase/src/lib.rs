@@ -12,6 +12,7 @@ use argui::{
 
 const ROWS: usize = 1_000_000;
 
+/// Retained-tree performance laboratory with counter and virtual-list examples.
 pub struct PerfShowcase {
     counter: Entity<CounterLab>,
     fixed: Entity<FixedListLab>,
@@ -216,6 +217,11 @@ fn text(size: f32, color: TextColor, weight: u16) -> TextStyle {
 
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen::prelude::wasm_bindgen(start)]
+/// Starts the performance laboratory in a WebAssembly browser runtime.
+///
+/// # Errors
+///
+/// Returns a JavaScript error if runtime startup fails.
 pub fn start() -> Result<(), wasm_bindgen::JsValue> {
     use argui::{
         platform::{ApplicationConfig, ApplicationIdentity, WindowConfig},

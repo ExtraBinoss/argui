@@ -2,6 +2,9 @@ use std::{cell::RefCell, ops::Range, rc::Rc};
 
 use crate::{Axes, Dimension, Element, Overflow, ScrollConfig};
 
+mod fenwick;
+use fenwick::Fenwick;
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct VirtualWindow {
     pub range: Range<usize>,
@@ -66,6 +69,13 @@ struct VariableExtents {
 }
 
 impl VirtualList {
+    /// Creates a list whose items share one fixed extent.
+    ///
+    /// # Arguments
+    ///
+    /// * `item_count` — initial number of items.
+    /// * `item_extent` — extent of each item in logical pixels.
+    /// * `viewport_extent` — viewport extent along the list axis.
     #[must_use]
     pub fn fixed(item_count: usize, item_extent: f32, viewport_extent: f32) -> Self {
         Self::from_extents(
@@ -75,6 +85,13 @@ impl VirtualList {
         )
     }
 
+    /// Creates a list with variable item extents initialized to one estimate.
+    ///
+    /// # Arguments
+    ///
+    /// * `item_count` — initial number of items.
+    /// * `estimated_extent` — initial extent used until an item is measured.
+    /// * `viewport_extent` — viewport extent along the list axis.
     #[must_use]
     pub fn variable(item_count: usize, estimated_extent: f32, viewport_extent: f32) -> Self {
         let estimate = sanitize_extent(estimated_extent);
@@ -103,6 +120,7 @@ impl VirtualList {
         }
     }
 
+    /// Returns the current number of items in the list.
     #[must_use]
     pub fn item_count(&self) -> usize {
         match &self.extents {
@@ -111,30 +129,38 @@ impl VirtualList {
         }
     }
 
+    /// Returns the viewport extent along the list axis.
     #[must_use]
     pub const fn viewport_extent(&self) -> f32 {
         self.viewport_extent
     }
 
-    /// Resizes a viewport while retaining shared variable measurements.
+    /// Resizes the viewport while retaining shared variable measurements.
+    /// `extent` is the new viewport extent in logical pixels.
     #[must_use]
     pub fn with_viewport(mut self, extent: f32) -> Self {
         self.viewport_extent = extent.max(0.0);
         self
     }
 
+    /// Sets the number of extra items kept around the visible window.
+    /// `overscan` is the number of items retained outside the visible range.
     #[must_use]
     pub const fn overscan(mut self, overscan: usize) -> Self {
         self.overscan = overscan;
         self
     }
 
+    /// Sets the scrolling configuration used by a built list.
+    /// `scroll` configures scroll behavior for the generated container.
     #[must_use]
     pub fn scroll_config(mut self, scroll: ScrollConfig) -> Self {
         self.scroll = scroll;
         self
     }
 
+    /// Returns the extent of an item, or `None` when its index is out of range.
+    /// `index` is the zero-based item index.
     #[must_use]
     pub fn item_extent(&self, index: usize) -> Option<f32> {
         (index < self.item_count())
@@ -142,6 +168,8 @@ impl VirtualList {
             .flatten()
     }
 
+    /// Returns whether an item has a measured extent.
+    /// `index` is the zero-based item index.
     #[must_use]
     pub fn is_measured(&self, index: usize) -> bool {
         match &self.extents {
@@ -152,11 +180,13 @@ impl VirtualList {
         }
     }
 
+    /// Returns the total estimated or measured extent of all items.
     #[must_use]
     pub fn total_extent(&self) -> f32 {
         self.extents.total(self.item_count())
     }
 
+    /// Returns the configured fixed extent or initial variable-item estimate.
     #[must_use]
     pub fn estimated_extent(&self) -> f32 {
         match self.extents {
@@ -165,11 +195,15 @@ impl VirtualList {
         }
     }
 
+    /// Returns the content offset at the beginning of an item index.
+    /// `index` is clamped to the current item count.
     #[must_use]
     pub fn offset_of(&self, index: usize) -> f32 {
         self.extents.prefix(index.min(self.item_count()))
     }
 
+    /// Returns the item containing an offset, or `None` for an empty list.
+    /// `offset` is the current content offset in logical pixels.
     #[must_use]
     pub fn item_at_offset(&self, offset: f32) -> Option<usize> {
         let item_count = self.item_count();
@@ -180,6 +214,8 @@ impl VirtualList {
         })
     }
 
+    /// Returns the half-open item range intersecting the viewport at an offset.
+    /// `offset` is the current content offset in logical pixels.
     #[must_use]
     pub fn visible_range(&self, offset: f32) -> Range<usize> {
         let start = self.item_at_offset(offset).unwrap_or(0);
@@ -190,6 +226,8 @@ impl VirtualList {
         start..end.max(start).min(self.item_count())
     }
 
+    /// Computes the mounted item window and extents before and after it.
+    /// `offset` is the current content offset in logical pixels.
     #[must_use]
     pub fn window(&self, offset: f32) -> VirtualWindow {
         let total = self.total_extent();
@@ -239,6 +277,8 @@ impl VirtualList {
         }
     }
 
+    /// Computes a clamped offset that reveals `index` using `align`, relative to
+    /// `current_offset`; offsets are in logical pixels.
     #[must_use]
     pub fn scroll_to(&self, index: usize, align: VirtualAlignment, current_offset: f32) -> f32 {
         let item_count = self.item_count();
@@ -260,6 +300,13 @@ impl VirtualList {
         target.clamp(0.0, (self.total_extent() - self.viewport_extent).max(0.0))
     }
 
+    /// Records a measured item extent and corrects the scroll offset to preserve its anchor.
+    ///
+    /// * `index` — zero-based item index that was measured.
+    /// * `extent` — measured item extent in logical pixels.
+    /// * `offset` — current content offset before correction.
+    ///
+    /// Returns whether the measurement changed and the corrected offset.
     pub fn measure(&mut self, index: usize, extent: f32, offset: f32) -> MeasurementUpdate {
         let Extents::Variable { state, .. } = &self.extents else {
             return MeasurementUpdate {
@@ -276,6 +323,10 @@ impl VirtualList {
         )
     }
 
+    /// Inserts estimated items at an index and updates the list length.
+    ///
+    /// * `index` — insertion position, clamped to the current list length.
+    /// * `count` — number of items to insert.
     pub fn insert(&mut self, index: usize, count: usize) {
         let item_count = self.item_count();
         let index = index.min(item_count);
@@ -303,6 +354,9 @@ impl VirtualList {
         self.item_count = item_count.saturating_add(count);
     }
 
+    /// Removes a range of items and their retained measurements.
+    ///
+    /// * `range` — half-open range of item indices to remove.
     pub fn remove(&mut self, range: Range<usize>) {
         let item_count = self.item_count();
         let start = range.start.min(item_count);
@@ -321,6 +375,8 @@ impl VirtualList {
 
     /// Reorder retained measurements. New entries (`None`) start at the estimate.
     /// Call when data changes, before rebuilding mounted rows; all handles share the update.
+    ///
+    /// * `order` — old item index for each new position, or `None` for a new item.
     pub fn remap(&mut self, order: impl IntoIterator<Item = Option<usize>>) {
         match &mut self.extents {
             Extents::Fixed(_) => self.item_count = order.into_iter().count(),
@@ -350,6 +406,11 @@ impl VirtualList {
         }
     }
 
+    /// Builds a scrollable element containing the mounted window.
+    ///
+    /// * `key` — stable key for the list container.
+    /// * `offset` — current content offset along the list axis.
+    /// * `item` — callback that builds each mounted item by index.
     #[must_use]
     pub fn build(
         &self,
@@ -362,6 +423,13 @@ impl VirtualList {
 
     /// Keeps one active or edited row mounted outside the visible window.
     /// Only the window and the pinned row are visited; gaps retain their measured extent.
+    ///
+    /// # Arguments
+    ///
+    /// * `key` — stable key for the list container.
+    /// * `offset` — current content offset along the list axis.
+    /// * `pinned` — optional item index to keep mounted outside the visible window.
+    /// * `item` — callback that builds a mounted item by index.
     #[must_use]
     pub fn build_pinned(
         &self,
@@ -439,6 +507,12 @@ impl Extents {
 }
 
 impl VirtualItem {
+    /// Records the measured extent for this mounted item.
+    ///
+    /// * `extent` — measured extent in logical pixels.
+    /// * `offset` — current content offset, corrected to preserve the anchor.
+    ///
+    /// Returns whether the shared measurement changed and the corrected offset.
     #[must_use]
     pub fn measure_layout(&self, extent: f32, offset: f32) -> MeasurementUpdate {
         measure_variable(
@@ -485,75 +559,6 @@ fn spacer(height: f32) -> Element {
         .height(Dimension::length(height))
         .shrink(0.0)
         .semantic_hidden(true)
-}
-
-#[derive(Clone, Debug, PartialEq)]
-struct Fenwick {
-    tree: Vec<f32>,
-}
-
-impl Fenwick {
-    fn uniform(len: usize, value: f32) -> Self {
-        Self::from_values(&vec![value; len])
-    }
-
-    fn from_values(values: &[f32]) -> Self {
-        let mut result = Self {
-            tree: vec![0.0; values.len() + 1],
-        };
-        for (index, value) in values.iter().copied().enumerate() {
-            result.add(index, value);
-        }
-        result
-    }
-
-    fn add(&mut self, index: usize, delta: f32) {
-        let mut cursor = index + 1;
-        while cursor < self.tree.len() {
-            self.tree[cursor] += delta;
-            cursor += cursor & cursor.wrapping_neg();
-        }
-    }
-
-    fn push(&mut self, value: f32) {
-        let position = self.tree.len();
-        let width = position & position.wrapping_neg();
-        let start = position - width;
-        let previous = self.sum(position - 1) - self.sum(start);
-        self.tree.push(previous + value);
-    }
-
-    fn sum(&self, end: usize) -> f32 {
-        let mut cursor = end.min(self.tree.len().saturating_sub(1));
-        let mut sum = 0.0;
-        while cursor != 0 {
-            sum += self.tree[cursor];
-            cursor &= cursor - 1;
-        }
-        sum
-    }
-
-    fn total(&self) -> f32 {
-        self.sum(self.tree.len().saturating_sub(1))
-    }
-
-    fn lower_bound(&self, target: f32, count: usize) -> usize {
-        if count == 0 || target <= 0.0 {
-            return 0;
-        }
-        let mut index = 0;
-        let mut accumulated = 0.0;
-        let mut bit = count.next_power_of_two();
-        while bit != 0 {
-            let next = index + bit;
-            if next <= count && accumulated + self.tree[next] <= target {
-                index = next;
-                accumulated += self.tree[next];
-            }
-            bit >>= 1;
-        }
-        index.min(count.saturating_sub(1))
-    }
 }
 
 fn sanitize_extent(extent: f32) -> f32 {

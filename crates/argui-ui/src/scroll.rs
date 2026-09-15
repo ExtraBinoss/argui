@@ -39,6 +39,11 @@ pub struct ScrollRegion {
 }
 
 #[must_use]
+/// Finds the topmost enabled scrollbar containing a point and not occluded by a later hit region.
+///
+/// * `point` — pointer position in window coordinates.
+/// * `scroll_regions` — scroll regions and their scrollbar geometry.
+/// * `hit_regions` — hit-test regions used to determine occlusion.
 pub fn scrollbar_at<'a>(
     point: Point,
     scroll_regions: &'a [ScrollRegion],
@@ -60,6 +65,7 @@ pub fn scrollbar_at<'a>(
 }
 
 impl ScrollRegion {
+    /// Returns whether a point lies inside this region's bounds, clip, and clip chain.
     #[must_use]
     pub fn contains(&self, point: Point) -> bool {
         self.local_point(point)
@@ -67,6 +73,7 @@ impl ScrollRegion {
             && self.clips.contains(point)
     }
 
+    /// Returns whether a point lies over the track or thumb of this region's scrollbar.
     #[must_use]
     pub fn scrollbar_contains(&self, point: Point) -> bool {
         self.clips.contains(point)
@@ -77,6 +84,9 @@ impl ScrollRegion {
             })
     }
 
+    /// Converts a window-space point into this region's local coordinates.
+    ///
+    /// Returns `None` when the region transform is not invertible.
     #[must_use]
     pub fn local_point(&self, point: Point) -> Option<Point> {
         self.transform

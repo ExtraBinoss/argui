@@ -34,6 +34,10 @@ pub struct DomTree {
 
 impl DomTree {
     /// Updates the native password control without storing its secret in semantic snapshots.
+    ///
+    /// # Arguments
+    /// * `id` — semantic identifier of the protected control.
+    /// * `value` — current secret to place in the native password field.
     pub fn set_protected_value(&self, id: SemanticNodeId, value: &str) {
         if let Some(node) = self.nodes.get(&id)
             && let Some(input) = node.element.dyn_ref::<HtmlInputElement>()
@@ -43,6 +47,16 @@ impl DomTree {
             input.set_value(value);
         }
     }
+    /// Creates and attaches an accessibility DOM tree for a canvas.
+    ///
+    /// # Arguments
+    /// * `canvas` — canvas whose accessible representation is being managed.
+    /// * `snapshot` — initial semantic tree to expose.
+    /// * `on_action` — callback invoked for supported assistive-technology actions.
+    ///
+    /// # Errors
+    /// Returns a JavaScript error if the canvas is detached, required DOM elements cannot be
+    /// created, or DOM attributes/styles cannot be applied.
     pub fn new(
         canvas: HtmlCanvasElement,
         snapshot: SemanticTree,
@@ -86,6 +100,16 @@ impl DomTree {
         Ok(tree)
     }
 
+    /// Applies changes from the current snapshot to `next` in the accessibility DOM.
+    ///
+    /// # Arguments
+    /// * `next` — semantic snapshot to expose after synchronization.
+    ///
+    /// # Returns
+    /// `true` if semantic changes were applied, or `false` if the snapshot was unchanged.
+    ///
+    /// # Errors
+    /// Returns a JavaScript error if DOM positioning or patch application fails.
     pub fn sync(&mut self, next: SemanticTree) -> Result<bool, JsValue> {
         self.position_root()?;
         let patch = self.snapshot.diff(&next);

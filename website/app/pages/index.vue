@@ -8,6 +8,7 @@ import {
   RefreshCw,
   Sparkles,
 } from '@lucide/vue'
+import catalogue from '~/data/catalogue.json'
 import { composeExample, sourceUrl } from '~/data/project'
 const { t } = useI18n()
 const asset = usePublicAsset()
@@ -25,6 +26,7 @@ const components = [
   { slug: 'dialog', name: 'Dialog', icon: Layers },
   { slug: 'updater', name: 'Updater', icon: RefreshCw },
 ]
+const componentCount = catalogue.filter((item) => item.category === 'Components').length
 </script>
 <template>
   <main id="main-content">
@@ -39,7 +41,7 @@ const components = [
         </div>
       </div>
       <div class="hero-actions">
-        <ActionLink to="/get-started">{{ t('home.code') }}</ActionLink>
+        <ActionLink to="/docs/start/installation">{{ t('home.code') }}</ActionLink>
         <ActionLink to="/components" variant="secondary">{{ t('home.gallery') }}</ActionLink>
       </div>
       <div class="hero-preview">
@@ -116,7 +118,7 @@ const components = [
     </section>
     <section class="component-teaser container">
       <div class="section-heading">
-        <h2>{{ t('home.componentsTitle') }}</h2>
+        <h2>{{ t('home.componentsTitle', { count: componentCount }) }}</h2>
         <ActionLink to="/components" variant="text">{{ t('home.browseAll') }}</ActionLink>
       </div>
       <div class="teaser-grid">
@@ -167,13 +169,15 @@ const components = [
       <div>
         <h2>{{ t('home.codeTitle') }}</h2>
         <p>{{ t('home.codeBody') }}</p>
-        <ActionLink to="/get-started" variant="text">{{ t('nav.start') }}</ActionLink>
+        <ActionLink to="/docs/start/installation" variant="text">
+          {{ t('home.code') }}
+        </ActionLink>
       </div>
       <CodeBlock :code="composeExample" filename="view.rs" />
     </section>
     <section class="closing-section container">
       <h2>{{ t('home.closing') }}</h2>
-      <ActionLink to="/get-started">{{ t('home.closingLink') }}</ActionLink>
+      <ActionLink to="/docs/start/installation">{{ t('home.closingLink') }}</ActionLink>
     </section>
   </main>
 </template>

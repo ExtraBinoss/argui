@@ -15,6 +15,12 @@ pub struct VList {
 }
 
 impl VList {
+    /// Creates a fixed-height virtual list with viewport and initial scroll offset.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `row_height` is non-finite or not positive.
+    /// `key` identifies the viewport; `viewport` is its height and `offset` its initial scroll position.
     #[must_use]
     pub fn new(key: impl Into<String>, row_height: f32, viewport: f32, offset: f32) -> Self {
         assert!(row_height.is_finite() && row_height > 0.0);
@@ -30,6 +36,8 @@ impl VList {
     }
 
     /// Keep `config` in application state; clones share measured row heights.
+    /// `offset` is the initial vertical scroll position.
+    /// `key` identifies the viewport.
     #[must_use]
     pub fn variable(key: impl Into<String>, config: &VirtualList, offset: f32) -> Self {
         let mut list = Self::new(
@@ -43,6 +51,7 @@ impl VList {
     }
 
     /// Builds selectable rows with the same behavior as a non-virtual List.
+    /// `collection` supplies items, `state` supplies controlled selection, `multiple` enables multi-selection, `theme` styles rows, and `row` builds them.
     #[must_use]
     pub fn build_list(
         &self,
@@ -68,6 +77,11 @@ impl VList {
     }
 
     #[must_use]
+    /// Returns the virtual-list configuration for `count` rows.
+    ///
+    /// # Panics
+    ///
+    /// Panics when a retained variable-height configuration has a different item count.
     pub fn config(&self, count: usize) -> VirtualList {
         if let Some(config) = &self.variable {
             assert_eq!(
@@ -82,18 +96,21 @@ impl VList {
     }
 
     #[must_use]
+    /// Adds one scroll effect to the viewport.
     pub fn effect(mut self, effect: argui_ui::ScrollEffect) -> Self {
         self.effects.push(effect);
         self
     }
 
     #[must_use]
+    /// Adds each supplied `effects` scroll effect to the viewport.
     pub fn effects(mut self, effects: impl IntoIterator<Item = argui_ui::ScrollEffect>) -> Self {
         self.effects.extend(effects);
         self
     }
 
     /// Controls whether unused scroll input can reach an enclosing viewport.
+    /// `propagation` selects the scroll chaining policy.
     #[must_use]
     pub fn propagation(mut self, propagation: argui_ui::ScrollPropagation) -> Self {
         self.propagation = propagation;
@@ -101,6 +118,7 @@ impl VList {
     }
 
     #[must_use]
+    /// Builds a virtual viewport for `count` rows using `theme`, rendering each through `row`.
     pub fn build(
         &self,
         count: usize,
@@ -111,6 +129,8 @@ impl VList {
     }
 
     /// Keeps the active row mounted when it leaves the virtual window.
+    /// `pinned` is the optional row index to retain outside the visible window.
+    /// `count` is the number of rows and `theme` supplies scroll styling.
     #[must_use]
     pub fn build_pinned(
         &self,
@@ -135,6 +155,8 @@ impl VList {
 
     /// Scrolls a non-virtual header and virtual rows in one viewport.
     /// `header_extent` is the measured height of the header, including its spacing.
+    /// `header` is the fixed element above rows; `row` builds each virtual row.
+    /// `count` is the number of virtual rows and `theme` supplies scroll styling.
     #[must_use]
     pub fn build_with_header(
         &self,

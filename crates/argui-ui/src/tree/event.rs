@@ -45,6 +45,13 @@ impl EventRegistry {
 }
 
 impl UiTree {
+    /// Creates event deliveries for listeners along the target's propagation path.
+    ///
+    /// * `target` — retained node receiving the event.
+    /// * `kind` — event kind and payload to dispatch.
+    ///
+    /// Returns deliveries in propagation order, or an empty vector for an unknown
+    /// target or a click on an unavailable input.
     pub fn event_deliveries(&mut self, target: NodeId, kind: UiEventKind) -> Vec<UiEvent> {
         let Some(target_index) = self.index.position(target) else {
             return Vec::new();

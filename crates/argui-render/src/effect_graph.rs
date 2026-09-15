@@ -45,6 +45,16 @@ pub struct EffectGraphAnalysis {
 }
 
 /// Validates and analyzes a display list without creating GPU resources.
+///
+/// # Arguments
+/// * `display_list` — commands to validate and analyze.
+/// * `text_ranges` — prepared text ranges referenced by text commands.
+/// * `viewport` — target dimensions in physical pixels.
+/// * `scale_factor` — logical-to-physical scale.
+/// * `content_revision` — revision key used for retained content.
+///
+/// # Errors
+/// Returns an error if the display list contains invalid commands or references.
 pub fn analyze_display_list(
     display_list: &DisplayList,
     text_ranges: &[Range<u32>],

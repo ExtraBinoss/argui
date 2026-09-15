@@ -49,6 +49,6 @@ const features = [
       </ActionLink>
     </div>
     <p class="experimental-note">{{ t('features.experimental') }}</p>
-    <ActionLink to="/get-started">{{ t('nav.start') }}</ActionLink>
+    <ActionLink to="/docs/start/installation">{{ t('home.code') }}</ActionLink>
   </main>
 </template>

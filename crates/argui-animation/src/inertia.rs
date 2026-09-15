@@ -1,9 +1,13 @@
 use crate::{Decay, DecayConfig, Duration, PhysicsError, Spring, SpringConfig};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
+/// Decay, bounce, and optional bounds settings for inertial motion.
 pub struct InertiaConfig {
+    /// Exponential decay parameters used before reaching a bound.
     pub decay: DecayConfig,
+    /// Spring parameters used when bouncing at a bound.
     pub bounce: SpringConfig,
+    /// Optional inclusive minimum and maximum position.
     pub bounds: Option<(f32, f32)>,
 }
 
@@ -22,6 +26,10 @@ impl Default for InertiaConfig {
 }
 
 impl InertiaConfig {
+    /// Validates nested configurations and optional bounds.
+    ///
+    /// # Errors
+    /// Returns a physics error if the decay, bounce, or bounds are invalid.
     pub fn validate(self) -> Result<Self, PhysicsError> {
         self.decay.validate()?;
         self.bounce.validate()?;
@@ -36,14 +44,19 @@ impl InertiaConfig {
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+/// Current phase of an inertial motion.
 pub enum InertiaState {
+    /// The motion has settled.
     #[default]
     Settled,
+    /// Velocity is decaying freely.
     Decaying,
+    /// A spring is returning the value to a bound.
     Bouncing,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
+/// One-dimensional inertial motion with optional spring bounds.
 pub struct Inertia {
     decay: Decay<f32>,
     spring: Option<Spring<f32>>,
@@ -52,6 +65,10 @@ pub struct Inertia {
 }
 
 impl Inertia {
+    /// Creates inertial motion from `value` and `velocity` using `config`.
+    ///
+    /// # Errors
+    /// Returns a physics error when any configuration value is invalid.
     pub fn new(value: f32, velocity: f32, config: InertiaConfig) -> Result<Self, PhysicsError> {
         let config = config.validate()?;
         let decay = Decay::new(value, velocity, config.decay)?;
@@ -75,28 +92,33 @@ impl Inertia {
         })
     }
 
+    /// Returns the current position.
     #[must_use]
     pub fn value(&self) -> f32 {
         self.spring
             .map_or_else(|| self.decay.value(), |spring| spring.value())
     }
 
+    /// Returns the current velocity.
     #[must_use]
     pub fn velocity(&self) -> f32 {
         self.spring
             .map_or_else(|| self.decay.velocity(), |spring| spring.velocity())
     }
 
+    /// Returns the current inertial phase.
     #[must_use]
     pub const fn state(&self) -> InertiaState {
         self.state
     }
 
+    /// Returns whether the motion is decaying or bouncing.
     #[must_use]
     pub fn is_active(&self) -> bool {
         self.state != InertiaState::Settled
     }
 
+    /// Advances the motion by `elapsed`; returns whether its value changed.
     pub fn advance(&mut self, elapsed: Duration) -> bool {
         match &mut self.spring {
             Some(spring) => {
@@ -127,6 +149,7 @@ impl Inertia {
         }
     }
 
+    /// Restarts the motion from `value` with the supplied `velocity`.
     pub fn launch(&mut self, value: f32, velocity: f32) {
         *self = Self::new(value, velocity, self.config)
             .expect("an existing inertia always retains valid configuration");

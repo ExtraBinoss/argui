@@ -16,6 +16,10 @@ pub struct ScopedEffect {
 }
 
 impl ScopedEffect {
+    /// Associates a layer effect with the selected part of an element.
+    ///
+    /// * `scope` — element region where the effect is applied.
+    /// * `layer` — effect layer configuration.
     #[must_use]
     pub const fn new(scope: EffectScope, layer: LayerStyle) -> Self {
         Self { scope, layer }

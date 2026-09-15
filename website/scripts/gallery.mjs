@@ -5,17 +5,18 @@ import { resolve } from 'node:path'
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
 const destination = resolve(root, 'website/public/gallery')
-const exampleDestination = resolve(root, 'website/public/examples/ai-harness')
+const aiDestination = resolve(root, 'website/public/examples/ai-harness')
+const docsDestination = resolve(root, 'website/public/examples/docs')
 const wasmEnvironment = {
   ...process.env,
   CARGO_BUILD_JOBS: '6',
   BINARYEN_CORES: '6',
-  CARGO_TARGET_DIR: resolve(root, 'target/website-wasm'),
 }
 if (process.argv.includes('--check')) {
   try {
     await access(resolve(destination, 'pkg/argui_widget_gallery_bg.wasm'))
-    await access(resolve(exampleDestination, 'pkg/argui_example_ai_harness_bg.wasm'))
+    await access(resolve(aiDestination, 'pkg/argui_example_ai_harness_bg.wasm'))
+    await access(resolve(docsDestination, 'pkg/argui_example_docs_bg.wasm'))
     await access(resolve(root, 'website/public/browser-shortcuts.js'))
   } catch {
     throw new Error(
@@ -57,17 +58,37 @@ if (process.argv.includes('--check')) {
       { cwd: root, stdio: 'inherit', env: wasmEnvironment },
     )
     if (exampleBuild.status !== 0) process.exit(exampleBuild.status ?? 1)
+    const docsBuild = spawnSync(
+      'wasm-pack',
+      [
+        'build',
+        'app_examples/docs-examples',
+        '--target',
+        'web',
+        '--release',
+        '--out-dir',
+        '../../web/examples/docs/pkg',
+      ],
+      { cwd: root, stdio: 'inherit', env: wasmEnvironment },
+    )
+    if (docsBuild.status !== 0) process.exit(docsBuild.status ?? 1)
   }
   await access(resolve(root, 'web/widgets/pkg/argui_widget_gallery_bg.wasm'))
   await access(resolve(root, 'web/examples/ai-harness/pkg/argui_example_ai_harness_bg.wasm'))
   await mkdir(destination, { recursive: true })
-  await mkdir(exampleDestination, { recursive: true })
+  await mkdir(aiDestination, { recursive: true })
+  await mkdir(docsDestination, { recursive: true })
   await rm(resolve(destination, 'pkg'), { recursive: true, force: true })
-  await rm(resolve(exampleDestination, 'pkg'), { recursive: true, force: true })
+  await rm(resolve(aiDestination, 'pkg'), { recursive: true, force: true })
+  await rm(resolve(docsDestination, 'pkg'), { recursive: true, force: true })
   await cp(resolve(root, 'web/widgets/pkg'), resolve(destination, 'pkg'), { recursive: true })
-  await cp(resolve(root, 'web/examples/ai-harness/pkg'), resolve(exampleDestination, 'pkg'), {
+  await cp(resolve(root, 'web/examples/ai-harness/pkg'), resolve(aiDestination, 'pkg'), {
     recursive: true,
   })
+  await cp(resolve(root, 'web/examples/docs/pkg'), resolve(docsDestination, 'pkg'), {
+    recursive: true,
+  })
+  await cp(resolve(root, 'web/examples/docs/index.html'), resolve(docsDestination, 'index.html'))
   await cp(
     resolve(root, 'web/browser-shortcuts.js'),
     resolve(root, 'website/public/browser-shortcuts.js'),

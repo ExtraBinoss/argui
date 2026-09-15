@@ -22,6 +22,7 @@ impl Default for AllSmi {
 }
 
 impl AllSmi {
+    /// Creates a provider that launches the executable at `executable`.
     #[must_use]
     pub fn new(executable: impl Into<PathBuf>) -> Self {
         Self {
@@ -30,6 +31,7 @@ impl AllSmi {
         }
     }
 
+    /// Sets the process timeout, clamped to the supported 100 ms–10 s interval.
     #[must_use]
     pub fn timeout(mut self, timeout: Duration) -> Self {
         self.timeout = timeout.clamp(Duration::from_millis(100), Duration::from_secs(10));
@@ -37,6 +39,12 @@ impl AllSmi {
     }
 
     /// Decode the documented snapshot format; useful for recorded sensor feeds.
+    /// `json` is a schema-1 snapshot from `all-smi`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a diagnostic when the JSON, schema, or device records are invalid,
+    /// or when no usable device snapshot is present.
     pub fn decode(json: &str) -> Result<Vec<DeviceTelemetry>, String> {
         let snapshot: serde_json::Value =
             serde_json::from_str(json).map_err(|error| error.to_string())?;

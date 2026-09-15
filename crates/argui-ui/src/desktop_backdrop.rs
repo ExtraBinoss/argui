@@ -13,6 +13,10 @@ pub struct DesktopBackdrop {
 }
 
 impl DesktopBackdrop {
+    /// Creates a backdrop with matching active and inactive colors.
+    ///
+    /// * `tint` — color tint requested while the compositor blur is available.
+    /// * `fallback` — color painted when compositor blur is unavailable.
     #[must_use]
     pub const fn new(tint: Color, fallback: Color) -> Self {
         Self {
@@ -25,24 +29,29 @@ impl DesktopBackdrop {
     }
 
     /// Disable the compositor effect while keeping the active and inactive fallback colors.
+    ///
+    /// * `enabled` — whether compositor blur is requested.
     #[must_use]
     pub const fn blur(mut self, enabled: bool) -> Self {
         self.blur = enabled;
         self
     }
 
+    /// Sets the tint used while the window is inactive and blur is available.
     #[must_use]
     pub const fn inactive_tint(mut self, tint: Color) -> Self {
         self.inactive_tint = tint;
         self
     }
 
+    /// Sets the fallback color used while the window is inactive.
     #[must_use]
     pub const fn inactive_fallback(mut self, color: Color) -> Self {
         self.inactive_fallback = color;
         self
     }
 
+    /// Resolves the backdrop color for the current compositor and focus state.
     #[must_use]
     pub const fn color(self, state: DesktopBackdropState) -> Color {
         if self.blur && state.available {
@@ -75,6 +84,7 @@ impl Default for DesktopBackdropState {
 }
 
 impl crate::Element {
+    /// Sets the desktop backdrop painted behind this element's content.
     #[must_use]
     pub fn desktop_backdrop(mut self, backdrop: DesktopBackdrop) -> Self {
         self.desktop_backdrop = Some(backdrop);
@@ -83,6 +93,7 @@ impl crate::Element {
 }
 
 impl crate::UiTree {
+    /// Returns the current desktop backdrop capabilities used to resolve materials.
     #[must_use]
     pub const fn desktop_backdrop_state(&self) -> DesktopBackdropState {
         self.desktop_backdrop_state

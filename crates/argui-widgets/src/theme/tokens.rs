@@ -4,6 +4,7 @@ use argui_theme::{ThemeOverrides, ThemeValue};
 impl WidgetTheme {
     /// Editable tokens for the current resolved palette. Derived widget styles
     /// read these values when built, so previews update every mounted consumer.
+    /// Returns the token names and values supported by this palette.
     #[must_use]
     pub fn tokens(&self) -> Vec<(&'static str, ThemeValue)> {
         let colors = [
@@ -39,6 +40,7 @@ impl WidgetTheme {
             .collect()
     }
 
+    /// Applies recognized color and blur overrides from `overrides`; unknown tokens are ignored.
     pub fn apply_overrides(&mut self, overrides: &ThemeOverrides) {
         for (name, value) in overrides.iter() {
             match (name, value) {

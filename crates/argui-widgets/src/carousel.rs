@@ -19,6 +19,9 @@ pub struct Carousel {
 }
 
 impl Carousel {
+    /// Creates a controlled carousel with slides in display order and a selected index.
+    ///
+    /// `key` identifies the carousel and `label` names it to assistive technology.
     #[must_use]
     pub fn new(
         key: impl Into<String>,
@@ -56,6 +59,7 @@ impl Carousel {
     }
 
     #[must_use]
+    /// Returns the new selected slide index when `event` requests navigation.
     pub fn action(&self, event: &UiEvent) -> Option<usize> {
         for (part, forward) in [("previous", false), ("next", true)] {
             if ButtonBehavior::new(format!("{}::{part}", self.key), part)
@@ -96,6 +100,7 @@ impl Carousel {
     }
 
     #[must_use]
+    /// Builds the carousel and its controls using `theme` for button styling.
     pub fn build(&self, theme: &WidgetTheme) -> Element {
         let selected = self.selected.min(self.slides.len().saturating_sub(1));
         let slide = self.slides.get(selected).cloned();

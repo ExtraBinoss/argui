@@ -15,6 +15,7 @@ pub struct Item {
 }
 
 impl Item {
+    /// Creates an item presentation with the supplied identity and title; `key` scopes its element identity.
     #[must_use]
     pub fn new(key: impl Into<String>, title: impl Into<String>) -> Self {
         Self {
@@ -28,6 +29,7 @@ impl Item {
     }
 
     #[must_use]
+    /// Builds the item using `theme` for its text and surface styling.
     pub fn build(self, theme: &WidgetTheme) -> Element {
         let title_key = format!("{}::title", self.key);
         let title = Element::text(self.title)

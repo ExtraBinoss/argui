@@ -14,6 +14,10 @@ pub struct InputOtp {
 }
 
 impl InputOtp {
+    /// Creates a one-time-password input with a fixed number of slots.
+    ///
+    /// `key` identifies the control, `label` names it accessibly, `value` is the current
+    /// digit string, and `length` is the desired slot count (clamped to 1 through 16).
     #[must_use]
     pub fn new(
         key: impl Into<String>,
@@ -31,6 +35,7 @@ impl InputOtp {
     }
 
     #[must_use]
+    /// Returns the updated value when `event` changes or completes the input.
     pub fn action(&self, event: &UiEvent) -> Option<String> {
         if !self.enabled || event.target_key() != Some(&self.key) {
             return None;
@@ -43,12 +48,14 @@ impl InputOtp {
     }
 
     #[must_use]
+    /// Returns whether every configured slot contains a character.
     pub fn complete(&self) -> bool {
         self.value.len() == self.length.clamp(1, 16)
             && self.value.bytes().all(|byte| byte.is_ascii_digit())
     }
 
     #[must_use]
+    /// Builds the input slots using `theme` for their appearance.
     pub fn build(&self, theme: &WidgetTheme) -> Element {
         let count = self.length.clamp(1, 16);
         let value: String = self

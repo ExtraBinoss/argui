@@ -4,6 +4,7 @@ const status = document.querySelector('#status')
 const modulePath = document.body.dataset.module
 const readyLabel = document.body.dataset.readyLabel
 const component = new URLSearchParams(location.search).get('component')
+const example = new URLSearchParams(location.search).get('example')
 const browser = navigator.brave
   ? 'Brave'
   : /Edg\//.test(navigator.userAgent)
@@ -164,8 +165,13 @@ try {
     attributeFilter: ['aria-label'],
   })
   timer = setTimeout(() => fail(new Error('Argui renderer startup timed out'), 'timeout'), 90_000)
-  const { default: init } = await import(modulePath)
-  await init()
+  const module = await import(modulePath)
+  await module.default()
+  if (example) {
+    if (typeof module.run !== 'function')
+      throw previewError('config', 'The preview module does not export run(example)')
+    module.run(example)
+  }
   if (!rendererReady && !finished) {
     status.textContent = 'Starting the Argui renderer…'
     notify('loading')

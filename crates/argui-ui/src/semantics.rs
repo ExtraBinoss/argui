@@ -10,6 +10,13 @@ use crate::{Display, Element, ElementKind, NodeId, UiTree};
 impl UiTree {
     /// Builds the renderer-independent accessibility snapshot from retained
     /// identities and the latest resolved layout bounds.
+    ///
+    /// # Arguments
+    ///
+    /// * `bounds` — latest layout rectangle for each retained node with layout.
+    /// * `scale_factor` — conversion factor from logical to physical pixels.
+    ///
+    /// Returns a semantic tree with resolved labels, relations, bounds, and focus.
     #[must_use]
     pub fn semantic_tree(&self, bounds: &[(NodeId, Rect)], scale_factor: f32) -> SemanticTree {
         let bounds = bounds.iter().copied().collect::<HashMap<_, _>>();

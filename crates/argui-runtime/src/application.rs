@@ -76,6 +76,7 @@ pub struct AppUpdate {
 }
 
 impl AppUpdate {
+    /// Creates an update with no invalidations, commands, or tray changes.
     #[must_use]
     pub const fn none() -> Self {
         Self {
@@ -86,23 +87,30 @@ impl AppUpdate {
     }
 
     #[must_use]
+    /// Adds or combines an invalidation for one window.
+    /// `window` is the target window and `update` describes the required redraw.
     pub fn window(mut self, window: WindowKey, update: ViewUpdate) -> Self {
         self.invalidate(window, update);
         self
     }
 
     #[must_use]
+    /// Adds a command for the host to process.
+    /// `command` describes the requested operation.
     pub fn command(mut self, command: AppCommand) -> Self {
         self.commands.push(command);
         self
     }
 
     #[must_use]
+    /// Marks the tray configuration as changed.
     pub fn tray_changed(mut self) -> Self {
         self.tray_changed = true;
         self
     }
 
+    /// Adds or strengthens an invalidation for `window` using `update`.
+    /// A `None` update is ignored; repeated invalidations keep the strongest update.
     pub fn invalidate(&mut self, window: WindowKey, update: ViewUpdate) {
         if update == ViewUpdate::None {
             return;
@@ -128,14 +136,19 @@ fn strongest(left: ViewUpdate, right: ViewUpdate) -> ViewUpdate {
 }
 
 pub trait AppModel: 'static {
+    /// Takes pending UI commands for a window. The default implementation has none.
     fn take_ui_commands(&mut self, _window: &WindowKey) -> Vec<argui_ui::UiCommand> {
         Vec::new()
     }
+    /// Handles completed work associated with the window and returns its effects.
     fn tasks_ready(&mut self, _window: &WindowKey) -> AppUpdate {
         AppUpdate::none()
     }
+    /// Builds a window's current view using its platform environment.
+    /// `None` indicates that this application has no view for the window.
     fn view(&self, window: &WindowKey, environment: WindowEnvironment) -> Option<Element>;
 
+    /// Returns the retained entity that should receive routed UI events, if any.
     fn event_router(&self, _window: &WindowKey) -> Option<crate::AnyEntity> {
         None
     }
@@ -145,53 +158,66 @@ pub trait AppModel: 'static {
         false
     }
 
+    /// Updates application state for `event` and returns the resulting effects.
     fn update(&mut self, event: &AppEvent) -> AppUpdate;
 
+    /// Advances time-dependent state for `window` by one animation `frame`.
     fn animation_frame(&mut self, window: &WindowKey, frame: Frame) -> AppUpdate {
         let _ = (window, frame);
         AppUpdate::none()
     }
 
+    /// Returns whether the application needs animation frames for the window.
     fn wants_animation_frame(&self, _window: &WindowKey) -> bool {
         false
     }
 
+    /// Handles a new layout snapshot for the window.
     fn layout_changed(&mut self, _window: &WindowKey, _layout: &LayoutSnapshot) -> AppUpdate {
         AppUpdate::none()
     }
 
+    /// Returns tray configuration when this application provides a tray.
     fn tray(&self) -> Option<TrayConfig> {
         None
     }
 
+    /// Returns image assets referenced by the application.
     fn image_assets(&self) -> Vec<ImageAsset> {
         Vec::new()
     }
 
+    /// Returns vector assets referenced by the application.
     fn vector_assets(&self) -> Vec<VectorAsset> {
         Vec::new()
     }
 
+    /// Returns the inspection handle for the window, if inspection is enabled.
     fn inspector(&self, _window: &WindowKey) -> Option<InspectorHandle> {
         None
     }
 
+    /// Takes a pending clipboard request for the window, if present.
     fn take_clipboard_request(&mut self, _window: &WindowKey) -> Option<ClipboardRequest> {
         None
     }
 
+    /// Takes a pending scroll request for the window, if present.
     fn take_scroll_request(&mut self, _window: &WindowKey) -> Option<ScrollRequest> {
         None
     }
 
+    /// Takes a pending focus request for the window, if present.
     fn take_focus_request(&mut self, _window: &WindowKey) -> Option<FocusRequest> {
         None
     }
 
+    /// Takes a pending text-selection request for the window, if present.
     fn take_text_selection_request(&mut self, _window: &WindowKey) -> Option<TextSelectionRequest> {
         None
     }
 
+    /// Takes a pending theme request for the window, if present.
     fn take_theme_request(&mut self, _window: &WindowKey) -> Option<ThemeRequest> {
         None
     }
@@ -211,6 +237,9 @@ pub struct SingleWindowModel<A: Render> {
 }
 
 impl<A: Render> SingleWindowModel<A> {
+    /// Creates a single-window application from a new retained model.
+    ///
+    /// `app` is the render model presented in the window.
     #[must_use]
     pub fn new(app: A) -> Self {
         Self::from_entity(Entity::new(app)).expect("new application model is open")
@@ -218,6 +247,12 @@ impl<A: Render> SingleWindowModel<A> {
 
     /// Create an independent window presentation in an existing model domain.
     /// Other windows may retain the same entity without sharing this mount.
+    ///
+    /// # Arguments
+    /// * `app` — retained model to present in this window.
+    ///
+    /// # Errors
+    /// Returns [`crate::ScopeClosed`] if the entity's resource scope has closed.
     pub fn from_entity(app: Entity<A>) -> Result<Self, crate::ScopeClosed> {
         Ok(Self {
             window: WindowKey::main(),

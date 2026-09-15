@@ -14,6 +14,7 @@ impl<T: Future + Send + 'static> TaskFuture for T {}
 pub trait TaskFuture: Future + 'static {}
 #[cfg(target_arch = "wasm32")]
 impl<T: Future + 'static> TaskFuture for T {}
+/// Values that can be transferred from task execution to the UI-thread callback.
 #[cfg(not(target_arch = "wasm32"))]
 pub trait TaskOutput: Send + 'static {}
 #[cfg(not(target_arch = "wasm32"))]
