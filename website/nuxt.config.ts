@@ -1,5 +1,6 @@
 import { env } from 'node:process'
 import catalogue from './app/data/catalogue.json'
+import { docs } from './app/data/docs'
 const baseURL = env.NUXT_APP_BASE_URL ?? '/'
 
 export default defineNuxtConfig({
@@ -30,6 +31,8 @@ export default defineNuxtConfig({
         '/features',
         '/get-started',
         '/examples',
+        '/docs',
+        ...docs.map((guide) => `/docs/${guide.slug}`),
         '/components',
         '/sitemap.xml',
         '/robots.txt',

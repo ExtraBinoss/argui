@@ -1,4 +1,5 @@
 import catalogue from '../../app/data/catalogue.json'
+import { docs } from '../../app/data/docs'
 
 export default defineEventHandler((event) => {
   const origin = useRuntimeConfig(event).public.siteUrl.replace(/\/$/, '')
@@ -7,6 +8,8 @@ export default defineEventHandler((event) => {
     '/features',
     '/get-started',
     '/examples',
+    '/docs',
+    ...docs.map((guide) => `/docs/${guide.slug}`),
     '/components',
     ...catalogue.map((item) => `/components/${item.slug}`),
   ]

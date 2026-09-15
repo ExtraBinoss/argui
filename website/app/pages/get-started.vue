@@ -10,7 +10,7 @@ const run = `git clone ${repository}.git\ncd argui\ncargo run -p argui-widget-ga
 const dependency = `[dependencies.argui]\ngit = "${repository}"\nfeatures = ["widget-button"]`
 const links = [
   { key: 'examples', url: '/examples' },
-  { key: 'docs', url: sourceUrl('docs/README.md') },
+  { key: 'docs', url: '/docs' },
   { key: 'linux', url: sourceUrl('docs/platform/webview.md') },
   { key: 'web', url: '/components' },
 ]
