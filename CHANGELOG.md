@@ -12,6 +12,9 @@ that do not use them.
   backdrop, so the Metal surface remains visible with `--all-features`.
 - Applied GTK's integer buffer scale to the Wayland WebView canvas, preventing
   oversized and clipped rendering on HiDPI Linux desktops.
+- Kept the GTK WebView event loop active while a redraw is queued, so animated
+  text, scroll momentum and other continuous frames do not stall between input
+  events on Linux.
 - Removed the unused native WebView deadline warning on macOS and Windows.
 
 ### Changed

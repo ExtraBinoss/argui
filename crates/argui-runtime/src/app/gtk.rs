@@ -39,6 +39,7 @@ impl Application {
         let host = Rc::new(GtkHost {
             platform,
             ime_enabled: Cell::new(false),
+            redraw_requested: Cell::new(false),
         });
         let (width, height, scale) = host.platform.client_size();
         self.window = Some(host.clone());
@@ -113,6 +114,19 @@ impl Application {
             self.pending_ui_frame.request_rebuild();
             window.request_redraw();
         }
+    }
+
+    pub(crate) fn begin_gtk_redraw(&self) {
+        if let Some(host) = self.window.as_ref().and_then(|window| window.gtk()) {
+            host.begin_redraw();
+        }
+    }
+
+    pub(crate) fn gtk_redraw_pending(&self) -> bool {
+        self.window
+            .as_ref()
+            .and_then(|window| window.gtk())
+            .is_some_and(GtkHost::redraw_pending)
     }
 
     pub(crate) fn gtk_event(&mut self, event: WindowEvent<'_>, control: &dyn LoopControl) {

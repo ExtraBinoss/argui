@@ -66,6 +66,7 @@ pub(crate) fn launch(mut application: MultiApplication) -> Result<(), RuntimeErr
             Event::RedrawRequested(window_id) => {
                 if let Some(key) = application.by_native.get(&HostId::Gtk(window_id)).cloned() {
                     if let Some(entry) = application.windows.get_mut(&key) {
+                        entry.runtime.begin_gtk_redraw();
                         entry.runtime.gtk_geometry();
                         entry.runtime.redraw(&context);
                     }
@@ -126,6 +127,15 @@ pub(crate) fn launch(mut application: MultiApplication) -> Result<(), RuntimeErr
         }
         if context.exit.get() {
             *control = ControlFlow::Exit;
+        } else if application
+            .windows
+            .values()
+            .any(|entry| entry.runtime.gtk_redraw_pending())
+        {
+            // Tao's Linux redraw channel does not wake a blocked GTK main
+            // iteration. Poll only while a frame is queued so animations and
+            // scroll physics continue, then return to event-driven waiting.
+            *control = ControlFlow::Poll;
         } else if let Some(deadline) = application
             .windows
             .values()

@@ -10,6 +10,17 @@ use winit::{
 pub(crate) struct GtkHost {
     pub(crate) platform: GtkWindow,
     pub(crate) ime_enabled: Cell<bool>,
+    pub(crate) redraw_requested: Cell<bool>,
+}
+
+impl GtkHost {
+    pub(crate) fn begin_redraw(&self) {
+        self.redraw_requested.set(false);
+    }
+
+    pub(crate) fn redraw_pending(&self) -> bool {
+        self.redraw_requested.get()
+    }
 }
 
 impl WindowHost for GtkHost {
@@ -49,6 +60,7 @@ impl WindowHost for GtkHost {
             .map_err(|error| error.to_string())
     }
     fn request_redraw(&self) {
+        self.redraw_requested.set(true);
         self.platform.native().request_redraw();
     }
     fn drawable_size(&self) -> PhysicalSize<u32> {

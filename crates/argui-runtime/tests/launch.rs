@@ -184,6 +184,8 @@ mod native {
         visits: Visits,
         pending: Rc<RefCell<Vec<TaskHandle>>>,
         closed: Rc<RefCell<Vec<WindowKey>>>,
+        #[cfg(all(feature = "webview", target_os = "linux"))]
+        animation: crate::gtk_input::AnimationProbe,
     }
     impl AppModel for App {
         fn view(&self, key: &WindowKey, environment: WindowEnvironment) -> Option<Element> {
@@ -331,6 +333,24 @@ mod native {
                 .unwrap()
                 .layout_changed(key, layout)
         }
+        fn animation_frame(&mut self, _key: &WindowKey, _: argui_animation::Frame) -> AppUpdate {
+            #[cfg(all(feature = "webview", target_os = "linux"))]
+            if _key == &WindowKey::main() {
+                self.animation.frame();
+            }
+            AppUpdate::none()
+        }
+        fn wants_animation_frame(&self, key: &WindowKey) -> bool {
+            #[cfg(all(feature = "webview", target_os = "linux"))]
+            {
+                key == &WindowKey::main() && self.animation.wants_frame()
+            }
+            #[cfg(not(all(feature = "webview", target_os = "linux")))]
+            {
+                let _ = key;
+                false
+            }
+        }
     }
     pub fn run() {
         let runtime = ModelRuntime::default();
@@ -350,6 +370,8 @@ mod native {
         let visits = Visits::default();
         let pending = Rc::new(RefCell::new(Vec::new()));
         let closed = Rc::new(RefCell::new(Vec::new()));
+        #[cfg(all(feature = "webview", target_os = "linux"))]
+        let animation = crate::gtk_input::AnimationProbe::default();
         let errors = Rc::new(RefCell::new(Vec::new()));
         let captured = errors.clone();
         let edited = data.clone();
@@ -387,6 +409,8 @@ mod native {
                 visits: visits.clone(),
                 pending: pending.clone(),
                 closed: closed.clone(),
+                #[cfg(all(feature = "webview", target_os = "linux"))]
+                animation: animation.clone(),
             },
             move |event| match event {
                 RuntimeEvent::Window {
@@ -414,6 +438,8 @@ mod native {
         .unwrap();
         assert!(errors.borrow().is_empty(), "{:?}", errors.borrow());
         assert_eq!(data.read(|data| data.phase), 8);
+        #[cfg(all(feature = "webview", target_os = "linux"))]
+        animation.assert_smooth();
         assert!(
             data.read(|data| data.edited),
             "native edit command was delivered"

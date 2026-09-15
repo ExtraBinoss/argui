@@ -1,3 +1,49 @@
+use std::{cell::Cell, rc::Rc, time::Duration};
+use web_time::Instant;
+
+#[derive(Clone, Default)]
+pub struct AnimationProbe(Rc<AnimationState>);
+
+#[derive(Default)]
+struct AnimationState {
+    frames: Cell<usize>,
+    first: Cell<Option<Instant>>,
+    span: Cell<Option<Duration>>,
+}
+
+impl AnimationProbe {
+    pub fn frame(&self) {
+        let now = Instant::now();
+        let frame = self.0.frames.get();
+        if frame == 0 {
+            self.0.first.set(Some(now));
+        }
+        if frame < 12 {
+            self.0.frames.set(frame + 1);
+            if frame == 11 {
+                self.0.span.set(self.0.first.get().map(|first| now - first));
+            }
+        }
+    }
+
+    pub fn wants_frame(&self) -> bool {
+        self.0.frames.get() < 12
+    }
+
+    pub fn assert_smooth(&self) {
+        let span = self
+            .0
+            .span
+            .get()
+            .expect("GTK delivered all animation frames");
+        eprintln!("GTK delivered 12 consecutive animation frames in {span:?}");
+        assert!(
+            span < Duration::from_millis(500),
+            "GTK animation redraws stalled for {span:?}"
+        );
+    }
+}
+
 pub fn keys() -> Vec<(gtk::gdk::keys::Key, argui_core::Key)> {
     use argui_core::Key;
     use gtk::gdk::keys::constants as keys;
