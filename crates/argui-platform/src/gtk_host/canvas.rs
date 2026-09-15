@@ -54,6 +54,7 @@ pub struct GtkCanvas {
 struct Attachment {
     subsurface: wl_subsurface::WlSubsurface,
     position: (i32, i32),
+    scale: i32,
 }
 impl Drop for Attachment {
     fn drop(&mut self) {
@@ -62,7 +63,7 @@ impl Drop for Attachment {
 }
 impl GtkCanvas {
     #[allow(unsafe_code)]
-    pub(super) fn new(window: Arc<tao::window::Window>) -> Result<Self, String> {
+    pub(super) fn new(window: Arc<tao::window::Window>, scale: i32) -> Result<Self, String> {
         let RawDisplayHandle::Wayland(display) = window
             .display_handle()
             .map_err(|error| error.to_string())?
@@ -100,19 +101,26 @@ impl GtkCanvas {
             connection,
             window,
         };
-        canvas.place(0, 0)?;
+        canvas.place(0, 0, scale)?;
         Ok(canvas)
     }
 
     /// Return whether GTK must commit the changed child placement on its next frame.
-    pub fn place(&self, x: i32, y: i32) -> Result<bool, String> {
+    pub fn place(&self, x: i32, y: i32, scale: i32) -> Result<bool, String> {
+        let scale = scale.max(1);
         let mut attachment = self.attachment.lock().map_err(|error| error.to_string())?;
         if let Some(attachment) = attachment.as_mut() {
-            if attachment.position == (x, y) {
+            if attachment.position == (x, y) && attachment.scale == scale {
                 return Ok(false);
             }
-            attachment.subsurface.set_position(x, y);
-            attachment.position = (x, y);
+            if attachment.position != (x, y) {
+                attachment.subsurface.set_position(x, y);
+                attachment.position = (x, y);
+            }
+            if attachment.scale != scale {
+                self.surface.set_buffer_scale(scale);
+                attachment.scale = scale;
+            }
         } else {
             let parent = self.parent()?;
             let handle = self
@@ -123,12 +131,14 @@ impl GtkCanvas {
             let subsurface = self
                 .subcompositor
                 .get_subsurface(&self.surface, &parent, &handle, ());
+            self.surface.set_buffer_scale(scale);
             subsurface.set_desync();
             subsurface.set_position(x, y);
             subsurface.place_below(&parent);
             *attachment = Some(Attachment {
                 subsurface,
                 position: (x, y),
+                scale,
             });
         }
         self.connection

@@ -84,7 +84,7 @@ impl Application {
         }
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg(target_os = "linux")]
     pub(crate) fn native_deadline(&self) -> Option<web_time::Instant> {
         self.native_views
             .as_ref()

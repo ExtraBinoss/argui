@@ -34,8 +34,13 @@ Explore the [live gallery](https://extrabinoss.github.io/argui/components), or r
 ```sh
 git clone https://github.com/ExtraBinoss/argui.git
 cd argui
-cargo run -p argui-widget-gallery --all-features
+cargo run -p argui-widget-gallery --release
 ```
+
+The base gallery already includes every widget, Fluent localization, tasks,
+effects and DevTools. Enable optional platform integrations individually;
+`--all-features` additionally compiles WebView, updater, native popups, desktop
+backdrop, hardware sensors and the debug hot-reload bridge.
 
 For state-preserving Rust patches, install Dioxus CLI and run the gallery with
 `dx serve --package argui-widget-gallery --features hot-reload --hot-patch`.

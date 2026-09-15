@@ -4,6 +4,21 @@ All notable changes to Argui are documented here. The 0.x series may still make
 breaking API changes; Cargo features keep optional integrations out of builds
 that do not use them.
 
+## [Unreleased]
+
+### Fixed
+
+- Kept Winit's AppKit content view attached when enabling the macOS desktop
+  backdrop, so the Metal surface remains visible with `--all-features`.
+- Applied GTK's integer buffer scale to the Wayland WebView canvas, preventing
+  oversized and clipped rendering on HiDPI Linux desktops.
+- Removed the unused native WebView deadline warning on macOS and Windows.
+
+### Changed
+
+- Made the base release gallery the recommended local command. Optional native
+  integrations can still be enabled individually or together when needed.
+
 ## [0.2.1] - 2026-09-14
 
 ### Fixed
@@ -56,3 +71,4 @@ that do not use them.
 
 [0.2.1]: https://github.com/ExtraBinoss/argui/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/ExtraBinoss/argui/releases/tag/v0.2.0
+[Unreleased]: https://github.com/ExtraBinoss/argui/compare/v0.2.1...HEAD

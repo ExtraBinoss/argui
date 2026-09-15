@@ -55,7 +55,7 @@ impl GtkWindow {
             .ok_or("GTK client container unavailable")?
             .pack_start(&container, true, true, 0);
         container.show_all();
-        let canvas = Arc::new(GtkCanvas::new(window.clone())?);
+        let canvas = Arc::new(GtkCanvas::new(window.clone(), container.scale_factor())?);
         let weak_canvas = Arc::downgrade(&canvas);
         native.connect_unmap(move |_| {
             if let Some(canvas) = weak_canvas.upgrade() {
@@ -130,7 +130,11 @@ impl GtkWindow {
             return Ok(());
         }
         let allocation = self.container.allocation();
-        if self.canvas.place(allocation.x(), allocation.y())? {
+        if self.canvas.place(
+            allocation.x(),
+            allocation.y(),
+            self.container.scale_factor(),
+        )? {
             // GTK owns parent commits and must first acknowledge the compositor's configure.
             self.window.gtk_window().queue_draw();
         }

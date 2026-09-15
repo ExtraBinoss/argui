@@ -4,7 +4,7 @@ use objc2::{MainThreadMarker, MainThreadOnly, rc::Retained};
 use objc2_app_kit::{
     NSAppearance, NSAppearanceCustomization, NSAppearanceNameAqua, NSAppearanceNameDarkAqua,
     NSAutoresizingMaskOptions, NSView, NSVisualEffectBlendingMode, NSVisualEffectMaterial,
-    NSVisualEffectState, NSVisualEffectView, NSWindow,
+    NSVisualEffectState, NSVisualEffectView, NSWindowOrderingMode,
 };
 use objc2_core_graphics::CGMutablePath;
 use objc2_foundation::{NSPoint, NSRect, NSSize};
@@ -12,12 +12,8 @@ use objc2_quartz_core::CAShapeLayer;
 use winit::raw_window_handle::{RawDisplayHandle, RawWindowHandle};
 
 pub(super) struct Backend {
-    window: Retained<NSWindow>,
-    content: Retained<NSView>,
-    container: Retained<NSView>,
     effect: Retained<NSVisualEffectView>,
     mask: Retained<CAShapeLayer>,
-    autoresizing: NSAutoresizingMaskOptions,
 }
 
 #[cfg_attr(coverage_nightly, coverage(off))]
@@ -28,15 +24,10 @@ impl BackdropBackend for Backend {
             return Err(BackdropError::Unsupported);
         };
         let mtm = MainThreadMarker::new().ok_or(BackdropError::Unsupported)?;
-        // SAFETY: the live NSView is retained by NativeBackdrop's owner. All AppKit work is
-        // on the main thread. Retaining the view and window also keeps the wrapper's children alive.
+        // SAFETY: the live NSView is retained by NativeBackdrop's owner and all
+        // AppKit work is performed on the main thread.
         let content = unsafe { Retained::retain(handle.ns_view.cast::<NSView>().as_ptr()) }
             .ok_or(BackdropError::Unsupported)?;
-        let window = content.window().ok_or(BackdropError::Unsupported)?;
-        if window.contentView().as_deref() != Some(&content) {
-            return Err(BackdropError::Unsupported);
-        }
-        let container = NSView::initWithFrame(NSView::alloc(mtm), content.frame());
         let effect =
             NSVisualEffectView::initWithFrame(NSVisualEffectView::alloc(mtm), content.bounds());
         effect.setBlendingMode(NSVisualEffectBlendingMode::BehindWindow);
@@ -51,26 +42,14 @@ impl BackdropBackend for Backend {
                 .ok_or(BackdropError::Unsupported)?
                 .setMask(Some(&mask));
         }
-        let autoresizing = content.autoresizingMask();
         let flexible = NSAutoresizingMaskOptions::ViewWidthSizable
             | NSAutoresizingMaskOptions::ViewHeightSizable;
-        container.setAutoresizingMask(flexible);
-        content.setAutoresizingMask(flexible);
         effect.setAutoresizingMask(flexible);
-        // The GPU view must remain above the native material. A child of the GPU view
-        // would instead cover rendered text and intercept input.
-        window.setContentView(Some(&container));
-        container.addSubview(&effect);
-        container.addSubview(&content);
-        content.setFrame(container.bounds());
-        Ok(Self {
-            window,
-            content,
-            container,
-            effect,
-            mask,
-            autoresizing,
-        })
+        // Keep Winit's view as the NSWindow content view. WGPU attaches its
+        // CAMetalLayer to that exact view, so replacing or reparenting it after
+        // window creation can leave Metal presenting into a detached hierarchy.
+        content.addSubview_positioned_relativeTo(&effect, NSWindowOrderingMode::Below, None);
+        Ok(Self { effect, mask })
     }
     fn available(&mut self) -> Result<bool, BackdropError> {
         Ok(true)
@@ -122,10 +101,5 @@ impl BackdropBackend for Backend {
 impl Drop for Backend {
     fn drop(&mut self) {
         self.effect.removeFromSuperview();
-        if self.window.contentView().as_deref() == Some(&self.container) {
-            self.content.removeFromSuperview();
-            self.content.setAutoresizingMask(self.autoresizing);
-            self.window.setContentView(Some(&self.content));
-        }
     }
 }
