@@ -6,6 +6,8 @@ import { resolve } from 'node:path'
 const website = fileURLToPath(new URL('../', import.meta.url))
 const output = resolve(website, '.output/public')
 const catalogue = JSON.parse(await readFile(resolve(website, 'app/data/catalogue.json'), 'utf8'))
+const docsSource = await readFile(resolve(website, 'app/data/docs.ts'), 'utf8')
+const docs = [...docsSource.matchAll(/slug: '([^']+)'/g)].map((match) => match[1])
 const origin = (process.env.NUXT_PUBLIC_SITE_URL ?? '').replace(/\/$/, '')
 const base = process.env.NUXT_APP_BASE_URL ?? '/'
 const routes = [
@@ -13,6 +15,8 @@ const routes = [
   '/features',
   '/get-started',
   '/examples',
+  '/docs',
+  ...docs.map((slug) => `/docs/${slug}`),
   '/components',
   ...catalogue.map((item) => `/components/${item.slug}`),
 ]
@@ -34,6 +38,11 @@ for (const route of routes) {
 for (const item of catalogue) {
   const html = await readFile(resolve(output, 'components', item.slug, 'index.html'), 'utf8')
   assert.ok(html.includes(item.source), `Missing server-rendered source: ${item.slug}`)
+}
+for (const slug of docs) {
+  const html = await readFile(resolve(output, 'docs', slug, 'index.html'), 'utf8')
+  assert.ok(html.includes('Compiled example'), `Missing live example: ${slug}`)
+  assert.ok(html.includes('Reference files'), `Missing reference files: ${slug}`)
 }
 const sitemap = await readFile(resolve(output, 'sitemap.xml'), 'utf8')
 assert.equal((sitemap.match(/<loc>/g) ?? []).length, origin ? routes.length : 0)

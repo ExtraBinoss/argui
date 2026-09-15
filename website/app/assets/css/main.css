@@ -1,4 +1,5 @@
 @import './components.css';
+@import './docs.css';
 
 :root {
   font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
@@ -1043,7 +1044,7 @@ code {
     margin-left: 38px;
   }
 }
-@media (max-width: 540px) {
+@media (max-width: 800px) {
   .desktop-nav {
     display: none;
   }
@@ -1061,6 +1062,8 @@ code {
     padding: 12px 0;
     font-size: 15px;
   }
+}
+@media (max-width: 540px) {
   .header-actions {
     gap: 7px;
   }

@@ -109,6 +109,20 @@ try {
     /git clone https:\/\/github.com\/ExtraBinoss\/argui/,
   )
 
+  await page.goto(`${origin}/docs`, { waitUntil: 'networkidle0' })
+  assert.equal(await page.$$('.docs-path li').then((items) => items.length), 4)
+  assert.equal(await page.$$('.docs-card-grid a').then((items) => items.length), 13)
+  await page.type('.docs-home-search input', 'custom element')
+  assert.match(
+    await page.$eval('.docs-search-results', (element) => element.textContent),
+    /custom/i,
+  )
+  await screenshot('docs-desktop')
+  await page.goto(`${origin}/docs/start/first-window`, { waitUntil: 'networkidle0' })
+  assert.equal(await page.$$('.docs-sources a').then((items) => items.length), 3)
+  assert.match(await page.$eval('.docs-live-example', (element) => element.textContent), /Compiled/)
+  await screenshot('docs-guide-desktop')
+
   await page.goto(`${origin}/components/`, { waitUntil: 'networkidle0' })
   assert.equal(
     await page.$eval('#component-navigation nav a', (element) => element.textContent.trim()),
@@ -343,6 +357,25 @@ try {
   await mobileFrame.waitForSelector('[role="navigation"][aria-label="Component navigation"]')
   await screenshot('component-mobile-live')
   await page.click('button[aria-label="Stop gallery"]')
+
+  await page.goto(`${origin}/docs`, { waitUntil: 'networkidle0' })
+  assert.equal(
+    await page.$eval('.docs-sidebar', (element) => getComputedStyle(element).display),
+    'none',
+  )
+  await page.click('.docs-nav-toggle')
+  assert.equal(
+    await page.$eval('.docs-sidebar', (element) => getComputedStyle(element).display),
+    'block',
+  )
+  await screenshot('docs-mobile-menu')
+  await page.click('.docs-nav-group a')
+  await page.waitForSelector('.docs-guide-heading')
+  assert.equal(
+    await page.$eval('.docs-nav-toggle', (element) => getComputedStyle(element).display),
+    'flex',
+  )
+  await screenshot('docs-guide-mobile')
 
   await page.goto(`${origin}/examples`, { waitUntil: 'networkidle0' })
   await page.waitForSelector('.status-dot.live', { timeout: 90_000 })

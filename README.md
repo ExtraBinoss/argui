@@ -14,7 +14,7 @@
 <p align="center">
   <a href="https://extrabinoss.github.io/argui/">Website</a> ·
   <a href="https://extrabinoss.github.io/argui/components">Live components</a> ·
-  <a href="docs/README.md">Documentation</a> ·
+  <a href="https://extrabinoss.github.io/argui/docs">Documentation</a> ·
   <a href="CHANGELOG.md">Changelog</a> ·
   <a href="https://extrabinoss.github.io/argui/get-started">Get started</a> ·
   <a href="https://discord.gg/xY9CWSc65">Discord</a>
