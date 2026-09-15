@@ -1,177 +1,121 @@
 # Architecture
 
-For a complete workspace inventory, direct dependency table and crates.io
-order, see [workspace crates and dependencies](repo/structure.md).
-
-Argui is retained-mode with selective immediate GPU recording: the UI tree and
-widget state persist between frames. Paint passes reuse cached subtree fragments
-and assemble an ordered display list; some assembly work still spans the tree.
-Animation schedules frames; an idle UI does not.
+Argui is a retained UI engine. Application models rebuild element descriptions;
+the runtime reconciles them with a persistent tree and recomputes only the data
+invalidated by that change. WGPU receives renderer-neutral paint commands.
 
 ```text
-Rust builders or future DSL
-            |
-         argui-ui
-       /           \
-layout            text
-       \           /
-          paint
-            |
-        argui-runtime
-        /           \
-  platform       render
-    winit          wgpu
+application model
+      |
+      v
+argui-runtime ---- platform events and windows
+      |
+      v
+  argui-ui ---- argui-layout ---- argui-text
+      |
+      v
+ argui-paint
+      |
+      v
+ argui-render ---- WGPU surface
 ```
 
-The actual dependency graph stays acyclic even where the diagram groups runtime
-collaboration. `argui-core` contains dependency-light shared primitives, and
-`argui` is only the public facade.
+`argui-core` supplies dependency-light types to these layers. `argui` is the
+public facade; it contains no second implementation. See
+[repository structure](repo/structure.md) for the complete crate graph.
 
-## Crate boundaries
+## One update
 
-- `argui-core`: shared geometry, colors and input primitives.
-- `argui-accessibility`: renderer-independent semantics, incremental tree
-  patches, AccessKit lowering, and the browser semantic DOM adapter.
-- `argui-platform`: `winit` window lifecycle, input, IME, clipboard hooks, and
-  native/web surface handles, application identity, and optional native tray.
-- `argui-layout`: the narrow adapter from UI style/tree data to `taffy`.
-- `argui-paint`: renderer-independent fills, borders, corner radii, clips, and
-  the ordered display list shared by native and web.
-- `argui-text`: shaping, bidi, fallback, line breaking, cursor geometry, and
-  glyph preparation through `cosmic-text`.
-- `argui-i18n`: renderer-independent Fluent catalogs, locale negotiation,
-  message fallback, formatting, and writing-direction metadata.
-- `argui-render`: WGPU resources, batching, atlases, clips, layers, filters, and
-  surface presentation.
-- `argui-runtime`: the composition root connecting the window, retained UI,
-  layout, text, and renderer. It owns scheduling but none of their algorithms.
-- `argui-ui`: retained elements, reconciliation, widget state, focus, hit testing,
-  and animation scheduling.
-- `argui-inspect`: renderer-independent tree snapshots, reversible typed style
-  overrides, and bounded frame records.
-- `argui-devtools`: an optional application wrapper whose dock, virtualized tree,
-  controls, and highlights are ordinary Argui elements. Engine crates never
-  depend on this frontend.
-- `argui-animation`: typed timelines, motion, interpolation and physics.
-- `argui-theme` and `argui-widgets`: theme values and optional controlled widgets.
-- `argui-image` and `argui-vector`: optional asset decoding and validation.
-- `argui-effects`: optional effect definitions; the renderer executes their passes.
-- `argui-webview`: optional retained native WebViews and browser frames.
-- `argui-updater`: optional update transactions, signed downloads and desktop
-  installation adapters, independent of the renderer, runtime and UI. The
-  controlled update dialog belongs to the separate `argui-widgets/updater` feature.
-- `argui`: deliberate re-exports; application code should start here.
-- `argui-showcase`: non-published example application shared unchanged by the
-  native and WASM launchers; it is not part of the framework dependency graph.
+1. A platform event enters through `argui-platform`.
+2. The runtime converts coordinates to logical pixels and dispatches the event
+   through `argui-ui`.
+3. A listener mutates an `Entity<T>` and calls `Context::notify`.
+4. The affected presentation rebuilds its `Element` description.
+5. Reconciliation preserves keyed node identity and classifies the change.
+6. Layout, text, paint, and accessibility update only when their inputs changed.
+7. The renderer submits the ordered display list and presents the surface.
 
-Text shaping is not text editing. Selection, copy/paste commands, IME composition,
-and undo belong to UI/platform code around the text engine. This avoids rejecting
-`cosmic-text` for a responsibility it does not claim to own.
+The event loop schedules no frame while the application is idle. Animation,
+scroll momentum, async completion, window changes, or explicit invalidation wake
+it.
 
-Fonts are application resources. Native applications may use the system-backed
-`TextEngine::new()`. Sandboxed targets can create an isolated engine with
-`TextEngine::from_embedded_fonts(...)` and pass it to the runtime. The library
-does not force a font, a download, or an application bundle-size cost.
+## Invalidation
 
-## DSL seam
+| Change | Reused | Recomputed |
+| --- | --- | --- |
+| Identical description | tree, layout, text, paint | nothing |
+| Semantics only | layout, text, paint | accessibility diff |
+| Paint or opacity | layout, shaped text, node identity | paint data |
+| Transform or scroll offset | layout and shaped text | translated paint and hit geometry |
+| Text, size, structure, or layout style | stable keyed nodes where possible | affected layout, text, and paint |
 
-`argui-ui::Element` is the lowering target. A future `argui-dsl` crate can parse
-CSS-like or custom syntax and produce the same elements/styles as Rust builders.
-The DSL may depend on the public UI description API; the UI runtime, layout,
-text, and renderer must never depend on the DSL or parser.
+`Element::layout_boundary` stops a child's intrinsic size from invalidating an
+ancestor. Use it only when the parent supplies the child's size and clips or
+scrolls both axes. Virtualized lists rely on the same ownership rule: the model
+can contain many rows while the UI mounts only the visible window.
 
-The DSL remains optional and testable without a GPU. Its syntax does not become
-part of the runtime representation.
+Painting preserves tree order. Compatible adjacent commands may batch, but
+batching never moves later content behind earlier content. Hit testing follows
+the same paint and clip order in reverse.
 
-## Retained layout flow
+## State and identity
 
-`argui-ui::UiTree` owns the persistent element description, a revision, and an
-explicit dirty state. `argui-layout::LayoutEngine` reconciles retained Taffy nodes
-when the description changes, reusing unchanged branches and measurement caches.
-Viewport and DPI changes also reuse the retained layout tree. Text leaves
-are measured by Cosmic Text under Taffy's width constraint, then lowered to a
-`TextScene`. No layout or shaping work runs while the event loop is idle.
+`Entity<T>` owns shared model data. A renderable entity can have several
+`Mount<T>` presentations, each with its own environment, handlers, render
+cache, and view-owned tasks. A stable `NodeId` belongs to the retained UI tree.
+Keys preserve node identity when siblings move.
 
-Painting preserves tree order across primitive types. Consecutive compatible
-commands are batched, but a later quad is never moved behind earlier text merely
-to reduce draw calls. The WGPU quad pipeline uses one reusable instance buffer;
-rounded corners, asymmetric borders, clipping, and antialiasing stay in WGSL.
+Model notifications invalidate presentations that observed the model. Typed
+events and services coordinate models without global registries. Resource scopes
+own tasks, subscriptions, and cleanup. The full lifetime contract is in
+[models](runtime/models.md).
 
-## Interaction flow
+## Layer ownership
 
-Winit pointer and focus events are translated by `argui-platform`; the runtime
-normalizes coordinates and dispatches them through `argui-ui`. Stable node IDs,
-clipped reverse-order hit testing, focus, and pointer capture remain independent
-from WGPU. Application events include the stable ID and optional element key.
+| Concern | Owner |
+| --- | --- |
+| Geometry, color, identifiers | `argui-core` |
+| Elements, styles, focus, hit testing, semantics | `argui-ui` |
+| Flexbox and Grid adaptation | `argui-layout` |
+| Shaping, bidi, fallback, glyph preparation | `argui-text` |
+| Renderer-neutral draw commands | `argui-paint` |
+| GPU resources, batching, effects, presentation | `argui-render` |
+| Windows, native input, clipboard and OS adapters | `argui-platform` |
+| Models, scheduling, composition, multi-window lifecycle | `argui-runtime` |
+| Reusable controlled components | `argui-widgets` |
 
-Semantic nodes reuse those stable IDs. Native AccessKit and the browser DOM are
-updated from semantic diffs after UI dispatch; semantic-only mutations never
-invalidate Taffy or paint. Pointer contacts use one mouse/touch/pen event schema,
-and the UI gesture arena remains independent from both platform and renderer.
+Text shaping does not own editing. Selection, IME, clipboard commands, and undo
+cross UI and platform layers. The renderer does not own timelines. Animation
+state lives in `argui-animation` and the retained UI; the renderer receives the
+resolved value for the current frame.
 
-Hover, press, focus, named state, and container conditions compose sparse typed
-`StylePatch` values. Paint and transform properties reuse Taffy geometry;
-layout properties update retained Taffy nodes; text color updates prepared text
-without reshaping glyphs. See the [interaction model](ui/interaction.md) and
-[responsive styling](ui/styling.md) for the invalidation contract.
+Accessibility follows the same stable node IDs. Semantic-only changes bypass
+layout and paint. Native AccessKit and the browser semantic DOM consume
+incremental semantic patches after event dispatch.
 
-## Application state flow
+## Platform boundary
 
-`argui-runtime::Render`, `Context<T>`, and `Entity<T>` connect component-local
-Rust state to the retained tree. Each mount owns an independent render cache;
-clean presentations return their exact cached COW subtree. Notifications
-invalidate dependent presentations and their ancestor composition paths.
-`UiTree` uses pointer equality to skip shared descendants, and keyed
-reconciliation preserves stable identities in linear sibling work. See the
-[application state model](runtime/models.md).
+Applications implement `Render` or `AppModel` once. Native and WebAssembly
+launchers differ only at the executable entry point. Android and iOS add small
+ABI shells, while the model, layout, text, paint, and renderer remain shared.
 
-The optional native `hot-reload` feature resolves each `Render` hook and
-`AppModel` callback through Subsecond in debug builds. After a patch, the
-runtime advances a generation, invalidates each window and rejects render-cache
-entries from older generations while retaining the model instances. The bridge
-is compiled out of release and WebAssembly code. See the
-[hot-reload guide](hot-reload.md).
+Target-specific code belongs at the platform edge. Do not put Winit handles in
+UI state, WGPU resources in paint descriptions, or OS policy in reusable
+widgets. Optional integrations such as localization, WebView, updater,
+DevTools, and hot reload remain feature-gated.
 
-`DevtoolsHost<A>` decorates the retained application boundary without changing
-`A`. It gives the application the remaining docked viewport, delegates assets, shaders,
-events and animation lifecycle, and attaches an `InspectorHandle` to the
-runtime. `DevtoolsApp<M>` wraps a multi-window application and supports a
-detached native tools window. The inspection protocol contains no `Element`,
-WGPU resource, or platform handle.
+## Where to change code
 
-An application implements this boundary once for every target. Native and WASM
-need different executable entry symbols, but those launchers contain no view,
-style, state, or business logic. A future project generator can own these static
-entrypoint files completely.
+| Goal | Start in |
+| --- | --- |
+| Add a widget or change widget behavior | `crates/argui-widgets` |
+| Change style resolution, focus, input, or reconciliation | `crates/argui-ui` |
+| Change Flexbox/Grid integration | `crates/argui-layout` |
+| Change shaping or glyph preparation | `crates/argui-text` |
+| Add a paint primitive | `argui-paint`, then `argui-render` |
+| Add an OS capability | `crates/argui-platform`, then expose it through the runtime |
+| Change model lifetime or scheduling | `crates/argui-runtime` |
+| Add an application example | `app_examples` or `crates/argui-widget-gallery` |
 
-`AppModel` extends the same retained boundary to several windows. A stable
-`WindowKey` routes events and invalidations, each window keeps independent UI,
-layout, scroll, and surface state, and all surfaces reuse the same WGPU device.
-The optional tray and Web favicon consume the same immutable application icon
-set and never add work to a frame.
-
-## Retained performance path
-
-`Element` is a copy-on-write `Rc` node. Taffy `NodeMap`s retain the exact
-element and subtree length, allowing layout reconciliation to jump over an
-unchanged branch in constant time. Quad uploads compare stable POD ranges and
-write only the changed interval through WGPU, identically on Vulkan, Metal,
-DX12, and WebGPU.
-
-`VirtualList` handles fixed and variable rows. Variable extents use a Fenwick
-prefix tree, find visible rows in `O(log n)`, receive their real measurements
-from layout, and correct the scroll offset to preserve the current top anchor.
-Run `cargo run -p argui-perf-showcase --example perf` for the native million-row
-and component-isolation labs; the crate's `cdylib` entry runs the same labs on
-WASM without DevTools instrumentation.
-
-## Scroll and stacking
-
-Scroll input keeps line and pixel units distinct until the target container
-applies its policy. Offsets live beside interaction state in `argui-ui`; Taffy
-geometry remains unchanged while layout output, prepared glyphs, clips, and hit
-regions are translated. Stable sibling `z_index` ordering drives both painting
-and reverse hit testing. See [scroll, stacking, and virtual lists](ui/scroll.md).
-
-Storage decisions, baselines and remaining costs are documented in the
-[optimization measurements](performance/optimizations.md).
+Follow the [development guide](contributing/development.md) before crossing a
+crate boundary.

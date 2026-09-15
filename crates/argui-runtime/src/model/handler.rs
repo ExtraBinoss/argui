@@ -51,6 +51,14 @@ impl<T> HandlerRegistry<T> {
 }
 
 impl<T: Render> Context<T> {
+    /// Creates an action binding whose callback runs when the matching action fires.
+    ///
+    /// `id` selects the action; `state` describes its current action state;
+    /// `handler` updates the component in response to action events.
+    /// Returns an action binding that pairs the metadata with its listener.
+    ///
+    /// # Panics
+    /// Panics if called outside a live entity render context.
     #[must_use]
     pub fn on_action(
         &mut self,
@@ -65,6 +73,12 @@ impl<T: Render> Context<T> {
         }
     }
     /// Declares a handler slot for this render. Removed slots are never reused.
+    ///
+    /// `event` selects the event type; `handler` handles matching events.
+    /// Returns the listener declaration for the current event-handler slot.
+    ///
+    /// # Panics
+    /// Panics if called outside a live entity render context.
     #[must_use]
     pub fn listener(
         &mut self,

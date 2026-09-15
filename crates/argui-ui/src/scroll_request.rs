@@ -42,6 +42,10 @@ pub struct ScrollRequest {
 }
 
 impl ScrollRequest {
+    /// Requests an offset for a scroll container.
+    ///
+    /// * `container` — node or key identifying the scroll container.
+    /// * `offset` — requested horizontal and vertical scroll offsets.
     #[must_use]
     pub fn offset(container: impl Into<FocusTarget>, offset: Point) -> Self {
         Self::new(ScrollTarget::Offset {
@@ -50,11 +54,15 @@ impl ScrollRequest {
         })
     }
 
+    /// Requests that a target element be brought into view.
+    /// `target` identifies the element by node or key.
     #[must_use]
     pub fn reveal(target: impl Into<FocusTarget>) -> Self {
         Self::new(ScrollTarget::Element(target.into()))
     }
 
+    /// Requests that a rectangle in a scroll container be brought into view.
+    /// `container` identifies the container and `rect` is in its content coordinates.
     #[must_use]
     pub fn rect(container: impl Into<FocusTarget>, rect: Rect) -> Self {
         Self::new(ScrollTarget::Rect {
@@ -78,6 +86,8 @@ impl ScrollRequest {
         }
     }
 
+    /// Sets horizontal and vertical alignment for reveal requests.
+    /// `x` and `y` are the horizontal and vertical alignment policies.
     #[must_use]
     pub const fn align(mut self, x: ScrollAlignment, y: ScrollAlignment) -> Self {
         self.x = x;
@@ -85,12 +95,16 @@ impl ScrollRequest {
         self
     }
 
+    /// Sets the margin to leave around the revealed content.
+    /// `margin` is the inset applied around the reveal target.
     #[must_use]
     pub const fn margin(mut self, margin: Sides<f32>) -> Self {
         self.margin = margin;
         self
     }
 
+    /// Sets whether the request is applied immediately or animated.
+    /// `behavior` selects how this request is applied.
     #[must_use]
     pub fn behavior(mut self, behavior: ScrollBehavior) -> Self {
         self.behavior = behavior;

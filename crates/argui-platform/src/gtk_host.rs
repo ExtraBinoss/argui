@@ -13,6 +13,7 @@ use crate::WindowConfig;
 mod canvas;
 pub use canvas::GtkCanvas;
 
+/// GTK-backed native window with a transparent WGPU canvas child.
 pub struct GtkWindow {
     window: Arc<Window>,
     container: gtk::Fixed,
@@ -21,6 +22,11 @@ pub struct GtkWindow {
 }
 
 impl GtkWindow {
+    /// Creates a GTK host for the supplied window configuration.
+    ///
+    /// # Errors
+    /// Returns an error if native window or GTK canvas setup fails.
+    /// `target` is the Winit event-loop target and `config` supplies window dimensions and appearance.
     pub fn new<T: 'static>(
         target: &EventLoopWindowTarget<T>,
         config: &WindowConfig,
@@ -70,17 +76,21 @@ impl GtkWindow {
         })
     }
 
+    /// Returns the Tao window that owns this GTK host.
     pub fn native(&self) -> &Window {
         &self.window
     }
+    /// Returns the GTK container that hosts child surfaces.
     pub fn container(&self) -> &gtk::Fixed {
         &self.container
     }
+    /// Returns a retained handle to the WGPU canvas surface.
     pub fn canvas(&self) -> Arc<GtkCanvas> {
         self.canvas.clone()
     }
 
     /// Query in the toplevel's GDK coordinates, never in the child window under the pointer.
+    /// Returns the pointer position in the host's logical coordinates, if available.
     pub fn pointer_position(&self) -> Option<argui_core::Point> {
         let window = self.window.gtk_window().window()?;
         let pointer = window.display().default_seat()?.pointer()?;
@@ -92,6 +102,7 @@ impl GtkWindow {
         ))
     }
 
+    /// Reports whether a native child surface currently owns keyboard focus.
     pub fn native_content_focused(&self) -> bool {
         self.window
             .gtk_window()
@@ -102,10 +113,12 @@ impl GtkWindow {
             })
     }
 
+    /// Requests keyboard focus for the WGPU canvas container.
     pub fn focus_canvas(&self) {
         self.container.grab_focus();
     }
 
+    /// Returns the GTK theme's current window corner radius in logical pixels.
     pub fn corner_radius(&self) -> f32 {
         if self.window.is_decorated() && !self.window.is_maximized() {
             8.0
@@ -115,6 +128,7 @@ impl GtkWindow {
     }
 
     /// The client allocation excludes title bar and CSD shadow extents.
+    /// Returns client width, height, and scale factor.
     pub fn client_size(&self) -> (u32, u32, f32) {
         let allocation = self.container.allocation();
         let scale = self.container.scale_factor().max(1);
@@ -125,6 +139,10 @@ impl GtkWindow {
         )
     }
 
+    /// Updates the canvas placement and dispatches pending Wayland events.
+    ///
+    /// # Errors
+    /// Returns an error if canvas placement or event dispatch fails.
     pub fn sync_canvas(&self) -> Result<(), String> {
         if !self.window.gtk_window().is_mapped() {
             return Ok(());

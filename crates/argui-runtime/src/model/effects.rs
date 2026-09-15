@@ -28,10 +28,14 @@ pub(crate) enum PointerCaptureRequest {
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+/// Strongest rendering work requested for a retained view.
 pub enum ViewUpdate {
+    /// The cached view remains valid.
     #[default]
     None,
+    /// Repaint the view using its existing retained tree.
     Paint,
+    /// Rebuild the retained tree and repaint it.
     Rebuild,
 }
 

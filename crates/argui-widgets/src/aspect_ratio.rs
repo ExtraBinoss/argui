@@ -11,6 +11,12 @@ pub struct AspectRatio {
 impl AspectRatio {
     /// The ratio must be finite and strictly positive.
     #[must_use]
+    /// Creates a container with the requested width-to-height ratio.
+    /// `key` identifies the element, `ratio` is width divided by height, and `content` is fitted inside it.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `ratio` is not finite and strictly positive.
     pub fn new(key: impl Into<String>, ratio: f32, content: Element) -> Self {
         assert!(
             ratio.is_finite() && ratio > 0.0,
@@ -24,6 +30,7 @@ impl AspectRatio {
     }
 
     #[must_use]
+    /// Builds the aspect-ratio container.
     pub fn build(self) -> Element {
         Element::container([self
             .content

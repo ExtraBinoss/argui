@@ -30,6 +30,7 @@ pub struct TabsBehavior {
 }
 
 impl TabsBehavior {
+    /// Creates tab behavior; `key` scopes the set, `tabs` provides labels and enabled flags, and `selected` is the active index.
     #[must_use]
     pub fn new(
         key: impl Into<String>,
@@ -46,11 +47,13 @@ impl TabsBehavior {
     }
 
     #[must_use]
+    /// Returns the trigger key for the tab at `index`.
     pub fn trigger_key(&self, index: usize) -> String {
         format!("{}::tab::{index}", self.key)
     }
 
     #[must_use]
+    /// Applies tab semantics and interaction behavior to `element` for `part`.
     pub fn decorate(&self, part: TabsPart, element: Element) -> Element {
         match part {
             TabsPart::Root => element.state_scope(TABS_SCOPE),
@@ -103,6 +106,7 @@ impl TabsBehavior {
     }
 
     #[must_use]
+    /// Returns a selection or focus action when `event` targets a tab.
     pub fn action(&self, event: &UiEvent) -> Option<TabsAction> {
         if !matches!(event.kind, UiEventKind::Click(_)) {
             return None;

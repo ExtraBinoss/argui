@@ -19,6 +19,7 @@ type Host = gtk::Fixed;
 type Host = Arc<dyn raw_window_handle::HasWindowHandle + Send + Sync>;
 
 #[derive(Default)]
+/// Wry-backed native WebView factory.
 pub struct WryBackend {
     hosts: HashMap<u64, Host>,
     #[cfg(target_os = "linux")]
@@ -26,23 +27,27 @@ pub struct WryBackend {
 }
 
 impl WryBackend {
-    /// Wake the owning UI loop when a native child takes pointer or keyboard input.
     #[cfg(target_os = "linux")]
+    /// Wakes the owning UI loop when a native child handles pointer or keyboard input.
+    /// `wake` schedules processing on the host event loop.
     pub fn input_waker(mut self, wake: impl Fn() + 'static) -> Self {
         self.input_waker = Some(std::rc::Rc::new(wake));
         self
     }
+    /// Creates a Wry backend without registered host windows.
     #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
     #[cfg(target_os = "linux")]
+    /// Registers a GTK container as the native parent for `id`.
     pub fn register_gtk_host(&mut self, id: u64, container: gtk::Fixed) {
         self.hosts.insert(id, container);
     }
 
     #[cfg(not(target_os = "linux"))]
+    /// Registers a native parent window for `id`.
     pub fn register_host(
         &mut self,
         id: u64,
@@ -52,6 +57,7 @@ impl WryBackend {
     }
 }
 
+/// Native Wry view owned and positioned by a [`crate::WebViewPool`].
 pub struct WryView {
     view: wry::WebView,
     policy: WebViewPolicy,

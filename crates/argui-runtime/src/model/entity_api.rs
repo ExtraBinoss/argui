@@ -11,6 +11,8 @@ use super::{
 };
 
 impl<T: 'static> WeakEntity<T> {
+    /// Upgrades this weak reference while its model or presentation is alive.
+    /// Returns `None` after both have been dropped.
     #[must_use]
     pub fn upgrade(&self) -> Option<Entity<T>> {
         if let Some(presentation) = self.presentation.upgrade() {
@@ -26,6 +28,9 @@ impl<T: 'static> WeakEntity<T> {
 }
 
 impl AnyEntity {
+    /// Tests whether two erased entities refer to the same retained identity.
+    ///
+    /// `other` is the entity to compare with this one.
     #[must_use]
     pub fn ptr_eq(&self, other: &Self) -> bool {
         Rc::ptr_eq(&self.identity, &other.identity)

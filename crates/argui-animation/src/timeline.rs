@@ -4,31 +4,47 @@ use crate::{
 };
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+/// Lifecycle state of a timeline.
 pub enum PlaybackState {
+    /// The timeline has not started.
     #[default]
     Idle,
+    /// The timeline is advancing.
     Running,
+    /// The timeline is paused.
     Paused,
+    /// The timeline reached an endpoint.
     Finished,
+    /// The timeline was canceled.
     Canceled,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+/// Events emitted while sampling a timeline.
 pub struct TimelineEvents {
+    /// Whether playback entered its active interval during this sample.
     pub started: bool,
+    /// Number of iteration boundaries crossed since the prior sample.
     pub iterations: u64,
+    /// Whether playback finished during this sample.
     pub finished: bool,
+    /// Whether cancellation was reported during this sample.
     pub canceled: bool,
 }
 
 #[derive(Clone, Debug)]
+/// Value, events, and lifecycle state produced by a timeline sample.
 pub struct TimelineSample<T> {
+    /// Sampled value, absent when fill behavior does not contribute.
     pub value: Option<T>,
+    /// Events emitted by this sample.
     pub events: TimelineEvents,
+    /// Timeline state after sampling.
     pub state: PlaybackState,
 }
 
 #[derive(Clone, Debug)]
+/// Keyframed animation with timing and playback controls.
 pub struct Timeline<T> {
     keyframes: Keyframes<T>,
     timing: Timing,
@@ -43,6 +59,10 @@ pub struct Timeline<T> {
 }
 
 impl<T> Timeline<T> {
+    /// Creates a timeline from validated keyframes and timing parameters.
+    ///
+    /// # Errors
+    /// Returns a timing error if duration, iteration count, or playback rate is invalid.
     pub fn new(keyframes: Keyframes<T>, timing: Timing) -> Result<Self, TimingError> {
         let timing = timing.validate()?;
         Ok(Self {
@@ -59,21 +79,25 @@ impl<T> Timeline<T> {
         })
     }
 
+    /// Returns the current playback state.
     #[must_use]
     pub const fn state(&self) -> PlaybackState {
         self.state
     }
 
+    /// Returns the timing configuration.
     #[must_use]
     pub const fn timing(&self) -> Timing {
         self.timing
     }
 
+    /// Returns whether playback is running and needs another frame.
     #[must_use]
     pub fn needs_frame(&self) -> bool {
         self.state == PlaybackState::Running
     }
 
+    /// Starts playback at `now`, or resumes a paused timeline.
     pub fn play(&mut self, now: Time) {
         match self.state {
             PlaybackState::Running => return,
@@ -89,6 +113,7 @@ impl<T> Timeline<T> {
         self.state = PlaybackState::Running;
     }
 
+    /// Pauses playback at the position reached at `now`.
     pub fn pause(&mut self, now: Time) {
         if self.state == PlaybackState::Running {
             self.anchor_position = self.position(now);
@@ -97,6 +122,7 @@ impl<T> Timeline<T> {
         }
     }
 
+    /// Resumes paused playback with its position anchored at `now`.
     pub fn resume(&mut self, now: Time) {
         if self.state == PlaybackState::Paused {
             self.anchor_time = now;
@@ -104,18 +130,27 @@ impl<T> Timeline<T> {
         }
     }
 
+    /// Restarts playback from the beginning (or end when playing backward).
+    /// * `now` — current timestamp used as the new playback anchor.
     pub fn restart(&mut self, now: Time) {
         self.reset_position();
         self.anchor_time = now;
         self.state = PlaybackState::Running;
     }
 
+    /// Sets the playback position, clamped to the timeline's total duration.
+    /// * `now` — current timestamp used as the new playback anchor.
     pub fn seek(&mut self, position: Duration, now: Time) {
         self.anchor_position = self.clamp_position(position.as_secs_f64());
         self.anchor_time = now;
         self.reset_events_for_position();
     }
 
+    /// Changes playback speed while preserving the position at `now`.
+    ///
+    /// # Errors
+    /// Returns [`TimingError::InvalidPlaybackRate`] for zero or non-finite rates.
+    /// * `playback_rate` — nonzero finite speed multiplier; the sign selects direction.
     pub fn set_playback_rate(&mut self, playback_rate: f64, now: Time) -> Result<(), TimingError> {
         if !playback_rate.is_finite() || playback_rate == 0.0 {
             return Err(TimingError::InvalidPlaybackRate);
@@ -126,6 +161,7 @@ impl<T> Timeline<T> {
         Ok(())
     }
 
+    /// Reverses the current playback direction at `now`.
     pub fn reverse(&mut self, now: Time) {
         let rate = -self.playback_rate;
         if matches!(
@@ -141,6 +177,7 @@ impl<T> Timeline<T> {
         }
     }
 
+    /// Marks the timeline finished and queues a finish event for its next sample.
     pub fn finish(&mut self) {
         self.anchor_position = if self.playback_rate >= 0.0 {
             self.timing.total_seconds()
@@ -151,6 +188,7 @@ impl<T> Timeline<T> {
         self.pending_finished = true;
     }
 
+    /// Cancels playback and queues a cancellation event for its next sample.
     pub fn cancel(&mut self) {
         self.state = PlaybackState::Canceled;
         self.pending_canceled = true;
@@ -215,6 +253,12 @@ impl<T: Clone + Interpolate> Timeline<T> {
         self.keyframes.sample(progress)
     }
 
+    /// Replaces the timeline with a tween from its current sample to `target`.
+    ///
+    /// # Errors
+    /// Returns a timing error if `duration` is zero or keyframe construction fails.
+    /// * `easing` — interpolation curve from the current value to `target`.
+    /// * `now` — current timestamp used to restart the tween.
     pub fn retarget(
         &mut self,
         target: T,
@@ -236,6 +280,7 @@ impl<T: Clone + Interpolate> Timeline<T> {
         Ok(())
     }
 
+    /// Samples the timeline at `now`, returning its value, events, and state.
     #[must_use]
     pub fn sample(&mut self, now: Time) -> TimelineSample<T> {
         let mut events = TimelineEvents {

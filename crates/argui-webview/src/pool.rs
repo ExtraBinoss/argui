@@ -5,8 +5,11 @@ use argui_core::Rect;
 use crate::{NativeWebView, WebViewBackend, WebViewError, WebViewId, WebViewState};
 
 #[derive(Clone, Copy, Debug)]
+/// Residency limits and cleanup delay for a WebView pool.
 pub struct PoolConfig {
+    /// Maximum number of active or retained native views.
     pub max_resident: usize,
+    /// Time an unused view remains resident before eviction.
     pub idle_timeout: Duration,
 }
 
@@ -20,17 +23,26 @@ impl Default for PoolConfig {
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+/// Snapshot of current residency and cumulative pool activity.
 pub struct PoolStats {
+    /// Number of native views currently resident.
     pub resident: usize,
+    /// Total views created by this pool.
     pub created: u64,
+    /// Total views reused after becoming idle.
     pub reused: u64,
+    /// Total views evicted from the pool.
     pub evicted: u64,
 }
 
 #[derive(Clone, Debug)]
+/// Layout-derived placement and visibility state for a retained WebView.
 pub struct WebViewMount {
+    /// Retained state associated with this mount.
     pub state: WebViewState,
+    /// Identity of the host window.
     pub host: u64,
+    /// Desired bounds in host logical coordinates.
     pub bounds: Rect,
     /// Covered by an Argui overlay: retain the instance but remove native input/paint.
     pub occluded: bool,
@@ -49,6 +61,7 @@ struct Resident<V> {
     idle_since: Option<Duration>,
 }
 
+/// Reconciles retained WebView slots with a bounded set of native views.
 pub struct WebViewPool<B: WebViewBackend> {
     backend: B,
     config: PoolConfig,
@@ -62,6 +75,11 @@ impl<B: WebViewBackend> WebViewPool<B> {
         &self.backend
     }
 
+    /// Creates a pool with the supplied backend and residency limits.
+    /// `backend` creates native views; `config` limits residency and eviction delay.
+    ///
+    /// # Errors
+    /// Returns an error if `max_resident` is zero.
     pub fn new(backend: B, config: PoolConfig) -> Result<Self, WebViewError> {
         if config.max_resident == 0 {
             return Err(WebViewError::CapacityExceeded);
@@ -75,6 +93,7 @@ impl<B: WebViewBackend> WebViewPool<B> {
     }
 
     #[must_use]
+    /// Returns current residency and cumulative lifecycle counters.
     pub fn stats(&self) -> PoolStats {
         PoolStats {
             resident: self.residents.len(),
@@ -83,6 +102,8 @@ impl<B: WebViewBackend> WebViewPool<B> {
     }
 
     #[must_use]
+    /// Reports whether a visible resident view contains the logical pointer position.
+    /// `point` is expressed in the same logical coordinate space as mount bounds.
     pub fn contains_pointer(&self, point: argui_core::Point) -> bool {
         self.residents
             .iter()
@@ -91,6 +112,10 @@ impl<B: WebViewBackend> WebViewPool<B> {
 
     /// One call after layout/commands change, or when `next_expiry` elapses.
     /// Unchanged slots do not call the native backend.
+    ///
+    /// # Errors
+    /// Returns an error for duplicate mounts, invalid bounds, capacity limits, or backend failures.
+    /// `mounts` are the current layout-derived slots; `now` is the host's monotonic elapsed time.
     pub fn reconcile(
         &mut self,
         mounts: &[WebViewMount],
@@ -216,6 +241,7 @@ impl<B: WebViewBackend> WebViewPool<B> {
 
     /// Monotonic deadline used to wake an otherwise idle event loop.
     #[must_use]
+    /// Returns the delay until an idle resident reaches its eviction timeout.
     pub fn next_expiry(&self) -> Option<Duration> {
         self.residents
             .iter()
@@ -224,6 +250,7 @@ impl<B: WebViewBackend> WebViewPool<B> {
             .min()
     }
 
+    /// Evicts all resident views belonging to `host`.
     pub fn close_host(&mut self, host: u64) {
         while let Some(index) = self
             .residents

@@ -30,6 +30,7 @@ pub enum ScrollMetric {
 }
 
 impl ScrollMetrics {
+    /// Returns distances from the viewport's left, top, right, and bottom edges.
     #[must_use]
     pub fn remaining(self) -> [f32; 4] {
         let x = positive(self.max_offset.x);
@@ -39,6 +40,9 @@ impl ScrollMetrics {
         [left, top, x - left, y - top]
     }
 
+    /// Resolves one scroll metric into the effect value expected by its binding.
+    ///
+    /// * `source` — metric to evaluate from this scroll state.
     #[must_use]
     pub fn value(self, source: ScrollMetric) -> EffectValue {
         let distances = self.remaining();
@@ -110,6 +114,9 @@ struct ScrollEffectBinding {
 }
 
 impl ScrollEffect {
+    /// Creates an effect layer whose parameters can be bound to scroll metrics.
+    ///
+    /// * `layer` — layer and custom-filter configuration to resolve.
     #[must_use]
     pub fn new(layer: LayerStyle) -> Self {
         Self {
@@ -121,6 +128,10 @@ impl ScrollEffect {
 
     /// Skips this entire layer when none of the selected edges is visible.
     /// Kept separate from bindings: a zero parameter need not disable a custom shader.
+    ///
+    /// * `strengths` — left, top, right, and bottom edge strengths.
+    /// * `threshold` — edge distance before the effect begins.
+    /// * `ramp` — distance over which strength ramps up after the threshold.
     #[must_use]
     pub fn when_edges(mut self, strengths: [f32; 4], threshold: f32, ramp: f32) -> Self {
         self.active_edges = Some(ScrollMetric::Edges {
@@ -132,6 +143,15 @@ impl ScrollEffect {
     }
 
     /// Binds an existing custom-filter parameter; invalid targets fail at construction.
+    ///
+    /// * `filter` — index of the custom filter in the layer's filter list.
+    /// * `parameter` — name of the parameter to bind.
+    /// * `source` — scroll metric used as the parameter value.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the filter is missing or is not a custom effect, if the parameter
+    /// does not exist, or if its value type does not match the selected metric.
     #[must_use]
     pub fn bind(mut self, filter: usize, parameter: &'static str, source: ScrollMetric) -> Self {
         let Some(Filter::Effect(effect)) = self.layer.filters.get(filter) else {
@@ -165,6 +185,11 @@ impl ScrollEffect {
     }
 
     /// Inactive effects produce no layer and therefore no offscreen passes.
+    ///
+    /// * `metrics` — current viewport, transform, offset, and maximum offset.
+    ///
+    /// Returns the resolved layer, or `None` when the effect is inactive or cannot
+    /// be mapped through the current geometry.
     #[must_use]
     pub fn resolve(&self, metrics: ScrollMetrics) -> Option<LayerStyle> {
         if !metrics.remaining().iter().any(|distance| *distance > 0.0)

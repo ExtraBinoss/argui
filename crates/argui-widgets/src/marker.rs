@@ -20,6 +20,7 @@ pub struct Marker {
 }
 
 impl Marker {
+    /// Creates a compact marker identified by `key` and displaying `text`.
     #[must_use]
     pub fn new(key: impl Into<String>, text: impl Into<String>) -> Self {
         Self {
@@ -32,6 +33,7 @@ impl Marker {
     }
 
     #[must_use]
+    /// Builds the marker using `theme` for its visual variant.
     pub fn build(self, theme: &WidgetTheme) -> Element {
         let root = if self.variant == MarkerVariant::Separator {
             Separator::new(&self.key).label(&self.text).build(theme)

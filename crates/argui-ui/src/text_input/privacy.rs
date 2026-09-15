@@ -12,6 +12,7 @@ pub enum TextPrivacy {
 }
 
 impl TextPrivacy {
+    /// Returns whether this mode protects text from clipboard and history access.
     #[must_use]
     pub const fn protected(self) -> bool {
         !matches!(self, Self::Public)
@@ -19,6 +20,9 @@ impl TextPrivacy {
 }
 
 impl crate::Element {
+    /// Sets how this element's text is displayed and retained.
+    ///
+    /// * `privacy` — public, password, or revealed-password policy.
     #[must_use]
     pub fn text_privacy(mut self, privacy: TextPrivacy) -> Self {
         self.text_privacy = privacy;

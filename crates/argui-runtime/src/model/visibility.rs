@@ -30,6 +30,11 @@ impl<T: 'static> Mount<T> {
 
     /// Changes presentation visibility without cancelling any work. Repeated
     /// requests are inert. Showing renders the latest data on the next frame.
+    ///
+    /// `visible` selects whether this mount should be shown.
+    ///
+    /// # Errors
+    /// Returns [`ScopeClosed`] if this mount has already closed.
     pub fn set_visible(&self, visible: bool) -> Result<(), ScopeClosed> {
         if self.resources().is_closed() {
             return Err(ScopeClosed);
@@ -56,11 +61,16 @@ impl<T: 'static> Mount<T> {
 
 impl<T: Render> Context<T> {
     /// Renders a child entity and reuses its exact subtree while it is clean.
+    ///
+    /// `entity` is the child model to present. Returns its current retained subtree.
     pub fn entity<U: Render>(&mut self, entity: &Entity<U>) -> Element {
         self.entity_visible(entity, true)
     }
 
-    /// Render a child with a scoped environment, inherited by its descendants.
+    /// Renders a child with an environment inherited by its descendants.
+    ///
+    /// `entity` is the child model to present; `environment` is the environment for
+    /// this child subtree. Returns the rendered child subtree.
     pub fn entity_in<U: Render>(
         &mut self,
         entity: &Entity<U>,
@@ -74,6 +84,9 @@ impl<T: Render> Context<T> {
 
     /// Retains a child while hidden, without rendering or accepting UI input.
     /// Omitting this call on a later render unmounts the child instead.
+    ///
+    /// `entity` is the child model; `visible` controls whether its subtree is shown.
+    /// Returns the retained subtree, which is empty while hidden.
     pub fn entity_visible<U: Render>(&mut self, entity: &Entity<U>, visible: bool) -> Element {
         let entity = self.child_presentation(entity);
         let before = entity.0.presentation.is_visible();
@@ -164,11 +177,17 @@ impl<T: 'static> Entity<T> {
 
 impl super::AnyEntity {
     /// Applies window visibility independently of each child's local hide/show state.
+    ///
+    /// `visible` is the host-level visibility to apply to this presentation and its
+    /// descendants.
     pub fn set_host_visible(&self, visible: bool) {
         (self.host_visibility)(visible);
     }
     /// Closes this presentation and routed presentations, even if external handles remain.
     /// Data models and their resources retain their separate ownership.
+    ///
+    /// # Panics
+    /// Resumes the first panic raised while closing a presentation or its resources.
     pub fn close_presentation(&self) {
         (self.close_host)();
     }

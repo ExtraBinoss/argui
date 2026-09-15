@@ -35,6 +35,7 @@ pub struct InputStyle {
 }
 
 impl InputStyle {
+    /// Creates an input style from base paint and text typography.
     #[must_use]
     pub fn new(paint: PaintStyle, mut text: TextStyle) -> Self {
         text.wrap = TextWrap::None;
@@ -67,30 +68,35 @@ impl InputStyle {
     }
 
     #[must_use]
+    /// Sets the style patch applied while the pointer hovers over the field.
     pub fn hovered(mut self, style: impl Into<StylePatch>) -> Self {
         self.hovered = style.into();
         self
     }
 
     #[must_use]
+    /// Sets the style patch applied while the field has visible focus.
     pub fn focused(mut self, style: impl Into<StylePatch>) -> Self {
         self.focused = style.into();
         self
     }
 
     #[must_use]
+    /// Sets the style and text transition behavior.
     pub fn transition(mut self, transition: StyleTransition) -> Self {
         self.transition = transition;
         self
     }
 
     #[must_use]
+    /// Sets the text-selection highlight color.
     pub const fn selection(mut self, color: Color) -> Self {
         self.selection = color;
         self
     }
 
     #[must_use]
+    /// Sets the caret appearance.
     pub fn caret(mut self, caret: CaretStyle) -> Self {
         self.caret = caret;
         self
@@ -115,6 +121,10 @@ pub struct Input {
 
 #[cfg(feature = "input")]
 impl Input {
+    /// Creates an editable single-line input.
+    ///
+    /// `key` identifies the field, `value` is its controlled text, `placeholder` is shown
+    /// when empty, and `style` configures its appearance.
     #[must_use]
     pub fn new(
         key: impl Into<String>,
@@ -138,48 +148,56 @@ impl Input {
     }
 
     #[must_use]
+    /// Sets the input purpose and corresponding text filter; `kind` selects its semantics.
     pub const fn kind(mut self, kind: InputKind) -> Self {
         self.kind = kind;
         self
     }
 
     #[must_use]
+    /// Sets whether the input accepts user editing; `enabled` controls interaction availability.
     pub const fn enabled(mut self, enabled: bool) -> Self {
         self.enabled = enabled;
         self
     }
 
     #[must_use]
+    /// Sets whether the text can be edited while remaining focusable; `read_only` controls editability.
     pub const fn read_only(mut self, read_only: bool) -> Self {
         self.read_only = read_only;
         self
     }
 
     #[must_use]
+    /// Sets the accessible name of the input; `label` supplies that name.
     pub fn label(mut self, label: impl Into<String>) -> Self {
         self.label = Some(label.into());
         self
     }
 
     #[must_use]
+    /// Sets supplementary accessible description text.
     pub fn description(mut self, description: impl Into<String>) -> Self {
         self.description = Some(description.into());
         self
     }
 
     #[must_use]
+    /// Sets whether the input is marked invalid.
     pub const fn invalid(mut self, invalid: bool) -> Self {
         self.invalid = invalid;
         self
     }
 
     #[must_use]
+    /// Adds a leading element and reserves `slot_width` logical pixels for it; `content` is rendered before the field.
     pub fn leading(mut self, content: Element, slot_width: f32) -> Self {
         self.leading = Some((content, slot_width.max(0.0)));
         self
     }
 
     #[must_use]
+    /// Builds the configured input element.
     pub fn build(self) -> Element {
         let mut style = self.style;
         if let Some((_, slot_width)) = self.leading.as_ref() {
@@ -235,6 +253,10 @@ pub struct TextArea {
 
 #[cfg(feature = "textarea")]
 impl TextArea {
+    /// Creates a multiline input with wrapping text.
+    ///
+    /// `key` identifies the field, `value` is its controlled text, `placeholder` is shown
+    /// when empty, and `style` configures its appearance.
     #[must_use]
     pub fn new(
         key: impl Into<String>,
@@ -258,30 +280,35 @@ impl TextArea {
     }
 
     #[must_use]
+    /// Sets the scroll behavior for overflowing text.
     pub fn scroll_config(mut self, scroll: ScrollConfig) -> Self {
         self.scroll = scroll;
         self
     }
 
     #[must_use]
+    /// Sets the scrollbar style for the text area.
     pub fn scrollbar(mut self, scrollbar: ScrollbarStyle) -> Self {
         self.scroll = self.scroll.scrollbar(scrollbar);
         self
     }
 
     #[must_use]
+    /// Sets whether the text area accepts user editing; `enabled` controls interaction availability.
     pub const fn enabled(mut self, enabled: bool) -> Self {
         self.enabled = enabled;
         self
     }
 
     #[must_use]
+    /// Sets whether the text remains focusable but cannot be edited; `read_only` controls editability.
     pub const fn read_only(mut self, read_only: bool) -> Self {
         self.read_only = read_only;
         self
     }
 
     #[must_use]
+    /// Builds the configured text area.
     pub fn build(self) -> Element {
         editor(
             EditorSpec {

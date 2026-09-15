@@ -18,6 +18,9 @@ pub struct Progress {
 }
 
 impl Progress {
+    /// Creates a progress indicator with an optional value from 0.0 through 1.0.
+    ///
+    /// `key` identifies it and `label` provides its accessible name.
     #[must_use]
     pub fn new(key: impl Into<String>, label: impl Into<String>, value: Option<f32>) -> Self {
         let mut progress = Self {
@@ -31,6 +34,7 @@ impl Progress {
         progress
     }
 
+    /// Replaces the progress value; `None` represents indeterminate progress.
     pub fn set_value(&mut self, value: Option<f32>) {
         self.value = value
             .filter(|value| value.is_finite())
@@ -38,11 +42,13 @@ impl Progress {
     }
 
     #[must_use]
+    /// Returns the current determinate value, or `None` when indeterminate.
     pub const fn value(&self) -> Option<f32> {
         self.value
     }
 
     #[must_use]
+    /// Builds the progress indicator using `theme` for its track and fill.
     pub fn build(&self, theme: &WidgetTheme) -> Element {
         let (width, offset) = self.value.map_or_else(
             || {

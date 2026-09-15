@@ -3,6 +3,7 @@ use crate::{WebViewError, WebViewPolicy, WebViewSource};
 /// Browser-only origin handling. Wry already preserves the loaded site's origin.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub enum WebCompatibility {
+    /// Keep browser content isolated from the host page's origin.
     #[default]
     Isolated,
     /// A trusted, separately hosted Argui relay, configured with an origin allowlist.
@@ -10,6 +11,11 @@ pub enum WebCompatibility {
 }
 
 impl WebCompatibility {
+    /// Allows the configured trusted relay origin for browser-backed sessions.
+    /// `relay` must be an HTTP(S) origin without credentials, query, or fragment.
+    ///
+    /// # Errors
+    /// Returns an error if the relay is not a valid HTTP(S) origin or contains credentials, query, or fragment data.
     pub fn compatible(relay: &str) -> Result<Self, WebViewError> {
         let WebViewSource::Url(relay) = WebViewSource::url(relay)? else {
             unreachable!()
@@ -29,6 +35,7 @@ impl WebCompatibility {
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum PopupPolicy {
+    /// Reject popup and new-window requests.
     #[default]
     Block,
     /// New windows inherit the frame sandbox.
@@ -47,6 +54,7 @@ pub struct WebViewOptions {
 }
 
 impl WebViewOptions {
+    /// Creates restrictive defaults for an external web page.
     #[must_use]
     pub fn webpage() -> Self {
         Self {
@@ -56,6 +64,7 @@ impl WebViewOptions {
             downloads: false,
         }
     }
+    /// Creates restrictive defaults for a sanitized email or other untrusted HTML document.
     #[must_use]
     pub fn email() -> Self {
         Self {
@@ -64,30 +73,43 @@ impl WebViewOptions {
         }
     }
     #[must_use]
+    /// Selects browser origin compatibility behavior.
+    /// `mode` is the requested isolation policy.
     pub fn compatibility(mut self, mode: WebCompatibility) -> Self {
         self.compatibility = mode;
         self
     }
     #[must_use]
+    /// Sets how popup requests are handled.
+    /// `policy` selects whether requests are blocked or opened.
     pub fn popups(mut self, policy: PopupPolicy) -> Self {
         self.popups = policy;
         self
     }
     #[must_use]
+    /// Sets whether this session may download files.
+    /// `allow` enables or disables downloads.
     pub fn allow_downloads(mut self, allow: bool) -> Self {
         self.downloads = allow;
         self
     }
+    /// Returns the configured browser compatibility mode.
     pub fn compatibility_mode(&self) -> &WebCompatibility {
         &self.compatibility
     }
+    /// Returns the configured popup policy.
     pub fn popup_policy(&self) -> PopupPolicy {
         self.popups
     }
+    /// Returns whether downloads are allowed.
     pub fn downloads_allowed(&self) -> bool {
         self.downloads
     }
 
+    /// Checks that these permissions are compatible with `source`.
+    ///
+    /// # Errors
+    /// Returns an error if source policy differs or restricted HTML permissions were relaxed.
     pub fn validate(&self, source: &WebViewSource) -> Result<(), WebViewError> {
         if source.policy() != self.policy {
             return Err(WebViewError::PolicyMismatch);
@@ -108,6 +130,9 @@ impl WebViewOptions {
     }
 
     /// Wry default popup windows do not guarantee inheritance of our policies.
+    ///
+    /// # Errors
+    /// Returns an error if the requested popup policy cannot be enforced by the native backend.
     pub fn validate_native(&self) -> Result<(), WebViewError> {
         if self.popups != PopupPolicy::Block {
             return Err(WebViewError::UnsupportedOptions(
@@ -117,6 +142,7 @@ impl WebViewOptions {
         Ok(())
     }
 
+    /// Builds the iframe sandbox token list corresponding to these options.
     pub fn sandbox(&self) -> String {
         if self.policy == WebViewPolicy::RestrictedHtml {
             return "allow-same-origin".into();

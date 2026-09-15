@@ -30,6 +30,9 @@ pub struct Combobox {
 }
 
 impl Combobox {
+    /// Creates an enabled combobox from options in source order.
+    ///
+    /// `key` identifies the control and `label` names it for accessibility.
     #[must_use]
     pub fn new(
         key: impl Into<String>,
@@ -50,6 +53,7 @@ impl Combobox {
     }
 
     #[must_use]
+    /// Returns source indices whose labels contain the current query, ignoring case.
     pub fn visible_indices(&self) -> Vec<usize> {
         let query = self.query.to_lowercase();
         self.options
@@ -72,11 +76,13 @@ impl Combobox {
     }
 
     #[must_use]
+    /// Returns the interaction key for the source option at `index`.
     pub fn option_key(&self, index: usize) -> String {
         format!("{}::option::{index}", self.key)
     }
 
     #[must_use]
+    /// Interprets `event` as a query, popup, highlight or selection action.
     pub fn action(&self, event: &UiEvent) -> Option<ComboboxAction> {
         if !self.enabled {
             return None;
@@ -142,6 +148,7 @@ impl Combobox {
     }
 
     #[must_use]
+    /// Builds the editable combobox and its popup using `theme` for control styling.
     pub fn build(&self, theme: &WidgetTheme) -> Element {
         let open = self.open && self.enabled;
         let visible = self.visible_indices();

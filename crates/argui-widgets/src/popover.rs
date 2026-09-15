@@ -27,6 +27,9 @@ pub struct Popover {
 }
 
 impl Popover {
+    /// Creates a controlled popover with a trigger and panel content.
+    ///
+    /// `key` identifies the popover, `label` names it accessibly, and `open` supplies visibility.
     #[must_use]
     pub fn new(
         key: impl Into<String>,
@@ -57,18 +60,21 @@ impl Popover {
     }
 
     #[must_use]
+    /// Sets the panel placement relative to its trigger.
     pub const fn placement(mut self, placement: FloatingPlacement) -> Self {
         self.placement = placement;
         self
     }
 
     #[must_use]
+    /// Replaces the panel paint style.
     pub fn paint(mut self, paint: PaintStyle) -> Self {
         self.paint = Some(paint);
         self
     }
 
     #[must_use]
+    /// Sets the preferred width and maximum height in logical pixels; `max_height` bounds the panel vertically.
     pub const fn size(mut self, width: f32, max_height: f32) -> Self {
         self.width = width;
         self.max_height = max_height;
@@ -76,18 +82,21 @@ impl Popover {
     }
 
     #[must_use]
+    /// Sets the panel's inner padding in logical pixels.
     pub const fn padding(mut self, padding: f32) -> Self {
         self.padding = padding;
         self
     }
 
     #[must_use]
+    /// Sets the panel corner radius.
     pub const fn radius(mut self, radius: f32) -> Self {
         self.radius = radius;
         self
     }
 
     #[must_use]
+    /// Sets the backdrop blur radius; non-positive values disable blur.
     pub const fn backdrop_blur(mut self, radius: f32) -> Self {
         self.backdrop_blur = Some(radius);
         self
@@ -101,12 +110,14 @@ impl Popover {
     }
 
     #[must_use]
+    /// Sets whether focus is trapped within the open panel; `trap` enables focus containment.
     pub const fn trap_focus(mut self, trap: bool) -> Self {
         self.trap_focus = trap;
         self
     }
 
     #[must_use]
+    /// Uses retained presence state for visibility and entry/exit motion.
     pub fn presence(mut self, presence: &crate::Presence) -> Self {
         self.open = presence.is_open();
         self.presence = Some(presence.clone());
@@ -114,12 +125,14 @@ impl Popover {
     }
 
     #[must_use]
+    /// Sets the overlay surface policy.
     pub const fn surface(mut self, surface: argui_ui::OverlaySurface) -> Self {
         self.surface = Some(surface);
         self
     }
 
     #[must_use]
+    /// Builds the popover using `theme` for default panel and backdrop styling.
     pub fn build(self, theme: &WidgetTheme) -> Element {
         let behavior = PopoverBehavior::new(&self.key, &self.label, self.open);
         let trigger = behavior.decorate(PopoverPart::Trigger, self.trigger);

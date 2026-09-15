@@ -34,6 +34,7 @@ pub struct DevtoolsApp<M> {
 }
 
 impl<M: AppModel> DevtoolsApp<M> {
+    /// Wraps `app` with a shared inspection session and DevTools presentation.
     #[must_use]
     pub fn new(app: M) -> Self {
         let mut tools = DevtoolsHost::new(EmptyApp);
@@ -49,6 +50,11 @@ impl<M: AppModel> DevtoolsApp<M> {
         }
     }
 
+    /// Selects the application window to which the docked tools are attached.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `target` equals the reserved detached-tools window key.
     #[must_use]
     pub fn target(mut self, target: WindowKey) -> Self {
         assert!(target != self.detached);
@@ -56,6 +62,7 @@ impl<M: AppModel> DevtoolsApp<M> {
         self
     }
 
+    /// Sets whether the tools panel starts open.
     #[must_use]
     pub fn open(mut self, open: bool) -> Self {
         let tools = self.tools.get_mut();
@@ -64,6 +71,7 @@ impl<M: AppModel> DevtoolsApp<M> {
     }
 
     #[cfg(not(target_arch = "wasm32"))]
+    /// Installs a device telemetry provider for native targets.
     #[must_use]
     pub fn device_telemetry(
         mut self,
@@ -73,6 +81,7 @@ impl<M: AppModel> DevtoolsApp<M> {
         self
     }
 
+    /// Selects the scroll effect used by DevTools lists; `None` disables it.
     #[must_use]
     pub fn scroll_effect(mut self, effect: Option<argui_ui::ScrollEffect>) -> Self {
         let tools = self.tools.get_mut();
@@ -81,16 +90,19 @@ impl<M: AppModel> DevtoolsApp<M> {
         self
     }
 
+    /// Returns a handle for publishing inspection data to this app's tools.
     #[must_use]
     pub fn inspector(&self) -> InspectorHandle {
         self.tools.borrow().inspector()
     }
 
+    /// Returns the current dock location.
     #[must_use]
     pub fn dock_mode(&self) -> DockMode {
         self.tools.borrow().dock_mode
     }
 
+    /// Returns the window currently presenting DevTools.
     #[must_use]
     pub fn tools_window(&self) -> &WindowKey {
         if self.dock_mode() == DockMode::Detached {
@@ -101,6 +113,8 @@ impl<M: AppModel> DevtoolsApp<M> {
     }
 
     /// Requests presentation changes; the dock stays visible until the new surface is ready.
+    /// `mode` is the requested dock or detached-window presentation. Returns runtime
+    /// commands and invalidations needed to perform the transition.
     pub fn set_dock_mode(&mut self, mode: DockMode) -> AppUpdate {
         if mode == DockMode::Detached {
             if cfg!(target_arch = "wasm32") {

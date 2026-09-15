@@ -18,6 +18,11 @@ pub struct TextLayout {
 }
 
 impl TextLayout {
+    /// Returns the caret position hit within a shaped line at `point`.
+    ///
+    /// * `point` — position in text-layout coordinates.
+    ///
+    /// Returns `None` when no line contains the point.
     #[must_use]
     pub fn hit_position(&self, point: Point) -> Option<TextPosition> {
         self.lines
@@ -26,6 +31,9 @@ impl TextLayout {
             .and_then(|line| closest_on_line(&self.stops, line, point.x))
     }
 
+    /// Returns the nearest caret position, even when `point` is outside all lines.
+    ///
+    /// * `point` — position in text-layout coordinates.
     #[must_use]
     pub fn closest_position(&self, point: Point) -> TextPosition {
         let Some(line) = self.lines.iter().min_by(|left, right| {
@@ -37,6 +45,10 @@ impl TextLayout {
         closest_on_line(&self.stops, line, point.x).unwrap_or_default()
     }
 
+    /// Returns visual rectangles covering the selected range between two positions.
+    ///
+    /// * `anchor` — first selection endpoint.
+    /// * `focus` — second selection endpoint.
     #[must_use]
     pub fn selection_rects(&self, anchor: TextPosition, focus: TextPosition) -> Vec<Rect> {
         let (start, end) = ordered(anchor.index, focus.index);
@@ -73,6 +85,11 @@ impl TextLayout {
 }
 
 impl TextEngine {
+    /// Shapes content within a viewport and returns its caret and line geometry.
+    ///
+    /// * `content` — plain or styled text to lay out.
+    /// * `style` — shaping and line-layout configuration.
+    /// * `viewport` — available size in logical pixels.
     #[must_use]
     pub fn layout_text(
         &mut self,
@@ -102,6 +119,10 @@ impl TextEngine {
 }
 
 #[must_use]
+/// Returns the word-boundary range containing the byte `index`, or an empty range.
+///
+/// * `text` — UTF-8 text to inspect.
+/// * `index` — byte position, clamped to a character boundary.
 pub fn word_range(text: &str, index: usize) -> std::ops::Range<usize> {
     let index = boundary(text, index);
     text.split_word_bound_indices()
@@ -114,6 +135,10 @@ pub fn word_range(text: &str, index: usize) -> std::ops::Range<usize> {
 }
 
 #[must_use]
+/// Returns the line range containing the byte `index`, excluding its newline.
+///
+/// * `text` — UTF-8 text to inspect.
+/// * `index` — byte position, clamped to a character boundary.
 pub fn line_range(text: &str, index: usize) -> std::ops::Range<usize> {
     let index = boundary(text, index);
     let start = text[..index].rfind('\n').map_or(0, |offset| offset + 1);

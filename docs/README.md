@@ -1,43 +1,46 @@
-# Argui documentation
+# Repository documentation
 
-Start with the [live components](https://extrabinoss.github.io/argui/components)
-and [getting started guide](https://extrabinoss.github.io/argui/get-started).
-These guides cover the current Rust APIs, supported behavior and platform limits.
-Run commands from the repository root unless a guide says otherwise.
+The [documentation website](https://extrabinoss.github.io/argui/docs) teaches
+the public API with runnable examples. The files in this directory explain the
+repository: ownership boundaries, implementation contracts, platform limits,
+testing, and releases.
 
-## Build an application
+Start with:
 
-| Topic | Guides |
+1. [Architecture](architecture.md) for the frame and event flow.
+2. [Repository structure](repo/structure.md) to find the crate that owns a change.
+3. [Development guide](contributing/development.md) for the edit and test loop.
+4. [Code quality](contributing/code-quality.md) before opening a pull request.
+
+## Engine and application contracts
+
+| Area | Guide |
 | --- | --- |
-| State and runtime | [Models, ownership and services](runtime/models.md) · [Asynchronous tasks](runtime/tasks.md) · [Hot reload](hot-reload.md) |
-| Layout and interaction | [Styling and themes](ui/styling.md) · [Focus, input and accessibility](ui/interaction.md) · [Scroll and virtualization](ui/scroll.md) |
-| UI composition | [Localization](i18n.md) · [Animation](ui/animation.md) · [Actions and editing](ui/editing.md) · [Custom elements](ui/custom-elements.md) |
-| Widgets | [Component catalogue](widgets/shadcn.md) · [Lists and tables](widgets/lists-tables.md) · [Overlays and placement](widgets/overlays.md) |
-| Rendering | [Primitives, colors, images and SVG](rendering/primitives.md) · [GPU effects](rendering/effects.md) |
+| Models and lifetime | [Models](runtime/models.md) · [Tasks](runtime/tasks.md) |
+| Layout and input | [Styling](ui/styling.md) · [Interaction](ui/interaction.md) · [Scroll](ui/scroll.md) |
+| UI behavior | [Editing](ui/editing.md) · [Animation](ui/animation.md) · [Custom elements](ui/custom-elements.md) |
+| Rendering | [Primitives](rendering/primitives.md) · [Effects](rendering/effects.md) |
+| Optional capabilities | [Localization](i18n.md) · [Hot reload](hot-reload.md) |
+| Widgets | [Catalogue](widgets/shadcn.md) · [Lists and tables](widgets/lists-tables.md) · [Overlays](widgets/overlays.md) |
 
-## Integrate with the platform
+## Platform integration
 
-| Topic | Guide |
+| Area | Guide |
 | --- | --- |
-| Application identity, windows and tray | [Application setup](platform/application.md) |
-| Native Android and iOS | [Mobile integration](native-mobile.md) |
-| Safe areas and system UI | [Window insets](platform/window-insets.md) |
-| Native and browser web content | [WebView](platform/webview.md) |
-| System file selection | [File picker](platform/file-picker.md) |
-| Blur behind window regions | [Desktop backdrops](platform/desktop-backdrops.md) |
-| Popovers outside the window | [Native popovers](platform/native-popovers.md) |
-| Signed application updates | [Updater engine and dialog](platform/updater.md) |
+| Windows and application setup | [Application](platform/application.md) |
+| Android and iOS | [Native mobile](native-mobile.md) · [Safe areas](platform/window-insets.md) |
+| Native services | [File picker](platform/file-picker.md) · [WebView](platform/webview.md) · [Updater](platform/updater.md) |
+| Desktop surfaces | [Backdrops](platform/desktop-backdrops.md) · [Native popovers](platform/native-popovers.md) |
 
-## Understand and contribute
+## Maintainer guides
 
-- [Repository structure](repo/structure.md): every crate, platform boundary, dependency and publication order.
-- [Architecture](architecture.md): crate boundaries and how the retained runtime works.
-- [Performance](performance/optimizations.md): measured costs, raw data and reproducible workloads.
-- [DevTools](contributing/devtools.md): inspection, live editing and profiling.
-- [Code quality](contributing/code-quality.md): dependencies, source rules, tests and coverage.
-- [Linux graphical testing](contributing/linux-testing.md): isolated displays and browser captures.
-- [Releases](contributing/releases.md): crates.io publication, GitHub releases and branch protection.
-- [Website](../website/README.md): Nuxt development and GitHub Pages deployment.
-- [Roadmap](roadmap.md): planned capabilities and remaining validation.
+- [Performance](performance/optimizations.md): contracts, measurements, and
+  reproducible profiling commands.
+- [DevTools](contributing/devtools.md): inspection and profiling behavior.
+- [Linux graphical testing](contributing/linux-testing.md): private displays and
+  capture-based checks.
+- [Releases](contributing/releases.md): packaging, crates.io, and GitHub automation.
+- [Website](../website/README.md): local development and GitHub Pages.
+- [Roadmap](roadmap.md): open work only.
 
-Complete widget integrations live in the [gallery source](../crates/argui-widget-gallery/src/pages/).
+Commands in these guides run from the repository root unless stated otherwise.

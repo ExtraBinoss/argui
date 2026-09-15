@@ -47,18 +47,25 @@ impl Default for HitTestStyle {
 }
 
 impl HitTestStyle {
+    /// Sets how pointer events are assigned between this element and its children.
+    ///
+    /// * `pointer_events` — pointer assignment policy.
     #[must_use]
     pub const fn pointer_events(mut self, pointer_events: PointerEvents) -> Self {
         self.pointer_events = pointer_events;
         self
     }
 
+    /// Sets the shape used to test pointer hits.
     #[must_use]
     pub const fn shape(mut self, shape: HitShape) -> Self {
         self.shape = shape;
         self
     }
 
+    /// Expands the hit region by per-side logical pixel distances.
+    ///
+    /// * `slop` — additional hit distance on each side.
     #[must_use]
     pub const fn slop(mut self, slop: Sides<f32>) -> Self {
         self.slop = slop;
@@ -74,6 +81,7 @@ impl NodeId {
         Self(value)
     }
 
+    /// Returns the opaque numeric value of this node identity.
     #[must_use]
     pub const fn get(self) -> u64 {
         self.0
@@ -118,6 +126,9 @@ impl Default for Interaction {
 }
 
 impl Interaction {
+    /// Sets whether this element responds to interaction.
+    ///
+    /// * `enabled` — whether interaction is enabled.
     #[must_use]
     pub const fn enabled(mut self, enabled: bool) -> Self {
         self.enabled = enabled;
@@ -138,30 +149,37 @@ impl Interaction {
         }
     }
 
+    /// Sets the element's focus policy.
     #[must_use]
     pub const fn focus_policy(mut self, policy: crate::FocusPolicy) -> Self {
         self.focus_policy = policy;
         self
     }
 
+    /// Sets the cursor requested while the pointer is over this element.
     #[must_use]
     pub const fn cursor(mut self, cursor: CursorIcon) -> Self {
         self.cursor = cursor;
         self
     }
 
+    /// Sets the gestures recognized on this element.
     #[must_use]
     pub const fn gestures(mut self, gestures: GestureSet) -> Self {
         self.gestures = gestures;
         self
     }
 
+    /// Sets which keyboard keys activate this element.
+    ///
+    /// * `activation` — keyboard activation policy.
     #[must_use]
     pub const fn keyboard_activation(mut self, activation: KeyboardActivation) -> Self {
         self.keyboard_activation = activation;
         self
     }
 
+    /// Sets the window dragging behavior for this element.
     #[must_use]
     pub const fn window_drag(mut self, behavior: WindowDragBehavior) -> Self {
         self.window_drag = Some(behavior);
@@ -185,6 +203,9 @@ pub struct HitRegion {
 }
 
 impl HitRegion {
+    /// Tests whether a point lies in this hit region and within its clip chain.
+    ///
+    /// * `point` — point in the coordinate space of the hit region's transform.
     #[must_use]
     pub fn contains(&self, point: Point) -> bool {
         self.transform.inverse().is_some_and(|inverse| {
@@ -267,6 +288,9 @@ pub struct InteractionUpdate {
 }
 
 impl InteractionUpdate {
+    /// Combines another update's events and change flags into this update.
+    ///
+    /// * `other` — update whose effects are merged into this value.
     pub fn merge(&mut self, other: Self) {
         self.events.extend(other.events);
         self.paint_changed |= other.paint_changed;

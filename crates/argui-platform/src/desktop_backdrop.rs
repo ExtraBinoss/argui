@@ -26,9 +26,13 @@ mod unsupported;
 use unsupported::Backend;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+/// Error creating or updating a compositor backdrop.
 pub enum BackdropError {
+    /// The current platform has no supported compositor backdrop API.
     Unsupported,
+    /// Input geometry or scale is invalid.
     InvalidGeometry,
+    /// The native platform operation failed.
     Platform(String),
 }
 impl std::fmt::Display for BackdropError {
@@ -68,6 +72,11 @@ pub struct NativeBackdrop {
 
 #[cfg_attr(coverage_nightly, coverage(off))]
 impl NativeBackdrop {
+    /// Creates a compositor backdrop associated with the native window owner.
+    ///
+    /// # Errors
+    /// Returns an error if native handles cannot be obtained or the platform backend cannot initialize.
+    /// `window` is retained as the owner of the native handles for this backdrop.
     pub fn new<T: HasWindowHandle + HasDisplayHandle + 'static>(
         window: Arc<T>,
     ) -> Result<Self, BackdropError> {
@@ -89,6 +98,10 @@ impl NativeBackdrop {
     }
 
     /// Returns native availability, even for an empty region set. Identical updates do no OS work.
+    ///
+    /// # Errors
+    /// Returns an error for invalid scale or size, invalid region geometry, or a platform failure.
+    /// `shapes` describe regions, `material` and `scheme` choose appearance, and `size`/`scale` describe the surface.
     pub fn update(
         &mut self,
         shapes: &[ClipChain],

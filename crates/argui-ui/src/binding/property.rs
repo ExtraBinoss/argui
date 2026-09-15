@@ -174,6 +174,9 @@ macro_rules! indexed_property {
         #[derive(Clone, Copy, Debug)]
         pub struct $name(usize);
 
+        /// Creates a property selector for the item at `index`.
+        ///
+        /// * `index` — zero-based gradient stop or shadow index.
         #[must_use]
         pub const fn $constructor(index: usize) -> $name {
             $name(index)
@@ -334,6 +337,10 @@ macro_rules! effect_property {
         #[derive(Clone, Copy, Debug)]
         pub struct $name(EffectTarget);
 
+        /// Creates a selector for an effect parameter.
+        ///
+        /// * `effect` — identity of the effect instance.
+        /// * `parameter` — name of the parameter within that effect.
         #[must_use]
         pub const fn $constructor(effect: EffectId, parameter: &'static str) -> $name {
             $name(EffectTarget { effect, parameter })

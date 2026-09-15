@@ -17,6 +17,8 @@ pub struct Card {
 }
 
 impl Card {
+    /// Creates a card around `content`.
+    /// `key` identifies the card in the UI tree.
     #[must_use]
     pub fn new(key: impl Into<String>, content: Element) -> Self {
         Self {
@@ -31,36 +33,44 @@ impl Card {
     }
 
     #[must_use]
+    /// Adds a heading to the card.
+    /// `title` is the heading text.
     pub fn title(mut self, title: impl Into<String>) -> Self {
         self.title = Some(title.into());
         self
     }
 
     #[must_use]
+    /// Adds supporting text beneath the heading.
+    /// `description` supplies the secondary card text.
     pub fn description(mut self, description: impl Into<String>) -> Self {
         self.description = Some(description.into());
         self
     }
 
     #[must_use]
+    /// Adds an action element to the card heading.
     pub fn action(mut self, action: Element) -> Self {
         self.action = Some(action);
         self
     }
 
     #[must_use]
+    /// Adds a footer element beneath the card content.
     pub fn footer(mut self, footer: Element) -> Self {
         self.footer = Some(footer);
         self
     }
 
     #[must_use]
+    /// Sets the semantic heading level used for the title.
     pub fn heading_level(mut self, level: u32) -> Self {
         self.heading_level = level.clamp(1, 6);
         self
     }
 
     #[must_use]
+    /// Builds the card using `theme` for its surface and text styling.
     pub fn build(self, theme: &WidgetTheme) -> Element {
         let title_key = format!("{}::title", self.key);
         let description_key = format!("{}::description", self.key);

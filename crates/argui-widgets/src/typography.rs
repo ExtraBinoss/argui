@@ -4,6 +4,7 @@ use argui_text::{FontFamily, TextStyle};
 use argui_ui::{Element, Role, Semantics, Sides};
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+/// Semantic style choice for [`Typography`].
 pub enum TypographyVariant {
     Heading(u32),
     #[default]
@@ -24,6 +25,9 @@ pub struct Typography {
 }
 
 impl Typography {
+    /// Creates semantic text with the requested visual variant.
+    ///
+    /// `text` is the displayed content; `variant` selects its typography and semantics.
     #[must_use]
     pub fn new(text: impl Into<String>, variant: TypographyVariant) -> Self {
         Self {
@@ -32,6 +36,7 @@ impl Typography {
         }
     }
 
+    /// Builds the text element using the supplied theme colors.
     #[must_use]
     pub fn build(self, theme: &WidgetTheme) -> Element {
         let (size, weight) = match self.variant {

@@ -28,6 +28,13 @@ pub struct SplitPane {
 }
 
 impl SplitPane {
+    /// Creates a resizable pane with the requested axis, size and inclusive size limits.
+    /// `key` identifies the separator; `size`, `minimum` and `maximum` are logical pixels.
+    ///
+    /// # Panics
+    ///
+    /// Panics if bounds are non-finite, `minimum` is negative, `maximum` is below it,
+    /// or `size` is non-finite.
     #[must_use]
     pub fn new(
         key: impl Into<String>,
@@ -52,6 +59,7 @@ impl SplitPane {
     }
 
     #[must_use]
+    /// Places the resizable pane after the separator when `trailing` is true.
     pub fn trailing(mut self, trailing: bool) -> Self {
         self.trailing = trailing;
         self
@@ -110,11 +118,13 @@ impl SplitPane {
     }
 
     #[must_use]
+    /// Returns the pane size for `available` space after preserving `other_minimum` and separator space.
     pub fn effective_size(&self, available: f32, other_minimum: f32) -> f32 {
         self.size.min((available - other_minimum - 6.0).max(0.0))
     }
 
     #[must_use]
+    /// Builds the keyboard- and pointer-resizable separator using `theme`.
     pub fn separator(&self, theme: &WidgetTheme) -> Element {
         let horizontal = self.axis == SplitAxis::Horizontal;
         let line = Element::container([])
@@ -198,6 +208,10 @@ impl SplitPane {
     }
 
     #[must_use]
+    /// Builds the two panes and separator within the available extent.
+    ///
+    /// `available` is the size along the split axis; `other_minimum` reserves space for
+    /// the flexible pane. `first` and `second` provide the two pane contents.
     pub fn build(
         &self,
         first: Element,

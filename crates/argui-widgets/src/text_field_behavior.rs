@@ -27,6 +27,8 @@ pub struct TextFieldBehavior {
 }
 
 impl TextFieldBehavior {
+    /// Creates text-field behavior with an accessible label and current value.
+    /// `key` identifies the field, `value` is exposed to accessibility consumers, and `role` sets its semantic role.
     #[must_use]
     pub fn new(
         key: impl Into<String>,
@@ -47,30 +49,35 @@ impl TextFieldBehavior {
     }
 
     #[must_use]
+    /// Sets supplementary accessible description text.
     pub fn description(mut self, description: impl Into<String>) -> Self {
         self.description = Some(description.into());
         self
     }
 
     #[must_use]
+    /// Sets whether the field can be focused and edited; `enabled` controls availability.
     pub const fn enabled(mut self, enabled: bool) -> Self {
         self.enabled = enabled;
         self
     }
 
     #[must_use]
+    /// Sets whether the field is focusable but prevents editing; `read_only` controls editability.
     pub const fn read_only(mut self, read_only: bool) -> Self {
         self.read_only = read_only;
         self
     }
 
     #[must_use]
+    /// Sets whether the field is marked invalid.
     pub const fn invalid(mut self, invalid: bool) -> Self {
         self.invalid = invalid;
         self
     }
 
     #[must_use]
+    /// Applies text-field semantics and behavior to `element` for `part`.
     pub fn decorate(&self, part: TextFieldPart, element: Element) -> Element {
         match part {
             TextFieldPart::Decoration => element.semantic_hidden(true),

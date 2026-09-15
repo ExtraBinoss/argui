@@ -133,66 +133,83 @@ impl Default for ScrollConfig {
 }
 
 impl ScrollConfig {
+    /// Adds a paint effect driven by this scroll configuration's metrics.
     #[must_use]
     pub fn effect(mut self, effect: crate::ScrollEffect) -> Self {
         self.effects.push(effect);
         self
     }
 
+    /// Sets whether this scroll container accepts scroll input.
+    /// * `enabled` — whether the container processes scroll input.
     #[must_use]
     pub const fn enabled(mut self, enabled: bool) -> Self {
         self.enabled = enabled;
         self
     }
 
+    /// Restricts scrolling to the selected axes.
     #[must_use]
     pub const fn axes(mut self, axes: ScrollAxes) -> Self {
         self.axes = axes;
         self
     }
 
+    /// Sets whether native scroll deltas are inverted.
+    /// * `polarity` — interpretation of native scroll delta signs.
     #[must_use]
     pub const fn polarity(mut self, polarity: ScrollPolarity) -> Self {
         self.polarity = polarity;
         self
     }
 
+    /// Sets whether unconsumed scroll deltas chain to ancestors.
+    /// * `propagation` — policy for forwarding unused scroll movement.
     #[must_use]
     pub const fn propagation(mut self, propagation: ScrollPropagation) -> Self {
         self.propagation = propagation;
         self
     }
 
+    /// Sets the logical-pixel size of one input scroll line.
+    /// * `line_size` — logical-pixel distance represented by one line delta.
     #[must_use]
     pub const fn line_size(mut self, line_size: f32) -> Self {
         self.line_size = line_size;
         self
     }
 
+    /// Sets the multiplier applied to input scroll deltas.
     #[must_use]
     pub const fn multiplier(mut self, multiplier: f32) -> Self {
         self.multiplier = multiplier;
         self
     }
 
+    /// Sets the scroll physics model.
     #[must_use]
     pub const fn physics(mut self, physics: ScrollPhysics) -> Self {
         self.physics = physics;
         self
     }
 
+    /// Sets the behavior used when scrolling beyond the content extent.
+    /// * `overscroll` — policy for handling movement beyond the extent.
     #[must_use]
     pub const fn overscroll(mut self, overscroll: OverscrollBehavior) -> Self {
         self.overscroll = overscroll;
         self
     }
 
+    /// Sets how scroll offsets are preserved when content changes.
+    /// * `anchoring` — scroll anchoring policy.
     #[must_use]
     pub const fn anchoring(mut self, anchoring: ScrollAnchoring) -> Self {
         self.anchoring = anchoring;
         self
     }
 
+    /// Sets the scrollbar style for this scroll container.
     #[must_use]
     pub fn scrollbar(mut self, scrollbar: ScrollbarStyle) -> Self {
         self.scrollbar = Some(scrollbar);
@@ -246,6 +263,10 @@ pub struct ScrollbarStyle {
 }
 
 impl ScrollbarStyle {
+    /// Creates a scrollbar with separate styles for its track and thumb.
+    ///
+    /// * `track` — visual style for the track.
+    /// * `thumb` — visual style for the draggable thumb.
     #[must_use]
     pub const fn new(track: ScrollbarPartStyle, thumb: ScrollbarPartStyle) -> Self {
         Self {
@@ -265,36 +286,46 @@ impl ScrollbarStyle {
         }
     }
 
+    /// Sets the scrollbar width in logical pixels.
     #[must_use]
     pub const fn width(mut self, width: f32) -> Self {
         self.width = width;
         self
     }
 
+    /// Sets the scrollbar insets from the scroll viewport edges.
     #[must_use]
     pub const fn insets(mut self, insets: Sides<f32>) -> Self {
         self.insets = insets;
         self
     }
 
+    /// Sets the minimum thumb length in logical pixels.
+    /// * `min_thumb` — shortest permitted scrollbar thumb.
     #[must_use]
     pub const fn min_thumb(mut self, min_thumb: f32) -> Self {
         self.min_thumb = min_thumb;
         self
     }
 
+    /// Sets when the scrollbar is visible.
+    /// * `visibility` — visibility policy.
     #[must_use]
     pub const fn visibility(mut self, visibility: ScrollbarVisibility) -> Self {
         self.visibility = visibility;
         self
     }
 
+    /// Sets the delay before an automatically shown scrollbar starts fading.
+    /// * `hide_delay` — time to wait before fading begins.
     #[must_use]
     pub const fn hide_delay(mut self, hide_delay: Duration) -> Self {
         self.hide_delay = hide_delay;
         self
     }
 
+    /// Sets how long a fading scrollbar takes to disappear.
+    /// * `fade_duration` — duration of the fade-out.
     #[must_use]
     pub const fn fade_duration(mut self, fade_duration: Duration) -> Self {
         self.fade_duration = fade_duration;
@@ -302,6 +333,7 @@ impl ScrollbarStyle {
     }
 
     #[must_use]
+    /// Returns the width reserved by this scrollbar's gutter and insets.
     pub fn gutter_width(&self) -> f32 {
         (self.width + self.insets.right.max(self.insets.bottom)).max(0.0)
     }
@@ -315,6 +347,9 @@ pub struct ScrollbarPartStyle {
 }
 
 impl ScrollbarPartStyle {
+    /// Creates a part style from its base quad paint.
+    ///
+    /// * `base` — default paint style before conditional rules are applied.
     #[must_use]
     pub const fn new(base: QuadStyle) -> Self {
         Self {
@@ -325,6 +360,9 @@ impl ScrollbarPartStyle {
     }
 
     #[must_use]
+    /// Adds a conditional style for this scrollbar part.
+    /// * `condition` — condition under which the style patch is applied.
+    /// * `style` — style changes applied when the condition matches.
     pub fn when(mut self, condition: impl Into<StyleCondition>, style: StylePatch) -> Self {
         assert!(
             style.values().iter().all(|property| property.key.is_quad()),
@@ -335,6 +373,8 @@ impl ScrollbarPartStyle {
     }
 
     #[must_use]
+    /// Sets transitions between conditional styles for this part.
+    /// * `transition` — animation configuration for style changes.
     pub fn transition(mut self, transition: StyleTransition) -> Self {
         self.transition = Some(transition);
         self

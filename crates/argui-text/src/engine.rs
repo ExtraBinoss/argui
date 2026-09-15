@@ -32,11 +32,18 @@ impl Default for TextEngine {
 }
 
 impl TextEngine {
+    /// Creates a text engine using the system font database.
     #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Creates an engine using embedded font data and explicit family fallbacks.
+    ///
+    /// * `fonts` — static font-file byte slices to load.
+    /// * `sans_serif` — configured sans-serif family name.
+    /// * `serif` — configured serif family name.
+    /// * `monospace` — configured monospace family name.
     #[must_use]
     pub fn from_embedded_fonts(
         fonts: impl IntoIterator<Item = &'static [u8]>,
@@ -61,16 +68,27 @@ impl TextEngine {
         }
     }
 
+    /// Returns mutable access to the font database, clearing cached text first.
     pub fn fonts_mut(&mut self) -> &mut FontSystem {
         self.cache.clear();
         &mut self.fonts
     }
 
+    /// Measures plain text with the supplied style and optional width constraint.
+    ///
+    /// * `text` — UTF-8 text to measure.
+    /// * `style` — shaping and line-layout configuration.
+    /// * `width` — optional logical-pixel width constraint.
     #[must_use]
     pub fn measure(&mut self, text: &str, style: &TextStyle, width: Option<f32>) -> Size {
         self.measure_layout(text, style, width).size
     }
 
+    /// Measures plain text and returns its size and baseline positions.
+    ///
+    /// * `text` — UTF-8 text to measure.
+    /// * `style` — shaping and line-layout configuration.
+    /// * `width` — optional logical-pixel width constraint.
     #[must_use]
     pub fn measure_layout(
         &mut self,
@@ -81,6 +99,11 @@ impl TextEngine {
         self.measure_content(&TextContent::plain(text), style, width)
     }
 
+    /// Measures plain or rich text and returns its size and baseline positions.
+    ///
+    /// * `content` — text and optional span styles to measure.
+    /// * `style` — block-level shaping and line-layout configuration.
+    /// * `width` — optional logical-pixel width constraint.
     #[must_use]
     pub fn measure_content(
         &mut self,
@@ -110,6 +133,10 @@ impl TextEngine {
         measurement
     }
 
+    /// Shapes a scene into positioned glyph and decoration data for painting.
+    ///
+    /// * `scene` — blocks to shape.
+    /// * `scale_factor` — logical-to-physical pixel scale.
     pub fn prepare(&mut self, scene: &TextScene, scale_factor: f32) -> PreparedText {
         let mut prepared = PreparedText {
             blocks: scene.blocks().len(),
@@ -176,6 +203,11 @@ impl TextEngine {
         }
     }
 
+    /// Rasterizes a shaped glyph key into bitmap image data when available.
+    ///
+    /// * `key` — glyph cache key produced by text shaping.
+    ///
+    /// Returns `None` when the rasterizer has no image for the key.
     pub fn rasterize(&mut self, key: GlyphKey) -> Option<GlyphImage> {
         let image = self.rasterizer.get_image_uncached(&mut self.fonts, key.0)?;
         let content = match image.content {

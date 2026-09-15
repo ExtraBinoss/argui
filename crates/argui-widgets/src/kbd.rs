@@ -13,6 +13,7 @@ pub struct Kbd {
 }
 
 impl Kbd {
+    /// Creates a keyboard hint from `keys`, the displayed key labels; `key` identifies the element.
     #[must_use]
     pub fn new(key: impl Into<String>, keys: impl IntoIterator<Item = impl Into<String>>) -> Self {
         Self {
@@ -25,6 +26,7 @@ impl Kbd {
 
     /// Spoken description for symbolic chords, such as "Control plus K".
     #[must_use]
+    /// Sets the accessible label for the key sequence.
     pub fn label(mut self, label: impl Into<String>) -> Self {
         self.label = Some(label.into());
         self
@@ -32,6 +34,7 @@ impl Kbd {
 
     /// Keycap height in logical pixels; smaller caps also scale their typography and spacing.
     #[must_use]
+    /// Sets the displayed keycap size in logical pixels.
     pub fn size(mut self, size: f32) -> Self {
         if size.is_finite() {
             self.size = size.clamp(12.0, 48.0);
@@ -40,6 +43,7 @@ impl Kbd {
     }
 
     #[must_use]
+    /// Builds the key hint using `theme` for its colors.
     pub fn build(self, theme: &WidgetTheme) -> Element {
         let label = self.label.unwrap_or_else(|| self.keys.join(" + "));
         Element::row(self.keys.into_iter().map(|key| {

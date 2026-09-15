@@ -9,23 +9,31 @@ pub struct Typeahead {
 }
 
 impl Typeahead {
+    /// Creates an empty search state using `config`.
     pub fn new(config: TypeaheadConfig) -> Self {
         Self {
             config,
             ..Self::default()
         }
     }
+    /// Clears the accumulated query and input timestamp.
     pub fn clear(&mut self) {
         self.query.clear();
         self.last_input = None;
     }
 
+    /// Returns the currently accumulated search query.
     pub fn query(&self) -> &str {
         &self.query
     }
 
     /// Search after `active`, wrapping once. Repeated characters cycle matching items.
     /// `label` returns `None` for disabled entries. Supply a matcher for locale-specific rules.
+    /// `input` is the newly typed text; `now` is monotonic elapsed time; `active` is the
+    /// current item index; and `count` is the number of candidate indices.
+    /// `matches` defines how a query is compared with each candidate label.
+    ///
+    /// Returns the matching item index, if any.
     pub fn search<'a>(
         &mut self,
         input: &str,
@@ -65,7 +73,9 @@ impl Typeahead {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Timing configuration for retained typeahead search.
 pub struct TypeaheadConfig {
+    /// Quiet interval after which the accumulated query is discarded.
     pub timeout: Duration,
 }
 
@@ -78,6 +88,7 @@ impl Default for TypeaheadConfig {
 }
 
 /// Unicode lowercase prefix matching. Applications can supply a locale-aware matcher.
+/// `label` is the candidate text and `query` is the accumulated search prefix.
 pub fn unicode_prefix(label: &str, query: &str) -> bool {
     label.to_lowercase().starts_with(&query.to_lowercase())
 }

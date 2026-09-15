@@ -25,6 +25,11 @@ use theme::mode_label;
 
 const EDITOR_DEFAULT_SIZE: Size = Size::new(520.0, 170.0);
 
+/// Interactive gallery demonstrating Argui widgets and their behaviors.
+///
+/// # Panics
+///
+/// [`Default::default`] panics if the bundled gallery icon is not valid PNG data.
 pub struct WidgetGallery {
     pub(crate) catalogue: std::collections::HashMap<Page, Entity<pages::catalogue::CatalogueDemo>>,
     backdrop: desktop_backdrop::BackdropSettings,

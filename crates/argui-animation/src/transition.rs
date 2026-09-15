@@ -8,23 +8,31 @@ enum TransitionDriver {
 
 /// A validated driver used when a presented style retargets.
 #[derive(Clone, Debug, PartialEq)]
+/// Validated driver used to retarget a motion.
 pub struct Transition(TransitionDriver);
 
 impl Transition {
+    /// Creates a transition driven by the supplied tween.
     #[must_use]
     pub const fn tween(tween: Tween) -> Self {
         Self(TransitionDriver::Tween(tween))
     }
 
+    /// Creates a spring transition using the default spring configuration.
     #[must_use]
     pub fn spring() -> Self {
         Self(TransitionDriver::Spring(SpringConfig::default()))
     }
 
+    /// Creates a spring transition after validating its configuration.
+    ///
+    /// # Errors
+    /// Returns a physics error if `config` contains invalid spring parameters.
     pub fn try_spring(config: SpringConfig) -> Result<Self, PhysicsError> {
         Ok(Self(TransitionDriver::Spring(config.validate()?)))
     }
 
+    /// Applies this driver to `motion`, retargeting it to `target`.
     #[doc(hidden)]
     pub fn retarget<T>(&self, motion: &Motion<T>, target: T)
     where

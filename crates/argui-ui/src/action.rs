@@ -25,6 +25,7 @@ impl ActionId {
     pub const SELECT_ALL: Self = Self("argui.select-all");
     pub const UNDO: Self = Self("argui.undo");
     pub const REDO: Self = Self("argui.redo");
+    /// Returns the built-in text-selection command represented by this identifier.
     #[must_use]
     pub fn selection_command(self) -> Option<SelectionCommand> {
         match self {
@@ -49,6 +50,7 @@ pub struct Shortcut {
 }
 
 impl Shortcut {
+    /// Creates a shortcut using the platform's primary modifier and the given key.
     #[must_use]
     pub fn primary(key: impl Into<String>) -> Self {
         Self {
@@ -58,11 +60,15 @@ impl Shortcut {
             alt: false,
         }
     }
+    /// Adds Shift to this shortcut.
     #[must_use]
     pub const fn shift(mut self) -> Self {
         self.shift = true;
         self
     }
+    /// Reports whether a key input activates this shortcut.
+    ///
+    /// Repeated key presses and releases do not match.
     #[must_use]
     pub fn matches(&self, input: &KeyInput) -> bool {
         let key = match &input.key {
@@ -76,6 +82,7 @@ impl Shortcut {
             && self.shift == input.modifiers.shift
             && self.alt == input.modifiers.alt
     }
+    /// Formats this shortcut using the platform's primary-modifier label.
     #[must_use]
     pub fn label(&self) -> String {
         let mut parts = Vec::new();
@@ -108,6 +115,7 @@ pub struct ActionState {
 }
 
 impl ActionState {
+    /// Creates an enabled action with the supplied display label.
     #[must_use]
     pub fn new(label: impl Into<String>) -> Self {
         Self {
@@ -116,11 +124,13 @@ impl ActionState {
             shortcut: None,
         }
     }
+    /// Sets whether this action is currently enabled.
     #[must_use]
     pub const fn enabled(mut self, enabled: bool) -> Self {
         self.enabled = enabled;
         self
     }
+    /// Assigns the keyboard shortcut shown for this action.
     #[must_use]
     pub fn shortcut(mut self, shortcut: Shortcut) -> Self {
         self.shortcut = Some(shortcut);
@@ -166,6 +176,16 @@ pub struct ActionScope {
 }
 
 impl ActionScope {
+    /// Creates a scope after checking that action identifiers and shortcuts are unique.
+    ///
+    /// # Arguments
+    ///
+    /// * `bindings` — action definitions to include in this scope.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ActionError::DuplicateId`] or [`ActionError::ShortcutConflict`] when
+    /// a duplicate identifier or shortcut is present.
     pub fn new(bindings: impl IntoIterator<Item = ActionBinding>) -> Result<Self, ActionError> {
         let mut scope = Self::default();
         for binding in bindings {
@@ -194,10 +214,14 @@ pub struct ActionInvocation {
 }
 
 impl ActionInvocation {
+    /// Creates an invocation without a captured origin node.
+    ///
+    /// * `id` — identity of the action to invoke.
     #[must_use]
     pub const fn new(id: ActionId) -> Self {
         Self { id, origin: None }
     }
+    /// Captures the node from which this action was invoked.
     #[must_use]
     pub const fn at(mut self, node: NodeId) -> Self {
         self.origin = Some(node);
@@ -206,15 +230,24 @@ impl ActionInvocation {
 }
 
 impl Element {
+    /// Attaches a validated action scope to this element.
+    ///
+    /// * `scope` — action definitions available within this element's scope.
     #[must_use]
     pub fn action_scope(mut self, scope: ActionScope) -> Self {
         self.action_scope = Some(scope);
         self
     }
+    /// Assigns a built-in or application-defined action to this element.
+    ///
+    /// * `id` — identity of the action to invoke.
     #[must_use]
     pub fn action(self, id: ActionId) -> Self {
         self.action_from(ActionInvocation::new(id))
     }
+    /// Assigns an action invocation, optionally retaining its origin node.
+    ///
+    /// * `invocation` — action identity and captured origin, if any.
     #[must_use]
     pub fn action_from(mut self, invocation: ActionInvocation) -> Self {
         self.action = Some(invocation);

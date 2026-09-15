@@ -1,29 +1,26 @@
 use crate::AppCommand;
 use argui_animation::Frame;
-use argui_core::{PointerId, Rect};
 use argui_inspect::InspectorHandle;
 use argui_paint::{ImageAsset, VectorAsset};
-use argui_ui::{
-    ClipboardRequest, Element, EventHandlerId, EventOwnerId, FocusRequest, FocusTarget,
-    TextSelection, TextSelectionRequest, UiEvent,
-};
+use argui_ui::{Element, EventHandlerId, EventOwnerId, UiEvent};
 use std::{
     any::Any,
     cell::{Cell, RefCell},
-    marker::PhantomData,
     rc::{Rc, Weak},
 };
 
-use crate::{ThemeRequest, WindowEnvironment};
+use crate::WindowEnvironment;
 
 pub(crate) mod effects;
 mod handler;
+use handler::HandlerRegistry;
 mod layout;
 pub(crate) use effects::PointerCaptureRequest;
 pub use effects::ViewUpdate;
-use effects::{ContextEffects, merge_effects, strongest_update};
+use effects::{ContextEffects, merge_effects};
+mod context;
+pub use context::{Context, Render};
 mod editing;
-use handler::{HandlerRegistry, LocalHandler};
 pub use layout::{LayoutBounds, LayoutSnapshot, ScrollRequest};
 
 type HandlerDispatch = dyn Fn(EventHandlerId, &UiEvent) -> ContextEffects;
@@ -57,7 +54,7 @@ pub use lifecycle::{MountEvent, MountTransition};
 mod presentation;
 mod visibility;
 pub use mount::{Mount, MountId, WeakMount};
-use presentation::{Presentation, PresentationId};
+use presentation::Presentation;
 #[cfg(feature = "tasks")]
 mod tasks;
 
@@ -91,6 +88,7 @@ impl<T> Clone for Entity<T> {
     }
 }
 
+/// Non-owning reference to a retained entity and its current presentation.
 pub struct WeakEntity<T> {
     model: Weak<ModelState<T>>,
     presentation: Weak<EntityCell<T>>,
@@ -106,6 +104,7 @@ impl<T> Clone for WeakEntity<T> {
 }
 
 #[derive(Clone)]
+/// Type-erased retained entity for storage and event routing across model types.
 pub struct AnyEntity {
     host_visibility: Rc<dyn Fn(bool)>,
     close_host: Rc<dyn Fn()>,
@@ -132,151 +131,6 @@ pub struct AnyEntity {
     take_effects: Rc<dyn Fn() -> ContextEffects>,
 }
 
-/// Mutation and scheduling access scoped to one retained component.
-pub struct Context<T> {
-    entity: Option<WeakEntity<T>>,
-    pub(crate) effects: ContextEffects,
-    owner: Option<(PresentationId, Observer)>,
-    environment: WindowEnvironment,
-    environment_read: Cell<bool>,
-    event_target: Option<argui_ui::NodeId>,
-    handlers: Vec<LocalHandler<T>>,
-    dependencies: Vec<Subscription>,
-    _marker: PhantomData<fn() -> T>,
-}
-
-impl<T> Default for Context<T> {
-    fn default() -> Self {
-        Self {
-            entity: None,
-            effects: ContextEffects::default(),
-            owner: None,
-            environment: WindowEnvironment::default(),
-            environment_read: Cell::new(false),
-            event_target: None,
-            handlers: Vec::new(),
-            dependencies: Vec::new(),
-            _marker: PhantomData,
-        }
-    }
-}
-
-impl<T: 'static> Context<T> {
-    #[must_use]
-    pub fn new_entity<U: 'static>(&mut self, value: U) -> Entity<U> {
-        match self.entity.as_ref().and_then(WeakEntity::upgrade) {
-            Some(owner) => owner.0.model.runtime.entity(value),
-            None => Entity::new(value),
-        }
-    }
-
-    /// Marks this entity dirty. Its cached subtree is rebuilt once at the next frame.
-    pub fn notify(&mut self) {
-        self.effects.update = ViewUpdate::Rebuild;
-    }
-
-    pub fn command(&mut self, command: AppCommand) {
-        self.effects.commands.push(command);
-    }
-
-    #[must_use]
-    pub const fn view_update(&self) -> ViewUpdate {
-        self.effects.update
-    }
-
-    pub(crate) fn merge_effects(&mut self, child: ContextEffects) {
-        merge_effects(&mut self.effects, child);
-    }
-}
-
-impl<T: Render> Context<T> {
-    #[must_use]
-    pub fn environment(&self) -> WindowEnvironment {
-        self.environment_read.set(true);
-        self.environment.clone()
-    }
-
-    pub fn request_paint(&mut self) {
-        self.effects.update = strongest_update(self.effects.update, ViewUpdate::Paint);
-    }
-
-    pub fn request_animation_frame(&mut self) {
-        self.effects.animation_frame = true;
-        self.request_paint();
-    }
-
-    pub fn capture_pointer(&mut self, pointer: PointerId) -> bool {
-        let Some(target) = self.event_target else {
-            return false;
-        };
-        self.effects
-            .pointer_capture
-            .push(PointerCaptureRequest::Capture { pointer, target });
-        true
-    }
-
-    pub fn release_pointer(&mut self, pointer: PointerId) -> bool {
-        let Some(target) = self.event_target else {
-            return false;
-        };
-        self.effects
-            .pointer_capture
-            .push(PointerCaptureRequest::Release { pointer, target });
-        true
-    }
-
-    pub fn write_clipboard(&mut self, request: ClipboardRequest) {
-        self.effects.clipboard = Some(request);
-    }
-
-    pub fn scroll(&mut self, request: ScrollRequest) {
-        self.effects.scroll = Some(request);
-        self.request_paint();
-    }
-
-    pub fn request_focus(&mut self, target: impl Into<FocusTarget>) {
-        self.effects.focus = Some(FocusRequest::Focus(target.into()));
-        self.request_paint();
-    }
-
-    pub fn clear_focus(&mut self) {
-        self.effects.focus = Some(FocusRequest::Clear);
-        self.request_paint();
-    }
-
-    pub fn select_text(&mut self, target: impl Into<FocusTarget>, selection: TextSelection) {
-        self.effects.text_selection = Some(TextSelectionRequest::new(target, selection));
-        self.request_paint();
-    }
-
-    pub fn set_theme(&mut self, request: ThemeRequest) {
-        self.effects.theme = Some(request);
-        self.notify();
-    }
-
-    #[must_use]
-    pub fn observe_bounds(&self, layout: &LayoutSnapshot, key: &str) -> Option<Rect> {
-        layout.bounds(key)
-    }
-
-    /// Connects handlers from an already-rendered retained subtree to this entity.
-    pub fn route_events_to(&mut self, entity: AnyEntity) {
-        if let Some(owner) = self.entity.as_ref().and_then(WeakEntity::upgrade) {
-            (entity.bind_model_wake)(&owner.0.model.runtime);
-        }
-        #[cfg(feature = "tasks")]
-        if let Some(runtime) = self
-            .entity
-            .as_ref()
-            .and_then(WeakEntity::upgrade)
-            .and_then(|owner| owner.0.model.runtime.task_runtime())
-        {
-            entity.set_task_runtime(runtime);
-        }
-        self.effects.event_routes.push(entity);
-    }
-}
-
 fn inherit_environment_use(parent: &Cell<bool>, child: &Cell<bool>) {
     if child.get() {
         parent.set(true);
@@ -291,47 +145,9 @@ fn update_environment(
     current.replace(next.clone()) != *next && used.get()
 }
 
-pub trait Render: 'static {
-    #[cfg(feature = "tasks")]
-    fn tasks_ready(&mut self, _cx: &mut Context<Self>)
-    where
-        Self: Sized,
-    {
-    }
-    fn render(&mut self, cx: &mut Context<Self>) -> Element
-    where
-        Self: Sized;
-
-    fn animation_frame(&mut self, _frame: Frame, _cx: &mut Context<Self>)
-    where
-        Self: Sized,
-    {
-    }
-
-    fn wants_animation_frame(&self) -> bool {
-        false
-    }
-
-    fn layout_changed(&mut self, _layout: &LayoutSnapshot, _cx: &mut Context<Self>)
-    where
-        Self: Sized,
-    {
-    }
-
-    fn image_assets(&self) -> Vec<ImageAsset> {
-        Vec::new()
-    }
-
-    fn vector_assets(&self) -> Vec<VectorAsset> {
-        Vec::new()
-    }
-
-    fn inspector(&self) -> Option<InspectorHandle> {
-        None
-    }
-}
-
 impl<T: Render> Entity<T> {
+    /// Erases the concrete model type while retaining its runtime operations.
+    /// Returns a cloneable handle for type-independent storage and routing.
     #[must_use]
     pub fn erase(&self) -> AnyEntity {
         #[cfg(feature = "tasks")]
@@ -430,12 +246,16 @@ impl<T: Render> Entity<T> {
     }
 
     #[must_use]
+    /// Renders this entity using its presentation's most recent environment.
+    /// Returns the retained UI subtree, or an empty container when hidden.
     pub fn render(&self) -> Element {
         let environment = self.0.presentation.environment.borrow().clone();
         self.render_in(environment)
     }
 
     #[must_use]
+    /// Renders this entity using `environment` for platform and theme state.
+    /// Returns the retained UI subtree, or an empty container when hidden.
     pub fn render_in(&self, environment: WindowEnvironment) -> Element {
         let _transaction = self.0.model.runtime.enter();
         if !self.0.presentation.is_visible() {
@@ -503,6 +323,8 @@ impl<T: Render> Entity<T> {
     }
 
     /// Dispatches one listener delivery produced by [`argui_ui::UiTree`].
+    ///
+    /// `event` is the UI event whose current listener should run.
     pub fn dispatch_event(&self, event: &UiEvent) {
         with_event_handler(event, &mut |handler| {
             let effects = self.dispatch_handler(handler, event);

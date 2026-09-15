@@ -23,7 +23,9 @@ pub struct PickedFile(PathBuf);
     not(any(target_os = "linux", target_os = "windows", target_os = "macos"))
 ))]
 impl PickedFile {
+    /// Returns the selected file's path.
     #[must_use]
+    /// Returns the selected file's final path component, or an empty string if absent.
     pub fn path(&self) -> &std::path::Path {
         &self.0
     }
@@ -47,12 +49,18 @@ impl From<PathBuf> for PickedFile {
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+/// Selection operation requested from a file dialog.
 pub enum FilePickerMode {
     #[default]
+    /// Select one file.
     File,
+    /// Select multiple files.
     Files,
+    /// Select one folder.
     Folder,
+    /// Select multiple folders.
     Folders,
+    /// Choose a destination and name for a new file.
     Save,
 }
 impl FilePickerMode {
@@ -72,12 +80,19 @@ impl FilePickerMode {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+/// Named set of filename extensions accepted by a file dialog.
 pub struct FileFilter {
+    /// User-visible filter label.
     pub name: String,
     /// Extensions without a leading dot, or `*` for all files.
     pub extensions: Vec<String>,
 }
 impl FileFilter {
+    /// Creates a named extension filter. Extensions omit the leading dot; `*` accepts all files.
+    ///
+    /// # Arguments
+    /// * `name` — label shown by the dialog.
+    /// * `extensions` — accepted extensions, without leading dots.
     #[must_use]
     pub fn new(
         name: impl Into<String>,
@@ -91,9 +106,13 @@ impl FileFilter {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+/// Failure validating or opening a file dialog.
 pub enum FileDialogError {
+    /// A dialog option is malformed.
     InvalidOptions(String),
+    /// The selected mode is unavailable on this target.
     UnsupportedMode(FilePickerMode),
+    /// The native or browser dialog could not be opened.
     Unavailable(String),
 }
 impl std::fmt::Display for FileDialogError {
@@ -111,12 +130,15 @@ impl std::error::Error for FileDialogError {}
 /// `None` means no selection. RFD does not distinguish cancellation from an OS dialog failure.
 pub type FileDialogResult = Result<Option<Vec<PickedFile>>, FileDialogError>;
 #[cfg(not(target_arch = "wasm32"))]
+/// A file dialog future that is safe to move between native threads.
 pub type FileDialogFuture = Pin<Box<dyn Future<Output = FileDialogResult> + Send>>;
 #[cfg(target_arch = "wasm32")]
+/// A browser file dialog future, which remains on the browser thread.
 pub type FileDialogFuture = Pin<Box<dyn Future<Output = FileDialogResult>>>;
 
 /// One interface for the native service and application-supplied dialog providers.
 pub trait FileDialogBackend: Send + Sync {
+    /// Opens the requested dialog and resolves to selected files or cancellation.
     fn open(&self, dialog: FileDialog) -> FileDialogFuture;
 }
 
@@ -128,11 +150,17 @@ trait Parent: HasWindowHandle + HasDisplayHandle + Send + Sync {}
 impl<T: HasWindowHandle + HasDisplayHandle + Send + Sync> Parent for T {}
 
 #[derive(Clone)]
+/// Options and parent ownership for one file dialog request.
 pub struct FileDialog {
+    /// Selection operation to perform.
     pub mode: FilePickerMode,
+    /// Optional title displayed by the dialog.
     pub title: String,
+    /// Accepted filename filters.
     pub filters: Vec<FileFilter>,
+    /// Optional starting directory.
     pub directory: Option<PathBuf>,
+    /// Optional suggested filename for save operations.
     pub file_name: Option<String>,
     parent: Option<Arc<dyn Parent>>,
 }
@@ -155,6 +183,7 @@ impl Default for FileDialog {
 }
 impl FileDialog {
     #[must_use]
+    /// Creates a dialog request for the selected `mode`.
     pub fn new(mode: FilePickerMode) -> Self {
         Self {
             mode,
@@ -165,27 +194,33 @@ impl FileDialog {
             parent: None,
         }
     }
+    /// Sets the dialog title.
     #[must_use]
     pub fn title(mut self, title: impl Into<String>) -> Self {
         self.title = title.into();
         self
     }
+    /// Adds a file type filter.
     #[must_use]
     pub fn filter(mut self, filter: FileFilter) -> Self {
         self.filters.push(filter);
         self
     }
+    /// Sets the initial directory.
     #[must_use]
     pub fn directory(mut self, directory: impl Into<PathBuf>) -> Self {
         self.directory = Some(directory.into());
         self
     }
+    /// Sets the suggested filename for save operations.
+    /// `name` is the filename suggestion, not a path.
     #[must_use]
     pub fn file_name(mut self, name: impl Into<String>) -> Self {
         self.file_name = Some(name.into());
         self
     }
     /// Retains the owner until the native dialog finishes, including if its result future is dropped.
+    /// `parent` is the native window whose lifetime should cover the dialog.
     #[must_use]
     pub fn parent<W: HasWindowHandle + HasDisplayHandle + Send + Sync + 'static>(
         mut self,
@@ -194,6 +229,10 @@ impl FileDialog {
         self.parent = Some(parent);
         self
     }
+    /// Checks that the mode and options are supported and well-formed.
+    ///
+    /// # Errors
+    /// Returns an error for unsupported modes or invalid titles, names, paths, or filters.
     pub fn validate(&self) -> Result<(), FileDialogError> {
         let invalid = |message: &str| FileDialogError::InvalidOptions(message.into());
         if !self.mode.supported() {
@@ -237,11 +276,14 @@ impl FileDialog {
         Ok(())
     }
     /// Call from an input handler. macOS needs its application event loop; browsers need a user gesture.
+    /// Returns `None` when the user cancels the dialog.
     #[must_use]
     pub fn open(self) -> FileDialogFuture {
         self.open_with(&NativeFileDialog)
     }
     #[must_use]
+    /// Opens this request using a caller-supplied dialog provider.
+    /// `backend` performs the native or application-provided dialog operation.
     pub fn open_with(self, backend: &dyn FileDialogBackend) -> FileDialogFuture {
         if let Err(error) = self.validate() {
             return Box::pin(async { Err(error) });

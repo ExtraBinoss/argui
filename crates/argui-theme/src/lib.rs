@@ -21,6 +21,7 @@ pub struct Theme<T> {
 }
 
 impl<T> Theme<T> {
+    /// Creates a theme with light and dark values, initially following the system scheme.
     #[must_use]
     pub const fn new(light: T, dark: T) -> Self {
         Self {
@@ -31,21 +32,25 @@ impl<T> Theme<T> {
     }
 
     #[must_use]
+    /// Returns whether this theme follows the system scheme or uses an explicit mode.
     pub const fn mode(&self) -> ThemeMode {
         self.mode
     }
 
+    /// Sets whether this theme follows the system scheme or uses an explicit mode.
     pub const fn set_mode(&mut self, mode: ThemeMode) {
         self.mode = mode;
     }
 
     #[must_use]
+    /// Sets the mode and returns the updated theme.
     pub const fn with_mode(mut self, mode: ThemeMode) -> Self {
         self.mode = mode;
         self
     }
 
     #[must_use]
+    /// Resolves the active value using this theme's mode and the system color scheme.
     pub const fn resolve(&self, system: ColorScheme) -> &T {
         match self.mode {
             ThemeMode::Light => &self.light,

@@ -23,6 +23,8 @@ pub struct Drawer {
 }
 
 impl Drawer {
+    /// Creates a bottom drawer with a labelled trigger and panel content.
+    /// `key` identifies it, `open` sets current visibility, and `label` supplies its accessible name.
     #[must_use]
     pub fn new(
         key: impl Into<String>,
@@ -43,6 +45,7 @@ impl Drawer {
     }
 
     #[must_use]
+    /// Returns an open, close or drag action resulting from `event`.
     pub fn action(&self, event: &UiEvent) -> Option<DrawerAction> {
         if self.sheet.open
             && event.target_key() == Some(format!("{}::handle", self.sheet.key).as_str())
@@ -72,6 +75,7 @@ impl Drawer {
     }
 
     #[must_use]
+    /// Builds the drawer using `theme` for its trigger and panel styling.
     pub fn build(self, theme: &WidgetTheme) -> Element {
         let mut sheet = self.sheet;
         let handle = Element::row([Element::container([])

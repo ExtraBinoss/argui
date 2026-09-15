@@ -47,6 +47,13 @@ impl TryFrom<ActionRequest> for SemanticRequest {
 pub struct AccessKitTree;
 
 impl AccessKitTree {
+    /// Lowers a complete semantic snapshot into an AccessKit update.
+    ///
+    /// # Arguments
+    /// * `tree` — snapshot to convert, including its root and focused node.
+    ///
+    /// # Returns
+    /// An update containing every semantic node and tree metadata.
     #[must_use]
     pub fn full(tree: &SemanticTree) -> TreeUpdate {
         let mut metadata = Tree::new(NodeId(tree.root.get()));
@@ -61,6 +68,14 @@ impl AccessKitTree {
     }
 
     #[must_use]
+    /// Lowers a semantic patch into an AccessKit update.
+    ///
+    /// # Arguments
+    /// * `patch` — changes to apply.
+    /// * `tree` — resulting snapshot, used to provide the current focus.
+    ///
+    /// # Returns
+    /// An update containing the patch's upserts, root change, and resulting focus.
     pub fn patch(patch: &SemanticPatch, tree: &SemanticTree) -> TreeUpdate {
         TreeUpdate {
             nodes: patch.upserts.iter().map(lower_node).collect(),

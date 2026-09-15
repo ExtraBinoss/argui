@@ -26,6 +26,8 @@ pub struct Badge {
 }
 
 impl Badge {
+    /// Creates a badge displaying `label`.
+    /// `key` identifies the badge; `label` is its displayed text.
     #[must_use]
     pub fn new(key: impl Into<String>, label: impl Into<String>) -> Self {
         Self {
@@ -38,24 +40,28 @@ impl Badge {
     }
 
     #[must_use]
+    /// Selects the badge's visual variant.
     pub const fn variant(mut self, variant: BadgeVariant) -> Self {
         self.variant = variant;
         self
     }
 
     #[must_use]
+    /// Adds an icon before the badge label.
     pub fn leading(mut self, icon: Element) -> Self {
         self.leading = Some(icon);
         self
     }
 
     #[must_use]
+    /// Adds an icon after the badge label.
     pub fn trailing(mut self, icon: Element) -> Self {
         self.trailing = Some(icon);
         self
     }
 
     #[must_use]
+    /// Builds the badge using `theme` for its colors.
     pub fn build(self, theme: &WidgetTheme) -> Element {
         let (background, foreground, border) = match self.variant {
             BadgeVariant::Primary => (theme.primary, theme.primary_foreground, Color::TRANSPARENT),

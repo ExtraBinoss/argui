@@ -85,6 +85,7 @@ pub struct DevtoolsHost<A> {
 }
 
 impl<A: Render> DevtoolsHost<A> {
+    /// Creates a DevTools host around the application view `app`.
     #[must_use]
     pub fn new(app: A) -> Self {
         let inspector = InspectorHandle::default();
@@ -166,6 +167,7 @@ impl<A: Render> DevtoolsHost<A> {
         }
     }
 
+    /// Sets whether the DevTools panel is initially open.
     #[must_use]
     pub fn open(mut self, open: bool) -> Self {
         self.set_open_immediate(open);
@@ -173,6 +175,7 @@ impl<A: Render> DevtoolsHost<A> {
     }
 
     /// Configures all DevTools list edges; `None` removes their offscreen passes.
+    /// `effect` is applied to scrollable lists, if present.
     #[must_use]
     pub fn scroll_effect(mut self, effect: Option<argui_ui::ScrollEffect>) -> Self {
         self.scroll_effect = effect;
@@ -189,12 +192,14 @@ impl<A: Render> DevtoolsHost<A> {
         self.sheet_motion = sheet_spring(self.sheet_progress);
     }
 
+    /// Returns a handle for publishing tree, frame, and memory inspection data.
     #[must_use]
     pub fn inspector(&self) -> InspectorHandle {
         self.inspector.clone()
     }
 
     #[cfg(not(target_arch = "wasm32"))]
+    /// Installs a device telemetry provider for native targets.
     #[must_use]
     pub fn device_telemetry(
         mut self,
@@ -204,6 +209,7 @@ impl<A: Render> DevtoolsHost<A> {
         self
     }
 
+    /// Returns the most recently collected process and device telemetry.
     #[must_use]
     pub fn telemetry_snapshot(&self) -> &crate::telemetry::TelemetrySnapshot {
         &self.telemetry.snapshot
@@ -245,10 +251,12 @@ impl<A: Render> DevtoolsHost<A> {
 }
 
 impl<A: Render> DevtoolsHost<A> {
+    /// Applies a UI event to DevTools and returns the required view invalidation.
     pub fn update(&mut self, event: &UiEvent) -> ViewUpdate {
         self.update_tools(event).unwrap_or(ViewUpdate::None)
     }
 
+    /// Advances DevTools animations and periodic sampling using `frame`.
     pub fn animation_frame(&mut self, frame: Frame) -> ViewUpdate {
         self.advance_animations(frame, ViewUpdate::None)
     }
@@ -301,6 +309,7 @@ impl<A: Render> DevtoolsHost<A> {
         }
     }
 
+    /// Reports whether another animation frame is currently needed.
     pub fn wants_animation_frame(&self) -> bool {
         self.dock_presence.animating()
             || self.sheet_motion.is_active()
@@ -324,6 +333,8 @@ impl<A: Render> DevtoolsHost<A> {
 
     /// Update inspector geometry without delivering layout to the application.
     /// Application layout delivery belongs to the retained parent presentation.
+    /// `layout` is the latest layout snapshot; the return value indicates the
+    /// invalidation needed to refresh the tools view.
     pub fn inspect_layout(&mut self, layout: &LayoutSnapshot) -> ViewUpdate {
         self.property_editing.layout_changed(layout);
         self.theme_editing.layout_changed(layout);
@@ -344,32 +355,39 @@ impl<A: Render> DevtoolsHost<A> {
         }
     }
 
+    /// Returns image assets required by the hosted application view.
     pub fn image_assets(&self) -> Vec<ImageAsset> {
         self.app.read(Render::image_assets)
     }
 
+    /// Returns vector assets required by the application and DevTools controls.
     pub fn vector_assets(&self) -> Vec<VectorAsset> {
         let mut assets = self.app.read(Render::vector_assets);
         assets.extend_from_slice(self.icons.assets());
         assets
     }
 
+    /// Returns the inspector handle exposed to runtime integrations.
     pub fn runtime_inspector(&self) -> Option<InspectorHandle> {
         Some(self.inspector.clone())
     }
 
+    /// Takes and clears a pending clipboard request.
     pub fn take_clipboard_request(&mut self) -> Option<ClipboardRequest> {
         self.clipboard.take()
     }
 
+    /// Takes and clears a pending focus request.
     pub fn take_focus_request(&mut self) -> Option<argui_ui::FocusRequest> {
         self.pending_focus.take()
     }
 
+    /// Takes and clears a pending scroll request.
     pub fn take_scroll_request(&mut self) -> Option<ScrollRequest> {
         self.pending_scroll.take()
     }
 
+    /// Takes and clears a pending text-selection request.
     pub fn take_text_selection_request(&mut self) -> Option<argui_ui::TextSelectionRequest> {
         self.pending_selection.take()
     }

@@ -9,38 +9,64 @@ use std::{
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "kebab-case")]
+/// Archive or installer format advertised by a release.
 pub enum Format {
+    /// Replace the installed executable.
     Executable,
+    /// Replace an AppImage file.
     AppImage,
+    /// Replace a macOS `.app` bundle archive.
     AppBundle,
+    /// Launch an NSIS Windows installer.
     Nsis,
+    /// Launch an MSI Windows installer.
     Msi,
 }
 
+/// Installation contract for verified update packages.
 pub trait Installer {
     /// Fail during the update check when the package cannot update this installation.
+    ///
+    /// # Errors
+    /// Returns an error when `format` cannot update this installation.
+    /// `format` is the package format advertised by the selected release.
     fn supports(&self, format: Format) -> Result<()>;
     /// The path belongs to a verified package and remains valid until this call returns.
+    ///
+    /// # Errors
+    /// Returns an error if installation of the package fails.
+    /// `format` selects the installation procedure; `package` is the verified artifact path.
     fn install(&self, format: Format, package: &Path) -> Result<InstallOutcome>;
 }
 
 #[derive(Clone, Debug)]
+/// Filesystem destination detected or configured for native installation.
 pub enum Destination {
+    /// Installed executable path.
     Executable(PathBuf),
+    /// Installed AppImage path.
     AppImage(PathBuf),
+    /// Installed macOS app bundle path.
     AppBundle(PathBuf),
 }
 
+/// Native installer for directly distributed desktop applications.
 pub struct NativeInstaller {
     destination: Destination,
 }
 
 impl NativeInstaller {
     /// Useful when the app's packaging supplies an explicit installation location.
+    ///
+    /// `destination` identifies the installed executable, AppImage, or app bundle.
     pub fn new(destination: Destination) -> Self {
         Self { destination }
     }
 
+    /// Detects the current executable, AppImage, or macOS application bundle.
+    ///
+    /// # Errors
+    /// Returns an error if the executable path cannot be determined or the detected destination is invalid.
     pub fn detect() -> Result<Self> {
         let exe = std::env::current_exe().map_err(Error::backend)?;
         let destination = if cfg!(target_os = "linux") && std::env::var_os("APPIMAGE").is_some() {
@@ -126,8 +152,12 @@ fn replace_file(package: &Path, destination: &Path) -> Result<()> {
     }
 }
 
-/// Replace a signed `.app.tar.gz` on the same filesystem, retaining the old bundle
+/// Replaces a signed `.app.tar.gz` on the same filesystem, retaining the old bundle
 /// if the final rename fails. No elevation or shell interpolation is involved.
+///
+/// # Errors
+/// Returns an error if extraction, validation, replacement, or rollback fails.
+/// `package` is the signed archive path and `destination` is the existing `.app` bundle to replace.
 pub fn replace_bundle(package: &Path, destination: &Path) -> Result<()> {
     let parent = destination
         .parent()

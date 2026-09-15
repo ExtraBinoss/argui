@@ -44,8 +44,9 @@ pub struct WidgetTheme {
     pub scrollbar: ScrollbarStyle,
 }
 
+/// Builds Argui's default light and dark widget palettes using `source` for primary color and theme overrides.
 #[must_use]
-pub fn shadcn(source: impl argui_theme::ThemeSource) -> Theme<WidgetTheme> {
+pub fn default_theme(source: impl argui_theme::ThemeSource) -> Theme<WidgetTheme> {
     let overrides = source.theme_overrides();
     let primary = match overrides.and_then(|tokens| tokens.get("primary")) {
         Some(argui_theme::ThemeValue::Color(color)) => color,
@@ -59,6 +60,14 @@ pub fn shadcn(source: impl argui_theme::ThemeSource) -> Theme<WidgetTheme> {
         theme
     };
     Theme::new(resolve(ColorScheme::Light), resolve(ColorScheme::Dark))
+}
+
+/// Builds the shadcn-inspired widget palette.
+///
+/// This is the compatibility name for [`default_theme`]; `source` supplies the color and overrides.
+#[must_use]
+pub fn shadcn(source: impl argui_theme::ThemeSource) -> Theme<WidgetTheme> {
+    default_theme(source)
 }
 
 mod tokens;
@@ -211,6 +220,7 @@ pub(crate) fn instant_hover(
 
 impl WidgetTheme {
     /// Rounded floating surface with independent backdrop blur and elevation.
+    /// `radius` controls corner rounding; positive `blur` enables backdrop blur.
     #[must_use]
     pub fn overlay_layer(&self, radius: f32, blur: f32) -> LayerStyle {
         let mut layer = LayerStyle::new(Default::default())
@@ -232,6 +242,7 @@ impl WidgetTheme {
         }
     }
     #[cfg(feature = "button")]
+    /// Creates the primary button style from this palette.
     #[must_use]
     pub fn button(&self) -> ButtonStyle {
         button_style(
@@ -243,6 +254,7 @@ impl WidgetTheme {
         )
     }
     #[cfg(feature = "button")]
+    /// Creates a secondary button style from this palette.
     #[must_use]
     pub fn secondary_button(&self) -> ButtonStyle {
         button_style(
@@ -254,6 +266,7 @@ impl WidgetTheme {
         )
     }
     #[cfg(feature = "button")]
+    /// Creates an outlined button style from this palette.
     #[must_use]
     pub fn outline_button(&self) -> ButtonStyle {
         button_style(
@@ -265,6 +278,7 @@ impl WidgetTheme {
         )
     }
     #[cfg(feature = "button")]
+    /// Creates a transparent ghost button style from this palette.
     #[must_use]
     pub fn ghost_button(&self) -> ButtonStyle {
         button_style(
@@ -276,6 +290,7 @@ impl WidgetTheme {
         )
     }
     #[cfg(feature = "button")]
+    /// Creates a destructive-action button style from this palette.
     #[must_use]
     pub fn destructive_button(&self) -> ButtonStyle {
         button_style(
@@ -287,6 +302,7 @@ impl WidgetTheme {
         )
     }
     #[cfg(any(feature = "input", feature = "textarea"))]
+    /// Creates the text-input style from this palette.
     #[must_use]
     pub fn input(&self) -> InputStyle {
         let mut input = InputStyle::new(PaintStyle::new(quad(self.card, self.border)), self.text());

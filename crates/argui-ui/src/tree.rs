@@ -71,6 +71,9 @@ pub struct UiTree {
 }
 
 impl UiTree {
+    /// Creates a retained UI tree from its root element.
+    ///
+    /// * `root` — element hierarchy to retain.
     #[must_use]
     pub fn new(root: Element) -> Self {
         let mut next_node_id = 1;
@@ -109,11 +112,13 @@ impl UiTree {
         tree.sync_transitions();
         tree
     }
+    /// Returns the root element of the retained tree.
     #[must_use]
     pub const fn root(&self) -> &Element {
         &self.root
     }
 
+    /// Returns stable node identifiers in tree preorder.
     #[must_use]
     pub fn node_ids(&self) -> &[NodeId] {
         &self.node_ids
@@ -126,11 +131,13 @@ impl UiTree {
         self.node_ids.capacity() * size_of::<NodeId>() + self.index.column_bytes()
     }
 
+    /// Returns the current retained-tree revision.
     #[must_use]
     pub const fn revision(&self) -> u64 {
         self.revision
     }
 
+    /// Returns whether a layout update has been requested.
     #[must_use]
     pub const fn layout_dirty(&self) -> bool {
         self.layout_dirty
@@ -143,15 +150,24 @@ impl UiTree {
         self.index.layout_roots()
     }
 
+    /// Returns counters describing the most recent tree update.
     #[must_use]
     pub const fn update_stats(&self) -> TreeUpdateStats {
         self.update_stats
     }
 
+    /// Replaces the tree root and reports whether retained state changed.
+    ///
+    /// * `root` — new element hierarchy.
     pub fn replace(&mut self, root: Element) -> bool {
         self.update(root) != TreeUpdate::None
     }
 
+    /// Reconciles a new element hierarchy with this tree's retained state.
+    ///
+    /// * `root` — new element hierarchy.
+    ///
+    /// Returns the strongest update required by the reconciliation.
     pub fn update(&mut self, mut root: Element) -> TreeUpdate {
         let mut stats = TreeUpdateStats::default();
         let update = classify_update(&self.root, &mut root, &mut stats);
@@ -228,24 +244,37 @@ impl UiTree {
         update
     }
 
+    /// Marks layout as clean after the host has processed the pending layout.
     pub fn mark_layout_clean(&mut self) {
         self.layout_dirty = false;
     }
 
+    /// Updates pointer-device settings used by interaction policy.
+    ///
+    /// * `settings` — current host pointer settings.
     pub fn set_pointer_settings(&mut self, settings: argui_core::PointerSettings) {
         self.interaction.set_pointer_settings(settings);
     }
 
+    /// Returns the node identifier at a preorder index, if present.
+    ///
+    /// * `index` — zero-based preorder position.
     #[must_use]
     pub fn node_id_at(&self, index: usize) -> Option<NodeId> {
         self.node_ids.get(index).copied()
     }
 
+    /// Returns a node's explicit key, if it has one.
+    ///
+    /// * `node` — retained node identifier.
     #[must_use]
     pub fn key(&self, node: NodeId) -> Option<&str> {
         self.key_for(node)
     }
 
+    /// Resolves a node or key focus target against the current tree.
+    ///
+    /// * `target` — node identifier or explicit element key.
     #[must_use]
     pub fn resolve_node(&self, target: &crate::FocusTarget) -> Option<NodeId> {
         match target {
@@ -258,6 +287,9 @@ impl UiTree {
         }
     }
 
+    /// Returns the parent node, or `None` for an unknown node or the root.
+    ///
+    /// * `node` — retained node identifier.
     #[must_use]
     pub fn parent_of(&self, node: NodeId) -> Option<NodeId> {
         let index = self.index.position(node)?;
@@ -266,16 +298,23 @@ impl UiTree {
             .and_then(|parent| self.node_ids.get(parent).copied())
     }
 
+    /// Returns the active visual states for a node.
+    ///
+    /// * `node` — retained node identifier.
     #[must_use]
     pub fn visual_states(&self, node: NodeId) -> crate::VisualStates {
         self.interaction.visual_states(node)
     }
 
+    /// Returns the currently focused node, if any.
     #[must_use]
     pub const fn focused_node(&self) -> Option<NodeId> {
         self.interaction.focused()
     }
 
+    /// Returns the element at a preorder index, if present.
+    ///
+    /// * `index` — zero-based preorder position.
     #[must_use]
     pub fn element_at(&self, index: usize) -> Option<&Element> {
         self.index.at(index)
@@ -376,6 +415,9 @@ impl UiTree {
         }
     }
 
+    /// Returns the retained element for a node identifier, if it exists.
+    ///
+    /// * `node` — retained node identifier.
     #[must_use]
     pub fn element_for(&self, node: NodeId) -> Option<&Element> {
         self.index.element(node)

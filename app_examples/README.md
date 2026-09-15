@@ -4,9 +4,10 @@ These applications are product-shaped demonstrations rather than isolated
 widget samples. They live in a separate Cargo workspace so normal Argui builds,
 packages and dependency graphs do not include them.
 
-| Application                         | What it demonstrates                                                                                                                          |
-| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| [Fake AI Harness](fake-ai-harness/) | A bundled adaptation of Wikipedia's Large language model article streams 6,000 simulated tokens at 1,000 tokens/s through a responsive VList. |
+| Application                              | What it demonstrates                                                                                                                          |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Fake AI Harness](fake-ai-harness/)      | A bundled adaptation of Wikipedia's Large language model article streams 6,000 simulated tokens at 1,000 tokens/s through a responsive VList. |
+| [Documentation examples](docs-examples/) | Seventeen exact-source applications compiled into the interactive learning site. Each guide displays the Rust module it actually runs.        |
 
 Run an application from the repository root:
 

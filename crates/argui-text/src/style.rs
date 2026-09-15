@@ -152,54 +152,81 @@ pub struct TextSpanStyle {
 }
 
 impl TextSpanStyle {
+    /// Overrides the font size for a text span.
+    ///
+    /// * `font_size` — font size in logical pixels.
     #[must_use]
     pub const fn font_size(mut self, font_size: f32) -> Self {
         self.font_size = Some(font_size);
         self
     }
 
+    /// Overrides the line height for a text span.
+    ///
+    /// * `line_height` — line height in logical pixels.
     #[must_use]
     pub const fn line_height(mut self, line_height: f32) -> Self {
         self.line_height = Some(line_height);
         self
     }
 
+    /// Overrides the text color for a text span.
+    ///
+    /// * `color` — span color.
     #[must_use]
     pub const fn color(mut self, color: TextColor) -> Self {
         self.color = Some(color);
         self
     }
 
+    /// Overrides the font weight for a text span.
+    ///
+    /// * `weight` — font weight value.
     #[must_use]
     pub const fn weight(mut self, weight: u16) -> Self {
         self.weight = Some(weight);
         self
     }
 
+    /// Overrides the font family for a text span.
+    ///
+    /// * `family` — family selection for the span.
     #[must_use]
     pub fn family(mut self, family: FontFamily) -> Self {
         self.family = Some(family);
         self
     }
 
+    /// Overrides the font style for a text span.
+    ///
+    /// * `style` — normal, italic, or oblique style.
     #[must_use]
     pub const fn font_style(mut self, style: FontStyle) -> Self {
         self.font_style = Some(style);
         self
     }
 
+    /// Overrides the font stretch for a text span.
+    ///
+    /// * `stretch` — width variant of the font family.
     #[must_use]
     pub const fn stretch(mut self, stretch: FontStretch) -> Self {
         self.stretch = Some(stretch);
         self
     }
 
+    /// Overrides letter spacing for a text span.
+    ///
+    /// * `spacing` — normal spacing or an explicit pixel/em value.
     #[must_use]
     pub const fn letter_spacing(mut self, spacing: LetterSpacing) -> Self {
         self.letter_spacing = Some(spacing);
         self
     }
 
+    /// Overrides text decoration for a text span.
+    ///
+    /// * `decoration` — underline and strikethrough settings.
     #[must_use]
     pub const fn decoration(mut self, decoration: TextDecoration) -> Self {
         self.decoration = Some(decoration);
@@ -214,6 +241,9 @@ pub struct TextSpan {
 }
 
 impl TextSpan {
+    /// Creates a span with default styling.
+    ///
+    /// * `content` — text content of the span.
     #[must_use]
     pub fn new(content: impl Into<String>) -> Self {
         Self {
@@ -222,6 +252,9 @@ impl TextSpan {
         }
     }
 
+    /// Sets the style overrides for this span.
+    ///
+    /// * `style` — style properties to override.
     #[must_use]
     pub fn style(mut self, style: TextSpanStyle) -> Self {
         self.style = style;
@@ -236,6 +269,9 @@ pub struct TextContent {
 }
 
 impl TextContent {
+    /// Creates unstyled text content.
+    ///
+    /// * `text` — UTF-8 text to store.
     #[must_use]
     pub fn plain(text: impl Into<String>) -> Self {
         Self {
@@ -244,6 +280,9 @@ impl TextContent {
         }
     }
 
+    /// Concatenates styled spans into rich text content.
+    ///
+    /// * `spans` — ordered spans whose content and style are retained.
     #[must_use]
     pub fn rich(spans: impl IntoIterator<Item = TextSpan>) -> Self {
         let mut text = String::new();
@@ -259,11 +298,13 @@ impl TextContent {
         Self { text, runs }
     }
 
+    /// Returns the concatenated UTF-8 text, without style metadata.
     #[must_use]
     pub fn as_str(&self) -> &str {
         &self.text
     }
 
+    /// Returns whether this content contains any styled runs.
     #[must_use]
     pub fn is_rich(&self) -> bool {
         !self.runs.is_empty()
@@ -295,6 +336,10 @@ pub struct TextBlock {
 }
 
 impl TextBlock {
+    /// Creates a text block with default style and a clip matching its bounds.
+    ///
+    /// * `content` — plain or rich text to render.
+    /// * `bounds` — block rectangle in logical coordinates.
     #[must_use]
     pub fn new(content: impl Into<TextContent>, bounds: Rect) -> Self {
         Self {
@@ -305,6 +350,9 @@ impl TextBlock {
         }
     }
 
+    /// Sets the font size and derives a default line height of 1.25 times that size.
+    ///
+    /// * `font_size` — font size in logical pixels.
     #[must_use]
     pub fn size(mut self, font_size: f32) -> Self {
         self.style.font_size = font_size;
@@ -312,78 +360,117 @@ impl TextBlock {
         self
     }
 
+    /// Sets the line height in logical pixels.
+    ///
+    /// * `line_height` — height of each text line.
     #[must_use]
     pub const fn line_height(mut self, line_height: f32) -> Self {
         self.style.line_height = line_height;
         self
     }
 
+    /// Sets the text color.
+    ///
+    /// * `color` — block color.
     #[must_use]
     pub const fn color(mut self, color: TextColor) -> Self {
         self.style.color = color;
         self
     }
 
+    /// Sets the preferred font family.
+    ///
+    /// * `family` — family selection for the block.
     #[must_use]
     pub fn family(mut self, family: FontFamily) -> Self {
         self.style.family = family;
         self
     }
 
+    /// Sets the font weight.
+    ///
+    /// * `weight` — font weight value.
     #[must_use]
     pub const fn weight(mut self, weight: u16) -> Self {
         self.style.weight = weight;
         self
     }
 
+    /// Sets the font style.
+    ///
+    /// * `style` — normal, italic, or oblique style.
     #[must_use]
     pub const fn font_style(mut self, style: FontStyle) -> Self {
         self.style.font_style = style;
         self
     }
 
+    /// Sets the font stretch.
+    ///
+    /// * `stretch` — width variant of the font family.
     #[must_use]
     pub const fn stretch(mut self, stretch: FontStretch) -> Self {
         self.style.stretch = stretch;
         self
     }
 
+    /// Sets letter spacing.
+    ///
+    /// * `spacing` — normal spacing or an explicit pixel/em value.
     #[must_use]
     pub const fn letter_spacing(mut self, spacing: LetterSpacing) -> Self {
         self.style.letter_spacing = spacing;
         self
     }
 
+    /// Sets underline and strikethrough styling.
+    ///
+    /// * `decoration` — decoration settings.
     #[must_use]
     pub const fn decoration(mut self, decoration: TextDecoration) -> Self {
         self.style.decoration = decoration;
         self
     }
 
+    /// Sets the line-wrapping policy.
+    ///
+    /// * `wrap` — wrapping mode used within the block bounds.
     #[must_use]
     pub const fn wrap(mut self, wrap: TextWrap) -> Self {
         self.style.wrap = wrap;
         self
     }
 
+    /// Sets clipping or ellipsis behavior when text overflows.
+    ///
+    /// * `overflow` — overflow policy for shaped text.
     #[must_use]
     pub const fn overflow(mut self, overflow: TextOverflow) -> Self {
         self.style.overflow = overflow;
         self
     }
 
+    /// Limits the number of displayed lines when set.
+    ///
+    /// * `line_clamp` — maximum line count, or `None` for no clamp.
     #[must_use]
     pub const fn line_clamp(mut self, line_clamp: Option<NonZeroUsize>) -> Self {
         self.style.line_clamp = line_clamp;
         self
     }
 
+    /// Sets horizontal text alignment.
+    ///
+    /// * `align` — alignment within the block width.
     #[must_use]
     pub const fn align(mut self, align: TextAlign) -> Self {
         self.style.align = align;
         self
     }
 
+    /// Sets the clipping rectangle for this block.
+    ///
+    /// * `clip` — clip rectangle in logical coordinates.
     #[must_use]
     pub const fn clip(mut self, clip: Rect) -> Self {
         self.clip = clip;
@@ -397,26 +484,35 @@ pub struct TextScene {
 }
 
 impl TextScene {
+    /// Creates an empty text scene.
     #[must_use]
     pub const fn new() -> Self {
         Self { blocks: Vec::new() }
     }
 
+    /// Returns a scene with `block` appended.
+    ///
+    /// * `block` — text block to append.
     #[must_use]
     pub fn with(mut self, block: TextBlock) -> Self {
         self.blocks.push(block);
         self
     }
 
+    /// Appends a text block to this scene.
+    ///
+    /// * `block` — text block to append.
     pub fn push(&mut self, block: TextBlock) {
         self.blocks.push(block);
     }
 
+    /// Returns the scene's text blocks in paint order.
     #[must_use]
     pub fn blocks(&self) -> &[TextBlock] {
         &self.blocks
     }
 
+    /// Returns mutable access to the scene's blocks in paint order.
     pub fn blocks_mut(&mut self) -> &mut [TextBlock] {
         &mut self.blocks
     }

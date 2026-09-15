@@ -10,6 +10,10 @@ pub struct ButtonGroup {
 }
 
 impl ButtonGroup {
+    /// Creates a horizontal group with a semantic `label` and ordered `children`.
+    ///
+    /// `key` identifies the group, `label` names it to assistive technology, and `children`
+    /// supplies its controls in display order.
     #[must_use]
     pub fn new(
         key: impl Into<String>,
@@ -25,6 +29,7 @@ impl ButtonGroup {
     }
 
     #[must_use]
+    /// Builds the group in its configured orientation.
     pub fn build(self) -> Element {
         let root = match self.orientation {
             Orientation::Horizontal => Element::row(self.children),

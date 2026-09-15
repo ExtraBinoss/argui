@@ -14,6 +14,8 @@ pub struct BreadcrumbLink {
 }
 
 impl BreadcrumbLink {
+    /// Creates a navigation link with a stable identity and display label.
+    /// `id` is the destination identity returned on activation; `label` is displayed to users.
     #[must_use]
     pub fn new(id: impl Into<String>, label: impl Into<String>) -> Self {
         Self {
@@ -35,7 +37,9 @@ pub struct Breadcrumb {
 }
 
 impl Breadcrumb {
+    /// Creates a breadcrumb trail from the ordered links and current page.
     /// Ancestor IDs must be unique within this breadcrumb.
+    /// `key` identifies the trail, `links` lists ancestors in order, and `current` names the current page.
     #[must_use]
     pub fn new(
         key: impl Into<String>,
@@ -59,29 +63,35 @@ impl Breadcrumb {
     }
 
     #[must_use]
+    /// Sets the accessible label for the breadcrumb navigation.
     pub fn label(mut self, label: impl Into<String>) -> Self {
         self.label = label.into();
         self
     }
 
     #[must_use]
+    /// Sets the accessible description for the current-page item.
     pub fn current_description(mut self, description: impl Into<String>) -> Self {
         self.current_description = description.into();
         self
     }
 
     #[must_use]
+    /// Sets the text displayed between breadcrumb links.
+    /// `separator` is the text inserted between adjacent items.
     pub fn separator(mut self, separator: impl Into<String>) -> Self {
         self.separator = separator.into();
         self
     }
 
     #[must_use]
+    /// Returns the element key for the link identified by `id`.
     pub fn link_key(&self, id: &str) -> String {
         format!("{}::link::{id}", self.key)
     }
 
     #[must_use]
+    /// Returns the activated link identity when `event` targets a breadcrumb link.
     pub fn action(&self, event: &UiEvent) -> Option<&str> {
         self.links
             .iter()
@@ -94,6 +104,7 @@ impl Breadcrumb {
     }
 
     #[must_use]
+    /// Builds the breadcrumb navigation using `theme` for styling.
     pub fn build(&self, theme: &WidgetTheme) -> Element {
         let style = TextStyle {
             font_size: 14.0,

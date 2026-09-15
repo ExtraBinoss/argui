@@ -1,6 +1,7 @@
 use crate::{Element, WritingDirection};
 
 impl Element {
+    /// Sets the writing direction used to resolve logical layout properties.
     #[must_use]
     pub fn writing_direction(mut self, direction: WritingDirection) -> Self {
         self.style.writing_direction = direction;

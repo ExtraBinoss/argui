@@ -15,6 +15,13 @@ pub struct Localizer {
 
 impl Localizer {
     /// Creates a localizer whose fallback catalog is always searched last.
+    ///
+    /// # Arguments
+    /// * `fallback` — locale required as the final lookup fallback.
+    /// * `catalogs` — catalogs available for negotiation and lookup.
+    ///
+    /// # Errors
+    /// Returns an error if a locale occurs more than once or no catalog matches `fallback`.
     pub fn new(
         fallback: LanguageIdentifier,
         catalogs: impl IntoIterator<Item = Catalog>,
@@ -47,6 +54,9 @@ impl Localizer {
     }
 
     /// Negotiates preferred locales in order and returns whether visible output may change.
+    ///
+    /// # Arguments
+    /// * `requested` — preferred locales, ordered by preference.
     pub fn select(&mut self, requested: impl IntoIterator<Item = LanguageIdentifier>) -> bool {
         let requested: Vec<_> = requested.into_iter().collect();
         let negotiated = negotiate_languages(
@@ -82,6 +92,7 @@ impl Localizer {
     }
 
     #[must_use]
+    /// Returns the locale used as the final lookup fallback.
     pub const fn fallback_locale(&self) -> &LanguageIdentifier {
         &self.fallback
     }
@@ -93,16 +104,30 @@ impl Localizer {
     }
 
     #[must_use]
+    /// Returns whether the primary negotiated locale uses right-to-left character direction.
     pub fn is_rtl(&self) -> bool {
         self.direction() == CharacterDirection::RTL
     }
 
     /// Formats a message without variables.
+    ///
+    /// # Arguments
+    /// * `id` — Fluent message identifier.
+    ///
+    /// # Errors
+    /// Returns an error if no matching message/value exists or Fluent formatting reports problems.
     pub fn text(&self, id: &str) -> Result<String, TranslationError> {
         self.format_optional(id, None)
     }
 
     /// Formats a message with Fluent variables, selectors, terms, and built-ins.
+    ///
+    /// # Arguments
+    /// * `id` — Fluent message identifier.
+    /// * `args` — variables referenced while formatting the message.
+    ///
+    /// # Errors
+    /// Returns an error if no matching message/value exists or Fluent formatting reports problems.
     pub fn format(&self, id: &str, args: &FluentArgs<'_>) -> Result<String, TranslationError> {
         self.format_optional(id, Some(args))
     }
@@ -144,11 +169,26 @@ impl Localizer {
     }
 
     /// Formats a message attribute without variables.
+    ///
+    /// # Arguments
+    /// * `id` — Fluent message identifier.
+    /// * `attribute` — attribute name on that message.
+    ///
+    /// # Errors
+    /// Returns an error if the message or attribute is absent, or formatting reports problems.
     pub fn attribute(&self, id: &str, attribute: &str) -> Result<String, TranslationError> {
         self.format_attribute_optional(id, attribute, None)
     }
 
     /// Formats a message attribute with Fluent variables.
+    ///
+    /// # Arguments
+    /// * `id` — Fluent message identifier.
+    /// * `attribute` — attribute name on that message.
+    /// * `args` — variables referenced while formatting the attribute.
+    ///
+    /// # Errors
+    /// Returns an error if the message or attribute is absent, or formatting reports problems.
     pub fn format_attribute(
         &self,
         id: &str,

@@ -13,6 +13,7 @@ pub struct Separator {
 }
 
 impl Separator {
+    /// Creates a non-decorative separator identified by `key`.
     #[must_use]
     pub fn new(key: impl Into<String>) -> Self {
         Self {
@@ -25,6 +26,8 @@ impl Separator {
 
     /// Vertical separators need a definite height on their parent.
     #[must_use]
+    /// Sets the separator axis.
+    /// `orientation` determines the line direction.
     pub const fn orientation(mut self, orientation: Orientation) -> Self {
         self.orientation = orientation;
         self
@@ -32,18 +35,22 @@ impl Separator {
 
     /// Centers a label between equal-length rules. Empty labels render a plain rule.
     #[must_use]
+    /// Sets the accessible label for a non-decorative separator.
     pub fn label(mut self, label: impl Into<String>) -> Self {
         self.label = Some(label.into()).filter(|label| !label.trim().is_empty());
         self
     }
 
     #[must_use]
+    /// Sets whether the separator is hidden from accessibility semantics.
+    /// `decorative` is true when it should not be announced.
     pub const fn decorative(mut self, decorative: bool) -> Self {
         self.decorative = decorative;
         self
     }
 
     #[must_use]
+    /// Builds the separator using `theme` for its line color.
     pub fn build(self, theme: &WidgetTheme) -> Element {
         let rule = || {
             Element::container([])

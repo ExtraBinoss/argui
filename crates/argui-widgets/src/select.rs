@@ -15,6 +15,7 @@ pub struct SelectOption {
 }
 
 impl SelectOption {
+    /// Creates an enabled option with the supplied display label.
     #[must_use]
     pub fn new(label: impl Into<String>) -> Self {
         Self {
@@ -24,6 +25,8 @@ impl SelectOption {
     }
 
     #[must_use]
+    /// Sets whether this option can be highlighted or selected.
+    /// `enabled` controls whether it participates in interaction.
     pub const fn enabled(mut self, enabled: bool) -> Self {
         self.enabled = enabled;
         self
@@ -44,6 +47,8 @@ pub struct Select {
 }
 
 impl Select {
+    /// Creates a controlled select from options in source order.
+    /// `key` identifies the control, `label` names it accessibly, and `selected` is the initial option index.
     #[must_use]
     pub fn new(
         key: impl Into<String>,
@@ -65,24 +70,28 @@ impl Select {
     }
 
     #[must_use]
+    /// Sets whether the option list is initially open.
     pub const fn open(mut self, open: bool) -> Self {
         self.open = open;
         self
     }
 
     #[must_use]
+    /// Sets the source index of the currently highlighted option.
     pub const fn highlighted(mut self, highlighted: usize) -> Self {
         self.highlighted = highlighted;
         self
     }
 
     #[must_use]
+    /// Adds a trailing element to the trigger.
     pub fn trailing(mut self, trailing: Element) -> Self {
         self.trailing = Some(trailing);
         self
     }
 
     #[must_use]
+    /// Uses retained presence state for popup visibility and motion.
     pub fn presence(mut self, presence: &crate::Presence) -> Self {
         self.open = presence.is_open();
         self.presence = Some(presence.clone());
@@ -90,12 +99,14 @@ impl Select {
     }
 
     #[must_use]
+    /// Sets the overlay surface policy.
     pub const fn surface(mut self, surface: argui_ui::OverlaySurface) -> Self {
         self.surface = Some(surface);
         self
     }
 
     #[must_use]
+    /// Builds the select trigger and popup using `theme` for their styling.
     pub fn build(self, theme: &WidgetTheme) -> Element {
         let behavior = SelectBehavior::new(
             &self.key,

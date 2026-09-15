@@ -60,6 +60,10 @@ pub struct TextSelectionRequest {
 }
 
 impl TextSelectionRequest {
+    /// Creates a request to set a target's text selection.
+    ///
+    /// * `target` — node or key identifying the text input.
+    /// * `selection` — caret, range, or select-all operation to apply.
     #[must_use]
     pub fn new(target: impl Into<FocusTarget>, selection: TextSelection) -> Self {
         Self {

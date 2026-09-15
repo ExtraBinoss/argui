@@ -7,6 +7,14 @@ pub enum VectorError {
     Svg(#[from] usvg::Error),
 }
 
+/// Parses an SVG document into an immutable vector asset.
+///
+/// # Arguments
+/// * `id` — identifier to associate with the asset.
+/// * `svg` — SVG document bytes to parse and retain.
+///
+/// # Errors
+/// Returns an error when the bytes do not contain a valid SVG document.
 pub fn parse_svg(id: VectorId, svg: &[u8]) -> Result<VectorAsset, VectorError> {
     let tree = usvg::Tree::from_data(svg, &usvg::Options::default())?;
     let width = tree.size().width();

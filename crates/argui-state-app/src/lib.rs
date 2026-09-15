@@ -1,3 +1,4 @@
+//! Native packaged application for the Argui state showcase.
 use std::error::Error;
 
 use argui::{
@@ -12,6 +13,10 @@ use argui_devtools::DevtoolsHost;
 use argui_showcase::{StateShowcase, text_engine};
 
 /// Builds the packaged app identity, main window, and quit tray item.
+///
+/// # Errors
+///
+/// Returns an error if an embedded icon cannot be decoded or configuration fails.
 pub fn application_config() -> Result<ApplicationConfig, Box<dyn Error>> {
     Ok(ApplicationConfig::new(
         ApplicationIdentity::new(
@@ -40,11 +45,18 @@ pub fn application_config() -> Result<ApplicationConfig, Box<dyn Error>> {
 }
 
 /// Adds DevTools effects and selects the requested GPU profile mode.
+/// `profiling` controls whether renderer profiling is enabled.
+///
+/// # Errors
+///
+/// Returns a renderer error if DevTools effects cannot be configured.
 pub fn renderer_config(profiling: bool) -> Result<RendererConfig, RendererError> {
     argui_devtools::configure_renderer(RendererConfig::default().profiling(profiling))
 }
 
 /// Formats enabled profile events for display by the native application.
+/// `profiling` enables or suppresses output; `event` is the runtime event to inspect.
+/// Returns formatted profile text for supported profile events, otherwise `None`.
 pub fn profile_message(profiling: bool, event: RuntimeEvent) -> Option<String> {
     if !profiling {
         return None;
@@ -82,6 +94,10 @@ pub fn profile_message(profiling: bool, event: RuntimeEvent) -> Option<String> {
 }
 
 /// Starts the native state showcase.
+///
+/// # Errors
+///
+/// Returns an error if application setup or runtime startup fails.
 pub fn run() -> Result<(), Box<dyn Error>> {
     let profiling = std::env::var_os("ARGUI_PROFILE").is_some();
     run_app_with_text_engine(

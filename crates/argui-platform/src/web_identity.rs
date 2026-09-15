@@ -14,6 +14,11 @@ html.argui-show-canvas-focus-ring canvas[data-argui-window]:focus-visible {
 }
 "#;
 
+/// Applies application identity metadata to the current browser document.
+/// `identity` supplies the document title, application identifier, and icons.
+///
+/// # Errors
+/// Returns an error if the browser document cannot be accessed or modified.
 pub fn apply_web_identity(identity: &ApplicationIdentity) -> Result<(), String> {
     let document = web_sys::window()
         .and_then(|window| window.document())
@@ -48,6 +53,11 @@ pub fn apply_web_identity(identity: &ApplicationIdentity) -> Result<(), String> 
     Ok(())
 }
 
+/// Attaches the Winit canvas to the configured browser parent, if present.
+/// `window` supplies the canvas, `key` labels it, and `parent_id` selects its DOM parent when set.
+///
+/// # Errors
+/// Returns an error if the document, canvas, or configured parent element is unavailable.
 pub fn attach_web_canvas(
     window: &Window,
     key: &WindowKey,

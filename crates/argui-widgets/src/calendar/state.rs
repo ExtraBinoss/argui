@@ -13,6 +13,7 @@ pub enum CalendarSelection {
 }
 
 impl CalendarSelection {
+    /// Returns whether `date` belongs to the current selection.
     pub fn contains(&self, date: Date) -> bool {
         match self {
             Self::Single(selected) => *selected == Some(date),
@@ -35,6 +36,7 @@ pub struct CalendarState {
 }
 
 impl CalendarState {
+    /// Creates calendar state focused on `active` with the supplied selection.
     pub fn new(active: Date, selection: CalendarSelection) -> Self {
         Self {
             active,
@@ -43,11 +45,14 @@ impl CalendarState {
         }
     }
 
+    /// Returns the first day of the month containing the active date.
     pub fn month(&self) -> Date {
         self.active.replace_day(1).expect("first day of month")
     }
 
     /// Selection is atomic: a range containing a disabled date is rejected unchanged.
+    ///
+    /// Returns whether the date was accepted under `constraints`.
     pub fn select(&mut self, date: Date, constraints: &CalendarConstraints<'_>) -> bool {
         if !constraints.enabled(date) {
             return false;
@@ -88,6 +93,11 @@ impl CalendarState {
         true
     }
 
+    /// Moves the active date according to a calendar navigation key.
+    ///
+    /// `key` is the pressed key, `modifiers` controls modified navigation, and
+    /// `first_weekday` defines the week boundary used by Home and End. `constraints`
+    /// bounds navigation and skips disabled dates. Returns whether the active date changed.
     pub fn navigate(
         &mut self,
         key: &Key,
@@ -179,9 +189,11 @@ impl Default for CalendarConstraints<'_> {
 }
 
 impl CalendarConstraints<'_> {
+    /// Returns whether `date` falls between the optional inclusive bounds.
     pub fn in_bounds(&self, date: Date) -> bool {
         self.minimum.is_none_or(|min| date >= min) && self.maximum.is_none_or(|max| date <= max)
     }
+    /// Returns whether `date` is in bounds and is not rejected by the disabled-date predicate.
     pub fn enabled(&self, date: Date) -> bool {
         self.in_bounds(date) && !(self.disabled)(date)
     }

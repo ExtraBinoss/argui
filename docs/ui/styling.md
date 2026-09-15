@@ -92,7 +92,7 @@ application data can be themed; `WidgetTheme` is only the standard preset pack
 for buttons and text editors.
 
 Theme colors are authored in sRGB and stored internally as linear sRGB. The
-standard `shadcn` theme uses exact Zinc light/dark tokens and derives hover,
+standard `default_theme` preset uses Zinc light/dark tokens and derives hover,
 pressed, scrollbar, and focus colors in OKLab. See [Color](../rendering/primitives.md#color) for the
 renderer-wide contract.
 
@@ -103,14 +103,15 @@ an environment without overrides allocates no token map. Components that read it
 the environment changes; unrelated component caches remain valid.
 
 Resolve widgets with `let environment = cx.environment(); let themes =
-shadcn(&environment); let theme = themes.resolve(environment.color_scheme);`.
-`shadcn` accepts any `ThemeSource`, including a plain primary `Color` when scoped
+default_theme(&environment); let theme = themes.resolve(environment.color_scheme);`.
+`default_theme` accepts any `ThemeSource`, including a plain primary `Color` when scoped
 tokens are not needed. `WidgetTheme::tokens()` exposes the editable palette;
 `apply_overrides` applies typed `ThemeValue::Color`/`Number` entries. Primary
 overrides also derive the matching foreground unless explicitly overridden.
 `Context::entity_in(&entity, environment)` scopes an environment to a mounted
-child and its descendants. The [DevTools Theme tab](../contributing/devtools.md#live-theme)
+child and its descendants. The [DevTools Theme tab](../contributing/devtools.md#theme)
 uses this to preview tokens without changing the inspector's own palette.
+The older `shadcn` name remains an equivalent compatibility alias.
 
 System mode uses Winit theme notifications on Windows, macOS, and Web. Linux
 reads and continuously watches the XDG desktop portal. An unknown or explicitly

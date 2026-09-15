@@ -1,14 +1,21 @@
 use crate::{Easing, Interpolate, TimingError};
 
 #[derive(Clone, Debug, PartialEq)]
+/// Value and interpolation settings at a normalized timeline offset.
 pub struct Keyframe<T> {
+    /// Position in the normalized interval from zero to one.
     pub offset: f32,
+    /// Value at this keyframe.
     pub value: T,
+    /// Easing applied from this frame to the next.
     pub easing: Easing,
+    /// Whether to hold this value until the next frame rather than interpolate.
     pub hold: bool,
 }
 
 impl<T> Keyframe<T> {
+    /// Creates a keyframe with linear easing and no hold.
+    /// * `offset` — normalized timeline position; `value` — value at that position.
     #[must_use]
     pub fn new(offset: f32, value: T) -> Self {
         Self {
@@ -19,12 +26,14 @@ impl<T> Keyframe<T> {
         }
     }
 
+    /// Sets the easing used from this frame to its successor.
     #[must_use]
     pub fn easing(mut self, easing: Easing) -> Self {
         self.easing = easing;
         self
     }
 
+    /// Holds this keyframe's value until the next keyframe.
     #[must_use]
     pub const fn hold(mut self) -> Self {
         self.hold = true;
@@ -33,11 +42,17 @@ impl<T> Keyframe<T> {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+/// Validated, ordered keyframes spanning the complete normalized interval.
 pub struct Keyframes<T> {
     frames: Box<[Keyframe<T>]>,
 }
 
 impl<T> Keyframes<T> {
+    /// Creates keyframes covering offsets zero through one in nondecreasing order.
+    ///
+    /// # Errors
+    /// Returns [`TimingError::InvalidKeyframes`] if there are fewer than two frames,
+    /// the endpoints are not zero and one, or offsets are invalid or unsorted.
     pub fn new(frames: impl Into<Vec<Keyframe<T>>>) -> Result<Self, TimingError> {
         let frames = frames.into();
         if frames.len() < 2
@@ -57,6 +72,7 @@ impl<T> Keyframes<T> {
         })
     }
 
+    /// Returns the validated keyframes in offset order.
     #[must_use]
     pub fn as_slice(&self) -> &[Keyframe<T>] {
         &self.frames
@@ -64,6 +80,7 @@ impl<T> Keyframes<T> {
 }
 
 impl<T: Clone + Interpolate> Keyframes<T> {
+    /// Samples the keyframes at `progress`, clamped to the normalized interval.
     #[must_use]
     pub fn sample(&self, progress: f32) -> T {
         let progress = progress.clamp(0.0, 1.0);

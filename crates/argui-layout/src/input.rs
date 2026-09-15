@@ -7,6 +7,11 @@ mod navigation;
 
 impl crate::LayoutOutput {
     /// Convert a viewport pointer to layout coordinates for editor hits and captured drags.
+    ///
+    /// * `node` — text-input node whose transform is used.
+    /// * `point` — point in viewport coordinates.
+    ///
+    /// Returns `None` when the node has no invertible hit-region transform.
     #[must_use]
     pub fn local_point(&self, node: NodeId, point: Point) -> Option<Point> {
         self.hit_regions
@@ -43,17 +48,26 @@ pub(crate) struct InputPlacement {
 }
 
 impl TextInputRegion {
+    /// Returns the caret position under `point` when it lies within input bounds and clip.
+    ///
+    /// * `point` — position in layout coordinates.
     #[must_use]
     pub fn hit_position(&self, point: Point) -> Option<TextPosition> {
         (self.bounds.contains(point) && self.clip.contains(point))
             .then(|| self.closest_position(point))
     }
 
+    /// Returns the byte index under `point`, if it hits the input.
+    ///
+    /// * `point` — position in layout coordinates.
     #[must_use]
     pub fn hit_index(&self, point: Point) -> Option<usize> {
         self.hit_position(point).map(|position| position.index)
     }
 
+    /// Returns the nearest caret stop to `point`, including points outside the input.
+    ///
+    /// * `point` — position in layout coordinates.
     #[must_use]
     pub fn closest_position(&self, point: Point) -> TextPosition {
         let Some(line_y) = self
@@ -82,11 +96,19 @@ impl TextInputRegion {
             .map_or(TextPosition::default(), |stop| stop.position)
     }
 
+    /// Returns the byte index of the nearest caret stop to `point`.
+    ///
+    /// * `point` — position in layout coordinates.
     #[must_use]
     pub fn closest_index(&self, point: Point) -> usize {
         self.closest_position(point).index
     }
 
+    /// Finds the neighboring caret stop in visual order.
+    ///
+    /// * `position` — current caret position and affinity.
+    /// * `left` — whether to search left rather than right.
+    /// * `by_word` — whether to restrict candidates to word boundaries.
     #[must_use]
     pub fn visual_neighbor(
         &self,

@@ -4,6 +4,11 @@ use argui_paint::ClipChain;
 
 /// Converts intersected rounded/transformed clips into compositor region rectangles.
 /// Adjacent equal scanlines coalesce; rectangular sidebars use one rectangle.
+/// Converts backdrop clip chains into merged rectangles in logical coordinates.
+/// `shapes` are the clip chains describing visible backdrop regions.
+///
+/// # Errors
+/// Returns an error if a shape contains invalid geometry.
 pub fn region_rectangles(shapes: &[ClipChain]) -> Result<Vec<Rect>, BackdropError> {
     let mut output = Vec::new();
     for shape in shapes {

@@ -28,11 +28,18 @@ pub struct DeviceTelemetry {
 /// Implementations run on a dedicated worker, only after sensor collection is
 /// enabled. Bound blocking work and report unsupported metrics as `None`.
 pub trait DeviceTelemetryProvider: Send + 'static {
+    /// Returns the human-readable name of this provider.
     fn name(&self) -> &str;
+    /// Samples available device counters.
+    ///
+    /// # Errors
+    ///
+    /// Returns a provider-specific diagnostic if sampling fails.
     fn sample(&mut self) -> Result<Vec<DeviceTelemetry>, String>;
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
+/// A named memory region reported for the current process.
 pub struct MemoryCategory {
     pub name: String,
     pub resident_bytes: u64,
@@ -40,6 +47,7 @@ pub struct MemoryCategory {
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
+/// Current process memory and CPU measurements.
 pub struct ProcessTelemetry {
     pub resident_bytes: u64,
     pub virtual_bytes: u64,
@@ -53,6 +61,7 @@ pub struct ProcessTelemetry {
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
+/// Latest process and optional device telemetry collected by DevTools.
 pub struct TelemetrySnapshot {
     pub process: Option<ProcessTelemetry>,
     pub devices: Vec<DeviceTelemetry>,
@@ -93,12 +102,14 @@ impl Default for Telemetry {
 
 impl Telemetry {
     #[cfg(not(target_arch = "wasm32"))]
+    /// Replaces the device sampler with `provider`.
     pub fn provider(&mut self, provider: impl DeviceTelemetryProvider) {
         self.source = Some(provider.name().into());
         self.worker = worker::Worker::new(Box::new(provider));
         self.snapshot.devices.clear();
     }
 
+    /// Advances collection by `elapsed` and reports whether the snapshot changed.
     pub fn advance(&mut self, elapsed: Duration) -> bool {
         #[cfg(not(target_arch = "wasm32"))]
         {

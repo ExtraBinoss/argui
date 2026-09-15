@@ -9,6 +9,7 @@ pub struct MenuIntent {
 }
 
 impl MenuIntent {
+    /// Schedules activation of `id` after `delay`, recording pointer position and monotonic time `now`.
     pub fn schedule(
         &mut self,
         id: impl Into<String>,
@@ -19,13 +20,16 @@ impl MenuIntent {
         self.pending = now.checked_add(delay).map(|deadline| (id.into(), deadline));
         self.origin = Some(pointer);
     }
+    /// Cancels the pending submenu change and clears its pointer origin.
     pub fn cancel(&mut self) {
         self.pending = None;
         self.origin = None;
     }
+    /// Returns the pending activation deadline, if any.
     pub fn next_deadline(&self) -> Option<Duration> {
         self.pending.as_ref().map(|(_, deadline)| *deadline)
     }
+    /// Takes the scheduled item id when its deadline is no later than `now`.
     pub fn take_due(&mut self, now: Duration) -> Option<String> {
         if self.next_deadline().is_none_or(|deadline| deadline > now) {
             return None;
@@ -35,6 +39,9 @@ impl MenuIntent {
     }
     /// Keep a pending sibling change delayed while moving through the triangle
     /// toward the open submenu. Works with either left- or right-opening menus.
+    /// `point` is the new pointer position, `submenu` its current bounds, and `now`/`delay`
+    /// provide the clock and extension interval.
+    /// Returns whether the pointer is inside the corridor.
     pub fn pointer_moved(
         &mut self,
         point: Point,
@@ -77,6 +84,7 @@ impl MenuIntent {
 impl super::Menu {
     /// Schedule a menu entry change on pointer entry. Advance the one returned deadline
     /// through the owning component's task scheduler and call `hover_response` when due.
+    /// Returns whether a hover deadline was scheduled; `delay`, `event`, `intent`, and `now` describe the pending hover action and timing.
     pub fn schedule_hover(
         &self,
         event: &argui_ui::UiEvent,
@@ -103,6 +111,7 @@ impl super::Menu {
         true
     }
 
+    /// Returns the submenu response to apply for hovered item `id`.
     pub fn hover_response(&self, id: &str) -> Option<super::MenuResponse> {
         use super::{MenuItem, MenuItemKind, MenuResponse};
         fn find<'a>(

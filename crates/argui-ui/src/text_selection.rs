@@ -39,6 +39,10 @@ pub struct DocumentTextPoint {
 }
 
 impl DocumentTextPoint {
+    /// Creates a document position within a retained node.
+    ///
+    /// * `node` — node containing the text position.
+    /// * `position` — byte index and affinity within that node's text.
     #[must_use]
     pub const fn new(node: NodeId, position: TextPosition) -> Self {
         Self { node, position }
@@ -94,12 +98,18 @@ struct DocumentSelectionDrag {
 }
 
 impl Element {
+    /// Sets how users may select this element's text.
+    ///
+    /// * `value` — selection policy for this element and its content.
     #[must_use]
     pub fn user_select(mut self, value: UserSelect) -> Self {
         self.user_select = value;
         self
     }
 
+    /// Sets the colors used for document text selection and touch handles.
+    ///
+    /// * `value` — selection highlight and handle colors.
     #[must_use]
     pub fn selection_style(mut self, value: TextSelectionStyle) -> Self {
         self.selection_style = Some(value);
@@ -108,26 +118,31 @@ impl Element {
 }
 
 impl UiTree {
+    /// Returns the current document-wide text selection, if any.
     #[must_use]
     pub const fn document_selection(&self) -> Option<DocumentTextSelection> {
         self.document_selection.selection
     }
 
+    /// Returns the revision number of the current document selection state.
     #[must_use]
     pub const fn document_selection_revision(&self) -> u64 {
         self.document_selection.revision
     }
 
+    /// Returns whether a document selection drag is in progress.
     #[must_use]
     pub const fn document_selection_dragging(&self) -> bool {
         self.document_selection.drag.is_some()
     }
 
+    /// Returns whether touch selection handles are currently shown.
     #[must_use]
     pub const fn document_selection_handles_visible(&self) -> bool {
         self.document_selection.touch_handles
     }
 
+    /// Returns whether the document selection contains a non-empty range.
     #[must_use]
     pub fn has_document_selection(&self) -> bool {
         match self.document_selection.selection {
@@ -136,6 +151,13 @@ impl UiTree {
         }
     }
 
+    /// Begins or extends a document selection at `point`.
+    ///
+    /// * `point` — text position where selection starts.
+    /// * `extend` — whether to preserve the existing anchor.
+    /// * `granularity` — character, word, or line selection unit.
+    ///
+    /// Returns the interaction changes caused by starting the selection.
     pub fn begin_document_selection(
         &mut self,
         point: DocumentTextPoint,
@@ -146,6 +168,12 @@ impl UiTree {
         self.begin_selection(point, extend, granularity)
     }
 
+    /// Begins a touch selection and shows touch handles at `point`.
+    ///
+    /// * `point` — text position where selection starts.
+    /// * `granularity` — character, word, or line selection unit.
+    ///
+    /// Returns the interaction changes caused by starting the selection.
     pub fn begin_touch_document_selection(
         &mut self,
         point: DocumentTextPoint,
@@ -189,6 +217,9 @@ impl UiTree {
         )
     }
 
+    /// Extends the active document selection to `point`.
+    ///
+    /// Returns the interaction changes caused by moving the selection.
     pub fn drag_document_selection(&mut self, point: DocumentTextPoint) -> InteractionUpdate {
         let Some(drag) = self.document_selection.drag else {
             return InteractionUpdate::default();
@@ -229,6 +260,9 @@ impl UiTree {
         self.set_document_selection(selection, Some(drag))
     }
 
+    /// Ends an active document selection drag.
+    ///
+    /// Returns the interaction changes caused by releasing the selection.
     pub fn release_document_selection(&mut self) -> InteractionUpdate {
         if self.document_selection.drag.take().is_none() {
             return InteractionUpdate::default();
@@ -236,6 +270,9 @@ impl UiTree {
         self.document_selection_update(false)
     }
 
+    /// Clears the document selection and any active drag or touch handles.
+    ///
+    /// Returns the interaction changes caused by clearing the selection.
     pub fn clear_document_selection(&mut self) -> InteractionUpdate {
         if self.document_selection.selection.take().is_none() {
             return InteractionUpdate::default();
@@ -247,6 +284,9 @@ impl UiTree {
         self.document_selection_update(true)
     }
 
+    /// Selects all selectable document text in the current containment scope.
+    ///
+    /// Returns the interaction changes caused by selecting the text.
     pub fn select_all_document_text(&mut self) -> InteractionUpdate {
         self.document_selection.touch_handles = false;
         let mut entries = self.selectable_text_entries();
@@ -271,6 +311,9 @@ impl UiTree {
         )
     }
 
+    /// Reports supported text-selection commands for a node or document.
+    ///
+    /// * `target` — node whose text-input capabilities are queried.
     #[must_use]
     pub fn selection_capabilities(&self, target: NodeId) -> SelectionCapabilities {
         if let Some(input) = self.text_inputs.get(target) {
@@ -286,6 +329,7 @@ impl UiTree {
         self.document_selection_capabilities()
     }
 
+    /// Reports capabilities for the current document-wide selection.
     #[must_use]
     pub fn document_selection_capabilities(&self) -> SelectionCapabilities {
         SelectionCapabilities {
@@ -295,11 +339,22 @@ impl UiTree {
         }
     }
 
+    /// Applies a selection command to the currently focused target.
+    ///
+    /// * `command` — copy, paste, cut, undo, redo, or select-all operation.
+    ///
+    /// Returns the interaction changes caused by the command.
     pub fn focused_selection_command(&mut self, command: SelectionCommand) -> InteractionUpdate {
         let target = self.interaction.focused();
         self.selection_command(target, command)
     }
 
+    /// Applies a selection command to a specific input or the document selection.
+    ///
+    /// * `target` — optional text-input node; `None` targets document text.
+    /// * `command` — copy, paste, cut, undo, redo, or select-all operation.
+    ///
+    /// Returns the interaction changes caused by the command.
     pub fn selection_command(
         &mut self,
         target: Option<NodeId>,
@@ -335,6 +390,7 @@ impl UiTree {
         }
     }
 
+    /// Returns the selected document text, joined by newlines, when non-empty.
     #[must_use]
     pub fn selected_document_text(&self) -> Option<String> {
         self.document_selection.selection?;
@@ -350,6 +406,10 @@ impl UiTree {
         (!selected.is_empty()).then(|| selected.join("\n"))
     }
 
+    /// Returns the selected byte range within `node`, bounded by `text_len`.
+    ///
+    /// * `node` — node whose text range is requested.
+    /// * `text_len` — byte length of that node's text.
     #[must_use]
     pub fn document_selection_range(&self, node: NodeId, text_len: usize) -> Option<Range<usize>> {
         let selection = self.document_selection.selection?;
@@ -378,6 +438,9 @@ impl UiTree {
         Some(range)
     }
 
+    /// Returns whether `point` lies within the document selection, inclusively.
+    ///
+    /// * `point` — document position to test.
     #[must_use]
     pub fn document_selection_contains(&self, point: DocumentTextPoint) -> bool {
         let Some(selection) = self.document_selection.selection else {
@@ -400,6 +463,10 @@ impl UiTree {
         start <= candidate && candidate <= end
     }
 
+    /// Returns whether the selection intersects a node-index interval.
+    ///
+    /// * `first` — first node index in the interval.
+    /// * `count` — number of node indices in the interval.
     #[must_use]
     pub fn document_selection_intersects(&self, first: usize, count: usize) -> bool {
         let Some(selection) = self.document_selection.selection else {

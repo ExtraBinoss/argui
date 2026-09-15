@@ -19,9 +19,11 @@ pub enum ColorFormat {
 }
 
 impl ColorFormat {
+    /// All supported textual color formats.
     pub const ALL: [Self; 4] = [Self::Hex, Self::Rgb, Self::Hsl, Self::Hsv];
 
     #[must_use]
+    /// Returns the short display label for this format.
     pub const fn label(self) -> &'static str {
         match self {
             Self::Hex => "HEX",
@@ -49,6 +51,7 @@ pub struct ColorPickerState {
 }
 
 impl ColorPickerState {
+    /// Creates an enabled picker state initialized from `color`.
     #[must_use]
     pub fn new(color: Color) -> Self {
         let [r, g, b, alpha] = color.to_srgba();
@@ -66,12 +69,13 @@ impl ColorPickerState {
     }
 
     #[must_use]
+    /// Returns the current color represented by the retained HSV and alpha values.
     pub fn color(&self) -> Color {
         let [r, g, b] = values::hsv_to_rgb(self.hsv);
         Color::srgba(r, g, b, self.alpha)
     }
 
-    /// Replace the external value without discarding hue when the color is gray.
+    /// Replaces the external value without discarding hue when the color is gray.
     pub fn set_color(&mut self, color: Color) {
         if self.color() == color {
             return;
@@ -87,15 +91,19 @@ impl ColorPickerState {
     }
 
     #[must_use]
+    /// Returns the currently selected textual format.
     pub const fn format(&self) -> ColorFormat {
         self.format
     }
 
+    /// Selects the text format and discards any incomplete text draft.
     pub fn set_format(&mut self, format: ColorFormat) {
         self.format = format;
         self.draft = None;
     }
 
+    /// Enables or disables editing, cancelling an active drag when disabled.
+    /// `enabled` controls whether picker interactions can change the color.
     pub fn set_enabled(&mut self, enabled: bool) {
         if !enabled {
             if let Some(start) = self.drag_start.take() {
@@ -108,6 +116,8 @@ impl ColorPickerState {
         self.enabled = enabled;
     }
 
+    /// Updates the retained interaction geometry from the latest `layout` snapshot.
+    /// `key` is the element-key prefix used to find this picker's subcontrols.
     pub fn layout_changed(&mut self, key: &str, layout: &LayoutSnapshot) {
         self.pad = layout.bounds(&format!("{key}::pad"));
         self.hue_range
@@ -140,6 +150,8 @@ pub struct ColorPicker<'a> {
 }
 
 impl<'a> ColorPicker<'a> {
+    /// Creates a picker presentation with an accessible `label` and retained `state`.
+    /// `key` identifies the picker and scopes its child element keys.
     #[must_use]
     pub fn new(
         key: impl Into<String>,
@@ -154,6 +166,7 @@ impl<'a> ColorPicker<'a> {
     }
 
     #[must_use]
+    /// Builds the picker using `theme` for controls and text.
     pub fn build(self, theme: &WidgetTheme) -> argui_ui::Element {
         self.view(theme)
     }

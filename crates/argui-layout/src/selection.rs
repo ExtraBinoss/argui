@@ -22,6 +22,11 @@ pub struct TextRegion {
 }
 
 impl TextRegion {
+    /// Returns the text position hit by `point`, respecting transforms and clips.
+    ///
+    /// * `point` — position in viewport coordinates.
+    ///
+    /// Returns `None` when the point is clipped or outside the shaped text lines.
     #[must_use]
     pub fn hit_position(&self, point: Point) -> Option<DocumentTextPoint> {
         self.local_point(point)
@@ -29,12 +34,18 @@ impl TextRegion {
             .map(|position| DocumentTextPoint::new(self.node, position))
     }
 
+    /// Returns the nearest text position to `point`, without clip rejection.
+    ///
+    /// * `point` — position in viewport coordinates.
     #[must_use]
     pub fn closest_position(&self, point: Point) -> DocumentTextPoint {
         let local = self.local_point_unclipped(point);
         DocumentTextPoint::new(self.node, self.layout.closest_position(local))
     }
 
+    /// Returns squared distance from `point` to the nearest shaped line bounds.
+    ///
+    /// * `point` — position in viewport coordinates.
     #[must_use]
     pub fn distance_squared(&self, point: Point) -> f32 {
         let local = self.local_point_unclipped(point);
@@ -53,6 +64,10 @@ impl TextRegion {
         })
     }
 
+    /// Returns selection rectangles for the half-open byte interval `start..end`.
+    ///
+    /// * `start` — first selected byte offset.
+    /// * `end` — byte offset after the selected text.
     #[must_use]
     pub fn visual_rects(&self, start: usize, end: usize) -> Vec<Rect> {
         self.layout
@@ -92,6 +107,10 @@ impl TextRegion {
 impl LayoutOutput {
     /// Selectable text under the pointer, excluding later-painted hit surfaces.
     /// A transparent blocker still owns input; its paint alpha is irrelevant.
+    ///
+    /// * `point` — position in viewport coordinates.
+    ///
+    /// Returns the topmost selectable text position, if one is not occluded.
     pub fn text_at(&self, point: Point) -> Option<DocumentTextPoint> {
         self.text_regions
             .iter()
@@ -205,6 +224,11 @@ fn paint_rect(
 }
 
 impl LayoutOutput {
+    /// Returns the viewport-space union of rectangles in the current document selection.
+    ///
+    /// * `ui` — tree providing the selected ranges for each text node.
+    ///
+    /// Returns `None` when the selection has no visible text rectangles.
     #[must_use]
     pub fn document_selection_bounds(&self, ui: &UiTree) -> Option<Rect> {
         self.text_regions

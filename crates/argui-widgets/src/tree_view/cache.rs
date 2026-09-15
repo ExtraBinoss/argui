@@ -25,6 +25,8 @@ struct Row {
 
 impl TreeView<'_> {
     /// Reuses unchanged rows across scroll events; invalidates on data or style changes.
+    /// `cache` retains row elements and virtual-list measurements between builds.
+    /// `theme` supplies visual styling for the tree rows.
     #[must_use]
     pub fn build_cached(&self, theme: &WidgetTheme, cache: &mut TreeViewCache) -> Element {
         if cache.nodes != self.nodes || &cache.collapsed != self.collapsed {

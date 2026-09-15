@@ -8,6 +8,11 @@ pub struct TableColumn {
 }
 
 impl TableColumn {
+    /// Creates a column with display `label` and preferred width in logical pixels.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `width` is not finite and positive.
     #[must_use]
     pub fn new(label: impl Into<String>, width: f32) -> Self {
         assert!(width.is_finite() && width > 0.0);
@@ -27,6 +32,8 @@ pub struct Table<'a> {
 }
 
 impl<'a> Table<'a> {
+    /// Creates a table from `columns` and rows in display order.
+    /// `key` identifies the table, `label` names it accessibly, and `collection` supplies its rows.
     #[must_use]
     pub fn new(
         key: impl Into<String>,
@@ -41,23 +48,31 @@ impl<'a> Table<'a> {
     }
 
     #[must_use]
+    /// Enables controlled row selection using `state`; `multiple` allows selecting more than one row.
     pub fn selection(mut self, state: &'a ListState, multiple: bool) -> Self {
         self.list = self.list.selection(state, multiple);
         self
     }
 
     #[must_use]
+    /// Sets the accessible name of the table; `label` is announced to assistive technology.
     pub fn label(mut self, label: impl Into<String>) -> Self {
         self.list = self.list.label(label);
         self
     }
 
     #[must_use]
+    /// Returns updated selection state when `event` selects a row.
     pub fn action(&self, event: &argui_ui::UiEvent) -> Option<ListState> {
         self.list.action(event)
     }
 
     #[must_use]
+    /// Builds the table using `theme` and `row` to render each row.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the list builder does not provide expected semantics. `cell` builds the content for each cell.
     pub fn build(
         &self,
         theme: &WidgetTheme,

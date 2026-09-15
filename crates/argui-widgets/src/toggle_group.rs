@@ -20,6 +20,8 @@ pub struct ToggleGroup {
 }
 
 impl ToggleGroup {
+    /// Creates a controlled group from items in display order.
+    /// `key` identifies the group and `label` names it accessibly.
     #[must_use]
     pub fn new(
         key: impl Into<String>,
@@ -38,11 +40,13 @@ impl ToggleGroup {
     }
 
     #[must_use]
+    /// Returns the interaction key for item `id`.
     pub fn item_key(&self, id: &str) -> String {
         format!("{}::item::{id}", self.key)
     }
 
     #[must_use]
+    /// Returns the requested item-state change for `event`, if any.
     pub fn action(&self, event: &UiEvent) -> Option<ToggleGroupAction> {
         let index = self
             .items
@@ -80,6 +84,11 @@ impl ToggleGroup {
     }
 
     #[must_use]
+    /// Builds the toggle group using `theme` for its item styling.
+    ///
+    /// # Panics
+    ///
+    /// Panics if a built toggle unexpectedly has no interaction properties.
     pub fn build(&self, theme: &WidgetTheme) -> Element {
         let active = self
             .items

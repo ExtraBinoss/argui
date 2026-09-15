@@ -6,6 +6,7 @@ use crate::binding::{GradientPointTarget, LayoutTarget};
 use crate::{BindingImpact, ContainerQuery, Element};
 
 impl Element {
+    /// Returns whether state or conditional styles have an active animation.
     #[must_use]
     pub fn has_state_animation(&self) -> bool {
         self.style_transition.is_some() || !self.conditional_styles.is_empty()
@@ -25,11 +26,15 @@ pub enum VisualState {
 pub struct StateName(&'static str);
 
 impl StateName {
+    /// Creates an application-defined visual state name.
+    ///
+    /// * `name` — stable name used by state selectors.
     #[must_use]
     pub const fn new(name: &'static str) -> Self {
         Self(name)
     }
 
+    /// Returns the stable name of this state.
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         self.0
@@ -40,11 +45,15 @@ impl StateName {
 pub struct StateScopeId(&'static str);
 
 impl StateScopeId {
+    /// Creates an identifier for a named state scope.
+    ///
+    /// * `name` — stable application-defined scope name.
     #[must_use]
     pub const fn new(name: &'static str) -> Self {
         Self(name)
     }
 
+    /// Returns the stable name of this scope.
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         self.0
@@ -76,11 +85,18 @@ pub enum StateSelector {
 }
 
 impl StateSelector {
+    /// Selects a state on the element where the style condition is declared.
+    ///
+    /// * `state` — visual or application-defined state to match.
     #[must_use]
     pub const fn own(state: State) -> Self {
         Self::Own(state)
     }
 
+    /// Selects a state on an element in the named scope.
+    ///
+    /// * `scope` — state scope to search.
+    /// * `state` — visual or application-defined state to match.
     #[must_use]
     pub fn scope(scope: StateScopeId, state: impl Into<State>) -> Self {
         Self::Scope {
@@ -112,21 +128,33 @@ pub enum StyleCondition {
 }
 
 impl StyleCondition {
+    /// Creates a condition that matches a state selector.
+    ///
+    /// * `selector` — state and scope to test.
     #[must_use]
     pub fn state(selector: impl Into<StateSelector>) -> Self {
         Self::State(selector.into())
     }
 
+    /// Creates a condition that matches a container query.
+    ///
+    /// * `query` — container size or orientation condition to test.
     #[must_use]
     pub const fn container(query: ContainerQuery) -> Self {
         Self::Container(query)
     }
 
+    /// Creates a condition that matches when every child condition matches.
+    ///
+    /// * `conditions` — conditions combined with logical AND.
     #[must_use]
     pub fn all(conditions: impl IntoIterator<Item = Self>) -> Self {
         Self::All(conditions.into_iter().collect())
     }
 
+    /// Creates a condition that matches when any child condition matches.
+    ///
+    /// * `conditions` — conditions combined with logical OR.
     #[must_use]
     pub fn any(conditions: impl IntoIterator<Item = Self>) -> Self {
         Self::Any(conditions.into_iter().collect())
@@ -194,8 +222,10 @@ impl std::ops::Not for StyleCondition {
 pub struct VisualStates(u8);
 
 impl VisualStates {
+    /// A set containing no active visual states.
     pub const NONE: Self = Self(0);
 
+    /// Returns whether the given visual state is present.
     #[must_use]
     pub const fn contains(self, state: VisualState) -> bool {
         self.0 & state.bit() != 0
@@ -259,6 +289,7 @@ pub enum PropertyKey {
 }
 
 impl PropertyKey {
+    /// Returns the strongest invalidation required when this property changes.
     #[must_use]
     pub const fn impact(self) -> BindingImpact {
         match self {
@@ -314,10 +345,13 @@ pub struct StylePropertyValue {
     pub value: StateValue,
 }
 
+/// Sealed mapping from a public style-property marker to its value type.
 pub trait StyleProperty: crate::binding::private::Sealed {
+    /// Value accepted by this property marker.
     type Value;
 
     #[doc(hidden)]
+    /// Converts the typed property value to the internal representation.
     fn into_state_value(self, value: Self::Value) -> StylePropertyValue;
 }
 
@@ -398,11 +432,13 @@ impl ConditionalStyles {
 }
 
 impl StylePatch {
+    /// Creates an empty conditional style patch.
     #[must_use]
     pub const fn new() -> Self {
         Self { values: Vec::new() }
     }
 
+    /// Adds or replaces a style property using `property` and its new `value`.
     #[must_use]
     pub fn set<P: StyleProperty>(mut self, property: P, value: P::Value) -> Self {
         let value = property.into_state_value(value);
@@ -414,11 +450,15 @@ impl StylePatch {
         self
     }
 
+    /// Sets the complete layout style in this patch.
+    ///
+    /// * `style` — layout style to apply while the condition matches.
     #[must_use]
     pub fn layout(self, style: crate::LayoutStyle) -> Self {
         self.set(crate::property::Layout, style)
     }
 
+    /// Creates a patch containing the supported properties of `style`.
     #[must_use]
     pub fn from_quad(style: QuadStyle) -> Self {
         let mut state = Self::new()
@@ -461,6 +501,9 @@ pub struct TransitionRule {
 }
 
 impl TransitionRule {
+    /// Creates a transition rule that applies to all properties and directions.
+    ///
+    /// * `transition` — transition used when this rule matches.
     #[must_use]
     pub const fn new(transition: Transition) -> Self {
         Self {
@@ -470,12 +513,15 @@ impl TransitionRule {
         }
     }
 
+    /// Restricts this rule to one property.
     #[must_use]
     pub const fn property(mut self, property: PropertyKey) -> Self {
         self.property = Some(property);
         self
     }
 
+    /// Restricts this rule to entering or exiting a condition.
+    /// * `direction` — transition direction to which this rule applies.
     #[must_use]
     pub fn direction(mut self, direction: TransitionDirection) -> Self {
         self.direction = Some(direction);
@@ -503,6 +549,7 @@ impl StyleTransition {
         }
     }
 
+    /// Creates a policy using `default` when no more specific rule matches.
     #[must_use]
     pub const fn new(default: Transition) -> Self {
         Self {
@@ -511,6 +558,7 @@ impl StyleTransition {
         }
     }
 
+    /// Adds `rule`; later rules win when specificity ties.
     #[must_use]
     pub fn rule(mut self, rule: TransitionRule) -> Self {
         self.rules.push(rule);

@@ -8,12 +8,16 @@ use crate::Semantics;
 pub struct SemanticNodeId(u64);
 
 impl SemanticNodeId {
+    /// Creates an identifier from its numeric representation.
+    ///
+    /// * `value` — numeric node identifier to wrap.
     #[must_use]
     pub const fn new(value: u64) -> Self {
         Self(value)
     }
 
     #[must_use]
+    /// Returns the identifier's numeric representation.
     pub const fn get(self) -> u64 {
         self.0
     }
@@ -39,6 +43,9 @@ impl SemanticTree {
     /// positioned relative to their semantic parent (for example nested DOM).
     /// Root and unattached nodes retain surface coordinates. Recompute after
     /// parent movement/reparenting even when a child's surface bounds are unchanged.
+    ///
+    /// # Returns
+    /// A map from each known node identifier to its bounds relative to its semantic parent.
     #[must_use]
     pub fn parent_relative_bounds(&self) -> HashMap<SemanticNodeId, Rect> {
         let mut bounds = self
@@ -57,11 +64,21 @@ impl SemanticTree {
         bounds
     }
 
+    /// Finds a node by identifier, returning `None` when it is absent.
+    ///
+    /// * `id` — identifier of the node to find.
     #[must_use]
     pub fn node(&self, id: SemanticNodeId) -> Option<&SemanticNode> {
         self.nodes.iter().find(|node| node.id == id)
     }
 
+    /// Computes the changes needed to transform this snapshot into `next`.
+    ///
+    /// # Arguments
+    /// * `next` — target semantic snapshot.
+    ///
+    /// # Returns
+    /// A patch containing changed nodes and removed identifiers.
     #[must_use]
     pub fn diff(&self, next: &Self) -> SemanticPatch {
         let old = self
@@ -102,6 +119,7 @@ pub struct SemanticPatch {
 }
 
 impl SemanticPatch {
+    /// Returns whether this patch contains no changes.
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.root.is_none()

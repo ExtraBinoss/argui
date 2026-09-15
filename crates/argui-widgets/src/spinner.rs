@@ -13,6 +13,7 @@ pub struct Spinner {
 }
 
 impl Spinner {
+    /// Creates a decorative spinner from registered vector `vector` at `size` logical pixels.
     #[must_use]
     pub const fn new(vector: VectorId, size: f32) -> Self {
         Self {

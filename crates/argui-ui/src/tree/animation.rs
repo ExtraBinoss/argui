@@ -67,6 +67,11 @@ impl AnimationRegistry {
 }
 
 impl UiTree {
+    /// Advances active bindings, transitions, and the animated caret.
+    ///
+    /// * `now` — current animation time.
+    ///
+    /// Returns the strongest required tree update.
     pub fn advance_animations(&mut self, now: argui_animation::Time) -> TreeUpdate {
         let bindings = if self.reduced_motion {
             self.animations.finish_active()
@@ -86,6 +91,11 @@ impl UiTree {
         strongest_updates(strongest_updates(bindings, transitions), caret)
     }
 
+    /// Enables or disables reduced-motion behavior for this tree.
+    ///
+    /// * `reduced` — whether active animations should finish immediately.
+    ///
+    /// Returns the strongest update caused by changing the setting.
     pub fn set_reduced_motion(&mut self, reduced: bool) -> TreeUpdate {
         let caret_changed = self.focused_animated_caret().is_some();
         self.reduced_motion = reduced;
@@ -105,6 +115,7 @@ impl UiTree {
         }
     }
 
+    /// Returns whether an animation or animated caret needs another frame.
     #[must_use]
     pub fn wants_animation_frame(&self) -> bool {
         self.animations
@@ -115,11 +126,13 @@ impl UiTree {
             || self.focused_animated_caret().is_some()
     }
 
+    /// Returns the number of active property animations.
     #[must_use]
     pub fn animation_count(&self) -> usize {
         self.animations.entries.len()
     }
 
+    /// Returns preorder indices whose layout is affected by active animations.
     #[must_use]
     pub fn layout_animation_indices(&self) -> Vec<usize> {
         let mut indices = self.animations.layout_indices.clone();

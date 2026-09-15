@@ -2,6 +2,8 @@
   "nav": {
     "home": "Argui home",
     "features": "Features",
+    "docs": "Docs",
+    "newHere": "New? Start here",
     "components": "Components",
     "examples": "App Examples",
     "start": "Get started",
@@ -26,7 +28,7 @@
     "foundation": "A small footprint.\nRoom for big ideas.",
     "foundationBody": "A retained UI tree, shaped text and a GPU renderer. The parts you need to build an application, with the freedom to make it yours.",
     "allFeatures": "See all features",
-    "componentsTitle": "Good building blocks.",
+    "componentsTitle": "{count}+ components. Buttons, dialogs, data tables, and more.",
     "browseAll": "Browse all components",
     "codeTitle": "Rust, all the way down.",
     "codeBody": "Compose your interface with typed building blocks. Enable the widgets you need, and keep application state in your hands.",

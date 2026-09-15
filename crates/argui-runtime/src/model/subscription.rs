@@ -38,10 +38,12 @@ impl Subscription {
             leases: RefCell::new(Vec::new()),
         }))
     }
+    /// Cancels this subscription and any queued callback deliveries.
     pub fn cancel(&self) {
         self.0.cancel();
     }
     #[must_use]
+    /// Returns whether this subscription can still deliver callbacks.
     pub fn is_active(&self) -> bool {
         self.0.active()
     }
@@ -50,6 +52,11 @@ impl Subscription {
     }
 
     /// Adds a lifetime constraint without removing the entity/handle lifetimes.
+    ///
+    /// `scope` is an additional owner whose closure cancels this subscription.
+    ///
+    /// # Errors
+    /// Returns [`ScopeClosed`] if `scope` is already closed.
     pub fn in_scope(self, scope: &ResourceScope) -> Result<Self, ScopeClosed> {
         self.attach(scope)?;
         Ok(self)

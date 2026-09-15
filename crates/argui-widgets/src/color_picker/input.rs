@@ -4,7 +4,8 @@ use argui_ui::{GestureKind, GesturePhase, SemanticValue, UiEvent, UiEventKind};
 use super::{ColorFormat, ColorPickerState};
 
 impl ColorPickerState {
-    /// Handle events for this picker. Consumed keys and gestures suppress their
+    /// Handle events for this picker. `key` scopes events to this picker and
+    /// `event` is the UI input being handled. Consumed keys and gestures suppress their
     /// default action so arrow keys do not also scroll the surrounding panel.
     pub fn update(&mut self, key: &str, event: &UiEvent) -> bool {
         if !self.enabled {

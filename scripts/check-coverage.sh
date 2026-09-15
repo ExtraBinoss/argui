@@ -36,6 +36,15 @@ trap cleanup EXIT
 # Old feature/build variants contain duplicate coverage maps even after their
 # raw profiles are removed. Keep dependency caches, but discard workspace maps.
 CARGO_TARGET_DIR="$coverage_target" cargo "+$coverage_toolchain" llvm-cov clean --workspace
+if [[ -n "${ARGUI_NATIVE_TESTS:-}" ]]; then
+  # Run the GPU integration in isolation. The workspace pass below retains its profile and
+  # produces the final report with the complete set of test binaries.
+  CARGO_TARGET_DIR="$coverage_target" CARGO_INCREMENTAL=0 \
+    CARGO_PROFILE_TEST_OPT_LEVEL=0 CARGO_PROFILE_TEST_DEBUG=0 \
+    cargo "+$coverage_toolchain" llvm-cov nextest \
+    --package argui-render --all-features --test surface --branch --no-report \
+    --jobs 1 --run-ignored only
+fi
 echo "coverage: running workspace library and integration tests"
 CARGO_TARGET_DIR="$coverage_target" CARGO_INCREMENTAL=0 \
   CARGO_PROFILE_TEST_OPT_LEVEL=0 CARGO_PROFILE_TEST_DEBUG=0 \
@@ -45,18 +54,5 @@ CARGO_TARGET_DIR="$coverage_target" CARGO_INCREMENTAL=0 \
   --jobs "$coverage_jobs" --status-level fail --final-status-level fail \
   --success-output never --failure-output immediate-final \
   --json --output-path "$report"
-
-if [[ -n "${ARGUI_NATIVE_TESTS:-}" ]]; then
-  # Include the opt-in GPU integration without running the manual CPU benchmark.
-  CARGO_TARGET_DIR="$coverage_target" CARGO_INCREMENTAL=0 \
-    CARGO_PROFILE_TEST_OPT_LEVEL=0 CARGO_PROFILE_TEST_DEBUG=0 \
-    cargo "+$coverage_toolchain" llvm-cov nextest \
-    --workspace --all-features --lib --tests --branch --no-report \
-    --jobs "$coverage_jobs" --run-ignored only \
-    -E 'package(argui-render) & binary(surface)'
-  CARGO_TARGET_DIR="$coverage_target" cargo "+$coverage_toolchain" llvm-cov report \
-    --ignore-filename-regex "$boundary_regex" \
-    --json --output-path "$report"
-fi
 
 python3 "$repo_root/scripts/coverage-gate.py" "$report" "$minimum"

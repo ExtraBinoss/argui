@@ -16,6 +16,8 @@ pub struct NativeSelect {
 }
 
 impl NativeSelect {
+    /// Creates a controlled compact select with the supplied options and selected index.
+    /// `key` identifies the control and `label` names it for accessibility.
     #[must_use]
     pub fn new(
         key: impl Into<String>,
@@ -42,12 +44,14 @@ impl NativeSelect {
     }
 
     #[must_use]
+    /// Interprets `event` as a select open, close, highlight or selection action.
     pub fn action(&self, event: &UiEvent) -> Option<SelectAction> {
         self.enabled
             .then(|| self.behavior().action(event))
             .flatten()
     }
 
+    /// Returns a typeahead action for `event` using retained `state` at monotonic time `now`.
     pub fn search(
         &self,
         event: &UiEvent,
@@ -60,6 +64,11 @@ impl NativeSelect {
     }
 
     #[must_use]
+    /// Builds the compact select using `theme` for its controls and popup.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the underlying select does not contain its expected trigger semantics.
     pub fn build(&self, theme: &WidgetTheme) -> Element {
         let mut root =
             Select::new(&self.key, &self.label, self.options.clone(), self.selected)

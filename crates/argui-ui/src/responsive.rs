@@ -2,11 +2,13 @@
 pub struct ContainerScopeId(&'static str);
 
 impl ContainerScopeId {
+    /// Creates a container scope identifier from a stable application-defined name.
     #[must_use]
     pub const fn new(name: &'static str) -> Self {
         Self(name)
     }
 
+    /// Returns the name used to create this scope identifier.
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         self.0
@@ -24,36 +26,49 @@ pub enum ContainerQuery {
 }
 
 impl ContainerQuery {
+    /// Matches containers whose width is at least `value`.
+    /// * `scope` — container scope whose width is tested.
     #[must_use]
     pub const fn min_width(scope: ContainerScopeId, value: f32) -> Self {
         Self::MinWidth { scope, value }
     }
 
+    /// Matches containers whose width is less than `value`.
+    /// * `scope` — container scope whose width is tested.
     #[must_use]
     pub const fn max_width(scope: ContainerScopeId, value: f32) -> Self {
         Self::MaxWidth { scope, value }
     }
 
+    /// Matches containers whose height is at least `value`.
+    /// * `scope` — container scope whose height is tested.
     #[must_use]
     pub const fn min_height(scope: ContainerScopeId, value: f32) -> Self {
         Self::MinHeight { scope, value }
     }
 
+    /// Matches containers whose height is less than `value`.
+    /// * `scope` — container scope whose height is tested.
     #[must_use]
     pub const fn max_height(scope: ContainerScopeId, value: f32) -> Self {
         Self::MaxHeight { scope, value }
     }
 
+    /// Matches containers that are landscape or square.
+    /// * `scope` — container scope whose aspect is tested.
     #[must_use]
     pub const fn landscape(scope: ContainerScopeId) -> Self {
         Self::Landscape(scope)
     }
 
+    /// Matches containers that are taller than they are wide.
+    /// * `scope` — container scope whose aspect is tested.
     #[must_use]
     pub const fn portrait(scope: ContainerScopeId) -> Self {
         Self::Portrait(scope)
     }
 
+    /// Returns the scope whose dimensions this query examines.
     #[must_use]
     pub const fn scope(self) -> ContainerScopeId {
         match self {
@@ -66,6 +81,7 @@ impl ContainerQuery {
         }
     }
 
+    /// Tests this query against a container's width and height in logical pixels.
     #[must_use]
     pub fn matches(self, width: f32, height: f32) -> bool {
         match self {

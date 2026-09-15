@@ -13,6 +13,7 @@ pub struct Message {
 }
 
 impl Message {
+    /// Creates a message identified by `key`, with an `author` label and `content` element.
     #[must_use]
     pub fn new(key: impl Into<String>, author: impl Into<String>, content: Element) -> Self {
         Self {
@@ -27,6 +28,7 @@ impl Message {
     }
 
     #[must_use]
+    /// Builds the message presentation.
     pub fn build(self) -> Element {
         let content = Element::column(
             self.header

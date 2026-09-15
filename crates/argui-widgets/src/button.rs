@@ -19,6 +19,9 @@ pub struct ButtonStyle {
 }
 
 impl ButtonStyle {
+    /// Creates a button style from its base paint and label typography.
+    ///
+    /// `paint` supplies the resting appearance; `label` supplies the text style.
     #[must_use]
     pub fn new(paint: PaintStyle, mut label: TextStyle) -> Self {
         label.wrap = TextWrap::None;
@@ -43,30 +46,36 @@ impl ButtonStyle {
     }
 
     #[must_use]
+    /// Replaces the button's layout style.
     pub fn layout(mut self, layout: LayoutStyle) -> Self {
         self.layout = layout;
         self
     }
 
     #[must_use]
+    /// Sets the style patch applied while the pointer hovers over the button.
     pub fn hovered(mut self, style: impl Into<StylePatch>) -> Self {
         self.hovered = style.into();
         self
     }
 
     #[must_use]
+    /// Sets the style patch applied while the button is pressed.
     pub fn pressed(mut self, style: impl Into<StylePatch>) -> Self {
         self.pressed = style.into();
         self
     }
 
     #[must_use]
+    /// Sets the style patch applied while the button has visible keyboard focus.
     pub fn focused(mut self, style: impl Into<StylePatch>) -> Self {
         self.focused = Some(style.into());
         self
     }
 
     #[must_use]
+    /// Sets transitions used for style and text changes.
+    /// `transition` supplies the transition timing and properties.
     pub fn transition(mut self, transition: StyleTransition) -> Self {
         self.transition = transition;
         self
@@ -94,6 +103,9 @@ pub struct Button {
 }
 
 impl Button {
+    /// Creates an enabled button with a visible and accessible `label`.
+    ///
+    /// `key` identifies the button in events and state; `style` configures its appearance.
     #[must_use]
     pub fn new(key: impl Into<String>, label: impl Into<String>, style: ButtonStyle) -> Self {
         let label = label.into();
@@ -111,12 +123,15 @@ impl Button {
     }
 
     #[must_use]
+    /// Adds an element before the button content.
+    /// `icon` is the leading visual element.
     pub fn leading(mut self, icon: Element) -> Self {
         self.leading = Some(icon);
         self
     }
 
     /// Replaces the visible label while retaining its accessible name.
+    /// `content` is the custom visible element.
     #[must_use]
     pub fn content(mut self, content: Element) -> Self {
         self.content = Some(content);
@@ -124,6 +139,9 @@ impl Button {
     }
 
     #[must_use]
+    /// Creates an icon-only button with the supplied accessible `label`.
+    ///
+    /// `key` identifies the button, `icon` is its visible content, and `style` configures it.
     pub fn icon(
         key: impl Into<String>,
         label: impl Into<String>,
@@ -134,24 +152,30 @@ impl Button {
     }
 
     #[must_use]
+    /// Adds an element after the button content.
+    /// `icon` is the trailing visual element.
     pub fn trailing(mut self, icon: Element) -> Self {
         self.trailing = Some(icon);
         self
     }
 
     #[must_use]
+    /// Sets whether the button can be activated.
+    /// `enabled` is `false` to disable activation.
     pub const fn enabled(mut self, enabled: bool) -> Self {
         self.enabled = enabled;
         self
     }
 
     #[must_use]
+    /// Sets a loading indicator; a loading button cannot be activated.
     pub fn loading(mut self, indicator: Element) -> Self {
         self.loading = Some(indicator);
         self
     }
 
     /// Override the default label shown by `TooltipHost` on hover or keyboard focus.
+    /// `description` is the tooltip text.
     #[must_use]
     pub fn tooltip(mut self, description: impl Into<String>) -> Self {
         self.tooltip = Some(description.into());
@@ -159,12 +183,14 @@ impl Button {
     }
 
     #[must_use]
+    /// Removes the tooltip text configured for this button.
     pub fn without_tooltip(mut self) -> Self {
         self.tooltip = None;
         self
     }
 
     #[must_use]
+    /// Builds the button element with its configured style and behavior.
     pub fn build(self) -> Element {
         let loading = self.loading.is_some();
         let behavior = ButtonBehavior::new(self.key, self.label.clone())

@@ -4,6 +4,7 @@ use argui_ui::{Element, LiveRegion, Role, Semantics, UiEvent, UiEventKind};
 use argui_updater::{InstallOutcome, State};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// User intent emitted by the controlled update dialog.
 pub enum UpdateAction {
     Open,
     Close,
@@ -23,6 +24,10 @@ pub struct UpdateDialog<'a> {
 }
 
 impl<'a> UpdateDialog<'a> {
+    /// Creates an update dialog view backed by the updater's current `state`.
+    ///
+    /// `key` identifies the dialog, `open` controls its visibility, and `trigger`
+    /// is the element that opens it. The owner handles returned actions.
     pub fn new(key: impl Into<String>, state: &'a State, open: bool, trigger: Element) -> Self {
         Self {
             key: key.into(),
@@ -33,6 +38,7 @@ impl<'a> UpdateDialog<'a> {
     }
 
     #[must_use]
+    /// Returns the update action requested by `event`, or `None` if it is unrelated.
     pub fn action(&self, event: &UiEvent) -> Option<UpdateAction> {
         let dialog = DialogBehavior::new(&self.key, "Application update", self.open);
         if let Some(action) = dialog.action(event) {
@@ -67,6 +73,7 @@ impl<'a> UpdateDialog<'a> {
     }
 
     #[must_use]
+    /// Builds the dialog contents and controls using `theme` for styling.
     pub fn build(self, theme: &WidgetTheme) -> Element {
         let title = self.state.release().map_or_else(
             || "Application update".into(),

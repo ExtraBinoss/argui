@@ -46,6 +46,9 @@ impl Default for ModelRuntime {
 }
 
 impl ModelRuntime {
+    /// Creates a runtime whose queued work wakes the host through `wake`.
+    ///
+    /// The callback schedules a later call to [`Self::dispatch_pending`].
     #[must_use]
     pub fn new(wake: impl Fn() + 'static) -> Self {
         Self::with_wake(Some(Rc::new(wake)))
@@ -71,6 +74,9 @@ impl ModelRuntime {
     }
 
     #[must_use]
+    /// Creates a retained entity that shares this runtime.
+    ///
+    /// `value` is the entity's initial model state.
     pub fn entity<T: 'static>(&self, value: T) -> Entity<T> {
         Entity::in_runtime(value, self.clone())
     }
@@ -98,6 +104,9 @@ impl ModelRuntime {
 
     /// Disconnects a terminating host, cancels queued model work and stops its executor.
     /// Data and explicitly owned services remain valid. Final lifecycle events are delivered.
+    ///
+    /// # Panics
+    /// Resumes a panic raised while delivering final lifecycle events.
     pub fn shutdown_host(&self) {
         #[cfg(feature = "tasks")]
         if let Some(tasks) = self.task_runtime() {
@@ -137,6 +146,11 @@ impl ModelRuntime {
     /// Bind this application's event-loop wake. Already queued work requests a
     /// wake immediately; replacing a host does not inherit its outstanding wake.
     /// The callback schedules a later `dispatch_pending`, never a synchronous drain.
+    ///
+    /// `wake` is invoked when queued work needs the host to dispatch it.
+    ///
+    /// # Panics
+    /// Propagates a panic raised by `wake` if queued work requests an immediate wake.
     pub fn set_wake(&self, wake: impl Fn() + 'static) {
         self.bind_wake(Rc::new(wake));
     }
@@ -194,6 +208,8 @@ impl ModelRuntime {
 
     /// Attach the host executor to every model in this runtime, including models
     /// created before attachment and models that are never rendered.
+    ///
+    /// `runtime` is the executor used to run model tasks.
     #[cfg(feature = "tasks")]
     pub fn set_task_runtime(&self, runtime: crate::tasks::TaskRuntime) {
         *self.0.tasks.borrow_mut() = Some(runtime);
@@ -206,22 +222,34 @@ impl ModelRuntime {
 
     /// Defers event callbacks until every nested transaction has released its borrows.
     /// This batches delivery, not data rollback.
+    ///
+    /// `update` is the synchronous operation to run inside the transaction. Its result
+    /// is returned unchanged.
+    ///
+    /// # Panics
+    /// Propagates any panic raised by `update` after releasing the transaction guard.
     pub fn transaction<R>(&self, update: impl FnOnce() -> R) -> R {
         let _guard = self.enter();
         update()
     }
 
     #[must_use]
+    /// Returns the number of queued event deliveries.
     pub fn pending_events(&self) -> usize {
         self.0.queue.borrow().len()
     }
 
     #[must_use]
+    /// Returns the number of queued model invalidations.
     pub fn pending_invalidations(&self) -> usize {
         self.0.invalidations.borrow().len()
     }
 
     /// Runs a bounded batch, yielding to the host even for self-emitting listeners.
+    /// Requeues the host wake when work remains after the batch.
+    ///
+    /// # Panics
+    /// Propagates a panic raised by a dispatched listener or lifecycle callback.
     pub fn dispatch_pending(&self) {
         self.0.wake_pending.set(false);
         self.dispatch_batch(true);

@@ -22,6 +22,10 @@ pub struct AlertDialog {
 }
 
 impl AlertDialog {
+    /// Creates a confirmation dialog with Cancel and Continue actions.
+    ///
+    /// `key` identifies the dialog, `title` and `description` explain the decision,
+    /// `open` controls its initial visibility, and `trigger` is its opening control.
     #[must_use]
     pub fn new(
         key: impl Into<String>,
@@ -43,6 +47,7 @@ impl AlertDialog {
     }
 
     #[must_use]
+    /// Interprets `event` as opening, cancelling or confirming this dialog.
     pub fn action(&self, event: &UiEvent) -> Option<AlertDialogAction> {
         if self.open
             && ButtonBehavior::new(format!("{}::confirm", self.key), &self.confirm_label)
@@ -63,6 +68,7 @@ impl AlertDialog {
     }
 
     #[must_use]
+    /// Builds the dialog using `theme` for its controls and panel.
     pub fn build(self, theme: &WidgetTheme) -> Element {
         let close = format!("{}::close", self.key);
         let title_key = format!("{}::title", self.key);

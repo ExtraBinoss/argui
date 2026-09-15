@@ -5,11 +5,17 @@ use crate::{Element, ElementKind, NodeId, TextSelectionStyle, UiTree, UserSelect
 use super::{DocumentTextPoint, SelectionGranularity};
 
 impl UiTree {
+    /// Returns the resolved text-selection policy for a node.
+    ///
+    /// * `node` — retained node whose policy is queried.
     #[must_use]
     pub fn resolved_user_select(&self, node: NodeId) -> UserSelect {
         self.index.user_select(node)
     }
 
+    /// Returns the resolved selection colors for a node.
+    ///
+    /// * `node` — retained node whose selection style is queried.
     #[must_use]
     pub fn resolved_selection_style(&self, node: NodeId) -> TextSelectionStyle {
         self.index.selection_style(node)

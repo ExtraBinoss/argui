@@ -1,6 +1,7 @@
 use argui_paint::{EffectId, EffectInstance, EffectValue, Filter};
 use argui_render::{EffectDefinition, EffectParameter, EffectParameterType, EffectPassDefinition};
 
+/// Registry identifier for the liquid-glass effect.
 pub const LIQUID_GLASS_ID: EffectId = EffectId::new("argui.liquid-glass");
 const PARAMETERS: &[EffectParameter] = &[
     EffectParameter::new("refraction", EffectParameterType::LogicalPixels),
@@ -38,14 +39,23 @@ fn finite(value: f32, fallback: f32) -> f32 {
 /// Lengths are logical pixels; dispersion, color controls and depth are dimensionless.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct LiquidGlass {
+    /// Maximum inward lens displacement in logical pixels.
     pub refraction: f32,
+    /// Spectral dispersion amount.
     pub chromatic_aberration: f32,
+    /// Gaussian blur sigma in logical pixels.
     pub blur: f32,
+    /// Reflection intensity on the glass rim.
     pub highlight: f32,
+    /// Depth of the refracting rim in logical pixels.
     pub edge_width: f32,
+    /// Color saturation adjustment.
     pub saturation: f32,
+    /// Linear brightness adjustment.
     pub brightness: f32,
+    /// Contrast adjustment around mid-gray.
     pub contrast: f32,
+    /// Whether radial depth contributes to the refraction normal.
     pub depth_effect: bool,
     /// Linear RGB and mix amount; does not change source coverage.
     pub tint: [f32; 4],
@@ -56,6 +66,7 @@ impl Default for LiquidGlass {
     }
 }
 impl LiquidGlass {
+    /// Creates a liquid-glass preset with its default optical and color settings.
     #[must_use]
     pub const fn new() -> Self {
         Self {
@@ -72,65 +83,76 @@ impl LiquidGlass {
         }
     }
     /// Maximum inward lens displacement, in logical pixels (0–64).
+    /// * `value` — refraction distance in logical pixels.
     #[must_use]
     pub const fn refraction(mut self, value: f32) -> Self {
         self.refraction = value;
         self
     }
     /// Spectral dispersion amount (0–1); 1 matches Backdrop’s enabled setting.
+    /// * `value` — chromatic dispersion amount.
     #[must_use]
     pub const fn chromatic_aberration(mut self, value: f32) -> Self {
         self.chromatic_aberration = value;
         self
     }
     /// Gaussian blur sigma in logical pixels (0–16); zero keeps details sharp.
+    /// * `value` — blur sigma in logical pixels.
     #[must_use]
     pub const fn blur(mut self, value: f32) -> Self {
         self.blur = value;
         self
     }
     /// Directional reflection on the glass rim (0–1).
+    /// * `value` — rim highlight strength.
     #[must_use]
     pub const fn highlight(mut self, value: f32) -> Self {
         self.highlight = value;
         self
     }
     /// Depth of the refracting rim, in logical pixels (0–64).
+    /// * `value` — rim depth in logical pixels.
     #[must_use]
     pub const fn edge_width(mut self, value: f32) -> Self {
         self.edge_width = value;
         self
     }
     /// Color saturation (0–4); 1 preserves source saturation.
+    /// * `value` — saturation multiplier.
     #[must_use]
     pub const fn saturation(mut self, value: f32) -> Self {
         self.saturation = value;
         self
     }
     /// Linear brightness adjustment (−1–1).
+    /// * `value` — linear brightness adjustment.
     #[must_use]
     pub const fn brightness(mut self, value: f32) -> Self {
         self.brightness = value;
         self
     }
     /// Linear contrast around mid-gray (0–4).
+    /// * `value` — contrast multiplier.
     #[must_use]
     pub const fn contrast(mut self, value: f32) -> Self {
         self.contrast = value;
         self
     }
     /// Blend radial depth into the rounded rectangle's refraction normal.
+    /// * `value` — whether to include the radial depth effect.
     #[must_use]
     pub const fn depth_effect(mut self, value: bool) -> Self {
         self.depth_effect = value;
         self
     }
     /// Linear RGB plus tint amount. Alpha does not change source coverage.
+    /// * `value` — linear red, green, blue, and tint amount.
     #[must_use]
     pub const fn tint(mut self, value: [f32; 4]) -> Self {
         self.tint = value;
         self
     }
+    /// Converts this preset into a paint filter.
     #[must_use]
     pub fn filter(self) -> Filter {
         Filter::Effect(

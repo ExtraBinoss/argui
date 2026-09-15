@@ -15,6 +15,8 @@ pub struct DatePickerState {
 }
 
 impl DatePickerState {
+    /// Creates picker state from an optional value, current date and locale.
+    /// `today` supplies the initial calendar date when no value is selected.
     pub fn new(value: Option<Date>, today: Date, locale: &dyn CalendarLocale) -> Self {
         Self {
             value,
@@ -25,6 +27,7 @@ impl DatePickerState {
         }
     }
 
+    /// Discards the draft and restores the committed value formatted with `locale`.
     pub fn cancel(&mut self, locale: &dyn CalendarLocale) {
         self.draft = self
             .value
@@ -38,6 +41,10 @@ impl DatePickerState {
         );
     }
 
+    /// Parses and validates the draft, committing it when available.
+    ///
+    /// `locale` parses the draft; `unavailable` is shown when constraints reject the date.
+    /// Returns whether a value was committed.
     pub fn commit(
         &mut self,
         locale: &dyn CalendarLocale,
@@ -85,6 +92,8 @@ pub struct DatePicker<'a> {
 }
 
 impl<'a> DatePicker<'a> {
+    /// Creates a date picker identified by `key`, labelled for accessibility and initialized with `today`.
+    /// `label` names the control for assistive technology; `state` supplies its retained value and draft.
     pub fn new(
         key: impl Into<String>,
         label: impl Into<String>,
@@ -105,16 +114,19 @@ impl<'a> DatePicker<'a> {
     }
 
     #[must_use]
+    /// Sets the overlay surface policy for the calendar popup.
     pub fn surface(mut self, surface: argui_ui::OverlaySurface) -> Self {
         self.surface = Some(surface);
         self
     }
 
+    /// Replaces the default calendar icon with `icon`.
     pub fn icon(mut self, icon: Element) -> Self {
         self.icon = Some(icon);
         self
     }
 
+    /// Returns the state key used by the editable date input.
     pub fn input_key(&self) -> String {
         format!("{}::input", self.key)
     }
@@ -137,6 +149,7 @@ impl<'a> DatePicker<'a> {
         calendar
     }
 
+    /// Builds the date input and calendar popup using `theme` for styling.
     pub fn build(&self, theme: &WidgetTheme) -> Element {
         let error_key = format!("{}::error", self.key);
         let mut input = Input::new(
@@ -212,6 +225,7 @@ impl<'a> DatePicker<'a> {
             .semantic_scope()
     }
 
+    /// Returns the updated picker state and focus request resulting from `event`, if any.
     pub fn action(&self, event: &UiEvent) -> Option<DatePickerResponse> {
         let key = event.target_key()?;
         if key != self.key && !key.starts_with(&format!("{}::", self.key)) {

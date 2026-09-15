@@ -17,6 +17,9 @@ pub struct Field {
 }
 
 impl Field {
+    /// Creates a labelled field wrapping a control identified by `control_key`.
+    ///
+    /// `key` identifies the field, `label` names its control, and `control` is the element to wrap.
     #[must_use]
     pub fn new(
         key: impl Into<String>,
@@ -46,6 +49,7 @@ impl Field {
     }
 
     #[must_use]
+    /// Returns the associated control key when `event` activates this field's label.
     pub fn focus_target(&self, event: &UiEvent) -> Option<&str> {
         self.label_widget()
             .focus_target(event)
@@ -53,6 +57,7 @@ impl Field {
     }
 
     #[must_use]
+    /// Builds the field and its control, descriptions and validation message using `theme`.
     pub fn build(&self, theme: &WidgetTheme) -> Element {
         let label = self.label_widget();
         let mut control = self.control.clone();

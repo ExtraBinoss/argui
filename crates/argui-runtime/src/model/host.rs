@@ -74,6 +74,11 @@ impl AnyEntity {
 /// Retained models remain readable; their old executor rejects new work.
 /// Queued model deliveries are cancelled; final lifecycle records are delivered
 /// outside rendering. All roots are closed even if cleanup panics.
+///
+/// `roots` are the entity roots whose related presentations and runtimes should stop.
+///
+/// # Panics
+/// Resumes the first panic raised while closing a presentation or delivering final lifecycle records.
 pub fn shutdown_presentations(roots: &[AnyEntity]) {
     let mut runtimes = Vec::new();
     for root in roots {

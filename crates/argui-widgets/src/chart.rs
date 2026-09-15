@@ -37,6 +37,9 @@ pub struct Chart {
 }
 
 impl Chart {
+    /// Creates a bar chart with the provided categories and data series.
+    ///
+    /// `key` identifies the chart; `label` provides its accessible name.
     #[must_use]
     pub fn new(
         key: impl Into<String>,
@@ -55,6 +58,12 @@ impl Chart {
         }
     }
 
+    /// Computes a zero-inclusive value domain after validating dimensions and series data.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for undersized or non-finite dimensions, non-finite values, or series
+    /// whose value counts do not match the category count.
     pub fn domain(&self) -> Result<(f64, f64), ChartError> {
         if !self.width.is_finite()
             || !self.height.is_finite()
@@ -86,6 +95,7 @@ impl Chart {
     }
 
     /// Point activation identifies a source series and category; it never mutates the data.
+    /// `event` is the UI event to map to a chart point.
     #[must_use]
     pub fn action(&self, event: &argui_ui::UiEvent) -> Option<(usize, usize)> {
         let suffix = event
@@ -100,6 +110,11 @@ impl Chart {
             .map(|_| (series, category))
     }
 
+    /// Builds the chart using `theme` for labels and chart marks.
+    ///
+    /// # Errors
+    ///
+    /// Returns any validation error reported by [`Self::domain`].
     pub fn build(&self, theme: &WidgetTheme) -> Result<Element, ChartError> {
         let (minimum, maximum) = self.domain()?;
         let plot_height = self.height - 36.0;

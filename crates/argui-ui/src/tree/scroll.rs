@@ -7,6 +7,12 @@ use super::UiTree;
 impl UiTree {
     /// Default keyboard scrolling for a focused viewport. Editors and collection controls
     /// retain their own arrow-key contracts. Hosts call this after cancelable key delivery.
+    ///
+    /// * `input` — pressed key and modifiers.
+    /// * `regions` — current scroll regions and their viewport geometry.
+    ///
+    /// Returns the resulting interaction update; unrelated keys or unchanged offsets
+    /// produce an empty update.
     pub fn scroll_keyboard(
         &mut self,
         input: &argui_core::KeyInput,
@@ -72,6 +78,11 @@ impl UiTree {
         })
     }
 
+    /// Dispatches a wheel event to the topmost enabled scroll region at `point`.
+    ///
+    /// * `point` — pointer position in window coordinates.
+    /// * `delta` — wheel or trackpad displacement.
+    /// * `regions` — current scroll regions used for hit testing.
     pub fn wheel_event(
         &mut self,
         point: Point,
@@ -90,6 +101,10 @@ impl UiTree {
     }
 
     /// Dispatch a wheel event to the viewport retained by the current gesture.
+    ///
+    /// * `target` — latched viewport receiving the wheel event.
+    /// * `point` — pointer position in window coordinates.
+    /// * `delta` — wheel or trackpad displacement.
     pub fn wheel_event_from(
         &mut self,
         target: NodeId,
@@ -108,6 +123,9 @@ impl UiTree {
         }
     }
 
+    /// Returns the resolved visual scroll offset of a node.
+    ///
+    /// * `node` — scroll container node.
     #[must_use]
     pub fn scroll_offset(&self, node: NodeId) -> Point {
         let mut base = self.scroll.visual_offset(node);
@@ -117,6 +135,12 @@ impl UiTree {
         })
     }
 
+    /// Sets a scroll container's logical offset.
+    ///
+    /// * `node` — scroll container node.
+    /// * `offset` — requested horizontal and vertical offsets.
+    ///
+    /// Returns whether the stored offset changed.
     pub fn set_scroll_offset(&mut self, node: NodeId, offset: Point) -> bool {
         let changed = self.scroll.set_offset(node, offset);
         if changed {
@@ -125,10 +149,20 @@ impl UiTree {
         changed
     }
 
+    /// Marks a node's scrollbar as active for its configured visibility policy.
+    ///
+    /// * `node` — scroll container node.
+    /// * `regions` — current scroll regions containing scrollbar configuration.
     pub fn activate_scrollbar(&mut self, node: NodeId, regions: &[ScrollRegion]) {
         self.scroll.activate_scrollbar(node, regions);
     }
 
+    /// Advances overscroll and scrollbar animations by elapsed seconds.
+    ///
+    /// * `elapsed` — nonnegative time since the previous physics update, in seconds.
+    /// * `regions` — current scroll regions for scrollbar animation.
+    ///
+    /// Returns the interaction update produced by animated changes.
     pub fn advance_scroll_physics(
         &mut self,
         elapsed: f32,
@@ -145,11 +179,17 @@ impl UiTree {
         update
     }
 
+    /// Returns whether scrolling physics or scrollbar activity needs another frame.
     #[must_use]
     pub fn wants_scroll_frame(&self) -> bool {
         self.scroll.overscroll_active() || self.scroll.scrollbar_activity_active()
     }
 
+    /// Routes a scroll delta from the pointer through eligible scroll ancestors.
+    ///
+    /// * `point` — pointer position in window coordinates.
+    /// * `delta` — wheel or trackpad displacement.
+    /// * `regions` — current scroll regions and geometry.
     pub fn scroll(
         &mut self,
         point: Point,
@@ -160,6 +200,11 @@ impl UiTree {
     }
 
     /// Scroll a latched viewport and its ancestors, never descendants newly under the pointer.
+    ///
+    /// * `target` — viewport retained when the scroll gesture began.
+    /// * `point` — current pointer position in window coordinates.
+    /// * `delta` — wheel or trackpad displacement.
+    /// * `regions` — current scroll regions and geometry.
     pub fn scroll_from(
         &mut self,
         target: NodeId,
@@ -205,6 +250,12 @@ impl UiTree {
         }
     }
 
+    /// Begins scrollbar interaction at a pointer position.
+    ///
+    /// * `point` — pointer position in window coordinates.
+    /// * `regions` — current scroll regions and scrollbar geometry.
+    ///
+    /// Returns `None` when no scrollbar handles the press.
     pub fn scrollbar_pressed(
         &mut self,
         point: Point,
@@ -220,6 +271,12 @@ impl UiTree {
         Some(update)
     }
 
+    /// Updates the active scrollbar drag.
+    ///
+    /// * `point` — current pointer position in window coordinates.
+    /// * `regions` — current scroll regions and scrollbar geometry.
+    ///
+    /// Returns `None` when no scrollbar drag is active.
     pub fn scrollbar_dragged(
         &mut self,
         point: Point,
@@ -235,6 +292,9 @@ impl UiTree {
         }))
     }
 
+    /// Ends the active scrollbar drag, if any.
+    ///
+    /// Returns an update when a drag was released.
     pub fn scrollbar_released(&mut self) -> Option<InteractionUpdate> {
         self.scroll.scrollbar_released().then(|| {
             let mut update = transition_update(self.sync_transitions());
@@ -243,6 +303,10 @@ impl UiTree {
         })
     }
 
+    /// Updates scrollbar hover state at the given pointer position.
+    ///
+    /// * `point` — pointer position, or `None` when outside the window.
+    /// * `regions` — current scroll regions and scrollbar geometry.
     pub fn scrollbar_pointer_moved(
         &mut self,
         point: Option<Point>,
@@ -256,6 +320,7 @@ impl UiTree {
         update
     }
 
+    /// Returns whether a scrollbar drag is active.
     #[must_use]
     pub fn scrollbar_dragging(&self) -> bool {
         self.scroll.dragging()

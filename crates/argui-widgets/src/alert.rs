@@ -23,6 +23,9 @@ pub struct Alert {
 }
 
 impl Alert {
+    /// Creates an assertively announced alert with the given title.
+    ///
+    /// `key` identifies the element and `title` provides its primary message.
     #[must_use]
     pub fn new(key: impl Into<String>, title: impl Into<String>) -> Self {
         Self {
@@ -36,30 +39,36 @@ impl Alert {
     }
 
     #[must_use]
+    /// Adds supporting text to the alert.
+    /// `description` is the supporting text announced with the alert.
     pub fn description(mut self, description: impl Into<String>) -> Self {
         self.description = Some(description.into());
         self
     }
 
     #[must_use]
+    /// Adds a decorative icon before the alert text.
     pub fn icon(mut self, icon: Element) -> Self {
         self.icon = Some(icon);
         self
     }
 
     #[must_use]
+    /// Selects the alert's visual variant.
     pub const fn variant(mut self, variant: AlertVariant) -> Self {
         self.variant = variant;
         self
     }
 
     #[must_use]
+    /// Sets the live-region announcement behavior.
     pub const fn live(mut self, live: LiveRegion) -> Self {
         self.live = live;
         self
     }
 
     #[must_use]
+    /// Builds the alert using `theme` for its colors and surface.
     pub fn build(self, theme: &WidgetTheme) -> Element {
         let (foreground, detail) = match self.variant {
             AlertVariant::Default => (theme.foreground, theme.muted_foreground),

@@ -28,6 +28,8 @@ pub struct Tooltip {
 }
 
 impl Tooltip {
+    /// Creates a caller-controlled tooltip anchored to `trigger`.
+    /// `key` identifies the tooltip, `description` names it accessibly, and `open` controls visibility.
     #[must_use]
     pub fn new(
         key: impl Into<String>,
@@ -49,24 +51,27 @@ impl Tooltip {
     }
 
     #[must_use]
+    /// Sets the position of the tooltip relative to its trigger using `placement`.
     pub const fn placement(mut self, placement: FloatingPlacement) -> Self {
         self.placement = placement;
         self
     }
 
     #[must_use]
+    /// Sets the maximum tooltip width in logical pixels.
     pub const fn max_width(mut self, width: f32) -> Self {
         self.max_width = width;
         self
     }
 
     #[must_use]
+    /// Replaces the tooltip's paint style.
     pub fn paint(mut self, paint: PaintStyle) -> Self {
         self.paint = Some(paint);
         self
     }
 
-    /// Supply any foreground/backdrop filter, including a registered custom effect.
+    /// Supplies `layer`, including foreground/backdrop filters and registered custom effects.
     #[must_use]
     pub fn layer(mut self, layer: LayerStyle) -> Self {
         self.layer = Some(layer);
@@ -74,12 +79,14 @@ impl Tooltip {
     }
 
     #[must_use]
+    /// Sets the overlay surface policy.
     pub const fn surface(mut self, surface: argui_ui::OverlaySurface) -> Self {
         self.surface = Some(surface);
         self
     }
 
     #[must_use]
+    /// Builds the tooltip using `theme` for its default surface and text styles.
     pub fn build(self, theme: &WidgetTheme) -> Element {
         let content_key = format!("{}::content", self.key);
         let mut trigger = self.trigger.keyed(self.key.clone());
@@ -159,6 +166,7 @@ pub struct TooltipState {
 }
 
 impl TooltipState {
+    /// Creates event-driven visibility state for the tooltip identified by `key`.
     #[must_use]
     pub fn new(key: impl Into<String>) -> Self {
         let key = key.into();
@@ -176,22 +184,26 @@ impl TooltipState {
     }
 
     #[must_use]
+    /// Sets the hover/focus opening delay.
     pub const fn delay(mut self, delay: Duration) -> Self {
         self.delay = delay;
         self
     }
 
     #[must_use]
+    /// Returns whether the tooltip is currently open.
     pub const fn is_open(&self) -> bool {
         self.open
     }
 
     #[must_use]
+    /// Returns the pending open or close deadline, if any.
     pub fn next_deadline(&self) -> Option<Duration> {
         self.deadline.map(|(time, _)| time)
     }
 
     /// Clear transient interaction state when the trigger is removed or its view is hidden.
+    /// Clears hover/focus state and closes the tooltip immediately.
     pub fn reset(&mut self) {
         self.hovered = [false; 2];
         self.focused = false;
@@ -201,6 +213,7 @@ impl TooltipState {
         self.deadline = None;
     }
 
+    /// Applies `event` at monotonic time `now`; returns whether retained state changed.
     pub fn update(&mut self, event: &UiEvent, now: Duration) -> bool {
         let previous = (
             self.hovered,
@@ -282,6 +295,7 @@ impl TooltipState {
         self.focus_dismissed = true;
     }
 
+    /// Applies a pending deadline at monotonic time `now`; returns whether visibility changed.
     pub fn advance(&mut self, now: Duration) -> bool {
         let Some((deadline, open)) = self.deadline else {
             return false;

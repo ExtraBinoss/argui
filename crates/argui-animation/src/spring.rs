@@ -1,11 +1,17 @@
 use crate::{Duration, MotionValue, PhysicsError};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
+/// Physical parameters and rest thresholds for a spring.
 pub struct SpringConfig {
+    /// Positive mass.
     pub mass: f64,
+    /// Positive spring stiffness.
     pub stiffness: f64,
+    /// Non-negative damping coefficient.
     pub damping: f64,
+    /// Velocity magnitude at or below which the spring can rest.
     pub rest_speed: f64,
+    /// Displacement magnitude at or below which the spring can rest.
     pub rest_delta: f64,
 }
 
@@ -22,6 +28,11 @@ impl Default for SpringConfig {
 }
 
 impl SpringConfig {
+    /// Checks that the spring coefficients and rest thresholds are valid.
+    ///
+    /// # Errors
+    /// Returns the corresponding [`PhysicsError`] for an invalid mass, stiffness,
+    /// damping coefficient, or rest threshold.
     pub fn validate(self) -> Result<Self, PhysicsError> {
         if !self.mass.is_finite() || self.mass <= 0.0 {
             Err(PhysicsError::InvalidMass)
@@ -42,6 +53,7 @@ impl SpringConfig {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
+/// Analytically integrated spring motion for a supported [`MotionValue`].
 pub struct Spring<T> {
     value: T,
     target: T,
@@ -51,6 +63,10 @@ pub struct Spring<T> {
 }
 
 impl<T: MotionValue> Spring<T> {
+    /// Creates a spring from current value, target, initial velocity, and config.
+    ///
+    /// # Errors
+    /// Returns a physics error if `config` contains invalid coefficients or thresholds.
     pub fn new(
         value: T,
         target: T,
@@ -69,38 +85,45 @@ impl<T: MotionValue> Spring<T> {
         })
     }
 
+    /// Returns the current spring value.
     #[must_use]
     pub const fn value(&self) -> T {
         self.value
     }
 
+    /// Returns the spring target.
     #[must_use]
     pub const fn target(&self) -> T {
         self.target
     }
 
+    /// Returns the current spring velocity.
     #[must_use]
     pub const fn velocity(&self) -> T {
         self.velocity
     }
 
+    /// Returns whether the spring has not yet reached its rest thresholds.
     #[must_use]
     pub const fn is_active(&self) -> bool {
         self.active
     }
 
+    /// Changes the target while preserving the current value and velocity.
     pub fn retarget(&mut self, target: T) {
         self.target = target;
         self.active = self.value.subtract(target).magnitude() > self.config.rest_delta
             || self.velocity.magnitude() > self.config.rest_speed;
     }
 
+    /// Replaces the current velocity and updates the active state.
     pub fn set_velocity(&mut self, velocity: T) {
         self.velocity = velocity;
         self.active = self.value.subtract(self.target).magnitude() > self.config.rest_delta
             || velocity.magnitude() > self.config.rest_speed;
     }
 
+    /// Advances the spring by `elapsed`; returns whether its value changed.
     pub fn advance(&mut self, elapsed: Duration) -> bool {
         if !self.active || elapsed == Duration::ZERO {
             return false;

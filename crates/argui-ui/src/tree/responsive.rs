@@ -5,11 +5,17 @@ use crate::TreeUpdate;
 use super::UiTree;
 
 impl UiTree {
+    /// Returns whether this tree contains any container queries.
     #[must_use]
     pub const fn has_container_queries(&self) -> bool {
         self.has_container_queries
     }
 
+    /// Applies measured container sizes to registered queries.
+    ///
+    /// * `sizes` — layout sizes indexed by the tree's preorder positions.
+    ///
+    /// Returns the strongest update required by changed query results.
     pub fn resolve_container_queries(&mut self, sizes: &[Size]) -> TreeUpdate {
         let next = self
             .container_indices

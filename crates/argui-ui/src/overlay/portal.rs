@@ -29,6 +29,10 @@ pub struct Portal {
 }
 
 impl Portal {
+    /// Creates a portal at the given window layer and target.
+    ///
+    /// * `layer` — stacking layer used for the portal.
+    /// * `target` — layout, anchor, rectangle, or viewport placement.
     #[must_use]
     pub const fn new(layer: WindowLayer, target: PortalTarget) -> Self {
         Self {
@@ -39,12 +43,15 @@ impl Portal {
         }
     }
 
+    /// Sets how the portal can be dismissed.
+    /// * `dismiss` — dismissal policy applied to the portal.
     #[must_use]
     pub const fn dismiss(mut self, dismiss: DismissPolicy) -> Self {
         self.dismiss = dismiss;
         self
     }
 
+    /// Sets the preferred surface used to present this portal.
     #[must_use]
     pub const fn surface(mut self, surface: OverlaySurface) -> Self {
         self.surface = Some(surface);

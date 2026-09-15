@@ -81,112 +81,48 @@ updater dialog is a separate opt-in.
 
 ## Integration
 
-Build the view with its theme, forward events to `action`, apply the returned
-action to retained state and notify the owning entity. Forward focus requests
-to the runtime. Widget models do not perform network transfers or submit answers.
+Widgets are controlled. Build from model state, forward events to the widget's
+behavior method, apply the returned action, then notify the owning model. Focus
+requests go through the runtime. Network transfers, persistence, validation, and
+navigation remain application responsibilities.
 
-Complete examples:
+Direction inherits through layout. Pass the same RTL value to collection
+controllers whose arrow-key behavior depends on direction.
 
-- [Forms](../../crates/argui-widget-gallery/src/pages/catalogue/forms.rs): Field,
-  Input Group, OTP, Combobox, Native Select and Questionnaire.
-- [Navigation](../../crates/argui-widget-gallery/src/pages/catalogue/navigation.rs):
-  Accordion, toggles, Button Group, Navigation Menu, Sidebar and Direction.
-- [Surfaces](../../crates/argui-widget-gallery/src/pages/catalogue/surfaces.rs):
-  Sheet, Alert Dialog, Drawer, Carousel, Chart and Hover Card.
-- [Conversation](../../crates/argui-widget-gallery/src/pages/catalogue/conversation.rs):
-  Attachment, Bubble, Item, Marker, Message, Message Scroller and Scroll Area.
-- [Typography](../../crates/argui-widget-gallery/src/pages/typography.rs): text styles,
-  rich text and selection.
+Focused examples:
 
-Keep `HoverCardState`, capture Focus/Blur/Key on the panel and schedule `advance`
-at `next_deadline` through a `TaskSlot`. For MessageScroller, provide layout
-measurements to `appended`/`prepended`, pass reading events to `observe` and
-apply returned `ScrollRequest`s. Virtualization and network streaming are
-application responsibilities.
+- [Forms](../../crates/argui-widget-gallery/src/pages/catalogue/forms.rs)
+- [Navigation](../../crates/argui-widget-gallery/src/pages/catalogue/navigation.rs)
+- [Surfaces](../../crates/argui-widget-gallery/src/pages/catalogue/surfaces.rs)
+- [Conversation](../../crates/argui-widget-gallery/src/pages/catalogue/conversation.rs)
+- [Typography](../../crates/argui-widget-gallery/src/pages/typography.rs)
 
-Direction inherits through layout and supports opposing nested scopes. Set
-collection controllers' `rtl` parameter to the same direction for arrow-key
-interpretation. The engine stays independent of widgets and any future DSL.
-
-## Composition contracts
-
-### Content and disclosure
-
-Card and Empty connect title/description to their accessible group while their
-actions retain focus. Badge is noninteractive. Decorative media should not
-produce duplicate announcements. Use `Alert::live(LiveRegion::Off)` for an
-already-present persistent alert that should not announce dynamically.
-
-Collapsible unmounts closed content. `trigger_key()` and `content_key()` identify
-its parts. The application retains data and restores focus when closing a
-section containing the focused control. Height changes are not animated.
-
-Separator is horizontal by default; a vertical separator needs a parent with
-a defined height. `label` centers text. `decorative(false)` exposes its role
-and orientation without announcing children twice.
-
-### Images and loading
-
-`Avatar::image` receives an already-loaded `Option<ImageId>`; the application
-chooses the image or fallback. AspectRatio requires a finite positive ratio;
-clip its frame when needed. Kbd describes keys without registering shortcuts;
-`label` supplies a spoken name for symbols.
-
-Mount `Entity<Progress>` or `Entity<Skeleton>` with `cx.entity` for animation.
-Calling `build` directly is static. `Progress::set_value` takes a percentage
-clamped to 0–100; `None` or a non-finite value selects indeterminate progress.
-Reduced motion, unmounting and `Skeleton::set_animated(false)` stop frame requests.
-Announce loading on the parent group instead of every decorative shape.
-
-### Labels and navigation
-
-`Label::associate` sets the control key and replaces its direct name with
-`labelled_by`. Keep both in one accessible scope with matching enabled states,
-and forward `focus_target(event)` to the runtime. Clicking focuses without
-changing the control value.
-
-`Breadcrumb::action` returns a unique ancestor ID for application navigation.
-`Pagination::action` returns an available destination. Pages start at 1; an
-empty total produces page 0 and disabled buttons. At most seven entries appear
-between previous/next. `PaginationLabels` provides translated announcements.
-Both widgets currently expose a named group and current-page description,
-without `aria-current`.
-
-`Menu::submenu_content_key` identifies the geometry anchor for MenuIntent.
-Supply bounds after layout, update the pointer-corridor deadline during movement
-and cancel its task when closing. `CalendarLocale::rtl` controls horizontal
-navigation. DatePicker scopes events and restores the committed date on cancel.
-
-## Additional widgets
-
-**AnimatedText** (`animated-text`) animates changed characters through rolling,
-sliding or fading, reuses layout between intermediate frames and stops requesting
-frames at rest. See [animation](../ui/animation.md).
-
-**ColorPicker** (`color-picker`) includes saturation/value, hue, checkerboard
-opacity and HEX/RGB/HSL/HSV fields. `ColorPickerState` retains hue through gray,
-captured gestures and invalid drafts without replacing the last valid color.
-Call `layout_changed(key, snapshot)` after layout, then `update(key, event)`;
-`true` requests a rebuild. Compare `color()` before/after to publish only changes.
-Use `set_color`, `set_format` and `set_enabled` for external state. Arrow keys
-adjust sliders and the pad; Shift refines pad steps to 0.1%, and Escape discards
-an invalid draft.
-
-See dedicated guides for [lists and tables](lists-tables.md),
+Specialized contracts live in [lists and tables](lists-tables.md),
 [overlays](overlays.md), [native popovers](../platform/native-popovers.md),
 [file pickers](../platform/file-picker.md), [WebViews](../platform/webview.md),
-[desktop backdrops](../platform/desktop-backdrops.md) and
+[desktop backdrops](../platform/desktop-backdrops.md), and
 [application updates](../platform/updater.md).
+
+## Feature names
+
+Enable a feature directly on `argui-widgets`, or add the `widget-` prefix on
+the `argui` facade. `argui/widgets-all` enables the general widget collection.
+The updater dialog remains a separate opt-in. The workspace script verifies
+isolated, empty, and complete configurations:
+
+```sh
+python3 scripts/check-widget-features.py
+```
 
 ## Validation
 
-[Widget tests](../../crates/argui-widgets/tests/) cover actions, limits, disabled
-states, accessible relationships, gestures and layout. The
-[gallery tests](../../crates/argui-widget-gallery/tests/pages/catalogue.rs) exercise
-retained states in light/dark themes and at two viewport sizes.
+[Widget tests](../../crates/argui-widgets/tests/) cover state changes, limits,
+disabled behavior, accessibility, gestures, and layout. [Gallery
+tests](../../crates/argui-widget-gallery/tests/pages/catalogue.rs) cover retained
+state in light and dark themes and at narrow and wide viewports.
 
-The [browser scenario](../../crates/argui-widget-gallery/tests/pages/catalogue.mjs)
-covers actual WebGPU output, navigation, input, modals, focus restoration,
-Hover Card and scrolling. Inspect its captures in `target/catalogue-interactions/`;
-a blank image fails. Use the [private Linux display](../contributing/linux-testing.md)
-and the [quality gate](../contributing/code-quality.md).
+The browser scenario
+`crates/argui-widget-gallery/tests/pages/catalogue.mjs` covers WebGPU output,
+navigation, input, modals, focus restoration, hover cards, and scrolling. Run it
+through the [private Linux display](../contributing/linux-testing.md) and inspect
+its captures.

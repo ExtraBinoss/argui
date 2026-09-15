@@ -42,6 +42,9 @@ pub struct FilePicker {
 impl EventEmitter<FilePickerEvent> for FilePicker {}
 
 impl FilePicker {
+    /// Creates a file picker with the native dialog backend.
+    ///
+    /// `key` identifies the control, `label` names it accessibly, and `dialog` configures the request.
     #[must_use]
     pub fn new(key: impl Into<String>, label: impl Into<String>, dialog: FileDialog) -> Self {
         Self {
@@ -55,26 +58,33 @@ impl FilePicker {
             task: TaskSlot::default(),
         }
     }
-    /// Use an application's dialog provider with the same request/result contract.
+    /// Use an application's dialog provider with the same request/result contract; `backend` performs the selection request.
     #[must_use]
     pub fn backend(mut self, backend: Arc<dyn FileDialogBackend>) -> Self {
         self.backend = backend;
         self
     }
     #[must_use]
+    /// Returns the last successful selection; dismissal leaves it unchanged.
     pub fn selection(&self) -> &[PickedFile] {
         &self.selection
     }
     #[must_use]
+    /// Returns the current dialog status.
     pub fn status(&self) -> &FilePickerStatus {
         &self.status
     }
     #[must_use]
+    /// Returns whether a dialog-opening task is in progress.
     pub fn is_open(&self) -> bool {
         self.task.is_running()
     }
 
-    /// Also usable from a command or menu. A second activation cannot open another dialog.
+    /// Also usable from a command or menu. `cx` provides runtime task services; a second activation cannot open another dialog.
+    ///
+    /// # Errors
+    ///
+    /// Returns a task error if the runtime could not start the dialog operation.
     pub fn open(&mut self, cx: &mut Context<Self>) -> Result<bool, TaskError> {
         if !self.enabled || self.is_open() {
             return Ok(false);
@@ -128,6 +138,7 @@ impl FilePicker {
     }
 
     #[must_use]
+    /// Builds the picker and status message using `theme`; `cx` schedules the native dialog task.
     pub fn build(&mut self, theme: &WidgetTheme, cx: &mut Context<Self>) -> Element {
         let busy = self.is_open();
         let supported = self.dialog.mode.supported();

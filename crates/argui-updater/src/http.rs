@@ -20,13 +20,26 @@ pub struct Config {
     current: Version,
     endpoint: Url,
     key: PublicKey,
+    /// Manifest platform key, typically `{os}-{arch}`.
     pub target: String,
+    /// Whether prerelease versions are eligible for selection.
     pub allow_prerelease: bool,
+    /// Request timeout for manifest and artifact transfers.
     pub timeout: Duration,
+    /// Maximum accepted artifact size in bytes.
     pub max_download_bytes: u64,
 }
 
 impl Config {
+    /// Creates a signed-feed configuration with safe defaults.
+    ///
+    /// # Arguments
+    /// * `current` — semantic version currently installed.
+    /// * `endpoint` — HTTPS manifest URL.
+    /// * `public_key` — Minisign public key used to authenticate packages.
+    ///
+    /// # Errors
+    /// Returns an error if the version, endpoint, or public key is invalid.
     pub fn new(current: &str, endpoint: &str, public_key: &str) -> Result<Self> {
         let endpoint = safe_url(endpoint)?;
         Ok(Self {
@@ -60,6 +73,7 @@ struct Manifest {
 /// Opaque, authenticated staging file, automatically removed on cancellation, failure or drop.
 pub struct VerifiedPackage(NamedTempFile);
 
+/// HTTPS JSON-feed backend with Minisign verification and a configurable installer.
 pub struct HttpBackend<I> {
     config: Config,
     client: Client,
@@ -67,6 +81,11 @@ pub struct HttpBackend<I> {
 }
 
 impl<I: Installer> HttpBackend<I> {
+    /// Creates an HTTPS update backend using the supplied installer.
+    /// `config` contains the trusted manifest and download settings; `installer` handles packages.
+    ///
+    /// # Errors
+    /// Returns an error if limits are invalid or the HTTP client cannot be configured.
     pub fn new(config: Config, installer: I) -> Result<Self> {
         if config.target.is_empty() || config.timeout.is_zero() || config.max_download_bytes == 0 {
             return Err(Error::backend(

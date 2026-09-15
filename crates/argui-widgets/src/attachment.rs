@@ -20,6 +20,8 @@ pub struct Attachment {
 }
 
 impl Attachment {
+    /// Creates an attachment presentation for `filename`.
+    /// `key` identifies this attachment; `filename` is the displayed file name.
     #[must_use]
     pub fn new(key: impl Into<String>, filename: impl Into<String>) -> Self {
         Self {
@@ -30,6 +32,7 @@ impl Attachment {
     }
 
     #[must_use]
+    /// Builds the attachment element using `theme` for styling.
     pub fn build(self, theme: &WidgetTheme) -> Element {
         let state_label = match self.state {
             AttachmentState::Idle => "Ready",

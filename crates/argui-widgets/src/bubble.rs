@@ -25,6 +25,8 @@ pub struct Bubble {
 }
 
 impl Bubble {
+    /// Creates a message bubble containing `content`.
+    /// `key` identifies the bubble in the UI tree.
     #[must_use]
     pub fn new(key: impl Into<String>, content: Element) -> Self {
         Self {
@@ -37,6 +39,7 @@ impl Bubble {
     }
 
     #[must_use]
+    /// Builds the bubble using `theme` for its colors.
     pub fn build(self, theme: &WidgetTheme) -> Element {
         let color = match self.variant {
             BubbleVariant::Primary => theme.primary,

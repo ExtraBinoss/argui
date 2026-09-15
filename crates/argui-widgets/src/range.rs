@@ -38,6 +38,7 @@ pub struct RangeDetents {
 }
 
 impl RangeDetents {
+    /// Creates detent snapping with interval, tolerance and velocity limits; `maximum_velocity` disables snapping above that speed.
     #[must_use]
     pub const fn new(interval: f32, tolerance: f32, maximum_velocity: f32) -> Self {
         Self {
@@ -57,6 +58,7 @@ impl RangeDetents {
 }
 
 impl RangeConfig {
+    /// Creates a range from `minimum` to `maximum` using increments of `step`.
     #[must_use]
     pub const fn new(minimum: f32, maximum: f32, step: f32) -> Self {
         Self {
@@ -70,24 +72,29 @@ impl RangeConfig {
     }
 
     #[must_use]
+    /// Sets the control's movement axis to `direction`.
     pub const fn axis(mut self, axis: RangeAxis) -> Self {
         self.axis = axis;
         self
     }
 
     #[must_use]
+    /// Sets whether normalized values increase forward or in reverse.
+    /// `direction` chooses the value progression along the axis.
     pub const fn direction(mut self, direction: RangeDirection) -> Self {
         self.direction = direction;
         self
     }
 
     #[must_use]
+    /// Enables snapping to the supplied `detents` configuration.
     pub const fn detents(mut self, detents: RangeDetents) -> Self {
         self.detents = Some(detents);
         self
     }
 
     #[must_use]
+    /// Clamps `value` to the configured bounds and nearest step.
     pub fn clamp(self, value: f32) -> f32 {
         let config = self.normalized();
         let stepped =
@@ -96,6 +103,7 @@ impl RangeConfig {
     }
 
     #[must_use]
+    /// Maps `value` to the normalized range from 0.0 to 1.0, honoring direction.
     pub fn ratio(self, value: f32) -> f32 {
         let config = self.normalized();
         let range = config.maximum - config.minimum;
@@ -143,6 +151,9 @@ pub struct RangeBehavior {
 }
 
 impl RangeBehavior {
+    /// Creates slider behavior with a label, current value and range configuration.
+    ///
+    /// `key` identifies matching events; `config` is normalized for bounds and step size.
     #[must_use]
     pub fn new(
         key: impl Into<String>,
@@ -160,27 +171,32 @@ impl RangeBehavior {
     }
 
     #[must_use]
+    /// Sets whether the range control can be changed; `enabled` controls interaction availability.
     pub const fn enabled(mut self, enabled: bool) -> Self {
         self.enabled = enabled;
         self
     }
 
     #[must_use]
+    /// Returns the normalized position of the current value.
     pub fn ratio(&self) -> f32 {
         self.config.ratio(self.value)
     }
 
     #[must_use]
+    /// Returns the normalized range configuration.
     pub const fn config(&self) -> RangeConfig {
         self.config
     }
 
     #[must_use]
+    /// Returns the layout key used for the range track.
     pub fn track_key(&self) -> String {
         format!("{}::track", self.key)
     }
 
     #[must_use]
+    /// Adds range semantics and interaction behavior to `element` for `part`.
     pub fn decorate(&self, part: RangePart, element: Element) -> Element {
         match part {
             RangePart::Track => element.keyed(self.track_key()).semantic_hidden(true),
@@ -246,6 +262,7 @@ pub enum RangeAction {
 }
 
 impl RangeAction {
+    /// Returns the value carried by any range action variant.
     #[must_use]
     pub const fn value(self) -> f32 {
         match self {
@@ -265,11 +282,13 @@ pub struct RangeState {
 }
 
 impl RangeState {
+    /// Updates the retained track geometry from `layout` for `behavior`.
     pub fn layout_changed(&mut self, layout: &LayoutSnapshot, behavior: &RangeBehavior) {
         self.track = layout.bounds(&behavior.track_key());
     }
 
     #[must_use]
+    /// Applies `event` to `behavior`, returning a begin, update, commit or cancel action.
     pub fn update(&mut self, event: &UiEvent, behavior: &RangeBehavior) -> Option<RangeAction> {
         if !behavior.enabled || event.target_key() != Some(behavior.key.as_str()) {
             return None;

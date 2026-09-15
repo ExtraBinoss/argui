@@ -19,6 +19,7 @@ pub struct List<'a> {
 }
 
 impl<'a> List<'a> {
+    /// Creates list behavior for the immutable `collection` snapshot, identified by `key`.
     #[must_use]
     pub fn new(key: impl Into<String>, collection: &'a Collection) -> Self {
         let key = key.into();
@@ -33,12 +34,14 @@ impl<'a> List<'a> {
     }
 
     #[must_use]
+    /// Sets the accessible name of the list; `label` is announced to assistive technology.
     pub fn label(mut self, label: impl Into<String>) -> Self {
         self.label = label.into();
         self
     }
 
     #[must_use]
+    /// Uses controlled `state`, with `multiple` enabling additive and range selection.
     pub fn selection(mut self, state: &'a ListState, multiple: bool) -> Self {
         self.state = Some(state);
         self.multiple = multiple;
@@ -53,6 +56,10 @@ impl<'a> List<'a> {
     }
 
     /// Interpret printable input using an explicitly retained search buffer and clock.
+    /// Searches enabled items using a retained typeahead buffer and returns updated selection.
+    ///
+    /// `input` is the typed text, `now` is its monotonic timestamp, and `matches` compares
+    /// an item label with the accumulated query.
     pub fn search(
         &self,
         search: &mut crate::Typeahead,
@@ -88,6 +95,11 @@ impl<'a> List<'a> {
     }
 
     #[must_use]
+    /// Returns the stable element key for the row at `index`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `index` is outside the collection. `element` is row content and `theme` supplies its style.
     pub fn row_key(&self, index: usize) -> String {
         format!(
             "{}::row::{}",
@@ -97,6 +109,7 @@ impl<'a> List<'a> {
     }
 
     #[must_use]
+    /// Decorates `element` with the list's group semantics and interaction scope.
     pub fn root(&self, element: Element) -> Element {
         let mut root = element
             .semantic_scope()
@@ -121,6 +134,12 @@ impl<'a> List<'a> {
     }
 
     #[must_use]
+    /// Decorates a row with selection, focus, identity and themed interaction styling.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `index` is outside the collection.
+    /// `element` is the row content and `theme` supplies the row interaction styling.
     pub fn row(&self, index: usize, element: Element, theme: &WidgetTheme) -> Element {
         let item = self.collection.get(index).expect("row index");
         let selected = self
@@ -165,6 +184,7 @@ impl<'a> List<'a> {
     }
 
     #[must_use]
+    /// Builds rows by calling `row` for each index; `theme` supplies list styling.
     pub fn build(&self, theme: &WidgetTheme, mut row: impl FnMut(usize) -> Element) -> Element {
         self.root(Element::column(
             (0..self.collection.len()).map(|index| self.row(index, row(index), theme)),
@@ -174,6 +194,7 @@ impl<'a> List<'a> {
     /// Returns the next controlled state for a click or navigation key.
     /// The consumer scrolls `active` into view for virtual lists.
     #[must_use]
+    /// Returns updated controlled selection or active-row state for `event`, if applicable.
     pub fn action(&self, event: &UiEvent) -> Option<ListState> {
         let key = event.target_key()?;
         let index = key

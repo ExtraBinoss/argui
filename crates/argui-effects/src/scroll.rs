@@ -3,7 +3,9 @@ use argui_paint::{Color, EffectId, EffectInstance, EffectValue, Filter, LayerSty
 use argui_render::{EffectDefinition, EffectParameter, EffectParameterType, EffectPassDefinition};
 use argui_ui::{ScrollEffect, ScrollMetric};
 
+/// Registry identifier for the scroll edge-fade effect.
 pub const EDGE_FADE_ID: EffectId = EffectId::new("argui.scroll.edge-fade");
+/// Registry identifier for the scroll edge-shadow effect.
 pub const EDGE_SHADOW_ID: EffectId = EffectId::new("argui.scroll.edge-shadow");
 
 const PARAMETERS: &[EffectParameter] = &[
@@ -30,8 +32,11 @@ pub(crate) fn definitions() -> [EffectDefinition; 2] {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
+/// Fade treatment at scroll viewport edges.
 pub struct EdgeFade {
+    /// Fade width in logical pixels.
     pub width: f32,
+    /// Maximum fade opacity, clamped when creating the filter.
     pub intensity: f32,
     /// Left, top, right, bottom. Also controls which edges respond to scrolling.
     pub strengths: [f32; 4],
@@ -44,6 +49,8 @@ impl Default for EdgeFade {
 }
 
 impl EdgeFade {
+    /// Creates a fade with the supplied logical-pixel width.
+    /// * `width` — fade width in logical pixels.
     #[must_use]
     pub const fn new(width: f32) -> Self {
         Self {
@@ -53,28 +60,34 @@ impl EdgeFade {
         }
     }
 
+    /// Sets the fade opacity strength.
+    /// * `intensity` — opacity multiplier for the fade.
     #[must_use]
     pub const fn intensity(mut self, intensity: f32) -> Self {
         self.intensity = intensity;
         self
     }
 
+    /// Sets left, top, right, and bottom edge strengths.
     #[must_use]
     pub const fn strengths(mut self, strengths: [f32; 4]) -> Self {
         self.strengths = strengths;
         self
     }
 
+    /// Creates a static edge-fade paint filter.
     #[must_use]
     pub fn filter(self) -> Filter {
         self.make_filter(false, Color::TRANSPARENT)
     }
 
+    /// Creates a scroll-bound fade using the default threshold and ramp.
     #[must_use]
     pub fn scroll(self) -> ScrollEffect {
         self.scroll_with(0.0, 12.0)
     }
 
+    /// Creates a scroll-bound fade with edge activation threshold and ramp.
     #[must_use]
     pub fn scroll_with(self, threshold: f32, ramp: f32) -> ScrollEffect {
         self.bind(self.filter(), threshold, ramp)
@@ -131,12 +144,17 @@ impl EdgeFade {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
+/// Shadow treatment at scroll viewport edges.
 pub struct EdgeShadow {
+    /// Edge configuration used to determine width and edge strengths.
     pub edges: EdgeFade,
+    /// Shadow color.
     pub color: Color,
 }
 
 impl EdgeShadow {
+    /// Creates an edge shadow with a logical-pixel width and color.
+    /// * `width` — shadow width in logical pixels; `color` — shadow color.
     #[must_use]
     pub const fn new(width: f32, color: Color) -> Self {
         Self {
@@ -145,28 +163,34 @@ impl EdgeShadow {
         }
     }
 
+    /// Sets the shadow opacity strength.
+    /// * `intensity` — opacity multiplier for the shadow.
     #[must_use]
     pub const fn intensity(mut self, intensity: f32) -> Self {
         self.edges.intensity = intensity;
         self
     }
 
+    /// Sets left, top, right, and bottom edge strengths.
     #[must_use]
     pub const fn strengths(mut self, strengths: [f32; 4]) -> Self {
         self.edges.strengths = strengths;
         self
     }
 
+    /// Creates a static edge-shadow paint filter.
     #[must_use]
     pub fn filter(self) -> Filter {
         self.edges.make_filter(true, self.color)
     }
 
+    /// Creates a scroll-bound shadow using the default threshold and ramp.
     #[must_use]
     pub fn scroll(self) -> ScrollEffect {
         self.scroll_with(0.0, 12.0)
     }
 
+    /// Creates a scroll-bound shadow with edge activation threshold and ramp.
     #[must_use]
     pub fn scroll_with(self, threshold: f32, ramp: f32) -> ScrollEffect {
         self.edges.bind(self.filter(), threshold, ramp)

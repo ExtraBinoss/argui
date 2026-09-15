@@ -16,21 +16,25 @@ pub struct MemorySnapshot {
 }
 
 impl InspectorHandle {
+    /// Requests a memory-capacity sample from the next eligible host update.
     pub fn request_memory_sample(&self) {
         let mut state = self.0.borrow_mut();
         state.memory_requested = state.recording && !state.paused;
     }
 
+    /// Consumes a pending memory-sample request, if recording is currently active.
     pub fn take_memory_request(&self) -> bool {
         let mut state = self.0.borrow_mut();
         let requested = std::mem::take(&mut state.memory_requested);
         requested && state.recording && !state.paused
     }
 
+    /// Publishes the latest allocator-capacity snapshot.
     pub fn publish_memory(&self, snapshot: MemorySnapshot) {
         self.0.borrow_mut().memory = Some(snapshot);
     }
 
+    /// Returns the most recently published capacity snapshot, if available.
     #[must_use]
     pub fn memory(&self) -> Option<MemorySnapshot> {
         self.0.borrow().memory

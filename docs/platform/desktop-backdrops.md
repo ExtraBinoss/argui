@@ -11,7 +11,7 @@ Multiple regions can use different tints.
 independent of native popovers, widgets and WGSL effects.
 
 ```toml
-argui = { git = "https://github.com/ExtraBinoss/argui", features = ["desktop-backdrop"] }
+argui = { version = "0.2.1", features = ["desktop-backdrop"] }
 ```
 
 Configure the window at creation, then choose regions while rendering:

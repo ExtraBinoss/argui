@@ -16,10 +16,13 @@ const PASSTHROUGH_TIME: Duration = Duration::from_secs(2);
 const PANEL_WIDTH: f32 = 688.0;
 const PANEL_HEIGHT: f32 = 428.0;
 const PANEL_RADIUS: f32 = 16.0;
+/// Recommended width in logical pixels for the Spotlight showcase window.
 pub const SPOTLIGHT_WINDOW_WIDTH: f64 = PANEL_WIDTH as f64;
+/// Recommended height in logical pixels for the Spotlight showcase window.
 pub const SPOTLIGHT_WINDOW_HEIGHT: f64 = PANEL_HEIGHT as f64;
 
 #[derive(Default)]
+/// Search-oriented single-window showcase demonstrating focus and passthrough.
 pub struct SpotlightShowcase {
     query: String,
     capabilities: Option<WindowCapabilities>,

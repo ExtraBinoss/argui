@@ -9,6 +9,10 @@ pub struct NativeContent {
 }
 
 impl NativeContent {
+    /// Retains an opaque native payload under an application-provided identity.
+    ///
+    /// * `id` — stable identity, unique among payloads of the same type.
+    /// * `payload` — value retained for native integration code.
     #[must_use]
     pub fn new<T: Any>(id: u64, payload: T) -> Self {
         Self {
@@ -16,10 +20,12 @@ impl NativeContent {
             payload: Rc::new(payload),
         }
     }
+    /// Returns a reference to the payload when it has type `T`.
     #[must_use]
     pub fn downcast_ref<T: Any>(&self) -> Option<&T> {
         self.payload.downcast_ref()
     }
+    /// Returns this payload's application-provided identity.
     #[must_use]
     pub const fn id(&self) -> u64 {
         self.id
@@ -41,6 +47,7 @@ impl fmt::Debug for NativeContent {
 }
 
 impl crate::Element {
+    /// Attaches opaque native content to this element.
     #[must_use]
     pub fn native_content(mut self, content: NativeContent) -> Self {
         self.native_content = Some(content);

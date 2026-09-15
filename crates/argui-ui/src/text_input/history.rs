@@ -24,6 +24,9 @@ impl Default for HistoryConfig {
 }
 
 impl crate::Element {
+    /// Sets history limits for this element and its descendants.
+    ///
+    /// * `config` — per-editor transaction and byte limits.
     #[must_use]
     pub fn text_history(mut self, config: HistoryConfig) -> Self {
         self.text_history = Some(config);

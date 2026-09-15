@@ -3,6 +3,7 @@ use argui_core::{Color, ColorInterpolation, Point, Rect, Size, Transform2D, Tran
 /// Produces a value between two typed endpoints.
 pub trait Interpolate: Sized {
     #[must_use]
+    /// Interpolates from `self` toward `target` by `progress`.
     fn interpolate(self, target: Self, progress: f32) -> Self;
 }
 

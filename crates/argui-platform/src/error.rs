@@ -1,6 +1,7 @@
 use std::{error::Error, fmt};
 
 #[derive(Debug)]
+/// Error returned when the platform event loop cannot be initialized or run.
 pub struct PlatformError(winit::error::EventLoopError);
 
 impl fmt::Display for PlatformError {

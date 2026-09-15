@@ -8,6 +8,7 @@ use crate::{
 
 impl Element {
     /// Overrides the presentation preference inherited by this portal and its descendants.
+    /// * `surface` — preferred surface used to present the portal subtree.
     #[must_use]
     pub fn portal_surface(mut self, surface: crate::OverlaySurface) -> Self {
         if let Some(portal) = &mut self.portal {
@@ -18,6 +19,7 @@ impl Element {
 
     /// Clips content to the element's bounds and sets its rounded surface corners.
     /// Geometric clipping does not require an offscreen compositing layer.
+    /// * `radii` — corner radii for the clipped surface.
     #[must_use]
     pub fn clip(self, radii: argui_paint::CornerRadii) -> Self {
         self.radius(radii).overflow(crate::Axes {
@@ -36,6 +38,7 @@ impl Element {
         self
     }
 
+    /// Sets the layer mask applied to this element.
     #[must_use]
     pub fn mask(mut self, mask: argui_paint::LayerMask) -> Self {
         self.layer
@@ -57,6 +60,11 @@ impl Element {
         self
     }
 
+    /// Creates an anchor-relative portal.
+    ///
+    /// * `layer` — window stacking layer for the portal.
+    /// * `key` — stable key of the anchor element.
+    /// * `placement` — placement and collision settings relative to the anchor.
     #[must_use]
     pub fn anchored_portal(
         mut self,
@@ -73,6 +81,11 @@ impl Element {
     }
 
     /// Anchor to viewport coordinates, for context menus, carets or selection bounds.
+    /// Creates a portal at a supplied viewport-relative rectangle.
+    ///
+    /// * `layer` — window stacking layer for the portal.
+    /// * `bounds` — anchor bounds in viewport coordinates.
+    /// * `placement` — placement and collision settings relative to those bounds.
     #[must_use]
     pub fn rect_portal(
         mut self,
@@ -85,6 +98,10 @@ impl Element {
         self
     }
 
+    /// Creates a portal positioned within the viewport.
+    ///
+    /// * `layer` — window stacking layer for the portal.
+    /// * `placement` — alignment and margin within the viewport.
     #[must_use]
     pub fn viewport_portal(mut self, layer: WindowLayer, placement: ViewportPlacement) -> Self {
         self.prepare_portal();
@@ -92,6 +109,9 @@ impl Element {
         self
     }
 
+    /// Places this element in a portal using its layout coordinates.
+    ///
+    /// * `layer` — window stacking layer for the portal.
     #[must_use]
     pub fn portal(mut self, layer: WindowLayer) -> Self {
         self.prepare_portal();
@@ -102,6 +122,8 @@ impl Element {
         self
     }
 
+    /// Sets the dismissal policy when this element already has a portal.
+    /// * `dismiss` — policy controlling dismissal of the portal.
     #[must_use]
     pub fn portal_dismiss(mut self, dismiss: DismissPolicy) -> Self {
         if let Some(portal) = &mut self.portal {
@@ -110,6 +132,7 @@ impl Element {
         self
     }
 
+    /// Appends a backdrop filter behind this element's compositing layer.
     #[must_use]
     pub fn backdrop_filter(mut self, filter: Filter) -> Self {
         self.layer

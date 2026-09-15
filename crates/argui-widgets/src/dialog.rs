@@ -35,6 +35,9 @@ pub struct Dialog {
 }
 
 impl Dialog {
+    /// Creates a controlled dialog around `content`, with `trigger` as its opener.
+    ///
+    /// `key` identifies the dialog, `label` names it accessibly, and `open` supplies its state.
     #[must_use]
     pub fn new(
         key: impl Into<String>,
@@ -61,54 +64,63 @@ impl Dialog {
     }
 
     #[must_use]
+    /// Sets the panel's placement relative to the viewport.
     pub const fn placement(mut self, placement: DialogPlacement) -> Self {
         self.placement = placement;
         self
     }
 
     #[must_use]
+    /// Sets the focus target selected when the dialog opens.
     pub fn initial_focus(mut self, focus: argui_ui::InitialFocus) -> Self {
         self.initial_focus = Some(focus);
         self
     }
 
     #[must_use]
+    /// Enables alert-dialog semantics when `alert` is true.
     pub const fn alert(mut self, alert: bool) -> Self {
         self.alert = alert;
         self
     }
 
     #[must_use]
+    /// Overrides the backdrop color.
     pub const fn backdrop(mut self, color: Color) -> Self {
         self.backdrop = Some(color);
         self
     }
 
     #[must_use]
+    /// Sets the backdrop blur radius; non-positive values disable blur.
     pub const fn backdrop_blur(mut self, radius: f32) -> Self {
         self.backdrop_blur = Some(radius);
         self
     }
 
     #[must_use]
+    /// Replaces the panel's paint style.
     pub fn panel_paint(mut self, paint: PaintStyle) -> Self {
         self.panel_paint = Some(paint);
         self
     }
 
     #[must_use]
+    /// Sets the preferred panel width in logical pixels.
     pub const fn panel_width(mut self, width: f32) -> Self {
         self.panel_width = width;
         self
     }
 
     #[must_use]
+    /// Sets the minimum margin between the panel and viewport edges.
     pub const fn viewport_margin(mut self, margin: f32) -> Self {
         self.viewport_margin = margin;
         self
     }
 
     #[must_use]
+    /// Builds the dialog using `theme` for its default backdrop and panel styling.
     pub fn build(self, theme: &WidgetTheme) -> Element {
         let mut behavior = DialogBehavior::new(&self.key, &self.label, self.open).alert(self.alert);
         if let Some(focus) = self.initial_focus {

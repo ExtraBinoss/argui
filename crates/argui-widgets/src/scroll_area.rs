@@ -16,6 +16,8 @@ pub struct ScrollArea {
 }
 
 impl ScrollArea {
+    /// Creates a scroll area identified by `key` around `content`.
+    /// `label` is its accessible name; `extent` sets the viewport length along its scroll axis.
     #[must_use]
     pub fn new(
         key: impl Into<String>,
@@ -34,6 +36,7 @@ impl ScrollArea {
     }
 
     #[must_use]
+    /// Builds the scroll area using `theme` for its scrollbar.
     pub fn build(self, theme: &WidgetTheme) -> Element {
         let vertical = self.orientation == Orientation::Vertical;
         Element::layout_boundary(self.content.shrink(0.0))

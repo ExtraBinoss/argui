@@ -26,6 +26,9 @@ struct Entry {
 
 impl InspectionCache {
     /// Returns a new snapshot only when inspectable content or geometry changed.
+    ///
+    /// `tree` is the retained UI tree to inspect; `layout` provides the current node
+    /// geometry. Returns `None` when the cached snapshot remains current.
     pub fn snapshot(&mut self, tree: &UiTree, layout: &LayoutOutput) -> Option<TreeSnapshot> {
         self.layout.clear();
         self.layout

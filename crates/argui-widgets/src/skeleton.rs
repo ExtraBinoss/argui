@@ -19,6 +19,7 @@ pub struct Skeleton {
 }
 
 impl Skeleton {
+    /// Creates a placeholder skeleton identified by `key`.
     #[must_use]
     pub fn new(key: impl Into<String>) -> Self {
         Self {
@@ -33,6 +34,7 @@ impl Skeleton {
     }
 
     #[must_use]
+    /// Sets the skeleton dimensions using `width` and `height` constraints.
     pub fn size(mut self, width: Dimension, height: Dimension) -> Self {
         self.width = width;
         self.height = height;
@@ -40,6 +42,11 @@ impl Skeleton {
     }
 
     #[must_use]
+    /// Sets its corner radius in logical pixels.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `radius` is non-finite or negative.
     pub fn radius(mut self, radius: f32) -> Self {
         assert!(
             radius.is_finite() && radius >= 0.0,
@@ -49,11 +56,13 @@ impl Skeleton {
         self
     }
 
+    /// Sets whether the skeleton's shimmer animation is enabled; `animated` toggles the shimmer.
     pub fn set_animated(&mut self, animated: bool) {
         self.animated = animated;
     }
 
     #[must_use]
+    /// Builds the skeleton using `theme` for its placeholder color.
     pub fn build(&self, theme: &WidgetTheme) -> Element {
         let opacity = if self.wants_animation_frame() {
             0.75 + 0.25 * (self.phase * std::f32::consts::TAU).cos()

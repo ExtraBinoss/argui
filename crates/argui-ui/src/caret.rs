@@ -28,6 +28,11 @@ pub struct CaretPrimitive {
 }
 
 impl CaretPrimitive {
+    /// Creates a caret primitive with a start-aligned origin offset of zero.
+    ///
+    /// * `width` — primitive width in logical pixels.
+    /// * `height` — line-relative or fixed pixel height.
+    /// * `paint` — quad paint style for the primitive.
     #[must_use]
     pub const fn new(width: f32, height: CaretHeight, paint: QuadStyle) -> Self {
         Self {
@@ -39,18 +44,25 @@ impl CaretPrimitive {
         }
     }
 
+    /// Sets the primitive's x and y offset from the text line.
     #[must_use]
     pub const fn offset(mut self, x: f32, y: f32) -> Self {
         self.offset = Point::new(x, y);
         self
     }
 
+    /// Sets how a fixed-height primitive aligns within the text line.
+    ///
+    /// * `align` — vertical alignment within the line.
     #[must_use]
     pub const fn align(mut self, align: CaretAlign) -> Self {
         self.align = align;
         self
     }
 
+    /// Computes the primitive's bounds relative to a shaped text line.
+    ///
+    /// * `line` — bounds of the text line containing the caret.
     #[must_use]
     pub fn bounds(&self, line: Rect) -> Rect {
         let height = match self.height {
@@ -75,6 +87,9 @@ pub struct CaretVisual {
 }
 
 impl CaretVisual {
+    /// Creates a visual from its caret primitives.
+    ///
+    /// * `primitives` — primitives to paint for the caret.
     #[must_use]
     pub fn new(primitives: impl IntoIterator<Item = CaretPrimitive>) -> Self {
         Self {
@@ -91,6 +106,10 @@ pub struct CaretFrame {
 }
 
 impl CaretFrame {
+    /// Creates a frame with identity transform.
+    ///
+    /// * `opacity` — frame opacity.
+    /// * `tint` — frame color tint.
     #[must_use]
     pub const fn new(opacity: f32, tint: Color) -> Self {
         Self {
@@ -100,6 +119,7 @@ impl CaretFrame {
         }
     }
 
+    /// Sets the frame's 2D transform.
     #[must_use]
     pub const fn transform(mut self, transform: Transform2D) -> Self {
         self.transform = transform;
@@ -130,6 +150,16 @@ pub struct CaretAnimation {
 }
 
 impl CaretAnimation {
+    /// Creates a looping animation from keyframes and a non-zero duration.
+    ///
+    /// # Arguments
+    ///
+    /// * `keyframes` — frames sampled across the animation's normalized interval.
+    /// * `duration` — time for one animation cycle.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TimingError::ZeroDuration`] when `duration` is zero.
     pub fn new(keyframes: Keyframes<CaretFrame>, duration: Duration) -> Result<Self, TimingError> {
         if duration == Duration::ZERO {
             return Err(TimingError::ZeroDuration);
@@ -140,6 +170,9 @@ impl CaretAnimation {
         })
     }
 
+    /// Samples the animation at elapsed time, wrapping at its duration.
+    ///
+    /// * `elapsed` — elapsed time since the animation began.
     #[must_use]
     pub fn sample(&self, elapsed: Duration) -> CaretFrame {
         let progress = (elapsed.as_nanos() % self.duration.as_nanos()) as f32
@@ -155,6 +188,9 @@ pub struct CaretStyle {
 }
 
 impl CaretStyle {
+    /// Creates a static caret style from its visual primitives.
+    ///
+    /// * `visual` — caret primitives to display.
     #[must_use]
     pub const fn new(visual: CaretVisual) -> Self {
         Self {
@@ -163,12 +199,16 @@ impl CaretStyle {
         }
     }
 
+    /// Adds an animation to this caret style.
     #[must_use]
     pub fn animated(mut self, animation: CaretAnimation) -> Self {
         self.animation = Some(animation);
         self
     }
 
+    /// Samples the animation, or returns the default frame for a static style.
+    ///
+    /// * `elapsed` — elapsed time since the animation began.
     #[must_use]
     pub fn sample(&self, elapsed: Duration) -> CaretFrame {
         self.animation
@@ -176,6 +216,7 @@ impl CaretStyle {
             .map_or_else(CaretFrame::default, |animation| animation.sample(elapsed))
     }
 
+    /// Returns whether this style has an animation.
     #[must_use]
     pub const fn is_animated(&self) -> bool {
         self.animation.is_some()

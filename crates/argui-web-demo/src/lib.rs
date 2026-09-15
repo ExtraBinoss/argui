@@ -1,3 +1,4 @@
+//! WebAssembly entry points for the Argui state showcase.
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
 use argui::runtime::SingleWindowModel;
@@ -16,6 +17,10 @@ use argui_showcase::text_engine;
 use wasm_bindgen::prelude::*;
 
 /// Builds the browser demo's application identity and main window.
+///
+/// # Errors
+///
+/// Returns an error if the application identity cannot be constructed.
 pub fn application_config() -> Result<ApplicationConfig, Box<dyn std::error::Error>> {
     Ok(ApplicationConfig::new(
         ApplicationIdentity::new(
@@ -31,11 +36,16 @@ pub fn application_config() -> Result<ApplicationConfig, Box<dyn std::error::Err
 }
 
 /// Adds the DevTools effects to the browser renderer.
+///
+/// # Errors
+///
+/// Returns a renderer error if DevTools effects cannot be configured.
 pub fn renderer_config() -> Result<RendererConfig, RendererError> {
     argui_devtools::configure_renderer(RendererConfig::default())
 }
 
 /// Creates the state showcase inside the DevTools app.
+/// Returns the showcase wrapped in a single-window model and DevTools host.
 pub fn devtools_app() -> DevtoolsApp<SingleWindowModel<StateShowcase>> {
     DevtoolsApp::new(SingleWindowModel::new(StateShowcase::default()))
 }
@@ -43,6 +53,11 @@ pub fn devtools_app() -> DevtoolsApp<SingleWindowModel<StateShowcase>> {
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen(start)]
 #[cfg_attr(coverage_nightly, coverage(off))]
+/// Starts the demo in the browser's WebAssembly runtime.
+///
+/// # Errors
+///
+/// Returns a JavaScript error if app configuration or runtime startup fails.
 pub fn start() -> Result<(), JsValue> {
     run_application_with_text_engine(
         application_config().map_err(|error| JsValue::from_str(&error.to_string()))?,

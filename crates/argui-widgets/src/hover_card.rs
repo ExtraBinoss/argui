@@ -14,6 +14,8 @@ pub struct HoverCard {
 }
 
 impl HoverCard {
+    /// Creates a preview card controlled by `open`, with a trigger and panel content.
+    /// `key` identifies it and `label` supplies its accessible name.
     #[must_use]
     pub fn new(
         key: impl Into<String>,
@@ -32,6 +34,7 @@ impl HoverCard {
     }
 
     #[must_use]
+    /// Builds the hover card using `theme` for its panel styling.
     pub fn build(self, theme: &WidgetTheme) -> Element {
         let mut root =
             Popover::new(&self.key, self.label, self.open, self.trigger, self.content).build(theme);
@@ -58,6 +61,7 @@ pub struct HoverCardState {
 }
 
 impl HoverCardState {
+    /// Creates retained hover/focus state for the element identified by `key`.
     #[must_use]
     pub fn new(key: impl Into<String>) -> Self {
         Self {
@@ -72,15 +76,18 @@ impl HoverCardState {
     }
 
     #[must_use]
+    /// Returns whether the card is currently open.
     pub const fn is_open(&self) -> bool {
         self.open
     }
 
     #[must_use]
+    /// Returns the pending open or close deadline, if one exists.
     pub fn next_deadline(&self) -> Option<Duration> {
         self.deadline.map(|(time, _)| time)
     }
 
+    /// Clears pointer/focus retention and closes the card immediately.
     pub fn reset(&mut self) {
         self.hovered = [false; 2];
         self.focused = [false; 2];
@@ -88,6 +95,7 @@ impl HoverCardState {
         self.deadline = None;
     }
 
+    /// Applies `event` at monotonic time `now`; returns whether retained hover/focus state changed.
     pub fn update(&mut self, event: &UiEvent, now: Duration) -> bool {
         let content_key = format!("{}::content", self.key);
         let panel = event.target_key() == Some(content_key.as_str())
@@ -141,6 +149,7 @@ impl HoverCardState {
         *self != before
     }
 
+    /// Applies a pending deadline at monotonic time `now`; returns whether visibility changed.
     pub fn advance(&mut self, now: Duration) -> bool {
         let Some((deadline, open)) = self.deadline else {
             return false;

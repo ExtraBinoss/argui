@@ -170,6 +170,9 @@ impl UiTree {
         self.focus.modal_visible(node)
     }
 
+    /// Processes a primary-button press and applies pointer focus defaults.
+    ///
+    /// * `regions` — current hit regions used to resolve focus behavior.
     pub fn primary_pressed(&mut self, regions: &[HitRegion]) -> InteractionUpdate {
         let event = argui_core::PointerEvent {
             phase: argui_core::PointerPhase::Pressed,
@@ -192,6 +195,10 @@ impl UiTree {
         self.decorate(raw)
     }
 
+    /// Applies the default focus action for a pointer press.
+    ///
+    /// * `pointer` — identifier of the pointer that pressed.
+    /// * `regions` — current hit regions and focus policies.
     pub fn focus_pointer_default(
         &mut self,
         pointer: argui_core::PointerId,
@@ -214,6 +221,10 @@ impl UiTree {
         self.decorate(raw)
     }
 
+    /// Delivers a key event to the focused node or the root fallback.
+    ///
+    /// * `input` — key and modifier state to deliver.
+    /// * `regions` — hit regions accepted by the keyboard input path; not inspected here.
     pub fn keyboard_event(&mut self, input: &KeyInput, regions: &[HitRegion]) -> InteractionUpdate {
         let _ = regions;
         let target = self
@@ -240,6 +251,10 @@ impl UiTree {
         }
     }
 
+    /// Applies default keyboard focus and activation behavior.
+    ///
+    /// * `input` — key event whose default behavior is processed.
+    /// * `regions` — current hit regions used for Tab navigation.
     pub fn keyboard_default(
         &mut self,
         input: &KeyInput,
@@ -280,6 +295,10 @@ impl UiTree {
         update
     }
 
+    /// Processes a key event, its defaults, and focused text editing.
+    ///
+    /// * `input` — key and modifier state to process.
+    /// * `regions` — current hit regions for keyboard defaults.
     pub fn key_input(&mut self, input: &KeyInput, regions: &[HitRegion]) -> InteractionUpdate {
         let mut update = self.keyboard_event(input, regions);
         update.merge(self.keyboard_default(input, regions));
@@ -289,6 +308,9 @@ impl UiTree {
         update
     }
 
+    /// Applies a key event to the focused text input, if available.
+    ///
+    /// * `input` — key and modifier state to edit with.
     pub fn edit_text_input(&mut self, input: &KeyInput) -> InteractionUpdate {
         let Some(node) = self.interaction.focused() else {
             return InteractionUpdate::default();
@@ -303,6 +325,10 @@ impl UiTree {
         self.text_input_update(node, result)
     }
 
+    /// Resolves queued and explicit focus requests against current hit regions.
+    ///
+    /// * `regions` — current focusable hit regions.
+    /// * `request` — optional explicit focus or clear request.
     pub fn sync_focus(
         &mut self,
         regions: &[HitRegion],
@@ -366,6 +392,9 @@ impl UiTree {
         update
     }
 
+    /// Restores suspended focus when the host window regains focus.
+    ///
+    /// * `regions` — current focusable hit regions.
     pub fn window_focused(&mut self, regions: &[HitRegion]) -> InteractionUpdate {
         let request = self
             .focus

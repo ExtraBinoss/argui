@@ -33,6 +33,8 @@ pub struct Checkbox {
 
 #[cfg(feature = "checkbox")]
 impl Checkbox {
+    /// Creates a checkbox with controlled `checked` state and accessible `label`.
+    /// `key` identifies the control.
     #[must_use]
     pub fn new(
         key: impl Into<String>,
@@ -49,18 +51,22 @@ impl Checkbox {
     }
 
     #[must_use]
+    /// Sets whether the checkbox can be changed.
+    /// `enabled` controls its interaction availability.
     pub const fn enabled(mut self, enabled: bool) -> Self {
         self.enabled = enabled;
         self
     }
 
     #[must_use]
+    /// Replaces the default checked/mixed mark with `indicator`.
     pub fn indicator(mut self, indicator: Element) -> Self {
         self.indicator = Some(indicator);
         self
     }
 
     #[must_use]
+    /// Builds the checkbox using `theme` for its track and mark colors.
     pub fn build(self, theme: &WidgetTheme) -> Element {
         let box_color = if self.checked != argui_ui::CheckedState::Unchecked {
             theme.primary
@@ -117,6 +123,8 @@ pub struct Switch {
 
 #[cfg(feature = "switch")]
 impl Switch {
+    /// Creates a controlled switch with accessible `label` and initial `checked` state.
+    /// `key` identifies the control.
     #[must_use]
     pub fn new(key: impl Into<String>, label: impl Into<String>, checked: bool) -> Self {
         Self {
@@ -128,12 +136,15 @@ impl Switch {
     }
 
     #[must_use]
+    /// Sets whether the switch can be changed.
+    /// `enabled` controls its interaction availability.
     pub const fn enabled(mut self, enabled: bool) -> Self {
         self.enabled = enabled;
         self
     }
 
     #[must_use]
+    /// Builds the switch using `theme` for its track and thumb colors.
     pub fn build(self, theme: &WidgetTheme) -> Element {
         let thumb_key = format!("{}::thumb", self.key);
         let thumb = Element::container([])
@@ -191,6 +202,7 @@ pub struct RadioOption {
 
 #[cfg(feature = "radio-group")]
 impl RadioOption {
+    /// Creates an enabled radio option with the given label.
     #[must_use]
     pub fn new(label: impl Into<String>) -> Self {
         Self {
@@ -200,6 +212,8 @@ impl RadioOption {
     }
 
     #[must_use]
+    /// Sets whether this option can be selected.
+    /// `enabled` controls whether it can be selected.
     pub const fn enabled(mut self, enabled: bool) -> Self {
         self.enabled = enabled;
         self
@@ -218,6 +232,8 @@ pub struct RadioGroup {
 
 #[cfg(feature = "radio-group")]
 impl RadioGroup {
+    /// Creates a radio group with options in display order and an optional selected index.
+    /// `key` identifies the group and `label` names it accessibly.
     #[must_use]
     pub fn new(
         key: impl Into<String>,
@@ -235,12 +251,15 @@ impl RadioGroup {
     }
 
     #[must_use]
+    /// Sets the direction in which options are laid out.
+    /// `orientation` determines the layout and keyboard navigation axis.
     pub const fn orientation(mut self, orientation: Orientation) -> Self {
         self.orientation = orientation;
         self
     }
 
     #[must_use]
+    /// Builds the radio group using `theme` for option styling.
     pub fn build(self, theme: &WidgetTheme) -> Element {
         let behavior = RadioGroupBehavior::new(
             &self.key,

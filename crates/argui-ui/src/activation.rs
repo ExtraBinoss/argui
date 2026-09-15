@@ -14,6 +14,12 @@ pub struct ClickEvent {
 }
 
 impl ClickEvent {
+    /// Creates a click event from a pointer event and its reported click count.
+    ///
+    /// # Arguments
+    ///
+    /// * `event` — pointer event that produced the activation.
+    /// * `count` — click count associated with the activation.
     #[must_use]
     pub const fn pointer(event: PointerEvent, count: u8) -> Self {
         Self {
@@ -22,6 +28,7 @@ impl ClickEvent {
         }
     }
 
+    /// Creates a click event from the key input that produced the activation.
     #[must_use]
     pub const fn keyboard(input: KeyInput) -> Self {
         Self {
@@ -30,6 +37,7 @@ impl ClickEvent {
         }
     }
 
+    /// Creates a click event produced by an accessibility action.
     #[must_use]
     pub const fn accessibility() -> Self {
         Self {
@@ -38,6 +46,7 @@ impl ClickEvent {
         }
     }
 
+    /// Returns the pointer identifier when this activation came from a pointer.
     #[must_use]
     pub const fn pointer_id(&self) -> Option<PointerId> {
         match &self.source {
@@ -46,6 +55,7 @@ impl ClickEvent {
         }
     }
 
+    /// Returns the pointer position when this activation came from a pointer.
     #[must_use]
     pub const fn position(&self) -> Option<Point> {
         match &self.source {
@@ -54,6 +64,7 @@ impl ClickEvent {
         }
     }
 
+    /// Returns the modifiers associated with this activation.
     #[must_use]
     pub const fn modifiers(&self) -> Modifiers {
         match &self.source {

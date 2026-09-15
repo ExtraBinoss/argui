@@ -1,7 +1,7 @@
 # Argui website
 
 Nuxt 4, Vue, Pinia, Nuxt I18n and `@lucide/vue`. English content, server rendering,
-and static generation for the home, features, getting started and component pages.
+and static generation for the home, features, getting started, documentation and component pages.
 
 ## Run locally
 
@@ -15,7 +15,7 @@ pnpm dev
 ```
 
 `gallery:build` needs `wasm-pack` and the `wasm32-unknown-unknown` Rust target.
-It builds the real gallery with all features, including the updater demo, and
+It builds the real gallery, the AI harness and the exact-source documentation examples, and
 at most six Cargo jobs and six WebAssembly optimization workers. If `web/widgets/pkg` is already built, use
 `pnpm gallery:copy` instead. The generated binaries are ignored by Git.
 The rest of the website can be developed without building WASM.
@@ -65,6 +65,9 @@ prerendered. Nothing is deployed by these commands.
 
 - `app/components/` holds the shared navigation, action links, source links,
   code blocks, feature cards and gallery frame.
+- `app/data/docs.ts` holds the progressive documentation curriculum. Every guide
+  names repository reference files and a gallery page that is compiled into its
+  final WebAssembly example; `tests/docs.test.mjs` validates both contracts.
 - `app/stores/interface.ts` owns component search, mobile component navigation
   and the persisted light/dark preference.
 - `i18n/locales/en.json` holds the website copy. Add a locale file and a locale

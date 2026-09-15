@@ -40,6 +40,12 @@ pub struct GestureArena {
 }
 
 impl GestureArena {
+    /// Processes a pointer event and returns any gesture events it produces.
+    ///
+    /// # Arguments
+    ///
+    /// * `event` — pointer event to feed to the recognizers.
+    /// * `hit` — hit target and its enabled gesture set for a press, if any.
     pub fn update(
         &mut self,
         event: PointerEvent,
@@ -54,6 +60,7 @@ impl GestureArena {
         }
     }
 
+    /// Cancels active gestures and returns the resulting cancellation events.
     pub fn cancel_all(&mut self) -> Vec<GestureEvent> {
         let mut output = Vec::new();
         for contact in self.contacts.values() {

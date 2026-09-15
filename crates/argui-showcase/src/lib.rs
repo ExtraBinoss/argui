@@ -5,6 +5,7 @@ mod list;
 mod physics;
 mod popover;
 mod runtime;
+/// Single-window Spotlight-style search showcase.
 pub mod spotlight;
 mod state_style;
 mod theme;
@@ -27,6 +28,7 @@ use popover::{popover_spring, shadow_timeline};
 use theme::{PRIMARIES, primary_label, top_right};
 use visual::ShowcaseImages;
 
+/// Stateful interactive showcase shared by the native and browser applications.
 pub struct StateShowcase {
     count: u32,
     motion_shifted: bool,
@@ -123,10 +125,12 @@ impl Default for StateShowcase {
 }
 
 impl StateShowcase {
+    /// Returns the embedded image assets used by the showcase.
     pub fn image_assets(&self) -> Vec<ImageAsset> {
         self.images.assets().to_vec()
     }
 
+    /// Returns the vector assets required by the showcase controls.
     pub fn vector_assets(&self) -> Vec<VectorAsset> {
         self.light_assets
             .assets()
@@ -136,6 +140,8 @@ impl StateShowcase {
             .collect()
     }
 
+    /// Builds the showcase view for the supplied window environment.
+    /// `environment` supplies the active window and color-scheme context.
     pub fn view(&self, environment: WindowEnvironment) -> Element {
         self.view_with_resize(environment, None)
     }
@@ -250,6 +256,8 @@ impl StateShowcase {
         .padding(sides(20.0, 24.0))
     }
 
+    /// Applies a UI event and returns the invalidation needed for the updated view.
+    /// `event` is the event dispatched by the runtime.
     pub fn update(&mut self, event: &UiEvent) -> ViewUpdate {
         if let UiEventKind::TextChanged(value) = &event.kind {
             match event.target_key() {
@@ -389,6 +397,8 @@ impl StateShowcase {
         ViewUpdate::Rebuild
     }
 
+    /// Advances showcase animations by the elapsed time in `frame`.
+    /// Returns the invalidation needed after advancing.
     pub fn animation_frame(&mut self, frame: Frame) -> ViewUpdate {
         let popover_changed = self.popover_motion.advance(frame.elapsed);
         if popover_changed {
@@ -459,6 +469,7 @@ impl StateShowcase {
         }
     }
 
+    /// Reports whether the showcase currently needs another animation frame.
     pub fn wants_animation_frame(&self) -> bool {
         let physics_active = match self.physics_mode {
             PhysicsMode::Spring => self.spring.is_active(),
@@ -473,6 +484,8 @@ impl StateShowcase {
             || (self.tooltip_hovered && !self.tooltip_visible)
     }
 
+    /// Accepts layout notifications; the showcase does not currently invalidate on layout.
+    /// `_layout` is the updated layout snapshot supplied by the runtime.
     pub fn layout_changed(&mut self, _layout: &argui_runtime::LayoutSnapshot) -> ViewUpdate {
         ViewUpdate::None
     }
@@ -513,6 +526,7 @@ impl StateShowcase {
 }
 
 #[must_use]
+/// Creates the text engine with the embedded fonts used by the showcase.
 pub fn text_engine() -> TextEngine {
     TextEngine::from_embedded_fonts(
         [

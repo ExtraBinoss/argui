@@ -24,6 +24,10 @@ pub struct AnchorPortal {
 }
 
 impl AnchorPortal {
+    /// Creates an anchor-relative portal target.
+    ///
+    /// * `key` — stable key of the anchor element.
+    /// * `placement` — placement and collision settings for the overlay.
     #[must_use]
     pub fn new(key: impl Into<String>, placement: FloatingPlacement) -> Self {
         Self {
@@ -170,6 +174,9 @@ pub struct FloatingPlacement {
 }
 
 impl FloatingPlacement {
+    /// Creates placement settings with bottom-start preference and viewport fitting.
+    ///
+    /// * `preferred` — preferred side and alignment relative to the anchor.
     #[must_use]
     pub const fn new(preferred: Placement) -> Self {
         Self {
@@ -182,36 +189,44 @@ impl FloatingPlacement {
         }
     }
 
+    /// Sets the gap between the overlay and its anchor.
+    /// * `offset` — distance from the anchor edge.
     #[must_use]
     pub const fn offset(mut self, offset: f32) -> Self {
         self.offset = offset;
         self
     }
 
+    /// Sets the offset along the anchor edge.
     #[must_use]
     pub const fn cross_offset(mut self, offset: f32) -> Self {
         self.cross_offset = offset;
         self
     }
 
+    /// Sets minimum padding between the overlay and the viewport edges.
     #[must_use]
     pub const fn viewport_padding(mut self, padding: f32) -> Self {
         self.viewport_padding = padding;
         self
     }
 
+    /// Sets how the overlay width relates to the anchor width.
     #[must_use]
     pub const fn anchor_width(mut self, width: AnchorWidth) -> Self {
         self.anchor_width = width;
         self
     }
 
+    /// Sets collision handling for flipping, shifting, and constraining placement.
     #[must_use]
     pub const fn collision(mut self, collision: CollisionPolicy) -> Self {
         self.collision = collision;
         self
     }
 
+    /// Places the overlay relative to the anchor within the viewport; `viewport`, `anchor`,
+    /// `desired`, and `direction` are available bounds, anchor bounds, preferred size, and writing direction.
     #[must_use]
     pub fn place(
         self,
@@ -325,11 +340,13 @@ pub enum ViewportPlacement {
 }
 
 impl ViewportPlacement {
+    /// Creates a placement that fills the viewport.
     #[must_use]
     pub const fn fill() -> Self {
         Self::Fill { margin: 0.0 }
     }
 
+    /// Creates a centered placement in the viewport.
     #[must_use]
     pub const fn centered() -> Self {
         Self::Positioned {
@@ -339,6 +356,7 @@ impl ViewportPlacement {
         }
     }
 
+    /// Sets viewport alignment: `horizontal` and `vertical` select alignment on each axis.
     #[must_use]
     pub const fn align(mut self, horizontal: ViewportAlign, vertical: ViewportAlign) -> Self {
         self = Self::Positioned {
@@ -349,6 +367,8 @@ impl ViewportPlacement {
         self
     }
 
+    /// Sets the inset from viewport edges in logical pixels.
+    /// * `margin` — minimum inset from each viewport edge.
     #[must_use]
     pub const fn margin(mut self, margin: f32) -> Self {
         match &mut self {
@@ -362,6 +382,9 @@ impl ViewportPlacement {
         self
     }
 
+    /// Computes the placed rectangle for the viewport and preferred size.
+    ///
+    /// * `desired` — preferred size before fitting it inside the viewport.
     #[must_use]
     pub fn place(self, viewport: Rect, desired: Size) -> Rect {
         let inner = inset_rect(
@@ -414,6 +437,9 @@ pub struct PlacedOverlay {
 }
 
 impl PlacedOverlay {
+    /// Converts this placement into CSS-like insets from a containing block.
+    ///
+    /// * `containing_block` — rectangle relative to which the insets are expressed.
     #[must_use]
     pub fn inset_from(self, containing_block: Rect) -> Sides<LengthPercentageAuto> {
         Sides {

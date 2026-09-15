@@ -12,6 +12,7 @@ use argui_ui::{
 use taffy::NodeId;
 
 mod compute;
+mod output;
 
 mod storage;
 pub use storage::LayoutStorage;
@@ -128,11 +129,16 @@ impl LayoutEngine {
     pub fn retained_node_count(&self) -> usize {
         self.tree.len()
     }
+    /// Creates an engine with empty retained layout and paint state.
     #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Replaces intrinsic image and vector assets used during layout.
+    ///
+    /// * `images` — image assets available to image elements.
+    /// * `vectors` — vector assets available to vector elements.
     pub fn set_assets(&mut self, images: &[ImageAsset], vectors: &[VectorAsset]) {
         if !self.assets.update(images, vectors) {
             return;
@@ -141,47 +147,6 @@ impl LayoutEngine {
         // Invalidating measurement alone leaves those styles and child caches stale.
         self.root = None;
         self.revision = None;
-    }
-
-    pub fn apply_scroll(
-        &mut self,
-        ui: &UiTree,
-        output: &mut LayoutOutput,
-    ) -> Result<(), LayoutError> {
-        let elements = flattened(ui.root());
-        let root = self.root.as_ref().ok_or(LayoutError::MissingRoot)?;
-        output.scroll_regions.clear();
-        apply_scroll_layout(
-            &self.tree,
-            root,
-            &elements,
-            ui,
-            ScrollPlacement {
-                translation: Point::default(),
-                clip: Some(output.viewport),
-                sticky_container: None,
-            },
-            output,
-        )?;
-        crate::overlay::resolve(&self.tree, root, &elements, ui, output)?;
-        self.scroll_anchors = crate::anchor::capture(root, output);
-        self.repaint(ui, output);
-        Ok(())
-    }
-
-    /// Repaints retained primitives and returns whether prepared text needs refreshing.
-    pub fn repaint(&mut self, ui: &UiTree, output: &mut LayoutOutput) -> bool {
-        paint::repaint(self.root.as_ref(), ui, output, &mut self.paint_cache)
-    }
-
-    pub fn update_text_inputs(
-        &mut self,
-        ui: &mut UiTree,
-        text_engine: &mut TextEngine,
-        output: &mut LayoutOutput,
-    ) {
-        input::update(ui, text_engine, output);
-        self.repaint(ui, output);
     }
 
     fn rebuild(&mut self, ui: &UiTree) -> Result<(), LayoutError> {

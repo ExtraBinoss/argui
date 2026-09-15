@@ -19,6 +19,16 @@ use super::{LayoutEngine, LayoutOutput, Placement, collect_layout, flattened};
 const MAX_CONTAINER_QUERY_PASSES: usize = 4;
 
 impl LayoutEngine {
+    /// Computes node geometry, text input regions, hit regions, and paint output.
+    ///
+    /// * `ui` — retained UI tree to lay out.
+    /// * `text_engine` — text shaper used for intrinsic text and input geometry.
+    /// * `viewport` — available viewport size in logical pixels.
+    ///
+    /// # Errors
+    ///
+    /// Returns layout, custom-element, identity, or Taffy errors; also returns
+    /// [`LayoutError::NonConvergentContainerQueries`] if responsive queries do not settle.
     pub fn compute(
         &mut self,
         ui: &mut UiTree,

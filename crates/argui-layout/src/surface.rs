@@ -74,6 +74,13 @@ impl NativeSurfacePaint {
 
 impl crate::LayoutOutput {
     /// Resolve an anchored portal against an OS work area, keeping the tree's logical coordinates.
+    ///
+    /// * `ui` — retained UI tree containing the portal and anchor.
+    /// * `node` — portal node to place.
+    /// * `work_area` — available logical bounds of the native surface.
+    ///
+    /// Returns `None` when portal metadata, target, anchor geometry, or positive-size placement
+    /// is unavailable.
     #[must_use]
     pub fn native_portal_placement(
         &self,

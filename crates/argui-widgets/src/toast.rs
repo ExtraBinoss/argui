@@ -26,6 +26,8 @@ pub struct Toast {
 }
 
 impl Toast {
+    /// Creates a notification identified by `id` with a title and optional lifetime.
+    /// `duration: None` keeps it visible until explicitly closed.
     pub fn new(
         id: impl Into<String>,
         title: impl Into<String>,
@@ -72,6 +74,11 @@ pub struct ToastState {
 }
 
 impl ToastState {
+    /// Creates an empty notification queue with visibility/capacity limits at time `now`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `visible_limit` is zero or `capacity` is below that limit.
     pub fn new(visible_limit: usize, capacity: usize, now: Duration) -> Self {
         assert!(visible_limit > 0 && capacity >= visible_limit);
         Self {
@@ -82,19 +89,27 @@ impl ToastState {
         }
     }
 
+    /// Iterates over notifications currently within the visible limit.
     pub fn visible(&self) -> impl Iterator<Item = &Toast> {
         self.entries
             .iter()
             .take(self.visible_limit)
             .map(|entry| &entry.toast)
     }
+    /// Returns the number of queued notifications, including hidden queued entries.
     pub fn len(&self) -> usize {
         self.entries.len()
     }
+    /// Returns whether the queue contains no notifications.
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
 
+    /// Adds `toast`, starting its timer when visible; `now` is the monotonic time for queue updates.
+    ///
+    /// # Errors
+    ///
+    /// Returns `DuplicateId` if its id is already queued, or `Capacity` if the queue is full.
     pub fn insert(&mut self, toast: Toast, now: Duration) -> Result<(), ToastInsertError> {
         self.advance(now);
         if self.entries.iter().any(|entry| entry.toast.id == toast.id) {
@@ -112,7 +127,8 @@ impl ToastState {
         Ok(())
     }
 
-    /// Replace content and restart this notification's duration, keeping its queue position.
+    /// Replaces content and restarts duration, keeping queue position; `now` is the monotonic update time.
+    /// Returns whether a toast with the same id was found.
     pub fn update(&mut self, toast: Toast, now: Duration) -> bool {
         self.advance(now);
         let Some(entry) = self
@@ -127,6 +143,7 @@ impl ToastState {
         true
     }
 
+    /// Removes `id` at monotonic time `now`; returns whether that notification was present.
     pub fn close(&mut self, id: &str, now: Duration) -> bool {
         self.advance(now);
         let Some(index) = self.entries.iter().position(|entry| entry.toast.id == id) else {
@@ -136,6 +153,7 @@ impl ToastState {
         true
     }
 
+    /// Changes the pause state for `id` and `reason` to `paused` at monotonic time `now`; returns whether it changed.
     pub fn pause(&mut self, id: &str, reason: ToastPause, paused: bool, now: Duration) -> bool {
         self.advance(now);
         let Some(entry) = self.entries.iter_mut().find(|entry| entry.toast.id == id) else {
@@ -150,6 +168,7 @@ impl ToastState {
         changed
     }
 
+    /// Returns the earliest expiration deadline among visible, unpaused notifications.
     pub fn next_deadline(&self) -> Option<Duration> {
         self.entries
             .iter()
@@ -163,6 +182,7 @@ impl ToastState {
             .min()
     }
 
+    /// Advances timers to `now`, removing expired notifications; returns whether any expired.
     pub fn advance(&mut self, now: Duration) -> bool {
         let elapsed = now.saturating_sub(self.last);
         self.last = now.max(self.last);
@@ -193,9 +213,11 @@ pub struct ToastHost<'a> {
 }
 
 impl ToastHost<'_> {
+    /// Returns the close-control key for the notification with `id`.
     pub fn close_key(&self, id: &str) -> String {
         format!("{}::close::{id}", self.key)
     }
+    /// Returns the visible toast id when `event` activates its close control.
     pub fn close_action<'a>(&self, event: &'a argui_ui::UiEvent) -> Option<&'a str> {
         if !matches!(event.kind, argui_ui::UiEventKind::Click(_)) {
             return None;
@@ -208,6 +230,7 @@ impl ToastHost<'_> {
             .any(|toast| toast.id == id)
             .then_some(id)
     }
+    /// Returns the toast pause update requested by pointer or focus `event`.
     pub fn pause_action(&self, event: &argui_ui::UiEvent) -> Option<(String, ToastPause, bool)> {
         let key = event.target_key()?;
         for toast in self.state.visible() {
@@ -239,6 +262,7 @@ impl ToastHost<'_> {
         None
     }
 
+    /// Builds visible notifications using `theme` for styling and `icons` for variant marks.
     pub fn build(&self, theme: &WidgetTheme, icons: &WidgetAssets) -> Element {
         Element::column(self.state.visible().map(|toast| {
             let mut semantics = Semantics::new(if toast.variant == ToastVariant::Error {

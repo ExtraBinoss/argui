@@ -6,9 +6,11 @@ use crate::{
     AdapterRecord, FrameRecord, GpuFrameRecord, GpuPassRecord, InspectNodeId, Invalidation,
 };
 
+/// Version identifier written to and required by serialized inspector traces.
 pub const TRACE_VERSION: &str = "argui-gpu-trace-v3";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+/// Failure encountered while serializing or importing a trace.
 pub enum TraceError {
     InvalidJson(String),
     UnsupportedVersion(String),

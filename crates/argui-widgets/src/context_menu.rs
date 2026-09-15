@@ -9,12 +9,14 @@ pub struct ContextMenu {
 }
 
 impl ContextMenu {
+    /// Sets the surface policy used by the context menu's overlay.
     #[must_use]
     pub fn surface(mut self, surface: argui_ui::OverlaySurface) -> Self {
         self.menu = self.menu.surface(surface);
         self
     }
 
+    /// Builds the menu attached to `target`, using `theme` for styling.
     pub fn build(&self, target: Element, theme: &WidgetTheme) -> Element {
         let mut root = self.menu.build(target, theme);
         if let Some(position) = self.position
@@ -30,6 +32,7 @@ impl ContextMenu {
     }
 
     /// Returns the pointer anchor, or None for keyboard anchoring to the target.
+    /// `event` is the UI event checked for a context-menu opening gesture.
     pub fn open_action(&self, event: &UiEvent) -> Option<Option<Point>> {
         if event.target_key() != Some(self.menu.key.as_str()) {
             return None;
@@ -46,6 +49,7 @@ impl ContextMenu {
             _ => None,
         }
     }
+    /// Returns a menu response for `event`, excluding clicks on the attached target.
     pub fn response(&self, event: &UiEvent) -> Option<MenuResponse> {
         if event.target_key() == Some(self.menu.key.as_str())
             && matches!(event.kind, UiEventKind::Click(_))

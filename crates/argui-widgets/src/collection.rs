@@ -14,6 +14,8 @@ pub struct CollectionItem {
 }
 
 impl CollectionItem {
+    /// Creates an enabled item with the supplied stable identity and display label.
+    /// `id` is the stable item identity; `label` is the displayed search text.
     pub fn new(id: impl Into<String>, label: impl Into<String>) -> Self {
         Self {
             id: id.into(),
@@ -37,6 +39,11 @@ struct CollectionData {
 pub struct DuplicateItemId(pub String);
 
 impl Collection {
+    /// Creates an immutable ordered snapshot, rejecting duplicate item identities.
+    ///
+    /// # Errors
+    ///
+    /// Returns the repeated identity when two items share an `id`.
     pub fn new(items: impl IntoIterator<Item = CollectionItem>) -> Result<Self, DuplicateItemId> {
         let items: Vec<_> = items.into_iter().collect();
         let mut indices = HashMap::with_capacity(items.len());
@@ -48,24 +55,33 @@ impl Collection {
         Ok(Self(Arc::new(CollectionData { items, indices })))
     }
 
+    /// Returns all items in display order.
     pub fn items(&self) -> &[CollectionItem] {
         &self.0.items
     }
+    /// Returns the number of items in the snapshot.
     pub fn len(&self) -> usize {
         self.0.items.len()
     }
+    /// Returns whether the snapshot contains no items.
     pub fn is_empty(&self) -> bool {
         self.0.items.is_empty()
     }
+    /// Returns the item at `index`, if present.
     pub fn get(&self, index: usize) -> Option<&CollectionItem> {
         self.0.items.get(index)
     }
+    /// Returns the current index of the item identified by `id`, if present.
     pub fn index_of(&self, id: &str) -> Option<usize> {
         self.0.indices.get(id).copied()
     }
 
     /// Preserve measured heights by identity after sorting, insertion or filtering.
     /// A clone retains this immutable snapshot in constant time.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `heights` does not contain one measurement for every item in `previous`.
     pub fn remap_heights(&self, previous: &Self, heights: &mut argui_ui::VirtualList) {
         assert_eq!(
             previous.len(),
@@ -98,6 +114,7 @@ pub struct ListState {
 
 impl ListState {
     /// Remove deleted identities using the full source collection, before filtering it.
+    /// `collection` must be the source snapshot, not a filtered view.
     pub fn reconcile(&mut self, collection: &Collection) {
         self.selected.retain(|id| collection.index_of(id).is_some());
         if self
@@ -118,6 +135,9 @@ impl ListState {
         }
     }
 
+    /// Selects the enabled item at `index` using the configured multiplicity and modifiers.
+    /// `collection` supplies the ordered items, `multiple` selects multi-select behavior,
+    /// and `modifiers` controls range/toggle selection semantics.
     pub fn select(
         &mut self,
         index: usize,

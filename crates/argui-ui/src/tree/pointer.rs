@@ -8,6 +8,12 @@ use crate::{
 use super::UiTree;
 
 impl UiTree {
+    /// Updates hover state for a pointer position.
+    ///
+    /// * `point` — pointer position in window coordinates.
+    /// * `regions` — current hit-test regions.
+    ///
+    /// Returns the interaction changes caused by updating hover state.
     pub fn pointer_moved(&mut self, point: Point, regions: &[HitRegion]) -> InteractionUpdate {
         let update = self
             .interaction
@@ -29,6 +35,12 @@ impl UiTree {
         }
     }
 
+    /// Processes a pointer phase, dispatching interactions and gesture events.
+    ///
+    /// * `event` — pointer identifier, kind, phase, and position.
+    /// * `regions` — current hit-test and gesture regions.
+    ///
+    /// Returns interaction changes and delivered events for this pointer phase.
     pub fn pointer_event(
         &mut self,
         event: PointerEvent,
@@ -152,6 +164,8 @@ impl UiTree {
         }
     }
 
+    /// Clears mouse hover state after the pointer leaves the host window.
+    /// Returns the resulting interaction update.
     pub fn pointer_left(&mut self) -> InteractionUpdate {
         let update = self
             .interaction
@@ -159,6 +173,8 @@ impl UiTree {
         self.decorate(update)
     }
 
+    /// Processes release of the primary mouse button.
+    /// Returns the resulting interaction update.
     pub fn primary_released(&mut self) -> InteractionUpdate {
         let update = self.interaction.primary_released(PointerEvent {
             button: Some(argui_core::PointerButton::Primary),
@@ -168,12 +184,23 @@ impl UiTree {
         self.decorate(update)
     }
 
+    /// Captures a pointer for a target node.
+    ///
+    /// * `pointer` — pointer identifier to capture.
+    /// * `target` — node that receives the captured interaction.
+    ///
+    /// Returns the resulting interaction update.
     pub fn capture_pointer(&mut self, pointer: PointerId, target: NodeId) -> InteractionUpdate {
         let update = self.interaction.capture_pointer(pointer, target);
         self.decorate(update)
     }
 
     /// A captured drag retains its cursor even when the pointer leaves its hit region.
+    ///
+    /// * `pointer` — captured pointer identifier.
+    /// * `regions` — current hit regions, used to obtain the target cursor.
+    ///
+    /// Returns the non-default cursor for the capture target, if available.
     pub fn captured_cursor(
         &self,
         pointer: PointerId,
@@ -187,6 +214,12 @@ impl UiTree {
             .filter(|cursor| *cursor != crate::CursorIcon::Auto)
     }
 
+    /// Releases a pointer capture owned by `target`.
+    ///
+    /// * `pointer` — pointer identifier to release.
+    /// * `target` — node expected to own the capture.
+    ///
+    /// Returns the resulting interaction update.
     pub fn release_pointer_capture(
         &mut self,
         pointer: PointerId,
@@ -201,6 +234,8 @@ impl UiTree {
         self.decorate(update)
     }
 
+    /// Suspends focus and cancels active pointer and gesture state on window blur.
+    /// Returns the resulting interaction update.
     pub fn window_blurred(&mut self) -> InteractionUpdate {
         self.suspend_focus();
         let update = self.interaction.window_blurred();
@@ -211,6 +246,7 @@ impl UiTree {
     }
 
     /// Emits the newest pending update for each frame-coalesced gesture stream.
+    /// Returns the delivered gesture events for this frame.
     pub fn flush_gesture_frame(&mut self) -> InteractionUpdate {
         let pending = std::mem::take(&mut self.pending_gestures);
         let mut update = InteractionUpdate::default();

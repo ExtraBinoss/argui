@@ -6,21 +6,27 @@ use winit::window::WindowAttributes;
 use crate::ApplicationIdentity;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+/// Stable application-local identifier for a native window.
 pub struct WindowKey(String);
 
 impl WindowKey {
+    /// String value reserved for the primary application window.
     pub const MAIN_VALUE: &'static str = "main";
 
+    /// Creates a key identifying a window within one application.
+    /// `value` is the stable key used by the runtime to address the window.
     #[must_use]
     pub fn new(value: impl Into<String>) -> Self {
         Self(value.into())
     }
 
+    /// Creates the key reserved for the primary window.
     #[must_use]
     pub fn main() -> Self {
         Self::new(Self::MAIN_VALUE)
     }
 
+    /// Returns this key's string value.
     #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
@@ -28,19 +34,28 @@ impl WindowKey {
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+/// Policy applied when a user or platform requests window closure.
 pub enum CloseBehavior {
+    /// Quit the application when the main window closes.
     #[default]
     Quit,
+    /// Close only the requested window.
     CloseWindow,
+    /// Hide the window instead of closing it.
     Hide,
+    /// Report the close request to the application.
     NotifyApp,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+/// Requested stacking level for a native window.
 pub enum WindowLevel {
+    /// Keep the window below ordinary windows.
     AlwaysOnBottom,
+    /// Use the platform's normal stacking level.
     #[default]
     Normal,
+    /// Keep the window above ordinary windows.
     AlwaysOnTop,
 }
 
@@ -55,29 +70,47 @@ impl From<WindowLevel> for winit::window::WindowLevel {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Native window backend detected for the current target.
 pub enum WindowBackend {
+    /// Microsoft Windows backend.
     Windows,
+    /// Apple macOS backend.
     MacOs,
+    /// Android native activity backend.
     Android,
+    /// Apple iOS backend.
     Ios,
+    /// X11 display server backend.
     X11,
+    /// Wayland display server backend.
     Wayland,
+    /// Browser canvas backend.
     Web,
+    /// Backend whose capabilities are not specifically known.
     Other,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Operations supported by a window backend.
 pub struct WindowCapabilities {
+    /// Backend on which the window is running.
     pub backend: WindowBackend,
+    /// Whether the platform supports moving a window through native drag.
     pub native_drag: bool,
+    /// Whether the platform supports a native shadow on undecorated windows.
     pub native_shadow: bool,
+    /// Whether the platform supports minimizing windows.
     pub minimize: bool,
+    /// Whether the platform supports maximizing windows.
     pub maximize: bool,
+    /// Whether the platform supports non-normal window levels.
     pub window_level: bool,
+    /// Whether the platform supports pointer passthrough.
     pub mouse_passthrough: bool,
 }
 
 impl WindowBackend {
+    /// Returns the window operations implemented by this backend.
     #[must_use]
     pub const fn capabilities(self) -> WindowCapabilities {
         let desktop = matches!(
@@ -97,13 +130,19 @@ impl WindowBackend {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+/// Configuration for creating one application window.
 pub struct WindowSpec {
+    /// Key used to identify this window.
     pub key: WindowKey,
+    /// Platform configuration for this window.
     pub window: WindowConfig,
+    /// Whether the window should be shown after creation.
     pub visible: bool,
 }
 
 impl WindowSpec {
+    /// Creates a visible window specification with the supplied key and configuration.
+    /// `key` identifies the window and `window` contains its native settings.
     #[must_use]
     pub fn new(key: WindowKey, window: WindowConfig) -> Self {
         Self {
@@ -115,21 +154,53 @@ impl WindowSpec {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+/// Portable window settings translated to native window attributes.
 pub struct WindowConfig {
+    /// Text shown by the native title bar and browser document.
     pub title: String,
+    /// Requested native window width in logical pixels.
+    ///
+    /// A Web canvas takes its size from CSS instead.
     pub width: f64,
+    /// Requested native window height in logical pixels.
+    ///
+    /// A Web canvas takes its size from CSS instead.
     pub height: f64,
+    /// Whether the operating system draws its standard title bar and borders.
     pub decorations: bool,
+    /// Whether the user can resize a native window.
     pub resizable: bool,
+    /// Whether the surface is composited with transparency.
     pub transparent: bool,
     /// Opt in to desktop effects. Regions are supplied by Element::desktop_backdrop.
     pub desktop_backdrop: Option<argui_core::BackdropMaterial>,
+    /// Whether an undecorated window requests a platform-drawn shadow.
+    ///
+    /// This is supported on Windows and macOS. Other platforms ignore it.
     pub native_shadow: bool,
+    /// The native stacking level of the window.
     pub level: WindowLevel,
+    /// Whether Winit appends a newly created Web canvas to the document body.
+    ///
+    /// Set this to `false` when the host attaches the canvas itself. Native
+    /// targets ignore this setting.
     pub append_to_document: bool,
+    /// ID of the Web element that receives the canvas after it is created.
+    ///
+    /// `None` leaves the canvas under the parent selected by Winit. Native
+    /// targets ignore this setting.
     pub web_parent_id: Option<String>,
+    /// Action taken when the user asks the operating system to close the window.
     pub close_behavior: CloseBehavior,
+    /// Pointer timing and gesture thresholds used by this window.
     pub pointer: argui_core::PointerSettings,
+    /// Whether the window or Web canvas requests keyboard focus when launched.
+    ///
+    /// The default is `true` on native targets. It is `false` on WebAssembly so
+    /// an embedded canvas cannot steal focus and scroll its host page while it
+    /// loads. Pointer interaction still focuses a Web canvas. A full-page Web
+    /// application can opt in with [`WindowConfig::with_focus_on_launch`].
+    pub focus_on_launch: bool,
     /// Explicit safe-area override in logical pixels. `None` uses native
     /// insets where Winit exposes them and zero elsewhere.
     pub safe_area_insets: Option<argui_core::Insets>,
@@ -151,18 +222,34 @@ impl Default for WindowConfig {
             web_parent_id: None,
             close_behavior: CloseBehavior::Quit,
             pointer: argui_core::PointerSettings::default(),
+            focus_on_launch: cfg!(not(target_arch = "wasm32")),
             safe_area_insets: None,
         }
     }
 }
 
 impl WindowConfig {
+    /// Overrides the safe-area insets reported to the root view.
+    /// `insets` is the explicit inset value in logical pixels.
     #[must_use]
     pub fn with_safe_area_insets(mut self, insets: argui_core::Insets) -> Self {
         self.safe_area_insets = Some(insets);
         self
     }
 
+    /// Chooses whether this window requests keyboard focus as it launches.
+    ///
+    /// Web applications embedded in another page should leave this disabled to
+    /// preserve the page's focus and scroll position. Full-page applications
+    /// may enable it when keyboard input should be ready immediately.
+    /// `focus` selects whether keyboard focus is requested at launch.
+    #[must_use]
+    pub fn with_focus_on_launch(mut self, focus: bool) -> Self {
+        self.focus_on_launch = focus;
+        self
+    }
+
+    /// Converts this portable configuration into Winit window attributes.
     #[must_use]
     pub fn into_attributes(self) -> WindowAttributes {
         let attributes = WindowAttributes::default()
@@ -170,7 +257,8 @@ impl WindowConfig {
             .with_decorations(self.decorations)
             .with_resizable(self.resizable)
             .with_transparent(self.transparent || self.desktop_backdrop.is_some())
-            .with_window_level(self.level.into());
+            .with_window_level(self.level.into())
+            .with_active(self.focus_on_launch);
 
         #[cfg(target_os = "windows")]
         let attributes = {
@@ -203,6 +291,8 @@ impl WindowConfig {
         attributes.with_inner_size(LogicalSize::new(self.width, self.height))
     }
 
+    /// Converts this configuration and applies the shared application identity.
+    /// `identity` supplies the fallback title, application IDs, and icon.
     #[must_use]
     pub fn into_attributes_with_identity(self, identity: &ApplicationIdentity) -> WindowAttributes {
         let title = if self.title.is_empty() {
@@ -238,6 +328,10 @@ impl WindowConfig {
     }
 }
 
+/// Detects the native operations supported by `window`'s backend.
+///
+/// The result describes platform support, not current window state.
+/// `window` is the native window whose backend is inspected.
 #[must_use]
 #[cfg_attr(coverage_nightly, coverage(off))]
 pub fn window_capabilities(window: &Window) -> WindowCapabilities {
