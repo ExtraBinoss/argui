@@ -51,6 +51,34 @@ Historical optimization data remains machine-readable:
 The main guide does not preserve each intermediate implementation comparison.
 Use the raw revision and environment fields when investigating one.
 
+## Binary size
+
+These Linux x86-64 release measurements use the Widget Gallery as a complete
+application rather than a minimal example:
+
+| Gallery configuration | Executable | After `strip` |
+| --- | ---: | ---: |
+| Base | 36.04 MiB | 26.81 MiB |
+| Hot reload | 36.03 MiB | 26.79 MiB |
+| All desktop integrations | 39.21 MiB | 29.17 MiB |
+
+The base gallery includes its widgets, localization, tasks, effects, and
+DevTools. The complete build adds the updater, WebView, native popups, desktop
+backdrop, and hardware sensors. Release builds remove the hot-reload runtime
+path, so its measured difference is build noise.
+
+Build a configuration with:
+
+```sh
+cargo build -p argui-widget-gallery --bin argui-widget-gallery \
+  --release --no-default-features
+```
+
+Add `--features hot-reload` or replace the feature arguments with
+`--all-features`. The stripped measurement comes from a copied executable
+processed by GNU `strip`; shared system libraries and installer compression are
+outside the measurement.
+
 ## Measure a native application
 
 Build once, then sample the saved release binary without compiling during the

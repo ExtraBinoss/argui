@@ -175,35 +175,15 @@ current Android/iOS architecture, build commands and completion checklist. The
 [repository structure](docs/repo/structure.md) lists every crate, direct
 dependency and crates.io publication position.
 
-## But… what about package size?
+## Package size
 
-Features stay opt-in so applications only compile the integrations they choose.
-The table below measures the real Linux x86-64 Widget Gallery executable with
-Rust 1.98.0. “Base gallery” already contains every widget, Fluent i18n, tasks,
-effects and DevTools; “all features” additionally enables the updater, WebView,
-native popups, desktop backdrop and all-smi support.
+Argui integrations are opt-in, so an application only includes what it enables.
+In the current Linux measurement, the stripped Widget Gallery release is
+**26.8 MiB** with its base configuration and **29.2 MiB** with every desktop
+integration enabled. Hot reload is removed from release builds.
 
-| Profile | Gallery features | Executable | After `strip` |
-| --- | --- | ---: | ---: |
-| Debug | Base gallery (`--no-default-features`) | 98.63 MiB | 29.73 MiB |
-| Debug | `hot-reload` | 100.29 MiB | 30.40 MiB |
-| Debug | `--all-features` | 107.00 MiB | 33.23 MiB |
-| Release | Base gallery (`--no-default-features`) | 36.04 MiB | 26.81 MiB |
-| Release | `hot-reload` | 36.03 MiB | 26.79 MiB |
-| Release | `--all-features` | 39.21 MiB | 29.17 MiB |
-
-The development bridge costs 1.66 MiB in the debug executable, or 0.67 MiB
-after stripping. In release, the 0.02 MiB difference is code-generation noise:
-Argui compiles out its Subsecond connection and dispatch path, and the linker
-does not retain the unused patch engine. Enabling the feature can still increase
-release compilation time because Cargo builds its optional dependencies.
-
-Reproduce a row with `cargo build -p argui-widget-gallery --bin
-argui-widget-gallery --no-default-features`, adding `--features hot-reload` or
-`--all-features`, and `--release` for the release rows. Sizes are `stat -c %s`
-converted with 1 MiB = 1,048,576 bytes; stripped values come from a copied
-binary processed by GNU `strip`. This measures the executable itself and
-excludes shared system libraries and installer compression.
+See the [performance guide](docs/performance/optimizations.md#binary-size) for
+the measured configurations and reproduction command.
 
 ### Release WebAssembly startup
 
