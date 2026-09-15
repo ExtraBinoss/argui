@@ -1,11 +1,36 @@
 use super::*;
 
+/// Builds the warning emitted after Windows selects a compatibility renderer.
+///
+/// `failures` contains earlier initialization errors and `selected` names the
+/// renderer configuration that succeeded.
+#[cfg(target_os = "windows")]
+fn fallback_message(failures: &[crate::RendererAttemptFailure], selected: &str) -> String {
+    let failures = failures
+        .iter()
+        .map(|failure| format!("{} failed: {}", failure.renderer, failure.error))
+        .collect::<Vec<_>>()
+        .join("; ");
+    format!(
+        "Renderer fallback activated. {failures}. Continuing with {selected}. Desktop backdrop effects are disabled for this session."
+    )
+}
+
 #[cfg_attr(coverage_nightly, coverage(off))]
 impl SurfaceRenderer {
     /// Returns whether the surface uses premultiplied transparency.
     #[must_use]
     pub fn is_transparent(&self) -> bool {
         self.surface_config.alpha_mode == wgpu::CompositeAlphaMode::PreMultiplied
+    }
+
+    /// Returns the user-facing warning produced when renderer initialization used a fallback.
+    ///
+    /// The returned message includes each failed configuration and the renderer that was
+    /// ultimately selected. `None` means the preferred renderer initialized successfully.
+    #[must_use]
+    pub fn initialization_fallback(&self) -> Option<&str> {
+        self.device_handle.0.initialization_fallback.as_deref()
     }
 
     /// Creates a renderer and requests a compatible GPU device for `target`.
@@ -15,13 +40,71 @@ impl SurfaceRenderer {
     /// # Errors
     /// Returns an error if surface creation, adapter/device selection, or surface configuration fails.
     #[cfg_attr(coverage_nightly, coverage(off))]
-    pub async fn new(
+    pub async fn new<T>(
+        target: T,
+        width: u32,
+        height: u32,
+        renderer_config: RendererConfig,
+    ) -> Result<Self, RendererError>
+    where
+        T: Into<SurfaceTarget<'static>> + Clone,
+    {
+        #[cfg(target_os = "windows")]
+        {
+            let mut failures = Vec::new();
+            for renderer in configure::WindowsRenderer::attempts(renderer_config.renderer_fallback)
+            {
+                let fallback_message =
+                    (!failures.is_empty()).then(|| fallback_message(&failures, renderer.label()));
+                let result = Self::new_with_instance(
+                    target.clone(),
+                    width,
+                    height,
+                    renderer_config.clone(),
+                    configure::instance_for(*renderer),
+                    fallback_message,
+                )
+                .await;
+                match result {
+                    Ok(renderer) => return Ok(renderer),
+                    Err(error) => failures.push(crate::RendererAttemptFailure {
+                        renderer: renderer.label().into(),
+                        error: error.to_string(),
+                    }),
+                }
+            }
+            Err(RendererError::Initialization {
+                attempts: failures,
+                fallback_enabled: renderer_config.renderer_fallback,
+            })
+        }
+
+        #[cfg(not(target_os = "windows"))]
+        Self::new_with_instance(
+            target,
+            width,
+            height,
+            renderer_config,
+            configure::instance(),
+            None,
+        )
+        .await
+    }
+
+    /// Creates a renderer using one already-selected WGPU instance.
+    ///
+    /// `target` identifies the window surface, `width` and `height` specify its initial
+    /// drawable size, `renderer_config` controls resources and presentation,
+    /// `instance` selects the GPU API, and `initialization_fallback` records any
+    /// compatibility fallback exposed to the runtime.
+    async fn new_with_instance(
         target: impl Into<SurfaceTarget<'static>>,
         width: u32,
         height: u32,
         renderer_config: RendererConfig,
+        instance: wgpu::Instance,
+        initialization_fallback: Option<String>,
     ) -> Result<Self, RendererError> {
-        let instance = configure::instance();
         let surface = instance
             .create_surface(target)
             .map_err(|error| RendererError::SurfaceCreation(error.to_string()))?;
@@ -54,6 +137,7 @@ impl SurfaceRenderer {
             adapter,
             device,
             queue,
+            initialization_fallback,
         }));
         Self::from_existing_device(
             instance,

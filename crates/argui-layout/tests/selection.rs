@@ -1,10 +1,12 @@
 use argui_core::{Affine2D, CaretAffinity, Point, Rect, Size, TextPosition};
 use argui_layout::LayoutEngine;
-use argui_paint::{ClipChain, ClipRegion, DisplayCommand, Fill};
+use argui_paint::{
+    ClipChain, ClipRegion, CornerRadii, DisplayCommand, Fill, GradientStop, LinearGradient,
+};
 use argui_text::TextEngine;
 use argui_ui::{
-    DocumentTextPoint, Element, SelectionGranularity, TextSelectionStyle, UiTree, UserSelect,
-    percent,
+    DocumentTextPoint, Element, SelectionGranularity, TextSelectionHighlight, TextSelectionStyle,
+    UiTree, UserSelect, percent,
 };
 
 const NOTO_SANS: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
@@ -134,6 +136,77 @@ fn document_selection_uses_glyph_regions_and_paints_without_relayout() {
     assert!(output.document_selection_bounds(&ui).is_some());
     assert!(output.display_list.commands().iter().any(|command| {
         matches!(command, DisplayCommand::Quad(quad) if quad.background == Some(Fill::Solid(color)))
+    }));
+}
+
+#[test]
+fn document_selection_paints_gradient_fills_with_fragment_radii() {
+    let radii = CornerRadii {
+        top_left: 2.0,
+        top_right: 5.0,
+        bottom_right: 8.0,
+        bottom_left: 3.0,
+    };
+    let gradient = LinearGradient::new(
+        Point::new(0.0, 0.0),
+        Point::new(1.0, 0.0),
+        argui_core::ColorInterpolation::Oklab,
+        [
+            GradientStop::new(0.0, argui_core::Color::srgb(0.9, 0.2, 0.5)),
+            GradientStop::new(1.0, argui_core::Color::srgb(0.2, 0.7, 1.0)),
+        ],
+    )
+    .unwrap();
+    let mut ui = UiTree::new(
+        Element::text("rounded rainbow selection")
+            .selection_highlight(
+                TextSelectionHighlight::new(Fill::Linear(gradient.clone())).radii(radii),
+            )
+            .width(percent(1.0)),
+    );
+    let mut engine = LayoutEngine::new();
+    let mut output = engine
+        .compute(&mut ui, &mut text_engine(), Size::new(300.0, 80.0))
+        .unwrap();
+    let node = output.text_regions[0].node;
+    ui.begin_document_selection(
+        DocumentTextPoint::new(node, TextPosition::new(0, CaretAffinity::Before)),
+        false,
+        SelectionGranularity::Character,
+    );
+    ui.drag_document_selection(DocumentTextPoint::new(
+        node,
+        TextPosition::new(7, CaretAffinity::After),
+    ));
+    engine.repaint(&ui, &mut output);
+
+    assert!(output.display_list.commands().iter().any(|command| {
+        matches!(command, DisplayCommand::Quad(quad)
+            if quad.background == Some(Fill::Linear(gradient.clone())) && quad.radii == radii)
+    }));
+
+    let replacement = LinearGradient::new(
+        Point::new(0.0, 0.0),
+        Point::new(0.0, 1.0),
+        argui_core::ColorInterpolation::Oklab,
+        [
+            GradientStop::new(0.0, argui_core::Color::srgb(0.2, 0.9, 0.5)),
+            GradientStop::new(1.0, argui_core::Color::srgb(0.8, 0.3, 1.0)),
+        ],
+    )
+    .unwrap();
+    ui.update(
+        Element::text("rounded rainbow selection")
+            .selection_highlight(
+                TextSelectionHighlight::new(Fill::Linear(replacement.clone())).radius(12.0),
+            )
+            .width(percent(1.0)),
+    );
+    engine.repaint(&ui, &mut output);
+    assert!(output.display_list.commands().iter().any(|command| {
+        matches!(command, DisplayCommand::Quad(quad)
+            if quad.background == Some(Fill::Linear(replacement.clone()))
+                && quad.radii == CornerRadii::all(12.0))
     }));
 }
 

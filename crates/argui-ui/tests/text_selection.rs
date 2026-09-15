@@ -209,6 +209,10 @@ fn disabled_subtrees_can_be_explicitly_reenabled_and_invalid_points_clear() {
         transient.resolved_selection_style(removed),
         TextSelectionStyle::default()
     );
+    assert_eq!(
+        transient.resolved_selection_highlight(removed),
+        argui_ui::TextSelectionHighlight::default()
+    );
 }
 
 #[test]

@@ -58,6 +58,7 @@ struct RendererDeviceInner {
     adapter: wgpu::Adapter,
     device: wgpu::Device,
     queue: wgpu::Queue,
+    initialization_fallback: Option<String>,
 }
 
 pub struct SurfaceRenderer {

@@ -1,10 +1,23 @@
 use std::{error::Error, fmt};
 
+/// Describes one renderer configuration that failed during GPU initialization.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RendererAttemptFailure {
+    /// Human-readable renderer configuration name.
+    pub renderer: String,
+    /// Error returned while initializing the configuration.
+    pub error: String,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RendererError {
     SurfaceCreation(String),
     AdapterRequest(String),
     DeviceRequest(String),
+    Initialization {
+        attempts: Vec<RendererAttemptFailure>,
+        fallback_enabled: bool,
+    },
     UnsupportedSurface,
     UnsupportedSurfaceTransparency,
     GlyphAtlasFull,
@@ -44,6 +57,29 @@ impl fmt::Display for RendererError {
             }
             Self::AdapterRequest(message) => write!(formatter, "adapter request failed: {message}"),
             Self::DeviceRequest(message) => write!(formatter, "device request failed: {message}"),
+            Self::Initialization {
+                attempts,
+                fallback_enabled,
+            } => {
+                let plural = if attempts.len() == 1 { "" } else { "s" };
+                writeln!(
+                    formatter,
+                    "renderer initialization failed after {} attempt{plural}:",
+                    attempts.len()
+                )?;
+                for attempt in attempts {
+                    writeln!(formatter, "- {}: {}", attempt.renderer, attempt.error)?;
+                }
+                if *fallback_enabled {
+                    formatter.write_str(
+                        "No compatible GPU renderer could be started. Update the graphics driver or choose a supported renderer configuration.",
+                    )
+                } else {
+                    formatter.write_str(
+                        "Renderer fallback is disabled; only DirectX 12 with DirectComposition was attempted.",
+                    )
+                }
+            }
             Self::UnsupportedSurface => {
                 formatter.write_str("the adapter cannot present to this surface")
             }

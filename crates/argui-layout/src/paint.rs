@@ -49,6 +49,7 @@ pub(crate) fn repaint(
     cache.reused_commands = 0;
     sync::scroll_config(&elements, ui, output);
     let text_changed = sync::text_colors(&elements, ui, output);
+    sync::text_selection(ui, output);
     let clips = ClipChain::from_regions([ClipRegion::new(output.viewport, Affine2D::IDENTITY)]);
     if let Some(root) = root {
         let mut scroll_updates = Vec::new();

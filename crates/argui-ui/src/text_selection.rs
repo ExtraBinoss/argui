@@ -1,7 +1,7 @@
 use std::ops::Range;
 
 use argui_core::{CaretAffinity, TextPosition};
-use argui_paint::Color;
+use argui_paint::{Color, CornerRadii, Fill};
 
 use crate::{Element, InteractionUpdate, NodeId, UiTree};
 
@@ -29,6 +29,59 @@ impl Default for TextSelectionStyle {
             background: Color::srgba(0.20, 0.48, 0.96, 0.38),
             handle: Color::srgb(0.20, 0.48, 0.96),
         }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct TextSelectionHighlight {
+    /// GPU fill painted behind every visual selection fragment.
+    pub background: Fill,
+    /// Corner radii applied independently to every visual selection fragment.
+    pub radii: CornerRadii,
+}
+
+impl TextSelectionHighlight {
+    /// Creates a text selection highlight from any GPU fill.
+    ///
+    /// * `background` — fill painted behind selected glyphs.
+    #[must_use]
+    pub const fn new(background: Fill) -> Self {
+        Self {
+            background,
+            radii: CornerRadii::all(0.0),
+        }
+    }
+
+    /// Creates a text selection highlight with a solid color.
+    ///
+    /// * `background` — color painted behind selected glyphs.
+    #[must_use]
+    pub const fn solid(background: Color) -> Self {
+        Self::new(Fill::Solid(background))
+    }
+
+    /// Uses the same corner radius for every visual selection fragment.
+    ///
+    /// * `radius` — radius in logical pixels.
+    #[must_use]
+    pub const fn radius(mut self, radius: f32) -> Self {
+        self.radii = CornerRadii::all(radius);
+        self
+    }
+
+    /// Sets independent corner radii for every visual selection fragment.
+    ///
+    /// * `radii` — top-left, top-right, bottom-right, and bottom-left radii.
+    #[must_use]
+    pub const fn radii(mut self, radii: CornerRadii) -> Self {
+        self.radii = radii;
+        self
+    }
+}
+
+impl Default for TextSelectionHighlight {
+    fn default() -> Self {
+        Self::solid(TextSelectionStyle::default().background)
     }
 }
 
@@ -113,6 +166,15 @@ impl Element {
     #[must_use]
     pub fn selection_style(mut self, value: TextSelectionStyle) -> Self {
         self.selection_style = Some(value);
+        self
+    }
+
+    /// Sets an inherited GPU fill and corner radii for document text highlights.
+    ///
+    /// * `value` — highlight fill and per-fragment corner radii.
+    #[must_use]
+    pub fn selection_highlight(mut self, value: TextSelectionHighlight) -> Self {
+        self.selection_highlight = Some(value);
         self
     }
 }

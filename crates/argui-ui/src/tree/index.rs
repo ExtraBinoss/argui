@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
-use crate::{Element, NodeId, TextSelectionStyle, UserSelect, WritingDirection};
+use crate::{
+    Element, NodeId, TextSelectionHighlight, TextSelectionStyle, UserSelect, WritingDirection,
+};
 
 const NONE: u32 = u32::MAX;
 
@@ -14,6 +16,7 @@ pub(crate) struct TreeIndex {
     subtree_ends: Vec<u32>,
     selection: Vec<UserSelect>,
     selection_owners: Vec<u32>,
+    selection_highlight_owners: Vec<u32>,
     directions: Vec<Option<WritingDirection>>,
     default_selection_style: TextSelectionStyle,
     transition_nodes: usize,
@@ -25,7 +28,8 @@ impl TreeIndex {
         self.elements.capacity() * size_of::<Element>()
             + (self.parents.capacity()
                 + self.subtree_ends.capacity()
-                + self.selection_owners.capacity())
+                + self.selection_owners.capacity()
+                + self.selection_highlight_owners.capacity())
                 * size_of::<u32>()
             + self.selection.capacity() * size_of::<UserSelect>()
             + self.directions.capacity() * size_of::<Option<WritingDirection>>()
@@ -43,6 +47,7 @@ impl TreeIndex {
             subtree_ends: Vec::with_capacity(ids.len()),
             selection: Vec::with_capacity(ids.len()),
             selection_owners: Vec::with_capacity(ids.len()),
+            selection_highlight_owners: Vec::with_capacity(ids.len()),
             directions: Vec::with_capacity(ids.len()),
             default_selection_style: TextSelectionStyle::default(),
             transition_nodes: 0,
@@ -64,6 +69,11 @@ impl TreeIndex {
         } else {
             inherited.map_or(NONE, |p| self.selection_owners[p])
         };
+        let highlight_owner = if element.selection_highlight.is_some() {
+            position as u32
+        } else {
+            inherited.map_or(NONE, |p| self.selection_highlight_owners[p])
+        };
         let direction = element
             .direction_scope
             .or_else(|| inherited.and_then(|p| self.directions[p]));
@@ -77,6 +87,7 @@ impl TreeIndex {
         }
         self.selection.push(policy);
         self.selection_owners.push(owner);
+        self.selection_highlight_owners.push(highlight_owner);
         self.directions.push(direction);
         for child in &element.children {
             self.visit(child, ids, position as u32);
@@ -113,6 +124,11 @@ impl TreeIndex {
         } else {
             parent.map_or(NONE, |p| self.selection_owners[p])
         };
+        let highlight_owner = if element.selection_highlight.is_some() {
+            position as u32
+        } else {
+            parent.map_or(NONE, |p| self.selection_highlight_owners[p])
+        };
         let direction = element
             .direction_scope
             .or_else(|| parent.and_then(|p| self.directions[p]));
@@ -120,6 +136,7 @@ impl TreeIndex {
         if shared
             && self.selection[position] == policy
             && self.selection_owners[position] == owner
+            && self.selection_highlight_owners[position] == highlight_owner
             && self.directions[position] == direction
         {
             return (self.subtree_ends[position] as usize, false);
@@ -141,6 +158,7 @@ impl TreeIndex {
         }
         self.selection[position] = policy;
         self.selection_owners[position] = owner;
+        self.selection_highlight_owners[position] = highlight_owner;
         self.directions[position] = direction;
         let mut cursor = position + 1;
         for child in &element.children {
@@ -186,6 +204,19 @@ impl TreeIndex {
             .get(owner as usize)
             .and_then(|element| element.selection_style)
             .unwrap_or(self.default_selection_style)
+    }
+
+    /// Resolves the nearest inherited highlight, falling back to the resolved solid color.
+    pub(crate) fn selection_highlight(&self, node: NodeId) -> TextSelectionHighlight {
+        let Some(index) = self.position(node) else {
+            return TextSelectionHighlight::solid(self.default_selection_style.background);
+        };
+        let owner = self.selection_highlight_owners[index];
+        self.elements
+            .get(owner as usize)
+            .and_then(|element| element.selection_highlight.as_ref())
+            .cloned()
+            .unwrap_or_else(|| TextSelectionHighlight::solid(self.selection_style(node).background))
     }
 }
 

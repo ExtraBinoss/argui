@@ -1,4 +1,4 @@
-use argui_ui::{Element, TextSelectionStyle, UiTree, UserSelect};
+use argui_ui::{Element, TextSelectionHighlight, TextSelectionStyle, UiTree, UserSelect};
 
 #[test]
 fn indexed_elements_follow_reordering_removal_and_inherited_selection_changes() {
@@ -46,6 +46,30 @@ fn index_refreshes_for_paint_only_changes_and_explicit_selection_overrides() {
     assert_eq!(
         tree.element_at(1).unwrap().paint,
         root(argui_core::Color::BLACK).children[0].paint
+    );
+}
+
+#[test]
+fn selection_highlights_inherit_and_refresh_independently_from_handle_colors() {
+    let first = TextSelectionHighlight::solid(argui_core::Color::BLACK).radius(3.0);
+    let second = TextSelectionHighlight::solid(argui_core::Color::WHITE).radius(9.0);
+    let child = Element::text("child").keyed("child");
+    let mut tree = UiTree::new(
+        Element::column([child.clone()])
+            .selection_highlight(first.clone())
+            .selection_style(TextSelectionStyle {
+                background: argui_core::Color::TRANSPARENT,
+                handle: argui_core::Color::WHITE,
+            }),
+    );
+    let child_id = tree.node_ids()[1];
+    assert_eq!(tree.resolved_selection_highlight(child_id), first);
+
+    tree.update(Element::column([child]).selection_highlight(second.clone()));
+    assert_eq!(tree.resolved_selection_highlight(child_id), second);
+    assert_eq!(
+        tree.resolved_selection_style(child_id),
+        TextSelectionStyle::default()
     );
 }
 

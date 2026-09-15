@@ -84,6 +84,20 @@ native handles remain retained until their effects are destroyed.
 | macOS | `NSVisualEffectView` with `BehindWindow`, below the GPU view and masked to the regions. Popover, Sidebar and HeaderView materials follow window activity. |
 | Web or unsupported API | Fallback color. Translucent web fallback reveals the page beneath the canvas, never the desktop behind the browser. |
 
+On Windows, renderer fallback is enabled by default. Startup first tries DirectX 12
+with DirectComposition, then DirectX 12 with an opaque HWND surface, and finally
+Vulkan. The runtime emits `RuntimeEvent::RendererFallback` when a compatibility
+renderer is selected and disables the desktop backdrop for that session. Applications
+can require only the preferred DirectX 12 DirectComposition path when diagnosing GPU
+or driver failures:
+
+```rust
+let renderer = argui::render::RendererConfig::default().renderer_fallback(false);
+```
+
+If every enabled configuration fails, `RuntimeEvent::RendererFailed` contains each
+attempt and its initialization error.
+
 Compositor support is detected at runtime. The development machine's Mutter 50.4
 does not expose either supported Wayland blur protocol and uses fallback.
 

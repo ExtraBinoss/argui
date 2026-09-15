@@ -91,6 +91,7 @@ fn visual_changed(old: &Element, new: &Element) -> bool {
         || old.action != new.action
         || old.user_select != new.user_select
         || old.selection_style != new.selection_style
+        || old.selection_highlight != new.selection_highlight
         || old.z_index != new.z_index
 }
 

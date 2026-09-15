@@ -50,6 +50,7 @@ pub(crate) mod progress;
 pub(crate) mod scroll_effects;
 mod separator;
 pub(crate) mod skeleton;
+pub(crate) mod text_selection;
 pub(crate) mod timeline;
 pub(crate) mod toast;
 pub(crate) mod tooltip;
@@ -173,6 +174,7 @@ pub(crate) fn render(
         Page::LiquidGlass => cx.entity(&gallery.glass),
         Page::ScrollShadow => cx.entity(&gallery.scroll_demo),
         Page::Typography => typography::render(theme),
+        Page::TextSelection => cx.entity(&gallery.text_selection),
         Page::WebView => cx.entity(&gallery.webview),
         Page::AsyncTasks => cx.entity(&gallery.tasks),
         Page::Editing => cx.entity(&gallery.editing),

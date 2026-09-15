@@ -1,4 +1,4 @@
-use argui_render::RendererError;
+use argui_render::{RendererAttemptFailure, RendererError};
 
 #[test]
 fn renderer_errors_keep_actionable_context() {
@@ -46,6 +46,58 @@ fn renderer_errors_keep_actionable_context() {
         .to_string(),
         "effect parameters need 25 bytes but this adapter allows 24"
     );
+}
+
+#[test]
+fn renderer_initialization_errors_list_every_attempt() {
+    let attempts = vec![
+        RendererAttemptFailure {
+            renderer: "DirectX 12 with DirectComposition".into(),
+            error: "device request failed: Parent device is lost".into(),
+        },
+        RendererAttemptFailure {
+            renderer: "DirectX 12 with an opaque window surface".into(),
+            error: "adapter request failed: no compatible adapter".into(),
+        },
+        RendererAttemptFailure {
+            renderer: "Vulkan".into(),
+            error: "surface creation failed: unsupported handle".into(),
+        },
+    ];
+    let message = RendererError::Initialization {
+        attempts,
+        fallback_enabled: true,
+    }
+    .to_string();
+
+    assert!(message.starts_with("renderer initialization failed after 3 attempts:"));
+    assert!(message.contains(
+        "- DirectX 12 with DirectComposition: device request failed: Parent device is lost"
+    ));
+    assert!(message.contains(
+        "- DirectX 12 with an opaque window surface: adapter request failed: no compatible adapter"
+    ));
+    assert!(message.contains("- Vulkan: surface creation failed: unsupported handle"));
+    assert!(message.ends_with(
+        "No compatible GPU renderer could be started. Update the graphics driver or choose a supported renderer configuration."
+    ));
+}
+
+#[test]
+fn strict_renderer_initialization_error_explains_disabled_fallback() {
+    let message = RendererError::Initialization {
+        attempts: vec![RendererAttemptFailure {
+            renderer: "DirectX 12 with DirectComposition".into(),
+            error: "device request failed: Parent device is lost".into(),
+        }],
+        fallback_enabled: false,
+    }
+    .to_string();
+
+    assert!(message.starts_with("renderer initialization failed after 1 attempt:"));
+    assert!(message.ends_with(
+        "Renderer fallback is disabled; only DirectX 12 with DirectComposition was attempted."
+    ));
 }
 
 #[test]

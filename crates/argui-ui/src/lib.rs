@@ -116,7 +116,7 @@ pub use text_input::{
 };
 pub use text_selection::{
     DocumentTextPoint, DocumentTextSelection, SelectionCapabilities, SelectionCommand,
-    SelectionGranularity, TextSelectionStyle, UserSelect,
+    SelectionGranularity, TextSelectionHighlight, TextSelectionStyle, UserSelect,
 };
 pub use tree::{TreeUpdate, TreeUpdateStats, UiTree};
 pub use virtual_list::{

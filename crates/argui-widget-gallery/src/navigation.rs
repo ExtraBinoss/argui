@@ -74,6 +74,7 @@ pub enum Page {
     LiquidGlass,
     ScrollShadow,
     Typography,
+    TextSelection,
     WebView,
     AsyncTasks,
     Editing,
@@ -83,7 +84,7 @@ pub enum Page {
 }
 
 impl Page {
-    pub const ALL: [Self; 76 + cfg!(feature = "updater") as usize] = [
+    pub const ALL: [Self; 77 + cfg!(feature = "updater") as usize] = [
         Self::Accordion,
         Self::Alert,
         Self::AlertDialog,
@@ -158,6 +159,7 @@ impl Page {
         Self::I18n,
         Self::Motion,
         Self::Typography,
+        Self::TextSelection,
         Self::Layout,
         Self::WebView,
         #[cfg(feature = "updater")]
@@ -239,6 +241,7 @@ impl Page {
             | Self::I18n
             | Self::Motion
             | Self::Typography
+            | Self::TextSelection
             | Self::WebView
             | Self::AsyncTasks
             | Self::Editing
@@ -321,6 +324,7 @@ impl Page {
             Self::LiquidGlass => "Liquid glass",
             Self::ScrollShadow => "Scroll shadow",
             Self::Typography => "Typography & selection",
+            Self::TextSelection => "Text selection",
             Self::WebView => "WebView",
             Self::AsyncTasks => "Async tasks",
             Self::Editing => "Editing & Password",
@@ -405,6 +409,7 @@ impl Page {
             Self::LiquidGlass => "liquid-glass",
             Self::ScrollShadow => "scroll-shadow",
             Self::Typography => "typography",
+            Self::TextSelection => "text-selection",
             Self::WebView => "webview",
             Self::AsyncTasks => "async-tasks",
             Self::Editing => "editing",
@@ -521,6 +526,9 @@ impl Page {
             Self::LiquidGlass => "Scroll colorful palettes behind a floating glass navigation bar.",
             Self::ScrollShadow => "Edge shadows reveal more content in scrollable views.",
             Self::Typography => "Rich spans, decoration, clamping and web-like text selection.",
+            Self::TextSelection => {
+                "Selection policies, rounded highlights, gradients and animated fills."
+            }
             Self::WebView => {
                 "Retained web content, with separate email and webpage security policies."
             }

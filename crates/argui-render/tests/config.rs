@@ -8,6 +8,8 @@ fn renderer_defaults_to_vsync_and_a_discrete_gpu() {
         config.power_preference,
         wgpu::PowerPreference::HighPerformance
     );
+    assert!(config.renderer_fallback);
+    assert!(!config.clone().renderer_fallback(false).renderer_fallback);
     assert_eq!(config.present_mode, wgpu::PresentMode::AutoVsync);
     assert_eq!(config.maximum_frame_latency, 2);
     assert_eq!(

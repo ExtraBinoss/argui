@@ -8,6 +8,11 @@ that do not use them.
 
 ### Added
 
+- Added inherited text-selection highlight styling with solid or gradient fills,
+  per-corner radii and an interactive Widget Gallery page.
+- Added default-on Windows renderer fallback from DirectX 12 DirectComposition
+  to an opaque DirectX 12 surface and then Vulkan, with an opt-out configuration
+  and actionable runtime diagnostics for every failed attempt.
 - Added `default_theme` as the clear public name for Argui's standard widget
   palette while keeping `shadcn` as a compatible alias.
 - Added an interactive documentation site whose lessons display and run their

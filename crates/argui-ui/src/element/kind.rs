@@ -57,6 +57,7 @@ pub struct ElementNode {
     pub event_listeners: Vec<crate::EventListener>,
     pub user_select: crate::UserSelect,
     pub selection_style: Option<crate::TextSelectionStyle>,
+    pub selection_highlight: Option<crate::TextSelectionHighlight>,
     pub z_index: i32,
     pub children: Vec<super::Element>,
 }

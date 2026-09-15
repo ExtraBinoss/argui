@@ -3,8 +3,8 @@ use argui_ui::{
     Axes, Border, Color, ContainerQuery, ContainerScopeId, CornerRadii, EffectScope, Element,
     ElementKind, FlexDirection, Interaction, LayerStyle, Overflow, Role, ScrollConfig,
     ScrollbarPartStyle, ScrollbarStyle, Semantics, StateName, StateScopeId, StylePatch,
-    StyleTransition, TextSelectionStyle, TransformOrigin, TreeUpdate, UiTree, UserSelect, VectorId,
-    VisualState, WindowLayer, length, percent, property,
+    StyleTransition, TextSelectionHighlight, TextSelectionStyle, TransformOrigin, TreeUpdate,
+    UiTree, UserSelect, VectorId, VisualState, WindowLayer, length, percent, property,
 };
 
 #[path = "tree/event.rs"]
@@ -340,6 +340,8 @@ fn every_visual_field_and_portal_change_has_an_exact_invalidation_class() {
             .effect(EffectScope::Content, LayerStyle::new(Default::default())),
         base.clone().user_select(UserSelect::None),
         base.clone().selection_style(TextSelectionStyle::default()),
+        base.clone()
+            .selection_highlight(TextSelectionHighlight::default().radius(4.0)),
         base.clone().z_index(7),
     ];
     for changed in paint_changes {

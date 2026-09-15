@@ -66,3 +66,11 @@ pub(super) fn text_colors(elements: &[&Element], ui: &UiTree, output: &mut Layou
     }
     changed
 }
+
+/// Refreshes paint-only selection styles without rebuilding text geometry.
+pub(super) fn text_selection(ui: &UiTree, output: &mut LayoutOutput) {
+    for region in &mut output.text_regions {
+        region.style = ui.resolved_selection_style(region.node);
+        region.highlight = ui.resolved_selection_highlight(region.node);
+    }
+}

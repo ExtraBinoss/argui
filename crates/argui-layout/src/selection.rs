@@ -3,7 +3,7 @@ use std::sync::Arc;
 use argui_core::{Affine2D, Point, Rect, TextPosition};
 use argui_paint::{Border, ClipChain, Color, CornerRadii, DisplayList, Fill, Quad};
 use argui_text::TextLayout;
-use argui_ui::{DocumentTextPoint, NodeId, TextSelectionStyle, UiTree};
+use argui_ui::{DocumentTextPoint, NodeId, TextSelectionHighlight, TextSelectionStyle, UiTree};
 
 use crate::LayoutOutput;
 
@@ -17,6 +17,7 @@ pub struct TextRegion {
     pub transform: Affine2D,
     pub clips: ClipChain,
     pub style: TextSelectionStyle,
+    pub highlight: TextSelectionHighlight,
     /// Number of hit regions emitted through this text's paint position.
     pub interaction_order: usize,
 }
@@ -147,7 +148,13 @@ pub(crate) fn paint(ui: &UiTree, region: &TextRegion, display_list: &mut Display
     };
     let rects = region.visual_rects(range.start, range.end);
     for bounds in &rects {
-        paint_rect(display_list, region, *bounds, region.style.background, 0.0);
+        paint_rect(
+            display_list,
+            region,
+            *bounds,
+            region.highlight.background.clone(),
+            region.highlight.radii,
+        );
     }
     if ui.document_selection_handles_visible()
         && let Some(selection) = ui.document_selection()
@@ -200,8 +207,8 @@ fn paint_handle(
         display_list,
         region,
         bounds,
-        region.style.handle,
-        diameter * 0.5,
+        Fill::Solid(region.style.handle),
+        CornerRadii::all(diameter * 0.5),
     );
 }
 
@@ -209,14 +216,14 @@ fn paint_rect(
     display_list: &mut DisplayList,
     region: &TextRegion,
     bounds: Rect,
-    color: Color,
-    radius: f32,
+    background: Fill,
+    radii: CornerRadii,
 ) {
     display_list.push_quad(Quad {
         bounds,
-        background: Some(Fill::Solid(color)),
+        background: Some(background),
         border: Border::all(0.0, Color::TRANSPARENT),
-        radii: CornerRadii::all(radius),
+        radii,
         opacity: 1.0,
         transform: region.transform,
         clips: region.clips.clone(),

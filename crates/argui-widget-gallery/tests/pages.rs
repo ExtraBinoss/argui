@@ -22,6 +22,8 @@ mod motion;
 mod popover;
 #[path = "pages/scroll_effects.rs"]
 mod scroll_effects;
+#[path = "pages/text_selection.rs"]
+mod text_selection;
 #[path = "pages/timeline.rs"]
 mod timeline;
 #[path = "pages/tooltip.rs"]
@@ -92,6 +94,7 @@ fn all_pages_keep_finite_layout_when_narrow_dark_or_reduced_motion() {
         ("liquid-glass", "Liquid glass"),
         ("scroll-shadow", "Scroll shadow"),
         ("typography", "Typography & selection"),
+        ("text-selection", "Text selection"),
         ("custom-timeline", "Custom Timeline"),
     ] {
         let key = format!("nav::{slug}");

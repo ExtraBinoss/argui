@@ -166,6 +166,9 @@ fn selection_examples(theme: &WidgetTheme) -> Element {
     .border(Border::all(1.0, theme.border))
     .radius(CornerRadii::all(10.0))
     .selection_style(selection)
+    .selection_highlight(
+        argui::ui::TextSelectionHighlight::solid(selection.background).radius(4.0),
+    )
     .width(percent(1.0))
 }
 

@@ -49,6 +49,7 @@ impl Element {
             event_listeners: Vec::new(),
             user_select: crate::UserSelect::Auto,
             selection_style: None,
+            selection_highlight: None,
             z_index: 0,
             children: children.into_iter().collect(),
         }))

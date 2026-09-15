@@ -21,6 +21,8 @@ pub enum RuntimeEvent {
     RendererReady,
     RenderProfile(Box<RenderProfile>),
     AnimationProfile(AnimationProfile),
+    /// Renderer initialization succeeded after selecting a compatibility fallback.
+    RendererFallback(String),
     RendererFailed(String),
     LayoutFailed(String),
     DesktopBackdropUnavailable(String),
@@ -51,6 +53,8 @@ pub enum WindowRuntimeEvent {
     RendererReady,
     RenderProfile(Box<RenderProfile>),
     AnimationProfile(AnimationProfile),
+    /// Renderer initialization succeeded after selecting a compatibility fallback.
+    RendererFallback(String),
     RendererFailed(String),
     LayoutFailed(String),
     DesktopBackdropUnavailable(String),
@@ -70,6 +74,7 @@ impl RuntimeEvent {
             Self::RendererReady => WindowRuntimeEvent::RendererReady,
             Self::RenderProfile(event) => WindowRuntimeEvent::RenderProfile(event),
             Self::AnimationProfile(event) => WindowRuntimeEvent::AnimationProfile(event),
+            Self::RendererFallback(event) => WindowRuntimeEvent::RendererFallback(event),
             Self::RendererFailed(event) => WindowRuntimeEvent::RendererFailed(event),
             Self::LayoutFailed(event) => WindowRuntimeEvent::LayoutFailed(event),
             Self::DesktopBackdropUnavailable(reason) => {

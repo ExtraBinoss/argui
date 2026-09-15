@@ -348,6 +348,7 @@ fn collect_layout(
                     argui_core::Affine2D::IDENTITY,
                 )]),
                 style: ui.resolved_selection_style(node.node),
+                highlight: ui.resolved_selection_highlight(node.node),
                 interaction_order: 0,
             });
         }

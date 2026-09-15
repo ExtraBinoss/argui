@@ -21,6 +21,14 @@ impl UiTree {
         self.index.selection_style(node)
     }
 
+    /// Returns the inherited GPU fill and corner radii for a node's selection highlight.
+    ///
+    /// * `node` — retained node whose selection highlight is queried.
+    #[must_use]
+    pub fn resolved_selection_highlight(&self, node: NodeId) -> crate::TextSelectionHighlight {
+        self.index.selection_highlight(node)
+    }
+
     pub(super) fn expanded_point(
         &self,
         point: DocumentTextPoint,

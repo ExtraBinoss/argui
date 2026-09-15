@@ -67,7 +67,7 @@ fn application() -> Result<GalleryApplication, Box<dyn std::error::Error>> {
             },
         ),
         renderer: argui_devtools::configure_renderer(
-            RendererConfig::default().effects(
+            RendererConfig::default().renderer_fallback(true).effects(
                 argui_effects::registry()?
                     .with_definition(crate::pages::overlay_effects::definition())?,
             ),
@@ -96,6 +96,24 @@ fn handle_event(event: RuntimeEvent) {
             }
     ) {
         renderer_state("ready");
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    match &event {
+        RuntimeEvent::RendererFallback(message) => {
+            eprintln!("Argui renderer warning: {message}");
+        }
+        RuntimeEvent::DesktopBackdropUnavailable(reason) => {
+            eprintln!("Argui desktop backdrop warning: {reason}.");
+        }
+        RuntimeEvent::Window {
+            event: WindowRuntimeEvent::RendererFallback(message),
+            ..
+        } => eprintln!("Argui renderer warning: {message}"),
+        RuntimeEvent::Window {
+            event: WindowRuntimeEvent::DesktopBackdropUnavailable(reason),
+            ..
+        } => eprintln!("Argui desktop backdrop warning: {reason}."),
+        _ => {}
     }
     let error = match event {
         RuntimeEvent::RendererFailed(message)

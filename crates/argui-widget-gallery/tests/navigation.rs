@@ -67,6 +67,7 @@ fn navigation_rebuilds_widget_and_example_pages_from_public_events() {
         ("nav::liquid-glass", "Liquid glass"),
         ("nav::scroll-shadow", "Scroll shadow"),
         ("nav::typography", "Typography & selection"),
+        ("nav::text-selection", "Animated rainbow"),
         ("nav::async-tasks", "Search 10,000 draft titles"),
         ("nav::editing", "Unicode text"),
     ] {

@@ -67,13 +67,23 @@ impl Application {
     ) {
         match renderer {
             Ok(mut renderer) => {
+                if let Some(message) = renderer.initialization_fallback() {
+                    (self.on_event)(RuntimeEvent::RendererFallback(message.into()));
+                }
                 #[cfg(all(feature = "desktop-backdrop", not(target_arch = "wasm32")))]
-                if self.window_config.desktop_backdrop.is_some() && !renderer.is_transparent() {
+                if self.window_config.desktop_backdrop.is_some()
+                    && (renderer.initialization_fallback().is_some() || !renderer.is_transparent())
+                {
                     self.desktop_backdrop = None;
                     self.environment.desktop_backdrop_available = false;
                     self.pending_ui_frame.request_rebuild();
                     (self.on_event)(RuntimeEvent::DesktopBackdropUnavailable(
-                        "the GPU surface is opaque".into(),
+                        if renderer.initialization_fallback().is_some() {
+                            "the renderer selected a compatibility fallback without Windows DirectComposition support"
+                                .into()
+                        } else {
+                            "the GPU surface is opaque".into()
+                        },
                     ));
                 }
                 if self.renderer_device.borrow().is_none() {

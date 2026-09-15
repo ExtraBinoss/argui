@@ -50,6 +50,9 @@ impl EffectQuality {
 #[derive(Clone, Debug)]
 pub struct RendererConfig {
     pub power_preference: wgpu::PowerPreference,
+    /// Whether Windows may retry compatible renderer configurations after the preferred
+    /// DirectX 12 DirectComposition configuration fails.
+    pub renderer_fallback: bool,
     pub present_mode: wgpu::PresentMode,
     pub maximum_frame_latency: u32,
     pub clear_color: Color,
@@ -65,6 +68,7 @@ impl Default for RendererConfig {
     fn default() -> Self {
         Self {
             power_preference: wgpu::PowerPreference::HighPerformance,
+            renderer_fallback: true,
             present_mode: wgpu::PresentMode::AutoVsync,
             maximum_frame_latency: 2,
             clear_color: Color::srgb(0.055, 0.065, 0.09),
@@ -79,6 +83,16 @@ impl Default for RendererConfig {
 }
 
 impl RendererConfig {
+    /// Enables or disables renderer fallback during Windows GPU initialization.
+    ///
+    /// When `enabled` is `false`, Windows only attempts DirectX 12 with
+    /// DirectComposition. Other platforms currently ignore this setting.
+    #[must_use]
+    pub fn renderer_fallback(mut self, enabled: bool) -> Self {
+        self.renderer_fallback = enabled;
+        self
+    }
+
     /// Sets the maximum number of frames queued for presentation, clamped to 1–3.
     /// * `frames` — requested frame latency; values are clamped to the supported range.
     #[must_use]
