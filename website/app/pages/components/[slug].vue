@@ -7,6 +7,20 @@ definePageMeta({
 const route = useRoute()
 const { t } = useI18n()
 const item = computed(() => catalogue.find((item) => item.slug === route.params.slug))
+const previewItem = ref<(typeof catalogue)[number]>()
+const source = computed(() => previewItem.value?.source ?? item.value?.source ?? '')
+watch(
+  () => item.value?.slug,
+  () => {
+    previewItem.value = undefined
+  },
+)
+function selectPreviewPage(label: string) {
+  const selected =
+    catalogue.find((entry) => entry.name === label) ??
+    catalogue.find((entry) => entry.gallery === label)
+  if (selected) previewItem.value = selected
+}
 const featureCode = computed(
   () => `[dependencies.argui]\ngit = "${repository}"\nfeatures = ["widget-${item.value?.feature}"]`,
 )
@@ -21,12 +35,12 @@ usePageSeo(
 </script>
 <template>
   <article v-if="item">
-    <SourceLink :path="item.source" />
+    <SourceLink :path="source" />
     <div class="component-page-heading">
       <h1>{{ item.name }}</h1>
       <p>{{ item.description }}</p>
     </div>
-    <GalleryFrame v-if="item.gallery" :component="item.gallery" />
+    <GalleryFrame v-if="item.gallery" :component="item.gallery" @page-change="selectPreviewPage" />
     <div v-else class="no-demo">
       <p>{{ t('components.noDemo') }}</p>
       <ActionLink to="/components" variant="secondary">{{ t('components.title') }}</ActionLink>
@@ -37,7 +51,7 @@ usePageSeo(
       <CodeBlock :code="featureCode" filename="Cargo.toml" />
       <p>{{ t('components.integration') }}</p>
     </section>
-    <ActionLink :to="sourceUrl(item.source)" external variant="text">
+    <ActionLink :to="sourceUrl(source)" external variant="text">
       {{
         t(item.category === 'Examples' ? 'components.exampleSource' : 'components.implementation')
       }}

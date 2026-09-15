@@ -2,6 +2,7 @@
 import { ArrowUpRight, Box, LoaderCircle, Play, RotateCw, Square, TriangleAlert } from '@lucide/vue'
 import WebGpuHelp from './WebGpuHelp.vue'
 const props = defineProps<{ component?: string | null; app?: 'ai-harness' }>()
+const emit = defineEmits<{ pageChange: [label: string] }>()
 const asset = usePublicAsset()
 const { t } = useI18n()
 const frame = ref<HTMLIFrameElement>()
@@ -43,6 +44,10 @@ function receive(event: MessageEvent) {
     event.data?.type !== 'argui-preview'
   )
     return
+  if (event.data.state === 'selection' && typeof event.data.component === 'string') {
+    emit('pageChange', event.data.component)
+    return
+  }
   if (event.data.state === 'loading') phase.value = 'loading'
   if (event.data.state === 'ready' || event.data.state === 'error') {
     clearTimeout(timer)

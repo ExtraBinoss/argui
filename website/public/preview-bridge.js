@@ -39,11 +39,24 @@ const notify = (state, reason) =>
     { type: 'argui-preview', state, reason, origin: location.origin, ...profile },
     location.origin,
   )
+const notifySelection = (component) =>
+  parent.postMessage({ type: 'argui-preview', state: 'selection', component }, location.origin)
 let observer
 let timer
 let rendererReady = false
 let finished = false
 let failed = false
+
+addEventListener(
+  'click',
+  (event) => {
+    const button =
+      event.target instanceof Element ? event.target.closest('button[aria-label]') : null
+    const label = button?.getAttribute('aria-label')
+    if (label) notifySelection(label)
+  },
+  true,
+)
 
 function previewError(reason, message) {
   const error = new Error(message)

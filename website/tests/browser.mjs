@@ -195,6 +195,15 @@ try {
   assert.equal(await page.$$('iframe').then((items) => items.length), 0)
   await page.click('.gallery-launch button')
   await page.waitForSelector('.status-dot.live', { timeout: 90_000 })
+  const restartedFrame = await (await page.$('iframe')).contentFrame()
+  await restartedFrame.waitForSelector('button[aria-label="Async tasks"]')
+  await restartedFrame.$eval('button[aria-label="Async tasks"]', (element) => element.click())
+  await page.waitForFunction(() =>
+    document
+      .querySelector('.action-link.action-text')
+      ?.getAttribute('href')
+      ?.endsWith('/crates/argui-widget-gallery/src/pages/async_tasks.rs'),
+  )
 
   await page.setViewport({ width: 1000, height: 820 })
   await page.goto(`${origin}/examples`, { waitUntil: 'networkidle0' })
