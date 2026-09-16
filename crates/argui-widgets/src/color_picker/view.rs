@@ -2,9 +2,9 @@ use argui_core::{Color, ColorInterpolation, Point};
 use argui_paint::{BilinearGradient, CornerRadii, Fill, GradientStop, LinearGradient};
 use argui_text::TextStyle;
 use argui_ui::{
-    AlignItems, Element, FocusPolicy, GestureCapture, GestureDelivery, GestureSet, Interaction,
-    PanGesture, Role, SemanticState, Semantics, Sides, StylePatch, UserSelect, VisualState, length,
-    percent,
+    AlignItems, ColorHandlerValue, ColorValueFormat, ContinuousValuePhase, Element, EventType,
+    FocusPolicy, GestureCapture, GestureDelivery, GestureSet, Interaction, PanGesture, Role,
+    SemanticState, Semantics, Sides, StylePatch, UserSelect, VisualState, length, percent,
 };
 
 use super::{ColorFormat, ColorPicker, paint::Decoration, values::hsv_to_rgb};
@@ -41,7 +41,7 @@ impl ColorPicker<'_> {
                 let mut style = theme.input();
                 style.layout.padding = Sides::length(6.0);
                 style.text.font_size = 12.0;
-                let field = Input::new(
+                let mut field = Input::new(
                     format!("{}::field::{index}", self.key),
                     draft.map_or(value, |draft| draft.1.clone()),
                     "",
@@ -57,6 +57,25 @@ impl ColorPicker<'_> {
                 .enabled(self.state.enabled)
                 .build()
                 .min_width(length(0.0));
+                if self.state.enabled {
+                    let format = match self.state.format {
+                        ColorFormat::Hex => ColorValueFormat::Hex,
+                        ColorFormat::Rgb => ColorValueFormat::Rgb,
+                        ColorFormat::Hsl => ColorValueFormat::Hsl,
+                        ColorFormat::Hsv => ColorValueFormat::Hsv,
+                    };
+                    let source =
+                        ColorHandlerValue::field(self.state.hsv, self.state.alpha, format, index);
+                    for handler in &self.change_handlers {
+                        field = field
+                            .on(handler
+                                .direct_listener(EventType::Input)
+                                .color_handler_value(source))
+                            .on(handler
+                                .direct_listener(EventType::Submit)
+                                .color_handler_value(source));
+                    }
+                }
                 Element::column([label_text(label, theme.muted_foreground, 11.0), field])
                     .gap(4.0)
                     .grow(1.0)
@@ -109,7 +128,7 @@ impl ColorPicker<'_> {
         let [h, s, v] = self.state.hsv;
         let [r, g, b] = hsv_to_rgb([h, 1.0, 1.0]);
         let marker = marker(self.state.color(), 14.0, s, 1.0 - v);
-        Element::container([marker]).keyed(format!("{}::pad", self.key))
+        let mut pad = Element::container([marker]).keyed(format!("{}::pad", self.key))
             .width(percent(1.0)).height(length(160.0))
             .fill(Fill::Bilinear(BilinearGradient::new(
                 [Color::WHITE, Color::srgb(r, g, b), Color::BLACK, Color::BLACK], ColorInterpolation::Srgb,
@@ -123,7 +142,20 @@ impl ColorPicker<'_> {
                 .label(format!("Saturation {:.0}%, brightness {:.0}%", s * 100.0, v * 100.0))
                 .description("Left/right changes saturation; up/down changes brightness. Shift adjusts by 0.1%. Color channels are also editable below.")
                 .state(SemanticState { disabled: !self.state.enabled, ..SemanticState::default() }))
-            .when(VisualState::FocusVisible, StylePatch::new().set(argui_ui::property::BorderColor, theme.ring).set(argui_ui::property::BorderWidths, [2.0; 4]))
+            .when(VisualState::FocusVisible, StylePatch::new().set(argui_ui::property::BorderColor, theme.ring).set(argui_ui::property::BorderWidths, [2.0; 4]));
+        if self.state.enabled {
+            let source = ColorHandlerValue::pad(self.state.hsv, self.state.alpha);
+            for handler in &self.change_handlers {
+                pad = pad
+                    .on(handler
+                        .direct_listener(EventType::Gesture)
+                        .color_handler_value(source))
+                    .on(handler
+                        .direct_listener(EventType::Key)
+                        .color_handler_value(source));
+            }
+        }
+        pad
     }
 
     fn track(
@@ -168,7 +200,29 @@ impl ColorPicker<'_> {
                         .set(argui_ui::property::BorderWidths, [2.0; 4]),
                 ),
         );
-        behavior.decorate(RangePart::Root, control)
+        let mut control = behavior.decorate(RangePart::Root, control);
+        if self.state.enabled {
+            for handler in &self.change_handlers {
+                for phase in [ContinuousValuePhase::Change, ContinuousValuePhase::Commit] {
+                    let source = if alpha {
+                        ColorHandlerValue::alpha(self.state.hsv, self.state.alpha, phase)
+                    } else {
+                        ColorHandlerValue::hue(self.state.hsv, self.state.alpha, phase)
+                    };
+                    control = control
+                        .on(handler
+                            .direct_listener(EventType::Gesture)
+                            .color_handler_value(source))
+                        .on(handler
+                            .direct_listener(EventType::Key)
+                            .color_handler_value(source))
+                        .on(handler
+                            .direct_listener(EventType::SemanticAction)
+                            .color_handler_value(source));
+                }
+            }
+        }
+        control
     }
 }
 

@@ -361,6 +361,36 @@ fn multiple_listeners_keep_distinct_handler_identities() {
 }
 
 #[test]
+fn target_only_listeners_ignore_descendant_bubbling_without_affecting_other_listeners() {
+    let options = EventListenerOptions::default();
+    let root = Element::container([Element::text("child").keyed("child")])
+        .keyed("root")
+        .listen(EventType::Click, options.target_only(true))
+        .listen(EventType::Click, options);
+    let mut tree = UiTree::new(root);
+    let child = tree.node_id_at(1).unwrap();
+    let descendant = tree.event_deliveries(
+        child,
+        UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
+    );
+    assert_eq!(descendant.len(), 1);
+    assert_eq!(descendant[0].current_key(), Some("root"));
+    assert_eq!(descendant[0].phase(), EventPhase::Bubble);
+
+    let root = tree.node_id_at(0).unwrap();
+    let direct = tree.event_deliveries(
+        root,
+        UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
+    );
+    assert_eq!(direct.len(), 2);
+    assert!(
+        direct
+            .iter()
+            .all(|event| event.phase() == EventPhase::Target)
+    );
+}
+
+#[test]
 fn top_light_dismiss_portal_receives_pointer_outside() {
     let mut tree = UiTree::new(Element::container([
         Element::container([]).keyed("outside"),

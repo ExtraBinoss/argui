@@ -1,7 +1,7 @@
 use argui::{
     runtime::{Context, Render},
     text::TextStyle,
-    ui::{AlignItems, Element, EventType, Sides, UiEventKind, percent},
+    ui::{AlignItems, Element, Sides, percent},
     widgets::{Button, default_theme},
 };
 
@@ -22,7 +22,9 @@ impl Render for Example {
                 weight: 700,
                 ..TextStyle::default()
             }),
-            Button::new("increment", "Increment", theme.button()).build(),
+            Button::new("increment", "Increment", theme.button())
+                .on_click(cx.callback(|app| app.count = app.count.saturating_add(1)))
+                .build(),
         ])
         .width(percent(1.0))
         .height(percent(1.0))
@@ -30,13 +32,5 @@ impl Render for Example {
         .padding(Sides::length(28.0))
         .gap(18.0)
         .background(theme.background)
-        .on(cx.listener(EventType::Click, |app, event, cx| {
-            if event.target_key() == Some("increment")
-                && matches!(event.kind, UiEventKind::Click(_))
-            {
-                app.count = app.count.saturating_add(1);
-                cx.notify();
-            }
-        }))
     }
 }

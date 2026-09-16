@@ -2,11 +2,16 @@
     <uses-feature
         android:name="android.hardware.vulkan.level"
         android:required="false" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
-        android:hasCode="false"
+        android:hasCode="true"
+        android:icon="@mipmap/ic_launcher"
         android:label="Argui Widget Gallery"
-        android:theme="@android:style/Theme.Material.NoActionBar">
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:theme="@style/ArguiTheme">
         <activity
             android:name="android.app.NativeActivity"
             android:configChanges="orientation|keyboardHidden|screenSize|screenLayout|uiMode"
@@ -22,5 +27,9 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <service
+            android:name="dev.argui.android.ForegroundTaskService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
     </application>
 </manifest>

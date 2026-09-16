@@ -1,6 +1,6 @@
 use crate::{Popover, WidgetTheme};
 use argui_core::{Key, KeyState, PointerKind, PointerPhase};
-use argui_ui::{Element, UiEvent, UiEventKind};
+use argui_ui::{Element, UiEvent, UiEventKind, ValueHandler};
 use std::time::Duration;
 
 /// Delayed rich preview. It opens on hover or focus without moving focus into its panel.
@@ -11,6 +11,7 @@ pub struct HoverCard {
     pub trigger: Element,
     pub content: Element,
     pub open: bool,
+    open_handlers: Vec<ValueHandler<bool>>,
 }
 
 impl HoverCard {
@@ -30,14 +31,26 @@ impl HoverCard {
             trigger,
             content,
             open,
+            open_handlers: Vec::new(),
         }
+    }
+
+    /// Adds a callback receiving immediate click and dismissal open-state requests.
+    #[must_use]
+    pub fn on_open_change(mut self, handler: ValueHandler<bool>) -> Self {
+        self.open_handlers.push(handler);
+        self
     }
 
     #[must_use]
     /// Builds the hover card using `theme` for its panel styling.
     pub fn build(self, theme: &WidgetTheme) -> Element {
-        let mut root =
-            Popover::new(&self.key, self.label, self.open, self.trigger, self.content).build(theme);
+        let mut popover =
+            Popover::new(&self.key, self.label, self.open, self.trigger, self.content);
+        for handler in self.open_handlers {
+            popover = popover.on_open_change(handler);
+        }
+        let mut root = popover.build(theme);
         if self.open {
             root.children[0] = root.children[0]
                 .clone()

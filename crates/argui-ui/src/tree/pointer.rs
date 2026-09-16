@@ -46,6 +46,9 @@ impl UiTree {
         event: PointerEvent,
         regions: &[HitRegion],
     ) -> InteractionUpdate {
+        self.interaction_bounds.clear();
+        self.interaction_bounds
+            .extend(regions.iter().map(|region| (region.node, region.bounds)));
         let region = regions
             .iter()
             .rev()
@@ -176,10 +179,11 @@ impl UiTree {
     /// Processes release of the primary mouse button.
     /// Returns the resulting interaction update.
     pub fn primary_released(&mut self) -> InteractionUpdate {
+        let position = self.interaction.mouse_position().unwrap_or_default();
         let update = self.interaction.primary_released(PointerEvent {
             button: Some(argui_core::PointerButton::Primary),
             phase: PointerPhase::Released,
-            ..PointerEvent::mouse(PointerPhase::Released, Point::default())
+            ..PointerEvent::mouse(PointerPhase::Released, position)
         });
         self.decorate(update)
     }

@@ -5,6 +5,7 @@ mod view;
 
 use argui_core::{Color, Rect};
 use argui_runtime::LayoutSnapshot;
+use argui_ui::ValueHandler;
 
 use crate::{RangeBehavior, RangeConfig, RangeState, WidgetTheme};
 
@@ -147,6 +148,7 @@ pub struct ColorPicker<'a> {
     key: String,
     label: String,
     state: &'a ColorPickerState,
+    change_handlers: Vec<ValueHandler<Color>>,
 }
 
 impl<'a> ColorPicker<'a> {
@@ -162,7 +164,18 @@ impl<'a> ColorPicker<'a> {
             key: key.into(),
             label: label.into(),
             state,
+            change_handlers: Vec::new(),
         }
+    }
+
+    /// Adds a handler that receives the next color produced by editing the picker.
+    ///
+    /// Pointer, keyboard, semantic, and valid text edits use the same controlled
+    /// callback path. Invalid drafts do not invoke `handler`.
+    #[must_use]
+    pub fn on_change(mut self, handler: ValueHandler<Color>) -> Self {
+        self.change_handlers.push(handler);
+        self
     }
 
     #[must_use]

@@ -20,6 +20,7 @@ const sourceOverrides = {
   'async-tasks': 'pages/async_tasks',
   editing: 'pages/editing',
   'custom-timeline': 'pages/timeline',
+  'mobile-activity': 'pages/mobile_activity',
 }
 const extraWidgets = [
   [
@@ -35,12 +36,6 @@ const extraWidgets = [
     'Split pane',
     'Resizable panels with limits, pointer gestures and keyboard control.',
     null,
-  ],
-  [
-    'text-selection',
-    'Text selection',
-    'Selection surfaces and contextual actions for retained text.',
-    'Typography & selection',
   ],
   [
     'tree-view',
@@ -102,6 +97,11 @@ export async function createCatalogue() {
       gallery,
     })
   }
+  const duplicateSlugs = items
+    .map((item) => item.slug)
+    .filter((slug, index, slugs) => slugs.indexOf(slug) !== index)
+  if (duplicateSlugs.length > 0)
+    throw new Error(`Duplicate catalogue slugs: ${[...new Set(duplicateSlugs)].join(', ')}`)
   for (const item of items) {
     if (!item.name || !item.description) throw new Error(`Missing gallery metadata: ${item.slug}`)
     await access(resolve(root, item.source))

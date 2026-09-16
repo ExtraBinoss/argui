@@ -1,5 +1,5 @@
 use argui::{
-    core::{Insets, Point, PointerEvent, PointerId, PointerPhase},
+    core::{Insets, Point, PointerEvent, PointerId, PointerPhase, Rect, Size},
     runtime::{Entity, LayoutSnapshot, WindowEnvironment},
     ui::{
         ClickEvent, Element, GestureDelivery, GestureEvent, GestureKind, GesturePhase, UiEventKind,
@@ -90,6 +90,24 @@ fn find_key<'a>(element: &'a Element, key: &str) -> Option<&'a Element> {
         .find_map(|child| find_key(child, key))
 }
 
+/// Finds the laid-out bounds for an element identified by its stable UI key.
+///
+/// * `tree` — retained UI tree containing the keyed element.
+/// * `output` — layout result produced for `tree`.
+/// * `key` — stable key of the element whose bounds are requested.
+///
+/// # Panics
+///
+/// Panics when the tree does not contain `key` or the layout output omits it.
+fn layout_bounds_for_key(tree: &UiTree, output: &argui::layout::LayoutOutput, key: &str) -> Rect {
+    output
+        .nodes
+        .iter()
+        .find(|node| tree.key(node.node) == Some(key))
+        .unwrap_or_else(|| panic!("layout node with key {key:?} is missing"))
+        .bounds
+}
+
 #[test]
 fn gallery_app_builds_a_searchable_public_root() {
     let gallery = Entity::new(WidgetGallery::default());
@@ -111,6 +129,49 @@ fn gallery_root_respects_native_safe_area_insets() {
     assert_eq!(root.style.padding.bottom, length(34.0));
     assert_eq!(root.style.padding.left, length(6.0));
     assert!(has_key(&root, "gallery-root"));
+    let tree = UiTree::new(root);
+    assert!(
+        tree.resolved_quad(tree.node_ids()[0], tree.root())
+            .background
+            .is_some()
+    );
+}
+
+#[test]
+fn compact_gallery_layout_keeps_its_header_and_content_inside_native_safe_area() {
+    let gallery = Entity::new(WidgetGallery::default());
+    let mount = gallery.mount().unwrap();
+    resize_gallery(&mount, 390.0, 844.0);
+    let insets = Insets::new(44.0, 8.0, 24.0, 6.0);
+    let mut tree = UiTree::new(
+        mount
+            .render(WindowEnvironment {
+                safe_area_insets: insets,
+                ..WindowEnvironment::default()
+            })
+            .unwrap(),
+    );
+    let output = argui::layout::LayoutEngine::new()
+        .compute(
+            &mut tree,
+            &mut argui::text::TextEngine::new(),
+            Size::new(390.0, 844.0),
+        )
+        .unwrap();
+
+    let gallery_bounds = layout_bounds_for_key(&tree, &output, "gallery-root");
+    let topbar_bounds = layout_bounds_for_key(&tree, &output, "gallery-topbar");
+    let mobile_header_bounds = layout_bounds_for_key(&tree, &output, "gallery-mobile-header");
+    let content_bounds = layout_bounds_for_key(&tree, &output, "gallery-content-scroll");
+    let safe_right = 390.0 - insets.right;
+    let safe_bottom = 844.0 - insets.bottom;
+
+    assert_eq!(gallery_bounds.origin, Point::new(insets.left, insets.top));
+    assert!(gallery_bounds.origin.x + gallery_bounds.size.width <= safe_right);
+    assert!(gallery_bounds.origin.y + gallery_bounds.size.height <= safe_bottom);
+    assert_eq!(topbar_bounds.origin.y, insets.top);
+    assert!(mobile_header_bounds.origin.y >= topbar_bounds.origin.y + topbar_bounds.size.height);
+    assert!(content_bounds.origin.y + content_bounds.size.height <= safe_bottom);
 }
 
 #[test]
@@ -125,6 +186,8 @@ fn narrow_gallery_uses_a_horizontal_header_and_compact_content() {
     resize_gallery(&mount, 390.0, 844.0);
     let compact = mount.render(WindowEnvironment::default()).unwrap();
     assert!(!has_key(&compact, "gallery-sidebar"));
+    let topbar = find_key(&compact, "gallery-topbar").unwrap();
+    assert_eq!(topbar.style.padding.right, length(14.0));
     let navigation = find_key(&compact, "gallery-mobile-navigation").unwrap();
     assert_eq!(navigation.style.overflow.x, argui::ui::Overflow::Auto);
     assert_eq!(navigation.style.overflow.y, argui::ui::Overflow::Hidden);
@@ -143,6 +206,8 @@ fn narrow_gallery_uses_a_horizontal_header_and_compact_content() {
     let desktop = mount.render(WindowEnvironment::default()).unwrap();
     assert!(has_key(&desktop, "gallery-sidebar"));
     assert!(!has_key(&desktop, "gallery-mobile-navigation"));
+    let topbar = find_key(&desktop, "gallery-topbar").unwrap();
+    assert_eq!(topbar.style.padding.right, length(126.0));
 }
 
 fn resize_gallery(mount: &argui::runtime::Mount<WidgetGallery>, width: f32, height: f32) {

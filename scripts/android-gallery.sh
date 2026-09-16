@@ -23,7 +23,11 @@ case "$command_name" in
     ;;
   launch)
     command -v adb >/dev/null || { echo "adb is missing; install Android platform-tools" >&2; exit 1; }
-    exec adb shell monkey -p dev.argui.widgetgallery.debug 1 "$@"
+    exec adb shell am start -W \
+      -a android.intent.action.MAIN \
+      -c android.intent.category.LAUNCHER \
+      -n dev.argui.widgetgallery.debug/android.app.NativeActivity \
+      "$@"
     ;;
   *)
     echo "unknown command: $command_name" >&2

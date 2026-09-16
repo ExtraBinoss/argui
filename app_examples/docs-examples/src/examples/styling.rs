@@ -6,7 +6,7 @@ use argui::{
     runtime::{Context, Render},
     text::TextStyle,
     theme::{ThemeOverrides, ThemeValue},
-    ui::{Element, EventType, FlexWrap, Sides, UiEventKind, percent},
+    ui::{Element, EventHandler, FlexWrap, Sides, percent},
     widgets::{Button, WidgetTheme, default_theme},
 };
 
@@ -55,13 +55,19 @@ fn custom_overrides(scheme: ColorScheme) -> Arc<ThemeOverrides> {
     Arc::new(tokens)
 }
 
-fn choice(key: &'static str, label: &'static str, selected: bool, theme: &WidgetTheme) -> Element {
+fn choice(
+    key: &'static str,
+    label: &'static str,
+    selected: bool,
+    theme: &WidgetTheme,
+    handler: EventHandler,
+) -> Element {
     let style = if selected {
         theme.button()
     } else {
         theme.outline_button()
     };
-    Button::new(key, label, style).build()
+    Button::new(key, label, style).on_click(handler).build()
 }
 
 impl Render for Example {
@@ -85,26 +91,52 @@ impl Render for Example {
         };
 
         let schemes = Element::row([
-            choice("system", "System", self.scheme.is_none(), theme),
+            choice(
+                "system",
+                "System",
+                self.scheme.is_none(),
+                theme,
+                cx.callback(|app| app.scheme = None),
+            ),
             choice(
                 "light",
                 "Light",
                 self.scheme == Some(ColorScheme::Light),
                 theme,
+                cx.callback(|app| app.scheme = Some(ColorScheme::Light)),
             ),
             choice(
                 "dark",
                 "Dark",
                 self.scheme == Some(ColorScheme::Dark),
                 theme,
+                cx.callback(|app| app.scheme = Some(ColorScheme::Dark)),
             ),
         ])
         .gap(8.0)
         .flex_wrap(FlexWrap::Wrap);
         let accents = Element::row([
-            choice("blue", "Blue", self.accent == 0, theme),
-            choice("violet", "Violet", self.accent == 1, theme),
-            choice("amber", "Amber", self.accent == 2, theme),
+            choice(
+                "blue",
+                "Blue",
+                self.accent == 0,
+                theme,
+                cx.callback(|app| app.accent = 0),
+            ),
+            choice(
+                "violet",
+                "Violet",
+                self.accent == 1,
+                theme,
+                cx.callback(|app| app.accent = 1),
+            ),
+            choice(
+                "amber",
+                "Amber",
+                self.accent == 2,
+                theme,
+                cx.callback(|app| app.accent = 2),
+            ),
             choice(
                 "tokens",
                 if self.custom_tokens {
@@ -114,6 +146,7 @@ impl Render for Example {
                 },
                 self.custom_tokens,
                 theme,
+                cx.callback(|app| app.custom_tokens = !app.custom_tokens),
             ),
         ])
         .gap(8.0)
@@ -159,21 +192,5 @@ impl Render for Example {
         .padding(Sides::length(20.0))
         .gap(14.0)
         .background(theme.background)
-        .on(cx.listener(EventType::Click, |app, event, cx| {
-            if !matches!(event.kind, UiEventKind::Click(_)) {
-                return;
-            }
-            match event.target_key() {
-                Some("system") => app.scheme = None,
-                Some("light") => app.scheme = Some(ColorScheme::Light),
-                Some("dark") => app.scheme = Some(ColorScheme::Dark),
-                Some("blue") => app.accent = 0,
-                Some("violet") => app.accent = 1,
-                Some("amber") => app.accent = 2,
-                Some("tokens") => app.custom_tokens = !app.custom_tokens,
-                _ => return,
-            }
-            cx.notify();
-        }))
     }
 }

@@ -18,6 +18,29 @@ fn cancellation_is_shared_and_empty_slot_is_idle() {
 
 #[test]
 #[cfg(not(target_arch = "wasm32"))]
+fn dispatcher_clock_rejects_wall_time_control_and_shutdown() {
+    use argui_runtime::tasks::{TaskError, TaskRuntime};
+
+    let realtime = TaskRuntime::new(|| {});
+    assert!(matches!(
+        realtime.advance_time(std::time::Duration::from_millis(1)),
+        Err(TaskError::Unavailable)
+    ));
+    realtime.advance_time(std::time::Duration::ZERO).unwrap();
+
+    let paused = TaskRuntime::new_paused(|| {});
+    paused
+        .advance_time(std::time::Duration::from_millis(1))
+        .unwrap();
+    paused.shutdown();
+    assert!(matches!(
+        paused.advance_time(std::time::Duration::ZERO),
+        Err(TaskError::Unavailable)
+    ));
+}
+
+#[test]
+#[cfg(not(target_arch = "wasm32"))]
 fn data_models_share_the_executor_without_rendering_or_parent_retention() {
     use argui_runtime::{ModelRuntime, tasks::TaskRuntime};
     let models = ModelRuntime::default();

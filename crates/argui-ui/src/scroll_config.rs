@@ -104,6 +104,7 @@ pub struct ScrollConfig {
     pub enabled: bool,
     pub axes: ScrollAxes,
     pub polarity: ScrollPolarity,
+    pub natural_touch_scroll: bool,
     pub propagation: ScrollPropagation,
     pub line_size: f32,
     pub multiplier: f32,
@@ -120,6 +121,7 @@ impl Default for ScrollConfig {
             enabled: true,
             axes: ScrollAxes::Vertical,
             polarity: ScrollPolarity::Normal,
+            natural_touch_scroll: true,
             propagation: ScrollPropagation::Chain,
             line_size: 40.0,
             multiplier: 1.0,
@@ -160,6 +162,17 @@ impl ScrollConfig {
     #[must_use]
     pub const fn polarity(mut self, polarity: ScrollPolarity) -> Self {
         self.polarity = polarity;
+        self
+    }
+
+    /// Sets whether content follows a finger during direct touch scrolling.
+    ///
+    /// * `natural` — `true` makes content follow the finger; `false` reverses touch movement.
+    ///
+    /// Wheel and trackpad deltas remain controlled by [`Self::polarity`].
+    #[must_use]
+    pub const fn natural_touch_scroll(mut self, natural: bool) -> Self {
+        self.natural_touch_scroll = natural;
         self
     }
 

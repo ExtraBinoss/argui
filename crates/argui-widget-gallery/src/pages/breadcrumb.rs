@@ -1,6 +1,6 @@
 use argui::{
     runtime::Context,
-    ui::{Element, EventType, length},
+    ui::{Element, length},
     widgets::{Breadcrumb, BreadcrumbLink, Card, WidgetTheme},
 };
 
@@ -14,7 +14,14 @@ pub(super) fn render(theme: &WidgetTheme, cx: &mut Context<WidgetGallery>) -> El
             BreadcrumbLink::new("components", "Components"),
         ],
         "Breadcrumb",
-    );
+    )
+    .on_activate(cx.value_callback(|gallery, id| {
+        gallery.page = if id == "home" {
+            Page::Button
+        } else {
+            Page::Card
+        };
+    }));
     let custom = Breadcrumb::new(
         "project-path",
         [
@@ -24,24 +31,19 @@ pub(super) fn render(theme: &WidgetTheme, cx: &mut Context<WidgetGallery>) -> El
         "Navigation",
     )
     .separator("›")
-    .label("Project location");
+    .label("Project location")
+    .on_activate(cx.value_callback(|gallery, id| {
+        gallery.page = if id == "projects" {
+            Page::Empty
+        } else {
+            Page::Card
+        };
+    }));
     Element::column([
         super::preview(
             "Know where you are",
             "Follow the trail back to an earlier page.",
-            breadcrumb
-                .build(theme)
-                .on(cx.listener(EventType::Click, move |gallery, event, cx| {
-                    if let Some(id) = breadcrumb.action(event) {
-                        gallery.page = if id == "home" {
-                            Page::Button
-                        } else {
-                            Page::Card
-                        };
-                        event.stop_propagation();
-                        cx.notify();
-                    }
-                })),
+            breadcrumb.build(theme),
             theme,
         ),
         super::preview(
@@ -57,20 +59,7 @@ pub(super) fn render(theme: &WidgetTheme, cx: &mut Context<WidgetGallery>) -> El
                 ),
             )
             .title("Component library")
-            .footer(custom.build(theme).on(cx.listener(
-                EventType::Click,
-                move |gallery, event, cx| {
-                    if let Some(id) = custom.action(event) {
-                        gallery.page = if id == "projects" {
-                            Page::Empty
-                        } else {
-                            Page::Card
-                        };
-                        event.stop_propagation();
-                        cx.notify();
-                    }
-                },
-            )))
+            .footer(custom.build(theme))
             .build(theme)
             .max_width(length(560.0)),
             theme,

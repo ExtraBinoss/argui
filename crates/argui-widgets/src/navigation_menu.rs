@@ -1,6 +1,9 @@
 use crate::{Button, ButtonBehavior, Popover, WidgetTheme, choice_navigation::navigate};
 use argui_core::{Key, KeyState};
-use argui_ui::{Element, FocusPolicy, Orientation, Role, Semantics, UiEvent, UiEventKind};
+use argui_ui::{
+    Element, EventFilter, EventType, FocusPolicy, Orientation, Role, Semantics, UiEvent,
+    UiEventKind, ValueHandler,
+};
 
 #[derive(Clone, Debug)]
 pub struct NavigationItem {
@@ -40,6 +43,8 @@ pub struct NavigationMenu {
     pub items: Vec<NavigationItem>,
     pub open: Option<String>,
     pub rtl: bool,
+    action_handlers: Vec<ValueHandler<String>>,
+    open_handlers: Vec<ValueHandler<String>>,
 }
 
 impl NavigationMenu {
@@ -57,7 +62,23 @@ impl NavigationMenu {
             items: items.into_iter().collect(),
             open: None,
             rtl: false,
+            action_handlers: Vec::new(),
+            open_handlers: Vec::new(),
         }
+    }
+
+    /// Adds a handler receiving the stable id of an activated navigation link.
+    #[must_use]
+    pub fn on_action(mut self, handler: ValueHandler<String>) -> Self {
+        self.action_handlers.push(handler);
+        self
+    }
+
+    /// Adds a handler receiving the requested panel id, or an empty string when closing.
+    #[must_use]
+    pub fn on_open_change(mut self, handler: ValueHandler<String>) -> Self {
+        self.open_handlers.push(handler);
+        self
     }
 
     #[must_use]
@@ -136,10 +157,39 @@ impl NavigationMenu {
             )
             .enabled(item.enabled)
             .build();
+            let mut trigger = trigger;
+            if item.enabled {
+                let handlers = if item.panel.is_some() {
+                    &self.open_handlers
+                } else {
+                    &self.action_handlers
+                };
+                let value = if item.panel.is_some() && self.open.as_deref() == Some(&item.id) {
+                    String::new()
+                } else {
+                    item.id.clone()
+                };
+                for handler in handlers {
+                    trigger =
+                        trigger.on(handler.direct_listener_value(EventType::Click, value.clone()));
+                }
+            }
             if let Some(panel) = &item.panel {
                 let open = item.enabled && self.open.as_deref() == Some(&item.id);
                 let mut root =
                     Popover::new(&key, &item.label, open, trigger, panel.clone()).build(theme);
+                if open && let Some(content) = root.children.get_mut(1) {
+                    for handler in &self.open_handlers {
+                        *content = content
+                            .clone()
+                            .on(handler
+                                .direct_listener_value(EventType::PointerOutside, String::new()))
+                            .on(handler.direct_listener_value(EventType::Dismiss, String::new()))
+                            .on(handler
+                                .listener_value(EventType::Key, String::new())
+                                .filter(EventFilter::EscapePressed));
+                    }
+                }
                 // Popover owns trigger semantics; preserve the navigation item's disabled state.
                 let trigger = &mut root.children[0];
                 trigger.interaction.as_mut().expect("trigger").enabled = item.enabled;

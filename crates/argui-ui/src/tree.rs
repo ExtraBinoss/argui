@@ -68,6 +68,7 @@ pub struct UiTree {
     events: EventRegistry,
     pending_gestures: Vec<crate::GestureEvent>,
     native_portals: std::collections::HashMap<NodeId, argui_core::Rect>,
+    interaction_bounds: std::collections::HashMap<NodeId, argui_core::Rect>,
 }
 
 impl UiTree {
@@ -106,6 +107,7 @@ impl UiTree {
             events,
             pending_gestures: Vec::new(),
             native_portals: Default::default(),
+            interaction_bounds: Default::default(),
         };
         tree.sync_text_inputs();
         tree.sync_responsive_registry();
@@ -209,6 +211,8 @@ impl UiTree {
                 self.root = root;
                 self.sync_animation_registry(structure_changed);
                 self.interaction.retain(&self.node_ids);
+                self.interaction_bounds
+                    .retain(|node, _| self.node_ids.contains(node));
                 self.pending_gestures
                     .retain(|gesture| self.node_ids.contains(&gesture.target));
                 self.scroll.retain(&self.node_ids);

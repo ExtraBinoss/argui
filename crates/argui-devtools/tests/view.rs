@@ -1,9 +1,9 @@
 use argui_animation::{Duration, Frame, Time};
-use argui_core::{Point, Size};
+use argui_core::{Insets, Point, Size};
 use argui_devtools::DevtoolsHost;
 use argui_inspect::{AdapterRecord, FrameRecord, GpuFrameRecord, GpuPassRecord};
 use argui_layout::LayoutEngine;
-use argui_runtime::{LayoutBounds, LayoutSnapshot, ViewUpdate};
+use argui_runtime::{LayoutBounds, LayoutSnapshot, ViewUpdate, WindowEnvironment};
 use argui_showcase::{StateShowcase, text_engine};
 use argui_ui::{Element, UiEvent, UiEventKind, UiTree};
 
@@ -109,7 +109,13 @@ fn open_dock_reserves_application_viewport_space() {
     let host = argui_runtime::Entity::new(DevtoolsHost::new(StateShowcase::default()).open(true))
         .mount()
         .unwrap();
-    let mut tree = UiTree::new(host.render(Default::default()).unwrap());
+    let mut tree = UiTree::new(
+        host.render(WindowEnvironment {
+            safe_area_insets: Insets::new(44.0, 12.0, 24.0, 8.0),
+            ..WindowEnvironment::default()
+        })
+        .unwrap(),
+    );
     let mut layout = LayoutEngine::new();
     let output = layout
         .compute(&mut tree, &mut text_engine(), Size::new(1_100.0, 700.0))
@@ -127,12 +133,24 @@ fn open_dock_reserves_application_viewport_space() {
     let application = keyed("__devtools-app-root");
     let surface = keyed("__devtools-surface");
     let splitter = keyed("__devtools-splitter");
+    let (surface_index, surface_node) = tree
+        .node_ids()
+        .iter()
+        .copied()
+        .enumerate()
+        .find(|(_, node)| tree.key(*node) == Some("__devtools-surface"))
+        .unwrap();
     assert!(application.size.height < output.viewport.size.height);
     assert_eq!(
         surface.origin.y + surface.size.height,
         output.viewport.size.height
     );
     assert_eq!(splitter.origin.y, surface.origin.y);
+    assert!(
+        tree.resolved_quad(surface_node, tree.element_at(surface_index).unwrap())
+            .background
+            .is_some()
+    );
 }
 
 #[test]
@@ -165,6 +183,42 @@ fn closed_dock_keeps_a_visible_overlay_button_without_stealing_app_height() {
     assert!(toggle.origin.x + toggle.size.width <= 1_100.0);
     assert!(toggle.origin.y + toggle.size.height <= 700.0);
     assert!((1_100.0 - toggle.origin.x - toggle.size.width - 14.0).abs() < 0.01);
+}
+
+#[test]
+fn devtools_overlay_respects_native_safe_area_insets() {
+    let host = argui_runtime::Entity::new(DevtoolsHost::new(StateShowcase::default()))
+        .mount()
+        .unwrap();
+    let insets = Insets::new(44.0, 12.0, 24.0, 8.0);
+    let mut tree = UiTree::new(
+        host.render(WindowEnvironment {
+            safe_area_insets: insets,
+            ..WindowEnvironment::default()
+        })
+        .unwrap(),
+    );
+    let output = LayoutEngine::new()
+        .compute(&mut tree, &mut text_engine(), Size::new(390.0, 844.0))
+        .unwrap();
+    let bounds = |key: &str| {
+        tree.node_ids()
+            .iter()
+            .copied()
+            .enumerate()
+            .find_map(|(index, node)| {
+                (tree.key(node) == Some(key)).then(|| output.nodes[index].bounds)
+            })
+            .unwrap()
+    };
+    let toggle = bounds("__devtools-toggle");
+    let application = bounds("__devtools-app-root");
+    let surface = bounds("__devtools-surface");
+
+    assert!((toggle.origin.y - insets.top - 14.0).abs() < 0.01);
+    assert!((390.0 - insets.right - toggle.origin.x - toggle.size.width - 14.0).abs() < 0.01);
+    assert_eq!(application.size.height, 844.0);
+    assert_eq!(surface.size.height, 0.0);
 }
 
 #[test]

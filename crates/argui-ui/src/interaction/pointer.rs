@@ -13,8 +13,18 @@ pub(super) struct ClickRecord {
     count: u8,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(super) struct PressRecord {
+    pub target: NodeId,
+    origin: Point,
+    pub activation_cancelled: bool,
+}
+
 impl InteractionState {
     pub fn pointer_moved(&mut self, event: PointerEvent, regions: &[HitRegion]) -> RawUpdate {
+        if event.id == PointerId::MOUSE {
+            self.mouse_position = Some(event.position);
+        }
         let hit = hit_test(regions, event.position).filter(|region| region.enabled);
         let hovered = self.hovered.get(&event.id).copied();
         let mut update = RawUpdate::default();
@@ -37,6 +47,25 @@ impl InteractionState {
             update.paint_changed = true;
         }
         if event.phase == PointerPhase::Moved
+            && let Some(press) = self.pressed.get_mut(&event.id)
+            && !press.activation_cancelled
+        {
+            let delta = Point::new(
+                event.position.x - press.origin.x,
+                event.position.y - press.origin.y,
+            );
+            let slop = self.pointer_settings.activation_slop_distance();
+            if !delta.x.is_finite()
+                || !delta.y.is_finite()
+                || delta.x * delta.x + delta.y * delta.y > slop * slop
+            {
+                let keeps_pressed = self.captured.get(&event.id) == Some(&press.target);
+                press.activation_cancelled = true;
+                self.last_click = None;
+                update.paint_changed |= !keeps_pressed;
+            }
+        }
+        if event.phase == PointerPhase::Moved
             && let Some(target) = self
                 .captured
                 .get(&event.id)
@@ -50,6 +79,9 @@ impl InteractionState {
 
     pub fn pointer_left(&mut self, event: PointerEvent) -> RawUpdate {
         let mut update = RawUpdate::default();
+        if event.id == PointerId::MOUSE {
+            self.mouse_position = None;
+        }
         if let Some(node) = self.hovered.remove(&event.id) {
             update.push(node, UiEventKind::Pointer(event));
             update.paint_changed = true;
@@ -59,10 +91,20 @@ impl InteractionState {
 
     pub fn primary_pressed(&mut self, event: PointerEvent) -> RawUpdate {
         let mut update = RawUpdate::default();
+        if event.id == PointerId::MOUSE {
+            self.mouse_position = Some(event.position);
+        }
         let Some(target) = self.hovered.get(&event.id).copied() else {
             return update;
         };
-        self.pressed.insert(event.id, target);
+        self.pressed.insert(
+            event.id,
+            PressRecord {
+                target,
+                origin: event.position,
+                activation_cancelled: false,
+            },
+        );
         update.push(target, UiEventKind::Pointer(event));
         update.paint_changed = true;
         update
@@ -79,12 +121,13 @@ impl InteractionState {
         if let Some(target) = captured {
             update.push(target, UiEventKind::LostPointerCapture(event.id));
         }
-        if let Some(target) = pressed
-            && hovered == Some(target)
+        if let Some(press) = pressed
+            && !press.activation_cancelled
+            && hovered == Some(press.target)
         {
-            let count = self.click_count(target, event);
+            let count = self.click_count(press.target, event);
             update.push(
-                target,
+                press.target,
                 UiEventKind::Click(ClickEvent::pointer(event, count)),
             );
         }
@@ -95,13 +138,16 @@ impl InteractionState {
     pub fn primary_cancelled(&mut self, event: PointerEvent) -> RawUpdate {
         let mut update = RawUpdate::default();
         let captured = self.captured.remove(&event.id);
-        if let Some(target) = captured.or_else(|| self.pressed.get(&event.id).copied()) {
+        if let Some(target) =
+            captured.or_else(|| self.pressed.get(&event.id).map(|press| press.target))
+        {
             update.push(target, UiEventKind::Pointer(event));
         }
         if let Some(target) = captured {
             update.push(target, UiEventKind::LostPointerCapture(event.id));
         }
         update.paint_changed = self.pressed.remove(&event.id).is_some();
+        self.last_click = None;
         update
     }
 
@@ -130,9 +176,9 @@ impl InteractionState {
 
     pub fn window_blurred(&mut self) -> RawUpdate {
         let mut update = RawUpdate::default();
-        for (pointer, target) in self.pressed.drain() {
+        for (pointer, press) in self.pressed.drain() {
             update.push(
-                target,
+                press.target,
                 UiEventKind::Pointer(PointerEvent {
                     id: pointer,
                     phase: PointerPhase::Cancelled,
@@ -142,6 +188,7 @@ impl InteractionState {
             update.paint_changed = true;
         }
         self.hovered.clear();
+        self.mouse_position = None;
         self.release_keyboard(&mut update, None);
         for (pointer, target) in self.captured.drain() {
             update.push(target, UiEventKind::LostPointerCapture(pointer));

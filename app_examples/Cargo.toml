@@ -10,7 +10,8 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/ExtraBinoss/argui"
 
 [workspace.dependencies]
-argui = { path = "../crates/argui", version = "0.2.1" }
+argui = { path = "../crates/argui", version = "0.3.0" }
+argui-testing = { path = "../crates/argui-testing", version = "0.3.0" }
 web-time = "=1.1.0"
 wasm-bindgen = "=0.2.127"
 

@@ -2,8 +2,9 @@ use argui_core::{Affine2D, Color, ColorScheme, Point, Rect, Size};
 use argui_paint::{ClipChain, PaintStyle, QuadStyle};
 use argui_text::{TextStyle, TextWrap};
 use argui_ui::{
-    CursorIcon, Element, ElementKind, HitRegion, KeyboardActivation, Role, UiEvent, UiEventKind,
-    UiTree, UserSelect, VisualState,
+    CursorIcon, Element, ElementKind, EventHandler, EventHandlerId, EventOwnerId, EventPhase,
+    EventType, HitRegion, KeyboardActivation, Role, UiEvent, UiEventKind, UiTree, UserSelect,
+    VisualState,
 };
 use argui_widgets::{
     Button, ButtonAction, ButtonBehavior, ButtonStyle, TablerIcon, WidgetAssets, shadcn,
@@ -410,4 +411,38 @@ fn busy_button_is_not_activatable_even_when_enabled() {
             .is_focusable()
     );
     assert!(decorated.semantics.as_ref().unwrap().state.busy);
+}
+
+#[test]
+fn direct_click_handlers_are_additive_target_only_and_use_normal_propagation() {
+    let themes = shadcn(Color::srgb(0.2, 0.5, 0.9));
+    let theme = themes.resolve(ColorScheme::Dark);
+    let handler = |slot| EventHandler::from_identity(EventHandlerId::new(EventOwnerId(7), slot));
+    let root = Button::new("save", "Save", theme.button())
+        .on_click(handler(0))
+        .on_click(handler(1))
+        .build();
+    assert_eq!(root.event_listeners.len(), 2);
+    assert!(
+        root.event_listeners
+            .iter()
+            .all(|listener| { listener.event == EventType::Click && listener.options.target_only })
+    );
+
+    let mut tree =
+        UiTree::new(Element::container([root]).on(handler(2).listener(EventType::Click)));
+    let button = tree
+        .node_ids()
+        .iter()
+        .copied()
+        .find(|node| tree.key(*node) == Some("save"))
+        .unwrap();
+    let deliveries = tree.event_deliveries(
+        button,
+        UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
+    );
+    assert_eq!(deliveries.len(), 3);
+    assert_eq!(deliveries[0].phase(), EventPhase::Target);
+    assert_eq!(deliveries[1].phase(), EventPhase::Target);
+    assert_eq!(deliveries[2].phase(), EventPhase::Bubble);
 }

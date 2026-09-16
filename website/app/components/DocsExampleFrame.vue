@@ -85,7 +85,6 @@ watch(() => props.example, launch)
         ref="frame"
         :src="url"
         :title="title"
-        :style="{ visibility: state === 'ready' ? 'visible' : 'hidden' }"
         @error="state = 'error'"
       />
       <div

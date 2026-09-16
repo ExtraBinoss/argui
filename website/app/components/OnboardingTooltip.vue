@@ -58,6 +58,7 @@ onMounted(() => {
   font-size: 11px;
   font-weight: 600;
   line-height: 1.35;
+  pointer-events: none;
   text-align: center;
   transform: translateX(-50%);
   animation: onboarding-hint-pulse 2.4s ease-in-out infinite;

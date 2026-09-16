@@ -1,7 +1,7 @@
 use argui::{
     runtime::{Context, Render},
     text::TextStyle,
-    ui::{Element, EventType, Sides, UiEventKind, percent},
+    ui::{Element, Sides, percent},
     widgets::{Button, default_theme},
 };
 
@@ -29,6 +29,7 @@ impl Render for Example {
         Element::column(
             rows.chain([Button::new("next", "Complete next", theme.button())
                 .enabled(self.completed < checks.len())
+                .on_click(cx.callback(|app| app.completed = (app.completed + 1).min(3)))
                 .build()]),
         )
         .width(percent(1.0))
@@ -36,11 +37,5 @@ impl Render for Example {
         .padding(Sides::length(28.0))
         .gap(14.0)
         .background(theme.background)
-        .on(cx.listener(EventType::Click, |app, event, cx| {
-            if event.target_key() == Some("next") && matches!(event.kind, UiEventKind::Click(_)) {
-                app.completed = (app.completed + 1).min(3);
-                cx.notify();
-            }
-        }))
     }
 }

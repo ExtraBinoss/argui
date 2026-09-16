@@ -81,6 +81,15 @@
     "gallery": "Avatar"
   },
   {
+    "slug": "mobile-activity",
+    "name": "Background activity",
+    "description": "Continue a cancellable task in the background with native progress where available.",
+    "source": "crates/argui-widget-gallery/src/pages/mobile_activity.rs",
+    "feature": null,
+    "category": "Examples",
+    "gallery": "Background activity"
+  },
+  {
     "slug": "badge",
     "name": "Badge",
     "description": "Compact labels with variants and optional icons.",
@@ -659,11 +668,11 @@
   {
     "slug": "text-selection",
     "name": "Text selection",
-    "description": "Selection surfaces and contextual actions for retained text.",
+    "description": "Selection policies, rounded highlights, gradients and animated fills.",
     "source": "crates/argui-widgets/src/text_selection.rs",
     "feature": "text-selection",
     "category": "Components",
-    "gallery": "Typography & selection"
+    "gallery": "Text selection"
   },
   {
     "slug": "toast",

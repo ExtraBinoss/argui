@@ -67,8 +67,10 @@ pub use cursor::CursorIcon;
 pub use effect::{EffectScope, ScopedEffect};
 pub use element::{Element, ElementKind, TextEditorSpec};
 pub use event::{
+    ColorHandlerValue, ColorValueFormat, ContinuousValuePhase, EventFilter, EventHandler,
     EventHandlerId, EventListener, EventListenerOptions, EventOwnerId, EventPhase, EventType,
-    UiEvent, UiEventKind,
+    FromHandlerValue, HandlerValue, RangeHandlerValue, SplitHandlerValue, UiEvent, UiEventKind,
+    ValueHandler,
 };
 pub use focus::{FocusContainment, FocusRequest, FocusScope, FocusTarget, InitialFocus};
 pub use gesture::{
@@ -115,8 +117,8 @@ pub use text_input::{
     TextSelectionRequest,
 };
 pub use text_selection::{
-    DocumentTextPoint, DocumentTextSelection, SelectionCapabilities, SelectionCommand,
-    SelectionGranularity, TextSelectionHighlight, TextSelectionStyle, UserSelect,
+    DocumentSelectionEndpoint, DocumentTextPoint, DocumentTextSelection, SelectionCapabilities,
+    SelectionCommand, SelectionGranularity, TextSelectionHighlight, TextSelectionStyle, UserSelect,
 };
 pub use tree::{TreeUpdate, TreeUpdateStats, UiTree};
 pub use virtual_list::{

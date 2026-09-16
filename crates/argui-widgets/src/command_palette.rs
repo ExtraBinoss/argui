@@ -1,12 +1,13 @@
 use crate::{Input, InputKind, Menu, MenuItem, MenuResponse, WidgetTheme};
 use argui_core::{Key, KeyState};
-use argui_ui::{Element, UiEvent, UiEventKind};
+use argui_ui::{Element, UiEvent, UiEventKind, ValueHandler};
 
 /// Searchable action menu. Query and visibility stay owned by the application.
 #[derive(Clone, Debug)]
 pub struct CommandPalette {
     menu: Menu,
     query: String,
+    input_handlers: Vec<ValueHandler<String>>,
 }
 
 impl CommandPalette {
@@ -30,12 +31,34 @@ impl CommandPalette {
         Self {
             menu: Menu::new(key, "Commands", open, items),
             query,
+            input_handlers: Vec::new(),
         }
     }
     #[must_use]
     /// Sets the retained presence state used to animate the menu.
     pub fn presence(mut self, presence: &crate::Presence) -> Self {
         self.menu = self.menu.presence(presence);
+        self
+    }
+
+    /// Adds a callback receiving the edited search query.
+    #[must_use]
+    pub fn on_input(mut self, handler: ValueHandler<String>) -> Self {
+        self.input_handlers.push(handler);
+        self
+    }
+
+    /// Adds a callback receiving the stable ID of an activated command.
+    #[must_use]
+    pub fn on_action(mut self, handler: ValueHandler<String>) -> Self {
+        self.menu = self.menu.on_action(handler);
+        self
+    }
+
+    /// Adds a callback receiving the requested palette open state.
+    #[must_use]
+    pub fn on_open_change(mut self, handler: ValueHandler<bool>) -> Self {
+        self.menu = self.menu.on_open_change(handler);
         self
     }
     #[must_use]
@@ -46,18 +69,21 @@ impl CommandPalette {
     #[must_use]
     /// Builds the palette around `trigger`, using `theme` for its controls.
     pub fn build(&self, trigger: Element, theme: &WidgetTheme) -> Element {
+        let mut input = Input::new(
+            self.query_key(),
+            &self.query,
+            "Search commands…",
+            theme.input(),
+        )
+        .kind(InputKind::Search)
+        .label("Search commands");
+        for handler in &self.input_handlers {
+            input = input.on_input(*handler);
+        }
         self.menu.with_content(
             trigger,
             Element::column([
-                Input::new(
-                    self.query_key(),
-                    &self.query,
-                    "Search commands…",
-                    theme.input(),
-                )
-                .kind(InputKind::Search)
-                .label("Search commands")
-                .build(),
+                input.build(),
                 if self.menu.items.is_empty() {
                     Element::text("No matching commands").text_style(theme.ghost_button().label)
                 } else {

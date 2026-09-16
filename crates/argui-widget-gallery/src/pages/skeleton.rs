@@ -1,6 +1,6 @@
 use argui::{
     runtime::{Context, Entity, Render},
-    ui::{AlignItems, Element, EventType, Role, SemanticState, Semantics, length, percent},
+    ui::{AlignItems, Element, Role, SemanticState, Semantics, length, percent},
     widgets::{Avatar, Button, Card, Skeleton, shadcn},
 };
 
@@ -113,11 +113,10 @@ impl Render for SkeletonDemo {
                     },
                     theme.outline_button(),
                 )
-                .build()
-                .on(cx.listener(EventType::Click, |demo, _, cx| {
+                .on_click(cx.callback(|demo| {
                     demo.loaded = !demo.loaded;
-                    cx.notify();
-                })),
+                }))
+                .build(),
             ])
             .gap(20.0)
             .max_width(length(480.0)),

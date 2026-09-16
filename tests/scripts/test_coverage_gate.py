@@ -7,6 +7,7 @@ from tempfile import TemporaryDirectory
 from contextlib import redirect_stdout, redirect_stderr
 from io import StringIO
 import json
+import os
 
 spec = importlib.util.spec_from_file_location(
     "coverage_gate", Path(__file__).resolve().parents[2] / "scripts/coverage-gate.py"
@@ -28,6 +29,26 @@ def entry(branches, count):
 
 
 class SourceCoverage(unittest.TestCase):
+    def test_nested_prelude_with_only_reexports_has_no_coverable_code(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "crates" / "facade" / "src"
+            source.mkdir(parents=True)
+            (source / "lib.rs").write_text(
+                "//! Facade.\n"
+                "pub mod prelude {\n"
+                "    #[cfg(feature = \"widgets\")]\n"
+                "    pub use crate::widgets::{self, Button};\n"
+                "}\n"
+                "pub use dependency as widgets;\n"
+            )
+            previous = Path.cwd()
+            try:
+                os.chdir(root)
+                self.assertTrue(gate.only_reexports("facade"))
+            finally:
+                os.chdir(previous)
+
     def test_threshold_is_enforced_for_workspace_and_every_crate(self):
         for false_count, failed in [(0, True), (1, False)]:
             file = entry([[10, 4, 10, 20, 1, false_count]], 2)

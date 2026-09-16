@@ -4,6 +4,13 @@ use argui_core::{KeyInput, Point, PointerEvent, PointerId, PointerPhase, Rect, S
 
 use crate::{ClickEvent, Element, NodeId, SelectionCapabilities, SemanticAction, SemanticValue};
 
+mod listener;
+pub use listener::{
+    ColorHandlerValue, ColorValueFormat, ContinuousValuePhase, EventFilter, EventHandler,
+    EventHandlerId, EventListener, EventListenerOptions, EventOwnerId, EventPhase,
+    FromHandlerValue, HandlerValue, RangeHandlerValue, SplitHandlerValue, ValueHandler,
+};
+
 impl Element {
     /// Registers an event listener on this element.
     ///
@@ -85,131 +92,6 @@ impl EventType {
                 | Self::Wheel
                 | Self::Scroll
         )
-    }
-}
-
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub enum EventPhase {
-    Capture,
-    #[default]
-    Target,
-    Bubble,
-}
-
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub struct EventListenerOptions {
-    pub capture: bool,
-    pub passive: bool,
-    pub once: bool,
-}
-
-impl EventListenerOptions {
-    /// Enables capture phase delivery for this listener.
-    #[must_use]
-    pub const fn capture(mut self, capture: bool) -> Self {
-        self.capture = capture;
-        self
-    }
-
-    /// Marks this listener passive, disallowing default prevention.
-    #[must_use]
-    pub const fn passive(mut self, passive: bool) -> Self {
-        self.passive = passive;
-        self
-    }
-
-    /// Marks this listener for delivery only once.
-    ///
-    /// * `once` — whether to remove the listener after its first delivery.
-    #[must_use]
-    pub const fn once(mut self, once: bool) -> Self {
-        self.once = once;
-        self
-    }
-}
-
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct EventOwnerId(pub usize);
-
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct EventHandlerId {
-    owner: EventOwnerId,
-    slot: u32,
-}
-
-impl EventHandlerId {
-    /// Creates a handler identity from an owner and its local slot.
-    ///
-    /// * `owner` — identity of the registering owner.
-    /// * `slot` — handler slot within that owner.
-    #[doc(hidden)]
-    #[must_use]
-    pub const fn new(owner: EventOwnerId, slot: u32) -> Self {
-        Self { owner, slot }
-    }
-
-    /// Returns the owner associated with this handler.
-    #[doc(hidden)]
-    #[must_use]
-    pub const fn owner(self) -> EventOwnerId {
-        self.owner
-    }
-
-    /// Returns this handler's owner-local slot.
-    #[doc(hidden)]
-    #[must_use]
-    pub const fn slot(self) -> u32 {
-        self.slot
-    }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct EventListener {
-    pub event: EventType,
-    pub options: EventListenerOptions,
-    pub(crate) handler: EventHandlerId,
-}
-
-impl EventListener {
-    /// Creates a listener for an event and handler.
-    ///
-    /// * `event` — event type to receive.
-    /// * `handler` — registered event handler identity.
-    #[doc(hidden)]
-    #[must_use]
-    pub const fn new(event: EventType, handler: EventHandlerId) -> Self {
-        Self {
-            event,
-            options: EventListenerOptions {
-                capture: false,
-                passive: false,
-                once: false,
-            },
-            handler,
-        }
-    }
-
-    /// Enables or disables capture phase delivery.
-    #[must_use]
-    pub const fn capture(mut self, capture: bool) -> Self {
-        self.options.capture = capture;
-        self
-    }
-
-    /// Enables or disables passive listener behavior.
-    #[must_use]
-    pub const fn passive(mut self, passive: bool) -> Self {
-        self.options.passive = passive;
-        self
-    }
-
-    /// Enables or disables one-time delivery.
-    ///
-    /// * `once` — whether to remove the listener after its first delivery.
-    #[must_use]
-    pub const fn once(mut self, once: bool) -> Self {
-        self.options.once = once;
-        self
     }
 }
 
@@ -342,6 +224,7 @@ pub struct UiEvent {
     current_target: NodeId,
     current_key: Option<String>,
     current_handler: Option<EventHandlerId>,
+    handler_value: Option<HandlerValue>,
     phase: EventPhase,
     passive: bool,
     once: Option<Rc<Cell<bool>>>,
@@ -349,6 +232,17 @@ pub struct UiEvent {
     default_action: bool,
     focused_node: Option<NodeId>,
     history: Option<(bool, bool)>,
+}
+
+/// Internal listener-delivery metadata copied onto one dispatched event.
+pub(crate) struct EventDelivery {
+    pub(crate) current_target: NodeId,
+    pub(crate) current_key: Option<String>,
+    pub(crate) current_handler: Option<EventHandlerId>,
+    pub(crate) phase: EventPhase,
+    pub(crate) passive: bool,
+    pub(crate) once: Option<Rc<Cell<bool>>>,
+    pub(crate) handler_value: Option<HandlerValue>,
 }
 
 impl PartialEq for UiEvent {
@@ -359,6 +253,7 @@ impl PartialEq for UiEvent {
             &self.target_key,
             self.current_target,
             &self.current_key,
+            &self.handler_value,
             self.phase,
         ) == (
             other.target,
@@ -366,6 +261,7 @@ impl PartialEq for UiEvent {
             &other.target_key,
             other.current_target,
             &other.current_key,
+            &other.handler_value,
             other.phase,
         )
     }
@@ -388,6 +284,7 @@ impl UiEvent {
             current_target: target,
             current_key: key,
             current_handler: None,
+            handler_value: None,
             phase: EventPhase::Target,
             passive: false,
             once: None,
@@ -398,25 +295,19 @@ impl UiEvent {
         }
     }
 
-    pub(crate) fn delivery(
-        &self,
-        current_target: NodeId,
-        current_key: Option<String>,
-        current_handler: Option<EventHandlerId>,
-        phase: EventPhase,
-        passive: bool,
-        once: Option<Rc<Cell<bool>>>,
-    ) -> Self {
+    /// Clones this event for one listener with the supplied propagation metadata.
+    pub(crate) fn delivery(&self, delivery: EventDelivery) -> Self {
         Self {
             target: self.target,
             kind: self.kind.clone(),
             target_key: self.target_key.clone(),
-            current_target,
-            current_key,
-            current_handler,
-            phase,
-            passive,
-            once,
+            current_target: delivery.current_target,
+            current_key: delivery.current_key,
+            current_handler: delivery.current_handler,
+            handler_value: delivery.handler_value,
+            phase: delivery.phase,
+            passive: delivery.passive,
+            once: delivery.once,
             control: Rc::clone(&self.control),
             default_action: self.default_action,
             focused_node: self.focused_node,
@@ -435,6 +326,13 @@ impl UiEvent {
     #[must_use]
     pub const fn current_handler(&self) -> Option<EventHandlerId> {
         self.current_handler
+    }
+
+    /// Returns the typed value attached by the current widget listener.
+    #[doc(hidden)]
+    #[must_use]
+    pub const fn handler_value(&self) -> Option<&HandlerValue> {
+        self.handler_value.as_ref()
     }
 
     /// Returns the key of the original target, if it had one.

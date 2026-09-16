@@ -12,6 +12,7 @@ pub mod file_picker;
 #[cfg(all(feature = "gtk-host", target_os = "linux"))]
 pub mod gtk_host;
 mod identity;
+pub mod mobile;
 #[cfg(all(feature = "tray", not(target_arch = "wasm32")))]
 mod native_tray;
 #[cfg(all(feature = "native-popups", not(target_arch = "wasm32")))]

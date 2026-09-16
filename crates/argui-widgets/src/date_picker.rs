@@ -3,7 +3,9 @@ use crate::{
     Input, IsoCalendarLocale, Popover, PopoverAction, PopoverBehavior, WidgetTheme,
 };
 use argui_core::{Key, KeyState};
-use argui_ui::{Element, FocusTarget, LiveRegion, Role, Semantics, UiEvent, UiEventKind};
+use argui_ui::{
+    Element, FocusTarget, LiveRegion, Role, Semantics, UiEvent, UiEventKind, ValueHandler,
+};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DatePickerState {
@@ -89,6 +91,9 @@ pub struct DatePicker<'a> {
     pub unavailable_message: &'a str,
     icon: Option<Element>,
     surface: Option<argui_ui::OverlaySurface>,
+    input_handlers: Vec<ValueHandler<String>>,
+    select_handlers: Vec<ValueHandler<String>>,
+    open_handlers: Vec<ValueHandler<bool>>,
 }
 
 impl<'a> DatePicker<'a> {
@@ -110,7 +115,31 @@ impl<'a> DatePicker<'a> {
             unavailable_message: "This date is unavailable",
             icon: None,
             surface: None,
+            input_handlers: Vec::new(),
+            select_handlers: Vec::new(),
+            open_handlers: Vec::new(),
         }
+    }
+
+    /// Adds a handler that receives each edited draft string.
+    #[must_use]
+    pub fn on_input(mut self, handler: ValueHandler<String>) -> Self {
+        self.input_handlers.push(handler);
+        self
+    }
+
+    /// Adds a handler that receives a selected date in ISO `YYYY-MM-DD` form.
+    #[must_use]
+    pub fn on_select(mut self, handler: ValueHandler<String>) -> Self {
+        self.select_handlers.push(handler);
+        self
+    }
+
+    /// Adds a handler receiving the requested popup open state.
+    #[must_use]
+    pub fn on_open_change(mut self, handler: ValueHandler<bool>) -> Self {
+        self.open_handlers.push(handler);
+        self
     }
 
     #[must_use]
@@ -146,25 +175,32 @@ impl<'a> DatePicker<'a> {
             maximum: self.constraints.maximum,
             disabled: self.constraints.disabled,
         };
+        for handler in &self.select_handlers {
+            calendar = calendar.on_select(*handler);
+        }
         calendar
     }
 
     /// Builds the date input and calendar popup using `theme` for styling.
     pub fn build(&self, theme: &WidgetTheme) -> Element {
         let error_key = format!("{}::error", self.key);
-        let mut input = Input::new(
+        let mut input_builder = Input::new(
             self.input_key(),
             &self.state.draft,
             self.locale.format(self.today),
             theme.input(),
         )
         .label(&self.label)
-        .invalid(self.state.error.is_some())
-        .build()
-        .width(argui_ui::length(0.0))
-        .grow(1.0)
-        .shrink(1.0)
-        .min_width(argui_ui::length(0.0));
+        .invalid(self.state.error.is_some());
+        for handler in &self.input_handlers {
+            input_builder = input_builder.on_input(*handler);
+        }
+        let mut input = input_builder
+            .build()
+            .width(argui_ui::length(0.0))
+            .grow(1.0)
+            .shrink(1.0)
+            .min_width(argui_ui::length(0.0));
         if self.state.open {
             input = input.controls([format!("{}::content", self.popup_key())]);
         }
@@ -195,6 +231,9 @@ impl<'a> DatePicker<'a> {
         .size(300.0, 380.0);
         if let Some(surface) = self.surface {
             popup = popup.surface(surface);
+        }
+        for handler in &self.open_handlers {
+            popup = popup.on_open_change(*handler);
         }
         let popup = popup.build(theme);
         let mut children = vec![

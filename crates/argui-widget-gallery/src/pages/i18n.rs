@@ -2,7 +2,7 @@ use argui::{
     i18n::{Catalog, FluentArgs, Localizer, langid},
     paint::{Border, CornerRadii},
     runtime::{Context, Render},
-    ui::{AlignItems, Element, EventType, FlexWrap, Sides, UiEvent, WritingDirection, length},
+    ui::{AlignItems, Element, FlexWrap, Sides, WritingDirection, length},
     widgets::{Button, shadcn},
 };
 
@@ -68,24 +68,6 @@ impl Default for I18nDemo {
 }
 
 impl I18nDemo {
-    fn event(&mut self, event: &UiEvent, cx: &mut Context<Self>) {
-        match event.target_key() {
-            Some("i18n-english") => {
-                self.localizer.select([langid!("en-US")]);
-            }
-            Some("i18n-french") => {
-                self.localizer.select([langid!("fr-CA")]);
-            }
-            Some("i18n-arabic") => {
-                self.localizer.select([langid!("ar")]);
-            }
-            Some("i18n-less") => self.count = self.count.saturating_sub(1).max(0),
-            Some("i18n-more") => self.count = self.count.saturating_add(1).min(99),
-            _ => return,
-        }
-        cx.notify();
-    }
-
     fn text(&self, id: &str) -> String {
         self.localizer
             .text(id)
@@ -113,15 +95,31 @@ impl Render for I18nDemo {
             WritingDirection::Ltr
         };
         let language = Element::row([
-            Button::new("i18n-english", "English", theme.outline_button()).build(),
-            Button::new("i18n-french", "Français", theme.outline_button()).build(),
-            Button::new("i18n-arabic", "العربية", theme.outline_button()).build(),
+            Button::new("i18n-english", "English", theme.outline_button())
+                .on_click(cx.callback(|demo| {
+                    demo.localizer.select([langid!("en-US")]);
+                }))
+                .build(),
+            Button::new("i18n-french", "Français", theme.outline_button())
+                .on_click(cx.callback(|demo| {
+                    demo.localizer.select([langid!("fr-CA")]);
+                }))
+                .build(),
+            Button::new("i18n-arabic", "العربية", theme.outline_button())
+                .on_click(cx.callback(|demo| {
+                    demo.localizer.select([langid!("ar")]);
+                }))
+                .build(),
         ])
         .gap(8.0)
         .flex_wrap(FlexWrap::Wrap);
         let controls = Element::row([
-            Button::new("i18n-less", self.text("less"), theme.outline_button()).build(),
-            Button::new("i18n-more", self.text("more"), theme.outline_button()).build(),
+            Button::new("i18n-less", self.text("less"), theme.outline_button())
+                .on_click(cx.callback(|demo| demo.count = demo.count.saturating_sub(1).max(0)))
+                .build(),
+            Button::new("i18n-more", self.text("more"), theme.outline_button())
+                .on_click(cx.callback(|demo| demo.count = demo.count.saturating_add(1).min(99)))
+                .build(),
             Button::new(
                 "i18n-save",
                 self.localizer
@@ -168,6 +166,5 @@ impl Render for I18nDemo {
             Element::column([language, localized]).gap(16.0),
             theme,
         )
-        .on(cx.listener(EventType::Click, Self::event))
     }
 }

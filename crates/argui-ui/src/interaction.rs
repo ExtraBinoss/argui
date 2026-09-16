@@ -319,7 +319,8 @@ impl RawUpdate {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct InteractionState {
     hovered: HashMap<PointerId, NodeId>,
-    pressed: HashMap<PointerId, NodeId>,
+    mouse_position: Option<Point>,
+    pressed: HashMap<PointerId, pointer::PressRecord>,
     keyboard_pressed: Option<NodeId>,
     focused: Option<NodeId>,
     focus_visible: bool,
@@ -341,6 +342,14 @@ impl InteractionState {
     pub(crate) fn captured_node(&self, pointer: PointerId) -> Option<NodeId> {
         self.captured.get(&pointer).copied()
     }
+
+    /// Returns the most recently observed mouse position.
+    ///
+    /// Returns `None` before the tree receives a mouse position or after the pointer leaves.
+    pub(crate) const fn mouse_position(&self) -> Option<Point> {
+        self.mouse_position
+    }
+
     pub fn visual_states(&self, node: NodeId) -> VisualStates {
         let mut states = VisualStates::NONE;
         if self.focused == Some(node) {
@@ -352,8 +361,10 @@ impl InteractionState {
         if self.hovered.values().any(|hovered| *hovered == node) {
             states.insert(VisualState::Hovered);
         }
-        if self.pressed.values().any(|pressed| *pressed == node)
-            || self.keyboard_pressed == Some(node)
+        if self.pressed.iter().any(|(pointer, press)| {
+            press.target == node
+                && (!press.activation_cancelled || self.captured.get(pointer) == Some(&node))
+        }) || self.keyboard_pressed == Some(node)
         {
             states.insert(VisualState::Pressed);
         }
@@ -366,11 +377,15 @@ impl InteractionState {
         regions: &[HitRegion],
         preserve_on_background: bool,
     ) -> RawUpdate {
-        let target = self.pressed.get(&pointer).copied().filter(|target| {
-            regions.iter().any(|region| {
-                region.node == *target && region.enabled && region.focus_policy.is_focusable()
-            })
-        });
+        let target = self
+            .pressed
+            .get(&pointer)
+            .map(|press| press.target)
+            .filter(|target| {
+                regions.iter().any(|region| {
+                    region.node == *target && region.enabled && region.focus_policy.is_focusable()
+                })
+            });
         let Some(target) = target else {
             return if preserve_on_background {
                 RawUpdate::default()
@@ -508,7 +523,7 @@ impl InteractionState {
     pub fn retain(&mut self, ids: &[NodeId]) {
         let exists = |candidate: Option<NodeId>| candidate.is_some_and(|id| ids.contains(&id));
         self.hovered.retain(|_, node| ids.contains(node));
-        self.pressed.retain(|_, node| ids.contains(node));
+        self.pressed.retain(|_, press| ids.contains(&press.target));
         if !exists(self.keyboard_pressed) {
             self.keyboard_pressed = None;
         }

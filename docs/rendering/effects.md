@@ -6,7 +6,7 @@ definitions they use.
 
 ```toml
 [dependencies]
-argui-effects = { version = "0.2.1", features = ["artistic"] }
+argui-effects = { version = "0.3.0", features = ["artistic"] }
 ```
 
 ```rust,ignore
@@ -90,7 +90,7 @@ Custom}` lets the application combine that request with a global quality choice.
 Enable the dedicated preset:
 
 ```toml
-argui-effects = { version = "0.2.1", features = ["liquid-glass"] }
+argui-effects = { version = "0.3.0", features = ["liquid-glass"] }
 ```
 
 ```rust,ignore

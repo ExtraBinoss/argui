@@ -17,6 +17,12 @@ use argui::{
 
 impl AiHarness {
     pub(super) fn view(&self, cx: &mut Context<Self>, theme: &WidgetTheme) -> Element {
+        let latest_handler = cx.event_handler(|app, _, cx| {
+            let request = app.message_scroll.latest("conversation");
+            app.conversation_offset = app.scroll_maximum;
+            cx.scroll(request);
+            cx.notify();
+        });
         let mut body_children = vec![
             self.conversation(cx, theme)
                 .grow(1.0)
@@ -29,6 +35,12 @@ impl AiHarness {
             .width(percent(1.0))
             .gap(if self.compact { 0.0 } else { 16.0 })
             .align_items(AlignItems::START);
+        let mut body_layers = vec![body];
+        body_layers.extend(self.latest_button(theme, latest_handler));
+        let body = Element::container(body_layers)
+            .width(percent(1.0))
+            .min_width(length(0.0))
+            .position(Position::Relative);
         Element::column([self.header(theme), body])
             .width(percent(1.0))
             .height(percent(1.0))
@@ -73,6 +85,9 @@ impl AiHarness {
     }
 
     fn conversation(&self, cx: &mut Context<Self>, theme: &WidgetTheme) -> Element {
+        let input_handler = cx.input_callback(|app, prompt| app.prompt = prompt);
+        let submit_handler = cx.submit_event_handler(|app, _, _, cx| app.start(cx));
+        let run_handler = cx.event_handler(|app, _, cx| app.start(cx));
         let messages = if self.submitted_prompt.is_empty() {
             Element::column([
                 text("Send a message", 20.0, theme.foreground, 650),
@@ -116,6 +131,8 @@ impl AiHarness {
             )
             .kind(InputKind::Text)
             .label("Prompt")
+            .on_input(input_handler)
+            .on_submit(submit_handler)
             .build()
             .width(auto())
             .flex_basis(percent(0.8))
@@ -132,6 +149,7 @@ impl AiHarness {
                 theme.button(),
             )
             .enabled(!self.prompt.trim().is_empty())
+            .on_click(run_handler)
             .build()
             .width(auto())
             .flex_basis(percent(0.2))
@@ -142,18 +160,18 @@ impl AiHarness {
         .align_items(AlignItems::CENTER);
         let content =
             Element::column([messages, controls]).gap(if self.compact { 7.0 } else { 10.0 });
-        let conversation = panel("Conversation", content, theme)
+        panel("Conversation", content, theme)
             .padding(Sides::length(if self.compact { 10.0 } else { 15.0 }))
-            .gap(if self.compact { 8.0 } else { 13.0 });
-        let mut children = vec![conversation];
-        children.extend(self.latest_button(theme));
-        Element::container(children)
+            .gap(if self.compact { 8.0 } else { 13.0 })
             .width(percent(1.0))
             .min_width(length(0.0))
-            .position(Position::Relative)
     }
 
-    fn latest_button(&self, theme: &WidgetTheme) -> Option<Element> {
+    fn latest_button(
+        &self,
+        theme: &WidgetTheme,
+        handler: argui::ui::EventHandler,
+    ) -> Option<Element> {
         (!self.message_scroll.following).then(|| {
             let mut button = Button::icon(
                 "conversation::latest",
@@ -163,6 +181,7 @@ impl AiHarness {
                     .vector_color(theme.foreground),
                 theme.outline_button(),
             )
+            .on_click(handler)
             .tooltip(format!(
                 "Go to latest message · {} unread",
                 self.message_scroll.unread

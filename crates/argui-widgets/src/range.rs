@@ -189,6 +189,18 @@ impl RangeBehavior {
         self.config
     }
 
+    /// Returns the current controlled value before event processing.
+    #[must_use]
+    pub const fn value(&self) -> f32 {
+        self.value
+    }
+
+    /// Returns whether this range accepts interaction.
+    #[must_use]
+    pub const fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
     #[must_use]
     /// Returns the layout key used for the range track.
     pub fn track_key(&self) -> String {

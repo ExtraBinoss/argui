@@ -1,7 +1,7 @@
 use argui::{
     paint::{Border, CornerRadii},
     runtime::Context,
-    ui::{Element, EventType, Sides, length},
+    ui::{Element, Sides, length},
     widgets::{Collapsible, TablerIcon, WidgetAssets, WidgetTheme},
 };
 
@@ -43,21 +43,8 @@ pub(super) fn render(
             )
             .vector_color(theme.foreground),
     )
-    .build(theme)
-    .on(cx.listener(EventType::Click, |gallery, event, cx| {
-        if let Some(open) = Collapsible::new(
-            "project-files",
-            "Project files",
-            gallery.collapsible_open,
-            Element::container([]),
-        )
-        .action(event)
-        {
-            gallery.collapsible_open = open;
-            event.stop_propagation();
-            cx.notify();
-        }
-    }));
+    .on_open_change(cx.value_callback(|gallery, open| gallery.collapsible_open = open))
+    .build(theme);
     super::preview(
         "A closer look",
         "Expand the project or archive to browse its components.",
@@ -85,21 +72,8 @@ pub(super) fn render(
                     )
                     .vector_color(theme.foreground),
             )
-            .build(theme)
-            .on(cx.listener(EventType::Click, |gallery, event, cx| {
-                if let Some(open) = Collapsible::new(
-                    "archived-files",
-                    "Archived files",
-                    gallery.archived_open,
-                    Element::container([]),
-                )
-                .action(event)
-                {
-                    gallery.archived_open = open;
-                    event.stop_propagation();
-                    cx.notify();
-                }
-            })),
+            .on_open_change(cx.value_callback(|gallery, open| gallery.archived_open = open))
+            .build(theme),
         ])
         .gap(24.0)
         .max_width(length(480.0)),

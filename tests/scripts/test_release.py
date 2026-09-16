@@ -207,12 +207,18 @@ class ReleasePolicyTests(unittest.TestCase):
     def test_package_verifies_every_archive_in_publication_order(self):
         names = ['argui-core', 'argui-render', 'argui']
         with patch.object(release, 'workspace', return_value=('0.1.0', names)), \
-                patch.object(release, 'run') as run:
+                patch.object(release, 'run') as run, \
+                patch.object(release, 'verify_staged_archives') as verify:
             release.package_archives()
-        self.assertEqual(run.call_args.args, (
-            'cargo', 'package', '--locked', '--all-features', '--allow-dirty',
-            '--package', 'argui-core', '--package', 'argui-render', '--package', 'argui',
-        ))
+        self.assertEqual(
+            [call.args for call in run.call_args_list],
+            [
+                ('cargo', 'package', '--locked', '--all-features', '--allow-dirty',
+                 '--no-verify', '--package', 'argui-core', '--package', 'argui-render',
+                 '--package', 'argui')
+            ],
+        )
+        verify.assert_called_once_with('0.1.0', names)
 
     def test_unchanged_version_never_runs_a_publisher(self):
         with patch.object(release, 'run') as run:

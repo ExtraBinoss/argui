@@ -1,5 +1,5 @@
 use crate::{Button, ButtonBehavior, Dialog, DialogAction, DialogBehavior, WidgetTheme};
-use argui_ui::{Element, InitialFocus, UiEvent};
+use argui_ui::{Element, EventHandler, EventType, InitialFocus, UiEvent, ValueHandler};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum AlertDialogAction {
@@ -19,6 +19,9 @@ pub struct AlertDialog {
     pub cancel_label: String,
     pub confirm_label: String,
     pub confirm_enabled: bool,
+    open_handlers: Vec<ValueHandler<bool>>,
+    cancel_handlers: Vec<EventHandler>,
+    confirm_handlers: Vec<EventHandler>,
 }
 
 impl AlertDialog {
@@ -43,7 +46,31 @@ impl AlertDialog {
             cancel_label: "Cancel".into(),
             confirm_label: "Continue".into(),
             confirm_enabled: true,
+            open_handlers: Vec::new(),
+            cancel_handlers: Vec::new(),
+            confirm_handlers: Vec::new(),
         }
+    }
+
+    /// Adds a callback receiving the requested controlled open state.
+    #[must_use]
+    pub fn on_open_change(mut self, handler: ValueHandler<bool>) -> Self {
+        self.open_handlers.push(handler);
+        self
+    }
+
+    /// Adds a callback for cancellation through the button or Escape.
+    #[must_use]
+    pub fn on_cancel(mut self, handler: EventHandler) -> Self {
+        self.cancel_handlers.push(handler);
+        self
+    }
+
+    /// Adds a callback for confirmation while the confirm button is enabled.
+    #[must_use]
+    pub fn on_confirm(mut self, handler: EventHandler) -> Self {
+        self.confirm_handlers.push(handler);
+        self
     }
 
     #[must_use]
@@ -73,6 +100,28 @@ impl AlertDialog {
         let close = format!("{}::close", self.key);
         let title_key = format!("{}::title", self.key);
         let description_key = format!("{}::description", self.key);
+        let mut cancel = Button::new(&close, self.cancel_label, theme.outline_button()).build();
+        for handler in &self.cancel_handlers {
+            cancel = cancel.on(handler.direct_listener(EventType::Click));
+        }
+        for handler in &self.open_handlers {
+            cancel = cancel.on(handler.direct_listener_value(EventType::Click, false));
+        }
+        let mut confirm = Button::new(
+            format!("{}::confirm", self.key),
+            self.confirm_label,
+            theme.destructive_button(),
+        )
+        .enabled(self.confirm_enabled)
+        .build();
+        if self.confirm_enabled {
+            for handler in &self.confirm_handlers {
+                confirm = confirm.on(handler.direct_listener(EventType::Click));
+            }
+            for handler in &self.open_handlers {
+                confirm = confirm.on(handler.direct_listener_value(EventType::Click, false));
+            }
+        }
         let content = Element::column([
             crate::Typography::new(&self.title, crate::TypographyVariant::Heading(2))
                 .build(theme)
@@ -80,24 +129,21 @@ impl AlertDialog {
             crate::Typography::new(self.description, crate::TypographyVariant::Paragraph)
                 .build(theme)
                 .keyed(&description_key),
-            Element::row([
-                Button::new(&close, self.cancel_label, theme.outline_button()).build(),
-                Button::new(
-                    format!("{}::confirm", self.key),
-                    self.confirm_label,
-                    theme.destructive_button(),
-                )
-                .enabled(self.confirm_enabled)
-                .build(),
-            ])
-            .gap(8.0)
-            .flex_wrap(argui_ui::FlexWrap::Wrap),
+            Element::row([cancel, confirm])
+                .gap(8.0)
+                .flex_wrap(argui_ui::FlexWrap::Wrap),
         ])
         .gap(16.0);
-        let mut root = Dialog::new(self.key, self.title, self.open, self.trigger, content)
+        let mut dialog = Dialog::new(self.key, self.title, self.open, self.trigger, content)
             .alert(true)
-            .initial_focus(InitialFocus::Target(close.into()))
-            .build(theme);
+            .initial_focus(InitialFocus::Target(close.into()));
+        for handler in self.open_handlers {
+            dialog = dialog.on_open_change(handler);
+        }
+        for handler in self.cancel_handlers {
+            dialog = dialog.on_dismiss(handler);
+        }
+        let mut root = dialog.build(theme);
         if let Some(overlay) = root.children.get_mut(1) {
             let panel = &mut overlay.children[1];
             *panel = panel

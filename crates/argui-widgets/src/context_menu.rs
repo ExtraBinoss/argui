@@ -1,6 +1,6 @@
 use crate::{Menu, MenuResponse, WidgetTheme};
 use argui_core::{Key, KeyState, Point, Rect, Size};
-use argui_ui::{Element, FloatingPlacement, PortalTarget, UiEvent, UiEventKind};
+use argui_ui::{Element, FloatingPlacement, PortalTarget, UiEvent, UiEventKind, ValueHandler};
 
 /// Context-menu presentation reuses the same entries and keyboard policy as Menu.
 pub struct ContextMenu {
@@ -9,6 +9,20 @@ pub struct ContextMenu {
 }
 
 impl ContextMenu {
+    /// Adds a handler that receives the stable id of an activated menu item.
+    #[must_use]
+    pub fn on_action(mut self, handler: ValueHandler<String>) -> Self {
+        self.menu = self.menu.on_action(handler);
+        self
+    }
+
+    /// Adds a handler receiving the requested menu open state.
+    #[must_use]
+    pub fn on_open_change(mut self, handler: ValueHandler<bool>) -> Self {
+        self.menu = self.menu.on_open_change(handler);
+        self
+    }
+
     /// Sets the surface policy used by the context menu's overlay.
     #[must_use]
     pub fn surface(mut self, surface: argui_ui::OverlaySurface) -> Self {

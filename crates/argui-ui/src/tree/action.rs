@@ -116,14 +116,20 @@ impl UiTree {
             );
             base.set_focused_node(invocation.origin.or(self.focused_node()));
             return InteractionUpdate {
-                events: vec![base.delivery(
-                    node,
-                    self.key_for(node).map(str::to_owned),
-                    Some(binding.listener.handler),
-                    EventPhase::Target,
-                    false,
-                    None,
-                )],
+                events: vec![base.delivery(crate::event::EventDelivery {
+                    current_target: node,
+                    current_key: self.key_for(node).map(str::to_owned),
+                    current_handler: Some(binding.listener.handler),
+                    phase: EventPhase::Target,
+                    passive: false,
+                    once: None,
+                    handler_value: binding.listener.value.as_ref().and_then(|source| {
+                        source.resolve(
+                            &base.kind,
+                            self.interaction_bounds.get(&base.target).copied(),
+                        )
+                    }),
+                })],
                 ..Default::default()
             };
         }

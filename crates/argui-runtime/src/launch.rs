@@ -326,6 +326,8 @@ fn launch_android(
     android_app: AndroidApp,
     application: MultiApplication,
 ) -> Result<(), RuntimeError> {
+    argui_platform::mobile::initialize_android(&android_app)
+        .map_err(|error| RuntimeError::NativeHost(error.to_string()))?;
     let mut builder = EventLoop::<UserEvent>::with_user_event();
     builder.with_android_app(android_app);
     let event_loop = builder.build().map_err(PlatformError::from)?;

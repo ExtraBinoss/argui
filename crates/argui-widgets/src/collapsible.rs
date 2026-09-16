@@ -1,4 +1,6 @@
-use argui_ui::{Element, JustifyContent, Role, Semantics, UiEvent, length, percent};
+use argui_ui::{
+    Element, EventType, JustifyContent, Role, Semantics, UiEvent, ValueHandler, length, percent,
+};
 
 use crate::{Button, ButtonBehavior, WidgetTheme};
 
@@ -13,6 +15,7 @@ pub struct Collapsible {
     trigger: Option<Element>,
     indicator: Option<Element>,
     content: Element,
+    open_handlers: Vec<ValueHandler<bool>>,
 }
 
 impl Collapsible {
@@ -35,6 +38,7 @@ impl Collapsible {
             trigger: None,
             indicator: None,
             content,
+            open_handlers: Vec::new(),
         }
     }
 
@@ -81,6 +85,13 @@ impl Collapsible {
             .map(|_| !self.open)
     }
 
+    /// Adds a callback receiving the requested controlled open state.
+    #[must_use]
+    pub fn on_open_change(mut self, handler: ValueHandler<bool>) -> Self {
+        self.open_handlers.push(handler);
+        self
+    }
+
     #[must_use]
     /// Builds the disclosure using `theme` for trigger styling.
     pub fn build(self, theme: &WidgetTheme) -> Element {
@@ -114,6 +125,11 @@ impl Collapsible {
         }
         if self.open {
             trigger = trigger.controls([content_key.clone()]);
+        }
+        if self.enabled {
+            for handler in self.open_handlers {
+                trigger = trigger.on(handler.direct_listener_value(EventType::Click, !self.open));
+            }
         }
         let mut children = vec![trigger];
         if self.open {

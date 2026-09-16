@@ -84,6 +84,7 @@ for workloads, memory figures and reproduction commands.
 - [x] State-preserving Subsecond patches through the optional `hot-reload` feature
 - [x] Optional DevTools, file picker, updater, WebView, tray, native popovers and desktop backdrop
 - [x] Android/iOS bootstrap crates, safe areas and packaged Widget Gallery CI artifacts
+- [x] Local typed widget callbacks and renderer-independent application tests
 
 The public integration flags are `i18n`, `hot-reload`, `tasks`, `devtools`,
 `devtools-all-smi`, `file-picker`, `updater`, `widget-updater`,
@@ -103,6 +104,9 @@ feature bundle.
 | Async model tasks | `tasks` | All targets |
 | Every widget | `widgets-all` | All targets |
 | A small widget set | the matching `widget-*` flags | All targets |
+| Common forms and overlays | `basic` | All targets |
+| Common UI plus native integrations | `desktop` | Desktop |
+| Common UI plus browser/WebView support | `web` | Desktop and browser |
 | Inspector and profiler | `devtools` | Desktop and WebAssembly |
 | NVIDIA/AMD/Intel sensor collection | `devtools-all-smi` | Supported desktop hosts |
 | State-preserving Rust patches | `hot-reload` | Native desktop debug builds |
@@ -118,7 +122,7 @@ not need an OS feature. A focused application can enable capabilities directly:
 
 ```toml
 [dependencies]
-argui = { version = "0.2.1", default-features = false, features = [
+argui = { version = "0.3.0", default-features = false, features = [
   "i18n", "tasks", "widget-button", "widget-input",
 ] }
 ```
@@ -127,12 +131,12 @@ For mobile, add the platform entry crate as a separate dependency:
 
 ```toml
 # Android
-argui = { version = "0.2.1", features = ["i18n", "widgets-all"] }
-argui-android = "0.2.1"
+argui = { version = "0.3.0", features = ["i18n", "widgets-all"] }
+argui-android = "0.3.0"
 
 # iOS
-argui = { version = "0.2.1", features = ["i18n", "widgets-all"] }
-argui-ios = "0.2.1"
+argui = { version = "0.3.0", features = ["i18n", "widgets-all"] }
+argui-ios = "0.3.0"
 ```
 
 Available widget flags are `widget-accordion`, `widget-alert`,
@@ -208,25 +212,27 @@ Add only the widgets your application uses:
 
 ```toml
 [dependencies]
-argui = { version = "0.2.1", features = ["widget-button"] }
+argui = { version = "0.3.0", features = ["widget-button"] }
 ```
 
 ```rust
-use argui::{
-    ui::Element,
-    widgets::{Button, WidgetTheme},
-};
+use argui::{runtime::{Context, Render}, ui::Element, widgets::{Button, WidgetTheme}};
 
-fn view(theme: &WidgetTheme) -> Element {
-    Element::row([
-        Button::new("save", "Save changes", theme.button()).build(),
-        Button::new("cancel", "Cancel", theme.ghost_button()).build(),
-    ])
-    .gap(10.0)
+struct Editor {
+    saved: bool,
+}
+
+impl Editor {
+    fn view(&mut self, theme: &WidgetTheme, cx: &mut Context<Self>) -> Element {
+        Button::new("save", "Save changes", theme.button())
+            .on_click(cx.callback(|editor| editor.saved = true))
+            .build()
+    }
 }
 ```
 
 Continue with the product-shaped [example applications](app_examples/),
+[simplified 0.3 API](docs/simplified-api.md),
 [models and state](docs/runtime/models.md),
 [localization](docs/i18n.md), [hot reload](docs/hot-reload.md), the
 [widget catalogue](docs/widgets/shadcn.md) or the [complete examples](crates/argui/examples/).

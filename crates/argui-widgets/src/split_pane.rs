@@ -1,9 +1,9 @@
 use argui_core::{Key, KeyState};
 use argui_ui::{
-    AlignItems, CursorIcon, Element, GestureCapture, GestureDelivery, GestureKind, GesturePhase,
-    GestureSet, Interaction, JustifyContent, Orientation, PanAxis, PanGesture, Role,
-    SemanticAction, SemanticValue, Semantics, StylePatch, UiEvent, UiEventKind, UserSelect,
-    VisualState, length, percent, property,
+    AlignItems, CursorIcon, Element, EventType, GestureCapture, GestureDelivery, GestureKind,
+    GesturePhase, GestureSet, Interaction, JustifyContent, Orientation, PanAxis, PanGesture, Role,
+    SemanticAction, SemanticValue, Semantics, SplitHandlerValue, StylePatch, UiEvent, UiEventKind,
+    UserSelect, ValueHandler, VisualState, length, percent, property,
 };
 
 use crate::WidgetTheme;
@@ -25,6 +25,7 @@ pub struct SplitPane {
     reset: f32,
     start: Option<f32>,
     trailing: bool,
+    change_handlers: Vec<ValueHandler<f32>>,
 }
 
 impl SplitPane {
@@ -55,7 +56,15 @@ impl SplitPane {
             reset: size,
             start: None,
             trailing: false,
+            change_handlers: Vec::new(),
         }
+    }
+
+    /// Adds a handler receiving the next controlled pane size in logical pixels.
+    #[must_use]
+    pub fn on_change(mut self, handler: ValueHandler<f32>) -> Self {
+        self.change_handlers.push(handler);
+        self
     }
 
     #[must_use]
@@ -139,7 +148,7 @@ impl SplitPane {
                 length(2.0)
             })
             .background(theme.border);
-        Element::container([line])
+        let mut separator = Element::container([line])
             .keyed(self.key.clone())
             .width(if horizontal {
                 length(6.0)
@@ -204,7 +213,28 @@ impl SplitPane {
             .when(
                 VisualState::FocusVisible,
                 StylePatch::new().set(property::BackgroundColor, theme.primary),
-            )
+            );
+        let source = SplitHandlerValue::new(
+            self.size,
+            self.minimum,
+            self.maximum,
+            self.reset,
+            horizontal,
+            self.trailing,
+        );
+        for handler in &self.change_handlers {
+            separator = separator
+                .on(handler
+                    .direct_listener(EventType::Gesture)
+                    .split_handler_value(source))
+                .on(handler
+                    .direct_listener(EventType::Key)
+                    .split_handler_value(source))
+                .on(handler
+                    .direct_listener(EventType::Click)
+                    .split_handler_value(source));
+        }
+        separator
     }
 
     #[must_use]

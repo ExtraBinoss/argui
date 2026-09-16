@@ -404,7 +404,13 @@ impl<A: Render> Render for DevtoolsHost<A> {
         }
         let app = cx.entity_in(&self.app, self.theme_editing.environment());
         let themes = argui_widgets::shadcn(&environment);
-        let mut root = view::host(self, app, themes.resolve(environment.color_scheme), None);
+        let mut root = view::host(
+            self,
+            app,
+            themes.resolve(environment.color_scheme),
+            None,
+            environment.safe_area_insets,
+        );
         for event in EventType::ALL {
             root = root.on(cx
                 .listener(event, |host, event, cx| {

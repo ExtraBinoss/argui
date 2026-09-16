@@ -1,4 +1,4 @@
-mod examples;
+pub mod examples;
 
 use argui::{
     platform::{ApplicationConfig, ApplicationIdentity, WindowConfig},

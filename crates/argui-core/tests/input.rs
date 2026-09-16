@@ -15,12 +15,14 @@ fn scroll_units_stay_explicit_until_ui_dispatch() {
 fn pointer_thresholds_are_configurable_as_one_policy() {
     let settings = PointerSettings::default()
         .multi_click(std::time::Duration::from_millis(240), 3.0)
+        .activation_slop(8.0)
         .long_press(std::time::Duration::from_millis(650), 12.0);
     assert_eq!(
         settings.multi_click_interval(),
         std::time::Duration::from_millis(240)
     );
     assert_eq!(settings.multi_click_distance(), 3.0);
+    assert_eq!(settings.activation_slop_distance(), 8.0);
     assert_eq!(
         settings.long_press_interval(),
         std::time::Duration::from_millis(650)
@@ -50,6 +52,18 @@ fn touch_slop_rejects_negative_values() {
 #[should_panic]
 fn touch_slop_rejects_nan() {
     let _ = PointerSettings::default().long_press(std::time::Duration::from_millis(650), f32::NAN);
+}
+
+#[test]
+#[should_panic]
+fn activation_slop_rejects_negative_values() {
+    let _ = PointerSettings::default().activation_slop(-1.0);
+}
+
+#[test]
+#[should_panic]
+fn activation_slop_rejects_nan() {
+    let _ = PointerSettings::default().activation_slop(f32::NAN);
 }
 
 #[test]

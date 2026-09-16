@@ -79,12 +79,16 @@ pub enum Page {
     AsyncTasks,
     Editing,
     CustomTimeline,
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    MobileActivity,
     #[cfg(feature = "updater")]
     Updater,
 }
 
 impl Page {
-    pub const ALL: [Self; 77 + cfg!(feature = "updater") as usize] = [
+    pub const ALL: [Self;
+        77 + cfg!(feature = "updater") as usize
+            + cfg!(any(target_os = "android", target_os = "ios")) as usize] = [
         Self::Accordion,
         Self::Alert,
         Self::AlertDialog,
@@ -153,6 +157,8 @@ impl Page {
         Self::LiquidGlass,
         Self::ScrollShadow,
         Self::AsyncTasks,
+        #[cfg(any(target_os = "android", target_os = "ios"))]
+        Self::MobileActivity,
         Self::CustomTimeline,
         Self::Editing,
         Self::HotReload,
@@ -170,6 +176,8 @@ impl Page {
         match self {
             #[cfg(feature = "updater")]
             Self::Updater => "Examples",
+            #[cfg(any(target_os = "android", target_os = "ios"))]
+            Self::MobileActivity => "Examples",
             Self::Accordion
             | Self::AlertDialog
             | Self::Attachment
@@ -327,6 +335,8 @@ impl Page {
             Self::TextSelection => "Text selection",
             Self::WebView => "WebView",
             Self::AsyncTasks => "Async tasks",
+            #[cfg(any(target_os = "android", target_os = "ios"))]
+            Self::MobileActivity => "Background activity",
             Self::Editing => "Editing & Password",
             Self::CustomTimeline => "Custom Timeline",
             #[cfg(feature = "updater")]
@@ -412,6 +422,8 @@ impl Page {
             Self::TextSelection => "text-selection",
             Self::WebView => "webview",
             Self::AsyncTasks => "async-tasks",
+            #[cfg(any(target_os = "android", target_os = "ios"))]
+            Self::MobileActivity => "mobile-activity",
             Self::Editing => "editing",
             Self::CustomTimeline => "custom-timeline",
             #[cfg(feature = "updater")]
@@ -424,11 +436,6 @@ impl Page {
         query.is_empty()
             || self.label().to_lowercase().contains(&query)
             || self.category().to_lowercase().contains(&query)
-    }
-
-    pub fn from_navigation_key(key: &str) -> Option<Self> {
-        let slug = key.strip_prefix("nav::")?;
-        Self::ALL.into_iter().find(|page| page.slug() == slug)
     }
 }
 
@@ -533,6 +540,10 @@ impl Page {
                 "Retained web content, with separate email and webpage security policies."
             }
             Self::AsyncTasks => "Owned, cancellable work with event-driven delivery to the UI.",
+            #[cfg(any(target_os = "android", target_os = "ios"))]
+            Self::MobileActivity => {
+                "Continue a cancellable task in the background with native progress where available."
+            }
             Self::Editing => {
                 "Transactional undo/redo, Unicode, filtered fields and protected passwords."
             }

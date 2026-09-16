@@ -1,8 +1,8 @@
 use argui_paint::PaintStyle;
 use argui_text::{TextStyle, TextWrap};
 use argui_ui::{
-    AlignItems, Display, Element, FlexDirection, JustifyContent, LayoutStyle, StylePatch,
-    StyleTransition, VisualState,
+    AlignItems, Display, Element, EventHandler, EventType, FlexDirection, JustifyContent,
+    LayoutStyle, StylePatch, StyleTransition, VisualState,
 };
 
 use crate::{ButtonBehavior, ButtonPart};
@@ -100,6 +100,7 @@ pub struct Button {
     loading: Option<Element>,
     content: Option<Element>,
     tooltip: Option<String>,
+    click_handlers: Vec<EventHandler>,
 }
 
 impl Button {
@@ -119,6 +120,7 @@ impl Button {
             enabled: true,
             loading: None,
             content: None,
+            click_handlers: Vec::new(),
         }
     }
 
@@ -189,6 +191,18 @@ impl Button {
         self
     }
 
+    /// Adds a callback for this button's own activation.
+    ///
+    /// `handler` is normally created with `Context::callback` or
+    /// `Context::event_handler`. Handlers run in declaration order and use the
+    /// normal click propagation pipeline. Activation bubbling from interactive
+    /// descendants does not invoke them.
+    #[must_use]
+    pub fn on_click(mut self, handler: EventHandler) -> Self {
+        self.click_handlers.push(handler);
+        self
+    }
+
     #[must_use]
     /// Builds the button element with its configured style and behavior.
     pub fn build(self) -> Element {
@@ -219,6 +233,9 @@ impl Button {
         );
         if let Some(focused) = self.style.focused {
             element = element.when(VisualState::FocusVisible, focused);
+        }
+        for handler in self.click_handlers {
+            element = element.on(handler.direct_listener(EventType::Click));
         }
         element.tooltip = self.tooltip.filter(|_| self.enabled && !loading);
         element

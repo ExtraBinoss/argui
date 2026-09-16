@@ -42,6 +42,8 @@ mod kbd;
 mod label;
 pub(crate) mod liquid_glass;
 pub(crate) mod menus;
+#[cfg(any(target_os = "android", target_os = "ios"))]
+pub(crate) mod mobile_activity;
 pub(crate) mod motion;
 pub(crate) mod overlay_effects;
 mod pagination;
@@ -139,18 +141,19 @@ pub(crate) fn render(
         Page::Alert => alert::render(theme, assets),
         Page::Separator => separator::render(theme),
         Page::Collapsible => collapsible::render(gallery, theme, assets, cx),
-        Page::Button => buttons::render(gallery, theme, cx.entity(&gallery.spinner)),
-        Page::Input => inputs::render(gallery, theme, assets),
+        Page::Button => buttons::render(gallery, theme, cx.entity(&gallery.spinner), cx),
+        Page::Input => inputs::render(gallery, theme, assets, cx),
         Page::TextArea => textarea(
             gallery,
             theme,
             assets,
+            cx,
             resize.textarea,
             resize.textarea_reset,
         ),
-        Page::Checkbox => checkboxes(gallery, theme, assets),
-        Page::Switch => switches(gallery, theme),
-        Page::RadioGroup => radios(gallery, theme),
+        Page::Checkbox => checkboxes(gallery, theme, assets, cx),
+        Page::Switch => switches(gallery, theme, cx),
+        Page::RadioGroup => radios(gallery, theme, cx),
         Page::AnimatedText => cx.entity(
             gallery
                 .animated_text
@@ -161,10 +164,10 @@ pub(crate) fn render(
                 .color_picker
                 .get_or_init(|| Entity::new(color_picker::ColorPickerDemo::default())),
         ),
-        Page::Slider => sliders(gallery, theme, assets),
-        Page::Tabs => tabs(gallery, theme),
+        Page::Slider => sliders(gallery, theme, assets, cx),
+        Page::Tabs => tabs(gallery, theme, cx),
         Page::Select => selects(gallery, theme, assets),
-        Page::Dialog => dialogs(gallery, theme),
+        Page::Dialog => dialogs(gallery, theme, cx),
         Page::Popover => cx.entity(&gallery.popover),
         Page::Tooltip => cx.entity(&gallery.tooltip),
         Page::HotReload => cx.entity(&gallery.hot_reload),
@@ -177,6 +180,8 @@ pub(crate) fn render(
         Page::TextSelection => cx.entity(&gallery.text_selection),
         Page::WebView => cx.entity(&gallery.webview),
         Page::AsyncTasks => cx.entity(&gallery.tasks),
+        #[cfg(any(target_os = "android", target_os = "ios"))]
+        Page::MobileActivity => cx.entity(&gallery.mobile_activity),
         Page::Editing => cx.entity(&gallery.editing),
         Page::CustomTimeline => cx.entity(&gallery.timeline),
         #[cfg(feature = "updater")]
@@ -214,6 +219,7 @@ fn textarea(
     gallery: &WidgetGallery,
     theme: &WidgetTheme,
     assets: &WidgetAssets,
+    cx: &mut argui::runtime::Context<WidgetGallery>,
     resize_listener: EventListener,
     resize_reset_listener: EventListener,
 ) -> Element {
@@ -226,6 +232,7 @@ fn textarea(
     });
     let area = TextArea::new("notes", &gallery.notes, "Write a note…", style)
         .scrollbar(scrollbar)
+        .on_input(cx.input_callback(|gallery, value| gallery.notes = value))
         .build();
     preview(
         "Resizable multiline input",
@@ -278,7 +285,12 @@ fn resizable_textarea(
         .position(Position::Relative)
 }
 
-fn checkboxes(gallery: &WidgetGallery, theme: &WidgetTheme, assets: &WidgetAssets) -> Element {
+fn checkboxes(
+    gallery: &WidgetGallery,
+    theme: &WidgetTheme,
+    assets: &WidgetAssets,
+    cx: &mut argui::runtime::Context<WidgetGallery>,
+) -> Element {
     preview(
         "Team notifications",
         "Choose which project updates you receive. Space toggles the focused option.",
@@ -293,6 +305,11 @@ fn checkboxes(gallery: &WidgetGallery, theme: &WidgetTheme, assets: &WidgetAsset
                 },
             )
             .indicator(assets.icon(TablerIcon::Check, 14.0))
+            .on_change(
+                cx.value_callback(|gallery, value: argui::ui::CheckedState| {
+                    gallery.accepted = value != argui::ui::CheckedState::Unchecked;
+                }),
+            )
             .build(theme),
             Checkbox::new(
                 "check-empty",
@@ -302,6 +319,11 @@ fn checkboxes(gallery: &WidgetGallery, theme: &WidgetTheme, assets: &WidgetAsset
                 } else {
                     argui::ui::CheckedState::Unchecked
                 },
+            )
+            .on_change(
+                cx.value_callback(|gallery, value: argui::ui::CheckedState| {
+                    gallery.email_updates = value != argui::ui::CheckedState::Unchecked;
+                }),
             )
             .build(theme),
             Checkbox::new(
@@ -317,13 +339,21 @@ fn checkboxes(gallery: &WidgetGallery, theme: &WidgetTheme, assets: &WidgetAsset
     )
 }
 
-fn switches(gallery: &WidgetGallery, theme: &WidgetTheme) -> Element {
+fn switches(
+    gallery: &WidgetGallery,
+    theme: &WidgetTheme,
+    cx: &mut argui::runtime::Context<WidgetGallery>,
+) -> Element {
     preview(
         "Rendering preferences",
         "Enable profiling while you work, or prepare a render without a network connection.",
         Element::column([
-            Switch::new("notifications", "GPU profiling", gallery.notifications).build(theme),
-            Switch::new("switch-off", "Offline rendering", gallery.offline_rendering).build(theme),
+            Switch::new("notifications", "GPU profiling", gallery.notifications)
+                .on_change(cx.value_callback(|gallery, value| gallery.notifications = value))
+                .build(theme),
+            Switch::new("switch-off", "Offline rendering", gallery.offline_rendering)
+                .on_change(cx.value_callback(|gallery, value| gallery.offline_rendering = value))
+                .build(theme),
             Switch::new(
                 "switch-disabled",
                 "Cloud rendering (connection required)",
@@ -337,7 +367,11 @@ fn switches(gallery: &WidgetGallery, theme: &WidgetTheme) -> Element {
     )
 }
 
-fn radios(gallery: &WidgetGallery, theme: &WidgetTheme) -> Element {
+fn radios(
+    gallery: &WidgetGallery,
+    theme: &WidgetTheme,
+    cx: &mut argui::runtime::Context<WidgetGallery>,
+) -> Element {
     preview(
         "Quality preset",
         "Choose a rendering preset. Use the arrow keys to compare the options.",
@@ -351,12 +385,18 @@ fn radios(gallery: &WidgetGallery, theme: &WidgetTheme) -> Element {
             ],
             Some(gallery.radio),
         )
+        .on_select(cx.value_callback(|gallery, selection| gallery.radio = selection))
         .build(theme),
         theme,
     )
 }
 
-fn sliders(gallery: &WidgetGallery, theme: &WidgetTheme, assets: &WidgetAssets) -> Element {
+fn sliders(
+    gallery: &WidgetGallery,
+    theme: &WidgetTheme,
+    assets: &WidgetAssets,
+    cx: &mut argui::runtime::Context<WidgetGallery>,
+) -> Element {
     preview(
         "Continuous and stepped input",
         "Drag a slider or use the arrow keys to adjust the value. Home and End reach the limits.",
@@ -368,6 +408,8 @@ fn sliders(gallery: &WidgetGallery, theme: &WidgetTheme, assets: &WidgetAssets) 
                 gallery.plain_slider,
                 RangeConfig::default(),
             )
+            .on_change(cx.value_callback(|gallery, value| gallery.plain_slider = value))
+            .on_commit(cx.value_callback(|gallery, value| gallery.plain_slider = value))
             .build(theme),
         ])
         .gap(12.0),
@@ -375,7 +417,11 @@ fn sliders(gallery: &WidgetGallery, theme: &WidgetTheme, assets: &WidgetAssets) 
     )
 }
 
-fn tabs(gallery: &WidgetGallery, theme: &WidgetTheme) -> Element {
+fn tabs(
+    gallery: &WidgetGallery,
+    theme: &WidgetTheme,
+    cx: &mut argui::runtime::Context<WidgetGallery>,
+) -> Element {
     preview(
         "Tabbed settings",
         "Switch categories to explore the available workspace settings.",
@@ -391,6 +437,7 @@ fn tabs(gallery: &WidgetGallery, theme: &WidgetTheme) -> Element {
             ],
             gallery.tab,
         )
+        .on_select(cx.value_callback(|gallery, selection| gallery.tab = selection))
         .build(theme),
         theme,
     )
@@ -414,7 +461,11 @@ fn selects(gallery: &WidgetGallery, theme: &WidgetTheme, assets: &WidgetAssets) 
     )
 }
 
-fn dialogs(gallery: &WidgetGallery, theme: &WidgetTheme) -> Element {
+fn dialogs(
+    gallery: &WidgetGallery,
+    theme: &WidgetTheme,
+    cx: &mut argui::runtime::Context<WidgetGallery>,
+) -> Element {
     let content = Element::column([
         text("Delete GPU cache?", 22.0, theme.foreground, 700),
         text(
@@ -441,6 +492,7 @@ fn dialogs(gallery: &WidgetGallery, theme: &WidgetTheme) -> Element {
             Button::new("open-dialog", "Open dialog", theme.button()).build(),
             content,
         )
+        .on_open_change(cx.value_callback(|gallery, open| gallery.dialog_open = open))
         .build(theme),
         theme,
     )

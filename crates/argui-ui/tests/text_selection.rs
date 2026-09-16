@@ -1,9 +1,9 @@
 use argui_core::{CaretAffinity, TextPosition};
 use argui_ui::{
-    ClipboardRequest, DocumentTextPoint, Element, EventHandlerId, EventListener, EventOwnerId,
-    EventType, GestureSet, Interaction, Role, SelectionCommand, SelectionGranularity, Semantics,
-    TapGesture, TextEditorSpec, TextInputFilter, TextSelectionStyle, UiEventKind, UiTree,
-    UserSelect,
+    ClipboardRequest, DocumentSelectionEndpoint, DocumentTextPoint, Element, EventHandlerId,
+    EventListener, EventOwnerId, EventType, GestureSet, Interaction, Role, SelectionCommand,
+    SelectionGranularity, Semantics, TapGesture, TextEditorSpec, TextInputFilter,
+    TextSelectionStyle, UiEventKind, UiTree, UserSelect,
 };
 
 fn listens_for_selection(element: Element) -> Element {
@@ -229,6 +229,48 @@ fn touch_selection_exposes_handles_and_empty_documents_stay_empty() {
     let mut empty = UiTree::new(Element::container([]));
     assert!(empty.select_all_document_text().events.is_empty());
     assert!(empty.selected_document_text().is_none());
+}
+
+#[test]
+fn touch_selection_handles_drag_both_endpoints_through_crossing_and_release() {
+    let mut tree = UiTree::new(Element::text("alpha beta gamma"));
+    let text = tree.node_id_at(0).unwrap();
+    let point =
+        |index| DocumentTextPoint::new(text, TextPosition::new(index, CaretAffinity::After));
+
+    tree.begin_touch_document_selection(point(7), SelectionGranularity::Word);
+    tree.release_document_selection();
+    assert_eq!(tree.selected_document_text().as_deref(), Some("beta"));
+
+    tree.begin_document_selection_handle_drag(DocumentSelectionEndpoint::Anchor);
+    assert!(tree.document_selection_dragging());
+    tree.drag_document_selection(point(13));
+    let crossed_anchor = tree.document_selection().unwrap();
+    assert_eq!(crossed_anchor.anchor.position.index, 13);
+    assert_eq!(crossed_anchor.focus.position.index, 10);
+    assert_eq!(tree.selected_document_text().as_deref(), Some(" ga"));
+
+    tree.drag_document_selection(point(3));
+    assert_eq!(tree.selected_document_text().as_deref(), Some("ha beta"));
+    tree.release_document_selection();
+
+    tree.begin_document_selection_handle_drag(DocumentSelectionEndpoint::Focus);
+    tree.drag_document_selection(point(14));
+    assert_eq!(
+        tree.selected_document_text().as_deref(),
+        Some("ha beta gam")
+    );
+    tree.drag_document_selection(point(1));
+    let crossed_focus = tree.document_selection().unwrap();
+    assert_eq!(crossed_focus.anchor.position.index, 3);
+    assert_eq!(crossed_focus.focus.position.index, 1);
+    assert_eq!(tree.selected_document_text().as_deref(), Some("lp"));
+
+    tree.release_document_selection();
+    assert!(!tree.document_selection_dragging());
+    assert!(tree.document_selection_handles_visible());
+    assert!(tree.drag_document_selection(point(8)).events.is_empty());
+    assert_eq!(tree.selected_document_text().as_deref(), Some("lp"));
 }
 
 #[test]

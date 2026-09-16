@@ -24,6 +24,7 @@ mod layout;
 mod model_updates;
 mod visibility;
 pub use inspect::{Inspection, InspectionCache};
+mod inertia;
 mod lifecycle;
 #[cfg(all(
     feature = "webview",
@@ -111,6 +112,7 @@ pub(crate) struct Application {
     primary_touch: Option<PointerId>,
     selection_click: text_selection::SelectionClick,
     touch_selection: Option<text_selection::TouchSelection>,
+    touch_selection_handle: Option<text_selection::TouchSelectionHandle>,
     input_epoch: Instant,
     last_cursor: argui_ui::CursorIcon,
     modifiers: Modifiers,
@@ -122,7 +124,7 @@ pub(crate) struct Application {
     pub(crate) tasks: Option<crate::tasks::TaskRuntime>,
     pending_scrollbar_drag: Option<Point>,
     pending_pointer_scroll: Option<scroll::PendingScroll>,
-    scroll_inertia: scroll::ScrollInertia,
+    scroll_inertia: inertia::ScrollInertia,
     scroll_gesture: argui_ui::ScrollGesture,
     programmatic_scroll: Option<scroll::ProgrammaticScroll>,
     last_scroll_physics: Option<Instant>,
@@ -231,6 +233,7 @@ impl Application {
             primary_touch: None,
             selection_click: text_selection::SelectionClick::default(),
             touch_selection: None,
+            touch_selection_handle: None,
             input_epoch: Instant::now(),
             last_cursor: argui_ui::CursorIcon::Default,
             modifiers: Modifiers::default(),
@@ -242,7 +245,7 @@ impl Application {
             tasks: None,
             pending_scrollbar_drag: None,
             pending_pointer_scroll: None,
-            scroll_inertia: scroll::ScrollInertia::default(),
+            scroll_inertia: inertia::ScrollInertia::default(),
             scroll_gesture: argui_ui::ScrollGesture::default(),
             programmatic_scroll: None,
             last_scroll_physics: None,
@@ -458,6 +461,9 @@ impl Application {
             update.merge(ui.scrollbar_pointer_moved(None, &[]));
             update.merge(ui.window_blurred());
             self.apply_ui_update(update, window, event_loop);
+        }
+        if !focused {
+            self.update_ime(window);
         }
         if focused && let (Some(ui), Some(layout)) = (&mut self.ui_tree, &self.ui_layout) {
             let update = ui.window_focused(&layout.hit_regions);

@@ -93,7 +93,6 @@ watch([() => props.component, () => props.app], launch)
         ref="frame"
         :src="url"
         :title="isApp ? t('appExamples.label') : t('gallery.label')"
-        :style="{ visibility: state === 'ready' ? 'visible' : 'hidden' }"
         @error="state = 'error'"
       />
       <div

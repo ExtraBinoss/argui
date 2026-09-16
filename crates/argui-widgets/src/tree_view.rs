@@ -2,7 +2,8 @@ use std::collections::BTreeSet;
 
 use argui_core::{Key, KeyState};
 use argui_ui::{
-    Element, Role, SemanticAction, SemanticState, Semantics, UiEvent, UiEventKind, length,
+    Element, EventFilter, EventType, Role, SemanticAction, SemanticState, Semantics, UiEvent,
+    UiEventKind, ValueHandler, length,
 };
 
 use crate::{Button, VList, WidgetTheme};
@@ -32,9 +33,54 @@ pub struct TreeView<'a> {
     pub collapsed: &'a BTreeSet<String>,
     pub list: VList,
     pub disclosure: Option<argui_paint::VectorId>,
+    select_handlers: Vec<ValueHandler<String>>,
+    activate_handlers: Vec<ValueHandler<String>>,
 }
 
 impl TreeView<'_> {
+    /// Creates a controlled tree from preorder `nodes` and a virtual `list` viewport.
+    ///
+    /// `selected` identifies the active row and `collapsed` contains stable ids of
+    /// closed branches. The application owns both values.
+    #[must_use]
+    pub fn new<'a>(
+        nodes: &'a [TreeNode],
+        selected: Option<&'a str>,
+        collapsed: &'a BTreeSet<String>,
+        list: VList,
+    ) -> TreeView<'a> {
+        TreeView {
+            nodes,
+            selected,
+            collapsed,
+            list,
+            disclosure: None,
+            select_handlers: Vec::new(),
+            activate_handlers: Vec::new(),
+        }
+    }
+
+    /// Sets the optional disclosure `icon` shown for expandable branches.
+    #[must_use]
+    pub fn disclosure(mut self, icon: Option<argui_paint::VectorId>) -> Self {
+        self.disclosure = icon;
+        self
+    }
+
+    /// Adds a handler that receives the stable id of a selected node.
+    #[must_use]
+    pub fn on_select(mut self, handler: ValueHandler<String>) -> Self {
+        self.select_handlers.push(handler);
+        self
+    }
+
+    /// Adds a handler that receives the stable id of a node activated by double click.
+    #[must_use]
+    pub fn on_activate(mut self, handler: ValueHandler<String>) -> Self {
+        self.activate_handlers.push(handler);
+        self
+    }
+
     /// Returns source indices visible after applying collapsed ancestors.
     #[must_use]
     pub fn visible_indices(&self) -> Vec<usize> {
@@ -263,6 +309,63 @@ impl TreeView<'_> {
                     .action(SemanticAction::Click)
                     .action(SemanticAction::Focus),
             );
+        for handler in &self.select_handlers {
+            row = row.on(handler.direct_listener_value(EventType::Click, node.key.clone()));
+        }
+        for handler in &self.activate_handlers {
+            row = row.on(handler
+                .direct_listener_value(EventType::Click, node.key.clone())
+                .filter(EventFilter::DoubleClick));
+        }
+        let visible = self.visible_indices();
+        let position = visible.iter().position(|candidate| *candidate == index);
+        for (filter, target) in [
+            (
+                EventFilter::ArrowLeftPressed,
+                self.nodes[..index]
+                    .iter()
+                    .rev()
+                    .find(|parent| parent.depth < node.depth)
+                    .map(|parent| parent.key.clone()),
+            ),
+            (
+                EventFilter::ArrowRightPressed,
+                self.has_children(index)
+                    .then(|| self.nodes[index + 1].key.clone()),
+            ),
+            (
+                EventFilter::ArrowUpPressed,
+                position.and_then(|position| {
+                    visible
+                        .get(position.saturating_sub(1))
+                        .map(|index| self.nodes[*index].key.clone())
+                }),
+            ),
+            (
+                EventFilter::ArrowDownPressed,
+                position.and_then(|position| {
+                    visible
+                        .get((position + 1).min(visible.len().saturating_sub(1)))
+                        .map(|index| self.nodes[*index].key.clone())
+                }),
+            ),
+            (
+                EventFilter::HomePressed,
+                visible.first().map(|index| self.nodes[*index].key.clone()),
+            ),
+            (
+                EventFilter::EndPressed,
+                visible.last().map(|index| self.nodes[*index].key.clone()),
+            ),
+        ] {
+            if let Some(target) = target {
+                for handler in &self.select_handlers {
+                    row = row.on(handler
+                        .direct_listener_value(EventType::Key, target.clone())
+                        .filter(filter));
+                }
+            }
+        }
         row.interaction
             .as_mut()
             .expect("tree row button interaction")

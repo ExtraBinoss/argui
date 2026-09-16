@@ -81,10 +81,15 @@ updater dialog is a separate opt-in.
 
 ## Integration
 
-Widgets are controlled. Build from model state, forward events to the widget's
-behavior method, apply the returned action, then notify the owning model. Focus
-requests go through the runtime. Network transfers, persistence, validation, and
-navigation remain application responsibilities.
+Widgets are controlled. For local reactions, attach the widget's typed direct
+handler and write the emitted value into model state. For multi-effect reducers,
+custom controls, and intentional delegation, forward events to the existing
+behavior/action API. Focus requests go through the runtime. Network transfers,
+persistence, validation, and navigation remain application responsibilities.
+
+The complete direct-handler payloads, keyboard/accessibility behavior, harness
+pattern, and explicit reasons for action-only widgets are documented in the
+[interaction API inventory](interaction-api.md).
 
 Direction inherits through layout. Pass the same RTL value to collection
 controllers whose arrow-key behavior depends on direction.

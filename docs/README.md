@@ -7,10 +7,11 @@ testing, and releases.
 
 Start with:
 
-1. [Architecture](architecture.md) for the frame and event flow.
-2. [Repository structure](repo/structure.md) to find the crate that owns a change.
-3. [Development guide](contributing/development.md) for the edit and test loop.
-4. [Code quality](contributing/code-quality.md) before opening a pull request.
+1. [The 0.3 application API](simplified-api.md) for the public learning path.
+2. [Architecture](architecture.md) for the frame and event flow.
+3. [Repository structure](repo/structure.md) to find the crate that owns a change.
+4. [Development guide](contributing/development.md) for the edit and test loop.
+5. [Code quality](contributing/code-quality.md) before opening a pull request.
 
 ## Engine and application contracts
 
@@ -21,7 +22,7 @@ Start with:
 | UI behavior | [Editing](ui/editing.md) · [Animation](ui/animation.md) · [Custom elements](ui/custom-elements.md) |
 | Rendering | [Primitives](rendering/primitives.md) · [Effects](rendering/effects.md) |
 | Optional capabilities | [Localization](i18n.md) · [Hot reload](hot-reload.md) |
-| Widgets | [Catalogue](widgets/shadcn.md) · [Lists and tables](widgets/lists-tables.md) · [Overlays](widgets/overlays.md) |
+| Widgets | [Interaction APIs](widgets/interaction-api.md) · [Builder inventory](widgets/builder-inventory.md) · [Catalogue](widgets/shadcn.md) · [Lists and tables](widgets/lists-tables.md) · [Overlays](widgets/overlays.md) |
 
 ## Platform integration
 
@@ -35,7 +36,8 @@ Start with:
 ## Maintainer guides
 
 - [Performance](performance/optimizations.md): contracts, measurements, and
-  reproducible profiling commands.
+  reproducible profiling commands. The [feature profile measurements](performance/feature-profiles.md)
+  cover the facade's convenience aliases.
 - [DevTools](contributing/devtools.md): inspection and profiling behavior.
 - [Linux graphical testing](contributing/linux-testing.md): private displays and
   capture-based checks.

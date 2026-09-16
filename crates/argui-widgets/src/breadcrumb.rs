@@ -1,7 +1,7 @@
 use argui_text::{TextStyle, TextWrap};
 use argui_ui::{
-    AlignItems, Element, FlexWrap, KeyboardActivation, Role, Semantics, Sides, UiEvent, auto,
-    length, percent,
+    AlignItems, Element, EventType, FlexWrap, KeyboardActivation, Role, Semantics, Sides, UiEvent,
+    ValueHandler, auto, length, percent,
 };
 
 use crate::{Button, ButtonBehavior, WidgetTheme};
@@ -34,6 +34,7 @@ pub struct Breadcrumb {
     current: String,
     current_description: String,
     separator: String,
+    activate_handlers: Vec<ValueHandler<String>>,
 }
 
 impl Breadcrumb {
@@ -59,6 +60,7 @@ impl Breadcrumb {
             current: current.into(),
             current_description: "Current page".into(),
             separator: "/".into(),
+            activate_handlers: Vec::new(),
         }
     }
 
@@ -81,6 +83,13 @@ impl Breadcrumb {
     /// `separator` is the text inserted between adjacent items.
     pub fn separator(mut self, separator: impl Into<String>) -> Self {
         self.separator = separator.into();
+        self
+    }
+
+    /// Adds a callback receiving the activated ancestor's stable ID.
+    #[must_use]
+    pub fn on_activate(mut self, handler: ValueHandler<String>) -> Self {
+        self.activate_handlers.push(handler);
         self
     }
 
@@ -134,6 +143,10 @@ impl Breadcrumb {
             }
             if let Some(interaction) = &mut button.interaction {
                 interaction.keyboard_activation = KeyboardActivation::Enter;
+            }
+            for handler in &self.activate_handlers {
+                button =
+                    button.on(handler.direct_listener_value(EventType::Click, link.id.clone()));
             }
             children.push(
                 Element::row([

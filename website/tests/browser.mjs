@@ -127,7 +127,7 @@ try {
   await page.waitForSelector('.copy-button[aria-label="Copied"]')
   assert.match(
     await page.evaluate(() => navigator.clipboard.readText()),
-    /git clone https:\/\/github.com\/ExtraBinoss\/argui/,
+    /argui = \{ version = "0\.3\.0", features = \["widget-button"\] \}/,
   )
 
   await page.goto(`${origin}/docs`, { waitUntil: 'networkidle0' })
@@ -146,6 +146,9 @@ try {
     await page.$eval('.docs-live-example iframe', (element) => element.src),
     /\/examples\/docs\/index\.html\?example=first-window$/,
   )
+  await page.$eval('.docs-live-example', (element) =>
+    element.scrollIntoView({ block: 'center', behavior: 'instant' }),
+  )
   await page.waitForSelector('.docs-live-example .status-dot.live', { timeout: 90_000 })
   assert.equal(
     await page.$eval('.docs-live-example iframe', (element) => document.activeElement === element),
@@ -157,6 +160,9 @@ try {
   await screenshot('docs-guide-desktop')
 
   await page.goto(`${origin}/docs/essentials/styling`, { waitUntil: 'networkidle0' })
+  await page.$eval('.docs-live-example', (element) =>
+    element.scrollIntoView({ block: 'center', behavior: 'instant' }),
+  )
   await page.waitForSelector('.docs-live-example .status-dot.live', { timeout: 90_000 })
   const themeFrame = await (await page.$('.docs-live-example iframe')).contentFrame()
   await themeFrame.waitForSelector('button[aria-label="Dark"]')
@@ -286,6 +292,9 @@ try {
   await page.waitForSelector('.status-dot.live', { timeout: 90_000 })
   const desktopExampleFrame = await (await page.$('iframe')).contentFrame()
   await desktopExampleFrame.waitForSelector('input[aria-label="Prompt"]')
+  await page.$eval('iframe', (element) =>
+    element.scrollIntoView({ block: 'center', behavior: 'instant' }),
+  )
   const harnessLayout = async (example) =>
     example.evaluate(() => {
       const prompt = document.querySelector('input[aria-label="Prompt"]').getBoundingClientRect()

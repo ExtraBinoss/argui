@@ -1,6 +1,6 @@
 use argui::{
     runtime::Context,
-    ui::{AlignItems, Element, EventType, FlexWrap, JustifyContent, length},
+    ui::{AlignItems, Element, FlexWrap, JustifyContent, length},
     widgets::{
         Badge, BadgeVariant, Button, Card, Separator, TablerIcon, WidgetAssets, WidgetTheme,
     },
@@ -23,11 +23,10 @@ pub(super) fn render(
             .icon(TablerIcon::ChevronRight, 16.0)
             .vector_color(theme.foreground),
     )
-    .build()
-    .on(cx.listener(EventType::Click, |gallery, _, cx| {
+    .on_click(cx.callback(|gallery| {
         gallery.page = Page::Collapsible;
-        cx.notify();
-    }));
+    }))
+    .build();
     super::preview(
         "Project overview",
         "Compose a header, an optional action, body content and a footer.",

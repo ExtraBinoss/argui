@@ -22,6 +22,15 @@ then bubbling to root. `stop_propagation`, `stop_immediate_propagation`, and
 `prevent_default` act on the shared event control. Passive listeners cannot
 prevent defaults.
 
+For an ordinary widget, prefer its local direct API: `Button::on_click`,
+`Input::on_input`, `Checkbox::on_change`, `Select::on_select`, and the other
+handlers listed in the [widget interaction inventory](../widgets/interaction-api.md).
+These bindings use the same dispatch pipeline and keyboard/accessibility
+behavior, but do not require bubbling, `target_key()` comparisons, event-kind
+matching, or explicit invalidation when paired with `Context::callback` or
+`value_callback`. Use listeners when capture or deliberate ancestor delegation
+is the actual design.
+
 Hit regions follow paint order and are tested in reverse. A target must pass its
 own hit shape and every ancestor clip. Paint and hit-test ordering change
 together.

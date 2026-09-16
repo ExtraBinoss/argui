@@ -5,8 +5,8 @@ use argui::{
     paint::{Border, BorderWidths},
     runtime::Context,
     ui::{
-        Axes, Element, ElementKind, JustifyContent, Overflow, Role, ScrollAxes, ScrollConfig,
-        Semantics, Sides, TextSelection, UiEvent, UiEventKind, length, percent,
+        Axes, Element, ElementKind, EventHandler, JustifyContent, Overflow, Role, ScrollAxes,
+        ScrollConfig, Semantics, Sides, TextSelection, UiEvent, UiEventKind, length, percent,
     },
     widgets::{Button, Input, InputKind, TablerIcon, WidgetAssets, WidgetTheme},
 };
@@ -36,8 +36,13 @@ impl WidgetGallery {
         }
     }
 
-    pub(super) fn sidebar(&self, theme: &WidgetTheme, assets: &WidgetAssets) -> Element {
-        let mut children = vec![self.search_input(theme, assets)];
+    pub(super) fn sidebar(
+        &self,
+        theme: &WidgetTheme,
+        assets: &WidgetAssets,
+        cx: &mut Context<Self>,
+    ) -> Element {
+        let mut children = vec![self.search_input(theme, assets, cx)];
         for category in ["Widgets", "Effects", "Examples"] {
             let pages = self
                 .filtered_pages()
@@ -48,11 +53,10 @@ impl WidgetGallery {
                 continue;
             }
             children.push(text(category, 11.0, theme.muted_foreground, 700));
-            children.extend(
-                pages
-                    .into_iter()
-                    .map(|page| self.navigation_button(page, theme, true)),
-            );
+            for page in pages {
+                let select = cx.callback(move |gallery| gallery.select_page(page));
+                children.push(self.navigation_button(page, theme, true, select));
+            }
         }
         let mut sidebar = Element::column(children)
             .keyed("gallery-sidebar")
@@ -80,8 +84,13 @@ impl WidgetGallery {
         sidebar
     }
 
-    pub(super) fn mobile_navigation(&self, theme: &WidgetTheme, assets: &WidgetAssets) -> Element {
-        let mut items = vec![self.theme_button(theme, assets)];
+    pub(super) fn mobile_navigation(
+        &self,
+        theme: &WidgetTheme,
+        assets: &WidgetAssets,
+        cx: &mut Context<Self>,
+    ) -> Element {
+        let mut items = vec![self.theme_button(theme, assets, cx)];
         for category in ["Widgets", "Effects", "Examples"] {
             let pages = self
                 .filtered_pages()
@@ -96,11 +105,10 @@ impl WidgetGallery {
                     .padding(Sides::length(8.0))
                     .shrink(0.0),
             );
-            items.extend(
-                pages
-                    .into_iter()
-                    .map(|page| self.navigation_button(page, theme, false)),
-            );
+            for page in pages {
+                let select = cx.callback(move |gallery| gallery.select_page(page));
+                items.push(self.navigation_button(page, theme, false, select));
+            }
         }
         let strip = Element::row(items)
             .keyed("gallery-mobile-navigation-strip")
@@ -128,7 +136,7 @@ impl WidgetGallery {
             )
             .semantics(Semantics::new(Role::Navigation).label("Component navigation"));
         Element::column([
-            Element::container([self.search_input(theme, assets)])
+            Element::container([self.search_input(theme, assets, cx)])
                 .padding(Sides {
                     left: length(12.0),
                     right: length(12.0),
@@ -150,7 +158,12 @@ impl WidgetGallery {
         })
     }
 
-    fn search_input(&self, theme: &WidgetTheme, assets: &WidgetAssets) -> Element {
+    fn search_input(
+        &self,
+        theme: &WidgetTheme,
+        assets: &WidgetAssets,
+        cx: &mut Context<Self>,
+    ) -> Element {
         Input::new(
             "gallery-search",
             self.search.clone(),
@@ -161,16 +174,27 @@ impl WidgetGallery {
         .label("Search components")
         .description("Type anywhere outside an editor, or press Ctrl or Command K")
         .leading(assets.icon(TablerIcon::Search, 16.0), 38.0)
+        .on_input(cx.input_callback(|gallery, value| {
+            gallery.search = value;
+            gallery.search_highlight = 0;
+        }))
         .build()
     }
 
-    fn navigation_button(&self, page: Page, theme: &WidgetTheme, full_width: bool) -> Element {
+    fn navigation_button(
+        &self,
+        page: Page,
+        theme: &WidgetTheme,
+        full_width: bool,
+        select: EventHandler,
+    ) -> Element {
         let style = if page == self.page {
             theme.button()
         } else {
             theme.ghost_button()
         };
         let mut button = Button::new(format!("nav::{}", page.slug()), page.label(), style)
+            .on_click(select)
             .build()
             .shrink(0.0)
             .justify_content(JustifyContent::START);

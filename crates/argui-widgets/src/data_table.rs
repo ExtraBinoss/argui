@@ -3,8 +3,9 @@ use argui_core::{Key, KeyState};
 use argui_paint::{Border, BorderWidths, CornerRadii, QuadStyle};
 use argui_text::{TextStyle, TextWrap};
 use argui_ui::{
-    Element, FocusPolicy, GestureSet, GridPosition, Interaction, Role, SemanticState, Semantics,
-    SortDirection, TapGesture, UiEvent, UiEventKind, VirtualList, length,
+    Element, EventFilter, EventType, FocusPolicy, GestureSet, GridPosition, Interaction, Role,
+    SemanticState, Semantics, SortDirection, TapGesture, UiEvent, UiEventKind, ValueHandler,
+    VirtualList, length,
 };
 
 mod model;
@@ -24,7 +25,7 @@ pub enum DataTableAction {
     CommitEdit { next: Option<bool> },
     Sort(Vec<DataSort>),
     SelectPage(bool),
-    ResizeColumn { column: String, event: UiEvent },
+    ResizeColumn { column: String, event: Box<UiEvent> },
 }
 
 pub struct DataTable<'a, R> {
@@ -35,6 +36,8 @@ pub struct DataTable<'a, R> {
     pub offset: f32,
     pub select_page_label: String,
     icons: Option<&'a crate::WidgetAssets>,
+    select_handlers: Vec<ValueHandler<String>>,
+    activate_handlers: Vec<ValueHandler<Vec<String>>>,
 }
 
 impl<'a, R> DataTable<'a, R> {
@@ -57,7 +60,23 @@ impl<'a, R> DataTable<'a, R> {
             offset,
             select_page_label: "Select page".into(),
             icons: None,
+            select_handlers: Vec::new(),
+            activate_handlers: Vec::new(),
         }
+    }
+
+    /// Adds a handler that receives the stable id of a selected row.
+    #[must_use]
+    pub fn on_select(mut self, handler: ValueHandler<String>) -> Self {
+        self.select_handlers.push(handler);
+        self
+    }
+
+    /// Adds a handler receiving `[row_id, column_id]` for an activated cell.
+    #[must_use]
+    pub fn on_activate(mut self, handler: ValueHandler<Vec<String>>) -> Self {
+        self.activate_handlers.push(handler);
+        self
     }
     /// Supplies vector assets for built-in table controls.
     /// `icons` provides the assets used to render those controls.
@@ -278,6 +297,19 @@ impl<'a, R> DataTable<'a, R> {
                     if active {
                         cell = cell.border(Border::all(1.0, theme.ring));
                     }
+                    for handler in &self.select_handlers {
+                        cell = cell
+                            .on(handler
+                                .direct_listener_value(EventType::Click, address.row.clone()));
+                    }
+                    for handler in &self.activate_handlers {
+                        cell = cell.on(handler
+                            .direct_listener_value(
+                                EventType::Click,
+                                vec![address.row.clone(), address.column.clone()],
+                            )
+                            .filter(EventFilter::DoubleClick));
+                    }
                     cell
                 }))
                 .min_height(length(self.heights.estimated_extent()))
@@ -362,7 +394,7 @@ impl<'a, R> DataTable<'a, R> {
         {
             return Some(DataTableAction::ResizeColumn {
                 column: column.into(),
-                event: event.clone(),
+                event: Box::new(event.clone()),
             });
         }
         if let Some(ToggleAction::SetChecked(checked)) = ToggleBehavior::new(

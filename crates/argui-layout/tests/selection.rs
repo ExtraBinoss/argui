@@ -5,8 +5,8 @@ use argui_paint::{
 };
 use argui_text::TextEngine;
 use argui_ui::{
-    DocumentTextPoint, Element, SelectionGranularity, TextSelectionHighlight, TextSelectionStyle,
-    UiTree, UserSelect, percent,
+    DocumentSelectionEndpoint, DocumentTextPoint, Element, SelectionGranularity,
+    TextSelectionHighlight, TextSelectionStyle, UiTree, UserSelect, percent,
 };
 
 const NOTO_SANS: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
@@ -288,6 +288,62 @@ fn touch_selection_paints_both_handles_in_forward_and_reverse_order() {
     engine.repaint(&ui, &mut output);
     assert_eq!(solid_quad_count(&output, handle), 2);
     assert!(output.document_selection_bounds(&ui).is_some());
+}
+
+#[test]
+fn touch_selection_handles_have_transformed_comfortable_hit_targets() {
+    let mut ui = UiTree::new(Element::text("alpha beta gamma").width(percent(1.0)));
+    let mut engine = LayoutEngine::new();
+    let mut text = text_engine();
+    let mut output = engine
+        .compute(&mut ui, &mut text, Size::new(300.0, 80.0))
+        .unwrap();
+    let node = output.text_regions[0].node;
+    ui.begin_touch_document_selection(
+        DocumentTextPoint::new(node, TextPosition::new(7, CaretAffinity::After)),
+        SelectionGranularity::Word,
+    );
+    ui.release_document_selection();
+    engine.repaint(&ui, &mut output);
+
+    let handles = output.selection_handles(&ui);
+    assert_eq!(handles.len(), 2);
+    for handle in &handles {
+        assert_eq!(handle.hit_bounds.size, Size::new(44.0, 44.0));
+        assert_eq!(handle.visual_bounds.size, Size::new(10.0, 10.0));
+        assert_eq!(
+            output
+                .selection_handle_at(&ui, handle.center)
+                .map(|hit| hit.endpoint),
+            Some(handle.endpoint)
+        );
+        assert!(
+            handle
+                .hit_bounds
+                .contains(Point::new(handle.center.x, handle.center.y + 21.0))
+        );
+    }
+
+    let anchor = handles
+        .iter()
+        .find(|handle| handle.endpoint == DocumentSelectionEndpoint::Anchor)
+        .unwrap();
+    output.text_regions[0].transform = Affine2D::translation(2.0, 3.0);
+    let moved_anchor = output
+        .selection_handles(&ui)
+        .into_iter()
+        .find(|handle| handle.endpoint == DocumentSelectionEndpoint::Anchor)
+        .unwrap();
+    assert_eq!(
+        moved_anchor.center,
+        Point::new(anchor.center.x + 2.0, anchor.center.y + 3.0)
+    );
+    assert_eq!(
+        output
+            .selection_handle_at(&ui, moved_anchor.center)
+            .map(|hit| hit.endpoint),
+        Some(DocumentSelectionEndpoint::Anchor)
+    );
 }
 
 #[test]

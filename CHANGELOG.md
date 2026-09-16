@@ -8,6 +8,24 @@ that do not use them.
 
 ### Added
 
+- Added opaque `EventHandler`/typed `ValueHandler` bindings and local direct
+  handlers across interactive widgets, including domain payloads for forms,
+  selection, ranges, overlays, menus, navigation, data controls, and composites.
+- Added the publishable `argui-testing` crate with real headless layout and hit
+  testing, accessible queries, editing, focus, scrolling, gestures, lifecycle,
+  multiple windows, diagnostic settle bounds, and deterministic task time.
+- Added the small `argui::prelude`, `basic`, `desktop`, and `web` convenience
+  feature profiles, while preserving every granular feature.
+- Added staged archive verification and a public API/SemVer CI job for the 0.3
+  release line.
+- Added installable Android Widget Gallery packaging for ARM64 devices and
+  x86-64 emulators, including launcher and notification icons, command-line SDK
+  scripts, USB deployment, and native soft-keyboard integration.
+- Added shared mobile background-activity state with an Android foreground
+  service and ongoing progress notification, plus an iOS ActivityKit bridge and
+  SwiftUI Lock Screen/Dynamic Island extension kept under `argui-ios`.
+- Added direct-touch momentum, configurable natural scrolling, drag-safe click
+  activation, and draggable text-selection handles shared by Android and iOS.
 - Added inherited text-selection highlight styling with solid or gradient fills,
   per-corner radii and an interactive Widget Gallery page.
 - Added default-on Windows renderer fallback from DirectX 12 DirectComposition
@@ -21,6 +39,15 @@ that do not use them.
 
 ### Fixed
 
+- Made Android and iOS render edge to edge while preserving native safe areas,
+  painting the active theme behind transparent system regions and matching
+  Android system-icon contrast to light and dark themes.
+- Prevented a closed or animated DevTools dock from reserving the bottom system
+  inset, which removed the moving band of repeated framebuffer pixels on
+  Android without hiding content behind the status or navigation bars.
+- Made mobile search reliably focus and open the software keyboard, preserved
+  adjustable selection handles, and stopped a touch scroll from activating the
+  item released beneath the finger.
 - Prevented Web canvases from taking focus and moving an embedding page while
   they load; full-page apps can opt in through `WindowConfig::focus_on_launch`.
 - Kept Winit's AppKit content view attached when enabling the macOS desktop
@@ -34,8 +61,21 @@ that do not use them.
 
 ### Changed
 
+- Moved the workspace to 0.3.0. `Context::callback` now provides the short
+  invalidating path; `event_handler`, `listener`, `Element::on`, and typed
+  behavior/action APIs remain the explicit advanced layer.
+- Migrated every naturally local documentation example, its exact generated
+  website snippet, the Widget Gallery, and the fake AI harness to direct
+  callbacks while retaining the Events delegation example and complex reducers.
 - Made the base release gallery the recommended local command. Optional native
   integrations can still be enabled individually or together when needed.
+
+### Known limitations
+
+- Native file picking is not wired to Android's document provider or the iOS
+  document picker yet. The cross-platform file-picker widget still compiles on
+  mobile and reports the mode as unsupported; adding the two native adapters
+  does not require a change to its public model.
 
 ## [0.2.1] - 2026-09-14
 
@@ -89,4 +129,4 @@ that do not use them.
 
 [0.2.1]: https://github.com/ExtraBinoss/argui/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/ExtraBinoss/argui/releases/tag/v0.2.0
-[Unreleased]: https://github.com/ExtraBinoss/argui/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/ExtraBinoss/argui/compare/v0.3.0...HEAD

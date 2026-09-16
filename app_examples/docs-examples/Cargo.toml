@@ -22,5 +22,8 @@ argui = { workspace = true, features = [
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen.workspace = true
 
+[dev-dependencies]
+argui-testing.workspace = true
+
 [lints]
 workspace = true

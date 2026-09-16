@@ -2,7 +2,7 @@ use crate::{WidgetGallery, navigation::Page};
 use argui::{
     paint::CornerRadii,
     runtime::Context,
-    ui::{Element, EventType, Sides, length},
+    ui::{Element, Sides, length},
     widgets::{Button, Empty, TablerIcon, WidgetAssets, WidgetTheme},
 };
 
@@ -12,11 +12,10 @@ pub(super) fn render(
     cx: &mut Context<WidgetGallery>,
 ) -> Element {
     let action = Button::new("empty-browse", "Browse components", theme.button())
-        .build()
-        .on(cx.listener(EventType::Click, |gallery, _, cx| {
+        .on_click(cx.callback(|gallery| {
             gallery.page = Page::Card;
-            cx.notify();
-        }));
+        }))
+        .build();
     let media = Element::row([assets
         .icon(TablerIcon::Copy, 24.0)
         .vector_color(theme.foreground)])

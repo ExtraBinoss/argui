@@ -287,9 +287,10 @@ impl<T: 'static> Context<T> {
             {
                 return true;
             }
-            if let Some(listener) = listeners.next()
-                && listener.state.upgrade().is_some_and(|state| state.active())
-            {
+            let listener = listeners
+                .next()
+                .expect("a queued listener batch cannot be empty");
+            if listener.state.upgrade().is_some_and(|state| state.active()) {
                 (listener.callback)(&event);
             }
             listeners.len() == 0

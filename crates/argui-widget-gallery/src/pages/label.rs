@@ -13,8 +13,11 @@ pub(super) fn render(
 ) -> Element {
     let label = Label::new("profile-name-label", "Display name", "name");
     let workspace = Label::new("profile-id-label", "Workspace ID", "workspace-id");
-    let name =
-        label.associate(Input::new("name", &gallery.name, "Your name", theme.input()).build());
+    let name = label.associate(
+        Input::new("name", &gallery.name, "Your name", theme.input())
+            .on_input(cx.input_callback(|gallery, value| gallery.name = value))
+            .build(),
+    );
     let id = workspace.associate(
         Input::new(
             "workspace-id",
@@ -22,6 +25,7 @@ pub(super) fn render(
             "Workspace ID",
             theme.input(),
         )
+        .on_input(cx.input_callback(|gallery, value| gallery.workspace_id = value))
         .build(),
     );
     super::preview(

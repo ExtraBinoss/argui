@@ -31,7 +31,7 @@ const example = (id: string, filename: keyof typeof docExampleSources): DocExamp
 })
 
 const dependency = `[dependencies]
-argui = { version = "0.2.1", features = ["widget-button"] }`
+argui = { version = "0.3.0", features = ["widget-button"] }`
 
 const launch = `use argui::{
     platform::{ApplicationConfig, ApplicationId, ApplicationIdentity, IconSet, WindowConfig},
@@ -77,15 +77,12 @@ impl Render for Counter {
         Element::column([
             Element::text(format!("Count: {}", self.count)),
             Button::new("increment", "Increment", theme.button())
+                .on_click(cx.callback(|app| {
+                    app.count = app.count.saturating_add(1);
+                }))
                 .build(),
         ])
         .gap(12.0)
-        .on(cx.listener(EventType::Click, |app, event, cx| {
-            if event.target_key() == Some("increment") {
-                app.count = app.count.saturating_add(1);
-                cx.notify();
-            }
-        }))
     }
 }`
 
@@ -107,12 +104,10 @@ Element::column([
 .gap(20.0)`
 
 const listener = `let save = Button::new("save", "Save", theme.button())
-    .build()
-    .on(cx.listener(EventType::Click, |model, event, cx| {
-        debug_assert_eq!(event.target_key(), Some("save"));
+    .on_click(cx.callback(|model| {
         model.saved = true;
-        cx.notify();
-    }));`
+    }))
+    .build();`
 
 const tasks = `fn search(&mut self, cx: &mut Context<Self>) -> Result<(), TaskError> {
     let query = self.query.clone();
@@ -186,7 +181,7 @@ export const docs: DocGuide[] = [
         id: 'requirements',
         title: 'What you need',
         paragraphs: [
-          'Argui 0.2.1 requires Rust 1.89 or newer. The repository itself currently recommends a newer toolchain for contributors, while the workspace manifest remains the source of truth for the minimum supported Rust version.',
+          'Argui 0.3.0 requires Rust 1.89 or newer. The repository itself currently recommends a newer toolchain for contributors, while the workspace manifest remains the source of truth for the minimum supported Rust version.',
         ],
         bullets: [
           'Rust and Cargo',
@@ -321,18 +316,18 @@ export const docs: DocGuide[] = [
         code: { filename: 'src/counter.rs', code: counter },
       },
       {
-        id: 'notify',
-        title: 'Notify after a visible change',
+        id: 'callback',
+        title: 'Local callbacks invalidate automatically',
         paragraphs: [
-          'Mutating the struct is immediate. cx.notify() marks dependent presentations dirty and wakes the host. Multiple notifications in one transaction coalesce; an idle application does not continuously request frames.',
+          'Context::callback registers state-only work and invalidates this presentation after it returns. The button owns the activation binding, so pointer, touch, Enter, Space and accessibility click all reach the same callback.',
         ],
-        note: 'If you forget cx.notify(), the value changes in memory but the view is not scheduled to rebuild.',
+        note: 'Use Context::event_handler when you need the raw UiEvent, propagation control, focus or commands. That lower-level callback does not invalidate implicitly.',
       },
       {
-        id: 'events',
-        title: 'Match stable targets',
+        id: 'controlled',
+        title: 'The model stays in control',
         paragraphs: [
-          'Events expose both stable keys and typed payloads. Match the control key, mutate state, then notify. Keyboard and accessibility activation synthesize the same click path as a pointer.',
+          'The handler changes ordinary Rust state; the next render rebuilds the controlled widget from that state. Handler identities remain opaque and closures stay in the runtime rather than inside cloneable Element values.',
         ],
       },
     ],
@@ -399,17 +394,17 @@ export const docs: DocGuide[] = [
     sections: [
       {
         id: 'listeners',
-        title: 'Attach typed listeners',
+        title: 'Start with a direct widget callback',
         paragraphs: [
-          'Context::listener creates a handler owned by the current presentation. Element::on attaches it to any element. Dispatch follows capture, target, and bubbling phases.',
+          'Ordinary buttons do not require bubbling, target-key comparisons or event-kind matching. Attach Context::callback to Button::on_click; typed widgets similarly expose on_input, on_change, on_select and on_open_change with useful payloads.',
         ],
         code: { filename: 'src/view.rs', code: listener },
       },
       {
-        id: 'payloads',
-        title: 'Read the typed payload',
+        id: 'delegation',
+        title: 'Use listeners for deliberate delegation',
         paragraphs: [
-          'UiEventKind distinguishes clicks, key input, text changes, gestures, scroll, dismiss, and selection changes. Check the kind before reading its payload and use target_key for stable application routing.',
+          'Context::listener and Element::on remain the advanced layer for capture, bubbling, application-wide shortcuts and routers that intentionally handle many descendants. The runnable Events example demonstrates that pattern rather than presenting it as the basic button API.',
         ],
       },
       {
@@ -581,7 +576,7 @@ export const docs: DocGuide[] = [
         ],
         code: {
           filename: 'Cargo.toml',
-          code: '[dependencies]\nargui = { version = "0.2.1", features = ["tasks", "widget-input", "widget-button", "widget-vlist"] }',
+          code: '[dependencies]\nargui = { version = "0.3.0", features = ["tasks", "widget-input", "widget-button", "widget-vlist"] }',
         },
       },
       {

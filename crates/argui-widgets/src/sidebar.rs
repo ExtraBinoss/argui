@@ -1,5 +1,5 @@
 use crate::{Button, ButtonBehavior, DialogAction, Sheet, SheetSide, WidgetTheme};
-use argui_ui::{Element, Role, Semantics, UiEvent, length};
+use argui_ui::{Element, EventType, Role, Semantics, UiEvent, ValueHandler, length};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SidebarAction {
@@ -20,6 +20,8 @@ pub struct Sidebar {
     pub mobile: bool,
     pub open: bool,
     pub toggle_label: String,
+    collapsed_handlers: Vec<ValueHandler<bool>>,
+    open_handlers: Vec<ValueHandler<bool>>,
 }
 
 impl Sidebar {
@@ -38,7 +40,23 @@ impl Sidebar {
             mobile: false,
             open: false,
             toggle_label: "Toggle navigation".into(),
+            collapsed_handlers: Vec::new(),
+            open_handlers: Vec::new(),
         }
+    }
+
+    /// Adds a handler receiving the requested desktop collapsed state.
+    #[must_use]
+    pub fn on_collapsed_change(mut self, handler: ValueHandler<bool>) -> Self {
+        self.collapsed_handlers.push(handler);
+        self
+    }
+
+    /// Adds a handler receiving the requested mobile-sheet open state.
+    #[must_use]
+    pub fn on_open_change(mut self, handler: ValueHandler<bool>) -> Self {
+        self.open_handlers.push(handler);
+        self
     }
 
     #[must_use]
@@ -86,6 +104,12 @@ impl Sidebar {
         } else {
             !self.collapsed
         });
+        if !self.mobile {
+            for handler in &self.collapsed_handlers {
+                toggle =
+                    toggle.on(handler.direct_listener_value(EventType::Click, !self.collapsed));
+            }
+        }
         let compact = self.collapsed && !self.mobile;
         let content = if compact {
             self.rail.unwrap_or_else(|| Element::container([]))
@@ -116,6 +140,9 @@ impl Sidebar {
                 Element::column([close, content]).gap(12.0),
             );
             sheet.side = SheetSide::Left;
+            for handler in &self.open_handlers {
+                sheet = sheet.on_open_change(*handler);
+            }
             sheet.build(theme)
         } else {
             Element::column([toggle, content])

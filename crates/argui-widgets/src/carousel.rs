@@ -1,8 +1,9 @@
 use crate::{Button, ButtonBehavior, WidgetTheme};
 use argui_core::{Key, KeyState};
 use argui_ui::{
-    Element, FocusPolicy, GestureKind, GesturePhase, GestureSet, Interaction, LiveRegion, PanAxis,
-    PanGesture, Role, Semantics, UiEvent, UiEventKind,
+    Element, EventFilter, EventType, FocusPolicy, GestureKind, GesturePhase, GestureSet,
+    Interaction, LiveRegion, PanAxis, PanGesture, Role, Semantics, UiEvent, UiEventKind,
+    ValueHandler,
 };
 
 /// Controlled, non-autoplaying carousel. Only the active slide contributes focus targets.
@@ -16,6 +17,7 @@ pub struct Carousel {
     pub rtl: bool,
     pub previous_label: String,
     pub next_label: String,
+    select_handlers: Vec<ValueHandler<usize>>,
 }
 
 impl Carousel {
@@ -38,7 +40,15 @@ impl Carousel {
             rtl: false,
             previous_label: "Previous slide".into(),
             next_label: "Next slide".into(),
+            select_handlers: Vec::new(),
         }
+    }
+
+    /// Adds a callback receiving the requested zero-based slide index.
+    #[must_use]
+    pub fn on_select(mut self, handler: ValueHandler<usize>) -> Self {
+        self.select_handlers.push(handler);
+        self
     }
 
     fn next(&self, forward: bool) -> Option<usize> {
@@ -109,7 +119,7 @@ impl Carousel {
         } else {
             format!("{} / {}", selected + 1, self.slides.len())
         };
-        let viewport = Element::column(slide)
+        let mut viewport = Element::column(slide)
             .keyed(format!("{}::viewport", self.key))
             .interaction(
                 Interaction::default()
@@ -119,14 +129,58 @@ impl Carousel {
                     ),
             )
             .semantics(Semantics::new(Role::Group).label(&self.label));
+        for (filter, value) in [
+            (
+                EventFilter::HomePressed,
+                (!self.slides.is_empty()).then_some(0),
+            ),
+            (EventFilter::EndPressed, self.slides.len().checked_sub(1)),
+            (EventFilter::ArrowLeftPressed, self.next(self.rtl)),
+            (EventFilter::ArrowRightPressed, self.next(!self.rtl)),
+            (EventFilter::PanEndedLeft, self.next(!self.rtl)),
+            (EventFilter::PanEndedRight, self.next(self.rtl)),
+        ] {
+            if let Some(value) = value {
+                for handler in &self.select_handlers {
+                    let event = if matches!(
+                        filter,
+                        EventFilter::PanEndedLeft | EventFilter::PanEndedRight
+                    ) {
+                        EventType::Gesture
+                    } else {
+                        EventType::Key
+                    };
+                    viewport =
+                        viewport.on(handler.direct_listener_value(event, value).filter(filter));
+                }
+            }
+        }
+        let mut previous = Button::new(
+            format!("{}::previous", self.key),
+            &self.previous_label,
+            theme.outline_button(),
+        )
+        .enabled(self.next(false).is_some())
+        .build();
+        if let Some(value) = self.next(false) {
+            for handler in &self.select_handlers {
+                previous = previous.on(handler.direct_listener_value(EventType::Click, value));
+            }
+        }
+        let mut next = Button::new(
+            format!("{}::next", self.key),
+            &self.next_label,
+            theme.outline_button(),
+        )
+        .enabled(self.next(true).is_some())
+        .build();
+        if let Some(value) = self.next(true) {
+            for handler in &self.select_handlers {
+                next = next.on(handler.direct_listener_value(EventType::Click, value));
+            }
+        }
         let controls = Element::row([
-            Button::new(
-                format!("{}::previous", self.key),
-                &self.previous_label,
-                theme.outline_button(),
-            )
-            .enabled(self.next(false).is_some())
-            .build(),
+            previous,
             Element::text(position.clone())
                 .text_style(argui_text::TextStyle {
                     color: theme.muted_foreground,
@@ -137,13 +191,7 @@ impl Carousel {
                         .label(position)
                         .live(LiveRegion::Polite),
                 ),
-            Button::new(
-                format!("{}::next", self.key),
-                &self.next_label,
-                theme.outline_button(),
-            )
-            .enabled(self.next(true).is_some())
-            .build(),
+            next,
         ])
         .gap(12.0)
         .align_items(argui_ui::AlignItems::CENTER);

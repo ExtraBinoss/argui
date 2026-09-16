@@ -3,8 +3,8 @@ use argui_core::Transform2D;
 use argui_paint::{Border, CornerRadii, PaintStyle, QuadStyle};
 use argui_text::{TextStyle, TextWrap};
 use argui_ui::{
-    AlignItems, Dimensions, Display, Element, FlexDirection, JustifyContent, LayoutStyle,
-    StylePatch, StyleTransition, VisualState, auto, length,
+    AlignItems, Dimensions, Display, Element, EventType, FlexDirection, JustifyContent,
+    LayoutStyle, StylePatch, StyleTransition, ValueHandler, VisualState, auto, length,
 };
 
 use crate::WidgetTheme;
@@ -29,6 +29,7 @@ pub struct Checkbox {
     checked: argui_ui::CheckedState,
     enabled: bool,
     indicator: Option<Element>,
+    change_handlers: Vec<ValueHandler<argui_ui::CheckedState>>,
 }
 
 #[cfg(feature = "checkbox")]
@@ -47,6 +48,7 @@ impl Checkbox {
             checked,
             enabled: true,
             indicator: None,
+            change_handlers: Vec::new(),
         }
     }
 
@@ -62,6 +64,15 @@ impl Checkbox {
     /// Replaces the default checked/mixed mark with `indicator`.
     pub fn indicator(mut self, indicator: Element) -> Self {
         self.indicator = Some(indicator);
+        self
+    }
+
+    /// Adds a callback receiving the next checked state.
+    ///
+    /// `handler` is normally created with `Context::value_callback`.
+    #[must_use]
+    pub fn on_change(mut self, handler: ValueHandler<argui_ui::CheckedState>) -> Self {
+        self.change_handlers.push(handler);
         self
     }
 
@@ -108,7 +119,12 @@ impl Checkbox {
                 .semantic_hidden(true);
         let behavior = ToggleBehavior::new(&self.key, &self.label, Role::CheckBox, self.checked)
             .enabled(self.enabled);
-        control_row(behavior, self.label, box_element, theme)
+        let next = self.checked.toggled();
+        let mut root = control_row(behavior, self.label, box_element, theme);
+        for handler in self.change_handlers {
+            root = root.on(handler.direct_listener_value(EventType::Click, next));
+        }
+        root
     }
 }
 
@@ -119,6 +135,7 @@ pub struct Switch {
     label: String,
     checked: bool,
     enabled: bool,
+    change_handlers: Vec<ValueHandler<bool>>,
 }
 
 #[cfg(feature = "switch")]
@@ -132,6 +149,7 @@ impl Switch {
             label: label.into(),
             checked,
             enabled: true,
+            change_handlers: Vec::new(),
         }
     }
 
@@ -140,6 +158,15 @@ impl Switch {
     /// `enabled` controls its interaction availability.
     pub const fn enabled(mut self, enabled: bool) -> Self {
         self.enabled = enabled;
+        self
+    }
+
+    /// Adds a callback receiving the next switch state.
+    ///
+    /// `handler` is normally created with `Context::value_callback`.
+    #[must_use]
+    pub fn on_change(mut self, handler: ValueHandler<bool>) -> Self {
+        self.change_handlers.push(handler);
         self
     }
 
@@ -189,7 +216,11 @@ impl Switch {
             },
         )
         .enabled(self.enabled);
-        control_row(behavior, self.label, track, theme)
+        let mut root = control_row(behavior, self.label, track, theme);
+        for handler in self.change_handlers {
+            root = root.on(handler.direct_listener_value(EventType::Click, !self.checked));
+        }
+        root
     }
 }
 
@@ -228,6 +259,7 @@ pub struct RadioGroup {
     options: Vec<RadioOption>,
     selected: Option<usize>,
     orientation: Orientation,
+    select_handlers: Vec<ValueHandler<usize>>,
 }
 
 #[cfg(feature = "radio-group")]
@@ -247,6 +279,7 @@ impl RadioGroup {
             options: options.into_iter().collect(),
             selected,
             orientation: Orientation::Vertical,
+            select_handlers: Vec::new(),
         }
     }
 
@@ -255,6 +288,16 @@ impl RadioGroup {
     /// `orientation` determines the layout and keyboard navigation axis.
     pub const fn orientation(mut self, orientation: Orientation) -> Self {
         self.orientation = orientation;
+        self
+    }
+
+    /// Adds a callback receiving the selected source option index.
+    ///
+    /// `handler` is normally created with `Context::value_callback`. Disabled
+    /// options never deliver the handler.
+    #[must_use]
+    pub fn on_select(mut self, handler: ValueHandler<usize>) -> Self {
+        self.select_handlers.push(handler);
         self
     }
 
@@ -293,7 +336,7 @@ impl RadioGroup {
                 },
             ))
             .radius(CornerRadii::all(999.0));
-            behavior.decorate(
+            let mut option = behavior.decorate(
                 RadioGroupPart::Option(index),
                 control_row_content(
                     option.label.clone(),
@@ -301,7 +344,11 @@ impl RadioGroup {
                     option.enabled,
                     theme,
                 ),
-            )
+            );
+            for handler in self.select_handlers.iter().copied() {
+                option = option.on(handler.direct_listener_value(EventType::Click, index));
+            }
+            option
         });
         let content = match self.orientation {
             Orientation::Horizontal => Element::row(children.collect::<Vec<_>>()),

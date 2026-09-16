@@ -1,8 +1,9 @@
 use crate::{Button, Input, InputKind, SelectOption, WidgetTheme, choice_navigation::navigate};
 use argui_core::{Key, KeyState};
 use argui_ui::{
-    AnchorWidth, DismissPolicy, Element, FloatingPlacement, FocusPolicy, Orientation, Placement,
-    Role, Semantics, UiEvent, UiEventKind, WindowLayer, length,
+    AnchorWidth, DismissPolicy, Element, EventFilter, EventType, FloatingPlacement, FocusPolicy,
+    Orientation, Placement, Role, Semantics, UiEvent, UiEventKind, ValueHandler, WindowLayer,
+    length,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -27,6 +28,9 @@ pub struct Combobox {
     pub open: bool,
     pub enabled: bool,
     pub empty_label: String,
+    input_handlers: Vec<ValueHandler<String>>,
+    select_handlers: Vec<ValueHandler<usize>>,
+    open_handlers: Vec<ValueHandler<bool>>,
 }
 
 impl Combobox {
@@ -49,7 +53,31 @@ impl Combobox {
             open: false,
             enabled: true,
             empty_label: "No results".into(),
+            input_handlers: Vec::new(),
+            select_handlers: Vec::new(),
+            open_handlers: Vec::new(),
         }
+    }
+
+    /// Adds a callback receiving the edited query.
+    #[must_use]
+    pub fn on_input(mut self, handler: ValueHandler<String>) -> Self {
+        self.input_handlers.push(handler);
+        self
+    }
+
+    /// Adds a callback receiving an enabled option's source index.
+    #[must_use]
+    pub fn on_select(mut self, handler: ValueHandler<usize>) -> Self {
+        self.select_handlers.push(handler);
+        self
+    }
+
+    /// Adds a callback receiving the requested popup open state.
+    #[must_use]
+    pub fn on_open_change(mut self, handler: ValueHandler<bool>) -> Self {
+        self.open_handlers.push(handler);
+        self
     }
 
     #[must_use]
@@ -154,11 +182,39 @@ impl Combobox {
         let visible = self.visible_indices();
         let active = self.active(&visible);
         let list_key = format!("{}::list", self.key);
-        let mut input = Input::new(&self.key, &self.query, &self.label, theme.input())
+        let mut input_builder = Input::new(&self.key, &self.query, &self.label, theme.input())
             .kind(InputKind::Search)
             .label(&self.label)
-            .enabled(self.enabled)
-            .build();
+            .enabled(self.enabled);
+        for handler in &self.input_handlers {
+            input_builder = input_builder.on_input(*handler);
+        }
+        let mut input = input_builder.build();
+        if self.enabled {
+            for handler in &self.open_handlers {
+                input = input
+                    .on(handler.direct_listener_value(EventType::Click, true))
+                    .on(handler
+                        .direct_listener_value(EventType::Key, true)
+                        .filter(EventFilter::VerticalArrowPressed));
+                if open {
+                    input = input
+                        .on(handler
+                            .direct_listener_value(EventType::Key, false)
+                            .filter(EventFilter::EscapePressed))
+                        .on(handler
+                            .direct_listener_value(EventType::Key, false)
+                            .filter(EventFilter::TabPressed));
+                }
+            }
+            if open && let Some(index) = active {
+                for handler in &self.select_handlers {
+                    input = input.on(handler
+                        .direct_listener_value(EventType::Key, index)
+                        .filter(EventFilter::EnterPressed));
+                }
+            }
+        }
         let semantics = input.semantics.as_mut().expect("input semantics");
         semantics.role = Role::ComboBox;
         semantics.popup = Some(argui_ui::PopupKind::ListBox);
@@ -192,6 +248,9 @@ impl Combobox {
                     let semantics = row.semantics.as_mut().expect("option semantics");
                     semantics.role = Role::Option;
                     semantics.state.selected = self.selected == Some(*index);
+                    for handler in &self.select_handlers {
+                        row = row.on(handler.direct_listener_value(EventType::Click, *index));
+                    }
                     row
                 })
                 .collect();
@@ -229,6 +288,11 @@ impl Combobox {
                 .as_mut()
                 .expect("scroll area interaction")
                 .focus_policy = FocusPolicy::None;
+            for handler in &self.open_handlers {
+                panel = panel
+                    .on(handler.direct_listener_value(EventType::PointerOutside, false))
+                    .on(handler.direct_listener_value(EventType::Dismiss, false));
+            }
             panel
         });
         Element::column(std::iter::once(input).chain(panel))

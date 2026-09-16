@@ -23,5 +23,5 @@ pub use custom::CustomElementStats;
 pub use engine::{LayoutEngine, LayoutNode, LayoutOutput, LayoutStorage, PaintStats, PortalLayout};
 pub use error::LayoutError;
 pub use input::TextInputRegion;
-pub use selection::TextRegion;
+pub use selection::{SelectionHandleGeometry, TextRegion};
 pub use surface::NativeSurfacePaint;

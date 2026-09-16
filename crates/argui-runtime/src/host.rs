@@ -5,7 +5,7 @@ pub(crate) use event_loop::EventProxy;
 pub(crate) mod gtk;
 
 use argui_core::Insets;
-#[cfg(any(target_os = "android", target_os = "ios"))]
+#[cfg(target_os = "ios")]
 use argui_core::{Point, Rect, Size};
 use argui_platform::WindowCapabilities;
 use winit::{
@@ -127,6 +127,8 @@ impl WindowHost for Arc<Window> {
     }
     fn set_ime_allowed(&self, allowed: bool) {
         self.as_ref().set_ime_allowed(allowed);
+        #[cfg(target_os = "android")]
+        argui_platform::mobile::set_android_soft_input_visible(allowed);
     }
     fn set_ime_cursor_area(&self, position: LogicalPosition<f64>, size: LogicalSize<f64>) {
         self.as_ref().set_ime_cursor_area(position, size);
@@ -234,24 +236,8 @@ impl<T: WindowHost + ?Sized> WindowHost for std::rc::Rc<T> {
 
 #[cfg(target_os = "android")]
 fn android_safe_area_insets(window: &Window, scale_factor: f32) -> Option<Insets> {
-    use winit::platform::android::WindowExtAndroid;
-
-    let size = window.inner_size();
-    let content = window.content_rect();
-    Insets::try_from_physical_rects(
-        Rect::new(
-            Point::default(),
-            Size::new(size.width as f32, size.height as f32),
-        ),
-        Rect::new(
-            Point::new(content.left as f32, content.top as f32),
-            Size::new(
-                content.right as f32 - content.left as f32,
-                content.bottom as f32 - content.top as f32,
-            ),
-        ),
-        scale_factor,
-    )
+    let _ = window;
+    argui_platform::mobile::android_safe_area_insets(scale_factor)
 }
 
 #[cfg(target_os = "ios")]

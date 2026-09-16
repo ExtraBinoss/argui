@@ -1,9 +1,12 @@
 use std::sync::Arc;
 
-use argui_core::{Affine2D, Point, Rect, TextPosition};
+use argui_core::{Affine2D, Point, Rect, Size, TextPosition};
 use argui_paint::{Border, ClipChain, Color, CornerRadii, DisplayList, Fill, Quad};
 use argui_text::TextLayout;
-use argui_ui::{DocumentTextPoint, NodeId, TextSelectionHighlight, TextSelectionStyle, UiTree};
+use argui_ui::{
+    DocumentSelectionEndpoint, DocumentTextPoint, DocumentTextSelection, NodeId,
+    TextSelectionHighlight, TextSelectionStyle, UiTree,
+};
 
 use crate::LayoutOutput;
 
@@ -20,6 +23,21 @@ pub struct TextRegion {
     pub highlight: TextSelectionHighlight,
     /// Number of hit regions emitted through this text's paint position.
     pub interaction_order: usize,
+}
+
+/// Viewport-space hit and paint geometry for one touch selection endpoint.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SelectionHandleGeometry {
+    /// Retained text node containing this endpoint.
+    pub node: NodeId,
+    /// Directed endpoint that will move when this handle is dragged.
+    pub endpoint: DocumentSelectionEndpoint,
+    /// Center of the visible handle in viewport coordinates.
+    pub center: Point,
+    /// Visible handle bounds in viewport coordinates.
+    pub visual_bounds: Rect,
+    /// Comfortable touch target in viewport coordinates.
+    pub hit_bounds: Rect,
 }
 
 impl TextRegion {
@@ -158,51 +176,29 @@ pub(crate) fn paint(ui: &UiTree, region: &TextRegion, display_list: &mut Display
     }
     if ui.document_selection_handles_visible()
         && let Some(selection) = ui.document_selection()
+        && ui.has_document_selection()
     {
-        let forward = ui
-            .node_ids()
-            .iter()
-            .position(|node| *node == selection.anchor.node)
-            .zip(
-                ui.node_ids()
-                    .iter()
-                    .position(|node| *node == selection.focus.node),
-            )
-            .is_none_or(|(anchor, focus)| {
-                (anchor, selection.anchor.position.index) <= (focus, selection.focus.position.index)
-            });
-        if region.node == selection.anchor.node
-            && let Some(rect) = if forward { rects.first() } else { rects.last() }
-        {
-            paint_handle(display_list, region, *rect, forward);
-        }
-        if region.node == selection.focus.node
-            && let Some(rect) = if forward { rects.last() } else { rects.first() }
-        {
-            paint_handle(display_list, region, *rect, !forward);
+        for endpoint in [
+            DocumentSelectionEndpoint::Anchor,
+            DocumentSelectionEndpoint::Focus,
+        ] {
+            let point = selection_endpoint(selection, endpoint);
+            if point.node == region.node
+                && let Some((_, bounds)) = handle_geometry(region, endpoint, point)
+            {
+                paint_handle(display_list, region, bounds);
+            }
         }
     }
 }
 
-fn paint_handle(
-    display_list: &mut DisplayList,
-    region: &TextRegion,
-    selection: Rect,
-    leading: bool,
-) {
-    let diameter = 10.0;
-    let x = if leading {
-        selection.origin.x - diameter * 0.5
-    } else {
-        selection.origin.x + selection.size.width - diameter * 0.5
-    };
-    let bounds = Rect::new(
-        Point::new(
-            x,
-            selection.origin.y + selection.size.height - diameter * 0.5,
-        ),
-        argui_core::Size::new(diameter, diameter),
-    );
+/// Paints one round touch-selection handle inside its text region's transform and clips.
+///
+/// * `display_list` — destination display list for the handle primitive.
+/// * `region` — text region supplying the handle color, transform, and clipping chain.
+/// * `bounds` — local-space visible bounds of the handle.
+fn paint_handle(display_list: &mut DisplayList, region: &TextRegion, bounds: Rect) {
+    let diameter = bounds.size.width;
     paint_rect(
         display_list,
         region,
@@ -231,6 +227,58 @@ fn paint_rect(
 }
 
 impl LayoutOutput {
+    /// Returns the visible touch selection handles and their hit targets.
+    ///
+    /// * `ui` — tree containing the current selection and its touch-handle visibility.
+    ///
+    /// Each endpoint receives a 44-logical-pixel square hit target centered on its painted
+    /// handle. Returns no handles when the selection is empty, hidden, clipped, or has no shaped
+    /// caret geometry.
+    #[must_use]
+    pub fn selection_handles(&self, ui: &UiTree) -> Vec<SelectionHandleGeometry> {
+        if !ui.document_selection_handles_visible() || !ui.has_document_selection() {
+            return Vec::new();
+        }
+        let Some(selection) = ui.document_selection() else {
+            return Vec::new();
+        };
+        [
+            DocumentSelectionEndpoint::Anchor,
+            DocumentSelectionEndpoint::Focus,
+        ]
+        .into_iter()
+        .filter_map(|endpoint| {
+            let point = selection_endpoint(selection, endpoint);
+            let region = self
+                .text_regions
+                .iter()
+                .find(|region| region.node == point.node)?;
+            handle_geometry(region, endpoint, point).map(|(geometry, _)| geometry)
+        })
+        .collect()
+    }
+
+    /// Finds the closest visible touch selection handle whose target contains `point`.
+    ///
+    /// * `ui` — tree containing the current selection and its touch-handle visibility.
+    /// * `point` — pointer position in viewport coordinates.
+    ///
+    /// Returns the nearest matching handle, or `None` when no hit target contains the point.
+    #[must_use]
+    pub fn selection_handle_at(
+        &self,
+        ui: &UiTree,
+        point: Point,
+    ) -> Option<SelectionHandleGeometry> {
+        self.selection_handles(ui)
+            .into_iter()
+            .filter(|handle| handle.hit_bounds.contains(point))
+            .min_by(|left, right| {
+                distance_squared(left.center, point)
+                    .total_cmp(&distance_squared(right.center, point))
+            })
+    }
+
     /// Returns the viewport-space union of rectangles in the current document selection.
     ///
     /// * `ui` — tree providing the selected ranges for each text node.
@@ -249,6 +297,88 @@ impl LayoutOutput {
             })
             .reduce(union)
     }
+}
+
+/// Selects the requested directed endpoint from a document selection.
+///
+/// * `selection` — anchor and focus positions to inspect.
+/// * `endpoint` — endpoint identity to return.
+///
+/// Returns the document text position stored at that endpoint.
+fn selection_endpoint(
+    selection: DocumentTextSelection,
+    endpoint: DocumentSelectionEndpoint,
+) -> DocumentTextPoint {
+    match endpoint {
+        DocumentSelectionEndpoint::Anchor => selection.anchor,
+        DocumentSelectionEndpoint::Focus => selection.focus,
+    }
+}
+
+/// Builds viewport hit geometry and local paint bounds for a selection endpoint.
+///
+/// * `region` — shaped text region containing the endpoint.
+/// * `endpoint` — directed selection endpoint represented by the handle.
+/// * `point` — document text position for that endpoint.
+///
+/// Returns `None` when the endpoint has no caret stop, matching text line, or visible clip point.
+fn handle_geometry(
+    region: &TextRegion,
+    endpoint: DocumentSelectionEndpoint,
+    point: DocumentTextPoint,
+) -> Option<(SelectionHandleGeometry, Rect)> {
+    let stop = region
+        .layout
+        .stops
+        .iter()
+        .filter(|stop| stop.position.index == point.position.index)
+        .min_by_key(|stop| stop.position != point.position)?;
+    let line = region
+        .layout
+        .lines
+        .iter()
+        .find(|line| (line.bounds.origin.y - stop.point.y).abs() < 0.01)?;
+    let local_center = Point::new(
+        region.origin.x + stop.point.x,
+        region.origin.y + line.bounds.origin.y + line.bounds.size.height,
+    );
+    let center = region.transform.transform_point(local_center);
+    if !region.clips.contains(center) {
+        return None;
+    }
+    let visual_diameter = 10.0;
+    let visual_local = centered_rect(local_center, visual_diameter);
+    let hit_bounds = centered_rect(center, 44.0);
+    Some((
+        SelectionHandleGeometry {
+            node: region.node,
+            endpoint,
+            center,
+            visual_bounds: region.transform.transform_rect(visual_local),
+            hit_bounds,
+        },
+        visual_local,
+    ))
+}
+
+/// Creates a square centered at `center` with the supplied side length.
+///
+/// * `center` — rectangle center in the caller's coordinate space.
+/// * `diameter` — width and height of the returned square.
+fn centered_rect(center: Point, diameter: f32) -> Rect {
+    Rect::new(
+        Point::new(center.x - diameter * 0.5, center.y - diameter * 0.5),
+        Size::new(diameter, diameter),
+    )
+}
+
+/// Computes squared Euclidean distance without taking a square root.
+///
+/// * `left` — first viewport-space point.
+/// * `right` — second viewport-space point.
+fn distance_squared(left: Point, right: Point) -> f32 {
+    let delta = Point::new(left.x - right.x, left.y - right.y);
+    delta.x * delta.x + delta.y * delta.y
 }
 
 fn union(left: Rect, right: Rect) -> Rect {

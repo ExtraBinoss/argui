@@ -117,6 +117,7 @@ impl ApplicationHandler<UserEvent> for Application {
             self.touch_points.clear();
             self.primary_touch = None;
             self.touch_selection = None;
+            self.touch_selection_handle = None;
         }
         (self.on_event)(RuntimeEvent::Platform(PlatformEvent::Suspended));
     }

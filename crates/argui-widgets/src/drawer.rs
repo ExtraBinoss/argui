@@ -1,8 +1,8 @@
 use crate::{Button, DialogAction, Sheet, SheetSide, WidgetTheme};
 use argui_core::Transform2D;
 use argui_ui::{
-    Element, GestureCapture, GestureKind, GesturePhase, GestureSet, Interaction, PanAxis,
-    PanGesture, UiEvent, UiEventKind,
+    Element, EventHandler, GestureCapture, GestureKind, GesturePhase, GestureSet, Interaction,
+    PanAxis, PanGesture, UiEvent, UiEventKind, ValueHandler,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -72,6 +72,20 @@ impl Drawer {
             DialogAction::Open => DrawerAction::Open,
             DialogAction::Close => DrawerAction::Close,
         })
+    }
+
+    /// Adds a callback receiving the requested controlled open state.
+    #[must_use]
+    pub fn on_open_change(mut self, handler: ValueHandler<bool>) -> Self {
+        self.sheet = self.sheet.on_open_change(handler);
+        self
+    }
+
+    /// Adds a callback for explicit or gesture dismissal.
+    #[must_use]
+    pub fn on_dismiss(mut self, handler: EventHandler) -> Self {
+        self.sheet = self.sheet.on_dismiss(handler);
+        self
     }
 
     #[must_use]

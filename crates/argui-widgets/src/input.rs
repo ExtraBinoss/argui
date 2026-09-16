@@ -1,8 +1,8 @@
 use argui_paint::{Color, PaintStyle};
 use argui_text::{TextColor, TextOverflow, TextStyle, TextWrap};
 use argui_ui::{
-    AlignItems, CaretStyle, Element, LayoutStyle, Role, StateSelector, StylePatch, StyleTransition,
-    TextEditorSpec, TextInputFilter, VisualState, percent,
+    AlignItems, CaretStyle, Element, EventType, LayoutStyle, Role, StateSelector, StylePatch,
+    StyleTransition, TextEditorSpec, TextInputFilter, ValueHandler, VisualState, percent,
 };
 
 #[cfg(feature = "textarea")]
@@ -117,6 +117,8 @@ pub struct Input {
     description: Option<String>,
     invalid: bool,
     leading: Option<(Element, f32)>,
+    input_handlers: Vec<ValueHandler<String>>,
+    submit_handlers: Vec<ValueHandler<String>>,
 }
 
 #[cfg(feature = "input")]
@@ -144,6 +146,8 @@ impl Input {
             description: None,
             invalid: false,
             leading: None,
+            input_handlers: Vec::new(),
+            submit_handlers: Vec::new(),
         }
     }
 
@@ -196,6 +200,26 @@ impl Input {
         self
     }
 
+    /// Adds a callback receiving the newly edited controlled value.
+    ///
+    /// `handler` is normally created with `Context::input_callback`. Handlers
+    /// run in declaration order through the normal input event pipeline.
+    #[must_use]
+    pub fn on_input(mut self, handler: ValueHandler<String>) -> Self {
+        self.input_handlers.push(handler);
+        self
+    }
+
+    /// Adds a callback receiving the submitted value.
+    ///
+    /// `handler` is normally created with `Context::submit_callback`. Handlers
+    /// run in declaration order through the normal submit event pipeline.
+    #[must_use]
+    pub fn on_submit(mut self, handler: ValueHandler<String>) -> Self {
+        self.submit_handlers.push(handler);
+        self
+    }
+
     #[must_use]
     /// Builds the configured input element.
     pub fn build(self) -> Element {
@@ -232,6 +256,8 @@ impl Input {
                 label: self.label,
                 description: self.description,
                 invalid: self.invalid,
+                input_handlers: self.input_handlers,
+                submit_handlers: self.submit_handlers,
             },
             self.leading,
         )
@@ -249,6 +275,8 @@ pub struct TextArea {
     scroll: ScrollConfig,
     enabled: bool,
     read_only: bool,
+    input_handlers: Vec<ValueHandler<String>>,
+    submit_handlers: Vec<ValueHandler<String>>,
 }
 
 #[cfg(feature = "textarea")]
@@ -276,6 +304,8 @@ impl TextArea {
             scroll: ScrollConfig::default().propagation(ScrollPropagation::Contain),
             enabled: true,
             read_only: false,
+            input_handlers: Vec::new(),
+            submit_handlers: Vec::new(),
         }
     }
 
@@ -307,6 +337,24 @@ impl TextArea {
         self
     }
 
+    /// Adds a callback receiving the newly edited multiline value.
+    ///
+    /// `handler` is normally created with `Context::input_callback`.
+    #[must_use]
+    pub fn on_input(mut self, handler: ValueHandler<String>) -> Self {
+        self.input_handlers.push(handler);
+        self
+    }
+
+    /// Adds a callback receiving the submitted multiline value.
+    ///
+    /// `handler` is normally created with `Context::submit_callback`.
+    #[must_use]
+    pub fn on_submit(mut self, handler: ValueHandler<String>) -> Self {
+        self.submit_handlers.push(handler);
+        self
+    }
+
     #[must_use]
     /// Builds the configured text area.
     pub fn build(self) -> Element {
@@ -324,6 +372,8 @@ impl TextArea {
                 label: None,
                 description: None,
                 invalid: false,
+                input_handlers: self.input_handlers,
+                submit_handlers: self.submit_handlers,
             },
             None,
         )
@@ -349,6 +399,8 @@ struct EditorSpec {
     label: Option<String>,
     description: Option<String>,
     invalid: bool,
+    input_handlers: Vec<ValueHandler<String>>,
+    submit_handlers: Vec<ValueHandler<String>>,
 }
 
 fn editor(spec: EditorSpec, leading: Option<(Element, f32)>) -> Element {
@@ -382,7 +434,13 @@ fn editor(spec: EditorSpec, leading: Option<(Element, f32)>) -> Element {
         spec.style.focused,
     )
     .transition(spec.style.transition);
-    let editor = behavior.decorate(TextFieldPart::Editor, element);
+    let mut editor = behavior.decorate(TextFieldPart::Editor, element);
+    for handler in spec.input_handlers {
+        editor = editor.on(handler.direct_listener(EventType::Input));
+    }
+    for handler in spec.submit_handlers {
+        editor = editor.on(handler.direct_listener(EventType::Submit));
+    }
     let Some((leading, slot_width)) = leading else {
         return behavior.decorate(TextFieldPart::Root, editor);
     };

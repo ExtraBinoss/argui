@@ -21,6 +21,8 @@ def only_reexports(crate):
         text = re.sub(r"//[^\n]*", "", source.read_text())
         text = re.sub(r"#!?\[[^\]]*\]", "", text)
         text = re.sub(r"pub\s+use\s+[^;]+;", "", text)
+        text = re.sub(r"pub\s+mod\s+[A-Za-z_][A-Za-z0-9_]*\s*\{", "", text)
+        text = text.replace("}", "")
         if text.strip():
             return False
     return True
