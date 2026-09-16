@@ -1,8 +1,8 @@
 use argui_core::{Affine2D, Color, Point, Rect, Size};
 use argui_paint::{
-    Border, ClipChain, CornerRadii, DisplayList, EffectId, EffectInstance, Fill, Filter, ImageFit,
-    ImageId, ImagePrimitive, ImageSampling, LayerMask, LayerStyle, Quad, Refraction, Shadow,
-    VectorId, VectorPrimitive,
+    Border, ClipChain, CornerRadii, DisplayList, EffectId, EffectInstance, Fill, Filter,
+    GpuCanvasId, GpuCanvasPrimitive, ImageFit, ImageId, ImagePrimitive, ImageSampling, LayerMask,
+    LayerStyle, ProfileDomain, Quad, Refraction, RenderObjectId, Shadow, VectorId, VectorPrimitive,
 };
 use argui_render::analyze_display_list;
 
@@ -42,6 +42,22 @@ fn vector() -> VectorPrimitive {
         fit: ImageFit::Contain,
         color: Color::WHITE,
         opacity: 1.0,
+        transform: Affine2D::IDENTITY,
+        clips: ClipChain::default(),
+    }
+}
+
+fn canvas(revision: u64) -> GpuCanvasPrimitive {
+    GpuCanvasPrimitive {
+        canvas: GpuCanvasId::fresh(),
+        object: RenderObjectId::new(ProfileDomain::Ui, 17),
+        slot: 0,
+        bounds: bounds(),
+        content_revision: revision,
+        resolution_scale: 1.0,
+        sampling: ImageSampling::Linear,
+        opacity: 0.75,
+        radii: CornerRadii::all(4.0),
         transform: Affine2D::IDENTITY,
         clips: ClipChain::default(),
     }
@@ -125,4 +141,20 @@ fn analysis_handles_empty_clipped_and_malformed_display_lists() {
     let mut unclosed = DisplayList::new();
     unclosed.begin_layer(LayerStyle::new(bounds()));
     assert!(analyze_display_list(&unclosed, &[], [1.0, 1.0], 1.0, 0).is_err());
+}
+
+#[test]
+fn canvas_draws_keep_display_order_and_participate_in_effect_layers() {
+    let mut list = DisplayList::new();
+    list.push_quad(quad());
+    list.push_gpu_canvas(canvas(1));
+    list.push_quad(quad());
+    list.begin_layer(LayerStyle::new(bounds()).filter(Filter::Blur(3.0)));
+    list.push_gpu_canvas(canvas(2));
+    list.end_layer();
+
+    let analysis = analyze_display_list(&list, &[], [320.0, 240.0], 1.0, 19).unwrap();
+    assert_eq!(analysis.stats.draw_batches, 4);
+    assert_eq!(analysis.stats.offscreen_layers, 1);
+    assert_eq!(analysis.stats.filter_passes, 1);
 }

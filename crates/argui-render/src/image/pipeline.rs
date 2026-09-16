@@ -1,11 +1,11 @@
 use std::{mem::size_of, ops::Range};
 
-use argui_paint::{ImageFit, ImagePrimitive, ImageSampling};
+use argui_paint::{GpuCanvasPrimitive, ImageFit, ImagePrimitive, ImageSampling};
 use bytemuck::{Pod, Zeroable};
 
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
-pub(super) struct ImageClip {
+pub(crate) struct ImageClip {
     inverse_a: [f32; 4],
     inverse_b: [f32; 4],
     bounds: [f32; 4],
@@ -14,7 +14,7 @@ pub(super) struct ImageClip {
 
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
-pub(super) struct ImageInstance {
+pub(crate) struct ImageInstance {
     rect: [f32; 4],
     uv: [f32; 4],
     radii: [f32; 4],
@@ -65,6 +65,44 @@ impl ImageInstance {
             clip_meta: [start, clips.len() as u32 - start, 0, 0],
         }
     }
+
+    /// Builds compositor geometry for `canvas` at physical `scale` and appends its clips.
+    pub(crate) fn from_gpu_canvas(
+        canvas: &GpuCanvasPrimitive,
+        scale: f32,
+        clips: &mut Vec<ImageClip>,
+    ) -> Self {
+        let start = clips.len() as u32;
+        clips.extend(canvas.clips.regions().iter().filter_map(|clip| {
+            let inverse = clip.transform.scaled(scale).inverse()?;
+            Some(ImageClip {
+                inverse_a: inverse.matrix,
+                inverse_b: [inverse.translation.x, inverse.translation.y, 0.0, 0.0],
+                bounds: [
+                    clip.bounds.origin.x * scale,
+                    clip.bounds.origin.y * scale,
+                    clip.bounds.size.width * scale,
+                    clip.bounds.size.height * scale,
+                ],
+                radii: clip.radii.as_array().map(|radius| radius * scale),
+            })
+        }));
+        let transform = canvas.transform.scaled(scale);
+        Self {
+            rect: [
+                canvas.bounds.origin.x * scale,
+                canvas.bounds.origin.y * scale,
+                canvas.bounds.size.width * scale,
+                canvas.bounds.size.height * scale,
+            ],
+            uv: [0.0, 0.0, 1.0, 1.0],
+            radii: canvas.radii.as_array().map(|value| value * scale),
+            transform_a: transform.matrix,
+            transform_b: [transform.translation.x, transform.translation.y, 0.0, 0.0],
+            params: [canvas.opacity, 0.0, 0.0, 0.0],
+            clip_meta: [start, clips.len() as u32 - start, 0, 0],
+        }
+    }
 }
 
 fn fit(fit: ImageFit, image: [u32; 2], rect: &mut [f32; 4], uv: &mut [f32; 4]) {
@@ -107,7 +145,7 @@ struct Viewport {
 const VIEWPORT_STRIDE: u64 = 256;
 const VIEWPORT_CAPACITY: u64 = 1024;
 
-pub(super) struct ImagePipeline {
+pub(crate) struct ImagePipeline {
     pipeline: wgpu::RenderPipeline,
     scene_layout: wgpu::BindGroupLayout,
     texture_layout: wgpu::BindGroupLayout,
@@ -124,7 +162,8 @@ pub(super) struct ImagePipeline {
 
 #[cfg_attr(coverage_nightly, coverage(off))]
 impl ImagePipeline {
-    pub fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
+    /// Creates the shared textured-quad pipeline for `format`.
+    pub(crate) fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("argui-image-shader"),
             source: wgpu::ShaderSource::Wgsl(
@@ -228,7 +267,8 @@ impl ImagePipeline {
         }
     }
 
-    pub fn texture_group(
+    /// Creates a sampled-texture bind group for `view` and `sampling`.
+    pub(crate) fn texture_group(
         &self,
         device: &wgpu::Device,
         view: &wgpu::TextureView,
@@ -259,7 +299,8 @@ impl ImagePipeline {
         })
     }
 
-    pub fn write(
+    /// Uploads changed compositor `instances` and `clips`, returning whether data changed.
+    pub(crate) fn write(
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
@@ -304,10 +345,12 @@ impl ImagePipeline {
         instances_changed || clips_changed
     }
 
-    pub fn begin_frame(&mut self) {
+    /// Resets transient target-region uniform offsets for a new frame.
+    pub(crate) fn begin_frame(&mut self) {
         self.next_viewport = 0;
     }
-    pub fn target_offset(&mut self, queue: &wgpu::Queue, region: [f32; 4]) -> u32 {
+    /// Uploads `region` and returns its dynamic uniform offset.
+    pub(crate) fn target_offset(&mut self, queue: &wgpu::Queue, region: [f32; 4]) -> u32 {
         let offset = self.next_viewport % VIEWPORT_CAPACITY * VIEWPORT_STRIDE;
         self.next_viewport += 1;
         queue.write_buffer(
@@ -320,7 +363,8 @@ impl ImagePipeline {
         );
         offset as u32
     }
-    pub fn draw<'a>(
+    /// Draws `instances` with `texture_group` and one target-region offset.
+    pub(crate) fn draw<'a>(
         &'a self,
         pass: &mut wgpu::RenderPass<'a>,
         texture: &'a wgpu::BindGroup,

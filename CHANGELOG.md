@@ -8,6 +8,30 @@ that do not use them.
 
 ### Added
 
+- Added retained GPU canvases for editor, visualization, game/map and scientific
+  viewports. `Element::gpu_canvas`, `GpuCanvasSpec` and the renderer-neutral
+  `CustomPaintContext::gpu_canvas` helper preserve normal Argui layout,
+  transforms, clipping, rounded corners, opacity, effects, overlays,
+  interaction, accessibility, multi-window surfaces and native popups.
+- Added `GpuCanvasRegistration`, `GpuCanvasRegistry`, `GpuCanvasFactory`,
+  `GpuCanvasRenderer` and private-field device/render contexts, plus the exact
+  `argui::render::wgpu` re-export. Callbacks can create resources from Argui's
+  selected device, perform queue writes, and encode compute/render/copy work
+  into a borrowed offscreen target. Argui remains the owner of backend
+  selection, surface acquisition, command submission and presentation.
+- Added explicit content-revision and resize/DPI caching with a configurable,
+  bounded per-surface texture budget. Paused or unchanged canvases avoid custom
+  GPU callbacks. Required/optional WGPU features and direction-aware limits are
+  negotiated before device creation, including every Windows fallback attempt;
+  incompatible shared devices fail clearly. Recoverable frame errors use a
+  visible placeholder and deduplicated failure/recovery runtime events instead
+  of aborting surrounding UI. Profiles, inspector traces and DevTools report
+  canvas cache, render, hit, failure, byte and CPU-encode statistics.
+- Added native and WebAssembly/WebGPU support plus the product-shaped
+  **GPU Canvas Lab** in `app_examples/gpu-canvas`. It demonstrates an Argui
+  toolbar and inspector around custom WGPU compute and render passes, pan/zoom,
+  pause/resume, keyboard alternatives, overlays, an effect layer, resize/HiDPI,
+  bounded particles and in-app simulated failure recovery.
 - Added inherited text-selection highlight styling with solid or gradient fills,
   per-corner radii and an interactive Widget Gallery page.
 - Added default-on Windows renderer fallback from DirectX 12 DirectComposition
@@ -34,8 +58,21 @@ that do not use them.
 
 ### Changed
 
+- Advanced strict DevTools GPU-trace JSON to `argui-gpu-trace-v4` so exported
+  frames include GPU-canvas cache, byte, render, hit, failure and CPU-encode
+  metrics; older strict trace versions remain rejected on import.
 - Made the base release gallery the recommended local command. Optional native
   integrations can still be enabled individually or together when needed.
+
+### Known limitations
+
+- GPU canvases use Argui-owned WGPU instances, devices, queues and surfaces;
+  the high-level runtime still does not accept externally owned GPU objects.
+- Canvas pixels have no automatic semantic meaning. Applications must provide
+  labels, keyboard controls and semantic Argui overlays for important actions.
+- Canvas profiling measures cache behavior and CPU encoding time, not the
+  duration of application-authored GPU passes; applications may encode their
+  own supported timestamp queries when needed.
 
 ## [0.2.1] - 2026-09-14
 

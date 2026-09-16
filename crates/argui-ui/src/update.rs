@@ -155,6 +155,7 @@ fn kind_changes_layout(old: &Element, new: &Element) -> bool {
     match (&old.kind, &new.kind) {
         (ElementKind::Custom(old), ElementKind::Custom(new)) => !old.same_layout(new),
         (ElementKind::Container, ElementKind::Container)
+        | (ElementKind::GpuCanvas(_), ElementKind::GpuCanvas(_))
         | (ElementKind::Image { .. }, ElementKind::Image { .. })
         | (ElementKind::Vector { .. }, ElementKind::Vector { .. }) => false,
         (

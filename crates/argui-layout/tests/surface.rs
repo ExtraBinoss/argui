@@ -1,10 +1,10 @@
 use argui_core::{Color, Point, Rect, Size};
 use argui_layout::LayoutEngine;
-use argui_paint::{DisplayCommand, Fill, LayerStyle};
+use argui_paint::{DisplayCommand, Fill, GpuCanvasId, LayerStyle};
 use argui_text::TextEngine;
 use argui_ui::{
-    Axes, Element, FloatingPlacement, Interaction, NodeId, Overflow, OverlaySurface, Placement,
-    ScrollConfig, UiTree, WindowLayer, length,
+    Axes, Element, FloatingPlacement, GpuCanvasSpec, Interaction, NodeId, Overflow, OverlaySurface,
+    Placement, ScrollConfig, UiTree, WindowLayer, length,
 };
 
 fn node(ui: &UiTree, key: &str) -> NodeId {
@@ -222,6 +222,9 @@ fn native_image_vector_and_effect_clips_share_the_same_local_coordinates() {
                 Element::vector(VectorId::fresh())
                     .width(length(32.0))
                     .height(length(32.0)),
+                Element::gpu_canvas(GpuCanvasSpec::new(GpuCanvasId::fresh()))
+                    .width(length(28.0))
+                    .height(length(24.0)),
             ],
         )
         .layer(LayerStyle::new(Rect::default()).opacity(0.8)),
@@ -244,6 +247,10 @@ fn native_image_vector_and_effect_clips_share_the_same_local_coordinates() {
                 kinds.push("vector");
                 (vector.transform, &vector.clips)
             }
+            DisplayCommand::GpuCanvas(canvas) => {
+                kinds.push("gpu-canvas");
+                (canvas.transform, &canvas.clips)
+            }
             DisplayCommand::BeginLayer(layer) => {
                 assert_eq!(layer.bounds.origin, Point::default());
                 continue;
@@ -255,6 +262,6 @@ fn native_image_vector_and_effect_clips_share_the_same_local_coordinates() {
         assert_eq!(clip.transform.translation, transform.translation);
         assert_eq!(clip.bounds, bounds);
     }
-    assert_eq!(kinds, ["image", "vector"]);
+    assert_eq!(kinds, ["image", "vector", "gpu-canvas"]);
     assert!(output.native_surfaces[0].display_list.validate().is_ok());
 }

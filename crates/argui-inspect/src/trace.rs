@@ -7,7 +7,7 @@ use crate::{
 };
 
 /// Version identifier written to and required by serialized inspector traces.
-pub const TRACE_VERSION: &str = "argui-gpu-trace-v3";
+pub const TRACE_VERSION: &str = "argui-gpu-trace-v4";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 /// Failure encountered while serializing or importing a trace.
@@ -84,6 +84,12 @@ struct TraceFrame {
     vector_atlas_entries: usize,
     vector_atlas_hits: usize,
     vector_rasterizations: usize,
+    gpu_canvas_entries: usize,
+    gpu_canvas_bytes: u64,
+    gpu_canvas_renders: usize,
+    gpu_canvas_hits: usize,
+    gpu_canvas_failures: usize,
+    gpu_canvas_encode_cpu_ns: u64,
     gpu: Option<TraceGpuFrame>,
 }
 
@@ -218,6 +224,12 @@ impl From<&FrameRecord> for TraceFrame {
             vector_atlas_entries: value.vector_atlas_entries,
             vector_atlas_hits: value.vector_atlas_hits,
             vector_rasterizations: value.vector_rasterizations,
+            gpu_canvas_entries: value.gpu_canvas_entries,
+            gpu_canvas_bytes: value.gpu_canvas_bytes,
+            gpu_canvas_renders: value.gpu_canvas_renders,
+            gpu_canvas_hits: value.gpu_canvas_hits,
+            gpu_canvas_failures: value.gpu_canvas_failures,
+            gpu_canvas_encode_cpu_ns: nanos(value.gpu_canvas_encode_cpu),
             gpu: value.gpu.as_ref().map(TraceGpuFrame::from),
         }
     }
@@ -247,6 +259,12 @@ impl TraceFrame {
             vector_atlas_entries: self.vector_atlas_entries,
             vector_atlas_hits: self.vector_atlas_hits,
             vector_rasterizations: self.vector_rasterizations,
+            gpu_canvas_entries: self.gpu_canvas_entries,
+            gpu_canvas_bytes: self.gpu_canvas_bytes,
+            gpu_canvas_renders: self.gpu_canvas_renders,
+            gpu_canvas_hits: self.gpu_canvas_hits,
+            gpu_canvas_failures: self.gpu_canvas_failures,
+            gpu_canvas_encode_cpu: Duration::from_nanos(self.gpu_canvas_encode_cpu_ns),
             adapter,
             gpu: self.gpu.map(TraceGpuFrame::into_record),
         }

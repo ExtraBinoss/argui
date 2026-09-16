@@ -58,6 +58,13 @@ Painting preserves tree order. Compatible adjacent commands may batch, but
 batching never moves later content behind earlier content. Hit testing follows
 the same paint and clip order in reverse.
 
+Retained GPU canvases preserve the same boundary. UI and paint store only an
+opaque registration ID, retained object/slot, revision and composition data.
+`argui-render` owns each bounded target texture, invokes application WGPU code
+only when that target is dirty, then samples it in ordinary display/effect
+order. Argui remains the sole owner of command submission and presentation.
+See the [GPU canvas guide](rendering/gpu-canvas.md).
+
 ## State and identity
 
 `Entity<T>` owns shared model data. A renderable entity can have several

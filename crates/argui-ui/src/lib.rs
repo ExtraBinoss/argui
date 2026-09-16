@@ -25,6 +25,7 @@ mod event;
 mod focus;
 pub use argui_accessibility::FocusPolicy;
 mod gesture;
+mod gpu_canvas;
 mod identity;
 mod interaction;
 mod layout_builders;
@@ -55,9 +56,9 @@ pub use argui_animation::{Motion, MotionBinding, MotionState, Transition, Tween}
 pub use argui_core::{Insets, Transform2D, TransformOrigin};
 pub use argui_paint::{
     BlendMode, Border, BorderWidths, Color, CornerRadii, EffectArgument, EffectId, EffectInstance,
-    EffectValue, Fill, Filter, GradientStop, ImageAsset, ImageFit, ImageId, ImageSampling,
-    LayerMask, LayerStyle, LinearGradient, PaintStyle, ProfileDomain, QuadStyle, RadialGradient,
-    Refraction, RenderObjectId, Shadow, VectorAsset, VectorId,
+    EffectValue, Fill, Filter, GpuCanvasId, GradientStop, ImageAsset, ImageFit, ImageId,
+    ImageSampling, LayerMask, LayerStyle, LinearGradient, PaintStyle, ProfileDomain, QuadStyle,
+    RadialGradient, Refraction, RenderObjectId, Shadow, VectorAsset, VectorId,
 };
 pub use binding::{BindingImpact, MotionProperty, PropertyBinding, property};
 pub use caret::{
@@ -75,6 +76,7 @@ pub use gesture::{
     GestureArena, GestureCapture, GestureDelivery, GestureEvent, GestureKind, GesturePhase,
     GestureSet, PanAxis, PanGesture, PinchGesture, RotationGesture, TapGesture,
 };
+pub use gpu_canvas::GpuCanvasSpec;
 pub use interaction::{
     HitRegion, HitShape, HitTestStyle, Interaction, InteractionUpdate, KeyboardActivation, NodeId,
     PointerEvents, WindowDragBehavior,

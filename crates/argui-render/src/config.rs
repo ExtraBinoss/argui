@@ -1,4 +1,4 @@
-use crate::EffectRegistry;
+use crate::{EffectRegistry, GpuCanvasRegistry};
 use argui_core::Color;
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -59,8 +59,12 @@ pub struct RendererConfig {
     pub surface_alpha: SurfaceAlphaMode,
     pub profiling: bool,
     pub image_cache_bytes: usize,
+    /// Maximum retained GPU-canvas texture bytes per surface renderer.
+    pub gpu_canvas_cache_bytes: usize,
     pub gradient_stop_capacity: usize,
     pub effects: EffectRegistry,
+    /// Immutable factories and device requirements available to GPU canvases.
+    pub gpu_canvases: GpuCanvasRegistry,
     pub effect_quality: EffectQuality,
 }
 
@@ -75,8 +79,10 @@ impl Default for RendererConfig {
             surface_alpha: SurfaceAlphaMode::Opaque,
             profiling: false,
             image_cache_bytes: 64 * 1024 * 1024,
+            gpu_canvas_cache_bytes: 128 * 1024 * 1024,
             gradient_stop_capacity: 65_536,
             effects: EffectRegistry::default(),
+            gpu_canvases: GpuCanvasRegistry::default(),
             effect_quality: EffectQuality::Normal,
         }
     }
@@ -136,6 +142,16 @@ impl RendererConfig {
         self
     }
 
+    /// Sets the retained GPU-canvas texture budget in bytes.
+    ///
+    /// Requests that cannot fit this budget display a recoverable placeholder
+    /// without allocating the oversized texture.
+    #[must_use]
+    pub fn gpu_canvas_cache_bytes(mut self, bytes: usize) -> Self {
+        self.gpu_canvas_cache_bytes = bytes;
+        self
+    }
+
     /// Sets capacity reserved for gradient stops.
     /// * `stops` — reserved number of gradient stops.
     #[must_use]
@@ -149,6 +165,13 @@ impl RendererConfig {
     #[must_use]
     pub fn effects(mut self, effects: EffectRegistry) -> Self {
         self.effects = effects;
+        self
+    }
+
+    /// Sets the immutable GPU-canvas registrations known before device creation.
+    #[must_use]
+    pub fn gpu_canvases(mut self, gpu_canvases: GpuCanvasRegistry) -> Self {
+        self.gpu_canvases = gpu_canvases;
         self
     }
 

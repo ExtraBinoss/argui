@@ -1,4 +1,4 @@
-mod pipeline;
+pub(crate) mod pipeline;
 
 use std::collections::HashMap;
 

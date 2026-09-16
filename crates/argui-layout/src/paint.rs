@@ -12,6 +12,7 @@ use cache::CachedFragment;
 pub(crate) use cache::PaintCache;
 mod effects;
 mod geometry;
+mod gpu_canvas;
 mod portal;
 mod sync;
 use effects::{begin_layer, begin_scope, end_layers, scope_count};
@@ -202,7 +203,15 @@ pub(super) fn paint_node(
             ),
         active_portal: context.active_portal,
     };
-    crate::custom::paint(map, element, node, output, transform, &child_context.clips);
+    crate::custom::paint(
+        map,
+        element,
+        node,
+        output,
+        transform,
+        &child_context.clips,
+        ui.resolved_quad(node.node, element),
+    );
     if (map.style.overflow.x.scrolls() || map.style.overflow.y.scrolls())
         && let Some(region) = output
             .scroll_regions
@@ -360,6 +369,7 @@ fn paint_enter(
         context,
     );
     push_image(ui, element, node, output, context);
+    gpu_canvas::push(ui, element, node, output, context);
     push_vector(ui, element, node, output, context);
     begin_scope(
         ui,

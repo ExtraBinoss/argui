@@ -1,10 +1,10 @@
 use argui_core::{Point, Rect, Size};
 use argui_layout::LayoutEngine;
-use argui_paint::{Color, DisplayCommand, QuadStyle};
+use argui_paint::{Color, DisplayCommand, GpuCanvasId, QuadStyle};
 use argui_text::TextEngine;
 use argui_ui::{
-    CustomElement, CustomLayoutContext, CustomMeasurement, CustomPaintContext, Element, TreeUpdate,
-    UiTree,
+    CustomElement, CustomLayoutContext, CustomMeasurement, CustomPaintContext, Element,
+    GpuCanvasSpec, TreeUpdate, UiTree,
 };
 use std::{cell::Cell, rc::Rc};
 
@@ -66,6 +66,82 @@ fn tile(counts: &Rc<Counts>, width: f32, color: Color) -> Element {
         color,
     })
     .keyed("tile")
+}
+
+#[derive(Debug)]
+struct CanvasTile {
+    canvas: GpuCanvasId,
+}
+
+impl CustomElement for CanvasTile {
+    type State = ();
+
+    fn create_state(&self) {}
+
+    fn layout_revision(&self) -> u64 {
+        0
+    }
+
+    fn paint_revision(&self) -> u64 {
+        3
+    }
+
+    fn prepare(&self, _: &mut (), _: Size) {}
+
+    fn layout(
+        &self,
+        _: &mut (),
+        _: &mut dyn CustomLayoutContext,
+    ) -> Result<CustomMeasurement, String> {
+        Ok(CustomMeasurement {
+            size: Size::new(80.0, 40.0),
+            baseline: None,
+        })
+    }
+
+    fn paint(&self, _: &mut (), context: &mut CustomPaintContext<'_>) {
+        context.gpu_canvas(
+            2,
+            Rect::new(Point::new(4.0, 6.0), Size::new(30.0, 20.0)),
+            GpuCanvasSpec::new(self.canvas).content_revision(9),
+        );
+        context.gpu_canvas(
+            7,
+            Rect::new(Point::new(40.0, 6.0), Size::new(30.0, 20.0)),
+            GpuCanvasSpec::new(self.canvas).content_revision(10),
+        );
+    }
+}
+
+#[test]
+fn custom_paint_gpu_canvases_share_retained_object_and_keep_local_slots() {
+    let canvas = GpuCanvasId::fresh();
+    let element = Element::custom(CanvasTile { canvas })
+        .width(argui_ui::length(80.0))
+        .height(argui_ui::length(40.0))
+        .paint_opacity(0.5)
+        .radius(argui_ui::CornerRadii::all(5.0));
+    let mut ui = UiTree::new(element);
+    let object = ui.node_ids()[0];
+    let output = LayoutEngine::new()
+        .compute(&mut ui, &mut TextEngine::new(), Size::new(100.0, 60.0))
+        .unwrap();
+    let canvases = output
+        .display_list
+        .commands()
+        .iter()
+        .filter_map(|command| match command {
+            DisplayCommand::GpuCanvas(canvas) => Some(canvas),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(canvases.len(), 2);
+    assert_eq!([canvases[0].slot, canvases[1].slot], [2, 7]);
+    assert_eq!(canvases[0].object.value, object.get());
+    assert_eq!(canvases[1].object, canvases[0].object);
+    assert_eq!(canvases[0].bounds.origin, Point::new(4.0, 6.0));
+    assert_eq!(canvases[0].opacity, 0.5);
+    assert_eq!(canvases[0].radii, argui_ui::CornerRadii::all(5.0));
 }
 #[test]
 fn custom_measurement_paint_invalidation_and_state_lifetime() {

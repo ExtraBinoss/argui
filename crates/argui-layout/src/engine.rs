@@ -217,6 +217,7 @@ fn build_node(
     let id = match element.kind {
         ElementKind::Text { .. }
         | ElementKind::TextEditor { .. }
+        | ElementKind::GpuCanvas(_)
         | ElementKind::Image { .. }
         | ElementKind::Vector { .. } => tree.new_leaf_with_context(style, index)?,
         ElementKind::Custom(_) | ElementKind::Container => {

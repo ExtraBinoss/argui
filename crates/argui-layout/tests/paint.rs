@@ -4,12 +4,12 @@ mod effects;
 #[path = "paint/geometry.rs"]
 mod geometry;
 use argui_layout::LayoutEngine;
-use argui_paint::{Border, Color, DisplayCommand, ImageFit, LayerStyle, VectorId};
+use argui_paint::{Border, Color, DisplayCommand, GpuCanvasId, ImageFit, LayerStyle, VectorId};
 use argui_text::TextEngine;
 use argui_ui::{
-    Axes, CornerRadii, CursorIcon, Element, HitTestStyle, ImageId, Interaction, Overflow,
-    PointerEvents, StylePatch, Transform2D, TransformOrigin, UiTree, UserSelect, VisualState,
-    length, property,
+    Axes, CornerRadii, CursorIcon, Element, FocusPolicy, GpuCanvasSpec, HitTestStyle, ImageId,
+    Interaction, Overflow, PointerEvents, Role, Semantics, StylePatch, Transform2D,
+    TransformOrigin, UiTree, UserSelect, VisualState, length, property,
 };
 
 const NOTO_SANS: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
@@ -20,6 +20,69 @@ fn text_engine() -> TextEngine {
 
 fn effect() -> LayerStyle {
     LayerStyle::new(Default::default()).opacity(0.8)
+}
+
+#[test]
+fn gpu_canvas_lowers_with_retained_identity_and_normal_visual_geometry() {
+    let id = GpuCanvasId::fresh();
+    let canvas = Element::gpu_canvas(
+        GpuCanvasSpec::new(id)
+            .content_revision(8)
+            .resolution_scale(1.5)
+            .sampling(argui_ui::ImageSampling::Nearest),
+    )
+    .width(length(80.0))
+    .height(length(40.0))
+    .paint_opacity(0.6)
+    .radius(CornerRadii::all(7.0))
+    .transform(Transform2D::IDENTITY.translate(9.0, 11.0));
+    let mut ui = UiTree::new(
+        Element::container([canvas])
+            .width(length(120.0))
+            .height(length(80.0))
+            .overflow(Axes {
+                x: Overflow::Hidden,
+                y: Overflow::Hidden,
+            }),
+    );
+    let retained = ui.node_ids()[1];
+    let output = LayoutEngine::new()
+        .compute(&mut ui, &mut text_engine(), Size::new(120.0, 80.0))
+        .unwrap();
+    let DisplayCommand::GpuCanvas(canvas) = &output.display_list.commands()[0] else {
+        panic!("GPU canvas element must lower to a canvas command");
+    };
+    assert_eq!(canvas.canvas, id);
+    assert_eq!(canvas.object.value, retained.get());
+    assert_eq!(canvas.slot, 0);
+    assert_eq!(canvas.content_revision, 8);
+    assert_eq!(canvas.resolution_scale, 1.5);
+    assert_eq!(canvas.opacity, 0.6);
+    assert_eq!(canvas.radii, CornerRadii::all(7.0));
+    assert_eq!(canvas.clips.regions().len(), 2);
+    assert_eq!(output.display_list.gpu_canvas_count(), 1);
+}
+
+#[test]
+fn gpu_canvas_is_an_opaque_focusable_hit_target_without_executing_gpu_code() {
+    let element = Element::gpu_canvas(GpuCanvasSpec::new(GpuCanvasId::fresh()))
+        .width(length(90.0))
+        .height(length(45.0))
+        .interaction(Interaction::default().focus_policy(FocusPolicy::TabStop))
+        .semantics(Semantics::new(Role::Image).label("Data viewport"));
+    let mut ui = UiTree::new(element);
+    let output = LayoutEngine::new()
+        .compute(&mut ui, &mut text_engine(), Size::new(120.0, 80.0))
+        .unwrap();
+
+    assert_eq!(output.hit_regions.len(), 1);
+    assert_eq!(output.hit_regions[0].focus_policy, FocusPolicy::TabStop);
+    assert!(output.hit_regions[0].contains(Point::new(30.0, 20.0)));
+    let semantics = ui.semantic_tree(&output.semantic_bounds, 1.0);
+    assert_eq!(
+        semantics.nodes[0].semantics.label.as_deref(),
+        Some("Data viewport")
+    );
 }
 
 #[test]

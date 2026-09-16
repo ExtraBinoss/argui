@@ -253,6 +253,7 @@ impl SurfaceRenderer {
         let text_offset = self.text.target_offset(&self.queue, region);
         let image_offset = self.image.target_offset(&self.queue, region);
         let vector_offset = self.vector.target_offset(&self.queue, region);
+        let canvas_offset = self.gpu_canvas.target_offset(&self.queue, region);
         let attachment = Some(RenderPassColorAttachment {
             view: self.offscreen.view(target.texture),
             depth_slice: None,
@@ -302,6 +303,10 @@ impl SurfaceRenderer {
                     batch.instances.clone(),
                     image_offset,
                 ),
+                DrawKind::GpuCanvas(index) => {
+                    self.gpu_canvas
+                        .draw(&mut pass, index, batch.instances.clone(), canvas_offset)
+                }
                 DrawKind::Vector => {
                     self.vector
                         .draw(&mut pass, batch.instances.clone(), vector_offset);

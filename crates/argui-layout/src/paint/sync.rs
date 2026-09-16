@@ -57,6 +57,7 @@ pub(super) fn text_colors(elements: &[&Element], ui: &UiTree, output: &mut Layou
                 }
             }
             ElementKind::Custom(_)
+            | ElementKind::GpuCanvas(_)
             | ElementKind::Container
             | ElementKind::Image { .. }
             | ElementKind::Vector { .. } => {

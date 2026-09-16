@@ -262,6 +262,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "argui-example-gpu-canvas"
+version = "0.1.0"
+dependencies = [
+ "argui",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "argui-i18n"
 version = "0.2.1"
 dependencies = [

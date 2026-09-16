@@ -108,3 +108,16 @@ crossfade or transform animation between assets.
 
 `RenderProfile::vector_atlas` reports entries, hits, rasterizations, and
 allocated bytes. DevTools records the same values in GPU traces.
+
+## GPU canvases
+
+`Element::gpu_canvas` composes application-authored WGPU output as a retained
+offscreen texture. It participates in normal display order, transforms, clips,
+rounded corners, opacity and effects while Argui continues to own the device,
+submission, surface and presentation. An explicit content revision prevents
+unchanged or paused canvases from rerunning their callback.
+
+Use it for bounded editor, visualization, map, game or scientific viewports,
+not for text and controls that ordinary Argui primitives already render and
+make accessible. Registration, memory, alpha, capability, diagnostics and
+native/WebAssembly contracts are in the [GPU canvas guide](gpu-canvas.md).
