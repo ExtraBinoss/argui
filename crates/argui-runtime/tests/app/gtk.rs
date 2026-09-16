@@ -73,12 +73,13 @@ pub fn keys() -> Vec<(gtk::gdk::keys::Key, argui_core::Key)> {
     keys
 }
 pub fn send() {
-    use gtk::{gdk, prelude::*};
+    use gtk::{gdk, glib::translate::ToGlibPtr, prelude::*};
     let window = gtk::Window::list_toplevels()
         .into_iter()
         .filter_map(|widget| widget.downcast::<gtk::Window>().ok())
         .find(|window| window.title().as_deref() == Some("Argui updated lifecycle check"))
         .expect("the lifecycle window is mounted");
+    let native_window = window.window().expect("the lifecycle window is realized");
     send_pointer(&window);
     for (key, _) in keys() {
         for (kind, signal) in [
@@ -86,6 +87,7 @@ pub fn send() {
             (gdk::EventType::KeyRelease, "key-release-event"),
         ] {
             let mut event = gdk::Event::new(kind).downcast::<gdk::EventKey>().unwrap();
+            event.as_mut().window = native_window.to_glib_full();
             event.as_mut().keyval = *key;
             event.as_mut().send_event = 1;
             window.emit_by_name::<bool>(signal, &[&*event]);
@@ -105,10 +107,12 @@ fn buttons() -> [(u32, argui_core::PointerButton, u16); 5] {
 }
 
 fn send_pointer(window: &gtk::Window) {
-    use gtk::{gdk, prelude::*};
+    use gtk::{gdk, glib::translate::ToGlibPtr, prelude::*};
+    let native_window = window.window().expect("the lifecycle window is realized");
     let mut motion = gdk::Event::new(gdk::EventType::MotionNotify)
         .downcast::<gdk::EventMotion>()
         .unwrap();
+    motion.as_mut().window = native_window.to_glib_full();
     motion.as_mut().send_event = 1;
     motion.as_mut().time = 100;
     motion.set_device(window.display().default_seat().unwrap().pointer().as_ref());
@@ -121,6 +125,7 @@ fn send_pointer(window: &gtk::Window) {
             let mut event = gdk::Event::new(kind)
                 .downcast::<gdk::EventButton>()
                 .unwrap();
+            event.as_mut().window = native_window.to_glib_full();
             event.as_mut().button = button;
             event.as_mut().time = button;
             event.as_mut().send_event = 1;
@@ -130,6 +135,7 @@ fn send_pointer(window: &gtk::Window) {
     let mut event = gdk::Event::new(gdk::EventType::Scroll)
         .downcast::<gdk::EventScroll>()
         .unwrap();
+    event.as_mut().window = native_window.to_glib_full();
     event.as_mut().direction = gdk::ffi::GDK_SCROLL_SMOOTH;
     event.as_mut().delta_x = 2.0;
     event.as_mut().delta_y = -3.0;
