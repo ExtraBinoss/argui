@@ -212,10 +212,14 @@ class ReleasePolicyTests(unittest.TestCase):
             (package_directory / 'stale-registry').write_text('old archive')
             metadata = json.dumps({'target_directory': directory})
             with patch.object(release, 'workspace', return_value=('0.1.0', names)), \
-                    patch.object(release, 'run', side_effect=[metadata, None]) as run:
+                    patch.object(release, 'run', side_effect=[metadata, None, None]) as run:
                 release.package_archives()
             self.assertFalse(package_directory.exists())
         self.assertEqual(run.call_args_list[1].args, (
+            'cargo', 'clean', '--locked', '--profile', 'dev',
+            '--package', 'argui-core', '--package', 'argui-render', '--package', 'argui',
+        ))
+        self.assertEqual(run.call_args_list[2].args, (
             'cargo', 'package', '--locked', '--all-features', '--allow-dirty',
             '--package', 'argui-core', '--package', 'argui-render', '--package', 'argui',
         ))
