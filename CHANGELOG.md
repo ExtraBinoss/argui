@@ -32,6 +32,9 @@ that do not use them.
   toolbar and inspector around custom WGPU compute and render passes, pan/zoom,
   pause/resume, keyboard alternatives, overlays, an effect layer, resize/HiDPI,
   bounded particles and in-app simulated failure recovery.
+- Published a release-built WebAssembly version of the GPU Canvas Lab on the
+  website's App Examples page, with build/copy validation and a responsive
+  compact layout for narrow viewports.
 - Added inherited text-selection highlight styling with solid or gradient fills,
   per-corner radii and an interactive Widget Gallery page.
 - Added default-on Windows renderer fallback from DirectX 12 DirectComposition
@@ -45,6 +48,9 @@ that do not use them.
 
 ### Fixed
 
+- Kept embedded GPU canvases renderable beneath the website loading overlay so
+  Chromium can initialize WebGPU and emit its ready signal instead of stalling
+  a hidden iframe.
 - Prevented Web canvases from taking focus and moving an embedding page while
   they load; full-page apps can opt in through `WindowConfig::focus_on_launch`.
 - Kept Winit's AppKit content view attached when enabling the macOS desktop
@@ -58,6 +64,9 @@ that do not use them.
 
 ### Changed
 
+- Made vertical canvas dragging follow the content by default, added an
+  in-app natural/inverted direction toggle, aligned keyboard panning with the
+  selected direction and smoothed wheel/pinch zoom interaction.
 - Advanced strict DevTools GPU-trace JSON to `argui-gpu-trace-v4` so exported
   frames include GPU-canvas cache, byte, render, hit, failure and CPU-encode
   metrics; older strict trace versions remain rejected on import.
