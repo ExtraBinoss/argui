@@ -84,12 +84,32 @@ try {
     const canvas = await page.$('[role="img"][aria-label="Interactive GPU particle canvas"]');
     const rect = await canvas.boundingBox();
     assert.ok(rect && rect.width > 400 && rect.height > 300, 'Canvas viewport is visible');
+    const waitForPanY = direction => page.waitForFunction(
+        expected => [...document.querySelectorAll('[aria-label]')]
+            .map(element => element.getAttribute('aria-label')?.match(/^(-?\d+), (-?\d+)$/))
+            .some(match => match && Math.sign(Number.parseInt(match[2], 10)) === expected),
+        {},
+        direction,
+    );
+    const dragUp = async () => {
+        await page.mouse.move(rect.x + rect.width * 0.55, rect.y + rect.height * 0.55);
+        await page.mouse.down();
+        await page.mouse.move(rect.x + rect.width * 0.68, rect.y + rect.height * 0.44, { steps: 8 });
+        await page.mouse.up();
+    };
 
     await capture('initial');
+    await dragUp();
+    await waitForPanY(1);
+    await click('Drag Y: natural');
+    await click('Reset view');
+    await page.waitForFunction(() => [...document.querySelectorAll('[aria-label]')]
+        .map(element => element.getAttribute('aria-label'))
+        .some(label => label === '0, 0'));
+    await dragUp();
+    await waitForPanY(-1);
+    await click('Drag Y: inverted');
     await page.mouse.move(rect.x + rect.width * 0.55, rect.y + rect.height * 0.55);
-    await page.mouse.down();
-    await page.mouse.move(rect.x + rect.width * 0.68, rect.y + rect.height * 0.44, { steps: 8 });
-    await page.mouse.up();
     await page.mouse.wheel({ deltaY: -240 });
     await page.waitForFunction(() => [...document.querySelectorAll('[aria-label]')]
         .map(element => element.getAttribute('aria-label'))

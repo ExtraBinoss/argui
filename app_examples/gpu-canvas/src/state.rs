@@ -14,6 +14,7 @@ pub struct LabState {
     revision: u64,
     paused: bool,
     force_error: bool,
+    natural_vertical_drag: bool,
 }
 
 impl Default for LabState {
@@ -28,6 +29,7 @@ impl Default for LabState {
             revision: 1,
             paused: false,
             force_error: false,
+            natural_vertical_drag: true,
         }
     }
 }
@@ -75,6 +77,12 @@ impl LabState {
         self.force_error
     }
 
+    /// Returns whether vertical pointer drags move the scene with the pointer.
+    #[must_use]
+    pub const fn natural_vertical_drag(&self) -> bool {
+        self.natural_vertical_drag
+    }
+
     /// Moves the camera destination by logical-pixel deltas.
     pub fn pan_by(&mut self, x: f32, y: f32) {
         if x.is_finite() && y.is_finite() {
@@ -112,6 +120,12 @@ impl LabState {
         self.force_error
     }
 
+    /// Toggles vertical drag direction and returns whether natural mode is active.
+    pub fn toggle_vertical_drag(&mut self) -> bool {
+        self.natural_vertical_drag = !self.natural_vertical_drag;
+        self.natural_vertical_drag
+    }
+
     /// Returns whether the camera is still moving toward a requested view.
     #[must_use]
     pub fn view_is_settling(&self) -> bool {
@@ -130,12 +144,7 @@ impl LabState {
         let blend = 1.0 - (-14.0 * seconds).exp();
         let mut changed = false;
         for axis in 0..2 {
-            changed |= smooth_value(
-                &mut self.pan[axis],
-                self.target_pan[axis],
-                blend,
-                0.01,
-            );
+            changed |= smooth_value(&mut self.pan[axis], self.target_pan[axis], blend, 0.01);
         }
         changed |= smooth_value(&mut self.zoom, self.target_zoom, blend, 0.0005);
         if !self.paused {

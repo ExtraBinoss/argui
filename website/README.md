@@ -15,9 +15,10 @@ pnpm dev
 ```
 
 `gallery:build` needs `wasm-pack` and the `wasm32-unknown-unknown` Rust target.
-It builds the real gallery, the AI harness and the exact-source documentation examples, and
-at most six Cargo jobs and six WebAssembly optimization workers. If `web/widgets/pkg` is already built, use
-`pnpm gallery:copy` instead. The generated binaries are ignored by Git.
+It builds the real gallery, the AI harness, the GPU Canvas Lab and the exact-source
+documentation examples, using at most six Cargo jobs and six WebAssembly optimization
+workers. If the packages under `web/` are already built, use `pnpm gallery:copy` instead.
+The generated binaries are ignored by Git.
 The rest of the website can be developed without building WASM.
 
 Component previews start automatically after hydration and open their matching

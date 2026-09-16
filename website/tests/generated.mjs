@@ -53,10 +53,12 @@ const sitemap = await readFile(resolve(output, 'sitemap.xml'), 'utf8')
 assert.equal((sitemap.match(/<loc>/g) ?? []).length, origin ? routes.length : 0)
 assert.ok(!sitemap.includes('/gallery/'))
 assert.ok(!sitemap.includes('/examples/ai-harness/'))
+assert.ok(!sitemap.includes('/examples/gpu-canvas/'))
 assert.ok(!sitemap.includes('/examples/docs/'))
 const robots = await readFile(resolve(output, 'robots.txt'), 'utf8')
 assert.ok(robots.includes(`Disallow: ${base}gallery/`))
 assert.ok(robots.includes(`Disallow: ${base}examples/ai-harness/`))
+assert.ok(robots.includes(`Disallow: ${base}examples/gpu-canvas/`))
 assert.ok(robots.includes(`Disallow: ${base}examples/docs/`))
 assert.equal(robots.includes('Sitemap:'), Boolean(origin))
 for (const asset of [
@@ -67,6 +69,8 @@ for (const asset of [
   'gallery/pkg/argui_widget_gallery_bg.wasm',
   'examples/ai-harness/index.html',
   'examples/ai-harness/pkg/argui_example_ai_harness_bg.wasm',
+  'examples/gpu-canvas/index.html',
+  'examples/gpu-canvas/pkg/argui_example_gpu_canvas_bg.wasm',
   'examples/docs/index.html',
   'examples/docs/pkg/argui_example_docs_bg.wasm',
   'gallery-preview.webp',

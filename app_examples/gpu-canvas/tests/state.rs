@@ -48,6 +48,10 @@ fn zoom_reset_and_error_controls_are_bounded_and_explicit() {
 #[test]
 fn paused_scene_still_settles_camera_motion() {
     let mut state = LabState::default();
+    assert!(state.natural_vertical_drag());
+    assert!(!state.toggle_vertical_drag());
+    assert!(!state.natural_vertical_drag());
+    assert!(state.toggle_vertical_drag());
     assert!(state.toggle_paused());
     state.pan_by(40.0, -12.0);
     state.zoom_by(1.8);

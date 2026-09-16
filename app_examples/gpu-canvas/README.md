@@ -47,5 +47,7 @@ python3 -m http.server --directory app_examples/gpu-canvas/web 8000
 
 Open `http://localhost:8000` in a WebGPU-capable browser. Drag or use arrow keys
 to pan; use the wheel, pinch, or `+`/`-` to zoom; press `0` to reset and Space to
-pause/resume. “Test recovery” exercises the visible placeholder and runtime
-diagnostic path; “Recover canvas” advances the revision and retries.
+pause/resume. Vertical dragging follows the pointer by default; “Drag Y” switches
+between natural and inverted modes. “Test recovery” exercises the visible
+placeholder and runtime diagnostic path; “Recover canvas” advances the revision
+and retries.

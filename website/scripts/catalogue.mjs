@@ -37,12 +37,6 @@ const extraWidgets = [
     null,
   ],
   [
-    'text-selection',
-    'Text selection',
-    'Selection surfaces and contextual actions for retained text.',
-    'Typography & selection',
-  ],
-  [
     'tree-view',
     'Tree view',
     'Hierarchical navigation with virtualized rows and keyboard actions.',

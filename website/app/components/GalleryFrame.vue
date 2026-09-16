@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ArrowUpRight, Box, LoaderCircle, Play, RotateCw, Square, TriangleAlert } from '@lucide/vue'
 import WebGpuHelp from './WebGpuHelp.vue'
-const props = defineProps<{ component?: string | null; app?: 'ai-harness' }>()
+const props = defineProps<{ component?: string | null; app?: 'ai-harness' | 'gpu-canvas' }>()
 const emit = defineEmits<{ pageChange: [label: string] }>()
 const asset = usePublicAsset()
 const { t } = useI18n()
@@ -16,10 +16,23 @@ const issue = ref<{
   os?: string
   mobile?: boolean
 } | null>(null)
-const isApp = computed(() => props.app === 'ai-harness')
-const title = computed(() => (isApp.value ? t('appExamples.harnessTitle') : 'Argui Widget Gallery'))
+const isApp = computed(() => Boolean(props.app))
+const title = computed(() => {
+  if (props.app === 'ai-harness') return t('appExamples.harnessTitle')
+  if (props.app === 'gpu-canvas') return t('appExamples.gpuTitle')
+  return 'Argui Widget Gallery'
+})
+const frameTitle = computed(() => {
+  if (props.app === 'ai-harness') return t('appExamples.harnessLabel')
+  if (props.app === 'gpu-canvas') return t('appExamples.gpuLabel')
+  return t('gallery.label')
+})
+const appLaunchLabel = computed(() =>
+  props.app === 'gpu-canvas' ? t('appExamples.gpuLaunch') : t('appExamples.harnessLaunch'),
+)
 const url = computed(() => {
-  if (isApp.value) return asset('examples/ai-harness/index.html')
+  if (props.app === 'ai-harness') return asset('examples/ai-harness/index.html')
+  if (props.app === 'gpu-canvas') return asset('examples/gpu-canvas/index.html')
   return `${asset('gallery/index.html')}${props.component ? `?component=${encodeURIComponent(props.component)}` : ''}`
 })
 let timer: ReturnType<typeof setTimeout> | undefined
@@ -92,8 +105,7 @@ watch([() => props.component, () => props.app], launch)
         :key="attempt"
         ref="frame"
         :src="url"
-        :title="isApp ? t('appExamples.label') : t('gallery.label')"
-        :style="{ visibility: state === 'ready' ? 'visible' : 'hidden' }"
+        :title="frameTitle"
         @error="state = 'error'"
       />
       <div
@@ -108,7 +120,7 @@ watch([() => props.component, () => props.app], launch)
             <Play :size="15" />
             {{
               isApp
-                ? t('appExamples.launch')
+                ? appLaunchLabel
                 : component
                   ? t('gallery.launchComponent', { name: component })
                   : t('gallery.launch')

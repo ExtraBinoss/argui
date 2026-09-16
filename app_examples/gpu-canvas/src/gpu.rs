@@ -109,10 +109,10 @@ impl GpuCanvasFactory for LabCanvasFactory {
             context.device_generation(),
             context.limits().max_texture_dimension_2d
         ));
-        Ok(Box::new(LabCanvasRenderer::new(
-            context,
-            Arc::clone(&self.shared),
-        )))
+        let renderer = LabCanvasRenderer::new(context, Arc::clone(&self.shared));
+        #[cfg(target_arch = "wasm32")]
+        crate::renderer_state("ready");
+        Ok(Box::new(renderer))
     }
 }
 

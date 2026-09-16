@@ -659,11 +659,11 @@
   {
     "slug": "text-selection",
     "name": "Text selection",
-    "description": "Selection surfaces and contextual actions for retained text.",
+    "description": "Selection policies, rounded highlights, gradients and animated fills.",
     "source": "crates/argui-widgets/src/text_selection.rs",
     "feature": "text-selection",
     "category": "Components",
-    "gallery": "Typography & selection"
+    "gallery": "Text selection"
   },
   {
     "slug": "toast",
