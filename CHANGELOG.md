@@ -48,6 +48,9 @@ that do not use them.
 
 ### Fixed
 
+- Rebuilt the temporary crates.io validation registry for every archive check,
+  preventing cached same-version crates from masking coordinated workspace
+  changes or breaking dependent archive verification.
 - Kept embedded GPU canvases renderable beneath the website loading overlay so
   Chromium can initialize WebGPU and emit its ready signal instead of stalling
   a hidden iframe.
