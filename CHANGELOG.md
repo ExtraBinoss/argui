@@ -51,6 +51,8 @@ that do not use them.
 - Cleared workspace crate artifacts and the temporary crates.io registry before
   archive checks, preventing same-version caches from masking coordinated
   workspace changes and breaking dependent archive verification.
+- Used an operating-system lock for coverage runs so a cached lock file from a
+  cancelled CI job cannot block the next quality check.
 - Kept embedded GPU canvases renderable beneath the website loading overlay so
   Chromium can initialize WebGPU and emit its ready signal instead of stalling
   a hidden iframe.
