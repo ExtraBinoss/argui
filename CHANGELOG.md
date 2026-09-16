@@ -35,7 +35,11 @@ that do not use them.
   palette while keeping `shadcn` as a compatible alias.
 - Added an interactive documentation site whose lessons display and run their
   exact Rust source as dedicated WebAssembly examples, including a complete
-  light/dark, accent and token override configurator.
+  light/dark, accent and token override configurator, plus side-by-side solid
+  and backdrop-blurred popover surfaces in the overlays lesson.
+- Added dedicated Technicalities and Platforms documentation categories that
+  explain retained versus immediate UI, Argui's scope, the audited target
+  support matrix, and a clearly labelled Android/iOS capability roadmap.
 
 ### Fixed
 

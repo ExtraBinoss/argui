@@ -81,6 +81,11 @@ pub fn launch_example(example: &str) -> Result<(), Box<dyn std::error::Error>> {
         "tasks" => launch("Tasks", examples::tasks::Example::default()),
         "data" => launch("Data", examples::data::Example::default()),
         "overlays" => launch("Overlays", examples::overlays::Example::default()),
+        "platform-support" => launch("Platform support", examples::platform_support::Example),
+        "platform-roadmap" => launch(
+            "Platform roadmap",
+            examples::platform_roadmap::Example::default(),
+        ),
         "animation" => launch("Animation", examples::animation::Example::default()),
         "i18n" => launch("Internationalization", examples::i18n::Example::default()),
         "mental-model" => launch("Mental model", examples::mental_model::Example),

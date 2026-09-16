@@ -17,6 +17,7 @@ argui = { workspace = true, features = [
     "tasks",
     "widget-button",
     "widget-dialog",
+    "widget-popover",
 ] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]

@@ -67,6 +67,22 @@ usePageSeo(
         </li>
       </ul>
       <CodeBlock v-if="section.code" :filename="section.code.filename" :code="section.code.code" />
+      <div v-if="section.table" class="docs-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th v-for="header in section.table.headers" :key="header" scope="col">
+                {{ header }}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(row, rowIndex) in section.table.rows" :key="rowIndex">
+              <td v-for="(cell, cellIndex) in row" :key="cellIndex">{{ cell }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
       <aside v-if="section.note" class="docs-note">
         <strong>Good to know</strong>
         <p>{{ section.note }}</p>

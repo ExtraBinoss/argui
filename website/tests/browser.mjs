@@ -48,6 +48,16 @@ try {
       `Horizontal overflow: ${name}`,
     )
   }
+  const screenshotViewport = async (name) => {
+    await pause(500)
+    const image = await page.screenshot({ path: resolve(output, `${name}.png`) })
+    assert.ok(image.length > 15000, `Blank capture: ${name}`)
+    assert.equal(
+      await page.evaluate(() => document.documentElement.scrollWidth > innerWidth),
+      false,
+      `Horizontal overflow: ${name}`,
+    )
+  }
 
   if (process.env.UPDATE_ASSETS === '1') {
     await page.setViewport({ width: 1120, height: 700 })
@@ -132,7 +142,13 @@ try {
 
   await page.goto(`${origin}/docs`, { waitUntil: 'networkidle0' })
   assert.equal(await page.$$('.docs-path li').then((items) => items.length), 4)
-  assert.equal(await page.$$('.docs-card-grid a').then((items) => items.length), 13)
+  assert.equal(await page.$$('.docs-card-grid a').then((items) => items.length), 15)
+  assert.deepEqual(
+    await page.$$eval('.docs-category-heading h2', (headings) =>
+      headings.map((heading) => heading.textContent.trim()),
+    ),
+    ['Essentials', 'Advanced', 'Technicalities', 'Platforms'],
+  )
   await page.type('.docs-home-search input', 'custom element')
   assert.match(
     await page.$eval('.docs-search-results', (element) => element.textContent),
@@ -171,6 +187,44 @@ try {
   await themeFrame.$eval('button[aria-label="Override tokens"]', (element) => element.click())
   await themeFrame.waitForSelector('button[aria-label="Reset tokens"]')
   await screenshot('docs-theme-configurator')
+
+  await page.goto(`${origin}/docs/advanced/overlays`, { waitUntil: 'networkidle0' })
+  await page.$eval('.docs-live-example', (element) =>
+    element.scrollIntoView({ block: 'center', behavior: 'instant' }),
+  )
+  await page.waitForSelector('.docs-live-example .status-dot.live', { timeout: 90_000 })
+  await page.$eval('.docs-live-example iframe', (element) =>
+    element.scrollIntoView({ block: 'center', behavior: 'instant' }),
+  )
+  const overlayFrame = await (await page.$('.docs-live-example iframe')).contentFrame()
+  await overlayFrame.waitForSelector('button[aria-label="Solid popover"]')
+  await overlayFrame.$eval('button[aria-label="Solid popover"]', (element) => element.click())
+  await overlayFrame.waitForSelector('button[aria-label="Close solid popover"]')
+  await screenshotViewport('docs-overlay-solid')
+  await overlayFrame.$eval('button[aria-label="Close solid popover"]', (element) => element.click())
+  await overlayFrame.$eval('button[aria-label="Blurred popover"]', (element) => element.click())
+  await overlayFrame.waitForSelector('button[aria-label="Close blurred popover"]')
+  await screenshotViewport('docs-overlay-blurred')
+
+  await page.goto(`${origin}/docs/platforms/roadmap`, { waitUntil: 'networkidle0' })
+  assert.match(await page.$eval('.docs-table-wrap', (element) => element.textContent), /Shipping/)
+  assert.match(
+    await page.$eval('.docs-table-wrap', (element) => element.textContent),
+    /Planned · High/,
+  )
+  assert.equal(await page.$$('.docs-table-wrap tbody tr').then((items) => items.length), 33)
+  await screenshot('docs-platform-roadmap')
+  await page.$eval('.docs-live-example iframe', (element) =>
+    element.scrollIntoView({ block: 'center', behavior: 'instant' }),
+  )
+  await page.waitForSelector('.docs-live-example .status-dot.live', { timeout: 90_000 })
+  const roadmapFrame = await (await page.$('.docs-live-example iframe')).contentFrame()
+  await roadmapFrame.waitForSelector('button[aria-label="Show the full planned roadmap"]')
+  await roadmapFrame.$eval('button[aria-label="Show the full planned roadmap"]', (element) =>
+    element.click(),
+  )
+  await roadmapFrame.waitForSelector('button[aria-label="Show shipping only"]')
+  await screenshotViewport('docs-platform-roadmap-live')
 
   await page.goto(`${origin}/components/`, { waitUntil: 'networkidle0' })
   assert.equal(

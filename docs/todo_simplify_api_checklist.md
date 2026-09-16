@@ -141,9 +141,9 @@ the protected branch.
   96.01% lines, 95.52% functions, 95.42% regions, and 89.36% branches; every
   measured crate met the 85% gate.
 - Targeted API verification passed 838 tests; the headless harness passed 18
-  tests and all 10 interactive documentation examples passed independently.
+  tests and all 12 interactive documentation examples passed independently.
 - Android and iOS cross-checks, the complete native and Wasm example workspaces,
-  all 24 staged crates.io archives, and 107 generated website routes passed.
+  all 24 staged crates.io archives, and 109 generated website routes passed.
 - The hidden-display browser suite passed its desktop and mobile flows, themes,
   search, routing, copy, live Wasm interaction, fallback, 404, and hydration checks.
 - The private Wayland capture was 1600×1200 and 643,396 bytes with visible

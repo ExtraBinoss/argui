@@ -2,18 +2,20 @@ import { docExampleSources } from './doc-example-sources.generated'
 
 export type DocCode = { filename: string; code: string }
 export type DocExample = { id: string; path: string; source: string }
+export type DocTable = { headers: string[]; rows: string[][] }
 export type DocSection = {
   id: string
   title: string
   paragraphs: string[]
   bullets?: string[]
   code?: DocCode
+  table?: DocTable
   note?: string
 }
 
 export type DocGuide = {
   slug: string
-  category: 'Start here' | 'Essentials' | 'Advanced' | 'Architecture'
+  category: 'Start here' | 'Essentials' | 'Advanced' | 'Technicalities' | 'Platforms'
   level: 'Beginner' | 'Intermediate' | 'Advanced'
   minutes: number
   title: string
@@ -648,7 +650,7 @@ export const docs: DocGuide[] = [
     description:
       'Build focus-safe overlay surfaces and optionally host them outside the native window bounds.',
     example: example('overlays', 'overlays'),
-    demoTitle: 'A modal dialog with focus management',
+    demoTitle: 'Solid and blurred popovers with a modal dialog',
     sources: [
       'docs/widgets/overlays.md',
       'docs/platform/native-popovers.md',
@@ -660,6 +662,13 @@ export const docs: DocGuide[] = [
         title: 'Mount overlays as retained UI',
         paragraphs: [
           'Dialogs, popovers, tooltips, menus, sheets, and drawers keep their open state in the model. Their elements participate in normal layout, paint, event dispatch, and semantics.',
+        ],
+      },
+      {
+        id: 'surfaces',
+        title: 'Choose an opaque or blurred surface',
+        paragraphs: [
+          'A solid popover disables backdrop blur and uses an opaque panel. A frosted popover combines translucent paint with backdrop blur so the content behind it remains visible without competing with the foreground text.',
         ],
       },
       {
@@ -724,7 +733,7 @@ export const docs: DocGuide[] = [
   },
   {
     slug: 'architecture/mental-model',
-    category: 'Architecture',
+    category: 'Technicalities',
     level: 'Intermediate',
     minutes: 18,
     title: 'The Argui mental model',
@@ -734,6 +743,57 @@ export const docs: DocGuide[] = [
     demoTitle: 'The retained pipeline in a running application',
     sources: ['docs/architecture.md', 'docs/runtime/models.md', 'docs/rendering/primitives.md'],
     sections: [
+      {
+        id: 'what-it-is',
+        title: 'What Argui is',
+        paragraphs: [
+          'Argui is a retained, GPU-rendered application UI runtime written in Rust. Application models own state and render cloneable Element descriptions; the runtime reconciles those descriptions into persistent presentation nodes, computes layout, paints through WGPU, and publishes an accessibility tree.',
+          'It is designed for product interfaces that need explicit state, native input, deterministic updates, portable rendering, and opt-in platform integrations without a browser DOM as the primary runtime.',
+        ],
+      },
+      {
+        id: 'retained-vs-immediate',
+        title: 'Retained versus immediate mode',
+        paragraphs: [
+          'Immediate-mode UI code describes and processes the interface afresh for each frame. Argui view code also returns a description, but the runtime retains the resulting nodes between renders and reconciles only what changed. Stable identity therefore matters: it preserves focus, scrolling, handlers, accessibility state, animation, and cached layout or paint work.',
+        ],
+        table: {
+          headers: ['Concern', 'Immediate mode', 'Argui retained mode'],
+          rows: [
+            [
+              'Lifetime',
+              'Recreated as part of each frame',
+              'Nodes persist until reconciliation removes them',
+            ],
+            ['State', 'Often coupled to the frame loop', 'Owned explicitly by application models'],
+            ['Updates', 'Frame-oriented', 'Classified as semantic, paint, scroll, or layout work'],
+            [
+              'Identity',
+              'Usually positional or call-site based',
+              'Stable keys and model-owned handler slots',
+            ],
+            [
+              'Idle cost',
+              'Commonly redraws continuously',
+              'Requests frames only when work is pending',
+            ],
+          ],
+        },
+      },
+      {
+        id: 'what-it-is-not',
+        title: 'What Argui is not',
+        paragraphs: [
+          'Argui does not hide application state inside widgets, generate a web DOM for native targets, or make every operating-system service portable by pretending platform differences do not exist.',
+        ],
+        bullets: [
+          'Not an immediate-mode frame loop: view descriptions reconcile into retained nodes.',
+          'Not an HTML/CSS wrapper: layout, text, paint, interaction, and semantics are Rust-native layers.',
+          'Not a business-state store: widgets remain controlled by the owning application model.',
+          'Not a universal native-services abstraction: shared contracts stay small and platform adapters remain explicit.',
+          'Not a replacement for device and renderer testing: headless tests cover behavior, while browser and native checks cover integration.',
+        ],
+      },
       {
         id: 'pipeline',
         title: 'Data flows through explicit layers',
@@ -763,7 +823,7 @@ export const docs: DocGuide[] = [
   },
   {
     slug: 'architecture/project-structure',
-    category: 'Architecture',
+    category: 'Technicalities',
     level: 'Intermediate',
     minutes: 13,
     title: 'Structure a real application',
@@ -806,7 +866,7 @@ export const docs: DocGuide[] = [
   },
   {
     slug: 'architecture/clean-code',
-    category: 'Architecture',
+    category: 'Technicalities',
     level: 'Advanced',
     minutes: 16,
     title: 'Write clean Argui code',
@@ -852,7 +912,7 @@ export const docs: DocGuide[] = [
   },
   {
     slug: 'architecture/custom-elements',
-    category: 'Architecture',
+    category: 'Technicalities',
     level: 'Advanced',
     minutes: 22,
     title: 'Create a custom element',
@@ -891,9 +951,252 @@ export const docs: DocGuide[] = [
       },
     ],
   },
+  {
+    slug: 'platforms/support',
+    category: 'Platforms',
+    level: 'Beginner',
+    minutes: 10,
+    title: 'Supported platforms',
+    description:
+      'See which targets are supported today, what CI proves, and where preview status still applies.',
+    example: example('platform-support', 'platform_support'),
+    demoTitle: 'The current support matrix rendered by Argui',
+    sources: ['README.md', 'docs/native-mobile.md', '.github/workflows/ci.yml'],
+    sections: [
+      {
+        id: 'matrix',
+        title: 'Current support matrix',
+        paragraphs: [
+          'Desktop and WebAssembly are the supported product targets. Android and iOS use the same models, widgets, layout, text, and WGPU renderer, but remain explicit preview targets until physical-device, assistive-technology, lifecycle, and owner-signing validation is complete.',
+        ],
+        table: {
+          headers: ['Target', 'Status', 'Validated today', 'Important boundary'],
+          rows: [
+            [
+              'Linux',
+              'Supported · runtime-tested',
+              'Native gallery, hidden-display interaction, WGPU, accessibility, all features',
+              'Some integrations require Wayland/GTK system packages',
+            ],
+            [
+              'Windows',
+              'Supported · CI-compiled',
+              'Complete workspace, native implementation, DirectX 12 and Vulkan fallback paths',
+              'Platform behavior still receives focused release validation',
+            ],
+            [
+              'macOS',
+              'Supported · CI-compiled',
+              'Complete workspace, AppKit integration, Metal surface, bundle-oriented updater path',
+              'Signing and notarization belong to the application owner',
+            ],
+            [
+              'WebAssembly',
+              'Supported · browser-tested',
+              'WebGPU, browser semantics, responsive live gallery, documentation examples',
+              'Requires a WebGPU-capable secure browser context',
+            ],
+            [
+              'Android',
+              'Preview',
+              'Cross-compile, debug APK, release AAB, IME, safe areas, activity progress',
+              'Physical devices, TalkBack, lifecycle breadth, and Play signing need validation',
+            ],
+            [
+              'iOS',
+              'Preview',
+              'Cross-compile, XCFramework, Simulator app, safe areas, IME, ActivityKit bridge',
+              'Physical devices, VoiceOver, provisioning, archive signing, and TestFlight need validation',
+            ],
+          ],
+        },
+      },
+      {
+        id: 'shared-core',
+        title: 'Share the core; keep native edges explicit',
+        paragraphs: [
+          'Application models, views, fonts, themes, tasks, and renderer configuration belong in a shared Rust crate. Desktop, WebAssembly, Android, and iOS launch that same application through target-specific entry points.',
+          'A platform is not considered supported merely because Rust can compile for its target triple. The matrix distinguishes runtime tests, browser tests, compile checks, packaging checks, and preview-only native shells so the claim remains auditable.',
+        ],
+      },
+      {
+        id: 'selection',
+        title: 'Select platform integrations deliberately',
+        paragraphs: [
+          'Core UI capabilities are selected by Cargo target. Native entry points and integrations such as trays, system dialogs, WebViews, native popovers, desktop backdrops, Android services, and iOS ActivityKit stay opt-in because their dependencies and lifecycle rules differ.',
+        ],
+        note: 'Preview means usable for development and cross-platform work, not a promise that every production device, store workflow, or native service has already been validated.',
+      },
+    ],
+  },
+  {
+    slug: 'platforms/roadmap',
+    category: 'Platforms',
+    level: 'Intermediate',
+    minutes: 14,
+    title: 'Native capability roadmap',
+    description:
+      'Separate mobile capabilities that ship today from explicit future Android and iOS integrations.',
+    example: example('platform-roadmap', 'platform_roadmap'),
+    demoTitle: 'A scrollable shipping-versus-planned capability list',
+    sources: [
+      'docs/native-mobile.md',
+      'crates/argui-platform/src/mobile.rs',
+      'crates/argui-platform/src/mobile/android.rs',
+      'crates/argui-platform/src/mobile/ios.rs',
+    ],
+    sections: [
+      {
+        id: 'status',
+        title: 'Shipping foundations and planned adapters',
+        paragraphs: [
+          'Shipping identifies code present in the repository now. Planned identifies direction only: it is not available API, not a release promise, and not a schedule. Priority describes the intended order when mobile integration work resumes.',
+        ],
+        table: {
+          headers: ['Capability', 'Android foundation', 'iOS foundation', 'Roadmap state'],
+          rows: [
+            [
+              'Text input / IME',
+              'InputConnection and InputMethodManager path',
+              'UIKit first-responder text input path',
+              'Shipping',
+            ],
+            [
+              'Accessibility',
+              'AccessibilityNodeInfo / provider validation',
+              'UIAccessibilityElement validation',
+              'Planned validation · Highest',
+            ],
+            [
+              'Safe areas, keyboard, system bars',
+              'WindowInsets',
+              'safeAreaInsets and keyboard lifecycle',
+              'Shipping',
+            ],
+            [
+              'Live activity progress',
+              'Foreground-service ongoing notification',
+              'ActivityKit Live Activity',
+              'Shipping',
+            ],
+            [
+              'Background activity foundation',
+              'Foreground service rules',
+              'Finite UIKit fallback and ActivityKit status',
+              'Shipping foundation; durable scheduling remains planned',
+            ],
+            ['Camera', 'Camera2', 'AVFoundation / AVCaptureSession', 'Planned · Medium'],
+            ['Clipboard', 'ClipboardManager', 'UIPasteboard', 'Planned · High'],
+            [
+              'Drag and drop',
+              'startDragAndDrop / DragEvent',
+              'UIDragInteraction / UIDropInteraction',
+              'Planned · High',
+            ],
+            [
+              'Haptics',
+              'HapticFeedbackConstants / VibrationEffect',
+              'UIFeedbackGenerator / CoreHaptics',
+              'Planned · High',
+            ],
+            [
+              'File picker',
+              'Storage Access Framework',
+              'UIDocumentPickerViewController',
+              'Planned · High',
+            ],
+            ['Photo picker', 'Android Photo Picker', 'PhotosUI', 'Planned · High'],
+            [
+              'Share sheet',
+              'ACTION_SEND / Sharesheet',
+              'UIActivityViewController',
+              'Planned · High',
+            ],
+            ['Biometrics', 'BiometricPrompt', 'LocalAuthentication', 'Planned · High'],
+            [
+              'Passkeys and credentials',
+              'Credential Manager',
+              'AuthenticationServices',
+              'Planned · High',
+            ],
+            ['Secure storage', 'Android Keystore', 'Keychain / Secure Enclave', 'Planned · High'],
+            ['Notifications', 'NotificationManager', 'UserNotifications', 'Planned · High'],
+            ['Home-screen widgets', 'App Widgets / Glance', 'WidgetKit', 'Planned · High'],
+            ['Location', 'LocationManager', 'CoreLocation', 'Planned · Medium'],
+            ['Motion and sensors', 'SensorManager', 'CoreMotion', 'Planned · Medium'],
+            ['Bluetooth LE', 'android.bluetooth', 'CoreBluetooth', 'Planned · Medium'],
+            ['NFC', 'NfcAdapter', 'CoreNFC', 'Planned · Medium'],
+            ['UWB and ranging', 'RangingManager', 'NearbyInteraction', 'Planned · High'],
+            [
+              'Audio input and output',
+              'AudioTrack / AudioRecord / AAudio',
+              'AVAudioEngine / AVAudioSession',
+              'Planned · High',
+            ],
+            [
+              'Video encode and decode',
+              'MediaCodec',
+              'VideoToolbox / AVFoundation',
+              'Planned · Medium',
+            ],
+            ['Mobile WebView', 'WebView', 'WKWebView', 'Planned · High'],
+            ['Deep links', 'Intents / App Links', 'Universal Links', 'Planned · High'],
+            ['Network status', 'ConnectivityManager', 'NWPathMonitor', 'Planned · Medium'],
+            [
+              'Gamepads',
+              'InputDevice / KeyEvent / MotionEvent',
+              'GameController',
+              'Planned · Medium',
+            ],
+            [
+              'Mouse and stylus',
+              'MotionEvent validation',
+              'Pointer / Pencil interactions',
+              'Planned validation · High',
+            ],
+            ['Store and in-app purchases', 'Play Billing', 'StoreKit', 'Planned · Medium'],
+            [
+              'Speech and text to speech',
+              'SpeechRecognizer / TextToSpeech',
+              'Speech / AVSpeechSynthesizer',
+              'Planned · Later',
+            ],
+            [
+              'Contacts and calendar',
+              'ContactsContract / Calendar Provider',
+              'Contacts / EventKit',
+              'Planned · Later',
+            ],
+            ['Health', 'Health Connect', 'HealthKit', 'Planned · Later'],
+          ],
+        },
+      },
+      {
+        id: 'contract',
+        title: 'Portable contracts stay smaller than native APIs',
+        paragraphs: [
+          'A future shared API should represent portable application intent and data, then map that contract independently to Android and iOS. Platform permissions, manifests, entitlements, store policy, native presentation, and lifecycle remain the responsibility of each adapter and application shell.',
+          'This avoids false parity. Camera capture, credentials, health data, background execution, and store purchases have materially different authorization and lifecycle rules even when a Rust-facing operation can share a name.',
+        ],
+      },
+      {
+        id: 'delivery',
+        title: 'When a Planned row becomes Shipping',
+        paragraphs: [
+          'A capability moves to Shipping only after the shared contract, both relevant native adapters, error and permission behavior, documentation, focused tests, packaging changes, and device validation are present. One-platform prototypes remain explicitly partial.',
+        ],
+      },
+    ],
+  },
 ]
 
-export const docCategories = ['Start here', 'Essentials', 'Advanced', 'Architecture'] as const
+export const docCategories = [
+  'Start here',
+  'Essentials',
+  'Advanced',
+  'Technicalities',
+  'Platforms',
+] as const
 export const docsByCategory = docCategories.map((category) => ({
   category,
   guides: docs.filter((guide) => guide.category === category),

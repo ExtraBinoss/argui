@@ -67,14 +67,41 @@ fn i18n_controls_update_the_controlled_locale_and_count() {
 }
 
 #[test]
-fn dialog_opens_and_closes_through_its_typed_state_handler() {
+fn overlays_open_and_close_through_their_typed_state_handlers() {
     let mut app = TestApp::new(examples::overlays::Example::default());
+    app.click("solid-popover").unwrap();
+    app.assert_text("An opaque panel with backdrop blur disabled.");
+    app.click("close-solid").unwrap();
+    app.assert_no_text("An opaque panel with backdrop blur disabled.");
+
+    app.click("blurred-popover").unwrap();
+    app.assert_text("Translucent paint keeps the colored backdrop visible through the blur.");
+    app.click("close-blurred").unwrap();
+    app.assert_no_text("Translucent paint keeps the colored backdrop visible through the blur.");
+
     app.click("example-dialog::trigger").unwrap();
     app.assert_text("A real modal portal");
     app.get_by_role(Role::Button, "Close dialog")
         .click()
         .unwrap();
     app.assert_no_text("A real modal portal");
+}
+
+#[test]
+fn platform_support_distinguishes_supported_and_preview_targets() {
+    let app = TestApp::new(examples::platform_support::Example);
+    app.assert_text("Supported · runtime-tested");
+    app.assert_text("Supported · browser-tested");
+    app.assert_text("Preview");
+}
+
+#[test]
+fn platform_roadmap_reveals_capabilities_marked_as_planned() {
+    let mut app = TestApp::new(examples::platform_roadmap::Example::default());
+    app.assert_no_text("Health integrations");
+    app.click("toggle-roadmap").unwrap();
+    app.assert_text("Health integrations");
+    app.assert_text("Later");
 }
 
 #[test]
