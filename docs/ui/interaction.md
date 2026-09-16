@@ -55,6 +55,12 @@ Pinch and rotation can run together. Velocity uses a bounded recent history.
 Touch can drive scroll containers while the same contacts remain available to
 configured gestures.
 
+Document text selection follows browser-style mouse behavior. Pressing directly
+on selectable text anchors at that glyph; starting a drag in non-interactive
+whitespace anchors at the nearest selectable text and extends across the
+document. Interactive hit regions such as buttons, editors, resize handles, and
+custom gestures keep ownership of the pointer and never trigger this fallback.
+
 ## Keyboard and focus
 
 Physical key transitions reach the focused node with modifiers and repeat state.

@@ -13,6 +13,12 @@ use argui::{
 
 const NOTO_SANS: &[u8] =
     include_bytes!("../../../crates/argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
+const NOTO_ARABIC: &[u8] =
+    include_bytes!("../../../crates/argui-web-demo/assets/fonts/NotoSansArabic.ttf");
+const NOTO_HEBREW: &[u8] =
+    include_bytes!("../../../crates/argui-web-demo/assets/fonts/NotoSansHebrew.ttf");
+const NOTO_EMOJI: &[u8] =
+    include_bytes!("../../../crates/argui-web-demo/assets/fonts/NotoEmoji-Regular.ttf");
 
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen::prelude::wasm_bindgen(
@@ -63,7 +69,12 @@ pub fn start() -> Result<(), wasm_bindgen::JsValue> {
 }
 
 pub fn launch() -> Result<(), Box<dyn std::error::Error>> {
-    let text = TextEngine::from_embedded_fonts([NOTO_SANS], "Noto Sans", "Noto Sans", "Noto Sans");
+    let text = TextEngine::from_embedded_fonts(
+        [NOTO_SANS, NOTO_ARABIC, NOTO_HEBREW, NOTO_EMOJI],
+        "Noto Sans",
+        "Noto Sans",
+        "Noto Sans",
+    );
     run_application_with_text_engine(
         ApplicationConfig::new(
             ApplicationIdentity::development("Argui AI Harness"),

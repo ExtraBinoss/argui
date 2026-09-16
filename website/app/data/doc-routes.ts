@@ -5,6 +5,7 @@ export const docRoutes = [
   'start/counter',
   'essentials/layout',
   'essentials/events',
+  'essentials/interaction-api',
   'essentials/styling',
   'essentials/accessibility',
   'essentials/animation',

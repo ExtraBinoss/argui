@@ -9,6 +9,7 @@ pub mod events;
 pub mod first_window;
 pub mod i18n;
 pub mod installation;
+pub mod interaction_api;
 pub mod layout;
 pub mod mental_model;
 pub mod overlays;

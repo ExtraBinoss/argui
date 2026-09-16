@@ -111,6 +111,16 @@ const listener = `let save = Button::new("save", "Save", theme.button())
     }))
     .build();`
 
+const interactionCallbacks = `Slider::new("volume", "Preview volume", self.volume, range)
+    .on_change(cx.value_callback(|app, value| {
+        app.volume = value;
+    }))
+    .on_commit(cx.value_callback(|app, value| {
+        app.volume = value;
+        app.saved_volume = value;
+    }))
+    .build(theme)`
+
 const tasks = `fn search(&mut self, cx: &mut Context<Self>) -> Result<(), TaskError> {
     let query = self.query.clone();
     cx.spawn_latest(&mut self.task, load_results(query), |model, result, cx| {
@@ -125,44 +135,67 @@ const tasks = `fn search(&mut self, cx: &mut Context<Self>) -> Result<(), TaskEr
 }`
 
 const custom = `#[derive(Debug)]
-struct Ruler {
-    zoom: f32,
-    color: Color,
+struct EditorTimeline {
+    background: Color,
+    track: Color,
+    seconds: f32,
+    grid: Color,
+    playhead: Color,
+    clips: [Clip; 5],
 }
 
-impl CustomElement for Ruler {
+impl CustomElement for EditorTimeline {
     type State = Vec<f32>;
 
     fn create_state(&self) -> Self::State { Vec::new() }
-    fn layout_revision(&self) -> u64 { u64::from(self.zoom.to_bits()) }
+    fn layout_revision(&self) -> u64 { u64::from(self.seconds.to_bits()) }
     fn paint_revision(&self) -> u64 {
-        u64::from(u32::from_le_bytes(self.color.to_srgba8()))
+        u64::from(u32::from_le_bytes(self.playhead.to_srgba8()))
     }
 
     fn layout(
         &self,
         _state: &mut Self::State,
-        _cx: &mut dyn CustomLayoutContext,
+        cx: &mut dyn CustomLayoutContext,
     ) -> Result<CustomMeasurement, String> {
+        for (index, clip) in self.clips.into_iter().enumerate() {
+            cx.place_child(
+                TIME_LABELS + TRACK_LABELS + index,
+                Rect::new(
+                    Point::new(
+                        GUTTER + clip.start * PIXELS_PER_SECOND,
+                        RULER_HEIGHT + clip.track as f32 * TRACK_HEIGHT + 6.0,
+                    ),
+                    Size::new(clip.duration * PIXELS_PER_SECOND, TRACK_HEIGHT - 12.0),
+                ),
+            )?;
+        }
         Ok(CustomMeasurement {
-            size: Size::new(800.0 * self.zoom, 80.0),
+            size: Size::new(764.0, 206.0),
             baseline: None,
         })
     }
 
-    fn prepare(&self, ticks: &mut Self::State, size: Size) {
-        let spacing = 40.0 * self.zoom;
+    fn prepare(&self, ticks: &mut Self::State, _size: Size) {
         ticks.clear();
-        ticks.extend((0..(size.width / spacing).ceil() as usize).map(|tick| tick as f32 * spacing));
+        ticks.extend((0..=20).map(|second| 76.0 + second as f32 * 32.0));
     }
 
     fn paint(&self, ticks: &mut Self::State, cx: &mut CustomPaintContext<'_>) {
-        for &x in ticks.iter() {
+        for (second, x) in ticks.iter().copied().enumerate() {
             cx.quad(
-                Rect::new(Point::new(x, 0.0), Size::new(1.0, cx.bounds.size.height)),
-                QuadStyle::solid(self.color),
+                Rect::new(
+                    Point::new(x, if second.is_multiple_of(5) { 24.0 } else { 32.0 }),
+                    Size::new(1.0, 174.0),
+                ),
+                QuadStyle::solid(self.grid),
             );
         }
+        let playhead_x = GUTTER + self.seconds * PIXELS_PER_SECOND;
+        cx.quad(
+            Rect::new(Point::new(playhead_x - 1.0, 10.0), Size::new(2.0, 196.0)),
+            QuadStyle::solid(self.playhead),
+        );
     }
 }`
 
@@ -414,6 +447,92 @@ export const docs: DocGuide[] = [
         title: 'Preserve platform defaults deliberately',
         paragraphs: [
           'Use prevent_default only when the application replaces the normal behavior. stop_propagation ends bubbling; stop_immediate_propagation also stops later listeners on the current node. Passive listeners cannot prevent defaults.',
+        ],
+      },
+    ],
+  },
+  {
+    slug: 'essentials/interaction-api',
+    category: 'Essentials',
+    level: 'Beginner',
+    minutes: 10,
+    title: 'Choose the right interaction API',
+    description:
+      'Match clicks, edits, continuous changes, commits, selections, and overlay state to the smallest typed callback.',
+    example: example('interaction-api', 'interaction_api'),
+    demoTitle: 'See continuous change, final commit, and click callbacks separately',
+    sources: [
+      'docs/widgets/interaction-api.md',
+      'docs/simplified-api.md',
+      'crates/argui-runtime/src/model/handler.rs',
+      'crates/argui-widgets/src/slider.rs',
+    ],
+    sections: [
+      {
+        id: 'decision-table',
+        title: 'Pick the callback that names the intent',
+        paragraphs: [
+          'Start with the widget method that describes the domain event. Direct handlers already unify pointer, touch, keyboard, and accessibility activation, so application code should not decode UiEvent for ordinary controls.',
+        ],
+        table: {
+          headers: ['Widget API', 'Use it for', 'Context helper'],
+          rows: [
+            ['on_click', 'A button or one-shot action was activated', 'callback'],
+            ['on_input', 'Each new controlled text value while editing', 'input_callback'],
+            [
+              'on_submit',
+              'A text value or form was deliberately submitted',
+              'submit_callback or callback',
+            ],
+            [
+              'on_change',
+              'Each next checkbox, switch, collection, color, or range value',
+              'value_callback',
+            ],
+            [
+              'on_commit',
+              'The final value after a continuous slider interaction',
+              'value_callback',
+            ],
+            [
+              'on_select',
+              'A stable option, index, date, row, page, or node was chosen',
+              'value_callback',
+            ],
+            [
+              'on_open_change',
+              'An overlay or disclosure requests open or closed state',
+              'value_callback',
+            ],
+            [
+              'on_action / on_activate / on_navigate',
+              'A stable command, item, cell, or destination was invoked',
+              'value_callback',
+            ],
+            [
+              'listener + Element.on',
+              'Capture, bubbling, delegation, shortcuts, or default prevention is intentional',
+              'listener or event_handler',
+            ],
+          ],
+        },
+        note: 'on_commit is not a replacement for on_change. Use on_change for live visual feedback and on_commit for expensive or durable work after the interaction ends.',
+      },
+      {
+        id: 'controlled-values',
+        title: 'Keep values controlled',
+        paragraphs: [
+          'A handler reports intent or a next value. Store it in the model and pass it back on the next render. callback, value_callback, input_callback, and submit_callback invalidate the current presentation automatically.',
+          'The live example uses on_change to update its preview and on_commit to record the final slider value. The button uses on_click because saving is a discrete action.',
+        ],
+        code: { filename: 'src/view.rs', code: interactionCallbacks },
+      },
+      {
+        id: 'advanced-handlers',
+        title: 'Reach for the event layer only when you need it',
+        paragraphs: [
+          'Use event_handler or value_event_handler when a callback must inspect the routed event, stop propagation, request focus, or issue commands. These advanced forms do not invalidate automatically, so call cx.notify() after changing visible state.',
+          'Use Context::listener with Element::on for deliberate ancestor delegation, capture, passive or one-shot listeners, application-wide shortcuts, and custom controls. Typed widget callbacks remain additive and still travel through the same retained event pipeline.',
         ],
       },
     ],
@@ -919,7 +1038,7 @@ export const docs: DocGuide[] = [
     description:
       'Own custom measurement and paint while keeping children, interaction, semantics, and invalidation in Argui.',
     example: example('custom-elements', 'custom_elements'),
-    demoTitle: 'A draggable custom timeline rendered in WebAssembly',
+    demoTitle: 'A draggable video-editor timeline rendered in WebAssembly',
     sources: [
       'docs/ui/custom-elements.md',
       'crates/argui-widget-gallery/src/pages/timeline.rs',
@@ -939,7 +1058,7 @@ export const docs: DocGuide[] = [
         paragraphs: [
           'State persists beside the retained node. layout_revision changes when measurement or child placement changes. paint_revision changes when prepared or recorded pixels change. Accurate revisions let Argui skip work safely.',
         ],
-        code: { filename: 'src/ruler.rs', code: custom },
+        code: { filename: 'src/editor_timeline.rs', code: custom },
       },
       {
         id: 'integrate',
@@ -947,7 +1066,7 @@ export const docs: DocGuide[] = [
         paragraphs: [
           'Attach gestures and listeners through normal Element interaction, and attach Semantics for assistive technology. Paint does not implicitly define hit geometry. Use a stable key and explicit HitTestStyle when the custom shape needs non-rectangular or enlarged targets.',
         ],
-        note: 'The complete timeline source places retained button children, caches ruler ticks, supports pan and keyboard edits, and shares clip data across two mounted views.',
+        note: 'The exact example below places retained track labels and clips inside the custom layout, clips every label to its block, lets clips move in time or between tracks, and gives the playhead a forgiving draggable hit target plus keyboard and accessibility controls.',
       },
     ],
   },

@@ -1,5 +1,5 @@
 use argui::{
-    accessibility::Role,
+    accessibility::{Role, SemanticAction, SemanticValue},
     core::{Key, Point, ScrollDelta},
 };
 use argui_example_docs::examples;
@@ -30,8 +30,43 @@ fn animation_example_toggles_locally() {
 #[test]
 fn clean_code_example_completes_one_item() {
     let mut app = TestApp::new(examples::clean_code::Example::default());
+    app.assert_text("Pending");
     app.click("next").unwrap();
-    app.assert_text("✓  State is explicit");
+    app.assert_text("Done");
+    app.assert_text("Complete next (2 of 3)");
+    app.click("next").unwrap();
+    app.click("next").unwrap();
+    app.assert_text("All complete");
+}
+
+#[test]
+fn custom_timeline_scrubs_with_buttons_and_a_real_pan_gesture() {
+    let mut app = TestApp::new(examples::custom_elements::Example::default());
+    app.assert_text("00:07.5 / 00:20.0");
+    let clip = app.bounds("editor-clip-2").unwrap();
+    let clip_start = Point::new(
+        clip.origin.x + clip.size.width * 0.5,
+        clip.origin.y + clip.size.height * 0.5,
+    );
+    app.drag(
+        clip_start,
+        Point::new(clip_start.x, clip_start.y + 58.0),
+        4,
+    )
+    .unwrap();
+    app.assert_text("Selected: B-roll · 14.0s · track 2");
+
+    app.click("playhead-forward").unwrap();
+    app.assert_text("00:08.5 / 00:20.0");
+
+    let bounds = app.bounds("editor-playhead").unwrap();
+    let start = Point::new(
+        bounds.origin.x + bounds.size.width * 0.5,
+        bounds.origin.y + bounds.size.height * 0.5,
+    );
+    app.drag(start, Point::new(start.x + 64.0, start.y), 3)
+        .unwrap();
+    app.assert_text("00:10.5 / 00:20.0");
 }
 
 #[test]
@@ -39,6 +74,26 @@ fn event_delegation_example_remains_explicit() {
     let mut app = TestApp::new(examples::events::Example::default());
     app.click("save").unwrap();
     app.assert_text("Received Click(save)");
+}
+
+#[test]
+fn interaction_api_distinguishes_change_commit_and_click() {
+    let mut app = TestApp::new(examples::interaction_api::Example::default());
+    app.accessibility_action(
+        "volume",
+        SemanticAction::SetValue,
+        Some(SemanticValue::Number {
+            value: 64.0,
+            minimum: None,
+            maximum: None,
+            step: None,
+        }),
+    )
+    .unwrap();
+    app.assert_text("Live value: 64%");
+    app.assert_text("Committed value: 64%");
+    app.click("save").unwrap();
+    app.assert_text("Saved 1 time(s)");
 }
 
 #[test]

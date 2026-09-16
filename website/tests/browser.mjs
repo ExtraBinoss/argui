@@ -142,7 +142,7 @@ try {
 
   await page.goto(`${origin}/docs`, { waitUntil: 'networkidle0' })
   assert.equal(await page.$$('.docs-path li').then((items) => items.length), 4)
-  assert.equal(await page.$$('.docs-card-grid a').then((items) => items.length), 15)
+  assert.equal(await page.$$('.docs-card-grid a').then((items) => items.length), 16)
   assert.deepEqual(
     await page.$$eval('.docs-category-heading h2', (headings) =>
       headings.map((heading) => heading.textContent.trim()),
@@ -188,6 +188,135 @@ try {
   await themeFrame.waitForSelector('button[aria-label="Reset tokens"]')
   await screenshot('docs-theme-configurator')
 
+  await page.goto(`${origin}/docs/essentials/interaction-api`, { waitUntil: 'networkidle0' })
+  assert.equal(await page.$$('.docs-table-wrap tbody tr').then((items) => items.length), 9)
+  assert.match(
+    await page.$eval('.docs-table-wrap', (element) => element.textContent),
+    /on_change[\s\S]*on_commit/,
+  )
+  await page.$eval('.docs-live-example iframe', (element) =>
+    element.scrollIntoView({ block: 'center', behavior: 'instant' }),
+  )
+  await page.waitForSelector('.docs-live-example .status-dot.live', { timeout: 90_000 })
+  const interactionFrame = await (await page.$('.docs-live-example iframe')).contentFrame()
+  await interactionFrame.waitForSelector('button[aria-label="Save preset"]')
+  await interactionFrame.$eval('button[aria-label="Save preset"]', (element) => element.click())
+  await interactionFrame.waitForSelector('[aria-label="Saved 1 time(s)"]')
+  await screenshotViewport('docs-interaction-api')
+
+  await page.goto(`${origin}/docs/architecture/clean-code`, { waitUntil: 'networkidle0' })
+  await page.$eval('.docs-live-example iframe', (element) =>
+    element.scrollIntoView({ block: 'center', behavior: 'instant' }),
+  )
+  await page.waitForSelector('.docs-live-example .status-dot.live', { timeout: 90_000 })
+  const cleanFrame = await (await page.$('.docs-live-example iframe')).contentFrame()
+  for (const label of [
+    'Complete next (1 of 3)',
+    'Complete next (2 of 3)',
+    'Complete next (3 of 3)',
+  ]) {
+    await cleanFrame.waitForSelector(`button[aria-label="${label}"]`)
+    await cleanFrame.$eval(`button[aria-label="${label}"]`, (element) => element.click())
+  }
+  await cleanFrame.waitForSelector('button[aria-label="All complete"]')
+  assert.equal(
+    await cleanFrame.$eval(
+      'button[aria-label="All complete"]',
+      (element) => element.disabled || element.getAttribute('aria-disabled') === 'true',
+    ),
+    true,
+  )
+  await screenshotViewport('docs-clean-code-complete')
+
+  await page.goto(`${origin}/docs/architecture/custom-elements`, { waitUntil: 'networkidle0' })
+  await page.$eval('.docs-live-example iframe', (element) =>
+    element.scrollIntoView({ block: 'center', behavior: 'instant' }),
+  )
+  await page.waitForSelector('.docs-live-example .status-dot.live', { timeout: 90_000 })
+  const timelineFrame = await (await page.$('.docs-live-example iframe')).contentFrame()
+  await timelineFrame.waitForSelector('button[aria-label="Forward 1s"]')
+  await timelineFrame.$eval('button[aria-label="Forward 1s"]', (element) => element.click())
+  await timelineFrame.waitForFunction(
+    () =>
+      Number(
+        document
+          .querySelector('[role="slider"][aria-label="Timeline playhead"]')
+          ?.getAttribute('aria-valuenow'),
+      ) === 8.5,
+  )
+  const playhead = await timelineFrame.$('[role="slider"][aria-label="Timeline playhead"]')
+  const playheadBounds = await playhead.boundingBox()
+  await page.mouse.move(
+    playheadBounds.x + playheadBounds.width / 2,
+    playheadBounds.y + playheadBounds.height / 2,
+  )
+  await page.mouse.down()
+  await page.mouse.move(
+    playheadBounds.x + playheadBounds.width / 2 + 64,
+    playheadBounds.y + playheadBounds.height / 2,
+    { steps: 3 },
+  )
+  await page.mouse.up()
+  await timelineFrame.waitForFunction(
+    () =>
+      Number(
+        document
+          .querySelector('[role="slider"][aria-label="Timeline playhead"]')
+          ?.getAttribute('aria-valuenow'),
+      ) === 10.5,
+  )
+  const bRollClip = await timelineFrame.$('[aria-label^="B-roll clip"]')
+  const bRollBounds = await bRollClip.boundingBox()
+  await page.mouse.move(
+    bRollBounds.x + bRollBounds.width / 2,
+    bRollBounds.y + bRollBounds.height / 2,
+  )
+  await page.mouse.down()
+  await page.mouse.move(
+    bRollBounds.x + bRollBounds.width / 2,
+    bRollBounds.y + bRollBounds.height / 2 + 58,
+    { steps: 4 },
+  )
+  await page.mouse.up()
+  await timelineFrame.waitForSelector('[aria-label="B-roll clip at 14.0s on track 2"]')
+
+  await page.evaluate(() => navigator.clipboard.writeText(''))
+  const timelineCanvas = await timelineFrame.$('canvas')
+  const timelineBounds = await timelineCanvas.boundingBox()
+  await page.mouse.move(
+    timelineBounds.x + timelineBounds.width - 20,
+    timelineBounds.y + timelineBounds.height - 20,
+  )
+  await page.mouse.down()
+  await page.mouse.move(timelineBounds.x + 20, timelineBounds.y + 20, { steps: 6 })
+  await page.mouse.up()
+  await timelineCanvas.focus()
+  await page.keyboard.down('Control')
+  await page.keyboard.press('c')
+  await page.keyboard.up('Control')
+  await page.waitForFunction(async () => (await navigator.clipboard.readText()).length > 0)
+  assert.match(
+    await page.evaluate(() => navigator.clipboard.readText()),
+    /Product launch edit|VIDEO 1|Music bed/,
+  )
+  await screenshotViewport('docs-text-selection-from-whitespace')
+  await page.mouse.click(
+    timelineBounds.x + timelineBounds.width - 20,
+    timelineBounds.y + timelineBounds.height - 20,
+  )
+  await screenshotViewport('docs-video-editor-timeline')
+
+  await page.goto(`${origin}/docs/advanced/i18n`, { waitUntil: 'networkidle0' })
+  await page.$eval('.docs-live-example iframe', (element) =>
+    element.scrollIntoView({ block: 'center', behavior: 'instant' }),
+  )
+  await page.waitForSelector('.docs-live-example .status-dot.live', { timeout: 90_000 })
+  const i18nFrame = await (await page.$('.docs-live-example iframe')).contentFrame()
+  await i18nFrame.waitForSelector('button[aria-label="العربية"]')
+  await i18nFrame.$eval('button[aria-label="العربية"]', (element) => element.click())
+  await i18nFrame.waitForSelector('[aria-label^="مرحبًا"]')
+  await screenshotViewport('docs-i18n-arabic')
+
   await page.goto(`${origin}/docs/advanced/overlays`, { waitUntil: 'networkidle0' })
   await page.$eval('.docs-live-example', (element) =>
     element.scrollIntoView({ block: 'center', behavior: 'instant' }),
@@ -225,6 +354,66 @@ try {
   )
   await roadmapFrame.waitForSelector('button[aria-label="Show shipping only"]')
   await screenshotViewport('docs-platform-roadmap-live')
+
+  await page.goto(`${origin}/components/drag-drop`, { waitUntil: 'networkidle0' })
+  await page.waitForSelector('.status-dot.live', { timeout: 90_000 })
+  const dragFrame = await (await page.$('iframe')).contentFrame()
+  const openingCard = await dragFrame.waitForSelector('[aria-label="Opening titles at position 1"]')
+  const openingBounds = await openingCard.boundingBox()
+  await page.mouse.move(
+    openingBounds.x + openingBounds.width / 2,
+    openingBounds.y + openingBounds.height / 2,
+  )
+  await page.mouse.down()
+  await page.mouse.move(
+    openingBounds.x + openingBounds.width / 2 + 36,
+    openingBounds.y + openingBounds.height / 2 + 190,
+    { steps: 5 },
+  )
+  await dragFrame.waitForSelector('[aria-label="Opening titles at position 3"]')
+  await dragFrame.waitForSelector('[aria-label="HOLDING"]')
+  await screenshotViewport('component-drag-drop-held')
+  await page.mouse.up()
+  await dragFrame.waitForFunction(() => !document.querySelector('[aria-label="HOLDING"]'))
+  await screenshotViewport('component-drag-drop-reordered')
+
+  await page.goto(`${origin}/components/split-pane`, { waitUntil: 'networkidle0' })
+  assert.match(
+    await page.$eval('.source-link', (element) => element.textContent),
+    /argui-widget-gallery\/src\/pages\/split_pane.rs/,
+  )
+  await page.waitForSelector('.status-dot.live', { timeout: 90_000 })
+  const splitFrame = await (await page.$('iframe')).contentFrame()
+  const explorerSplit = await splitFrame.waitForSelector(
+    '[role="separator"][aria-label="Resize file explorer"]',
+  )
+  const initialSplitSize = Number(
+    await explorerSplit.evaluate((element) => element.getAttribute('aria-valuenow')),
+  )
+  const splitBounds = await explorerSplit.boundingBox()
+  await page.mouse.move(
+    splitBounds.x + splitBounds.width / 2,
+    splitBounds.y + splitBounds.height / 2,
+  )
+  await page.mouse.down()
+  await page.mouse.move(
+    splitBounds.x + splitBounds.width / 2 + 80,
+    splitBounds.y + splitBounds.height / 2,
+    { steps: 4 },
+  )
+  await page.mouse.up()
+  await splitFrame.waitForFunction(
+    (initial) =>
+      Number(
+        document
+          .querySelector('[role="separator"][aria-label="Resize file explorer"]')
+          ?.getAttribute('aria-valuenow'),
+      ) >=
+      initial + 70,
+    {},
+    initialSplitSize,
+  )
+  await screenshotViewport('component-split-pane-resized')
 
   await page.goto(`${origin}/components/`, { waitUntil: 'networkidle0' })
   assert.equal(

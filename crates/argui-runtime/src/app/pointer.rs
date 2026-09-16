@@ -46,6 +46,7 @@ impl Application {
         self.flush_scrollbar_drag(window, event_loop);
         let point = self.pointer.unwrap_or_default();
         self.pointer = None;
+        self.mouse_selection_origin = None;
         self.refresh_cursor(window);
         if let Some(ui) = &mut self.ui_tree {
             let mut update = ui.scrollbar_pointer_moved(None, &[]);
@@ -99,9 +100,19 @@ impl Application {
         let static_placement = self
             .pointer
             .and_then(|point| Self::static_text_at(layout, point));
+        let hit_target = self.pointer.and_then(|point| {
+            layout
+                .hit_regions
+                .iter()
+                .rev()
+                .find(|region| region.contains(point))
+                .map(|region| region.node)
+        });
         let Some(ui) = &mut self.ui_tree else {
             return;
         };
+        let hit_blocks_selection = hit_target
+            .is_some_and(|target| ui.resolved_user_select(target) == argui_ui::UserSelect::None);
         if state == ButtonState::Pressed
             && let Some(point) = self.pointer
             && let Some(region) =
@@ -171,6 +182,11 @@ impl Application {
             argui_ui::SelectionGranularity::Character
         };
         if state == ButtonState::Pressed {
+            self.mouse_selection_origin = (!default_prevented
+                && placement.is_none()
+                && static_placement.is_none()
+                && !hit_blocks_selection)
+                .then_some(point);
             if !default_prevented
                 && let (Some(ui), Some(layout)) = (&mut self.ui_tree, &self.ui_layout)
             {
@@ -195,6 +211,7 @@ impl Application {
             };
             self.apply_ui_update(selection_update, window, event_loop);
         } else {
+            self.mouse_selection_origin = None;
             let update = self.ui_tree.as_mut().map_or_else(
                 InteractionUpdate::default,
                 UiTree::release_document_selection,
@@ -308,6 +325,20 @@ impl Application {
             && let Some(position) = Self::closest_static_text(layout, point)
         {
             let update = ui.drag_document_selection(position);
+            self.apply_ui_update(update, window, event_loop);
+            return;
+        }
+        if let Some(origin) = self.mouse_selection_origin
+            && let Some(anchor) = Self::closest_static_text(layout, origin)
+            && let Some(focus) = Self::closest_static_text(layout, point)
+        {
+            self.mouse_selection_origin = None;
+            let mut update = ui.begin_document_selection(
+                anchor,
+                false,
+                argui_ui::SelectionGranularity::Character,
+            );
+            update.merge(ui.drag_document_selection(focus));
             self.apply_ui_update(update, window, event_loop);
             return;
         }

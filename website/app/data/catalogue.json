@@ -270,6 +270,15 @@
     "gallery": "Direction"
   },
   {
+    "slug": "drag-drop",
+    "name": "Drag & Drop",
+    "description": "Reorder image cards live with pointer capture, velocity deformation and momentum.",
+    "source": "crates/argui-widget-gallery/src/pages/drag_drop.rs",
+    "feature": null,
+    "category": "Examples",
+    "gallery": "Drag & Drop"
+  },
+  {
     "slug": "drawer",
     "name": "Drawer",
     "description": "Drag the handle or use Close to dismiss the panel.",
@@ -622,12 +631,12 @@
   },
   {
     "slug": "split-pane",
-    "name": "Split pane",
-    "description": "Resizable panels with limits, pointer gestures and keyboard control.",
-    "source": "crates/argui-widgets/src/split_pane.rs",
+    "name": "Split Pane",
+    "description": "Resize horizontal, vertical, trailing and nested application panes.",
+    "source": "crates/argui-widget-gallery/src/pages/split_pane.rs",
     "feature": "split-pane",
     "category": "Components",
-    "gallery": null
+    "gallery": "Split Pane"
   },
   {
     "slug": "switch",

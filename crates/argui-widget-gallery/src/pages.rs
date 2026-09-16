@@ -32,6 +32,7 @@ pub(crate) mod color_picker;
 pub(crate) mod data;
 pub(crate) mod data_table;
 pub(crate) mod dates;
+pub(crate) mod drag_drop;
 pub(crate) mod editing;
 mod empty;
 pub(crate) mod file_picker;
@@ -52,6 +53,7 @@ pub(crate) mod progress;
 pub(crate) mod scroll_effects;
 mod separator;
 pub(crate) mod skeleton;
+pub(crate) mod split_pane;
 pub(crate) mod text_selection;
 pub(crate) mod timeline;
 pub(crate) mod toast;
@@ -183,6 +185,8 @@ pub(crate) fn render(
         #[cfg(any(target_os = "android", target_os = "ios"))]
         Page::MobileActivity => cx.entity(&gallery.mobile_activity),
         Page::Editing => cx.entity(&gallery.editing),
+        Page::DragDrop => cx.entity(&gallery.drag_drop),
+        Page::SplitPane => cx.entity(&gallery.split_pane),
         Page::CustomTimeline => cx.entity(&gallery.timeline),
         #[cfg(feature = "updater")]
         Page::Updater => cx.entity(

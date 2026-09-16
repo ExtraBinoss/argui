@@ -25,6 +25,8 @@ struct GalleryApplication {
 
 const NOTO_SANS: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
 const NOTO_ARABIC: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSansArabic.ttf");
+const NOTO_HEBREW: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSansHebrew.ttf");
+const NOTO_EMOJI: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoEmoji-Regular.ttf");
 const APP_ICON: &[u8] = include_bytes!("../../argui/examples/assets/astra-icon-256.png");
 
 #[cfg(target_arch = "wasm32")]
@@ -44,7 +46,7 @@ extern "C" {
 
 fn application() -> Result<GalleryApplication, Box<dyn std::error::Error>> {
     let text = TextEngine::from_embedded_fonts(
-        [NOTO_SANS, NOTO_ARABIC],
+        [NOTO_SANS, NOTO_ARABIC, NOTO_HEBREW, NOTO_EMOJI],
         "Noto Sans",
         "Noto Sans",
         "Noto Sans",

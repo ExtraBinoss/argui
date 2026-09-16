@@ -40,9 +40,33 @@ that do not use them.
 - Added dedicated Technicalities and Platforms documentation categories that
   explain retained versus immediate UI, Argui's scope, the audited target
   support matrix, and a clearly labelled Android/iOS capability roadmap.
+- Added an interaction API decision guide with a callback selection table and
+  an exact-source live example that distinguishes `on_change`, `on_commit`, and
+  `on_click`.
+- Added a Widget Gallery drag-and-drop board with live data reordering, retained
+  image cards, pointer capture, keyboard/accessibility alternatives, and
+  velocity-driven squash, stretch, shadow, and spring settling.
+- Added a working Widget Gallery split-pane showcase with horizontal, vertical,
+  trailing, and nested IDE layouts, all resizable by pointer or keyboard.
 
 ### Fixed
 
+- Replaced unsupported checklist glyphs in the clean-code documentation example
+  with explicit status labels, and made each completion step visible in the
+  button label before its final disabled state.
+- Rebuilt the custom-element lesson as a recognizable video-editor timeline
+  with labeled tracks, fitted clip text, draggable clips, time ruler, timecode,
+  and a forgiving draggable, keyboard-accessible playhead.
+- Made mouse text selection start from the nearest selectable text when a drag
+  begins in non-interactive whitespace, matching browser-style document
+  selection without stealing button, editor, or custom gesture input.
+- Embedded Arabic, Hebrew, and emoji fallback fonts in every shipped WebAssembly
+  application so localized text no longer renders as missing-glyph squares.
+- Applied coalesced split-pane gesture deltas to the latest controlled value so
+  pane sizes no longer drift when the view rerenders during a drag.
+- Coalesced drag-and-drop updates to one delivery per rendered frame, skipped
+  redundant list mutations, and replaced the expensive offscreen blur with
+  transform-locked shadow plates so fast drags remain responsive and artifact-free.
 - Made Android and iOS render edge to edge while preserving native safe areas,
   painting the active theme behind transparent system regions and matching
   Android system-icon contrast to light and dark themes.

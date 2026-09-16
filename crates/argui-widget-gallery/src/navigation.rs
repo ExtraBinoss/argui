@@ -78,6 +78,8 @@ pub enum Page {
     WebView,
     AsyncTasks,
     Editing,
+    DragDrop,
+    SplitPane,
     CustomTimeline,
     #[cfg(any(target_os = "android", target_os = "ios"))]
     MobileActivity,
@@ -87,7 +89,7 @@ pub enum Page {
 
 impl Page {
     pub const ALL: [Self;
-        77 + cfg!(feature = "updater") as usize
+        79 + cfg!(feature = "updater") as usize
             + cfg!(any(target_os = "android", target_os = "ios")) as usize] = [
         Self::Accordion,
         Self::Alert,
@@ -160,6 +162,8 @@ impl Page {
         #[cfg(any(target_os = "android", target_os = "ios"))]
         Self::MobileActivity,
         Self::CustomTimeline,
+        Self::DragDrop,
+        Self::SplitPane,
         Self::Editing,
         Self::HotReload,
         Self::I18n,
@@ -253,6 +257,8 @@ impl Page {
             | Self::WebView
             | Self::AsyncTasks
             | Self::Editing
+            | Self::DragDrop
+            | Self::SplitPane
             | Self::CustomTimeline => "Examples",
         }
     }
@@ -338,6 +344,8 @@ impl Page {
             #[cfg(any(target_os = "android", target_os = "ios"))]
             Self::MobileActivity => "Background activity",
             Self::Editing => "Editing & Password",
+            Self::DragDrop => "Drag & Drop",
+            Self::SplitPane => "Split Pane",
             Self::CustomTimeline => "Custom Timeline",
             #[cfg(feature = "updater")]
             Self::Updater => "Updater",
@@ -425,6 +433,8 @@ impl Page {
             #[cfg(any(target_os = "android", target_os = "ios"))]
             Self::MobileActivity => "mobile-activity",
             Self::Editing => "editing",
+            Self::DragDrop => "drag-drop",
+            Self::SplitPane => "split-pane",
             Self::CustomTimeline => "custom-timeline",
             #[cfg(feature = "updater")]
             Self::Updater => "updater",
@@ -546,6 +556,12 @@ impl Page {
             }
             Self::Editing => {
                 "Transactional undo/redo, Unicode, filtered fields and protected passwords."
+            }
+            Self::DragDrop => {
+                "Reorder image cards live with pointer capture, velocity deformation and momentum."
+            }
+            Self::SplitPane => {
+                "Resize horizontal, vertical, trailing and nested application panes."
             }
             #[cfg(feature = "updater")]
             Self::Updater => {

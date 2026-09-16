@@ -168,13 +168,16 @@ impl SplitHandlerValue {
         let direction = if self.trailing { -1.0 } else { 1.0 };
         let value = match kind {
             UiEventKind::Gesture(gesture) => {
-                let crate::GestureKind::Pan { total, .. } = gesture.kind else {
+                let crate::GestureKind::Pan { delta, .. } = gesture.kind else {
                     return None;
                 };
                 if gesture.phase == crate::GesturePhase::Cancelled {
                     self.current
                 } else {
-                    self.current + (if self.horizontal { total.x } else { total.y }) * direction
+                    // Controlled views can rebuild between coalesced pan samples. Applying the
+                    // per-sample delta to the latest controlled value avoids counting `total`
+                    // again every time the handler source is rebuilt.
+                    self.current + (if self.horizontal { delta.x } else { delta.y }) * direction
                 }
             }
             UiEventKind::Click(click) if click.count >= 2 => self.reset,

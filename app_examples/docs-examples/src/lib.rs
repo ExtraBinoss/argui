@@ -12,6 +12,12 @@ use argui::{
 
 const NOTO_SANS: &[u8] =
     include_bytes!("../../../crates/argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
+const NOTO_ARABIC: &[u8] =
+    include_bytes!("../../../crates/argui-web-demo/assets/fonts/NotoSansArabic.ttf");
+const NOTO_HEBREW: &[u8] =
+    include_bytes!("../../../crates/argui-web-demo/assets/fonts/NotoSansHebrew.ttf");
+const NOTO_EMOJI: &[u8] =
+    include_bytes!("../../../crates/argui-web-demo/assets/fonts/NotoEmoji-Regular.ttf");
 
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen::prelude::wasm_bindgen(
@@ -49,7 +55,12 @@ fn events(event: RuntimeEvent) {
 }
 
 fn launch<M: Render + 'static>(title: &str, model: M) -> Result<(), Box<dyn std::error::Error>> {
-    let text = TextEngine::from_embedded_fonts([NOTO_SANS], "Noto Sans", "Noto Sans", "Noto Sans");
+    let text = TextEngine::from_embedded_fonts(
+        [NOTO_SANS, NOTO_ARABIC, NOTO_HEBREW, NOTO_EMOJI],
+        "Noto Sans",
+        "Noto Sans",
+        "Noto Sans",
+    );
     run_application_with_text_engine(
         ApplicationConfig::new(
             ApplicationIdentity::development(title),
@@ -76,6 +87,10 @@ pub fn launch_example(example: &str) -> Result<(), Box<dyn std::error::Error>> {
         "counter" => launch("Counter", examples::counter::Example::default()),
         "layout" => launch("Responsive layout", examples::layout::Example::default()),
         "events" => launch("Events", examples::events::Example::default()),
+        "interaction-api" => launch(
+            "Interaction API",
+            examples::interaction_api::Example::default(),
+        ),
         "styling" => launch("Styling", examples::styling::Example::default()),
         "accessibility" => launch("Accessibility", examples::accessibility::Example::default()),
         "tasks" => launch("Tasks", examples::tasks::Example::default()),
@@ -91,7 +106,10 @@ pub fn launch_example(example: &str) -> Result<(), Box<dyn std::error::Error>> {
         "mental-model" => launch("Mental model", examples::mental_model::Example),
         "project-structure" => launch("Project structure", examples::project_structure::Example),
         "clean-code" => launch("Clean code", examples::clean_code::Example::default()),
-        "custom-elements" => launch("Custom elements", examples::custom_elements::Example),
+        "custom-elements" => launch(
+            "Custom elements",
+            examples::custom_elements::Example::default(),
+        ),
         _ => Err(format!("unknown documentation example: {example}").into()),
     }
 }

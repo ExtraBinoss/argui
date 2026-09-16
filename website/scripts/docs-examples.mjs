@@ -15,6 +15,7 @@ export const exampleFiles = [
   'first_window',
   'i18n',
   'installation',
+  'interaction_api',
   'layout',
   'mental_model',
   'overlays',
