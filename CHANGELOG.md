@@ -53,6 +53,8 @@ that do not use them.
   workspace changes and breaking dependent archive verification.
 - Used an operating-system lock for coverage runs so a cached lock file from a
   cancelled CI job cannot block the next quality check.
+- Limited individual Nextest cases to two minutes so a stalled native test is
+  reported by name instead of consuming the full CI job timeout.
 - Kept embedded GPU canvases renderable beneath the website loading overlay so
   Chromium can initialize WebGPU and emit its ready signal instead of stalling
   a hidden iframe.
