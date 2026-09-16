@@ -57,7 +57,8 @@ that do not use them.
   reported by name instead of consuming the full CI job timeout.
 - Stopped hidden or minimized GTK windows from keeping the event loop in a
   permanent redraw poll, and associated synthetic lifecycle input with its GDK
-  window so native CI can advance after minimizing an auxiliary window.
+  window. Active tasks now also receive a bounded GTK fallback wake when Tao
+  loses its proxy notification after minimizing an auxiliary window.
 - Kept embedded GPU canvases renderable beneath the website loading overlay so
   Chromium can initialize WebGPU and emit its ready signal instead of stalling
   a hidden iframe.

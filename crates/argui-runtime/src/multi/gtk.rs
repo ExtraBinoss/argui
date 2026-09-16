@@ -12,6 +12,10 @@ use tao::{
     platform::run_return::EventLoopExtRunReturn,
 };
 
+/// Maximum delay before GTK checks active tasks if Tao loses a proxy wake.
+#[cfg(feature = "tasks")]
+const TASK_WAKE_FALLBACK: std::time::Duration = std::time::Duration::from_millis(100);
+
 struct GtkLoop<'a> {
     target: &'a EventLoopWindowTarget<UserEvent>,
     exit: Cell<bool>,
@@ -74,6 +78,14 @@ pub(crate) fn launch(mut application: MultiApplication) -> Result<(), RuntimeErr
                 }
             }
             Event::MainEventsCleared => {
+                #[cfg(feature = "tasks")]
+                if application
+                    .tasks
+                    .as_ref()
+                    .is_some_and(crate::tasks::TaskRuntime::completion_pending)
+                {
+                    application.tasks_ready(&context);
+                }
                 for entry in application.windows.values_mut() {
                     entry.runtime.gtk_geometry();
                     entry.runtime.gtk_pointer_boundary(&context);
@@ -136,13 +148,24 @@ pub(crate) fn launch(mut application: MultiApplication) -> Result<(), RuntimeErr
             // iteration. Poll only while a frame is queued so animations and
             // scroll physics continue, then return to event-driven waiting.
             *control = ControlFlow::Poll;
-        } else if let Some(deadline) = application
-            .windows
-            .values()
-            .filter_map(|entry| entry.runtime.native_deadline())
-            .min()
-        {
-            *control = ControlFlow::WaitUntil(deadline);
+        } else {
+            let mut deadline = application
+                .windows
+                .values()
+                .filter_map(|entry| entry.runtime.native_deadline())
+                .min();
+            #[cfg(feature = "tasks")]
+            if application
+                .tasks
+                .as_ref()
+                .is_some_and(|tasks| tasks.pending() > 0)
+            {
+                let fallback = web_time::Instant::now() + TASK_WAKE_FALLBACK;
+                deadline = Some(deadline.map_or(fallback, |value| value.min(fallback)));
+            }
+            if let Some(deadline) = deadline {
+                *control = ControlFlow::WaitUntil(deadline);
+            }
         }
     });
     application.shutdown();
