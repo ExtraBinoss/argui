@@ -7,7 +7,9 @@ use std::sync::{
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct LabState {
     pan: [f32; 2],
+    target_pan: [f32; 2],
     zoom: f32,
+    target_zoom: f32,
     elapsed: f32,
     revision: u64,
     paused: bool,
@@ -19,7 +21,9 @@ impl Default for LabState {
     fn default() -> Self {
         Self {
             pan: [0.0, 0.0],
+            target_pan: [0.0, 0.0],
             zoom: 1.0,
+            target_zoom: 1.0,
             elapsed: 0.0,
             revision: 1,
             paused: false,
@@ -39,6 +43,12 @@ impl LabState {
     #[must_use]
     pub const fn zoom_factor(&self) -> f32 {
         self.zoom
+    }
+
+    /// Returns the destination zoom used by the smoothed camera animation.
+    #[must_use]
+    pub const fn target_zoom_factor(&self) -> f32 {
+        self.target_zoom
     }
 
     /// Returns elapsed animation time in seconds.
@@ -65,25 +75,25 @@ impl LabState {
         self.force_error
     }
 
-    /// Pans the scene by logical-pixel deltas and advances its revision.
+    /// Moves the camera destination by logical-pixel deltas.
     pub fn pan_by(&mut self, x: f32, y: f32) {
-        self.pan[0] += x;
-        self.pan[1] += y;
-        self.bump();
-    }
-
-    /// Multiplies the zoom by `factor`, clamps it to 0.2–8.0, and advances the revision.
-    pub fn zoom_by(&mut self, factor: f32) {
-        if factor.is_finite() && factor > 0.0 {
-            self.zoom = (self.zoom * factor).clamp(0.2, 8.0);
-            self.bump();
+        if x.is_finite() && y.is_finite() {
+            self.target_pan[0] += x;
+            self.target_pan[1] += y;
         }
     }
 
-    /// Restores pan, zoom and animation time while preserving pause state.
+    /// Multiplies the camera destination zoom by `factor` and clamps it to 0.2–8.0.
+    pub fn zoom_by(&mut self, factor: f32) {
+        if factor.is_finite() && factor > 0.0 {
+            self.target_zoom = (self.target_zoom * factor).clamp(0.2, 8.0);
+        }
+    }
+
+    /// Smoothly restores pan and zoom and immediately resets animation time.
     pub fn reset_view(&mut self) {
-        self.pan = [0.0, 0.0];
-        self.zoom = 1.0;
+        self.target_pan = [0.0, 0.0];
+        self.target_zoom = 1.0;
         self.elapsed = 0.0;
         self.bump();
     }
@@ -102,22 +112,60 @@ impl LabState {
         self.force_error
     }
 
-    /// Advances animation by finite non-negative `seconds` only while running.
+    /// Returns whether the camera is still moving toward a requested view.
+    #[must_use]
+    pub fn view_is_settling(&self) -> bool {
+        self.pan != self.target_pan || self.zoom != self.target_zoom
+    }
+
+    /// Advances animation and camera smoothing by finite non-negative `seconds`.
     ///
-    /// Returns whether the scene and its revision changed.
+    /// Camera motion continues while particle animation is paused. Returns whether
+    /// the visible scene and its revision changed.
     pub fn advance(&mut self, seconds: f32) -> bool {
-        if self.paused || !seconds.is_finite() || seconds < 0.0 {
+        if !seconds.is_finite() || seconds <= 0.0 {
             return false;
         }
-        self.elapsed += seconds.min(0.1);
-        self.bump();
-        true
+        let seconds = seconds.min(0.1);
+        let blend = 1.0 - (-14.0 * seconds).exp();
+        let mut changed = false;
+        for axis in 0..2 {
+            changed |= smooth_value(
+                &mut self.pan[axis],
+                self.target_pan[axis],
+                blend,
+                0.01,
+            );
+        }
+        changed |= smooth_value(&mut self.zoom, self.target_zoom, blend, 0.0005);
+        if !self.paused {
+            self.elapsed += seconds;
+            changed = true;
+        }
+        if changed {
+            self.bump();
+        }
+        changed
     }
 
     /// Advances the explicit content revision after a visible scene mutation.
     fn bump(&mut self) {
         self.revision = self.revision.wrapping_add(1);
     }
+}
+
+/// Interpolates `current` toward `target` and snaps values within `epsilon`.
+fn smooth_value(current: &mut f32, target: f32, blend: f32, epsilon: f32) -> bool {
+    let difference = target - *current;
+    if difference.abs() <= epsilon {
+        if *current == target {
+            return false;
+        }
+        *current = target;
+        return true;
+    }
+    *current += difference * blend;
+    true
 }
 
 pub(crate) struct SharedLab {

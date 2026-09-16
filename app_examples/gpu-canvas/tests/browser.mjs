@@ -90,16 +90,24 @@ try {
     await page.mouse.down();
     await page.mouse.move(rect.x + rect.width * 0.68, rect.y + rect.height * 0.44, { steps: 8 });
     await page.mouse.up();
+    await page.mouse.wheel({ deltaY: -240 });
+    await page.waitForFunction(() => [...document.querySelectorAll('[aria-label]')]
+        .map(element => element.getAttribute('aria-label'))
+        .some(label => {
+            const match = label?.match(/(\d+\.\d{2})×/);
+            return match && Number.parseFloat(match[1]) > 1.05;
+        }),
+        { timeout: 10000 });
     await click('Zoom +');
     await capture('panned-zoomed');
 
-    await click('Simulate error');
+    await click('Test recovery');
     await waitForAccessibleText('simulated failure');
     await capture('diagnostic-placeholder');
     await click('Recover canvas');
     await waitForAccessibleText('recovered');
 
-    await click('Pause');
+    await click('Pause animation');
     await new Promise(resolve => setTimeout(resolve, 400));
     const before = await page.evaluate(() => window.arguiFrameCount);
     await new Promise(resolve => setTimeout(resolve, 700));
@@ -107,7 +115,7 @@ try {
     assert.equal(after, before, 'Paused canvas requests no animation frames');
 
     await page.setViewport({ width: 980, height: 700, deviceScaleFactor: 2 });
-    await click('Resume');
+    await click('Resume animation');
     await new Promise(resolve => setTimeout(resolve, 350));
     await capture('hidpi-resized-resumed');
     assert.deepEqual(errors, []);

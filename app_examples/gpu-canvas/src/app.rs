@@ -8,9 +8,9 @@ use argui::{
     text::{TextColor, TextStyle, TextWrap},
     ui::{
         Axes, CursorIcon, Element, EventType, FocusPolicy, GestureCapture, GestureDelivery,
-        GestureKind, GesturePhase, GestureSet, GpuCanvasSpec, Interaction, JustifyContent,
-        Overflow, PanGesture, PinchGesture, Position, Role, Semantics, Sides, UiEvent, UiEventKind,
-        auto, length, percent,
+        GestureKind, GesturePhase, GestureSet, GpuCanvasSpec, HitTestStyle, Interaction, Overflow,
+        PanGesture, PinchGesture, PointerEvents, Position, Role, Semantics, Sides, UiEvent,
+        UiEventKind, auto, length, percent,
     },
     widgets::{Button, WidgetTheme, shadcn},
 };
@@ -48,9 +48,6 @@ impl GpuCanvasLab {
 
     /// Applies pointer pan and pinch gestures emitted by the canvas leaf.
     fn gesture(&mut self, event: &UiEvent, cx: &mut Context<Self>) {
-        if event.target_key() != Some("lab-canvas") {
-            return;
-        }
         let UiEventKind::Gesture(gesture) = event.kind else {
             return;
         };
@@ -71,26 +68,22 @@ impl GpuCanvasLab {
 
     /// Converts wheel movement over the canvas into bounded zoom changes.
     fn wheel(&mut self, event: &UiEvent, cx: &mut Context<Self>) {
-        if event.target_key() != Some("lab-canvas") {
-            return;
-        }
         let UiEventKind::Wheel { delta, .. } = event.kind else {
             return;
         };
-        let y = match delta {
-            ScrollDelta::Lines(point) | ScrollDelta::Pixels(point) => point.y,
+        let notches = match delta {
+            ScrollDelta::Lines(point) => point.y,
+            ScrollDelta::Pixels(point) => point.y / 100.0,
         };
+        let zoom = (notches * 0.18).clamp(-0.6, 0.6).exp();
         self.shared
-            .update(|state| state.zoom_by((-y * 0.015).exp()));
+            .update(|state| state.zoom_by(zoom));
         let _ = event.prevent_default();
         cx.notify();
     }
 
     /// Provides keyboard alternatives for every canvas navigation action.
     fn key(&mut self, event: &UiEvent, cx: &mut Context<Self>) {
-        if event.target_key() != Some("lab-canvas") {
-            return;
-        }
         let UiEventKind::KeyInput(input) = &event.kind else {
             return;
         };
@@ -124,38 +117,64 @@ impl GpuCanvasLab {
     fn toolbar(&self, theme: &WidgetTheme) -> Element {
         let state = self.shared.state();
         let button = |key, label| Button::new(key, label, theme.outline_button()).build();
-        Element::row([
-            Element::column([
-                text("GPU Canvas Lab", 22.0, theme.foreground, 700),
+        Element::column([
+            Element::row([
+                Element::column([
+                    text("GPU Canvas Lab", 24.0, theme.foreground, 750),
+                    text(
+                        "App-owned WGPU passes inside an Argui-managed frame",
+                        12.0,
+                        theme.muted_foreground,
+                        500,
+                    ),
+                ])
+                .gap(1.0)
+                .grow(1.0),
+                badge("NEW GPU CANVAS API", Color::srgb(0.2, 0.78, 1.0), theme),
+            ])
+            .width(percent(1.0))
+            .gap(12.0),
+            Element::row([
                 text(
-                    "Argui shell · custom WGPU compute + render passes",
+                    "Explore the scene",
                     11.0,
                     theme.muted_foreground,
-                    500,
+                    650,
+                )
+                .grow(1.0),
+                button("zoom-out", "Zoom −"),
+                button("zoom-in", "Zoom +"),
+                button("reset", "Reset view"),
+                button(
+                    "pause",
+                    if state.paused() {
+                        "Resume animation"
+                    } else {
+                        "Pause animation"
+                    },
+                ),
+                button(
+                    "error",
+                    if state.force_error() {
+                        "Recover canvas"
+                    } else {
+                        "Test recovery"
+                    },
                 ),
             ])
-            .gap(1.0)
-            .grow(1.0),
-            button("zoom-out", "Zoom −"),
-            button("zoom-in", "Zoom +"),
-            button("reset", "Reset"),
-            button("pause", if state.paused() { "Resume" } else { "Pause" }),
-            button(
-                "error",
-                if state.force_error() {
-                    "Recover canvas"
-                } else {
-                    "Simulate error"
-                },
-            ),
+            .width(percent(1.0))
+            .padding(Sides::length(8.0))
+            .gap(7.0)
+            .background(theme.card)
+            .border(Border::all(1.0, theme.border))
+            .radius(CornerRadii::all(10.0)),
         ])
         .width(percent(1.0))
-        .gap(8.0)
-        .justify_content(JustifyContent::SPACE_BETWEEN)
+        .gap(10.0)
     }
 
     /// Builds the clipped canvas viewport and a normal Argui overlay above it.
-    fn canvas_panel(&self, theme: &WidgetTheme) -> Element {
+    fn canvas_panel(&self, theme: &WidgetTheme, cx: &mut Context<Self>) -> Element {
         let state = self.shared.state();
         let gestures = GestureSet::EMPTY
             .pan(
@@ -188,6 +207,9 @@ impl GpuCanvasLab {
                     "Drag or use arrow keys to pan. Wheel, pinch, plus and minus change zoom. Space pauses animation and zero resets the view.",
                 ),
         )
+        .on(cx.listener(EventType::Gesture, Self::gesture))
+        .on(cx.listener(EventType::Wheel, Self::wheel))
+        .on(cx.listener(EventType::Key, Self::key))
         .layer(
             LayerStyle::new(Default::default())
                 .filter(Filter::Brightness(1.02))
@@ -195,7 +217,11 @@ impl GpuCanvasLab {
         );
         let overlay = Element::column([
             text(
-                if state.paused() { "PAUSED" } else { "LIVE" },
+                if state.paused() {
+                    "PAUSED · CAMERA STILL INTERACTIVE"
+                } else {
+                    "LIVE · COMPUTE + RENDER"
+                },
                 11.0,
                 Color::WHITE,
                 800,
@@ -225,8 +251,29 @@ impl GpuCanvasLab {
             bottom: auto(),
         })
         .z_index(2)
+        .hit_test(HitTestStyle::default().pointer_events(PointerEvents::None))
         .semantic_hidden(true);
-        Element::container([canvas, overlay])
+        let help = text(
+            "Drag to pan  ·  Scroll to zoom  ·  Pinch on touch  ·  Select canvas for keyboard",
+            11.0,
+            Color::WHITE,
+            600,
+        )
+        .padding(Sides::length(9.0))
+        .background(Color::BLACK.with_alpha(0.58))
+        .border(Border::all(1.0, Color::WHITE.with_alpha(0.18)))
+        .radius(CornerRadii::all(9.0))
+        .position(Position::Absolute)
+        .absolute(Sides {
+            left: length(14.0),
+            top: auto(),
+            right: auto(),
+            bottom: length(14.0),
+        })
+        .z_index(2)
+        .hit_test(HitTestStyle::default().pointer_events(PointerEvents::None))
+        .semantic_hidden(true);
+        Element::container([canvas, overlay, help])
             .position(Position::Relative)
             .width(percent(1.0))
             .height(percent(1.0))
@@ -246,10 +293,10 @@ impl GpuCanvasLab {
         let state = self.shared.state();
         let (capability, diagnostic, callbacks) = self.shared.status();
         panel(
-            "Canvas inspector",
+            "Live API inspector",
             Element::column([
                 metric("Revision", state.revision().to_string(), theme),
-                metric("GPU callbacks", callbacks.to_string(), theme),
+                metric("Renderer calls", callbacks.to_string(), theme),
                 metric("Zoom", format!("{:.2}×", state.zoom_factor()), theme),
                 metric(
                     "Pan",
@@ -257,7 +304,27 @@ impl GpuCanvasLab {
                     theme,
                 ),
                 divider(theme),
-                text("CAPABILITIES", 10.0, theme.muted_foreground, 700),
+                text("WHAT THIS PROVES", 10.0, theme.muted_foreground, 750),
+                proof(
+                    "1",
+                    "Device context",
+                    "The factory receives Device, limits and target format.",
+                    theme,
+                ),
+                proof(
+                    "2",
+                    "App GPU work",
+                    "The callback writes the Queue and encodes compute + render passes.",
+                    theme,
+                ),
+                proof(
+                    "3",
+                    "Argui lifecycle",
+                    "Argui owns texture retention, submission and presentation.",
+                    theme,
+                ),
+                divider(theme),
+                text("NEGOTIATED CONTEXT", 10.0, theme.muted_foreground, 750),
                 text(capability, 11.0, theme.foreground, 450),
                 divider(theme),
                 text("LAST GPU CANVAS EVENT", 10.0, theme.muted_foreground, 700),
@@ -271,18 +338,11 @@ impl GpuCanvasLab {
                     },
                     500,
                 ),
-                divider(theme),
-                text(
-                    "Controls: drag / arrows · wheel / pinch / ± · 0 reset · Space pause",
-                    11.0,
-                    theme.muted_foreground,
-                    450,
-                ),
             ])
             .gap(9.0),
             theme,
         )
-        .width(length(260.0))
+        .width(length(280.0))
         .shrink(0.0)
     }
 }
@@ -296,7 +356,9 @@ impl Render for GpuCanvasLab {
         Element::column([
             self.toolbar(theme),
             Element::row([
-                self.canvas_panel(theme).grow(1.0).min_width(length(0.0)),
+                self.canvas_panel(theme, cx)
+                    .grow(1.0)
+                    .min_width(length(0.0)),
                 self.inspector(theme),
             ])
             .width(percent(1.0))
@@ -312,14 +374,12 @@ impl Render for GpuCanvasLab {
         .gap(14.0)
         .background(theme.background)
         .on(cx.listener(EventType::Click, Self::click))
-        .on(cx.listener(EventType::Gesture, Self::gesture))
-        .on(cx.listener(EventType::Wheel, Self::wheel))
-        .on(cx.listener(EventType::Key, Self::key))
     }
 
     /// Returns whether the running scene needs another animation frame.
     fn wants_animation_frame(&self) -> bool {
-        !self.shared.state().paused()
+        let state = self.shared.state();
+        !state.paused() || state.view_is_settling()
     }
 
     /// Advances the scene from `frame` timing and notifies `cx` when it changed.
@@ -331,6 +391,53 @@ impl Render for GpuCanvasLab {
             cx.notify();
         }
     }
+}
+
+/// Builds a compact accent badge for the active GPU-canvas API.
+fn badge(label: &str, accent: Color, theme: &WidgetTheme) -> Element {
+    Element::row([
+        Element::container([])
+            .width(length(7.0))
+            .height(length(7.0))
+            .background(accent)
+            .radius(CornerRadii::all(4.0)),
+        text(label, 10.0, theme.foreground, 750),
+    ])
+    .padding(Sides::length(8.0))
+    .gap(7.0)
+    .background(theme.card)
+    .border(Border::all(1.0, accent.with_alpha(0.34)))
+    .radius(CornerRadii::all(9.0))
+}
+
+/// Builds one numbered API-boundary explanation for the live inspector.
+fn proof(
+    number: &str,
+    title: &str,
+    description: &str,
+    theme: &WidgetTheme,
+) -> Element {
+    Element::row([
+        text(
+            number,
+            10.0,
+            Color::srgb(0.32, 0.82, 1.0),
+            800,
+        )
+        .padding(Sides::length(5.0))
+        .background(Color::srgb(0.08, 0.3, 0.4))
+        .radius(CornerRadii::all(6.0)),
+        Element::column([
+            text(title, 11.0, theme.foreground, 700),
+            text(description, 10.0, theme.muted_foreground, 450),
+        ])
+        .gap(1.0)
+        .min_width(length(0.0))
+        .grow(1.0),
+    ])
+    .width(percent(1.0))
+    .min_width(length(0.0))
+    .gap(8.0)
 }
 
 /// Builds a bordered inspector panel with a visible heading.
