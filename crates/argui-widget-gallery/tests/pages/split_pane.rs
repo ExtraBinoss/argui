@@ -103,5 +103,5 @@ fn split_pane_examples_expose_axis_and_trailing_keyboard_controls() {
     keyboard(&app, "split-ide-console", argui::core::Key::Home);
     let root = app.render();
     assert_eq!(separator_value(&root, "split-ide-navigator"), 320.0);
-    assert_eq!(separator_value(&root, "split-ide-console"), 64.0);
+    assert_eq!(separator_value(&root, "split-ide-console"), 84.0);
 }

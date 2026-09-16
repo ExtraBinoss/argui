@@ -48,6 +48,9 @@ that do not use them.
   velocity-driven squash, stretch, shadow, and spring settling.
 - Added a working Widget Gallery split-pane showcase with horizontal, vertical,
   trailing, and nested IDE layouts, all resizable by pointer or keyboard.
+- Added a Technicalities performance guide explaining `Immediate` versus
+  `FrameCoalesced`, its requestAnimationFrame-shaped scheduling contract, and
+  appropriate high-frequency workloads.
 
 ### Fixed
 
@@ -67,6 +70,14 @@ that do not use them.
 - Coalesced drag-and-drop updates to one delivery per rendered frame, skipped
   redundant list mutations, and replaced the expensive offscreen blur with
   transform-locked shadow plates so fast drags remain responsive and artifact-free.
+- Fixed frame-coalesced pan delivery to accumulate every raw delta between
+  display frames, keeping split-pane handles exactly under the pointer during
+  fast input on Firefox and other high-rate hosts.
+- Smoothed the Widget Gallery drag-and-drop velocity deformation with
+  frame-rate-independent interpolation while keeping its position and live
+  velocity label on the same frame-coalesced callback.
+- Clamped, wrapped, and clipped split-pane panel text and raised compact vertical
+  pane minima so content cannot paint outside its panel.
 - Made Android and iOS render edge to edge while preserving native safe areas,
   painting the active theme behind transparent system regions and matching
   Android system-icon contrast to light and dark themes.

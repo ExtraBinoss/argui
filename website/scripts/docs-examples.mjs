@@ -19,6 +19,7 @@ export const exampleFiles = [
   'layout',
   'mental_model',
   'overlays',
+  'performance',
   'platform_roadmap',
   'platform_support',
   'project_structure',

@@ -132,6 +132,17 @@ fn drag_drop_reorders_live_and_settles_velocity_deformation() {
         Point::new(36.0, 190.0),
         Point::new(900.0, 1_100.0),
     );
+    for (index, elapsed) in [Duration::from_millis(16), Duration::from_millis(80)]
+        .into_iter()
+        .enumerate()
+    {
+        gallery
+            .animation_frame(Frame {
+                now: Time::from_nanos((index as u64 + 1) * 80_000_000),
+                elapsed,
+            })
+            .unwrap();
+    }
     let moving = gallery.render(Default::default()).unwrap();
     let held = keyed(&moving, "drag-item-0").unwrap();
     assert_eq!(

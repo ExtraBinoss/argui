@@ -13,6 +13,37 @@ These rules are tested. Timing and memory values depend on hardware, drivers,
 features, viewport, and workload; treat the values below as repository snapshots,
 not guarantees for every application.
 
+## Frame-coalesce continuous input
+
+Use `GestureDelivery::FrameCoalesced` when a gesture update invalidates a view,
+changes layout, shapes text, or records new paint. It is Argui's portable
+equivalent of scheduling visual input work with `requestAnimationFrame`: the
+runtime keeps the newest state for each gesture stream and delivers at most one
+`Changed` event on each available display frame.
+
+The callback rate is capped by the active display refresh cadence, such as 60,
+120, or 144 Hz. It can be lower under load or while a browser tab is backgrounded;
+it is not a fixed-rate timer. `Started`, `Ended`, and `Cancelled` remain immediate.
+For pans, the delivered sample contains the latest position, total displacement,
+and velocity plus the sum of every delta accumulated since the previous frame.
+
+```rust
+Interaction::default().gestures(
+    GestureSet::EMPTY.pan(
+        PanGesture::default()
+            .immediate()
+            .capture(GestureCapture::OnPress)
+            .delivery(GestureDelivery::FrameCoalesced),
+    ),
+)
+```
+
+Prefer `Immediate` only when every raw input sample is application data and
+discarding intermediate samples would change the result. Frame coalescing bounds
+callback frequency, but each callback must still fit within the frame budget.
+Keep stable keys, prefer transform or paint changes over layout, and defer durable
+work to the final commit or release event.
+
 ## Current snapshots
 
 The native Widget Gallery release sample was measured on 2026-09-10 on Linux

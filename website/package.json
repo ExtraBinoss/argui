@@ -19,6 +19,7 @@
     "gallery:copy": "node scripts/gallery.mjs --copy",
     "test": "node --test tests/*.test.mjs",
     "test:browser": "node tests/browser.mjs",
+    "test:browser:firefox": "node tests/firefox-interactions.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test:generated": "node tests/generated.mjs"

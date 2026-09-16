@@ -121,6 +121,15 @@ const interactionCallbacks = `Slider::new("volume", "Preview volume", self.volum
     }))
     .build(theme)`
 
+const frameCoalesced = `Interaction::default().gestures(
+    GestureSet::EMPTY.pan(
+        PanGesture::default()
+            .immediate()
+            .capture(GestureCapture::OnPress)
+            .delivery(GestureDelivery::FrameCoalesced),
+    ),
+)`
+
 const tasks = `fn search(&mut self, cx: &mut Context<Self>) -> Result<(), TaskError> {
     let query = self.query.clone();
     cx.spawn_latest(&mut self.task, load_results(query), |model, result, cx| {
@@ -1067,6 +1076,78 @@ export const docs: DocGuide[] = [
           'Attach gestures and listeners through normal Element interaction, and attach Semantics for assistive technology. Paint does not implicitly define hit geometry. Use a stable key and explicit HitTestStyle when the custom shape needs non-rectangular or enlarged targets.',
         ],
         note: 'The exact example below places retained track labels and clips inside the custom layout, clips every label to its block, lets clips move in time or between tracks, and gives the playhead a forgiving draggable hit target plus keyboard and accessibility controls.',
+      },
+    ],
+  },
+  {
+    slug: 'technicalities/performance',
+    category: 'Technicalities',
+    level: 'Intermediate',
+    minutes: 12,
+    title: 'Continuous input and frame pacing',
+    description:
+      'Keep drag, scrub, resize, and other high-frequency work aligned with the display refresh cadence.',
+    example: example('performance', 'performance'),
+    demoTitle: 'Drag with position, velocity, and status delivered once per available frame',
+    sources: [
+      'docs/performance/optimizations.md',
+      'crates/argui-ui/src/tree/pointer.rs',
+      'crates/argui-ui/src/gesture/config.rs',
+      'crates/argui-widget-gallery/src/pages/drag_drop.rs',
+    ],
+    sections: [
+      {
+        id: 'frame-coalescing',
+        title: 'FrameCoalesced is Argui’s requestAnimationFrame-shaped input mode',
+        paragraphs: [
+          'Browsers may produce pointer events faster than they can present frames. GestureDelivery::FrameCoalesced keeps the newest visual state for each gesture stream and delivers at most one Changed event on each available Argui display frame. This has the same scheduling intent as requestAnimationFrame, while remaining portable across browser and native hosts.',
+          'The callback cadence is capped by the active display refresh rate—commonly 60, 120, or 144 Hz—and can be lower when the host is busy or backgrounded. It is not a timer and does not promise a fixed frequency.',
+        ],
+        code: { filename: 'src/view.rs', code: frameCoalesced },
+        note: 'Started, Ended, and Cancelled are delivered immediately. Only repeated Changed samples are coalesced, so interaction boundaries are never delayed or lost.',
+      },
+      {
+        id: 'preserved-data',
+        title: 'Coalescing preserves the data a visual interaction needs',
+        paragraphs: [
+          'For a pan, the delivered event uses the latest pointer position, total displacement, and velocity. Its delta is the sum of every raw delta received since the previous frame, so controlled split panes and other incremental consumers remain exactly under the pointer even when several input samples arrive between frames.',
+          'The live example updates the card transform, velocity label, and delivered-update counter from the same frame-coalesced callback. No intermediate text layout or model invalidation runs between two presentable frames.',
+        ],
+      },
+      {
+        id: 'choose-delivery',
+        title: 'Choose delivery from the workload',
+        paragraphs: [
+          'Use FrameCoalesced when each sample triggers rendering, layout, text shaping, hit-test changes, or substantial model work. Use Immediate only when every raw sample is itself application data and dropping intermediate samples would change the result.',
+        ],
+        table: {
+          headers: ['Delivery', 'Best for', 'Cost model'],
+          rows: [
+            [
+              'FrameCoalesced',
+              'Dragging, split resizing, scrubbing, visual sliders, hover previews',
+              'At most one Changed callback per gesture stream and display frame',
+            ],
+            [
+              'Immediate',
+              'Raw telemetry, input recording, or algorithms that consume every sample',
+              'One callback per input event; application code owns batching',
+            ],
+          ],
+        },
+      },
+      {
+        id: 'keep-frame-work-bounded',
+        title: 'Keep each delivered frame bounded',
+        paragraphs: [
+          'Frame coalescing prevents redundant callbacks, but it cannot make an expensive callback cheap. Prefer transform or paint changes over layout, retain stable keys, avoid rebuilding unrelated ownership graphs, and move durable work to the final commit or release event.',
+        ],
+        bullets: [
+          'Use total displacement for absolute visual position and accumulated delta for incremental state.',
+          'Keep velocity smoothing frame-rate independent by scaling it from elapsed frame time.',
+          'Update dynamic labels in the same coalesced callback so their shaping is also capped to frame cadence.',
+          'Measure input-to-display latency in Firefox and Chromium rather than counting raw pointer events.',
+        ],
       },
     ],
   },

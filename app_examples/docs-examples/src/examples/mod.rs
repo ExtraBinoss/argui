@@ -13,6 +13,7 @@ pub mod interaction_api;
 pub mod layout;
 pub mod mental_model;
 pub mod overlays;
+pub mod performance;
 pub mod platform_roadmap;
 pub mod platform_support;
 pub mod project_structure;

@@ -1,8 +1,11 @@
+use std::num::NonZeroUsize;
+
 use argui::{
     core::Color,
     paint::{Border, CornerRadii},
     runtime::{Context, Render},
-    ui::{AlignItems, Element, Sides, length, percent, sides},
+    text::{EllipsisPosition, TextOverflow, TextStyle, TextWrap},
+    ui::{AlignItems, Axes, Element, Overflow, Sides, length, percent, sides},
     widgets::{SplitAxis, SplitPane, WidgetTheme, shadcn},
 };
 
@@ -94,7 +97,7 @@ fn horizontal_example(size: f32, theme: &WidgetTheme, cx: &mut Context<SplitPane
 
 /// Builds a vertically resizable preview and console stack.
 fn vertical_example(size: f32, theme: &WidgetTheme, cx: &mut Context<SplitPaneDemo>) -> Element {
-    let pane = SplitPane::new("split-preview", SplitAxis::Vertical, size, 72.0, 210.0)
+    let pane = SplitPane::new("split-preview", SplitAxis::Vertical, size, 92.0, 210.0)
         .on_change(cx.value_callback(|demo, value| demo.preview = value));
     let separator = labeled_separator(&pane, theme, "Resize preview and console");
     Element::column([
@@ -164,7 +167,7 @@ fn nested_example(
         "split-ide-console",
         SplitAxis::Vertical,
         console_size,
-        64.0,
+        84.0,
         190.0,
     )
     .trailing(true)
@@ -234,6 +237,29 @@ fn labeled_separator(pane: &SplitPane, theme: &WidgetTheme, label: &str) -> Elem
 
 /// Builds a compact application surface used as one side of a split.
 fn panel(title: &str, detail: &str, accent: Color, theme: &WidgetTheme) -> Element {
+    let title = Element::text(title).text_style(TextStyle {
+        color: theme.foreground,
+        font_size: 11.0,
+        line_height: 15.0,
+        weight: 760,
+        wrap: TextWrap::None,
+        overflow: TextOverflow::Ellipsis(EllipsisPosition::End),
+        line_clamp: NonZeroUsize::new(1),
+        ..TextStyle::default()
+    });
+    let detail = Element::text(detail)
+        .text_style(TextStyle {
+            color: theme.muted_foreground,
+            font_size: 13.0,
+            line_height: 17.0,
+            weight: 450,
+            wrap: TextWrap::WordOrGlyph,
+            overflow: TextOverflow::Ellipsis(EllipsisPosition::End),
+            line_clamp: NonZeroUsize::new(5),
+            ..TextStyle::default()
+        })
+        .min_width(length(0.0))
+        .min_height(length(0.0));
     Element::column([
         Element::row([
             Element::container([])
@@ -241,21 +267,26 @@ fn panel(title: &str, detail: &str, accent: Color, theme: &WidgetTheme) -> Eleme
                 .height(length(8.0))
                 .background(accent)
                 .radius(CornerRadii::all(999.0)),
-            crate::app::text(title, 11.0, theme.foreground, 760),
+            title,
         ])
         .align_items(AlignItems::CENTER)
         .gap(8.0),
-        crate::app::text(detail, 13.0, theme.muted_foreground, 450),
+        detail,
     ])
     .width(percent(1.0))
     .height(percent(1.0))
     .min_width(length(0.0))
     .min_height(length(0.0))
-    .padding(Sides::length(14.0))
-    .gap(12.0)
+    .padding(Sides::length(10.0))
+    .gap(8.0)
     .background(accent.with_alpha(0.07))
     .border(Border::all(1.0, theme.border))
     .radius(CornerRadii::all(10.0))
+    .overflow(Axes {
+        x: Overflow::Hidden,
+        y: Overflow::Hidden,
+    })
+    .clip(CornerRadii::all(10.0))
 }
 
 /// Displays the latest controlled pane size above its example.

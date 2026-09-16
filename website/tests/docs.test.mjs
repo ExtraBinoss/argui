@@ -18,9 +18,16 @@ const referencedFiles = [...source.matchAll(/sources: \[([^\]]+)\]/g)].flatMap((
 )
 
 test('documentation routes are unique and grouped', () => {
-  assert.equal(slugs.length, 20)
+  assert.equal(slugs.length, 21)
   assert.equal(new Set(slugs).size, slugs.length)
-  for (const prefix of ['start/', 'essentials/', 'advanced/', 'architecture/', 'platforms/'])
+  for (const prefix of [
+    'start/',
+    'essentials/',
+    'advanced/',
+    'architecture/',
+    'technicalities/',
+    'platforms/',
+  ])
     assert.ok(
       slugs.some((slug) => slug.startsWith(prefix)),
       `Missing ${prefix} guides`,

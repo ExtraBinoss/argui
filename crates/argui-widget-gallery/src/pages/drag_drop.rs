@@ -32,6 +32,7 @@ pub(crate) struct DragDropDemo {
     drag_total: Point,
     velocity: Point,
     deformation: [f32; 2],
+    target_deformation: [f32; 2],
     settling: Option<u8>,
     settle: Spring<[f32; 2]>,
 }
@@ -74,6 +75,7 @@ impl DragDropDemo {
             drag_total: Point::default(),
             velocity: Point::default(),
             deformation: [0.0, 0.0],
+            target_deformation: [0.0, 0.0],
             settling: None,
             settle: settle_spring([0.0, 0.0], [0.0, 0.0]),
         }
@@ -123,6 +125,8 @@ impl DragDropDemo {
             self.drag_from = index;
             self.original_items.clone_from(&self.items);
             self.settling = None;
+            self.deformation = [0.0, 0.0];
+            self.target_deformation = [0.0, 0.0];
         }
         if phase == GesturePhase::Cancelled {
             self.items.clone_from(&self.original_items);
@@ -130,11 +134,12 @@ impl DragDropDemo {
             self.drag_total = Point::default();
             self.velocity = Point::default();
             self.deformation = [0.0, 0.0];
+            self.target_deformation = [0.0, 0.0];
             return;
         }
         self.drag_total = total;
         self.velocity = velocity;
-        self.deformation = normalized_velocity(velocity);
+        self.target_deformation = normalized_velocity(velocity);
         let target = (self.drag_from as f32 + total.y / ROW_SPAN)
             .round()
             .clamp(0.0, self.items.len() as f32 - 1.0) as usize;
@@ -146,12 +151,17 @@ impl DragDropDemo {
             if reduced_motion {
                 self.settling = None;
                 self.deformation = [0.0, 0.0];
+                self.target_deformation = [0.0, 0.0];
             } else {
+                let release = normalized_velocity(velocity);
+                self.deformation = [
+                    self.deformation[0] * 0.7 + release[0] * 0.3,
+                    self.deformation[1] * 0.7 + release[1] * 0.3,
+                ];
+                self.target_deformation = [0.0, 0.0];
                 self.settling = Some(id);
-                self.settle = settle_spring(
-                    self.deformation,
-                    [velocity.x / 4_000.0, velocity.y / 4_000.0],
-                );
+                self.settle =
+                    settle_spring(self.deformation, [release[0] * 0.28, release[1] * 0.28]);
             }
         }
     }
@@ -282,13 +292,25 @@ impl DragDropDemo {
 
 impl Render for DragDropDemo {
     fn wants_animation_frame(&self) -> bool {
-        self.settling.is_some() && self.settle.is_active()
+        self.dragged.is_some() || (self.settling.is_some() && self.settle.is_active())
     }
 
     fn animation_frame(&mut self, frame: Frame, cx: &mut Context<Self>) {
-        if self
-            .settle
-            .advance(frame.elapsed.min(Duration::from_millis(34)))
+        if self.dragged.is_some() {
+            let seconds = frame.elapsed.as_secs_f64().min(0.05) as f32;
+            let follow = 1.0 - (-18.0 * seconds).exp();
+            let decay = (-7.0 * seconds).exp();
+            for axis in 0..2 {
+                self.deformation[axis] +=
+                    (self.target_deformation[axis] - self.deformation[axis]) * follow;
+                self.target_deformation[axis] *= decay;
+            }
+            cx.notify();
+        }
+        if self.settling.is_some()
+            && self
+                .settle
+                .advance(frame.elapsed.min(Duration::from_millis(34)))
         {
             self.deformation = self.settle.value();
             cx.notify();

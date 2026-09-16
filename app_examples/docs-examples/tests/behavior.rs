@@ -143,6 +143,19 @@ fn overlays_open_and_close_through_their_typed_state_handlers() {
 }
 
 #[test]
+fn performance_example_coalesces_many_moves_into_one_available_frame() {
+    let mut app = TestApp::new(examples::performance::Example::default());
+    let bounds = app.bounds("frame-coalesced-pad").unwrap();
+    let start = Point::new(
+        bounds.origin.x + bounds.size.width * 0.5,
+        bounds.origin.y + bounds.size.height * 0.5,
+    );
+    app.drag(start, Point::new(start.x + 120.0, start.y + 40.0), 12)
+        .unwrap();
+    app.assert_text("Delivered frame updates: 1");
+}
+
+#[test]
 fn platform_support_distinguishes_supported_and_preview_targets() {
     let app = TestApp::new(examples::platform_support::Example);
     app.assert_text("Supported · runtime-tested");

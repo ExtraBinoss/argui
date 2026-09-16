@@ -272,7 +272,7 @@ impl UiTree {
                     .iter_mut()
                     .find(|pending| same_gesture_stream(pending, &gesture))
                 {
-                    *pending = gesture;
+                    *pending = coalesce_gesture(pending, gesture);
                 } else {
                     self.pending_gestures.push(gesture);
                 }
@@ -298,6 +298,21 @@ impl UiTree {
             }
         }
     }
+}
+
+/// Keeps the latest frame sample while preserving motion accumulated since the last delivery.
+fn coalesce_gesture(previous: &GestureEvent, mut latest: GestureEvent) -> GestureEvent {
+    if let (
+        GestureKind::Pan {
+            delta: previous_delta,
+            ..
+        },
+        GestureKind::Pan { delta, .. },
+    ) = (&previous.kind, &mut latest.kind)
+    {
+        *delta = Point::new(delta.x + previous_delta.x, delta.y + previous_delta.y);
+    }
+    latest
 }
 
 fn with_phase(mut event: PointerEvent, phase: PointerPhase) -> PointerEvent {

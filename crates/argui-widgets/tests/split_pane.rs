@@ -1,7 +1,8 @@
 use argui_core::{Key, KeyInput, KeyState, Modifiers, Point, PointerId};
 use argui_ui::{
-    Dimension, Element, FlexDirection, GestureCapture, GestureDelivery, GestureEvent, GestureKind,
-    GesturePhase, Orientation, PanAxis, Role, UiEvent, UiEventKind, UserSelect,
+    Dimension, Element, EventHandler, EventHandlerId, EventOwnerId, FlexDirection, GestureCapture,
+    GestureDelivery, GestureEvent, GestureKind, GesturePhase, HandlerValue, Orientation, PanAxis,
+    Role, UiEvent, UiEventKind, UserSelect, ValueHandler,
 };
 use argui_widgets::{SplitAxis, SplitPane, shadcn};
 
@@ -200,6 +201,48 @@ fn trailing_vertical_pan_moves_from_the_opposite_edge() {
     assert_eq!(pane.size, 40.0);
     assert!(pane.update(&pan("v", GesturePhase::Ended, Point::new(0.0, -10.0))));
     assert_eq!(pane.size, 60.0);
+}
+
+#[test]
+fn controlled_split_delivers_changed_values_without_an_ended_rollback() {
+    let themes = shadcn(argui_core::Color::srgb(0.2, 0.5, 0.9));
+    let theme = themes.resolve(argui_core::ColorScheme::Dark);
+    let handler = ValueHandler::from_handler(EventHandler::from_identity(EventHandlerId::new(
+        EventOwnerId(1),
+        0,
+    )));
+    let pane = SplitPane::new("v", SplitAxis::Vertical, 100.0, 20.0, 200.0)
+        .trailing(true)
+        .on_change(handler);
+    let mut tree = argui_ui::UiTree::new(pane.separator(theme));
+    let target = tree.node_ids()[0];
+    let gesture = |phase, delta| {
+        UiEventKind::Gesture(GestureEvent {
+            target,
+            pointer: PointerId::MOUSE,
+            phase,
+            kind: GestureKind::Pan {
+                position: Point::default(),
+                delta,
+                total: delta,
+                velocity: Point::default(),
+            },
+            delivery: GestureDelivery::FrameCoalesced,
+        })
+    };
+
+    let changed = tree.event_deliveries(
+        target,
+        gesture(GesturePhase::Changed, Point::new(0.0, -70.0)),
+    );
+    assert!(matches!(
+        changed[0].handler_value(),
+        Some(HandlerValue::Number(170.0))
+    ));
+    assert!(
+        tree.event_deliveries(target, gesture(GesturePhase::Ended, Point::default()))
+            .is_empty()
+    );
 }
 
 #[test]

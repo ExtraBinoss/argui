@@ -142,7 +142,7 @@ try {
 
   await page.goto(`${origin}/docs`, { waitUntil: 'networkidle0' })
   assert.equal(await page.$$('.docs-path li').then((items) => items.length), 4)
-  assert.equal(await page.$$('.docs-card-grid a').then((items) => items.length), 16)
+  assert.equal(await page.$$('.docs-card-grid a').then((items) => items.length), 17)
   assert.deepEqual(
     await page.$$eval('.docs-category-heading h2', (headings) =>
       headings.map((heading) => heading.textContent.trim()),
@@ -203,6 +203,21 @@ try {
   await interactionFrame.$eval('button[aria-label="Save preset"]', (element) => element.click())
   await interactionFrame.waitForSelector('[aria-label="Saved 1 time(s)"]')
   await screenshotViewport('docs-interaction-api')
+
+  await page.goto(`${origin}/docs/technicalities/performance`, { waitUntil: 'networkidle0' })
+  assert.match(
+    await page.$eval('.docs-table-wrap', (element) => element.textContent),
+    /FrameCoalesced/,
+  )
+  assert.match(
+    await page.$eval('#main-content', (element) => element.textContent),
+    /requestAnimationFrame/,
+  )
+  await page.$eval('.docs-live-example iframe', (element) =>
+    element.scrollIntoView({ block: 'center', behavior: 'instant' }),
+  )
+  await page.waitForSelector('.docs-live-example .status-dot.live', { timeout: 90_000 })
+  await screenshotViewport('docs-performance-chrome')
 
   await page.goto(`${origin}/docs/architecture/clean-code`, { waitUntil: 'networkidle0' })
   await page.$eval('.docs-live-example iframe', (element) =>
@@ -383,7 +398,8 @@ try {
     /argui-widget-gallery\/src\/pages\/split_pane.rs/,
   )
   await page.waitForSelector('.status-dot.live', { timeout: 90_000 })
-  const splitFrame = await (await page.$('iframe')).contentFrame()
+  const splitIframe = await page.$('iframe')
+  const splitFrame = await splitIframe.contentFrame()
   const explorerSplit = await splitFrame.waitForSelector(
     '[role="separator"][aria-label="Resize file explorer"]',
   )
@@ -414,6 +430,44 @@ try {
     initialSplitSize,
   )
   await screenshotViewport('component-split-pane-resized')
+
+  const splitIframeBounds = await splitIframe.boundingBox()
+  await page.mouse.move(
+    splitIframeBounds.x + splitIframeBounds.width * 0.7,
+    splitIframeBounds.y + splitIframeBounds.height * 0.7,
+  )
+  await page.mouse.wheel({ deltaY: 1_200 })
+  await pause(500)
+  const consoleSplit = await splitFrame.waitForSelector(
+    '[role="separator"][aria-label="Resize IDE console"]',
+  )
+  const initialConsoleSize = Number(
+    await consoleSplit.evaluate((element) => element.getAttribute('aria-valuenow')),
+  )
+  const consoleBounds = await consoleSplit.boundingBox()
+  await page.mouse.move(
+    consoleBounds.x + consoleBounds.width / 2,
+    consoleBounds.y + consoleBounds.height / 2,
+  )
+  await page.mouse.down()
+  await page.mouse.move(
+    consoleBounds.x + consoleBounds.width / 2,
+    consoleBounds.y + consoleBounds.height / 2 - 70,
+    { steps: 14 },
+  )
+  await page.mouse.up()
+  await splitFrame.waitForFunction(
+    (initial) =>
+      Number(
+        document
+          .querySelector('[role="separator"][aria-label="Resize IDE console"]')
+          ?.getAttribute('aria-valuenow'),
+      ) >=
+      initial + 60,
+    {},
+    initialConsoleSize,
+  )
+  await screenshotViewport('component-split-pane-nested-chrome')
 
   await page.goto(`${origin}/components/`, { waitUntil: 'networkidle0' })
   assert.equal(

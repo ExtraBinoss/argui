@@ -171,14 +171,14 @@ impl SplitHandlerValue {
                 let crate::GestureKind::Pan { delta, .. } = gesture.kind else {
                     return None;
                 };
-                if gesture.phase == crate::GesturePhase::Cancelled {
-                    self.current
-                } else {
-                    // Controlled views can rebuild between coalesced pan samples. Applying the
-                    // per-sample delta to the latest controlled value avoids counting `total`
-                    // again every time the handler source is rebuilt.
-                    self.current + (if self.horizontal { delta.x } else { delta.y }) * direction
+                if gesture.phase != crate::GesturePhase::Changed {
+                    return None;
                 }
+                // Controlled views can rebuild between coalesced pan samples. Applying the
+                // accumulated frame delta to the latest controlled value avoids counting `total`
+                // again every time the handler source is rebuilt. Gesture boundaries carry no
+                // value so an Ended event cannot overwrite a Changed event flushed beside it.
+                self.current + (if self.horizontal { delta.x } else { delta.y }) * direction
             }
             UiEventKind::Click(click) if click.count >= 2 => self.reset,
             UiEventKind::KeyInput(input) if input.state == argui_core::KeyState::Pressed => {
