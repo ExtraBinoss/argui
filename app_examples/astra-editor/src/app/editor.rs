@@ -220,7 +220,12 @@ impl AstraEditor {
         style.selection = accent(0.28);
         let mut editor = TextArea::new("code-editor", &document.content, "Start writing…", style)
             .wrap(TextWrap::None)
-            .scrollbar(theme.scrollbar.clone());
+            .scroll_config(
+                ScrollConfig::default()
+                    .propagation(ScrollPropagation::Contain)
+                    .scrollbar(theme.scrollbar.clone())
+                    .effect(scroll_shadow(theme)),
+            );
         if let Some(content) =
             document.highlighted_content(matches!(self.theme_mode, argui::theme::ThemeMode::Dark))
         {
@@ -235,6 +240,8 @@ impl AstraEditor {
             .width(percent(1.0))
             .min_width(length(0.0))
             .min_height(length(0.0))
+            .flex_basis(length(0.0))
             .grow(1.0)
+            .shrink(1.0)
     }
 }

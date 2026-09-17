@@ -98,7 +98,7 @@ fn scroll_layers_exclude_background_and_scrollbars_and_preserve_effect_order() {
     ));
     let initial = layers(&output);
     assert_eq!(initial.len(), 2);
-    assert_eq!(initial[0].bounds.size.width, 90.0);
+    assert_eq!(initial[0].bounds.size.width, 100.0);
     let Filter::Effect(filter) = &initial[0].filters[0] else {
         panic!()
     };
@@ -125,7 +125,7 @@ fn scroll_layers_exclude_background_and_scrollbars_and_preserve_effect_order() {
 }
 
 #[test]
-fn fitting_content_skips_effects_and_both_axes_reserve_their_gutters() {
+fn fitting_content_skips_effects_and_active_effects_cover_the_full_viewport() {
     let mut text = TextEngine::from_embedded_fonts(
         [include_bytes!("../../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf").as_slice()],
         "Noto Sans",
@@ -144,7 +144,7 @@ fn fitting_content_skips_effects_and_both_axes_reserve_their_gutters() {
         let layers = layers(&output);
         assert_eq!(layers.len(), expected);
         if both {
-            assert_eq!(layers[0].bounds.size, Size::new(90.0, 70.0));
+            assert_eq!(layers[0].bounds.size, Size::new(100.0, 80.0));
         }
     }
 }
@@ -163,7 +163,7 @@ fn horizontal_axes_survive_repaint_and_resizing_removes_obsolete_effects() {
         output.scroll_regions[0].config.axes,
         argui_ui::ScrollAxes::Horizontal
     );
-    assert_eq!(layers(&output)[0].bounds.size, Size::new(100.0, 70.0));
+    assert_eq!(layers(&output)[0].bounds.size, Size::new(100.0, 80.0));
     let node = output.scroll_regions[0].node;
     ui.set_scroll_offset(node, Point::new(6.0, 50.0));
     engine.apply_scroll(&ui, &mut output).unwrap();

@@ -1,8 +1,8 @@
 use argui::{
     accessibility::Role,
-    core::{ColorScheme, Key, Modifiers, Size},
+    core::{ColorScheme, Key, Modifiers, Point, ScrollDelta, Size},
 };
-use argui_example_astra_editor::AstraEditor;
+use argui_example_astra_editor::{AstraEditor, workspace::Project};
 use argui_testing::TestApp;
 
 #[test]
@@ -109,4 +109,33 @@ fn search_backdrop_is_modal_and_dismisses_without_clicking_through() {
 
     app.assert_no_text("in-memory index");
     assert_eq!(app.environment().color_scheme, ColorScheme::Light);
+}
+
+#[test]
+fn a_preloaded_highlighted_rust_file_scrolls_to_its_real_document_end() {
+    let source = include_str!("../../docs-examples/src/examples/custom_elements.rs");
+    assert!(source.lines().count() > 500);
+    let project = Project::from_documents(
+        "argui",
+        [("custom_elements.rs".into(), source.to_owned())],
+    );
+    assert!(project.documents[0].highlighted_content(false).is_some());
+    let mut app = TestApp::new(AstraEditor::with_project(project));
+    let editor = app.bounds("code-editor").unwrap();
+    let center = Point::new(
+        editor.origin.x + editor.size.width * 0.5,
+        editor.origin.y + editor.size.height * 0.5,
+    );
+
+    app.wheel(
+        center,
+        ScrollDelta::Pixels(Point::new(0.0, -50_000.0)),
+    )
+    .unwrap();
+
+    let offset = app.scroll_offset("code-editor").unwrap();
+    assert!(
+        offset.y > 9_000.0,
+        "editor stopped at {offset:?} inside {editor:?}"
+    );
 }

@@ -279,17 +279,28 @@ impl Application {
 
     #[cfg_attr(coverage_nightly, coverage(off))]
     pub(super) fn scroll_or_exit(&mut self, event_loop: &dyn crate::host::LoopControl) -> bool {
-        let result = match (&self.ui_tree, &mut self.ui_layout) {
-            (Some(ui), Some(layout)) => self.layout_engine.apply_scroll(ui, layout),
+        let result = match (&mut self.ui_tree, &mut self.ui_layout) {
+            (Some(ui), Some(layout)) => {
+                self.layout_engine
+                    .apply_scroll_with_text(ui, &mut self.text_engine, layout)
+            }
             _ => return false,
         };
-        if let Err(error) = result {
-            (self.on_event)(RuntimeEvent::LayoutFailed(error.to_string()));
-            self.fatal_error = Some(RuntimeError::from(error));
-            event_loop.exit();
-            return false;
-        }
-        if let (Some(prepared), Some(layout)) = (&mut self.prepared_text, &self.ui_layout) {
+        let refreshed_text = match result {
+            Ok(refreshed) => refreshed,
+            Err(error) => {
+                (self.on_event)(RuntimeEvent::LayoutFailed(error.to_string()));
+                self.fatal_error = Some(RuntimeError::from(error));
+                event_loop.exit();
+                return false;
+            }
+        };
+        if refreshed_text {
+            self.prepared_text = self
+                .ui_layout
+                .as_ref()
+                .map(|layout| self.text_engine.prepare(&layout.text, self.scale_factor));
+        } else if let (Some(prepared), Some(layout)) = (&mut self.prepared_text, &self.ui_layout) {
             for (index, block) in layout.text.blocks().iter().enumerate() {
                 prepared.reposition_block(index, block.bounds.origin, block.clip);
             }

@@ -20,6 +20,45 @@ impl LayoutEngine {
         ui: &UiTree,
         output: &mut LayoutOutput,
     ) -> Result<(), LayoutError> {
+        self.apply_scroll_geometry(ui, output)?;
+        self.repaint(ui, output);
+        Ok(())
+    }
+
+    /// Recomputes scroll placement and refreshes virtualized editor text when required.
+    ///
+    /// * `ui` — current retained UI tree whose scroll offsets are authoritative.
+    /// * `text_engine` — shaping engine used to prepare newly visible editor lines.
+    /// * `output` — retained layout output updated in place.
+    ///
+    /// Returns whether editor text was reshaped. Callers can use this result to
+    /// rebuild prepared glyph data only when the visible text window changed.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LayoutError::MissingRoot`] if layout has not been computed yet,
+    /// or propagates errors from scroll and portal layout.
+    pub fn apply_scroll_with_text(
+        &mut self,
+        ui: &mut UiTree,
+        text_engine: &mut TextEngine,
+        output: &mut LayoutOutput,
+    ) -> Result<bool, LayoutError> {
+        let refresh_text = needs_scroll_refresh(ui, output);
+        self.apply_scroll_geometry(ui, output)?;
+        if refresh_text {
+            input::update(ui, text_engine, output);
+        }
+        self.repaint(ui, output);
+        Ok(refresh_text)
+    }
+
+    /// Updates retained scroll and overlay geometry without repainting the output.
+    fn apply_scroll_geometry(
+        &mut self,
+        ui: &UiTree,
+        output: &mut LayoutOutput,
+    ) -> Result<(), LayoutError> {
         let elements = flattened(ui.root());
         let root = self.root.as_ref().ok_or(LayoutError::MissingRoot)?;
         output.scroll_regions.clear();
@@ -37,7 +76,6 @@ impl LayoutEngine {
         )?;
         crate::overlay::resolve(&self.tree, root, &elements, ui, output)?;
         self.scroll_anchors = crate::anchor::capture(root, output);
-        self.repaint(ui, output);
         Ok(())
     }
 
@@ -63,4 +101,24 @@ impl LayoutEngine {
         input::update(ui, text_engine, output);
         self.repaint(ui, output);
     }
+}
+
+/// Reports whether a vertical scroll exposed a new virtualized editor text window.
+fn needs_scroll_refresh(ui: &UiTree, output: &LayoutOutput) -> bool {
+    output.text_inputs.iter().any(|region| {
+        let offset = ui.scroll_offset(region.node);
+        if (offset.y - region.scroll_y).abs() <= f32::EPSILON
+            || region.content_size.height <= region.viewport.size.height
+        {
+            return false;
+        }
+        output
+            .nodes
+            .iter()
+            .find(|node| node.node == region.node)
+            .and_then(|node| node.text_index)
+            .is_some_and(|index| {
+                output.text.blocks()[index].style.wrap == argui_text::TextWrap::None
+            })
+    })
 }

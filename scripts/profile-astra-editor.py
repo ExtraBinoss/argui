@@ -16,9 +16,9 @@ from Xlib.ext import xtest
 
 WINDOW_WIDTH = 1360
 WINDOW_HEIGHT = 900
-TREE_POINT = (115, 170)
+TREE_POINT = (115, 80)
 EDITOR_POINT = (760, 430)
-TREE_REGION = (45, 185, 295, 225)
+TREE_REGION = (45, 64, 295, 158)
 SIDEBAR_REGION = (0, 0, 350, WINDOW_HEIGHT)
 EDITOR_REGION = (300, 70, WINDOW_WIDTH, WINDOW_HEIGHT)
 
@@ -363,6 +363,7 @@ def profile(session, args):
         SIDEBAR_REGION,
         lambda: session.shortcut("Control_L", "b"),
     )
+    session.shortcut("Control_L", "Home")
     time.sleep(0.6)
 
     session.motion(*EDITOR_POINT)
@@ -398,6 +399,10 @@ def profile(session, args):
     time.sleep(0.3)
 
     session.motion(*EDITOR_POINT)
+    session.button()
+    session.connection.sync()
+    session.shortcut("Control_L", "Home")
+    time.sleep(0.12)
 
     def scroll_down():
         for _ in range(args.scroll_events):

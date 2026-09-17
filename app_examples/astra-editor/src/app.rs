@@ -117,7 +117,28 @@ pub struct AstraEditor {
 impl Default for AstraEditor {
     /// Creates the editor around an embedded project without touching disk.
     fn default() -> Self {
-        let project = Project::demo();
+        let mut editor = Self::with_project(Project::demo());
+        editor.open_documents = vec![0, 3];
+        editor.notice = Some("Bundled workspace · open a folder to edit your project".into());
+        editor
+    }
+}
+
+impl AstraEditor {
+    /// Creates an editor around a preloaded nonempty project.
+    ///
+    /// `project` supplies the documents, navigator entries, and optional native root.
+    /// The first document is active and at most two initial tabs are opened.
+    ///
+    /// # Panics
+    ///
+    /// Panics when `project` contains no editable documents.
+    #[must_use]
+    pub fn with_project(project: Project) -> Self {
+        assert!(
+            !project.documents.is_empty(),
+            "Astra Editor requires at least one document"
+        );
         let active_document = 0;
         let selected_tree_key = project.documents[active_document].path.clone();
         let assets = WidgetAssets::tabler_subset(
@@ -139,9 +160,10 @@ impl Default for AstraEditor {
             ],
         );
         let tree_nodes = project_tree_nodes(&project, &assets);
+        let open_documents = (0..project.documents.len().min(2)).collect();
         Self {
             project,
-            open_documents: vec![0, 3],
+            open_documents,
             active_document,
             selected_tree_key,
             collapsed: BTreeSet::new(),
@@ -168,7 +190,7 @@ impl Default for AstraEditor {
             scan_task: None,
             #[cfg(not(target_arch = "wasm32"))]
             save_task: None,
-            notice: Some("Bundled workspace · open a folder to edit your project".into()),
+            notice: Some("Preloaded workspace".into()),
         }
     }
 }

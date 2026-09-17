@@ -34,12 +34,6 @@ const extraWidgets = [
   ['range', 'Range', 'Shared value, bounds, step and gesture behavior for range controls.', null],
   ['spinner', 'Spinner', 'A loading indicator that respects reduced motion.', 'Button'],
   [
-    'split-pane',
-    'Split pane',
-    'Resizable panels with limits, pointer gestures and keyboard control.',
-    null,
-  ],
-  [
     'tree-view',
     'Tree view',
     'Hierarchical navigation with virtualized rows and keyboard actions.',

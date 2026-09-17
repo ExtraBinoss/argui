@@ -198,7 +198,11 @@ fn repeated_virtual_editor_scrolls_keep_the_viewport_and_reach_the_last_line() {
     for step in 1..=20 {
         let offset = maximum * step as f32 / 20.0;
         ui.set_scroll_offset(node, Point::new(0.0, offset));
-        layout.update_text_inputs(&mut ui, &mut text, &mut output);
+        assert!(
+            layout
+                .apply_scroll_with_text(&mut ui, &mut text, &mut output)
+                .unwrap()
+        );
         assert_eq!(output.text_inputs[0].viewport, viewport);
         assert_eq!(output.scroll_regions[0].max_offset.y, maximum);
     }
