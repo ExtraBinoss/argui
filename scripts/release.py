@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -101,6 +102,15 @@ def workspace():
 
 def package_archives():
     current, names = workspace()
+    metadata = json.loads(run('cargo', 'metadata', '--locked', '--no-deps',
+                              '--format-version', '1', capture=True))
+    package_directory = Path(metadata['target_directory']) / 'package'
+    if package_directory.exists():
+        shutil.rmtree(package_directory)
+    clean = ['cargo', 'clean', '--locked', '--profile', 'dev']
+    for name in names:
+        clean.extend(['--package', name])
+    run(*clean)
     args = ['cargo', 'package', '--locked', '--all-features', '--allow-dirty']
     for name in names:
         args.extend(['--package', name])

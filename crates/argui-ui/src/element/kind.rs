@@ -65,6 +65,7 @@ pub struct ElementNode {
 #[derive(Clone, Debug, PartialEq)]
 pub enum ElementKind {
     Custom(crate::CustomDescription),
+    GpuCanvas(crate::GpuCanvasSpec),
     Container,
     Text {
         content: TextContent,

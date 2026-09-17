@@ -61,6 +61,7 @@ WebAssembly and the opt-in Android/iOS shells.
 - **Responsive by design.** Flex and grid layout, light and dark themes, animation and virtualized lists.
 - **Accessible controls.** Keyboard navigation, focus, text editing, native AccessKit integration and browser semantics.
 - **GPU effects.** Custom WGSL shaders, gradients, shadows, blur and liquid glass.
+- **Retained GPU canvases.** Embed bounded application WGPU compute/render viewports while Argui preserves layout, clipping, effects, input and presentation.
 - **Native integrations.** Multiple windows, file pickers, trays, WebViews and popovers that can extend beyond the window on supported backends.
 - **Optional updates.** A signed update engine with a separate, reusable progress dialog.
 - **Inspect as you build.** Element inspection, live styles, theme editing and profiling through optional DevTools.
@@ -80,6 +81,7 @@ for workloads, memory figures and reproduction commands.
 - [x] Text shaping, editing, selection, bidirectional text and IME input
 - [x] Mouse, touch, keyboard, focus and accessible semantics
 - [x] Light/dark themes, animation, images, SVG and custom WGSL effects
+- [x] Retained custom WGPU canvases with native and WebAssembly/WebGPU support
 - [x] Fluent localization through the optional `i18n` feature
 - [x] State-preserving Subsecond patches through the optional `hot-reload` feature
 - [x] Optional DevTools, file picker, updater, WebView, tray, native popovers and desktop backdrop

@@ -24,6 +24,10 @@ pub enum RuntimeEvent {
     /// Renderer initialization succeeded after selecting a compatibility fallback.
     RendererFallback(String),
     RendererFailed(String),
+    /// One retained GPU canvas entered a recoverable failure state.
+    GpuCanvasFailed(argui_render::GpuCanvasDiagnostic),
+    /// One retained GPU canvas recovered after a later successful render.
+    GpuCanvasRecovered(argui_render::GpuCanvasDiagnostic),
     LayoutFailed(String),
     DesktopBackdropUnavailable(String),
     /// A requested native overlay was retained in its parent surface.
@@ -56,6 +60,10 @@ pub enum WindowRuntimeEvent {
     /// Renderer initialization succeeded after selecting a compatibility fallback.
     RendererFallback(String),
     RendererFailed(String),
+    /// One retained GPU canvas entered a recoverable failure state.
+    GpuCanvasFailed(argui_render::GpuCanvasDiagnostic),
+    /// One retained GPU canvas recovered after a later successful render.
+    GpuCanvasRecovered(argui_render::GpuCanvasDiagnostic),
     LayoutFailed(String),
     DesktopBackdropUnavailable(String),
     /// A requested native overlay was retained in its parent surface.
@@ -76,6 +84,8 @@ impl RuntimeEvent {
             Self::AnimationProfile(event) => WindowRuntimeEvent::AnimationProfile(event),
             Self::RendererFallback(event) => WindowRuntimeEvent::RendererFallback(event),
             Self::RendererFailed(event) => WindowRuntimeEvent::RendererFailed(event),
+            Self::GpuCanvasFailed(event) => WindowRuntimeEvent::GpuCanvasFailed(event),
+            Self::GpuCanvasRecovered(event) => WindowRuntimeEvent::GpuCanvasRecovered(event),
             Self::LayoutFailed(event) => WindowRuntimeEvent::LayoutFailed(event),
             Self::DesktopBackdropUnavailable(reason) => {
                 WindowRuntimeEvent::DesktopBackdropUnavailable(reason)

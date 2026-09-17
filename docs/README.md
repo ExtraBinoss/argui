@@ -19,7 +19,7 @@ Start with:
 | Models and lifetime | [Models](runtime/models.md) · [Tasks](runtime/tasks.md) |
 | Layout and input | [Styling](ui/styling.md) · [Interaction](ui/interaction.md) · [Scroll](ui/scroll.md) |
 | UI behavior | [Editing](ui/editing.md) · [Animation](ui/animation.md) · [Custom elements](ui/custom-elements.md) |
-| Rendering | [Primitives](rendering/primitives.md) · [Effects](rendering/effects.md) |
+| Rendering | [Primitives](rendering/primitives.md) · [Effects](rendering/effects.md) · [GPU canvases](rendering/gpu-canvas.md) |
 | Optional capabilities | [Localization](i18n.md) · [Hot reload](hot-reload.md) |
 | Widgets | [Catalogue](widgets/shadcn.md) · [Lists and tables](widgets/lists-tables.md) · [Overlays](widgets/overlays.md) |
 

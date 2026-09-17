@@ -1,6 +1,13 @@
 use argui_paint::{DisplayList, ImageAsset, VectorAsset};
 use argui_text::{PreparedText, TextEngine};
-use std::{collections::HashMap, mem::size_of, sync::Arc};
+use std::{
+    collections::HashMap,
+    mem::size_of,
+    sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+    },
+};
 use wgpu::{
     CurrentSurfaceTexture, LoadOp, Operations, RenderPassColorAttachment, RenderPassDescriptor,
     StoreOp, SurfaceTarget, TextureFormat, TextureViewDescriptor,
@@ -11,6 +18,7 @@ use crate::{
     batch::{DrawBatch, DrawKind, build_batches},
     effect::EffectGpu,
     effect_graph::EffectGraph,
+    gpu_canvas::CanvasGpu,
     gpu_profile::GpuProfiler,
     image::ImageGpu,
     offscreen::{TexturePool, TexturePoolStats},
@@ -59,6 +67,20 @@ struct RendererDeviceInner {
     device: wgpu::Device,
     queue: wgpu::Queue,
     initialization_fallback: Option<String>,
+    generation: u64,
+}
+
+static NEXT_DEVICE_GENERATION: AtomicU64 = AtomicU64::new(1);
+
+/// Allocates an opaque process-local device generation for cache diagnostics.
+///
+/// # Panics
+///
+/// Panics if the generation identity space is exhausted.
+fn next_device_generation() -> u64 {
+    let generation = NEXT_DEVICE_GENERATION.fetch_add(1, Ordering::Relaxed);
+    assert_ne!(generation, u64::MAX, "renderer device generation exhausted");
+    generation
 }
 
 pub struct SurfaceRenderer {
@@ -75,6 +97,7 @@ pub struct SurfaceRenderer {
     text: TextGpu,
     image: ImageGpu,
     vector: VectorGpu,
+    gpu_canvas: CanvasGpu,
     effect: EffectGpu,
     offscreen: TexturePool,
     gpu_profiler: GpuProfiler,
@@ -119,6 +142,9 @@ impl SurfaceRenderer {
         height: u32,
         renderer_config: RendererConfig,
     ) -> Result<Self, RendererError> {
+        renderer_config
+            .gpu_canvases
+            .validate_device(device.features(), &device.limits())?;
         let mut surface_config = surface
             .get_default_config(&adapter, width.max(1), height.max(1))
             .ok_or(RendererError::UnsupportedSurface)?;
@@ -141,6 +167,14 @@ impl SurfaceRenderer {
         let text = TextGpu::new(&device, target_format);
         let image = ImageGpu::new(&device, target_format, renderer_config.image_cache_bytes);
         let vector = VectorGpu::new(&device, target_format);
+        let gpu_canvas = CanvasGpu::new(
+            &device,
+            &queue,
+            target_format,
+            device_handle.0.generation,
+            renderer_config.gpu_canvases.clone(),
+            renderer_config.gpu_canvas_cache_bytes,
+        );
         let maximum_parameter_words = renderer_config
             .effects
             .definitions()
@@ -175,6 +209,7 @@ impl SurfaceRenderer {
             text,
             image,
             vector,
+            gpu_canvas,
             effect,
             offscreen,
             gpu_profiler,
@@ -210,13 +245,16 @@ impl SurfaceRenderer {
         let gpu_capture = self.gpu_profiler.begin_frame(self.profiling_active);
         let mut graph_stats = EffectGraphStats::default();
         let mut effect_graph = None;
+        let mut canvas_commands = Vec::new();
         match content {
             FrameContent::None => {
                 self.vector.clear_frame_stats();
+                self.gpu_canvas.clear_frame_stats();
                 self.batches.clear();
             }
             FrameContent::Text { engine, text } => {
                 self.vector.clear_frame_stats();
+                self.gpu_canvas.clear_frame_stats();
                 let draw = self.text.prepare(&self.device, &self.queue, engine, text)?;
                 let range = draw.all();
                 self.batches.clear();
@@ -242,6 +280,10 @@ impl SurfaceRenderer {
                 let vector_changed =
                     self.vector
                         .prepare(&self.device, &self.queue, display_list, scale_factor)?;
+                let canvas =
+                    self.gpu_canvas
+                        .prepare(&self.device, &self.queue, display_list, scale_factor);
+                canvas_commands = canvas.command_buffers;
                 let draw = self.text.prepare_ui(
                     &self.device,
                     &self.queue,
@@ -250,7 +292,12 @@ impl SurfaceRenderer {
                     display_list,
                     scale_factor,
                 )?;
-                if quad_changed || image_changed || vector_changed || draw.changed() {
+                if quad_changed
+                    || image_changed
+                    || vector_changed
+                    || canvas.changed
+                    || draw.changed()
+                {
                     self.content_revision = self.content_revision.wrapping_add(1);
                 }
                 build_batches(display_list, draw.ranges(), &mut self.batches);
@@ -286,6 +333,7 @@ impl SurfaceRenderer {
         self.text.begin_frame();
         self.image.begin_frame();
         self.vector.begin_frame();
+        self.gpu_canvas.begin_frame();
         if let Some(graph) = effect_graph
             && graph.needs_offscreen_root()
         {
@@ -302,7 +350,8 @@ impl SurfaceRenderer {
             if let Some(capture) = gpu_capture {
                 capture.finish(&mut encoder);
             }
-            self.queue.submit([encoder.finish()]);
+            canvas_commands.push(encoder.finish());
+            self.queue.submit(canvas_commands);
             let _ = self.device.poll(wgpu::PollType::Poll);
             self.finish_profile(profiler, viewport, graph_stats);
             self.queue.present(frame);
@@ -313,6 +362,7 @@ impl SurfaceRenderer {
         let text_offset = self.text.target_offset(&self.queue, target.as_f32());
         let image_offset = self.image.target_offset(&self.queue, target.as_f32());
         let vector_offset = self.vector.target_offset(&self.queue, target.as_f32());
+        let canvas_offset = self.gpu_canvas.target_offset(&self.queue, target.as_f32());
         {
             let timestamp_writes = gpu_capture.as_ref().and_then(|capture| {
                 capture.timestamp_writes(
@@ -344,6 +394,12 @@ impl SurfaceRenderer {
                         batch.instances.clone(),
                         image_offset,
                     ),
+                    DrawKind::GpuCanvas(index) => self.gpu_canvas.draw(
+                        &mut pass,
+                        index,
+                        batch.instances.clone(),
+                        canvas_offset,
+                    ),
                     DrawKind::Vector => {
                         self.vector
                             .draw(&mut pass, batch.instances.clone(), vector_offset)
@@ -355,7 +411,8 @@ impl SurfaceRenderer {
         if let Some(capture) = gpu_capture {
             capture.finish(&mut encoder);
         }
-        self.queue.submit([encoder.finish()]);
+        canvas_commands.push(encoder.finish());
+        self.queue.submit(canvas_commands);
         let _ = self.device.poll(wgpu::PollType::Poll);
         self.finish_profile(profiler, viewport, graph_stats);
         self.queue.present(frame);
@@ -374,6 +431,7 @@ impl SurfaceRenderer {
             effects,
             texture_pool: self.offscreen.stats(),
             vector_atlas: self.vector.stats(),
+            gpu_canvases: self.gpu_canvas.stats(),
             direct_surface: effects.offscreen_layers == 0,
             adapter: self.gpu_profiler.adapter().clone(),
             gpu: self.gpu_profiler.take_latest(),

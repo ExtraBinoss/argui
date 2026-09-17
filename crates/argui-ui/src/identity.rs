@@ -88,6 +88,7 @@ fn compatible(old: &Element, new: &Element) -> bool {
         && matches!(
             (&old.kind, &new.kind),
             (ElementKind::Container, ElementKind::Container)
+                | (ElementKind::GpuCanvas(_), ElementKind::GpuCanvas(_))
                 | (ElementKind::Text { .. }, ElementKind::Text { .. })
                 | (
                     ElementKind::TextEditor { .. },

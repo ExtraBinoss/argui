@@ -262,6 +262,7 @@ fn descendant_count(element: &Element) -> usize {
 fn kind_name(kind: &ElementKind) -> &'static str {
     match kind {
         ElementKind::Custom(_) => "custom",
+        ElementKind::GpuCanvas(_) => "gpu-canvas",
         ElementKind::Container => "container",
         ElementKind::Text { .. } => "text",
         ElementKind::TextEditor { multiline, .. } => {
@@ -279,6 +280,11 @@ fn kind_name(kind: &ElementKind) -> &'static str {
 fn summary(kind: &ElementKind, children: usize) -> Option<String> {
     match kind {
         ElementKind::Custom(custom) => Some(custom.type_name().to_owned()),
+        ElementKind::GpuCanvas(canvas) => Some(format!(
+            "id={} · revision={}",
+            canvas.canvas().get(),
+            canvas.revision()
+        )),
         ElementKind::Container => Some(format!("{children} children")),
         ElementKind::Text { content, .. } => Some(short(content.as_str())),
         ElementKind::TextEditor {

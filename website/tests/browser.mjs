@@ -127,7 +127,7 @@ try {
   await page.waitForSelector('.copy-button[aria-label="Copied"]')
   assert.match(
     await page.evaluate(() => navigator.clipboard.readText()),
-    /git clone https:\/\/github.com\/ExtraBinoss\/argui/,
+    /argui = \{ version = "0\.2\.1", features = \["widget-button"\] \}/,
   )
 
   await page.goto(`${origin}/docs`, { waitUntil: 'networkidle0' })
@@ -264,10 +264,29 @@ try {
 
   await page.setViewport({ width: 1000, height: 820 })
   await page.goto(`${origin}/examples`, { waitUntil: 'networkidle0' })
-  assert.equal(await page.$$('.app-example-list button').then((items) => items.length), 2)
+  assert.equal(await page.$$('.app-example-list button').then((items) => items.length), 3)
   assert.equal(await page.$$('.more-example-grid a').then((items) => items.length), 4)
   assert.match(await page.$eval('.app-example-list', (element) => element.textContent), /0\.30 s/)
   assert.match(await page.$eval('.app-example-list', (element) => element.textContent), /0\.79 s/)
+  await page.setViewport({ width: 1000, height: 1050 })
+  await page.click('.app-example-list button:nth-child(3)')
+  await page.waitForFunction(() =>
+    document.querySelector('iframe')?.src.includes('/examples/gpu-canvas/index.html'),
+  )
+  await page.waitForSelector('.status-dot.live', { timeout: 90_000 })
+  const gpuIframe = await page.$('iframe')
+  const gpuFrame = await gpuIframe.contentFrame()
+  const gpuCanvas = await gpuFrame.waitForSelector(
+    '[role="img"][aria-label="Interactive GPU particle canvas"]',
+  )
+  const gpuCanvasBounds = await gpuCanvas.evaluate((element) =>
+    element.getBoundingClientRect().toJSON(),
+  )
+  assert.ok(gpuCanvasBounds && gpuCanvasBounds.width > 400 && gpuCanvasBounds.height > 300)
+  await gpuFrame.$eval('button[aria-label="Drag Y: natural"]', (element) => element.click())
+  await gpuFrame.waitForSelector('button[aria-label="Drag Y: inverted"]')
+  await screenshot('app-example-gpu-canvas')
+  await page.setViewport({ width: 1000, height: 820 })
   await page.click('.app-example-list button:nth-child(2)')
   await page.waitForFunction(() =>
     document.querySelector('.gallery-status')?.textContent.includes('Widget Gallery'),
@@ -448,6 +467,25 @@ try {
     'Streamed VList messages keep the available mobile width',
   )
   await screenshot('app-example-mobile-live')
+
+  await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2 })
+  await page.goto(`${origin}/examples`, { waitUntil: 'networkidle0' })
+  await page.click('.app-example-list button:nth-child(3)')
+  await page.waitForFunction(() =>
+    document.querySelector('iframe')?.src.includes('/examples/gpu-canvas/index.html'),
+  )
+  await page.$eval('iframe', (element) => element.scrollIntoView({ block: 'center' }))
+  await page.waitForSelector('.status-dot.live', { timeout: 90_000 })
+  const mobileGpuFrame = await (await page.$('iframe')).contentFrame()
+  await mobileGpuFrame.waitForSelector('button[aria-label="Drag Y: natural"]')
+  const mobileGpuLayout = await mobileGpuFrame.$eval('canvas', (canvas) => ({
+    canvas: canvas.clientWidth,
+    viewport: innerWidth,
+    overflow: document.documentElement.scrollWidth > innerWidth,
+  }))
+  assert.ok(mobileGpuLayout.canvas <= mobileGpuLayout.viewport)
+  assert.equal(mobileGpuLayout.overflow, false)
+  await screenshot('app-example-gpu-canvas-mobile')
 
   const response = await page.goto(`${origin}/components/does-not-exist`, {
     waitUntil: 'networkidle0',

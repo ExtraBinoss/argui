@@ -31,6 +31,7 @@ impl AssetMetrics {
             ElementKind::Image { image, .. } => self.images.get(image).copied(),
             ElementKind::Vector { vector, .. } => self.vectors.get(vector).copied(),
             ElementKind::Custom(_)
+            | ElementKind::GpuCanvas(_)
             | ElementKind::Container
             | ElementKind::Text { .. }
             | ElementKind::TextEditor { .. } => None,

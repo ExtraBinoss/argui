@@ -116,17 +116,16 @@ impl SurfaceRenderer {
             })
             .await
             .map_err(|error| RendererError::AdapterRequest(error.to_string()))?;
-        let required_features = if renderer_config.profiling
-            && adapter.features().contains(wgpu::Features::TIMESTAMP_QUERY)
-        {
-            wgpu::Features::TIMESTAMP_QUERY
-        } else {
-            wgpu::Features::empty()
-        };
+        let requirements = renderer_config.gpu_canvases.device_requirements(
+            adapter.features(),
+            &adapter.limits(),
+            renderer_config.profiling,
+        )?;
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
                 label: Some("argui-device"),
-                required_features,
+                required_features: requirements.features,
+                required_limits: requirements.limits,
                 memory_hints: wgpu::MemoryHints::MemoryUsage,
                 ..Default::default()
             })
@@ -138,6 +137,7 @@ impl SurfaceRenderer {
             device,
             queue,
             initialization_fallback,
+            generation: next_device_generation(),
         }));
         Self::from_existing_device(
             instance,
@@ -322,6 +322,17 @@ impl SurfaceRenderer {
     #[must_use]
     pub fn texture_pool_stats(&self) -> TexturePoolStats {
         self.offscreen.stats()
+    }
+
+    /// Returns retained and per-frame GPU-canvas cache statistics.
+    #[must_use]
+    pub fn gpu_canvas_stats(&self) -> crate::GpuCanvasStats {
+        self.gpu_canvas.stats()
+    }
+
+    /// Drains recoverable GPU-canvas failure and recovery diagnostics.
+    pub fn take_gpu_canvas_diagnostics(&mut self) -> Vec<crate::GpuCanvasDiagnostic> {
+        self.gpu_canvas.take_diagnostics()
     }
 
     /// Returns profiling data from the most recently rendered frame.

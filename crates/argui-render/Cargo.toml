@@ -26,5 +26,9 @@ pollster.workspace = true
 # Creates a Wayland window for the native surface integration test.
 winit.workspace = true
 
+[[test]]
+name = "gpu_canvas"
+path = "tests/gpu_canvas/mod.rs"
+
 [lints]
 workspace = true

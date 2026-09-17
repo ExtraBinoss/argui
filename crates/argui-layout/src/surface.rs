@@ -46,6 +46,10 @@ impl NativeSurfacePaint {
                         translate(&mut item.transform);
                         clips(&mut item.clips);
                     }
+                    DisplayCommand::GpuCanvas(item) => {
+                        translate(&mut item.transform);
+                        clips(&mut item.clips);
+                    }
                     DisplayCommand::Vector(item) => {
                         translate(&mut item.transform);
                         clips(&mut item.clips);

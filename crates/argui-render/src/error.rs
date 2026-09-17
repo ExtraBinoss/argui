@@ -34,6 +34,14 @@ pub enum RendererError {
         provided: usize,
         maximum: usize,
     },
+    GpuCanvasCapability {
+        canvas: String,
+        message: String,
+    },
+    IncompatibleGpuCanvasDevice {
+        canvas: String,
+        message: String,
+    },
     MissingImage(u64),
     MissingVector(u64),
     VectorAtlasFull,
@@ -104,6 +112,14 @@ impl fmt::Display for RendererError {
             Self::EffectParametersTooLarge { provided, maximum } => write!(
                 formatter,
                 "effect parameters need {provided} bytes but this adapter allows {maximum}"
+            ),
+            Self::GpuCanvasCapability { canvas, message } => write!(
+                formatter,
+                "GPU canvas '{canvas}' cannot use this adapter: {message}"
+            ),
+            Self::IncompatibleGpuCanvasDevice { canvas, message } => write!(
+                formatter,
+                "GPU canvas '{canvas}' is incompatible with the shared renderer device: {message}"
             ),
             Self::MissingImage(id) => write!(formatter, "image {id} is not registered"),
             Self::MissingVector(id) => write!(formatter, "vector {id} is not registered"),

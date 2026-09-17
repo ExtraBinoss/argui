@@ -23,4 +23,9 @@ work that remains open; it is not a release schedule.
 - Geometry transitions for insertion, removal and reordering.
 - A documented compatibility policy as the public API stabilizes.
 
+Retained custom WGPU viewports are complete for Argui-owned devices and
+surfaces; see [GPU canvases](rendering/gpu-canvas.md). A lower-level API for
+embedding externally owned WGPU instances, devices or surfaces remains outside
+the high-level runtime and would require a separate ownership design.
+
 Performance work follows [measured workloads](performance/optimizations.md).
