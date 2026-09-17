@@ -214,7 +214,7 @@ mod native {
             }
             self.issued = phase;
             eprintln!("native lifecycle command {phase}");
-            if phase < 8 {
+            if phase < 6 {
                 self.timer = Some(self.data.update(|_, cx| {
                     cx.spawn(
                         async {
@@ -230,7 +230,7 @@ mod native {
                 }));
             }
             #[cfg(all(feature = "webview", target_os = "linux"))]
-            if phase == 6 {
+            if phase == 5 {
                 crate::gtk_input::send();
             }
             let auxiliary = WindowKey::new("auxiliary");
@@ -266,6 +266,9 @@ mod native {
                     window: WindowKey::main(),
                     maximized: phase == 3,
                 }),
+                6 => update
+                    .command(AppCommand::FocusWindow(WindowKey::new("auxiliary")))
+                    .command(AppCommand::Quit),
                 _ => update,
             }
         }
@@ -437,7 +440,7 @@ mod native {
         )
         .unwrap();
         assert!(errors.borrow().is_empty(), "{:?}", errors.borrow());
-        assert_eq!(data.read(|data| data.phase), 8);
+        assert_eq!(data.read(|data| data.phase), 6);
         #[cfg(all(feature = "webview", target_os = "linux"))]
         animation.assert_smooth();
         assert!(
