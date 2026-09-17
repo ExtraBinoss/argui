@@ -1,5 +1,5 @@
 import { access, cp, mkdir, rm } from 'node:fs/promises'
-import { spawnSync } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
 
@@ -8,11 +8,137 @@ const destination = resolve(root, 'website/public/gallery')
 const aiDestination = resolve(root, 'website/public/examples/ai-harness')
 const gpuDestination = resolve(root, 'website/public/examples/gpu-canvas')
 const docsDestination = resolve(root, 'website/public/examples/docs')
-const wasmEnvironment = {
-  ...process.env,
-  CARGO_BUILD_JOBS: '6',
-  BINARYEN_CORES: '6',
+const wasmEnvironment = { ...process.env }
+const defaultBuildConcurrency = 2
+
+const wasmBuilds = [
+  {
+    label: 'widget gallery',
+    args: [
+      'build',
+      'crates/argui-widget-gallery',
+      '--target',
+      'web',
+      '--release',
+      '--out-dir',
+      '../../web/widgets/pkg',
+      '--all-features',
+    ],
+  },
+  {
+    label: 'AI harness example',
+    args: [
+      'build',
+      'app_examples/fake-ai-harness',
+      '--target',
+      'web',
+      '--release',
+      '--out-dir',
+      '../../web/examples/ai-harness/pkg',
+    ],
+  },
+  {
+    label: 'GPU canvas example',
+    args: [
+      'build',
+      'app_examples/gpu-canvas',
+      '--target',
+      'web',
+      '--release',
+      '--out-dir',
+      '../../web/examples/gpu-canvas/pkg',
+    ],
+  },
+  {
+    label: 'docs examples',
+    args: [
+      'build',
+      'app_examples/docs-examples',
+      '--target',
+      'web',
+      '--release',
+      '--out-dir',
+      '../../web/examples/docs/pkg',
+    ],
+  },
+]
+
+/**
+ * Reads a positive integer setting without allowing malformed values to alter
+ * the worker pool unexpectedly.
+ *
+ * @param {string | undefined} value The environment value to parse.
+ * @param {number} fallback The value to use when the setting is invalid.
+ * @returns {number} A positive integer suitable for a worker count.
+ */
+function positiveInteger(value, fallback) {
+  if (!value || !/^\d+$/.test(value)) return fallback
+  const parsed = Number(value)
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : fallback
 }
+
+/**
+ * Runs one wasm-pack build while streaming its output directly to the caller.
+ *
+ * @param {{ label: string, args: string[] }} build The build command to run.
+ * @returns {Promise<void>} Resolves when the build succeeds.
+ * @throws {Error} If wasm-pack cannot start or exits unsuccessfully.
+ */
+function runWasmBuild(build) {
+  return new Promise((resolveBuild, rejectBuild) => {
+    const child = spawn('wasm-pack', build.args, {
+      cwd: root,
+      env: wasmEnvironment,
+      stdio: 'inherit',
+    })
+
+    child.once('error', (error) => {
+      rejectBuild(new Error(`${build.label} could not start: ${error.message}`, { cause: error }))
+    })
+    child.once('close', (code, signal) => {
+      if (code === 0) {
+        resolveBuild()
+        return
+      }
+      const reason = signal ? `signal ${signal}` : `exit code ${code ?? 'unknown'}`
+      const error = new Error(`${build.label} failed with ${reason}`)
+      if (code !== null) error.exitCode = code
+      rejectBuild(error)
+    })
+  })
+}
+
+/**
+ * Runs wasm builds through a bounded worker pool so independent bundles can
+ * overlap without spawning one process per bundle at once.
+ *
+ * @param {{ label: string, args: string[] }[]} builds The builds to execute.
+ * @param {number} concurrency The maximum number of active wasm-pack processes.
+ * @returns {Promise<void>} Resolves when every build succeeds.
+ * @throws {Error} The first build error after active workers have drained.
+ */
+async function runWasmBuilds(builds, concurrency) {
+  let nextBuild = 0
+  let firstError
+
+  async function worker() {
+    while (firstError === undefined) {
+      const build = builds[nextBuild]
+      nextBuild += 1
+      if (!build) return
+      try {
+        await runWasmBuild(build)
+      } catch (error) {
+        firstError = error
+      }
+    }
+  }
+
+  const workerCount = Math.min(concurrency, builds.length)
+  await Promise.all(Array.from({ length: workerCount }, () => worker()))
+  if (firstError) throw firstError
+}
+
 if (process.argv.includes('--check')) {
   try {
     await access(resolve(destination, 'pkg/argui_widget_gallery_bg.wasm'))
@@ -27,67 +153,17 @@ if (process.argv.includes('--check')) {
   }
 } else {
   if (!process.argv.includes('--copy')) {
-    const build = spawnSync(
-      'wasm-pack',
-      [
-        'build',
-        'crates/argui-widget-gallery',
-        '--target',
-        'web',
-        '--release',
-        '--out-dir',
-        '../../web/widgets/pkg',
-        '--all-features',
-      ],
-      {
-        cwd: root,
-        stdio: 'inherit',
-        env: wasmEnvironment,
-      },
+    const concurrency = positiveInteger(
+      process.env.ARGUI_WASM_BUILD_CONCURRENCY,
+      defaultBuildConcurrency,
     )
-    if (build.status !== 0) process.exit(build.status ?? 1)
-    const exampleBuild = spawnSync(
-      'wasm-pack',
-      [
-        'build',
-        'app_examples/fake-ai-harness',
-        '--target',
-        'web',
-        '--release',
-        '--out-dir',
-        '../../web/examples/ai-harness/pkg',
-      ],
-      { cwd: root, stdio: 'inherit', env: wasmEnvironment },
-    )
-    if (exampleBuild.status !== 0) process.exit(exampleBuild.status ?? 1)
-    const gpuBuild = spawnSync(
-      'wasm-pack',
-      [
-        'build',
-        'app_examples/gpu-canvas',
-        '--target',
-        'web',
-        '--release',
-        '--out-dir',
-        '../../web/examples/gpu-canvas/pkg',
-      ],
-      { cwd: root, stdio: 'inherit', env: wasmEnvironment },
-    )
-    if (gpuBuild.status !== 0) process.exit(gpuBuild.status ?? 1)
-    const docsBuild = spawnSync(
-      'wasm-pack',
-      [
-        'build',
-        'app_examples/docs-examples',
-        '--target',
-        'web',
-        '--release',
-        '--out-dir',
-        '../../web/examples/docs/pkg',
-      ],
-      { cwd: root, stdio: 'inherit', env: wasmEnvironment },
-    )
-    if (docsBuild.status !== 0) process.exit(docsBuild.status ?? 1)
+    try {
+      await runWasmBuilds(wasmBuilds, concurrency)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      console.error(`WASM gallery build failed: ${message}`)
+      process.exit(error?.exitCode ?? 1)
+    }
   }
   await access(resolve(root, 'web/widgets/pkg/argui_widget_gallery_bg.wasm'))
   await access(resolve(root, 'web/examples/ai-harness/pkg/argui_example_ai_harness_bg.wasm'))

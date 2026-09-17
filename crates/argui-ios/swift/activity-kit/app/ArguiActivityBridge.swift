@@ -99,7 +99,11 @@ public func arguiIOSActivityUpdate(
         guard #available(iOS 16.1, *) else {
             return 0
         }
-        ArguiActivityBridge.update(identifier: identifier, percent: percent, message: messageText)
+        return ArguiActivityBridge.update(
+            identifier: identifier,
+            percent: percent,
+            message: messageText
+        )
     }
 }
 
@@ -109,7 +113,7 @@ public func arguiIOSActivityFinish(_ identifier: UInt64) -> Int32 {
         guard #available(iOS 16.1, *) else {
             return 0
         }
-        ArguiActivityBridge.finish(identifier: identifier)
+        return ArguiActivityBridge.finish(identifier: identifier)
     }
 }
 

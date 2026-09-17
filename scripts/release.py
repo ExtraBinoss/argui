@@ -7,7 +7,6 @@ import json
 import os
 from pathlib import Path
 import re
-import shutil
 import subprocess
 import sys
 import tarfile
@@ -35,9 +34,15 @@ def version_key(value):
             tuple((0, int(part)) if part.isdigit() else (1, part) for part in identifiers))
 
 
-def run(*args, capture=False):
+def run(*args, capture=False, env=None):
+    """Run a release command from the repository root.
+
+    ``env`` can override the process environment for isolated Cargo
+    operations without changing the environment used by ordinary release
+    checks.
+    """
     result = subprocess.run(args, cwd=ROOT, check=True, text=True,
-                            stdout=subprocess.PIPE if capture else None)
+                            stdout=subprocess.PIPE if capture else None, env=env)
     return result.stdout.strip() if capture else None
 
 
@@ -103,34 +108,25 @@ def workspace():
 
 def package_archives():
     current, names = workspace()
-    metadata = json.loads(run('cargo', 'metadata', '--locked', '--no-deps',
-                              '--format-version', '1', capture=True))
-    package_directory = Path(metadata['target_directory']) / 'package'
-    if package_directory.exists():
-        shutil.rmtree(package_directory)
-    clean = ['cargo', 'clean', '--locked', '--profile', 'dev']
-    for name in names:
-        clean.extend(['--package', name])
-    run(*clean)
     selection = [argument for name in names for argument in ('--package', name)]
-    # Package the complete publishable graph in one Cargo transaction so
-    # unpublished workspace versions resolve to one another instead of crates.io.
-    run('cargo', 'package', '--locked', '--all-features', '--allow-dirty',
-        '--no-verify', *selection)
-    verify_staged_archives(current, names)
+    # Keep package artifacts out of the checkout's shared target. In
+    # particular, never clean that target: it may be shared by an IDE, other
+    # worktrees, or sccache-backed builds running at the same time.
+    with tempfile.TemporaryDirectory(prefix='argui-package-target-') as directory:
+        target = Path(directory)
+        environment = os.environ.copy()
+        environment['CARGO_TARGET_DIR'] = str(target)
+        # Package the complete publishable graph in one Cargo transaction so
+        # unpublished workspace versions resolve to one another instead of
+        # crates.io.
+        run('cargo', 'package', '--locked', '--all-features', '--allow-dirty',
+            '--no-verify', *selection, env=environment)
+        verify_staged_archives(current, names, target)
     print(f'Verified {len(names)} crates.io archives at version {current}')
 
 
-def shared_target_directory():
-    """Return Cargo's configured target directory for this checkout."""
-    metadata = json.loads(run('cargo', 'metadata', '--locked', '--no-deps',
-                              '--format-version', '1', capture=True))
-    return Path(metadata['target_directory'])
-
-
-def verify_staged_archives(current, names):
+def verify_staged_archives(current, names, package_target):
     """Compile packaged sources together against only the staged archives."""
-    target = shared_target_directory()
     with tempfile.TemporaryDirectory(prefix='argui-package-') as directory:
         staged = Path(directory)
         config = staged / '.cargo' / 'config.toml'
@@ -138,7 +134,7 @@ def verify_staged_archives(current, names):
         patches = []
         members = []
         for name in names:
-            archive = target / 'package' / f'{name}-{current}.crate'
+            archive = package_target / 'package' / f'{name}-{current}.crate'
             if not archive.is_file():
                 raise ValueError(f'{name}: missing staged archive {archive}')
             with tarfile.open(archive, mode='r:gz') as package:
@@ -153,9 +149,19 @@ def verify_staged_archives(current, names):
             '[workspace]\nresolver = "2"\nmembers = [' + ', '.join(members) + ']\n'
         )
         environment = os.environ.copy()
-        environment['CARGO_TARGET_DIR'] = str(target)
+        # Keep verification's compiled output inside the temporary staging
+        # directory as well. The fetch/check order is intentional: fetch may
+        # populate the local registry, while check must prove the staged
+        # archives build without network access.
+        environment['CARGO_TARGET_DIR'] = str(staged / 'target')
         subprocess.run(
-            ['cargo', 'check', '--offline', '--workspace', '--all-features'],
+            ['cargo', 'fetch'],
+            cwd=staged,
+            env=environment,
+            check=True,
+        )
+        subprocess.run(
+            ['cargo', 'check', '--offline', '--locked', '--workspace', '--all-features'],
             cwd=staged,
             env=environment,
             check=True,

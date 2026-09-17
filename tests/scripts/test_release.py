@@ -206,26 +206,76 @@ class ReleasePolicyTests(unittest.TestCase):
 
     def test_package_verifies_every_archive_in_publication_order(self):
         names = ['argui-core', 'argui-render', 'argui']
+        targets = []
+
+        def verify(current, actual_names, target):
+            self.assertEqual((current, actual_names), ('0.1.0', names))
+            self.assertTrue(target.is_dir())
+            targets.append(target)
+
         with tempfile.TemporaryDirectory() as directory:
-            package_directory = Path(directory) / 'package'
-            package_directory.mkdir()
-            (package_directory / 'stale-registry').write_text('old archive')
-            metadata = json.dumps({'target_directory': directory})
+            shared_package_directory = Path(directory) / 'package'
+            shared_package_directory.mkdir()
+            (shared_package_directory / 'stale-registry').write_text('old archive')
             with patch.object(release, 'workspace', return_value=('0.1.0', names)), \
-                    patch.object(release, 'run', side_effect=[metadata, None, None]) as run, \
-                    patch.object(release, 'verify_staged_archives') as verify:
+                    patch.object(release, 'run') as run, \
+                    patch.object(release, 'verify_staged_archives', side_effect=verify):
                 release.package_archives()
-            self.assertFalse(package_directory.exists())
-        self.assertEqual(run.call_args_list[1].args, (
-            'cargo', 'clean', '--locked', '--profile', 'dev',
-            '--package', 'argui-core', '--package', 'argui-render', '--package', 'argui',
-        ))
-        self.assertEqual(run.call_args_list[2].args, (
+            self.assertTrue((shared_package_directory / 'stale-registry').exists())
+        self.assertEqual(run.call_count, 1)
+        self.assertEqual(run.call_args.args, (
             'cargo', 'package', '--locked', '--all-features', '--allow-dirty',
             '--no-verify',
             '--package', 'argui-core', '--package', 'argui-render', '--package', 'argui',
         ))
-        verify.assert_called_once_with('0.1.0', names)
+        target = targets[0]
+        self.assertFalse(target.exists())
+        self.assertEqual(Path(run.call_args.kwargs['env']['CARGO_TARGET_DIR']), target)
+
+    def test_archive_verification_fetches_before_the_offline_locked_check(self):
+        names = ['argui-core', 'argui']
+
+        class Archive:
+            def __init__(self, name):
+                self.name = name
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_):
+                return False
+
+            def extractall(self, destination, filter):
+                if filter != 'data':
+                    raise AssertionError(f'unexpected archive filter: {filter}')
+                source = destination / self.name.removesuffix('.crate')
+                source.mkdir()
+                (source / 'Cargo.toml').write_text('[package]\nname = "staged"\n')
+
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory)
+            package_directory = target / 'package'
+            package_directory.mkdir()
+            for name in names:
+                (package_directory / f'{name}-0.3.0.crate').touch()
+
+            def archive(path, mode):
+                self.assertEqual(mode, 'r:gz')
+                return Archive(Path(path).name)
+
+            with patch.object(release.tarfile, 'open', side_effect=archive), \
+                    patch.object(release.subprocess, 'run') as run:
+                release.verify_staged_archives('0.3.0', names, target)
+
+        self.assertEqual(run.call_count, 2)
+        self.assertEqual(run.call_args_list[0].args[0], ['cargo', 'fetch'])
+        self.assertEqual(
+            run.call_args_list[1].args[0],
+            ['cargo', 'check', '--offline', '--locked', '--workspace', '--all-features'],
+        )
+        self.assertNotEqual(
+            Path(run.call_args_list[1].kwargs['env']['CARGO_TARGET_DIR']), target,
+        )
 
     def test_unchanged_version_never_runs_a_publisher(self):
         with patch.object(release, 'run') as run:
