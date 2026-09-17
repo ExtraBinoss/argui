@@ -5,8 +5,8 @@ mod physics;
 
 use argui::{
     animation::{
-        Direction, Duration, Easing, FillMode, Inertia, InertiaConfig, Interpolate, Iterations,
-        Keyframe, Keyframes, Spring, SpringConfig, Timeline, Timing, curves,
+        Direction, Duration, Easing, Inertia, InertiaConfig, Iterations, Keyframe, Keyframes,
+        Spring, SpringConfig, Time, Timeline, Timing, curves,
     },
     core::{Color, Transform2D},
     paint::{Border, CornerRadii},
@@ -27,9 +27,11 @@ pub(crate) struct MotionDemo {
     alternate: Timeline<f32>,
     pub(super) timeline_value: f32,
     pub(super) alternate_value: f32,
-    timeline_from: f32,
     pub(super) target: f32,
     pending: bool,
+    running: bool,
+    resume_pending: bool,
+    last_frame: Option<Time>,
     pub(super) reduced_motion: bool,
 }
 
@@ -44,27 +46,39 @@ impl Default for MotionDemo {
             alternate: alternate_timeline(),
             timeline_value: 0.0,
             alternate_value: 0.0,
-            timeline_from: 0.0,
             target: 1.0,
             pending: true,
+            running: true,
+            resume_pending: false,
+            last_frame: None,
             reduced_motion: false,
         }
     }
 }
 
 impl MotionDemo {
-    fn replay(&mut self) {
-        self.target = if self.target > 0.5 { 0.0 } else { 1.0 };
-        self.timeline_from = self.timeline_value;
+    /// Pauses or resumes every laboratory animation as one synchronized group.
+    fn toggle_running(&mut self) {
         if self.reduced_motion {
-            self.snap();
+            return;
+        }
+        self.running = !self.running;
+        if self.running {
+            self.resume_pending = true;
         } else {
-            self.pending = true;
+            self.resume_pending = false;
+            if let Some(now) = self.last_frame {
+                self.timeline.pause(now);
+                self.alternate.pause(now);
+            }
         }
     }
 
+    /// Places every example at the shared destination without scheduling frames.
     fn snap(&mut self) {
         self.pending = false;
+        self.resume_pending = false;
+        self.last_frame = None;
         self.spring = spring(self.target, self.target);
         self.spring_value = self.target;
         self.timeline_value = self.target;
@@ -74,13 +88,24 @@ impl MotionDemo {
     }
 
     fn content(&self, theme: &WidgetTheme) -> Element {
+        let button_label = if self.reduced_motion {
+            "Animations disabled"
+        } else if self.running {
+            "Stop animations"
+        } else {
+            "Run animations"
+        };
         let controls = Element::row([
-            Button::new("motion-replay", "Run all animations", theme.button()).build(),
+            Button::new("motion-toggle", button_label, theme.button())
+                .enabled(!self.reduced_motion)
+                .build(),
             super::super::app::text(
                 if self.reduced_motion {
                     "Reduced motion: every example snaps to its destination"
+                } else if self.running {
+                    "20 live examples · looping continuously"
                 } else {
-                    "20 live examples · interrupt at any time to test retargeting"
+                    "20 live examples · paused on the current cycle"
                 },
                 13.0,
                 theme.muted_foreground,
@@ -124,16 +149,16 @@ impl MotionDemo {
 
 impl Render for MotionDemo {
     fn wants_animation_frame(&self) -> bool {
-        !self.reduced_motion
-            && (self.pending
-                || self.spring.is_active()
-                || self.inertia.is_active()
-                || self.timeline.needs_frame()
-                || self.alternate.needs_frame())
+        self.running && !self.reduced_motion
     }
 
     fn animation_frame(&mut self, frame: argui::animation::Frame, cx: &mut Context<Self>) {
         let mut changed = false;
+        let resumed = std::mem::take(&mut self.resume_pending);
+        if resumed && !self.pending {
+            self.timeline.resume(frame.now);
+            self.alternate.resume(frame.now);
+        }
         if self.pending {
             self.pending = false;
             self.spring.retarget(self.target);
@@ -145,7 +170,26 @@ impl Render for MotionDemo {
             self.alternate.restart(frame.now);
             changed = true;
         }
-        let elapsed = frame.elapsed.min(Duration::from_millis(34));
+        let timeline_sample = self.timeline.sample(frame.now);
+        if timeline_sample.events.iterations % 2 == 1 {
+            self.target = if self.target > 0.5 { 0.0 } else { 1.0 };
+            self.spring.retarget(self.target);
+            let velocity = if self.target > 0.5 { 720.0 } else { -720.0 };
+            self.inertia.launch(self.inertia_value, velocity);
+        }
+        if let Some(progress) = timeline_sample.value {
+            changed |= progress != self.timeline_value;
+            self.timeline_value = progress;
+        }
+        if let Some(progress) = self.alternate.sample(frame.now).value {
+            changed |= progress != self.alternate_value;
+            self.alternate_value = progress;
+        }
+        let elapsed = if resumed {
+            Duration::ZERO
+        } else {
+            frame.elapsed.min(Duration::from_millis(34))
+        };
         if self.spring.advance(elapsed) {
             self.spring_value = self.spring.value();
             changed = true;
@@ -154,15 +198,7 @@ impl Render for MotionDemo {
             self.inertia_value = self.inertia.value();
             changed = true;
         }
-        if let Some(progress) = self.timeline.sample(frame.now).value {
-            let next = self.timeline_from.interpolate(self.target, progress);
-            changed |= next != self.timeline_value;
-            self.timeline_value = next;
-        }
-        if let Some(progress) = self.alternate.sample(frame.now).value {
-            changed |= progress != self.alternate_value;
-            self.alternate_value = progress;
-        }
+        self.last_frame = Some(frame.now);
         if changed {
             cx.notify();
         }
@@ -173,7 +209,12 @@ impl Render for MotionDemo {
         if self.reduced_motion != reduced_motion {
             self.reduced_motion = reduced_motion;
             if reduced_motion {
+                self.target = 1.0;
                 self.snap();
+            } else {
+                self.timeline = timeline();
+                self.alternate = alternate_timeline();
+                self.pending = true;
             }
         }
         let themes = shadcn(cx.environment());
@@ -185,10 +226,10 @@ impl Render for MotionDemo {
             theme,
         )
         .on(cx.listener(EventType::Click, |demo, event, cx| {
-            if event.target_key() == Some("motion-replay")
+            if event.target_key() == Some("motion-toggle")
                 && matches!(event.kind, UiEventKind::Click(_))
             {
-                demo.replay();
+                demo.toggle_running();
                 cx.notify();
             }
         }))
@@ -303,12 +344,14 @@ fn timeline() -> Timeline<f32> {
             Keyframe::new(1.0, 1.0),
         ])
         .expect("motion keyframes are ordered"),
-        Timing::new(Duration::from_millis(850)).fill(FillMode::Forwards),
+        Timing::new(Duration::from_millis(850))
+            .iterations(Iterations::Infinite)
+            .direction(Direction::Alternate),
     )
     .expect("the motion timeline is valid")
 }
 
-/// Creates the two-pass timeline used to demonstrate alternate direction.
+/// Creates the infinite timeline used to demonstrate alternate direction.
 fn alternate_timeline() -> Timeline<f32> {
     Timeline::new(
         Keyframes::new([
@@ -317,9 +360,8 @@ fn alternate_timeline() -> Timeline<f32> {
         ])
         .expect("alternate keyframes are ordered"),
         Timing::new(Duration::from_millis(430))
-            .iterations(Iterations::Finite(2.0))
-            .direction(Direction::Alternate)
-            .fill(FillMode::Forwards),
+            .iterations(Iterations::Infinite)
+            .direction(Direction::Alternate),
     )
     .expect("the alternate timeline is valid")
 }

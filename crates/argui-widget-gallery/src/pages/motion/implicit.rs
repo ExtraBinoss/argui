@@ -154,7 +154,7 @@ pub(super) fn cards(demo: &MotionDemo, theme: &WidgetTheme) -> Vec<Element> {
         card(
             "implicit-retarget",
             "Interruptible retargeting",
-            "Replay mid-flight: motion continues from the visible value.",
+            "Each loop retargets from the currently presented value.",
             interrupted,
             theme,
         ),

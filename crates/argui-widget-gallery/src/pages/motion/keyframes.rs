@@ -133,7 +133,7 @@ pub(super) fn cards(demo: &MotionDemo, theme: &WidgetTheme) -> Vec<Element> {
         card(
             "alternate",
             "Alternate direction",
-            "Two iterations reverse automatically on the same timeline.",
+            "Infinite iterations reverse automatically on one timeline.",
             alternate_art,
             theme,
         ),

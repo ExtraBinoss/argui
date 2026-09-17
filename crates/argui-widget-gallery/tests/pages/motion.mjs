@@ -34,17 +34,23 @@ try {
   });
   await page.waitForSelector(button("Animation lab"));
   await page.$eval(button("Animation lab"), (element) => element.click());
-  await page.waitForSelector(button("Run all animations"));
+  await page.waitForSelector(button("Stop animations"));
   await pause(350);
 
-  const run = await page.$eval(button("Run all animations"), (element) =>
+  const toggle = await page.$eval(button("Stop animations"), (element) =>
     element.getBoundingClientRect().toJSON(),
   );
   assert.ok(
-    run.top >= 0 && run.bottom <= 620,
-    "Run all animations is immediately visible",
+    toggle.top >= 0 && toggle.bottom <= 620,
+    "The animation toggle is immediately visible",
   );
-  await page.mouse.click(run.x + run.width / 2, run.y + run.height / 2);
+  await page.mouse.click(
+    toggle.x + toggle.width / 2,
+    toggle.y + toggle.height / 2,
+  );
+  await page.waitForSelector(button("Run animations"));
+  await page.$eval(button("Run animations"), (element) => element.click());
+  await page.waitForSelector(button("Stop animations"));
 
   const scrollAndSample = async (x, y, selector) => {
     const position = () =>
@@ -67,9 +73,10 @@ try {
   const contentSamples = await scrollAndSample(
     650,
     430,
-    button("Run all animations"),
+    button("Stop animations"),
   );
-  await page.$eval(button("Run all animations"), (element) => element.click());
+  await page.$eval(button("Stop animations"), (element) => element.click());
+  await page.waitForSelector(button("Run animations"));
   const sidebarSamples = await scrollAndSample(130, 420, button("Button"));
 
   const png = await page.screenshot({

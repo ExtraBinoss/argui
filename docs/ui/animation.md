@@ -147,10 +147,11 @@ The Widget Gallery's **Animation laboratory** contains twenty live examples:
 | Physics | analytical spring; bounded inertia; velocity-preserving retarget; squash and stretch |
 | Composition | additive tracks; a user-defined `Curve`; synchronized layer, glow and compositor properties |
 
-Use **Run all animations** repeatedly while motion is active to see every
-retarget continue from its presented value. Enabling the platform reduced-motion
-preference snaps all twenty examples to their destination and returns the
-application to an idle frame schedule.
+The laboratory starts all twenty examples automatically and loops them forever.
+Use **Stop animations** to pause the shared clock, then **Run animations** to
+resume from the same phase. Enabling the platform reduced-motion preference
+snaps every example to its destination and returns the application to an idle
+frame schedule.
 
 ## Ownership and scheduling
 

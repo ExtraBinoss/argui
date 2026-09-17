@@ -1,7 +1,7 @@
 use super::*;
 
 #[test]
-fn animation_lab_replays_spring_layout_color_and_transform_tracks() {
+fn animation_lab_auto_runs_loops_and_toggles_every_track() {
     use argui::animation::{Duration, Frame, Time};
     let gallery = Entity::new(WidgetGallery::default()).mount().unwrap();
     let click = |key: &str| {
@@ -20,6 +20,7 @@ fn animation_lab_replays_spring_layout_color_and_transform_tracks() {
     };
     click("nav::motion");
     let initial = gallery.render(Default::default()).unwrap();
+    assert!(contains_text(&initial, "Stop animations"));
     for label in [
         "AnimatedOpacity",
         "Animated size",
@@ -51,6 +52,17 @@ fn animation_lab_replays_spring_layout_color_and_transform_tracks() {
     let initial_spring = keyed(&initial, "motion-spring-square").unwrap().transform;
     let initial_scale = keyed(&initial, "motion-morph").unwrap().transform.scale.x;
 
+    click("motion-toggle");
+    assert!(contains_text(
+        &gallery.render(Default::default()).unwrap(),
+        "Run animations"
+    ));
+    click("motion-toggle");
+    assert!(contains_text(
+        &gallery.render(Default::default()).unwrap(),
+        "Stop animations"
+    ));
+
     for index in 0..=30 {
         gallery
             .animation_frame(Frame {
@@ -66,23 +78,73 @@ fn animation_lab_replays_spring_layout_color_and_transform_tracks() {
     assert!(spring.rotation > initial_spring.rotation);
     assert!(scale > initial_scale);
 
-    click("motion-replay");
-    gallery
-        .animation_frame(Frame {
-            now: Time::from_nanos(600_000_000),
-            elapsed: Duration::from_millis(16),
-        })
-        .unwrap();
-    for index in 1..=30 {
+    for index in 31..=120 {
         gallery
             .animation_frame(Frame {
-                now: Time::from_nanos(600_000_000 + index * 16_000_000),
+                now: Time::from_nanos(index * 16_000_000),
                 elapsed: Duration::from_millis(16),
             })
             .unwrap();
     }
-    let reversed = gallery.render(Default::default()).unwrap();
-    assert!(keyed(&reversed, "motion-morph").unwrap().transform.scale.x < scale);
+    let looped = gallery.render(Default::default()).unwrap();
+    assert_eq!(
+        keyed(&looped, "motion-implicit-transform")
+            .unwrap()
+            .transform
+            .translation
+            .x,
+        130.0,
+        "the implicit examples entered a third cycle instead of settling"
+    );
+
+    let before_stop = keyed(&looped, "motion-morph").unwrap().transform.scale.x;
+    click("motion-toggle");
+    let stopped = gallery.render(Default::default()).unwrap();
+    assert!(contains_text(&stopped, "Run animations"));
+    gallery
+        .animation_frame(Frame {
+            now: Time::from_nanos(5_000_000_000),
+            elapsed: Duration::from_millis(16),
+        })
+        .unwrap();
+    let frozen = gallery.render(Default::default()).unwrap();
+    assert_eq!(
+        keyed(&frozen, "motion-morph").unwrap().transform.scale.x,
+        before_stop
+    );
+
+    click("motion-toggle");
+    let resumed = gallery.render(Default::default()).unwrap();
+    assert!(contains_text(&resumed, "Stop animations"));
+    gallery
+        .animation_frame(Frame {
+            now: Time::from_nanos(5_000_000_000),
+            elapsed: Duration::from_millis(16),
+        })
+        .unwrap();
+    assert_eq!(
+        keyed(&gallery.render(Default::default()).unwrap(), "motion-morph")
+            .unwrap()
+            .transform
+            .scale
+            .x,
+        before_stop,
+        "resuming preserves the paused phase"
+    );
+    gallery
+        .animation_frame(Frame {
+            now: Time::from_nanos(5_080_000_000),
+            elapsed: Duration::from_millis(16),
+        })
+        .unwrap();
+    assert_ne!(
+        keyed(&gallery.render(Default::default()).unwrap(), "motion-morph")
+            .unwrap()
+            .transform
+            .scale
+            .x,
+        before_stop
+    );
 }
 
 /// Counts animation example cards recursively in the rendered tree.
@@ -108,4 +170,7 @@ fn reduced_motion_snaps_the_animation_lab_to_its_destination() {
     assert_eq!(square.transform.translation.x, 150.0);
     assert_eq!(morph.style.size.width.value(), 212.0);
     assert_eq!(morph.transform.scale.x, 1.0);
+
+    let restored = gallery.render_in(WindowEnvironment::default());
+    assert!(contains_text(&restored, "Stop animations"));
 }

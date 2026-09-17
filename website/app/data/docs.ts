@@ -684,9 +684,9 @@ export const docs: DocGuide[] = [
         id: 'gallery',
         title: 'Explore twenty focused examples',
         paragraphs: [
-          'The complete Widget Gallery groups twenty examples into implicit animation, keyframes and orchestration, physics, and composition. Repeatedly press Run all animations while they move to see retargeting continue from the visible frame.',
+          'The complete Widget Gallery groups twenty examples into implicit animation, keyframes and orchestration, physics, and composition. They start automatically, loop forever, and share one Run / Stop toggle that resumes from the paused phase.',
         ],
-        note: 'Settled animations request no frames. Reduced-motion preferences finish active values and keep future target changes immediate.',
+        note: 'The laboratory requests frames only while its global toggle is running. Reduced-motion preferences finish active values and keep the loop idle.',
       },
     ],
   },
