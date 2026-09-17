@@ -9,7 +9,7 @@ pub mod prelude {
     pub use crate::platform::{ApplicationConfig, WindowConfig};
     pub use crate::runtime::{Context, Render, WindowEnvironment, run_app};
     pub use crate::theme::{Theme, ThemeMode};
-    pub use crate::ui::{Element, EventHandler, ValueHandler, length, percent, sides};
+    pub use crate::ui::{Element, EventHandler, TextEdit, ValueHandler, length, percent, sides};
     #[cfg(feature = "argui-widgets")]
     pub use crate::widgets::{self, WidgetTheme, default_theme};
 }

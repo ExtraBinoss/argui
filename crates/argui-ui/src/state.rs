@@ -3,15 +3,9 @@ use argui_core::{Color, Point, Transform2D};
 use argui_paint::{Border, EffectId, Fill, QuadStyle};
 
 use crate::binding::{GradientPointTarget, LayoutTarget};
-use crate::{BindingImpact, ContainerQuery, Element};
+use crate::{BindingImpact, ContainerQuery};
 
-impl Element {
-    /// Returns whether state or conditional styles have an active animation.
-    #[must_use]
-    pub fn has_state_animation(&self) -> bool {
-        self.style_transition.is_some() || !self.conditional_styles.is_empty()
-    }
-}
+mod compositor;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum VisualState {
@@ -293,6 +287,7 @@ impl PropertyKey {
     #[must_use]
     pub const fn impact(self) -> BindingImpact {
         match self {
+            Self::Transform | Self::LayerOpacity => BindingImpact::Composite,
             Self::Layout(_) | Self::LayoutStyle => BindingImpact::Layout,
             Self::Scroll => BindingImpact::Scroll,
             _ => BindingImpact::Paint,
@@ -411,9 +406,10 @@ impl ConditionalStyles {
             .flat_map(|rule| rule.style.values())
             .map(|value| value.key.impact())
             .max_by_key(|impact| match impact {
-                BindingImpact::Paint => 0,
-                BindingImpact::Scroll => 1,
-                BindingImpact::Layout => 2,
+                BindingImpact::Composite => 0,
+                BindingImpact::Paint => 1,
+                BindingImpact::Scroll => 2,
+                BindingImpact::Layout => 3,
             })
     }
 

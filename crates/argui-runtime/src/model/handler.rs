@@ -1,7 +1,8 @@
 use std::rc::Rc;
 
 use argui_ui::{
-    EventHandler, EventHandlerId, EventListener, EventType, FromHandlerValue, UiEvent, ValueHandler,
+    EventHandler, EventHandlerId, EventListener, EventType, FromHandlerValue, TextEdit, UiEvent,
+    ValueHandler,
 };
 
 use super::{Context, Entity, Render};
@@ -172,6 +173,21 @@ impl<T: Render> Context<T> {
         self.value_callback(callback)
     }
 
+    /// Registers an incremental text-edit callback that invalidates after delivery.
+    ///
+    /// `callback` receives the accepted UTF-8 range replacement rather than a
+    /// clone of the complete controlled value.
+    ///
+    /// # Panics
+    /// Panics if called outside a live entity render context.
+    #[must_use]
+    pub fn edit_callback(
+        &mut self,
+        callback: impl Fn(&mut T, TextEdit) + 'static,
+    ) -> ValueHandler<TextEdit> {
+        self.value_callback(callback)
+    }
+
     /// Registers a submit callback receiving the submitted string.
     ///
     /// `callback` receives mutable application state and the submitted value.
@@ -199,6 +215,21 @@ impl<T: Render> Context<T> {
         &mut self,
         handler: impl Fn(&mut T, String, &UiEvent, &mut Context<T>) + 'static,
     ) -> ValueHandler<String> {
+        self.value_event_handler(handler)
+    }
+
+    /// Registers an incremental text-edit handler with routed event access.
+    ///
+    /// `handler` receives the accepted UTF-8 range replacement and must request
+    /// invalidation explicitly when required.
+    ///
+    /// # Panics
+    /// Panics if called outside a live entity render context.
+    #[must_use]
+    pub fn edit_event_handler(
+        &mut self,
+        handler: impl Fn(&mut T, TextEdit, &UiEvent, &mut Context<T>) + 'static,
+    ) -> ValueHandler<TextEdit> {
         self.value_event_handler(handler)
     }
 

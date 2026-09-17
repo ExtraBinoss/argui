@@ -1,11 +1,18 @@
+use std::borrow::Cow;
+
 use argui_core::{CaretAffinity, ImeInput, Key, KeyInput, KeyState, TextPosition};
 use unicode_segmentation::UnicodeSegmentation;
 
-use crate::{FocusTarget, NodeId};
+use crate::{AppliedTextEdit, FocusTarget, NodeId, TextEdit};
 
+mod boundaries;
 mod filter;
 mod history;
 mod privacy;
+use boundaries::{
+    char_boundary, grapheme_boundary, line_end, line_start, next_grapheme, ordered,
+    previous_grapheme,
+};
 pub use filter::TextInputFilter;
 pub use history::HistoryConfig;
 pub use privacy::TextPrivacy;
@@ -75,11 +82,18 @@ impl TextSelectionRequest {
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct EditResult {
-    pub changed: bool,
+    pub edit: Option<AppliedTextEdit>,
     pub submitted: bool,
     pub layout: bool,
     pub reshape: bool,
     pub clipboard: Option<ClipboardRequest>,
+}
+
+impl EditResult {
+    /// Returns whether the operation accepted a text-buffer replacement.
+    pub(crate) const fn changed(&self) -> bool {
+        self.edit.is_some()
+    }
 }
 
 impl TextInputState {
@@ -92,13 +106,14 @@ impl TextInputState {
         if self.read_only || self.value == value || !self.filter.accepts(&value) {
             return EditResult::default();
         }
-        self.value = value;
+        let previous_len = self.value.len();
+        let edit = AppliedTextEdit::apply(&mut self.value, TextEdit::new(0..previous_len, value));
         self.cursor = self.value.len();
         self.anchor = None;
         self.affinity = CaretAffinity::Before;
         self.preedit = None;
         EditResult {
-            changed: true,
+            edit: Some(edit),
             layout: true,
             reshape: true,
             ..Default::default()
@@ -207,13 +222,16 @@ impl TextInputState {
         (anchor != self.display_position()).then(|| (anchor, self.display_position()))
     }
 
-    pub fn display(&self) -> String {
-        let display = self.unmasked_display();
+    pub fn display_cow(&self) -> Cow<'_, str> {
         if self.privacy == TextPrivacy::Password {
-            "•".repeat(display.graphemes(true).count())
-        } else {
-            display
+            return Cow::Owned("•".repeat(self.unmasked_display().graphemes(true).count()));
         }
+        let Some(preedit) = &self.preedit else {
+            return Cow::Borrowed(&self.value);
+        };
+        let mut display = self.value.clone();
+        display.insert_str(self.cursor, &preedit.text);
+        Cow::Owned(display)
     }
 
     fn unmasked_display(&self) -> String {
@@ -245,21 +263,20 @@ impl TextInputState {
         match input.key {
             Key::ArrowLeft | Key::ArrowRight | Key::Home | Key::End => self.navigate(input),
             Key::Backspace if !self.read_only => {
-                result.changed = self.backspace(command || input.modifiers.alt)
+                result.edit = self.backspace(command || input.modifiers.alt)
             }
             Key::Delete if !self.read_only => {
-                result.changed = self.delete(command || input.modifiers.alt)
+                result.edit = self.delete(command || input.modifiers.alt)
             }
             Key::Enter if self.multiline && !command && !self.read_only => {
-                self.insert("\n");
-                result.changed = true;
+                result.edit = Some(self.insert("\n"));
             }
             Key::Enter if self.multiline && self.read_only => {}
             Key::Enter => result.submitted = true,
             Key::Escape => self.anchor = None,
             _ if !self.read_only && !input.modifiers.alt => {
                 if let Some(text) = input.text.as_deref().filter(|text| !text.is_empty()) {
-                    result.changed = self.insert_input(text);
+                    result.edit = self.insert_input(text);
                 }
             }
             _ => {}
@@ -270,6 +287,7 @@ impl TextInputState {
         ) {
             self.extend_selection(old_cursor, input.modifiers.shift);
         }
+        let changed = result.changed();
         result.layout = before
             != (
                 self.cursor,
@@ -277,8 +295,8 @@ impl TextInputState {
                 self.anchor,
                 self.preedit.clone(),
             )
-            || result.changed;
-        result.reshape = result.changed;
+            || changed;
+        result.reshape = changed;
         result
     }
 
@@ -299,9 +317,10 @@ impl TextInputState {
             }
             ImeInput::Commit(text) => {
                 self.preedit = None;
-                let changed = self.insert_input(&text);
+                let edit = self.insert_input(&text);
+                let changed = edit.is_some();
                 return EditResult {
-                    changed,
+                    edit,
                     layout: changed || before.is_some(),
                     reshape: changed || before.is_some(),
                     ..EditResult::default()
@@ -321,9 +340,10 @@ impl TextInputState {
         if self.read_only {
             return EditResult::default();
         }
-        let changed = self.insert_input(text);
+        let edit = self.insert_input(text);
+        let changed = edit.is_some();
         EditResult {
-            changed,
+            edit,
             layout: changed,
             reshape: changed,
             ..EditResult::default()
@@ -400,9 +420,10 @@ impl TextInputState {
                     return EditResult::default();
                 }
                 let clipboard = self.selected_text().map(ClipboardRequest::Write);
-                let changed = clipboard.is_some() && self.delete_selection();
+                let edit = clipboard.as_ref().and_then(|_| self.delete_selection());
+                let changed = edit.is_some();
                 EditResult {
-                    changed,
+                    edit,
                     layout: changed,
                     reshape: changed,
                     clipboard,
@@ -425,15 +446,16 @@ impl TextInputState {
         Some(self.value[start..end].to_owned())
     }
 
-    fn insert(&mut self, text: &str) {
-        self.delete_selection();
-        self.value.insert_str(self.cursor, text);
-        self.cursor += text.len();
+    fn insert(&mut self, text: &str) -> AppliedTextEdit {
+        let (start, end) = self.selection().unwrap_or((self.cursor, self.cursor));
+        let edit = AppliedTextEdit::apply(&mut self.value, TextEdit::new(start..end, text));
+        self.cursor = start + text.len();
         self.affinity = CaretAffinity::Before;
         self.anchor = None;
+        edit
     }
 
-    fn insert_input(&mut self, text: &str) -> bool {
+    fn insert_input(&mut self, text: &str) -> Option<AppliedTextEdit> {
         let single_line;
         let text = if self.multiline {
             text
@@ -442,23 +464,24 @@ impl TextInputState {
             &single_line
         };
         if text.is_empty() {
-            return false;
+            return None;
         }
         let (start, end) = self.selection().unwrap_or((self.cursor, self.cursor));
-        let mut candidate = String::with_capacity(self.value.len() + text.len());
-        candidate.push_str(&self.value[..start]);
-        candidate.push_str(text);
-        candidate.push_str(&self.value[end..]);
-        if !self.filter.accepts(&candidate) {
-            return false;
+        if self.filter != TextInputFilter::Any {
+            let mut candidate = String::with_capacity(self.value.len() + text.len());
+            candidate.push_str(&self.value[..start]);
+            candidate.push_str(text);
+            candidate.push_str(&self.value[end..]);
+            if !self.filter.accepts(&candidate) {
+                return None;
+            }
         }
-        self.insert(text);
-        true
+        Some(self.insert(text))
     }
 
-    fn backspace(&mut self, by_word: bool) -> bool {
-        if self.delete_selection() {
-            return true;
+    fn backspace(&mut self, by_word: bool) -> Option<AppliedTextEdit> {
+        if let Some(edit) = self.delete_selection() {
+            return Some(edit);
         }
         let start = if by_word {
             navigation::previous_word(&self.value, self.cursor)
@@ -466,17 +489,20 @@ impl TextInputState {
             previous_grapheme(&self.value, self.cursor)
         };
         if start == self.cursor {
-            return false;
+            return None;
         }
-        self.value.replace_range(start..self.cursor, "");
+        let edit = AppliedTextEdit::apply(
+            &mut self.value,
+            TextEdit::new(start..self.cursor, String::new()),
+        );
         self.cursor = start;
         self.affinity = CaretAffinity::After;
-        true
+        Some(edit)
     }
 
-    fn delete(&mut self, by_word: bool) -> bool {
-        if self.delete_selection() {
-            return true;
+    fn delete(&mut self, by_word: bool) -> Option<AppliedTextEdit> {
+        if let Some(edit) = self.delete_selection() {
+            return Some(edit);
         }
         let end = if by_word {
             navigation::next_word(&self.value, self.cursor)
@@ -484,21 +510,22 @@ impl TextInputState {
             next_grapheme(&self.value, self.cursor)
         };
         if end == self.cursor {
-            return false;
+            return None;
         }
-        self.value.replace_range(self.cursor..end, "");
-        true
+        Some(AppliedTextEdit::apply(
+            &mut self.value,
+            TextEdit::new(self.cursor..end, String::new()),
+        ))
     }
 
-    fn delete_selection(&mut self) -> bool {
-        let Some((start, end)) = self.selection() else {
-            return false;
-        };
-        self.value.replace_range(start..end, "");
+    fn delete_selection(&mut self) -> Option<AppliedTextEdit> {
+        let (start, end) = self.selection()?;
+        let edit =
+            AppliedTextEdit::apply(&mut self.value, TextEdit::new(start..end, String::new()));
         self.cursor = start;
         self.affinity = CaretAffinity::After;
         self.anchor = None;
-        true
+        Some(edit)
     }
 
     fn move_to(&mut self, cursor: usize) {
@@ -516,50 +543,4 @@ impl TextInputState {
             self.anchor = None;
         }
     }
-}
-
-const fn ordered(a: usize, b: usize) -> (usize, usize) {
-    if a <= b { (a, b) } else { (b, a) }
-}
-
-fn previous_grapheme(value: &str, cursor: usize) -> usize {
-    value[..cursor]
-        .grapheme_indices(true)
-        .next_back()
-        .map_or(0, |(index, _)| index)
-}
-
-fn next_grapheme(value: &str, cursor: usize) -> usize {
-    value[cursor..]
-        .grapheme_indices(true)
-        .nth(1)
-        .map_or(value.len(), |(index, _)| cursor + index)
-}
-
-fn char_boundary(value: &str, index: usize) -> usize {
-    (0..=index)
-        .rev()
-        .find(|candidate| value.is_char_boundary(*candidate))
-        .unwrap_or(0)
-}
-
-fn grapheme_boundary(value: &str, index: usize) -> usize {
-    if index >= value.len() {
-        return value.len();
-    }
-    value
-        .grapheme_indices(true)
-        .take_while(|(boundary, _)| *boundary <= index)
-        .last()
-        .map_or(0, |(boundary, _)| boundary)
-}
-
-fn line_start(value: &str, cursor: usize) -> usize {
-    value[..cursor].rfind('\n').map_or(0, |index| index + 1)
-}
-
-fn line_end(value: &str, cursor: usize) -> usize {
-    value[cursor..]
-        .find('\n')
-        .map_or(value.len(), |index| cursor + index)
 }

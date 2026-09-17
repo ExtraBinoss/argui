@@ -24,18 +24,15 @@ impl Render for Example {
     fn render(&mut self, cx: &mut Context<Self>) -> Element {
         let themes = default_theme(cx.environment());
         let theme = themes.resolve(cx.environment().color_scheme);
-        let orb = Element::row([Element::text(if self.dragging {
-            "HOLDING"
-        } else {
-            "DRAG"
-        })
-        .text_style(TextStyle {
-            color: Color::WHITE.into(),
-            font_size: 11.0,
-            line_height: 15.0,
-            weight: 760,
-            ..TextStyle::default()
-        })])
+        let orb = Element::row([
+            Element::text(if self.dragging { "HOLDING" } else { "DRAG" }).text_style(TextStyle {
+                color: Color::WHITE,
+                font_size: 11.0,
+                line_height: 15.0,
+                weight: 760,
+                ..TextStyle::default()
+            }),
+        ])
         .absolute(Sides {
             left: length(220.0),
             right: argui::ui::auto(),
@@ -96,7 +93,8 @@ impl Render for Example {
                 if gesture.phase == GesturePhase::Changed {
                     example.delivered_updates = example.delivered_updates.saturating_add(1);
                 }
-                example.offset = Point::new(total.x.clamp(-210.0, 210.0), total.y.clamp(-68.0, 68.0));
+                example.offset =
+                    Point::new(total.x.clamp(-210.0, 210.0), total.y.clamp(-68.0, 68.0));
                 example.velocity = velocity;
                 if matches!(gesture.phase, GesturePhase::Ended | GesturePhase::Cancelled) {
                     example.dragging = false;

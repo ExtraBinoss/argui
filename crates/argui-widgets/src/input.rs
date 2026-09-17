@@ -1,8 +1,8 @@
 use argui_paint::{Color, PaintStyle};
-use argui_text::{TextColor, TextOverflow, TextStyle, TextWrap};
+use argui_text::{TextColor, TextContent, TextOverflow, TextStyle, TextWrap};
 use argui_ui::{
     AlignItems, CaretStyle, Element, EventType, LayoutStyle, Role, StateSelector, StylePatch,
-    StyleTransition, TextEditorSpec, TextInputFilter, ValueHandler, VisualState, percent,
+    StyleTransition, TextEdit, TextEditorSpec, TextInputFilter, ValueHandler, VisualState, percent,
 };
 
 #[cfg(feature = "textarea")]
@@ -118,6 +118,7 @@ pub struct Input {
     invalid: bool,
     leading: Option<(Element, f32)>,
     input_handlers: Vec<ValueHandler<String>>,
+    edit_handlers: Vec<ValueHandler<TextEdit>>,
     submit_handlers: Vec<ValueHandler<String>>,
 }
 
@@ -147,6 +148,7 @@ impl Input {
             invalid: false,
             leading: None,
             input_handlers: Vec::new(),
+            edit_handlers: Vec::new(),
             submit_handlers: Vec::new(),
         }
     }
@@ -210,6 +212,16 @@ impl Input {
         self
     }
 
+    /// Adds a callback receiving only the accepted UTF-8 range replacement.
+    ///
+    /// `handler` is normally created with `Context::edit_callback`. Prefer this
+    /// over [`Self::on_input`] for large document buffers.
+    #[must_use]
+    pub fn on_edit(mut self, handler: ValueHandler<TextEdit>) -> Self {
+        self.edit_handlers.push(handler);
+        self
+    }
+
     /// Adds a callback receiving the submitted value.
     ///
     /// `handler` is normally created with `Context::submit_callback`. Handlers
@@ -257,6 +269,7 @@ impl Input {
                 description: self.description,
                 invalid: self.invalid,
                 input_handlers: self.input_handlers,
+                edit_handlers: self.edit_handlers,
                 submit_handlers: self.submit_handlers,
             },
             self.leading,
@@ -273,9 +286,11 @@ pub struct TextArea {
     placeholder: String,
     style: InputStyle,
     scroll: ScrollConfig,
+    content: Option<TextContent>,
     enabled: bool,
     read_only: bool,
     input_handlers: Vec<ValueHandler<String>>,
+    edit_handlers: Vec<ValueHandler<TextEdit>>,
     submit_handlers: Vec<ValueHandler<String>>,
 }
 
@@ -302,9 +317,11 @@ impl TextArea {
             placeholder: placeholder.into(),
             style,
             scroll: ScrollConfig::default().propagation(ScrollPropagation::Contain),
+            content: None,
             enabled: true,
             read_only: false,
             input_handlers: Vec::new(),
+            edit_handlers: Vec::new(),
             submit_handlers: Vec::new(),
         }
     }
@@ -313,6 +330,28 @@ impl TextArea {
     /// Sets the scroll behavior for overflowing text.
     pub fn scroll_config(mut self, scroll: ScrollConfig) -> Self {
         self.scroll = scroll;
+        self
+    }
+
+    /// Sets how multiline content wraps inside the editor viewport.
+    ///
+    /// `wrap` controls both entered text and the placeholder. Code editors commonly
+    /// use [`TextWrap::None`], while prose editors normally keep the default
+    /// [`TextWrap::WordOrGlyph`].
+    #[must_use]
+    pub fn wrap(mut self, wrap: TextWrap) -> Self {
+        self.style.text.wrap = wrap;
+        self.style.placeholder.wrap = wrap;
+        self
+    }
+
+    /// Supplies rich text styling for the current controlled value.
+    ///
+    /// `content` must concatenate to the same text as the value passed to [`Self::new`].
+    /// A mismatched value safely falls back to plain text until refreshed content arrives.
+    #[must_use]
+    pub fn rich_text(mut self, content: TextContent) -> Self {
+        self.content = Some(content);
         self
     }
 
@@ -346,6 +385,16 @@ impl TextArea {
         self
     }
 
+    /// Adds a callback receiving only the accepted UTF-8 range replacement.
+    ///
+    /// `handler` is normally created with `Context::edit_callback`. This avoids
+    /// cloning the complete controlled value on every edit.
+    #[must_use]
+    pub fn on_edit(mut self, handler: ValueHandler<TextEdit>) -> Self {
+        self.edit_handlers.push(handler);
+        self
+    }
+
     /// Adds a callback receiving the submitted multiline value.
     ///
     /// `handler` is normally created with `Context::submit_callback`.
@@ -358,7 +407,13 @@ impl TextArea {
     #[must_use]
     /// Builds the configured text area.
     pub fn build(self) -> Element {
-        editor(
+        let horizontal_overflow = if self.style.text.wrap == TextWrap::None {
+            Overflow::Auto
+        } else {
+            Overflow::Hidden
+        };
+        let content = self.content;
+        let mut element = editor(
             EditorSpec {
                 key: self.key,
                 value: self.value,
@@ -373,16 +428,21 @@ impl TextArea {
                 description: None,
                 invalid: false,
                 input_handlers: self.input_handlers,
+                edit_handlers: self.edit_handlers,
                 submit_handlers: self.submit_handlers,
             },
             None,
-        )
-        .overflow(Axes {
-            x: Overflow::Hidden,
-            y: Overflow::Auto,
-        })
-        .scrollbar_gutter(ScrollbarGutter::Stable)
-        .scroll_config(self.scroll)
+        );
+        if let Some(content) = content {
+            element = element.text_editor_content(content);
+        }
+        element
+            .overflow(Axes {
+                x: horizontal_overflow,
+                y: Overflow::Auto,
+            })
+            .scrollbar_gutter(ScrollbarGutter::Stable)
+            .scroll_config(self.scroll)
     }
 }
 
@@ -400,6 +460,7 @@ struct EditorSpec {
     description: Option<String>,
     invalid: bool,
     input_handlers: Vec<ValueHandler<String>>,
+    edit_handlers: Vec<ValueHandler<TextEdit>>,
     submit_handlers: Vec<ValueHandler<String>>,
 }
 
@@ -437,6 +498,9 @@ fn editor(spec: EditorSpec, leading: Option<(Element, f32)>) -> Element {
     let mut editor = behavior.decorate(TextFieldPart::Editor, element);
     for handler in spec.input_handlers {
         editor = editor.on(handler.direct_listener(EventType::Input));
+    }
+    for handler in spec.edit_handlers {
+        editor = editor.on(handler.direct_listener(EventType::TextEdit));
     }
     for handler in spec.submit_handlers {
         editor = editor.on(handler.direct_listener(EventType::Submit));

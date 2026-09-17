@@ -2,11 +2,13 @@ use argui_core::{Key, KeyState};
 use argui_ui::{
     AlignItems, CursorIcon, Element, EventType, GestureCapture, GestureDelivery, GestureKind,
     GesturePhase, GestureSet, Interaction, JustifyContent, Orientation, PanAxis, PanGesture, Role,
-    SemanticAction, SemanticValue, Semantics, SplitHandlerValue, StylePatch, UiEvent, UiEventKind,
-    UserSelect, ValueHandler, VisualState, length, percent, property,
+    SemanticAction, SemanticValue, Semantics, SplitHandlerValue, StateScopeId, StylePatch, UiEvent,
+    UiEventKind, UserSelect, ValueHandler, VisualState, length, percent, property,
 };
 
 use crate::WidgetTheme;
+
+const SPLIT_PANE_SCOPE: StateScopeId = StateScopeId::new("split-pane");
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SplitAxis {
@@ -147,7 +149,19 @@ impl SplitPane {
             } else {
                 length(2.0)
             })
-            .background(theme.border);
+            .background(theme.border)
+            .when(
+                argui_ui::StateSelector::scope(SPLIT_PANE_SCOPE, VisualState::Hovered),
+                StylePatch::new().set(property::BackgroundColor, theme.primary),
+            )
+            .when(
+                argui_ui::StateSelector::scope(SPLIT_PANE_SCOPE, VisualState::Pressed),
+                StylePatch::new().set(property::BackgroundColor, theme.primary),
+            )
+            .when(
+                argui_ui::StateSelector::scope(SPLIT_PANE_SCOPE, VisualState::FocusVisible),
+                StylePatch::new().set(property::BackgroundColor, theme.primary),
+            );
         let mut separator = Element::container([line])
             .keyed(self.key.clone())
             .width(if horizontal {
@@ -163,6 +177,7 @@ impl SplitPane {
             .shrink(0.0)
             .align_items(AlignItems::CENTER)
             .justify_content(JustifyContent::CENTER)
+            .state_scope(SPLIT_PANE_SCOPE)
             .user_select(UserSelect::None)
             .interaction(
                 Interaction::default()
@@ -201,18 +216,6 @@ impl SplitPane {
                         step: Some(10.0),
                     })
                     .action(SemanticAction::Focus),
-            )
-            .when(
-                VisualState::Hovered,
-                StylePatch::new().set(property::BackgroundColor, theme.primary),
-            )
-            .when(
-                VisualState::Pressed,
-                StylePatch::new().set(property::BackgroundColor, theme.primary),
-            )
-            .when(
-                VisualState::FocusVisible,
-                StylePatch::new().set(property::BackgroundColor, theme.primary),
             );
         let source = SplitHandlerValue::new(
             self.size,

@@ -11,11 +11,7 @@ impl Application {
         };
         self.layout_engine
             .update_text_inputs(ui, &mut self.text_engine, layout);
-        if let Some(prepared) = &mut self.prepared_text {
-            for (index, block) in layout.text.blocks().iter().enumerate() {
-                prepared.reposition_block(index, block.bounds.origin, block.clip);
-            }
-        }
+        self.prepared_text = Some(self.text_engine.prepare(&layout.text, self.scale_factor));
         true
     }
 

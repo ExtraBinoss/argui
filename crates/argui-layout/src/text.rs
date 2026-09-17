@@ -18,6 +18,7 @@ pub(super) fn content<'a>(
         )),
         ElementKind::TextEditor {
             placeholder,
+            styled,
             text,
             placeholder_text,
             ..
@@ -29,10 +30,12 @@ pub(super) fn content<'a>(
                     Cow::Borrowed(placeholder_text),
                 ))
             } else {
-                Some((
-                    TextContent::plain(value),
-                    Cow::Owned(ui.resolved_text_style(node, text)),
-                ))
+                let content = styled
+                    .as_deref()
+                    .filter(|content| content.as_str() == value.as_ref())
+                    .cloned()
+                    .unwrap_or_else(|| TextContent::plain(value.into_owned()));
+                Some((content, Cow::Owned(ui.resolved_text_style(node, text))))
             }
         }
         ElementKind::Custom(_)

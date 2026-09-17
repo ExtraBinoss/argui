@@ -551,8 +551,10 @@ pub(in crate::tree) fn apply_layer(
     registry.visit(
         TransitionTarget::Element(node),
         |key| {
-            key.impact() == crate::BindingImpact::Paint
-                && !key.is_quad()
+            matches!(
+                key.impact(),
+                crate::BindingImpact::Paint | crate::BindingImpact::Composite
+            ) && !key.is_quad()
                 && !matches!(
                     key,
                     PropertyKey::TextColor | PropertyKey::VectorColor | PropertyKey::Transform

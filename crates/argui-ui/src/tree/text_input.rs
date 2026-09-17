@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use crate::text_input::TextInputState;
 use crate::{InteractionUpdate, NodeId, SelectionGranularity, TextSelectionRequest, UiTree};
 use argui_core::{ImeInput, TextPosition};
@@ -15,8 +17,8 @@ impl UiTree {
     ///
     /// * `node` — retained text-input node.
     #[must_use]
-    pub fn text_input_display(&self, node: NodeId) -> Option<String> {
-        self.text_inputs.get(node).map(TextInputState::display)
+    pub fn text_input_display(&self, node: NodeId) -> Option<Cow<'_, str>> {
+        self.text_inputs.get(node).map(TextInputState::display_cow)
     }
 
     /// Returns the displayed cursor byte index for a text input.

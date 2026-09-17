@@ -318,6 +318,59 @@ impl SurfaceRenderer {
         )
     }
 
+    /// Presents composition-only changes while reusing prepared primitive and text buffers.
+    ///
+    /// This method is valid after at least one successful [`Self::render_ui`] or
+    /// [`Self::render_ui_notified`] call for the same retained display-list content.
+    ///
+    /// # Errors
+    /// Returns a renderer error if the display list is invalid, a required effect
+    /// is unavailable, or frame acquisition or rendering fails.
+    ///
+    /// * `display_list` — retained commands with updated compositor layers.
+    /// * `scale_factor` — logical-to-physical scale used by the prepared content.
+    #[cfg_attr(coverage_nightly, coverage(off))]
+    pub fn render_composite(
+        &mut self,
+        display_list: &DisplayList,
+        scale_factor: f32,
+    ) -> Result<RenderStatus, RendererError> {
+        self.render_frame(
+            FrameContent::Composite {
+                display_list,
+                scale_factor,
+            },
+            || {},
+        )
+    }
+
+    /// Presents composition-only changes and invokes `notify` after submission.
+    ///
+    /// This method is valid after at least one successful [`Self::render_ui`] or
+    /// [`Self::render_ui_notified`] call for the same retained display-list content.
+    ///
+    /// # Errors
+    /// Returns a renderer error if the display list is invalid, a required effect
+    /// is unavailable, or frame acquisition or rendering fails.
+    ///
+    /// * `display_list` — retained commands with updated compositor layers.
+    /// * `scale_factor` — logical-to-physical scale used by the prepared content.
+    /// * `notify` — callback invoked after the frame is submitted.
+    pub fn render_composite_notified(
+        &mut self,
+        display_list: &DisplayList,
+        scale_factor: f32,
+        notify: impl FnOnce(),
+    ) -> Result<RenderStatus, RendererError> {
+        self.render_frame(
+            FrameContent::Composite {
+                display_list,
+                scale_factor,
+            },
+            notify,
+        )
+    }
+
     /// Returns current statistics for the offscreen texture pool.
     #[must_use]
     pub fn texture_pool_stats(&self) -> TexturePoolStats {

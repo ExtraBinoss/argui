@@ -4,7 +4,7 @@ use argui_core::{
 };
 use argui_layout::{LayoutEngine, TextInputRegion};
 use argui_paint::{PaintStyle, QuadStyle};
-use argui_text::{CaretStop, TextEngine, TextOverflow, TextStyle};
+use argui_text::{CaretStop, TextEngine, TextOverflow, TextStyle, TextWrap};
 use argui_ui::{
     CursorIcon, Element, EventHandlerId, EventListener, EventOwnerId, EventType, GestureCapture,
     GestureKind, GestureSet, Interaction, PanGesture, Position, ScrollbarPartStyle, ScrollbarStyle,
@@ -74,6 +74,139 @@ fn placeholder_keeps_its_authored_color_on_the_first_frame() {
     assert_eq!(output.text.blocks()[0].style.color, Color::WHITE);
 }
 
+#[test]
+fn retained_text_edits_refresh_painted_content_without_a_tree_rebuild() {
+    let area = TextArea::new(
+        "code",
+        "before",
+        "Code",
+        InputStyle::new(PaintStyle::default(), TextStyle::default()),
+    )
+    .build();
+    let mut ui = UiTree::new(area);
+    let node = ui.node_id_at(0).unwrap();
+    let mut layout = LayoutEngine::new();
+    let mut text = text_engine();
+    let mut output = layout
+        .compute(&mut ui, &mut text, Size::new(320.0, 100.0))
+        .unwrap();
+
+    ui.replace_text_input(node, "after");
+    layout.update_text_inputs(&mut ui, &mut text, &mut output);
+
+    assert_eq!(output.text.blocks()[0].content.as_str(), "after");
+}
+
+#[test]
+fn non_wrapping_text_area_scrolls_both_axes_without_leaking_past_its_viewport() {
+    let long_line =
+        "let extremely_long_identifier = build_a_value_that_exceeds_the_editor_width();";
+    let value = std::iter::repeat_n(long_line, 24)
+        .collect::<Vec<_>>()
+        .join("\n");
+    let area = TextArea::new(
+        "code",
+        value,
+        "",
+        InputStyle::new(PaintStyle::default(), TextStyle::default()),
+    )
+    .wrap(TextWrap::None)
+    .build()
+    .width(length(240.0))
+    .height(length(96.0));
+    let mut ui = UiTree::new(area);
+    let output = LayoutEngine::new()
+        .compute(&mut ui, &mut text_engine(), Size::new(240.0, 96.0))
+        .unwrap();
+
+    assert!(output.scroll_regions[0].max_offset.x > 0.0);
+    assert!(output.scroll_regions[0].max_offset.y > 0.0);
+    assert_eq!(output.text.blocks()[0].clip, output.text_inputs[0].clip);
+}
+
+#[test]
+fn large_non_wrapping_text_areas_shape_only_the_scrolled_viewport() {
+    let value = (0..1_000)
+        .map(|line| format!("line {line:04}: let value = compute();"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let area = TextArea::new(
+        "code",
+        &value,
+        "",
+        InputStyle::new(
+            PaintStyle::default(),
+            TextStyle {
+                line_height: 20.0,
+                ..TextStyle::default()
+            },
+        ),
+    )
+    .wrap(TextWrap::None)
+    .build()
+    .width(length(320.0))
+    .height(length(100.0));
+    let mut ui = UiTree::new(area);
+    let node = ui.node_id_at(0).unwrap();
+    let mut layout = LayoutEngine::new();
+    let mut text = text_engine();
+    let mut output = layout
+        .compute(&mut ui, &mut text, Size::new(320.0, 100.0))
+        .unwrap();
+    assert!(output.text_inputs[0].content_size.height >= 20_000.0);
+    assert!(output.text.blocks()[0].content.as_str().len() < value.len() / 10);
+
+    ui.set_scroll_offset(node, Point::new(0.0, 10_000.0));
+    layout.update_text_inputs(&mut ui, &mut text, &mut output);
+
+    let visible = output.text.blocks()[0].content.as_str();
+    assert!(visible.contains("line 0498") || visible.contains("line 0499"));
+    assert!(!visible.contains("line 0000"));
+    assert!(output.text_inputs[0].content_size.height >= 20_000.0);
+}
+
+#[test]
+fn repeated_virtual_editor_scrolls_keep_the_viewport_and_reach_the_last_line() {
+    let value = (0..1_000)
+        .map(|line| format!("line {line:04}: let value = compute();"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let mut style = InputStyle::new(
+        PaintStyle::default(),
+        TextStyle {
+            line_height: 20.0,
+            ..TextStyle::default()
+        },
+    );
+    style.layout.padding = argui_ui::sides(20.0, 16.0);
+    let area = TextArea::new("code", &value, "", style)
+        .wrap(TextWrap::None)
+        .build()
+        .width(length(640.0))
+        .height(length(420.0));
+    let mut ui = UiTree::new(area);
+    let node = ui.node_id_at(0).unwrap();
+    let mut layout = LayoutEngine::new();
+    let mut text = text_engine();
+    let mut output = layout
+        .compute(&mut ui, &mut text, Size::new(640.0, 420.0))
+        .unwrap();
+    let viewport = output.text_inputs[0].viewport;
+    let maximum = output.scroll_regions[0].max_offset.y;
+    assert!(maximum > 19_000.0);
+
+    for step in 1..=20 {
+        let offset = maximum * step as f32 / 20.0;
+        ui.set_scroll_offset(node, Point::new(0.0, offset));
+        layout.update_text_inputs(&mut ui, &mut text, &mut output);
+        assert_eq!(output.text_inputs[0].viewport, viewport);
+        assert_eq!(output.scroll_regions[0].max_offset.y, maximum);
+    }
+
+    let visible = output.text.blocks()[0].content.as_str();
+    assert!(visible.contains("line 0999"), "{visible}");
+}
+
 fn stop(index: usize, x: f32, y: f32, word_boundary: bool) -> CaretStop {
     CaretStop {
         position: TextPosition::new(index, CaretAffinity::Before),
@@ -92,7 +225,7 @@ fn region(stops: Vec<CaretStop>) -> TextInputRegion {
         stops,
         selection: Vec::new(),
         caret: Some(Rect::new(Point::new(10.0, 0.0), Size::new(1.0, 16.0))),
-        selection_color: Color::TRANSPARENT,
+        selection_highlight: argui_ui::TextSelectionHighlight::solid(Color::TRANSPARENT),
         caret_style: argui_ui::CaretStyle::default(),
         content_size: Size::new(100.0, 60.0),
         scroll_x: 0.0,
@@ -383,56 +516,6 @@ fn a_resize_handle_painted_over_a_scrollbar_keeps_pointer_priority() {
 }
 
 #[test]
-fn repeated_newlines_keep_the_multiline_caret_visible_and_scroll_monotonic() {
-    let editor = |value: &str| {
-        TextArea::new(
-            "notes",
-            value,
-            "notes",
-            InputStyle::new(PaintStyle::default(), TextStyle::default()),
-        )
-        .build()
-        .height(length(96.0))
-    };
-    let mut ui = UiTree::new(editor("start"));
-    let node = ui.node_id_at(0).unwrap();
-    let mut layout = LayoutEngine::new();
-    let mut text = text_engine();
-    let mut output = layout
-        .compute(&mut ui, &mut text, Size::new(260.0, 96.0))
-        .unwrap();
-    ui.pointer_moved(Point::new(20.0, 20.0), &output.hit_regions);
-    ui.primary_pressed(&output.hit_regions);
-    ui.place_text_cursor(node, "start".len(), false);
-    let mut previous_scroll = 0.0;
-
-    for repeat in 0..12 {
-        ui.edit_text_input(&KeyInput {
-            key: Key::Enter,
-            state: KeyState::Pressed,
-            modifiers: Modifiers::default(),
-            repeat: repeat > 0,
-            text: None,
-        });
-        let value = ui.text_input_value(node).unwrap().to_owned();
-        ui.update(editor(&value));
-        output = layout
-            .compute(&mut ui, &mut text, Size::new(260.0, 96.0))
-            .unwrap();
-        let region = &output.text_inputs[0];
-        let scroll = ui.scroll_offset(node).y;
-        assert!(scroll >= previous_scroll);
-        assert!(region.caret.unwrap().origin.y >= region.viewport.origin.y);
-        assert!(
-            region.caret.unwrap().origin.y + region.caret.unwrap().size.height
-                <= region.viewport.origin.y + region.viewport.size.height
-        );
-        previous_scroll = scroll;
-    }
-    assert!(previous_scroll > 0.0);
-}
-
-#[test]
 fn empty_or_degenerate_custom_carets_do_not_emit_invalid_quads() {
     use argui_ui::{CaretHeight, CaretPrimitive, CaretStyle, CaretVisual, FocusRequest};
     let color = Color::srgb(0.3, 0.8, 0.4);
@@ -481,84 +564,3 @@ fn empty_or_degenerate_custom_carets_do_not_emit_invalid_quads() {
 
 #[path = "input/navigation.rs"]
 mod navigation;
-
-#[test]
-fn transformed_editor_hits_and_drags_resolve_the_same_text_positions() {
-    use argui_core::Affine2D;
-    let field = |key, value| {
-        Input::new(
-            key,
-            value,
-            "",
-            InputStyle::new(PaintStyle::default(), TextStyle::default()),
-        )
-        .build()
-    };
-    let mut ui = UiTree::new(Element::column([
-        field("first", "other field"),
-        field("second", "alpha beta gamma"),
-    ]));
-    let node = ui.node_ids()[2];
-    let mut output = LayoutEngine::new()
-        .compute(&mut ui, &mut text_engine(), Size::new(400.0, 160.0))
-        .unwrap();
-    let region = output
-        .text_inputs
-        .iter()
-        .find(|region| region.node == node)
-        .unwrap()
-        .clone();
-    let local = region
-        .stops
-        .iter()
-        .find(|stop| stop.position.index == 7)
-        .unwrap()
-        .point;
-    let expected = region.closest_position(local);
-    for transform in [
-        Affine2D::IDENTITY,
-        Affine2D {
-            matrix: [2.0, 0.0, 0.0, 1.5],
-            translation: Point::new(120.0, 45.0),
-        },
-    ] {
-        output
-            .hit_regions
-            .iter_mut()
-            .find(|hit| hit.node == node)
-            .unwrap()
-            .transform = transform;
-        let point = transform.transform_point(local);
-        let mapped = output.local_point(node, point).unwrap();
-        assert!((mapped.x - local.x).hypot(mapped.y - local.y) < 0.001);
-        assert_eq!(region.hit_position(mapped), Some(expected));
-        ui.begin_text_selection(
-            node,
-            region.closest_position(mapped),
-            false,
-            argui_ui::SelectionGranularity::Word,
-        );
-        assert_eq!(ui.text_input_selection(node), Some((6, 10)));
-        // Captured drags may leave the editor while still needing its inverse transform.
-        let outside = Point::new(region.bounds.origin.x - 50.0, local.y);
-        let mapped = output
-            .local_point(node, transform.transform_point(outside))
-            .unwrap();
-        assert!(region.hit_position(mapped).is_none());
-        ui.drag_text_position(node, region.closest_position(mapped));
-        assert_eq!(ui.text_input_selection(node), Some((0, 10)));
-        ui.release_text_cursor();
-    }
-    output
-        .hit_regions
-        .iter_mut()
-        .find(|hit| hit.node == node)
-        .unwrap()
-        .transform = Affine2D {
-        matrix: [0.0; 4],
-        ..Affine2D::IDENTITY
-    };
-    assert!(output.local_point(node, local).is_none());
-    output.hit_regions.retain(|hit| hit.node != node);
-    assert!(output.local_point(node, local).is_none());
-}

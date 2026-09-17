@@ -37,6 +37,10 @@ impl UiTree {
                 crate::UiEventKind::TextChanged(value) | crate::UiEventKind::Submitted(value) => {
                     *value = "[protected]".into()
                 }
+                crate::UiEventKind::TextEdited(edit) => {
+                    edit.range = 0..0;
+                    edit.replacement = "[protected]".into();
+                }
                 crate::UiEventKind::KeyInput(input) => {
                     input.text = None;
                     if matches!(input.key, argui_core::Key::Character(_)) {

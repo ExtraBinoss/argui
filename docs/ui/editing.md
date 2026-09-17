@@ -49,6 +49,17 @@ external value replaces the buffer, cancels preedit, clears history, and clamps
 positions to grapheme boundaries. Use a different element key when switching
 documents.
 
+`Input::on_edit` and `TextArea::on_edit` deliver a `TextEdit`: one half-open
+UTF-8 byte range in the previous controlled value plus its replacement. Apply it
+with `TextEdit::apply_to` to mutate only that range. This is the preferred path
+for code editors because ordinary typing no longer clones the complete document
+for history or callback delivery. `on_input(String)` remains compatible and the
+engine materializes that complete value only when an input listener exists.
+
+History stores the removed and inserted fragments for normal edits. Undo or
+redo may consolidate a grouped transaction into one delta; only that uncommon
+path snapshots the current value to calculate the combined replacement.
+
 Cosmic Text supplies shaping, bidi-aware caret stops, word boundaries, selection
 rectangles, and wrapping. Editing never splits a grapheme. Boundary affinity
 keeps the correct visual caret when one byte position has two positions at a

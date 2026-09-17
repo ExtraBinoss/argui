@@ -2,6 +2,7 @@
 
 mod anchor;
 mod assets;
+mod composite;
 mod custom;
 mod desktop_backdrop;
 pub use desktop_backdrop::DesktopBackdropRegion;

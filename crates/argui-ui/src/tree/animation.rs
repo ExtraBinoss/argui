@@ -83,8 +83,16 @@ impl UiTree {
         } else {
             self.transitions.advance(now)
         };
-        let caret = if self.caret.advance(self.focused_animated_caret(), now) {
-            TreeUpdate::Paint
+        let caret_animation = self.focused_animated_caret();
+        let caret_composited =
+            caret_animation.is_some_and(|(_, animation)| animation.supports_composition());
+        let caret_node = caret_animation.map(|(node, _)| node);
+        let caret = if self.caret.advance(caret_node, now) {
+            if caret_composited {
+                TreeUpdate::Composite
+            } else {
+                TreeUpdate::Paint
+            }
         } else {
             TreeUpdate::None
         };
@@ -115,15 +123,32 @@ impl UiTree {
         }
     }
 
-    /// Returns whether an animation or animated caret needs another frame.
+    /// Returns whether an animation needs display-linked frames immediately.
+    ///
+    /// Held caret keyframes return `false` here and expose their one-shot wake
+    /// time through [`UiTree::next_animation_frame_at`].
     #[must_use]
     pub fn wants_animation_frame(&self) -> bool {
-        self.animations
+        let bindings = self
+            .animations
             .entries
             .iter()
-            .any(|entry| entry.binding.track().is_active())
-            || self.transitions.wants_frame()
-            || self.focused_animated_caret().is_some()
+            .any(|entry| entry.binding.track().is_active());
+        let transitions = self.transitions.wants_frame();
+        let caret = self
+            .focused_animated_caret()
+            .is_some_and(|(node, animation)| self.caret.wants_frame(node, animation));
+        bindings || transitions || caret
+    }
+
+    /// Returns the next one-shot animation deadline for held visual state.
+    ///
+    /// Continuously interpolated bindings and transitions are represented by
+    /// [`UiTree::wants_animation_frame`] instead.
+    #[must_use]
+    pub fn next_animation_frame_at(&self) -> Option<argui_animation::Time> {
+        self.focused_animated_caret()
+            .and_then(|(node, animation)| self.caret.next_frame_at(node, animation))
     }
 
     /// Returns the number of active property animations.
@@ -148,12 +173,14 @@ fn strongest_updates(left: TreeUpdate, right: TreeUpdate) -> TreeUpdate {
         (TreeUpdate::Layout, _) | (_, TreeUpdate::Layout) => TreeUpdate::Layout,
         (TreeUpdate::Scroll, _) | (_, TreeUpdate::Scroll) => TreeUpdate::Scroll,
         (TreeUpdate::Paint, _) | (_, TreeUpdate::Paint) => TreeUpdate::Paint,
+        (TreeUpdate::Composite, _) | (_, TreeUpdate::Composite) => TreeUpdate::Composite,
         _ => TreeUpdate::None,
     }
 }
 
 fn strongest_tree_update(current: TreeUpdate, impact: BindingImpact) -> TreeUpdate {
     let next = match impact {
+        BindingImpact::Composite => TreeUpdate::Composite,
         BindingImpact::Paint => TreeUpdate::Paint,
         BindingImpact::Scroll => TreeUpdate::Scroll,
         BindingImpact::Layout => TreeUpdate::Layout,
@@ -162,6 +189,7 @@ fn strongest_tree_update(current: TreeUpdate, impact: BindingImpact) -> TreeUpda
         (TreeUpdate::Layout, _) | (_, TreeUpdate::Layout) => TreeUpdate::Layout,
         (TreeUpdate::Scroll, _) | (_, TreeUpdate::Scroll) => TreeUpdate::Scroll,
         (TreeUpdate::Paint, _) | (_, TreeUpdate::Paint) => TreeUpdate::Paint,
+        (TreeUpdate::Composite, _) | (_, TreeUpdate::Composite) => TreeUpdate::Composite,
         _ => TreeUpdate::None,
     }
 }
@@ -170,6 +198,7 @@ const fn strongest_impact(left: BindingImpact, right: BindingImpact) -> BindingI
     match (left, right) {
         (BindingImpact::Layout, _) | (_, BindingImpact::Layout) => BindingImpact::Layout,
         (BindingImpact::Scroll, _) | (_, BindingImpact::Scroll) => BindingImpact::Scroll,
-        _ => BindingImpact::Paint,
+        (BindingImpact::Paint, _) | (_, BindingImpact::Paint) => BindingImpact::Paint,
+        _ => BindingImpact::Composite,
     }
 }

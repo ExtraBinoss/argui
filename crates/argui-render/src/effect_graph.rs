@@ -144,11 +144,25 @@ impl EffectGraph {
                         content_revision,
                     });
                 }
-                DisplayCommand::EndLayer => {
+                DisplayCommand::BeginCompositor(layer) => {
+                    let style = layer.style().scaled(scale_factor);
+                    let viewport = PixelRegion::viewport(viewport[0] as u32, viewport[1] as u32);
+                    let region = match stack.last() {
+                        Some(parent) => parent.region.and_then(|parent| {
+                            PixelRegion::from_rect(style.expanded_bounds(), parent)
+                        }),
+                        None => PixelRegion::from_rect(style.expanded_bounds(), viewport),
+                    };
+                    stack.push(EffectLayer {
+                        region,
+                        style,
+                        children: Vec::new(),
+                        content_revision,
+                    });
+                }
+                DisplayCommand::EndLayer | DisplayCommand::EndCompositor => {
                     let layer = stack.pop().expect("validated layer stack");
-                    if layer.style.opacity > 0.0 {
-                        push_node(&mut roots, &mut stack, EffectNode::Layer(layer));
-                    }
+                    push_node(&mut roots, &mut stack, EffectNode::Layer(layer));
                 }
             }
         }
@@ -161,6 +175,7 @@ impl EffectGraph {
             for node in nodes {
                 match node {
                     EffectNode::Draw(_) => stats.draw_batches += 1,
+                    EffectNode::Layer(layer) if layer.style.opacity <= 0.0 => {}
                     EffectNode::Layer(layer) => {
                         stats.layers += 1;
                         stats.offscreen_layers += usize::from(layer.style.requires_offscreen());
@@ -185,13 +200,24 @@ impl EffectGraph {
 
     #[must_use]
     pub fn needs_offscreen_root(&self) -> bool {
-        self.stats().offscreen_layers != 0
+        /// Returns whether this node slice contains an offscreen layer.
+        fn visit(nodes: &[EffectNode]) -> bool {
+            nodes.iter().any(|node| match node {
+                EffectNode::Draw(_) => false,
+                EffectNode::Layer(layer) => {
+                    layer.style.requires_offscreen() || visit(&layer.children)
+                }
+            })
+        }
+        visit(&self.roots)
     }
 
     pub fn effects(&self) -> Vec<&EffectInstance> {
         fn visit<'a>(nodes: &'a [EffectNode], effects: &mut Vec<&'a EffectInstance>) {
             for node in nodes {
-                if let EffectNode::Layer(layer) = node {
+                if let EffectNode::Layer(layer) = node
+                    && layer.style.opacity > 0.0
+                {
                     for filter in layer
                         .style
                         .filters

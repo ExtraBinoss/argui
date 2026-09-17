@@ -4,12 +4,12 @@ use argui_vector::parse_svg;
 use icondata_core::IconData;
 use icondata_tb::{
     TbAlertCircleOutline, TbAlertTriangleOutline, TbArrowDownOutline, TbArrowUpOutline,
-    TbArrowsSortOutline, TbCalendarOutline, TbCheckOutline, TbChevronDownOutline,
-    TbChevronLeftOutline, TbChevronRightOutline, TbCircleCheckOutline, TbCircleFilled,
-    TbClipboardOutline, TbCopyOutline, TbCutOutline, TbDeviceDesktopOutline, TbInfoCircleOutline,
-    TbLayoutSidebarLeftCollapseOutline, TbLoader2Outline, TbMinusOutline, TbMoonOutline,
-    TbResizeOutline, TbRestoreOutline, TbSearchOutline, TbSelectAllOutline, TbSunOutline,
-    TbXOutline,
+    TbArrowsSortOutline, TbBrandRustOutline, TbCalendarOutline, TbCheckOutline,
+    TbChevronDownOutline, TbChevronLeftOutline, TbChevronRightOutline, TbCircleCheckOutline,
+    TbCircleFilled, TbClipboardOutline, TbCopyOutline, TbCutOutline, TbDeviceDesktopOutline,
+    TbFileOutline, TbFolderOutline, TbInfoCircleOutline, TbLayoutSidebarLeftCollapseOutline,
+    TbLoader2Outline, TbMinusOutline, TbMoonOutline, TbResizeOutline, TbRestoreOutline,
+    TbSearchOutline, TbSelectAllOutline, TbSunOutline, TbTerminal2Outline, TbXOutline,
 };
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -42,10 +42,14 @@ pub enum TablerIcon {
     Success,
     Warning,
     Error,
+    Folder,
+    File,
+    Rust,
+    Terminal,
 }
 
 impl TablerIcon {
-    const ALL: [Self; 27] = [
+    const ALL: [Self; 31] = [
         Self::Search,
         Self::Sun,
         Self::Moon,
@@ -73,6 +77,10 @@ impl TablerIcon {
         Self::Success,
         Self::Warning,
         Self::Error,
+        Self::Folder,
+        Self::File,
+        Self::Rust,
+        Self::Terminal,
     ];
 
     const fn data(self) -> &'static IconData {
@@ -105,13 +113,17 @@ impl TablerIcon {
             Self::Success => TbCircleCheckOutline,
             Self::Warning => TbAlertTriangleOutline,
             Self::Error => TbAlertCircleOutline,
+            Self::Folder => TbFolderOutline,
+            Self::File => TbFileOutline,
+            Self::Rust => TbBrandRustOutline,
+            Self::Terminal => TbTerminal2Outline,
         }
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct WidgetAssets {
-    ids: [Option<VectorId>; 27],
+    ids: [Option<VectorId>; 31],
     assets: Vec<VectorAsset>,
     color: Color,
 }
@@ -130,7 +142,7 @@ impl WidgetAssets {
     ///
     /// Panics if embedded Tabler icon data cannot be parsed as SVG.
     pub fn tabler_subset(color: Color, requested: impl IntoIterator<Item = TablerIcon>) -> Self {
-        let mut ids = [None; 27];
+        let mut ids = [None; 31];
         let icons = requested
             .into_iter()
             .collect::<std::collections::HashSet<_>>();

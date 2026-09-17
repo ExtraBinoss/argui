@@ -45,6 +45,32 @@ impl EventRegistry {
 }
 
 impl UiTree {
+    /// Returns whether `event_type` has a potential listener from `target` to the root.
+    pub(crate) fn has_event_listener(&self, target: NodeId, event_type: EventType) -> bool {
+        let Some(mut index) = self.index.position(target) else {
+            return false;
+        };
+        loop {
+            let node = self.node_ids[index];
+            if self.element_at(index).is_some_and(|element| {
+                element.event_listeners.iter().any(|listener| {
+                    listener.event == event_type
+                        && (!listener.options.target_only || node == target)
+                        && listener
+                            .target_key
+                            .as_deref()
+                            .is_none_or(|key| self.key_for(target) == Some(key))
+                })
+            }) {
+                return true;
+            }
+            let Some(parent) = self.index.parent(index) else {
+                return false;
+            };
+            index = parent;
+        }
+    }
+
     /// Creates event deliveries for listeners along the target's propagation path.
     ///
     /// * `target` — retained node receiving the event.

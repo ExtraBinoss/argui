@@ -1,5 +1,5 @@
 [workspace]
-members = ["docs-examples", "fake-ai-harness", "gpu-canvas"]
+members = ["astra-editor", "docs-examples", "fake-ai-harness", "gpu-canvas"]
 resolver = "3"
 
 [workspace.package]
@@ -12,8 +12,11 @@ repository = "https://github.com/ExtraBinoss/argui"
 [workspace.dependencies]
 argui = { path = "../crates/argui", version = "0.3.0" }
 argui-testing = { path = "../crates/argui-testing", version = "0.3.0" }
+argui-effects = { path = "../crates/argui-effects", version = "0.3.0", features = ["scroll"] }
 web-time = "=1.1.0"
 wasm-bindgen = "=0.2.127"
+tree-sitter-highlight = "=0.26.7"
+tree-sitter-rust = "=0.24.2"
 
 [workspace.lints.rust]
 unsafe_code = "deny"

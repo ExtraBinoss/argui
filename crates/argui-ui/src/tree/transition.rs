@@ -508,6 +508,7 @@ fn property_direction(
 impl From<BindingImpact> for TreeUpdate {
     fn from(value: BindingImpact) -> Self {
         match value {
+            BindingImpact::Composite => Self::Composite,
             BindingImpact::Paint => Self::Paint,
             BindingImpact::Layout => Self::Layout,
             BindingImpact::Scroll => Self::Scroll,
@@ -520,6 +521,7 @@ fn strongest(left: TreeUpdate, right: TreeUpdate) -> TreeUpdate {
         (TreeUpdate::Layout, _) | (_, TreeUpdate::Layout) => TreeUpdate::Layout,
         (TreeUpdate::Scroll, _) | (_, TreeUpdate::Scroll) => TreeUpdate::Scroll,
         (TreeUpdate::Paint, _) | (_, TreeUpdate::Paint) => TreeUpdate::Paint,
+        (TreeUpdate::Composite, _) | (_, TreeUpdate::Composite) => TreeUpdate::Composite,
         (TreeUpdate::Semantics, _) | (_, TreeUpdate::Semantics) => TreeUpdate::Semantics,
         _ => TreeUpdate::None,
     }

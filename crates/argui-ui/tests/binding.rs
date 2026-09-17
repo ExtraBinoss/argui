@@ -71,6 +71,27 @@ fn active_layout_motion_reports_layout_without_replacing_the_tree() {
 }
 
 #[test]
+fn active_transform_motion_reports_composition_without_replacing_the_tree() {
+    let transform = Motion::new(Transform2D::IDENTITY);
+    let element = Element::container([]).bind(property::Transform, transform.clone());
+    let mut tree = UiTree::new(element);
+    transform.animate_to(
+        Transform2D::IDENTITY.translate(40.0, 0.0),
+        Tween::new(Duration::from_millis(100)),
+    );
+
+    assert_eq!(
+        tree.advance_animations(Time::from_nanos(1)),
+        TreeUpdate::None
+    );
+    assert_eq!(
+        tree.advance_animations(Time::from_nanos(50_000_001)),
+        TreeUpdate::Composite
+    );
+    assert_eq!(tree.revision(), 0);
+}
+
+#[test]
 fn f32_effect_binding_updates_custom_uniform_value() {
     const EFFECT: EffectId = EffectId::new("tests.animated");
     let phase = Motion::new(0.75_f32);

@@ -4,12 +4,12 @@ use argui::{
     text::TextStyle,
     ui::{
         AlignItems, Axes, ContinuousValuePhase, Element, EventType, JustifyContent, Overflow,
-        RangeHandlerValue, Sides, StateSelector, StylePatch, StyleTransition, ValueHandler,
-        VisualState, auto, length, percent, property,
+        RangeHandlerValue, Sides, StateSelector, StylePatch, StyleTransition, TextEdit,
+        ValueHandler, VisualState, auto, length, percent, property,
     },
     widgets::{
         Button, RANGE_SCOPE, RangeAxis, RangeBehavior, RangeConfig, RangeDirection, RangePart,
-        WidgetTheme, default_theme,
+        TextArea, WidgetTheme, default_theme,
     },
 };
 
@@ -166,6 +166,9 @@ pub struct Example {
     live_volume: f32,
     committed_volume: f32,
     saves: u32,
+    source: String,
+    edit_count: u32,
+    last_edit: String,
 }
 
 impl Default for Example {
@@ -174,6 +177,9 @@ impl Default for Example {
             live_volume: 35.0,
             committed_volume: 35.0,
             saves: 0,
+            source: "fn main() {\n    println!(\"fast edits\");\n}".into(),
+            edit_count: 0,
+            last_edit: "No edits delivered yet".into(),
         }
     }
 }
@@ -196,6 +202,20 @@ impl Render for Example {
             app.committed_volume = value;
         });
         let save = cx.callback(|app| app.saves = app.saves.saturating_add(1));
+        let edit_source = cx.edit_callback(|app, edit: TextEdit| {
+            let summary = format!(
+                "bytes {}..{} → {} byte(s)",
+                edit.range.start,
+                edit.range.end,
+                edit.replacement.len()
+            );
+            if edit.apply_to(&mut app.source).is_ok() {
+                app.edit_count = app.edit_count.saturating_add(1);
+                app.last_edit = summary;
+            } else {
+                app.last_edit = "Rejected stale edit".into();
+            }
+        });
 
         Element::column([
             label("Choose callbacks by intent".into(), theme.foreground, 700),
@@ -221,6 +241,41 @@ impl Render for Example {
                 ),
                 label(
                     format!("Committed value: {:.0}%", self.committed_volume),
+                    theme.muted_foreground,
+                    500,
+                ),
+            ])
+            .padding(Sides::length(18.0))
+            .gap(10.0)
+            .background(theme.card)
+            .border(Border::all(1.0, theme.border))
+            .radius(CornerRadii::all(10.0)),
+            Element::column([
+                label(
+                    "Use deltas for document-sized text".into(),
+                    theme.foreground,
+                    650,
+                ),
+                label(
+                    "on_edit sends one UTF-8 range replacement instead of cloning the whole value."
+                        .into(),
+                    theme.muted_foreground,
+                    450,
+                ),
+                TextArea::new(
+                    "incremental-source",
+                    &self.source,
+                    "Paste or type Rust…",
+                    theme.input(),
+                )
+                .on_edit(edit_source)
+                .build()
+                .height(length(118.0)),
+                label(
+                    format!(
+                        "Incremental edits: {} · {}",
+                        self.edit_count, self.last_edit
+                    ),
                     theme.muted_foreground,
                     500,
                 ),

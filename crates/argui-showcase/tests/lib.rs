@@ -253,7 +253,10 @@ fn property_motion_is_retained_outside_the_app_model() {
     let mut app = StateShowcase::default();
     let mut tree = UiTree::new(render_view(&app));
     assert_eq!(click(&mut app, "motion"), ViewUpdate::Rebuild);
-    assert_eq!(tree.update(render_view(&app)), argui_ui::TreeUpdate::Paint);
+    assert_eq!(
+        tree.update(render_view(&app)),
+        argui_ui::TreeUpdate::Composite
+    );
     assert!(tree.wants_animation_frame());
     tree.advance_animations(Time::ZERO);
     tree.advance_animations(Time::from_nanos(500_000_000));

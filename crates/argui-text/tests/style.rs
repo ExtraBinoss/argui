@@ -95,3 +95,19 @@ fn rich_text_and_typography_builders_preserve_web_style_properties() {
     assert_eq!(block.style.align, TextAlign::Justify);
     assert_eq!(span_style.font_style, Some(FontStyle::Italic));
 }
+
+#[test]
+fn rich_text_slices_clamp_utf8_boundaries_and_rebase_styles() {
+    let content = TextContent::rich([
+        TextSpan::new("é").style(TextSpanStyle::default().color(TextColor::WHITE)),
+        TextSpan::new("abc").style(TextSpanStyle::default().weight(700)),
+    ]);
+
+    let clamped = content.slice(1..4);
+    let rebased = content.slice(2..4);
+
+    assert_eq!(clamped.as_str(), "éab");
+    assert_eq!(rebased.as_str(), "ab");
+    assert!(clamped.is_rich());
+    assert!(rebased.is_rich());
+}

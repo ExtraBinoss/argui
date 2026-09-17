@@ -8,6 +8,9 @@ that do not use them.
 
 ### Added
 
+- Added incremental `TextEdit` delivery for `Input` and `TextArea`, including
+  `on_edit`, context callback helpers, UTF-8 validation, fragment-based history,
+  and lazy compatibility delivery for the existing `on_input(String)` API.
 - Added opaque `EventHandler`/typed `ValueHandler` bindings and local direct
   handlers across interactive widgets, including domain payloads for forms,
   selection, ranges, overlays, menus, navigation, data controls, and composites.

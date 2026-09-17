@@ -43,12 +43,19 @@ pub(crate) fn classify_update(
         .map(|(old, new)| classify_update(old, new, stats))
         .max_by_key(|update| update_priority(*update))
         .unwrap_or(TreeUpdate::None);
-    let local = if state_update != TreeUpdate::None {
-        state_update
-    } else if visual_changed(old, new) {
+    let visual_update = visual_update(old, new).unwrap_or(TreeUpdate::None);
+    let local = strongest_update(
+        state_update,
+        strongest_update(visual_update, binding_update),
+    );
+    let local = if local == TreeUpdate::Composite && !old.needs_compositor_layer() {
+        // The first composite-capable value must establish its retained layer.
         TreeUpdate::Paint
-    } else if binding_update != TreeUpdate::None {
-        binding_update
+    } else {
+        local
+    };
+    let local = if local != TreeUpdate::None {
+        local
     } else if old.semantics != new.semantics
         || old.semantic_hidden != new.semantic_hidden
         || old.focus_scope != new.focus_scope
@@ -64,26 +71,26 @@ const fn update_priority(update: TreeUpdate) -> u8 {
     match update {
         TreeUpdate::None => 0,
         TreeUpdate::Semantics => 1,
-        TreeUpdate::Paint => 2,
-        TreeUpdate::Scroll => 3,
-        TreeUpdate::Layout => 4,
+        TreeUpdate::Composite => 2,
+        TreeUpdate::Paint => 3,
+        TreeUpdate::Scroll => 4,
+        TreeUpdate::Layout => 5,
     }
 }
 
-fn visual_changed(old: &Element, new: &Element) -> bool {
-    old.inspectable != new.inspectable
+/// Classifies non-layout element changes by their strongest visual phase.
+fn visual_update(old: &Element, new: &Element) -> Option<TreeUpdate> {
+    let paint = old.inspectable != new.inspectable
         || old.kind != new.kind
         || old.paint != new.paint
         || old.desktop_backdrop != new.desktop_backdrop
-        || old.transform != new.transform
-        || old.transform_origin != new.transform_origin
         || old.interaction != new.interaction
         || old.hit_test != new.hit_test
         || old.style_transition != new.style_transition
         || old.state_scope != new.state_scope
         || old.container_scope != new.container_scope
         || old.active_states != new.active_states
-        || old.layer != new.layer
+        || layer_content(old) != layer_content(new)
         || old.effects != new.effects
         || old.scroll != new.scroll
         || old.event_listeners != new.event_listeners
@@ -92,7 +99,37 @@ fn visual_changed(old: &Element, new: &Element) -> bool {
         || old.user_select != new.user_select
         || old.selection_style != new.selection_style
         || old.selection_highlight != new.selection_highlight
-        || old.z_index != new.z_index
+        || old.z_index != new.z_index;
+    if paint {
+        Some(TreeUpdate::Paint)
+    } else if (old.transform != new.transform
+        || old.transform_origin != new.transform_origin
+        || layer_composition(old) != layer_composition(new))
+        && old.needs_compositor_layer()
+    {
+        Some(TreeUpdate::Composite)
+    } else if old.transform != new.transform
+        || old.transform_origin != new.transform_origin
+        || layer_composition(old) != layer_composition(new)
+    {
+        Some(TreeUpdate::Paint)
+    } else {
+        None
+    }
+}
+
+/// Returns layer properties that affect retained pixels rather than presentation.
+fn layer_content(element: &Element) -> Option<argui_paint::LayerStyle> {
+    element.layer.as_ref().map(|layer| {
+        let mut layer = layer.as_ref().clone();
+        layer.opacity = 1.0;
+        layer
+    })
+}
+
+/// Returns the group-opacity portion of an element layer.
+fn layer_composition(element: &Element) -> Option<f32> {
+    element.layer.as_ref().map(|layer| layer.opacity)
 }
 
 fn state_update(old: &Element, new: &Element) -> TreeUpdate {
@@ -114,10 +151,11 @@ fn state_update(old: &Element, new: &Element) -> TreeUpdate {
         .impact()
         .into_iter()
         .chain(new.conditional_styles.impact())
-        .fold(TreeUpdate::Paint, |update, impact| {
+        .fold(TreeUpdate::None, |update, impact| {
             strongest_update(
                 update,
                 match impact {
+                    BindingImpact::Composite => TreeUpdate::Composite,
                     BindingImpact::Paint => TreeUpdate::Paint,
                     BindingImpact::Scroll => TreeUpdate::Scroll,
                     BindingImpact::Layout => TreeUpdate::Layout,
@@ -135,6 +173,7 @@ fn binding_update(old: &Element, new: &Element) -> TreeUpdate {
         .chain(&new.bindings)
         .fold(TreeUpdate::None, |update, binding| {
             let next = match binding.impact() {
+                BindingImpact::Composite => TreeUpdate::Composite,
                 BindingImpact::Paint => TreeUpdate::Paint,
                 BindingImpact::Scroll => TreeUpdate::Scroll,
                 BindingImpact::Layout => TreeUpdate::Layout,

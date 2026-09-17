@@ -1,4 +1,5 @@
 use argui_core::{Color, ColorScheme};
+use argui_text::{TextContent, TextSpan, TextSpanStyle, TextWrap};
 use argui_ui::{Dimension, ElementKind, Overflow, Role, ScrollPropagation, TextInputFilter};
 use argui_widgets::{Input, InputKind, TablerIcon, TextArea, WidgetAssets, shadcn};
 
@@ -42,6 +43,20 @@ fn controlled_inputs_keep_semantics_and_editor_configuration_together() {
             multiline: true,
             ..
         }
+    ));
+
+    let code = TextArea::new("code", "fn main() {}", "Code", theme.input())
+        .wrap(TextWrap::None)
+        .rich_text(TextContent::rich([
+            TextSpan::new("fn").style(TextSpanStyle::default().weight(700)),
+            TextSpan::new(" main() {}"),
+        ]))
+        .build();
+    assert_eq!(code.style.overflow.x, Overflow::Auto);
+    assert!(matches!(
+        &code.kind,
+        ElementKind::TextEditor { text, styled: Some(content), .. }
+            if text.wrap == TextWrap::None && content.is_rich()
     ));
 }
 

@@ -15,10 +15,15 @@ and shader uniforms. The renderer owns no timeline state.
 `Render::animation_frame` receives the shared `Frame`. Retained property motions
 use a compact registry built during reconciliation. A shared motion advances
 once even when several properties consume it. Settled motions leave scheduling.
+Held caret keyframes publish their next visible-change deadline instead of
+keeping a display-linked loop alive. The native event loop sleeps until that
+deadline; ordinary input still wakes it immediately. This preserves a single
+ordered animation clock without paying for idle 60 Hz redraws.
 
-Paint changes reuse layout and shaped text. Transforms update painting and hit
-geometry without running Taffy. Layout properties invalidate retained layout
-nodes, subject to ancestor dependencies and explicit layout boundaries.
+Paint changes reuse layout and shaped text. Transform and group-opacity changes
+reuse layout, shaped text, paint primitives, and GPU uploads through the retained
+compositor while updating hit geometry. Layout properties invalidate retained
+layout nodes, subject to ancestor dependencies and explicit layout boundaries.
 
 ## Timelines and property motions
 
@@ -41,7 +46,9 @@ use argui::{
 
 let opacity = Motion::new(1.0_f32);
 opacity.animate_to(0.4, Tween::new(Duration::from_millis(240)));
-let panel = Element::container([]).bind(property::Opacity, opacity);
+let panel = Element::container([])
+    .opacity(1.0)
+    .bind(property::LayerOpacity, opacity);
 ```
 
 `Schedule`, `ScheduleBuilder` and `Cue` compose sequences, parallel groups,

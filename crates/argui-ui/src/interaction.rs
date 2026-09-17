@@ -279,6 +279,7 @@ fn ellipse_contains(bounds: Rect, point: Point) -> bool {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct InteractionUpdate {
     pub events: Vec<crate::UiEvent>,
+    pub composite_changed: bool,
     pub paint_changed: bool,
     pub scroll_changed: bool,
     pub layout_changed: bool,
@@ -288,11 +289,25 @@ pub struct InteractionUpdate {
 }
 
 impl InteractionUpdate {
+    /// Returns whether this update carries no events, invalidations, requests, or clipboard work.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.events.is_empty()
+            && !self.composite_changed
+            && !self.paint_changed
+            && !self.scroll_changed
+            && !self.layout_changed
+            && !self.text_input_changed
+            && self.clipboard.is_none()
+            && !self.frame_requested
+    }
+
     /// Combines another update's events and change flags into this update.
     ///
     /// * `other` — update whose effects are merged into this value.
     pub fn merge(&mut self, other: Self) {
         self.events.extend(other.events);
+        self.composite_changed |= other.composite_changed;
         self.paint_changed |= other.paint_changed;
         self.scroll_changed |= other.scroll_changed;
         self.layout_changed |= other.layout_changed;

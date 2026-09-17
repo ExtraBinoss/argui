@@ -211,7 +211,9 @@ impl Application {
         };
         let update = ui.advance_scroll_physics(elapsed, &layout.scroll_regions);
         let active = ui.wants_scroll_frame();
-        self.apply_ui_update(update, window, event_loop);
+        if !update.is_empty() {
+            self.apply_ui_update(update, window, event_loop);
+        }
         if active {
             window.request_redraw();
         }

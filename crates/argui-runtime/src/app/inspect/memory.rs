@@ -25,7 +25,8 @@ impl Inspection {
                 + output.hit_regions.capacity() * size_of::<argui_ui::HitRegion>()
                 + output.scroll_regions.capacity() * size_of::<argui_ui::ScrollRegion>()
                 + output.text_inputs.capacity() * size_of::<argui_layout::TextInputRegion>()
-                + output.text_regions.capacity() * size_of::<argui_layout::TextRegion>(),
+                + output.text_regions.capacity() * size_of::<argui_layout::TextRegion>()
+                + output.compositor_storage_bytes(),
             paint_command_bytes: output.display_list.storage_bytes(),
         }
     }

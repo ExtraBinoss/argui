@@ -335,3 +335,12 @@ impl FromHandlerValue for String {
         }
     }
 }
+
+impl FromHandlerValue for crate::TextEdit {
+    fn from_handler_event(event: &UiEvent) -> Option<Self> {
+        match &event.kind {
+            UiEventKind::TextEdited(edit) => Some(edit.clone()),
+            _ => None,
+        }
+    }
+}

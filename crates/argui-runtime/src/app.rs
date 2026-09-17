@@ -104,8 +104,9 @@ pub(crate) struct Application {
     pub(super) ui_layout: Option<LayoutOutput>,
     pub(super) layout_engine: LayoutEngine,
     pub(super) prepared_text: Option<PreparedText>,
+    pub(super) composite_frame: bool,
     viewport: Size,
-    scale_factor: f32,
+    pub(super) scale_factor: f32,
     pointer: Option<Point>,
     pointer_buttons: u16,
     touch_points: HashMap<PointerId, Point>,
@@ -226,6 +227,7 @@ impl Application {
             ui_layout: None,
             layout_engine,
             prepared_text: None,
+            composite_frame: false,
             viewport: Size::default(),
             scale_factor: 1.0,
             pointer: None,
@@ -436,6 +438,7 @@ impl Application {
     }
 
     pub(super) fn repaint(&mut self) {
+        self.composite_frame = false;
         if let (Some(ui), Some(layout)) = (&self.ui_tree, &mut self.ui_layout)
             && self.layout_engine.repaint(ui, layout)
         {
@@ -443,6 +446,32 @@ impl Application {
         }
         self.publish_inspection();
         self.paint_inspection_highlight();
+    }
+
+    /// Applies retained compositor properties, falling back to paint when a
+    /// previous snapshot cannot represent the requested transform.
+    pub(super) fn composite(&mut self) {
+        if self
+            .inspector
+            .as_ref()
+            .is_some_and(|inspector| inspector.highlighted().is_some())
+        {
+            // The inspector overlay is appended after paint and is not retained
+            // inside the highlighted node's compositor layer.
+            self.repaint();
+            return;
+        }
+        let composited = match (&self.ui_tree, &mut self.ui_layout) {
+            (Some(ui), Some(layout)) => self.layout_engine.composite(ui, layout),
+            _ => false,
+        };
+        if composited {
+            self.composite_frame = true;
+            self.publish_inspection();
+            self.paint_inspection_highlight();
+        } else {
+            self.repaint();
+        }
     }
 
     fn window_focus(

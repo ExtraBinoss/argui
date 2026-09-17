@@ -48,12 +48,8 @@ fn custom_timeline_scrubs_with_buttons_and_a_real_pan_gesture() {
         clip.origin.x + clip.size.width * 0.5,
         clip.origin.y + clip.size.height * 0.5,
     );
-    app.drag(
-        clip_start,
-        Point::new(clip_start.x, clip_start.y + 58.0),
-        4,
-    )
-    .unwrap();
+    app.drag(clip_start, Point::new(clip_start.x, clip_start.y + 58.0), 4)
+        .unwrap();
     app.assert_text("Selected: B-roll · 14.0s · track 2");
 
     app.click("playhead-forward").unwrap();
@@ -94,6 +90,12 @@ fn interaction_api_distinguishes_change_commit_and_click() {
     app.assert_text("Committed value: 64%");
     app.click("save").unwrap();
     app.assert_text("Saved 1 time(s)");
+
+    app.get_by_role(Role::TextArea, "Paste or type Rust…")
+        .replace_text("fn edited() {}")
+        .unwrap();
+    app.assert_text("Incremental edits: 1");
+    app.assert_text("bytes 0..41 → 14 byte(s)");
 }
 
 #[test]

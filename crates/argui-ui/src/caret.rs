@@ -179,6 +179,40 @@ impl CaretAnimation {
             / self.duration.as_nanos() as f32;
         self.keyframes.sample(progress)
     }
+
+    /// Returns the delay until a held keyframe can visibly change.
+    ///
+    /// * `elapsed` — elapsed time since the looping animation began.
+    ///
+    /// Returns `None` while the current segment interpolates continuously.
+    pub(crate) fn next_sample_in(&self, elapsed: Duration) -> Option<Duration> {
+        let duration = self.duration.as_nanos();
+        let cycle = elapsed.as_nanos() % duration;
+        let progress = cycle as f64 / duration as f64;
+        let frames = self.keyframes.as_slice();
+        let upper = frames.partition_point(|frame| f64::from(frame.offset) <= progress);
+        let from = &frames[upper.saturating_sub(1)];
+        if !from.hold {
+            return None;
+        }
+        let target = frames.get(upper).map_or(duration, |frame| {
+            (f64::from(frame.offset) * duration as f64).ceil() as u64
+        });
+        Some(Duration::from_nanos(target.saturating_sub(cycle).max(1)))
+    }
+
+    /// Returns whether the animation can reuse retained pixels in the compositor.
+    ///
+    /// Opacity and transforms are composition properties. A changing tint must
+    /// repaint the caret primitives to preserve authored color interpolation.
+    #[must_use]
+    pub fn supports_composition(&self) -> bool {
+        let tint = self.keyframes.as_slice()[0].value.tint;
+        self.keyframes
+            .as_slice()
+            .iter()
+            .all(|frame| frame.value.tint == tint)
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -254,10 +288,14 @@ pub(crate) struct CaretAnimator {
 }
 
 impl CaretAnimator {
+    /// Resets the retained caret identity and timeline.
     pub fn reset(&mut self) {
         *self = Self::default();
     }
 
+    /// Advances the retained caret timeline to `now` for `node`.
+    ///
+    /// Returns whether an animated caret should be repainted.
     pub fn advance(&mut self, node: Option<NodeId>, now: Time) -> bool {
         let Some(node) = node else {
             self.reset();
@@ -273,6 +311,31 @@ impl CaretAnimator {
         true
     }
 
+    /// Returns whether `node` needs display-linked frames for `animation`.
+    ///
+    /// A new caret starts immediately; held keyframe segments sleep until their
+    /// next visible change.
+    pub fn wants_frame(self, node: NodeId, animation: &CaretAnimation) -> bool {
+        self.node != Some(node)
+            || self.started.is_none()
+            || animation.next_sample_in(self.elapsed).is_none()
+    }
+
+    /// Returns the absolute animation time of the next held-keyframe change.
+    ///
+    /// Returns `None` for an uninitialized caret or a continuously interpolated
+    /// segment.
+    pub fn next_frame_at(self, node: NodeId, animation: &CaretAnimation) -> Option<Time> {
+        if self.node != Some(node) {
+            return None;
+        }
+        let started = self.started?;
+        animation
+            .next_sample_in(self.elapsed)
+            .map(|delay| started + self.elapsed + delay)
+    }
+
+    /// Returns the retained elapsed time for `node`, or zero for another caret.
     pub fn elapsed(self, node: NodeId) -> Duration {
         if self.node == Some(node) {
             self.elapsed

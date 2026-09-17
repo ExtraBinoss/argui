@@ -1,3 +1,5 @@
+use argui_core::Transform2D;
+use argui_paint::LayerStyle;
 use argui_ui::{
     Color, Element, GpuCanvasId, GpuCanvasSpec, TreeUpdate, UiTree, UserSelect, length,
 };
@@ -120,4 +122,36 @@ fn gpu_canvas_revision_retains_identity_while_remount_allocates_a_new_node() {
         TreeUpdate::Layout
     );
     assert_ne!(tree.node_ids()[1], retained);
+}
+
+#[test]
+fn established_transform_and_group_opacity_changes_use_composition() {
+    let moving = |x, opacity| {
+        Element::container([])
+            .transform(Transform2D::IDENTITY.translate(x, 0.0))
+            .layer(LayerStyle::new(Default::default()).opacity(opacity))
+    };
+    let mut tree = UiTree::new(moving(0.0, 0.8));
+    tree.mark_layout_clean();
+
+    assert_eq!(tree.update(moving(20.0, 0.5)), TreeUpdate::Composite);
+    assert!(!tree.layout_dirty());
+
+    let plain = Element::container([]);
+    assert_eq!(
+        UiTree::new(plain.clone())
+            .update(plain.transform(Transform2D::IDENTITY.translate(20.0, 0.0))),
+        TreeUpdate::Paint
+    );
+}
+
+#[test]
+fn paint_changes_remain_stronger_than_compositor_changes() {
+    let original = Element::container([])
+        .background(Color::BLACK)
+        .transform(Transform2D::IDENTITY.translate(1.0, 0.0));
+    let changed = Element::container([])
+        .background(Color::WHITE)
+        .transform(Transform2D::IDENTITY.translate(20.0, 0.0));
+    assert_eq!(UiTree::new(original).update(changed), TreeUpdate::Paint);
 }

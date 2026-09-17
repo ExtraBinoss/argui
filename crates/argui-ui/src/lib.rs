@@ -40,6 +40,7 @@ mod scroll_request;
 mod semantics;
 mod state;
 mod style;
+mod text_edit;
 mod text_input;
 mod text_selection;
 mod traversal;
@@ -114,6 +115,8 @@ pub use style::{
 pub use style::{
     auto, evenly_sized_tracks, flex, fr, length, line, minmax, percent, repeat, sides, span, zero,
 };
+pub(crate) use text_edit::AppliedTextEdit;
+pub use text_edit::{TextEdit, TextEditError};
 pub use text_input::{
     ClipboardRequest, HistoryConfig, TextInputFilter, TextPrivacy, TextSelection,
     TextSelectionRequest,

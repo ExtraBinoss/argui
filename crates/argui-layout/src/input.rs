@@ -1,7 +1,9 @@
 use argui_core::{Affine2D, Color, Point, Rect, TextPosition};
-use argui_paint::{Border, ClipChain, DisplayList, Fill, Quad, QuadStyle};
+use argui_paint::{
+    Border, ClipChain, CompositorId, CompositorLayer, DisplayList, Fill, Quad, QuadStyle,
+};
 use argui_text::{CaretScroll, CaretStop, TextEngine, TextInputScroll};
-use argui_ui::{CaretStyle, Element, ElementKind, NodeId, UiTree};
+use argui_ui::{CaretStyle, Element, ElementKind, NodeId, TextSelectionHighlight, UiTree};
 
 mod navigation;
 
@@ -31,7 +33,7 @@ pub struct TextInputRegion {
     pub stops: Vec<CaretStop>,
     pub selection: Vec<Rect>,
     pub caret: Option<Rect>,
-    pub selection_color: Color,
+    pub selection_highlight: TextSelectionHighlight,
     pub caret_style: CaretStyle,
     pub content_size: argui_core::Size,
     pub scroll_x: f32,
@@ -45,6 +47,12 @@ pub(crate) struct InputPlacement {
     pub clip: Rect,
     pub scroll_x: f32,
     pub scroll_y: f32,
+}
+
+pub(crate) struct InputPaint {
+    content: argui_text::TextContent,
+    y: f32,
+    height: f32,
 }
 
 impl TextInputRegion {
@@ -194,9 +202,10 @@ pub(crate) fn prepare(
     ui: &UiTree,
     node: NodeId,
     element: &Element,
+    content: &argui_text::TextContent,
     engine: &mut TextEngine,
     placement: InputPlacement,
-) -> Option<(TextInputRegion, Point)> {
+) -> Option<(TextInputRegion, Point, Option<InputPaint>)> {
     let ElementKind::TextEditor {
         text,
         selection,
@@ -206,10 +215,9 @@ pub(crate) fn prepare(
     else {
         return None;
     };
-    let value = ui.text_input_display(node)?;
     let cursor = ui.text_input_position(node)?;
-    let layout = engine.input_layout(
-        &value,
+    let layout = engine.input_layout_content(
+        content,
         text,
         placement.text.size,
         cursor,
@@ -243,6 +251,7 @@ pub(crate) fn prepare(
         .collect();
     let mut caret_rect = layout.caret;
     caret_rect.origin = add(caret_rect.origin, origin);
+    let paint = visible_no_wrap_content(content, text, placement.text.size, layout.scroll_y);
     Some((
         TextInputRegion {
             node,
@@ -252,14 +261,46 @@ pub(crate) fn prepare(
             stops,
             selection: selection_rects,
             caret: (ui.focused_node() == Some(node)).then_some(caret_rect),
-            selection_color: *selection,
+            selection_highlight: element
+                .selection_highlight
+                .clone()
+                .unwrap_or_else(|| TextSelectionHighlight::solid(*selection)),
             caret_style: caret.clone(),
             content_size: layout.content_size,
             scroll_x: layout.scroll_x,
             scroll_y: layout.scroll_y,
         },
         Point::new(layout.scroll_x, layout.scroll_y),
+        paint,
     ))
+}
+
+fn visible_no_wrap_content(
+    content: &argui_text::TextContent,
+    style: &argui_text::TextStyle,
+    viewport: argui_core::Size,
+    scroll_y: f32,
+) -> Option<InputPaint> {
+    if style.wrap != argui_text::TextWrap::None || style.line_height <= 0.0 {
+        return None;
+    }
+    let offsets = source_line_offsets(content.as_str());
+    let visible_lines = (viewport.height / style.line_height).ceil().max(1.0) as usize;
+    if offsets.len() <= visible_lines + 4 {
+        return None;
+    }
+    let first = ((scroll_y / style.line_height).floor() as usize).saturating_sub(2);
+    let end_line = (first + visible_lines + 5).min(offsets.len());
+    let start = offsets[first];
+    let end = offsets
+        .get(end_line)
+        .copied()
+        .unwrap_or_else(|| content.as_str().len());
+    Some(InputPaint {
+        content: content.slice(start..end),
+        y: first as f32 * style.line_height,
+        height: (end_line - first) as f32 * style.line_height,
+    })
 }
 
 pub(crate) fn update(ui: &mut UiTree, engine: &mut TextEngine, output: &mut crate::LayoutOutput) {
@@ -280,21 +321,17 @@ pub(crate) fn update(ui: &mut UiTree, engine: &mut TextEngine, output: &mut crat
         else {
             continue;
         };
-        let previous_scroll_x = output.text_inputs[region_index].scroll_x;
-        let previous_scroll_y = output.text_inputs[region_index].scroll_y;
-        let viewport_size = output.text_inputs[region_index].viewport.size;
+        let text_bounds = output.text_inputs[region_index].viewport;
         let block = &mut output.text.blocks_mut()[text_index];
-        let text_bounds = Rect::new(
-            Point::new(
-                block.bounds.origin.x + previous_scroll_x,
-                block.bounds.origin.y + previous_scroll_y,
-            ),
-            viewport_size,
-        );
-        if let Some((region, scroll)) = prepare(
+        let Some((content, _)) = crate::text::content(ui, node.node, element) else {
+            continue;
+        };
+        block.content = content.clone();
+        if let Some((region, scroll, paint)) = prepare(
             ui,
             node.node,
             element,
+            &content,
             engine,
             InputPlacement {
                 text: text_bounds,
@@ -304,9 +341,7 @@ pub(crate) fn update(ui: &mut UiTree, engine: &mut TextEngine, output: &mut crat
                 scroll_y: ui.scroll_offset(node.node).y,
             },
         ) {
-            block.bounds.origin.x = text_bounds.origin.x - scroll.x;
-            block.bounds.origin.y = text_bounds.origin.y - scroll.y;
-            block.bounds.size.height = text_bounds.size.height.max(region.content_size.height);
+            position_input_block(block, text_bounds, scroll, paint, &content, &region);
             if let Some(config) = output
                 .scroll_regions
                 .iter()
@@ -343,6 +378,35 @@ pub(crate) fn update(ui: &mut UiTree, engine: &mut TextEngine, output: &mut crat
     ui.mark_text_input_layout_clean();
 }
 
+pub(crate) fn position_input_block(
+    block: &mut argui_text::TextBlock,
+    text_bounds: Rect,
+    scroll: Point,
+    paint: Option<InputPaint>,
+    content: &argui_text::TextContent,
+    region: &TextInputRegion,
+) {
+    block.bounds.origin.x = text_bounds.origin.x - scroll.x;
+    if let Some(paint) = paint {
+        block.content = paint.content;
+        block.bounds.origin.y = text_bounds.origin.y + paint.y - scroll.y;
+        block.bounds.size.height = paint.height;
+    } else {
+        block.content = content.clone();
+        block.bounds.origin.y = text_bounds.origin.y - scroll.y;
+        block.bounds.size.height = text_bounds.size.height.max(region.content_size.height);
+    }
+}
+
+fn source_line_offsets(text: &str) -> Vec<usize> {
+    let mut offsets = vec![0];
+    offsets.extend(
+        text.char_indices()
+            .filter_map(|(index, character)| (character == '\n').then_some(index + 1)),
+    );
+    offsets
+}
+
 pub(crate) fn paint_selection(
     region: &TextInputRegion,
     output: &mut DisplayList,
@@ -350,7 +414,13 @@ pub(crate) fn paint_selection(
     clips: &ClipChain,
 ) {
     for bounds in &region.selection {
-        push_quad(output, *bounds, region.selection_color, transform, clips);
+        push_selection_quad(
+            output,
+            *bounds,
+            &region.selection_highlight,
+            transform,
+            clips,
+        );
     }
 }
 
@@ -365,31 +435,66 @@ pub(crate) fn paint_caret(
         return;
     };
     let frame = ui.resolved_caret_frame(region.node, &region.caret_style);
-    if frame.opacity <= 0.0 {
-        return;
-    }
     let primitives = &region.caret_style.visual.primitives;
     let Some(bounds) = visual_bounds(line, primitives) else {
         return;
     };
-    let transform = transform
-        * frame
-            .transform
-            .affine(bounds, argui_core::TransformOrigin::CENTER);
+    if clips.regions().is_empty() || bounds.size.width <= 0.0 || bounds.size.height <= 0.0 {
+        return;
+    }
+    let frame_transform = frame
+        .transform
+        .affine(bounds, argui_core::TransformOrigin::CENTER);
+    let composited = region
+        .caret_style
+        .animation
+        .as_ref()
+        .is_some_and(argui_ui::CaretAnimation::supports_composition)
+        && transform.inverse().is_some();
+    if composited {
+        let inverse = transform
+            .inverse()
+            .expect("the composited caret transform was checked as invertible");
+        let mut layer = CompositorLayer::new(
+            caret_compositor_id(region.node),
+            transform.transform_rect(bounds),
+            transform,
+            transform,
+            frame.opacity,
+        );
+        layer.update(transform * frame_transform * inverse, frame.opacity);
+        output.begin_compositor(layer);
+    } else if frame.opacity <= 0.0 {
+        return;
+    }
+    let primitive_transform = if composited {
+        transform
+    } else {
+        transform * frame_transform
+    };
     for primitive in primitives {
         push_caret_quad(
             output,
             primitive.bounds(line),
             &primitive.paint,
             frame.tint,
-            frame.opacity,
-            transform,
+            if composited { 1.0 } else { frame.opacity },
+            primitive_transform,
             clips,
         );
     }
+    if composited {
+        output.end_compositor();
+    }
 }
 
-fn visual_bounds(line: Rect, primitives: &[argui_ui::CaretPrimitive]) -> Option<Rect> {
+/// Returns the stable compositor identity for one text input's caret.
+pub(crate) const fn caret_compositor_id(node: NodeId) -> CompositorId {
+    CompositorId::subpart(node.get(), 1)
+}
+
+/// Returns the union of the authored caret primitives around `line`.
+pub(crate) fn visual_bounds(line: Rect, primitives: &[argui_ui::CaretPrimitive]) -> Option<Rect> {
     let first = primitives.first()?.bounds(line);
     let (mut left, mut top) = (first.origin.x, first.origin.y);
     let (mut right, mut bottom) = (
@@ -464,19 +569,19 @@ fn radius_for(bounds: Rect, radii: argui_paint::CornerRadii) -> argui_paint::Cor
     }
 }
 
-fn push_quad(
+fn push_selection_quad(
     output: &mut DisplayList,
     bounds: Rect,
-    color: Color,
+    highlight: &TextSelectionHighlight,
     transform: Affine2D,
     clips: &ClipChain,
 ) {
     if !clips.regions().is_empty() {
         output.push_quad(Quad {
             bounds,
-            background: Some(Fill::Solid(color)),
+            background: Some(highlight.background.clone()),
             border: Border::all(0.0, Color::TRANSPARENT),
-            radii: Default::default(),
+            radii: radius_for(bounds, highlight.radii),
             opacity: 1.0,
             transform,
             clips: clips.clone(),

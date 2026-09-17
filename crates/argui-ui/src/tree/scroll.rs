@@ -327,6 +327,7 @@ impl UiTree {
     }
 
     fn scroll_update(&mut self, change: crate::scroll::ScrollChange) -> InteractionUpdate {
+        let text_input_changed = self.text_inputs.get(change.node).is_some();
         InteractionUpdate {
             events: self.event_deliveries(
                 change.node,
@@ -337,6 +338,7 @@ impl UiTree {
             ),
             paint_changed: true,
             scroll_changed: true,
+            text_input_changed,
             ..InteractionUpdate::default()
         }
     }
@@ -356,6 +358,7 @@ impl UiTree {
 
 fn transition_update(update: super::TreeUpdate) -> InteractionUpdate {
     InteractionUpdate {
+        composite_changed: update == super::TreeUpdate::Composite,
         paint_changed: update == super::TreeUpdate::Paint,
         scroll_changed: update == super::TreeUpdate::Scroll,
         layout_changed: update == super::TreeUpdate::Layout,

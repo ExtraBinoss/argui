@@ -7,6 +7,7 @@ pub(super) struct RuntimeAnimations {
     clock: MonotonicClock,
     scheduler: Scheduler,
     model_animation: Option<AnimationId>,
+    wake_at: Option<Time>,
 }
 
 impl RuntimeAnimations {
@@ -15,6 +16,7 @@ impl RuntimeAnimations {
             clock: MonotonicClock::new(),
             scheduler: Scheduler::default(),
             model_animation: None,
+            wake_at: None,
         };
         animations.sync(model.is_some_and(AnyEntity::wants_frame));
         animations
@@ -47,6 +49,7 @@ impl RuntimeAnimations {
 impl Application {
     pub(super) fn sync_animations(&mut self) -> bool {
         if !self.presentation_visible {
+            self.animations.wake_at = None;
             return self.animations.sync(false);
         }
         let model_active = self.model.as_ref().is_some_and(AnyEntity::wants_frame);
@@ -54,7 +57,33 @@ impl Application {
             .ui_tree
             .as_ref()
             .is_some_and(argui_ui::UiTree::wants_animation_frame);
-        self.animations.sync(model_active || tree_active)
+        let active = model_active || tree_active;
+        self.animations.wake_at = (!active)
+            .then(|| {
+                self.ui_tree
+                    .as_ref()
+                    .and_then(argui_ui::UiTree::next_animation_frame_at)
+            })
+            .flatten();
+        self.animations.sync(active)
+    }
+
+    /// Returns the next event-loop wake deadline for a one-shot animation frame.
+    pub(crate) fn next_animation_deadline(&self) -> Option<Instant> {
+        self.animations
+            .wake_at
+            .map(|time| self.animations.clock.instant(time))
+    }
+
+    /// Activates a single presentation frame when its scheduled deadline is due.
+    pub(crate) fn wake_due_animation(&mut self) {
+        if !self.presentation_visible || !self.animations.take_due_wake() {
+            return;
+        }
+        self.animations.sync(true);
+        if let Some(window) = self.window() {
+            window.request_redraw();
+        }
     }
 
     #[cfg_attr(coverage_nightly, coverage(off))]
@@ -88,6 +117,7 @@ impl Application {
         self.frame_record.paint += paint_time;
         self.pending_ui_frame.merge(
             &InteractionUpdate {
+                composite_changed: tree_animation == TreeUpdate::Composite,
                 paint_changed: tree_animation == TreeUpdate::Paint
                     || model_update == ViewUpdate::Paint,
                 layout_changed: tree_animation == TreeUpdate::Layout,
@@ -103,15 +133,35 @@ impl Application {
     }
 }
 
+impl RuntimeAnimations {
+    /// Clears and reports a one-shot wake whose monotonic deadline has elapsed.
+    fn take_due_wake(&mut self) -> bool {
+        let Some(deadline) = self.wake_at else {
+            return false;
+        };
+        if self.clock.now() < deadline {
+            return false;
+        }
+        self.wake_at = None;
+        true
+    }
+}
+
 struct MonotonicClock {
     origin: Instant,
 }
 
 impl MonotonicClock {
+    /// Creates a clock rooted at the current platform instant.
     fn new() -> Self {
         Self {
             origin: Instant::now(),
         }
+    }
+
+    /// Converts a clock-relative animation timestamp to a platform instant.
+    fn instant(&self, time: Time) -> Instant {
+        self.origin + std::time::Duration::from_nanos(time.as_nanos())
     }
 }
 

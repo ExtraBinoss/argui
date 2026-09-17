@@ -3,7 +3,9 @@ use std::sync::Arc;
 use argui_core::{Point, PointerEvent, PointerId, PointerKind, PointerPhase};
 use argui_platform::{PlatformError, PlatformEvent, PointerButton};
 use winit::{
-    application::ApplicationHandler, event::WindowEvent, event_loop::ActiveEventLoop,
+    application::ApplicationHandler,
+    event::WindowEvent,
+    event_loop::{ActiveEventLoop, ControlFlow},
     window::WindowId,
 };
 
@@ -40,6 +42,10 @@ impl Application {
 
 #[cfg_attr(coverage_nightly, coverage(off))]
 impl ApplicationHandler<UserEvent> for Application {
+    fn new_events(&mut self, _event_loop: &ActiveEventLoop, _cause: winit::event::StartCause) {
+        self.wake_due_animation();
+    }
+
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         if self.window.is_some() {
             return;
@@ -122,13 +128,17 @@ impl ApplicationHandler<UserEvent> for Application {
         (self.on_event)(RuntimeEvent::Platform(PlatformEvent::Suspended));
     }
 
-    fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
+    fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
         #[cfg(target_os = "android")]
         if let Some(window) = self.window.clone() {
             // Winit currently consumes Android ContentRectChanged without
             // forwarding it, so sample once after each platform event batch.
             self.refresh_safe_area_insets(window.as_ref(), self.scale_factor);
         }
+        event_loop.set_control_flow(
+            self.next_animation_deadline()
+                .map_or(ControlFlow::Wait, ControlFlow::WaitUntil),
+        );
     }
 
     fn user_event(&mut self, event_loop: &ActiveEventLoop, event: UserEvent) {

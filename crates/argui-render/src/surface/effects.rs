@@ -165,7 +165,11 @@ impl SurfaceRenderer {
                     }
                     self.draw_offscreen(encoder, target, &nodes[start..index], profiler, owner);
                 }
-                EffectNode::Layer(layer) if layer.style.opacity <= 0.0 => {}
+                EffectNode::Layer(layer) if layer.style.opacity <= 0.0 => {
+                    if let Some(profile) = layer.style.profile {
+                        cache_stats.used.insert(profile);
+                    }
+                }
                 EffectNode::Layer(layer) if !layer.style.requires_offscreen() => {
                     self.render_effect_nodes(
                         encoder,
@@ -185,7 +189,7 @@ impl SurfaceRenderer {
                         cache_stats.used.insert(profile);
                         self.layer_cache
                             .get(&profile)
-                            .filter(|cached| cached.layer == *layer)
+                            .filter(|cached| same_layer_content(&cached.layer, layer))
                             .map(|cached| cached.target)
                     });
                     let foreground = if let Some(cached) = cached {
@@ -226,13 +230,18 @@ impl SurfaceRenderer {
                         }
                         foreground
                     };
+                    let Some(output_region) =
+                        PixelRegion::from_rect(layer.style.transformed_bounds(), target.region)
+                    else {
+                        continue;
+                    };
                     self.composite_layer(
                         encoder,
                         target,
                         foreground,
                         &layer.style,
                         viewport,
-                        region,
+                        output_region,
                         profiler,
                     );
                 }
@@ -529,6 +538,19 @@ impl SurfaceRenderer {
     ) {
         clear_view(encoder, self.offscreen.view(target.texture), color);
     }
+}
+
+/// Returns whether a cached foreground remains valid across composition-only changes.
+fn same_layer_content(
+    cached: &crate::effect_graph::EffectLayer,
+    current: &crate::effect_graph::EffectLayer,
+) -> bool {
+    cached.region == current.region
+        && cached.content_revision == current.content_revision
+        && cached.children == current.children
+        && cached.style.bounds == current.style.bounds
+        && cached.style.filters == current.style.filters
+        && cached.style.mask == current.style.mask
 }
 
 fn clear_view(encoder: &mut wgpu::CommandEncoder, view: &wgpu::TextureView, color: wgpu::Color) {

@@ -85,6 +85,7 @@ impl PendingWindowFrame {
 pub(crate) struct PendingUiFrame {
     requested: bool,
     rebuild: bool,
+    composite: bool,
     layout: bool,
     text_input: bool,
     scroll: bool,
@@ -97,11 +98,13 @@ pub(crate) struct PendingUiFrame {
 impl PendingUiFrame {
     pub(crate) fn merge(&mut self, update: &InteractionUpdate, rebuild: bool) {
         self.requested |= rebuild
+            | update.composite_changed
             | update.layout_changed
             | update.text_input_changed
             | update.scroll_changed
             | update.paint_changed;
         self.rebuild |= rebuild;
+        self.composite |= update.composite_changed;
         self.layout |= update.layout_changed;
         self.text_input |= update.text_input_changed;
         self.scroll |= update.scroll_changed;
@@ -144,6 +147,12 @@ impl PendingUiFrame {
         self.paint = true;
     }
 
+    /// Requests a presentation-only compositor frame.
+    pub(super) fn request_composite(&mut self) {
+        self.requested = true;
+        self.composite = true;
+    }
+
     pub(super) fn request_rebuild(&mut self) {
         self.requested = true;
         self.rebuild = true;
@@ -157,6 +166,7 @@ impl PendingUiFrame {
 impl Application {
     #[cfg_attr(coverage_nightly, coverage(off))]
     pub(super) fn begin_frame_profile(&mut self) {
+        self.composite_frame = false;
         let now = Instant::now();
         self.frame_record = argui_inspect::FrameRecord {
             interval: self
@@ -241,16 +251,28 @@ impl Application {
                 self.scroll_or_exit(event_loop);
                 self.frame_record.paint += started.elapsed();
             }
-            TreeUpdate::Semantics => {}
-            TreeUpdate::None if pending.paint => {
+            _ if pending.paint => {
                 let started = Instant::now();
                 self.repaint();
                 self.frame_record.paint += started.elapsed();
             }
+            TreeUpdate::Composite => {
+                let started = Instant::now();
+                self.composite();
+                self.frame_record.paint += started.elapsed();
+            }
+            _ if pending.composite => {
+                let started = Instant::now();
+                self.composite();
+                self.frame_record.paint += started.elapsed();
+            }
+            TreeUpdate::Semantics => {}
             TreeUpdate::None => {}
         }
         self.frame_record.update = match tree_update {
             TreeUpdate::Layout => Invalidation::Layout,
+            TreeUpdate::Composite if self.composite_frame => Invalidation::Composite,
+            TreeUpdate::Composite => Invalidation::Paint,
             TreeUpdate::Paint => Invalidation::Paint,
             TreeUpdate::Scroll => Invalidation::Paint,
             TreeUpdate::Semantics => Invalidation::None,
@@ -258,6 +280,10 @@ impl Application {
             TreeUpdate::None if pending.text_input || pending.scroll || pending.paint => {
                 Invalidation::Paint
             }
+            TreeUpdate::None if pending.composite && self.composite_frame => {
+                Invalidation::Composite
+            }
+            TreeUpdate::None if pending.composite => Invalidation::Paint,
             TreeUpdate::None => Invalidation::None,
         };
         if let Some(request) = pending.scroll_request {
@@ -267,7 +293,7 @@ impl Application {
             (Some(ui), Some(layout)) => ui.sync_focus(&layout.hit_regions, pending.focus_request),
             _ => InteractionUpdate::default(),
         };
-        if (!focus_update.events.is_empty() || focus_update.paint_changed)
+        if !focus_update.is_empty()
             && let Some(window) = self.window.clone()
         {
             self.apply_ui_update(focus_update, &window, event_loop);
@@ -275,7 +301,7 @@ impl Application {
         }
         if let (Some(ui), Some(request)) = (&mut self.ui_tree, pending.text_selection_request) {
             let selection_update = ui.select_text(request);
-            if (!selection_update.events.is_empty() || selection_update.paint_changed)
+            if !selection_update.is_empty()
                 && let Some(window) = self.window.clone()
             {
                 self.apply_ui_update(selection_update, &window, event_loop);

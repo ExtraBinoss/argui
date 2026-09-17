@@ -45,8 +45,9 @@ it.
 | --- | --- | --- |
 | Identical description | tree, layout, text, paint | nothing |
 | Semantics only | layout, text, paint | accessibility diff |
-| Paint or opacity | layout, shaped text, node identity | paint data |
-| Transform or scroll offset | layout and shaped text | translated paint and hit geometry |
+| Color, primitive opacity, or effects | layout, shaped text, node identity | paint data |
+| Transform or group opacity | layout, shaped text, paint primitives, GPU uploads | compositor properties and presentation geometry |
+| Scroll offset | layout and shaped text | translated paint and hit geometry |
 | Text, size, structure, or layout style | stable keyed nodes where possible | affected layout, text, and paint |
 
 `Element::layout_boundary` stops a child's intrinsic size from invalidating an
@@ -99,6 +100,12 @@ resolved value for the current frame.
 Accessibility follows the same stable node IDs. Semantic-only changes bypass
 layout and paint. Native AccessKit and the browser semantic DOM consume
 incremental semantic patches after event dispatch.
+
+The [retained compositor](rendering/compositor.md) is a distinct invalidation
+phase between paint and presentation. The UI thread still owns event ordering,
+tree state, and animation sampling; WGPU owns cached layer surfaces and applies
+their transform and group opacity. This boundary is renderer-neutral and shared
+by native windows, native popups, and WebAssembly.
 
 ## Platform boundary
 

@@ -49,9 +49,15 @@ fn gpu_canvas_lowers_with_retained_identity_and_normal_visual_geometry() {
     let output = LayoutEngine::new()
         .compute(&mut ui, &mut text_engine(), Size::new(120.0, 80.0))
         .unwrap();
-    let DisplayCommand::GpuCanvas(canvas) = &output.display_list.commands()[0] else {
-        panic!("GPU canvas element must lower to a canvas command");
-    };
+    let canvas = output
+        .display_list
+        .commands()
+        .iter()
+        .find_map(|command| match command {
+            DisplayCommand::GpuCanvas(canvas) => Some(canvas),
+            _ => None,
+        })
+        .expect("GPU canvas element must lower to a canvas command");
     assert_eq!(canvas.canvas, id);
     assert_eq!(canvas.object.value, retained.get());
     assert_eq!(canvas.slot, 0);
@@ -350,12 +356,14 @@ fn transformed_images_share_exact_clips_layers_and_hit_geometry() {
     assert!(matches!(
         output.display_list.commands(),
         [
+            DisplayCommand::BeginCompositor(_),
             DisplayCommand::BeginLayer(_),
             DisplayCommand::Image(_),
-            DisplayCommand::EndLayer
+            DisplayCommand::EndLayer,
+            DisplayCommand::EndCompositor
         ]
     ));
-    let DisplayCommand::Image(image) = &output.display_list.commands()[1] else {
+    let DisplayCommand::Image(image) = &output.display_list.commands()[2] else {
         unreachable!();
     };
     assert_eq!(image.image, ImageId(42));

@@ -108,14 +108,27 @@ impl Element {
         Self::container([]).with_kind(ElementKind::TextEditor {
             value: spec.value,
             placeholder: spec.placeholder,
+            styled: None,
             multiline: spec.multiline,
             read_only: spec.read_only,
             filter: spec.filter,
             text: spec.text,
-            placeholder_text: spec.placeholder_text,
+            placeholder_text: Box::new(spec.placeholder_text),
             selection: spec.selection,
             caret: spec.caret,
         })
+    }
+
+    /// Supplies styled content for a text editor whose plain text matches its value.
+    ///
+    /// * `content` — rich text runs used while their concatenated text equals the
+    ///   controlled editor value. A mismatch safely falls back to plain text.
+    #[must_use]
+    pub fn text_editor_content(mut self, content: TextContent) -> Self {
+        if let ElementKind::TextEditor { styled, .. } = &mut self.kind {
+            *styled = Some(Box::new(content));
+        }
+        self
     }
 
     fn with_kind(mut self, kind: ElementKind) -> Self {

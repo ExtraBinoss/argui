@@ -10,7 +10,7 @@ as `Element::on`.
 | Widget | Direct API and payload | Keyboard and accessibility contract |
 | --- | --- | --- |
 | Button | `on_click(EventHandler)` | Enter, Space, pointer, touch, and accessibility click converge. Disabled or busy buttons do not emit. |
-| Input, TextArea | `on_input(String)`, `on_submit(String)` | Editing, paste, IME, Enter submission, and accessibility set-value use the text-input policy. |
+| Input, TextArea | `on_edit(TextEdit)`, `on_input(String)`, `on_submit(String)` | Editing, paste, IME, Enter submission, and accessibility set-value use the text-input policy. `on_edit` avoids cloning a large complete value. |
 | InputOtp | `on_input(String)`, `on_submit(String)` | Numeric filtering happens before delivery; completion submits the controlled value. |
 | Checkbox | `on_change(CheckedState)` | Click/Space/accessibility click; Mixed advances to Checked. |
 | Switch, Toggle | `on_change(bool)` | Click/Space/accessibility click; disabled controls do not emit. |
@@ -41,6 +41,31 @@ as `Element::on`.
 | ToastHost | `on_close(String)` | Close buttons emit the toast ID; hover/focus pause remains available through `pause_action`. |
 | Sidebar | `on_collapsed_change(bool)`, `on_open_change(bool)` | Rail and mobile sheet controls emit the requested controlled state. |
 | UpdateDialog | `on_action(String)`, `on_open_change(bool)` | Emits `check`, `download`, `cancel`, or `install`; engine state stays controlled. |
+
+## Incremental text edits
+
+Use `on_input(cx.input_callback(...))` when the complete next value is the most
+convenient payload. For document-sized buffers, use
+`on_edit(cx.edit_callback(...))`: `TextEdit` contains the half-open UTF-8 byte
+range in the previous value and its replacement text.
+
+```rust,ignore
+TextArea::new("source", &self.source, "Start writing…", theme.input())
+    .on_edit(cx.edit_callback(|model, edit| {
+        edit.apply_to(&mut model.source)
+            .expect("an editor edit matches the controlled revision");
+    }))
+    .build()
+```
+
+The engine emits both event forms only when both are observed. A control with
+only an `on_edit` handler does not allocate or copy its complete value for
+delivery. `Context::edit_event_handler` is the non-invalidating counterpart for
+apps that update retained text immediately and defer expensive derived work.
+The learning site's live Interaction API example shows the delivered byte range
+and replacement length after every edit. [Astra Editor](../../app_examples/astra-editor/README.md)
+uses the same path for its code buffer and includes reproducible
+incremental-delivery and native latency profiles.
 
 ## Intentionally action-only or presentational
 

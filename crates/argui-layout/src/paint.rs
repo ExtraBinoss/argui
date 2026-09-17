@@ -1,8 +1,5 @@
 use argui_core::{Affine2D, Rect};
-use argui_paint::{
-    Border, ClipChain, ClipRegion, Color, DisplayList, ImagePrimitive, Quad, QuadStyle,
-    VectorPrimitive,
-};
+use argui_paint::{ClipChain, ClipRegion, CompositorId, CompositorLayer, DisplayList};
 use argui_ui::{EffectScope, Element, ElementKind, NodeId, PointerEvents, UiTree};
 
 use crate::{LayoutNode, LayoutOutput, engine::NodeMap, input, scroll};
@@ -14,8 +11,10 @@ mod effects;
 mod geometry;
 mod gpu_canvas;
 mod portal;
+mod primitives;
 mod sync;
 use effects::{begin_layer, begin_scope, end_layers, scope_count};
+use primitives::{push_image, push_quad, push_vector};
 
 #[derive(Clone, Debug, PartialEq)]
 pub(super) struct PaintContext {
@@ -24,6 +23,7 @@ pub(super) struct PaintContext {
     clip_bounds: Rect,
     hit_allowed: bool,
     active_portal: Option<NodeId>,
+    compositor_owner: Option<CompositorId>,
 }
 
 #[derive(Clone, Debug)]
@@ -45,6 +45,7 @@ pub(crate) fn repaint(
     output.hit_regions.clear();
     output.semantic_bounds.clear();
     output.desktop_backdrops.clear();
+    output.compositor_owners.clear();
     cache.visited = 0;
     cache.reused = 0;
     cache.reused_commands = 0;
@@ -60,6 +61,7 @@ pub(crate) fn repaint(
             clip_bounds: output.viewport,
             hit_allowed: true,
             active_portal: None,
+            compositor_owner: None,
         };
         portal::paint(
             root,
@@ -71,6 +73,12 @@ pub(crate) fn repaint(
             &mut scroll_updates,
         );
     }
+    output.display_list.resolve_compositor_bounds();
+    for surface in &mut output.native_surfaces {
+        surface.display_list.resolve_compositor_bounds();
+    }
+    let composite_geometry = crate::composite::CompositeGeometry::capture(output);
+    output.composite_geometry = composite_geometry;
     output.paint_stats = crate::PaintStats {
         visited_subtrees: cache.visited,
         reused_subtrees: cache.reused,
@@ -130,6 +138,9 @@ pub(super) fn paint_node(
         output
             .semantic_bounds
             .extend_from_slice(&fragment.semantic_bounds);
+        output
+            .compositor_owners
+            .extend(fragment.compositor_owners.iter().copied());
         for update in &fragment.scroll_updates {
             apply_scroll_update(output, update);
             scroll_updates.push(update.clone());
@@ -152,6 +163,7 @@ pub(super) fn paint_node(
             clip_bounds: clip,
             hit_allowed: parent.hit_allowed,
             active_portal: parent.active_portal,
+            compositor_owner: None,
         };
         &portal
     } else {
@@ -160,12 +172,35 @@ pub(super) fn paint_node(
     let transform = parent.transform
         * ui.resolved_transform(node.node, element)
             .affine(node.bounds, element.transform_origin);
+    let composited = element.needs_compositor_layer();
+    let compositor_id = CompositorId::new(node.node.get());
+    let compositor_owner = if composited {
+        Some(compositor_id)
+    } else {
+        parent.compositor_owner
+    };
+    if let Some(owner) = compositor_owner {
+        output.compositor_owners.insert(node.node, owner);
+    }
+    if composited {
+        let compositor_opacity = element.layer.as_ref().map_or(1.0, |layer| {
+            ui.resolved_layer(node.node, element, layer).opacity
+        });
+        output.display_list.begin_compositor(CompositorLayer::new(
+            compositor_id,
+            transform.transform_rect(node.bounds),
+            parent.transform,
+            transform,
+            compositor_opacity,
+        ));
+    }
     let context = PaintContext {
         transform,
         clips: parent.clips.clone(),
         clip_bounds: parent.clip_bounds,
         hit_allowed: parent.hit_allowed,
         active_portal: parent.active_portal,
+        compositor_owner,
     };
     geometry::record(node, &context, output);
     let scroll_layers = paint_enter(
@@ -175,13 +210,15 @@ pub(super) fn paint_node(
         output,
         &context,
         map.style.overflow.x.clips() || map.style.overflow.y.clips(),
+        composited,
     );
 
     let child_clips = if map.style.overflow.x.clips() || map.style.overflow.y.clips() {
         let radii = ui.resolved_quad(node.node, element).radii;
-        context
-            .clips
-            .appended(ClipRegion::rounded(node.bounds, transform, radii))
+        context.clips.appended(owned_clip(
+            ClipRegion::rounded(node.bounds, transform, radii),
+            compositor_owner,
+        ))
     } else {
         context.clips.clone()
     };
@@ -202,6 +239,7 @@ pub(super) fn paint_node(
                 PointerEvents::None | PointerEvents::BoxOnly
             ),
         active_portal: context.active_portal,
+        compositor_owner,
     };
     crate::custom::paint(
         map,
@@ -263,6 +301,9 @@ pub(super) fn paint_node(
         scroll::paint(region, &mut output.display_list);
     }
     paint_exit(element, &mut output.display_list);
+    if composited {
+        output.display_list.end_compositor();
+    }
     if cacheable {
         remove_descendant_fragments(map, cache);
         cache.fragments.insert(
@@ -274,6 +315,16 @@ pub(super) fn paint_node(
                 commands: output.display_list.commands()[command_start..].to_vec(),
                 hit_regions: output.hit_regions[hit_start..].to_vec(),
                 semantic_bounds: output.semantic_bounds[semantic_start..].to_vec(),
+                compositor_owners: output.nodes[map.index..map.index + map.subtree_len]
+                    .iter()
+                    .filter_map(|node| {
+                        output
+                            .compositor_owners
+                            .get(&node.node)
+                            .copied()
+                            .map(|owner| (node.node, owner))
+                    })
+                    .collect(),
                 text_orders: output
                     .text_regions
                     .iter()
@@ -328,6 +379,7 @@ fn paint_enter(
     output: &mut LayoutOutput,
     context: &PaintContext,
     clips_content: bool,
+    composited: bool,
 ) -> usize {
     let visual_bounds = context.transform.transform_rect(node.bounds);
     if element
@@ -336,20 +388,23 @@ fn paint_enter(
     {
         output.desktop_backdrops.push(crate::DesktopBackdropRegion {
             node: node.node,
-            shape: context.clips.appended(ClipRegion::rounded(
-                node.bounds,
-                context.transform,
-                ui.resolved_quad(node.node, element).radii,
+            shape: context.clips.appended(owned_clip(
+                ClipRegion::rounded(
+                    node.bounds,
+                    context.transform,
+                    ui.resolved_quad(node.node, element).radii,
+                ),
+                context.compositor_owner,
             )),
         });
     }
     if let Some(layer) = &element.layer {
-        begin_layer(
-            &mut output.display_list,
-            ui.resolved_layer(node.node, element, layer),
-            visual_bounds,
-            node.node,
-        );
+        let mut layer = ui.resolved_layer(node.node, element, layer);
+        if composited {
+            // Group opacity is applied by the retained compositor wrapper.
+            layer.opacity = 1.0;
+        }
+        begin_layer(&mut output.display_list, layer, visual_bounds, node.node);
     }
     begin_scope(
         ui,
@@ -382,9 +437,10 @@ fn paint_enter(
 
     let scroll_layers = effects::begin_scroll(ui, element, node, output, context.transform);
     let content_clips = if clips_content {
-        context
-            .clips
-            .appended(ClipRegion::new(node.bounds, context.transform))
+        context.clips.appended(owned_clip(
+            ClipRegion::new(node.bounds, context.transform),
+            context.compositor_owner,
+        ))
     } else {
         context.clips.clone()
     };
@@ -439,6 +495,12 @@ fn paint_enter(
     scroll_layers
 }
 
+/// Associates a clip with the nearest retained compositor layer, when present.
+fn owned_clip(mut clip: ClipRegion, owner: Option<CompositorId>) -> ClipRegion {
+    clip.compositor = owner;
+    clip
+}
+
 fn paint_exit(element: &Element, display_list: &mut DisplayList) {
     end_layers(display_list, scope_count(element, EffectScope::Content));
     end_layers(
@@ -448,136 +510,4 @@ fn paint_exit(element: &Element, display_list: &mut DisplayList) {
     if element.layer.is_some() {
         display_list.end_layer();
     }
-}
-
-fn push_quad(
-    ui: &UiTree,
-    style: QuadStyle,
-    element: &Element,
-    node: LayoutNode,
-    output: &mut LayoutOutput,
-    context: &PaintContext,
-) {
-    let split = scope_count(element, EffectScope::Background) != 0
-        || scope_count(element, EffectScope::Border) != 0;
-    if !split {
-        if style.is_visible() {
-            output
-                .display_list
-                .push_quad(quad(style, node.bounds, context));
-        }
-        return;
-    }
-    if style.background.is_some() {
-        push_scoped_quad(
-            ui,
-            QuadStyle {
-                border: None,
-                ..style
-            },
-            element,
-            node,
-            EffectScope::Background,
-            output,
-            context,
-        );
-    }
-    if style.border.is_some() {
-        push_scoped_quad(
-            ui,
-            QuadStyle {
-                background: None,
-                ..style
-            },
-            element,
-            node,
-            EffectScope::Border,
-            output,
-            context,
-        );
-    }
-}
-
-fn push_scoped_quad(
-    ui: &UiTree,
-    style: QuadStyle,
-    element: &Element,
-    node: LayoutNode,
-    scope: EffectScope,
-    output: &mut LayoutOutput,
-    context: &PaintContext,
-) {
-    let visual_bounds = context.transform.transform_rect(node.bounds);
-    let layers = begin_scope(
-        ui,
-        &mut output.display_list,
-        element,
-        scope,
-        visual_bounds,
-        node.node,
-    );
-    output
-        .display_list
-        .push_quad(quad(style, node.bounds, context));
-    end_layers(&mut output.display_list, layers);
-}
-
-fn quad(style: QuadStyle, bounds: Rect, context: &PaintContext) -> Quad {
-    Quad {
-        bounds,
-        background: style.background,
-        border: style.border.unwrap_or(Border::all(0.0, Color::TRANSPARENT)),
-        radii: style.radii,
-        opacity: style.opacity,
-        transform: context.transform,
-        clips: context.clips.clone(),
-    }
-}
-
-fn push_image(
-    ui: &UiTree,
-    element: &Element,
-    node: LayoutNode,
-    output: &mut LayoutOutput,
-    context: &PaintContext,
-) {
-    let ElementKind::Image {
-        image,
-        fit,
-        sampling,
-    } = element.kind
-    else {
-        return;
-    };
-    output.display_list.push_image(ImagePrimitive {
-        bounds: node.bounds,
-        image,
-        fit,
-        sampling,
-        opacity: ui.resolved_quad(node.node, element).opacity,
-        radii: ui.resolved_quad(node.node, element).radii,
-        transform: context.transform,
-        clips: context.clips.clone(),
-    });
-}
-
-fn push_vector(
-    ui: &UiTree,
-    element: &Element,
-    node: LayoutNode,
-    output: &mut LayoutOutput,
-    context: &PaintContext,
-) {
-    let ElementKind::Vector { vector, fit, color } = element.kind else {
-        return;
-    };
-    output.display_list.push_vector(VectorPrimitive {
-        vector,
-        bounds: node.bounds,
-        fit,
-        color: ui.resolved_vector_color(node.node, color),
-        opacity: ui.resolved_quad(node.node, element).opacity,
-        transform: context.transform,
-        clips: context.clips.clone(),
-    });
 }

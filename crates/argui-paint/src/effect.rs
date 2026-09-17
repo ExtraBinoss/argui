@@ -1,4 +1,4 @@
-use argui_core::{Color, Point, Rect, Size};
+use argui_core::{Affine2D, Color, Point, Rect, Size};
 
 use crate::CornerRadii;
 
@@ -295,6 +295,10 @@ pub enum LayerMask {
 #[derive(Clone, Debug, PartialEq)]
 pub struct LayerStyle {
     pub bounds: Rect,
+    /// Composition-time transform applied after the layer content is rendered.
+    pub transform: Affine2D,
+    /// Whether the renderer should retain this layer even at identity presentation.
+    pub retained: bool,
     pub opacity: f32,
     pub blend_mode: BlendMode,
     pub filters: Vec<Filter>,
@@ -310,6 +314,8 @@ impl LayerStyle {
     pub const fn new(bounds: Rect) -> Self {
         Self {
             bounds,
+            transform: Affine2D::IDENTITY,
+            retained: false,
             opacity: 1.0,
             blend_mode: BlendMode::Normal,
             filters: Vec::new(),
@@ -348,6 +354,26 @@ impl LayerStyle {
         self
     }
 
+    /// Sets the composition-time transform applied to the completed layer.
+    ///
+    /// * `transform` — affine transform in logical surface coordinates.
+    #[must_use]
+    pub const fn transform(mut self, transform: Affine2D) -> Self {
+        self.transform = transform;
+        self
+    }
+
+    /// Marks this layer as retained compositor content.
+    ///
+    /// Retained layers receive an offscreen surface even while their current
+    /// transform and opacity are at identity, avoiding a promotion hitch when
+    /// an animation begins.
+    #[must_use]
+    pub const fn retained(mut self, retained: bool) -> Self {
+        self.retained = retained;
+        self
+    }
+
     /// Sets the blend mode used when compositing the layer.
     /// * `blend_mode` — compositing blend mode.
     #[must_use]
@@ -374,7 +400,9 @@ impl LayerStyle {
     /// Returns whether the style requires an offscreen compositing pass.
     #[must_use]
     pub fn requires_offscreen(&self) -> bool {
-        self.opacity != 1.0
+        self.retained
+            || self.transform != Affine2D::IDENTITY
+            || self.opacity != 1.0
             || self.blend_mode != BlendMode::Normal
             || !self.filters.is_empty()
             || !self.backdrop_filters.is_empty()
@@ -405,6 +433,12 @@ impl LayerStyle {
         )
     }
 
+    /// Returns expanded layer bounds after applying the composition transform.
+    #[must_use]
+    pub fn transformed_bounds(&self) -> Rect {
+        self.transform.transform_rect(self.expanded_bounds())
+    }
+
     /// Returns bounds expanded for foreground filters only.
     #[must_use]
     pub fn foreground_expansion(&self) -> f32 {
@@ -428,6 +462,7 @@ impl LayerStyle {
                 self.bounds.size.height * factor,
             ),
         );
+        scaled.transform = self.transform.scaled(factor);
         scaled.filters = self
             .filters
             .iter()

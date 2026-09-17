@@ -43,6 +43,7 @@ pub enum EventType {
     Focus,
     Blur,
     Input,
+    TextEdit,
     Submit,
     Gesture,
     SemanticAction,
@@ -51,7 +52,7 @@ pub enum EventType {
 
 impl EventType {
     /// Event kinds that can be emitted by the UI event system.
-    pub const ALL: [Self; 23] = [
+    pub const ALL: [Self; 24] = [
         Self::Action,
         Self::PointerEnter,
         Self::PointerLeave,
@@ -71,6 +72,7 @@ impl EventType {
         Self::Focus,
         Self::Blur,
         Self::Input,
+        Self::TextEdit,
         Self::Submit,
         Self::Gesture,
         Self::SemanticAction,
@@ -121,6 +123,7 @@ pub enum UiEventKind {
     Focused,
     Blurred,
     TextChanged(String),
+    TextEdited(crate::TextEdit),
     Submitted(String),
     Gesture(crate::GestureEvent),
     SemanticAction {
@@ -161,6 +164,7 @@ impl UiEventKind {
             Self::Focused => EventType::Focus,
             Self::Blurred => EventType::Blur,
             Self::TextChanged(_) => EventType::Input,
+            Self::TextEdited(_) => EventType::TextEdit,
             Self::Submitted(_) => EventType::Submit,
             Self::Gesture(_) => EventType::Gesture,
             Self::SemanticAction { .. } => EventType::SemanticAction,

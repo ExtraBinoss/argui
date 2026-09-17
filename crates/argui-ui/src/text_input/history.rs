@@ -4,6 +4,7 @@ use argui_core::{CaretAffinity, ImeInput, Key, KeyInput, KeyState, TextPosition}
 use web_time::Instant;
 
 use super::{EditResult, TextInputState};
+use crate::AppliedTextEdit;
 
 /// Per-editor limits. Zero disables history; the text itself is not size limited.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -77,32 +78,13 @@ struct Replacement {
 }
 
 impl Replacement {
-    fn between(before: &str, after: &str, caret: Caret, next: Caret) -> Self {
-        let mut start = before
-            .bytes()
-            .zip(after.bytes())
-            .take_while(|(a, b)| a == b)
-            .count();
-        while !before.is_char_boundary(start) || !after.is_char_boundary(start) {
-            start -= 1;
-        }
-        let mut suffix = before[start..]
-            .bytes()
-            .rev()
-            .zip(after[start..].bytes().rev())
-            .take_while(|(a, b)| a == b)
-            .count();
-        while !before.is_char_boundary(before.len() - suffix)
-            || !after.is_char_boundary(after.len() - suffix)
-        {
-            suffix -= 1;
-        }
+    fn from_applied(edit: &AppliedTextEdit, before: Caret, after: Caret) -> Self {
         Self {
-            start,
-            removed: before[start..before.len() - suffix].into(),
-            inserted: after[start..after.len() - suffix].into(),
-            before: caret,
-            after: next,
+            start: edit.edit.range.start,
+            removed: edit.removed.clone(),
+            inserted: edit.edit.replacement.clone(),
+            before,
+            after,
         }
     }
     fn bytes(&self) -> usize {
@@ -175,12 +157,15 @@ impl TextInputState {
         if self.protected() {
             return edit(self);
         }
-        let before = self.value.clone();
         let caret = Caret::capture(self);
         let result = edit(self);
-        if result.changed && self.value != before && !self.protected() {
+        if let Some(edit) = result
+            .edit
+            .as_ref()
+            .filter(|edit| !self.protected() && edit.removed != edit.edit.replacement)
+        {
             self.history.push(
-                Replacement::between(&before, &self.value, caret, Caret::capture(self)),
+                Replacement::from_applied(edit, caret, Caret::capture(self)),
                 kind,
                 Instant::now(),
             );
@@ -270,6 +255,7 @@ impl TextInputState {
                 ..Default::default()
             };
         };
+        let before = self.value.clone();
         if redo {
             for edit in &transaction {
                 self.value
@@ -287,7 +273,7 @@ impl TextInputState {
         }
         self.reveal_cursor = true;
         EditResult {
-            changed: true,
+            edit: Some(AppliedTextEdit::between(&before, &self.value)),
             layout: true,
             reshape: true,
             ..Default::default()

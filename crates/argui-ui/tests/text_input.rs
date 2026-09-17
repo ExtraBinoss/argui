@@ -153,6 +153,36 @@ fn editing_respects_graphemes_selection_and_clipboard_requests() {
 }
 
 #[test]
+fn incremental_listener_receives_a_delta_without_a_full_value_event() {
+    let input = Input::new(
+        "field",
+        "hello world",
+        "placeholder",
+        InputStyle::new(PaintStyle::default(), TextStyle::default()),
+    )
+    .build()
+    .on(EventListener::new(
+        EventType::TextEdit,
+        EventHandlerId::new(EventOwnerId(1), 0),
+    ));
+    let (mut tree, region) = with_region(UiTree::new(input));
+    focus(&mut tree, &region);
+
+    let update = tree.edit_text_input(&key(
+        Key::Character("!".into()),
+        Some("!"),
+        Modifiers::default(),
+    ));
+
+    assert_eq!(update.events.len(), 1);
+    assert!(matches!(
+        &update.events[0].kind,
+        UiEventKind::TextEdited(edit)
+            if edit.range == (11..11) && edit.replacement == "!"
+    ));
+}
+
+#[test]
 fn ime_preedit_is_visible_but_only_commit_changes_the_value() {
     let (mut tree, region) = tree("");
     focus(&mut tree, &region);

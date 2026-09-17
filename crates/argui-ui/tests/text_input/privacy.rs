@@ -1,7 +1,8 @@
 use super::{editor, field, key};
 use argui_core::{CaretAffinity, ImeInput, Key, TextPosition};
 use argui_ui::{
-    SelectionCommand, TextPrivacy, TextSelection, TextSelectionRequest, UiEvent, UiEventKind,
+    SelectionCommand, TextEdit, TextPrivacy, TextSelection, TextSelectionRequest, UiEvent,
+    UiEventKind,
 };
 use argui_widgets::InputKind;
 
@@ -52,6 +53,7 @@ fn password_semantics_debug_and_telemetry_do_not_export_plaintext() {
     assert!(!format!("{snapshot:?} {tree:?}").contains("topsecret"));
     for kind in [
         UiEventKind::TextChanged("topsecret".into()),
+        UiEventKind::TextEdited(TextEdit::new(0..0, "topsecret")),
         UiEventKind::Submitted("topsecret".into()),
         UiEventKind::KeyInput(key(
             Key::Character("topsecret".into()),

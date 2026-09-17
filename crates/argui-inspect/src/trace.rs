@@ -116,6 +116,7 @@ struct TraceGpuPass {
 #[serde(rename_all = "lowercase")]
 enum TraceInvalidation {
     None,
+    Composite,
     Paint,
     Layout,
 }
@@ -329,6 +330,7 @@ impl From<Invalidation> for TraceInvalidation {
     fn from(value: Invalidation) -> Self {
         match value {
             Invalidation::None => Self::None,
+            Invalidation::Composite => Self::Composite,
             Invalidation::Paint => Self::Paint,
             Invalidation::Layout => Self::Layout,
         }
@@ -339,6 +341,7 @@ impl From<TraceInvalidation> for Invalidation {
     fn from(value: TraceInvalidation) -> Self {
         match value {
             TraceInvalidation::None => Self::None,
+            TraceInvalidation::Composite => Self::Composite,
             TraceInvalidation::Paint => Self::Paint,
             TraceInvalidation::Layout => Self::Layout,
         }

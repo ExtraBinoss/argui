@@ -188,6 +188,7 @@ fn event_metadata_matches_dom_delivery_rules() {
         EventType::Focus,
         EventType::Blur,
         EventType::Input,
+        EventType::TextEdit,
         EventType::Submit,
         EventType::Gesture,
         EventType::SemanticAction,
@@ -313,6 +314,10 @@ fn every_event_kind_maps_to_its_dom_metadata() {
         (UiEventKind::Focused, EventType::Focus),
         (UiEventKind::Blurred, EventType::Blur),
         (UiEventKind::TextChanged("edit".into()), EventType::Input),
+        (
+            UiEventKind::TextEdited(argui_ui::TextEdit::new(1..2, "x")),
+            EventType::TextEdit,
+        ),
         (UiEventKind::Submitted("done".into()), EventType::Submit),
         (UiEventKind::Gesture(gesture), EventType::Gesture),
         (
