@@ -46,7 +46,9 @@ UTF-8 range replacement instead of cloning the complete document, retained input
 state is painted without rebuilding the whole application, and syntax/search
 derivation is coalesced before a source snapshot is taken. Non-wrapping code
 shapes only the visible lines plus overscan while retaining the full document
-scroll extent. Folder scans also defer syntax work until a document is opened.
+scroll extent; small wheel deltas reuse that prepared window. The explorer and
+search VLists notify the model only when their mounted row window changes.
+Folder scans also defer syntax work until a document is opened.
 
 ## Reproducible performance checks
 

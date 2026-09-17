@@ -60,6 +60,14 @@ fn effects_are_opt_in_and_survive_headers_without_mounting_more_rows() {
 }
 
 #[test]
+fn fixed_vlist_only_invalidates_when_its_mounted_window_changes() {
+    let list = VList::new("list", 20.0, 100.0, 0.0);
+
+    assert!(!list.window_changed(10_000, 0.0, 80.0));
+    assert!(list.window_changed(10_000, 0.0, 120.0));
+}
+
+#[test]
 fn variable_measurements_survive_rebuild_resize_and_selection() {
     use argui_ui::{VirtualAlignment, VirtualList};
     use argui_widgets::ListState;

@@ -119,6 +119,14 @@ impl VList {
         }
     }
 
+    /// Returns whether scrolling from `previous` to `next` needs a new mounted row window.
+    /// `count` is the current row count; offsets inside the same overscanned chunk return false.
+    #[must_use]
+    pub fn window_changed(&self, count: usize, previous: f32, next: f32) -> bool {
+        let config = self.config(count);
+        config.window(previous).range != config.window(next).range
+    }
+
     #[must_use]
     /// Adds one scroll effect to the viewport.
     pub fn effect(mut self, effect: argui_ui::ScrollEffect) -> Self {

@@ -8,7 +8,7 @@ mod selection;
 mod style;
 
 pub use engine::TextEngine;
-pub use input::{CaretScroll, CaretStop, TextInputLayout, TextInputScroll};
+pub use input::{CaretScroll, CaretStop, TextInputLayout, TextInputScroll, TextInputWindow};
 pub use layout::{
     GlyphContent, GlyphImage, GlyphKey, PreparedDecoration, PreparedGlyph, PreparedText,
 };

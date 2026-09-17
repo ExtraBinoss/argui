@@ -461,7 +461,7 @@ impl AstraEditor {
             Some("project-tree") => {
                 let previous = self.explorer_offset;
                 self.explorer_offset = offset.y.max(0.0);
-                (previous / 30.0).floor() != (self.explorer_offset / 30.0).floor()
+                self.project_tree_window_changed(previous, self.explorer_offset)
             }
             Some("workspace-search-results") => {
                 let previous = self.search.offset;
@@ -471,7 +471,7 @@ impl AstraEditor {
                 } else {
                     46.0
                 };
-                (previous / row_height).floor() != (self.search.offset / row_height).floor()
+                self.search_window_changed(row_height, previous, self.search.offset)
             }
             _ => return,
         };

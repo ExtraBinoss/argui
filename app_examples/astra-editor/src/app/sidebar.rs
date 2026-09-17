@@ -9,6 +9,17 @@ use super::AstraEditor;
 use crate::ui::{label, scroll_shadow};
 
 impl AstraEditor {
+    /// Returns whether the project tree crossed into a new virtual row window.
+    pub(super) fn project_tree_window_changed(&self, previous: f32, next: f32) -> bool {
+        let viewport =
+            (self.viewport.height - if self.compact { 142.0 } else { 168.0 }).clamp(120.0, 1_200.0);
+        VList::new("project-tree", 30.0, viewport, next).window_changed(
+            self.tree_cache.borrow().visible_count(),
+            previous,
+            next,
+        )
+    }
+
     /// Builds the virtualized project explorer for desktop and compact layouts.
     pub(super) fn project_sidebar(&self, theme: &WidgetTheme, cx: &mut Context<Self>) -> Element {
         let viewport =

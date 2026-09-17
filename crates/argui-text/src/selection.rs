@@ -150,7 +150,7 @@ pub fn line_range(text: &str, index: usize) -> std::ops::Range<usize> {
 
 fn from_buffer(buffer: &Buffer, text: &str, fallback_height: f32) -> TextLayout {
     let offsets = engine::source_line_offsets(text);
-    let stops = crate::input::caret_stops(buffer, text);
+    let stops = crate::input::caret_stops(buffer, &offsets);
     let mut lines = Vec::new();
     let mut content_size = Size::new(0.0, fallback_height);
     for run in buffer.layout_runs() {

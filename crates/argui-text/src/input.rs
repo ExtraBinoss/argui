@@ -7,11 +7,14 @@ use unicode_segmentation::UnicodeSegmentation;
 use crate::{TextContent, TextEngine, TextStyle, engine};
 
 const INPUT_BUFFER_CACHE_CAPACITY: usize = 8;
+const INPUT_WINDOW_OVERSCAN: usize = 8;
 
 pub(crate) struct InputBuffer {
     content: TextContent,
     style: TextStyle,
     viewport: Size,
+    line_offsets: Vec<usize>,
+    unwrapped_width: f32,
     buffer: Buffer,
 }
 
@@ -30,6 +33,17 @@ pub struct TextInputLayout {
     pub content_size: Size,
     pub scroll_x: f32,
     pub scroll_y: f32,
+}
+
+/// Source and vertical geometry retained for a virtualized text-input window.
+#[derive(Clone, Debug, PartialEq)]
+pub struct TextInputWindow {
+    /// UTF-8 byte range shaped for the current viewport and its overscan.
+    pub byte_range: std::ops::Range<usize>,
+    /// Content-space vertical origin of the shaped source range.
+    pub y: f32,
+    /// Content-space height covered by the shaped source range.
+    pub height: f32,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -128,8 +142,9 @@ impl TextEngine {
                 self.input_buffers.len() - 1
             });
         let cursor = TextPosition::new(boundary(text, cursor.index), cursor.affinity);
-        let line_offsets = engine::source_line_offsets(text);
         let no_wrap = style.wrap == crate::TextWrap::None;
+        let entry = &mut self.input_buffers[cache_index];
+        let line_offsets = &entry.line_offsets;
         let content_height = if no_wrap {
             line_offsets.len().max(1) as f32 * style.line_height
         } else {
@@ -149,7 +164,7 @@ impl TextEngine {
                 content_height,
             )
         });
-        let buffer = &mut self.input_buffers[cache_index].buffer;
+        let buffer = &mut entry.buffer;
         if let Some(scroll_y) = scroll_y {
             let line = (scroll_y / style.line_height.max(1.0)).floor() as usize;
             let line = line.min(line_offsets.len().saturating_sub(1));
@@ -158,7 +173,7 @@ impl TextEngine {
             buffer.shape_until_scroll(&mut self.fonts, false);
         }
         let y_offset = scroll_y.unwrap_or_default();
-        let mut raw_stops = caret_stops(buffer, text);
+        let mut raw_stops = caret_stops(buffer, line_offsets);
         if no_wrap {
             for stop in &mut raw_stops {
                 stop.point.y += y_offset;
@@ -179,7 +194,7 @@ impl TextEngine {
             .map(|run| run.line_w)
             .fold(0.0_f32, f32::max);
         let content_width = if no_wrap && style.family == crate::FontFamily::Monospace {
-            shaped_width.max(unwrapped_width_estimate(text, style.font_size))
+            shaped_width.max(entry.unwrapped_width)
         } else {
             shaped_width
         };
@@ -240,6 +255,66 @@ impl TextEngine {
             scroll_y,
         }
     }
+
+    /// Returns the cached source window covering a non-wrapping input viewport.
+    ///
+    /// * `content` — editor content previously passed to [`Self::input_layout_content`].
+    /// * `style` — matching editor text style.
+    /// * `viewport` — matching input viewport size.
+    /// * `scroll_y` — resolved vertical content offset.
+    ///
+    /// Returns `None` for wrapped or short content and when no matching shaped buffer exists.
+    #[must_use]
+    pub fn input_window(
+        &self,
+        content: &TextContent,
+        style: &TextStyle,
+        viewport: Size,
+        scroll_y: f32,
+    ) -> Option<TextInputWindow> {
+        if style.wrap != crate::TextWrap::None {
+            return None;
+        }
+        let entry = self
+            .input_buffers
+            .iter()
+            .find(|entry| entry.matches(content, style, viewport))?;
+        visible_window(
+            &entry.line_offsets,
+            content.as_str().len(),
+            style.line_height,
+            viewport.height,
+            scroll_y,
+        )
+    }
+}
+
+fn visible_window(
+    offsets: &[usize],
+    text_len: usize,
+    line_height: f32,
+    viewport_height: f32,
+    scroll_y: f32,
+) -> Option<TextInputWindow> {
+    if line_height <= 0.0 {
+        return None;
+    }
+    let visible_lines = (viewport_height / line_height).ceil().max(1.0) as usize;
+    if offsets.len() <= visible_lines + 4 {
+        return None;
+    }
+    let visible_start = (scroll_y / line_height).floor() as usize;
+    let anchor = visible_start / visible_lines * visible_lines;
+    let first = anchor.saturating_sub(INPUT_WINDOW_OVERSCAN);
+    let end_line = anchor
+        .saturating_add(visible_lines.saturating_mul(2))
+        .saturating_add(INPUT_WINDOW_OVERSCAN)
+        .min(offsets.len());
+    Some(TextInputWindow {
+        byte_range: offsets[first]..offsets.get(end_line).copied().unwrap_or(text_len),
+        y: first as f32 * line_height,
+        height: (end_line - first) as f32 * line_height,
+    })
 }
 
 fn unwrapped_width_estimate(text: &str, font_size: f32) -> f32 {
@@ -255,17 +330,16 @@ fn unwrapped_width_estimate(text: &str, font_size: f32) -> f32 {
     columns as f32 * font_size * 0.62
 }
 
-pub(crate) fn caret_stops(buffer: &Buffer, text: &str) -> Vec<CaretStop> {
-    let mut boundaries = text
-        .unicode_word_indices()
-        .flat_map(|(index, word)| [index, index + word.len()])
-        .collect::<HashSet<_>>();
-    boundaries.extend([0, text.len()]);
-    let line_offsets = engine::source_line_offsets(text);
+pub(crate) fn caret_stops(buffer: &Buffer, line_offsets: &[usize]) -> Vec<CaretStop> {
     let mut stops = Vec::new();
     let mut seen = HashSet::new();
     for run in buffer.layout_runs() {
         let base = line_offsets.get(run.line_i).copied().unwrap_or_default();
+        let boundaries = run
+            .text
+            .unicode_word_indices()
+            .flat_map(|(index, word)| [index, index + word.len()])
+            .collect::<Vec<_>>();
         let visuals = visual_clusters(&run);
         if visuals.is_empty() {
             push_stop(
@@ -274,7 +348,7 @@ pub(crate) fn caret_stops(buffer: &Buffer, text: &str) -> Vec<CaretStop> {
                 TextPosition::new(base, CaretAffinity::Before),
                 0.0,
                 run.line_top,
-                &boundaries,
+                true,
             );
         }
         for visual in visuals {
@@ -294,7 +368,7 @@ pub(crate) fn caret_stops(buffer: &Buffer, text: &str) -> Vec<CaretStop> {
                     TextPosition::new(base + visual.start + offset, CaretAffinity::After),
                     x,
                     run.line_top,
-                    &boundaries,
+                    is_word_boundary(&boundaries, visual.start + offset, run.text.len()),
                 );
             }
             let (position, x) = if visual.rtl {
@@ -314,7 +388,7 @@ pub(crate) fn caret_stops(buffer: &Buffer, text: &str) -> Vec<CaretStop> {
                 position,
                 x,
                 run.line_top,
-                &boundaries,
+                is_word_boundary(&boundaries, visual.end, run.text.len()),
             );
         }
     }
@@ -332,6 +406,10 @@ pub(crate) fn caret_stops(buffer: &Buffer, text: &str) -> Vec<CaretStop> {
             .then_with(|| a.point.x.total_cmp(&b.point.x))
     });
     stops
+}
+
+fn is_word_boundary(boundaries: &[usize], index: usize, line_len: usize) -> bool {
+    index == 0 || index == line_len || boundaries.binary_search(&index).is_ok()
 }
 
 fn visual_clusters(run: &cosmic_text::LayoutRun<'_>) -> Vec<VisualCluster> {
@@ -364,7 +442,7 @@ fn push_stop(
     position: TextPosition,
     x: f32,
     y: f32,
-    word_boundaries: &HashSet<usize>,
+    word_boundary: bool,
 ) {
     let key = (position.index, position.affinity == CaretAffinity::After);
     if !seen.insert(key) {
@@ -373,7 +451,7 @@ fn push_stop(
     stops.push(CaretStop {
         position,
         point: Point::new(x, y),
-        word_boundary: word_boundaries.contains(&position.index),
+        word_boundary,
     });
 }
 
@@ -398,10 +476,14 @@ impl InputBuffer {
         });
         engine::set_content(&mut buffer, content, style);
         buffer.shape_until_scroll(fonts, false);
+        let line_offsets = engine::source_line_offsets(content.as_str());
+        let unwrapped_width = unwrapped_width_estimate(content.as_str(), style.font_size);
         Self {
             content: content.clone(),
             style: style.clone(),
             viewport,
+            line_offsets,
+            unwrapped_width,
             buffer,
         }
     }

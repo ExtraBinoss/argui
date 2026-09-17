@@ -205,7 +205,12 @@ pub(crate) fn prepare(
     content: &argui_text::TextContent,
     engine: &mut TextEngine,
     placement: InputPlacement,
-) -> Option<(TextInputRegion, Point, Option<InputPaint>)> {
+) -> Option<(
+    TextInputRegion,
+    Point,
+    Option<InputPaint>,
+    std::ops::Range<f32>,
+)> {
     let ElementKind::TextEditor {
         text,
         selection,
@@ -231,6 +236,17 @@ pub(crate) fn prepare(
             },
         ),
     );
+    let window = engine.input_window(content, text, placement.text.size, layout.scroll_y);
+    let text_window = window
+        .as_ref()
+        .map_or(0.0..layout.content_size.height, |window| {
+            window.y..window.y + window.height
+        });
+    let paint = window.as_ref().map(|window| InputPaint {
+        content: content.slice(window.byte_range.clone()),
+        y: window.y,
+        height: window.height,
+    });
     let origin = placement.text.origin;
     let stops = layout
         .stops
@@ -251,7 +267,6 @@ pub(crate) fn prepare(
         .collect();
     let mut caret_rect = layout.caret;
     caret_rect.origin = add(caret_rect.origin, origin);
-    let paint = visible_no_wrap_content(content, text, placement.text.size, layout.scroll_y);
     Some((
         TextInputRegion {
             node,
@@ -272,35 +287,8 @@ pub(crate) fn prepare(
         },
         Point::new(layout.scroll_x, layout.scroll_y),
         paint,
+        text_window,
     ))
-}
-
-fn visible_no_wrap_content(
-    content: &argui_text::TextContent,
-    style: &argui_text::TextStyle,
-    viewport: argui_core::Size,
-    scroll_y: f32,
-) -> Option<InputPaint> {
-    if style.wrap != argui_text::TextWrap::None || style.line_height <= 0.0 {
-        return None;
-    }
-    let offsets = source_line_offsets(content.as_str());
-    let visible_lines = (viewport.height / style.line_height).ceil().max(1.0) as usize;
-    if offsets.len() <= visible_lines + 4 {
-        return None;
-    }
-    let first = ((scroll_y / style.line_height).floor() as usize).saturating_sub(2);
-    let end_line = (first + visible_lines + 5).min(offsets.len());
-    let start = offsets[first];
-    let end = offsets
-        .get(end_line)
-        .copied()
-        .unwrap_or_else(|| content.as_str().len());
-    Some(InputPaint {
-        content: content.slice(start..end),
-        y: first as f32 * style.line_height,
-        height: (end_line - first) as f32 * style.line_height,
-    })
 }
 
 pub(crate) fn update(ui: &mut UiTree, engine: &mut TextEngine, output: &mut crate::LayoutOutput) {
@@ -321,13 +309,23 @@ pub(crate) fn update(ui: &mut UiTree, engine: &mut TextEngine, output: &mut crat
         else {
             continue;
         };
+        let content = match output.input_sources.get(&node.node) {
+            Some(retained)
+                if ui.text_input_display(node.node).as_deref() == Some(retained.as_str()) =>
+            {
+                retained.clone()
+            }
+            _ => {
+                let Some((content, _)) = crate::text::content(ui, node.node, element) else {
+                    continue;
+                };
+                content
+            }
+        };
         let text_bounds = output.text_inputs[region_index].viewport;
         let block = &mut output.text.blocks_mut()[text_index];
-        let Some((content, _)) = crate::text::content(ui, node.node, element) else {
-            continue;
-        };
         block.content = content.clone();
-        if let Some((region, scroll, paint)) = prepare(
+        if let Some((region, scroll, paint, text_window)) = prepare(
             ui,
             node.node,
             element,
@@ -368,6 +366,8 @@ pub(crate) fn update(ui: &mut UiTree, engine: &mut TextEngine, output: &mut crat
                 }
             }
             offsets.push((node.node, scroll));
+            output.input_sources.insert(node.node, content);
+            output.input_windows.insert(node.node, text_window);
             output.text_inputs[region_index] = region;
         }
     }
@@ -396,15 +396,6 @@ pub(crate) fn position_input_block(
         block.bounds.origin.y = text_bounds.origin.y - scroll.y;
         block.bounds.size.height = text_bounds.size.height.max(region.content_size.height);
     }
-}
-
-fn source_line_offsets(text: &str) -> Vec<usize> {
-    let mut offsets = vec![0];
-    offsets.extend(
-        text.char_indices()
-            .filter_map(|(index, character)| (character == '\n').then_some(index + 1)),
-    );
-    offsets
 }
 
 pub(crate) fn paint_selection(

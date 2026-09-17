@@ -80,6 +80,12 @@ layout inputs change. `TextArea` clips text, selection, and caret to its
 viewport and shares one offset between caret reveal, wheel input, and scrollbar
 dragging.
 
+Non-wrapping editors cache their source-line index and widest-line estimate with
+the shaped buffer. Large documents retain a visible text window plus overscan;
+pixel scrolls translate that prepared window and reshape only after the viewport
+crosses its edge. Editing or replacing the controlled value invalidates the
+cached source metadata normally.
+
 Winit keyboard and IME events are normalized by `argui-platform`.
 `argui-runtime` routes them to the focused editor and updates the native IME
 candidate position. Native clipboard uses `arboard`; Web uses the asynchronous

@@ -46,6 +46,8 @@ pub struct LayoutOutput {
     pub virtualization_changed: bool,
     pub(crate) compositor_owners: HashMap<UiNodeId, argui_paint::CompositorId>,
     pub(crate) composite_geometry: crate::composite::CompositeGeometry,
+    pub(crate) input_sources: HashMap<UiNodeId, argui_text::TextContent>,
+    pub(crate) input_windows: HashMap<UiNodeId, std::ops::Range<f32>>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -309,7 +311,7 @@ fn collect_layout(
         let mut block = TextBlock::new(content.clone(), text_bounds);
         block.clip = text_clip;
         block.style = style.into_owned();
-        if let Some((region, scroll, paint)) = input::prepare(
+        if let Some((region, scroll, paint, text_window)) = input::prepare(
             ui,
             node.node,
             element,
@@ -324,6 +326,8 @@ fn collect_layout(
             },
         ) {
             input::position_input_block(&mut block, text_bounds, scroll, paint, &content, &region);
+            output.input_sources.insert(node.node, content.clone());
+            output.input_windows.insert(node.node, text_window);
             text_scroll = Some((region.scroll_content_size(), scroll));
             output.text_inputs.push(region);
         }

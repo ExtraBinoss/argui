@@ -62,7 +62,9 @@ prefix index, rebuild the virtual window until it settles, and correct the
 retained offset to preserve the visible item. Generic keyed scroll anchoring
 also preserves the first visible keyed descendant when content above it changes.
 `VirtualList::scroll_to` navigates fixed or variable data with the same four
-alignment modes.
+alignment modes. Applications that retain a controlled offset can use
+`VList::window_changed` before notifying their model; offsets inside the same
+mounted chunk stay on the engine's translation-only scroll path.
 
 ## Scroll-driven graphic effects
 

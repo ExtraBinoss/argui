@@ -13,6 +13,18 @@ use super::{AstraEditor, SearchMode};
 use crate::ui::{accent, label, scroll_shadow};
 
 impl AstraEditor {
+    /// Returns whether search scrolling crossed into a new virtual row window.
+    pub(super) fn search_window_changed(&self, row_height: f32, previous: f32, next: f32) -> bool {
+        let count = match self.search.mode {
+            SearchMode::Text => self.search.text_matches.len(),
+            SearchMode::Files => self.search.file_matches.len(),
+        };
+        let viewport =
+            (self.viewport.height - if self.compact { 210.0 } else { 260.0 }).clamp(180.0, 500.0);
+        VList::new("workspace-search-results", row_height, viewport, next)
+            .window_changed(count, previous, next)
+    }
+
     /// Builds the animated global-search overlay while it is entering, open, or exiting.
     pub(super) fn search_overlay(
         &self,

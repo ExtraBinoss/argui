@@ -112,13 +112,21 @@ fn needs_scroll_refresh(ui: &UiTree, output: &LayoutOutput) -> bool {
         {
             return false;
         }
-        output
+        let virtualized = output
             .nodes
             .iter()
             .find(|node| node.node == region.node)
             .and_then(|node| node.text_index)
             .is_some_and(|index| {
                 output.text.blocks()[index].style.wrap == argui_text::TextWrap::None
-            })
+            });
+        if !virtualized {
+            return false;
+        }
+        let Some(text_window) = output.input_windows.get(&region.node) else {
+            return true;
+        };
+        let visible_end = offset.y + region.viewport.size.height;
+        offset.y + f32::EPSILON < text_window.start || visible_end > text_window.end + f32::EPSILON
     })
 }

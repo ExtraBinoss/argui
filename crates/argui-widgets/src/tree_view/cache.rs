@@ -17,6 +17,14 @@ pub struct TreeViewCache {
     rows: BTreeMap<usize, Row>,
 }
 
+impl TreeViewCache {
+    /// Returns the number of rows visible after applying the retained collapse state.
+    #[must_use]
+    pub fn visible_count(&self) -> usize {
+        self.visible.len()
+    }
+}
+
 struct Row {
     selected: bool,
     active: bool,

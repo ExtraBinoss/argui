@@ -8,7 +8,9 @@ pub struct AnimationProbe(Rc<AnimationState>);
 struct AnimationState {
     frames: Cell<usize>,
     first: Cell<Option<Instant>>,
+    previous: Cell<Option<Instant>>,
     span: Cell<Option<Duration>>,
+    longest_gap: Cell<Duration>,
 }
 
 impl AnimationProbe {
@@ -19,6 +21,11 @@ impl AnimationProbe {
             self.0.first.set(Some(now));
         }
         if frame < 12 {
+            if let Some(previous) = self.0.previous.replace(Some(now)) {
+                self.0
+                    .longest_gap
+                    .set(self.0.longest_gap.get().max(now - previous));
+            }
             self.0.frames.set(frame + 1);
             if frame == 11 {
                 self.0.span.set(self.0.first.get().map(|first| now - first));
@@ -36,10 +43,13 @@ impl AnimationProbe {
             .span
             .get()
             .expect("GTK delivered all animation frames");
-        eprintln!("GTK delivered 12 consecutive animation frames in {span:?}");
+        let longest_gap = self.0.longest_gap.get();
+        eprintln!(
+            "GTK delivered 12 consecutive animation frames in {span:?}; longest gap {longest_gap:?}"
+        );
         assert!(
-            span < Duration::from_millis(500),
-            "GTK animation redraws stalled for {span:?}"
+            longest_gap < Duration::from_millis(500),
+            "GTK animation redraws stalled for {longest_gap:?}"
         );
     }
 }
