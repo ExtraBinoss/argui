@@ -8,6 +8,7 @@ const destination = resolve(root, 'website/public/gallery')
 const aiDestination = resolve(root, 'website/public/examples/ai-harness')
 const gpuDestination = resolve(root, 'website/public/examples/gpu-canvas')
 const docsDestination = resolve(root, 'website/public/examples/docs')
+const astraDestination = resolve(root, 'website/public/examples/astra-editor')
 const wasmEnvironment = { ...process.env }
 const defaultBuildConcurrency = 2
 
@@ -59,6 +60,18 @@ const wasmBuilds = [
       '--release',
       '--out-dir',
       '../../web/examples/docs/pkg',
+    ],
+  },
+  {
+    label: 'Astra Editor example',
+    args: [
+      'build',
+      'app_examples/astra-editor',
+      '--target',
+      'web',
+      '--release',
+      '--out-dir',
+      '../../web/examples/astra-editor/pkg',
     ],
   },
 ]
@@ -145,6 +158,7 @@ if (process.argv.includes('--check')) {
     await access(resolve(aiDestination, 'pkg/argui_example_ai_harness_bg.wasm'))
     await access(resolve(gpuDestination, 'pkg/argui_example_gpu_canvas_bg.wasm'))
     await access(resolve(docsDestination, 'pkg/argui_example_docs_bg.wasm'))
+    await access(resolve(astraDestination, 'pkg/argui_example_astra_editor_bg.wasm'))
     await access(resolve(root, 'website/public/browser-shortcuts.js'))
   } catch {
     throw new Error(
@@ -168,14 +182,17 @@ if (process.argv.includes('--check')) {
   await access(resolve(root, 'web/widgets/pkg/argui_widget_gallery_bg.wasm'))
   await access(resolve(root, 'web/examples/ai-harness/pkg/argui_example_ai_harness_bg.wasm'))
   await access(resolve(root, 'web/examples/gpu-canvas/pkg/argui_example_gpu_canvas_bg.wasm'))
+  await access(resolve(root, 'web/examples/astra-editor/pkg/argui_example_astra_editor_bg.wasm'))
   await mkdir(destination, { recursive: true })
   await mkdir(aiDestination, { recursive: true })
   await mkdir(gpuDestination, { recursive: true })
   await mkdir(docsDestination, { recursive: true })
+  await mkdir(astraDestination, { recursive: true })
   await rm(resolve(destination, 'pkg'), { recursive: true, force: true })
   await rm(resolve(aiDestination, 'pkg'), { recursive: true, force: true })
   await rm(resolve(gpuDestination, 'pkg'), { recursive: true, force: true })
   await rm(resolve(docsDestination, 'pkg'), { recursive: true, force: true })
+  await rm(resolve(astraDestination, 'pkg'), { recursive: true, force: true })
   await cp(resolve(root, 'web/widgets/pkg'), resolve(destination, 'pkg'), { recursive: true })
   await cp(resolve(root, 'web/examples/ai-harness/pkg'), resolve(aiDestination, 'pkg'), {
     recursive: true,
@@ -187,6 +204,13 @@ if (process.argv.includes('--check')) {
     recursive: true,
   })
   await cp(resolve(root, 'web/examples/docs/index.html'), resolve(docsDestination, 'index.html'))
+  await cp(resolve(root, 'web/examples/astra-editor/pkg'), resolve(astraDestination, 'pkg'), {
+    recursive: true,
+  })
+  await cp(
+    resolve(root, 'web/examples/astra-editor/index.html'),
+    resolve(astraDestination, 'index.html'),
+  )
   await cp(
     resolve(root, 'web/browser-shortcuts.js'),
     resolve(root, 'website/public/browser-shortcuts.js'),

@@ -475,6 +475,8 @@ export const docs: DocGuide[] = [
       'docs/simplified-api.md',
       'crates/argui-runtime/src/model/handler.rs',
       'crates/argui-widgets/src/slider.rs',
+      'app_examples/astra-editor/src/app/editor.rs',
+      'app_examples/astra-editor/README.md',
     ],
     sections: [
       {
@@ -533,6 +535,7 @@ export const docs: DocGuide[] = [
         paragraphs: [
           'A handler reports intent or a next value. Store it in the model and pass it back on the next render. callback, value_callback, input_callback, and submit_callback invalidate the current presentation automatically.',
           'The live example uses on_change to update its preview and on_commit to record the final slider value. The button uses on_click because saving is a discrete action.',
+          'For document-sized buffers, Astra Editor uses on_edit so each keystroke delivers only the changed UTF-8 range instead of cloning the complete source file.',
         ],
         code: { filename: 'src/view.rs', code: interactionCallbacks },
       },

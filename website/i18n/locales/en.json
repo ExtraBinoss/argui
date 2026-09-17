@@ -156,6 +156,12 @@
     "gpuLabel": "Argui GPU Canvas Lab",
     "gpuCategory": "Custom WGPU rendering",
     "gpuProof": "Live compute and render passes",
+    "astraTitle": "Astra Editor",
+    "astraBody": "A responsive Rust-oriented editor with syntax highlighting, multiple files, project navigation, search, native saves and a virtualized document view.",
+    "astraLaunch": "Launch Astra Editor",
+    "astraLabel": "Argui Astra Editor",
+    "astraCategory": "Application-scale Rust editor",
+    "astraProof": "Fast files, search and editing",
     "source": "View the application source",
     "category": "Streaming and performance",
     "available": "Available Argui applications",
@@ -230,7 +236,7 @@
     "start": "Get started",
     "featuresDescription": "Explore Argui's Rust UI engine: accessibility, retained rendering, WGSL shaders, native popovers, desktop updates and the upcoming roadmap.",
     "componentsDescription": "Explore Argui components and Rust source files in the interactive WebGPU widget gallery.",
-    "examplesDescription": "Run complete Argui application examples in the browser, including a responsive 1,000 token per second AI streaming harness.",
+    "examplesDescription": "Run complete Argui application examples in the browser, including a responsive Rust editor and a 1,000 token per second AI streaming harness.",
     "startDescription": "Get started with Argui: run the native widget gallery, add the Rust library and compose your first view."
   }
 }

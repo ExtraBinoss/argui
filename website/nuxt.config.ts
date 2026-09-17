@@ -38,7 +38,7 @@ export default defineNuxtConfig({
         '/robots.txt',
         ...catalogue.map((item) => `/components/${item.slug}`),
       ],
-      ignore: ['/gallery', '/examples/ai-harness', '/examples/docs'],
+      ignore: ['/gallery', '/examples/ai-harness', '/examples/docs', '/examples/astra-editor'],
     },
     compressPublicAssets: true,
   },
@@ -54,6 +54,9 @@ export default defineNuxtConfig({
       headers: { 'X-Robots-Tag': 'noindex', 'Cross-Origin-Resource-Policy': 'same-origin' },
     },
     '/examples/docs/**': {
+      headers: { 'X-Robots-Tag': 'noindex', 'Cross-Origin-Resource-Policy': 'same-origin' },
+    },
+    '/examples/astra-editor/**': {
       headers: { 'X-Robots-Tag': 'noindex', 'Cross-Origin-Resource-Policy': 'same-origin' },
     },
   },

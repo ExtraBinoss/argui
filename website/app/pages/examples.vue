@@ -3,7 +3,9 @@ import { ArrowUpRight } from '@lucide/vue'
 import { sourceUrl } from '~/data/project'
 
 const { t } = useI18n()
-const selectedApp = ref<'ai-harness' | 'widget-gallery' | 'gpu-canvas'>('ai-harness')
+const selectedApp = ref<'ai-harness' | 'widget-gallery' | 'gpu-canvas' | 'astra-editor'>(
+  'ai-harness',
+)
 usePageSeo(
   () => t('meta.examples'),
   () => t('meta.examplesDescription'),
@@ -12,23 +14,33 @@ const moreExamples = ['motion', 'i18n', 'hot-reload', 'liquid-glass'] as const
 const isHarness = computed(() => selectedApp.value === 'ai-harness')
 const isGallery = computed(() => selectedApp.value === 'widget-gallery')
 const isGpuCanvas = computed(() => selectedApp.value === 'gpu-canvas')
+const isAstraEditor = computed(() => selectedApp.value === 'astra-editor')
 const selectedTitle = computed(() => {
   if (isHarness.value) return t('appExamples.harnessTitle')
   if (isGpuCanvas.value) return t('appExamples.gpuTitle')
+  if (isAstraEditor.value) return t('appExamples.astraTitle')
   return t('appExamples.galleryTitle')
 })
 const selectedBody = computed(() => {
   if (isHarness.value) return t('appExamples.harnessBody')
   if (isGpuCanvas.value) return t('appExamples.gpuBody')
+  if (isAstraEditor.value) return t('appExamples.astraBody')
   return t('appExamples.galleryBody')
 })
 const selectedSource = computed(() => {
   if (isHarness.value) return sourceUrl('app_examples/fake-ai-harness/src/main.rs')
   if (isGpuCanvas.value) return sourceUrl('app_examples/gpu-canvas/src/main.rs')
+  if (isAstraEditor.value) return sourceUrl('app_examples/astra-editor/src/main.rs')
   return sourceUrl('crates/argui-widget-gallery/src/main.rs')
 })
 const selectedPreviewApp = computed(() =>
-  isGallery.value ? undefined : isGpuCanvas.value ? 'gpu-canvas' : 'ai-harness',
+  isGallery.value
+    ? undefined
+    : isGpuCanvas.value
+      ? 'gpu-canvas'
+      : isAstraEditor.value
+        ? 'astra-editor'
+        : 'ai-harness',
 )
 </script>
 
@@ -80,6 +92,18 @@ const selectedPreviewApp = computed(() =>
         <strong>{{ t('appExamples.gpuTitle') }}</strong>
         <small>{{ t('appExamples.gpuCategory') }}</small>
         <b>{{ t('appExamples.gpuProof') }}</b>
+      </button>
+      <button
+        type="button"
+        role="tab"
+        :aria-selected="isAstraEditor"
+        :class="{ selected: isAstraEditor }"
+        @click="selectedApp = 'astra-editor'"
+      >
+        <span>04</span>
+        <strong>{{ t('appExamples.astraTitle') }}</strong>
+        <small>{{ t('appExamples.astraCategory') }}</small>
+        <b>{{ t('appExamples.astraProof') }}</b>
       </button>
     </nav>
     <p class="app-startup-evidence">

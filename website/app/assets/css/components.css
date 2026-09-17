@@ -348,7 +348,7 @@
 }
 .app-example-list {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   margin-bottom: 14px;
   border-top: 1px solid var(--border);
   border-left: 1px solid var(--border);
@@ -582,6 +582,9 @@
   }
 }
 @media (max-width: 800px) {
+  .app-example-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .components-layout {
     display: block;
   }

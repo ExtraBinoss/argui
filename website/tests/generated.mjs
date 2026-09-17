@@ -55,11 +55,13 @@ assert.ok(!sitemap.includes('/gallery/'))
 assert.ok(!sitemap.includes('/examples/ai-harness/'))
 assert.ok(!sitemap.includes('/examples/gpu-canvas/'))
 assert.ok(!sitemap.includes('/examples/docs/'))
+assert.ok(!sitemap.includes('/examples/astra-editor/'))
 const robots = await readFile(resolve(output, 'robots.txt'), 'utf8')
 assert.ok(robots.includes(`Disallow: ${base}gallery/`))
 assert.ok(robots.includes(`Disallow: ${base}examples/ai-harness/`))
 assert.ok(robots.includes(`Disallow: ${base}examples/gpu-canvas/`))
 assert.ok(robots.includes(`Disallow: ${base}examples/docs/`))
+assert.ok(robots.includes(`Disallow: ${base}examples/astra-editor/`))
 assert.equal(robots.includes('Sitemap:'), Boolean(origin))
 for (const asset of [
   'gallery/index.html',
@@ -73,11 +75,19 @@ for (const asset of [
   'examples/gpu-canvas/pkg/argui_example_gpu_canvas_bg.wasm',
   'examples/docs/index.html',
   'examples/docs/pkg/argui_example_docs_bg.wasm',
+  'examples/astra-editor/index.html',
+  'examples/astra-editor/pkg/argui_example_astra_editor_bg.wasm',
   'gallery-preview.webp',
   'social.png',
   '404.html',
 ])
   await access(resolve(output, asset))
+const astraIndex = await readFile(resolve(output, 'examples/astra-editor/index.html'), 'utf8')
+assert.match(
+  astraIndex,
+  /data-module="\.\/examples\/astra-editor\/pkg\/argui_example_astra_editor\.js"/,
+)
+assert.match(astraIndex, /src="\.\.\/\.\.\/preview-bridge\.js"/)
 console.log(
   `Verified ${routes.length} prerendered pages, source links, SEO metadata, sitemap, robots and WASM previews.`,
 )

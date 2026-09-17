@@ -15,10 +15,11 @@ pnpm dev
 ```
 
 `gallery:build` needs `wasm-pack` and the `wasm32-unknown-unknown` Rust target.
-It builds the real gallery, the AI harness, the GPU Canvas Lab and the exact-source
-documentation examples, using at most six Cargo jobs and six WebAssembly optimization
-workers. If the packages under `web/` are already built, use `pnpm gallery:copy` instead.
-The generated binaries are ignored by Git.
+It builds the real gallery, Astra Editor, the AI harness, the GPU Canvas Lab and the
+exact-source documentation examples. Two WebAssembly builds run concurrently by
+default; set `ARGUI_WASM_BUILD_CONCURRENCY` to tune that bound. If the packages under
+`web/` are already built, use `pnpm gallery:copy` instead. The generated binaries are
+ignored by Git.
 The rest of the website can be developed without building WASM.
 
 Component previews start automatically after hydration and open their matching
@@ -107,7 +108,7 @@ saved to `website/test-results/`. The scenario exercises themes, reloads,
 mobile navigation, search, deep links, clipboard, the real WASM Button, the
 no-WebGPU fallback, missing pages and hydration warnings. The live gallery and
 application examples adapt their Argui layout to the frame width on small screens.
-The scenario also verifies horizontal touch navigation and the absence of page-level
-horizontal overflow. Inspect the PNGs.
+The scenario also verifies Astra Editor, horizontal touch navigation and the absence
+of page-level horizontal overflow. Inspect the PNGs.
 Set `UPDATE_ASSETS=1` to refresh the committed gallery preview and social card
 from actual browser captures. No browser is opened on the user's desktop.
