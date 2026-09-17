@@ -1,6 +1,6 @@
 use crate::{Input, WidgetTheme};
 use argui_text::{FontFamily, LetterSpacing};
-use argui_ui::{Element, ElementKind, TextInputFilter, UiEvent, UiEventKind, length};
+use argui_ui::{Element, ElementKind, TextInputFilter, UiEvent, UiEventKind, ValueHandler, length};
 
 /// One accessible editor for a numeric verification code. Native editing handles selection,
 /// arrows, deletion, clipboard and undo; the engine filter enforces length before mutation.
@@ -11,6 +11,7 @@ pub struct InputOtp {
     pub value: String,
     pub length: usize,
     pub enabled: bool,
+    input_handlers: Vec<ValueHandler<String>>,
 }
 
 impl InputOtp {
@@ -31,6 +32,7 @@ impl InputOtp {
             value: value.into(),
             length: length.clamp(1, 16),
             enabled: true,
+            input_handlers: Vec::new(),
         }
     }
 
@@ -54,6 +56,15 @@ impl InputOtp {
             && self.value.bytes().all(|byte| byte.is_ascii_digit())
     }
 
+    /// Adds a callback receiving each valid edited one-time-password value.
+    ///
+    /// `handler` is normally created with `Context::input_callback`.
+    #[must_use]
+    pub fn on_input(mut self, handler: ValueHandler<String>) -> Self {
+        self.input_handlers.push(handler);
+        self
+    }
+
     #[must_use]
     /// Builds the input slots using `theme` for their appearance.
     pub fn build(&self, theme: &WidgetTheme) -> Element {
@@ -70,11 +81,13 @@ impl InputOtp {
         style.text.letter_spacing = LetterSpacing::Px(12.0);
         style.placeholder = style.text.clone();
         style.placeholder.color = theme.muted_foreground;
-        let mut input = Input::new(&self.key, value, "·".repeat(count), style)
+        let mut builder = Input::new(&self.key, value, "·".repeat(count), style)
             .label(&self.label)
-            .enabled(self.enabled)
-            .build()
-            .width(length(count as f32 * 26.0 + 26.0));
+            .enabled(self.enabled);
+        for handler in self.input_handlers.iter().copied() {
+            builder = builder.on_input(handler);
+        }
+        let mut input = builder.build().width(length(count as f32 * 26.0 + 26.0));
         if let ElementKind::TextEditor { filter, .. } = &mut input.kind {
             *filter = TextInputFilter::Digits {
                 max_length: count as u16,

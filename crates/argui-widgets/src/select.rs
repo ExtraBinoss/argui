@@ -1,9 +1,9 @@
 use argui_paint::{Border, CornerRadii, PaintStyle, QuadStyle};
 use argui_text::{TextStyle, TextWrap};
 use argui_ui::{
-    AlignItems, AnchorWidth, Axes, DismissPolicy, Element, FloatingPlacement, FocusScope,
-    InitialFocus, JustifyContent, Overflow, Placement, ScrollConfig, StylePatch, StyleTransition,
-    VisualState, WindowLayer, length, percent,
+    AlignItems, AnchorWidth, Axes, DismissPolicy, Element, EventFilter, EventType,
+    FloatingPlacement, FocusScope, InitialFocus, JustifyContent, Overflow, Placement, ScrollConfig,
+    StylePatch, StyleTransition, ValueHandler, VisualState, WindowLayer, length, percent,
 };
 
 use crate::{SelectBehavior, SelectPart, WidgetTheme};
@@ -44,6 +44,8 @@ pub struct Select {
     open: bool,
     trailing: Option<Element>,
     presence: Option<crate::Presence>,
+    select_handlers: Vec<ValueHandler<usize>>,
+    open_handlers: Vec<ValueHandler<bool>>,
 }
 
 impl Select {
@@ -66,6 +68,8 @@ impl Select {
             open: false,
             trailing: None,
             presence: None,
+            select_handlers: Vec::new(),
+            open_handlers: Vec::new(),
         }
     }
 
@@ -105,6 +109,20 @@ impl Select {
         self
     }
 
+    /// Adds a callback for selection of an enabled option's source index.
+    #[must_use]
+    pub fn on_select(mut self, handler: ValueHandler<usize>) -> Self {
+        self.select_handlers.push(handler);
+        self
+    }
+
+    /// Adds a callback for a requested popup open-state change.
+    #[must_use]
+    pub fn on_open_change(mut self, handler: ValueHandler<bool>) -> Self {
+        self.open_handlers.push(handler);
+        self
+    }
+
     #[must_use]
     /// Builds the select trigger and popup using `theme` for their styling.
     pub fn build(self, theme: &WidgetTheme) -> Element {
@@ -125,7 +143,7 @@ impl Select {
             Element::text(selected_label).text_style(label_style(theme.foreground)),
         )];
         trigger_children.extend(self.trailing.clone());
-        let trigger = behavior.decorate(
+        let mut trigger = behavior.decorate(
             SelectPart::Trigger,
             Element::row(trigger_children)
                 .width(percent(1.0))
@@ -140,6 +158,9 @@ impl Select {
                     VisualState::Hovered.into(),
                 )),
         );
+        for handler in &self.open_handlers {
+            trigger = trigger.on(handler.direct_listener_value(EventType::Click, !self.open));
+        }
         let overlay = (self.open || self.presence.as_ref().is_some_and(crate::Presence::visible))
             .then(|| {
                 let overlay = self.overlay(theme);
@@ -165,7 +186,7 @@ impl Select {
         .open(self.open);
         let options = self.options.iter().enumerate().map(|(index, option)| {
             let highlighted = self.highlighted == index;
-            behavior.decorate(
+            let mut row = behavior.decorate(
                 SelectPart::Option(index),
                 Element::container([behavior.decorate(
                     SelectPart::Value,
@@ -196,9 +217,15 @@ impl Select {
                     StyleTransition::default(),
                     VisualState::Hovered.into(),
                 )),
-            )
+            );
+            if option.enabled {
+                for handler in &self.select_handlers {
+                    row = row.on(handler.direct_listener_value(EventType::Click, index));
+                }
+            }
+            row
         });
-        let list = Element::column(options)
+        let mut list = Element::column(options)
             .width(length(260.0))
             .max_height(length(280.0))
             .padding(argui_ui::Sides::length(5.0))
@@ -231,6 +258,14 @@ impl Select {
             )))
             .z_index(1_000)
             .layer(theme.overlay_layer(8.0, theme.overlay_blur));
+        for handler in &self.open_handlers {
+            list = list
+                .on(handler.direct_listener_value(EventType::PointerOutside, false))
+                .on(handler.direct_listener_value(EventType::Dismiss, false))
+                .on(handler
+                    .listener_value(EventType::Key, false)
+                    .filter(EventFilter::EscapePressed));
+        }
         behavior.decorate(
             SelectPart::List,
             if let Some(surface) = self.surface {

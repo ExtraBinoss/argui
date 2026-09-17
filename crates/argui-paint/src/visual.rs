@@ -314,6 +314,8 @@ pub struct ClipRegion {
     pub bounds: Rect,
     pub transform: Affine2D,
     pub radii: crate::CornerRadii,
+    /// Retained compositor layer that owns this transform, when known.
+    pub compositor: Option<crate::CompositorId>,
 }
 
 impl ClipRegion {
@@ -325,6 +327,7 @@ impl ClipRegion {
             bounds,
             transform,
             radii: crate::CornerRadii::all(0.0),
+            compositor: None,
         }
     }
 
@@ -336,7 +339,17 @@ impl ClipRegion {
             bounds,
             transform,
             radii,
+            compositor: None,
         }
+    }
+
+    /// Associates this clip with the compositor layer that moves it.
+    ///
+    /// * `compositor` — retained layer whose transform applies to the clip.
+    #[must_use]
+    pub const fn compositor(mut self, compositor: crate::CompositorId) -> Self {
+        self.compositor = Some(compositor);
+        self
     }
 
     /// Returns whether `point` lies inside the transformed rounded region.

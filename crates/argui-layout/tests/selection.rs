@@ -2,17 +2,51 @@ use argui_core::{Affine2D, CaretAffinity, Point, Rect, Size, TextPosition};
 use argui_layout::LayoutEngine;
 use argui_paint::{
     ClipChain, ClipRegion, CornerRadii, DisplayCommand, Fill, GradientStop, LinearGradient,
+    PaintStyle,
 };
-use argui_text::TextEngine;
+use argui_text::{TextEngine, TextStyle};
 use argui_ui::{
-    DocumentTextPoint, Element, SelectionGranularity, TextSelectionHighlight, TextSelectionStyle,
-    UiTree, UserSelect, percent,
+    DocumentSelectionEndpoint, DocumentTextPoint, Element, SelectionGranularity, TextSelection,
+    TextSelectionHighlight, TextSelectionRequest, TextSelectionStyle, UiTree, UserSelect, percent,
 };
+use argui_widgets::{InputStyle, TextArea};
 
 const NOTO_SANS: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
 
 fn text_engine() -> TextEngine {
     TextEngine::from_embedded_fonts([NOTO_SANS], "Noto Sans", "Noto Sans", "Noto Sans")
+}
+
+#[test]
+fn text_editor_selection_highlight_keeps_authored_corner_radii() {
+    let color = argui_core::Color::srgba(0.2, 0.5, 0.9, 0.4);
+    let area = TextArea::new(
+        "rounded-selection",
+        "select me",
+        "",
+        InputStyle::new(PaintStyle::default(), TextStyle::default()),
+    )
+    .build()
+    .selection_highlight(TextSelectionHighlight::solid(color).radius(5.0));
+    let mut ui = UiTree::new(area);
+    let mut layout = LayoutEngine::new();
+    let mut text = text_engine();
+    layout
+        .compute(&mut ui, &mut text, Size::new(240.0, 80.0))
+        .unwrap();
+    ui.select_text(TextSelectionRequest::new(
+        "rounded-selection",
+        TextSelection::All,
+    ));
+    let output = layout
+        .compute(&mut ui, &mut text, Size::new(240.0, 80.0))
+        .unwrap();
+
+    assert!(output.display_list.commands().iter().any(|command| {
+        matches!(command, DisplayCommand::Quad(quad)
+            if quad.background == Some(Fill::Solid(color))
+                && quad.radii.top_left == 5.0)
+    }));
 }
 
 #[test]
@@ -288,6 +322,62 @@ fn touch_selection_paints_both_handles_in_forward_and_reverse_order() {
     engine.repaint(&ui, &mut output);
     assert_eq!(solid_quad_count(&output, handle), 2);
     assert!(output.document_selection_bounds(&ui).is_some());
+}
+
+#[test]
+fn touch_selection_handles_have_transformed_comfortable_hit_targets() {
+    let mut ui = UiTree::new(Element::text("alpha beta gamma").width(percent(1.0)));
+    let mut engine = LayoutEngine::new();
+    let mut text = text_engine();
+    let mut output = engine
+        .compute(&mut ui, &mut text, Size::new(300.0, 80.0))
+        .unwrap();
+    let node = output.text_regions[0].node;
+    ui.begin_touch_document_selection(
+        DocumentTextPoint::new(node, TextPosition::new(7, CaretAffinity::After)),
+        SelectionGranularity::Word,
+    );
+    ui.release_document_selection();
+    engine.repaint(&ui, &mut output);
+
+    let handles = output.selection_handles(&ui);
+    assert_eq!(handles.len(), 2);
+    for handle in &handles {
+        assert_eq!(handle.hit_bounds.size, Size::new(44.0, 44.0));
+        assert_eq!(handle.visual_bounds.size, Size::new(10.0, 10.0));
+        assert_eq!(
+            output
+                .selection_handle_at(&ui, handle.center)
+                .map(|hit| hit.endpoint),
+            Some(handle.endpoint)
+        );
+        assert!(
+            handle
+                .hit_bounds
+                .contains(Point::new(handle.center.x, handle.center.y + 21.0))
+        );
+    }
+
+    let anchor = handles
+        .iter()
+        .find(|handle| handle.endpoint == DocumentSelectionEndpoint::Anchor)
+        .unwrap();
+    output.text_regions[0].transform = Affine2D::translation(2.0, 3.0);
+    let moved_anchor = output
+        .selection_handles(&ui)
+        .into_iter()
+        .find(|handle| handle.endpoint == DocumentSelectionEndpoint::Anchor)
+        .unwrap();
+    assert_eq!(
+        moved_anchor.center,
+        Point::new(anchor.center.x + 2.0, anchor.center.y + 3.0)
+    );
+    assert_eq!(
+        output
+            .selection_handle_at(&ui, moved_anchor.center)
+            .map(|hit| hit.endpoint),
+        Some(DocumentSelectionEndpoint::Anchor)
+    );
 }
 
 #[test]

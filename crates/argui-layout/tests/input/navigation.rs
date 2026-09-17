@@ -1,5 +1,136 @@
 use super::*;
 
+#[test]
+fn repeated_newlines_keep_the_multiline_caret_visible_and_scroll_monotonic() {
+    let editor = |value: &str| {
+        TextArea::new(
+            "notes",
+            value,
+            "notes",
+            InputStyle::new(PaintStyle::default(), TextStyle::default()),
+        )
+        .build()
+        .height(length(96.0))
+    };
+    let mut ui = UiTree::new(editor("start"));
+    let node = ui.node_id_at(0).unwrap();
+    let mut layout = LayoutEngine::new();
+    let mut text = text_engine();
+    let mut output = layout
+        .compute(&mut ui, &mut text, Size::new(260.0, 96.0))
+        .unwrap();
+    ui.pointer_moved(Point::new(20.0, 20.0), &output.hit_regions);
+    ui.primary_pressed(&output.hit_regions);
+    ui.place_text_cursor(node, "start".len(), false);
+    let mut previous_scroll = 0.0;
+
+    for repeat in 0..12 {
+        ui.edit_text_input(&KeyInput {
+            key: Key::Enter,
+            state: KeyState::Pressed,
+            modifiers: Modifiers::default(),
+            repeat: repeat > 0,
+            text: None,
+        });
+        let value = ui.text_input_value(node).unwrap().to_owned();
+        ui.update(editor(&value));
+        output = layout
+            .compute(&mut ui, &mut text, Size::new(260.0, 96.0))
+            .unwrap();
+        let region = &output.text_inputs[0];
+        let scroll = ui.scroll_offset(node).y;
+        assert!(scroll >= previous_scroll);
+        assert!(region.caret.unwrap().origin.y >= region.viewport.origin.y);
+        assert!(
+            region.caret.unwrap().origin.y + region.caret.unwrap().size.height
+                <= region.viewport.origin.y + region.viewport.size.height
+        );
+        previous_scroll = scroll;
+    }
+    assert!(previous_scroll > 0.0);
+}
+
+#[test]
+fn transformed_editor_hits_and_drags_resolve_the_same_text_positions() {
+    use argui_core::Affine2D;
+    let field = |key, value| {
+        Input::new(
+            key,
+            value,
+            "",
+            InputStyle::new(PaintStyle::default(), TextStyle::default()),
+        )
+        .build()
+    };
+    let mut ui = UiTree::new(Element::column([
+        field("first", "other field"),
+        field("second", "alpha beta gamma"),
+    ]));
+    let node = ui.node_ids()[2];
+    let mut output = LayoutEngine::new()
+        .compute(&mut ui, &mut text_engine(), Size::new(400.0, 160.0))
+        .unwrap();
+    let region = output
+        .text_inputs
+        .iter()
+        .find(|region| region.node == node)
+        .unwrap()
+        .clone();
+    let local = region
+        .stops
+        .iter()
+        .find(|stop| stop.position.index == 7)
+        .unwrap()
+        .point;
+    let expected = region.closest_position(local);
+    for transform in [
+        Affine2D::IDENTITY,
+        Affine2D {
+            matrix: [2.0, 0.0, 0.0, 1.5],
+            translation: Point::new(120.0, 45.0),
+        },
+    ] {
+        output
+            .hit_regions
+            .iter_mut()
+            .find(|hit| hit.node == node)
+            .unwrap()
+            .transform = transform;
+        let point = transform.transform_point(local);
+        let mapped = output.local_point(node, point).unwrap();
+        assert!((mapped.x - local.x).hypot(mapped.y - local.y) < 0.001);
+        assert_eq!(region.hit_position(mapped), Some(expected));
+        ui.begin_text_selection(
+            node,
+            region.closest_position(mapped),
+            false,
+            argui_ui::SelectionGranularity::Word,
+        );
+        assert_eq!(ui.text_input_selection(node), Some((6, 10)));
+        // Captured drags may leave the editor while still needing its inverse transform.
+        let outside = Point::new(region.bounds.origin.x - 50.0, local.y);
+        let mapped = output
+            .local_point(node, transform.transform_point(outside))
+            .unwrap();
+        assert!(region.hit_position(mapped).is_none());
+        ui.drag_text_position(node, region.closest_position(mapped));
+        assert_eq!(ui.text_input_selection(node), Some((0, 10)));
+        ui.release_text_cursor();
+    }
+    output
+        .hit_regions
+        .iter_mut()
+        .find(|hit| hit.node == node)
+        .unwrap()
+        .transform = Affine2D {
+        matrix: [0.0; 4],
+        ..Affine2D::IDENTITY
+    };
+    assert!(output.local_point(node, local).is_none());
+    output.hit_regions.retain(|hit| hit.node != node);
+    assert!(output.local_point(node, local).is_none());
+}
+
 struct Editor {
     ui: UiTree,
     layout: LayoutEngine,

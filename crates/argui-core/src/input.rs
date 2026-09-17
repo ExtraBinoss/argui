@@ -5,6 +5,7 @@ use crate::{Modifiers, Point};
 pub struct PointerSettings {
     multi_click_interval: std::time::Duration,
     multi_click_distance: f32,
+    activation_slop: f32,
     long_press_interval: std::time::Duration,
     touch_slop: f32,
 }
@@ -14,6 +15,7 @@ impl Default for PointerSettings {
         Self {
             multi_click_interval: std::time::Duration::from_millis(500),
             multi_click_distance: 5.0,
+            activation_slop: 10.0,
             long_press_interval: std::time::Duration::from_millis(500),
             touch_slop: 10.0,
         }
@@ -31,6 +33,21 @@ impl PointerSettings {
         assert!(distance.is_finite() && distance >= 0.0);
         self.multi_click_interval = interval;
         self.multi_click_distance = distance;
+        self
+    }
+
+    /// Sets the maximum movement allowed before a pointer press stops activating its target.
+    ///
+    /// * `distance` — maximum movement in logical pixels from the initial press position.
+    ///
+    /// Returns the updated pointer settings.
+    ///
+    /// # Panics
+    /// Panics if `distance` is negative or not finite.
+    #[must_use]
+    pub fn activation_slop(mut self, distance: f32) -> Self {
+        assert!(distance.is_finite() && distance >= 0.0);
+        self.activation_slop = distance;
         self
     }
 
@@ -57,6 +74,12 @@ impl PointerSettings {
     /// Returns the maximum movement allowed between repeated clicks.
     pub const fn multi_click_distance(self) -> f32 {
         self.multi_click_distance
+    }
+
+    /// Returns the maximum movement in logical pixels that preserves pointer activation.
+    #[must_use]
+    pub const fn activation_slop_distance(self) -> f32 {
+        self.activation_slop
     }
 
     #[must_use]

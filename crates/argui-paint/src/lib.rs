@@ -1,5 +1,6 @@
 //! Renderer-independent painting primitives and ordered display lists.
 
+mod compositor;
 mod display_list;
 mod effect;
 mod gpu_canvas;
@@ -8,6 +9,7 @@ mod vector;
 mod visual;
 
 pub use argui_core::{Color, ColorInterpolation};
+pub use compositor::{CompositorId, CompositorLayer, CompositorPatch};
 pub use display_list::{DisplayCommand, DisplayList, DisplayListError};
 pub use effect::{
     BlendMode, EffectArgument, EffectId, EffectInstance, EffectValue, Filter, LayerMask,

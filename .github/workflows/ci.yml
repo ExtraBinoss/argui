@@ -48,6 +48,52 @@ jobs:
     name: Rust quality
     needs: security
     runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Install Linux build dependencies
+        run: ./scripts/install-linux-ci.sh
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        with:
+          toolchain: '1.98.0'
+          components: rustfmt, clippy
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
+        with:
+          key: quality-static
+          cache-on-failure: true
+      - name: Validate registry manifests
+        run: python3 scripts/release.py check
+      - name: Run source, formatting, Clippy, Wasm, and public API checks
+        run: ./scripts/check-quality-static.sh
+
+  semver:
+    name: Public API
+    needs: security
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        with:
+          toolchain: '1.98.0'
+      - uses: taiki-e/install-action@3f74d7c16a4242f1c95561e98edc25d36adb4375 # v2
+        with:
+          tool: cargo-semver-checks@0.49.0
+      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
+        with:
+          key: semver
+      - name: Compare publishable APIs with crates.io
+        run: cargo semver-checks check-release --workspace --release-type minor
+
+  coverage:
+    name: Rust coverage
+    needs: security
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
     env:
       ARGUI_NATIVE_TESTS: '1'
@@ -80,8 +126,8 @@ jobs:
           cache-on-failure: true
       - name: Validate registry manifests
         run: python3 scripts/release.py check
-      - name: Run the complete 85% quality gate on a private display
-        run: ./scripts/linux-hidden-display.sh ./scripts/quality.sh
+      - name: Run the 85% coverage gate on a private display
+        run: ./scripts/linux-hidden-display.sh ./scripts/check-coverage.sh
       - name: Save coverage results
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -332,7 +378,7 @@ jobs:
 
   release:
     name: Publish crates and GitHub release
-    needs: [security, quality, desktop, mobile, android-package, ios-package, packages, website]
+    needs: [security, quality, semver, coverage, desktop, mobile, android-package, ios-package, packages, website]
     if: >-
       github.event_name == 'push' && github.ref == 'refs/heads/main' &&
       github.repository == 'ExtraBinoss/argui' && github.actor == 'ExtraBinoss' &&

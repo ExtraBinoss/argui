@@ -5,6 +5,7 @@ export const docRoutes = [
   'start/counter',
   'essentials/layout',
   'essentials/events',
+  'essentials/interaction-api',
   'essentials/styling',
   'essentials/accessibility',
   'essentials/animation',
@@ -16,4 +17,7 @@ export const docRoutes = [
   'architecture/project-structure',
   'architecture/clean-code',
   'architecture/custom-elements',
+  'technicalities/performance',
+  'platforms/support',
+  'platforms/roadmap',
 ] as const

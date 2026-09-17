@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ArrowRight, BookOpen, Boxes, Code2, Layers3, Search } from '@lucide/vue'
+import { ArrowRight, BookOpen, Boxes, Code2, Cpu, MonitorSmartphone, Search } from '@lucide/vue'
 import { docs, docsByCategory } from '~/data/docs'
 
 const query = ref('')
@@ -12,7 +12,13 @@ const matches = computed(() => {
   )
 })
 const startGuides = docsByCategory[0]?.guides ?? []
-const icons = { 'Start here': BookOpen, Essentials: Boxes, Advanced: Code2, Architecture: Layers3 }
+const icons = {
+  'Start here': BookOpen,
+  Essentials: Boxes,
+  Advanced: Code2,
+  Technicalities: Cpu,
+  Platforms: MonitorSmartphone,
+}
 const focusSearch = (event: KeyboardEvent) => {
   if (event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey) return
   if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement)
@@ -25,7 +31,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', focusSearch))
 usePageSeo(
   () => 'Documentation',
   () =>
-    'Learn Argui from your first Rust window to state, responsive layout, async tasks, architecture, clean code and custom elements, with live WebAssembly examples.',
+    'Learn Argui from your first Rust window to retained architecture, platform support, responsive layout, async tasks and custom elements, with live WebAssembly examples.',
 )
 </script>
 

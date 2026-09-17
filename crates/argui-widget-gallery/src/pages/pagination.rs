@@ -1,6 +1,6 @@
 use argui::{
     runtime::Context,
-    ui::{Element, EventType, length},
+    ui::{Element, length},
     widgets::{Card, Pagination, WidgetTheme},
 };
 
@@ -12,7 +12,8 @@ pub(super) fn render(
     cx: &mut Context<WidgetGallery>,
 ) -> Element {
     let page = gallery.result_page;
-    let pagination = Pagination::new("results", page, 12);
+    let pagination = Pagination::new("results", page, 12)
+        .on_select(cx.value_callback(|gallery, page| gallery.result_page = page));
     let titles = [
         "Navigation patterns",
         "Designing with contrast",
@@ -38,19 +39,7 @@ pub(super) fn render(
     let content = Card::new("result-list", Element::column(rows).gap(24.0))
         .title("Library notes")
         .description(format!("Page {page} of 12 · 36 notes"))
-        .footer(
-            pagination
-                .build(theme)
-                .on(cx.listener(EventType::Click, |gallery, event, cx| {
-                    if let Some(page) =
-                        Pagination::new("results", gallery.result_page, 12).action(event)
-                    {
-                        gallery.result_page = page;
-                        event.stop_propagation();
-                        cx.notify();
-                    }
-                })),
-        )
+        .footer(pagination.build(theme))
         .build(theme)
         .max_width(length(720.0));
     Element::column([

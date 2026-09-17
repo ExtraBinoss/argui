@@ -11,6 +11,30 @@ description = "A modular Rust UI library for fast, accessible native and WebAsse
 
 [features]
 default = []
+basic = [
+    "tasks",
+    "widget-button",
+    "widget-checkbox",
+    "widget-dialog",
+    "widget-input",
+    "widget-popover",
+    "widget-radio-group",
+    "widget-select",
+    "widget-switch",
+    "widget-tabs",
+    "widget-textarea",
+]
+desktop = [
+    "basic",
+    "desktop-backdrop",
+    "file-picker",
+    "native-popups",
+    "tray",
+    "updater",
+    "widget-file-picker",
+    "widget-updater",
+]
+web = ["basic", "webview"]
 hot-reload = ["argui-runtime/hot-reload"]
 i18n = ["dep:argui-i18n"]
 updater = ["dep:argui-updater", "argui-updater/native"]

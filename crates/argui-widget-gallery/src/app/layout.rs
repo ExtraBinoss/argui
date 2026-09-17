@@ -24,16 +24,16 @@ impl WidgetGallery {
     ) -> Element {
         let content = self.content(theme, assets, cx, resize);
         let body = if self.compact {
-            Element::column([self.mobile_navigation(theme, assets), content])
+            Element::column([self.mobile_navigation(theme, assets, cx), content])
                 .grow(1.0)
                 .min_height(length(0.0))
         } else {
-            Element::row([self.sidebar(theme, assets), content])
+            Element::row([self.sidebar(theme, assets, cx), content])
                 .grow(1.0)
                 .min_height(length(0.0))
         };
         Element::column([
-            self.topbar(theme, assets, environment),
+            self.topbar(theme, assets, environment, cx),
             body,
             cx.entity(&self.toasts),
         ])
@@ -98,6 +98,7 @@ impl WidgetGallery {
         theme: &WidgetTheme,
         assets: &WidgetAssets,
         environment: WindowEnvironment,
+        cx: &mut Context<Self>,
     ) -> Element {
         let brand = Element::row([
             Element::image(self.logo)
@@ -113,12 +114,14 @@ impl WidgetGallery {
         ])
         .align_items(AlignItems::CENTER)
         .gap(10.0);
-        let controls = (!self.compact).then(|| self.desktop_controls(theme, assets, environment));
+        let controls =
+            (!self.compact).then(|| self.desktop_controls(theme, assets, environment, cx));
         Element::row(std::iter::once(brand).chain(controls))
+            .keyed("gallery-topbar")
             .height(length(64.0))
             .padding(Sides {
                 left: length(if self.compact { 14.0 } else { 22.0 }),
-                right: length(126.0),
+                right: length(if self.compact { 14.0 } else { 126.0 }),
                 top: length(12.0),
                 bottom: length(12.0),
             })
@@ -139,6 +142,7 @@ impl WidgetGallery {
         theme: &WidgetTheme,
         assets: &WidgetAssets,
         environment: WindowEnvironment,
+        cx: &mut Context<Self>,
     ) -> Element {
         let swatches = Element::row(PRIMARIES.iter().enumerate().map(|(index, color)| {
             Element::container([])
@@ -174,11 +178,16 @@ impl WidgetGallery {
         if cfg!(feature = "desktop-backdrop") {
             controls.push(self.backdrop_controls(theme, environment));
         }
-        controls.push(self.theme_button(theme, assets));
+        controls.push(self.theme_button(theme, assets, cx));
         Element::row(controls).gap(10.0)
     }
 
-    pub(super) fn theme_button(&self, theme: &WidgetTheme, assets: &WidgetAssets) -> Element {
+    pub(super) fn theme_button(
+        &self,
+        theme: &WidgetTheme,
+        assets: &WidgetAssets,
+        cx: &mut Context<Self>,
+    ) -> Element {
         let icon = match self.theme_mode {
             ThemeMode::Light => TablerIcon::Sun,
             ThemeMode::Dark => TablerIcon::Moon,
@@ -190,6 +199,10 @@ impl WidgetGallery {
             theme.ghost_button(),
         )
         .leading(assets.icon(icon, 17.0))
+        .on_click(cx.event_handler(|gallery, _, cx| {
+            gallery.cycle_theme();
+            cx.set_theme(gallery.theme_request());
+        }))
         .build()
     }
 }

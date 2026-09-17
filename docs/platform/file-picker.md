@@ -3,7 +3,7 @@
 The `file-picker` feature exposes system dialogs independently of widgets:
 
 ```toml
-argui = { version = "0.2.1", features = ["file-picker"] }
+argui = { version = "0.3.0", features = ["file-picker"] }
 ```
 
 ```rust
@@ -56,7 +56,7 @@ filenames containing paths and invalid filters are rejected before native calls.
 ## Widget
 
 ```toml
-argui = { version = "0.2.1", features = ["widget-file-picker"] }
+argui = { version = "0.3.0", features = ["widget-file-picker"] }
 ```
 
 `widgets-all` and `argui-widgets/all` also include it. All are disabled by

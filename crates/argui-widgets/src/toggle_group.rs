@@ -1,5 +1,7 @@
 use crate::{ChoiceMode, Toggle, WidgetTheme, choice_navigation::navigate};
-use argui_ui::{Element, FocusPolicy, Orientation, Role, Semantics, UiEvent};
+use argui_ui::{
+    Element, EventType, FocusPolicy, Orientation, Role, Semantics, UiEvent, ValueHandler,
+};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ToggleGroupAction {
@@ -17,6 +19,7 @@ pub struct ToggleGroup {
     pub orientation: Orientation,
     pub rtl: bool,
     pub active: Option<String>,
+    change_handlers: Vec<ValueHandler<Vec<String>>>,
 }
 
 impl ToggleGroup {
@@ -36,6 +39,7 @@ impl ToggleGroup {
             orientation: Orientation::Horizontal,
             rtl: false,
             active: None,
+            change_handlers: Vec::new(),
         }
     }
 
@@ -83,6 +87,35 @@ impl ToggleGroup {
         Some(ToggleGroupAction::Change(selected))
     }
 
+    /// Adds a callback receiving the selected stable item keys.
+    ///
+    /// `handler` is normally created with `Context::value_callback`. Single
+    /// selection returns zero or one key; multiple selection returns all keys
+    /// that remain selected after activation.
+    #[must_use]
+    pub fn on_change(mut self, handler: ValueHandler<Vec<String>>) -> Self {
+        self.change_handlers.push(handler);
+        self
+    }
+
+    fn selection_after_activation(&self, index: usize) -> Vec<String> {
+        let next_pressed = !self.items[index].pressed;
+        let mut selected: Vec<_> = if self.mode == ChoiceMode::Multiple {
+            self.items
+                .iter()
+                .enumerate()
+                .filter(|(candidate, item)| *candidate != index && item.pressed)
+                .map(|(_, item)| item.key.clone())
+                .collect()
+        } else {
+            Vec::new()
+        };
+        if next_pressed {
+            selected.push(self.items[index].key.clone());
+        }
+        selected
+    }
+
     #[must_use]
     /// Builds the toggle group using `theme` for its item styling.
     ///
@@ -116,6 +149,11 @@ impl ToggleGroup {
             } else {
                 FocusPolicy::Programmatic
             };
+            let selected = self.selection_after_activation(index);
+            for handler in self.change_handlers.iter().copied() {
+                button =
+                    button.on(handler.direct_listener_value(EventType::Click, selected.clone()));
+            }
             button
         });
         let root = match self.orientation {

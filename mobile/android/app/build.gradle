@@ -25,6 +25,12 @@ android {
     compileSdk = 36
     ndkVersion = '28.2.13676358'
 
+    sourceSets {
+        main {
+            java.srcDir(new File(repositoryRoot, 'crates/argui-android/android/src/main/java'))
+        }
+    }
+
     defaultConfig {
         applicationId = 'dev.argui.widgetgallery'
         minSdk = 26
@@ -52,6 +58,7 @@ def registerRustBuild = { String variant, boolean optimized ->
         inputs.file(cargoManifest)
         inputs.file(new File(repositoryRoot, 'Cargo.lock'))
         inputs.dir(new File(repositoryRoot, 'crates'))
+        inputs.dir(new File(repositoryRoot, 'crates/argui-android/android'))
         inputs.dir(new File(repositoryRoot, '.cargo'))
         inputs.property('androidAbis', requestedAbis)
         inputs.property('androidApiLevel', 26)

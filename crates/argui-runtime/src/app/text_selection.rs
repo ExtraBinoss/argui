@@ -12,6 +12,23 @@ pub(super) struct TouchSelection {
     started: Instant,
 }
 
+/// Captures the touch pointer currently dragging a text-selection endpoint.
+#[derive(Clone, Copy, Debug)]
+pub(super) struct TouchSelectionHandle {
+    id: PointerId,
+}
+
+impl TouchSelectionHandle {
+    /// Reports whether this capture belongs to the supplied pointer.
+    ///
+    /// * `id` — pointer identity being checked.
+    ///
+    /// Returns `true` when `id` is the captured pointer.
+    pub(super) fn tracks(self, id: PointerId) -> bool {
+        self.id == id
+    }
+}
+
 impl TouchSelection {
     fn tracks(self, id: PointerId) -> bool {
         self.id == id
@@ -95,6 +112,42 @@ impl Application {
         if self.touch_selection.is_some() {
             window.request_redraw();
         }
+    }
+
+    /// Captures a touch press on a visible document-selection handle.
+    ///
+    /// * `id` — touch pointer that will own the drag.
+    /// * `point` — press position in viewport coordinates.
+    /// * `window` — host window used to request redraws after selection changes.
+    /// * `event_loop` — event-loop control used to apply the selection update.
+    ///
+    /// Returns `true` when a visible handle at `point` starts the drag; otherwise returns `false`
+    /// and leaves the current capture unchanged.
+    pub(super) fn begin_touch_selection_handle(
+        &mut self,
+        id: PointerId,
+        point: Point,
+        window: &dyn crate::host::WindowHost,
+        event_loop: &dyn crate::host::LoopControl,
+    ) -> bool {
+        let endpoint = self
+            .ui_layout
+            .as_ref()
+            .zip(self.ui_tree.as_ref())
+            .and_then(|(layout, ui)| layout.selection_handle_at(ui, point))
+            .map(|handle| handle.endpoint);
+        let Some(endpoint) = endpoint else {
+            return false;
+        };
+        self.touch_selection = None;
+        self.touch_selection_handle = Some(TouchSelectionHandle { id });
+        self.scroll_inertia.cancel();
+        self.programmatic_scroll = None;
+        if let Some(ui) = &mut self.ui_tree {
+            let update = ui.begin_document_selection_handle_drag(endpoint);
+            self.apply_ui_update(update, window, event_loop);
+        }
+        true
     }
 
     pub(super) fn move_touch_selection_candidate(&mut self, id: PointerId, point: Point) {

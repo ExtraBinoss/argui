@@ -45,6 +45,8 @@ struct Inner {
     wake: Wake,
     #[cfg(not(target_arch = "wasm32"))]
     executor: RefCell<Option<tokio::runtime::Runtime>>,
+    #[cfg(not(target_arch = "wasm32"))]
+    paused: bool,
 }
 impl Drop for Inner {
     fn drop(&mut self) {
@@ -69,7 +71,16 @@ impl TaskRuntime {
     ///
     /// `wake` schedules a later call to [`Self::drain`] when completions are ready.
     pub fn new(wake: impl Fn() + Send + Sync + 'static) -> Self {
-        Self::with_wake(Arc::new(wake))
+        Self::with_wake(Arc::new(wake), false)
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    /// Creates a dispatcher whose Tokio clock advances only through
+    /// [`Self::advance_time`].
+    ///
+    /// `wake` schedules a later drain when task completions become available.
+    /// This constructor is intended for deterministic headless hosts.
+    pub fn new_paused(wake: impl Fn() + Send + Sync + 'static) -> Self {
+        Self::with_wake(Arc::new(wake), true)
     }
     #[cfg(target_arch = "wasm32")]
     /// Creates a browser task dispatcher with a local completion wake callback.
@@ -78,7 +89,8 @@ impl TaskRuntime {
     pub fn new(wake: impl Fn() + 'static) -> Self {
         Self::with_wake(Rc::new(wake))
     }
-    fn with_wake(wake: Wake) -> Self {
+    #[cfg(not(target_arch = "wasm32"))]
+    fn with_wake(wake: Wake, paused: bool) -> Self {
         let wake_pending = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let pending = wake_pending.clone();
         #[cfg(not(target_arch = "wasm32"))]
@@ -102,8 +114,28 @@ impl TaskRuntime {
             sender,
             receiver: RefCell::new(receiver),
             wake,
-            #[cfg(not(target_arch = "wasm32"))]
             executor: RefCell::new(None),
+            paused,
+        }))
+    }
+    #[cfg(target_arch = "wasm32")]
+    fn with_wake(wake: Wake) -> Self {
+        let wake_pending = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let pending = wake_pending.clone();
+        let wake: Wake = Rc::new(move || {
+            if !pending.swap(true, std::sync::atomic::Ordering::AcqRel) {
+                wake();
+            }
+        });
+        let (sender, receiver) = mpsc::channel(64);
+        Self(Rc::new(Inner {
+            closed: Cell::new(false),
+            wake_pending,
+            entries: RefCell::new(HashMap::new()),
+            next: Cell::new(0),
+            sender,
+            receiver: RefCell::new(receiver),
+            wake,
         }))
     }
     #[must_use]
@@ -159,6 +191,41 @@ impl TaskRuntime {
         (self.0.wake)();
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
+    /// Advances a paused dispatcher clock and lets all newly ready work run.
+    ///
+    /// `duration` is added to Tokio's virtual clock. A normally timed dispatcher
+    /// accepts only a zero duration so production hosts cannot accidentally alter
+    /// wall-clock scheduling.
+    ///
+    /// # Errors
+    /// Returns [`TaskError::Unavailable`] after shutdown or when a non-zero
+    /// duration is supplied to a normally timed dispatcher.
+    pub fn advance_time(&self, duration: std::time::Duration) -> Result<(), TaskError> {
+        if self.0.closed.get() {
+            return Err(TaskError::Unavailable);
+        }
+        if !self.0.paused && !duration.is_zero() {
+            return Err(TaskError::Unavailable);
+        }
+        let _ = self.executor()?;
+        let mut executor = self.0.executor.borrow_mut();
+        executor
+            .as_mut()
+            .expect("executor was initialized")
+            .block_on(async {
+                if self.0.paused {
+                    tokio::time::advance(duration).await;
+                }
+                for _ in 0..8 {
+                    tokio::task::yield_now().await;
+                }
+            });
+        drop(executor);
+        self.drain();
+        Ok(())
+    }
+
     pub(super) fn register(
         &self,
         state: Arc<TaskState>,
@@ -193,12 +260,18 @@ impl TaskRuntime {
         }
         let mut executor = self.0.executor.borrow_mut();
         if executor.is_none() {
+            let mut builder = if self.0.paused {
+                tokio::runtime::Builder::new_current_thread()
+            } else {
+                let mut builder = tokio::runtime::Builder::new_multi_thread();
+                builder.worker_threads(
+                    std::thread::available_parallelism().map_or(1, |count| count.get().min(4)),
+                );
+                builder
+            };
+            builder.enable_all().start_paused(self.0.paused);
             *executor = Some(
-                tokio::runtime::Builder::new_multi_thread()
-                    .worker_threads(
-                        std::thread::available_parallelism().map_or(1, |count| count.get().min(4)),
-                    )
-                    .enable_all()
+                builder
                     .build()
                     .map_err(|error| TaskError::Runtime(error.to_string()))?,
             );

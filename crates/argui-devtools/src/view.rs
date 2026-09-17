@@ -1,3 +1,4 @@
+use argui_core::Insets;
 use argui_inspect::NodeSnapshot;
 use argui_paint::{Border, Color, CornerRadii, LayerStyle, PaintStyle, QuadStyle, VectorId};
 use argui_text::{TextColor, TextStyle, TextWrap};
@@ -24,6 +25,7 @@ pub(crate) fn host<A>(
     app: Element,
     theme: &WidgetTheme,
     splitter_listener: Option<EventListener>,
+    safe_area: Insets,
 ) -> Element {
     let application = Element::container([app
         .width(percent(1.0))
@@ -39,7 +41,7 @@ pub(crate) fn host<A>(
         y: Overflow::Hidden,
     });
     let mut toggle = toggle_button(false, theme)
-        .absolute(top_right(14.0, 14.0))
+        .absolute(top_right(14.0 + safe_area.top, 14.0 + safe_area.right))
         .z_index(30_000);
     if tools.open || tools.sheet_progress > 0.001 {
         if let Some(interaction) = &mut toggle.interaction {
@@ -49,7 +51,7 @@ pub(crate) fn host<A>(
     }
     let mut children = vec![application, toggle];
     if tools.dock_mode != crate::DockMode::Detached {
-        children.push(dock_surface(tools, theme, splitter_listener));
+        children.push(dock_surface(tools, theme, splitter_listener, safe_area));
     }
     if tools.picking {
         children.push(picker_surface(tools));
@@ -71,6 +73,7 @@ fn dock_surface<A>(
     tools: &DevtoolsHost<A>,
     theme: &WidgetTheme,
     splitter_listener: Option<EventListener>,
+    safe_area: Insets,
 ) -> Element {
     let extent = tools.dock_extent();
     let height = extent + 6.0;
@@ -96,6 +99,21 @@ fn dock_surface<A>(
     .width(if right { length(height) } else { percent(1.0) })
     .height(if right { percent(1.0) } else { length(height) })
     .shrink(0.0);
+    let safe_padding = if right {
+        Sides {
+            left: length(0.0),
+            right: length(safe_area.right * tools.sheet_progress),
+            top: length(safe_area.top * tools.sheet_progress),
+            bottom: length(safe_area.bottom * tools.sheet_progress),
+        }
+    } else {
+        Sides {
+            left: length(safe_area.left * tools.sheet_progress),
+            right: length(safe_area.right * tools.sheet_progress),
+            top: length(0.0),
+            bottom: length(safe_area.bottom * tools.sheet_progress),
+        }
+    };
     Element::container([surface])
         .keyed("__devtools-surface")
         .width(if right {
@@ -109,6 +127,8 @@ fn dock_surface<A>(
             length(height * tools.sheet_progress)
         })
         .shrink(0.0)
+        .padding(safe_padding)
+        .background(theme.background)
         .overflow(Axes {
             x: Overflow::Hidden,
             y: Overflow::Hidden,

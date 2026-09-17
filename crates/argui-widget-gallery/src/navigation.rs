@@ -78,13 +78,19 @@ pub enum Page {
     WebView,
     AsyncTasks,
     Editing,
+    DragDrop,
+    SplitPane,
     CustomTimeline,
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    MobileActivity,
     #[cfg(feature = "updater")]
     Updater,
 }
 
 impl Page {
-    pub const ALL: [Self; 77 + cfg!(feature = "updater") as usize] = [
+    pub const ALL: [Self;
+        79 + cfg!(feature = "updater") as usize
+            + cfg!(any(target_os = "android", target_os = "ios")) as usize] = [
         Self::Accordion,
         Self::Alert,
         Self::AlertDialog,
@@ -153,7 +159,11 @@ impl Page {
         Self::LiquidGlass,
         Self::ScrollShadow,
         Self::AsyncTasks,
+        #[cfg(any(target_os = "android", target_os = "ios"))]
+        Self::MobileActivity,
         Self::CustomTimeline,
+        Self::DragDrop,
+        Self::SplitPane,
         Self::Editing,
         Self::HotReload,
         Self::I18n,
@@ -170,6 +180,8 @@ impl Page {
         match self {
             #[cfg(feature = "updater")]
             Self::Updater => "Examples",
+            #[cfg(any(target_os = "android", target_os = "ios"))]
+            Self::MobileActivity => "Examples",
             Self::Accordion
             | Self::AlertDialog
             | Self::Attachment
@@ -245,6 +257,8 @@ impl Page {
             | Self::WebView
             | Self::AsyncTasks
             | Self::Editing
+            | Self::DragDrop
+            | Self::SplitPane
             | Self::CustomTimeline => "Examples",
         }
     }
@@ -327,7 +341,11 @@ impl Page {
             Self::TextSelection => "Text selection",
             Self::WebView => "WebView",
             Self::AsyncTasks => "Async tasks",
+            #[cfg(any(target_os = "android", target_os = "ios"))]
+            Self::MobileActivity => "Background activity",
             Self::Editing => "Editing & Password",
+            Self::DragDrop => "Drag & Drop",
+            Self::SplitPane => "Split Pane",
             Self::CustomTimeline => "Custom Timeline",
             #[cfg(feature = "updater")]
             Self::Updater => "Updater",
@@ -412,7 +430,11 @@ impl Page {
             Self::TextSelection => "text-selection",
             Self::WebView => "webview",
             Self::AsyncTasks => "async-tasks",
+            #[cfg(any(target_os = "android", target_os = "ios"))]
+            Self::MobileActivity => "mobile-activity",
             Self::Editing => "editing",
+            Self::DragDrop => "drag-drop",
+            Self::SplitPane => "split-pane",
             Self::CustomTimeline => "custom-timeline",
             #[cfg(feature = "updater")]
             Self::Updater => "updater",
@@ -424,11 +446,6 @@ impl Page {
         query.is_empty()
             || self.label().to_lowercase().contains(&query)
             || self.category().to_lowercase().contains(&query)
-    }
-
-    pub fn from_navigation_key(key: &str) -> Option<Self> {
-        let slug = key.strip_prefix("nav::")?;
-        Self::ALL.into_iter().find(|page| page.slug() == slug)
     }
 }
 
@@ -533,8 +550,18 @@ impl Page {
                 "Retained web content, with separate email and webpage security policies."
             }
             Self::AsyncTasks => "Owned, cancellable work with event-driven delivery to the UI.",
+            #[cfg(any(target_os = "android", target_os = "ios"))]
+            Self::MobileActivity => {
+                "Continue a cancellable task in the background with native progress where available."
+            }
             Self::Editing => {
                 "Transactional undo/redo, Unicode, filtered fields and protected passwords."
+            }
+            Self::DragDrop => {
+                "Reorder image cards live with pointer capture, velocity deformation and momentum."
+            }
+            Self::SplitPane => {
+                "Resize horizontal, vertical, trailing and nested application panes."
             }
             #[cfg(feature = "updater")]
             Self::Updater => {

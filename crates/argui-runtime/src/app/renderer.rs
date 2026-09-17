@@ -199,6 +199,7 @@ impl Application {
                 paint_time: self.frame_record.paint + self.frame_record.surface,
                 tree_update: match self.frame_record.update {
                     Invalidation::None => argui_ui::TreeUpdate::None,
+                    Invalidation::Composite => argui_ui::TreeUpdate::Composite,
                     Invalidation::Paint => argui_ui::TreeUpdate::Paint,
                     Invalidation::Layout => argui_ui::TreeUpdate::Layout,
                 },
@@ -206,6 +207,11 @@ impl Application {
         }
 
         let rendered = match (self.prepared_text.as_ref(), self.ui_layout.as_ref()) {
+            (_, Some(layout)) if self.composite_frame => {
+                renderer.render_composite_notified(&layout.display_list, self.scale_factor, || {
+                    window.pre_present_notify()
+                })
+            }
             (Some(text), Some(layout)) => renderer.render_ui_notified(
                 &mut self.text_engine,
                 text,

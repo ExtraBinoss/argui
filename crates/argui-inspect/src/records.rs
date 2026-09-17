@@ -135,6 +135,7 @@ impl FrameRecord {
 pub enum Invalidation {
     #[default]
     None,
+    Composite,
     Paint,
     Layout,
 }

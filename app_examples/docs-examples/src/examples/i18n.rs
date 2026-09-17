@@ -2,7 +2,7 @@ use argui::{
     i18n::{Catalog, FluentArgs, Localizer, langid},
     runtime::{Context, Render},
     text::TextStyle,
-    ui::{Element, EventType, FlexWrap, Sides, UiEventKind, WritingDirection, percent},
+    ui::{Element, FlexWrap, Sides, WritingDirection, percent},
     widgets::{Button, default_theme},
 };
 
@@ -60,38 +60,33 @@ impl Render for Example {
         .direction_scope(direction);
         Element::column([
             Element::row([
-                Button::new("en", "English", theme.outline_button()).build(),
-                Button::new("fr", "Français", theme.outline_button()).build(),
-                Button::new("ar", "العربية", theme.outline_button()).build(),
+                Button::new("en", "English", theme.outline_button())
+                    .on_click(cx.callback(|app| {
+                        app.localizer.select([langid!("en-US")]);
+                    }))
+                    .build(),
+                Button::new("fr", "Français", theme.outline_button())
+                    .on_click(cx.callback(|app| {
+                        app.localizer.select([langid!("fr")]);
+                    }))
+                    .build(),
+                Button::new("ar", "العربية", theme.outline_button())
+                    .on_click(cx.callback(|app| {
+                        app.localizer.select([langid!("ar")]);
+                    }))
+                    .build(),
             ])
             .gap(8.0)
             .flex_wrap(FlexWrap::Wrap),
             localized,
-            Button::new("more", "Add message", theme.button()).build(),
+            Button::new("more", "Add message", theme.button())
+                .on_click(cx.callback(|app| app.count += 1))
+                .build(),
         ])
         .width(percent(1.0))
         .height(percent(1.0))
         .padding(Sides::length(28.0))
         .gap(18.0)
         .background(theme.background)
-        .on(cx.listener(EventType::Click, |app, event, cx| {
-            if !matches!(event.kind, UiEventKind::Click(_)) {
-                return;
-            }
-            match event.target_key() {
-                Some("en") => {
-                    app.localizer.select([langid!("en-US")]);
-                }
-                Some("fr") => {
-                    app.localizer.select([langid!("fr")]);
-                }
-                Some("ar") => {
-                    app.localizer.select([langid!("ar")]);
-                }
-                Some("more") => app.count += 1,
-                _ => return,
-            }
-            cx.notify();
-        }))
     }
 }

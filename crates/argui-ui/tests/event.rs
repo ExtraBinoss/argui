@@ -188,6 +188,7 @@ fn event_metadata_matches_dom_delivery_rules() {
         EventType::Focus,
         EventType::Blur,
         EventType::Input,
+        EventType::TextEdit,
         EventType::Submit,
         EventType::Gesture,
         EventType::SemanticAction,
@@ -313,6 +314,10 @@ fn every_event_kind_maps_to_its_dom_metadata() {
         (UiEventKind::Focused, EventType::Focus),
         (UiEventKind::Blurred, EventType::Blur),
         (UiEventKind::TextChanged("edit".into()), EventType::Input),
+        (
+            UiEventKind::TextEdited(argui_ui::TextEdit::new(1..2, "x")),
+            EventType::TextEdit,
+        ),
         (UiEventKind::Submitted("done".into()), EventType::Submit),
         (UiEventKind::Gesture(gesture), EventType::Gesture),
         (
@@ -357,6 +362,36 @@ fn multiple_listeners_keep_distinct_handler_identities() {
     assert_ne!(
         deliveries[0].current_handler(),
         deliveries[1].current_handler()
+    );
+}
+
+#[test]
+fn target_only_listeners_ignore_descendant_bubbling_without_affecting_other_listeners() {
+    let options = EventListenerOptions::default();
+    let root = Element::container([Element::text("child").keyed("child")])
+        .keyed("root")
+        .listen(EventType::Click, options.target_only(true))
+        .listen(EventType::Click, options);
+    let mut tree = UiTree::new(root);
+    let child = tree.node_id_at(1).unwrap();
+    let descendant = tree.event_deliveries(
+        child,
+        UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
+    );
+    assert_eq!(descendant.len(), 1);
+    assert_eq!(descendant[0].current_key(), Some("root"));
+    assert_eq!(descendant[0].phase(), EventPhase::Bubble);
+
+    let root = tree.node_id_at(0).unwrap();
+    let direct = tree.event_deliveries(
+        root,
+        UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
+    );
+    assert_eq!(direct.len(), 2);
+    assert!(
+        direct
+            .iter()
+            .all(|event| event.phase() == EventPhase::Target)
     );
 }
 

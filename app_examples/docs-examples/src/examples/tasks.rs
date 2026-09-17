@@ -6,7 +6,7 @@ use argui::{
         tasks::{TaskHandle, sleep},
     },
     text::TextStyle,
-    ui::{Element, EventType, Sides, UiEventKind, percent},
+    ui::{Element, Sides, percent},
     widgets::{Button, default_theme},
 };
 
@@ -24,6 +24,21 @@ impl Render for Example {
         Element::column([
             Button::new("load", "Load asynchronously", theme.button())
                 .enabled(self.task.is_none())
+                .on_click(cx.event_handler(|app, _, cx| {
+                    app.result = Some("Loading…".into());
+                    app.task = cx
+                        .spawn(
+                            async { sleep(Duration::from_millis(650)).await },
+                            |app, result, cx| {
+                                result.expect("the local timer completes");
+                                app.result = Some("Loaded without blocking the UI".into());
+                                app.task = None;
+                                cx.notify();
+                            },
+                        )
+                        .ok();
+                    cx.notify();
+                }))
                 .build(),
             Element::text(status).text_style(TextStyle {
                 color: theme.foreground,
@@ -35,23 +50,5 @@ impl Render for Example {
         .padding(Sides::length(28.0))
         .gap(16.0)
         .background(theme.background)
-        .on(cx.listener(EventType::Click, |app, event, cx| {
-            if event.target_key() != Some("load") || !matches!(event.kind, UiEventKind::Click(_)) {
-                return;
-            }
-            app.result = Some("Loading…".into());
-            app.task = cx
-                .spawn(
-                    async { sleep(Duration::from_millis(650)).await },
-                    |app, result, cx| {
-                        result.expect("the local timer completes");
-                        app.result = Some("Loaded without blocking the UI".into());
-                        app.task = None;
-                        cx.notify();
-                    },
-                )
-                .ok();
-            cx.notify();
-        }))
     }
 }

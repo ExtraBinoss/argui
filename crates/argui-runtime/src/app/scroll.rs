@@ -1,39 +1,15 @@
 use argui_core::{Point, ScrollDelta};
-use argui_ui::{InertialScroll, NodeId, ScrollBehavior, ScrollPhysics, ScrollRequest};
+use argui_ui::{NodeId, ScrollBehavior, ScrollPhysics, ScrollRequest};
 use web_time::Instant;
 use winit::event::TouchPhase;
 
-use crate::{RuntimeError, RuntimeEvent, app::Application};
+use crate::{
+    RuntimeError, RuntimeEvent,
+    app::{Application, inertia::ScrollSample},
+};
 
 mod request;
 use request::{ScrollTrack, scroll_tracks};
-
-#[derive(Debug)]
-pub(super) struct ScrollInertia {
-    velocity: Point,
-    last_input: Option<Instant>,
-    last_frame: Option<Instant>,
-    released: bool,
-    target: Option<NodeId>,
-    config: InertialScroll,
-    point: Option<Point>,
-    dispatch_wheel: bool,
-}
-
-impl Default for ScrollInertia {
-    fn default() -> Self {
-        Self {
-            velocity: Point::default(),
-            last_input: None,
-            last_frame: None,
-            released: false,
-            target: None,
-            config: InertialScroll::default(),
-            point: None,
-            dispatch_wheel: true,
-        }
-    }
-}
 
 #[derive(Clone, Copy, Debug)]
 pub(super) struct PendingScroll {
@@ -43,114 +19,11 @@ pub(super) struct PendingScroll {
     target: Option<NodeId>,
 }
 
-#[derive(Clone, Copy, Debug)]
-struct ScrollSample {
-    delta: ScrollDelta,
-    phase: TouchPhase,
-    now: Instant,
-    target: Option<NodeId>,
-    physics: ScrollPhysics,
-    point: Point,
-    dispatch_wheel: bool,
-}
-
 #[derive(Debug)]
 pub(super) struct ProgrammaticScroll {
     tracks: Vec<ScrollTrack>,
     started: Instant,
     tween: argui_animation::Tween,
-}
-
-impl ScrollInertia {
-    fn observe(&mut self, sample: ScrollSample) {
-        let ScrollSample {
-            delta,
-            phase,
-            now,
-            target,
-            physics,
-            point,
-            dispatch_wheel,
-        } = sample;
-        let config = match physics {
-            ScrollPhysics::Hybrid => InertialScroll::default(),
-            ScrollPhysics::Inertial(config) => config,
-            ScrollPhysics::Direct | ScrollPhysics::Native => {
-                self.cancel();
-                return;
-            }
-        };
-        let config = valid_inertia(config);
-        let ScrollDelta::Pixels(delta) = delta else {
-            self.cancel();
-            return;
-        };
-        if phase == TouchPhase::Cancelled {
-            self.cancel();
-            return;
-        }
-        let target_changed = self.target != target;
-        self.target = target;
-        self.config = config;
-        self.point = Some(point);
-        self.dispatch_wheel = dispatch_wheel;
-        if phase == TouchPhase::Ended {
-            self.released = true;
-            self.last_input = Some(now);
-            self.last_frame = Some(now);
-            return;
-        }
-        if phase == TouchPhase::Started || target_changed {
-            self.velocity = Point::default();
-        }
-        let elapsed = self
-            .last_input
-            .map_or(1.0 / 60.0, |last| now.duration_since(last).as_secs_f32())
-            .clamp(1.0 / 240.0, 1.0 / 20.0);
-        let sample = Point::new(delta.x / elapsed, delta.y / elapsed);
-        let retained = 1.0 - config.sample_weight.clamp(0.0, 1.0);
-        let sample_weight = config.sample_weight.clamp(0.0, 1.0);
-        self.velocity.x = (self.velocity.x * retained + sample.x * sample_weight)
-            .clamp(-config.velocity_limit, config.velocity_limit);
-        self.velocity.y = (self.velocity.y * retained + sample.y * sample_weight)
-            .clamp(-config.velocity_limit, config.velocity_limit);
-        self.last_input = Some(now);
-        self.last_frame = Some(now);
-        self.released = false;
-    }
-
-    fn advance(&mut self, now: Instant) -> Option<(Point, Point, bool)> {
-        let last_input = self.last_input?;
-        if !self.released && now.duration_since(last_input) < self.config.continuation_grace {
-            return None;
-        }
-        let elapsed = now
-            .duration_since(self.last_frame.unwrap_or(last_input))
-            .as_secs_f32()
-            .clamp(1.0 / 240.0, 1.0 / 30.0);
-        self.last_frame = Some(now);
-        let decay = (-self.config.decay * elapsed).exp();
-        let distance = if self.config.decay <= f32::EPSILON {
-            elapsed
-        } else {
-            (1.0 - decay) / self.config.decay
-        };
-        let delta = Point::new(self.velocity.x * distance, self.velocity.y * distance);
-        self.velocity.x *= decay;
-        self.velocity.y *= decay;
-        if self.velocity.x.hypot(self.velocity.y) < self.config.stop_velocity {
-            self.cancel();
-        }
-        self.point.map(|point| (delta, point, self.dispatch_wheel))
-    }
-
-    pub(super) fn cancel(&mut self) {
-        *self = Self::default();
-    }
-
-    fn needs_frame(&self) -> bool {
-        self.last_input.is_some()
-    }
 }
 
 pub(super) fn merge_delta(pending: &mut ScrollDelta, next: ScrollDelta) -> bool {
@@ -202,11 +75,12 @@ impl Application {
         self.scroll_inertia.observe(ScrollSample {
             delta: inertia_delta,
             phase,
-            now: Instant::now(),
+            now: self.input_epoch.elapsed(),
             target,
             physics,
             point,
             dispatch_wheel: true,
+            reduced_motion: self.environment.reduced_motion,
         });
         if let Some(pending) = &mut self.pending_pointer_scroll {
             if !pending.dispatch_wheel
@@ -240,8 +114,13 @@ impl Application {
         window: &dyn crate::host::WindowHost,
         event_loop: &dyn crate::host::LoopControl,
     ) {
-        let target = self.scroll_inertia.target;
-        if let Some((delta, point, dispatch_wheel)) = self.scroll_inertia.advance(Instant::now()) {
+        if self.environment.reduced_motion {
+            self.scroll_inertia.cancel();
+        }
+        let target = self.scroll_inertia.target();
+        if let Some((delta, point, dispatch_wheel)) =
+            self.scroll_inertia.advance(self.input_epoch.elapsed())
+        {
             let delta = ScrollDelta::Pixels(delta);
             if let Some(pending) = &mut self.pending_pointer_scroll {
                 if pending.dispatch_wheel != dispatch_wheel
@@ -304,11 +183,12 @@ impl Application {
         self.scroll_inertia.observe(ScrollSample {
             delta: ScrollDelta::Pixels(delta.unwrap_or_default()),
             phase,
-            now: Instant::now(),
+            now: self.input_epoch.elapsed(),
             target,
             physics,
             point,
             dispatch_wheel: false,
+            reduced_motion: self.environment.reduced_motion,
         });
         if self.scroll_inertia.needs_frame() {
             window.request_redraw();
@@ -331,7 +211,9 @@ impl Application {
         };
         let update = ui.advance_scroll_physics(elapsed, &layout.scroll_regions);
         let active = ui.wants_scroll_frame();
-        self.apply_ui_update(update, window, event_loop);
+        if !update.is_empty() {
+            self.apply_ui_update(update, window, event_loop);
+        }
         if active {
             window.request_redraw();
         }
@@ -380,7 +262,11 @@ impl Application {
             .map_or_else(argui_ui::InteractionUpdate::default, |target| {
                 ui.scroll_from(target, point, delta, &layout.scroll_regions)
             });
+        let did_scroll = update.scroll_changed;
         self.apply_ui_update(update, window, event_loop);
+        if !did_scroll {
+            self.scroll_inertia.cancel();
+        }
         if !pending.dispatch_wheel {
             return;
         }
@@ -393,17 +279,28 @@ impl Application {
 
     #[cfg_attr(coverage_nightly, coverage(off))]
     pub(super) fn scroll_or_exit(&mut self, event_loop: &dyn crate::host::LoopControl) -> bool {
-        let result = match (&self.ui_tree, &mut self.ui_layout) {
-            (Some(ui), Some(layout)) => self.layout_engine.apply_scroll(ui, layout),
+        let result = match (&mut self.ui_tree, &mut self.ui_layout) {
+            (Some(ui), Some(layout)) => {
+                self.layout_engine
+                    .apply_scroll_with_text(ui, &mut self.text_engine, layout)
+            }
             _ => return false,
         };
-        if let Err(error) = result {
-            (self.on_event)(RuntimeEvent::LayoutFailed(error.to_string()));
-            self.fatal_error = Some(RuntimeError::from(error));
-            event_loop.exit();
-            return false;
-        }
-        if let (Some(prepared), Some(layout)) = (&mut self.prepared_text, &self.ui_layout) {
+        let refreshed_text = match result {
+            Ok(refreshed) => refreshed,
+            Err(error) => {
+                (self.on_event)(RuntimeEvent::LayoutFailed(error.to_string()));
+                self.fatal_error = Some(RuntimeError::from(error));
+                event_loop.exit();
+                return false;
+            }
+        };
+        if refreshed_text {
+            self.prepared_text = self
+                .ui_layout
+                .as_ref()
+                .map(|layout| self.text_engine.prepare(&layout.text, self.scale_factor));
+        } else if let (Some(prepared), Some(layout)) = (&mut self.prepared_text, &self.ui_layout) {
             for (index, block) in layout.text.blocks().iter().enumerate() {
                 prepared.reposition_block(index, block.bounds.origin, block.clip);
             }
@@ -512,26 +409,5 @@ impl Application {
         } else {
             window.request_redraw();
         }
-    }
-}
-
-fn valid_inertia(mut config: InertialScroll) -> InertialScroll {
-    let defaults = InertialScroll::default();
-    config.velocity_limit = non_negative(config.velocity_limit, defaults.velocity_limit);
-    config.stop_velocity = non_negative(config.stop_velocity, defaults.stop_velocity);
-    config.decay = non_negative(config.decay, defaults.decay);
-    config.sample_weight = if config.sample_weight.is_finite() {
-        config.sample_weight.clamp(0.0, 1.0)
-    } else {
-        defaults.sample_weight
-    };
-    config
-}
-
-fn non_negative(value: f32, fallback: f32) -> f32 {
-    if value.is_finite() {
-        value.max(0.0)
-    } else {
-        fallback
     }
 }

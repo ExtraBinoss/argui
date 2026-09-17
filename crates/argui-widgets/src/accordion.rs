@@ -1,5 +1,5 @@
 use crate::{ChoiceMode, Collapsible, WidgetTheme, choice_navigation::navigate};
-use argui_ui::{Element, Orientation, Role, Semantics, UiEvent};
+use argui_ui::{Element, EventType, Orientation, Role, Semantics, UiEvent, ValueHandler};
 
 #[derive(Clone, Debug)]
 pub struct AccordionItem {
@@ -38,6 +38,7 @@ pub struct Accordion {
     pub items: Vec<AccordionItem>,
     pub mode: ChoiceMode,
     pub collapsible: bool,
+    change_handlers: Vec<ValueHandler<Vec<String>>>,
 }
 
 impl Accordion {
@@ -50,7 +51,15 @@ impl Accordion {
             items: items.into_iter().collect(),
             mode: ChoiceMode::Single,
             collapsible: true,
+            change_handlers: Vec::new(),
         }
+    }
+
+    /// Adds a callback receiving the stable IDs that should remain open.
+    #[must_use]
+    pub fn on_change(mut self, handler: ValueHandler<Vec<String>>) -> Self {
+        self.change_handlers.push(handler);
+        self
     }
 
     fn disclosure(&self, item: &AccordionItem) -> Collapsible {
@@ -112,17 +121,46 @@ impl Accordion {
     /// Builds the accordion using `theme` for its item styling.
     pub fn build(&self, theme: &WidgetTheme) -> Element {
         Element::column(self.items.iter().map(|item| {
-            self.disclosure(item)
+            let mut disclosure = self
+                .disclosure(item)
                 .indicator(Element::text(if item.open { "−" } else { "+" }).text_style(
                     argui_text::TextStyle {
                         color: theme.foreground,
                         ..Default::default()
                     },
                 ))
-                .build(theme)
+                .build(theme);
+            if item.enabled {
+                let next = self.selection_after_toggle(item);
+                for handler in &self.change_handlers {
+                    disclosure.children[0] = disclosure.children[0]
+                        .clone()
+                        .on(handler.direct_listener_value(EventType::Click, next.clone()));
+                }
+            }
+            disclosure
         }))
         .keyed(&self.key)
         .gap(8.0)
         .semantics(Semantics::new(Role::Group))
+    }
+
+    fn selection_after_toggle(&self, item: &AccordionItem) -> Vec<String> {
+        if item.open && (!self.collapsible && self.mode == ChoiceMode::Single) {
+            return vec![item.id.clone()];
+        }
+        let mut selected = if self.mode == ChoiceMode::Multiple {
+            self.items
+                .iter()
+                .filter(|candidate| candidate.open && candidate.id != item.id)
+                .map(|candidate| candidate.id.clone())
+                .collect::<Vec<_>>()
+        } else {
+            Vec::new()
+        };
+        if !item.open {
+            selected.push(item.id.clone());
+        }
+        selected
     }
 }

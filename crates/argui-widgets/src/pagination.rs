@@ -1,5 +1,8 @@
 use argui_text::{TextStyle, TextWrap};
-use argui_ui::{AlignItems, Element, FlexWrap, JustifyContent, Role, Semantics, UiEvent, length};
+use argui_ui::{
+    AlignItems, Element, EventType, FlexWrap, JustifyContent, Role, Semantics, UiEvent,
+    ValueHandler, length,
+};
 
 use crate::{Button, ButtonBehavior, WidgetTheme};
 
@@ -33,6 +36,7 @@ pub struct Pagination {
     total: usize,
     enabled: bool,
     labels: PaginationLabels,
+    select_handlers: Vec<ValueHandler<usize>>,
 }
 
 impl Pagination {
@@ -45,6 +49,7 @@ impl Pagination {
             total,
             enabled: true,
             labels: PaginationLabels::default(),
+            select_handlers: Vec::new(),
         }
     }
 
@@ -65,6 +70,13 @@ impl Pagination {
     /// Replaces the accessible labels used by pagination controls.
     pub fn labels(mut self, labels: PaginationLabels) -> Self {
         self.labels = labels;
+        self
+    }
+
+    /// Adds a callback receiving the requested one-based page.
+    #[must_use]
+    pub fn on_select(mut self, handler: ValueHandler<usize>) -> Self {
+        self.select_handlers.push(handler);
         self
     }
 
@@ -141,12 +153,17 @@ impl Pagination {
     #[must_use]
     /// Builds the pagination controls using `theme` for their appearance.
     pub fn build(&self, theme: &WidgetTheme) -> Element {
-        let mut children = vec![self.navigation_button(
+        let previous_enabled = self.enabled && self.page > 1;
+        let mut previous = self.navigation_button(
             self.previous_key(),
             &self.labels.previous,
-            self.enabled && self.page > 1,
+            previous_enabled,
             theme,
-        )];
+        );
+        if previous_enabled {
+            previous = self.attach_handlers(previous, self.page - 1);
+        }
+        let mut children = vec![previous];
         for entry in self.entries() {
             if let Some(page) = entry {
                 let current = page == self.page;
@@ -182,6 +199,9 @@ impl Pagination {
                 if current && let Some(semantics) = &mut button.semantics {
                     semantics.description = Some(self.labels.current.clone());
                 }
+                if self.enabled && !current {
+                    button = self.attach_handlers(button, page);
+                }
                 children.push(button);
             } else {
                 children.push(
@@ -197,12 +217,13 @@ impl Pagination {
                 );
             }
         }
-        children.push(self.navigation_button(
-            self.next_key(),
-            &self.labels.next,
-            self.enabled && self.page < self.total,
-            theme,
-        ));
+        let next_enabled = self.enabled && self.page < self.total;
+        let mut next =
+            self.navigation_button(self.next_key(), &self.labels.next, next_enabled, theme);
+        if next_enabled {
+            next = self.attach_handlers(next, self.page + 1);
+        }
+        children.push(next);
         Element::row(children)
             .keyed(self.key.clone())
             .semantics(Semantics::new(Role::Group).label(self.labels.navigation.clone()))
@@ -223,5 +244,12 @@ impl Pagination {
             style.label.color = theme.muted_foreground;
         }
         Button::new(key, label, style).enabled(enabled).build()
+    }
+
+    fn attach_handlers(&self, mut element: Element, page: usize) -> Element {
+        for handler in &self.select_handlers {
+            element = element.on(handler.direct_listener_value(EventType::Click, page));
+        }
+        element
     }
 }

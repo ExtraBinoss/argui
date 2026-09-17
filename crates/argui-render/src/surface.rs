@@ -48,6 +48,10 @@ enum FrameContent<'a> {
         display_list: &'a DisplayList,
         scale_factor: f32,
     },
+    Composite {
+        display_list: &'a DisplayList,
+        scale_factor: f32,
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -93,6 +97,7 @@ pub struct SurfaceRenderer {
     target_format: TextureFormat,
     renderer_config: RendererConfig,
     batches: Vec<DrawBatch>,
+    text_ranges: Vec<std::ops::Range<u32>>,
     quad: QuadGpu,
     text: TextGpu,
     image: ImageGpu,
@@ -205,6 +210,7 @@ impl SurfaceRenderer {
             target_format,
             renderer_config,
             batches: Vec::new(),
+            text_ranges: Vec::new(),
             quad,
             text,
             image,
@@ -300,10 +306,30 @@ impl SurfaceRenderer {
                 {
                     self.content_revision = self.content_revision.wrapping_add(1);
                 }
-                build_batches(display_list, draw.ranges(), &mut self.batches);
+                self.text_ranges = draw.ranges().to_vec();
+                build_batches(display_list, &self.text_ranges, &mut self.batches);
                 let graph = EffectGraph::build(
                     display_list,
-                    draw.ranges(),
+                    &self.text_ranges,
+                    viewport,
+                    scale_factor,
+                    self.content_revision,
+                )
+                .map_err(|error| RendererError::InvalidDisplayList(error.to_string()))?;
+                let additional_effect_passes = self.validate_custom_effects(&graph)?;
+                graph_stats = graph.stats();
+                graph_stats.filter_passes += additional_effect_passes;
+                effect_graph = Some(graph);
+            }
+            FrameContent::Composite {
+                display_list,
+                scale_factor,
+            } => {
+                self.vector.clear_frame_stats();
+                build_batches(display_list, &self.text_ranges, &mut self.batches);
+                let graph = EffectGraph::build(
+                    display_list,
+                    &self.text_ranges,
                     viewport,
                     scale_factor,
                     self.content_revision,

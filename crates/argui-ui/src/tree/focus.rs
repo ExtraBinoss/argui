@@ -174,12 +174,10 @@ impl UiTree {
     ///
     /// * `regions` — current hit regions used to resolve focus behavior.
     pub fn primary_pressed(&mut self, regions: &[HitRegion]) -> InteractionUpdate {
+        let position = self.interaction.mouse_position().unwrap_or_default();
         let event = argui_core::PointerEvent {
             phase: argui_core::PointerPhase::Pressed,
-            ..argui_core::PointerEvent::mouse(
-                argui_core::PointerPhase::Pressed,
-                argui_core::Point::default(),
-            )
+            ..argui_core::PointerEvent::mouse(argui_core::PointerPhase::Pressed, position)
         };
         let mut update = self.primary_pressed_for(event, regions);
         update.merge(self.focus_pointer_default(event.id, regions));

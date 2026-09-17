@@ -6,6 +6,7 @@ impl<M: AppModel> DevtoolsApp<M> {
         window: &WindowKey,
         environment: WindowEnvironment,
     ) -> Option<Element> {
+        let safe_area = environment.safe_area_insets;
         {
             let mut tools = self.tools.borrow_mut();
             tools.reduced_motion = environment.reduced_motion;
@@ -36,7 +37,7 @@ impl<M: AppModel> DevtoolsApp<M> {
             return Some(app);
         }
         let tools = self.tools.borrow();
-        let mut root = view::host(&tools, app, theme, None);
+        let mut root = view::host(&tools, app, theme, None, safe_area);
         if let Some(error) = &self.error {
             root.children.push(Element::text(format!(
                 "Could not open developer tools window: {error}"

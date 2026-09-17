@@ -42,9 +42,9 @@ Mobile entry crates are explicit dependencies. They are not enabled by
 
 ```toml
 [dependencies]
-argui = { version = "0.2.1", features = ["widgets-all"] }
-argui-android = "0.2.1" # Android application only
-# argui-ios = "0.2.1"  # iOS application only
+argui = { version = "0.3.0", features = ["widgets-all"] }
+argui-android = "0.3.0" # Android application only
+# argui-ios = "0.3.0"  # iOS application only
 ```
 
 ## Android
@@ -79,7 +79,9 @@ argui_android::android_main!(launch);
 ```
 
 The repository shell is in `mobile/android`. It uses `NativeActivity`, so the
-UI needs no Java or Kotlin layer.
+UI itself needs no Java or Kotlin layer. The optional background-activity
+example includes a small Java foreground service; applications that do not use
+that API can omit the helper sources, service declaration, and permissions.
 
 ```sh
 ./scripts/android-gallery.sh apk      # debug-signed installable APK
@@ -94,6 +96,25 @@ paths, emulator ABIs, and signing.
 
 The runtime creates the window when Android resumes. Suspension drops the WGPU
 surface before the native window and recreates both on resume.
+
+Text fields use Winit's native IME path. When an Argui text field gains focus,
+the runtime enables IME input and explicitly requests Android's soft keyboard;
+losing window focus hides it. iOS uses Winit's UIKit first-responder path and
+resigns/restores it as the app loses and regains focus.
+
+The shell also declares a `dataSync` foreground service for explicitly started
+background work. `argui::platform::mobile::MobileActivity` starts it with an
+ongoing progress notification and a monochrome notification icon. On Android
+13 and later, the app asks for notification permission before starting; if the
+user declines, enable notifications in the app's system settings and try again.
+Start this API from a visible user action. Android 15 and later limit background
+`dataSync` foreground-service use to a cumulative six hours per 24-hour period;
+the notification does not make arbitrary or indefinite background work
+permitted. The Java helper/service is included by the repository's Gradle
+source set and declared in its manifest. Other Android shells do not need that
+helper to run Argui, but must package
+`crates/argui-android/android/src/main/java` and declare the service,
+permissions, and notification icon before calling `MobileActivity::begin`.
 
 ## iOS
 
@@ -147,11 +168,73 @@ fn view(environment: WindowEnvironment) -> Element {
 }
 ```
 
-Android derives the value from the activity content rectangle; iOS compares the
-window with Winit's safe-area bounds. Insets refresh with geometry and scale.
+Android reads current `WindowInsets` from the native activity, including system
+bars and display cutouts, then converts physical pixels to logical pixels using
+the current scale. Older Android versions use the legacy window-inset API. iOS
+compares the window with Winit's safe-area bounds. Insets refresh with geometry
+and scale. Android's shell uses transparent system bars and iOS renders against
+Winit's outer surface, so an application can paint edge to edge on both systems.
+Paint the safe-area wrapper with the current theme background: padding protects
+interactive content while the background continues behind status, navigation,
+home-indicator, and cutout regions. Overlays that are visually closed must not
+reserve an inset-sized flex item; an open overlay should paint its own safe-area
+padding rather than exposing the renderer clear color.
 `WindowConfig::with_safe_area_insets` and
 `AppCommand::SetSafeAreaInsets` support custom hosts and previews. See
 [safe areas](platform/window-insets.md) for the coordinate contract.
+
+## Direct-touch scrolling
+
+Touch scrolling follows the finger and keeps momentum by default. This affects
+direct touch only; mouse wheels and trackpads retain their platform direction.
+Applications that intentionally want reversed touch movement can opt out per
+scroll region:
+
+```rust,ignore
+let config = ScrollConfig::default().natural_touch_scroll(false);
+```
+
+## Background activity progress
+
+The shared API offers one owner for a native progress surface and a cloneable
+reporter suitable for background work:
+
+```rust,ignore
+let mut activity = argui::platform::mobile::MobileActivity::begin(
+    "Download",
+    "Starting",
+)?;
+let progress = activity.progress();
+// A worker may call progress.update(percent, "Downloading…") as work proceeds.
+activity.finish()?;
+```
+
+The portable contract is semantic rather than visual. Rust shares the activity
+title, current message, bounded progress, completion, and lifetime. Each native
+shell renders that state according to its operating system:
+
+| Concern | Shared Rust | Android | iOS |
+| --- | --- | --- | --- |
+| Task state and updates | `MobileActivity` and `MobileActivityProgress` | consumed by JNI adapter | consumed by C/Swift bridge |
+| System surface | common title/message/progress | ongoing notification | Lock Screen and Dynamic Island |
+| Native layout | no platform markup | Android notification template | SwiftUI `ActivityConfiguration` |
+| Background lifetime | explicit owner and finish | foreground service rules | ActivityKit plus finite UIKit fallback |
+
+This boundary keeps application logic portable without pretending the native
+surfaces are interchangeable. Add future shared fields to the Rust state and
+bridge contract, then map them independently in the Android notification and
+iOS SwiftUI extension. Platform-only decoration—notification channels, small
+icons, SF Symbols, Dynamic Island regions, colors, and accessibility
+descriptions—belongs to the corresponding native adapter.
+
+Android uses the foreground service and ongoing notification. iOS uses an
+ActivityKit Live Activity when the device and user settings allow it. If a Live
+Activity cannot be started, iOS falls back to UIKit's bounded background-task
+time allowance; that fallback has no ongoing notification and does not keep the
+process alive indefinitely. iOS background execution can be suspended or ended
+by the system, so persist resumable work and treat native progress as a status
+surface rather than a durable job scheduler. The gallery's **Background
+activity** example is available only on Android and iOS.
 
 ## Feature limits
 

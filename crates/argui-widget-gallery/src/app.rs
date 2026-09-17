@@ -6,9 +6,7 @@ use argui::{
     theme::ThemeMode,
     ui::{Element, ScrollRequest, UiEvent, UiEventKind},
     widgets::{
-        DialogAction, DialogBehavior, RadioGroupAction, RadioGroupBehavior, RangeBehavior,
-        RangeConfig, RangeState, SelectAction, SelectBehavior, SelectOption, Spinner, TablerIcon,
-        TabsAction, TabsBehavior, WidgetAssets,
+        RangeState, SelectAction, SelectBehavior, SelectOption, Spinner, TablerIcon, WidgetAssets,
     },
 };
 use argui_image::ImageLibrary;
@@ -82,14 +80,17 @@ pub struct WidgetGallery {
     #[cfg(feature = "updater")]
     pub(crate) updater: std::cell::OnceCell<Entity<pages::updater::UpdaterDemo>>,
     pub(crate) tasks: Entity<pages::async_tasks::TasksDemo>,
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    pub(crate) mobile_activity: Entity<pages::mobile_activity::MobileActivityDemo>,
     pub(crate) motion: Entity<pages::motion::MotionDemo>,
     pub(crate) text_selection: Entity<pages::text_selection::SelectionDemo>,
     pub(crate) editing: Entity<pages::editing::EditingDemo>,
+    pub(crate) drag_drop: Entity<pages::drag_drop::DragDropDemo>,
+    pub(crate) split_pane: Entity<pages::split_pane::SplitPaneDemo>,
     pub(crate) hot_reload: Entity<pages::hot_reload::HotReloadDemo>,
     pub(crate) i18n: Entity<pages::i18n::I18nDemo>,
     pub(crate) timeline: Entity<pages::timeline::Timeline>,
     pub(crate) slider_state: RangeState,
-    pub(crate) plain_slider_state: RangeState,
     images: ImageLibrary,
     pub(crate) logo: ImageId,
     light_assets: WidgetAssets,
@@ -143,9 +144,13 @@ impl Default for WidgetGallery {
             #[cfg(feature = "updater")]
             updater: std::cell::OnceCell::new(),
             tasks: Entity::new(pages::async_tasks::TasksDemo::default()),
+            #[cfg(any(target_os = "android", target_os = "ios"))]
+            mobile_activity: Entity::new(pages::mobile_activity::MobileActivityDemo::default()),
             motion: Entity::new(pages::motion::MotionDemo::default()),
             text_selection: Entity::new(pages::text_selection::SelectionDemo::default()),
             editing: Entity::new(pages::editing::EditingDemo::default()),
+            drag_drop: Entity::new(pages::drag_drop::DragDropDemo::new(logo)),
+            split_pane: Entity::new(pages::split_pane::SplitPaneDemo::default()),
             hot_reload: Entity::new(pages::hot_reload::HotReloadDemo::default()),
             i18n: Entity::new(pages::i18n::I18nDemo::default()),
             timeline: Entity::new(pages::timeline::Timeline::default()),
@@ -186,7 +191,6 @@ impl Default for WidgetGallery {
             editor_size: EDITOR_DEFAULT_SIZE,
             editor_resize_start: EDITOR_DEFAULT_SIZE,
             slider_state: RangeState::default(),
-            plain_slider_state: RangeState::default(),
             images,
             logo,
             light_assets,
@@ -271,119 +275,15 @@ impl WidgetGallery {
         if crate::property_slider::update(self, event, cx) {
             return;
         }
-        let plain_slider = RangeBehavior::new(
-            "plain-slider",
-            "Plain slider",
-            self.plain_slider,
-            RangeConfig::default(),
-        );
-        if let Some(action) = self.plain_slider_state.update(event, &plain_slider) {
-            self.plain_slider = action.value();
-            cx.notify();
-            return;
-        }
-        if let UiEventKind::TextChanged(value) = &event.kind {
-            match event.target_key() {
-                Some("gallery-search") => {
-                    self.search.clone_from(value);
-                    self.search_highlight = 0;
-                }
-                Some("name") => self.name.clone_from(value),
-                Some("workspace-id") => self.workspace_id.clone_from(value),
-                Some("email") => self.email.clone_from(value),
-                Some("input-search-demo") => self.input_search.clone_from(value),
-                Some("invalid") => self.invalid_email.clone_from(value),
-                Some("notes") => self.notes.clone_from(value),
-                _ => return,
-            }
-            cx.notify();
-            return;
-        }
-        if let Some(page) = event
-            .target_key()
-            .and_then(Page::from_navigation_key)
-            .filter(|_| matches!(event.kind, UiEventKind::Click(_)))
+        if matches!(event.kind, UiEventKind::Click(_))
+            && let Some(index) = event
+                .target_key()
+                .and_then(|key| key.strip_prefix("primary::"))
+                .and_then(|value| value.parse::<usize>().ok())
+                .filter(|index| *index < PRIMARIES.len())
         {
-            self.select_page(page);
-            cx.notify();
-            return;
-        }
-        if matches!(event.kind, UiEventKind::Click(_)) {
-            match event.target_key() {
-                Some("theme-mode") => {
-                    self.cycle_theme();
-                    cx.set_theme(self.theme_request());
-                    return;
-                }
-                Some(
-                    "demo-button" | "secondary" | "outline" | "ghost" | "danger"
-                    | "button-elevated" | "button-lift" | "button-shader",
-                ) => {
-                    self.clicks = self.clicks.saturating_add(1);
-                    cx.notify();
-                    return;
-                }
-                Some("accepted") => {
-                    self.accepted = !self.accepted;
-                    cx.notify();
-                    return;
-                }
-                Some("check-empty" | "switch-off") => {
-                    let value = if event.target_key() == Some("check-empty") {
-                        &mut self.email_updates
-                    } else {
-                        &mut self.offline_rendering
-                    };
-                    *value = !*value;
-                    cx.notify();
-                    return;
-                }
-                Some("notifications") => {
-                    self.notifications = !self.notifications;
-                    cx.notify();
-                    return;
-                }
-                _ => {
-                    if let Some(index) = event
-                        .target_key()
-                        .and_then(|key| key.strip_prefix("primary::"))
-                        .and_then(|value| value.parse::<usize>().ok())
-                        .filter(|index| *index < PRIMARIES.len())
-                    {
-                        self.primary = index;
-                        cx.set_theme(self.theme_request());
-                        return;
-                    }
-                }
-            }
-        }
-        let radio = RadioGroupBehavior::new(
-            "quality",
-            "Quality",
-            [
-                ("Maximum quality".into(), true),
-                ("Balanced".into(), true),
-                ("Performance".into(), true),
-            ],
-            Some(self.radio),
-        );
-        if let Some(RadioGroupAction::Select(selection)) = radio.action(event) {
-            self.radio = selection;
-            cx.notify();
-            return;
-        }
-        let tabs = TabsBehavior::new(
-            "demo-tabs",
-            [
-                ("General".into(), true),
-                ("Performance".into(), true),
-                ("Advanced".into(), true),
-            ],
-            self.tab,
-        );
-        if let Some(TabsAction::Select(selection)) = tabs.action(event) {
-            self.tab = selection;
-            cx.notify();
+            self.primary = index;
+            cx.set_theme(self.theme_request());
             return;
         }
         let options = Self::select_options();
@@ -416,26 +316,12 @@ impl WidgetGallery {
                 }
             }
             cx.notify();
-            return;
-        }
-        if let Some(action) =
-            DialogBehavior::new("demo-dialog", "Delete GPU cache", self.dialog_open).action(event)
-        {
-            self.dialog_open = action == DialogAction::Open;
-            cx.notify();
         }
     }
 
     fn handle_layout(&mut self, layout: &LayoutSnapshot) {
         self.backdrop.layout_changed(layout);
         crate::property_slider::layout_changed(self, layout);
-        let behavior = RangeBehavior::new(
-            "plain-slider",
-            "Plain slider",
-            self.plain_slider,
-            RangeConfig::default(),
-        );
-        self.plain_slider_state.layout_changed(layout, &behavior);
     }
 }
 

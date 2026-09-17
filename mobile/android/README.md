@@ -2,8 +2,37 @@
 
 This project packages the existing Rust Widget Gallery as a native Android app.
 Android's built-in `NativeActivity` starts Winit and Argui; the app contains no
-Java or Kotlin UI. The Rust shared library is built from the workspace and
+Java or Kotlin UI. A small Java service provides the optional ongoing background
+activity notification. The Rust shared library is built from the workspace and
 included in the APK or AAB by Gradle.
+
+## Background activity UI
+
+Android represents long-running, user-visible work with a foreground service
+and an ongoing notification. The shared Rust API owns the activity title,
+status, progress, lifetime, and worker-facing update handle. The Java adapter
+under `crates/argui-android/android/src/main/java/dev/argui/android` maps that
+state to Android's notification template and service lifecycle.
+
+This is deliberately separate from the iOS SwiftUI layout: Android and iOS do
+not share a native view system, but both consume the same semantic state. The
+Android shell must package the Java adapter and declare its service,
+foreground-service permissions, notification permission, and monochrome small
+icon. Applications that never call `MobileActivity::begin` may omit all of
+those optional pieces.
+
+The shell renders edge to edge. Its status and navigation bars are transparent,
+the current theme background is painted underneath them, and Android
+`WindowInsets` keep interactive content outside system icons, gesture handles,
+and display cutouts. An overlay that reaches a system edge should paint its own
+safe-area padding instead of exposing the renderer clear color.
+
+To test the reference integration, open **Background activity** in the mobile
+gallery and start the demo. Android 13 or newer asks for notification
+permission on first use. Accept it, leave the app, and verify that the progress
+notification remains visible while the foreground service is active. A
+foreground service is not permission for unlimited background execution; use
+the Android service type and workload limits appropriate to the real task.
 
 ## Install the build tools
 
@@ -52,11 +81,14 @@ Launch the installed gallery from the device, or use:
 
 ```sh
 adb install -r mobile/android/app/build/outputs/apk/debug/app-debug.apk
-adb shell monkey -p dev.argui.widgetgallery.debug 1
+adb shell am start -W -a android.intent.action.MAIN \
+  -c android.intent.category.LAUNCHER \
+  -n dev.argui.widgetgallery.debug/android.app.NativeActivity
 adb logcat -s RustStdoutStderr
 ```
 
-The first command is also available as `./scripts/android-gallery.sh launch`.
+The `am start` launch command is also available as
+`./scripts/android-gallery.sh launch`.
 
 ## Build a release AAB
 

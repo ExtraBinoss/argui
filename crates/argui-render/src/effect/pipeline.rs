@@ -57,6 +57,26 @@ impl Default for EffectUniform {
     }
 }
 
+impl EffectUniform {
+    /// Stores an inverse surface transform used by the built-in compositor pass.
+    ///
+    /// * `transform` — inverse transform mapping output pixels to retained source pixels.
+    pub(crate) fn set_inverse_transform(&mut self, transform: argui_core::Affine2D) {
+        self.matrix[0] = [
+            transform.matrix[0],
+            transform.matrix[2],
+            transform.translation.x,
+            0.0,
+        ];
+        self.matrix[1] = [
+            transform.matrix[1],
+            transform.matrix[3],
+            transform.translation.y,
+            0.0,
+        ];
+    }
+}
+
 pub(crate) struct EffectGpu {
     pipeline: wgpu::RenderPipeline,
     custom: HashMap<(EffectId, usize), wgpu::RenderPipeline>,

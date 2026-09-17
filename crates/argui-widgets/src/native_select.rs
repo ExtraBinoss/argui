@@ -1,5 +1,5 @@
 use crate::{Select, SelectAction, SelectBehavior, SelectOption, Typeahead, WidgetTheme};
-use argui_ui::{Element, UiEvent};
+use argui_ui::{Element, UiEvent, ValueHandler};
 
 /// Compact form select drawn by Argui on every platform; no system control or WebView.
 /// Uses the same controlled selection, keyboard and typeahead contract as Select.
@@ -13,6 +13,8 @@ pub struct NativeSelect {
     pub open: bool,
     pub enabled: bool,
     pub required: bool,
+    select_handlers: Vec<ValueHandler<usize>>,
+    open_handlers: Vec<ValueHandler<bool>>,
 }
 
 impl NativeSelect {
@@ -34,6 +36,8 @@ impl NativeSelect {
             open: false,
             enabled: true,
             required: false,
+            select_handlers: Vec::new(),
+            open_handlers: Vec::new(),
         }
     }
 
@@ -63,6 +67,20 @@ impl NativeSelect {
             .flatten()
     }
 
+    /// Adds a callback for selection of an enabled option's source index.
+    #[must_use]
+    pub fn on_select(mut self, handler: ValueHandler<usize>) -> Self {
+        self.select_handlers.push(handler);
+        self
+    }
+
+    /// Adds a callback for a requested popup open-state change.
+    #[must_use]
+    pub fn on_open_change(mut self, handler: ValueHandler<bool>) -> Self {
+        self.open_handlers.push(handler);
+        self
+    }
+
     #[must_use]
     /// Builds the compact select using `theme` for its controls and popup.
     ///
@@ -70,7 +88,7 @@ impl NativeSelect {
     ///
     /// Panics if the underlying select does not contain its expected trigger semantics.
     pub fn build(&self, theme: &WidgetTheme) -> Element {
-        let mut root =
+        let mut select =
             Select::new(&self.key, &self.label, self.options.clone(), self.selected)
                 .open(self.open && self.enabled)
                 .highlighted(self.highlighted)
@@ -79,8 +97,14 @@ impl NativeSelect {
                         color: theme.foreground,
                         ..Default::default()
                     },
-                ))
-                .build(theme);
+                ));
+        for handler in &self.select_handlers {
+            select = select.on_select(*handler);
+        }
+        for handler in &self.open_handlers {
+            select = select.on_open_change(*handler);
+        }
+        let mut root = select.build(theme);
         let trigger = &mut root.children[0];
         let semantics = trigger.semantics.as_mut().expect("select trigger");
         semantics.role = argui_ui::Role::ComboBox;

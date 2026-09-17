@@ -4,8 +4,8 @@ use argui::{
     runtime::{Context, Render},
     text::{TextStyle, TextWrap},
     ui::{
-        Element, EventType, FlexWrap, Sides, TextSelectionHighlight, TextSelectionStyle,
-        UiEventKind, UserSelect, length, percent,
+        Element, FlexWrap, Sides, TextSelectionHighlight, TextSelectionStyle, UserSelect, length,
+        percent,
     },
     widgets::{Button, WidgetTheme, default_theme},
 };
@@ -30,16 +30,6 @@ impl Default for SelectionDemo {
 }
 
 impl SelectionDemo {
-    /// Toggles the animated rainbow when its control is activated.
-    fn event(&mut self, event: &argui::ui::UiEvent, cx: &mut Context<Self>) {
-        if event.target_key() == Some("selection-rainbow-toggle")
-            && matches!(event.kind, UiEventKind::Click(_))
-        {
-            self.rainbow_running = !self.rainbow_running;
-            cx.notify();
-        }
-    }
-
     /// Builds the four visual highlight variants for the current animation phase.
     fn highlights(&self, theme: &WidgetTheme) -> Element {
         let default = selection_card(
@@ -172,6 +162,9 @@ impl Render for SelectionDemo {
                     ),
                     Button::new("selection-rainbow-toggle", rainbow_label, theme.outline_button())
                         .enabled(!self.reduced_motion)
+                        .on_click(cx.callback(|demo| {
+                            demo.rainbow_running = !demo.rainbow_running;
+                        }))
                         .build(),
                 ])
                 .width(percent(1.0))
@@ -193,7 +186,6 @@ impl Render for SelectionDemo {
             .gap(22.0),
             theme,
         )
-        .on(cx.listener(EventType::Click, Self::event))
     }
 }
 

@@ -13,6 +13,7 @@ use layout::{layout_value, set_layout_value};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BindingImpact {
+    Composite,
     Paint,
     Layout,
     Scroll,
@@ -100,6 +101,7 @@ impl PropertyBinding {
     #[must_use]
     pub const fn impact(&self) -> BindingImpact {
         match self {
+            Self::Transform(_) | Self::LayerOpacity(_) => BindingImpact::Composite,
             Self::Layout(..) | Self::BorderWidths(_) => BindingImpact::Layout,
             Self::Scroll(_) => BindingImpact::Scroll,
             _ => BindingImpact::Paint,

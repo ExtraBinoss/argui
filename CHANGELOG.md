@@ -8,6 +8,27 @@ that do not use them.
 
 ### Added
 
+- Added incremental `TextEdit` delivery for `Input` and `TextArea`, including
+  `on_edit`, context callback helpers, UTF-8 validation, fragment-based history,
+  and lazy compatibility delivery for the existing `on_input(String)` API.
+- Added opaque `EventHandler`/typed `ValueHandler` bindings and local direct
+  handlers across interactive widgets, including domain payloads for forms,
+  selection, ranges, overlays, menus, navigation, data controls, and composites.
+- Added the publishable `argui-testing` crate with real headless layout and hit
+  testing, accessible queries, editing, focus, scrolling, gestures, lifecycle,
+  multiple windows, diagnostic settle bounds, and deterministic task time.
+- Added the small `argui::prelude`, `basic`, `desktop`, and `web` convenience
+  feature profiles, while preserving every granular feature.
+- Added staged archive verification and a public API/SemVer CI job for the 0.3
+  release line.
+- Added installable Android Widget Gallery packaging for ARM64 devices and
+  x86-64 emulators, including launcher and notification icons, command-line SDK
+  scripts, USB deployment, and native soft-keyboard integration.
+- Added shared mobile background-activity state with an Android foreground
+  service and ongoing progress notification, plus an iOS ActivityKit bridge and
+  SwiftUI Lock Screen/Dynamic Island extension kept under `argui-ios`.
+- Added direct-touch momentum, configurable natural scrolling, drag-safe click
+  activation, and draggable text-selection handles shared by Android and iOS.
 - Added retained GPU canvases for editor, visualization, game/map and scientific
   viewports. `Element::gpu_canvas`, `GpuCanvasSpec` and the renderer-neutral
   `CustomPaintContext::gpu_canvas` helper preserve normal Argui layout,
@@ -44,10 +65,58 @@ that do not use them.
   palette while keeping `shadcn` as a compatible alias.
 - Added an interactive documentation site whose lessons display and run their
   exact Rust source as dedicated WebAssembly examples, including a complete
-  light/dark, accent and token override configurator.
+  light/dark, accent and token override configurator, plus side-by-side solid
+  and backdrop-blurred popover surfaces in the overlays lesson.
+- Added dedicated Technicalities and Platforms documentation categories that
+  explain retained versus immediate UI, Argui's scope, the audited target
+  support matrix, and a clearly labelled Android/iOS capability roadmap.
+- Added an interaction API decision guide with a callback selection table and
+  an exact-source live example that distinguishes `on_change`, `on_commit`, and
+  `on_click`.
+- Added a Widget Gallery drag-and-drop board with live data reordering, retained
+  image cards, pointer capture, keyboard/accessibility alternatives, and
+  velocity-driven squash, stretch, shadow, and spring settling.
+- Added a working Widget Gallery split-pane showcase with horizontal, vertical,
+  trailing, and nested IDE layouts, all resizable by pointer or keyboard.
+- Added a Technicalities performance guide explaining `Immediate` versus
+  `FrameCoalesced`, its requestAnimationFrame-shaped scheduling contract, and
+  appropriate high-frequency workloads.
 
 ### Fixed
 
+- Replaced unsupported checklist glyphs in the clean-code documentation example
+  with explicit status labels, and made each completion step visible in the
+  button label before its final disabled state.
+- Rebuilt the custom-element lesson as a recognizable video-editor timeline
+  with labeled tracks, fitted clip text, draggable clips, time ruler, timecode,
+  and a forgiving draggable, keyboard-accessible playhead.
+- Made mouse text selection start from the nearest selectable text when a drag
+  begins in non-interactive whitespace, matching browser-style document
+  selection without stealing button, editor, or custom gesture input.
+- Embedded Arabic, Hebrew, and emoji fallback fonts in every shipped WebAssembly
+  application so localized text no longer renders as missing-glyph squares.
+- Applied coalesced split-pane gesture deltas to the latest controlled value so
+  pane sizes no longer drift when the view rerenders during a drag.
+- Coalesced drag-and-drop updates to one delivery per rendered frame, skipped
+  redundant list mutations, and replaced the expensive offscreen blur with
+  transform-locked shadow plates so fast drags remain responsive and artifact-free.
+- Fixed frame-coalesced pan delivery to accumulate every raw delta between
+  display frames, keeping split-pane handles exactly under the pointer during
+  fast input on Firefox and other high-rate hosts.
+- Smoothed the Widget Gallery drag-and-drop velocity deformation with
+  frame-rate-independent interpolation while keeping its position and live
+  velocity label on the same frame-coalesced callback.
+- Clamped, wrapped, and clipped split-pane panel text and raised compact vertical
+  pane minima so content cannot paint outside its panel.
+- Made Android and iOS render edge to edge while preserving native safe areas,
+  painting the active theme behind transparent system regions and matching
+  Android system-icon contrast to light and dark themes.
+- Prevented a closed or animated DevTools dock from reserving the bottom system
+  inset, which removed the moving band of repeated framebuffer pixels on
+  Android without hiding content behind the status or navigation bars.
+- Made mobile search reliably focus and open the software keyboard, preserved
+  adjustable selection handles, and stopped a touch scroll from activating the
+  item released beneath the finger.
 - Cleared workspace crate artifacts and the temporary crates.io registry before
   archive checks, preventing same-version caches from masking coordinated
   workspace changes and breaking dependent archive verification.
@@ -74,6 +143,12 @@ that do not use them.
 
 ### Changed
 
+- Moved the workspace to 0.3.0. `Context::callback` now provides the short
+  invalidating path; `event_handler`, `listener`, `Element::on`, and typed
+  behavior/action APIs remain the explicit advanced layer.
+- Migrated every naturally local documentation example, its exact generated
+  website snippet, the Widget Gallery, and the fake AI harness to direct
+  callbacks while retaining the Events delegation example and complex reducers.
 - Made vertical canvas dragging follow the content by default, added an
   in-app natural/inverted direction toggle, aligned keyboard panning with the
   selected direction and smoothed wheel/pinch zoom interaction.
@@ -85,6 +160,10 @@ that do not use them.
 
 ### Known limitations
 
+- Native file picking is not wired to Android's document provider or the iOS
+  document picker yet. The cross-platform file-picker widget still compiles on
+  mobile and reports the mode as unsupported; adding the two native adapters
+  does not require a change to its public model.
 - GPU canvases use Argui-owned WGPU instances, devices, queues and surfaces;
   the high-level runtime still does not accept externally owned GPU objects.
 - Canvas pixels have no automatic semantic meaning. Applications must provide
@@ -145,4 +224,4 @@ that do not use them.
 
 [0.2.1]: https://github.com/ExtraBinoss/argui/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/ExtraBinoss/argui/releases/tag/v0.2.0
-[Unreleased]: https://github.com/ExtraBinoss/argui/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/ExtraBinoss/argui/compare/v0.3.0...HEAD

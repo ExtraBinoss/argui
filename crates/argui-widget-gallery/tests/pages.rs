@@ -8,6 +8,8 @@ mod catalogue;
 mod color_picker;
 #[path = "pages/data.rs"]
 mod data;
+#[path = "pages/drag_drop.rs"]
+mod drag_drop;
 #[path = "pages/hot_reload.rs"]
 mod hot_reload;
 #[path = "pages/i18n.rs"]
@@ -22,6 +24,8 @@ mod motion;
 mod popover;
 #[path = "pages/scroll_effects.rs"]
 mod scroll_effects;
+#[path = "pages/split_pane.rs"]
+mod split_pane;
 #[path = "pages/text_selection.rs"]
 mod text_selection;
 #[path = "pages/timeline.rs"]
@@ -95,6 +99,8 @@ fn all_pages_keep_finite_layout_when_narrow_dark_or_reduced_motion() {
         ("scroll-shadow", "Scroll shadow"),
         ("typography", "Typography & selection"),
         ("text-selection", "Text selection"),
+        ("drag-drop", "Drag & Drop"),
+        ("split-pane", "Split Pane"),
         ("custom-timeline", "Custom Timeline"),
     ] {
         let key = format!("nav::{slug}");

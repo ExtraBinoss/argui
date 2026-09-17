@@ -259,14 +259,9 @@ impl MenusDemo {
                 .or_else(|| context.response(event))
         } else if self.page == Page::Menubar {
             let menus = [self.menu("first-menu"), self.menu("second-menu")];
-            match (Menubar {
-                key: "bar",
-                label: "Menu bar",
-                menus: &menus,
-                active: Some(&self.active_menu),
-                rtl: false,
-            })
-            .response(event)
+            match Menubar::new("bar", "Menu bar", &menus)
+                .active(Some(&self.active_menu))
+                .response(event)
             {
                 Some(MenubarResponse::Focus { key }) => {
                     self.active_menu = key.clone();
@@ -372,13 +367,12 @@ impl Render for MenusDemo {
                 .height(argui::ui::length(180.0)),
                 theme,
             ),
-            Page::Menubar => Menubar {
-                key: "bar",
-                label: "Menu bar",
-                menus: &[self.menu("first-menu"), self.menu("second-menu")],
-                active: Some(&self.active_menu),
-                rtl: false,
-            }
+            Page::Menubar => Menubar::new(
+                "bar",
+                "Menu bar",
+                &[self.menu("first-menu"), self.menu("second-menu")],
+            )
+            .active(Some(&self.active_menu))
             .build(theme),
             _ => self.menu("menu").build(
                 Button::new("trigger", "Note actions", theme.outline_button()).build(),

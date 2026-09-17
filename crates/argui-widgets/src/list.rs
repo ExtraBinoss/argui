@@ -1,8 +1,8 @@
 use argui_core::{Key, KeyState};
 use argui_paint::{Border, QuadStyle};
 use argui_ui::{
-    Element, GestureSet, Interaction, Role, SemanticAction, SemanticState, Semantics, TapGesture,
-    UiEvent, UiEventKind, UserSelect, VisualState,
+    Element, EventFilter, EventType, GestureSet, Interaction, Role, SemanticAction, SemanticState,
+    Semantics, TapGesture, UiEvent, UiEventKind, UserSelect, ValueHandler, VisualState,
 };
 
 use crate::{Collection, ListState, WidgetTheme};
@@ -16,6 +16,8 @@ pub struct List<'a> {
     state: Option<&'a ListState>,
     multiple: bool,
     page_size: Option<usize>,
+    select_handlers: Vec<ValueHandler<String>>,
+    activate_handlers: Vec<ValueHandler<String>>,
 }
 
 impl<'a> List<'a> {
@@ -30,6 +32,8 @@ impl<'a> List<'a> {
             state: None,
             multiple: false,
             page_size: None,
+            select_handlers: Vec::new(),
+            activate_handlers: Vec::new(),
         }
     }
 
@@ -52,6 +56,26 @@ impl<'a> List<'a> {
     #[must_use]
     pub fn page_size(mut self, rows: usize) -> Self {
         self.page_size = Some(rows.max(1));
+        self
+    }
+
+    /// Adds a handler that receives the stable id of a selected row.
+    ///
+    /// `handler` is called for pointer, keyboard, and accessibility selection.
+    /// Disabled rows never deliver the handler. Additional handlers are additive.
+    #[must_use]
+    pub fn on_select(mut self, handler: ValueHandler<String>) -> Self {
+        self.select_handlers.push(handler);
+        self
+    }
+
+    /// Adds a handler that receives the stable id of an activated row.
+    ///
+    /// `handler` is called by double-click activation. Additional handlers are
+    /// delivered in registration order.
+    #[must_use]
+    pub fn on_activate(mut self, handler: ValueHandler<String>) -> Self {
+        self.activate_handlers.push(handler);
         self
     }
 
@@ -130,6 +154,74 @@ impl<'a> List<'a> {
         {
             root = root.active_descendant(self.row_key(index));
         }
+        if let Some(active) = self
+            .state
+            .and_then(|state| state.active.as_deref())
+            .or_else(|| {
+                self.collection
+                    .items()
+                    .iter()
+                    .find(|item| item.enabled)
+                    .map(|item| item.id.as_str())
+            })
+        {
+            for handler in &self.select_handlers {
+                for filter in [EventFilter::EnterPressed, EventFilter::SpacePressed] {
+                    root = root.on(handler
+                        .direct_listener_value(EventType::Key, active.to_owned())
+                        .filter(filter));
+                }
+            }
+        }
+        for (filter, forward) in [
+            (EventFilter::ArrowUpPressed, false),
+            (EventFilter::ArrowDownPressed, true),
+            (EventFilter::HomePressed, true),
+            (EventFilter::EndPressed, false),
+            (EventFilter::PageUpPressed, false),
+            (EventFilter::PageDownPressed, true),
+        ] {
+            let active = self
+                .state
+                .and_then(|state| state.active.as_deref())
+                .and_then(|id| self.collection.index_of(id));
+            let next = if filter == EventFilter::HomePressed {
+                self.collection.enabled_from(0, false)
+            } else if filter == EventFilter::EndPressed {
+                self.collection
+                    .len()
+                    .checked_sub(1)
+                    .and_then(|last| self.collection.enabled_from(last, true))
+            } else {
+                let distance = if matches!(
+                    filter,
+                    EventFilter::PageUpPressed | EventFilter::PageDownPressed
+                ) {
+                    self.page_size.unwrap_or(1)
+                } else {
+                    1
+                };
+                let start = if forward {
+                    active
+                        .unwrap_or(0)
+                        .saturating_add(distance)
+                        .min(self.collection.len().saturating_sub(1))
+                } else {
+                    active.unwrap_or(0).saturating_sub(distance)
+                };
+                self.collection.enabled_from(start, !forward)
+            };
+            if let Some(value) = next
+                .and_then(|index| self.collection.get(index))
+                .map(|item| item.id.clone())
+            {
+                for handler in &self.select_handlers {
+                    root = root.on(handler
+                        .direct_listener_value(EventType::Key, value.clone())
+                        .filter(filter));
+                }
+            }
+        }
         root
     }
 
@@ -152,8 +244,9 @@ impl<'a> List<'a> {
         if active {
             semantics = semantics.action(SemanticAction::Focus);
         }
-        element
-            .keyed(self.row_key(index))
+        let row_key = self.row_key(index);
+        let mut element = element
+            .keyed(&row_key)
             .user_select(UserSelect::None)
             .interaction(
                 Interaction::default()
@@ -180,7 +273,21 @@ impl<'a> List<'a> {
                 1.0,
                 if active { theme.ring } else { theme.border },
             ))
-            .when(VisualState::Hovered, QuadStyle::solid(theme.muted).into())
+            .when(VisualState::Hovered, QuadStyle::solid(theme.muted).into());
+        if item.enabled {
+            for handler in &self.select_handlers {
+                element = element.on(handler
+                    .direct_listener_value(EventType::Click, item.id.clone())
+                    .target_key(&row_key));
+            }
+            for handler in &self.activate_handlers {
+                element = element.on(handler
+                    .direct_listener_value(EventType::Click, item.id.clone())
+                    .target_key(&row_key)
+                    .filter(EventFilter::DoubleClick));
+            }
+        }
+        element
     }
 
     #[must_use]

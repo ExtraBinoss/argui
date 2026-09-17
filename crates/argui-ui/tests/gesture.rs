@@ -450,7 +450,7 @@ fn arena_edge_paths_keep_contacts_and_thresholds_independent() {
 }
 
 #[test]
-fn frame_coalesced_pan_keeps_only_the_latest_changed_sample() {
+fn frame_coalesced_pan_keeps_the_latest_sample_and_accumulated_delta() {
     let gestures = GestureSet::EMPTY.pan(
         PanGesture::default()
             .immediate()
@@ -506,9 +506,9 @@ fn frame_coalesced_pan_keeps_only_the_latest_changed_sample() {
         frame.events[0].kind,
         UiEventKind::Gesture(argui_ui::GestureEvent {
             phase: GesturePhase::Changed,
-            kind: GestureKind::Pan { total, .. },
+            kind: GestureKind::Pan { delta, total, .. },
             ..
-        }) if total == Point::new(24.0, 0.0)
+        }) if total == Point::new(24.0, 0.0) && delta == Point::new(24.0, 0.0)
     ));
     assert!(tree.flush_gesture_frame().events.is_empty());
 }

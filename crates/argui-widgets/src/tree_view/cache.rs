@@ -57,14 +57,20 @@ impl TreeView<'_> {
                 let row = cache.rows.entry(position).or_insert_with(|| Row {
                     selected,
                     active: active == Some(position),
-                    element: self.row(index, active == Some(position), theme),
+                    element: self.row(
+                        index,
+                        position,
+                        &cache.visible,
+                        active == Some(position),
+                        theme,
+                    ),
                 });
                 if row.selected != selected || row.active != (active == Some(position)) {
                     row.selected = selected;
                     row.active = active == Some(position);
-                    row.element = self.row(index, row.active, theme);
+                    row.element = self.row(index, position, &cache.visible, row.active, theme);
                 }
-                row.element.clone()
+                self.decorate_reveal(row.element.clone(), index)
             })
             .semantics(Semantics::new(Role::Tree).label("Elements"))
     }

@@ -1,7 +1,7 @@
 use crate::{LayoutNode, LayoutOutput};
 use argui_core::{Affine2D, Rect};
 use argui_paint::{DisplayList, LayerStyle, ProfileDomain, RenderObjectId};
-use argui_ui::{EffectScope, Element, NodeId, ScrollAxes, ScrollMetrics, ScrollbarGutter, UiTree};
+use argui_ui::{EffectScope, Element, NodeId, ScrollAxes, ScrollMetrics, UiTree};
 
 pub(super) fn begin_scope(
     ui: &UiTree,
@@ -76,20 +76,7 @@ pub(super) fn begin_scroll(
     else {
         return 0;
     };
-    let mut viewport = region.bounds;
-    let style = ui.resolved_layout_style(node.node, element);
-    if style.scrollbar_gutter == ScrollbarGutter::Stable {
-        let gutter = style.scrollbar_width.max(0.0);
-        if matches!(region.config.axes, ScrollAxes::Vertical | ScrollAxes::Both) {
-            viewport.size.width = (viewport.size.width - gutter).max(0.0);
-        }
-        if matches!(
-            region.config.axes,
-            ScrollAxes::Horizontal | ScrollAxes::Both
-        ) {
-            viewport.size.height = (viewport.size.height - gutter).max(0.0);
-        }
-    }
+    let viewport = region.bounds;
     let mut max_offset = region.max_offset;
     match region.config.axes {
         ScrollAxes::Vertical => max_offset.x = 0.0,

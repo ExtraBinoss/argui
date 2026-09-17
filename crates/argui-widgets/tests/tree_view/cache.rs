@@ -17,6 +17,10 @@ fn vectors(element: &Element) -> usize {
         + element.children.iter().map(vectors).sum::<usize>()
 }
 
+fn opacity(element: &Element) -> f32 {
+    element.layer.as_ref().map_or(1.0, |layer| layer.opacity)
+}
+
 #[test]
 fn scrolling_reuses_rows_and_evicts_rows_outside_the_window() {
     let nodes = (0..200)
@@ -31,13 +35,12 @@ fn scrolling_reuses_rows_and_evicts_rows_outside_the_window() {
     let themes = shadcn(Color::WHITE);
     let theme = themes.resolve(ColorScheme::Dark);
     let mut cache = TreeViewCache::default();
-    let mut tree = TreeView {
-        nodes: &nodes,
-        selected: None,
-        collapsed: &collapsed,
-        list: VList::new("tree", 28.0, 280.0, 0.0),
-        disclosure: None,
-    };
+    let mut tree = TreeView::new(
+        &nodes,
+        None,
+        &collapsed,
+        VList::new("tree", 28.0, 280.0, 0.0),
+    );
     let first = tree.build_cached(theme, &mut cache);
     tree.list.offset = 28.0;
     let second = tree.build_cached(theme, &mut cache);
@@ -79,13 +82,13 @@ fn selection_collapse_data_theme_and_icons_invalidate_rows() {
                  icon,
                  theme: &_,
                  cache: &mut _| {
-        TreeView {
+        TreeView::new(
             nodes,
-            collapsed,
             selected,
-            disclosure: icon,
-            list: VList::new("tree", 28.0, 280.0, 0.0),
-        }
+            collapsed,
+            VList::new("tree", 28.0, 280.0, 0.0),
+        )
+        .disclosure(icon)
         .build_cached(theme, cache)
     };
     let first = build(&nodes, &collapsed, None, None, theme, &mut cache);
@@ -132,6 +135,73 @@ fn selection_collapse_data_theme_and_icons_invalidate_rows() {
 }
 
 #[test]
+fn descendant_reveal_leaves_the_trigger_and_siblings_still() {
+    let nodes = [
+        TreeNode {
+            key: "parent".into(),
+            label: "Parent".into(),
+            depth: 0,
+            icon: None,
+        },
+        TreeNode {
+            key: "child".into(),
+            label: "Child".into(),
+            depth: 1,
+            icon: None,
+        },
+        TreeNode {
+            key: "nested".into(),
+            label: "Nested".into(),
+            depth: 2,
+            icon: None,
+        },
+        TreeNode {
+            key: "sibling".into(),
+            label: "Sibling".into(),
+            depth: 0,
+            icon: None,
+        },
+    ];
+    let collapsed = BTreeSet::new();
+    let themes = shadcn(Color::WHITE);
+    let theme = themes.resolve(ColorScheme::Light);
+    let mut cache = TreeViewCache::default();
+    let build = |progress, cache: &mut TreeViewCache| {
+        TreeView::new(
+            &nodes,
+            None,
+            &collapsed,
+            VList::new("tree", 28.0, 280.0, 0.0),
+        )
+        .reveal_descendants("parent", progress)
+        .build_cached(theme, cache)
+    };
+
+    let entering = build(0.0, &mut cache);
+    assert_eq!(opacity(row(&entering, "parent").unwrap()), 1.0);
+    assert_eq!(opacity(row(&entering, "sibling").unwrap()), 1.0);
+    assert_eq!(opacity(row(&entering, "child").unwrap()), 0.0);
+    assert_ne!(
+        row(&entering, "child").unwrap().transform,
+        argui_core::Transform2D::IDENTITY
+    );
+
+    let sweeping = build(0.45, &mut cache);
+    assert!(opacity(row(&sweeping, "child").unwrap()) > opacity(row(&sweeping, "nested").unwrap()));
+
+    let settled = build(1.0, &mut cache);
+    assert_eq!(opacity(row(&settled, "child").unwrap()), 1.0);
+    assert_eq!(
+        row(&settled, "nested").unwrap().transform,
+        argui_core::Transform2D::IDENTITY
+    );
+    assert!(
+        row(&entering, "child").unwrap().children[0]
+            .ptr_eq(&row(&settled, "child").unwrap().children[0])
+    );
+}
+
+#[test]
 fn active_row_stays_mounted_and_is_the_only_tab_stop() {
     let nodes: Vec<_> = (0..1000)
         .map(|i| TreeNode {
@@ -146,13 +216,12 @@ fn active_row_stays_mounted_and_is_the_only_tab_stop() {
     let theme = themes.resolve(ColorScheme::Light);
     let mut cache = TreeViewCache::default();
     for selected in [Some("999"), Some("500"), None, Some("deleted")] {
-        let tree = TreeView {
-            nodes: &nodes,
+        let tree = TreeView::new(
+            &nodes,
             selected,
-            collapsed: &collapsed,
-            list: VList::new("tree", 28.0, 280.0, 5600.0),
-            disclosure: None,
-        };
+            &collapsed,
+            VList::new("tree", 28.0, 280.0, 5600.0),
+        );
         for built in [tree.build(theme), tree.build_cached(theme, &mut cache)] {
             let ui = argui_ui::UiTree::new(built);
             assert!(ui.node_ids().len() < 250);
@@ -192,13 +261,12 @@ fn focus_survives_virtual_scroll_and_tab_leaves_the_tree_once() {
     let themes = shadcn(Color::WHITE);
     let theme = themes.resolve(ColorScheme::Light);
     let mut cache = TreeViewCache::default();
-    let mut view = TreeView {
-        nodes: &nodes,
-        collapsed: &collapsed,
-        selected: Some("50"),
-        list: VList::new("tree", 28.0, 140.0, 1400.0),
-        disclosure: None,
-    };
+    let mut view = TreeView::new(
+        &nodes,
+        Some("50"),
+        &collapsed,
+        VList::new("tree", 28.0, 140.0, 1400.0),
+    );
     let build = |view: &TreeView<'_>, cache: &mut TreeViewCache| {
         Element::column([
             view.build_cached(theme, cache),

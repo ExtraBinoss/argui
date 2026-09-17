@@ -66,7 +66,13 @@ impl NativeSurfacePaint {
                         layer.bounds.origin.x += delta.x;
                         layer.bounds.origin.y += delta.y;
                     }
-                    DisplayCommand::EndLayer => {}
+                    DisplayCommand::BeginCompositor(layer) => {
+                        layer.bounds.origin.x += delta.x;
+                        layer.bounds.origin.y += delta.y;
+                        translate(&mut layer.base_parent);
+                        translate(&mut layer.base_transform);
+                    }
+                    DisplayCommand::EndLayer | DisplayCommand::EndCompositor => {}
                 }
                 command
             })

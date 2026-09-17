@@ -1,13 +1,15 @@
 # Releases
 
 The [CI workflow](../../.github/workflows/ci.yml) runs independent jobs for
-security, Rust quality, desktop targets, mobile targets, package archives, and
-the website. GitHub Pages depends only on the website job. Crate publication
-waits for every required job.
+security, static Rust quality, public API/SemVer compatibility, Rust coverage,
+desktop targets, mobile targets, package archives, and the website. Keeping static checks and instrumented
+coverage separate gives each expensive build its own timeout without weakening
+the local combined gate. GitHub Pages depends only on the website job. Crate
+publication waits for every required job.
 
 ## Prepare a version
 
-All 23 public crates share one workspace version. Application and showcase
+All 24 public crates share one workspace version. Application and showcase
 crates set `publish = false`.
 
 ```sh
@@ -18,8 +20,9 @@ python3 scripts/release.py package
 
 `bump` updates the workspace version, internal requirements, and lockfile.
 `check` rejects mismatched or invalid manifests. `package` computes the
-dependency order from Cargo metadata and compiles every crates.io archive with
-all features in one temporary registry.
+dependency order from Cargo metadata, creates every archive without resolving
+older published workspace versions, and then compiles each extracted archive
+against the previously staged 0.3 sources.
 
 Review the generated diff and run the final
 [quality gate](code-quality.md#final-gate). The final commit on the push must
@@ -60,9 +63,9 @@ ownership, or a registry error stops the release.
 
 ## Protected main
 
-The repository rules require the security, quality, desktop, mobile, package,
-and website checks, a current branch, resolved review threads, and code-owner
-approval. Force pushes and branch deletion are blocked. The checked-in policy is
+The repository rules require the security, quality, public API, desktop,
+mobile, package, and website checks, a current branch, resolved review threads,
+and code-owner approval. Force pushes and branch deletion are blocked. The checked-in policy is
 [.github/main-ruleset.json](../../.github/main-ruleset.json).
 
 The current crate graph is documented in

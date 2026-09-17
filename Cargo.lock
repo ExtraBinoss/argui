@@ -224,7 +224,7 @@ dependencies = [
 
 [[package]]
 name = "argui"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "argui-accessibility",
  "argui-animation",
@@ -248,7 +248,7 @@ dependencies = [
 
 [[package]]
 name = "argui-accessibility"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "accesskit",
  "accesskit_consumer",
@@ -259,7 +259,7 @@ dependencies = [
 
 [[package]]
 name = "argui-android"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "argui-platform",
  "argui-render",
@@ -270,18 +270,18 @@ dependencies = [
 
 [[package]]
 name = "argui-animation"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "argui-core",
 ]
 
 [[package]]
 name = "argui-core"
-version = "0.2.1"
+version = "0.3.0"
 
 [[package]]
 name = "argui-devtools"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "argui-animation",
  "argui-core",
@@ -307,7 +307,7 @@ dependencies = [
 
 [[package]]
 name = "argui-effects"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "argui-paint",
  "argui-render",
@@ -318,7 +318,7 @@ dependencies = [
 
 [[package]]
 name = "argui-i18n"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "argui-ui",
  "fluent-bundle",
@@ -329,7 +329,7 @@ dependencies = [
 
 [[package]]
 name = "argui-image"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "argui-paint",
  "image",
@@ -338,7 +338,7 @@ dependencies = [
 
 [[package]]
 name = "argui-inspect"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "argui-core",
  "serde",
@@ -347,14 +347,14 @@ dependencies = [
 
 [[package]]
 name = "argui-ios"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "argui-runtime",
 ]
 
 [[package]]
 name = "argui-layout"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "argui-animation",
  "argui-core",
@@ -368,14 +368,14 @@ dependencies = [
 
 [[package]]
 name = "argui-paint"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "argui-core",
 ]
 
 [[package]]
 name = "argui-perf-showcase"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "argui",
  "wasm-bindgen",
@@ -383,23 +383,28 @@ dependencies = [
 
 [[package]]
 name = "argui-platform"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
+ "android-activity",
  "arboard",
  "argui-core",
  "argui-paint",
  "ashpd",
  "base64",
+ "block2 0.6.2",
+ "dispatch2",
  "futures-channel",
  "futures-util",
  "gtk",
  "image",
+ "jni 0.22.4",
  "ksni",
  "objc2 0.6.4",
  "objc2-app-kit 0.3.2",
  "objc2-core-graphics",
  "objc2-foundation 0.3.2",
  "objc2-quartz-core 0.3.2",
+ "objc2-ui-kit 0.3.2",
  "pollster 1.0.1",
  "raw-window-handle",
  "rfd",
@@ -419,7 +424,7 @@ dependencies = [
 
 [[package]]
 name = "argui-render"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "argui-core",
  "argui-paint",
@@ -435,7 +440,7 @@ dependencies = [
 
 [[package]]
 name = "argui-runtime"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "accesskit",
  "accesskit_winit",
@@ -466,7 +471,7 @@ dependencies = [
 
 [[package]]
 name = "argui-showcase"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "argui-animation",
  "argui-core",
@@ -483,7 +488,7 @@ dependencies = [
 
 [[package]]
 name = "argui-state-app"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "argui",
  "argui-devtools",
@@ -493,8 +498,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "argui-testing"
+version = "0.3.0"
+dependencies = [
+ "argui-accessibility",
+ "argui-animation",
+ "argui-core",
+ "argui-layout",
+ "argui-platform",
+ "argui-runtime",
+ "argui-text",
+ "argui-ui",
+ "argui-widgets",
+ "epaint_default_fonts",
+ "thiserror 2.0.20",
+]
+
+[[package]]
 name = "argui-text"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "argui-core",
  "cosmic-text",
@@ -503,14 +525,14 @@ dependencies = [
 
 [[package]]
 name = "argui-theme"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "argui-core",
 ]
 
 [[package]]
 name = "argui-ui"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "argui-accessibility",
  "argui-animation",
@@ -525,7 +547,7 @@ dependencies = [
 
 [[package]]
 name = "argui-updater"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "flate2",
  "minisign-verify",
@@ -541,7 +563,7 @@ dependencies = [
 
 [[package]]
 name = "argui-vector"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "argui-core",
  "argui-paint",
@@ -551,7 +573,7 @@ dependencies = [
 
 [[package]]
 name = "argui-web-demo"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "argui",
  "argui-devtools",
@@ -561,7 +583,7 @@ dependencies = [
 
 [[package]]
 name = "argui-webview"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "ammonia",
  "argui-core",
@@ -579,7 +601,7 @@ dependencies = [
 
 [[package]]
 name = "argui-widget-gallery"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "argui",
  "argui-android",
@@ -594,7 +616,7 @@ dependencies = [
 
 [[package]]
 name = "argui-widgets"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "argui-animation",
  "argui-core",
@@ -1683,6 +1705,12 @@ dependencies = [
  "quote",
  "syn 2.0.119",
 ]
+
+[[package]]
+name = "epaint_default_fonts"
+version = "0.31.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fc7e7a64c02cf7a5b51e745a9e45f60660a286f151c238b9d397b3e923f5082f"
 
 [[package]]
 name = "equivalent"

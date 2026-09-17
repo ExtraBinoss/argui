@@ -24,6 +24,7 @@ mod layout;
 mod model_updates;
 mod visibility;
 pub use inspect::{Inspection, InspectionCache};
+mod inertia;
 mod lifecycle;
 #[cfg(all(
     feature = "webview",
@@ -103,14 +104,17 @@ pub(crate) struct Application {
     pub(super) ui_layout: Option<LayoutOutput>,
     pub(super) layout_engine: LayoutEngine,
     pub(super) prepared_text: Option<PreparedText>,
+    pub(super) composite_frame: bool,
     viewport: Size,
-    scale_factor: f32,
+    pub(super) scale_factor: f32,
     pointer: Option<Point>,
     pointer_buttons: u16,
     touch_points: HashMap<PointerId, Point>,
     primary_touch: Option<PointerId>,
     selection_click: text_selection::SelectionClick,
+    mouse_selection_origin: Option<Point>,
     touch_selection: Option<text_selection::TouchSelection>,
+    touch_selection_handle: Option<text_selection::TouchSelectionHandle>,
     input_epoch: Instant,
     last_cursor: argui_ui::CursorIcon,
     modifiers: Modifiers,
@@ -122,7 +126,7 @@ pub(crate) struct Application {
     pub(crate) tasks: Option<crate::tasks::TaskRuntime>,
     pending_scrollbar_drag: Option<Point>,
     pending_pointer_scroll: Option<scroll::PendingScroll>,
-    scroll_inertia: scroll::ScrollInertia,
+    scroll_inertia: inertia::ScrollInertia,
     scroll_gesture: argui_ui::ScrollGesture,
     programmatic_scroll: Option<scroll::ProgrammaticScroll>,
     last_scroll_physics: Option<Instant>,
@@ -223,6 +227,7 @@ impl Application {
             ui_layout: None,
             layout_engine,
             prepared_text: None,
+            composite_frame: false,
             viewport: Size::default(),
             scale_factor: 1.0,
             pointer: None,
@@ -230,7 +235,9 @@ impl Application {
             touch_points: HashMap::new(),
             primary_touch: None,
             selection_click: text_selection::SelectionClick::default(),
+            mouse_selection_origin: None,
             touch_selection: None,
+            touch_selection_handle: None,
             input_epoch: Instant::now(),
             last_cursor: argui_ui::CursorIcon::Default,
             modifiers: Modifiers::default(),
@@ -242,7 +249,7 @@ impl Application {
             tasks: None,
             pending_scrollbar_drag: None,
             pending_pointer_scroll: None,
-            scroll_inertia: scroll::ScrollInertia::default(),
+            scroll_inertia: inertia::ScrollInertia::default(),
             scroll_gesture: argui_ui::ScrollGesture::default(),
             programmatic_scroll: None,
             last_scroll_physics: None,
@@ -431,6 +438,7 @@ impl Application {
     }
 
     pub(super) fn repaint(&mut self) {
+        self.composite_frame = false;
         if let (Some(ui), Some(layout)) = (&self.ui_tree, &mut self.ui_layout)
             && self.layout_engine.repaint(ui, layout)
         {
@@ -438,6 +446,32 @@ impl Application {
         }
         self.publish_inspection();
         self.paint_inspection_highlight();
+    }
+
+    /// Applies retained compositor properties, falling back to paint when a
+    /// previous snapshot cannot represent the requested transform.
+    pub(super) fn composite(&mut self) {
+        if self
+            .inspector
+            .as_ref()
+            .is_some_and(|inspector| inspector.highlighted().is_some())
+        {
+            // The inspector overlay is appended after paint and is not retained
+            // inside the highlighted node's compositor layer.
+            self.repaint();
+            return;
+        }
+        let composited = match (&self.ui_tree, &mut self.ui_layout) {
+            (Some(ui), Some(layout)) => self.layout_engine.composite(ui, layout),
+            _ => false,
+        };
+        if composited {
+            self.composite_frame = true;
+            self.publish_inspection();
+            self.paint_inspection_highlight();
+        } else {
+            self.repaint();
+        }
     }
 
     fn window_focus(
@@ -458,6 +492,9 @@ impl Application {
             update.merge(ui.scrollbar_pointer_moved(None, &[]));
             update.merge(ui.window_blurred());
             self.apply_ui_update(update, window, event_loop);
+        }
+        if !focused {
+            self.update_ime(window);
         }
         if focused && let (Some(ui), Some(layout)) = (&mut self.ui_tree, &self.ui_layout) {
             let update = ui.window_focused(&layout.hit_regions);

@@ -2,6 +2,7 @@ use argui::{
     animation::{Duration, Keyframe, Keyframes},
     core::{Color, Transform2D},
     paint::{CornerRadii, QuadStyle},
+    runtime::Context,
     ui::{
         CaretAlign, CaretAnimation, CaretFrame, CaretHeight, CaretPrimitive, CaretStyle,
         CaretVisual, Element,
@@ -16,9 +17,10 @@ pub(super) fn render(
     gallery: &WidgetGallery,
     theme: &WidgetTheme,
     assets: &WidgetAssets,
+    cx: &mut Context<WidgetGallery>,
 ) -> Element {
     Element::column([
-        controlled_fields(gallery, theme, assets),
+        controlled_fields(gallery, theme, assets, cx),
         caret_playground(theme),
     ])
     .gap(28.0)
@@ -28,6 +30,7 @@ fn controlled_fields(
     gallery: &WidgetGallery,
     theme: &WidgetTheme,
     assets: &WidgetAssets,
+    cx: &mut Context<WidgetGallery>,
 ) -> Element {
     let search = Input::new(
         "input-search-demo",
@@ -38,6 +41,7 @@ fn controlled_fields(
     .kind(InputKind::Search)
     .label("GPU graph search")
     .leading(assets.icon(TablerIcon::Search, 16.0), 38.0)
+    .on_input(cx.input_callback(|gallery, value| gallery.input_search = value))
     .build();
     preview(
         "Controlled fields",
@@ -45,10 +49,12 @@ fn controlled_fields(
         Element::column([
             Input::new("name", &gallery.name, "Full name", theme.input())
                 .label("Full name")
+                .on_input(cx.input_callback(|gallery, value| gallery.name = value))
                 .build(),
             Input::new("email", &gallery.email, "Email", theme.input())
                 .label("Email address")
                 .description("Used only for this local preview")
+                .on_input(cx.input_callback(|gallery, value| gallery.email = value))
                 .build(),
             search,
             Input::new("invalid", &gallery.invalid_email, "Email", theme.input())
@@ -59,6 +65,7 @@ fn controlled_fields(
                         .split_once('@')
                         .is_some_and(|(name, domain)| !name.is_empty() && domain.contains('.')),
                 )
+                .on_input(cx.input_callback(|gallery, value| gallery.invalid_email = value))
                 .build(),
             Input::new("readonly", "Read-only value", "", theme.input())
                 .read_only(true)

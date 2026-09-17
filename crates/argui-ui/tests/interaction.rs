@@ -375,12 +375,14 @@ fn disabled_regions_occlude_controls_without_receiving_pointer_actions() {
 
 #[test]
 fn interaction_updates_merge_every_dirty_signal_and_latest_clipboard_request() {
+    assert!(InteractionUpdate::default().is_empty());
     let mut update = InteractionUpdate {
         paint_changed: true,
         clipboard: Some(ClipboardRequest::Read { target: None }),
         ..InteractionUpdate::default()
     };
     update.merge(InteractionUpdate {
+        composite_changed: true,
         scroll_changed: true,
         layout_changed: true,
         text_input_changed: true,
@@ -389,6 +391,8 @@ fn interaction_updates_merge_every_dirty_signal_and_latest_clipboard_request() {
     });
     update.merge(InteractionUpdate::default());
 
+    assert!(!update.is_empty());
+    assert!(update.composite_changed);
     assert!(update.paint_changed);
     assert!(update.scroll_changed);
     assert!(update.layout_changed);

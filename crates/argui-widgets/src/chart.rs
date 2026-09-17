@@ -1,6 +1,6 @@
 use crate::{Button, ButtonBehavior, WidgetTheme};
 use argui_core::{Color, Transform2D, TransformOrigin};
-use argui_ui::{Element, Role, Semantics, Sides, auto, length};
+use argui_ui::{Element, EventType, Role, Semantics, Sides, ValueHandler, auto, length};
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum ChartKind {
@@ -34,6 +34,7 @@ pub struct Chart {
     pub kind: ChartKind,
     pub width: f32,
     pub height: f32,
+    activate_handlers: Vec<ValueHandler<Vec<usize>>>,
 }
 
 impl Chart {
@@ -55,7 +56,15 @@ impl Chart {
             kind: ChartKind::Bar,
             width: 480.0,
             height: 240.0,
+            activate_handlers: Vec::new(),
         }
+    }
+
+    /// Adds a handler receiving `[series_index, category_index]` for an activated point.
+    #[must_use]
+    pub fn on_activate(mut self, handler: ValueHandler<Vec<usize>>) -> Self {
+        self.activate_handlers.push(handler);
+        self
     }
 
     /// Computes a zero-inclusive value domain after validating dimensions and series data.
@@ -192,6 +201,11 @@ impl Chart {
                 .height(length(height))
                 .padding(Sides::length(0.0))
                 .background(series.color);
+                for handler in &self.activate_handlers {
+                    mark = mark
+                        .on(handler
+                            .direct_listener_value(EventType::Click, vec![series_index, index]));
+                }
                 mark.tooltip = Some(label);
                 marks.push(position(mark, left, top));
             }

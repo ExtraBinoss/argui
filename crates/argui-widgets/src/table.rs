@@ -1,5 +1,5 @@
 use crate::{List, ListState, WidgetTheme};
-use argui_ui::{Element, Role, Semantics, length};
+use argui_ui::{Element, Role, Semantics, ValueHandler, length};
 
 #[derive(Clone, Debug)]
 pub struct TableColumn {
@@ -51,6 +51,20 @@ impl<'a> Table<'a> {
     /// Enables controlled row selection using `state`; `multiple` allows selecting more than one row.
     pub fn selection(mut self, state: &'a ListState, multiple: bool) -> Self {
         self.list = self.list.selection(state, multiple);
+        self
+    }
+
+    /// Adds a handler that receives the stable id of a selected row.
+    #[must_use]
+    pub fn on_select(mut self, handler: ValueHandler<String>) -> Self {
+        self.list = self.list.on_select(handler);
+        self
+    }
+
+    /// Adds a handler that receives the stable id of an activated row.
+    #[must_use]
+    pub fn on_activate(mut self, handler: ValueHandler<String>) -> Self {
+        self.list = self.list.on_activate(handler);
         self
     }
 

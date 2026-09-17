@@ -93,6 +93,163 @@ fn captured_cursor_ignores_missing_or_disabled_regions() {
 }
 
 #[test]
+fn movement_at_the_activation_slop_boundary_preserves_mouse_and_touch_taps() {
+    for (kind, pointer) in [
+        (PointerKind::Mouse, PointerId::MOUSE),
+        (PointerKind::Touch, PointerId::new(41)),
+    ] {
+        let mut tree = UiTree::new(interactive("tap"));
+        tree.set_pointer_settings(argui_core::PointerSettings::default().activation_slop(10.0));
+        let region = region(tree.node_id_at(0).unwrap());
+        let regions = [region];
+        let origin = Point::new(30.0, 20.0);
+        let edge = Point::new(30.0, 30.0);
+
+        tree.pointer_event(
+            pointer_event(pointer, kind, PointerPhase::Pressed, origin),
+            &regions,
+        );
+        tree.pointer_event(
+            pointer_event(pointer, kind, PointerPhase::Moved, edge),
+            &regions,
+        );
+        let released = tree.pointer_event(
+            pointer_event(pointer, kind, PointerPhase::Released, edge),
+            &regions,
+        );
+
+        assert!(
+            released
+                .events
+                .iter()
+                .any(|event| matches!(event.kind, UiEventKind::Click(_))),
+            "movement equal to activation slop should still click for {kind:?}"
+        );
+    }
+}
+
+#[test]
+fn convenience_mouse_press_tracks_the_last_hover_position_for_drag_slop() {
+    let mut tree = UiTree::new(interactive("near-tap"));
+    let node = tree.node_id_at(0).unwrap();
+    let regions = [region(node)];
+    tree.pointer_moved(Point::new(30.0, 20.0), &regions);
+    tree.primary_pressed(&regions);
+    tree.pointer_moved(Point::new(39.0, 20.0), &regions);
+
+    let released = tree.primary_released();
+
+    assert!(
+        released
+            .events
+            .iter()
+            .any(|event| matches!(event.kind, UiEventKind::Click(_)))
+    );
+}
+
+#[test]
+fn dragging_beyond_activation_slop_cancels_mouse_touch_and_pen_clicks() {
+    for (kind, pointer) in [
+        (PointerKind::Mouse, PointerId::MOUSE),
+        (PointerKind::Touch, PointerId::new(42)),
+        (PointerKind::Pen, PointerId::new(43)),
+    ] {
+        let mut tree = UiTree::new(interactive("drag"));
+        let node = tree.node_id_at(0).unwrap();
+        let regions = [region(node)];
+        let origin = Point::new(30.0, 20.0);
+        let dragged = Point::new(30.0, 31.0);
+
+        tree.pointer_event(
+            pointer_event(pointer, kind, PointerPhase::Pressed, origin),
+            &regions,
+        );
+        let moved = tree.pointer_event(
+            pointer_event(pointer, kind, PointerPhase::Moved, dragged),
+            &regions,
+        );
+        assert!(!tree.visual_states(node).contains(VisualState::Pressed));
+        assert!(moved.paint_changed);
+        let released = tree.pointer_event(
+            pointer_event(pointer, kind, PointerPhase::Released, dragged),
+            &regions,
+        );
+
+        assert!(
+            released
+                .events
+                .iter()
+                .all(|event| !matches!(event.kind, UiEventKind::Click(_))),
+            "movement beyond activation slop must not click for {kind:?}"
+        );
+        assert!(!tree.visual_states(node).contains(VisualState::Pressed));
+    }
+}
+
+#[test]
+fn a_drag_suppresses_activation_without_stealing_gesture_pointer_capture() {
+    let mut tree = UiTree::new(interactive("pan"));
+    let node = tree.node_id_at(0).unwrap();
+    let pointer = PointerId::new(44);
+    let mut hit = region(node);
+    hit.cursor = CursorIcon::Grab;
+    hit.gestures = argui_ui::GestureSet::EMPTY
+        .pan(argui_ui::PanGesture::default().capture(argui_ui::GestureCapture::OnPress));
+    let regions = [hit];
+    let origin = Point::new(30.0, 20.0);
+    let dragged = Point::new(30.0, 31.0);
+
+    tree.pointer_event(
+        pointer_event(pointer, PointerKind::Touch, PointerPhase::Pressed, origin),
+        &regions,
+    );
+    tree.pointer_event(
+        pointer_event(pointer, PointerKind::Touch, PointerPhase::Moved, dragged),
+        &regions,
+    );
+    assert!(tree.visual_states(node).contains(VisualState::Pressed));
+    assert_eq!(
+        tree.captured_cursor(pointer, &regions),
+        Some(CursorIcon::Grab)
+    );
+    let released = tree.pointer_event(
+        pointer_event(pointer, PointerKind::Touch, PointerPhase::Released, dragged),
+        &regions,
+    );
+
+    assert!(
+        released
+            .events
+            .iter()
+            .any(|event| { event.kind == UiEventKind::LostPointerCapture(pointer) })
+    );
+    assert!(
+        released
+            .events
+            .iter()
+            .all(|event| !matches!(event.kind, UiEventKind::Click(_)))
+    );
+    assert_eq!(tree.captured_cursor(pointer, &regions), None);
+}
+
+fn pointer_event(
+    id: PointerId,
+    kind: PointerKind,
+    phase: PointerPhase,
+    position: Point,
+) -> PointerEvent {
+    PointerEvent {
+        id,
+        kind,
+        phase,
+        position,
+        button: Some(PointerButton::Primary),
+        buttons: u16::from(matches!(phase, PointerPhase::Pressed | PointerPhase::Moved)),
+        ..PointerEvent::mouse(phase, position)
+    }
+}
+
+#[test]
 fn replacing_capture_releases_the_previous_target_and_same_capture_is_idempotent() {
     let mut tree = UiTree::new(Element::row([interactive("first"), interactive("second")]));
     let first = tree.node_id_at(1).unwrap();

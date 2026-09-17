@@ -1,6 +1,6 @@
 use crate::{Button, ButtonBehavior, ScrollArea, WidgetTheme};
 use argui_core::Point;
-use argui_ui::{Element, ScrollAlignment, ScrollRequest, UiEvent, UiEventKind};
+use argui_ui::{Element, EventHandler, ScrollAlignment, ScrollRequest, UiEvent, UiEventKind};
 
 /// Retained reading position. Supply measured maximum offsets after layout changes.
 #[derive(Clone, Debug, PartialEq)]
@@ -102,6 +102,8 @@ pub struct MessageScroller {
     pub loading: bool,
     pub earlier_label: String,
     pub latest_label: String,
+    earlier_handlers: Vec<EventHandler>,
+    latest_handlers: Vec<EventHandler>,
 }
 
 impl MessageScroller {
@@ -118,7 +120,23 @@ impl MessageScroller {
             loading: false,
             earlier_label: "Load earlier messages".into(),
             latest_label: "Jump to latest".into(),
+            earlier_handlers: Vec::new(),
+            latest_handlers: Vec::new(),
         }
+    }
+
+    /// Adds a handler invoked when available earlier history is requested.
+    #[must_use]
+    pub fn on_load_earlier(mut self, handler: EventHandler) -> Self {
+        self.earlier_handlers.push(handler);
+        self
+    }
+
+    /// Adds a handler invoked when the user requests the latest message.
+    #[must_use]
+    pub fn on_latest(mut self, handler: EventHandler) -> Self {
+        self.latest_handlers.push(handler);
+        self
     }
 
     #[must_use]
@@ -143,13 +161,18 @@ impl MessageScroller {
     /// Builds the message scroller and its controls using `theme`.
     pub fn build(self, theme: &WidgetTheme) -> Element {
         let history = self.has_earlier.then(|| {
-            Button::new(
+            let mut button = Button::new(
                 format!("{}::earlier", self.key),
-                self.earlier_label,
+                &self.earlier_label,
                 theme.ghost_button(),
             )
-            .enabled(!self.loading)
-            .build()
+            .enabled(!self.loading);
+            if !self.loading {
+                for handler in &self.earlier_handlers {
+                    button = button.on_click(*handler);
+                }
+            }
+            button.build()
         });
         let viewport = ScrollArea::new(
             &self.key,
@@ -159,12 +182,15 @@ impl MessageScroller {
         )
         .build(theme);
         let latest = (!self.state.following).then(|| {
-            Button::new(
+            let mut button = Button::new(
                 format!("{}::latest", self.key),
                 format!("{} ({})", self.latest_label, self.state.unread),
                 theme.outline_button(),
-            )
-            .build()
+            );
+            for handler in &self.latest_handlers {
+                button = button.on_click(*handler);
+            }
+            button.build()
         });
         Element::column(std::iter::once(viewport).chain(latest)).gap(8.0)
     }

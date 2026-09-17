@@ -362,7 +362,7 @@ fn gpu_trace_round_trip_preserves_strict_timeline_data() {
     });
     inspector.select(Some(InspectNodeId(9)));
     inspector.record_ui(FrameRecord {
-        update: Invalidation::Paint,
+        update: Invalidation::Composite,
         vector_atlas_entries: 5,
         vector_atlas_hits: 8,
         vector_rasterizations: 1,
@@ -399,7 +399,7 @@ fn gpu_trace_round_trip_preserves_strict_timeline_data() {
     imported.import_trace_json(&json).unwrap();
     let frame = imported.frames().pop().unwrap();
     let pass = &frame.gpu.unwrap().passes[0];
-    assert_eq!(frame.update, Invalidation::Paint);
+    assert_eq!(frame.update, Invalidation::Composite);
     assert_eq!(frame.adapter.features, "TIMESTAMP_QUERY");
     assert_eq!(frame.vector_atlas_entries, 5);
     assert_eq!(frame.vector_atlas_hits, 8);

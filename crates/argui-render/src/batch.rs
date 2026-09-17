@@ -54,7 +54,10 @@ pub(crate) fn build_batches(
                 vector += 1;
                 Some((DrawKind::Vector, instances))
             }
-            DisplayCommand::BeginLayer(_) | DisplayCommand::EndLayer => None,
+            DisplayCommand::BeginLayer(_)
+            | DisplayCommand::EndLayer
+            | DisplayCommand::BeginCompositor(_)
+            | DisplayCommand::EndCompositor => None,
         };
         let Some((kind, instances)) = draw else {
             continue;

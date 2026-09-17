@@ -279,6 +279,7 @@ fn ellipse_contains(bounds: Rect, point: Point) -> bool {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct InteractionUpdate {
     pub events: Vec<crate::UiEvent>,
+    pub composite_changed: bool,
     pub paint_changed: bool,
     pub scroll_changed: bool,
     pub layout_changed: bool,
@@ -288,11 +289,25 @@ pub struct InteractionUpdate {
 }
 
 impl InteractionUpdate {
+    /// Returns whether this update carries no events, invalidations, requests, or clipboard work.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.events.is_empty()
+            && !self.composite_changed
+            && !self.paint_changed
+            && !self.scroll_changed
+            && !self.layout_changed
+            && !self.text_input_changed
+            && self.clipboard.is_none()
+            && !self.frame_requested
+    }
+
     /// Combines another update's events and change flags into this update.
     ///
     /// * `other` — update whose effects are merged into this value.
     pub fn merge(&mut self, other: Self) {
         self.events.extend(other.events);
+        self.composite_changed |= other.composite_changed;
         self.paint_changed |= other.paint_changed;
         self.scroll_changed |= other.scroll_changed;
         self.layout_changed |= other.layout_changed;
@@ -319,7 +334,8 @@ impl RawUpdate {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct InteractionState {
     hovered: HashMap<PointerId, NodeId>,
-    pressed: HashMap<PointerId, NodeId>,
+    mouse_position: Option<Point>,
+    pressed: HashMap<PointerId, pointer::PressRecord>,
     keyboard_pressed: Option<NodeId>,
     focused: Option<NodeId>,
     focus_visible: bool,
@@ -341,6 +357,14 @@ impl InteractionState {
     pub(crate) fn captured_node(&self, pointer: PointerId) -> Option<NodeId> {
         self.captured.get(&pointer).copied()
     }
+
+    /// Returns the most recently observed mouse position.
+    ///
+    /// Returns `None` before the tree receives a mouse position or after the pointer leaves.
+    pub(crate) const fn mouse_position(&self) -> Option<Point> {
+        self.mouse_position
+    }
+
     pub fn visual_states(&self, node: NodeId) -> VisualStates {
         let mut states = VisualStates::NONE;
         if self.focused == Some(node) {
@@ -352,8 +376,10 @@ impl InteractionState {
         if self.hovered.values().any(|hovered| *hovered == node) {
             states.insert(VisualState::Hovered);
         }
-        if self.pressed.values().any(|pressed| *pressed == node)
-            || self.keyboard_pressed == Some(node)
+        if self.pressed.iter().any(|(pointer, press)| {
+            press.target == node
+                && (!press.activation_cancelled || self.captured.get(pointer) == Some(&node))
+        }) || self.keyboard_pressed == Some(node)
         {
             states.insert(VisualState::Pressed);
         }
@@ -366,11 +392,15 @@ impl InteractionState {
         regions: &[HitRegion],
         preserve_on_background: bool,
     ) -> RawUpdate {
-        let target = self.pressed.get(&pointer).copied().filter(|target| {
-            regions.iter().any(|region| {
-                region.node == *target && region.enabled && region.focus_policy.is_focusable()
-            })
-        });
+        let target = self
+            .pressed
+            .get(&pointer)
+            .map(|press| press.target)
+            .filter(|target| {
+                regions.iter().any(|region| {
+                    region.node == *target && region.enabled && region.focus_policy.is_focusable()
+                })
+            });
         let Some(target) = target else {
             return if preserve_on_background {
                 RawUpdate::default()
@@ -508,7 +538,7 @@ impl InteractionState {
     pub fn retain(&mut self, ids: &[NodeId]) {
         let exists = |candidate: Option<NodeId>| candidate.is_some_and(|id| ids.contains(&id));
         self.hovered.retain(|_, node| ids.contains(node));
-        self.pressed.retain(|_, node| ids.contains(node));
+        self.pressed.retain(|_, press| ids.contains(&press.target));
         if !exists(self.keyboard_pressed) {
             self.keyboard_pressed = None;
         }

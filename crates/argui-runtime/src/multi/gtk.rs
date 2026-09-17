@@ -42,12 +42,17 @@ pub(crate) fn launch(mut application: MultiApplication) -> Result<(), RuntimeErr
             exit: Cell::new(false),
         };
         match event {
-            Event::NewEvents(StartCause::Init) => {
-                for spec in application.config.windows.clone() {
-                    application.open_window(&context, spec);
+            Event::NewEvents(cause) => {
+                if cause == StartCause::Init {
+                    for spec in application.config.windows.clone() {
+                        application.open_window(&context, spec);
+                    }
+                    application.sync_tray();
+                    application.process_pending(&context);
                 }
-                application.sync_tray();
-                application.process_pending(&context);
+                for entry in application.windows.values_mut() {
+                    entry.runtime.wake_due_animation();
+                }
             }
             Event::WindowEvent {
                 window_id, event, ..
@@ -139,7 +144,15 @@ pub(crate) fn launch(mut application: MultiApplication) -> Result<(), RuntimeErr
         } else if let Some(deadline) = application
             .windows
             .values()
-            .filter_map(|entry| entry.runtime.native_deadline())
+            .filter_map(|entry| {
+                [
+                    entry.runtime.next_animation_deadline(),
+                    entry.runtime.native_deadline(),
+                ]
+                .into_iter()
+                .flatten()
+                .min()
+            })
             .min()
         {
             *control = ControlFlow::WaitUntil(deadline);

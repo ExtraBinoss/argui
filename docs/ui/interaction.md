@@ -22,6 +22,21 @@ then bubbling to root. `stop_propagation`, `stop_immediate_propagation`, and
 `prevent_default` act on the shared event control. Passive listeners cannot
 prevent defaults.
 
+For an ordinary widget, prefer its local direct API: `Button::on_click`,
+`Input::on_input`, `TextArea::on_edit`, `Checkbox::on_change`, `Select::on_select`, and the other
+handlers listed in the [widget interaction inventory](../widgets/interaction-api.md).
+These bindings use the same dispatch pipeline and keyboard/accessibility
+behavior, but do not require bubbling, `target_key()` comparisons, event-kind
+matching, or explicit invalidation when paired with `Context::callback` or
+`value_callback`. Use listeners when capture or deliberate ancestor delegation
+is the actual design.
+
+`EventType::TextEdit` carries `UiEventKind::TextEdited(TextEdit)` through that
+same pipeline. `Context::edit_callback` invalidates automatically;
+`edit_event_handler` leaves invalidation to the app. The legacy
+`EventType::Input`/`TextChanged(String)` path is still supported, but a complete
+value is copied only when that event has a listener on the propagation path.
+
 Hit regions follow paint order and are tested in reverse. A target must pass its
 own hit shape and every ancestor clip. Paint and hit-test ordering change
 together.
@@ -45,6 +60,12 @@ sets axis, threshold, capture, and delivery:
 Pinch and rotation can run together. Velocity uses a bounded recent history.
 Touch can drive scroll containers while the same contacts remain available to
 configured gestures.
+
+Document text selection follows browser-style mouse behavior. Pressing directly
+on selectable text anchors at that glyph; starting a drag in non-interactive
+whitespace anchors at the nearest selectable text and extends across the
+document. Interactive hit regions such as buttons, editors, resize handles, and
+custom gestures keep ownership of the pointer and never trigger this fallback.
 
 ## Keyboard and focus
 
@@ -83,9 +104,9 @@ its ancestor.
 - hit slop enlarges a touch target without changing layout or pixels.
 
 Transforms and clips apply before hit testing. Style properties keep their
-invalidation class: color updates paint, transforms update paint and hit
-geometry, and dimensions update layout. Transitions retain tracks beside stable
-node IDs and stop requesting frames when settled.
+invalidation class: color updates paint, transforms update retained composition
+and hit geometry, and dimensions update layout. Transitions retain tracks beside
+stable node IDs and stop requesting frames when settled.
 
 Container queries are for deliberate presentation changes that Flexbox or Grid
 cannot infer. See [responsive styling](styling.md).

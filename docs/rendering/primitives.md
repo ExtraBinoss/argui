@@ -8,7 +8,9 @@ WGPU. Native and WebAssembly use the same display list.
 
 `Transform2D` supports translation, scale, rotation, skew, and normalized
 `TransformOrigin`. Transforms apply after layout to quads, text, images, vectors,
-clips, effects, and hit testing, so animation does not rerun Taffy.
+clips, effects, and hit testing. Retained transform motion uses the
+[compositor path](compositor.md), so animation reruns neither Taffy nor primitive
+preparation.
 
 The type implements `Interpolate` and `MotionValue` and works with keyframes,
 springs, decay, and velocity-preserving retargeting.

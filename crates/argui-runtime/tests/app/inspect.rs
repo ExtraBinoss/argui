@@ -182,17 +182,15 @@ fn snapshots_skip_uninspectable_subtrees_without_losing_siblings() {
     ]);
     let tree = UiTree::new(root);
     let visible = tree.node_ids()[3];
-    let layout = LayoutOutput {
-        nodes: vec![LayoutNode {
-            index: 3,
-            node: visible,
-            bounds: Rect::new(Point::new(5.0, 6.0), Size::new(7.0, 8.0)),
-            layout_bounds: Rect::default(),
-            clip: None,
-            text_index: None,
-        }],
-        ..LayoutOutput::default()
-    };
+    let mut layout = LayoutOutput::default();
+    layout.nodes.push(LayoutNode {
+        index: 3,
+        node: visible,
+        bounds: Rect::new(Point::new(5.0, 6.0), Size::new(7.0, 8.0)),
+        layout_bounds: Rect::default(),
+        clip: None,
+        text_index: None,
+    });
     let snapshot = Inspection::snapshot(&tree, &layout);
     assert_eq!(snapshot.nodes.len(), 3);
     assert_eq!(snapshot.nodes[1].key.as_deref(), Some("visible-image"));
@@ -560,11 +558,12 @@ fn snapshots_cover_every_media_summary_and_empty_identity_input() {
         element.kind = ElementKind::TextEditor {
             value: initial_value.into(),
             placeholder: "placeholder".into(),
+            styled: None,
             multiline,
             read_only: false,
             filter: argui_ui::TextInputFilter::Any,
             text: argui_text::TextStyle::default(),
-            placeholder_text: argui_text::TextStyle::default(),
+            placeholder_text: Box::new(argui_text::TextStyle::default()),
             selection: Color::WHITE,
             caret: argui_ui::CaretStyle::default(),
         };

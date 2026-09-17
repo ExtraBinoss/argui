@@ -1,8 +1,8 @@
 use argui_core::Color;
 use argui_paint::{Border, CornerRadii, Filter, PaintStyle, QuadStyle};
 use argui_ui::{
-    AlignItems, Display, Element, JustifyContent, Sides, ViewportPlacement, WindowLayer, length,
-    percent,
+    AlignItems, Display, Element, EventFilter, EventHandler, EventType, JustifyContent, Sides,
+    ValueHandler, ViewportPlacement, WindowLayer, length, percent,
 };
 
 use crate::{DialogBehavior, DialogPart, WidgetTheme};
@@ -32,6 +32,8 @@ pub struct Dialog {
     placement: DialogPlacement,
     initial_focus: Option<argui_ui::InitialFocus>,
     alert: bool,
+    open_handlers: Vec<ValueHandler<bool>>,
+    dismiss_handlers: Vec<EventHandler>,
 }
 
 impl Dialog {
@@ -60,6 +62,8 @@ impl Dialog {
             placement: DialogPlacement::Center,
             initial_focus: None,
             alert: false,
+            open_handlers: Vec::new(),
+            dismiss_handlers: Vec::new(),
         }
     }
 
@@ -119,6 +123,20 @@ impl Dialog {
         self
     }
 
+    /// Adds a callback receiving the requested controlled open state.
+    #[must_use]
+    pub fn on_open_change(mut self, handler: ValueHandler<bool>) -> Self {
+        self.open_handlers.push(handler);
+        self
+    }
+
+    /// Adds a callback for backdrop, close-control, or Escape dismissal.
+    #[must_use]
+    pub fn on_dismiss(mut self, handler: EventHandler) -> Self {
+        self.dismiss_handlers.push(handler);
+        self
+    }
+
     #[must_use]
     /// Builds the dialog using `theme` for its default backdrop and panel styling.
     pub fn build(self, theme: &WidgetTheme) -> Element {
@@ -126,7 +144,10 @@ impl Dialog {
         if let Some(focus) = self.initial_focus {
             behavior = behavior.initial_focus(focus);
         }
-        let trigger = behavior.decorate(DialogPart::Trigger, self.trigger);
+        let mut trigger = behavior.decorate(DialogPart::Trigger, self.trigger);
+        for handler in &self.open_handlers {
+            trigger = trigger.on(handler.direct_listener_value(EventType::Click, true));
+        }
         let overlay = self.open.then(|| {
             let backdrop_blur = self
                 .backdrop_blur
@@ -141,7 +162,13 @@ impl Dialog {
             if backdrop_blur > 0.0 {
                 backdrop = backdrop.backdrop_filter(Filter::Blur(backdrop_blur));
             }
-            let backdrop = behavior.decorate(DialogPart::Backdrop, backdrop);
+            let mut backdrop = behavior.decorate(DialogPart::Backdrop, backdrop);
+            for handler in &self.open_handlers {
+                backdrop = backdrop.on(handler.direct_listener_value(EventType::Click, false));
+            }
+            for handler in &self.dismiss_handlers {
+                backdrop = backdrop.on(handler.direct_listener(EventType::Click));
+            }
             let panel_paint = self.panel_paint.unwrap_or_else(|| {
                 PaintStyle::new(
                     QuadStyle::solid(theme.popover)
@@ -188,7 +215,7 @@ impl Dialog {
                 }
             };
             let panel = behavior.decorate(DialogPart::Panel, panel);
-            behavior.decorate(
+            let mut overlay = behavior.decorate(
                 DialogPart::Overlay,
                 Element::container([backdrop, panel])
                     .width(percent(1.0))
@@ -198,7 +225,26 @@ impl Dialog {
                     .align_items(align)
                     .justify_content(justify)
                     .viewport_portal(WindowLayer::Modal, ViewportPlacement::fill()),
-            )
+            );
+            for handler in &self.open_handlers {
+                overlay = overlay
+                    .on(handler
+                        .listener_value(EventType::Click, false)
+                        .target_key(behavior.close_key()))
+                    .on(handler
+                        .listener_value(EventType::Key, false)
+                        .filter(EventFilter::EscapePressed));
+            }
+            for handler in &self.dismiss_handlers {
+                overlay = overlay
+                    .on(handler
+                        .listener(EventType::Click)
+                        .target_key(behavior.close_key()))
+                    .on(handler
+                        .listener(EventType::Key)
+                        .filter(EventFilter::EscapePressed));
+            }
+            overlay
         });
         behavior.decorate(
             DialogPart::Root,

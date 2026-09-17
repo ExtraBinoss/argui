@@ -57,21 +57,9 @@ impl ToastDemo {
             self.error = format!("{error:?}");
         }
     }
-    fn event(&mut self, event: &UiEvent, cx: &mut Context<Self>) {
-        if let Some(id) = (ToastHost {
-            key: "toasts",
-            state: &self.state,
-            close_label: "Close",
-        })
-        .close_action(event)
-        {
-            self.state.close(id, self.origin.elapsed());
-        } else if let Some((id, reason, paused)) = (ToastHost {
-            key: "toasts",
-            state: &self.state,
-            close_label: "Close",
-        })
-        .pause_action(event)
+    fn pause_event(&mut self, event: &UiEvent, cx: &mut Context<Self>) {
+        if let Some((id, reason, paused)) =
+            ToastHost::new("toasts", &self.state, "Close").pause_action(event)
         {
             self.state.pause(&id, reason, paused, self.origin.elapsed());
         } else {
@@ -85,21 +73,23 @@ impl Render for ToastDemo {
         self.schedule(cx);
         let themes = shadcn(cx.environment());
         let theme = themes.resolve(cx.environment().color_scheme);
-        ToastHost {
-            key: "toasts",
-            state: &self.state,
-            close_label: "Close",
-        }
-        .build(theme, &self.icons)
-        .on(cx.listener(EventType::Click, Self::event))
-        .on(cx
-            .listener(EventType::PointerEnter, Self::event)
-            .capture(true))
-        .on(cx
-            .listener(EventType::PointerLeave, Self::event)
-            .capture(true))
-        .on(cx.listener(EventType::Focus, Self::event).capture(true))
-        .on(cx.listener(EventType::Blur, Self::event).capture(true))
+        ToastHost::new("toasts", &self.state, "Close")
+            .on_close(cx.value_callback(|demo, id: String| {
+                demo.state.close(&id, demo.origin.elapsed());
+            }))
+            .build(theme, &self.icons)
+            .on(cx
+                .listener(EventType::PointerEnter, Self::pause_event)
+                .capture(true))
+            .on(cx
+                .listener(EventType::PointerLeave, Self::pause_event)
+                .capture(true))
+            .on(cx
+                .listener(EventType::Focus, Self::pause_event)
+                .capture(true))
+            .on(cx
+                .listener(EventType::Blur, Self::pause_event)
+                .capture(true))
     }
 }
 
@@ -109,17 +99,19 @@ pub(crate) fn controls(
     cx: &mut Context<crate::WidgetGallery>,
 ) -> Element {
     let error = entity.read(|demo| demo.error.clone());
-    let entity = entity.clone();
+    let add = {
+        let entity = entity.clone();
+        cx.callback(move |_| {
+            entity.update(|demo, cx| {
+                demo.add();
+                cx.notify();
+            });
+        })
+    };
     Element::column([
         Button::new("toast-add", "Show notification", theme.button())
-            .build()
-            .on(cx.listener(EventType::Click, move |_, _, cx| {
-                entity.update(|demo, cx| {
-                    demo.add();
-                    cx.notify();
-                });
-                cx.notify();
-            })),
+            .on_click(add)
+            .build(),
         Element::text(error).text_style(argui::text::TextStyle {
             color: theme.muted_foreground,
             ..Default::default()

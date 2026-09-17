@@ -155,6 +155,7 @@ fn both_axes_preserve_pixel_precision() {
     );
     assert_eq!(tree.scroll_offset(node), Point::new(3.25, 7.5));
 }
+
 #[test]
 fn exhausted_nested_scrolls_chain_to_their_parent() {
     let mut tree = UiTree::new(Element::column([

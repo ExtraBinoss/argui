@@ -1,4 +1,4 @@
-use argui_ui::{Element, ScrollConfig, VirtualList};
+use argui_ui::{Element, ScrollConfig, ValueHandler, VirtualList};
 
 use crate::WidgetTheme;
 
@@ -12,6 +12,8 @@ pub struct VList {
     pub row_height: f32,
     pub effects: Vec<argui_ui::ScrollEffect>,
     pub propagation: argui_ui::ScrollPropagation,
+    select_handlers: Vec<ValueHandler<String>>,
+    activate_handlers: Vec<ValueHandler<String>>,
 }
 
 impl VList {
@@ -32,6 +34,8 @@ impl VList {
             offset: offset.max(0.0),
             effects: Vec::new(),
             propagation: argui_ui::ScrollPropagation::Chain,
+            select_handlers: Vec::new(),
+            activate_handlers: Vec::new(),
         }
     }
 
@@ -50,6 +54,20 @@ impl VList {
         list
     }
 
+    /// Adds a handler that receives the stable id selected in [`Self::build_list`].
+    #[must_use]
+    pub fn on_select(mut self, handler: ValueHandler<String>) -> Self {
+        self.select_handlers.push(handler);
+        self
+    }
+
+    /// Adds a handler that receives the stable id activated in [`Self::build_list`].
+    #[must_use]
+    pub fn on_activate(mut self, handler: ValueHandler<String>) -> Self {
+        self.activate_handlers.push(handler);
+        self
+    }
+
     /// Builds selectable rows with the same behavior as a non-virtual List.
     /// `collection` supplies items, `state` supplies controlled selection, `multiple` enables multi-selection, `theme` styles rows, and `row` builds them.
     #[must_use]
@@ -61,7 +79,13 @@ impl VList {
         theme: &WidgetTheme,
         mut row: impl FnMut(usize) -> Element,
     ) -> Element {
-        let list = crate::List::new(&self.key, collection).selection(state, multiple);
+        let mut list = crate::List::new(&self.key, collection).selection(state, multiple);
+        for handler in &self.select_handlers {
+            list = list.on_select(*handler);
+        }
+        for handler in &self.activate_handlers {
+            list = list.on_activate(*handler);
+        }
         let pinned = state
             .active
             .as_deref()

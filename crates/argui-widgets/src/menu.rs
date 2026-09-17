@@ -1,8 +1,8 @@
 use crate::{Button, Popover, PopoverAction, PopoverBehavior, WidgetTheme};
 use argui_core::{Key, KeyState};
 use argui_ui::{
-    ActionInvocation, Element, FocusTarget, JustifyContent, Role, Semantics, UiEvent, UiEventKind,
-    percent,
+    ActionInvocation, Element, EventType, FocusTarget, JustifyContent, Role, Semantics, UiEvent,
+    UiEventKind, ValueHandler, percent,
 };
 
 mod intent;
@@ -45,6 +45,8 @@ pub struct Menu {
     pub path: Vec<String>,
     pub rtl: bool,
     icons: Option<crate::WidgetAssets>,
+    action_handlers: Vec<ValueHandler<String>>,
+    open_handlers: Vec<ValueHandler<bool>>,
 }
 
 impl Menu {
@@ -83,7 +85,23 @@ impl Menu {
             path: Vec::new(),
             rtl: false,
             icons: None,
+            action_handlers: Vec::new(),
+            open_handlers: Vec::new(),
         }
+    }
+
+    /// Adds a callback receiving the stable ID of an activated leaf item.
+    #[must_use]
+    pub fn on_action(mut self, handler: ValueHandler<String>) -> Self {
+        self.action_handlers.push(handler);
+        self
+    }
+
+    /// Adds a callback receiving the requested controlled open state.
+    #[must_use]
+    pub fn on_open_change(mut self, handler: ValueHandler<bool>) -> Self {
+        self.open_handlers.push(handler);
+        self
     }
     #[must_use]
     /// Sets the overlay surface policy.
@@ -128,6 +146,9 @@ impl Menu {
         }
         if let Some(presence) = &self.presence {
             popover = popover.presence(presence);
+        }
+        for handler in &self.open_handlers {
+            popover = popover.on_open_change(*handler);
         }
         let mut root = popover.build(theme);
         if let Some(content) = root.children.get_mut(1) {
@@ -271,6 +292,19 @@ impl Menu {
                 }
                 MenuItemKind::Separator | MenuItemKind::Group(_) => {
                     unreachable!("structural entries rendered above")
+                }
+            }
+            if item.enabled()
+                && matches!(
+                    item.kind,
+                    MenuItemKind::Action(_)
+                        | MenuItemKind::Checkbox(_)
+                        | MenuItemKind::Radio { .. }
+                )
+            {
+                for handler in &self.action_handlers {
+                    element = element
+                        .on(handler.direct_listener_value(EventType::Click, item.id.clone()));
                 }
             }
             element

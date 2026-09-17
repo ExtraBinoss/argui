@@ -1,8 +1,9 @@
 use argui_core::{Affine2D, Color, Point, Rect, Size};
 use argui_paint::{
-    Border, ClipChain, CornerRadii, DisplayList, EffectId, EffectInstance, Fill, Filter,
-    GpuCanvasId, GpuCanvasPrimitive, ImageFit, ImageId, ImagePrimitive, ImageSampling, LayerMask,
-    LayerStyle, ProfileDomain, Quad, Refraction, RenderObjectId, Shadow, VectorId, VectorPrimitive,
+    Border, ClipChain, CompositorId, CompositorLayer, CornerRadii, DisplayList, EffectId,
+    EffectInstance, Fill, Filter, GpuCanvasId, GpuCanvasPrimitive, ImageFit, ImageId,
+    ImagePrimitive, ImageSampling, LayerMask, LayerStyle, ProfileDomain, Quad, Refraction,
+    RenderObjectId, Shadow, VectorId, VectorPrimitive,
 };
 use argui_render::analyze_display_list;
 
@@ -157,4 +158,23 @@ fn canvas_draws_keep_display_order_and_participate_in_effect_layers() {
     assert_eq!(analysis.stats.draw_batches, 4);
     assert_eq!(analysis.stats.offscreen_layers, 1);
     assert_eq!(analysis.stats.filter_passes, 1);
+}
+
+#[test]
+fn identity_compositor_layers_are_pre_promoted_for_future_animation_frames() {
+    let mut list = DisplayList::new();
+    list.begin_compositor(CompositorLayer::new(
+        CompositorId::new(9),
+        bounds(),
+        Affine2D::IDENTITY,
+        Affine2D::IDENTITY,
+        1.0,
+    ));
+    list.push_quad(quad());
+    list.end_compositor();
+
+    let analysis = analyze_display_list(&list, &[], [320.0, 240.0], 1.0, 4).unwrap();
+    assert_eq!(analysis.stats.layers, 1);
+    assert_eq!(analysis.stats.offscreen_layers, 1);
+    assert_eq!(analysis.stats.draw_batches, 1);
 }

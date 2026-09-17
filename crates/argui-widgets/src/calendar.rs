@@ -3,8 +3,8 @@ use argui_core::{Key, KeyState};
 use argui_paint::{Border, CornerRadii};
 use argui_text::{TextStyle, TextWrap};
 use argui_ui::{
-    AlignItems, Element, FocusPolicy, GridPosition, JustifyContent, Role, SemanticState, Semantics,
-    Sides, UiEvent, UiEventKind, length, percent,
+    AlignItems, Element, EventType, FocusPolicy, GridPosition, JustifyContent, Role, SemanticState,
+    Semantics, Sides, UiEvent, UiEventKind, ValueHandler, length, percent,
 };
 use time::{Date, Duration, Weekday};
 
@@ -65,6 +65,7 @@ pub struct Calendar<'a> {
     pub today: Date,
     pub locale: &'a dyn CalendarLocale,
     pub constraints: CalendarConstraints<'a>,
+    select_handlers: Vec<ValueHandler<String>>,
 }
 
 impl<'a> Calendar<'a> {
@@ -85,7 +86,17 @@ impl<'a> Calendar<'a> {
             today,
             locale: &IsoCalendarLocale,
             constraints: CalendarConstraints::default(),
+            select_handlers: Vec::new(),
         }
+    }
+
+    /// Adds a handler that receives the selected date in ISO `YYYY-MM-DD` form.
+    ///
+    /// `handler` is additive and is not delivered for constrained or disabled days.
+    #[must_use]
+    pub fn on_select(mut self, handler: ValueHandler<String>) -> Self {
+        self.select_handlers.push(handler);
+        self
     }
 
     /// Returns the interaction key used for `date`'s day cell.
@@ -178,6 +189,12 @@ impl<'a> Calendar<'a> {
                 let mut element = Button::new(self.day_key(date), self.locale.format(date), style)
                     .enabled(enabled)
                     .build();
+                if enabled {
+                    for handler in &self.select_handlers {
+                        element = element
+                            .on(handler.direct_listener_value(EventType::Click, date.to_string()));
+                    }
+                }
                 element.children =
                     vec![day(date, date == self.today, selected).semantic_hidden(true)];
                 if let Some(interaction) = &mut element.interaction {

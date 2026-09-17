@@ -74,11 +74,12 @@ pub enum ElementKind {
     TextEditor {
         value: String,
         placeholder: String,
+        styled: Option<Box<TextContent>>,
         multiline: bool,
         read_only: bool,
         filter: crate::TextInputFilter,
         text: TextStyle,
-        placeholder_text: TextStyle,
+        placeholder_text: Box<TextStyle>,
         selection: Color,
         caret: crate::CaretStyle,
     },

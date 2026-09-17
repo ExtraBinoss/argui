@@ -13,6 +13,8 @@ impl WidgetGallery {
     pub(super) fn render_element(&mut self, cx: &mut Context<Self>) -> Element {
         let environment = cx.environment();
         let safe_area_insets = environment.safe_area_insets;
+        #[cfg(target_os = "android")]
+        argui::platform::mobile::set_android_system_bar_color_scheme(environment.color_scheme);
         let themes = shadcn(&environment);
         let theme = themes.resolve(environment.color_scheme);
         let assets = match environment.color_scheme {
@@ -35,17 +37,23 @@ impl WidgetGallery {
                 cx.notify();
             }
         });
-        self.view(
-            environment,
-            theme,
-            assets,
-            cx,
-            ResizeListeners {
-                textarea: resize_listener,
-                textarea_reset: resize_reset_listener,
-            },
-        )
-        .safe_area(safe_area_insets)
+        let root = self
+            .view(
+                environment,
+                theme,
+                assets,
+                cx,
+                ResizeListeners {
+                    textarea: resize_listener,
+                    textarea_reset: resize_reset_listener,
+                },
+            )
+            .safe_area(safe_area_insets);
+        if safe_area_insets == argui::core::Insets::ZERO {
+            root
+        } else {
+            root.background(theme.background)
+        }
     }
 
     fn resize_editor(&mut self, gesture: argui::ui::GestureEvent, cx: &mut Context<Self>) {

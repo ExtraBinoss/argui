@@ -48,14 +48,14 @@ impl<A> DevtoolsHost<A> {
         nodes: &'a [TreeNode],
         selected: Option<&'a str>,
     ) -> TreeView<'a> {
-        TreeView {
+        TreeView::new(
             nodes,
             selected,
-            collapsed: &self.collapsed,
-            list: VList::new("__devtools-tree", 28.0, self.tree_height, self.tree_offset)
+            &self.collapsed,
+            VList::new("__devtools-tree", 28.0, self.tree_height, self.tree_offset)
                 .effects(self.scroll_effect.clone()),
-            disclosure: Some(self.icons.chevron),
-        }
+        )
+        .disclosure(Some(self.icons.chevron))
     }
 }
 

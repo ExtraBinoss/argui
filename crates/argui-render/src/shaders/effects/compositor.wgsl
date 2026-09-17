@@ -79,6 +79,14 @@ fn sample_backdrop(pixel: vec2<f32>) -> vec4<f32> {
     return textureSampleLevel(backdrop_texture, linear_sampler, allocated_uv(pixel, params.backdrop, params.backdrop_uv), 0.0);
 }
 
+fn retained_pixel(pixel: vec2<f32>) -> vec2<f32> {
+    let point = vec3<f32>(pixel, 1.0);
+    return vec2<f32>(
+        dot(point, params.matrix[0].xyz),
+        dot(point, params.matrix[1].xyz),
+    );
+}
+
 fn mask_coverage(pixel: vec2<f32>) -> f32 {
     let center = params.bounds.xy + params.bounds.zw * 0.5;
     let local = pixel - center;
@@ -124,10 +132,12 @@ fn sample_blur(pixel: vec2<f32>, axis: vec2<f32>) -> vec4<f32> {
 @fragment
 fn fs_main(input: VertexOut) -> @location(0) vec4<f32> {
     let pixel = global_pixel(input.uv);
-    let original = sample_source(pixel);
+    var source_pixel = pixel;
+    if params.mode == 0u { source_pixel = retained_pixel(pixel); }
+    let original = sample_source(source_pixel);
     var source = original;
     let backdrop = sample_backdrop(pixel);
-    if params.mode == 0u { return composite(source, backdrop, pixel); }
+    if params.mode == 0u { return composite(source, backdrop, source_pixel); }
     if params.mode == 1u { source = sample_blur(pixel, vec2<f32>(1.0, 0.0)); }
     if params.mode == 2u { source = sample_blur(pixel, vec2<f32>(0.0, 1.0)); }
     if params.mode == 8u {

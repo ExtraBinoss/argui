@@ -1,6 +1,8 @@
 use crate::{Button, Menu, MenuResponse, WidgetTheme};
 use argui_core::{Key, KeyState};
-use argui_ui::{Element, FocusPolicy, FocusTarget, Role, Semantics, UiEvent, UiEventKind};
+use argui_ui::{
+    Element, FocusPolicy, FocusTarget, Role, Semantics, UiEvent, UiEventKind, ValueHandler,
+};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum MenubarResponse {
@@ -15,9 +17,53 @@ pub struct Menubar<'a> {
     pub menus: &'a [Menu],
     pub active: Option<&'a str>,
     pub rtl: bool,
+    action_handlers: Vec<ValueHandler<String>>,
+    open_handlers: Vec<ValueHandler<bool>>,
 }
 
-impl Menubar<'_> {
+impl<'a> Menubar<'a> {
+    /// Creates a controlled menubar from `menus`, identified and named by `key` and `label`.
+    #[must_use]
+    pub fn new(key: &'a str, label: &'a str, menus: &'a [Menu]) -> Menubar<'a> {
+        Menubar {
+            key,
+            label,
+            menus,
+            active: None,
+            rtl: false,
+            action_handlers: Vec::new(),
+            open_handlers: Vec::new(),
+        }
+    }
+
+    /// Sets the stable key of the currently active top-level menu.
+    #[must_use]
+    pub fn active(mut self, active: Option<&'a str>) -> Self {
+        self.active = active;
+        self
+    }
+
+    /// Sets right-to-left keyboard and visual navigation when `rtl` is true.
+    #[must_use]
+    pub fn rtl(mut self, rtl: bool) -> Self {
+        self.rtl = rtl;
+        self
+    }
+
+    /// Adds a handler that receives the stable id of an activated menu item.
+    #[must_use]
+    pub fn on_action(mut self, handler: ValueHandler<String>) -> Self {
+        self.action_handlers.push(handler);
+        self
+    }
+
+    /// Adds a handler receiving requested nested-menu open states.
+    #[must_use]
+    pub fn on_open_change(mut self, handler: ValueHandler<bool>) -> Self {
+        self.open_handlers.push(handler);
+        self
+    }
+
     /// Builds the configured menus in a horizontal menubar using `theme` for their controls.
     ///
     /// # Panics
@@ -27,6 +73,12 @@ impl Menubar<'_> {
         Element::row(self.menus.iter().enumerate().map(|(index, menu)| {
             let mut menu = menu.clone();
             menu.rtl = self.rtl;
+            for handler in &self.action_handlers {
+                menu = menu.on_action(*handler);
+            }
+            for handler in &self.open_handlers {
+                menu = menu.on_open_change(*handler);
+            }
             let trigger = Button::new(&menu.key, &menu.label, theme.ghost_button()).build();
             let mut built = menu.build(trigger, theme);
             let trigger = &mut built.children[0];

@@ -9,6 +9,7 @@ use argui_text::{TextBlock, TextEngine, TextScene};
 use argui_ui::{
     Element, ElementKind, HitRegion, LayoutStyle, NodeId as UiNodeId, ScrollRegion, UiTree,
 };
+use std::collections::HashMap;
 use taffy::NodeId;
 
 mod compute;
@@ -43,6 +44,8 @@ pub struct LayoutOutput {
     pub desktop_backdrops: Vec<crate::DesktopBackdropRegion>,
     pub paint_stats: PaintStats,
     pub virtualization_changed: bool,
+    pub(crate) compositor_owners: HashMap<UiNodeId, argui_paint::CompositorId>,
+    pub(crate) composite_geometry: crate::composite::CompositeGeometry,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -303,13 +306,14 @@ fn collect_layout(
         );
         let text_clip = crate::text::clip(node, element, placement.clip, bounds);
         let text_clip = text_clip.unwrap_or_default();
-        let mut block = TextBlock::new(content, text_bounds);
+        let mut block = TextBlock::new(content.clone(), text_bounds);
         block.clip = text_clip;
         block.style = style.into_owned();
-        if let Some((region, scroll)) = input::prepare(
+        if let Some((region, scroll, paint)) = input::prepare(
             ui,
             node.node,
             element,
+            &block.content,
             text_engine,
             input::InputPlacement {
                 text: text_bounds,
@@ -319,9 +323,7 @@ fn collect_layout(
                 scroll_y: ui.scroll_offset(node.node).y,
             },
         ) {
-            block.bounds.origin.x -= scroll.x;
-            block.bounds.origin.y -= scroll.y;
-            block.bounds.size.height = block.bounds.size.height.max(region.content_size.height);
+            input::position_input_block(&mut block, text_bounds, scroll, paint, &content, &region);
             text_scroll = Some((region.scroll_content_size(), scroll));
             output.text_inputs.push(region);
         }

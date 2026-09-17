@@ -54,6 +54,13 @@ fn effect_layers_are_explicit_and_compute_conservative_bounds() {
 fn every_layer_feature_independently_requests_offscreen_rendering() {
     let plain = LayerStyle::new(bounds());
     assert!(!plain.requires_offscreen());
+    assert!(plain.clone().retained(true).requires_offscreen());
+    assert!(
+        plain
+            .clone()
+            .transform(argui_core::Affine2D::translation(3.0, 4.0))
+            .requires_offscreen()
+    );
     assert!(plain.clone().opacity(0.5).requires_offscreen());
     assert!(
         plain
@@ -137,5 +144,32 @@ fn balanced_nested_layers_validate_without_gpu_state() {
             .unwrap_err()
             .to_string()
             .contains("unclosed")
+    );
+}
+
+#[test]
+fn compositor_and_effect_layers_must_close_in_stack_order() {
+    use argui_paint::{CompositorId, CompositorLayer};
+
+    let compositor = CompositorLayer::new(
+        CompositorId::new(7),
+        bounds(),
+        argui_core::Affine2D::IDENTITY,
+        argui_core::Affine2D::IDENTITY,
+        1.0,
+    );
+    let mut list = DisplayList::new();
+    list.begin_compositor(compositor.clone());
+    list.begin_layer(LayerStyle::new(bounds()));
+    list.end_layer();
+    list.end_compositor();
+    assert_eq!(list.validate(), Ok(()));
+
+    let mut mismatched = DisplayList::new();
+    mismatched.begin_compositor(compositor);
+    mismatched.end_layer();
+    assert_eq!(
+        mismatched.validate(),
+        Err(DisplayListError::MismatchedLayerEnd { command: 1 })
     );
 }

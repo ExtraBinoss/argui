@@ -10,6 +10,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tarfile
 import tempfile
 import time
 import tomllib
@@ -111,11 +112,54 @@ def package_archives():
     for name in names:
         clean.extend(['--package', name])
     run(*clean)
-    args = ['cargo', 'package', '--locked', '--all-features', '--allow-dirty']
-    for name in names:
-        args.extend(['--package', name])
-    run(*args)
+    selection = [argument for name in names for argument in ('--package', name)]
+    # Package the complete publishable graph in one Cargo transaction so
+    # unpublished workspace versions resolve to one another instead of crates.io.
+    run('cargo', 'package', '--locked', '--all-features', '--allow-dirty',
+        '--no-verify', *selection)
+    verify_staged_archives(current, names)
     print(f'Verified {len(names)} crates.io archives at version {current}')
+
+
+def shared_target_directory():
+    """Return Cargo's configured target directory for this checkout."""
+    metadata = json.loads(run('cargo', 'metadata', '--locked', '--no-deps',
+                              '--format-version', '1', capture=True))
+    return Path(metadata['target_directory'])
+
+
+def verify_staged_archives(current, names):
+    """Compile packaged sources together against only the staged archives."""
+    target = shared_target_directory()
+    with tempfile.TemporaryDirectory(prefix='argui-package-') as directory:
+        staged = Path(directory)
+        config = staged / '.cargo' / 'config.toml'
+        config.parent.mkdir()
+        patches = []
+        members = []
+        for name in names:
+            archive = target / 'package' / f'{name}-{current}.crate'
+            if not archive.is_file():
+                raise ValueError(f'{name}: missing staged archive {archive}')
+            with tarfile.open(archive, mode='r:gz') as package:
+                package.extractall(staged, filter='data')
+            source = staged / f'{name}-{current}'
+            if not (source / 'Cargo.toml').is_file():
+                raise ValueError(f'{name}: archive has no normalized Cargo.toml')
+            patches.append(f'{name} = {{ path = {json.dumps(str(source))} }}')
+            members.append(json.dumps(source.name))
+        config.write_text('[patch.crates-io]\n' + '\n'.join(patches) + '\n')
+        (staged / 'Cargo.toml').write_text(
+            '[workspace]\nresolver = "2"\nmembers = [' + ', '.join(members) + ']\n'
+        )
+        environment = os.environ.copy()
+        environment['CARGO_TARGET_DIR'] = str(target)
+        subprocess.run(
+            ['cargo', 'check', '--offline', '--workspace', '--all-features'],
+            cwd=staged,
+            env=environment,
+            check=True,
+        )
 
 
 def registry_versions(name):

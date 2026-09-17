@@ -1,4 +1,4 @@
-use std::{num::NonZeroUsize, ops::Range};
+use std::{num::NonZeroUsize, ops::Range, sync::Arc};
 
 use argui_core::{Rect, Size};
 
@@ -262,10 +262,21 @@ impl TextSpan {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct TextContent {
+#[derive(Debug, PartialEq)]
+struct TextContentData {
     text: String,
     runs: Vec<(Range<usize>, TextSpanStyle)>,
+}
+
+#[derive(Clone, Debug)]
+pub struct TextContent {
+    data: Arc<TextContentData>,
+}
+
+impl PartialEq for TextContent {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.data, &other.data) || self.data == other.data
+    }
 }
 
 impl TextContent {
@@ -275,8 +286,10 @@ impl TextContent {
     #[must_use]
     pub fn plain(text: impl Into<String>) -> Self {
         Self {
-            text: text.into(),
-            runs: Vec::new(),
+            data: Arc::new(TextContentData {
+                text: text.into(),
+                runs: Vec::new(),
+            }),
         }
     }
 
@@ -295,23 +308,54 @@ impl TextContent {
                 runs.push((start..end, span.style));
             }
         }
-        Self { text, runs }
+        Self {
+            data: Arc::new(TextContentData { text, runs }),
+        }
     }
 
     /// Returns the concatenated UTF-8 text, without style metadata.
     #[must_use]
     pub fn as_str(&self) -> &str {
-        &self.text
+        &self.data.text
     }
 
     /// Returns whether this content contains any styled runs.
     #[must_use]
     pub fn is_rich(&self) -> bool {
-        !self.runs.is_empty()
+        !self.data.runs.is_empty()
+    }
+
+    /// Copies one UTF-8 byte range while retaining intersecting span styles.
+    ///
+    /// `range` is clamped to valid character boundaries in the stored text.
+    #[must_use]
+    pub fn slice(&self, range: Range<usize>) -> Self {
+        let mut start = range.start.min(self.data.text.len());
+        let mut end = range.end.min(self.data.text.len()).max(start);
+        while !self.data.text.is_char_boundary(start) {
+            start -= 1;
+        }
+        while !self.data.text.is_char_boundary(end) {
+            end -= 1;
+        }
+        let text = self.data.text[start..end].to_owned();
+        let runs = self
+            .data
+            .runs
+            .iter()
+            .filter_map(|(range, style)| {
+                let run_start = range.start.max(start);
+                let run_end = range.end.min(end);
+                (run_start < run_end).then(|| (run_start - start..run_end - start, style.clone()))
+            })
+            .collect();
+        Self {
+            data: Arc::new(TextContentData { text, runs }),
+        }
     }
 
     pub(crate) fn runs(&self) -> &[(Range<usize>, TextSpanStyle)] {
-        &self.runs
+        &self.data.runs
     }
 }
 

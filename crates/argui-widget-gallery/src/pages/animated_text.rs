@@ -1,6 +1,6 @@
 use argui::{
     runtime::{Context, Entity, Render},
-    ui::{Element, EventType, FlexWrap, UiEvent, length},
+    ui::{Element, FlexWrap, length},
     widgets::{AnimatedText, Button, TextAnimation, shadcn},
 };
 
@@ -38,28 +38,22 @@ impl Default for AnimatedTextDemo {
 }
 
 impl AnimatedTextDemo {
-    fn input(&mut self, event: &UiEvent, cx: &mut Context<Self>) {
-        match event.target_key() {
-            Some("animated-increment") => self.value = self.value.saturating_add(1),
-            Some("animated-decrement") => self.value = self.value.saturating_sub(1),
-            Some("animated-carry") => self.value = if self.value == 99 { 100 } else { 99 },
-            Some("animated-reset") => self.value = 10,
-            Some("animated-save") => {
-                self.saved = !self.saved;
-                self.status.update(|status, cx| {
-                    status.set_text(if self.saved { "Saved" } else { "Draft" });
-                    cx.notify();
-                });
-            }
-            _ => return,
-        }
+    fn set_value(&mut self, value: i32) {
+        self.value = value;
         for number in &self.numbers {
             number.update(|number, cx| {
                 number.set_text(self.value.to_string());
                 cx.notify();
             });
         }
-        cx.notify();
+    }
+
+    fn toggle_saved(&mut self) {
+        self.saved = !self.saved;
+        self.status.update(|status, cx| {
+            status.set_text(if self.saved { "Saved" } else { "Draft" });
+            cx.notify();
+        });
     }
 }
 
@@ -83,21 +77,52 @@ impl Render for AnimatedTextDemo {
                 .radius(argui::paint::CornerRadii::all(12.0))
             })
             .collect::<Vec<_>>();
-        super::preview("Only the changing digits move",
+        super::preview(
+            "Only the changing digits move",
             "Try 10 to 11, a carry from 99 to 100, or several quick clicks. Reduced motion shows the final value immediately.",
             Element::column([
                 Element::row(cards).gap(16.0).flex_wrap(FlexWrap::Wrap),
                 Element::row([
-                    Button::new("animated-decrement", "−1", theme.outline_button()).build(),
-                    Button::new("animated-increment", "+1", theme.button()).build(),
-                    Button::new("animated-carry", "99 / 100", theme.outline_button()).build(),
-                    Button::new("animated-reset", "Reset to 10", theme.ghost_button()).build(),
-                ]).gap(8.0).flex_wrap(FlexWrap::Wrap),
+                    Button::new("animated-decrement", "−1", theme.outline_button())
+                        .on_click(cx.callback(|demo| {
+                            let value = demo.value.saturating_sub(1);
+                            demo.set_value(value);
+                        }))
+                        .build(),
+                    Button::new("animated-increment", "+1", theme.button())
+                        .on_click(cx.callback(|demo| {
+                            let value = demo.value.saturating_add(1);
+                            demo.set_value(value);
+                        }))
+                        .build(),
+                    Button::new("animated-carry", "99 / 100", theme.outline_button())
+                        .on_click(cx.callback(|demo| {
+                            let value = if demo.value == 99 { 100 } else { 99 };
+                            demo.set_value(value);
+                        }))
+                        .build(),
+                    Button::new("animated-reset", "Reset to 10", theme.ghost_button())
+                        .on_click(cx.callback(|demo| demo.set_value(10)))
+                        .build(),
+                ])
+                .gap(8.0)
+                .flex_wrap(FlexWrap::Wrap),
                 Element::row([
-                    Button::new("animated-save", "Toggle saved status", theme.outline_button()).build(),
+                    Button::new(
+                        "animated-save",
+                        "Toggle saved status",
+                        theme.outline_button(),
+                    )
+                    .on_click(cx.callback(Self::toggle_saved))
+                    .build(),
                     cx.entity(&self.status),
-                ]).gap(16.0).align_items(argui::ui::AlignItems::CENTER).flex_wrap(FlexWrap::Wrap),
-            ]).gap(24.0), theme)
-            .on(cx.listener(EventType::Click, Self::input))
+                ])
+                .gap(16.0)
+                .align_items(argui::ui::AlignItems::CENTER)
+                .flex_wrap(FlexWrap::Wrap),
+            ])
+            .gap(24.0),
+            theme,
+        )
     }
 }

@@ -27,7 +27,7 @@ impl EventRegistry {
         });
     }
 
-    fn once_state(&mut self, node: NodeId, listener: EventListener) -> Option<Rc<Cell<bool>>> {
+    fn once_state(&mut self, node: NodeId, listener: &EventListener) -> Option<Rc<Cell<bool>>> {
         if !listener.options.once {
             return None;
         }
@@ -45,6 +45,32 @@ impl EventRegistry {
 }
 
 impl UiTree {
+    /// Returns whether `event_type` has a potential listener from `target` to the root.
+    pub(crate) fn has_event_listener(&self, target: NodeId, event_type: EventType) -> bool {
+        let Some(mut index) = self.index.position(target) else {
+            return false;
+        };
+        loop {
+            let node = self.node_ids[index];
+            if self.element_at(index).is_some_and(|element| {
+                element.event_listeners.iter().any(|listener| {
+                    listener.event == event_type
+                        && (!listener.options.target_only || node == target)
+                        && listener
+                            .target_key
+                            .as_deref()
+                            .is_none_or(|key| self.key_for(target) == Some(key))
+                })
+            }) {
+                return true;
+            }
+            let Some(parent) = self.index.parent(index) else {
+                return false;
+            };
+            index = parent;
+        }
+    }
+
     /// Creates event deliveries for listeners along the target's propagation path.
     ///
     /// * `target` — retained node receiving the event.
@@ -141,42 +167,42 @@ impl UiTree {
             .element_at(index)
             .map(|element| element.event_listeners.clone())
             .unwrap_or_default();
-        for listener in listeners
-            .into_iter()
-            .filter(|listener| listener.event == event_type && listener.options.capture == capture)
-        {
-            let once = self.events.once_state(node, listener);
+        for listener in listeners.into_iter().filter(|listener| {
+            listener.event == event_type
+                && listener.options.capture == capture
+                && (!listener.options.target_only || base.target == node)
+                && listener
+                    .target_key
+                    .as_deref()
+                    .is_none_or(|key| base.target_key() == Some(key))
+                && listener.options.filter.accepts(&base.kind)
+        }) {
+            let value = match &listener.value {
+                Some(source) => {
+                    let Some(value) = source.resolve(
+                        &base.kind,
+                        self.interaction_bounds.get(&base.target).copied(),
+                    ) else {
+                        continue;
+                    };
+                    Some(value)
+                }
+                None => None,
+            };
+            let once = self.events.once_state(node, &listener);
             if once.as_ref().is_some_and(|consumed| consumed.get()) {
                 continue;
             }
-            output.push(self.delivery(
-                base,
-                index,
+            let element = self.element_at(index);
+            output.push(base.delivery(crate::event::EventDelivery {
+                current_target: self.node_ids[index],
+                current_key: element.and_then(|value| value.key.clone()),
+                current_handler: Some(listener.handler),
                 phase,
-                listener.options.passive,
+                passive: listener.options.passive,
                 once,
-                Some(listener.handler),
-            ));
+                handler_value: value,
+            }));
         }
-    }
-
-    fn delivery(
-        &self,
-        base: &UiEvent,
-        index: usize,
-        phase: EventPhase,
-        passive: bool,
-        once: Option<Rc<Cell<bool>>>,
-        handler: Option<EventHandlerId>,
-    ) -> UiEvent {
-        let element = self.element_at(index);
-        base.delivery(
-            self.node_ids[index],
-            element.and_then(|value| value.key.clone()),
-            handler,
-            phase,
-            passive,
-            once,
-        )
     }
 }

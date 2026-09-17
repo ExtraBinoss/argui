@@ -63,6 +63,7 @@ when the purpose already names the integration.
 | `argui-runtime` | Models, scheduling, windows, layout, and rendering | engine and platform crates |
 | `argui-android` | Android `NativeActivity` entry point | platform, render, runtime, text |
 | `argui-ios` | iOS static-library entry point | runtime |
+| `argui-testing` | Renderer-independent application harness | accessibility, layout, runtime, text, ui |
 | `argui-widgets` | Individually feature-gated controlled widgets | runtime, theme, ui, supporting engines |
 | `argui-devtools` | Inspector, style editing, profiling, and tools UI | runtime, inspect, render, widgets |
 | `argui` | Public facade and feature routing | public engine crates |
@@ -72,7 +73,7 @@ when the purpose already names the integration.
 | `argui-state-app` | Packaged native state showcase | argui, devtools, showcase |
 | `argui-perf-showcase` | Focused native and WebAssembly workloads | argui |
 
-The first 23 crates in the table through `argui` are published. Applications
+The first 24 crates in the table through `argui` are published. Applications
 and showcases set `publish = false`.
 
 ## Target selection

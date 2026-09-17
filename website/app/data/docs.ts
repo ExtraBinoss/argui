@@ -2,18 +2,20 @@ import { docExampleSources } from './doc-example-sources.generated'
 
 export type DocCode = { filename: string; code: string }
 export type DocExample = { id: string; path: string; source: string }
+export type DocTable = { headers: string[]; rows: string[][] }
 export type DocSection = {
   id: string
   title: string
   paragraphs: string[]
   bullets?: string[]
   code?: DocCode
+  table?: DocTable
   note?: string
 }
 
 export type DocGuide = {
   slug: string
-  category: 'Start here' | 'Essentials' | 'Advanced' | 'Architecture'
+  category: 'Start here' | 'Essentials' | 'Advanced' | 'Technicalities' | 'Platforms'
   level: 'Beginner' | 'Intermediate' | 'Advanced'
   minutes: number
   title: string
@@ -31,7 +33,7 @@ const example = (id: string, filename: keyof typeof docExampleSources): DocExamp
 })
 
 const dependency = `[dependencies]
-argui = { version = "0.2.1", features = ["widget-button"] }`
+argui = { version = "0.3.0", features = ["widget-button"] }`
 
 const launch = `use argui::{
     platform::{ApplicationConfig, ApplicationId, ApplicationIdentity, IconSet, WindowConfig},
@@ -77,15 +79,12 @@ impl Render for Counter {
         Element::column([
             Element::text(format!("Count: {}", self.count)),
             Button::new("increment", "Increment", theme.button())
+                .on_click(cx.callback(|app| {
+                    app.count = app.count.saturating_add(1);
+                }))
                 .build(),
         ])
         .gap(12.0)
-        .on(cx.listener(EventType::Click, |app, event, cx| {
-            if event.target_key() == Some("increment") {
-                app.count = app.count.saturating_add(1);
-                cx.notify();
-            }
-        }))
     }
 }`
 
@@ -107,12 +106,29 @@ Element::column([
 .gap(20.0)`
 
 const listener = `let save = Button::new("save", "Save", theme.button())
-    .build()
-    .on(cx.listener(EventType::Click, |model, event, cx| {
-        debug_assert_eq!(event.target_key(), Some("save"));
+    .on_click(cx.callback(|model| {
         model.saved = true;
-        cx.notify();
-    }));`
+    }))
+    .build();`
+
+const interactionCallbacks = `Slider::new("volume", "Preview volume", self.volume, range)
+    .on_change(cx.value_callback(|app, value| {
+        app.volume = value;
+    }))
+    .on_commit(cx.value_callback(|app, value| {
+        app.volume = value;
+        app.saved_volume = value;
+    }))
+    .build(theme)`
+
+const frameCoalesced = `Interaction::default().gestures(
+    GestureSet::EMPTY.pan(
+        PanGesture::default()
+            .immediate()
+            .capture(GestureCapture::OnPress)
+            .delivery(GestureDelivery::FrameCoalesced),
+    ),
+)`
 
 const tasks = `fn search(&mut self, cx: &mut Context<Self>) -> Result<(), TaskError> {
     let query = self.query.clone();
@@ -128,44 +144,67 @@ const tasks = `fn search(&mut self, cx: &mut Context<Self>) -> Result<(), TaskEr
 }`
 
 const custom = `#[derive(Debug)]
-struct Ruler {
-    zoom: f32,
-    color: Color,
+struct EditorTimeline {
+    background: Color,
+    track: Color,
+    seconds: f32,
+    grid: Color,
+    playhead: Color,
+    clips: [Clip; 5],
 }
 
-impl CustomElement for Ruler {
+impl CustomElement for EditorTimeline {
     type State = Vec<f32>;
 
     fn create_state(&self) -> Self::State { Vec::new() }
-    fn layout_revision(&self) -> u64 { u64::from(self.zoom.to_bits()) }
+    fn layout_revision(&self) -> u64 { u64::from(self.seconds.to_bits()) }
     fn paint_revision(&self) -> u64 {
-        u64::from(u32::from_le_bytes(self.color.to_srgba8()))
+        u64::from(u32::from_le_bytes(self.playhead.to_srgba8()))
     }
 
     fn layout(
         &self,
         _state: &mut Self::State,
-        _cx: &mut dyn CustomLayoutContext,
+        cx: &mut dyn CustomLayoutContext,
     ) -> Result<CustomMeasurement, String> {
+        for (index, clip) in self.clips.into_iter().enumerate() {
+            cx.place_child(
+                TIME_LABELS + TRACK_LABELS + index,
+                Rect::new(
+                    Point::new(
+                        GUTTER + clip.start * PIXELS_PER_SECOND,
+                        RULER_HEIGHT + clip.track as f32 * TRACK_HEIGHT + 6.0,
+                    ),
+                    Size::new(clip.duration * PIXELS_PER_SECOND, TRACK_HEIGHT - 12.0),
+                ),
+            )?;
+        }
         Ok(CustomMeasurement {
-            size: Size::new(800.0 * self.zoom, 80.0),
+            size: Size::new(764.0, 206.0),
             baseline: None,
         })
     }
 
-    fn prepare(&self, ticks: &mut Self::State, size: Size) {
-        let spacing = 40.0 * self.zoom;
+    fn prepare(&self, ticks: &mut Self::State, _size: Size) {
         ticks.clear();
-        ticks.extend((0..(size.width / spacing).ceil() as usize).map(|tick| tick as f32 * spacing));
+        ticks.extend((0..=20).map(|second| 76.0 + second as f32 * 32.0));
     }
 
     fn paint(&self, ticks: &mut Self::State, cx: &mut CustomPaintContext<'_>) {
-        for &x in ticks.iter() {
+        for (second, x) in ticks.iter().copied().enumerate() {
             cx.quad(
-                Rect::new(Point::new(x, 0.0), Size::new(1.0, cx.bounds.size.height)),
-                QuadStyle::solid(self.color),
+                Rect::new(
+                    Point::new(x, if second.is_multiple_of(5) { 24.0 } else { 32.0 }),
+                    Size::new(1.0, 174.0),
+                ),
+                QuadStyle::solid(self.grid),
             );
         }
+        let playhead_x = GUTTER + self.seconds * PIXELS_PER_SECOND;
+        cx.quad(
+            Rect::new(Point::new(playhead_x - 1.0, 10.0), Size::new(2.0, 196.0)),
+            QuadStyle::solid(self.playhead),
+        );
     }
 }`
 
@@ -186,7 +225,7 @@ export const docs: DocGuide[] = [
         id: 'requirements',
         title: 'What you need',
         paragraphs: [
-          'Argui 0.2.1 requires Rust 1.89 or newer. The repository itself currently recommends a newer toolchain for contributors, while the workspace manifest remains the source of truth for the minimum supported Rust version.',
+          'Argui 0.3.0 requires Rust 1.89 or newer. The repository itself currently recommends a newer toolchain for contributors, while the workspace manifest remains the source of truth for the minimum supported Rust version.',
         ],
         bullets: [
           'Rust and Cargo',
@@ -321,18 +360,18 @@ export const docs: DocGuide[] = [
         code: { filename: 'src/counter.rs', code: counter },
       },
       {
-        id: 'notify',
-        title: 'Notify after a visible change',
+        id: 'callback',
+        title: 'Local callbacks invalidate automatically',
         paragraphs: [
-          'Mutating the struct is immediate. cx.notify() marks dependent presentations dirty and wakes the host. Multiple notifications in one transaction coalesce; an idle application does not continuously request frames.',
+          'Context::callback registers state-only work and invalidates this presentation after it returns. The button owns the activation binding, so pointer, touch, Enter, Space and accessibility click all reach the same callback.',
         ],
-        note: 'If you forget cx.notify(), the value changes in memory but the view is not scheduled to rebuild.',
+        note: 'Use Context::event_handler when you need the raw UiEvent, propagation control, focus or commands. That lower-level callback does not invalidate implicitly.',
       },
       {
-        id: 'events',
-        title: 'Match stable targets',
+        id: 'controlled',
+        title: 'The model stays in control',
         paragraphs: [
-          'Events expose both stable keys and typed payloads. Match the control key, mutate state, then notify. Keyboard and accessibility activation synthesize the same click path as a pointer.',
+          'The handler changes ordinary Rust state; the next render rebuilds the controlled widget from that state. Handler identities remain opaque and closures stay in the runtime rather than inside cloneable Element values.',
         ],
       },
     ],
@@ -399,17 +438,17 @@ export const docs: DocGuide[] = [
     sections: [
       {
         id: 'listeners',
-        title: 'Attach typed listeners',
+        title: 'Start with a direct widget callback',
         paragraphs: [
-          'Context::listener creates a handler owned by the current presentation. Element::on attaches it to any element. Dispatch follows capture, target, and bubbling phases.',
+          'Ordinary buttons do not require bubbling, target-key comparisons or event-kind matching. Attach Context::callback to Button::on_click; typed widgets similarly expose on_input, on_change, on_select and on_open_change with useful payloads.',
         ],
         code: { filename: 'src/view.rs', code: listener },
       },
       {
-        id: 'payloads',
-        title: 'Read the typed payload',
+        id: 'delegation',
+        title: 'Use listeners for deliberate delegation',
         paragraphs: [
-          'UiEventKind distinguishes clicks, key input, text changes, gestures, scroll, dismiss, and selection changes. Check the kind before reading its payload and use target_key for stable application routing.',
+          'Context::listener and Element::on remain the advanced layer for capture, bubbling, application-wide shortcuts and routers that intentionally handle many descendants. The runnable Events example demonstrates that pattern rather than presenting it as the basic button API.',
         ],
       },
       {
@@ -417,6 +456,92 @@ export const docs: DocGuide[] = [
         title: 'Preserve platform defaults deliberately',
         paragraphs: [
           'Use prevent_default only when the application replaces the normal behavior. stop_propagation ends bubbling; stop_immediate_propagation also stops later listeners on the current node. Passive listeners cannot prevent defaults.',
+        ],
+      },
+    ],
+  },
+  {
+    slug: 'essentials/interaction-api',
+    category: 'Essentials',
+    level: 'Beginner',
+    minutes: 10,
+    title: 'Choose the right interaction API',
+    description:
+      'Match clicks, edits, continuous changes, commits, selections, and overlay state to the smallest typed callback.',
+    example: example('interaction-api', 'interaction_api'),
+    demoTitle: 'See continuous change, final commit, and click callbacks separately',
+    sources: [
+      'docs/widgets/interaction-api.md',
+      'docs/simplified-api.md',
+      'crates/argui-runtime/src/model/handler.rs',
+      'crates/argui-widgets/src/slider.rs',
+    ],
+    sections: [
+      {
+        id: 'decision-table',
+        title: 'Pick the callback that names the intent',
+        paragraphs: [
+          'Start with the widget method that describes the domain event. Direct handlers already unify pointer, touch, keyboard, and accessibility activation, so application code should not decode UiEvent for ordinary controls.',
+        ],
+        table: {
+          headers: ['Widget API', 'Use it for', 'Context helper'],
+          rows: [
+            ['on_click', 'A button or one-shot action was activated', 'callback'],
+            ['on_input', 'Each new controlled text value while editing', 'input_callback'],
+            [
+              'on_submit',
+              'A text value or form was deliberately submitted',
+              'submit_callback or callback',
+            ],
+            [
+              'on_change',
+              'Each next checkbox, switch, collection, color, or range value',
+              'value_callback',
+            ],
+            [
+              'on_commit',
+              'The final value after a continuous slider interaction',
+              'value_callback',
+            ],
+            [
+              'on_select',
+              'A stable option, index, date, row, page, or node was chosen',
+              'value_callback',
+            ],
+            [
+              'on_open_change',
+              'An overlay or disclosure requests open or closed state',
+              'value_callback',
+            ],
+            [
+              'on_action / on_activate / on_navigate',
+              'A stable command, item, cell, or destination was invoked',
+              'value_callback',
+            ],
+            [
+              'listener + Element.on',
+              'Capture, bubbling, delegation, shortcuts, or default prevention is intentional',
+              'listener or event_handler',
+            ],
+          ],
+        },
+        note: 'on_commit is not a replacement for on_change. Use on_change for live visual feedback and on_commit for expensive or durable work after the interaction ends.',
+      },
+      {
+        id: 'controlled-values',
+        title: 'Keep values controlled',
+        paragraphs: [
+          'A handler reports intent or a next value. Store it in the model and pass it back on the next render. callback, value_callback, input_callback, and submit_callback invalidate the current presentation automatically.',
+          'The live example uses on_change to update its preview and on_commit to record the final slider value. The button uses on_click because saving is a discrete action.',
+        ],
+        code: { filename: 'src/view.rs', code: interactionCallbacks },
+      },
+      {
+        id: 'advanced-handlers',
+        title: 'Reach for the event layer only when you need it',
+        paragraphs: [
+          'Use event_handler or value_event_handler when a callback must inspect the routed event, stop propagation, request focus, or issue commands. These advanced forms do not invalidate automatically, so call cx.notify() after changing visible state.',
+          'Use Context::listener with Element::on for deliberate ancestor delegation, capture, passive or one-shot listeners, application-wide shortcuts, and custom controls. Typed widget callbacks remain additive and still travel through the same retained event pipeline.',
         ],
       },
     ],
@@ -581,7 +706,7 @@ export const docs: DocGuide[] = [
         ],
         code: {
           filename: 'Cargo.toml',
-          code: '[dependencies]\nargui = { version = "0.2.1", features = ["tasks", "widget-input", "widget-button", "widget-vlist"] }',
+          code: '[dependencies]\nargui = { version = "0.3.0", features = ["tasks", "widget-input", "widget-button", "widget-vlist"] }',
         },
       },
       {
@@ -653,7 +778,7 @@ export const docs: DocGuide[] = [
     description:
       'Build focus-safe overlay surfaces and optionally host them outside the native window bounds.',
     example: example('overlays', 'overlays'),
-    demoTitle: 'A modal dialog with focus management',
+    demoTitle: 'Solid and blurred popovers with a modal dialog',
     sources: [
       'docs/widgets/overlays.md',
       'docs/platform/native-popovers.md',
@@ -665,6 +790,13 @@ export const docs: DocGuide[] = [
         title: 'Mount overlays as retained UI',
         paragraphs: [
           'Dialogs, popovers, tooltips, menus, sheets, and drawers keep their open state in the model. Their elements participate in normal layout, paint, event dispatch, and semantics.',
+        ],
+      },
+      {
+        id: 'surfaces',
+        title: 'Choose an opaque or blurred surface',
+        paragraphs: [
+          'A solid popover disables backdrop blur and uses an opaque panel. A frosted popover combines translucent paint with backdrop blur so the content behind it remains visible without competing with the foreground text.',
         ],
       },
       {
@@ -729,7 +861,7 @@ export const docs: DocGuide[] = [
   },
   {
     slug: 'architecture/mental-model',
-    category: 'Architecture',
+    category: 'Technicalities',
     level: 'Intermediate',
     minutes: 18,
     title: 'The Argui mental model',
@@ -739,6 +871,57 @@ export const docs: DocGuide[] = [
     demoTitle: 'The retained pipeline in a running application',
     sources: ['docs/architecture.md', 'docs/runtime/models.md', 'docs/rendering/primitives.md'],
     sections: [
+      {
+        id: 'what-it-is',
+        title: 'What Argui is',
+        paragraphs: [
+          'Argui is a retained, GPU-rendered application UI runtime written in Rust. Application models own state and render cloneable Element descriptions; the runtime reconciles those descriptions into persistent presentation nodes, computes layout, paints through WGPU, and publishes an accessibility tree.',
+          'It is designed for product interfaces that need explicit state, native input, deterministic updates, portable rendering, and opt-in platform integrations without a browser DOM as the primary runtime.',
+        ],
+      },
+      {
+        id: 'retained-vs-immediate',
+        title: 'Retained versus immediate mode',
+        paragraphs: [
+          'Immediate-mode UI code describes and processes the interface afresh for each frame. Argui view code also returns a description, but the runtime retains the resulting nodes between renders and reconciles only what changed. Stable identity therefore matters: it preserves focus, scrolling, handlers, accessibility state, animation, and cached layout or paint work.',
+        ],
+        table: {
+          headers: ['Concern', 'Immediate mode', 'Argui retained mode'],
+          rows: [
+            [
+              'Lifetime',
+              'Recreated as part of each frame',
+              'Nodes persist until reconciliation removes them',
+            ],
+            ['State', 'Often coupled to the frame loop', 'Owned explicitly by application models'],
+            ['Updates', 'Frame-oriented', 'Classified as semantic, paint, scroll, or layout work'],
+            [
+              'Identity',
+              'Usually positional or call-site based',
+              'Stable keys and model-owned handler slots',
+            ],
+            [
+              'Idle cost',
+              'Commonly redraws continuously',
+              'Requests frames only when work is pending',
+            ],
+          ],
+        },
+      },
+      {
+        id: 'what-it-is-not',
+        title: 'What Argui is not',
+        paragraphs: [
+          'Argui does not hide application state inside widgets, generate a web DOM for native targets, or make every operating-system service portable by pretending platform differences do not exist.',
+        ],
+        bullets: [
+          'Not an immediate-mode frame loop: view descriptions reconcile into retained nodes.',
+          'Not an HTML/CSS wrapper: layout, text, paint, interaction, and semantics are Rust-native layers.',
+          'Not a business-state store: widgets remain controlled by the owning application model.',
+          'Not a universal native-services abstraction: shared contracts stay small and platform adapters remain explicit.',
+          'Not a replacement for device and renderer testing: headless tests cover behavior, while browser and native checks cover integration.',
+        ],
+      },
       {
         id: 'pipeline',
         title: 'Data flows through explicit layers',
@@ -768,7 +951,7 @@ export const docs: DocGuide[] = [
   },
   {
     slug: 'architecture/project-structure',
-    category: 'Architecture',
+    category: 'Technicalities',
     level: 'Intermediate',
     minutes: 13,
     title: 'Structure a real application',
@@ -811,7 +994,7 @@ export const docs: DocGuide[] = [
   },
   {
     slug: 'architecture/clean-code',
-    category: 'Architecture',
+    category: 'Technicalities',
     level: 'Advanced',
     minutes: 16,
     title: 'Write clean Argui code',
@@ -857,14 +1040,14 @@ export const docs: DocGuide[] = [
   },
   {
     slug: 'architecture/custom-elements',
-    category: 'Architecture',
+    category: 'Technicalities',
     level: 'Advanced',
     minutes: 22,
     title: 'Create a custom element',
     description:
       'Own custom measurement and paint while keeping children, interaction, semantics, and invalidation in Argui.',
     example: example('custom-elements', 'custom_elements'),
-    demoTitle: 'A draggable custom timeline rendered in WebAssembly',
+    demoTitle: 'A draggable video-editor timeline rendered in WebAssembly',
     sources: [
       'docs/ui/custom-elements.md',
       'crates/argui-widget-gallery/src/pages/timeline.rs',
@@ -884,7 +1067,7 @@ export const docs: DocGuide[] = [
         paragraphs: [
           'State persists beside the retained node. layout_revision changes when measurement or child placement changes. paint_revision changes when prepared or recorded pixels change. Accurate revisions let Argui skip work safely.',
         ],
-        code: { filename: 'src/ruler.rs', code: custom },
+        code: { filename: 'src/editor_timeline.rs', code: custom },
       },
       {
         id: 'integrate',
@@ -892,13 +1075,328 @@ export const docs: DocGuide[] = [
         paragraphs: [
           'Attach gestures and listeners through normal Element interaction, and attach Semantics for assistive technology. Paint does not implicitly define hit geometry. Use a stable key and explicit HitTestStyle when the custom shape needs non-rectangular or enlarged targets.',
         ],
-        note: 'The complete timeline source places retained button children, caches ruler ticks, supports pan and keyboard edits, and shares clip data across two mounted views.',
+        note: 'The exact example below places retained track labels and clips inside the custom layout, clips every label to its block, lets clips move in time or between tracks, and gives the playhead a forgiving draggable hit target plus keyboard and accessibility controls.',
+      },
+    ],
+  },
+  {
+    slug: 'technicalities/performance',
+    category: 'Technicalities',
+    level: 'Intermediate',
+    minutes: 12,
+    title: 'Continuous input and frame pacing',
+    description:
+      'Keep drag, scrub, resize, and other high-frequency work aligned with the display refresh cadence.',
+    example: example('performance', 'performance'),
+    demoTitle: 'Drag with position, velocity, and status delivered once per available frame',
+    sources: [
+      'docs/performance/optimizations.md',
+      'crates/argui-ui/src/tree/pointer.rs',
+      'crates/argui-ui/src/gesture/config.rs',
+      'crates/argui-widget-gallery/src/pages/drag_drop.rs',
+    ],
+    sections: [
+      {
+        id: 'frame-coalescing',
+        title: 'FrameCoalesced is Argui’s requestAnimationFrame-shaped input mode',
+        paragraphs: [
+          'Browsers may produce pointer events faster than they can present frames. GestureDelivery::FrameCoalesced keeps the newest visual state for each gesture stream and delivers at most one Changed event on each available Argui display frame. This has the same scheduling intent as requestAnimationFrame, while remaining portable across browser and native hosts.',
+          'The callback cadence is capped by the active display refresh rate—commonly 60, 120, or 144 Hz—and can be lower when the host is busy or backgrounded. It is not a timer and does not promise a fixed frequency.',
+        ],
+        code: { filename: 'src/view.rs', code: frameCoalesced },
+        note: 'Started, Ended, and Cancelled are delivered immediately. Only repeated Changed samples are coalesced, so interaction boundaries are never delayed or lost.',
+      },
+      {
+        id: 'preserved-data',
+        title: 'Coalescing preserves the data a visual interaction needs',
+        paragraphs: [
+          'For a pan, the delivered event uses the latest pointer position, total displacement, and velocity. Its delta is the sum of every raw delta received since the previous frame, so controlled split panes and other incremental consumers remain exactly under the pointer even when several input samples arrive between frames.',
+          'The live example updates the card transform, velocity label, and delivered-update counter from the same frame-coalesced callback. No intermediate text layout or model invalidation runs between two presentable frames.',
+        ],
+      },
+      {
+        id: 'choose-delivery',
+        title: 'Choose delivery from the workload',
+        paragraphs: [
+          'Use FrameCoalesced when each sample triggers rendering, layout, text shaping, hit-test changes, or substantial model work. Use Immediate only when every raw sample is itself application data and dropping intermediate samples would change the result.',
+        ],
+        table: {
+          headers: ['Delivery', 'Best for', 'Cost model'],
+          rows: [
+            [
+              'FrameCoalesced',
+              'Dragging, split resizing, scrubbing, visual sliders, hover previews',
+              'At most one Changed callback per gesture stream and display frame',
+            ],
+            [
+              'Immediate',
+              'Raw telemetry, input recording, or algorithms that consume every sample',
+              'One callback per input event; application code owns batching',
+            ],
+          ],
+        },
+      },
+      {
+        id: 'keep-frame-work-bounded',
+        title: 'Keep each delivered frame bounded',
+        paragraphs: [
+          'Frame coalescing prevents redundant callbacks, but it cannot make an expensive callback cheap. Prefer transform or paint changes over layout, retain stable keys, avoid rebuilding unrelated ownership graphs, and move durable work to the final commit or release event.',
+        ],
+        bullets: [
+          'Use total displacement for absolute visual position and accumulated delta for incremental state.',
+          'Keep velocity smoothing frame-rate independent by scaling it from elapsed frame time.',
+          'Update dynamic labels in the same coalesced callback so their shaping is also capped to frame cadence.',
+          'Measure input-to-display latency in Firefox and Chromium rather than counting raw pointer events.',
+        ],
+      },
+    ],
+  },
+  {
+    slug: 'platforms/support',
+    category: 'Platforms',
+    level: 'Beginner',
+    minutes: 10,
+    title: 'Supported platforms',
+    description:
+      'See which targets are supported today, what CI proves, and where preview status still applies.',
+    example: example('platform-support', 'platform_support'),
+    demoTitle: 'The current support matrix rendered by Argui',
+    sources: ['README.md', 'docs/native-mobile.md', '.github/workflows/ci.yml'],
+    sections: [
+      {
+        id: 'matrix',
+        title: 'Current support matrix',
+        paragraphs: [
+          'Desktop and WebAssembly are the supported product targets. Android and iOS use the same models, widgets, layout, text, and WGPU renderer, but remain explicit preview targets until physical-device, assistive-technology, lifecycle, and owner-signing validation is complete.',
+        ],
+        table: {
+          headers: ['Target', 'Status', 'Validated today', 'Important boundary'],
+          rows: [
+            [
+              'Linux',
+              'Supported · runtime-tested',
+              'Native gallery, hidden-display interaction, WGPU, accessibility, all features',
+              'Some integrations require Wayland/GTK system packages',
+            ],
+            [
+              'Windows',
+              'Supported · CI-compiled',
+              'Complete workspace, native implementation, DirectX 12 and Vulkan fallback paths',
+              'Platform behavior still receives focused release validation',
+            ],
+            [
+              'macOS',
+              'Supported · CI-compiled',
+              'Complete workspace, AppKit integration, Metal surface, bundle-oriented updater path',
+              'Signing and notarization belong to the application owner',
+            ],
+            [
+              'WebAssembly',
+              'Supported · browser-tested',
+              'WebGPU, browser semantics, responsive live gallery, documentation examples',
+              'Requires a WebGPU-capable secure browser context',
+            ],
+            [
+              'Android',
+              'Preview',
+              'Cross-compile, debug APK, release AAB, IME, safe areas, activity progress',
+              'Physical devices, TalkBack, lifecycle breadth, and Play signing need validation',
+            ],
+            [
+              'iOS',
+              'Preview',
+              'Cross-compile, XCFramework, Simulator app, safe areas, IME, ActivityKit bridge',
+              'Physical devices, VoiceOver, provisioning, archive signing, and TestFlight need validation',
+            ],
+          ],
+        },
+      },
+      {
+        id: 'shared-core',
+        title: 'Share the core; keep native edges explicit',
+        paragraphs: [
+          'Application models, views, fonts, themes, tasks, and renderer configuration belong in a shared Rust crate. Desktop, WebAssembly, Android, and iOS launch that same application through target-specific entry points.',
+          'A platform is not considered supported merely because Rust can compile for its target triple. The matrix distinguishes runtime tests, browser tests, compile checks, packaging checks, and preview-only native shells so the claim remains auditable.',
+        ],
+      },
+      {
+        id: 'selection',
+        title: 'Select platform integrations deliberately',
+        paragraphs: [
+          'Core UI capabilities are selected by Cargo target. Native entry points and integrations such as trays, system dialogs, WebViews, native popovers, desktop backdrops, Android services, and iOS ActivityKit stay opt-in because their dependencies and lifecycle rules differ.',
+        ],
+        note: 'Preview means usable for development and cross-platform work, not a promise that every production device, store workflow, or native service has already been validated.',
+      },
+    ],
+  },
+  {
+    slug: 'platforms/roadmap',
+    category: 'Platforms',
+    level: 'Intermediate',
+    minutes: 14,
+    title: 'Native capability roadmap',
+    description:
+      'Separate mobile capabilities that ship today from explicit future Android and iOS integrations.',
+    example: example('platform-roadmap', 'platform_roadmap'),
+    demoTitle: 'A scrollable shipping-versus-planned capability list',
+    sources: [
+      'docs/native-mobile.md',
+      'crates/argui-platform/src/mobile.rs',
+      'crates/argui-platform/src/mobile/android.rs',
+      'crates/argui-platform/src/mobile/ios.rs',
+    ],
+    sections: [
+      {
+        id: 'status',
+        title: 'Shipping foundations and planned adapters',
+        paragraphs: [
+          'Shipping identifies code present in the repository now. Planned identifies direction only: it is not available API, not a release promise, and not a schedule. Priority describes the intended order when mobile integration work resumes.',
+        ],
+        table: {
+          headers: ['Capability', 'Android foundation', 'iOS foundation', 'Roadmap state'],
+          rows: [
+            [
+              'Text input / IME',
+              'InputConnection and InputMethodManager path',
+              'UIKit first-responder text input path',
+              'Shipping',
+            ],
+            [
+              'Accessibility',
+              'AccessibilityNodeInfo / provider validation',
+              'UIAccessibilityElement validation',
+              'Planned validation · Highest',
+            ],
+            [
+              'Safe areas, keyboard, system bars',
+              'WindowInsets',
+              'safeAreaInsets and keyboard lifecycle',
+              'Shipping',
+            ],
+            [
+              'Live activity progress',
+              'Foreground-service ongoing notification',
+              'ActivityKit Live Activity',
+              'Shipping',
+            ],
+            [
+              'Background activity foundation',
+              'Foreground service rules',
+              'Finite UIKit fallback and ActivityKit status',
+              'Shipping foundation; durable scheduling remains planned',
+            ],
+            ['Camera', 'Camera2', 'AVFoundation / AVCaptureSession', 'Planned · Medium'],
+            ['Clipboard', 'ClipboardManager', 'UIPasteboard', 'Planned · High'],
+            [
+              'Drag and drop',
+              'startDragAndDrop / DragEvent',
+              'UIDragInteraction / UIDropInteraction',
+              'Planned · High',
+            ],
+            [
+              'Haptics',
+              'HapticFeedbackConstants / VibrationEffect',
+              'UIFeedbackGenerator / CoreHaptics',
+              'Planned · High',
+            ],
+            [
+              'File picker',
+              'Storage Access Framework',
+              'UIDocumentPickerViewController',
+              'Planned · High',
+            ],
+            ['Photo picker', 'Android Photo Picker', 'PhotosUI', 'Planned · High'],
+            [
+              'Share sheet',
+              'ACTION_SEND / Sharesheet',
+              'UIActivityViewController',
+              'Planned · High',
+            ],
+            ['Biometrics', 'BiometricPrompt', 'LocalAuthentication', 'Planned · High'],
+            [
+              'Passkeys and credentials',
+              'Credential Manager',
+              'AuthenticationServices',
+              'Planned · High',
+            ],
+            ['Secure storage', 'Android Keystore', 'Keychain / Secure Enclave', 'Planned · High'],
+            ['Notifications', 'NotificationManager', 'UserNotifications', 'Planned · High'],
+            ['Home-screen widgets', 'App Widgets / Glance', 'WidgetKit', 'Planned · High'],
+            ['Location', 'LocationManager', 'CoreLocation', 'Planned · Medium'],
+            ['Motion and sensors', 'SensorManager', 'CoreMotion', 'Planned · Medium'],
+            ['Bluetooth LE', 'android.bluetooth', 'CoreBluetooth', 'Planned · Medium'],
+            ['NFC', 'NfcAdapter', 'CoreNFC', 'Planned · Medium'],
+            ['UWB and ranging', 'RangingManager', 'NearbyInteraction', 'Planned · High'],
+            [
+              'Audio input and output',
+              'AudioTrack / AudioRecord / AAudio',
+              'AVAudioEngine / AVAudioSession',
+              'Planned · High',
+            ],
+            [
+              'Video encode and decode',
+              'MediaCodec',
+              'VideoToolbox / AVFoundation',
+              'Planned · Medium',
+            ],
+            ['Mobile WebView', 'WebView', 'WKWebView', 'Planned · High'],
+            ['Deep links', 'Intents / App Links', 'Universal Links', 'Planned · High'],
+            ['Network status', 'ConnectivityManager', 'NWPathMonitor', 'Planned · Medium'],
+            [
+              'Gamepads',
+              'InputDevice / KeyEvent / MotionEvent',
+              'GameController',
+              'Planned · Medium',
+            ],
+            [
+              'Mouse and stylus',
+              'MotionEvent validation',
+              'Pointer / Pencil interactions',
+              'Planned validation · High',
+            ],
+            ['Store and in-app purchases', 'Play Billing', 'StoreKit', 'Planned · Medium'],
+            [
+              'Speech and text to speech',
+              'SpeechRecognizer / TextToSpeech',
+              'Speech / AVSpeechSynthesizer',
+              'Planned · Later',
+            ],
+            [
+              'Contacts and calendar',
+              'ContactsContract / Calendar Provider',
+              'Contacts / EventKit',
+              'Planned · Later',
+            ],
+            ['Health', 'Health Connect', 'HealthKit', 'Planned · Later'],
+          ],
+        },
+      },
+      {
+        id: 'contract',
+        title: 'Portable contracts stay smaller than native APIs',
+        paragraphs: [
+          'A future shared API should represent portable application intent and data, then map that contract independently to Android and iOS. Platform permissions, manifests, entitlements, store policy, native presentation, and lifecycle remain the responsibility of each adapter and application shell.',
+          'This avoids false parity. Camera capture, credentials, health data, background execution, and store purchases have materially different authorization and lifecycle rules even when a Rust-facing operation can share a name.',
+        ],
+      },
+      {
+        id: 'delivery',
+        title: 'When a Planned row becomes Shipping',
+        paragraphs: [
+          'A capability moves to Shipping only after the shared contract, both relevant native adapters, error and permission behavior, documentation, focused tests, packaging changes, and device validation are present. One-platform prototypes remain explicitly partial.',
+        ],
       },
     ],
   },
 ]
 
-export const docCategories = ['Start here', 'Essentials', 'Advanced', 'Architecture'] as const
+export const docCategories = [
+  'Start here',
+  'Essentials',
+  'Advanced',
+  'Technicalities',
+  'Platforms',
+] as const
 export const docsByCategory = docCategories.map((category) => ({
   category,
   guides: docs.filter((guide) => guide.category === category),

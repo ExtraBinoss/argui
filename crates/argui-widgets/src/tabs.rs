@@ -1,6 +1,9 @@
 use argui_paint::{Border, CornerRadii, PaintStyle, QuadStyle};
 use argui_text::{TextStyle, TextWrap};
-use argui_ui::{AlignItems, Display, Element, JustifyContent, StyleTransition, VisualState, auto};
+use argui_ui::{
+    AlignItems, Display, Element, EventType, JustifyContent, StyleTransition, ValueHandler,
+    VisualState, auto,
+};
 
 use crate::{TabsBehavior, TabsPart, WidgetTheme};
 
@@ -36,6 +39,7 @@ pub struct Tabs {
     key: String,
     tabs: Vec<Tab>,
     selected: usize,
+    select_handlers: Vec<ValueHandler<usize>>,
 }
 
 impl Tabs {
@@ -51,7 +55,18 @@ impl Tabs {
             key: key.into(),
             tabs: tabs.into_iter().collect(),
             selected,
+            select_handlers: Vec::new(),
         }
+    }
+
+    /// Adds a callback receiving the selected source tab index.
+    ///
+    /// `handler` is normally created with `Context::value_callback`. Disabled
+    /// tabs never deliver it.
+    #[must_use]
+    pub fn on_select(mut self, handler: ValueHandler<usize>) -> Self {
+        self.select_handlers.push(handler);
+        self
     }
 
     #[must_use]
@@ -86,7 +101,7 @@ impl Tabs {
                     ..TextStyle::default()
                 }),
             );
-            behavior.decorate(
+            let mut trigger = behavior.decorate(
                 TabsPart::Trigger(index),
                 Element::container([label])
                     .padding(argui_ui::sides(12.0, 7.0))
@@ -108,7 +123,11 @@ impl Tabs {
                         StyleTransition::default(),
                         VisualState::Hovered.into(),
                     )),
-            )
+            );
+            for handler in self.select_handlers.iter().copied() {
+                trigger = trigger.on(handler.direct_listener_value(EventType::Click, index));
+            }
+            trigger
         });
         let tab_list = behavior.decorate(
             TabsPart::List,

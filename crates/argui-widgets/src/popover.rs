@@ -1,7 +1,8 @@
 use argui_paint::{Border, CornerRadii, LayerStyle, PaintStyle, QuadStyle};
 use argui_ui::{
-    AnchorWidth, Axes, DismissPolicy, Element, FloatingPlacement, FocusScope, InitialFocus,
-    Overflow, Placement, ScrollConfig, Sides, WindowLayer, length,
+    AnchorWidth, Axes, DismissPolicy, Element, EventFilter, EventHandler, EventType,
+    FloatingPlacement, FocusScope, InitialFocus, Overflow, Placement, ScrollConfig, Sides,
+    ValueHandler, WindowLayer, length,
 };
 
 use crate::{PopoverBehavior, PopoverPart, WidgetTheme};
@@ -24,6 +25,8 @@ pub struct Popover {
     layer: Option<LayerStyle>,
     trap_focus: bool,
     presence: Option<crate::Presence>,
+    open_handlers: Vec<ValueHandler<bool>>,
+    dismiss_handlers: Vec<EventHandler>,
 }
 
 impl Popover {
@@ -56,6 +59,8 @@ impl Popover {
             layer: None,
             trap_focus: false,
             presence: None,
+            open_handlers: Vec::new(),
+            dismiss_handlers: Vec::new(),
         }
     }
 
@@ -131,11 +136,28 @@ impl Popover {
         self
     }
 
+    /// Adds a callback receiving the requested controlled open state.
+    #[must_use]
+    pub fn on_open_change(mut self, handler: ValueHandler<bool>) -> Self {
+        self.open_handlers.push(handler);
+        self
+    }
+
+    /// Adds a callback for pointer-outside, native, or Escape dismissal.
+    #[must_use]
+    pub fn on_dismiss(mut self, handler: EventHandler) -> Self {
+        self.dismiss_handlers.push(handler);
+        self
+    }
+
     #[must_use]
     /// Builds the popover using `theme` for default panel and backdrop styling.
     pub fn build(self, theme: &WidgetTheme) -> Element {
         let behavior = PopoverBehavior::new(&self.key, &self.label, self.open);
-        let trigger = behavior.decorate(PopoverPart::Trigger, self.trigger);
+        let mut trigger = behavior.decorate(PopoverPart::Trigger, self.trigger);
+        for handler in &self.open_handlers {
+            trigger = trigger.on(handler.direct_listener_value(EventType::Click, !self.open));
+        }
         let content = (self.open || self.presence.as_ref().is_some_and(crate::Presence::visible))
             .then(|| {
                 let radius = self.radius.max(0.0);
@@ -175,7 +197,23 @@ impl Popover {
                 } else {
                     content.focus_scope(FocusScope::restoring())
                 };
-                let content = behavior.decorate(PopoverPart::Content, content);
+                let mut content = behavior.decorate(PopoverPart::Content, content);
+                for handler in &self.open_handlers {
+                    content = content
+                        .on(handler.direct_listener_value(EventType::PointerOutside, false))
+                        .on(handler.direct_listener_value(EventType::Dismiss, false))
+                        .on(handler
+                            .listener_value(EventType::Key, false)
+                            .filter(EventFilter::EscapePressed));
+                }
+                for handler in &self.dismiss_handlers {
+                    content = content
+                        .on(handler.direct_listener(EventType::PointerOutside))
+                        .on(handler.direct_listener(EventType::Dismiss))
+                        .on(handler
+                            .listener(EventType::Key)
+                            .filter(EventFilter::EscapePressed));
+                }
                 match &self.presence {
                     Some(presence) => presence.decorate(content),
                     None => content,

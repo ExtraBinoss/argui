@@ -64,10 +64,12 @@ fn scrollbar_is_regular_paint_with_geometry_from_the_scroll_state() {
     assert!(matches!(
         output.display_list.commands(),
         [
+            DisplayCommand::BeginCompositor(_),
             DisplayCommand::BeginLayer(_),
             DisplayCommand::Quad(_),
             DisplayCommand::Quad(_),
-            DisplayCommand::EndLayer
+            DisplayCommand::EndLayer,
+            DisplayCommand::EndCompositor
         ]
     ));
 

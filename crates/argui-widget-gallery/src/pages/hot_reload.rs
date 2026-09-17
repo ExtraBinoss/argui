@@ -1,23 +1,12 @@
 use argui::{
     runtime::{Context, Render},
-    ui::{Element, EventType, Sides, UiEvent, percent},
+    ui::{Element, Sides, percent},
     widgets::{Button, shadcn},
 };
 
 #[derive(Default)]
 pub(crate) struct HotReloadDemo {
     count: u32,
-}
-
-impl HotReloadDemo {
-    fn event(&mut self, event: &UiEvent, cx: &mut Context<Self>) {
-        match event.target_key() {
-            Some("hot-reload-increment") => self.count = self.count.saturating_add(1),
-            Some("hot-reload-reset") => self.count = 0,
-            _ => return,
-        }
-        cx.notify();
-    }
 }
 
 impl Render for HotReloadDemo {
@@ -44,8 +33,12 @@ impl Render for HotReloadDemo {
                     740,
                 ),
                 Element::row([
-                    Button::new("hot-reload-increment", "Increment", theme.button()).build(),
-                    Button::new("hot-reload-reset", "Reset", theme.outline_button()).build(),
+                    Button::new("hot-reload-increment", "Increment", theme.button())
+                        .on_click(cx.callback(|demo| demo.count = demo.count.saturating_add(1)))
+                        .build(),
+                    Button::new("hot-reload-reset", "Reset", theme.outline_button())
+                        .on_click(cx.callback(|demo| demo.count = 0))
+                        .build(),
                 ])
                 .gap(8.0),
                 crate::app::text(
@@ -60,6 +53,5 @@ impl Render for HotReloadDemo {
             .width(percent(1.0)),
             theme,
         )
-        .on(cx.listener(EventType::Click, Self::event))
     }
 }

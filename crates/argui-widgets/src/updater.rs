@@ -1,6 +1,8 @@
 use crate::{Button, Dialog, DialogAction, DialogBehavior, Progress, WidgetTheme};
 use argui_text::TextStyle;
-use argui_ui::{Element, LiveRegion, Role, Semantics, UiEvent, UiEventKind};
+use argui_ui::{
+    Element, EventType, LiveRegion, Role, Semantics, UiEvent, UiEventKind, ValueHandler,
+};
 use argui_updater::{InstallOutcome, State};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -21,6 +23,8 @@ pub struct UpdateDialog<'a> {
     state: &'a State,
     open: bool,
     trigger: Element,
+    action_handlers: Vec<ValueHandler<String>>,
+    open_handlers: Vec<ValueHandler<bool>>,
 }
 
 impl<'a> UpdateDialog<'a> {
@@ -34,7 +38,23 @@ impl<'a> UpdateDialog<'a> {
             state,
             open,
             trigger,
+            action_handlers: Vec::new(),
+            open_handlers: Vec::new(),
         }
+    }
+
+    /// Adds a handler receiving `check`, `download`, `cancel`, or `install`.
+    #[must_use]
+    pub fn on_action(mut self, handler: ValueHandler<String>) -> Self {
+        self.action_handlers.push(handler);
+        self
+    }
+
+    /// Adds a handler receiving the requested dialog open state.
+    #[must_use]
+    pub fn on_open_change(mut self, handler: ValueHandler<bool>) -> Self {
+        self.open_handlers.push(handler);
+        self
     }
 
     #[must_use]
@@ -150,9 +170,21 @@ impl<'a> UpdateDialog<'a> {
             );
         }
         let mut buttons = Vec::new();
-        if let Some((label, _)) = self.primary() {
-            buttons
-                .push(Button::new(format!("{}::primary", self.key), label, theme.button()).build());
+        if let Some((label, action)) = self.primary() {
+            let value = match action {
+                UpdateAction::Check => "check",
+                UpdateAction::Download => "download",
+                UpdateAction::Cancel => "cancel",
+                UpdateAction::Install => "install",
+                UpdateAction::Open | UpdateAction::Close => unreachable!("not a primary action"),
+            };
+            let mut primary =
+                Button::new(format!("{}::primary", self.key), label, theme.button()).build();
+            for handler in &self.action_handlers {
+                primary =
+                    primary.on(handler.direct_listener_value(EventType::Click, value.to_owned()));
+            }
+            buttons.push(primary);
         }
         buttons.push(
             Button::new(
@@ -167,13 +199,16 @@ impl<'a> UpdateDialog<'a> {
                 .gap(8.0)
                 .flex_wrap(argui_ui::FlexWrap::Wrap),
         );
-        Dialog::new(
+        let mut dialog = Dialog::new(
             &self.key,
             "Application update",
             self.open,
             self.trigger,
             Element::column(children).gap(16.0),
-        )
-        .build(theme)
+        );
+        for handler in &self.open_handlers {
+            dialog = dialog.on_open_change(*handler);
+        }
+        dialog.build(theme)
     }
 }

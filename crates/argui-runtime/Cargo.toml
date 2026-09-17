@@ -45,7 +45,7 @@ accesskit.workspace = true
 accesskit_winit.workspace = true
 dioxus-devtools = { workspace = true, optional = true }
 pollster.workspace = true
-tokio = { version = "=1.53.1", features = ["rt-multi-thread", "time", "net"], optional = true }
+tokio = { version = "=1.53.1", features = ["rt-multi-thread", "time", "net", "test-util"], optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen-futures.workspace = true

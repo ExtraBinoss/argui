@@ -90,11 +90,7 @@ fn host_announces_errors_and_pauses_for_pointer_or_action_focus() {
     ));
     state.insert(error, sec(0)).unwrap();
     state.insert(toast("queued"), sec(0)).unwrap();
-    let host = ToastHost {
-        key: "host",
-        state: &state,
-        close_label: "Close",
-    };
+    let host = ToastHost::new("host", &state, "Close");
     let themes = shadcn(Color::WHITE);
     let tree = UiTree::new(host.build(
         themes.resolve(ColorScheme::Light),
@@ -157,11 +153,7 @@ fn notifications_float_at_the_viewport_corner_and_keep_every_variant_readable() 
         notification.variant = variant;
         notification.description = "Your changes have been saved.".into();
         state.insert(notification, sec(0)).unwrap();
-        let host = ToastHost {
-            key: "host",
-            state: &state,
-            close_label: "Close notification",
-        };
+        let host = ToastHost::new("host", &state, "Close notification");
         for scheme in [ColorScheme::Light, ColorScheme::Dark] {
             let theme = themes.resolve(scheme);
             let built = host.build(theme, &icons);

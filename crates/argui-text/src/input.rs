@@ -1,13 +1,15 @@
+use std::collections::{HashMap, HashSet};
+
 use argui_core::{CaretAffinity, Point, Rect, Size, TextPosition};
-use cosmic_text::{Buffer, Metrics, Shaping};
+use cosmic_text::{Buffer, Metrics, Scroll};
 use unicode_segmentation::UnicodeSegmentation;
 
-use crate::{TextEngine, TextStyle, engine};
+use crate::{TextContent, TextEngine, TextStyle, engine};
 
 const INPUT_BUFFER_CACHE_CAPACITY: usize = 8;
 
 pub(crate) struct InputBuffer {
-    text: String,
+    content: TextContent,
     style: TextStyle,
     viewport: Size,
     buffer: Buffer,
@@ -83,22 +85,85 @@ impl TextEngine {
         selection: Option<(TextPosition, TextPosition)>,
         scroll: TextInputScroll,
     ) -> TextInputLayout {
+        self.input_layout_content(
+            &TextContent::plain(text),
+            style,
+            viewport,
+            cursor,
+            selection,
+            scroll,
+        )
+    }
+
+    /// Shapes rich editor content and computes caret, selection, and scrolling geometry.
+    ///
+    /// * `content` — displayed editor content with optional per-span styling.
+    /// * `style` — base editor text style inherited by spans.
+    /// * `viewport` — available input size in logical pixels.
+    /// * `cursor` — caret position and affinity in the displayed text.
+    /// * `selection` — optional anchor and focus positions.
+    /// * `scroll` — current offset and caret reveal policy.
+    ///
+    /// Returns caret stops, selection rectangles, content size, and resolved offsets.
+    pub fn input_layout_content(
+        &mut self,
+        content: &TextContent,
+        style: &TextStyle,
+        viewport: Size,
+        cursor: TextPosition,
+        selection: Option<(TextPosition, TextPosition)>,
+        scroll: TextInputScroll,
+    ) -> TextInputLayout {
+        let text = content.as_str();
         let cache_index = self
             .input_buffers
             .iter()
-            .position(|entry| entry.matches(text, style, viewport))
+            .position(|entry| entry.matches(content, style, viewport))
             .unwrap_or_else(|| {
-                let entry = InputBuffer::new(&mut self.fonts, text, style, viewport);
+                let entry = InputBuffer::new(&mut self.fonts, content, style, viewport);
                 if self.input_buffers.len() == INPUT_BUFFER_CACHE_CAPACITY {
                     self.input_buffers.remove(0);
                 }
                 self.input_buffers.push(entry);
                 self.input_buffers.len() - 1
             });
-        let buffer = &self.input_buffers[cache_index].buffer;
-
         let cursor = TextPosition::new(boundary(text, cursor.index), cursor.affinity);
-        let raw_stops = caret_stops(buffer, text);
+        let line_offsets = engine::source_line_offsets(text);
+        let no_wrap = style.wrap == crate::TextWrap::None;
+        let content_height = if no_wrap {
+            line_offsets.len().max(1) as f32 * style.line_height
+        } else {
+            0.0
+        };
+        let cursor_line = line_offsets
+            .partition_point(|offset| *offset <= cursor.index)
+            .saturating_sub(1);
+        let cursor_y = cursor_line as f32 * style.line_height;
+        let scroll_y = no_wrap.then(|| {
+            resolved_scroll(
+                scroll.caret,
+                scroll.offset.y,
+                cursor_y,
+                style.line_height,
+                viewport.height,
+                content_height,
+            )
+        });
+        let buffer = &mut self.input_buffers[cache_index].buffer;
+        if let Some(scroll_y) = scroll_y {
+            let line = (scroll_y / style.line_height.max(1.0)).floor() as usize;
+            let line = line.min(line_offsets.len().saturating_sub(1));
+            let vertical = scroll_y - line as f32 * style.line_height;
+            buffer.set_scroll(Scroll::new(line, vertical, 0.0));
+            buffer.shape_until_scroll(&mut self.fonts, false);
+        }
+        let y_offset = scroll_y.unwrap_or_default();
+        let mut raw_stops = caret_stops(buffer, text);
+        if no_wrap {
+            for stop in &mut raw_stops {
+                stop.point.y += y_offset;
+            }
+        }
         let caret_stop = raw_stops
             .iter()
             .find(|stop| stop.position == cursor)
@@ -107,17 +172,25 @@ impl TextEngine {
                     .iter()
                     .find(|stop| stop.position.index == cursor.index)
             });
-        let (caret_x, caret_y) = caret_stop
-            .map(|stop| (stop.point.x, stop.point.y))
-            .unwrap_or_default();
-        let content_width = buffer
+        let (caret_x, caret_y) =
+            caret_stop.map_or((0.0, cursor_y), |stop| (stop.point.x, stop.point.y));
+        let shaped_width = buffer
             .layout_runs()
             .map(|run| run.line_w)
             .fold(0.0_f32, f32::max);
-        let content_height = buffer
-            .layout_runs()
-            .map(|run| run.line_top + run.line_height)
-            .fold(style.line_height, f32::max);
+        let content_width = if no_wrap && style.family == crate::FontFamily::Monospace {
+            shaped_width.max(unwrapped_width_estimate(text, style.font_size))
+        } else {
+            shaped_width
+        };
+        let content_height = if no_wrap {
+            content_height
+        } else {
+            buffer
+                .layout_runs()
+                .map(|run| run.line_top + run.line_height)
+                .fold(style.line_height, f32::max)
+        };
         let scroll_x = resolved_scroll(
             scroll.caret,
             scroll.offset.x,
@@ -126,14 +199,16 @@ impl TextEngine {
             viewport.width,
             content_width,
         );
-        let scroll_y = resolved_scroll(
-            scroll.caret,
-            scroll.offset.y,
-            caret_y,
-            style.line_height,
-            viewport.height,
-            content_height,
-        );
+        let scroll_y = scroll_y.unwrap_or_else(|| {
+            resolved_scroll(
+                scroll.caret,
+                scroll.offset.y,
+                caret_y,
+                style.line_height,
+                viewport.height,
+                content_height,
+            )
+        });
         let caret = Rect::new(
             Point::new(caret_x - scroll_x, caret_y - scroll_y),
             Size::new(1.5, style.line_height),
@@ -145,6 +220,7 @@ impl TextEngine {
                 anchor,
                 focus,
                 Point::new(scroll_x, scroll_y),
+                y_offset,
             )
         });
         let stops = raw_stops
@@ -166,20 +242,35 @@ impl TextEngine {
     }
 }
 
+fn unwrapped_width_estimate(text: &str, font_size: f32) -> f32 {
+    let columns = text
+        .lines()
+        .map(|line| {
+            line.chars()
+                .map(|character| if character == '\t' { 4 } else { 1 })
+                .sum::<usize>()
+        })
+        .max()
+        .unwrap_or_default();
+    columns as f32 * font_size * 0.62
+}
+
 pub(crate) fn caret_stops(buffer: &Buffer, text: &str) -> Vec<CaretStop> {
     let mut boundaries = text
         .unicode_word_indices()
         .flat_map(|(index, word)| [index, index + word.len()])
-        .collect::<Vec<_>>();
+        .collect::<HashSet<_>>();
     boundaries.extend([0, text.len()]);
     let line_offsets = engine::source_line_offsets(text);
     let mut stops = Vec::new();
+    let mut seen = HashSet::new();
     for run in buffer.layout_runs() {
         let base = line_offsets.get(run.line_i).copied().unwrap_or_default();
         let visuals = visual_clusters(&run);
         if visuals.is_empty() {
             push_stop(
                 &mut stops,
+                &mut seen,
                 TextPosition::new(base, CaretAffinity::Before),
                 0.0,
                 run.line_top,
@@ -199,6 +290,7 @@ pub(crate) fn caret_stops(buffer: &Buffer, text: &str) -> Vec<CaretStop> {
                 };
                 push_stop(
                     &mut stops,
+                    &mut seen,
                     TextPosition::new(base + visual.start + offset, CaretAffinity::After),
                     x,
                     run.line_top,
@@ -216,7 +308,14 @@ pub(crate) fn caret_stops(buffer: &Buffer, text: &str) -> Vec<CaretStop> {
                     visual.right,
                 )
             };
-            push_stop(&mut stops, position, x, run.line_top, &boundaries);
+            push_stop(
+                &mut stops,
+                &mut seen,
+                position,
+                x,
+                run.line_top,
+                &boundaries,
+            );
         }
     }
     if stops.is_empty() {
@@ -236,39 +335,39 @@ pub(crate) fn caret_stops(buffer: &Buffer, text: &str) -> Vec<CaretStop> {
 }
 
 fn visual_clusters(run: &cosmic_text::LayoutRun<'_>) -> Vec<VisualCluster> {
-    let mut clusters: Vec<VisualCluster> = Vec::new();
+    let mut clusters: HashMap<(usize, usize), VisualCluster> = HashMap::new();
     for glyph in run.glyphs {
-        if let Some(cluster) = clusters
-            .iter_mut()
-            .find(|cluster| cluster.start == glyph.start && cluster.end == glyph.end)
-        {
+        if let Some(cluster) = clusters.get_mut(&(glyph.start, glyph.end)) {
             cluster.left = cluster.left.min(glyph.x);
             cluster.right = cluster.right.max(glyph.x + glyph.w);
         } else {
-            clusters.push(VisualCluster {
-                start: glyph.start,
-                end: glyph.end,
-                left: glyph.x,
-                right: glyph.x + glyph.w,
-                rtl: glyph.level.is_rtl(),
-            });
+            clusters.insert(
+                (glyph.start, glyph.end),
+                VisualCluster {
+                    start: glyph.start,
+                    end: glyph.end,
+                    left: glyph.x,
+                    right: glyph.x + glyph.w,
+                    rtl: glyph.level.is_rtl(),
+                },
+            );
         }
     }
+    let mut clusters = clusters.into_values().collect::<Vec<_>>();
     clusters.sort_by(|a, b| a.left.total_cmp(&b.left));
     clusters
 }
 
 fn push_stop(
     stops: &mut Vec<CaretStop>,
+    seen: &mut HashSet<(usize, bool)>,
     position: TextPosition,
     x: f32,
     y: f32,
-    word_boundaries: &[usize],
+    word_boundaries: &HashSet<usize>,
 ) {
-    if stops
-        .iter()
-        .any(|stop| stop.position == position && (stop.point.x - x).abs() < 0.01)
-    {
+    let key = (position.index, position.affinity == CaretAffinity::After);
+    if !seen.insert(key) {
         return;
     }
     stops.push(CaretStop {
@@ -281,7 +380,7 @@ fn push_stop(
 impl InputBuffer {
     fn new(
         fonts: &mut cosmic_text::FontSystem,
-        text: &str,
+        content: &TextContent,
         style: &TextStyle,
         viewport: Size,
     ) -> Self {
@@ -297,24 +396,18 @@ impl InputBuffer {
             crate::TextWrap::Word => cosmic_text::Wrap::Word,
             crate::TextWrap::WordOrGlyph => cosmic_text::Wrap::WordOrGlyph,
         });
-        let attrs = engine::attrs(style);
-        buffer.set_text(
-            text,
-            &attrs,
-            Shaping::Advanced,
-            engine::text_align(style.align),
-        );
+        engine::set_content(&mut buffer, content, style);
         buffer.shape_until_scroll(fonts, false);
         Self {
-            text: text.to_owned(),
+            content: content.clone(),
             style: style.clone(),
             viewport,
             buffer,
         }
     }
 
-    fn matches(&self, text: &str, style: &TextStyle, viewport: Size) -> bool {
-        self.text == text && self.style == *style && self.viewport == viewport
+    fn matches(&self, content: &TextContent, style: &TextStyle, viewport: Size) -> bool {
+        self.content == *content && self.style == *style && self.viewport == viewport
     }
 }
 
@@ -351,22 +444,21 @@ fn visual_selection_rects(
     anchor: TextPosition,
     focus: TextPosition,
     scroll: Point,
+    y_offset: f32,
 ) -> Vec<Rect> {
-    let (Some(anchor), Some(focus)) = (find_stop(stops, anchor), find_stop(stops, focus)) else {
-        return Vec::new();
-    };
-    let (start, end) = if anchor.position.index <= focus.position.index {
-        (anchor.position.index, focus.position.index)
+    let (start, end) = if anchor.index <= focus.index {
+        (anchor.index, focus.index)
     } else {
-        (focus.position.index, anchor.position.index)
+        (focus.index, anchor.index)
     };
     buffer
         .layout_runs()
         .filter_map(|run| {
+            let line_top = run.line_top + y_offset;
             let selected = stops
                 .iter()
                 .filter(|stop| {
-                    (stop.point.y - run.line_top).abs() < 0.01
+                    (stop.point.y - line_top).abs() < 0.01
                         && stop.position.index >= start
                         && stop.position.index <= end
                 })
@@ -381,23 +473,12 @@ fn visual_selection_rects(
                 .max_by(f32::total_cmp)?;
             (right > left).then(|| {
                 Rect::new(
-                    Point::new(left - scroll.x, run.line_top - scroll.y),
+                    Point::new(left - scroll.x, line_top - scroll.y),
                     Size::new(right - left, run.line_height),
                 )
             })
         })
         .collect()
-}
-
-fn find_stop(stops: &[CaretStop], position: TextPosition) -> Option<&CaretStop> {
-    stops
-        .iter()
-        .find(|stop| stop.position == position)
-        .or_else(|| {
-            stops
-                .iter()
-                .find(|stop| stop.position.index == position.index)
-        })
 }
 
 fn boundary(text: &str, index: usize) -> usize {

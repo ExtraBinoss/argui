@@ -1,7 +1,9 @@
 use crate::{Button, TablerIcon, WidgetAssets, WidgetTheme};
 use argui_paint::{Border, CornerRadii};
 use argui_text::{TextStyle, TextWrap};
-use argui_ui::{ActionInvocation, ActionState, Element, LiveRegion, Role, Semantics};
+use argui_ui::{
+    ActionInvocation, ActionState, Element, EventType, LiveRegion, Role, Semantics, ValueHandler,
+};
 use argui_ui::{AlignItems, Sides, ViewportAlign, ViewportPlacement, WindowLayer, length};
 use std::{collections::VecDeque, time::Duration};
 
@@ -210,15 +212,34 @@ pub struct ToastHost<'a> {
     pub key: &'a str,
     pub state: &'a ToastState,
     pub close_label: &'a str,
+    close_handlers: Vec<ValueHandler<String>>,
 }
 
-impl ToastHost<'_> {
+impl<'a> ToastHost<'a> {
+    /// Creates a toast host for controlled `state`, identified by `key`.
+    #[must_use]
+    pub fn new(key: &'a str, state: &'a ToastState, close_label: &'a str) -> Self {
+        Self {
+            key,
+            state,
+            close_label,
+            close_handlers: Vec::new(),
+        }
+    }
+
+    /// Adds a handler receiving the stable id of a toast requested for closure.
+    #[must_use]
+    pub fn on_close(mut self, handler: ValueHandler<String>) -> Self {
+        self.close_handlers.push(handler);
+        self
+    }
+
     /// Returns the close-control key for the notification with `id`.
     pub fn close_key(&self, id: &str) -> String {
         format!("{}::close::{id}", self.key)
     }
     /// Returns the visible toast id when `event` activates its close control.
-    pub fn close_action<'a>(&self, event: &'a argui_ui::UiEvent) -> Option<&'a str> {
+    pub fn close_action<'event>(&self, event: &'event argui_ui::UiEvent) -> Option<&'event str> {
         if !matches!(event.kind, argui_ui::UiEventKind::Click(_)) {
             return None;
         }
@@ -326,6 +347,21 @@ impl ToastHost<'_> {
             if !toast.actions.is_empty() {
                 copy.push(Element::row(actions).gap(8.0));
             }
+            let mut close = Button::icon(
+                self.close_key(&toast.id),
+                self.close_label,
+                icons
+                    .icon(TablerIcon::Close, 16.0)
+                    .vector_color(theme.muted_foreground),
+                theme.ghost_button(),
+            )
+            .build()
+            .width(length(24.0))
+            .height(length(24.0))
+            .padding(Sides::length(0.0));
+            for handler in &self.close_handlers {
+                close = close.on(handler.direct_listener_value(EventType::Click, toast.id.clone()));
+            }
             Element::row([
                 icons.icon(icon, 20.0).vector_color(color),
                 Element::column(copy)
@@ -333,18 +369,7 @@ impl ToastHost<'_> {
                     .grow(1.0)
                     .min_width(length(0.0))
                     .flex_basis(length(0.0)),
-                Button::icon(
-                    self.close_key(&toast.id),
-                    self.close_label,
-                    icons
-                        .icon(TablerIcon::Close, 16.0)
-                        .vector_color(theme.muted_foreground),
-                    theme.ghost_button(),
-                )
-                .build()
-                .width(length(24.0))
-                .height(length(24.0))
-                .padding(Sides::length(0.0)),
+                close,
             ])
             .align_items(AlignItems::START)
             .gap(12.0)

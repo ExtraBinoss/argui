@@ -17,10 +17,16 @@ argui = { workspace = true, features = [
     "tasks",
     "widget-button",
     "widget-dialog",
+    "widget-popover",
+    "widget-range",
+    "widget-textarea",
 ] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen.workspace = true
+
+[dev-dependencies]
+argui-testing.workspace = true
 
 [lints]
 workspace = true

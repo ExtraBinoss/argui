@@ -1,8 +1,10 @@
 use std::collections::BTreeSet;
 
 use argui_core::{Key, KeyState};
+use argui_text::{EllipsisPosition, TextOverflow};
 use argui_ui::{
-    Element, Role, SemanticAction, SemanticState, Semantics, UiEvent, UiEventKind, length,
+    Axes, Element, EventFilter, EventType, Overflow, Role, SemanticAction, SemanticState,
+    Semantics, UiEvent, UiEventKind, ValueHandler, length,
 };
 
 use crate::{Button, VList, WidgetTheme};
@@ -25,6 +27,13 @@ pub enum TreeAction {
     Collapse(String),
 }
 
+#[derive(Clone, Copy, Debug)]
+struct TreeReveal {
+    start: usize,
+    end: usize,
+    progress: f32,
+}
+
 /// A controlled tree accepting preorder rows from any data source.
 pub struct TreeView<'a> {
     pub nodes: &'a [TreeNode],
@@ -32,9 +41,81 @@ pub struct TreeView<'a> {
     pub collapsed: &'a BTreeSet<String>,
     pub list: VList,
     pub disclosure: Option<argui_paint::VectorId>,
+    reveal: Option<TreeReveal>,
+    select_handlers: Vec<ValueHandler<String>>,
+    activate_handlers: Vec<ValueHandler<String>>,
 }
 
-impl TreeView<'_> {
+impl<'a> TreeView<'a> {
+    /// Creates a controlled tree from preorder `nodes` and a virtual `list` viewport.
+    ///
+    /// `selected` identifies the active row and `collapsed` contains stable ids of
+    /// closed branches. The application owns both values.
+    #[must_use]
+    pub fn new(
+        nodes: &'a [TreeNode],
+        selected: Option<&'a str>,
+        collapsed: &'a BTreeSet<String>,
+        list: VList,
+    ) -> Self {
+        TreeView {
+            nodes,
+            selected,
+            collapsed,
+            list,
+            disclosure: None,
+            reveal: None,
+            select_handlers: Vec::new(),
+            activate_handlers: Vec::new(),
+        }
+    }
+
+    /// Sets the optional disclosure `icon` shown for expandable branches.
+    #[must_use]
+    pub fn disclosure(mut self, icon: Option<argui_paint::VectorId>) -> Self {
+        self.disclosure = icon;
+        self
+    }
+
+    /// Reveals visible descendants of `parent` with a soft top-to-bottom sweep.
+    ///
+    /// `progress` is clamped to `0..=1`. The parent row and rows outside its
+    /// preorder subtree remain unchanged.
+    #[must_use]
+    pub fn reveal_descendants(mut self, parent: &str, progress: f32) -> Self {
+        if let Some(parent_index) = self.nodes.iter().position(|node| node.key == parent) {
+            let parent_depth = self.nodes[parent_index].depth;
+            let end = self.nodes[parent_index + 1..]
+                .iter()
+                .position(|node| node.depth <= parent_depth)
+                .map_or(self.nodes.len(), |offset| parent_index + 1 + offset);
+            self.reveal = Some(TreeReveal {
+                start: parent_index + 1,
+                end,
+                progress: if progress.is_finite() {
+                    progress.clamp(0.0, 1.0)
+                } else {
+                    1.0
+                },
+            });
+        }
+        self
+    }
+
+    /// Adds a handler that receives the stable id of a selected node.
+    #[must_use]
+    pub fn on_select(mut self, handler: ValueHandler<String>) -> Self {
+        self.select_handlers.push(handler);
+        self
+    }
+
+    /// Adds a handler that receives the stable id of a node activated by double click.
+    #[must_use]
+    pub fn on_activate(mut self, handler: ValueHandler<String>) -> Self {
+        self.activate_handlers.push(handler);
+        self
+    }
+
     /// Returns source indices visible after applying collapsed ancestors.
     #[must_use]
     pub fn visible_indices(&self) -> Vec<usize> {
@@ -161,9 +242,36 @@ impl TreeView<'_> {
         let active = self.active_position(&visible);
         self.list
             .build_pinned(visible.len(), theme, active, |position| {
-                self.row(visible[position], active == Some(position), theme)
+                let index = visible[position];
+                self.decorate_reveal(
+                    self.row(index, position, &visible, active == Some(position), theme),
+                    index,
+                )
             })
             .semantics(Semantics::new(Role::Tree).label("Elements"))
+    }
+
+    fn decorate_reveal(&self, row: Element, index: usize) -> Element {
+        let Some(reveal) = self.reveal else {
+            return row;
+        };
+        if index < reveal.start || index >= reveal.end {
+            return row;
+        }
+        let animated_rows = reveal.end.saturating_sub(reveal.start).clamp(1, 12);
+        let order = index
+            .saturating_sub(reveal.start)
+            .min(animated_rows.saturating_sub(1));
+        let position = if animated_rows == 1 {
+            0.0
+        } else {
+            order as f32 / (animated_rows - 1) as f32
+        };
+        let band = 0.32;
+        let local = ((reveal.progress * (1.0 + band) - position) / band).clamp(0.0, 1.0);
+        let eased = local * local * (3.0 - 2.0 * local);
+        row.opacity(eased)
+            .transform(argui_core::Transform2D::IDENTITY.translate(0.0, -6.0 * (1.0 - eased)))
     }
 
     fn page_size(&self, count: usize) -> usize {
@@ -181,7 +289,14 @@ impl TreeView<'_> {
             .or_else(|| (!visible.is_empty()).then_some(0))
     }
 
-    fn row(&self, index: usize, active: bool, theme: &WidgetTheme) -> Element {
+    fn row(
+        &self,
+        index: usize,
+        position: usize,
+        visible: &[usize],
+        active: bool,
+        theme: &WidgetTheme,
+    ) -> Element {
         let node = &self.nodes[index];
         let selected = self.selected == Some(node.key.as_str());
         let mut style = if selected {
@@ -192,6 +307,7 @@ impl TreeView<'_> {
         style.layout.padding = argui_ui::sides(8.0 + node.depth as f32 * 12.0, 2.0);
         style.layout.justify_content = Some(argui_ui::JustifyContent::START);
         style.label.font_size = 12.0;
+        style.label.overflow = TextOverflow::Ellipsis(EllipsisPosition::End);
         let color = if selected {
             theme.primary_foreground
         } else {
@@ -244,11 +360,22 @@ impl TreeView<'_> {
                     .semantic_hidden(true),
             );
         }
+        let content = Element::text(node.label.clone())
+            .text_style(style.label.clone())
+            .min_width(length(0.0))
+            .grow(1.0);
         let mut row = Button::new(&node.key, &node.label, style)
             .leading(Element::row(icons).gap(4.0).shrink(0.0))
+            .content(content)
+            .tooltip(node.label.clone())
             .build()
             .width(argui_ui::percent(1.0))
+            .max_width(argui_ui::percent(1.0))
             .min_width(length(0.0))
+            .overflow(Axes {
+                x: Overflow::Hidden,
+                y: Overflow::Hidden,
+            })
             .semantics(
                 Semantics::new(Role::TreeItem)
                     .label(&node.label)
@@ -263,6 +390,57 @@ impl TreeView<'_> {
                     .action(SemanticAction::Click)
                     .action(SemanticAction::Focus),
             );
+        for handler in &self.select_handlers {
+            row = row.on(handler.direct_listener_value(EventType::Click, node.key.clone()));
+        }
+        for handler in &self.activate_handlers {
+            row = row.on(handler
+                .direct_listener_value(EventType::Click, node.key.clone())
+                .filter(EventFilter::DoubleClick));
+        }
+        for (filter, target) in [
+            (
+                EventFilter::ArrowLeftPressed,
+                self.nodes[..index]
+                    .iter()
+                    .rev()
+                    .find(|parent| parent.depth < node.depth)
+                    .map(|parent| parent.key.clone()),
+            ),
+            (
+                EventFilter::ArrowRightPressed,
+                self.has_children(index)
+                    .then(|| self.nodes[index + 1].key.clone()),
+            ),
+            (
+                EventFilter::ArrowUpPressed,
+                visible
+                    .get(position.saturating_sub(1))
+                    .map(|index| self.nodes[*index].key.clone()),
+            ),
+            (
+                EventFilter::ArrowDownPressed,
+                visible
+                    .get((position + 1).min(visible.len().saturating_sub(1)))
+                    .map(|index| self.nodes[*index].key.clone()),
+            ),
+            (
+                EventFilter::HomePressed,
+                visible.first().map(|index| self.nodes[*index].key.clone()),
+            ),
+            (
+                EventFilter::EndPressed,
+                visible.last().map(|index| self.nodes[*index].key.clone()),
+            ),
+        ] {
+            if let Some(target) = target {
+                for handler in &self.select_handlers {
+                    row = row.on(handler
+                        .direct_listener_value(EventType::Key, target.clone())
+                        .filter(filter));
+                }
+            }
+        }
         row.interaction
             .as_mut()
             .expect("tree row button interaction")

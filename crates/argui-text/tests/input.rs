@@ -348,3 +348,34 @@ fn empty_multiline_runs_keep_a_real_caret_stop_and_scroll_position() {
             .any(|stop| stop.position == pos(value.len()))
     );
 }
+
+#[test]
+fn large_code_buffers_build_unique_caret_stops_in_source_order() {
+    let value = (0..600)
+        .map(|line| format!("let value_{line} = compute({line}); // retained editor geometry"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let style = TextStyle {
+        font_size: 14.0,
+        line_height: 20.0,
+        wrap: TextWrap::None,
+        ..TextStyle::default()
+    };
+    let layout = engine().input_layout(
+        &value,
+        &style,
+        Size::new(720.0, 400.0),
+        pos(value.len()),
+        None,
+        reveal(Point::default()),
+    );
+    let unique = layout
+        .stops
+        .iter()
+        .map(|stop| (stop.position.index, stop.position.affinity))
+        .collect::<Vec<_>>();
+
+    assert!(layout.content_size.height > 10_000.0);
+    assert!(unique.windows(2).all(|pair| pair[0] != pair[1]));
+    assert!(layout.stops.iter().any(|stop| stop.word_boundary));
+}

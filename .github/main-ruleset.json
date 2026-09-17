@@ -52,6 +52,14 @@
             "integration_id": 15368
           },
           {
+            "context": "Public API",
+            "integration_id": 15368
+          },
+          {
+            "context": "Rust coverage",
+            "integration_id": 15368
+          },
+          {
             "context": "Desktop compile (Windows)",
             "integration_id": 15368
           },

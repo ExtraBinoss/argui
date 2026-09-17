@@ -91,7 +91,7 @@ fn zero_duration_caret_animation_is_rejected() {
 }
 
 #[test]
-fn focused_animated_caret_requests_paint_and_resets_after_editing() {
+fn focused_animated_caret_requests_composition_and_resets_after_editing() {
     let element = input(CaretStyle::default());
     let mut tree = UiTree::new(element.clone());
     let node = tree.node_id_at(0).unwrap();
@@ -101,14 +101,23 @@ fn focused_animated_caret_requests_paint_and_resets_after_editing() {
     assert!(tree.wants_animation_frame());
     assert_eq!(
         tree.advance_animations(Time::from_nanos(1)),
-        TreeUpdate::Paint
+        TreeUpdate::Composite
     );
-    tree.advance_animations(Time::from_nanos(600_000_001));
+    assert!(!tree.wants_animation_frame());
+    assert_eq!(
+        tree.next_animation_frame_at(),
+        Some(Time::from_nanos(500_000_001))
+    );
+    tree.advance_animations(Time::from_nanos(500_000_001));
     let caret = match &element.kind {
         argui_ui::ElementKind::TextEditor { caret, .. } => caret,
         _ => panic!("expected a text editor"),
     };
     assert_eq!(tree.resolved_caret_frame(node, caret).opacity, 0.0);
+    assert_eq!(
+        tree.next_animation_frame_at(),
+        Some(Time::from_nanos(1_000_000_001))
+    );
 
     tree.edit_text_input(&KeyInput {
         key: Key::Character("x".into()),
@@ -120,7 +129,51 @@ fn focused_animated_caret_requests_paint_and_resets_after_editing() {
     assert_eq!(tree.resolved_caret_frame(node, caret).opacity, 1.0);
     assert_eq!(tree.set_reduced_motion(true), TreeUpdate::Paint);
     assert!(!tree.wants_animation_frame());
+    assert_eq!(tree.next_animation_frame_at(), None);
     assert_eq!(tree.resolved_caret_frame(node, caret).opacity, 1.0);
+}
+
+#[test]
+fn interpolated_caret_keeps_display_linked_frames() {
+    let frames = Keyframes::new([
+        Keyframe::new(0.0, CaretFrame::new(1.0, Color::WHITE)),
+        Keyframe::new(1.0, CaretFrame::new(0.0, Color::WHITE)),
+    ])
+    .unwrap();
+    let style = CaretStyle::new(CaretVisual::new([CaretPrimitive::new(
+        1.5,
+        CaretHeight::Line,
+        QuadStyle::solid(Color::WHITE),
+    )]))
+    .animated(CaretAnimation::new(frames, Duration::from_millis(1_000)).unwrap());
+    let mut tree = UiTree::new(input(style));
+    let node = tree.node_id_at(0).unwrap();
+    tree.sync_focus(&[region(node)], Some(FocusRequest::Focus(node.into())));
+    tree.advance_animations(Time::from_nanos(1));
+    assert!(tree.wants_animation_frame());
+    assert_eq!(tree.next_animation_frame_at(), None);
+}
+
+#[test]
+fn tint_animation_requests_paint_instead_of_composition() {
+    let frames = Keyframes::new([
+        Keyframe::new(0.0, CaretFrame::new(1.0, Color::WHITE)),
+        Keyframe::new(1.0, CaretFrame::new(1.0, Color::BLACK)),
+    ])
+    .unwrap();
+    let style = CaretStyle::new(CaretVisual::new([CaretPrimitive::new(
+        1.5,
+        CaretHeight::Line,
+        QuadStyle::solid(Color::WHITE),
+    )]))
+    .animated(CaretAnimation::new(frames, Duration::from_millis(1_000)).unwrap());
+    let mut tree = UiTree::new(input(style));
+    let node = tree.node_id_at(0).unwrap();
+    tree.sync_focus(&[region(node)], Some(FocusRequest::Focus(node.into())));
+    assert_eq!(
+        tree.advance_animations(Time::from_nanos(1)),
+        TreeUpdate::Paint
+    );
 }
 
 #[test]

@@ -2,7 +2,7 @@ use argui_core::{Point, PointerEvent, PointerPhase};
 use argui_platform::{ButtonState, ScrollDelta};
 use argui_ui::{InteractionUpdate, UiTree};
 
-use super::Application;
+use super::{Application, inertia::touch_scroll_delta};
 
 #[cfg_attr(coverage_nightly, coverage(off))]
 impl Application {
@@ -46,6 +46,7 @@ impl Application {
         self.flush_scrollbar_drag(window, event_loop);
         let point = self.pointer.unwrap_or_default();
         self.pointer = None;
+        self.mouse_selection_origin = None;
         self.refresh_cursor(window);
         if let Some(ui) = &mut self.ui_tree {
             let mut update = ui.scrollbar_pointer_moved(None, &[]);
@@ -99,9 +100,19 @@ impl Application {
         let static_placement = self
             .pointer
             .and_then(|point| Self::static_text_at(layout, point));
+        let hit_target = self.pointer.and_then(|point| {
+            layout
+                .hit_regions
+                .iter()
+                .rev()
+                .find(|region| region.contains(point))
+                .map(|region| region.node)
+        });
         let Some(ui) = &mut self.ui_tree else {
             return;
         };
+        let hit_blocks_selection = hit_target
+            .is_some_and(|target| ui.resolved_user_select(target) == argui_ui::UserSelect::None);
         if state == ButtonState::Pressed
             && let Some(point) = self.pointer
             && let Some(region) =
@@ -171,6 +182,11 @@ impl Application {
             argui_ui::SelectionGranularity::Character
         };
         if state == ButtonState::Pressed {
+            self.mouse_selection_origin = (!default_prevented
+                && placement.is_none()
+                && static_placement.is_none()
+                && !hit_blocks_selection)
+                .then_some(point);
             if !default_prevented
                 && let (Some(ui), Some(layout)) = (&mut self.ui_tree, &self.ui_layout)
             {
@@ -195,6 +211,7 @@ impl Application {
             };
             self.apply_ui_update(selection_update, window, event_loop);
         } else {
+            self.mouse_selection_origin = None;
             let update = self.ui_tree.as_mut().map_or_else(
                 InteractionUpdate::default,
                 UiTree::release_document_selection,
@@ -311,6 +328,20 @@ impl Application {
             self.apply_ui_update(update, window, event_loop);
             return;
         }
+        if let Some(origin) = self.mouse_selection_origin
+            && let Some(anchor) = Self::closest_static_text(layout, origin)
+            && let Some(focus) = Self::closest_static_text(layout, point)
+        {
+            self.mouse_selection_origin = None;
+            let mut update = ui.begin_document_selection(
+                anchor,
+                false,
+                argui_ui::SelectionGranularity::Character,
+            );
+            update.merge(ui.drag_document_selection(focus));
+            self.apply_ui_update(update, window, event_loop);
+            return;
+        }
         let scrollbar = argui_ui::scrollbar_at(point, &layout.scroll_regions, &layout.hit_regions);
         let mut update =
             ui.scrollbar_pointer_moved(Some(point), scrollbar.map_or(&[], std::slice::from_ref));
@@ -341,15 +372,26 @@ impl Application {
             self.primary_touch = Some(event.id);
         }
         event.primary = self.primary_touch == Some(event.id);
-        match event.phase {
-            PointerPhase::Pressed if event.primary => {
-                self.begin_touch_selection(event.id, event.position, window);
+        let started_selection_handle = event.phase == PointerPhase::Pressed
+            && event.primary
+            && self.begin_touch_selection_handle(event.id, event.position, window, event_loop);
+        let dragging_selection_handle = started_selection_handle
+            || self
+                .touch_selection_handle
+                .is_some_and(|capture| capture.tracks(event.id));
+        if !dragging_selection_handle {
+            match event.phase {
+                PointerPhase::Pressed if event.primary => {
+                    self.begin_touch_selection(event.id, event.position, window);
+                }
+                PointerPhase::Moved => {
+                    self.move_touch_selection_candidate(event.id, event.position)
+                }
+                PointerPhase::Released | PointerPhase::Cancelled | PointerPhase::Left => {
+                    self.cancel_touch_selection(event.id);
+                }
+                PointerPhase::Entered | PointerPhase::Pressed => {}
             }
-            PointerPhase::Moved => self.move_touch_selection_candidate(event.id, event.position),
-            PointerPhase::Released | PointerPhase::Cancelled | PointerPhase::Left => {
-                self.cancel_touch_selection(event.id);
-            }
-            PointerPhase::Entered | PointerPhase::Pressed => {}
         }
         let finger_delta = match event.phase {
             PointerPhase::Pressed => {
@@ -370,9 +412,17 @@ impl Application {
             PointerPhase::Entered => None,
         };
         let mut touch_scroll = None;
+        let mut pointer_default = None;
         let update = if let (Some(layout), Some(ui)) = (&self.ui_layout, &mut self.ui_tree) {
             let selecting = ui.document_selection_dragging() && event.primary;
-            let mut update = if selecting && event.phase == PointerPhase::Moved {
+            let mut update = if dragging_selection_handle && event.phase == PointerPhase::Moved {
+                Self::closest_static_text(layout, event.position)
+                    .map_or_else(InteractionUpdate::default, |position| {
+                        ui.drag_document_selection(position)
+                    })
+            } else if dragging_selection_handle {
+                InteractionUpdate::default()
+            } else if selecting && event.phase == PointerPhase::Moved {
                 Self::closest_static_text(layout, event.position)
                     .map_or_else(InteractionUpdate::default, |position| {
                         ui.drag_document_selection(position)
@@ -380,8 +430,30 @@ impl Application {
             } else {
                 ui.pointer_event(event, &layout.hit_regions)
             };
+            if event.phase == PointerPhase::Pressed && event.primary {
+                pointer_default = update
+                    .events
+                    .iter()
+                    .find(|delivery| {
+                        matches!(
+                            delivery.kind,
+                            argui_ui::UiEventKind::Pointer(argui_core::PointerEvent {
+                                phase: PointerPhase::Pressed,
+                                ..
+                            })
+                        )
+                    })
+                    .cloned();
+            }
             let default_prevented = update.events.iter().any(|event| event.default_prevented());
-            if let Some(delta) = finger_delta.filter(|_| !selecting && !default_prevented) {
+            if let Some(finger_delta) = finger_delta.filter(|_| !selecting && !default_prevented) {
+                let natural = layout
+                    .scroll_regions
+                    .iter()
+                    .rev()
+                    .find(|region| region.config.enabled && region.contains(event.position))
+                    .is_none_or(|region| region.config.natural_touch_scroll);
+                let delta = touch_scroll_delta(finger_delta, natural);
                 self.programmatic_scroll = None;
                 touch_scroll = Some((Some(delta), event.phase));
                 update.merge(ui.scroll(
@@ -389,7 +461,7 @@ impl Application {
                     ScrollDelta::Pixels(delta),
                     &layout.scroll_regions,
                 ));
-            } else if event.primary {
+            } else if event.primary && !dragging_selection_handle {
                 let phase = if selecting || default_prevented {
                     PointerPhase::Cancelled
                 } else {
@@ -407,7 +479,15 @@ impl Application {
         if let Some(update) = update {
             self.apply_ui_update(update, window, event_loop);
         }
-        if matches!(event.phase, PointerPhase::Pressed | PointerPhase::Released) {
+        if pointer_default.is_some_and(|event| !event.default_prevented())
+            && let (Some(ui), Some(layout)) = (&mut self.ui_tree, &self.ui_layout)
+        {
+            let update = ui.focus_pointer_default(event.id, &layout.hit_regions);
+            self.apply_ui_update(update, window, event_loop);
+        }
+        if !dragging_selection_handle
+            && matches!(event.phase, PointerPhase::Pressed | PointerPhase::Released)
+        {
             self.update_ime(window);
         }
         if matches!(
@@ -420,6 +500,12 @@ impl Application {
                 UiTree::release_document_selection,
             );
             self.apply_ui_update(update, window, event_loop);
+            if self
+                .touch_selection_handle
+                .is_some_and(|capture| capture.tracks(event.id))
+            {
+                self.touch_selection_handle = None;
+            }
             self.primary_touch = self.touch_points.keys().min_by_key(|id| id.get()).copied();
         }
         event

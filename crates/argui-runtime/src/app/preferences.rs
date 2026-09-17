@@ -128,6 +128,7 @@ impl Application {
             TreeUpdate::Layout => self.pending_ui_frame.request_layout(),
             TreeUpdate::Scroll => self.pending_ui_frame.request_scroll_update(),
             TreeUpdate::Paint => self.pending_ui_frame.request_paint(),
+            TreeUpdate::Composite => self.pending_ui_frame.request_composite(),
             TreeUpdate::None | TreeUpdate::Semantics => {}
         }
         self.pending_ui_frame.request_rebuild();

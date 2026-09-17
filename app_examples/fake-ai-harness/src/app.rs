@@ -191,34 +191,6 @@ impl AiHarness {
         }
     }
 
-    fn handle_input(&mut self, event: &argui::ui::UiEvent, cx: &mut Context<Self>) {
-        if event.target_key() == Some("prompt")
-            && let UiEventKind::TextChanged(value) = &event.kind
-        {
-            self.prompt.clone_from(value);
-            cx.notify();
-        }
-    }
-
-    fn handle_submit(&mut self, event: &argui::ui::UiEvent, cx: &mut Context<Self>) {
-        if event.target_key() == Some("prompt") {
-            self.start(cx);
-        }
-    }
-
-    fn handle_click(&mut self, event: &argui::ui::UiEvent, cx: &mut Context<Self>) {
-        match event.target_key() {
-            Some("conversation::latest") => {
-                let request = self.message_scroll.latest("conversation");
-                self.conversation_offset = self.scroll_maximum;
-                cx.scroll(request);
-                cx.notify();
-            }
-            Some("run") => self.start(cx),
-            _ => {}
-        }
-    }
-
     fn handle_scroll(&mut self, event: &argui::ui::UiEvent, cx: &mut Context<Self>) {
         let mut window_changed = false;
         if event.target_key() == Some("conversation")
@@ -245,9 +217,6 @@ impl Render for AiHarness {
         let theme = themes.resolve(environment.color_scheme);
         self.view(cx, theme)
             .safe_area(environment.safe_area_insets)
-            .on(cx.listener(EventType::Input, Self::handle_input))
-            .on(cx.listener(EventType::Submit, Self::handle_submit))
-            .on(cx.listener(EventType::Click, Self::handle_click))
             .on(cx.listener(EventType::Scroll, Self::handle_scroll))
     }
 

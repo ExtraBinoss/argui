@@ -1,6 +1,9 @@
 use std::rc::Rc;
 
-use argui_ui::{EventHandlerId, EventListener, EventType, UiEvent};
+use argui_ui::{
+    EventHandler, EventHandlerId, EventListener, EventType, FromHandlerValue, TextEdit, UiEvent,
+    ValueHandler,
+};
 
 use super::{Context, Entity, Render};
 
@@ -51,6 +54,199 @@ impl<T> HandlerRegistry<T> {
 }
 
 impl<T: Render> Context<T> {
+    fn register_handler(
+        &mut self,
+        handler: impl Fn(&mut T, &UiEvent, &mut Context<T>) + 'static,
+    ) -> EventHandler {
+        let owner = self.owner.as_ref().map_or_else(
+            || panic!("event handlers require an entity render context"),
+            |owner| owner.0.get(),
+        );
+        let entity = self
+            .entity
+            .as_ref()
+            .and_then(super::WeakEntity::upgrade)
+            .expect("event handlers require a live entity render context");
+        let slot = entity
+            .0
+            .presentation
+            .handlers
+            .borrow()
+            .next_slot(self.handlers.len());
+        self.handlers.push(Rc::new(handler));
+        EventHandler::from_identity(EventHandlerId::new(argui_ui::EventOwnerId(owner), slot))
+    }
+
+    /// Registers a local state callback that invalidates this presentation after delivery.
+    ///
+    /// `callback` receives mutable application state. The returned opaque handler can be
+    /// attached by a widget such as `Button::on_click`. The runtime calls
+    /// [`Context::notify`] after `callback` returns.
+    ///
+    /// # Panics
+    /// Panics if called outside a live entity render context.
+    #[must_use]
+    pub fn callback(&mut self, callback: impl Fn(&mut T) + 'static) -> EventHandler {
+        self.register_handler(move |model, _, cx| {
+            callback(model);
+            cx.notify();
+        })
+    }
+
+    /// Registers a full event callback without implicitly invalidating the presentation.
+    ///
+    /// `handler` receives mutable application state, the routed [`UiEvent`], and the
+    /// presentation [`Context`]. It may inspect or stop propagation and request commands,
+    /// focus, or invalidation explicitly. The returned opaque identity is bound to an event
+    /// type by the widget that receives it.
+    ///
+    /// # Panics
+    /// Panics if called outside a live entity render context.
+    #[must_use]
+    pub fn event_handler(
+        &mut self,
+        handler: impl Fn(&mut T, &UiEvent, &mut Context<T>) + 'static,
+    ) -> EventHandler {
+        self.register_handler(handler)
+    }
+
+    fn mapped_handler<V: 'static>(
+        &mut self,
+        map: impl Fn(&UiEvent) -> Option<V> + 'static,
+        handler: impl Fn(&mut T, V, &UiEvent, &mut Context<T>) + 'static,
+    ) -> ValueHandler<V> {
+        ValueHandler::from_handler(self.register_handler(move |model, event, cx| {
+            if let Some(value) = map(event) {
+                handler(model, value, event, cx);
+            }
+        }))
+    }
+
+    /// Registers a typed callback for a value supplied by a widget listener.
+    ///
+    /// `callback` receives mutable application state plus the widget's domain
+    /// value. The presentation is invalidated after the callback returns. A
+    /// delivery without a compatible value is ignored.
+    ///
+    /// # Panics
+    /// Panics if called outside a live entity render context.
+    #[must_use]
+    pub fn value_callback<V: FromHandlerValue>(
+        &mut self,
+        callback: impl Fn(&mut T, V) + 'static,
+    ) -> ValueHandler<V> {
+        self.mapped_handler(V::from_handler_event, move |model, value, _, cx| {
+            callback(model, value);
+            cx.notify();
+        })
+    }
+
+    /// Registers a typed full event handler for a widget-supplied value.
+    ///
+    /// `handler` receives the domain value, routed event, and context. It must
+    /// request invalidation explicitly when required. A delivery without a
+    /// compatible value is ignored.
+    ///
+    /// # Panics
+    /// Panics if called outside a live entity render context.
+    #[must_use]
+    pub fn value_event_handler<V: FromHandlerValue>(
+        &mut self,
+        handler: impl Fn(&mut T, V, &UiEvent, &mut Context<T>) + 'static,
+    ) -> ValueHandler<V> {
+        self.mapped_handler(V::from_handler_event, handler)
+    }
+
+    /// Registers a text-input callback receiving the newly edited string.
+    ///
+    /// `callback` receives mutable application state and the new controlled
+    /// value. Non-input events are ignored. Successful delivery automatically
+    /// invalidates the presentation.
+    ///
+    /// # Panics
+    /// Panics if called outside a live entity render context.
+    #[must_use]
+    pub fn input_callback(
+        &mut self,
+        callback: impl Fn(&mut T, String) + 'static,
+    ) -> ValueHandler<String> {
+        self.value_callback(callback)
+    }
+
+    /// Registers an incremental text-edit callback that invalidates after delivery.
+    ///
+    /// `callback` receives the accepted UTF-8 range replacement rather than a
+    /// clone of the complete controlled value.
+    ///
+    /// # Panics
+    /// Panics if called outside a live entity render context.
+    #[must_use]
+    pub fn edit_callback(
+        &mut self,
+        callback: impl Fn(&mut T, TextEdit) + 'static,
+    ) -> ValueHandler<TextEdit> {
+        self.value_callback(callback)
+    }
+
+    /// Registers a submit callback receiving the submitted string.
+    ///
+    /// `callback` receives mutable application state and the submitted value.
+    /// Non-submit events are ignored. Successful delivery automatically
+    /// invalidates the presentation.
+    ///
+    /// # Panics
+    /// Panics if called outside a live entity render context.
+    #[must_use]
+    pub fn submit_callback(
+        &mut self,
+        callback: impl Fn(&mut T, String) + 'static,
+    ) -> ValueHandler<String> {
+        self.value_callback(callback)
+    }
+
+    /// Registers a text-input handler with access to the routed event and context.
+    ///
+    /// `handler` receives the edited string and does not implicitly invalidate.
+    ///
+    /// # Panics
+    /// Panics if called outside a live entity render context.
+    #[must_use]
+    pub fn input_event_handler(
+        &mut self,
+        handler: impl Fn(&mut T, String, &UiEvent, &mut Context<T>) + 'static,
+    ) -> ValueHandler<String> {
+        self.value_event_handler(handler)
+    }
+
+    /// Registers an incremental text-edit handler with routed event access.
+    ///
+    /// `handler` receives the accepted UTF-8 range replacement and must request
+    /// invalidation explicitly when required.
+    ///
+    /// # Panics
+    /// Panics if called outside a live entity render context.
+    #[must_use]
+    pub fn edit_event_handler(
+        &mut self,
+        handler: impl Fn(&mut T, TextEdit, &UiEvent, &mut Context<T>) + 'static,
+    ) -> ValueHandler<TextEdit> {
+        self.value_event_handler(handler)
+    }
+
+    /// Registers a submit handler with access to the routed event and context.
+    ///
+    /// `handler` receives the submitted string and does not implicitly invalidate.
+    ///
+    /// # Panics
+    /// Panics if called outside a live entity render context.
+    #[must_use]
+    pub fn submit_event_handler(
+        &mut self,
+        handler: impl Fn(&mut T, String, &UiEvent, &mut Context<T>) + 'static,
+    ) -> ValueHandler<String> {
+        self.value_event_handler(handler)
+    }
+
     /// Creates an action binding whose callback runs when the matching action fires.
     ///
     /// `id` selects the action; `state` describes its current action state;
@@ -85,26 +281,7 @@ impl<T: Render> Context<T> {
         event: EventType,
         handler: impl Fn(&mut T, &UiEvent, &mut Context<T>) + 'static,
     ) -> EventListener {
-        let owner = self.owner.as_ref().map_or_else(
-            || panic!("listeners require an entity render context"),
-            |owner| owner.0.get(),
-        );
-        let entity = self
-            .entity
-            .as_ref()
-            .and_then(super::WeakEntity::upgrade)
-            .expect("listeners require a live entity render context");
-        let slot = entity
-            .0
-            .presentation
-            .handlers
-            .borrow()
-            .next_slot(self.handlers.len());
-        self.handlers.push(Rc::new(handler));
-        EventListener::new(
-            event,
-            EventHandlerId::new(argui_ui::EventOwnerId(owner), slot),
-        )
+        self.event_handler(handler).listener(event)
     }
 }
 

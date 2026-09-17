@@ -1,7 +1,7 @@
 use crate::{
     Button, ButtonBehavior, ChoiceMode, Input, Toggle, Typography, TypographyVariant, WidgetTheme,
 };
-use argui_ui::{Element, UiEvent, UiEventKind};
+use argui_ui::{Element, EventHandler, EventType, UiEvent, UiEventKind, ValueHandler};
 use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -114,6 +114,10 @@ pub struct Questionnaire {
     pub submit_label: String,
     pub answer_label: String,
     pub error_label: String,
+    input_handlers: Vec<ValueHandler<String>>,
+    choice_handlers: Vec<ValueHandler<Vec<String>>>,
+    navigate_handlers: Vec<ValueHandler<usize>>,
+    submit_handlers: Vec<EventHandler>,
 }
 
 impl Questionnaire {
@@ -131,7 +135,41 @@ impl Questionnaire {
             submit_label: "Submit".into(),
             answer_label: "Your answer".into(),
             error_label: "Choose or enter a valid answer.".into(),
+            input_handlers: Vec::new(),
+            choice_handlers: Vec::new(),
+            navigate_handlers: Vec::new(),
+            submit_handlers: Vec::new(),
         }
+    }
+
+    /// Adds a handler receiving the active question's edited freeform answer.
+    #[must_use]
+    pub fn on_input(mut self, handler: ValueHandler<String>) -> Self {
+        self.input_handlers.push(handler);
+        self
+    }
+
+    /// Adds a handler receiving `[question_id, choice_id, selected]` for a choice change.
+    #[must_use]
+    pub fn on_choice(mut self, handler: ValueHandler<Vec<String>>) -> Self {
+        self.choice_handlers.push(handler);
+        self
+    }
+
+    /// Adds a handler receiving the requested controlled question index.
+    #[must_use]
+    pub fn on_navigate(mut self, handler: ValueHandler<usize>) -> Self {
+        self.navigate_handlers.push(handler);
+        self
+    }
+
+    /// Adds a handler invoked when a valid final submission is requested.
+    ///
+    /// The callback reads the controlled answers from application state.
+    #[must_use]
+    pub fn on_submit(mut self, handler: EventHandler) -> Self {
+        self.submit_handlers.push(handler);
+        self
     }
 
     /// Reject duplicate identifiers and invalid retained answers before submission.
@@ -288,19 +326,32 @@ impl Questionnaire {
                 answer.choices.contains(&choice.id),
             );
             toggle.outline = true;
-            toggle.build(theme)
+            let mut element = toggle.build(theme);
+            for handler in &self.choice_handlers {
+                element = element.on(handler.direct_listener_value(
+                    EventType::Click,
+                    vec![
+                        question.id.clone(),
+                        choice.id.clone(),
+                        (!answer.choices.contains(&choice.id)).to_string(),
+                    ],
+                ));
+            }
+            element
         }));
         if question.freeform {
-            let mut input = Input::new(
+            let mut builder = Input::new(
                 format!("{prefix}::input"),
                 &answer.text,
                 &self.answer_label,
                 theme.input(),
             )
             .label(&self.answer_label)
-            .invalid(self.state.invalid.contains(&question.id))
-            .build()
-            .labelled_by([title_key.clone()]);
+            .invalid(self.state.invalid.contains(&question.id));
+            for handler in &self.input_handlers {
+                builder = builder.on_input(*handler);
+            }
+            let mut input = builder.build().labelled_by([title_key.clone()]);
             if self.state.invalid.contains(&question.id) {
                 input = input.described_by([error_key.clone()]);
             }
@@ -318,40 +369,62 @@ impl Questionnaire {
                     ),
             );
         }
+        let mut previous = Button::new(
+            format!("{}::previous", self.key),
+            &self.previous_label,
+            theme.outline_button(),
+        )
+        .enabled(index > 0)
+        .build();
+        if index > 0 {
+            for handler in &self.navigate_handlers {
+                previous = previous.on(handler.direct_listener_value(EventType::Click, index - 1));
+            }
+        }
+        let next_index = (index + 1).min(self.questions.len().saturating_sub(1));
+        let mut skip = Button::new(
+            format!("{}::skip", self.key),
+            &self.skip_label,
+            theme.ghost_button(),
+        )
+        .enabled(!question.required)
+        .build();
+        if !question.required {
+            for handler in &self.navigate_handlers {
+                skip = skip.on(handler.direct_listener_value(EventType::Click, next_index));
+            }
+        }
+        let next = if index + 1 < self.questions.len() {
+            let mut next = Button::new(
+                format!("{}::next", self.key),
+                &self.next_label,
+                theme.button(),
+            )
+            .build();
+            if question.accepts(&answer) {
+                for handler in &self.navigate_handlers {
+                    next = next.on(handler.direct_listener_value(EventType::Click, index + 1));
+                }
+            }
+            next
+        } else {
+            let mut submit = Button::new(
+                format!("{}::submit", self.key),
+                &self.submit_label,
+                theme.button(),
+            )
+            .build();
+            if self.invalid_questions().is_empty() {
+                for handler in &self.submit_handlers {
+                    submit = submit.on(handler.direct_listener(EventType::Click));
+                }
+            }
+            submit
+        };
         children.push(
-            Element::row([
-                Button::new(
-                    format!("{}::previous", self.key),
-                    &self.previous_label,
-                    theme.outline_button(),
-                )
-                .enabled(index > 0)
-                .build(),
-                Button::new(
-                    format!("{}::skip", self.key),
-                    &self.skip_label,
-                    theme.ghost_button(),
-                )
-                .enabled(!question.required)
-                .build(),
-                if index + 1 < self.questions.len() {
-                    Button::new(
-                        format!("{}::next", self.key),
-                        &self.next_label,
-                        theme.button(),
-                    )
-                    .build()
-                } else {
-                    Button::new(
-                        format!("{}::submit", self.key),
-                        &self.submit_label,
-                        theme.button(),
-                    )
-                    .build()
-                },
-            ])
-            .gap(8.0)
-            .flex_wrap(argui_ui::FlexWrap::Wrap),
+            Element::row([previous, skip, next])
+                .gap(8.0)
+                .flex_wrap(argui_ui::FlexWrap::Wrap),
         );
         Element::column(children)
             .keyed(&self.key)

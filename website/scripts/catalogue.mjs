@@ -19,7 +19,10 @@ const sourceOverrides = {
   webview: 'pages/webview',
   'async-tasks': 'pages/async_tasks',
   editing: 'pages/editing',
+  'drag-drop': 'pages/drag_drop',
+  'split-pane': 'pages/split_pane',
   'custom-timeline': 'pages/timeline',
+  'mobile-activity': 'pages/mobile_activity',
 }
 const extraWidgets = [
   [
@@ -30,12 +33,6 @@ const extraWidgets = [
   ],
   ['range', 'Range', 'Shared value, bounds, step and gesture behavior for range controls.', null],
   ['spinner', 'Spinner', 'A loading indicator that respects reduced motion.', 'Button'],
-  [
-    'split-pane',
-    'Split pane',
-    'Resizable panels with limits, pointer gestures and keyboard control.',
-    null,
-  ],
   [
     'tree-view',
     'Tree view',
@@ -71,9 +68,9 @@ export async function createCatalogue() {
     const feature = features.has(slug) ? slug : null
     const file = sourceOverrides[slug] ?? slug.replaceAll('-', '_')
     const example = file.startsWith('pages')
-    const source =
-      documented[slug]?.source ??
-      `crates/${example ? 'argui-widget-gallery' : 'argui-widgets'}/src/${file}.rs`
+    const source = example
+      ? `crates/argui-widget-gallery/src/${file}.rs`
+      : (documented[slug]?.source ?? `crates/argui-widgets/src/${file}.rs`)
     return {
       slug,
       name: labels[variant],
@@ -96,6 +93,11 @@ export async function createCatalogue() {
       gallery,
     })
   }
+  const duplicateSlugs = items
+    .map((item) => item.slug)
+    .filter((slug, index, slugs) => slugs.indexOf(slug) !== index)
+  if (duplicateSlugs.length > 0)
+    throw new Error(`Duplicate catalogue slugs: ${[...new Set(duplicateSlugs)].join(', ')}`)
   for (const item of items) {
     if (!item.name || !item.description) throw new Error(`Missing gallery metadata: ${item.slug}`)
     await access(resolve(root, item.source))

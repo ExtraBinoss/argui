@@ -18,10 +18,10 @@ impl SurfaceRenderer {
         foreground: TextureTarget,
         style: &LayerStyle,
         viewport: [f32; 2],
-        region: PixelRegion,
+        output_region: PixelRegion,
         profiler: Option<&GpuFrameCapture>,
     ) {
-        let snapshot = self.snapshot(encoder, target, region);
+        let snapshot = self.snapshot(encoder, target, output_region);
         let filtered = self.apply_filters(
             encoder,
             snapshot,
@@ -35,16 +35,16 @@ impl SurfaceRenderer {
         let mut backdrop = if style.backdrop_filters.is_empty() {
             snapshot
         } else {
-            let merged = self.acquire_target(region, region.size);
+            let merged = self.acquire_target(output_region, output_region.size);
             self.clear_target(encoder, merged, wgpu::Color::TRANSPARENT);
-            let mut params = uniform(viewport, region, filtered, snapshot, style.bounds);
+            let mut params = uniform(viewport, output_region, filtered, snapshot, style.bounds);
             params.mode = 12;
             params.data[0] = style.opacity.clamp(0.0, 1.0);
             params.radii = layer_radii(style.mask);
             self.draw_effect(
                 encoder,
                 merged,
-                region,
+                output_region,
                 EffectSources {
                     source: filtered,
                     backdrop: snapshot,
@@ -68,9 +68,9 @@ impl SurfaceRenderer {
                 profiler,
                 style.profile,
             );
-            let shadowed = self.acquire_target(region, region.size);
+            let shadowed = self.acquire_target(output_region, output_region.size);
             self.clear_target(encoder, shadowed, wgpu::Color::TRANSPARENT);
-            let mut params = uniform(viewport, region, blurred, backdrop, style.bounds);
+            let mut params = uniform(viewport, output_region, blurred, backdrop, style.bounds);
             params.mode = if shadow.inset { 11 } else { 10 };
             params.color = shadow.color.to_linear_rgba();
             params.color[3] *= style.opacity.clamp(0.0, 1.0);
@@ -79,7 +79,7 @@ impl SurfaceRenderer {
             self.draw_effect(
                 encoder,
                 shadowed,
-                region,
+                output_region,
                 EffectSources {
                     source: blurred,
                     backdrop,
@@ -96,18 +96,19 @@ impl SurfaceRenderer {
         let expansion = style.foreground_expansion();
         let mut params = uniform(
             viewport,
-            region,
+            output_region,
             foreground,
             backdrop,
             style.foreground_bounds(),
         );
         params.blend = blend_mode(style.blend_mode);
         params.data[0] = style.opacity;
+        params.set_inverse_transform(style.transform.inverse().unwrap_or_default());
         params.radii = expanded_radii(style.mask, expansion);
         self.draw_effect(
             encoder,
             target,
-            region,
+            output_region,
             EffectSources {
                 source: foreground,
                 backdrop,

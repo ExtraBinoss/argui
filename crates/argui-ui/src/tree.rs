@@ -30,6 +30,7 @@ pub enum TreeUpdate {
     #[default]
     None,
     Semantics,
+    Composite,
     Paint,
     Scroll,
     Layout,
@@ -68,6 +69,7 @@ pub struct UiTree {
     events: EventRegistry,
     pending_gestures: Vec<crate::GestureEvent>,
     native_portals: std::collections::HashMap<NodeId, argui_core::Rect>,
+    interaction_bounds: std::collections::HashMap<NodeId, argui_core::Rect>,
 }
 
 impl UiTree {
@@ -106,6 +108,7 @@ impl UiTree {
             events,
             pending_gestures: Vec::new(),
             native_portals: Default::default(),
+            interaction_bounds: Default::default(),
         };
         tree.sync_text_inputs();
         tree.sync_responsive_registry();
@@ -192,7 +195,7 @@ impl UiTree {
                     None,
                 );
             }
-            TreeUpdate::Paint | TreeUpdate::Scroll => {
+            TreeUpdate::Composite | TreeUpdate::Paint | TreeUpdate::Scroll => {
                 self.root = root;
                 self.sync_animation_registry(false);
             }
@@ -209,6 +212,8 @@ impl UiTree {
                 self.root = root;
                 self.sync_animation_registry(structure_changed);
                 self.interaction.retain(&self.node_ids);
+                self.interaction_bounds
+                    .retain(|node, _| self.node_ids.contains(node));
                 self.pending_gestures
                     .retain(|gesture| self.node_ids.contains(&gesture.target));
                 self.scroll.retain(&self.node_ids);
@@ -336,6 +341,7 @@ impl UiTree {
         }
         InteractionUpdate {
             events,
+            composite_changed: transition_update == TreeUpdate::Composite,
             paint_changed: raw.paint_changed || transition_update == TreeUpdate::Paint,
             scroll_changed: transition_update == TreeUpdate::Scroll,
             layout_changed: transition_update == TreeUpdate::Layout,
@@ -349,27 +355,41 @@ impl UiTree {
         node: NodeId,
         result: crate::text_input::EditResult,
     ) -> InteractionUpdate {
-        let value = self
-            .text_inputs
-            .get(node)
-            .map_or_else(String::new, |state| state.value().to_owned());
+        let crate::text_input::EditResult {
+            edit,
+            submitted,
+            layout,
+            reshape,
+            clipboard,
+        } = result;
         let mut events = Vec::with_capacity(2);
-        if result.changed {
-            events.extend(self.event_deliveries(node, UiEventKind::TextChanged(value.clone())));
+        if let Some(edit) = edit {
+            if self.has_event_listener(node, crate::EventType::Input) {
+                let value = self
+                    .text_inputs
+                    .get(node)
+                    .map_or_else(String::new, |state| state.value().to_owned());
+                events.extend(self.event_deliveries(node, UiEventKind::TextChanged(value)));
+            }
+            events.extend(self.event_deliveries(node, UiEventKind::TextEdited(edit.edit)));
         }
-        if result.submitted {
+        if submitted {
+            let value = self
+                .text_inputs
+                .get(node)
+                .map_or_else(String::new, |state| state.value().to_owned());
             events.extend(self.event_deliveries(node, UiEventKind::Submitted(value)));
         }
-        if result.layout {
+        if layout {
             self.text_inputs.request_cursor_reveal(node);
             self.caret.reset();
         }
         InteractionUpdate {
             events,
-            paint_changed: result.layout,
-            layout_changed: result.reshape,
-            text_input_changed: result.layout,
-            clipboard: result.clipboard,
+            paint_changed: layout,
+            layout_changed: reshape,
+            text_input_changed: layout,
+            clipboard,
             ..InteractionUpdate::default()
         }
     }
@@ -423,14 +443,12 @@ impl UiTree {
         self.index.element(node)
     }
 
-    fn focused_animated_caret(&self) -> Option<NodeId> {
+    fn focused_animated_caret(&self) -> Option<(NodeId, &crate::CaretAnimation)> {
         let node = self.interaction.focused()?;
         let element = self.element_for(node)?;
         match &element.kind {
-            ElementKind::TextEditor { caret, .. }
-                if caret.is_animated() && !self.reduced_motion =>
-            {
-                Some(node)
+            ElementKind::TextEditor { caret, .. } if !self.reduced_motion => {
+                caret.animation.as_ref().map(|animation| (node, animation))
             }
             _ => None,
         }

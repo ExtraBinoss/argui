@@ -1,4 +1,4 @@
-use argui_ui::{Element, UiEvent};
+use argui_ui::{Element, EventType, UiEvent, ValueHandler};
 
 use crate::{Button, ButtonBehavior, WidgetTheme};
 
@@ -10,6 +10,7 @@ pub struct Toggle {
     pub pressed: bool,
     pub enabled: bool,
     pub outline: bool,
+    change_handlers: Vec<ValueHandler<bool>>,
 }
 
 impl Toggle {
@@ -23,6 +24,7 @@ impl Toggle {
             pressed,
             enabled: true,
             outline: false,
+            change_handlers: Vec::new(),
         }
     }
 
@@ -33,6 +35,15 @@ impl Toggle {
             .enabled(self.enabled)
             .action(event)
             .map(|_| !self.pressed)
+    }
+
+    /// Adds a callback receiving the next pressed state.
+    ///
+    /// `handler` is normally created with `Context::value_callback`.
+    #[must_use]
+    pub fn on_change(mut self, handler: ValueHandler<bool>) -> Self {
+        self.change_handlers.push(handler);
+        self
     }
 
     #[must_use]
@@ -54,6 +65,9 @@ impl Toggle {
             .expect("button semantics")
             .state
             .pressed = Some(self.pressed);
+        for handler in self.change_handlers.iter().copied() {
+            button = button.on(handler.direct_listener_value(EventType::Click, !self.pressed));
+        }
         button
     }
 }

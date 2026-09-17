@@ -8,13 +8,7 @@ mod tree_view {
     mod cache;
 
     fn view<'a>(nodes: &'a [TreeNode], collapsed: &'a BTreeSet<String>) -> TreeView<'a> {
-        TreeView {
-            nodes,
-            selected: None,
-            collapsed,
-            list: VList::new("tree", 24.0, 120.0, 0.0),
-            disclosure: None,
-        }
+        TreeView::new(nodes, None, collapsed, VList::new("tree", 24.0, 120.0, 0.0))
     }
 
     fn click(key: &str, count: u8) -> UiEvent {

@@ -262,13 +262,21 @@ impl Application {
             let window = popup.native.window();
             let size = window.inner_size();
             popup.renderer.resize(size.width, size.height);
-            let result = popup.renderer.render_ui_notified(
-                &mut self.text_engine,
-                text,
-                &surface.display_list,
-                self.scale_factor,
-                || window.pre_present_notify(),
-            );
+            let result = if self.composite_frame && popup.shown {
+                popup.renderer.render_composite_notified(
+                    &surface.display_list,
+                    self.scale_factor,
+                    || window.pre_present_notify(),
+                )
+            } else {
+                popup.renderer.render_ui_notified(
+                    &mut self.text_engine,
+                    text,
+                    &surface.display_list,
+                    self.scale_factor,
+                    || window.pre_present_notify(),
+                )
+            };
             for diagnostic in popup.renderer.take_gpu_canvas_diagnostics() {
                 let event = match diagnostic.kind {
                     GpuCanvasDiagnosticKind::Failed => {

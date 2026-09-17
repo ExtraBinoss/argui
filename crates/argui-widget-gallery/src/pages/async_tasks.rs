@@ -80,10 +80,23 @@ impl Render for TasksDemo {
             text("Type a title or id:500. Invalid id:abc produces a real parsing error. New searches cancel old results.", 13.0, theme.muted_foreground, 400),
             Input::new("tasks-query", &self.query, "Title or id:500", theme.input())
                 .kind(InputKind::Search)
-                .label("Draft search").build().width(percent(1.0)),
+                .label("Draft search")
+                .on_input(cx.input_event_handler(|demo, query, _, cx| {
+                    demo.query = query;
+                    demo.start(cx);
+                }))
+                .build().width(percent(1.0)),
             Element::row([
-                Button::new("tasks-search", "Search", theme.button()).build(),
-                Button::new("tasks-cancel", "Cancel", theme.ghost_button()).enabled(self.slot.is_running()).build(),
+                Button::new("tasks-search", "Search", theme.button())
+                    .on_click(cx.event_handler(|demo, _, cx| demo.start(cx)))
+                    .build(),
+                Button::new("tasks-cancel", "Cancel", theme.ghost_button())
+                    .enabled(self.slot.is_running())
+                    .on_click(cx.callback(|demo| {
+                        demo.slot.cancel();
+                        demo.status = "Cancelled".into();
+                    }))
+                    .build(),
             ]).gap(8.0),
             text(&self.status, 13.0, theme.foreground, 400),
             VList::new("tasks-results", 32.0, 256.0, self.offset)
@@ -92,24 +105,6 @@ impl Render for TasksDemo {
                 }),
             Element::container([]).height(length(1.0)).background(Color::TRANSPARENT),
         ]).gap(12.0).width(percent(1.0))
-            .on(cx.listener(EventType::Input, |demo, event, cx| {
-                if event.target_key() == Some("tasks-query")
-                    && let UiEventKind::TextChanged(value) = &event.kind {
-                    demo.query = value.clone();
-                    demo.start(cx);
-                }
-            }))
-            .on(cx.listener(EventType::Click, |demo, event, cx| {
-                match event.target_key() {
-                    Some("tasks-search") => demo.start(cx),
-                    Some("tasks-cancel") => {
-                        demo.slot.cancel();
-                        demo.status = "Cancelled".into();
-                        cx.notify();
-                    }
-                    _ => {}
-                }
-            }))
             .on(cx.listener(EventType::Scroll, |demo, event, cx| {
                 if event.target_key() == Some("tasks-results")
                     && let UiEventKind::Scrolled { offset, .. } = event.kind {

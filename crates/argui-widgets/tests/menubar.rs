@@ -40,13 +40,7 @@ fn menubar_wraps_in_both_directions_and_opens_first_and_last_entries() {
             }),
         )
     };
-    let bar = Menubar {
-        key: "bar",
-        label: "Menu",
-        menus: &menus,
-        active: None,
-        rtl: false,
-    };
+    let bar = Menubar::new("bar", "Menu", &menus);
     for key in [Key::ArrowLeft, Key::ArrowRight] {
         assert_eq!(
             bar.response(&event(key)),
@@ -88,13 +82,9 @@ fn open_menubar_moves_into_next_menu_and_uses_its_rtl_direction() {
     );
     first.rtl = false;
     let menus = [first, second];
-    let bar = Menubar {
-        key: "bar",
-        label: "Bar",
-        menus: &menus,
-        active: Some("first"),
-        rtl: true,
-    };
+    let bar = Menubar::new("bar", "Bar", &menus)
+        .active(Some("first"))
+        .rtl(true);
     let event = UiEvent::new(
         UiTree::new(Element::container([])).node_ids()[0],
         Some("first::item::a".into()),

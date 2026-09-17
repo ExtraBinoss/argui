@@ -4,8 +4,8 @@ use argui::{
     runtime::{Context, LayoutSnapshot, Render},
     text::TextStyle,
     ui::{
-        AlignItems, Axes, Element, EventType, FlexWrap, JustifyContent, Overflow, ScrollConfig,
-        Sides, UiEventKind, length, percent,
+        AlignItems, Axes, Element, FlexWrap, JustifyContent, Overflow, ScrollConfig, Sides, length,
+        percent,
     },
     vector::VectorLibrary,
     widgets::{Button, WidgetTheme, default_theme},
@@ -312,6 +312,7 @@ impl Render for Example {
                 theme.button(),
             )
             .enabled(!self.reduced_motion)
+            .on_click(cx.callback(|app| app.running = !app.running))
             .build(),
         ])
         .width(percent(1.0))
@@ -343,14 +344,6 @@ impl Render for Example {
             .height(percent(1.0))
             .min_height(length(0.0))
             .background(theme.background)
-            .on(cx.listener(EventType::Click, |app, event, cx| {
-                if event.target_key() == Some("toggle-animation")
-                    && matches!(event.kind, UiEventKind::Click(_))
-                {
-                    app.running = !app.running;
-                    cx.notify();
-                }
-            }))
     }
 
     fn layout_changed(&mut self, layout: &LayoutSnapshot, cx: &mut Context<Self>) {
