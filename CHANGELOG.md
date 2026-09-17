@@ -56,9 +56,8 @@ that do not use them.
 - Limited individual Nextest cases to two minutes so a stalled native test is
   reported by name instead of consuming the full CI job timeout.
 - Stopped hidden or minimized GTK windows from keeping the event loop in a
-  permanent redraw poll, and associated synthetic lifecycle input with its GDK
-  window. Active tasks now also receive a bounded GTK fallback wake when Tao
-  loses its proxy notification after minimizing an auxiliary window.
+  permanent redraw poll, and queued synthetic lifecycle input through its GDK
+  window instead of re-entering the renderer from a GTK signal callback.
 - Kept embedded GPU canvases renderable beneath the website loading overlay so
   Chromium can initialize WebGPU and emit its ready signal instead of stalling
   a hidden iframe.

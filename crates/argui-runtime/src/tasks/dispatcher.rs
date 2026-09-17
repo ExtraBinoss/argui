@@ -112,15 +112,6 @@ impl TaskRuntime {
         self.0.entries.borrow().len()
     }
 
-    /// Returns whether a completion has requested delivery on the UI thread.
-    #[must_use]
-    #[cfg(not(target_arch = "wasm32"))]
-    pub(crate) fn completion_pending(&self) -> bool {
-        self.0
-            .wake_pending
-            .load(std::sync::atomic::Ordering::Acquire)
-    }
-
     /// Stop accepting work and cancel all deliveries, even if owners outlive the host.
     /// Repeated calls have no additional effect.
     pub fn shutdown(&self) {
