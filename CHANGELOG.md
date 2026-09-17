@@ -8,6 +8,10 @@ that do not use them.
 
 ### Added
 
+- Added `AnimatedOpacity` and `AnimatedContainer` implicit target-value widgets,
+  a public user-implementable `Curve` trait, nine named curve presets, and a
+  twenty-example Animation Laboratory covering keyframes, orchestration,
+  physics, composition, interruption and reduced motion.
 - Added incremental `TextEdit` delivery for `Input` and `TextArea`, including
   `on_edit`, context callback helpers, UTF-8 validation, fragment-based history,
   and lazy compatibility delivery for the existing `on_input(String)` API.

@@ -1,4 +1,8 @@
 //! Optional, accessible widgets built from Argui engine primitives.
+#[cfg(feature = "implicit-animation")]
+mod implicit_animation;
+#[cfg(feature = "implicit-animation")]
+pub use implicit_animation::{AnimatedContainer, AnimatedOpacity};
 #[cfg(feature = "animated-text")]
 mod animated_text;
 #[cfg(feature = "animated-text")]

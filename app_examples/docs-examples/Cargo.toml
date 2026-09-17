@@ -17,6 +17,7 @@ argui = { workspace = true, features = [
     "tasks",
     "widget-button",
     "widget-dialog",
+    "widget-implicit-animation",
     "widget-popover",
     "widget-range",
     "widget-textarea",

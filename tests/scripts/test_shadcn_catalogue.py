@@ -9,15 +9,15 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class ShadcnCatalogueTests(unittest.TestCase):
-    def test_all_64_entries_link_to_exported_apis_and_forwarded_features(self):
+    def test_all_65_entries_link_to_exported_apis_and_forwarded_features(self):
         document = ROOT / "docs/widgets/shadcn.md"
         rows = re.findall(
             r"^\| ([^|]+) \| \[([^]]+)\]\(([^)]+)\) \| `([^`]+)` \|",
             document.read_text(),
             re.MULTILINE,
         )
-        self.assertEqual(len(rows), 64)
-        self.assertEqual(len({row[0] for row in rows}), 64)
+        self.assertEqual(len(rows), 65)
+        self.assertEqual(len({row[0] for row in rows}), 65)
         widgets = tomllib.loads((ROOT / "crates/argui-widgets/Cargo.toml").read_text())
         facade = tomllib.loads((ROOT / "crates/argui/Cargo.toml").read_text())
         exports = (ROOT / "crates/argui-widgets/src/lib.rs").read_text()

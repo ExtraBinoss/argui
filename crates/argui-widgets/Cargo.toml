@@ -13,6 +13,7 @@ description = "Feature-gated accessible widgets for Argui interfaces"
 default = []
 updater = ["dialog", "button", "progress", "dep:argui-updater"]
 all = [
+    "implicit-animation",
     "animated-text",
     "accordion",
     "alert",
@@ -87,6 +88,7 @@ all = [
     "typography",
     "vlist",
 ]
+implicit-animation = []
 toggle = ["button"]
 animated-text = ["dep:argui-runtime", "dep:unicode-segmentation"]
 toggle-group = ["toggle"]

@@ -2,6 +2,27 @@ use std::{fmt, sync::Arc};
 
 type CustomFunction = dyn Fn(f32) -> f32 + Send + Sync + 'static;
 
+/// Maps normalized time to animation progress.
+///
+/// Argui clamps the input supplied through [`Easing::curve`] to `0.0..=1.0`.
+/// Implementations may return values outside that interval to create anticipation
+/// or overshoot. Curves should return finite values and preserve the endpoints
+/// when they are intended to finish exactly on their animated target.
+pub trait Curve: Send + Sync + 'static {
+    /// Samples the curve at normalized `progress` and returns transformed progress.
+    #[must_use]
+    fn sample(&self, progress: f32) -> f32;
+}
+
+impl<F> Curve for F
+where
+    F: Fn(f32) -> f32 + Send + Sync + 'static,
+{
+    fn sample(&self, progress: f32) -> f32 {
+        self(progress)
+    }
+}
+
 #[derive(Clone, Default)]
 /// Maps normalized animation progress to eased progress.
 pub enum Easing {
@@ -23,6 +44,12 @@ impl Easing {
     #[must_use]
     pub fn custom(function: impl Fn(f32) -> f32 + Send + Sync + 'static) -> Self {
         Self::Custom(Arc::new(function))
+    }
+
+    /// Wraps a user-defined [`Curve`] as an easing value.
+    #[must_use]
+    pub fn curve(curve: impl Curve) -> Self {
+        Self::Custom(Arc::new(move |progress| curve.sample(progress)))
     }
 
     /// Creates piecewise-linear easing from sorted stops spanning input zero to one.
@@ -58,6 +85,12 @@ impl Easing {
             Self::PiecewiseLinear(stops) => sample_stops(stops, progress),
             Self::Custom(function) => function(progress),
         }
+    }
+}
+
+impl Curve for Easing {
+    fn sample(&self, progress: f32) -> f32 {
+        Easing::sample(self, progress)
     }
 }
 
@@ -138,6 +171,12 @@ impl CubicBezier {
     }
 }
 
+impl Curve for CubicBezier {
+    fn sample(&self, progress: f32) -> f32 {
+        (*self).sample(progress)
+    }
+}
+
 fn cubic(parameter: f32, first: f32, second: f32) -> f32 {
     let inverse = 1.0 - parameter;
     3.0 * inverse * inverse * parameter * first
@@ -190,6 +229,41 @@ impl Steps {
             StepPosition::JumpNone => ((progress * count).floor() / (count - 1.0)).clamp(0.0, 1.0),
             StepPosition::JumpBoth => ((progress * count).floor() + 1.0) / (count + 1.0),
         }
+    }
+}
+
+impl Curve for Steps {
+    fn sample(&self, progress: f32) -> f32 {
+        (*self).sample(progress)
+    }
+}
+
+/// Ready-to-use curves for common interface motion.
+pub mod curves {
+    use super::{CubicBezier, Easing};
+
+    /// Constant-speed progress.
+    pub const LINEAR: Easing = Easing::Linear;
+    /// Gentle acceleration from rest.
+    pub const EASE_IN: Easing = cubic(0.42, 0.0, 1.0, 1.0);
+    /// Gentle deceleration into the target.
+    pub const EASE_OUT: Easing = cubic(0.0, 0.0, 0.58, 1.0);
+    /// Symmetric acceleration and deceleration.
+    pub const EASE_IN_OUT: Easing = cubic(0.42, 0.0, 0.58, 1.0);
+    /// Balanced material-style movement for most interface changes.
+    pub const STANDARD: Easing = cubic(0.2, 0.0, 0.0, 1.0);
+    /// Fast exit from the current state followed by a soft arrival.
+    pub const EMPHASIZED: Easing = cubic(0.2, 0.8, 0.2, 1.0);
+    /// Quickly leaves the initial value.
+    pub const ACCELERATE: Easing = cubic(0.3, 0.0, 0.8, 0.15);
+    /// Quickly becomes visible and then settles gently.
+    pub const DECELERATE: Easing = cubic(0.05, 0.7, 0.1, 1.0);
+    /// Overshoots the target before settling on it.
+    pub const BACK_OUT: Easing = cubic(0.34, 1.56, 0.64, 1.0);
+
+    /// Creates a constant cubic Bézier easing for the preset catalog.
+    const fn cubic(x1: f32, y1: f32, x2: f32, y2: f32) -> Easing {
+        Easing::CubicBezier(CubicBezier { x1, y1, x2, y2 })
     }
 }
 

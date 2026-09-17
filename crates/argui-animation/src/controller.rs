@@ -1,5 +1,5 @@
 use crate::{
-    Composition, Duration, Easing, FillMode, Interpolate, Keyframe, Keyframes, MotionValue,
+    Composition, Curve, Duration, Easing, FillMode, Interpolate, Keyframe, Keyframes, MotionValue,
     PlaybackState, Spring, SpringConfig, Time, Timeline, Timing, TimingError,
 };
 use std::{
@@ -41,6 +41,13 @@ impl Tween {
     #[must_use]
     pub fn easing(mut self, easing: Easing) -> Self {
         self.easing = easing;
+        self
+    }
+
+    /// Sets a built-in or user-defined curve for this tween.
+    #[must_use]
+    pub fn curve(mut self, curve: impl Curve) -> Self {
+        self.easing = Easing::curve(curve);
         self
     }
 }

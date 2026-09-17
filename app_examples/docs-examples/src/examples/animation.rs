@@ -1,4 +1,5 @@
 use argui::{
+    animation::{Duration, curves},
     core::{ColorInterpolation, Transform2D, TransformOrigin},
     paint::{Border, CornerRadii, LayerStyle, Shadow, VectorAsset, VectorId},
     runtime::{Context, LayoutSnapshot, Render},
@@ -8,7 +9,7 @@ use argui::{
         percent,
     },
     vector::VectorLibrary,
-    widgets::{Button, WidgetTheme, default_theme},
+    widgets::{AnimatedContainer, AnimatedOpacity, Button, WidgetTheme, default_theme},
 };
 
 const ORBIT_SVG: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
@@ -24,6 +25,7 @@ pub struct Example {
     running: bool,
     reduced_motion: bool,
     compact: bool,
+    expanded: bool,
     vectors: VectorLibrary,
     orbit: VectorId,
     spark: VectorId,
@@ -39,6 +41,7 @@ impl Default for Example {
             running: true,
             reduced_motion: false,
             compact: false,
+            expanded: true,
             vectors,
             orbit,
             spark,
@@ -221,7 +224,40 @@ impl Example {
         .radius(CornerRadii::all(999.0))
         .transform(Transform2D::IDENTITY.scale(pulse, pulse));
 
+        let implicit_opacity = AnimatedOpacity::new(
+            "docs-implicit-opacity",
+            if self.expanded { 1.0 } else { 0.12 },
+            self.text("Target-driven fade", 17.0, 700, theme.primary),
+        )
+        .duration(Duration::from_millis(260))
+        .curve(curves::EASE_OUT)
+        .build();
+        let implicit_container = AnimatedContainer::new("docs-implicit-container", [])
+            .width(length(if self.expanded { 188.0 } else { 72.0 }))
+            .height(length(if self.expanded { 76.0 } else { 46.0 }))
+            .background(if self.expanded {
+                theme.destructive
+            } else {
+                theme.primary
+            })
+            .radius(CornerRadii::all(if self.expanded { 30.0 } else { 10.0 }))
+            .duration(Duration::from_millis(420))
+            .curve(curves::EMPHASIZED)
+            .build();
+
         Element::row([
+            self.card(
+                "AnimatedOpacity",
+                "A rebuild changes only the target; retained state owns the fade.",
+                implicit_opacity,
+                theme,
+            ),
+            self.card(
+                "AnimatedContainer",
+                "Size, color and radius transition with one declarative policy.",
+                implicit_container,
+                theme,
+            ),
             self.card(
                 "Composed transform",
                 "Translate, rotate, scale, and radius run in one two-second loop.",
@@ -291,7 +327,7 @@ impl Render for Example {
         let status = if self.reduced_motion {
             "Reduced motion is active"
         } else if self.running {
-            "Six loops · 2 seconds"
+            "Six loops · two implicit examples"
         } else {
             "Animations paused"
         };
@@ -313,6 +349,14 @@ impl Render for Example {
             )
             .enabled(!self.reduced_motion)
             .on_click(cx.callback(|app| app.running = !app.running))
+            .build(),
+            Button::new(
+                "toggle-implicit",
+                "Retarget implicit examples",
+                theme.outline_button(),
+            )
+            .enabled(!self.reduced_motion)
+            .on_click(cx.callback(|app| app.expanded = !app.expanded))
             .build(),
         ])
         .width(percent(1.0))

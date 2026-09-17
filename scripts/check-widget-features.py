@@ -25,7 +25,8 @@ def main():
     facade = manifest("argui")["features"]
     assert widgets["default"] == facade["default"] == [], "Widgets must be opt-in"
     individual = set(widgets) - {"all", "default"}
-    assert set(widgets["all"]) == individual, "all must include every widget feature"
+    assert set(widgets["all"]) == individual - {"updater"}, \
+        "all must include every standalone widget feature"
     assert facade["widgets-all"] == ["argui-widgets/all"]
     for feature in individual:
         assert facade[f"widget-{feature}"] == [f"argui-widgets/{feature}"]
@@ -35,7 +36,8 @@ def main():
     check("argui-widgets", "all")
     types = {feature: "".join(part.title() for part in feature.split("-")) for feature in individual}
     types.update({"textarea": "TextArea", "vlist": "VList", "range": "RangeState",
-                  "icons": "WidgetAssets", "text-selection": "TextSelectionToolbar"})
+                  "icons": "WidgetAssets", "text-selection": "TextSelectionToolbar",
+                  "implicit-animation": "AnimatedOpacity", "updater": "UpdateDialog"})
     with tempfile.TemporaryDirectory(prefix="argui-features-") as directory:
         probe = pathlib.Path(directory)
         (probe / "src").mkdir()
@@ -46,10 +48,16 @@ def main():
             '[features]\ndefault=[]\nall=["argui/widgets-all"]\n'
             + "".join(f'{feature}=["argui/widget-{feature}"]\n' for feature in sorted(individual))
         )
-        (probe / "src/main.rs").write_text("#![allow(unused_imports)]\nfn main() {}\n" + "".join(
-            f'#[cfg(any(feature="{feature}",feature="all"))]\nuse argui::widgets::{widget} as _;\n'
-            for feature, widget in sorted(types.items())
-        ))
+        imports = []
+        for feature, widget in sorted(types.items()):
+            condition = (f'feature="{feature}"' if feature == "updater"
+                         else f'any(feature="{feature}",feature="all")')
+            imports.append(
+                f'#[cfg({condition})]\nuse argui::widgets::{widget} as _;\n'
+            )
+        (probe / "src/main.rs").write_text(
+            "#![allow(unused_imports)]\nfn main() {}\n" + "".join(imports)
+        )
         for feature in [None, *sorted(individual), "all"]:
             print(f"features: external argui import / {feature or 'none'}", flush=True)
             command = ["cargo", "check", "--quiet", "--offline", "--manifest-path", str(probe / "Cargo.toml"),

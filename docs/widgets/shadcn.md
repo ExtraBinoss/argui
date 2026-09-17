@@ -17,6 +17,7 @@ updater dialog is a separate opt-in.
 | Accordion | [Accordion](../../crates/argui-widgets/src/accordion.rs) | `accordion` | Controlled single/multiple sections, arrow/Home/End navigation and disabled states; opening is not animated. |
 | Alert | [Alert](../../crates/argui-widgets/src/alert.rs) | `alert` | Inline standard/destructive presentation, icon and explicit announcement policy. |
 | Alert Dialog | [AlertDialog](../../crates/argui-widgets/src/alert_dialog.rs) | `alert-dialog` | Modal confirmation, initial Cancel focus, ignored outside clicks and a distinct confirmation action. |
+| Animated Container / Opacity | [AnimatedContainer](../../crates/argui-widgets/src/implicit_animation.rs) | `implicit-animation` | `AnimatedContainer` and `AnimatedOpacity` provide retained target-value transitions with curves, interruption-safe retargeting and reduced-motion support; incompatible representations switch discretely. |
 | Aspect Ratio | [AspectRatio](../../crates/argui-widgets/src/aspect_ratio.rs) | `aspect-ratio` | Reserves height from width and a positive aspect ratio; fits content to the frame. |
 | Attachment | [Attachment](../../crates/argui-widgets/src/attachment.rs) | `attachment` | File metadata, media, actions, five transfer states and progress; the application owns the transfer. |
 | Avatar | [Avatar](../../crates/argui-widgets/src/avatar.rs) | `avatar` | Loaded image or controlled fallback, circular clip, size and a single accessible name; no avatar group. |

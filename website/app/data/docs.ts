@@ -653,9 +653,9 @@ export const docs: DocGuide[] = [
     minutes: 14,
     title: 'Animation and motion',
     description:
-      'Compose transforms, layout morphs, color, vector transitions, and GPU aura effects in smooth loops.',
+      'Start with implicit target changes, then compose keyframes, physics, color, and GPU layers when an interaction needs more control.',
     example: example('animation', 'animation'),
-    demoTitle: 'Six responsive motion patterns running together',
+    demoTitle: 'Implicit transitions and six responsive motion patterns',
     sources: [
       'docs/ui/animation.md',
       'docs/rendering/effects.md',
@@ -663,26 +663,30 @@ export const docs: DocGuide[] = [
     ],
     sections: [
       {
-        id: 'frame',
-        title: 'Drive one coherent frame',
+        id: 'implicit',
+        title: 'Animate a target, not a timer',
         paragraphs: [
-          'A component opts into animation frames only while motion is active. One time value can coordinate translation, rotation, scale, layout, radii, Oklab color, opacity, and GPU layers without independent timers drifting apart.',
+          'AnimatedOpacity and AnimatedContainer retain the currently presented value. Rebuild with a new target and Argui performs the transition, including interruption-safe retargeting and automatic reduced-motion behavior.',
+        ],
+        code: {
+          filename: 'src/view.rs',
+          code: 'AnimatedOpacity::new("details", if visible { 1.0 } else { 0.0 }, panel)\n    .duration(Duration::from_millis(220))\n    .curve(curves::EASE_OUT)\n    .build()',
+        },
+      },
+      {
+        id: 'levels',
+        title: 'Use the right level of control',
+        paragraphs: [
+          'Use implicit widgets for ordinary state changes, Motion<T> for directly controlled values, Timeline<T> for multi-stage keyframes, and Spring or Inertia for velocity-aware movement. All four levels share one monotonic frame clock.',
         ],
       },
       {
-        id: 'practical',
-        title: 'Compose practical motion',
+        id: 'gallery',
+        title: 'Explore twenty focused examples',
         paragraphs: [
-          'Use short loops to communicate status and longer one-shot transitions for state changes. The live lab combines a text aura, a layout morph, a vector crossfade, a sequenced loader, and a status pulse alongside a full composed transform.',
+          'The complete Widget Gallery groups twenty examples into implicit animation, keyframes and orchestration, physics, and composition. Repeatedly press Run all animations while they move to see retargeting continue from the visible frame.',
         ],
-      },
-      {
-        id: 'responsive',
-        title: 'Keep motion responsive and interruptible',
-        paragraphs: [
-          'The control bar remains visible while the cards scroll inside the Argui canvas. Cards wrap into one column on narrow viewports, scrolling stays available while every loop runs, and Pause stops frame requests immediately.',
-        ],
-        note: 'Reduced-motion preferences disable the loops and present a stable frame automatically.',
+        note: 'Settled animations request no frames. Reduced-motion preferences finish active values and keep future target changes immediate.',
       },
     ],
   },

@@ -4,6 +4,154 @@
 native and WASM. The runtime supplies one monotonic frame clock; an idle
 application requests no animation frames.
 
+Argui exposes four layers. Start with the first one and move down only when the
+interaction needs more control:
+
+1. `AnimatedOpacity` and `AnimatedContainer` animate target changes implicitly.
+2. `Motion<T>` gives application code pause, retarget and spring control.
+3. `Timeline<T>` and `Keyframes<T>` describe multi-stage playback.
+4. `Spring`, `Decay`, `Inertia`, schedules and composition build physical or
+   coordinated systems.
+
+## Five-minute start
+
+Enable `widget-implicit-animation` on the `argui` facade, or
+`implicit-animation` when depending on `argui-widgets` directly.
+
+```toml
+argui = { version = "0.3", features = ["widget-implicit-animation"] }
+```
+
+### Fade a complete subtree
+
+Rebuild the same keyed element with a different target opacity. The first build
+is immediate; every later change begins at the value currently on screen.
+
+```rust
+use argui::{
+    animation::{Duration, curves},
+    ui::Element,
+    widgets::AnimatedOpacity,
+};
+
+fn details(visible: bool) -> Element {
+    AnimatedOpacity::new(
+        "details-fade",
+        if visible { 1.0 } else { 0.0 },
+        Element::text("Saved locally"),
+    )
+    .duration(Duration::from_millis(220))
+    .curve(curves::EASE_OUT)
+    .build()
+}
+```
+
+`AnimatedOpacity` uses group opacity, so the element and all descendants fade
+together. Opacity does not change hit testing or semantics. Disable interaction
+or hide semantics explicitly when invisible content must be inert.
+
+### Animate a container
+
+Compatible values animate together. This example changes layout, paint and
+corner geometry without maintaining an animation controller in the model.
+
+```rust
+use argui::{
+    animation::{Duration, curves},
+    core::Color,
+    paint::CornerRadii,
+    ui::{Element, length},
+    widgets::AnimatedContainer,
+};
+
+fn project_card(expanded: bool) -> Element {
+    AnimatedContainer::new("project-card", [Element::text("Argui")])
+        .width(length(if expanded { 320.0 } else { 180.0 }))
+        .height(length(if expanded { 150.0 } else { 72.0 }))
+        .background(if expanded {
+            Color::srgb(0.55, 0.30, 0.96)
+        } else {
+            Color::srgb(0.18, 0.48, 0.98)
+        })
+        .radius(CornerRadii::all(if expanded { 28.0 } else { 12.0 }))
+        .duration(Duration::from_millis(420))
+        .curve(curves::EMPHASIZED)
+        .build()
+}
+```
+
+Pixels interpolate with pixels and percentages with percentages. Switching
+between incompatible units, gradient kinds or other discrete representations
+snaps safely instead of inventing an ambiguous interpolation. Use
+`AnimatedContainer::from_element` or `configure` when row, column, grid or
+advanced element configuration is required.
+
+## Curves
+
+The `curves` module includes `LINEAR`, `EASE_IN`, `EASE_OUT`, `EASE_IN_OUT`,
+`STANDARD`, `EMPHASIZED`, `ACCELERATE`, `DECELERATE` and `BACK_OUT`. A custom
+curve implements one small trait. Input is normalized; output may overshoot.
+
+```rust
+use argui::{
+    animation::{Curve, Easing},
+    ui::Element,
+    widgets::AnimatedOpacity,
+};
+
+struct Anticipate;
+
+impl Curve for Anticipate {
+    fn sample(&self, progress: f32) -> f32 {
+        progress * progress * (2.7 * progress - 1.7)
+    }
+}
+
+let easing = Easing::curve(Anticipate);
+assert!(easing.sample(0.25) < 0.0);
+
+let _element = AnimatedOpacity::new("notice", 1.0, Element::text("Ready"))
+    .curve(Anticipate)
+    .build();
+```
+
+Springs intentionally remain separate from curves. A spring carries velocity
+and physical state, whereas a curve only transforms normalized progress.
+
+## What can animate implicitly
+
+| Family | Compatible values | Update cost |
+| --- | --- | --- |
+| Group opacity and transform | scalar opacity, `Transform2D` components | composite |
+| Surface paint | solid colors, border colors/widths, corner radii | paint |
+| Gradients | matching kind, points and stop topology | paint |
+| Layers | masks, shadow components and typed effect parameters | paint/composite |
+| Layout | same-unit width/height/min/max, padding, gap, grow/shrink and pixel insets | layout |
+| Scroll | `Point` offsets | scroll |
+
+The first transition to a composited value may require one paint to establish
+its layer; subsequent opacity and transform frames remain compositor updates.
+
+Explicit `Element::bind` motions have final precedence over implicit style
+transitions. This makes it safe to give one property direct application control
+while the remaining container values animate implicitly.
+
+## Gallery cookbook
+
+The Widget Gallery's **Animation laboratory** contains twenty live examples:
+
+| Group | Examples |
+| --- | --- |
+| Implicit | subtree opacity; size; color and radius; padding and gap; composed transform; border and shadow; interrupted retargeting |
+| Keyframes | typed multi-property morph; multiple stops; holds; steps; alternate direction; stagger schedule |
+| Physics | analytical spring; bounded inertia; velocity-preserving retarget; squash and stretch |
+| Composition | additive tracks; a user-defined `Curve`; synchronized layer, glow and compositor properties |
+
+Use **Run all animations** repeatedly while motion is active to see every
+retarget continue from its presented value. Enabling the platform reduced-motion
+preference snaps all twenty examples to their destination and returns the
+application to an idle frame schedule.
+
 ## Ownership and scheduling
 
 `argui-animation` owns interpolation and timing without Winit, Taffy or WGPU.

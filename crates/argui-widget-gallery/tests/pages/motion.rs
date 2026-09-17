@@ -20,7 +20,34 @@ fn animation_lab_replays_spring_layout_color_and_transform_tracks() {
     };
     click("nav::motion");
     let initial = gallery.render(Default::default()).unwrap();
-    assert!(contains_text(&initial, "Spring physics"));
+    for label in [
+        "AnimatedOpacity",
+        "Animated size",
+        "Color & radius",
+        "Padding & gap",
+        "Composed transform",
+        "Border & shadow",
+        "Interruptible retargeting",
+        "Typed multi-property timeline",
+        "Multiple keyframes",
+        "Held keyframes",
+        "Step easing",
+        "Alternate direction",
+        "Stagger schedule",
+        "Spring physics",
+        "Bounded inertia",
+        "Velocity-preserving retarget",
+        "Squash & stretch",
+        "Additive composition",
+        "User-defined Curve",
+        "Layer & compositor",
+    ] {
+        assert!(
+            contains_text(&initial, label),
+            "missing motion example: {label}"
+        );
+    }
+    assert_eq!(count_cards(&initial), 20);
     let initial_spring = keyed(&initial, "motion-spring-square").unwrap().transform;
     let initial_scale = keyed(&initial, "motion-morph").unwrap().transform.scale.x;
 
@@ -56,6 +83,16 @@ fn animation_lab_replays_spring_layout_color_and_transform_tracks() {
     }
     let reversed = gallery.render(Default::default()).unwrap();
     assert!(keyed(&reversed, "motion-morph").unwrap().transform.scale.x < scale);
+}
+
+/// Counts animation example cards recursively in the rendered tree.
+fn count_cards(element: &Element) -> usize {
+    usize::from(
+        element
+            .key
+            .as_deref()
+            .is_some_and(|key| key.starts_with("motion-card-")),
+    ) + element.children.iter().map(count_cards).sum::<usize>()
 }
 
 #[test]

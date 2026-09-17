@@ -1,4 +1,6 @@
-use argui_animation::{CubicBezier, Easing, EasingError, LinearStop, StepPosition, Steps};
+use argui_animation::{
+    CubicBezier, Curve, Easing, EasingError, LinearStop, StepPosition, Steps, Tween, curves,
+};
 
 fn close(actual: f32, expected: f32) {
     assert!((actual - expected).abs() < 1.0e-4, "{actual} != {expected}");
@@ -105,4 +107,29 @@ fn piecewise_linear_easing_interpolates_and_supports_hard_stops() {
             Err(EasingError::InvalidStops)
         ));
     }
+}
+
+#[derive(Clone, Copy)]
+struct Quadratic;
+
+impl Curve for Quadratic {
+    fn sample(&self, progress: f32) -> f32 {
+        progress * progress
+    }
+}
+
+#[test]
+fn named_and_user_curves_share_the_easing_interface() {
+    close(Easing::curve(Quadratic).sample(0.5), 0.25);
+    close(curves::LINEAR.sample(0.4), 0.4);
+    close(Curve::sample(&curves::LINEAR, 0.4), 0.4);
+    assert!(curves::EASE_OUT.sample(0.5) > 0.5);
+    assert!(curves::BACK_OUT.sample(0.7) > 1.0);
+    let bezier = CubicBezier::new(0.0, 0.0, 1.0, 1.0).unwrap();
+    close(Curve::sample(&bezier, 0.35), 0.35);
+    let steps = Steps::new(2, StepPosition::JumpEnd).unwrap();
+    close(Curve::sample(&steps, 0.75), 0.5);
+
+    let tween = Tween::new(argui_animation::Duration::from_millis(120)).curve(Quadratic);
+    close(tween.easing.sample(0.5), 0.25);
 }

@@ -22,6 +22,8 @@ fn accessibility_example_announces_each_activation() {
 #[test]
 fn animation_example_toggles_locally() {
     let mut app = TestApp::new(examples::animation::Example::default());
+    app.click("toggle-implicit").unwrap();
+    app.assert_text("Retarget implicit examples");
     app.click("toggle-animation").unwrap();
     app.assert_text("Animations paused");
     app.assert_text("Resume animations");
