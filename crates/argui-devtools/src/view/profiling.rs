@@ -83,6 +83,23 @@ pub(super) fn details(frame: &FrameRecord, theme: &WidgetTheme) -> Element {
                         frame.vector_rasterizations
                     ),
                 ),
+                (
+                    "GPU canvases cached / rendered / hits / failed",
+                    format!(
+                        "{} / {} / {} / {}",
+                        frame.gpu_canvas_entries,
+                        frame.gpu_canvas_renders,
+                        frame.gpu_canvas_hits,
+                        frame.gpu_canvas_failures
+                    ),
+                ),
+                (
+                    "GPU canvas encode CPU",
+                    format!(
+                        "{:.2} ms",
+                        frame.gpu_canvas_encode_cpu.as_secs_f64() * 1_000.0
+                    ),
+                ),
             ],
             theme,
         ),

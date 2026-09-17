@@ -1,4 +1,6 @@
-use argui_ui::{Color, Element, TreeUpdate, UiTree, UserSelect, length};
+use argui_ui::{
+    Color, Element, GpuCanvasId, GpuCanvasSpec, TreeUpdate, UiTree, UserSelect, length,
+};
 
 fn screen(color: Color) -> Element {
     Element::row([
@@ -96,4 +98,26 @@ fn text_color_and_alpha_repaint_but_text_and_font_metrics_still_relayout() {
         ),
         TreeUpdate::Layout
     );
+}
+
+#[test]
+fn gpu_canvas_revision_retains_identity_while_remount_allocates_a_new_node() {
+    let canvas = GpuCanvasId::fresh();
+    let view = |revision| {
+        Element::gpu_canvas(GpuCanvasSpec::new(canvas).content_revision(revision)).keyed("canvas")
+    };
+    let mut tree = UiTree::new(Element::container([view(1)]));
+    let retained = tree.node_ids()[1];
+    assert_eq!(
+        tree.update(Element::container([view(2)])),
+        TreeUpdate::Paint
+    );
+    assert_eq!(tree.node_ids()[1], retained);
+
+    assert_eq!(tree.update(Element::container([])), TreeUpdate::Layout);
+    assert_eq!(
+        tree.update(Element::container([view(2)])),
+        TreeUpdate::Layout
+    );
+    assert_ne!(tree.node_ids()[1], retained);
 }

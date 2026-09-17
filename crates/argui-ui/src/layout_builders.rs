@@ -178,6 +178,7 @@ impl Element {
                 placeholder_text.align = align;
             }
             ElementKind::Custom(_)
+            | ElementKind::GpuCanvas(_)
             | ElementKind::Container
             | ElementKind::Image { .. }
             | ElementKind::Vector { .. } => {}
@@ -199,6 +200,7 @@ impl Element {
                 placeholder_text.overflow = overflow;
             }
             ElementKind::Custom(_)
+            | ElementKind::GpuCanvas(_)
             | ElementKind::Container
             | ElementKind::Image { .. }
             | ElementKind::Vector { .. } => {}

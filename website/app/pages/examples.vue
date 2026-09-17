@@ -3,25 +3,32 @@ import { ArrowUpRight } from '@lucide/vue'
 import { sourceUrl } from '~/data/project'
 
 const { t } = useI18n()
-const selectedApp = ref<'ai-harness' | 'widget-gallery'>('ai-harness')
+const selectedApp = ref<'ai-harness' | 'widget-gallery' | 'gpu-canvas'>('ai-harness')
 usePageSeo(
   () => t('meta.examples'),
   () => t('meta.examplesDescription'),
 )
 const moreExamples = ['motion', 'i18n', 'hot-reload', 'liquid-glass'] as const
 const isHarness = computed(() => selectedApp.value === 'ai-harness')
-const selectedTitle = computed(() =>
-  t(isHarness.value ? 'appExamples.harnessTitle' : 'appExamples.galleryTitle'),
-)
-const selectedBody = computed(() =>
-  t(isHarness.value ? 'appExamples.harnessBody' : 'appExamples.galleryBody'),
-)
-const selectedSource = computed(() =>
-  sourceUrl(
-    isHarness.value
-      ? 'app_examples/fake-ai-harness/src/main.rs'
-      : 'crates/argui-widget-gallery/src/main.rs',
-  ),
+const isGallery = computed(() => selectedApp.value === 'widget-gallery')
+const isGpuCanvas = computed(() => selectedApp.value === 'gpu-canvas')
+const selectedTitle = computed(() => {
+  if (isHarness.value) return t('appExamples.harnessTitle')
+  if (isGpuCanvas.value) return t('appExamples.gpuTitle')
+  return t('appExamples.galleryTitle')
+})
+const selectedBody = computed(() => {
+  if (isHarness.value) return t('appExamples.harnessBody')
+  if (isGpuCanvas.value) return t('appExamples.gpuBody')
+  return t('appExamples.galleryBody')
+})
+const selectedSource = computed(() => {
+  if (isHarness.value) return sourceUrl('app_examples/fake-ai-harness/src/main.rs')
+  if (isGpuCanvas.value) return sourceUrl('app_examples/gpu-canvas/src/main.rs')
+  return sourceUrl('crates/argui-widget-gallery/src/main.rs')
+})
+const selectedPreviewApp = computed(() =>
+  isGallery.value ? undefined : isGpuCanvas.value ? 'gpu-canvas' : 'ai-harness',
 )
 </script>
 
@@ -50,8 +57,8 @@ const selectedSource = computed(() =>
       <button
         type="button"
         role="tab"
-        :aria-selected="!isHarness"
-        :class="{ selected: !isHarness }"
+        :aria-selected="isGallery"
+        :class="{ selected: isGallery }"
         @click="selectedApp = 'widget-gallery'"
       >
         <span>02</span>
@@ -61,6 +68,18 @@ const selectedSource = computed(() =>
           <time>0.79 s</time>
           {{ t('appExamples.startupLabel') }}
         </b>
+      </button>
+      <button
+        type="button"
+        role="tab"
+        :aria-selected="isGpuCanvas"
+        :class="{ selected: isGpuCanvas }"
+        @click="selectedApp = 'gpu-canvas'"
+      >
+        <span>03</span>
+        <strong>{{ t('appExamples.gpuTitle') }}</strong>
+        <small>{{ t('appExamples.gpuCategory') }}</small>
+        <b>{{ t('appExamples.gpuProof') }}</b>
       </button>
     </nav>
     <p class="app-startup-evidence">
@@ -84,7 +103,7 @@ const selectedSource = computed(() =>
           <ArrowUpRight :size="16" />
         </a>
       </div>
-      <GalleryFrame :app="isHarness ? 'ai-harness' : undefined" />
+      <GalleryFrame :app="selectedPreviewApp" />
     </section>
     <section class="more-examples">
       <div class="section-heading">

@@ -20,6 +20,8 @@ impl GtkHost {
 
     pub(crate) fn redraw_pending(&self) -> bool {
         self.redraw_requested.get()
+            && self.platform.native().is_visible()
+            && !self.platform.native().is_minimized()
     }
 }
 
@@ -28,6 +30,9 @@ impl WindowHost for GtkHost {
         HostId::Gtk(self.platform.native().id())
     }
     fn set_visible(&self, visible: bool) {
+        if !visible {
+            self.redraw_requested.set(false);
+        }
         self.platform.native().set_visible(visible);
     }
     fn is_visible(&self) -> Option<bool> {
@@ -43,6 +48,9 @@ impl WindowHost for GtkHost {
         Some(self.platform.native().is_minimized())
     }
     fn set_minimized(&self, minimized: bool) {
+        if minimized {
+            self.redraw_requested.set(false);
+        }
         self.platform.native().set_minimized(minimized);
     }
     fn set_window_level(&self, level: WindowLevel) {

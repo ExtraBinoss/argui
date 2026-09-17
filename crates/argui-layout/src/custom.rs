@@ -102,6 +102,7 @@ pub(crate) fn paint(
     output: &mut crate::LayoutOutput,
     transform: argui_core::Affine2D,
     clips: &argui_paint::ClipChain,
+    style: argui_paint::QuadStyle,
 ) {
     if let (ElementKind::Custom(custom), Some(state)) = (&element.kind, &map.custom_state) {
         custom.paint(
@@ -111,6 +112,12 @@ pub(crate) fn paint(
                 transform,
                 clips,
                 display_list: &mut output.display_list,
+                object: argui_paint::RenderObjectId::new(
+                    argui_paint::ProfileDomain::Ui,
+                    node.node.get(),
+                ),
+                opacity: style.opacity,
+                radii: style.radii,
             },
         );
     }

@@ -1,0 +1,21 @@
+[package]
+name = "argui-example-gpu-canvas"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+description = "A retained custom WGPU canvas inside an accessible Argui application shell"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+argui = { workspace = true, features = ["widget-button"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen.workspace = true
+
+[lints]
+workspace = true

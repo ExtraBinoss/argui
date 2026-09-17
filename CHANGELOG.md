@@ -26,6 +26,33 @@ that do not use them.
   SwiftUI Lock Screen/Dynamic Island extension kept under `argui-ios`.
 - Added direct-touch momentum, configurable natural scrolling, drag-safe click
   activation, and draggable text-selection handles shared by Android and iOS.
+- Added retained GPU canvases for editor, visualization, game/map and scientific
+  viewports. `Element::gpu_canvas`, `GpuCanvasSpec` and the renderer-neutral
+  `CustomPaintContext::gpu_canvas` helper preserve normal Argui layout,
+  transforms, clipping, rounded corners, opacity, effects, overlays,
+  interaction, accessibility, multi-window surfaces and native popups.
+- Added `GpuCanvasRegistration`, `GpuCanvasRegistry`, `GpuCanvasFactory`,
+  `GpuCanvasRenderer` and private-field device/render contexts, plus the exact
+  `argui::render::wgpu` re-export. Callbacks can create resources from Argui's
+  selected device, perform queue writes, and encode compute/render/copy work
+  into a borrowed offscreen target. Argui remains the owner of backend
+  selection, surface acquisition, command submission and presentation.
+- Added explicit content-revision and resize/DPI caching with a configurable,
+  bounded per-surface texture budget. Paused or unchanged canvases avoid custom
+  GPU callbacks. Required/optional WGPU features and direction-aware limits are
+  negotiated before device creation, including every Windows fallback attempt;
+  incompatible shared devices fail clearly. Recoverable frame errors use a
+  visible placeholder and deduplicated failure/recovery runtime events instead
+  of aborting surrounding UI. Profiles, inspector traces and DevTools report
+  canvas cache, render, hit, failure, byte and CPU-encode statistics.
+- Added native and WebAssembly/WebGPU support plus the product-shaped
+  **GPU Canvas Lab** in `app_examples/gpu-canvas`. It demonstrates an Argui
+  toolbar and inspector around custom WGPU compute and render passes, pan/zoom,
+  pause/resume, keyboard alternatives, overlays, an effect layer, resize/HiDPI,
+  bounded particles and in-app simulated failure recovery.
+- Published a release-built WebAssembly version of the GPU Canvas Lab on the
+  website's App Examples page, with build/copy validation and a responsive
+  compact layout for narrow viewports.
 - Added inherited text-selection highlight styling with solid or gradient fills,
   per-corner radii and an interactive Widget Gallery page.
 - Added default-on Windows renderer fallback from DirectX 12 DirectComposition
@@ -87,6 +114,19 @@ that do not use them.
 - Made mobile search reliably focus and open the software keyboard, preserved
   adjustable selection handles, and stopped a touch scroll from activating the
   item released beneath the finger.
+- Cleared workspace crate artifacts and the temporary crates.io registry before
+  archive checks, preventing same-version caches from masking coordinated
+  workspace changes and breaking dependent archive verification.
+- Used an operating-system lock for coverage runs so a cached lock file from a
+  cancelled CI job cannot block the next quality check.
+- Limited individual Nextest cases to two minutes so a stalled native test is
+  reported by name instead of consuming the full CI job timeout.
+- Stopped hidden or minimized GTK windows from keeping the event loop in a
+  permanent redraw poll, and queued synthetic lifecycle input through its GDK
+  window instead of re-entering the renderer from a GTK signal callback.
+- Kept embedded GPU canvases renderable beneath the website loading overlay so
+  Chromium can initialize WebGPU and emit its ready signal instead of stalling
+  a hidden iframe.
 - Prevented Web canvases from taking focus and moving an embedding page while
   they load; full-page apps can opt in through `WindowConfig::focus_on_launch`.
 - Kept Winit's AppKit content view attached when enabling the macOS desktop
@@ -106,6 +146,12 @@ that do not use them.
 - Migrated every naturally local documentation example, its exact generated
   website snippet, the Widget Gallery, and the fake AI harness to direct
   callbacks while retaining the Events delegation example and complex reducers.
+- Made vertical canvas dragging follow the content by default, added an
+  in-app natural/inverted direction toggle, aligned keyboard panning with the
+  selected direction and smoothed wheel/pinch zoom interaction.
+- Advanced strict DevTools GPU-trace JSON to `argui-gpu-trace-v4` so exported
+  frames include GPU-canvas cache, byte, render, hit, failure and CPU-encode
+  metrics; older strict trace versions remain rejected on import.
 - Made the base release gallery the recommended local command. Optional native
   integrations can still be enabled individually or together when needed.
 
@@ -115,6 +161,13 @@ that do not use them.
   document picker yet. The cross-platform file-picker widget still compiles on
   mobile and reports the mode as unsupported; adding the two native adapters
   does not require a change to its public model.
+- GPU canvases use Argui-owned WGPU instances, devices, queues and surfaces;
+  the high-level runtime still does not accept externally owned GPU objects.
+- Canvas pixels have no automatic semantic meaning. Applications must provide
+  labels, keyboard controls and semantic Argui overlays for important actions.
+- Canvas profiling measures cache behavior and CPU encoding time, not the
+  duration of application-authored GPU passes; applications may encode their
+  own supported timestamp queries when needed.
 
 ## [0.2.1] - 2026-09-14
 

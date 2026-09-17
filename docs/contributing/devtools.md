@@ -47,7 +47,7 @@ processed pixels, offscreen textures, and vector-atlas activity.
 
 GPU durations require timestamp-query support and remain separate from CPU
 durations. Pause freezes collection; Clear releases history. Export writes
-strict `argui-gpu-trace-v3` JSON; import rejects unknown versions and fields.
+strict `argui-gpu-trace-v4` JSON; import rejects unknown versions and fields.
 
 Detailed GPU profiling runs only while the Profiling pane is open and unpaused.
 Closing the tools stops recording. Selecting a frame freezes its details; Live

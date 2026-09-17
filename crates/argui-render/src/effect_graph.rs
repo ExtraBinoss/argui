@@ -93,6 +93,7 @@ impl EffectGraph {
         let mut quad = 0_u32;
         let mut image = 0_u32;
         let mut vector = 0_u32;
+        let mut gpu_canvas = 0_u32;
         for command in display_list.commands() {
             match command {
                 DisplayCommand::Quad(_) => {
@@ -113,6 +114,15 @@ impl EffectGraph {
                         image..image + 1,
                     );
                     image += 1;
+                }
+                DisplayCommand::GpuCanvas(_) => {
+                    push_draw(
+                        &mut roots,
+                        &mut stack,
+                        DrawKind::GpuCanvas(gpu_canvas),
+                        gpu_canvas..gpu_canvas + 1,
+                    );
+                    gpu_canvas += 1;
                 }
                 DisplayCommand::Vector(_) => {
                     push_draw(&mut roots, &mut stack, DrawKind::Vector, vector..vector + 1);

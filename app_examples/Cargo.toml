@@ -1,5 +1,5 @@
 [workspace]
-members = ["docs-examples", "fake-ai-harness"]
+members = ["docs-examples", "fake-ai-harness", "gpu-canvas"]
 resolver = "3"
 
 [workspace.package]

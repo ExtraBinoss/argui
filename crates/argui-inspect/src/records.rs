@@ -112,6 +112,12 @@ pub struct FrameRecord {
     pub vector_atlas_entries: usize,
     pub vector_atlas_hits: usize,
     pub vector_rasterizations: usize,
+    pub gpu_canvas_entries: usize,
+    pub gpu_canvas_bytes: u64,
+    pub gpu_canvas_renders: usize,
+    pub gpu_canvas_hits: usize,
+    pub gpu_canvas_failures: usize,
+    pub gpu_canvas_encode_cpu: Duration,
     pub adapter: AdapterRecord,
     pub gpu: Option<GpuFrameRecord>,
 }

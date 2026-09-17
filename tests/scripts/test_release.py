@@ -206,18 +206,25 @@ class ReleasePolicyTests(unittest.TestCase):
 
     def test_package_verifies_every_archive_in_publication_order(self):
         names = ['argui-core', 'argui-render', 'argui']
-        with patch.object(release, 'workspace', return_value=('0.1.0', names)), \
-                patch.object(release, 'run') as run, \
-                patch.object(release, 'verify_staged_archives') as verify:
-            release.package_archives()
-        self.assertEqual(
-            [call.args for call in run.call_args_list],
-            [
-                ('cargo', 'package', '--locked', '--all-features', '--allow-dirty',
-                 '--no-verify', '--package', 'argui-core', '--package', 'argui-render',
-                 '--package', 'argui')
-            ],
-        )
+        with tempfile.TemporaryDirectory() as directory:
+            package_directory = Path(directory) / 'package'
+            package_directory.mkdir()
+            (package_directory / 'stale-registry').write_text('old archive')
+            metadata = json.dumps({'target_directory': directory})
+            with patch.object(release, 'workspace', return_value=('0.1.0', names)), \
+                    patch.object(release, 'run', side_effect=[metadata, None, None]) as run, \
+                    patch.object(release, 'verify_staged_archives') as verify:
+                release.package_archives()
+            self.assertFalse(package_directory.exists())
+        self.assertEqual(run.call_args_list[1].args, (
+            'cargo', 'clean', '--locked', '--profile', 'dev',
+            '--package', 'argui-core', '--package', 'argui-render', '--package', 'argui',
+        ))
+        self.assertEqual(run.call_args_list[2].args, (
+            'cargo', 'package', '--locked', '--all-features', '--allow-dirty',
+            '--no-verify',
+            '--package', 'argui-core', '--package', 'argui-render', '--package', 'argui',
+        ))
         verify.assert_called_once_with('0.1.0', names)
 
     def test_unchanged_version_never_runs_a_publisher(self):

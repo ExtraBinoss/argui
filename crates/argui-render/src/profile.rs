@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use web_time::Instant;
 
-use crate::{EffectGraphStats, TexturePoolStats};
+use crate::{EffectGraphStats, GpuCanvasStats, TexturePoolStats};
 
 use argui_paint::RenderObjectId;
 
@@ -55,6 +55,7 @@ pub struct RenderProfile {
     pub effects: EffectGraphStats,
     pub texture_pool: TexturePoolStats,
     pub vector_atlas: VectorAtlasStats,
+    pub gpu_canvases: GpuCanvasStats,
     pub direct_surface: bool,
     pub adapter: AdapterProfile,
     pub gpu: Option<GpuFrameProfile>,

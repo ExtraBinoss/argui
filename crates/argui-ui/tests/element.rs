@@ -3,8 +3,8 @@ mod direction;
 use argui_paint::CornerRadii;
 use argui_text::{TextOverflow, TextStyle};
 use argui_ui::{
-    Color, Element, ElementKind, ImageFit, ImageId, ImageSampling, Insets, StateName, StylePatch,
-    UiTree, VectorId, property,
+    Color, Element, ElementKind, GpuCanvasId, GpuCanvasSpec, ImageFit, ImageId, ImageSampling,
+    Insets, StateName, StylePatch, UiTree, VectorId, property,
 };
 
 #[path = "element/overrides.rs"]
@@ -14,6 +14,32 @@ mod overrides;
 mod portal;
 
 const HOVERED: StateName = StateName::new("hovered-test");
+
+#[test]
+fn gpu_canvas_spec_builds_an_opaque_leaf_and_normalizes_resolution() {
+    let id = GpuCanvasId::fresh();
+    let spec = GpuCanvasSpec::new(id)
+        .content_revision(41)
+        .sampling(ImageSampling::Nearest)
+        .resolution_scale(f32::INFINITY);
+    let element = Element::gpu_canvas(spec);
+    let ElementKind::GpuCanvas(actual) = element.kind else {
+        panic!("GPU canvas constructor must create the dedicated leaf kind");
+    };
+    assert_eq!(actual.canvas(), id);
+    assert_eq!(actual.revision(), 41);
+    assert_eq!(actual.scale(), 1.0);
+    assert_eq!(actual.image_sampling(), ImageSampling::Nearest);
+    assert!(element.children.is_empty());
+    assert_eq!(
+        GpuCanvasSpec::new(id).resolution_scale(99.0).scale(),
+        GpuCanvasSpec::MAX_RESOLUTION_SCALE
+    );
+    assert_eq!(
+        GpuCanvasSpec::new(id).resolution_scale(0.01).scale(),
+        GpuCanvasSpec::MIN_RESOLUTION_SCALE
+    );
+}
 
 #[test]
 fn final_radius_is_inherited_by_existing_visual_states() {

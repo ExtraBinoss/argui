@@ -1,5 +1,5 @@
 use argui_core::{Affine2D, Rect, Size};
-use argui_paint::{ClipChain, DisplayList, Quad, QuadStyle};
+use argui_paint::{ClipChain, DisplayList, GpuCanvasPrimitive, Quad, QuadStyle, RenderObjectId};
 use std::{
     any::{Any, TypeId},
     cell::{Cell, RefCell},
@@ -107,6 +107,12 @@ pub struct CustomPaintContext<'a> {
     pub transform: Affine2D,
     pub clips: &'a ClipChain,
     pub display_list: &'a mut DisplayList,
+    /// Retained identity shared by primitives emitted from this custom node.
+    pub object: RenderObjectId,
+    /// Resolved paint opacity of the custom node.
+    pub opacity: f32,
+    /// Resolved rounded corners of the custom node.
+    pub radii: argui_paint::CornerRadii,
 }
 
 impl CustomPaintContext<'_> {
@@ -126,6 +132,29 @@ impl CustomPaintContext<'_> {
             )),
             radii: style.radii,
             opacity: style.opacity,
+            transform: self.transform,
+            clips: self.clips.clone(),
+        });
+    }
+
+    /// Adds a retained GPU canvas in element-local coordinates.
+    ///
+    /// `slot` distinguishes multiple canvases emitted by the same retained
+    /// custom node. Reusing a slot in one frame is diagnosed by the renderer.
+    /// `bounds` is translated by the custom element's content-box origin.
+    pub fn gpu_canvas(&mut self, slot: u32, mut bounds: Rect, spec: crate::GpuCanvasSpec) {
+        bounds.origin.x += self.bounds.origin.x;
+        bounds.origin.y += self.bounds.origin.y;
+        self.display_list.push_gpu_canvas(GpuCanvasPrimitive {
+            canvas: spec.canvas(),
+            object: self.object,
+            slot,
+            bounds,
+            content_revision: spec.revision(),
+            resolution_scale: spec.scale(),
+            sampling: spec.image_sampling(),
+            opacity: self.opacity,
+            radii: self.radii,
             transform: self.transform,
             clips: self.clips.clone(),
         });
@@ -274,6 +303,9 @@ impl CustomDescription {
             && cached.bounds == context.bounds
             && cached.transform == context.transform
             && cached.clips == *context.clips
+            && cached.object == context.object
+            && cached.opacity == context.opacity
+            && cached.radii == context.radii
         {
             context
                 .display_list
@@ -303,6 +335,9 @@ impl CustomDescription {
                 transform: context.transform,
                 clips: context.clips,
                 display_list: &mut commands,
+                object: context.object,
+                opacity: context.opacity,
+                radii: context.radii,
             },
         );
         context
@@ -313,6 +348,9 @@ impl CustomDescription {
             bounds: context.bounds,
             transform: context.transform,
             clips: context.clips.clone(),
+            object: context.object,
+            opacity: context.opacity,
+            radii: context.radii,
             commands,
         });
     }
@@ -324,6 +362,9 @@ struct CachedCustomPaint {
     bounds: Rect,
     transform: Affine2D,
     clips: ClipChain,
+    object: RenderObjectId,
+    opacity: f32,
+    radii: argui_paint::CornerRadii,
     commands: DisplayList,
 }
 

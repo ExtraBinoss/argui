@@ -422,7 +422,7 @@ fn render_listener_forwards_clipboard_focus_and_scroll_effects() {
     dispatch_model_event(&mut model, &mut tree, "__devtools-copy", click_count(1));
     assert!(matches!(
         argui_runtime::AppModel::take_clipboard_request(&mut model, &window),
-        Some(argui_ui::ClipboardRequest::Write(trace)) if trace.contains("argui-gpu-trace-v3")
+        Some(argui_ui::ClipboardRequest::Write(trace)) if trace.contains("argui-gpu-trace-v4")
     ));
 
     dispatch_model_event(&mut model, &mut tree, "__devtools-elements", click_count(1));

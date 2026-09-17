@@ -3,7 +3,7 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 report="$repo_root/target/coverage-report.json"
-coverage_lock="$repo_root/target/.argui-coverage-lock"
+coverage_lock="$repo_root/target/.argui-coverage.flock"
 coverage_target="$repo_root/target/coverage"
 minimum=85
 coverage_toolchain="${ARGUI_COVERAGE_TOOLCHAIN:-nightly}"
@@ -18,16 +18,20 @@ command -v cargo-nextest >/dev/null || {
   echo "error: cargo-nextest is required to run the coverage suite" >&2
   exit 1
 }
+command -v flock >/dev/null || {
+  echo "error: flock is required to serialize coverage runs" >&2
+  exit 1
+}
 
 cd "$repo_root"
 python3 -m unittest discover -s tests/scripts
 mkdir -p "$repo_root/target"
-if ! mkdir "$coverage_lock" 2>/dev/null; then
+exec 9>"$coverage_lock"
+if ! flock -n 9; then
   echo "error: another Argui coverage run is already active" >&2
   exit 1
 fi
 cleanup() {
-  rmdir "$coverage_lock" 2>/dev/null || true
   if [[ -z "${ARGUI_KEEP_COVERAGE_ARTIFACTS:-}" ]]; then
     cargo clean --target-dir "$coverage_target" >/dev/null 2>&1 || true
   fi

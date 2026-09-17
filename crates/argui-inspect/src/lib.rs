@@ -283,6 +283,12 @@ impl InspectorHandle {
             frame.vector_atlas_entries = record.vector_atlas_entries;
             frame.vector_atlas_hits = record.vector_atlas_hits;
             frame.vector_rasterizations = record.vector_rasterizations;
+            frame.gpu_canvas_entries = record.gpu_canvas_entries;
+            frame.gpu_canvas_bytes = record.gpu_canvas_bytes;
+            frame.gpu_canvas_renders = record.gpu_canvas_renders;
+            frame.gpu_canvas_hits = record.gpu_canvas_hits;
+            frame.gpu_canvas_failures = record.gpu_canvas_failures;
+            frame.gpu_canvas_encode_cpu = record.gpu_canvas_encode_cpu;
             frame.adapter = record.adapter;
             frame.gpu = record.gpu;
         } else {

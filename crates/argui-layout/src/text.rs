@@ -36,6 +36,7 @@ pub(super) fn content<'a>(
             }
         }
         ElementKind::Custom(_)
+        | ElementKind::GpuCanvas(_)
         | ElementKind::Container
         | ElementKind::Image { .. }
         | ElementKind::Vector { .. } => None,

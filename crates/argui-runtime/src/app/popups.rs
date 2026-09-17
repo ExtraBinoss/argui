@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use argui_core::Rect;
 use argui_platform::popup::{NativePopup, PopupEnvironment, PopupKind, PopupUnavailable};
-use argui_render::{RenderStatus, SurfaceRenderer};
+use argui_render::{GpuCanvasDiagnosticKind, RenderStatus, SurfaceRenderer};
 use argui_ui::{InteractionUpdate, NodeId, OverlaySurface, Role, UiEventKind};
 use winit::window::WindowId;
 
@@ -269,6 +269,17 @@ impl Application {
                 self.scale_factor,
                 || window.pre_present_notify(),
             );
+            for diagnostic in popup.renderer.take_gpu_canvas_diagnostics() {
+                let event = match diagnostic.kind {
+                    GpuCanvasDiagnosticKind::Failed => {
+                        crate::RuntimeEvent::GpuCanvasFailed(diagnostic)
+                    }
+                    GpuCanvasDiagnosticKind::Recovered => {
+                        crate::RuntimeEvent::GpuCanvasRecovered(diagnostic)
+                    }
+                };
+                (self.on_event)(event);
+            }
             match result {
                 Ok(RenderStatus::Presented) => {
                     if !popup.shown {

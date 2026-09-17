@@ -229,9 +229,16 @@ impl Application {
         let point = pending.point;
         let delta = pending.delta;
         if pending.dispatch_wheel {
+            // Deliver the event to the pointer hit target; default scrolling still
+            // uses the independently latched scroll-region target below.
             let wheel_update = match (&self.ui_layout, &mut self.ui_tree) {
-                (Some(_), Some(ui)) => pending
-                    .target
+                (Some(layout), Some(ui)) => layout
+                    .hit_regions
+                    .iter()
+                    .rev()
+                    .find(|region| region.enabled && region.contains(point))
+                    .map(|region| region.node)
+                    .or(pending.target)
                     .or_else(|| ui.node_id_at(0))
                     .map_or_else(argui_ui::InteractionUpdate::default, |target| {
                         ui.wheel_event_from(target, point, delta)

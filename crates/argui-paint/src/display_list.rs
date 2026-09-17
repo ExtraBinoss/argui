@@ -2,13 +2,14 @@ use core::fmt;
 
 use argui_core::Affine2D;
 
-use crate::{ClipChain, ImagePrimitive, LayerStyle, Quad, VectorPrimitive};
+use crate::{ClipChain, GpuCanvasPrimitive, ImagePrimitive, LayerStyle, Quad, VectorPrimitive};
 
 #[derive(Clone, Debug, PartialEq)]
 /// Ordered drawing commands submitted to a renderer.
 pub enum DisplayCommand {
     Quad(Quad),
     Image(ImagePrimitive),
+    GpuCanvas(GpuCanvasPrimitive),
     Vector(VectorPrimitive),
     Text {
         block: usize,
@@ -49,6 +50,7 @@ impl std::error::Error for DisplayListError {}
 pub struct DisplayList {
     commands: Vec<DisplayCommand>,
     quad_count: usize,
+    gpu_canvas_count: usize,
 }
 
 impl DisplayList {
@@ -63,6 +65,7 @@ impl DisplayList {
         Self {
             commands: Vec::new(),
             quad_count: 0,
+            gpu_canvas_count: 0,
         }
     }
 
@@ -75,6 +78,12 @@ impl DisplayList {
     /// Appends an image primitive.
     pub fn push_image(&mut self, image: ImagePrimitive) {
         self.commands.push(DisplayCommand::Image(image));
+    }
+
+    /// Appends a retained GPU-canvas primitive.
+    pub fn push_gpu_canvas(&mut self, canvas: GpuCanvasPrimitive) {
+        self.commands.push(DisplayCommand::GpuCanvas(canvas));
+        self.gpu_canvas_count += 1;
     }
 
     /// Appends a vector primitive.
@@ -111,6 +120,7 @@ impl DisplayList {
     pub fn clear(&mut self) {
         self.commands.clear();
         self.quad_count = 0;
+        self.gpu_canvas_count = 0;
     }
 
     /// Appends commands from an iterator and updates the quad count.
@@ -118,6 +128,9 @@ impl DisplayList {
         for command in commands {
             if matches!(command, DisplayCommand::Quad(_)) {
                 self.quad_count += 1;
+            }
+            if matches!(command, DisplayCommand::GpuCanvas(_)) {
+                self.gpu_canvas_count += 1;
             }
             self.commands.push(command);
         }
@@ -147,6 +160,12 @@ impl DisplayList {
         self.quad_count
     }
 
+    /// Returns the number of GPU-canvas commands.
+    #[must_use]
+    pub const fn gpu_canvas_count(&self) -> usize {
+        self.gpu_canvas_count
+    }
+
     /// Checks that every layer end has a matching begin.
     ///
     /// # Errors
@@ -163,6 +182,7 @@ impl DisplayList {
                 DisplayCommand::EndLayer => depth -= 1,
                 DisplayCommand::Quad(_)
                 | DisplayCommand::Image(_)
+                | DisplayCommand::GpuCanvas(_)
                 | DisplayCommand::Vector(_)
                 | DisplayCommand::Text { .. } => {}
             }

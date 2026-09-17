@@ -222,6 +222,7 @@ fn base_values(element: &Element, scroll: Point) -> Vec<StylePropertyValue> {
             values.push(value(PropertyKey::VectorColor, StateValue::Color(*color)));
         }
         crate::ElementKind::Custom(_)
+        | crate::ElementKind::GpuCanvas(_)
         | crate::ElementKind::Container
         | crate::ElementKind::Image { .. } => {}
     }

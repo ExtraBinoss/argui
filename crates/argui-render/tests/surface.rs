@@ -1,15 +1,24 @@
 #![cfg(target_os = "linux")]
 
-use std::sync::Arc;
+#[path = "gpu_canvas/pipeline.rs"]
+mod gpu_canvas;
+
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
+};
 
 use argui_core::{Affine2D, Color, Point, Rect, Size};
 use argui_paint::{
-    ClipChain, DisplayList, EffectId, EffectInstance, Filter, ImageFit, LayerStyle, VectorAsset,
-    VectorId, VectorPrimitive,
+    Border, ClipChain, CornerRadii, DisplayList, EffectId, EffectInstance, Fill, Filter,
+    GpuCanvasId, GpuCanvasPrimitive, ImageFit, ImageSampling, LayerStyle, ProfileDomain, Quad,
+    RenderObjectId, VectorAsset, VectorId, VectorPrimitive,
 };
 use argui_render::{
-    EffectDefinition, EffectPassDefinition, EffectRegistry, RenderStatus, RendererConfig,
-    RendererError, SurfaceRenderer,
+    EffectDefinition, EffectPassDefinition, EffectRegistry, GpuCanvasDeviceContext,
+    GpuCanvasDiagnosticKind, GpuCanvasError, GpuCanvasFactory, GpuCanvasRegistration,
+    GpuCanvasRegistry, GpuCanvasRenderContext, GpuCanvasRenderer, GpuCanvasRequirements,
+    RenderStatus, RendererConfig, RendererError, SurfaceRenderer,
 };
 use argui_text::{PreparedText, TextEngine};
 use winit::{
@@ -26,6 +35,226 @@ const PASSES: &[EffectPassDefinition] = &[
     EffectPassDefinition::fragment("first", SHADER),
     EffectPassDefinition::fragment("second", SHADER),
 ];
+
+const COMPUTE_SHADER: &str = r#"
+@group(0) @binding(0) var<storage, read_write> output: array<vec4<f32>, 1>;
+@compute @workgroup_size(1)
+fn main() { output[0] = vec4<f32>(0.08, 0.6, 0.25, 0.8); }
+"#;
+const CANVAS_SHADER: &str = r#"
+@group(0) @binding(0) var<storage, read> color: array<vec4<f32>, 1>;
+@vertex
+fn vertex(@builtin(vertex_index) index: u32) -> @builtin(position) vec4<f32> {
+    let positions = array<vec2<f32>, 3>(
+        vec2<f32>(-1.0, -1.0), vec2<f32>(3.0, -1.0), vec2<f32>(-1.0, 3.0));
+    return vec4<f32>(positions[index], 0.0, 1.0);
+}
+@fragment
+fn fragment() -> @location(0) vec4<f32> { return color[0]; }
+"#;
+
+#[derive(Default)]
+struct CanvasProbe {
+    creates: AtomicUsize,
+    renders: AtomicUsize,
+    extent: AtomicU64,
+    create_fail: AtomicBool,
+    fail: AtomicBool,
+}
+
+struct ComputeFactory(Arc<CanvasProbe>);
+
+struct RequiredFeatureFactory;
+
+impl GpuCanvasFactory for RequiredFeatureFactory {
+    fn requirements(&self) -> GpuCanvasRequirements {
+        GpuCanvasRequirements::default()
+            .required_features(wgpu::Features::TEXTURE_COMPRESSION_BC)
+            .reason("validates shared-device capability rejection")
+    }
+
+    fn create(
+        &self,
+        _context: &GpuCanvasDeviceContext<'_>,
+    ) -> Result<Box<dyn GpuCanvasRenderer>, GpuCanvasError> {
+        Err(GpuCanvasError::new(
+            "shared device validation should run before factory creation",
+        ))
+    }
+}
+
+impl GpuCanvasFactory for ComputeFactory {
+    fn create(
+        &self,
+        context: &GpuCanvasDeviceContext<'_>,
+    ) -> Result<Box<dyn GpuCanvasRenderer>, GpuCanvasError> {
+        self.0.creates.fetch_add(1, Ordering::Relaxed);
+        if self.0.create_fail.load(Ordering::Relaxed) {
+            return Err(GpuCanvasError::new(
+                "intentional integration-test factory failure",
+            ));
+        }
+        Ok(Box::new(ComputeRenderer::new(context, self.0.clone())))
+    }
+}
+
+struct ComputeRenderer {
+    probe: Arc<CanvasProbe>,
+    compute: wgpu::ComputePipeline,
+    compute_group: wgpu::BindGroup,
+    render: wgpu::RenderPipeline,
+    render_group: wgpu::BindGroup,
+    _color: wgpu::Buffer,
+}
+
+impl ComputeRenderer {
+    fn new(context: &GpuCanvasDeviceContext<'_>, probe: Arc<CanvasProbe>) -> Self {
+        let device = context.device();
+        let color = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("argui-test-canvas-color"),
+            size: 16,
+            usage: wgpu::BufferUsages::STORAGE,
+            mapped_at_creation: false,
+        });
+        let compute_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("argui-test-canvas-compute-layout"),
+            entries: &[wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::COMPUTE,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Storage { read_only: false },
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            }],
+        });
+        let render_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("argui-test-canvas-render-layout"),
+            entries: &[wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Storage { read_only: true },
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            }],
+        });
+        let group = |label, layout: &wgpu::BindGroupLayout| {
+            device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some(label),
+                layout,
+                entries: &[wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: color.as_entire_binding(),
+                }],
+            })
+        };
+        let compute_group = group("argui-test-canvas-compute-group", &compute_layout);
+        let render_group = group("argui-test-canvas-render-group", &render_layout);
+        let compute_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("argui-test-canvas-compute"),
+            source: wgpu::ShaderSource::Wgsl(COMPUTE_SHADER.into()),
+        });
+        let compute_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("argui-test-canvas-compute-pipeline-layout"),
+                bind_group_layouts: &[Some(&compute_layout)],
+                immediate_size: 0,
+            });
+        let compute = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+            label: Some("argui-test-canvas-compute-pipeline"),
+            layout: Some(&compute_pipeline_layout),
+            module: &compute_module,
+            entry_point: Some("main"),
+            compilation_options: Default::default(),
+            cache: None,
+        });
+        let render_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("argui-test-canvas-render"),
+            source: wgpu::ShaderSource::Wgsl(CANVAS_SHADER.into()),
+        });
+        let render_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("argui-test-canvas-render-pipeline-layout"),
+                bind_group_layouts: &[Some(&render_layout)],
+                immediate_size: 0,
+            });
+        let render = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("argui-test-canvas-render-pipeline"),
+            layout: Some(&render_pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &render_module,
+                entry_point: Some("vertex"),
+                compilation_options: Default::default(),
+                buffers: &[],
+            },
+            primitive: Default::default(),
+            depth_stencil: None,
+            multisample: Default::default(),
+            fragment: Some(wgpu::FragmentState {
+                module: &render_module,
+                entry_point: Some("fragment"),
+                compilation_options: Default::default(),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: context.target_format(),
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+            }),
+            multiview_mask: None,
+            cache: None,
+        });
+        Self {
+            probe,
+            compute,
+            compute_group,
+            render,
+            render_group,
+            _color: color,
+        }
+    }
+}
+
+impl GpuCanvasRenderer for ComputeRenderer {
+    fn render(&mut self, context: &mut GpuCanvasRenderContext<'_>) -> Result<(), GpuCanvasError> {
+        self.probe.renders.fetch_add(1, Ordering::Relaxed);
+        let [width, height] = context.physical_extent();
+        self.probe.extent.store(
+            (u64::from(width) << 32) | u64::from(height),
+            Ordering::Relaxed,
+        );
+        if self.probe.fail.load(Ordering::Relaxed) {
+            return Err(GpuCanvasError::new("intentional integration-test failure"));
+        }
+        let (encoder, target) = context.encoder_and_target();
+        {
+            let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor::default());
+            pass.set_pipeline(&self.compute);
+            pass.set_bind_group(0, &self.compute_group, &[]);
+            pass.dispatch_workgroups(1, 1, 1);
+        }
+        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("argui-test-canvas-render-pass"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view: target,
+                depth_slice: None,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Load,
+                    store: wgpu::StoreOp::Store,
+                },
+            })],
+            ..Default::default()
+        });
+        pass.set_pipeline(&self.render);
+        pass.set_bind_group(0, &self.render_group, &[]);
+        pass.draw(0..3, 0..1);
+        Ok(())
+    }
+}
 
 #[test]
 #[ignore = "Native surface integration: requires a dedicated Wayland test display"]
@@ -78,8 +307,23 @@ fn exercise(window: Arc<Window>, mut pump: impl FnMut()) {
         EffectDefinition::new(unused, &[], PASSES),
     ])
     .unwrap();
+    let probe = Arc::new(CanvasProbe::default());
+    let canvas_registration =
+        GpuCanvasRegistration::new("test.compute-canvas", ComputeFactory(probe.clone()));
+    let canvas_id = canvas_registration.id();
+    let retry_probe = Arc::new(CanvasProbe::default());
+    retry_probe.create_fail.store(true, Ordering::Relaxed);
+    let retry_registration =
+        GpuCanvasRegistration::new("test.creation-retry", ComputeFactory(retry_probe.clone()));
+    let retry_id = retry_registration.id();
+    let canvas_registry =
+        GpuCanvasRegistry::new([canvas_registration, retry_registration]).unwrap();
     let size = window.inner_size();
-    let mut config = RendererConfig::default().profiling(true).effects(registry);
+    let mut config = RendererConfig::default()
+        .profiling(true)
+        .effects(registry)
+        .gpu_canvas_cache_bytes(16 * 1024)
+        .gpu_canvases(canvas_registry);
     // This test submits many frames without application work between them. An
     // automatic non-vsync mode avoids depending on compositor frame throttling.
     config.present_mode = wgpu::PresentMode::AutoNoVsync;
@@ -90,6 +334,19 @@ fn exercise(window: Arc<Window>, mut pump: impl FnMut()) {
         config,
     ))
     .unwrap();
+    let required = GpuCanvasRegistration::new("test.required-feature", RequiredFeatureFactory);
+    let incompatible = pollster::block_on(SurfaceRenderer::new_with_device(
+        window.clone(),
+        size.width,
+        size.height,
+        RendererConfig::default().gpu_canvases(GpuCanvasRegistry::new([required]).unwrap()),
+        renderer.device_handle(),
+    ));
+    assert!(matches!(
+        incompatible,
+        Err(RendererError::IncompatibleGpuCanvasDevice { canvas, .. })
+            if canvas == "test.required-feature"
+    ));
     let mut render = |renderer: &mut SurfaceRenderer, list: &DisplayList| {
         render(renderer, list, &window, &mut pump)
     };
@@ -162,6 +419,69 @@ fn exercise(window: Arc<Window>, mut pump: impl FnMut()) {
         render(&mut renderer, &missing),
         Err(RendererError::MissingEffect("test.missing"))
     ));
+
+    gpu_canvas::exercise(
+        &mut renderer,
+        canvas_id,
+        &probe,
+        retry_id,
+        &retry_probe,
+        &window,
+        &mut render,
+    );
+}
+
+fn canvas_list(id: GpuCanvasId, revision: u64, size: Size, slot: u32, effect: bool) -> DisplayList {
+    let mut list = DisplayList::new();
+    list.push_quad(Quad {
+        bounds: bounds(size.width),
+        background: Some(Fill::Solid(Color::BLACK)),
+        border: Border::all(0.0, Color::TRANSPARENT),
+        radii: CornerRadii::default(),
+        opacity: 1.0,
+        transform: Affine2D::IDENTITY,
+        clips: ClipChain::default(),
+    });
+    if effect {
+        list.begin_layer(LayerStyle::new(bounds(size.width)).filter(Filter::Blur(2.0)));
+    }
+    list.push_gpu_canvas(canvas_primitive(id, revision, size, slot));
+    if effect {
+        list.end_layer();
+    }
+    list.push_quad(Quad {
+        bounds: Rect::new(Point::new(8.0, 8.0), Size::new(10.0, 10.0)),
+        background: Some(Fill::Solid(Color::WHITE)),
+        border: Border::all(0.0, Color::TRANSPARENT),
+        radii: CornerRadii::all(2.0),
+        opacity: 0.5,
+        transform: Affine2D::IDENTITY,
+        clips: ClipChain::default(),
+    });
+    list
+}
+
+fn canvas_primitive(id: GpuCanvasId, revision: u64, size: Size, slot: u32) -> GpuCanvasPrimitive {
+    GpuCanvasPrimitive {
+        canvas: id,
+        object: RenderObjectId::new(ProfileDomain::Ui, 777),
+        slot,
+        bounds: Rect::new(Point::new(0.0, 0.0), size),
+        content_revision: revision,
+        resolution_scale: 1.0,
+        sampling: if revision.is_multiple_of(2) {
+            ImageSampling::Nearest
+        } else {
+            ImageSampling::Linear
+        },
+        opacity: 0.9,
+        radii: CornerRadii::all(3.0),
+        transform: Affine2D::IDENTITY,
+        clips: ClipChain::from_regions([argui_paint::ClipRegion::new(
+            Rect::new(Point::default(), size),
+            Affine2D::IDENTITY,
+        )]),
+    }
 }
 
 fn render(

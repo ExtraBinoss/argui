@@ -366,6 +366,12 @@ fn gpu_trace_round_trip_preserves_strict_timeline_data() {
         vector_atlas_entries: 5,
         vector_atlas_hits: 8,
         vector_rasterizations: 1,
+        gpu_canvas_entries: 3,
+        gpu_canvas_bytes: 65_536,
+        gpu_canvas_renders: 2,
+        gpu_canvas_hits: 1,
+        gpu_canvas_failures: 1,
+        gpu_canvas_encode_cpu: Duration::from_nanos(450),
         adapter: AdapterRecord {
             name: "Test GPU".into(),
             backend: "Vulkan".into(),
@@ -398,6 +404,12 @@ fn gpu_trace_round_trip_preserves_strict_timeline_data() {
     assert_eq!(frame.vector_atlas_entries, 5);
     assert_eq!(frame.vector_atlas_hits, 8);
     assert_eq!(frame.vector_rasterizations, 1);
+    assert_eq!(frame.gpu_canvas_entries, 3);
+    assert_eq!(frame.gpu_canvas_bytes, 65_536);
+    assert_eq!(frame.gpu_canvas_renders, 2);
+    assert_eq!(frame.gpu_canvas_hits, 1);
+    assert_eq!(frame.gpu_canvas_failures, 1);
+    assert_eq!(frame.gpu_canvas_encode_cpu, Duration::from_nanos(450));
     assert_eq!(pass.start, Duration::from_nanos(100));
     assert_eq!(pass.duration, Duration::from_nanos(300));
     assert_eq!(imported.selected(), Some(InspectNodeId(9)));
@@ -409,7 +421,7 @@ fn gpu_trace_rejects_unknown_versions_fields_and_enum_values() {
     inspector.record_ui(FrameRecord::default());
     let json = inspector.trace_json().unwrap();
 
-    let wrong_version = json.replace("argui-gpu-trace-v3", "argui-gpu-trace-v1");
+    let wrong_version = json.replace("argui-gpu-trace-v4", "argui-gpu-trace-v1");
     assert!(inspector.import_trace_json(&wrong_version).is_err());
 
     let unknown_field = json.replacen("{", "{\"unknown\":true,", 1);
@@ -452,6 +464,12 @@ fn inspector_state_gates_recording_and_updates_the_current_render_sample() {
         vector_atlas_entries: 11,
         vector_atlas_hits: 12,
         vector_rasterizations: 13,
+        gpu_canvas_entries: 20,
+        gpu_canvas_bytes: 21,
+        gpu_canvas_renders: 22,
+        gpu_canvas_hits: 23,
+        gpu_canvas_failures: 24,
+        gpu_canvas_encode_cpu: Duration::from_nanos(25),
         adapter: AdapterRecord {
             name: "adapter".into(),
             vendor: 1,
@@ -489,6 +507,12 @@ fn inspector_state_gates_recording_and_updates_the_current_render_sample() {
     assert_eq!(frame.resize_events, 0, "resize counts belong to UI samples");
     assert_eq!(frame.layers, 3);
     assert_eq!(frame.vector_rasterizations, 13);
+    assert_eq!(frame.gpu_canvas_entries, 20);
+    assert_eq!(frame.gpu_canvas_bytes, 21);
+    assert_eq!(frame.gpu_canvas_renders, 22);
+    assert_eq!(frame.gpu_canvas_hits, 23);
+    assert_eq!(frame.gpu_canvas_failures, 24);
+    assert_eq!(frame.gpu_canvas_encode_cpu, Duration::from_nanos(25));
     assert_eq!(frame.adapter.max_bind_groups, 17);
     assert_eq!(frame.gpu.as_ref().unwrap().passes[0].pixels, 19);
 
@@ -556,7 +580,7 @@ fn trace_errors_display_and_duration_saturation_are_stable() {
 
     let invalid = imported.import_trace_json("not json").unwrap_err();
     assert!(invalid.to_string().contains("invalid Argui GPU trace JSON"));
-    let wrong = json.replace("argui-gpu-trace-v3", "other");
+    let wrong = json.replace("argui-gpu-trace-v4", "other");
     let unsupported = imported.import_trace_json(&wrong).unwrap_err();
     assert!(
         unsupported

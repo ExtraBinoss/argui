@@ -5,7 +5,8 @@ use std::rc::Rc;
 
 use argui_inspect::{AdapterRecord, FrameRecord, GpuFrameRecord, GpuPassRecord, Invalidation};
 use argui_render::{
-    AdapterProfile, GpuFrameProfile, RenderStatus, SurfaceAlphaMode, SurfaceRenderer,
+    AdapterProfile, GpuCanvasDiagnosticKind, GpuFrameProfile, RenderStatus, SurfaceAlphaMode,
+    SurfaceRenderer,
 };
 use winit::{event_loop::ActiveEventLoop, window::Window};
 
@@ -219,6 +220,13 @@ impl Application {
             }
             (None, _) => renderer.render_notified(|| window.pre_present_notify()),
         };
+        for diagnostic in renderer.take_gpu_canvas_diagnostics() {
+            let event = match diagnostic.kind {
+                GpuCanvasDiagnosticKind::Failed => RuntimeEvent::GpuCanvasFailed(diagnostic),
+                GpuCanvasDiagnosticKind::Recovered => RuntimeEvent::GpuCanvasRecovered(diagnostic),
+            };
+            (self.on_event)(event);
+        }
         let result = match rendered {
             Ok(RenderStatus::Presented | RenderStatus::Skipped) => {
                 if let Some(inspector) = &self.inspector {
@@ -230,10 +238,18 @@ impl Application {
                         offscreen_pixels: profile.effects.offscreen_pixels,
                         cached_layers: profile.effects.cached_layers,
                         damaged_pixels: profile.effects.damaged_pixels,
-                        textures: profile.texture_pool.textures + 1,
-                        reused_textures: profile.texture_pool.reused_this_frame,
+                        textures: profile.texture_pool.textures + profile.gpu_canvases.entries + 1,
+                        reused_textures: profile.texture_pool.reused_this_frame
+                            + profile.gpu_canvases.hits_this_frame,
                         texture_bytes: profile.texture_pool.allocated_bytes
-                            + profile.vector_atlas.allocated_bytes,
+                            + profile.vector_atlas.allocated_bytes
+                            + profile.gpu_canvases.allocated_bytes,
+                        gpu_canvas_entries: profile.gpu_canvases.entries,
+                        gpu_canvas_bytes: profile.gpu_canvases.allocated_bytes,
+                        gpu_canvas_renders: profile.gpu_canvases.renders_this_frame,
+                        gpu_canvas_hits: profile.gpu_canvases.hits_this_frame,
+                        gpu_canvas_failures: profile.gpu_canvases.failures_this_frame,
+                        gpu_canvas_encode_cpu: profile.gpu_canvases.encode_time,
                         vector_atlas_entries: profile.vector_atlas.entries,
                         vector_atlas_bytes: profile.vector_atlas.allocated_bytes,
                         vector_atlas_hits: profile.vector_atlas.hits_this_frame,
