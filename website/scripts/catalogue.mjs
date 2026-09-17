@@ -40,6 +40,12 @@ const extraWidgets = [
     null,
   ],
   ['icons', 'Icons', 'Vector icons registered once and shared across widgets.', 'Button'],
+  [
+    'implicit-animation',
+    'Implicit animation',
+    'Retained opacity and container transitions with curves and reduced-motion support.',
+    'Animation lab',
+  ],
 ]
 
 export async function createCatalogue() {

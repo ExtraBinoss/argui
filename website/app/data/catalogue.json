@@ -351,6 +351,15 @@
     "gallery": "Button"
   },
   {
+    "slug": "implicit-animation",
+    "name": "Implicit animation",
+    "description": "Retained opacity and container transitions with curves and reduced-motion support.",
+    "source": "crates/argui-widgets/src/implicit_animation.rs",
+    "feature": "implicit-animation",
+    "category": "Components",
+    "gallery": "Animation lab"
+  },
+  {
     "slug": "input",
     "name": "Input & Search",
     "description": "Controlled single-line and search fields.",
