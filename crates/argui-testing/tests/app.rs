@@ -212,13 +212,13 @@ fn shared_model_has_independent_window_presentations() {
     assert_eq!(windows.window_keys(), [argui_platform::WindowKey::main()]);
 }
 
-#[cfg(feature = "tasks")]
+#[cfg(all(feature = "tasks", not(target_arch = "wasm32")))]
 struct TimedTask {
     completed: bool,
     task: Option<argui_runtime::tasks::TaskHandle>,
 }
 
-#[cfg(feature = "tasks")]
+#[cfg(all(feature = "tasks", not(target_arch = "wasm32")))]
 impl Render for TimedTask {
     fn render(&mut self, cx: &mut Context<Self>) -> Element {
         let environment = cx.environment();

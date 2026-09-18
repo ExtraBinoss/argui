@@ -2,6 +2,7 @@ use super::{DeviceTelemetryProvider, TelemetrySnapshot, process::ProcessSampler}
 use std::sync::mpsc::{self, Receiver, SyncSender, TryRecvError};
 use web_time::Instant;
 
+#[cfg_attr(not(feature = "all-smi"), derive(Default))]
 pub(super) struct Worker {
     provider: Option<Box<dyn DeviceTelemetryProvider>>,
     channels: Option<(SyncSender<bool>, Receiver<TelemetrySnapshot>)>,
@@ -9,13 +10,11 @@ pub(super) struct Worker {
     failure: Option<String>,
 }
 
+#[cfg(feature = "all-smi")]
 impl Default for Worker {
     fn default() -> Self {
         Self {
-            #[cfg(feature = "all-smi")]
             provider: Some(Box::new(super::AllSmi::default())),
-            #[cfg(not(feature = "all-smi"))]
-            provider: None,
             channels: None,
             pending: false,
             failure: None,

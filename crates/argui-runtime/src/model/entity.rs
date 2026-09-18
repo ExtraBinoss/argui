@@ -8,10 +8,14 @@ pub struct EntityId(usize);
 impl EntityId {
     pub(super) fn next() -> Self {
         static NEXT: AtomicUsize = AtomicUsize::new(1);
-        Self(
-            NEXT.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))
-                .expect("entity identity space exhausted"),
-        )
+        let mut id = NEXT.load(Ordering::Relaxed);
+        loop {
+            let next = id.checked_add(1).expect("entity identity space exhausted");
+            match NEXT.compare_exchange_weak(id, next, Ordering::Relaxed, Ordering::Relaxed) {
+                Ok(_) => return Self(id),
+                Err(observed) => id = observed,
+            }
+        }
     }
 
     #[must_use]

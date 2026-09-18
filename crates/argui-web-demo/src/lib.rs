@@ -1,5 +1,8 @@
 //! WebAssembly entry points for the Argui state showcase.
-#![cfg_attr(coverage_nightly, feature(coverage_attribute))]
+#![cfg_attr(
+    all(coverage_nightly, target_arch = "wasm32"),
+    feature(coverage_attribute)
+)]
 
 use argui::runtime::SingleWindowModel;
 use argui::{
