@@ -1,4 +1,4 @@
-use argui_platform::{PlatformEvent, TrayEvent, WindowKey};
+use argui_platform::{GlobalShortcutEvent, PlatformEvent, TrayEvent, WindowKey};
 use argui_render::RenderProfile;
 use argui_ui::{TreeUpdate, UiEvent};
 
@@ -42,6 +42,12 @@ pub enum RuntimeEvent {
     Tray(TrayEvent),
     TrayUnavailable(String),
     TrayFailed(String),
+    /// A registered system-wide keyboard shortcut changed state.
+    GlobalShortcut(GlobalShortcutEvent),
+    /// Global shortcut registration is unsupported in the current build or platform.
+    GlobalShortcutsUnavailable(String),
+    /// Native global shortcut initialization or registration failed.
+    GlobalShortcutsFailed(String),
     CommandFailed(String),
     #[cfg(feature = "hot-reload")]
     HotReloaded {
@@ -131,6 +137,16 @@ pub(crate) enum UserEvent {
     AccessKit(accesskit_winit::Event),
     #[cfg(all(feature = "tray", not(target_arch = "wasm32")))]
     Tray(TrayEvent),
+    #[cfg(all(
+        feature = "global-shortcuts",
+        any(target_os = "linux", target_os = "windows", target_os = "macos")
+    ))]
+    GlobalShortcut(GlobalShortcutEvent),
+    #[cfg(all(
+        feature = "global-shortcuts",
+        any(target_os = "linux", target_os = "windows", target_os = "macos")
+    ))]
+    GlobalShortcutsFailed(String),
 }
 
 impl Application {

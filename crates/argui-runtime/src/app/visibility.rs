@@ -1,12 +1,22 @@
 use super::Application;
 use crate::{RuntimeEvent, ViewUpdate};
-use argui_platform::PlatformEvent;
+use argui_platform::{PlatformEvent, WindowBackend};
 
 impl Application {
     pub(crate) fn set_window_visible(&mut self, visible: bool) {
         self.initial_visible = visible;
         if let Some(window) = &self.window {
-            window.set_visible(visible);
+            if !visible
+                && window.winit().is_some()
+                && window.capabilities().backend == WindowBackend::Wayland
+            {
+                // Winit's Wayland `set_visible(false)` is intentionally a no-op.
+                // Minimizing immediately removes the surface; a later authorized
+                // XDG activation restores it for launcher-style applications.
+                window.set_minimized(true);
+            } else {
+                window.set_visible(visible);
+            }
         }
         self.sync_host_visibility();
     }

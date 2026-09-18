@@ -31,6 +31,7 @@ impl ApplicationHandler<UserEvent> for MultiApplication {
             self.open_window(event_loop, spec);
         }
         self.sync_tray();
+        self.sync_global_shortcuts();
         self.process_pending(event_loop);
     }
 
@@ -86,6 +87,20 @@ impl ApplicationHandler<UserEvent> for MultiApplication {
             }
             #[cfg(all(feature = "tray", not(target_arch = "wasm32")))]
             UserEvent::Tray(event) => self.tray_event(event_loop, event),
+            #[cfg(all(
+                feature = "global-shortcuts",
+                any(target_os = "linux", target_os = "windows", target_os = "macos")
+            ))]
+            UserEvent::GlobalShortcut(event) => {
+                self.global_shortcut_event(event_loop, event);
+            }
+            #[cfg(all(
+                feature = "global-shortcuts",
+                any(target_os = "linux", target_os = "windows", target_os = "macos")
+            ))]
+            UserEvent::GlobalShortcutsFailed(error) => {
+                self.emit(crate::RuntimeEvent::GlobalShortcutsFailed(error));
+            }
         }
     }
 

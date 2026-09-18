@@ -17,6 +17,7 @@ type PreparedGlyphs = (Vec<GlyphInstance>, Vec<Range<u32>>, Vec<TextClip>);
 struct BlockVisual {
     transform: Affine2D,
     clips: ClipChain,
+    backdrop: Option<[f32; 3]>,
 }
 
 #[derive(Clone, Copy)]
@@ -25,6 +26,7 @@ struct PreparedVisual {
     transform: Affine2D,
     clip_start: u32,
     clip_count: u32,
+    backdrop: Option<[f32; 3]>,
 }
 
 pub(crate) struct TextGpu {
@@ -162,6 +164,7 @@ impl TextGpu {
                     visual.transform,
                     visual.clip_start,
                     visual.clip_count,
+                    visual.backdrop,
                 ));
             }
             let end = instances.len() as u32;
@@ -200,12 +203,17 @@ fn block_visuals(display_list: &DisplayList, blocks: usize) -> Vec<Option<BlockV
             block,
             transform,
             clips,
+            backdrop,
         } = command
             && let Some(slot) = visuals.get_mut(*block)
         {
             *slot = Some(BlockVisual {
                 transform: *transform,
                 clips: clips.clone(),
+                backdrop: backdrop.map(|color| {
+                    let [red, green, blue, _] = color.to_linear_rgba();
+                    [red, green, blue]
+                }),
             });
         }
     }
@@ -244,6 +252,7 @@ fn prepare_visuals(
                 transform,
                 clip_start: start,
                 clip_count: clips.len() as u32 - start,
+                backdrop: visual.and_then(|visual| visual.backdrop),
             }
         })
         .collect()

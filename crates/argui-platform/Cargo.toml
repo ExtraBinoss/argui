@@ -15,6 +15,7 @@ file-picker = ["dep:rfd", "dep:futures-channel"]
 desktop-backdrop = ["dep:argui-paint", "dep:x11rb", "dep:wayland-client", "dep:wayland-backend", "dep:wayland-protocols", "dep:wayland-protocols-plasma", "dep:objc2", "dep:objc2-foundation", "dep:objc2-quartz-core", "dep:objc2-core-graphics", "objc2-app-kit/NSGraphics", "objc2-app-kit/NSView", "objc2-app-kit/NSWindow", "objc2-app-kit/NSVisualEffectView", "objc2-app-kit/NSAppearance", "objc2-app-kit/objc2-quartz-core", "windows/Win32_Graphics_Dwm", "windows/Win32_UI_Controls"]
 native-popups = ["dep:x11rb", "dep:objc2", "objc2-app-kit/NSWindow", "objc2-app-kit/NSGraphics", "objc2-app-kit/NSView", "objc2-app-kit/NSScreen", "windows/Win32_UI_WindowsAndMessaging", "windows/Win32_Graphics_Gdi"]
 tray = ["dep:ksni", "dep:tray-icon"]
+global-shortcuts = ["dep:global-hotkey", "dep:futures-channel", "dep:raw-window-handle", "ashpd/global_shortcuts", "dep:wayland-client", "dep:wayland-backend", "dep:wayland-protocols"]
 gtk-host = ["dep:gtk", "dep:tao", "dep:wayland-client", "dep:wayland-backend", "dep:raw-window-handle"]
 
 [dependencies]
@@ -29,6 +30,7 @@ pollster.workspace = true
 
 [target.'cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))'.dependencies]
 arboard.workspace = true
+global-hotkey = { workspace = true, optional = true }
 rfd = { version = "=0.17.2", optional = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]

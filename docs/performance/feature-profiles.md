@@ -7,7 +7,7 @@ new implementation path and the facade still has no default features.
 | Profile | Expands to |
 | --- | --- |
 | `basic` | tasks plus button, checkbox, dialog, input, popover, radio-group, select, switch, tabs, and textarea widgets |
-| `desktop` | `basic` plus backdrop, file picker, native popups, tray, updater, and their widgets |
+| `desktop` | `basic` plus backdrop, file picker, global shortcuts, native popups, tray, updater, and their widgets |
 | `web` | `basic` plus the webview integration |
 
 Applications that need a smaller graph should continue to select individual

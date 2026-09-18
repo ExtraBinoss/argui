@@ -178,6 +178,16 @@ impl ApplicationHandler<UserEvent> for Application {
                 }
                 #[cfg(feature = "tray")]
                 UserEvent::Tray(_) => {}
+                #[cfg(all(
+                    feature = "global-shortcuts",
+                    any(target_os = "linux", target_os = "windows", target_os = "macos")
+                ))]
+                UserEvent::GlobalShortcut(_) => {}
+                #[cfg(all(
+                    feature = "global-shortcuts",
+                    any(target_os = "linux", target_os = "windows", target_os = "macos")
+                ))]
+                UserEvent::GlobalShortcutsFailed(_) => {}
             }
         }
         #[cfg(target_arch = "wasm32")]

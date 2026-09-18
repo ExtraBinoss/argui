@@ -7,6 +7,7 @@ mod popover;
 mod runtime;
 /// Single-window Spotlight-style search showcase.
 pub mod spotlight;
+mod spotlight_components;
 mod state_style;
 mod theme;
 mod visual;

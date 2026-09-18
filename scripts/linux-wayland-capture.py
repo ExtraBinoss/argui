@@ -18,6 +18,13 @@ parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--output", default="target/wayland-captures")
 parser.add_argument("--settle", type=float, default=25)
 parser.add_argument("--click", action="append", default=[], metavar="NAME:X:Y")
+parser.add_argument(
+    "--action",
+    action="append",
+    default=[],
+    metavar="KIND:NAME:VALUE",
+    help="ordered click, type, or chord action followed by a named capture",
+)
 parser.add_argument("command", nargs=argparse.REMAINDER)
 args = parser.parse_args()
 assert args.command, "Pass the application command after --"
@@ -126,8 +133,9 @@ try:
             print(f"Captured {name}: {width} × {height}", flush=True)
 
         capture("initial")
-        for action in args.click:
-            name, x, y = action.split(":")
+
+        def click(x, y):
+            """Move from the monitor origin and click one logical position."""
             # Relative pointer events work on the private headless Mutter monitor even
             # when its screencast stream does not yet accept absolute motion.
             call(rd_destination, remote, rd_interface, "NotifyPointerMotionRelative",
@@ -139,6 +147,38 @@ try:
             call(rd_destination, remote, rd_interface, "NotifyPointerButton", "(ib)", (272, True))
             spin(0.12)
             call(rd_destination, remote, rd_interface, "NotifyPointerButton", "(ib)", (272, False))
+            spin(0.3)
+
+        def keysym(value, pressed):
+            """Send one Mutter virtual-keyboard keysym transition."""
+            call(rd_destination, remote, rd_interface, "NotifyKeyboardKeysym",
+                 "(ub)", (value, pressed))
+
+        named_keysyms = {"Control_L": 0xFFE3, "space": 0x20}
+        actions = [f"click:{action}" for action in args.click] + args.action
+        for action in actions:
+            kind, name, value = action.split(":", 2)
+            if kind == "click":
+                x, y = value.split(":", 1)
+                click(x, y)
+            elif kind == "type":
+                for character in value:
+                    keysym(ord(character), True)
+                    spin(0.08)
+                    keysym(ord(character), False)
+                    spin(0.08)
+            elif kind == "chord":
+                chord = [named_keysyms.get(key, int(key, 0) if key.startswith("0x") else None)
+                         for key in value.split("+")]
+                assert all(chord), f"Unknown keysym in {value}"
+                for key in chord:
+                    keysym(key, True)
+                    spin(0.08)
+                for key in reversed(chord):
+                    keysym(key, False)
+                    spin(0.08)
+            else:
+                raise AssertionError(f"Unknown action kind: {kind}")
             spin(2.0)
             capture(name)
 finally:

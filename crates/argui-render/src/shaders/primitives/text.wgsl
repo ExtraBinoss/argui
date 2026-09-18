@@ -13,7 +13,7 @@ struct VertexOutput {
     @builtin(position) position: vec4<f32>,
     @location(0) uv: vec2<f32>,
     @location(1) color: vec4<f32>,
-    @location(2) mode: f32,
+    @location(2) mode: vec4<f32>,
     @location(3) @interpolate(flat) clip_meta: vec2<u32>,
 }
 
@@ -53,7 +53,7 @@ fn vertex(
     output.position = vec4(ndc, 0.0, 1.0);
     output.uv = mix(uv_rect.xy, uv_rect.zw, corner);
     output.color = color;
-    output.mode = mode.x;
+    output.mode = mode;
     output.clip_meta = clip_meta.xy;
     return output;
 }
@@ -76,6 +76,30 @@ fn srgb_to_linear_channel(value: f32) -> f32 {
     );
 }
 
+fn linear_to_srgb_channel(value: f32) -> f32 {
+    return select(
+        value * 12.92,
+        1.055 * pow(max(value, 0.0), 1.0 / 2.4) - 0.055,
+        value > 0.0031308,
+    );
+}
+
+fn srgb_to_linear(color: vec3<f32>) -> vec3<f32> {
+    return vec3(
+        srgb_to_linear_channel(color.r),
+        srgb_to_linear_channel(color.g),
+        srgb_to_linear_channel(color.b),
+    );
+}
+
+fn linear_to_srgb(color: vec3<f32>) -> vec3<f32> {
+    return vec3(
+        linear_to_srgb_channel(color.r),
+        linear_to_srgb_channel(color.g),
+        linear_to_srgb_channel(color.b),
+    );
+}
+
 // Glyph masks encode geometric coverage. Correct that coverage with the sRGB
 // transfer curve while colors remain in the renderer's linear working space.
 // The two branches are complementary, so dark-on-light and light-on-dark text
@@ -86,6 +110,31 @@ fn text_coverage(mask: f32, color: vec3<f32>) -> f32 {
     let light_coverage = srgb_to_linear_channel(mask);
     let dark_coverage = 1.0 - srgb_to_linear_channel(1.0 - mask);
     return select(dark_coverage, light_coverage, light_on_dark);
+}
+
+// Reconstruct the straight-alpha source that makes linear GPU blending produce
+// the same edge color as an sRGB coverage blend over a known opaque backdrop.
+// Raising alpha when needed keeps every reconstructed source channel in gamut.
+fn backdrop_aware_text(
+    coverage: f32,
+    foreground: vec3<f32>,
+    backdrop: vec3<f32>,
+) -> vec4<f32> {
+    if coverage <= 0.00001 {
+        return vec4(foreground, 0.0);
+    }
+    let target_color = srgb_to_linear(mix(
+        linear_to_srgb(backdrop),
+        linear_to_srgb(foreground),
+        coverage,
+    ));
+    let delta = target_color - backdrop;
+    let toward_white = delta / max(vec3(1.0) - backdrop, vec3(0.00001));
+    let toward_black = -delta / max(backdrop, vec3(0.00001));
+    let required = select(toward_black, toward_white, delta >= vec3(0.0));
+    let alpha = clamp(max(coverage, max(required.r, max(required.g, required.b))), 0.0, 1.0);
+    let source = clamp(backdrop + delta / max(alpha, 0.00001), vec3(0.0), vec3(1.0));
+    return vec4(source, alpha);
 }
 
 @fragment
@@ -104,10 +153,14 @@ fn fragment(input: VertexOutput) -> @location(0) vec4<f32> {
         clip_coverage *= 1.0 - smoothstep(-clip_width, clip_width, clip_distance);
     }
     let sampled = textureSample(glyph_atlas, glyph_sampler, input.uv);
-    if input.mode > 1.5 {
+    if input.mode.x > 2.5 {
+        let coverage = sampled.a * input.color.a * clip_coverage;
+        return backdrop_aware_text(coverage, input.color.rgb, input.mode.yzw);
+    }
+    if input.mode.x > 1.5 {
         return input.color * vec4(1.0, 1.0, 1.0, clip_coverage);
     }
-    if input.mode > 0.5 {
+    if input.mode.x > 0.5 {
         return sampled * vec4(1.0, 1.0, 1.0, input.color.a * clip_coverage);
     }
     let coverage = text_coverage(sampled.a, input.color.rgb);

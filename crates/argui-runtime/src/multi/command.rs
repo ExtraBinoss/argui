@@ -32,7 +32,21 @@ impl MultiApplication {
                     .and_then(|entry| entry.runtime.window())
                 {
                     window.set_minimized(false);
-                    window.focus_window();
+                    let activated = self
+                        .pending_activation_token
+                        .take()
+                        .map(|token| window.activate_window(&token))
+                        .transpose();
+                    match activated {
+                        Ok(Some(true)) => {}
+                        Ok(Some(false) | None) => window.focus_window(),
+                        Err(error) => {
+                            window.focus_window();
+                            self.emit(RuntimeEvent::CommandFailed(format!(
+                                "window activation failed: {error}"
+                            )));
+                        }
+                    }
                 }
             }
             AppCommand::SetWindowTitle { window, title } => {

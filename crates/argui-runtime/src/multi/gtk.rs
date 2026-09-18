@@ -48,6 +48,7 @@ pub(crate) fn launch(mut application: MultiApplication) -> Result<(), RuntimeErr
                         application.open_window(&context, spec);
                     }
                     application.sync_tray();
+                    application.sync_global_shortcuts();
                     application.process_pending(&context);
                 }
                 for entry in application.windows.values_mut() {
@@ -121,6 +122,14 @@ pub(crate) fn launch(mut application: MultiApplication) -> Result<(), RuntimeErr
             }
             #[cfg(feature = "tray")]
             Event::UserEvent(UserEvent::Tray(event)) => application.tray_event(&context, event),
+            #[cfg(feature = "global-shortcuts")]
+            Event::UserEvent(UserEvent::GlobalShortcut(event)) => {
+                application.global_shortcut_event(&context, event);
+            }
+            #[cfg(feature = "global-shortcuts")]
+            Event::UserEvent(UserEvent::GlobalShortcutsFailed(error)) => {
+                application.emit(crate::RuntimeEvent::GlobalShortcutsFailed(error));
+            }
             _ => (),
         }
         for entry in application.windows.values_mut() {

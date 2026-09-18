@@ -44,6 +44,7 @@ fn display_lists_preserve_cross_primitive_order() {
                 block: 3,
                 transform: Affine2D::IDENTITY,
                 clips: ClipChain::default(),
+                backdrop: None,
             },
             DisplayCommand::GpuCanvas(canvas.clone()),
         ]

@@ -88,7 +88,7 @@ pub(crate) struct Application {
     #[cfg(not(target_arch = "wasm32"))]
     semantic_snapshot: Option<std::sync::Arc<std::sync::Mutex<argui_accessibility::SemanticTree>>>,
     #[cfg(target_arch = "wasm32")]
-    dom_accessibility: Option<argui_accessibility::DomTree>,
+    pub(super) dom_accessibility: Option<argui_accessibility::DomTree>,
     renderer: Rc<RefCell<RendererState>>,
     renderer_device: Rc<RefCell<Option<RendererDevice>>>,
     renderer_announced: bool,
@@ -480,6 +480,17 @@ impl Application {
         window: &dyn crate::host::WindowHost,
         event_loop: &dyn crate::host::LoopControl,
     ) {
+        #[cfg(target_arch = "wasm32")]
+        if !focused
+            && self
+                .dom_accessibility
+                .as_ref()
+                .is_some_and(argui_accessibility::DomTree::has_text_input_focus)
+        {
+            // Moving focus from the canvas to its mobile HTML input is internal
+            // to the same Argui window and must not clear the retained UI focus.
+            return;
+        }
         #[cfg(all(feature = "desktop-backdrop", not(target_arch = "wasm32")))]
         self.focus_desktop_backdrop(focused);
         if !focused {

@@ -72,6 +72,7 @@ unic-langid = { version = "=0.9.6", features = ["macros"] }
 image = { version = "=0.25.10", default-features = false, features = ["png", "jpeg"] }
 ksni = { version = "=0.3.6", default-features = false, features = ["async-io", "blocking"] }
 tray-icon = { version = "=0.24.2", default-features = false }
+global-hotkey = "=0.8.0"
 winresource = "=0.1.31"
 usvg = { version = "=0.48.1", default-features = false }
 resvg = { version = "=0.48.1", default-features = false }

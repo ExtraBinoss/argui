@@ -1,6 +1,12 @@
 #[cfg(all(feature = "tasks", feature = "webview", target_os = "linux"))]
 #[path = "app/gtk.rs"]
 mod gtk_input;
+#[cfg(not(target_arch = "wasm32"))]
+#[path = "app/lifecycle.rs"]
+mod model_free;
+#[cfg(all(feature = "tasks", target_os = "linux"))]
+#[path = "app/visibility.rs"]
+mod wayland_visibility;
 // Opt-in OS integration: ARGUI_NATIVE_TESTS=1 cargo nextest run -p argui-runtime --all-features --test launch
 #[cfg(all(feature = "tasks", not(target_arch = "wasm32")))]
 mod native {
@@ -355,6 +361,7 @@ mod native {
             }
         }
     }
+
     pub fn run() {
         let runtime = ModelRuntime::default();
         let data = runtime.entity(Data {
@@ -517,60 +524,6 @@ mod native {
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
-mod model_free {
-    use argui_platform::WindowConfig;
-
-    pub fn run() {
-        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        if std::env::var_os("ARGUI_MODEL_FREE_TEST_CHILD").is_none() {
-            let success = root
-                .join("target/native-launch")
-                .join(format!("success-{}", std::process::id()));
-            std::fs::create_dir_all(success.parent().unwrap()).unwrap();
-            let _ = std::fs::remove_file(&success);
-            let status = std::process::Command::new(root.join("scripts/linux-hidden-display.sh"))
-                .env("ARGUI_TEST_BACKEND", "x11")
-                .env("ARGUI_MODEL_FREE_TEST_CHILD", "1")
-                .env("ARGUI_MODEL_FREE_TEST_SUCCESS", &success)
-                .current_dir(&root)
-                .arg("timeout")
-                .arg("20s")
-                .arg(std::env::current_exe().unwrap())
-                .status()
-                .unwrap();
-            assert!(
-                status.success() || success.exists(),
-                "hidden model-free launch test failed"
-            );
-            let _ = std::fs::remove_file(success);
-            return;
-        }
-        let driver = std::thread::spawn(move || {
-            std::process::Command::new("python3")
-                .arg(root.join("crates/argui-runtime/tests/launch/close.py"))
-                .current_dir(root)
-                .status()
-                .unwrap()
-        });
-        argui_runtime::run(
-            WindowConfig {
-                title: "Argui model-free launch test".into(),
-                ..Default::default()
-            },
-            Default::default(),
-            |_| {},
-        )
-        .unwrap();
-        assert!(driver.join().unwrap().success());
-        std::fs::write(
-            std::env::var_os("ARGUI_MODEL_FREE_TEST_SUCCESS").unwrap(),
-            "passed",
-        )
-        .unwrap();
-    }
-}
-
 fn main() {
     let enabled = std::env::var_os("ARGUI_NATIVE_TESTS").is_some();
     if std::env::args().any(|argument| argument == "--list") {
@@ -584,6 +537,18 @@ fn main() {
     }
     #[cfg(all(feature = "tasks", not(target_arch = "wasm32")))]
     if enabled {
+        #[cfg(target_os = "linux")]
+        if std::env::var_os("ARGUI_WAYLAND_VISIBILITY_CHILD").is_some() {
+            wayland_visibility::run_child();
+        } else if std::env::var_os("ARGUI_MODEL_FREE_TEST_CHILD").is_some() {
+            model_free::run();
+        } else {
+            native::run();
+            #[cfg(target_os = "linux")]
+            wayland_visibility::verify();
+            model_free::run();
+        }
+        #[cfg(not(target_os = "linux"))]
         if std::env::var_os("ARGUI_MODEL_FREE_TEST_CHILD").is_some() {
             model_free::run();
         } else {

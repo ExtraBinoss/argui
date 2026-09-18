@@ -1,4 +1,4 @@
-use argui_core::{Affine2D, Rect};
+use argui_core::{Affine2D, Color, Rect};
 use argui_paint::{ClipChain, ClipRegion, CompositorId, CompositorLayer, DisplayList};
 use argui_ui::{EffectScope, Element, ElementKind, NodeId, PointerEvents, UiTree};
 
@@ -7,6 +7,7 @@ use crate::{LayoutNode, LayoutOutput, engine::NodeMap, input, scroll};
 mod cache;
 use cache::CachedFragment;
 pub(crate) use cache::PaintCache;
+mod backdrop;
 mod effects;
 mod geometry;
 mod gpu_canvas;
@@ -21,6 +22,7 @@ pub(super) struct PaintContext {
     transform: Affine2D,
     clips: ClipChain,
     clip_bounds: Rect,
+    backdrop: Option<Color>,
     hit_allowed: bool,
     active_portal: Option<NodeId>,
     compositor_owner: Option<CompositorId>,
@@ -59,6 +61,7 @@ pub(crate) fn repaint(
             transform: Affine2D::IDENTITY,
             clips,
             clip_bounds: output.viewport,
+            backdrop: None,
             hit_allowed: true,
             active_portal: None,
             compositor_owner: None,
@@ -161,6 +164,7 @@ pub(super) fn paint_node(
             transform: Affine2D::IDENTITY,
             clips: ClipChain::from_regions([ClipRegion::new(clip, Affine2D::IDENTITY)]),
             clip_bounds: clip,
+            backdrop: None,
             hit_allowed: parent.hit_allowed,
             active_portal: parent.active_portal,
             compositor_owner: None,
@@ -194,10 +198,17 @@ pub(super) fn paint_node(
             compositor_opacity,
         ));
     }
+    let resolved_quad = ui.resolved_quad(node.node, element);
     let context = PaintContext {
         transform,
         clips: parent.clips.clone(),
         clip_bounds: parent.clip_bounds,
+        backdrop: backdrop::resolve(
+            parent.backdrop,
+            &resolved_quad,
+            element.desktop_backdrop.is_some()
+                || effects::scope_count(element, EffectScope::Background) != 0,
+        ),
         hit_allowed: parent.hit_allowed,
         active_portal: parent.active_portal,
         compositor_owner,
@@ -233,6 +244,7 @@ pub(super) fn paint_node(
         } else {
             context.clip_bounds
         },
+        backdrop: context.backdrop,
         hit_allowed: context.hit_allowed
             && !matches!(
                 element.hit_test.pointer_events,
@@ -476,10 +488,11 @@ fn paint_enter(
             visual_bounds,
             node.node,
         );
-        output.display_list.push_text_transformed(
+        output.display_list.push_text_with_backdrop(
             text_index,
             context.transform,
             content_clips.clone(),
+            context.backdrop,
         );
         end_layers(&mut output.display_list, layers);
     }

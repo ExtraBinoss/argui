@@ -112,6 +112,75 @@ fn plain_elements_keep_one_combined_quad_and_no_layers() {
 }
 
 #[test]
+fn text_commands_inherit_only_exact_opaque_solid_backdrops() {
+    let blue = Color::from_srgb8(37, 99, 235);
+    let mut ui = UiTree::new(
+        Element::container([Element::text("Crisp on blue")])
+            .width(length(180.0))
+            .height(length(40.0))
+            .background(blue),
+    );
+    let output = LayoutEngine::new()
+        .compute(&mut ui, &mut text_engine(), Size::new(200.0, 80.0))
+        .unwrap();
+    assert!(output.display_list.commands().iter().any(|command| {
+        matches!(command, DisplayCommand::Text { backdrop: Some(color), .. } if *color == blue)
+    }));
+
+    let translucent_blue = blue.with_alpha(0.5);
+    let [red, green, blue_channel, _] = blue.to_linear_rgba();
+    let expected_composite =
+        Color::linear_rgb(red * 0.5 + 0.5, green * 0.5 + 0.5, blue_channel * 0.5 + 0.5);
+    let mut ui = UiTree::new(
+        Element::container([Element::text("Composited").background(translucent_blue)])
+            .width(length(180.0))
+            .height(length(40.0))
+            .background(Color::WHITE),
+    );
+    let output = LayoutEngine::new()
+        .compute(&mut ui, &mut text_engine(), Size::new(200.0, 80.0))
+        .unwrap();
+    assert!(output.display_list.commands().iter().any(|command| {
+        matches!(command, DisplayCommand::Text { backdrop: Some(color), .. }
+            if *color == expected_composite)
+    }));
+
+    let mut ui = UiTree::new(
+        Element::text("Unknown translucent backdrop")
+            .background(translucent_blue)
+            .width(length(180.0)),
+    );
+    let output = LayoutEngine::new()
+        .compute(&mut ui, &mut text_engine(), Size::new(200.0, 80.0))
+        .unwrap();
+    assert!(
+        output
+            .display_list
+            .commands()
+            .iter()
+            .any(|command| matches!(command, DisplayCommand::Text { backdrop: None, .. }))
+    );
+
+    let mut ui = UiTree::new(
+        Element::container([Element::text("Filtered")])
+            .width(length(180.0))
+            .height(length(40.0))
+            .background(blue)
+            .background_effect(effect()),
+    );
+    let output = LayoutEngine::new()
+        .compute(&mut ui, &mut text_engine(), Size::new(200.0, 80.0))
+        .unwrap();
+    assert!(
+        output
+            .display_list
+            .commands()
+            .iter()
+            .any(|command| matches!(command, DisplayCommand::Text { backdrop: None, .. }))
+    );
+}
+
+#[test]
 fn freshly_rebuilt_static_controls_reuse_paint_while_their_sibling_animates() {
     let screen = |color| {
         Element::row([

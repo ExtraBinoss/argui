@@ -77,15 +77,22 @@ impl Application {
     }
 
     pub(super) fn update_ime(&self, window: &dyn crate::host::WindowHost) {
-        let enabled = self
+        let focused_text_input = self
             .ui_tree
             .as_ref()
             .and_then(argui_ui::UiTree::focused_node)
-            .is_some_and(|node| {
+            .filter(|node| {
                 self.ui_tree
                     .as_ref()
-                    .is_some_and(|ui| ui.text_input_value(node).is_some())
+                    .is_some_and(|ui| ui.text_input_value(*node).is_some())
             });
+        let enabled = focused_text_input.is_some();
+        #[cfg(target_arch = "wasm32")]
+        if let Some(dom) = &self.dom_accessibility {
+            dom.sync_touch_text_input(
+                focused_text_input.map(|node| argui_accessibility::SemanticNodeId::new(node.get())),
+            );
+        }
         #[cfg(all(feature = "native-popups", not(target_arch = "wasm32")))]
         {
             let caret = self
@@ -105,10 +112,7 @@ impl Application {
         }
         window.set_ime_allowed(enabled);
         if enabled
-            && let Some(node) = self
-                .ui_tree
-                .as_ref()
-                .and_then(argui_ui::UiTree::focused_node)
+            && let Some(node) = focused_text_input
             && let Some(caret) = self
                 .ui_layout
                 .as_ref()

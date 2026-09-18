@@ -1,7 +1,9 @@
 use argui_animation::Frame;
 use argui_inspect::InspectorHandle;
 use argui_paint::{ImageAsset, VectorAsset};
-use argui_platform::{PlatformEvent, TrayConfig, TrayEvent, WindowKey, WindowLevel, WindowSpec};
+use argui_platform::{
+    GlobalShortcutEvent, PlatformEvent, TrayConfig, TrayEvent, WindowKey, WindowLevel, WindowSpec,
+};
 use argui_ui::{ClipboardRequest, Element, FocusRequest, TextSelectionRequest, UiEvent};
 
 use crate::{
@@ -26,6 +28,8 @@ pub enum AppEvent {
         event: PlatformEvent,
     },
     Tray(TrayEvent),
+    /// A registered system-wide keyboard shortcut changed state.
+    GlobalShortcut(GlobalShortcutEvent),
 }
 
 #[derive(Clone, Debug, PartialEq)]

@@ -58,8 +58,12 @@ through an ABI that converts to and from those intermediates.
 
 Image and rasterized SVG textures use sRGB sampling. Glyph atlases store coverage;
 the text shader applies the renderer's text-coverage transfer and linear text
-color before blending. Display-P3, HDR, and ICC color management are outside the
-current contract.
+color before blending. When layout can resolve an opaque solid backdrop, the
+shader reconstructs a backdrop-aware straight-alpha source so linear GPU
+blending reproduces sRGB edge coverage on saturated colors as well as on black
+and white. Complex, filtered, image, gradient, and translucent backdrops use the
+polarity-based fallback. Display-P3, HDR, and ICC color management are outside
+the current contract.
 
 ## Images
 

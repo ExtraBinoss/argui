@@ -75,8 +75,16 @@ impl GlyphInstance {
         transform: Affine2D,
         clip_start: u32,
         clip_count: u32,
+        backdrop: Option<[f32; 3]>,
     ) -> Self {
         let atlas_size = atlas_size as f32;
+        let mode = if entry.color {
+            [1.0, 0.0, 0.0, 0.0]
+        } else if let Some([red, green, blue]) = backdrop {
+            [3.0, red, green, blue]
+        } else {
+            [0.0; 4]
+        };
         Self {
             rect: [
                 (glyph.x + entry.left) as f32,
@@ -91,7 +99,7 @@ impl GlyphInstance {
                 (entry.y + entry.height) as f32 / atlas_size,
             ],
             color: glyph.color,
-            mode: [f32::from(entry.color), 0.0, 0.0, 0.0],
+            mode,
             transform_a: transform.matrix,
             transform_b: [transform.translation.x, transform.translation.y, 0.0, 0.0],
             clip_meta: [clip_start, clip_count, 0, 0],

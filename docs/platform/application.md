@@ -77,6 +77,44 @@ or nesting, return `AppUpdate::tray_changed()`. Built-in items can show, hide,
 focus, toggle, or close a `WindowKey`; custom items arrive through
 `AppEvent::Tray`.
 
+## Global shortcuts
+
+Enable `global-shortcuts` directly, or use the `desktop` feature profile. A
+shortcut has an application-defined ID and a portable accelerator. Modifiers
+must precede one physical key:
+
+```rust,ignore
+use argui::platform::{ApplicationConfig, GlobalShortcut};
+
+let config = ApplicationConfig::new(identity, window)
+    .with_global_shortcut(GlobalShortcut::new("show-search", "CmdOrCtrl+Space"));
+```
+
+`CmdOrCtrl` resolves to Command on macOS and Control elsewhere. Other accepted
+modifiers are `Shift`, `Alt`, `Ctrl`, and `Super`; keys use physical names such
+as `KeyK`, `Space`, `ArrowUp`, or `F12`.
+
+Press and release transitions arrive as `AppEvent::GlobalShortcut`, even while
+all application windows are hidden. Returning `AppCommand::FocusWindow` shows,
+restores, and focuses the target window. Combine this with
+`CloseBehavior::Hide` and a tray `Quit` action for a launcher-style app. The
+`spotlight` example demonstrates the complete flow with `CmdOrCtrl+Space`.
+
+Winit cannot directly unmap a Wayland toplevel. On that backend Argui implements
+`HideWindow` by minimizing the surface immediately; a compositor-authorized
+activation token restores it when `FocusWindow` follows a portal shortcut.
+
+Native registration supports Windows, macOS, Linux X11, and Linux Wayland.
+Wayland uses the XDG Global Shortcuts portal: the desktop presents a one-time
+approval/configuration dialog, and Argui consumes its activation token when a
+shortcut returns `AppCommand::FocusWindow`. Host applications must install a
+`.desktop` file whose basename matches
+`ApplicationIdentity::linux_application_id()`; packaged applications normally
+already satisfy this. A missing portal/backend, a rejected host identity,
+registration conflicts, and invalid accelerators emit
+`RuntimeEvent::GlobalShortcutsFailed`. Targets without a native implementation
+emit `RuntimeEvent::GlobalShortcutsUnavailable`.
+
 ## Multiple windows
 
 `AppModel` owns shared application state. `WindowKey` addresses each view and

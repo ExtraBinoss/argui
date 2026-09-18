@@ -1,32 +1,110 @@
-use argui_animation::{Duration, Frame};
-use argui_core::Color;
-use argui_paint::{Border, BorderWidths, CornerRadii, PaintStyle, QuadStyle};
-use argui_platform::{PlatformEvent, WindowBackend, WindowCapabilities, WindowKey};
+use argui_animation::{Duration, curves};
+use argui_core::{Color, ColorScheme, Key, KeyInput, KeyState};
+use argui_paint::{Border, BorderWidths, CornerRadii, PaintStyle, QuadStyle, VectorAsset};
+use argui_platform::{
+    GlobalShortcutState, PlatformEvent, WindowBackend, WindowCapabilities, WindowKey,
+};
 use argui_runtime::{AppCommand, AppEvent, AppModel, AppUpdate, ViewUpdate, WindowEnvironment};
 use argui_text::TextStyle;
 use argui_ui::{
-    AlignItems, Axes, Element, FocusContainment, FocusScope, FocusTarget, InitialFocus,
-    Interaction, JustifyContent, Overflow, Sides, UiEventKind, WindowDragBehavior, length, percent,
-    sides,
+    AlignItems, Axes, DesktopBackdrop, Element, FocusContainment, FocusScope, FocusTarget,
+    InitialFocus, JustifyContent, LiveRegion, Overflow, Role, Semantics, UiEventKind, length,
+    percent, sides,
 };
-use argui_widgets::{Button, ButtonStyle, Input, shadcn};
+use argui_widgets::{AnimatedContainer, Input, InputKind, TablerIcon, WidgetAssets, shadcn};
+
+use crate::spotlight_components::{compact_button, result_row, shortcut_hint, with_alpha};
 
 const SEARCH_KEY: &str = "spotlight-search";
-const PASSTHROUGH_TIME: Duration = Duration::from_secs(2);
-const PANEL_WIDTH: f32 = 688.0;
-const PANEL_HEIGHT: f32 = 428.0;
-const PANEL_RADIUS: f32 = 16.0;
+/// Stable ID used by the Spotlight example's global activation shortcut.
+pub const SPOTLIGHT_SHORTCUT_ID: &str = "activate-spotlight";
+const PANEL_WIDTH: f32 = 704.0;
+const PANEL_HEIGHT: f32 = 452.0;
+const PANEL_RADIUS: f32 = 18.0;
+const RESULT_KEY_PREFIX: &str = "spotlight-result::";
+const SPOTLIGHT_ICONS: [TablerIcon; 7] = [
+    TablerIcon::Search,
+    TablerIcon::Terminal,
+    TablerIcon::Folder,
+    TablerIcon::Sun,
+    TablerIcon::Rust,
+    TablerIcon::Minus,
+    TablerIcon::ChevronDown,
+];
 /// Recommended width in logical pixels for the Spotlight showcase window.
 pub const SPOTLIGHT_WINDOW_WIDTH: f64 = PANEL_WIDTH as f64;
 /// Recommended height in logical pixels for the Spotlight showcase window.
 pub const SPOTLIGHT_WINDOW_HEIGHT: f64 = PANEL_HEIGHT as f64;
 
-#[derive(Default)]
-/// Search-oriented single-window showcase demonstrating focus and passthrough.
+#[derive(Clone, Copy)]
+struct SpotlightResult {
+    id: &'static str,
+    label: &'static str,
+    description: &'static str,
+    icon: TablerIcon,
+    shortcut: &'static str,
+}
+
+const SPOTLIGHT_RESULTS: [SpotlightResult; 4] = [
+    SpotlightResult {
+        id: "command-palette",
+        label: "Open command palette",
+        description: "Jump to any action",
+        icon: TablerIcon::Terminal,
+        shortcut: "MOD K",
+    },
+    SpotlightResult {
+        id: "recent-files",
+        label: "Browse recent files",
+        description: "Files and folders",
+        icon: TablerIcon::Folder,
+        shortcut: "MOD O",
+    },
+    SpotlightResult {
+        id: "color-theme",
+        label: "Switch color theme",
+        description: "Appearance",
+        icon: TablerIcon::Sun,
+        shortcut: "MOD T",
+    },
+    SpotlightResult {
+        id: "gpu-frame",
+        label: "Inspect GPU frame",
+        description: "Developer tools",
+        icon: TablerIcon::Rust,
+        shortcut: "MOD I",
+    },
+];
+
+/// Search-oriented single-window showcase demonstrating filtering and global focus.
 pub struct SpotlightShowcase {
     query: String,
+    selected_result: usize,
+    last_action: Option<String>,
     capabilities: Option<WindowCapabilities>,
-    passthrough_remaining: Option<Duration>,
+    light_icons: WidgetAssets,
+    dark_icons: WidgetAssets,
+    selected_icons: WidgetAssets,
+}
+
+impl Default for SpotlightShowcase {
+    fn default() -> Self {
+        Self {
+            query: String::new(),
+            selected_result: 0,
+            last_action: None,
+            capabilities: None,
+            light_icons: WidgetAssets::tabler_subset(
+                Color::from_srgb8(82, 82, 91),
+                SPOTLIGHT_ICONS,
+            ),
+            dark_icons: WidgetAssets::tabler_subset(
+                Color::from_srgb8(212, 212, 216),
+                SPOTLIGHT_ICONS,
+            ),
+            selected_icons: WidgetAssets::tabler_subset(Color::WHITE, SPOTLIGHT_ICONS),
+        }
+    }
 }
 
 impl AppModel for SpotlightShowcase {
@@ -39,22 +117,22 @@ impl AppModel for SpotlightShowcase {
             AppEvent::Ui { window, event } => match (event.target_key(), &event.kind) {
                 (Some(SEARCH_KEY), UiEventKind::TextChanged(value)) => {
                     self.query.clone_from(value);
+                    self.selected_result = 0;
+                    self.last_action = None;
                     rebuild(window)
+                }
+                (Some(key), UiEventKind::Click(_)) if key.starts_with(RESULT_KEY_PREFIX) => {
+                    if self.activate_result(&key[RESULT_KEY_PREFIX.len()..]) {
+                        rebuild(window)
+                    } else {
+                        AppUpdate::none()
+                    }
                 }
                 (Some("minimize"), UiEventKind::Click(_)) => {
                     AppUpdate::none().command(AppCommand::MinimizeWindow(window.clone()))
                 }
-                (Some("close"), UiEventKind::Click(_)) => {
-                    AppUpdate::none().command(AppCommand::Quit)
-                }
-                (Some("passthrough"), UiEventKind::Click(_))
-                    if self.passthrough_remaining.is_none() =>
-                {
-                    self.passthrough_remaining = Some(PASSTHROUGH_TIME);
-                    rebuild(window).command(AppCommand::SetWindowMousePassthrough {
-                        window: window.clone(),
-                        passthrough: true,
-                    })
+                (Some("hide"), UiEventKind::Click(_)) => {
+                    AppUpdate::none().command(AppCommand::HideWindow(window.clone()))
                 }
                 _ => AppUpdate::none(),
             },
@@ -63,63 +141,124 @@ impl AppModel for SpotlightShowcase {
                 event: PlatformEvent::Opened { capabilities, .. },
             } => {
                 self.capabilities = Some(*capabilities);
-                rebuild(window)
+                let update = rebuild(window);
+                if capabilities.window_level {
+                    update.command(AppCommand::SetWindowLevel {
+                        window: window.clone(),
+                        level: argui_platform::WindowLevel::AlwaysOnTop,
+                    })
+                } else {
+                    update
+                }
+            }
+            AppEvent::Window {
+                window,
+                event: PlatformEvent::Keyboard(input),
+            } if input.state == KeyState::Pressed => {
+                if self.handle_launcher_key(input) {
+                    rebuild(window)
+                } else {
+                    AppUpdate::none()
+                }
             }
             AppEvent::Window { .. }
             | AppEvent::WindowReady { .. }
             | AppEvent::WindowFailed { .. }
             | AppEvent::Tray(_) => AppUpdate::none(),
+            AppEvent::GlobalShortcut(event)
+                if event.id.as_str() == SPOTLIGHT_SHORTCUT_ID
+                    && event.state == GlobalShortcutState::Pressed =>
+            {
+                AppUpdate::none().command(AppCommand::FocusWindow(WindowKey::main()))
+            }
+            AppEvent::GlobalShortcut(_) => AppUpdate::none(),
         }
     }
 
-    fn animation_frame(&mut self, window: &WindowKey, frame: Frame) -> AppUpdate {
-        let Some(remaining) = self.passthrough_remaining else {
-            return AppUpdate::none();
-        };
-        let remaining = remaining - frame.elapsed;
-        if remaining == Duration::ZERO {
-            self.passthrough_remaining = None;
-            rebuild(window).command(AppCommand::SetWindowMousePassthrough {
-                window: window.clone(),
-                passthrough: false,
-            })
-        } else {
-            self.passthrough_remaining = Some(remaining);
-            AppUpdate::none()
-        }
-    }
-
-    fn wants_animation_frame(&self, window: &WindowKey) -> bool {
-        window == &WindowKey::main() && self.passthrough_remaining.is_some()
+    fn vector_assets(&self) -> Vec<VectorAsset> {
+        self.light_icons
+            .assets()
+            .iter()
+            .chain(self.dark_icons.assets())
+            .chain(self.selected_icons.assets())
+            .cloned()
+            .collect()
     }
 }
 
 impl SpotlightShowcase {
+    /// Returns the result records matching the current controlled query.
+    fn matching_results(&self) -> Vec<SpotlightResult> {
+        let query = self.query.trim().to_lowercase();
+        SPOTLIGHT_RESULTS
+            .into_iter()
+            .filter(|result| {
+                query.is_empty()
+                    || result.label.to_lowercase().contains(&query)
+                    || result.description.to_lowercase().contains(&query)
+            })
+            .collect()
+    }
+
+    /// Applies launcher navigation or activation for a window key press.
+    fn handle_launcher_key(&mut self, input: &KeyInput) -> bool {
+        let results = self.matching_results();
+        if results.is_empty() {
+            return false;
+        }
+        match input.key {
+            Key::ArrowDown => {
+                self.selected_result = (self.selected_result + 1) % results.len();
+                true
+            }
+            Key::ArrowUp => {
+                self.selected_result = (self.selected_result + results.len() - 1) % results.len();
+                true
+            }
+            Key::Enter if !input.repeat => {
+                let result = results[self.selected_result.min(results.len() - 1)];
+                self.last_action = Some(format!("Activated · {}", result.label));
+                true
+            }
+            _ => false,
+        }
+    }
+
+    /// Selects and activates the visible result identified by `id`.
+    fn activate_result(&mut self, id: &str) -> bool {
+        let results = self.matching_results();
+        let Some((index, result)) = results
+            .into_iter()
+            .enumerate()
+            .find(|(_, result)| result.id == id)
+        else {
+            return false;
+        };
+        self.selected_result = index;
+        self.last_action = Some(format!("Activated · {}", result.label));
+        true
+    }
+
     fn window(&self, environment: WindowEnvironment) -> Element {
         let theme = shadcn(&environment);
         let theme = theme.resolve(environment.color_scheme);
+        let icons = match environment.color_scheme {
+            ColorScheme::Light => &self.light_icons,
+            ColorScheme::Dark => &self.dark_icons,
+        };
+        let glass = DesktopBackdrop::new(theme.card.with_alpha(0.76), theme.card.with_alpha(0.97))
+            .inactive_tint(theme.card.with_alpha(0.88))
+            .inactive_fallback(theme.card.with_alpha(0.985));
         let panel = Element::column([
-            self.title_bar(theme),
-            Element::column([
-                Input::new(
-                    SEARCH_KEY,
-                    &self.query,
-                    "Search commands, files and settings",
-                    theme.input(),
-                )
-                .build(),
-                self.results(theme),
-                self.footer(theme),
-            ])
-            .padding(Sides::length(18.0))
-            .gap(14.0)
-            .grow(1.0),
+            self.title_bar(theme, icons),
+            self.results(theme, icons),
+            self.footer(theme, icons),
         ])
+        .keyed("spotlight-panel")
         .width(percent(1.0))
         .height(percent(1.0))
-        .background(theme.card)
         .border(Border::all(1.0, theme.border))
-        .radius(CornerRadii::all(PANEL_RADIUS))
+        .desktop_backdrop(glass)
         .overflow(Axes {
             x: Overflow::Hidden,
             y: Overflow::Hidden,
@@ -129,38 +268,47 @@ impl SpotlightShowcase {
             initial: Some(InitialFocus::Target(FocusTarget::from(SEARCH_KEY))),
             restore: false,
         });
+        let panel = AnimatedContainer::from_element(panel)
+            .radius(CornerRadii::all(if self.query.is_empty() {
+                PANEL_RADIUS
+            } else {
+                PANEL_RADIUS + 2.0
+            }))
+            .duration(Duration::from_millis(220))
+            .curve(curves::EMPHASIZED)
+            .build();
         Element::container([panel])
             .width(percent(1.0))
             .height(percent(1.0))
+            .background(Color::TRANSPARENT)
     }
 
-    fn title_bar(&self, theme: &argui_widgets::WidgetTheme) -> Element {
-        let title = Element::column([
-            Element::text("Argui Spotlight").text_style(TextStyle {
-                color: theme.foreground,
-                font_size: 14.0,
-                line_height: 18.0,
-                weight: 650,
-                ..TextStyle::default()
-            }),
-            Element::text(self.backend_label()).text_style(TextStyle {
-                color: theme.muted_foreground,
-                font_size: 11.0,
-                line_height: 14.0,
-                ..TextStyle::default()
-            }),
-        ])
-        .gap(1.0);
-        let controls = Element::row([
-            compact_button("minimize", "Minimize", theme),
-            compact_button("close", "Close", theme),
-        ])
-        .gap(8.0);
-        Element::row([title, controls])
-            .height(length(58.0))
-            .padding(sides(18.0, 12.0))
-            .align_items(AlignItems::CENTER)
-            .justify_content(JustifyContent::SPACE_BETWEEN)
+    fn title_bar(&self, theme: &argui_widgets::WidgetTheme, icons: &WidgetAssets) -> Element {
+        let search_quad = QuadStyle::solid(Color::TRANSPARENT).radius(CornerRadii::all(13.0));
+        let mut search_style = theme.input();
+        search_style.layout.size.height = length(54.0);
+        search_style.layout.padding = sides(50.0, 14.0);
+        search_style.paint = PaintStyle::new(search_quad.clone());
+        search_style.hovered = argui_ui::StylePatch::from_quad(search_quad.clone());
+        search_style.focused = argui_ui::StylePatch::from_quad(search_quad);
+        search_style.text.font_size = 17.0;
+        search_style.text.line_height = 22.0;
+        search_style.text.weight = 500;
+        search_style.placeholder.font_size = 17.0;
+        search_style.placeholder.line_height = 22.0;
+        let search = Input::new(
+            SEARCH_KEY,
+            &self.query,
+            "Search apps and commands…",
+            search_style,
+        )
+        .kind(InputKind::Search)
+        .label("Search apps and commands")
+        .leading(icons.icon(TablerIcon::Search, 21.0), 48.0)
+        .build();
+        Element::container([search])
+            .height(length(74.0))
+            .padding(sides(10.0, 9.0))
             .border(Border {
                 widths: BorderWidths {
                     bottom: 1.0,
@@ -168,62 +316,142 @@ impl SpotlightShowcase {
                 },
                 color: theme.border,
             })
-            .interaction(
-                Interaction::default().window_drag(WindowDragBehavior::MoveAndToggleMaximize),
-            )
     }
 
-    fn results(&self, theme: &argui_widgets::WidgetTheme) -> Element {
-        let query = self.query.trim().to_lowercase();
-        let candidates = [
-            ("Open command palette", "Navigation"),
-            ("Toggle DevTools", "Developer"),
-            ("Switch color theme", "Appearance"),
-            ("Inspect GPU frame", "Performance"),
-        ];
-        let rows = candidates
+    fn results(&self, theme: &argui_widgets::WidgetTheme, icons: &WidgetAssets) -> Element {
+        let rows = self
+            .matching_results()
             .into_iter()
-            .filter(|(label, category)| {
-                query.is_empty()
-                    || label.to_lowercase().contains(&query)
-                    || category.to_lowercase().contains(&query)
+            .enumerate()
+            .map(|(index, result)| {
+                result_row(
+                    (
+                        result.id,
+                        result.label,
+                        result.description,
+                        result.shortcut,
+                        result.icon,
+                    ),
+                    index,
+                    index == self.selected_result,
+                    theme,
+                    icons,
+                    &self.selected_icons,
+                )
             })
-            .map(|(label, category)| result_row(label, category, theme));
-        Element::column(rows)
-            .background(with_alpha(theme.muted, 0.62))
-            .radius(CornerRadii::all(10.0))
-            .padding(Sides::length(6.0))
-            .gap(3.0)
-            .grow(1.0)
-    }
-
-    fn footer(&self, theme: &argui_widgets::WidgetTheme) -> Element {
-        let active = self.passthrough_remaining.is_some();
-        let status = if active {
-            "Input passes through this overlay for two seconds"
-        } else {
-            "Drag the header · double-click it to maximize"
-        };
-        Element::row([
-            Element::text(status).text_style(TextStyle {
+            .collect::<Vec<_>>();
+        let count = rows.len();
+        let query_empty = self.query.trim().is_empty();
+        let heading = Element::row([
+            Element::text(if query_empty {
+                "SUGGESTIONS".to_owned()
+            } else {
+                format!("{count} RESULT{}", if count == 1 { "" } else { "S" })
+            })
+            .text_style(TextStyle {
                 color: theme.muted_foreground,
-                font_size: 12.0,
-                line_height: 16.0,
+                font_size: 10.0,
+                line_height: 14.0,
+                weight: 750,
                 ..TextStyle::default()
             }),
-            Button::new(
-                "passthrough",
-                if active {
-                    "Click-through active"
-                } else {
-                    "Click-through 2 s"
-                },
-                compact_style(theme),
-            )
-            .build(),
+            Element::text(self.backend_label()).text_style(TextStyle {
+                color: theme.muted_foreground,
+                font_size: 10.0,
+                line_height: 14.0,
+                weight: 500,
+                ..TextStyle::default()
+            }),
         ])
+        .padding(sides(10.0, 2.0))
+        .justify_content(JustifyContent::SPACE_BETWEEN);
+        AnimatedContainer::from_element(
+            Element::column([heading, Element::column(rows).gap(4.0).grow(1.0)])
+                .keyed("spotlight-results")
+                .padding(sides(12.0, 8.0))
+                .gap(6.0)
+                .grow(1.0),
+        )
+        .background(if query_empty {
+            Color::TRANSPARENT
+        } else {
+            with_alpha(theme.primary, 0.035)
+        })
+        .radius(CornerRadii::all(if query_empty { 12.0 } else { 16.0 }))
+        .duration(Duration::from_millis(180))
+        .curve(curves::EASE_OUT)
+        .build()
+    }
+
+    fn footer(&self, theme: &argui_widgets::WidgetTheme, icons: &WidgetAssets) -> Element {
+        let status = self.last_action.as_deref().unwrap_or_else(|| {
+            if self
+                .capabilities
+                .is_some_and(|capabilities| capabilities.backend == WindowBackend::Web)
+            {
+                "Web preview"
+            } else {
+                "ARGUI · Ctrl+Space reopens after hiding"
+            }
+        });
+        let brand = Element::row([
+            icons.icon(TablerIcon::Search, 13.0),
+            Element::text(status)
+                .text_style(TextStyle {
+                    color: theme.muted_foreground,
+                    font_size: 10.0,
+                    line_height: 14.0,
+                    weight: 750,
+                    ..TextStyle::default()
+                })
+                .semantics(
+                    Semantics::new(Role::Status)
+                        .label(status)
+                        .live(LiveRegion::Polite),
+                ),
+        ])
+        .gap(7.0)
+        .align_items(AlignItems::CENTER);
+        let mut actions = vec![
+            shortcut_hint("UP/DN", "Navigate", theme),
+            shortcut_hint("ENTER", "Open", theme),
+        ];
+        if self
+            .capabilities
+            .is_some_and(|capabilities| capabilities.minimize)
+        {
+            actions.push(compact_button(
+                "minimize",
+                "Minimize",
+                TablerIcon::Minus,
+                theme,
+                icons,
+            ));
+            actions.push(compact_button(
+                "hide",
+                "Hide Spotlight — Ctrl+Space to reopen",
+                TablerIcon::ChevronDown,
+                theme,
+                icons,
+            ));
+        }
+        Element::row([
+            brand,
+            Element::row(actions)
+                .gap(7.0)
+                .align_items(AlignItems::CENTER),
+        ])
+        .height(length(50.0))
+        .padding(sides(18.0, 8.0))
         .align_items(AlignItems::CENTER)
         .justify_content(JustifyContent::SPACE_BETWEEN)
+        .border(Border {
+            widths: BorderWidths {
+                top: 1.0,
+                ..BorderWidths::default()
+            },
+            color: theme.border,
+        })
     }
 
     fn backend_label(&self) -> String {
@@ -243,67 +471,11 @@ impl SpotlightShowcase {
         if capabilities.window_level {
             format!("{backend} · always on top")
         } else {
-            format!("{backend} · always on top unavailable")
+            backend.into()
         }
     }
 }
 
-fn result_row(label: &str, category: &str, theme: &argui_widgets::WidgetTheme) -> Element {
-    Element::row([
-        Element::text(label).text_style(TextStyle {
-            color: theme.foreground,
-            font_size: 14.0,
-            line_height: 20.0,
-            weight: 550,
-            ..TextStyle::default()
-        }),
-        Element::text(category).text_style(TextStyle {
-            color: theme.muted_foreground,
-            font_size: 12.0,
-            line_height: 18.0,
-            ..TextStyle::default()
-        }),
-    ])
-    .padding(sides(10.0, 9.0))
-    .align_items(AlignItems::CENTER)
-    .justify_content(JustifyContent::SPACE_BETWEEN)
-}
-
-fn compact_button(key: &str, label: &str, theme: &argui_widgets::WidgetTheme) -> Element {
-    Button::new(key, label, compact_style(theme)).build()
-}
-
-fn compact_style(theme: &argui_widgets::WidgetTheme) -> ButtonStyle {
-    let mut style = ButtonStyle::new(
-        PaintStyle::new(
-            QuadStyle::solid(theme.card)
-                .border(Border::all(1.0, theme.border))
-                .radius(CornerRadii::all(7.0)),
-        ),
-        TextStyle {
-            color: theme.foreground,
-            font_size: 12.0,
-            line_height: 16.0,
-            weight: 600,
-            ..TextStyle::default()
-        },
-    );
-    style.layout.padding = sides(10.0, 7.0);
-    style.hovered = argui_ui::StylePatch::from_quad(
-        QuadStyle::solid(theme.muted).radius(CornerRadii::all(7.0)),
-    );
-    style.pressed = argui_ui::StylePatch::from_quad(
-        QuadStyle::solid(theme.muted)
-            .radius(CornerRadii::all(7.0))
-            .opacity(0.76),
-    );
-    style
-}
-
 fn rebuild(window: &WindowKey) -> AppUpdate {
     AppUpdate::none().window(window.clone(), ViewUpdate::Rebuild)
-}
-
-fn with_alpha(color: Color, alpha: f32) -> Color {
-    color.with_alpha(alpha)
 }

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use wasm_bindgen::{JsCast, JsValue, closure::Closure};
 use web_sys::{
     Element, Event, HtmlCanvasElement, HtmlElement, HtmlInputElement, HtmlTextAreaElement,
-    KeyboardEvent,
+    KeyboardEvent, KeyboardEventInit,
 };
 
 use crate::{
@@ -33,6 +33,55 @@ pub struct DomTree {
 }
 
 impl DomTree {
+    /// Focuses the native HTML editor that mirrors `id` on touch-capable Web devices.
+    ///
+    /// Mobile browsers only show their virtual keyboard for a real input or
+    /// textarea. `id` identifies the currently focused semantic editor; `None`
+    /// returns focus to the canvas when this bridge owns DOM focus.
+    pub fn sync_touch_text_input(&self, id: Option<SemanticNodeId>) {
+        let touch_capable = self
+            .canvas
+            .owner_document()
+            .and_then(|document| document.default_view())
+            .is_some_and(|window| {
+                window.navigator().max_touch_points() > 0
+                    && window
+                        .match_media("(pointer: coarse)")
+                        .ok()
+                        .flatten()
+                        .is_some_and(|query| query.matches())
+            });
+        if !touch_capable {
+            return;
+        }
+        let control = id
+            .and_then(|id| self.nodes.get(&id))
+            .filter(|node| !node.semantics.state.disabled && !node.semantics.state.read_only)
+            .map(|node| &node.element)
+            .filter(|element| {
+                element.dyn_ref::<HtmlInputElement>().is_some()
+                    || element.dyn_ref::<HtmlTextAreaElement>().is_some()
+            });
+        if let Some(control) = control.and_then(|element| element.dyn_ref::<HtmlElement>()) {
+            let _ = control.focus();
+        } else if self.has_text_input_focus() {
+            let _ = self.canvas.focus();
+        }
+    }
+
+    /// Returns whether one of this tree's HTML input mirrors currently owns DOM focus.
+    #[must_use]
+    pub fn has_text_input_focus(&self) -> bool {
+        self.canvas
+            .owner_document()
+            .and_then(|document| document.active_element())
+            .is_some_and(|element| {
+                self.root.contains(Some(&element))
+                    && (element.dyn_ref::<HtmlInputElement>().is_some()
+                        || element.dyn_ref::<HtmlTextAreaElement>().is_some())
+            })
+    }
+
     /// Updates the native password control without storing its secret in semantic snapshots.
     ///
     /// # Arguments
@@ -175,6 +224,7 @@ impl DomTree {
                 node.id,
                 &node.semantics.actions,
                 &element,
+                &self.canvas,
                 std::rc::Rc::clone(&self.on_action),
             )?;
             apply_attributes(&element, node, &self.root.id())?;
@@ -285,6 +335,7 @@ fn handlers(
     id: SemanticNodeId,
     actions: &[SemanticAction],
     element: &Element,
+    canvas: &HtmlCanvasElement,
     callback: std::rc::Rc<dyn Fn(SemanticRequest)>,
 ) -> Result<Vec<EventHandler>, JsValue> {
     let mut output = Vec::new();
@@ -330,6 +381,9 @@ fn handlers(
         });
         element.add_event_listener_with_callback("input", handler.as_ref().unchecked_ref())?;
         output.push(handler);
+        for event_name in ["keydown", "keyup"] {
+            output.push(forward_editor_navigation_key(element, canvas, event_name)?);
+        }
     }
     if actions.contains(&SemanticAction::Increment) || actions.contains(&SemanticAction::Decrement)
     {
@@ -358,4 +412,46 @@ fn handlers(
         output.push(handler);
     }
     Ok(output)
+}
+
+/// Forwards launcher-style navigation keys from a mirrored HTML editor to the canvas.
+///
+/// `element` is the focused input mirror, `canvas` owns Winit's keyboard
+/// listener, and `event_name` is either `keydown` or `keyup`.
+///
+/// # Errors
+/// Returns a JavaScript error when the DOM listener cannot be installed.
+fn forward_editor_navigation_key(
+    element: &Element,
+    canvas: &HtmlCanvasElement,
+    event_name: &'static str,
+) -> Result<EventHandler, JsValue> {
+    let canvas = canvas.clone();
+    let handler = Closure::new(move |event: Event| {
+        let Some(event) = event.dyn_ref::<KeyboardEvent>() else {
+            return;
+        };
+        if !matches!(
+            event.key().as_str(),
+            "ArrowDown" | "ArrowUp" | "Enter" | "Escape"
+        ) {
+            return;
+        }
+        event.prevent_default();
+        event.stop_propagation();
+        let init = KeyboardEventInit::new();
+        init.set_key(&event.key());
+        init.set_code(&event.code());
+        init.set_location(event.location());
+        init.set_repeat(event.repeat());
+        init.set_ctrl_key(event.ctrl_key());
+        init.set_shift_key(event.shift_key());
+        init.set_alt_key(event.alt_key());
+        init.set_meta_key(event.meta_key());
+        if let Ok(forwarded) = KeyboardEvent::new_with_keyboard_event_init_dict(event_name, &init) {
+            let _ = canvas.dispatch_event(&forwarded);
+        }
+    });
+    element.add_event_listener_with_callback(event_name, handler.as_ref().unchecked_ref())?;
+    Ok(handler)
 }

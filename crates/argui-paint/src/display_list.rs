@@ -18,6 +18,7 @@ pub enum DisplayCommand {
         block: usize,
         transform: Affine2D,
         clips: ClipChain,
+        backdrop: Option<argui_core::Color>,
     },
     BeginLayer(LayerStyle),
     EndLayer,
@@ -111,10 +112,26 @@ impl DisplayList {
     /// Appends a text block with an affine transform and clip chain.
     /// * `clips` — clipping regions applied to the text block.
     pub fn push_text_transformed(&mut self, block: usize, transform: Affine2D, clips: ClipChain) {
+        self.push_text_with_backdrop(block, transform, clips, None);
+    }
+
+    /// Appends a transformed text block with an optional known opaque backdrop.
+    ///
+    /// `block` identifies the prepared text block, `transform` places it in surface space,
+    /// `clips` constrains its pixels, and `backdrop` supplies the resolved solid color directly
+    /// behind the glyphs when painting can determine it exactly.
+    pub fn push_text_with_backdrop(
+        &mut self,
+        block: usize,
+        transform: Affine2D,
+        clips: ClipChain,
+        backdrop: Option<argui_core::Color>,
+    ) {
         self.commands.push(DisplayCommand::Text {
             block,
             transform,
             clips,
+            backdrop,
         });
     }
 

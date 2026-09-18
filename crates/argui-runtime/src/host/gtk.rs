@@ -41,6 +41,9 @@ impl WindowHost for GtkHost {
     fn focus_window(&self) {
         self.platform.native().set_focus();
     }
+    fn activate_window(&self, token: &str) -> Result<bool, String> {
+        argui_platform::activate_wayland_window(self.platform.native(), token)
+    }
     fn set_title(&self, title: &str) {
         self.platform.native().set_title(title);
     }

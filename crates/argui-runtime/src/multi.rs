@@ -17,6 +17,7 @@ use argui_ui::Element;
 
 mod command;
 mod event_loop;
+mod global_shortcuts;
 #[cfg(all(feature = "webview", target_os = "linux"))]
 pub(crate) mod gtk;
 mod lifecycle;
@@ -55,6 +56,19 @@ pub(crate) struct MultiApplication {
     native_tray: Option<argui_platform::NativeTray>,
     #[cfg(any(not(feature = "tray"), target_arch = "wasm32"))]
     tray_unavailable_announced: bool,
+    #[cfg(all(
+        feature = "global-shortcuts",
+        any(target_os = "linux", target_os = "windows", target_os = "macos")
+    ))]
+    native_global_shortcuts: Option<argui_platform::NativeGlobalShortcuts>,
+    #[cfg(all(feature = "global-shortcuts", target_os = "linux"))]
+    global_shortcut_setup_error: Option<String>,
+    pending_activation_token: Option<String>,
+    #[cfg(not(all(
+        feature = "global-shortcuts",
+        any(target_os = "linux", target_os = "windows", target_os = "macos")
+    )))]
+    global_shortcuts_unavailable_announced: bool,
     #[cfg(not(target_arch = "wasm32"))]
     pub(crate) fatal_error: Option<RuntimeError>,
 }
@@ -91,6 +105,14 @@ impl MultiApplication {
         let model = crate::hot_reload::app_model(model);
         #[cfg(not(all(feature = "hot-reload", debug_assertions, not(target_arch = "wasm32"))))]
         let model: Box<dyn AppModel> = Box::new(model);
+        #[cfg(all(feature = "global-shortcuts", target_os = "linux"))]
+        let global_shortcut_setup_error = (!config.global_shortcuts.is_empty()
+            && std::env::var_os("WAYLAND_DISPLAY").is_some())
+        .then(|| {
+            argui_platform::prepare_wayland_global_shortcuts(config.identity.linux_application_id())
+                .err()
+        })
+        .flatten();
         Ok(Self {
             config,
             renderer_config,
@@ -109,6 +131,19 @@ impl MultiApplication {
             native_tray: None,
             #[cfg(any(not(feature = "tray"), target_arch = "wasm32"))]
             tray_unavailable_announced: false,
+            #[cfg(all(
+                feature = "global-shortcuts",
+                any(target_os = "linux", target_os = "windows", target_os = "macos")
+            ))]
+            native_global_shortcuts: None,
+            #[cfg(all(feature = "global-shortcuts", target_os = "linux"))]
+            global_shortcut_setup_error,
+            pending_activation_token: None,
+            #[cfg(not(all(
+                feature = "global-shortcuts",
+                any(target_os = "linux", target_os = "windows", target_os = "macos")
+            )))]
+            global_shortcuts_unavailable_announced: false,
             #[cfg(not(target_arch = "wasm32"))]
             fatal_error: None,
         })

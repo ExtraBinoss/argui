@@ -29,6 +29,9 @@ web-sys = { workspace = true, features = [
     "HtmlInputElement",
     "HtmlTextAreaElement",
     "KeyboardEvent",
+    "KeyboardEventInit",
+    "MediaQueryList",
+    "Navigator",
     "Node",
     "Window",
 ] }

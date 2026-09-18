@@ -59,7 +59,7 @@ runtime update what changed. The same rendering stack runs on desktop,
 WebAssembly and the opt-in Android/iOS shells.
 
 - **Responsive by design.** Flex and grid layout, light and dark themes, animation and virtualized lists.
-- **Accessible controls.** Keyboard navigation, focus, text editing, native AccessKit integration and browser semantics.
+- **Accessible controls.** Keyboard navigation, focus, text editing, native AccessKit integration, browser semantics and mobile Web virtual keyboards.
 - **GPU effects.** Custom WGSL shaders, gradients, shadows, blur and liquid glass.
 - **Retained GPU canvases.** Embed bounded application WGPU compute/render viewports while Argui preserves layout, clipping, effects, input and presentation.
 - **Native integrations.** Multiple windows, file pickers, trays, WebViews and popovers that can extend beyond the window on supported backends.
@@ -84,13 +84,13 @@ for workloads, memory figures and reproduction commands.
 - [x] Retained custom WGPU canvases with native and WebAssembly/WebGPU support
 - [x] Fluent localization through the optional `i18n` feature
 - [x] State-preserving Subsecond patches through the optional `hot-reload` feature
-- [x] Optional DevTools, file picker, updater, WebView, tray, native popovers and desktop backdrop
+- [x] Optional DevTools, file picker, updater, WebView, tray, global shortcuts, native popovers and desktop backdrop
 - [x] Android/iOS bootstrap crates, safe areas and packaged Widget Gallery CI artifacts
 - [x] Local typed widget callbacks and renderer-independent application tests
 
 The public integration flags are `i18n`, `hot-reload`, `tasks`, `devtools`,
 `devtools-all-smi`, `file-picker`, `updater`, `widget-updater`,
-`webview`, `tray`, `native-popups`, `desktop-backdrop` and `widgets-all`.
+`webview`, `tray`, `global-shortcuts`, `native-popups`, `desktop-backdrop` and `widgets-all`.
 `argui-effects` additionally exposes `artistic`, `blur`, `color`, `liquid-glass`,
 `refraction`, `scroll` and `shadow`. Every flag is opt-in; `argui` has no default
 feature bundle.
@@ -116,6 +116,7 @@ feature bundle.
 | Signed native update engine and dialog | `updater`, `widget-updater` | Desktop |
 | Retained WebViews | `webview` | Desktop and browser frame support |
 | System tray | `tray` | Linux, Windows, macOS |
+| Global keyboard shortcuts | `global-shortcuts` | Windows, macOS, Linux X11/Wayland |
 | Windows outside the main surface | `native-popups` | Linux, Windows, macOS |
 | Acrylic, Mica and native blur materials | `desktop-backdrop` | Linux, Windows, macOS |
 

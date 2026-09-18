@@ -26,6 +26,13 @@ pub(crate) trait WindowHost {
     fn set_visible(&self, visible: bool);
     fn is_visible(&self) -> Option<bool>;
     fn focus_window(&self);
+    /// Attempts compositor-authorized activation with a platform token.
+    ///
+    /// `token` originates from a trusted desktop integration such as the
+    /// Wayland global-shortcuts portal. Returns whether activation was submitted.
+    fn activate_window(&self, _token: &str) -> Result<bool, String> {
+        Ok(false)
+    }
     fn set_title(&self, title: &str);
     fn set_minimized(&self, minimized: bool);
     fn is_minimized(&self) -> Option<bool>;
@@ -69,6 +76,17 @@ impl WindowHost for Arc<Window> {
     }
     fn focus_window(&self) {
         self.as_ref().focus_window();
+    }
+    fn activate_window(&self, token: &str) -> Result<bool, String> {
+        #[cfg(all(feature = "global-shortcuts", target_os = "linux"))]
+        {
+            argui_platform::activate_wayland_window(self.as_ref(), token)
+        }
+        #[cfg(not(all(feature = "global-shortcuts", target_os = "linux")))]
+        {
+            let _ = token;
+            Ok(false)
+        }
     }
     fn set_title(&self, title: &str) {
         self.as_ref().set_title(title);
@@ -174,6 +192,9 @@ impl<T: WindowHost + ?Sized> WindowHost for std::rc::Rc<T> {
     }
     fn focus_window(&self) {
         self.as_ref().focus_window();
+    }
+    fn activate_window(&self, token: &str) -> Result<bool, String> {
+        self.as_ref().activate_window(token)
     }
     fn set_title(&self, title: &str) {
         self.as_ref().set_title(title);

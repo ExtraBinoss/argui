@@ -28,6 +28,7 @@ desktop = [
     "basic",
     "desktop-backdrop",
     "file-picker",
+    "global-shortcuts",
     "native-popups",
     "tray",
     "updater",
@@ -36,6 +37,7 @@ desktop = [
 ]
 web = ["basic", "webview"]
 hot-reload = ["argui-runtime/hot-reload"]
+global-shortcuts = ["argui-platform/global-shortcuts", "argui-runtime/global-shortcuts"]
 i18n = ["dep:argui-i18n"]
 updater = ["dep:argui-updater", "argui-updater/native"]
 widget-updater = ["argui-widgets/updater"]

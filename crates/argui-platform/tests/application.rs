@@ -1,6 +1,6 @@
 use argui_platform::{
-    ApplicationConfig, ApplicationId, ApplicationIdentity, IconSet, TrayAction, TrayConfig,
-    TrayItemId, TrayMenuItem, WindowConfig, WindowKey, WindowSpec,
+    ApplicationConfig, ApplicationId, ApplicationIdentity, GlobalShortcut, IconSet, TrayAction,
+    TrayConfig, TrayItemId, TrayMenuItem, WindowConfig, WindowKey, WindowSpec,
 };
 
 fn identity() -> ApplicationIdentity {
@@ -79,4 +79,33 @@ fn invalid_configuration_diagnostics_identify_the_offending_window_or_tray() {
         ApplicationConfigError::InvalidTray("duplicate action".into()).to_string(),
         "duplicate action"
     );
+    assert_eq!(
+        ApplicationConfigError::InvalidGlobalShortcut("duplicate shortcut".into()).to_string(),
+        "duplicate shortcut"
+    );
+}
+
+#[test]
+fn application_configs_validate_global_shortcuts() {
+    let valid = ApplicationConfig::new(identity(), WindowConfig::default())
+        .with_global_shortcut(GlobalShortcut::new("spotlight", "CmdOrCtrl+Space"));
+    assert_eq!(valid.global_shortcuts.len(), 1);
+    assert!(valid.validate().is_ok());
+
+    for shortcuts in [
+        vec![GlobalShortcut::new("", "Ctrl+Space")],
+        vec![GlobalShortcut::new("open", "  ")],
+        vec![
+            GlobalShortcut::new("open", "Ctrl+Space"),
+            GlobalShortcut::new("open", "Ctrl+KeyK"),
+        ],
+        vec![
+            GlobalShortcut::new("open", "Ctrl+Space"),
+            GlobalShortcut::new("search", "ctrl+space"),
+        ],
+    ] {
+        let mut invalid = ApplicationConfig::new(identity(), WindowConfig::default());
+        invalid.global_shortcuts = shortcuts;
+        assert!(invalid.validate().is_err());
+    }
 }

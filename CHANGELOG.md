@@ -8,6 +8,10 @@ that do not use them.
 
 ### Added
 
+- Added cross-platform global shortcuts, tray-backed hide/reopen lifecycle,
+  Wayland portal activation, and the native/WebAssembly **Spotlight** app
+  example with animated search, keyboard navigation, SVG icons, and desktop
+  backdrop integration.
 - Added `AnimatedOpacity` and `AnimatedContainer` implicit target-value widgets,
   a public user-implementable `Curve` trait, nine named curve presets, and a
   twenty-example Animation Laboratory covering keyframes, orchestration,
@@ -90,6 +94,9 @@ that do not use them.
 
 ### Fixed
 
+- Made WebAssembly text fields request the mobile software keyboard, improved
+  glyph edge fidelity over saturated solid colors, and kept Spotlight result
+  text pixel-aligned while animated selection colors and radii transition.
 - Replaced unsupported checklist glyphs in the clean-code documentation example
   with explicit status labels, and made each completion step visible in the
   button label before its final disabled state.

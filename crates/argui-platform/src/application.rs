@@ -1,6 +1,9 @@
 use std::collections::HashSet;
 
-use crate::{ApplicationIdentity, PreferenceOverrides, TrayConfig, WindowKey, WindowSpec};
+use crate::{
+    ApplicationIdentity, GlobalShortcut, PreferenceOverrides, TrayConfig, WindowKey, WindowSpec,
+    global_shortcut::validate_global_shortcuts,
+};
 
 #[derive(Clone, Debug, PartialEq)]
 /// Validated application-wide platform configuration.
@@ -11,6 +14,8 @@ pub struct ApplicationConfig {
     pub windows: Vec<WindowSpec>,
     /// Optional system-tray configuration.
     pub tray: Option<TrayConfig>,
+    /// Global keyboard shortcuts requested for the application lifetime.
+    pub global_shortcuts: Vec<GlobalShortcut>,
     /// Explicit overrides for operating-system preferences.
     pub preferences: PreferenceOverrides,
 }
@@ -24,6 +29,7 @@ impl ApplicationConfig {
             identity,
             windows: vec![WindowSpec::new(WindowKey::main(), main_window)],
             tray: None,
+            global_shortcuts: Vec::new(),
             preferences: PreferenceOverrides::default(),
         }
     }
@@ -44,6 +50,15 @@ impl ApplicationConfig {
         self
     }
 
+    /// Adds a global keyboard shortcut requested for the application lifetime.
+    ///
+    /// `shortcut` is registered when the native event loop starts.
+    #[must_use]
+    pub fn with_global_shortcut(mut self, shortcut: GlobalShortcut) -> Self {
+        self.global_shortcuts.push(shortcut);
+        self
+    }
+
     #[must_use]
     /// Sets overrides for preferences detected from the operating system.
     /// `preferences` contains optional explicit settings.
@@ -52,10 +67,10 @@ impl ApplicationConfig {
         self
     }
 
-    /// Checks that window keys are unique and any tray configuration is valid.
+    /// Checks that window keys and global shortcuts are unique and the tray is valid.
     ///
     /// # Errors
-    /// Returns an error for an empty or duplicate window key, or an invalid tray configuration.
+    /// Returns an error for an empty or duplicate window key, global shortcut, or invalid tray.
     pub fn validate(&self) -> Result<(), ApplicationConfigError> {
         let mut keys = HashSet::new();
         for window in &self.windows {
@@ -72,6 +87,8 @@ impl ApplicationConfig {
             tray.validate()
                 .map_err(|error| ApplicationConfigError::InvalidTray(error.to_string()))?;
         }
+        validate_global_shortcuts(&self.global_shortcuts)
+            .map_err(|error| ApplicationConfigError::InvalidGlobalShortcut(error.to_string()))?;
         Ok(())
     }
 }
@@ -85,6 +102,8 @@ pub enum ApplicationConfigError {
     DuplicateWindowKey(WindowKey),
     /// The tray configuration failed validation.
     InvalidTray(String),
+    /// The global shortcut configuration failed validation.
+    InvalidGlobalShortcut(String),
 }
 
 impl std::fmt::Display for ApplicationConfigError {
@@ -95,6 +114,7 @@ impl std::fmt::Display for ApplicationConfigError {
                 write!(formatter, "duplicate window key: {}", key.as_str())
             }
             Self::InvalidTray(error) => formatter.write_str(error),
+            Self::InvalidGlobalShortcut(error) => formatter.write_str(error),
         }
     }
 }
