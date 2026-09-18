@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { ArrowUpRight, Box, LoaderCircle, Play, RotateCw, Square, TriangleAlert } from '@lucide/vue'
 import WebGpuHelp from './WebGpuHelp.vue'
-const props = defineProps<{ component?: string | null; app?: 'ai-harness' | 'gpu-canvas' }>()
+const props = defineProps<{
+  component?: string | null
+  app?: 'ai-harness' | 'gpu-canvas' | 'astra-editor'
+}>()
 const emit = defineEmits<{ pageChange: [label: string] }>()
 const asset = usePublicAsset()
 const { t } = useI18n()
@@ -20,19 +23,24 @@ const isApp = computed(() => Boolean(props.app))
 const title = computed(() => {
   if (props.app === 'ai-harness') return t('appExamples.harnessTitle')
   if (props.app === 'gpu-canvas') return t('appExamples.gpuTitle')
+  if (props.app === 'astra-editor') return t('appExamples.astraTitle')
   return 'Argui Widget Gallery'
 })
 const frameTitle = computed(() => {
   if (props.app === 'ai-harness') return t('appExamples.harnessLabel')
   if (props.app === 'gpu-canvas') return t('appExamples.gpuLabel')
+  if (props.app === 'astra-editor') return t('appExamples.astraLabel')
   return t('gallery.label')
 })
-const appLaunchLabel = computed(() =>
-  props.app === 'gpu-canvas' ? t('appExamples.gpuLaunch') : t('appExamples.harnessLaunch'),
-)
+const appLaunchLabel = computed(() => {
+  if (props.app === 'gpu-canvas') return t('appExamples.gpuLaunch')
+  if (props.app === 'astra-editor') return t('appExamples.astraLaunch')
+  return t('appExamples.harnessLaunch')
+})
 const url = computed(() => {
   if (props.app === 'ai-harness') return asset('examples/ai-harness/index.html')
   if (props.app === 'gpu-canvas') return asset('examples/gpu-canvas/index.html')
+  if (props.app === 'astra-editor') return asset('examples/astra-editor/index.html')
   return `${asset('gallery/index.html')}${props.component ? `?component=${encodeURIComponent(props.component)}` : ''}`
 })
 let timer: ReturnType<typeof setTimeout> | undefined

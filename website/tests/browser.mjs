@@ -567,7 +567,7 @@ try {
 
   await page.setViewport({ width: 1000, height: 820 })
   await page.goto(`${origin}/examples`, { waitUntil: 'networkidle0' })
-  assert.equal(await page.$$('.app-example-list button').then((items) => items.length), 3)
+  assert.equal(await page.$$('.app-example-list button').then((items) => items.length), 4)
   assert.equal(await page.$$('.more-example-grid a').then((items) => items.length), 4)
   assert.match(await page.$eval('.app-example-list', (element) => element.textContent), /0\.30 s/)
   assert.match(await page.$eval('.app-example-list', (element) => element.textContent), /0\.79 s/)
@@ -792,6 +792,18 @@ try {
   assert.ok(mobileGpuLayout.canvas <= mobileGpuLayout.viewport)
   assert.equal(mobileGpuLayout.overflow, false)
   await screenshot('app-example-gpu-canvas-mobile')
+
+  await page.setViewport({ width: 1000, height: 820, deviceScaleFactor: 1, isMobile: false })
+  await page.goto(`${origin}/examples`, { waitUntil: 'networkidle0' })
+  await page.click('.app-example-list button:nth-child(4)')
+  await page.waitForFunction(() =>
+    document.querySelector('iframe')?.src.includes('/examples/astra-editor/index.html'),
+  )
+  await page.waitForSelector('.status-dot.live', { timeout: 90_000 })
+  const astraIframe = await page.$('iframe')
+  const astraFrame = await astraIframe.contentFrame()
+  await astraFrame.waitForSelector('[role="application"][aria-label="Astra Editor"]')
+  await screenshot('app-example-astra-editor')
 
   const response = await page.goto(`${origin}/components/does-not-exist`, {
     waitUntil: 'networkidle0',
