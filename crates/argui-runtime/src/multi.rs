@@ -4,9 +4,11 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 #[cfg(all(feature = "tray", not(target_arch = "wasm32")))]
 use crate::AppCommand;
+#[cfg(any(feature = "tasks", all(feature = "tray", not(target_arch = "wasm32"))))]
+use crate::event::UserEvent;
 use crate::{
     AppEvent, AppModel, AppUpdate, Context, Entity, LayoutSnapshot, Render, RuntimeError,
-    RuntimeEvent, ViewUpdate, app::Application, event::UserEvent,
+    RuntimeEvent, ViewUpdate, app::Application,
 };
 use argui_platform::{ApplicationConfig, WindowKey, WindowLevel, WindowSpec};
 #[cfg(all(feature = "tray", not(target_arch = "wasm32")))]
@@ -64,6 +66,7 @@ pub(crate) struct MultiApplication {
     #[cfg(all(feature = "global-shortcuts", target_os = "linux"))]
     global_shortcut_setup_error: Option<String>,
     pending_activation_token: Option<String>,
+    ui_zoom_factor: f32,
     #[cfg(not(all(
         feature = "global-shortcuts",
         any(target_os = "linux", target_os = "windows", target_os = "macos")
@@ -139,6 +142,7 @@ impl MultiApplication {
             #[cfg(all(feature = "global-shortcuts", target_os = "linux"))]
             global_shortcut_setup_error,
             pending_activation_token: None,
+            ui_zoom_factor: 1.0,
             #[cfg(not(all(
                 feature = "global-shortcuts",
                 any(target_os = "linux", target_os = "windows", target_os = "macos")
@@ -199,6 +203,7 @@ impl MultiApplication {
         )
         .identified(self.config.identity.clone(), key.clone())
         .initially_visible(spec.visible)
+        .ui_zoom(self.config.ui_zoom.enabled, self.ui_zoom_factor)
         .preference_overrides(self.config.preferences)
         .shared_renderer_device(Rc::clone(&self.renderer_device));
         if let Some(proxy) = &self.event_proxy {
@@ -242,6 +247,26 @@ impl MultiApplication {
         }
         self.by_native.insert(window_id, key.clone());
         self.windows.insert(key, WindowEntry { spec, runtime });
+    }
+
+    /// Propagates a locally requested accessibility zoom to every open window.
+    ///
+    /// `source` identifies the window that received the keyboard or touch
+    /// gesture. Windows without a pending request leave the global factor unchanged.
+    fn synchronize_ui_zoom(&mut self, source: &WindowKey) {
+        let Some(factor) = self
+            .windows
+            .get_mut(source)
+            .and_then(|entry| entry.runtime.take_ui_zoom_request())
+        else {
+            return;
+        };
+        self.ui_zoom_factor = factor;
+        for (key, entry) in &mut self.windows {
+            if key != source {
+                entry.runtime.install_ui_zoom(factor, false);
+            }
+        }
     }
 
     #[cfg_attr(coverage_nightly, coverage(off))]

@@ -60,15 +60,24 @@ impl Application {
             return;
         };
         #[cfg(not(target_arch = "wasm32"))]
-        let mounts = match (&self.ui_tree, &self.ui_layout) {
+        let mut mounts = match (&self.ui_tree, &self.ui_layout) {
             (Some(ui), Some(layout)) => resolve_mounts(ui, layout, 1),
             _ => Vec::new(),
         };
         #[cfg(target_arch = "wasm32")]
-        let clipped = match (&self.ui_tree, &self.ui_layout) {
+        let mut clipped = match (&self.ui_tree, &self.ui_layout) {
             (Some(ui), Some(layout)) => argui_webview::resolve_clipped_mounts(ui, layout, 1),
             _ => Vec::new(),
         };
+        #[cfg(target_arch = "wasm32")]
+        for (mount, clip) in &mut clipped {
+            mount.bounds = platform_rect(mount.bounds, self.ui_zoom_factor);
+            *clip = clip.map(|clip| platform_rect(clip, self.ui_zoom_factor));
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        for mount in &mut mounts {
+            mount.bounds = platform_rect(mount.bounds, self.ui_zoom_factor);
+        }
         #[cfg(target_arch = "wasm32")]
         let mounts: Vec<_> = clipped.iter().map(|(mount, _)| mount.clone()).collect();
         if let Err(error) = pool.reconcile(&mounts, self.input_epoch.elapsed()) {
@@ -91,4 +100,15 @@ impl Application {
             .and_then(WebViewPool::next_expiry)
             .map(|deadline| self.input_epoch + deadline)
     }
+}
+
+/// Converts an Argui UI rectangle to host-logical coordinates.
+///
+/// `rect` is expressed in zoomed UI units and `factor` is the application UI
+/// zoom. The returned rectangle is suitable for a native or DOM child surface.
+fn platform_rect(rect: argui_core::Rect, factor: f32) -> argui_core::Rect {
+    argui_core::Rect::new(
+        argui_core::Point::new(rect.origin.x * factor, rect.origin.y * factor),
+        argui_core::Size::new(rect.size.width * factor, rect.size.height * factor),
+    )
 }

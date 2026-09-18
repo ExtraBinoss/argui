@@ -43,7 +43,9 @@ mod preferences;
 mod renderer;
 mod scroll;
 mod text_selection;
+mod ui_zoom;
 mod window;
+mod zoom;
 
 enum RendererState {
     Loading,
@@ -106,7 +108,12 @@ pub(crate) struct Application {
     pub(super) prepared_text: Option<PreparedText>,
     pub(super) composite_frame: bool,
     viewport: Size,
+    native_scale_factor: f32,
     pub(super) scale_factor: f32,
+    ui_zoom_enabled: bool,
+    pub(super) ui_zoom_factor: f32,
+    pending_ui_zoom: Option<f32>,
+    touch_zoom: argui_core::PinchRecognizer,
     pointer: Option<Point>,
     pointer_buttons: u16,
     touch_points: HashMap<PointerId, Point>,
@@ -229,7 +236,12 @@ impl Application {
             prepared_text: None,
             composite_frame: false,
             viewport: Size::default(),
+            native_scale_factor: 1.0,
             scale_factor: 1.0,
+            ui_zoom_enabled: true,
+            ui_zoom_factor: 1.0,
+            pending_ui_zoom: None,
+            touch_zoom: argui_core::PinchRecognizer::default(),
             pointer: None,
             pointer_buttons: 0,
             touch_points: HashMap::new(),

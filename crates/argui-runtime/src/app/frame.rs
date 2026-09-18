@@ -183,8 +183,9 @@ impl Application {
     pub(super) fn flush_window_frame(&mut self) {
         let pending = self.pending_window_frame.take();
         let scale_changed = pending.scale().is_some_and(|scale_factor| {
-            let changed = self.scale_factor != scale_factor;
-            self.scale_factor = scale_factor;
+            let changed = self.native_scale_factor != scale_factor;
+            self.native_scale_factor = scale_factor;
+            self.scale_factor = scale_factor * self.ui_zoom_factor;
             changed
         });
         let Some((width, height)) = pending.size() else {

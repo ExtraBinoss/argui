@@ -6,8 +6,18 @@ that do not use them.
 
 ## [Unreleased]
 
+_No changes yet._
+
+## [0.3.0] - 2026-09-18
+
 ### Added
 
+- Added default-on, application-wide UI zoom at the runtime coordinate boundary:
+  `Ctrl`/`Command` with `+`, `-`, `0`, or the wheel works on native and
+  WebAssembly hosts, trackpad and two-finger pinch cover pointer/mobile input,
+  every open window stays synchronized, and `UiZoomConfig::disabled()` provides
+  an opt-out. The core `PinchRecognizer` exposes the same contact-safe gesture
+  primitive to custom integrations.
 - Added cross-platform global shortcuts, tray-backed hide/reopen lifecycle,
   Wayland portal activation, and the native/WebAssembly **Spotlight** app
   example with animated search, keyboard navigation, SVG icons, and desktop
@@ -95,6 +105,9 @@ that do not use them.
 
 ### Fixed
 
+- Recomputed the full logical viewport whenever application UI zoom changes, so
+  responsive roots keep filling their native or WebAssembly window instead of
+  leaving stale-scale gaps along the right and bottom edges.
 - Made WebAssembly text fields request the mobile software keyboard, improved
   glyph edge fidelity over saturated solid colors, and kept Spotlight result
   text pixel-aligned while animated selection colors and radii transition.
@@ -236,6 +249,7 @@ that do not use them.
 - Added Windows and macOS workspace checks, Rust build caching, crates.io archive
   validation and ordered publication of all public crates.
 
+[Unreleased]: https://github.com/ExtraBinoss/argui/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/ExtraBinoss/argui/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/ExtraBinoss/argui/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/ExtraBinoss/argui/releases/tag/v0.2.0
-[Unreleased]: https://github.com/ExtraBinoss/argui/compare/v0.3.0...HEAD

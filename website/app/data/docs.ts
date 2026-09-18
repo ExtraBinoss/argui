@@ -288,6 +288,19 @@ export const docs: DocGuide[] = [
         note: 'Use with_focus_on_launch(true) for a full-page Web app that should accept keyboard input immediately. Leave it disabled for examples embedded in a scrollable site.',
       },
       {
+        id: 'ui-zoom',
+        title: 'Keep accessibility zoom coherent',
+        paragraphs: [
+          'Application-wide UI zoom is enabled by default. Ctrl or Command with + and - changes the zoom on native and WebAssembly hosts, Ctrl or Command with 0 restores 100%, modifier-wheel and trackpad magnification provide continuous desktop zoom, and a two-finger pinch provides the touch equivalent on mobile.',
+          'Argui combines the zoom with native DPI before layout and rendering, so text, geometry, hit testing, scrolling, IME placement, accessibility bounds, popups, backdrops, and hosted WebViews remain aligned. Every open application window receives the same factor through WindowEnvironment::ui_zoom.',
+        ],
+        code: {
+          filename: 'src/main.rs',
+          code: 'use argui::platform::UiZoomConfig;\n\nlet config = ApplicationConfig::new(identity, window)\n    .with_ui_zoom(UiZoomConfig::disabled());',
+        },
+        note: 'Disable the built-in gestures only when the application intentionally owns those shortcuts or pinch input.',
+      },
+      {
         id: 'errors',
         title: 'Keep startup errors visible',
         paragraphs: [

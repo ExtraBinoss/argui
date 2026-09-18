@@ -1,10 +1,12 @@
 use argui_paint::{Color, PaintStyle};
-use argui_text::{TextColor, TextContent, TextOverflow, TextStyle, TextWrap};
+use argui_text::{TextColor, TextOverflow, TextStyle, TextWrap};
 use argui_ui::{
     AlignItems, CaretStyle, Element, EventType, LayoutStyle, Role, StateSelector, StylePatch,
     StyleTransition, TextEdit, TextEditorSpec, TextInputFilter, ValueHandler, VisualState, percent,
 };
 
+#[cfg(feature = "textarea")]
+use argui_text::TextContent;
 #[cfg(feature = "textarea")]
 use argui_ui::{Axes, Overflow, ScrollConfig, ScrollPropagation, ScrollbarGutter, ScrollbarStyle};
 

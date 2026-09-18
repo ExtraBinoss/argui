@@ -1,6 +1,6 @@
 use argui_platform::{
     ApplicationConfig, ApplicationId, ApplicationIdentity, GlobalShortcut, IconSet, TrayAction,
-    TrayConfig, TrayItemId, TrayMenuItem, WindowConfig, WindowKey, WindowSpec,
+    TrayConfig, TrayItemId, TrayMenuItem, UiZoomConfig, WindowConfig, WindowKey, WindowSpec,
 };
 
 fn identity() -> ApplicationIdentity {
@@ -9,6 +9,16 @@ fn identity() -> ApplicationIdentity {
         "Test",
         IconSet::new(),
     )
+}
+
+#[test]
+fn application_ui_zoom_is_enabled_by_default_and_can_be_disabled() {
+    let default = ApplicationConfig::new(identity(), WindowConfig::default());
+    assert!(default.ui_zoom.enabled);
+
+    let disabled = default.with_ui_zoom(UiZoomConfig::disabled());
+    assert!(!disabled.ui_zoom.enabled);
+    assert!(disabled.validate().is_ok());
 }
 
 #[test]

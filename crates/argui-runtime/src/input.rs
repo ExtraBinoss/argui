@@ -119,12 +119,13 @@ impl Application {
                 .and_then(|layout| layout.text_inputs.iter().find(|region| region.node == node))
                 .and_then(|region| region.caret)
         {
+            let zoom = f64::from(self.ui_zoom_factor);
             window.set_ime_cursor_area(
                 LogicalPosition::new(
-                    f64::from(caret.origin.x),
-                    f64::from(caret.origin.y + caret.size.height),
+                    f64::from(caret.origin.x) * zoom,
+                    f64::from(caret.origin.y + caret.size.height) * zoom,
                 ),
-                LogicalSize::new(1.0, f64::from(caret.size.height)),
+                LogicalSize::new(1.0, f64::from(caret.size.height) * zoom),
             );
         }
     }

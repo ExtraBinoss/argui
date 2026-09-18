@@ -63,6 +63,7 @@ pub(crate) fn launch(mut application: MultiApplication) -> Result<(), RuntimeErr
                     if let Some(entry) = application.windows.get_mut(&key) {
                         entry.runtime.gtk_event(event, &context);
                     }
+                    application.synchronize_ui_zoom(&key);
                     application.process_pending(&context);
                     if close {
                         application.handle_close(&key, &context);

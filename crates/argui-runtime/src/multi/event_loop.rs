@@ -141,6 +141,7 @@ impl ApplicationHandler<UserEvent> for MultiApplication {
         if let Some(entry) = self.windows.get_mut(&key) {
             entry.runtime.window_event(event_loop, window_id, event);
         }
+        self.synchronize_ui_zoom(&key);
         self.process_pending(event_loop);
         if close {
             self.handle_close(&key, event_loop);

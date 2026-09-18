@@ -1,6 +1,6 @@
 use argui_core::{
-    Point, PointerButton, PointerEvent, PointerId, PointerKind, PointerPhase, PointerSettings,
-    ScrollDelta,
+    PinchRecognizer, Point, PointerButton, PointerEvent, PointerId, PointerKind, PointerPhase,
+    PointerSettings, ScrollDelta,
 };
 
 #[test]
@@ -84,4 +84,76 @@ fn pointer_events_keep_device_identity_and_contact_data() {
     assert_eq!(event.id.get(), 42);
     assert_eq!(event.pressure, Some(0.75));
     assert_eq!(event.kind, PointerKind::Pen);
+}
+
+#[test]
+fn pinch_recognizer_reports_incremental_scale_and_consumes_until_empty() {
+    let first = PointerId::new(1);
+    let second = PointerId::new(2);
+    let mut pinch = PinchRecognizer::default();
+
+    assert!(
+        !pinch
+            .observe(first, PointerPhase::Pressed, Point::new(0.0, 0.0))
+            .consumed
+    );
+    let started = pinch.observe(second, PointerPhase::Pressed, Point::new(100.0, 0.0));
+    assert!(started.started && started.consumed);
+    assert_eq!(started.scale, None);
+
+    let expanded = pinch.observe(second, PointerPhase::Moved, Point::new(150.0, 0.0));
+    assert_eq!(expanded.scale, Some(1.5));
+    assert!(expanded.consumed);
+    let contracted = pinch.observe(first, PointerPhase::Entered, Point::new(30.0, 0.0));
+    assert_eq!(contracted.scale, Some(0.8));
+
+    assert!(
+        pinch
+            .observe(first, PointerPhase::Released, Point::new(30.0, 0.0))
+            .consumed
+    );
+    assert!(
+        pinch
+            .observe(second, PointerPhase::Cancelled, Point::new(150.0, 0.0))
+            .consumed
+    );
+    assert!(
+        !pinch
+            .observe(first, PointerPhase::Pressed, Point::new(4.0, 8.0))
+            .consumed
+    );
+}
+
+#[test]
+fn pinch_recognizer_ignores_coincident_contacts_and_rebases_replacement_contacts() {
+    let first = PointerId::new(1);
+    let second = PointerId::new(2);
+    let third = PointerId::new(3);
+    let mut pinch = PinchRecognizer::default();
+
+    let _ = pinch.observe(first, PointerPhase::Entered, Point::new(10.0, 10.0));
+    let coincident = pinch.observe(second, PointerPhase::Pressed, Point::new(10.0, 10.0));
+    assert_eq!(coincident.scale, None);
+    assert!(!coincident.started);
+
+    let started = pinch.observe(second, PointerPhase::Moved, Point::new(30.0, 10.0));
+    assert!(started.started);
+    let _ = pinch.observe(third, PointerPhase::Pressed, Point::new(50.0, 10.0));
+    let replacement = pinch.observe(first, PointerPhase::Left, Point::new(10.0, 10.0));
+    assert_eq!(replacement.scale, None);
+    assert!(!replacement.started);
+    assert!(replacement.consumed);
+
+    let moved = pinch.observe(third, PointerPhase::Moved, Point::new(70.0, 10.0));
+    assert_eq!(moved.scale, Some(2.0));
+    assert!(
+        pinch
+            .observe(second, PointerPhase::Released, Point::new(30.0, 10.0))
+            .consumed
+    );
+    assert!(
+        pinch
+            .observe(third, PointerPhase::Left, Point::new(70.0, 10.0))
+            .consumed
+    );
 }

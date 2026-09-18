@@ -42,6 +42,35 @@ let window = WindowConfig::default().with_focus_on_launch(true);
 Enable it for a full-page Web application that should accept keyboard input
 immediately; leave it disabled for canvases embedded in a scrollable page.
 
+## Accessibility UI zoom
+
+Application-wide UI zoom is enabled by default. `Ctrl + +` and `Ctrl + -` on
+Windows, Linux, Android with a hardware keyboard, and WebAssembly increase or
+decrease the zoom. macOS and iOS hardware keyboards also accept the native
+`Command` equivalents. `Ctrl`/`Command + 0` returns to 100%, and holding that
+modifier while scrolling provides continuous zoom. Native trackpad
+magnification and a two-finger touch pinch provide pointer and mobile
+equivalents.
+
+The runtime combines UI zoom with the host DPI scale at the logical-coordinate
+boundary. Layout, shaped text, painting, hit testing, scrolling, IME placement,
+safe areas, accessibility bounds, popups, desktop backdrops, and hosted WebView
+bounds therefore change together. `WindowEnvironment::ui_zoom` exposes the
+current factor when an application wants to display it.
+
+Disable the runtime-owned shortcuts and pinch gesture when an application needs
+to reserve them for a product-specific canvas:
+
+```rust,ignore
+use argui::platform::UiZoomConfig;
+
+let config = ApplicationConfig::new(identity, window)
+    .with_ui_zoom(UiZoomConfig::disabled());
+```
+
+Disabling UI zoom leaves ordinary application keyboard and pinch handling
+unchanged.
+
 ## Packaging identity
 
 Argui does not package applications. Keep a packager's values aligned with

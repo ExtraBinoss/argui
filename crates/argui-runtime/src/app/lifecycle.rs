@@ -68,7 +68,8 @@ impl ApplicationHandler<UserEvent> for Application {
                 #[cfg(all(feature = "webview", any(target_os = "windows", target_os = "macos")))]
                 self.initialize_winit_webviews(window.clone());
                 let size = crate::host::WindowHost::drawable_size(&window);
-                self.scale_factor = window.scale_factor() as f32;
+                self.native_scale_factor = window.scale_factor() as f32;
+                self.scale_factor = self.native_scale_factor * self.ui_zoom_factor;
                 self.initialize_preference_snapshot(window.theme());
                 self.refresh_safe_area_insets(&window, self.scale_factor);
                 #[cfg(all(feature = "desktop-backdrop", not(target_arch = "wasm32")))]
@@ -247,8 +248,15 @@ impl ApplicationHandler<UserEvent> for Application {
         if self.window_id() != Some(crate::host::HostId::Winit(window_id)) {
             return;
         }
+        if let WindowEvent::PinchGesture { delta, .. } = &event
+            && self.handle_ui_zoom_magnify(*delta)
+        {
+            return;
+        }
         let safe_area_scale = match &event {
-            WindowEvent::ScaleFactorChanged { scale_factor, .. } => Some(*scale_factor as f32),
+            WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
+                Some(*scale_factor as f32 * self.ui_zoom_factor)
+            }
             WindowEvent::Resized(_) | WindowEvent::RedrawRequested => Some(self.scale_factor),
             _ => None,
         };
@@ -347,6 +355,12 @@ impl ApplicationHandler<UserEvent> for Application {
                 })
             }
             WindowEvent::Touch(touch) => {
+                let phase = pointer_phase(touch.phase);
+                let zoom = self.handle_ui_zoom_touch(
+                    PointerId::new(touch.id.saturating_add(1)),
+                    phase,
+                    Point::new(touch.location.x as f32, touch.location.y as f32),
+                );
                 let point = Point::new(
                     touch.location.x as f32 / self.scale_factor,
                     touch.location.y as f32 / self.scale_factor,
@@ -354,7 +368,7 @@ impl ApplicationHandler<UserEvent> for Application {
                 let event = PointerEvent {
                     id: PointerId::new(touch.id.saturating_add(1)),
                     kind: PointerKind::Touch,
-                    phase: pointer_phase(touch.phase),
+                    phase,
                     position: point,
                     button: Some(PointerButton::Primary),
                     buttons: u16::from(!matches!(
@@ -366,12 +380,14 @@ impl ApplicationHandler<UserEvent> for Application {
                     modifiers: self.modifiers,
                     timestamp: self.input_epoch.elapsed(),
                 };
-                let event = self.touch_pointer(event, &window, event_loop);
+                let event = self.touch_pointer(event, zoom, &window, event_loop);
                 PlatformEvent::Pointer(event)
             }
             WindowEvent::MouseWheel { delta, phase, .. } => {
                 let delta = scroll_delta(delta, self.scale_factor);
-                self.queue_pointer_scroll(delta, phase, &window, event_loop);
+                if !self.handle_ui_zoom_wheel(delta) {
+                    self.queue_pointer_scroll(delta, phase, &window, event_loop);
+                }
                 PlatformEvent::PointerScrolled(delta)
             }
             WindowEvent::ModifiersChanged(modifiers) => {
@@ -380,7 +396,9 @@ impl ApplicationHandler<UserEvent> for Application {
             }
             WindowEvent::KeyboardInput { event, .. } => {
                 let input = key_input(event, self.modifiers);
-                self.keyboard_input(&input, &window, event_loop);
+                if !self.handle_ui_zoom_key(&input) {
+                    self.keyboard_input(&input, &window, event_loop);
+                }
                 PlatformEvent::Keyboard(input)
             }
             WindowEvent::Ime(ime) => {

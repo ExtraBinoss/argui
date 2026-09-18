@@ -45,7 +45,8 @@ impl Application {
         self.window = Some(host.clone());
         self.window_config.transparent = true;
         self.initialize_gtk_webviews(host.platform.container().clone());
-        self.scale_factor = scale;
+        self.native_scale_factor = scale;
+        self.scale_factor = scale * self.ui_zoom_factor;
         self.initialize_preference_snapshot(None);
         #[cfg(feature = "desktop-backdrop")]
         self.initialize_desktop_backdrop(host.platform.canvas());
@@ -99,11 +100,11 @@ impl Application {
             return;
         }
         let (width, height, scale) = host.platform.client_size();
-        if self.scale_factor != scale {
+        if self.native_scale_factor != scale {
             self.pending_window_frame.scale_factor(scale, width, height);
             window.request_redraw();
-        } else if self.viewport.width != width as f32 / scale
-            || self.viewport.height != height as f32 / scale
+        } else if self.viewport.width != width as f32 / self.scale_factor
+            || self.viewport.height != height as f32 / self.scale_factor
         {
             self.pending_window_frame.resize(width, height);
             window.request_redraw();
@@ -144,18 +145,19 @@ impl Application {
                 return;
             }
             WindowEvent::CursorMoved { .. } => {
-                let Some(point) = host.platform.pointer_position() else {
+                let Some(platform_point) = host.platform.pointer_position() else {
                     return;
                 };
                 if self
                     .native_views
                     .as_ref()
-                    .is_some_and(|pool| pool.contains_pointer(point))
+                    .is_some_and(|pool| pool.contains_pointer(platform_point))
                     && self.pointer_buttons == 0
                 {
                     self.gtk_pointer_boundary(control);
                     return;
                 }
+                let point = self.platform_to_ui_point(platform_point);
                 self.pointer_moved(point, &window, control);
                 PlatformEvent::Pointer(PointerEvent::mouse(PointerPhase::Moved, point))
             }
@@ -169,8 +171,8 @@ impl Application {
                 PlatformEvent::Pointer(PointerEvent::mouse(PointerPhase::Left, point))
             }
             WindowEvent::MouseInput { state, button, .. } => {
-                let point = host.platform.pointer_position();
-                if point.is_some_and(|point| {
+                let platform_point = host.platform.pointer_position();
+                if platform_point.is_some_and(|point| {
                     self.native_views
                         .as_ref()
                         .is_some_and(|pool| pool.contains_pointer(point))
@@ -182,7 +184,7 @@ impl Application {
                 if state == ElementState::Pressed {
                     host.platform.focus_canvas();
                 }
-                if let Some(point) = point {
+                if let Some(point) = platform_point.map(|point| self.platform_to_ui_point(point)) {
                     self.pointer_moved(point, &window, control);
                 }
                 let button = match button {
@@ -255,7 +257,9 @@ impl Application {
                     tao::event::TouchPhase::Cancelled => winit::event::TouchPhase::Cancelled,
                     _ => return,
                 };
-                self.queue_pointer_scroll(delta, phase, &window, control);
+                if !self.handle_ui_zoom_wheel(delta) {
+                    self.queue_pointer_scroll(delta, phase, &window, control);
+                }
                 PlatformEvent::PointerScrolled(delta)
             }
             WindowEvent::ModifiersChanged(modifiers) => {
@@ -282,7 +286,9 @@ impl Application {
                     modifiers: self.modifiers,
                     repeat: event.repeat,
                 };
-                self.keyboard_input(&input, &window, control);
+                if !self.handle_ui_zoom_key(&input) {
+                    self.keyboard_input(&input, &window, control);
+                }
                 PlatformEvent::Keyboard(input)
             }
             WindowEvent::ReceivedImeText(text)

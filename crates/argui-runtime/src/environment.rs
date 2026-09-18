@@ -11,6 +11,8 @@ pub struct WindowEnvironment {
     pub desktop_backdrop_available: bool,
     /// Safe region supplied by the platform in logical pixels.
     pub safe_area_insets: Insets,
+    /// Application-wide accessibility zoom factor, where `1.0` is 100%.
+    pub ui_zoom: f32,
     /// Optional theme tokens; no map is allocated in ordinary environments.
     pub theme_overrides: Option<std::sync::Arc<argui_theme::ThemeOverrides>>,
 }
@@ -24,6 +26,7 @@ impl Default for WindowEnvironment {
             high_contrast: false,
             desktop_backdrop_available: false,
             safe_area_insets: Insets::ZERO,
+            ui_zoom: 1.0,
             theme_overrides: None,
         }
     }

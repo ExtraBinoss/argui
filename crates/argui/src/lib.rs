@@ -6,7 +6,7 @@
 /// feature-gated widget names cannot collide with application model types.
 /// Library crates may prefer explicit imports from the facade modules.
 pub mod prelude {
-    pub use crate::platform::{ApplicationConfig, WindowConfig};
+    pub use crate::platform::{ApplicationConfig, UiZoomConfig, WindowConfig};
     pub use crate::runtime::{Context, Render, WindowEnvironment, run_app};
     pub use crate::theme::{Theme, ThemeMode};
     pub use crate::ui::{Element, EventHandler, TextEdit, ValueHandler, length, percent, sides};

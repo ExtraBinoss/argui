@@ -33,7 +33,7 @@ mod wayland_global_shortcuts;
 mod web_identity;
 mod window;
 
-pub use application::{ApplicationConfig, ApplicationConfigError};
+pub use application::{ApplicationConfig, ApplicationConfigError, UiZoomConfig};
 pub use argui_core::{
     Insets, PointerButton, PointerEvent, PointerId, PointerKind, PointerPhase, PointerSettings,
 };

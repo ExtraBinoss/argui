@@ -100,6 +100,18 @@ pub fn send() {
             event.put();
         }
     }
+    for (key, kind) in [
+        (gdk::keys::constants::Control_L, gdk::EventType::KeyPress),
+        (gdk::keys::constants::plus, gdk::EventType::KeyPress),
+        (gdk::keys::constants::plus, gdk::EventType::KeyRelease),
+        (gdk::keys::constants::Control_L, gdk::EventType::KeyRelease),
+    ] {
+        let mut event = gdk::Event::new(kind).downcast::<gdk::EventKey>().unwrap();
+        event.as_mut().window = native_window.to_glib_full();
+        event.as_mut().keyval = *key;
+        event.as_mut().send_event = 1;
+        event.put();
+    }
 }
 
 fn buttons() -> [(u32, argui_core::PointerButton, u16); 5] {

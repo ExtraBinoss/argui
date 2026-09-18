@@ -119,6 +119,7 @@ impl Application {
             high_contrast: preferences.high_contrast.value,
             desktop_backdrop_available: self.environment.desktop_backdrop_available,
             safe_area_insets: self.environment.safe_area_insets,
+            ui_zoom: self.environment.ui_zoom,
             theme_overrides: self.environment.theme_overrides.clone(),
         };
         let animation_update = self.ui_tree.as_mut().map_or(TreeUpdate::None, |tree| {

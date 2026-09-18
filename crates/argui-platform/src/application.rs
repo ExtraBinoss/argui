@@ -5,6 +5,36 @@ use crate::{
     global_shortcut::validate_global_shortcuts,
 };
 
+/// Controls the runtime's application-wide accessibility zoom gestures.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct UiZoomConfig {
+    /// Whether keyboard, pointer, and touch gestures may change the UI zoom.
+    pub enabled: bool,
+}
+
+impl UiZoomConfig {
+    /// Creates a UI zoom configuration with gestures enabled or disabled.
+    ///
+    /// `enabled` controls keyboard shortcuts, modifier-wheel or trackpad zoom,
+    /// and two-finger touch pinch zoom.
+    #[must_use]
+    pub const fn new(enabled: bool) -> Self {
+        Self { enabled }
+    }
+
+    /// Returns a configuration that disables every built-in UI zoom gesture.
+    #[must_use]
+    pub const fn disabled() -> Self {
+        Self::new(false)
+    }
+}
+
+impl Default for UiZoomConfig {
+    fn default() -> Self {
+        Self::new(true)
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 /// Validated application-wide platform configuration.
 pub struct ApplicationConfig {
@@ -18,6 +48,8 @@ pub struct ApplicationConfig {
     pub global_shortcuts: Vec<GlobalShortcut>,
     /// Explicit overrides for operating-system preferences.
     pub preferences: PreferenceOverrides,
+    /// Application-wide accessibility zoom gesture configuration.
+    pub ui_zoom: UiZoomConfig,
 }
 
 impl ApplicationConfig {
@@ -31,6 +63,7 @@ impl ApplicationConfig {
             tray: None,
             global_shortcuts: Vec::new(),
             preferences: PreferenceOverrides::default(),
+            ui_zoom: UiZoomConfig::default(),
         }
     }
 
@@ -64,6 +97,15 @@ impl ApplicationConfig {
     /// `preferences` contains optional explicit settings.
     pub const fn with_preferences(mut self, preferences: PreferenceOverrides) -> Self {
         self.preferences = preferences;
+        self
+    }
+
+    /// Configures application-wide keyboard and touch UI zoom gestures.
+    ///
+    /// `ui_zoom` enables or disables the runtime-owned accessibility zoom controls.
+    #[must_use]
+    pub const fn with_ui_zoom(mut self, ui_zoom: UiZoomConfig) -> Self {
+        self.ui_zoom = ui_zoom;
         self
     }
 

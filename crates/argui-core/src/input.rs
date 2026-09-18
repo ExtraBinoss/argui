@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::{Modifiers, Point};
 
 /// Platform-independent timing and distance thresholds for pointer gestures.
@@ -150,6 +152,108 @@ pub enum PointerPhase {
     Left,
     /// The active pointer interaction was cancelled.
     Cancelled,
+}
+
+/// Incremental result produced by a two-contact pinch recognizer.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct PinchUpdate {
+    /// Scale change since the previous sample, when the distance changed.
+    pub scale: Option<f32>,
+    /// Whether this sample started a new pinch gesture.
+    pub started: bool,
+    /// Whether this contact belongs to a pinch and should bypass ordinary UI input.
+    pub consumed: bool,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct PinchSample {
+    contacts: [PointerId; 2],
+    distance: f32,
+}
+
+/// Tracks raw touch contacts and recognizes an incremental two-finger pinch.
+///
+/// Once a pinch starts, every participating contact remains consumed until all
+/// contacts end. This prevents a completed pinch from becoming an accidental
+/// click or one-finger scroll.
+#[derive(Debug, Default)]
+pub struct PinchRecognizer {
+    points: HashMap<PointerId, Point>,
+    sample: Option<PinchSample>,
+    suppress_until_empty: bool,
+}
+
+impl PinchRecognizer {
+    /// Observes one touch contact and returns the resulting pinch state.
+    ///
+    /// `id`, `phase`, and `position` identify a contact in one consistent
+    /// coordinate space. The returned scale is incremental, so callers should
+    /// multiply their current value by it. Coincident contacts do not start a
+    /// gesture.
+    #[must_use]
+    pub fn observe(&mut self, id: PointerId, phase: PointerPhase, position: Point) -> PinchUpdate {
+        let was_suppressed = self.suppress_until_empty;
+        match phase {
+            PointerPhase::Pressed | PointerPhase::Moved | PointerPhase::Entered => {
+                self.points.insert(id, position);
+            }
+            PointerPhase::Released | PointerPhase::Cancelled | PointerPhase::Left => {
+                self.points.remove(&id);
+            }
+        }
+
+        if self.sample.is_some_and(|sample| {
+            sample
+                .contacts
+                .iter()
+                .any(|contact| !self.points.contains_key(contact))
+        }) {
+            self.sample = None;
+        }
+        if self.sample.is_none() && self.points.len() >= 2 {
+            let mut contacts: Vec<_> = self.points.keys().copied().collect();
+            contacts.sort_by_key(|contact| contact.get());
+            let contacts = [contacts[0], contacts[1]];
+            let distance = self.distance(contacts);
+            if distance > f32::EPSILON {
+                self.sample = Some(PinchSample { contacts, distance });
+            }
+        }
+
+        let previous = self.sample;
+        if let Some(sample) = previous {
+            self.sample = Some(PinchSample {
+                contacts: sample.contacts,
+                distance: self.distance(sample.contacts),
+            });
+        }
+        let started = !was_suppressed && self.sample.is_some();
+        self.suppress_until_empty |= self.sample.is_some();
+        let scale = previous
+            .zip(self.sample)
+            .map(|(before, after)| after.distance / before.distance)
+            .filter(|scale| scale.is_finite() && (*scale - 1.0).abs() >= f32::EPSILON);
+        if self.points.len() < 2 {
+            self.sample = None;
+        }
+        if self.points.is_empty() {
+            self.suppress_until_empty = false;
+        }
+        PinchUpdate {
+            scale,
+            started,
+            consumed: was_suppressed || self.suppress_until_empty,
+        }
+    }
+
+    /// Returns the distance between `contacts` in the recognizer's coordinate
+    /// space, or zero if either contact is no longer active.
+    fn distance(&self, contacts: [PointerId; 2]) -> f32 {
+        let [Some(first), Some(second)] = contacts.map(|contact| self.points.get(&contact)) else {
+            return 0.0;
+        };
+        (second.x - first.x).hypot(second.y - first.y)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

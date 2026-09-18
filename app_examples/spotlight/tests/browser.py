@@ -64,6 +64,21 @@ def main() -> None:
                 search_bounds["x"] + search_bounds["width"] / 2,
                 search_bounds["y"] + search_bounds["height"] / 2,
             )
+            page.keyboard.press("Control+=")
+            page.wait_for_function(
+                "({ height }) => document.querySelector('[role=searchbox]')"
+                "?.getBoundingClientRect().height > height * 1.05",
+                arg={"height": search_bounds["height"]},
+            )
+            zoomed_bounds = search.bounding_box()
+            assert zoomed_bounds and zoomed_bounds["height"] > search_bounds["height"]
+            assert search.input_value() == "", "UI zoom shortcut leaked into the text field"
+            page.keyboard.press("Control+0")
+            page.wait_for_function(
+                "({ height }) => Math.abs(document.querySelector('[role=searchbox]')"
+                "?.getBoundingClientRect().height - height) < 0.5",
+                arg={"height": search_bounds["height"]},
+            )
             page.keyboard.press("ArrowDown")
             page.keyboard.press("Enter")
             time.sleep(0.32)

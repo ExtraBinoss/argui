@@ -1,4 +1,4 @@
-use argui_core::{Point, PointerEvent, PointerPhase};
+use argui_core::{PinchUpdate, Point, PointerEvent, PointerPhase};
 use argui_platform::{ButtonState, ScrollDelta};
 use argui_ui::{InteractionUpdate, UiTree};
 
@@ -362,9 +362,15 @@ impl Application {
         self.apply_ui_update(update, window, event_loop);
     }
 
+    /// Dispatches one touch contact after applying global zoom gesture ownership.
+    ///
+    /// `event` is expressed in UI coordinates, `zoom` describes whether the
+    /// runtime-owned pinch consumes it, and `window`/`event_loop` receive any
+    /// resulting UI work. Returns the normalized event for platform observers.
     pub(super) fn touch_pointer(
         &mut self,
         mut event: PointerEvent,
+        zoom: PinchUpdate,
         window: &dyn crate::host::WindowHost,
         event_loop: &dyn crate::host::LoopControl,
     ) -> PointerEvent {
@@ -372,6 +378,53 @@ impl Application {
             self.primary_touch = Some(event.id);
         }
         event.primary = self.primary_touch == Some(event.id);
+        if zoom.started {
+            self.scroll_inertia.cancel();
+            self.pending_pointer_scroll = None;
+            self.programmatic_scroll = None;
+            self.scroll_gesture = argui_ui::ScrollGesture::default();
+            self.touch_selection = None;
+            self.touch_selection_handle = None;
+            if let (Some(layout), Some(ui)) = (&self.ui_layout, &mut self.ui_tree) {
+                let mut update = InteractionUpdate::default();
+                for (&id, &position) in &self.touch_points {
+                    update.merge(ui.pointer_event(
+                        PointerEvent {
+                            id,
+                            kind: argui_core::PointerKind::Touch,
+                            phase: PointerPhase::Cancelled,
+                            position,
+                            button: Some(argui_core::PointerButton::Primary),
+                            buttons: 0,
+                            pressure: None,
+                            primary: self.primary_touch == Some(id),
+                            modifiers: self.modifiers,
+                            timestamp: self.input_epoch.elapsed(),
+                        },
+                        &layout.hit_regions,
+                    ));
+                }
+                self.apply_ui_update(update, window, event_loop);
+            }
+        }
+        if zoom.consumed {
+            match event.phase {
+                PointerPhase::Pressed | PointerPhase::Moved | PointerPhase::Entered => {
+                    self.touch_points.insert(event.id, event.position);
+                }
+                PointerPhase::Released | PointerPhase::Cancelled | PointerPhase::Left => {
+                    self.touch_points.remove(&event.id);
+                }
+            }
+            if matches!(
+                event.phase,
+                PointerPhase::Released | PointerPhase::Cancelled | PointerPhase::Left
+            ) && event.primary
+            {
+                self.primary_touch = self.touch_points.keys().min_by_key(|id| id.get()).copied();
+            }
+            return event;
+        }
         let started_selection_handle = event.phase == PointerPhase::Pressed
             && event.primary
             && self.begin_touch_selection_handle(event.id, event.position, window, event_loop);

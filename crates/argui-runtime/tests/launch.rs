@@ -28,6 +28,8 @@ mod native {
         edited: bool,
         themed: bool,
         safe_area: bool,
+        zoomed: bool,
+        zoom_layout: bool,
         keys: Vec<argui_core::KeyInput>,
         pointer: Vec<argui_core::PointerEvent>,
         wheel: Vec<argui_core::ScrollDelta>,
@@ -43,6 +45,7 @@ mod native {
         timer: Option<TaskHandle>,
         visits: Visits,
         pending: Rc<RefCell<Vec<TaskHandle>>>,
+        ui_zoom: f32,
     }
     impl Panel {
         fn schedule(&mut self) {
@@ -64,6 +67,7 @@ mod native {
     impl Render for Panel {
         fn render(&mut self, cx: &mut Context<Self>) -> Element {
             let phase = cx.read(&self.data, |data| data.phase);
+            self.ui_zoom = cx.environment().ui_zoom;
             if self.virtual_resets > 0 {
                 self.virtual_resets -= 1;
                 self.list = argui_ui::VirtualList::variable(3, 120.0, 240.0);
@@ -73,6 +77,9 @@ mod native {
             }
             if cx.environment().primary == argui_core::Color::BLACK {
                 self.data.update(|data, _| data.themed = true);
+            }
+            if cx.environment().ui_zoom > 1.0 {
+                self.data.update(|data, _| data.zoomed = true);
             }
             self.visits
                 .borrow_mut()
@@ -105,6 +112,9 @@ mod native {
             native_view(phase, cx, &self.list)
         }
         fn layout_changed(&mut self, layout: &LayoutSnapshot, cx: &mut Context<Self>) {
+            if self.main && self.ui_zoom > 1.0 {
+                self.data.update(|data, _| data.zoom_layout = true);
+            }
             if self.main
                 && layout
                     .bounds("native-first")
@@ -207,6 +217,7 @@ mod native {
                     timer: None,
                     visits: self.visits.clone(),
                     pending: self.pending.clone(),
+                    ui_zoom: 1.0,
                 }))
                 .unwrap()
                 .window_key(key.clone())
@@ -370,6 +381,8 @@ mod native {
             edited: false,
             themed: false,
             safe_area: false,
+            zoomed: false,
+            zoom_layout: false,
             keys: Vec::new(),
             pointer: Vec::new(),
             wheel: Vec::new(),
@@ -485,8 +498,28 @@ mod native {
                     .map(|input| (input.key.clone(), input.state))
                     .collect::<Vec<_>>(),
                 expected
+                    .into_iter()
+                    .chain([
+                        (
+                            argui_core::Key::Character("+".into()),
+                            argui_core::KeyState::Pressed,
+                        ),
+                        (
+                            argui_core::Key::Character("+".into()),
+                            argui_core::KeyState::Released,
+                        ),
+                    ])
+                    .collect::<Vec<_>>()
             );
         });
+        assert!(
+            data.read(|data| data.zoomed),
+            "GTK UI zoom shortcut reached the application-wide environment"
+        );
+        assert!(
+            data.read(|data| data.zoom_layout),
+            "UI zoom recomputed the layout for the resized logical viewport"
+        );
         let visits = visits.borrow();
         let original = visits
             .iter()
