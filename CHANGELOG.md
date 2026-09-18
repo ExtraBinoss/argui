@@ -11,7 +11,8 @@ that do not use them.
 - Added cross-platform global shortcuts, tray-backed hide/reopen lifecycle,
   Wayland portal activation, and the native/WebAssembly **Spotlight** app
   example with animated search, keyboard navigation, SVG icons, and desktop
-  backdrop integration.
+  backdrop integration, plus a Technicalities guide explaining the
+  backdrop-aware text fidelity work.
 - Added `AnimatedOpacity` and `AnimatedContainer` implicit target-value widgets,
   a public user-implementable `Curve` trait, nine named curve presets, and a
   twenty-example Animation Laboratory covering keyframes, orchestration,

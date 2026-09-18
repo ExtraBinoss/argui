@@ -219,6 +219,18 @@ try {
   await page.waitForSelector('.docs-live-example .status-dot.live', { timeout: 90_000 })
   await screenshotViewport('docs-performance-chrome')
 
+  await page.goto(`${origin}/docs/technicalities/text-fidelity`, { waitUntil: 'networkidle0' })
+  assert.match(
+    await page.$eval('#main-content', (element) => element.textContent),
+    /sRGB perceptual space/,
+  )
+  assert.equal(await page.$$('.docs-table-wrap tbody tr').then((items) => items.length), 3)
+  await page.$eval('.docs-live-example iframe', (element) =>
+    element.scrollIntoView({ block: 'center', behavior: 'instant' }),
+  )
+  await page.waitForSelector('.docs-live-example .status-dot.live', { timeout: 90_000 })
+  await screenshotViewport('docs-text-fidelity-chrome')
+
   await page.goto(`${origin}/docs/architecture/clean-code`, { waitUntil: 'networkidle0' })
   await page.$eval('.docs-live-example iframe', (element) =>
     element.scrollIntoView({ block: 'center', behavior: 'instant' }),

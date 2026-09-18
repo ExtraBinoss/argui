@@ -19,3 +19,4 @@ pub mod platform_support;
 pub mod project_structure;
 pub mod styling;
 pub mod tasks;
+pub mod text_fidelity;

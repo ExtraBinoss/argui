@@ -1087,6 +1087,91 @@ export const docs: DocGuide[] = [
     ],
   },
   {
+    slug: 'technicalities/text-fidelity',
+    category: 'Technicalities',
+    level: 'Advanced',
+    minutes: 12,
+    title: 'Text fidelity across colors',
+    description:
+      'Understand why glyphs can change apparent weight on colored surfaces and how Argui keeps their edges consistent.',
+    example: example('text-fidelity', 'text_fidelity'),
+    demoTitle: 'Identical glyphs over light, dark, and saturated backdrops',
+    sources: [
+      'docs/rendering/primitives.md',
+      'crates/argui-layout/src/paint/backdrop.rs',
+      'crates/argui-render/src/shaders/primitives/text.wgsl',
+      'crates/argui-render/tests/lib.rs',
+    ],
+    sections: [
+      {
+        id: 'why-color-matters',
+        title: 'A glyph edge is coverage, not a pre-painted gray pixel',
+        paragraphs: [
+          'The glyph atlas stores geometric coverage: zero outside the shape, one inside it, and fractional values around each edge. The final edge color is created only when that mask is blended between the text color and the pixels already behind it.',
+          'A GPU normally blends shader colors in linear light and converts the finished framebuffer to sRGB for display. Human perception and browser-style font coverage are not linear, so reusing one alpha correction chosen only from the foreground can make white text look thinner on saturated blue than on black, even when the font, size, weight, and glyph mask are identical.',
+        ],
+        note: 'Font files, hinting, device scale, and operating-system rasterizers can still differ. Fidelity here means stable optical weight across colors, not bit-identical pixels on every platform.',
+      },
+      {
+        id: 'target-edge',
+        title: 'Compute the edge that should be seen',
+        paragraphs: [
+          'When the backdrop is known, Argui first computes the desired edge in sRGB perceptual space. It then converts that target back to linear space and reconstructs a straight-alpha source color whose normal GPU blend lands on the target. Raising alpha only when required keeps the reconstructed color inside the renderable gamut.',
+        ],
+        code: {
+          filename: 'Backdrop-aware coverage',
+          code: 'edge_srgb = mix(to_srgb(backdrop), to_srgb(foreground), coverage)\ntarget_linear = to_linear(edge_srgb)\n(source_rgb, source_alpha) = reconstruct(target_linear, backdrop)\noutput = vec4(source_rgb, source_alpha)',
+        },
+      },
+      {
+        id: 'known-backdrop',
+        title: 'Carry exact backdrop information through paint',
+        paragraphs: [
+          'Layout resolves the solid color behind each text command while it walks the retained tree. Opaque fills replace the inherited backdrop, transparent fills preserve it, and translucent solid fills are composed when their parent is already known and opaque. The resolved linear RGB value travels with the text display command and glyph instances to the shader.',
+          'Argui deliberately stops claiming certainty when the pixels depend on a gradient, image, filter, native desktop backdrop, or another unknown surface. Those cases keep the existing foreground-polarity correction instead of sampling or guessing a false background color.',
+        ],
+        table: {
+          headers: ['Backdrop', 'Renderer path', 'Reason'],
+          rows: [
+            ['Opaque solid', 'Backdrop-aware reconstruction', 'Exact color is known'],
+            [
+              'Translucent solid over known opaque color',
+              'Precomposed backdrop-aware reconstruction',
+              'The resulting solid color is exact',
+            ],
+            [
+              'Gradient, image, filter, or desktop blur',
+              'Foreground-polarity fallback',
+              'The color varies per pixel or is owned by the host',
+            ],
+          ],
+        },
+      },
+      {
+        id: 'pixel-alignment',
+        title: 'Keep moving text aligned with the pixel grid',
+        paragraphs: [
+          'Color-correct edges cannot rescue text that is continuously translated between device pixels. A fractional transform changes the sampling phase of every glyph and can make a selected row look temporarily soft.',
+          'The Spotlight result now keeps its content transform at identity and animates the highlight background and corner radius instead. If text must move, prefer whole-device-pixel destinations at the active scale and inspect the animation at several scale factors.',
+        ],
+      },
+      {
+        id: 'verification',
+        title: 'Verify the math and the pixels separately',
+        paragraphs: [
+          'The renderer test exercises black, white, saturated blue, and colored foregrounds across a range of coverage values. It checks that ordinary linear alpha blending reconstructs the intended sRGB edge and that every source channel remains in gamut. Shader validation catches invalid WGSL independently.',
+          'A native capture is still required because a correct equation does not prove that layout supplied the right backdrop or that an animation stayed pixel-aligned. Compare the same text settings over light, dark, and saturated surfaces at native scale, and test WebAssembly separately because browser and operating-system presentation paths differ.',
+        ],
+        bullets: [
+          'Keep font family, size, weight, and device scale identical in comparison samples.',
+          'Inspect edge weight on saturated colors instead of checking only black and white.',
+          'Test both the resting frame and intermediate animation frames.',
+          'Fall back conservatively whenever the exact backdrop is not provable.',
+        ],
+      },
+    ],
+  },
+  {
     slug: 'technicalities/performance',
     category: 'Technicalities',
     level: 'Intermediate',

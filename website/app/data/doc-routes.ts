@@ -17,6 +17,7 @@ export const docRoutes = [
   'architecture/project-structure',
   'architecture/clean-code',
   'architecture/custom-elements',
+  'technicalities/text-fidelity',
   'technicalities/performance',
   'platforms/support',
   'platforms/roadmap',

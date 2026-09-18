@@ -25,6 +25,7 @@ export const exampleFiles = [
   'project_structure',
   'styling',
   'tasks',
+  'text_fidelity',
 ]
 
 export const root = fileURLToPath(new URL('../../', import.meta.url))
