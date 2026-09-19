@@ -1,4 +1,5 @@
 use super::*;
+use argui::paint::Filter;
 
 #[test]
 fn damage_control_switches_modes_and_keeps_a_controllable_workload() {
@@ -33,6 +34,20 @@ fn damage_control_switches_modes_and_keeps_a_controllable_workload() {
             .state
             .selected
     );
+
+    click("damage-control-blur");
+    let blurred = gallery.render(Default::default()).unwrap();
+    assert!(contains_text(&blurred, "Backdrop blur is active"));
+    assert!(matches!(
+        keyed(&blurred, "damage-control-blur::content")
+            .unwrap()
+            .layer
+            .as_ref()
+            .unwrap()
+            .backdrop_filters
+            .as_slice(),
+        [Filter::Blur(radius)] if *radius == 14.0
+    ));
 
     let before = keyed(&initial, "damage-control-orb")
         .unwrap()
@@ -141,6 +156,10 @@ fn damage_control_switches_modes_and_keeps_a_controllable_workload() {
         "Actions with variants, icons, loading and accessible activation."
     ));
     click("nav::damage-control");
+    assert!(!contains_text(
+        &gallery.render(Default::default()).unwrap(),
+        "Backdrop blur is active"
+    ));
 
     let reduced = WindowEnvironment {
         reduced_motion: true,

@@ -1,12 +1,15 @@
 use std::{cell::RefCell, collections::VecDeque, rc::Rc, time::Duration};
 
 use argui::{
-    paint::{Border, CornerRadii},
+    paint::{Border, CornerRadii, PaintStyle, QuadStyle},
     platform::WindowKey,
     render::{DamageMode, DamageTracking, RenderProfile},
     runtime::{AppCommand, Context, Render},
-    ui::{AlignItems, Axes, Element, FlexWrap, JustifyContent, Overflow, Sides, length, percent},
-    widgets::{Button, Tab, Tabs, WidgetTheme, shadcn},
+    ui::{
+        AlignItems, Axes, Element, FlexWrap, FloatingPlacement, JustifyContent, Overflow,
+        Placement, Sides, length, percent,
+    },
+    widgets::{Button, Popover, Tab, Tabs, WidgetTheme, shadcn},
 };
 
 use crate::app::text;
@@ -148,6 +151,7 @@ pub(crate) struct DamageControlDemo {
     frames: u64,
     running: bool,
     reduced_motion: bool,
+    blur_open: bool,
 }
 
 impl DamageControlDemo {
@@ -164,6 +168,7 @@ impl DamageControlDemo {
             frames: 0,
             running: true,
             reduced_motion: false,
+            blur_open: false,
         }
     }
 
@@ -177,6 +182,11 @@ impl DamageControlDemo {
         self.telemetry.borrow_mut().clear();
         self.displayed = DamageMetrics::default();
         self.frames = 0;
+    }
+
+    /// Closes transient overlays when the gallery navigates away from this page.
+    pub(crate) fn deactivate(&mut self) {
+        self.blur_open = false;
     }
 
     /// Selects a renderer mode and starts a fresh measurement window.
@@ -202,7 +212,7 @@ impl DamageControlDemo {
     }
 
     /// Builds the animated workload whose changed bounds drive damage tracking.
-    fn workload(&self, theme: &WidgetTheme) -> Element {
+    fn workload(&self, theme: &WidgetTheme, blur_popover: Element) -> Element {
         let travel = triangle_wave(self.phase) * 560.0;
         let orb = Element::container([])
             .keyed("damage-control-orb")
@@ -230,12 +240,18 @@ impl DamageControlDemo {
         Element::column([
             Element::row([
                 text("CONTROLLED WORKLOAD", 11.0, theme.muted_foreground, 700),
-                text(
-                    "One moving element · identical in both modes",
-                    12.0,
-                    theme.muted_foreground,
-                    450,
-                ),
+                Element::row([
+                    text(
+                        "One moving element · identical in both modes",
+                        12.0,
+                        theme.muted_foreground,
+                        450,
+                    ),
+                    blur_popover,
+                ])
+                .gap(10.0)
+                .align_items(AlignItems::CENTER)
+                .flex_wrap(FlexWrap::Wrap),
             ])
             .width(percent(1.0))
             .justify_content(JustifyContent::SPACE_BETWEEN)
@@ -320,7 +336,9 @@ impl DamageControlDemo {
                 .flex_wrap(FlexWrap::Wrap),
             Element::column([
                 Element::row([
-                    text("Rolling repaint average", 12.0, theme.muted_foreground, 550),
+                    text("Rolling repaint average", 12.0, theme.muted_foreground, 550)
+                        .min_width(length(0.0))
+                        .shrink(1.0),
                     text(
                         when_ready(
                             ready,
@@ -334,19 +352,28 @@ impl DamageControlDemo {
                         12.0,
                         theme.muted_foreground,
                         550,
-                    ),
+                    )
+                    .min_width(length(0.0))
+                    .max_width(percent(1.0))
+                    .shrink(1.0),
                 ])
                 .width(percent(1.0))
                 .justify_content(JustifyContent::SPACE_BETWEEN)
                 .gap(8.0)
                 .flex_wrap(FlexWrap::Wrap),
-                Element::container([])
-                    .width(percent(
-                        (metrics.average_ratio * 100.0).clamp(0.0, 100.0) as f32
-                    ))
-                    .height(length(7.0))
+                Element::container([Element::container([])
+                    .width(percent(metrics.average_ratio.clamp(0.0, 1.0) as f32))
+                    .height(percent(1.0))
                     .background(theme.primary)
-                    .radius(CornerRadii::all(999.0)),
+                    .radius(CornerRadii::all(999.0))])
+                .width(percent(1.0))
+                .height(length(7.0))
+                .background(theme.border.with_alpha(0.65))
+                .overflow(Axes {
+                    x: Overflow::Hidden,
+                    y: Overflow::Hidden,
+                })
+                .radius(CornerRadii::all(999.0)),
             ])
             .keyed("damage-control-ratio")
             .width(percent(1.0))
@@ -410,6 +437,51 @@ impl Render for DamageControlDemo {
         let pause = cx.callback(|demo| demo.running = !demo.running);
         let step = cx.callback(|demo| demo.step(0.08));
         let reset = cx.callback(|demo| demo.activate());
+        let blur_popover = Popover::new(
+            "damage-control-blur",
+            "Inspect backdrop blur",
+            self.blur_open,
+            Button::new(
+                "damage-control-blur",
+                if self.blur_open {
+                    "Close blur"
+                } else {
+                    "Open blur"
+                },
+                theme.outline_button(),
+            )
+            .build(),
+            Element::column([
+                text("Backdrop blur is active", 15.0, theme.foreground, 650),
+                text(
+                    "The moving workload continues behind this translucent surface.",
+                    13.0,
+                    theme.muted_foreground,
+                    450,
+                ),
+                text(
+                    "Backdrop-dependent effects require full composition today, even while Auto is selected.",
+                    12.0,
+                    theme.muted_foreground,
+                    450,
+                ),
+            ])
+            .gap(10.0),
+        )
+        .placement(FloatingPlacement::new(Placement::BottomEnd))
+        .size(286.0, 220.0)
+        .paint(PaintStyle::new(
+            QuadStyle::solid(theme.popover.with_alpha(0.68))
+                .border(Border::all(1.0, theme.popover_border))
+                .radius(CornerRadii::all(12.0)),
+        ))
+        .radius(12.0)
+        .backdrop_blur(14.0)
+        .on_open_change(cx.value_callback(|demo, open| {
+            demo.blur_open = open;
+            demo.activate();
+        }))
+        .build(theme);
         super::preview(
             "Same scene, real renderer modes",
             "Switch modes while the workload runs. The cards come from RenderProfile after each presented frame, not from estimated UI state.",
@@ -421,7 +493,7 @@ impl Render for DamageControlDemo {
                 )
                 .on_select(mode)
                 .build(theme),
-                self.workload(theme),
+                self.workload(theme, blur_popover),
                 self.metrics(theme),
                 Element::row([
                     Button::new(

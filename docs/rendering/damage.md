@@ -46,6 +46,29 @@ let always_full = RendererConfig::default()
     .damage_tracking(DamageTracking::disabled());
 ```
 
+The same policy can be changed later for an individual window:
+
+```rust
+use argui::{
+    platform::WindowKey,
+    render::DamageTracking,
+    runtime::{AppCommand, Context},
+};
+
+fn use_full_frames<App: 'static>(cx: &mut Context<App>) {
+    cx.command(AppCommand::SetDamageTracking {
+        window: WindowKey::main(),
+        tracking: DamageTracking::disabled(),
+    });
+}
+```
+
+Pass `DamageTracking::enabled()` to return to the default adaptive policy, or
+chain `max_regions` and `max_area_ratio` to select custom fallback thresholds.
+Applications choose the policy, not a `DamageMode`: `Seed`, `Partial`, and
+`Reused` are safety-dependent decisions made by the renderer, while disabling
+tracking consistently produces full-frame rendering.
+
 `DamageSnapshot` and `DamagePlan` expose the renderer-neutral comparison and
 policy for custom renderer integrations. `RenderProfile::damage` includes the
 chosen mode, region count, repainted pixel count, and retained texture bytes.
@@ -74,6 +97,12 @@ The controlled element changes its painted layout bounds instead of using a
 presentation `transform`. Argui promotes transforms to retained compositor
 layers; those exercise compositor reuse rather than root-surface damage, so
 mixing them into this workload would measure a different optimization.
+
+Open the workload's **Open blur** popover to add a translucent backdrop-filter
+surface while the element keeps moving behind it. This intentionally exercises
+an effect boundary: the current renderer uses full effect composition for
+backdrop-dependent filters, so Auto may correctly report full-frame repainting
+while the popover is visible. Closing it returns to the damage-only workload.
 
 ## Correctness boundaries
 

@@ -368,6 +368,9 @@ fn exercise(window: Arc<Window>, mut pump: impl FnMut()) {
     assert!(renderer.last_profile().damage.damaged_pixels < 256 * 256);
     render(&mut renderer, &moved).unwrap();
     assert_eq!(renderer.last_profile().damage.mode, DamageMode::Reused);
+    renderer.set_damage_tracking(DamageTracking::enabled());
+    render(&mut renderer, &moved).unwrap();
+    assert_eq!(renderer.last_profile().damage.mode, DamageMode::Reused);
     renderer.set_damage_tracking(DamageTracking::disabled());
     render(&mut renderer, &moved).unwrap();
     assert_eq!(renderer.last_profile().damage.mode, DamageMode::Full);

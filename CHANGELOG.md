@@ -16,9 +16,13 @@ that do not use them.
   the feature, while `DamagePlan`, `DamageSnapshot`, and
   `RenderProfile::damage` expose decisions and profiling statistics.
 - Added a live **Damage control** Widget Gallery page that runs the same
-  animated workload with adaptive damage rendering on or off. It switches the
-  renderer at runtime and reports repaint coverage, damage regions, retained
-  memory, CPU encoding time, and GPU time when timestamp queries are available.
+  animated workload and an optional blurred popover with adaptive damage
+  rendering on or off. The public
+  `AppCommand::SetDamageTracking` command also lets applications select the
+  default adaptive policy, tune its thresholds, or force full-frame rendering
+  per window at runtime. The page reports repaint coverage, damage regions,
+  retained memory, CPU encoding time, and GPU time when timestamp queries are
+  available.
 
 ## [0.3.2] - 2026-09-19
 

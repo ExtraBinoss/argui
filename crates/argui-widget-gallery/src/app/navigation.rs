@@ -17,6 +17,10 @@ impl WidgetGallery {
     pub(super) fn select_page(&mut self, page: Page, cx: &mut Context<Self>) {
         if self.page != page {
             if self.page == Page::DamageControl {
+                self.damage_control.update(|demo, child_cx| {
+                    demo.deactivate();
+                    child_cx.notify();
+                });
                 cx.command(AppCommand::SetDamageTracking {
                     window: WindowKey::main(),
                     tracking: DamageTracking::enabled(),

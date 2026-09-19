@@ -222,6 +222,9 @@ impl Application {
             self.renderer_announced = true;
         }
 
+        // WebAssembly initializes the renderer asynchronously, so a command can
+        // update the requested policy while the surface is still loading.
+        renderer.set_damage_tracking(self.renderer_config.damage_tracking);
         let profiling_active = self.renderer_profiling_requested
             || self
                 .inspector

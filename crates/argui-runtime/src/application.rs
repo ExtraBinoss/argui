@@ -64,7 +64,11 @@ pub enum AppCommand {
         window: WindowKey,
         passthrough: bool,
     },
-    /// Changes adaptive damage rendering for one initialized window.
+    /// Changes adaptive damage rendering for one window at runtime.
+    ///
+    /// Use [`DamageTracking::enabled`] for the adaptive policy,
+    /// [`DamageTracking::disabled`] to force full-frame rendering, or customize
+    /// the enabled policy's region and area thresholds.
     SetDamageTracking {
         window: WindowKey,
         tracking: DamageTracking,
