@@ -37,7 +37,7 @@ fn forms_edit_validate_filter_and_complete_the_questionnaire() {
     dispatch(&app, "framework", UiEventKind::TextChanged("s".into()));
     keyboard(&app, "framework", Key::ArrowDown);
     keyboard(&app, "framework", Key::Enter);
-    assert!(contains_text(&app.render(), "Selected Solid"));
+    assert!(contains_text(&app.render(), "Selected SvelteKit"));
     click(&app, "framework");
     keyboard(&app, "framework", Key::Escape);
     assert!(keyed(&app.render(), "framework::list").is_none());

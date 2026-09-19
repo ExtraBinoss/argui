@@ -27,11 +27,23 @@ impl CatalogueDemo {
         field
     }
 
-    fn combobox(&self) -> Combobox {
+    fn combobox(&self, theme: &WidgetTheme) -> Combobox {
         let mut combo = Combobox::new(
             "framework",
             "Search frameworks",
-            ["Argui", "React", "Svelte", "Vue", "Solid"].map(SelectOption::new),
+            ["Next.js", "SvelteKit", "Nuxt.js", "Remix", "Astro"].map(SelectOption::new),
+        )
+        .trigger_icon(
+            Element::vector(self.combobox_icons[0])
+                .width(argui::ui::length(16.0))
+                .height(argui::ui::length(16.0))
+                .vector_color(theme.muted_foreground),
+        )
+        .selected_icon(
+            Element::vector(self.combobox_icons[1])
+                .width(argui::ui::length(16.0))
+                .height(argui::ui::length(16.0))
+                .vector_color(theme.foreground),
         );
         combo.query.clone_from(&self.text);
         combo.open = self.open;
@@ -107,12 +119,17 @@ impl CatalogueDemo {
                 ),
             ])
             .gap(10.0),
-            Page::Combobox => self.combobox().build(theme),
+            Page::Combobox => self.combobox(theme).build(theme),
             Page::NativeSelect => self.native_select().build(theme),
             Page::Questionnaire => self.questionnaire_widget().build(theme),
             _ => unreachable!("form page"),
         };
-        view.width(percent(1.0)).max_width(argui::ui::length(520.0))
+        view.width(percent(1.0))
+            .max_width(argui::ui::length(if self.page == Page::Combobox {
+                320.0
+            } else {
+                520.0
+            }))
     }
 
     pub(super) fn forms_event(
@@ -164,7 +181,7 @@ impl CatalogueDemo {
                 }
             }
             Page::Combobox => {
-                if let Some(action) = self.combobox().action(event) {
+                if let Some(action) = self.combobox(theme).action(event) {
                     match action {
                         ComboboxAction::Query(value) => {
                             self.text = value;
@@ -176,12 +193,12 @@ impl CatalogueDemo {
                         ComboboxAction::Highlight(index) => {
                             self.highlighted = Some(index);
                             cx.scroll(argui::ui::ScrollRequest::reveal(
-                                self.combobox().option_key(index),
+                                self.combobox(theme).option_key(index),
                             ));
                         }
                         ComboboxAction::Select(index) => {
                             self.selected = index;
-                            self.text = self.combobox().options[index].label.clone();
+                            self.text = self.combobox(theme).options[index].label.clone();
                             self.status = format!("Selected {}", self.text);
                             self.open = false;
                             cx.request_focus("framework");

@@ -2,9 +2,10 @@ use crate::{
     Button, Calendar, CalendarConstraints, CalendarLocale, CalendarSelection, CalendarState, Date,
     Input, IsoCalendarLocale, Popover, PopoverAction, PopoverBehavior, WidgetTheme,
 };
-use argui_core::{Key, KeyState};
+use argui_core::{CaretAffinity, Key, KeyState, TextPosition};
 use argui_ui::{
-    Element, FocusTarget, LiveRegion, Role, Semantics, UiEvent, UiEventKind, ValueHandler,
+    Element, FocusTarget, LiveRegion, Role, Semantics, TextSelection, TextSelectionRequest,
+    UiEvent, UiEventKind, ValueHandler,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -75,9 +76,15 @@ impl DatePickerState {
     }
 }
 
+/// State and UI effects produced by a handled date-picker event.
 pub struct DatePickerResponse {
+    /// Controlled picker state to use for the next render.
     pub state: DatePickerState,
+    /// Optional focus target requested by popup or calendar navigation.
     pub focus: Option<FocusTarget>,
+    /// Optional selection update for the editable date input.
+    pub selection: Option<TextSelectionRequest>,
+    /// Whether the event committed a valid date value.
     pub committed: bool,
 }
 
@@ -273,6 +280,7 @@ impl<'a> DatePicker<'a> {
         }
         let mut state = self.state.clone();
         let mut focus = None;
+        let mut selection = None;
         let mut committed = false;
         if key == self.input_key() {
             match &event.kind {
@@ -326,9 +334,16 @@ impl<'a> DatePicker<'a> {
         } else {
             return None;
         }
+        if committed {
+            selection = Some(TextSelectionRequest::new(
+                self.input_key(),
+                TextSelection::Caret(TextPosition::new(state.draft.len(), CaretAffinity::After)),
+            ));
+        }
         Some(DatePickerResponse {
             state,
             focus,
+            selection,
             committed,
         })
     }

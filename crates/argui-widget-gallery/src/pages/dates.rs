@@ -61,6 +61,9 @@ impl DatesDemo {
                 if let Some(focus) = response.focus {
                     cx.request_focus(focus);
                 }
+                if let Some(selection) = response.selection {
+                    cx.select_text(selection.target, selection.selection);
+                }
                 let _ = event.prevent_default();
                 event.stop_propagation();
                 cx.notify();

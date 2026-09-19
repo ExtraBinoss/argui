@@ -1,9 +1,10 @@
 use crate::{Button, Input, InputKind, SelectOption, WidgetTheme, choice_navigation::navigate};
 use argui_core::{Key, KeyState};
+use argui_paint::{CornerRadii, QuadStyle};
 use argui_ui::{
     AnchorWidth, DismissPolicy, Element, EventFilter, EventType, FloatingPlacement, FocusPolicy,
-    Orientation, Placement, Role, Semantics, UiEvent, UiEventKind, ValueHandler, WindowLayer,
-    length,
+    HitTestStyle, JustifyContent, Orientation, Placement, PointerEvents, Role, Semantics, UiEvent,
+    UiEventKind, ValueHandler, WindowLayer, auto, length, percent,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -28,6 +29,8 @@ pub struct Combobox {
     pub open: bool,
     pub enabled: bool,
     pub empty_label: String,
+    trigger_icon: Option<Element>,
+    selected_icon: Option<Element>,
     input_handlers: Vec<ValueHandler<String>>,
     select_handlers: Vec<ValueHandler<usize>>,
     open_handlers: Vec<ValueHandler<bool>>,
@@ -53,6 +56,8 @@ impl Combobox {
             open: false,
             enabled: true,
             empty_label: "No results".into(),
+            trigger_icon: None,
+            selected_icon: None,
             input_handlers: Vec::new(),
             select_handlers: Vec::new(),
             open_handlers: Vec::new(),
@@ -77,6 +82,20 @@ impl Combobox {
     #[must_use]
     pub fn on_open_change(mut self, handler: ValueHandler<bool>) -> Self {
         self.open_handlers.push(handler);
+        self
+    }
+
+    /// Sets the decorative icon displayed at the inline end of the editable field.
+    #[must_use]
+    pub fn trigger_icon(mut self, icon: Element) -> Self {
+        self.trigger_icon = Some(icon);
+        self
+    }
+
+    /// Sets the decorative indicator displayed beside the selected option.
+    #[must_use]
+    pub fn selected_icon(mut self, icon: Element) -> Self {
+        self.selected_icon = Some(icon);
         self
     }
 
@@ -182,7 +201,9 @@ impl Combobox {
         let visible = self.visible_indices();
         let active = self.active(&visible);
         let list_key = format!("{}::list", self.key);
-        let mut input_builder = Input::new(&self.key, &self.query, &self.label, theme.input())
+        let mut input_style = theme.input();
+        input_style.layout.padding.right = length(38.0);
+        let mut input_builder = Input::new(&self.key, &self.query, &self.label, input_style)
             .kind(InputKind::Search)
             .label(&self.label)
             .enabled(self.enabled);
@@ -225,22 +246,60 @@ impl Combobox {
                 input = input.active_descendant(self.option_key(index));
             }
         }
+        let trigger_icon = self.trigger_icon.clone().unwrap_or_else(|| {
+            Element::text("⌄").text_style(argui_text::TextStyle {
+                color: theme.muted_foreground,
+                font_size: 15.0,
+                line_height: 16.0,
+                ..Default::default()
+            })
+        });
+        let input = Element::container([
+            input,
+            Element::row([trigger_icon.semantic_hidden(true)])
+                .absolute(argui_ui::Sides {
+                    left: auto(),
+                    right: length(0.0),
+                    top: length(0.0),
+                    bottom: length(0.0),
+                })
+                .width(length(36.0))
+                .height(percent(1.0))
+                .align_items(argui_ui::AlignItems::CENTER)
+                .justify_content(JustifyContent::CENTER)
+                .hit_test(HitTestStyle::default().pointer_events(PointerEvents::None)),
+        ])
+        .width(percent(1.0));
         let panel = open.then(|| {
             let mut rows: Vec<_> = visible
                 .iter()
                 .map(|index| {
                     let option = &self.options[*index];
-                    let mut row = Button::new(
-                        self.option_key(*index),
-                        &option.label,
-                        if active == Some(*index) {
-                            theme.secondary_button()
-                        } else {
-                            theme.ghost_button()
-                        },
-                    )
-                    .enabled(option.enabled)
-                    .build();
+                    let mut style = theme.ghost_button();
+                    let active_style = QuadStyle::solid(theme.muted).radius(CornerRadii::all(6.0));
+                    if active == Some(*index) {
+                        style.paint.quad = active_style.clone();
+                    }
+                    style.hovered = active_style.clone().into();
+                    style.pressed = active_style.opacity(0.8).into();
+                    style.layout.justify_content = Some(JustifyContent::SPACE_BETWEEN);
+                    style.layout.padding = argui_ui::sides(8.0, 0.0);
+                    style.label.weight = 400;
+                    let mut button = Button::new(self.option_key(*index), &option.label, style)
+                        .enabled(option.enabled)
+                        .without_tooltip();
+                    if self.selected == Some(*index) {
+                        let indicator = self.selected_icon.clone().unwrap_or_else(|| {
+                            Element::text("✓").text_style(argui_text::TextStyle {
+                                color: theme.foreground,
+                                font_size: 14.0,
+                                line_height: 16.0,
+                                ..Default::default()
+                            })
+                        });
+                        button = button.trailing(indicator.semantic_hidden(true));
+                    }
+                    let mut row = button.build().width(percent(1.0));
                     row.interaction
                         .as_mut()
                         .expect("option interaction")
@@ -279,7 +338,8 @@ impl Combobox {
                 WindowLayer::Popover,
                 &self.key,
                 FloatingPlacement::new(Placement::BottomStart)
-                    .anchor_width(AnchorWidth::AtLeastAnchor),
+                    .viewport_padding(10.0)
+                    .anchor_width(AnchorWidth::MatchAnchor),
             )
             .portal_dismiss(DismissPolicy::OutsidePointer)
             .semantics(Semantics::new(Role::ListBox).label(&self.label));
@@ -295,6 +355,6 @@ impl Combobox {
             }
             panel
         });
-        Element::column(std::iter::once(input).chain(panel))
+        Element::column(std::iter::once(input).chain(panel)).width(percent(1.0))
     }
 }

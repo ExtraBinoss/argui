@@ -42,6 +42,12 @@ as `Element::on`.
 | Sidebar | `on_collapsed_change(bool)`, `on_open_change(bool)` | Rail and mobile sheet controls emit the requested controlled state. |
 | UpdateDialog | `on_action(String)`, `on_open_change(bool)` | Emits `check`, `download`, `cancel`, or `install`; engine state stays controlled. |
 
+`DatePicker::action` additionally returns a `DatePickerResponse::selection`
+effect after a successful commit. Forward it with
+`cx.select_text(request.target, request.selection)` after applying the returned
+state so a normalized or calendar-selected date leaves its caret at the end of
+the field.
+
 ## Incremental text edits
 
 Use `on_input(cx.input_callback(...))` when the complete next value is the most

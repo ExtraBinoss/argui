@@ -118,6 +118,10 @@ impl Default for WidgetGallery {
             light_assets.vector_id(TablerIcon::Microphone),
             light_assets.vector_id(TablerIcon::Stop),
         ];
+        let combobox_icons = [
+            light_assets.vector_id(TablerIcon::ChevronDown),
+            light_assets.vector_id(TablerIcon::Check),
+        ];
         let spinner = Entity::new(Spinner::new(
             accent_assets.vector_id(TablerIcon::Loader),
             17.0,
@@ -131,6 +135,7 @@ impl Default for WidgetGallery {
                         Entity::new(pages::catalogue::CatalogueDemo::new(
                             page,
                             button_group_icons,
+                            combobox_icons,
                         )),
                     )
                 })

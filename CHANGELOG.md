@@ -14,6 +14,12 @@ that do not use them.
 
 ### Fixed
 
+- Kept the `DatePicker` caret at the end of the normalized value after a
+  calendar or keyboard commit, and exposed the resulting selection request to
+  controlled applications.
+- Matched the shadcn Combobox composition more closely with an inline chevron,
+  full-width active option rows, selected-option checks, an anchor-width popup,
+  compact gallery sizing, and the official framework example labels.
 - Made direct-touch scrolling wait for the configured touch slop, lock to the
   intended scroll axis and viewport, and yield to widget-owned pointer capture.
   Small finger movement now remains a tap, vertical movement no longer flings a

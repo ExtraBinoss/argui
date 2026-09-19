@@ -64,6 +64,7 @@ pub(crate) struct CatalogueDemo {
     append_count: Option<usize>,
     button_group: button_group::ButtonGroupState,
     button_group_icons: [VectorId; 2],
+    combobox_icons: [VectorId; 2],
 }
 
 impl CatalogueDemo {
@@ -85,8 +86,12 @@ impl CatalogueDemo {
         self.offset = 0.0;
     }
 
-    /// Creates a catalogue page and supplies the vector icons used by its Button Group examples.
-    pub(crate) fn new(page: Page, button_group_icons: [VectorId; 2]) -> Self {
+    /// Creates a catalogue page with the vector icons used by its interactive examples.
+    pub(crate) fn new(
+        page: Page,
+        button_group_icons: [VectorId; 2],
+        combobox_icons: [VectorId; 2],
+    ) -> Self {
         Self {
             page,
             text: String::new(),
@@ -108,6 +113,7 @@ impl CatalogueDemo {
             append_count: Some(0),
             button_group: button_group::ButtonGroupState::default(),
             button_group_icons,
+            combobox_icons,
         }
     }
 

@@ -94,14 +94,20 @@ try {
             await capture(`${scheme}-${width}-otp-complete`);
             await navigate('Combobox');
             await click('[role="combobox"]'); await page.keyboard.type('sv'); await pause();
-            await page.waitForSelector('[role="option"][aria-label="Svelte"]');
+            await page.waitForSelector('[role="option"][aria-label="SvelteKit"]');
+            await capture(`${scheme}-${width}-combobox-open`);
             await page.keyboard.press('ArrowDown'); await page.keyboard.press('Enter'); await pause();
             await page.waitForFunction(() => {
                 const input = document.querySelector('[role="combobox"]');
-                return (input?.value ?? input?.getAttribute('aria-valuetext')) === 'Svelte';
+                return (input?.value ?? input?.getAttribute('aria-valuetext')) === 'SvelteKit';
             });
-            assert.equal(await value('[role="combobox"]'), 'Svelte');
+            assert.equal(await value('[role="combobox"]'), 'SvelteKit');
             assert.equal(await state('[role="combobox"]', 'aria-expanded'), 'false');
+            await click('[role="combobox"]');
+            await page.waitForSelector('[role="option"][aria-label="SvelteKit"]');
+            assert.equal(await state('[role="option"][aria-label="SvelteKit"]', 'aria-selected'), 'true');
+            await capture(`${scheme}-${width}-combobox-selected`);
+            await page.keyboard.press('Escape'); await pause();
             await navigate('Native select');
             await click('[role="combobox"]'); await pause();
             await page.keyboard.press('ArrowDown'); await page.keyboard.press('Enter'); await pause();

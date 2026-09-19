@@ -1,5 +1,7 @@
-use argui_core::{Color, ColorScheme, Key, KeyInput, KeyState, Modifiers};
-use argui_ui::{Element, UiEvent, UiEventKind, UiTree};
+use argui_core::{
+    CaretAffinity, Color, ColorScheme, Key, KeyInput, KeyState, Modifiers, TextPosition,
+};
+use argui_ui::{Element, TextSelection, TextSelectionRequest, UiEvent, UiEventKind, UiTree};
 use argui_widgets::{
     CalendarConstraints, CalendarLocale, Date, DatePicker, DatePickerState, IsoCalendarLocale,
     shadcn,
@@ -85,6 +87,13 @@ fn text_changes_do_not_commit_and_valid_submission_normalizes_input() {
     assert!(response.committed);
     assert_eq!(response.state.value, Some(date("2025-01-01")));
     assert_eq!(response.state.draft, "2025-01-01");
+    assert_eq!(
+        response.selection,
+        Some(TextSelectionRequest::new(
+            "date::input",
+            TextSelection::Caret(TextPosition::new(10, CaretAffinity::After)),
+        ))
+    );
     assert!(
         DatePicker::new("date", "Date", &initial, today)
             .action(&event("other", UiEventKind::Submitted("2025-01-01".into())))
@@ -143,6 +152,13 @@ fn popup_navigation_selects_dates_and_ignores_unrelated_or_released_keys() {
     assert!(selected.committed);
     assert_eq!(selected.state.value, Some(date("2024-03-01")));
     assert!(!selected.state.open);
+    assert_eq!(
+        selected.selection,
+        Some(TextSelectionRequest::new(
+            "date::input",
+            TextSelection::Caret(TextPosition::new(10, CaretAffinity::After)),
+        ))
+    );
 }
 
 #[test]
