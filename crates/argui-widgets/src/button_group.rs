@@ -1,7 +1,8 @@
 use argui_paint::CornerRadii;
 use argui_text::{TextStyle, TextWrap};
 use argui_ui::{
-    AlignItems, AlignSelf, Element, Orientation, Role, Semantics, length, percent, sides,
+    AlignItems, AlignSelf, Element, Orientation, Role, Semantics, WritingDirection, length,
+    percent, sides,
 };
 
 use crate::WidgetTheme;
@@ -13,6 +14,7 @@ pub struct ButtonGroup {
     pub label: String,
     pub orientation: Orientation,
     pub spacing: f32,
+    pub rtl: bool,
     pub children: Vec<Element>,
 }
 
@@ -32,6 +34,7 @@ impl ButtonGroup {
             label: label.into(),
             orientation: Orientation::Horizontal,
             spacing: 0.0,
+            rtl: false,
             children: children.into_iter().collect(),
         }
     }
@@ -56,13 +59,23 @@ impl ButtonGroup {
         self
     }
 
+    /// Mirrors a horizontal group for right-to-left writing systems.
+    ///
+    /// `rtl` controls both layout direction and the physical edges shared by
+    /// adjacent controls. It has no effect on vertical joining.
+    #[must_use]
+    pub const fn rtl(mut self, rtl: bool) -> Self {
+        self.rtl = rtl;
+        self
+    }
+
     #[must_use]
     /// Builds the group in its configured orientation.
     pub fn build(mut self) -> Element {
         if self.spacing == 0.0 {
             let count = self.children.len();
             for (index, child) in self.children.iter_mut().enumerate() {
-                join_control(child, self.orientation, index, count);
+                join_control(child, self.orientation, self.rtl, index, count);
             }
         }
         let root = match self.orientation {
@@ -73,11 +86,22 @@ impl ButtonGroup {
             .gap(self.spacing)
             .align_items(AlignItems::STRETCH)
             .align_self(AlignSelf::START)
+            .writing_direction(if self.rtl {
+                WritingDirection::Rtl
+            } else {
+                WritingDirection::Ltr
+            })
             .semantics(Semantics::new(Role::Group).label(self.label))
     }
 }
 
-fn join_control(child: &mut Element, orientation: Orientation, index: usize, count: usize) {
+fn join_control(
+    child: &mut Element,
+    orientation: Orientation,
+    rtl: bool,
+    index: usize,
+    count: usize,
+) {
     let Some(child) = control_surface(child) else {
         return;
     };
@@ -85,11 +109,13 @@ fn join_control(child: &mut Element, orientation: Orientation, index: usize, cou
     if count > 1 {
         match orientation {
             Orientation::Horizontal => {
-                if index > 0 {
+                let has_left_neighbor = if rtl { index + 1 < count } else { index > 0 };
+                let has_right_neighbor = if rtl { index > 0 } else { index + 1 < count };
+                if has_left_neighbor {
                     radii.top_left = 0.0;
                     radii.bottom_left = 0.0;
                 }
-                if index + 1 < count {
+                if has_right_neighbor {
                     radii.top_right = 0.0;
                     radii.bottom_right = 0.0;
                 }
@@ -113,6 +139,7 @@ fn join_control(child: &mut Element, orientation: Orientation, index: usize, cou
     let mut widths = border.widths;
     if index > 0 {
         match orientation {
+            Orientation::Horizontal if rtl => widths.right = 0.0,
             Orientation::Horizontal => widths.left = 0.0,
             Orientation::Vertical => widths.top = 0.0,
         }

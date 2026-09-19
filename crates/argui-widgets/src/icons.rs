@@ -8,8 +8,9 @@ use icondata_tb::{
     TbChevronDownOutline, TbChevronLeftOutline, TbChevronRightOutline, TbCircleCheckOutline,
     TbCircleFilled, TbClipboardOutline, TbCopyOutline, TbCutOutline, TbDeviceDesktopOutline,
     TbFileOutline, TbFolderOutline, TbInfoCircleOutline, TbLayoutSidebarLeftCollapseOutline,
-    TbLoader2Outline, TbMinusOutline, TbMoonOutline, TbResizeOutline, TbRestoreOutline,
-    TbSearchOutline, TbSelectAllOutline, TbSunOutline, TbTerminal2Outline, TbXOutline,
+    TbLoader2Outline, TbMicrophoneOutline, TbMinusOutline, TbMoonOutline, TbPlayerStopFilled,
+    TbResizeOutline, TbRestoreOutline, TbSearchOutline, TbSelectAllOutline, TbSunOutline,
+    TbTerminal2Outline, TbXOutline,
 };
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -46,10 +47,12 @@ pub enum TablerIcon {
     File,
     Rust,
     Terminal,
+    Microphone,
+    Stop,
 }
 
 impl TablerIcon {
-    const ALL: [Self; 31] = [
+    const ALL: [Self; 33] = [
         Self::Search,
         Self::Sun,
         Self::Moon,
@@ -81,6 +84,8 @@ impl TablerIcon {
         Self::File,
         Self::Rust,
         Self::Terminal,
+        Self::Microphone,
+        Self::Stop,
     ];
 
     const fn data(self) -> &'static IconData {
@@ -117,13 +122,15 @@ impl TablerIcon {
             Self::File => TbFileOutline,
             Self::Rust => TbBrandRustOutline,
             Self::Terminal => TbTerminal2Outline,
+            Self::Microphone => TbMicrophoneOutline,
+            Self::Stop => TbPlayerStopFilled,
         }
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct WidgetAssets {
-    ids: [Option<VectorId>; 31],
+    ids: [Option<VectorId>; 33],
     assets: Vec<VectorAsset>,
     color: Color,
 }
@@ -142,7 +149,7 @@ impl WidgetAssets {
     ///
     /// Panics if embedded Tabler icon data cannot be parsed as SVG.
     pub fn tabler_subset(color: Color, requested: impl IntoIterator<Item = TablerIcon>) -> Self {
-        let mut ids = [None; 31];
+        let mut ids = [None; 33];
         let icons = requested
             .into_iter()
             .collect::<std::collections::HashSet<_>>();

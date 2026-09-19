@@ -62,6 +62,11 @@ try {
             await page.keyboard.press('Space'); await pause();
             assert.equal(await state(button('Italic'), 'aria-pressed'), 'true');
             await navigate('Button group');
+            await page.waitForSelector(button('Start voice input'));
+            await activate(button('Start voice input'));
+            await page.waitForSelector(button('Stop recording'));
+            await activate(button('Stop recording'));
+            await page.waitForSelector(button('Start voice input'));
             await activate(button('Follow options'));
             await page.waitForSelector('[role="menu"][aria-label="Follow options"]');
             await activate('[role="menuitem"][aria-label="Mentions only"]');

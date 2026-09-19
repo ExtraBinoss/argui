@@ -156,3 +156,39 @@ fn button_group_inputs_and_overlay_triggers_share_one_control_height() {
         assert_eq!(height(left), height(right), "{left} and {right}");
     }
 }
+
+#[test]
+fn button_group_voice_action_is_a_compact_circular_icon() {
+    let app = Entity::new(WidgetGallery::default());
+    click(&app, "nav::button-group");
+    let root = app.render();
+    let voice = keyed(&root, "group-voice").unwrap();
+
+    assert_eq!(voice.style.size.width, argui::ui::length(28.0));
+    assert_eq!(voice.style.size.height, argui::ui::length(28.0));
+    assert_eq!(
+        voice.paint.quad.radii,
+        argui::paint::CornerRadii::all(999.0)
+    );
+    assert_eq!(
+        voice.semantics.as_ref().unwrap().label.as_deref(),
+        Some("Start voice input")
+    );
+    assert!(matches!(
+        voice.children[0].kind,
+        argui::ui::ElementKind::Vector { .. }
+    ));
+
+    click(&app, "group-voice");
+    let active = app.render();
+    assert_eq!(
+        keyed(&active, "group-voice")
+            .unwrap()
+            .semantics
+            .as_ref()
+            .unwrap()
+            .label
+            .as_deref(),
+        Some("Stop recording")
+    );
+}

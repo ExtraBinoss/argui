@@ -114,6 +114,10 @@ impl Default for WidgetGallery {
         let light_assets = WidgetAssets::tabler(Color::srgb(0.18, 0.20, 0.25));
         let dark_assets = WidgetAssets::tabler(Color::srgb(0.88, 0.90, 0.95));
         let accent_assets = WidgetAssets::tabler(PRIMARIES[0]);
+        let button_group_icons = [
+            light_assets.vector_id(TablerIcon::Microphone),
+            light_assets.vector_id(TablerIcon::Stop),
+        ];
         let spinner = Entity::new(Spinner::new(
             accent_assets.vector_id(TablerIcon::Loader),
             17.0,
@@ -124,7 +128,10 @@ impl Default for WidgetGallery {
                 .map(|page| {
                     (
                         page,
-                        Entity::new(pages::catalogue::CatalogueDemo::new(page)),
+                        Entity::new(pages::catalogue::CatalogueDemo::new(
+                            page,
+                            button_group_icons,
+                        )),
                     )
                 })
                 .collect(),

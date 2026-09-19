@@ -1,5 +1,6 @@
 use crate::navigation::Page;
 use argui::{
+    paint::VectorId,
     runtime::{Context, Render, tasks::TaskSlot},
     ui::{Element, EventType, UiEvent, UiEventKind},
     widgets::{HoverCardState, MessageScrollState, QuestionnaireState, shadcn},
@@ -62,6 +63,7 @@ pub(crate) struct CatalogueDemo {
     scroll_maximum: f32,
     append_count: Option<usize>,
     button_group: button_group::ButtonGroupState,
+    button_group_icons: [VectorId; 2],
 }
 
 impl CatalogueDemo {
@@ -83,7 +85,8 @@ impl CatalogueDemo {
         self.offset = 0.0;
     }
 
-    pub(crate) fn new(page: Page) -> Self {
+    /// Creates a catalogue page and supplies the vector icons used by its Button Group examples.
+    pub(crate) fn new(page: Page, button_group_icons: [VectorId; 2]) -> Self {
         Self {
             page,
             text: String::new(),
@@ -104,6 +107,7 @@ impl CatalogueDemo {
             scroll_maximum: 0.0,
             append_count: Some(0),
             button_group: button_group::ButtonGroupState::default(),
+            button_group_icons,
         }
     }
 

@@ -25,7 +25,7 @@ updater dialog is a separate opt-in.
 | Breadcrumb | [Breadcrumb](../../crates/argui-widgets/src/breadcrumb.rs) | `breadcrumb` | Actionable ancestors, stable IDs, custom separators and a described current page; accessible group without a Navigation landmark. |
 | Bubble | [Bubble](../../crates/argui-widgets/src/bubble.rs) | `bubble` | Seven variants, alignment and reactions; content is arbitrary and must use suitable foreground colors. |
 | Button | [Button](../../crates/argui-widgets/src/button.rs) | `button` | Theme variants, icons, loading state and accessible activation. |
-| Button Group | [ButtonGroup](../../crates/argui-widgets/src/button_group.rs) | `button-group` | Compact horizontal/vertical joined controls with shared high-contrast borders, outer-only rounding, aligned input/select/overlay triggers, separators, text segments, nested clusters, RTL inheritance and independent Tab stops. |
+| Button Group | [ButtonGroup](../../crates/argui-widgets/src/button_group.rs) | `button-group` | Compact horizontal/vertical joined controls with shared high-contrast borders, outer-only rounding, aligned input/select/overlay triggers, separators, text segments, nested clusters, explicit `.rtl(true)` physical-edge joining and independent Tab stops. |
 | Calendar | [Calendar](../../crates/argui-widgets/src/calendar.rs) | `calendar` | Calendar and retained CalendarState, locale, bounds, single/multiple/range selection and keyboard navigation. |
 | Card | [Card](../../crates/argui-widgets/src/card.rs) | `card` | Optional title, description, actions, content and footer with accessible relationships. |
 | Carousel | [Carousel](../../crates/argui-widgets/src/carousel.rs) | `carousel` | Controlled slide, buttons, keyboard, swiping, optional looping and announcements; no autoplay. |
@@ -93,7 +93,9 @@ pattern, and explicit reasons for action-only widgets are documented in the
 [interaction API inventory](interaction-api.md).
 
 Direction inherits through layout. Pass the same RTL value to collection
-controllers whose arrow-key behavior depends on direction.
+controllers whose arrow-key behavior depends on direction and to joined
+surfaces such as `ButtonGroup::rtl`, whose physical borders and corner radii
+must mirror the visual order.
 
 Focused examples:
 

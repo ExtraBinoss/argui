@@ -1,7 +1,12 @@
 use super::*;
 use crate::app::text;
 use argui::{
-    ui::{ActionId, ActionInvocation, ActionState, Element, Orientation, WritingDirection, length},
+    core::ColorInterpolation,
+    paint::{CornerRadii, QuadStyle, VectorId},
+    ui::{
+        ActionId, ActionInvocation, ActionState, Dimensions, Element, Orientation, Sides,
+        StylePatch, WritingDirection, length,
+    },
     widgets::*,
 };
 
@@ -76,6 +81,47 @@ fn symbol_button(
     Button::new(format!("group-{key}"), label, style)
         .content(text(symbol, 17.0, theme.foreground, 500))
         .build()
+}
+
+/// Builds the compact circular voice action embedded in the message field.
+fn voice_button(active: bool, icon: VectorId, theme: &WidgetTheme) -> Element {
+    let background = if active {
+        theme.destructive
+    } else {
+        theme.foreground
+    };
+    let foreground = if active {
+        theme.destructive_foreground
+    } else {
+        theme.background
+    };
+    let resting = QuadStyle::solid(background).radius(CornerRadii::all(999.0));
+    let hovered = QuadStyle::solid(background.mix(
+        theme.background,
+        if active { 0.12 } else { 0.18 },
+        ColorInterpolation::Oklab,
+    ))
+    .radius(CornerRadii::all(999.0));
+    let mut style = theme.ghost_button();
+    style.layout.size = Dimensions::length(28.0);
+    style.layout.padding = Sides::length(0.0);
+    style.paint.quad = resting.clone();
+    style.hovered = StylePatch::from_quad(hovered);
+    style.pressed = StylePatch::from_quad(resting.opacity(0.78));
+    Button::icon(
+        "group-voice",
+        if active {
+            "Stop recording"
+        } else {
+            "Start voice input"
+        },
+        Element::vector(icon)
+            .width(length(15.0))
+            .height(length(15.0))
+            .vector_color(foreground),
+        style,
+    )
+    .build()
 }
 
 /// Returns the currencies used by both the Select view and its behavior.
@@ -319,15 +365,9 @@ impl CatalogueDemo {
             .enabled(!self.button_group.voice)
             .build(),
         );
-        voice_input.trailing = Some(symbol_button(
-            "voice",
-            "Toggle voice mode",
-            if self.button_group.voice {
-                "Stop"
-            } else {
-                "Mic"
-            },
-            theme.ghost_button(),
+        voice_input.trailing = Some(voice_button(
+            self.button_group.voice,
+            self.button_group_icons[usize::from(self.button_group.voice)],
             theme,
         ));
         let input_group = ButtonGroup::new(
@@ -459,6 +499,7 @@ impl CatalogueDemo {
                     symbol_button("more-rtl", "خيارات أخرى", "•••", outline(), theme),
                 ],
             )
+            .rtl(true)
             .build(),
         )
         .build();

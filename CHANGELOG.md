@@ -18,8 +18,10 @@ that do not use them.
   now share higher-contrast borders, keep rounding only on the outside corners,
   preserve hover border colors through overlay trigger wrappers, align buttons,
   inputs, input groups and selects to the same control height, and retain
-  intrinsic width in horizontal and vertical layouts. The gallery dropdown,
-  select, popover, input and voice examples now keep real interactive state.
+  intrinsic width in horizontal and vertical layouts. Right-to-left groups now
+  join the correct physical edges after visual reordering. The gallery dropdown,
+  select, popover, input and voice examples now keep real interactive state,
+  with a compact circular microphone/stop action inside the message field.
 
 ## [0.3.1] - 2026-09-19
 

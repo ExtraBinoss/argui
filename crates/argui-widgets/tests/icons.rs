@@ -5,7 +5,7 @@ use argui_widgets::{TablerIcon, WidgetAssets};
 #[test]
 fn tabler_assets_are_parsed_once_and_reused_by_vector_elements() {
     let assets = WidgetAssets::tabler(Color::srgb(0.1, 0.7, 0.4));
-    assert_eq!(assets.assets().len(), 31);
+    assert_eq!(assets.assets().len(), 33);
     let icon = assets.icon(TablerIcon::Search, 19.0);
     assert!(icon.semantic_hidden);
     assert!(matches!(icon.kind, ElementKind::Vector { .. }));
@@ -15,5 +15,9 @@ fn tabler_assets_are_parsed_once_and_reused_by_vector_elements() {
     assert_ne!(
         assets.vector_id(TablerIcon::Search),
         assets.vector_id(TablerIcon::Close)
+    );
+    assert_ne!(
+        assets.vector_id(TablerIcon::Microphone),
+        assets.vector_id(TablerIcon::Stop)
     );
 }

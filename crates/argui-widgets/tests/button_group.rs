@@ -1,6 +1,6 @@
 use argui_core::{Color, ColorScheme};
 use argui_paint::{BorderWidths, CornerRadii};
-use argui_ui::{AlignSelf, Element, Orientation, Role, UiTree};
+use argui_ui::{AlignSelf, Element, Orientation, Role, UiTree, WritingDirection};
 use argui_widgets::{Button, ButtonGroup, ButtonGroupSeparator, ButtonGroupText, shadcn};
 
 #[test]
@@ -104,6 +104,53 @@ fn adjacent_controls_share_borders_and_only_outer_corners_stay_rounded() {
             left: 1.0,
             right: 1.0,
             top: 0.0,
+            bottom: 1.0,
+        }
+    );
+}
+
+#[test]
+fn rtl_groups_join_the_physical_edges_selected_by_visual_order() {
+    let palette = shadcn(Color::BLACK);
+    let theme = palette.resolve(ColorScheme::Light);
+    let group = ButtonGroup::new(
+        "rtl-actions",
+        "RTL actions",
+        ["one", "two", "three"].map(|label| {
+            Button::new(label, label, theme.outline_button())
+                .without_tooltip()
+                .build()
+        }),
+    )
+    .rtl(true)
+    .build();
+
+    assert_eq!(group.style.writing_direction, WritingDirection::Rtl);
+    assert_eq!(
+        group.children[0].paint.quad.radii,
+        CornerRadii {
+            top_left: 0.0,
+            top_right: 7.0,
+            bottom_right: 7.0,
+            bottom_left: 0.0,
+        }
+    );
+    assert_eq!(group.children[1].paint.quad.radii, CornerRadii::all(0.0));
+    assert_eq!(
+        group.children[2].paint.quad.radii,
+        CornerRadii {
+            top_left: 7.0,
+            top_right: 0.0,
+            bottom_right: 0.0,
+            bottom_left: 7.0,
+        }
+    );
+    assert_eq!(
+        group.children[1].paint.quad.border.as_ref().unwrap().widths,
+        BorderWidths {
+            left: 1.0,
+            right: 0.0,
+            top: 1.0,
             bottom: 1.0,
         }
     );
