@@ -1,5 +1,8 @@
 use argui_core::{Point, Size, TextPosition};
-use argui_text::{CaretScroll, TextEngine, TextInputScroll, TextStyle, TextWrap};
+use argui_text::{
+    CaretScroll, TextContent, TextEngine, TextInputScroll, TextSpan, TextSpanStyle, TextStyle,
+    TextWrap,
+};
 
 const NOTO_SANS: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
 const NOTO_ARABIC: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSansArabic.ttf");
@@ -378,4 +381,50 @@ fn large_code_buffers_build_unique_caret_stops_in_source_order() {
     assert!(layout.content_size.height > 10_000.0);
     assert!(unique.windows(2).all(|pair| pair[0] != pair[1]));
     assert!(layout.stops.iter().any(|stop| stop.word_boundary));
+}
+
+#[test]
+fn scrolled_caret_stops_keep_their_source_lines() {
+    let mut value = (0..25)
+        .map(|line| format!("    let line_{line:03} = {line};"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    value.push('\n');
+    let rich = TextContent::rich(value.split_inclusive('\n').enumerate().map(|(line, text)| {
+        TextSpan::new(text).style(TextSpanStyle::default().color(if line % 2 == 0 {
+            argui_core::Color::BLACK
+        } else {
+            argui_core::Color::WHITE
+        }))
+    }));
+    let style = TextStyle {
+        font_size: 13.5,
+        line_height: 21.0,
+        wrap: TextWrap::None,
+        ..TextStyle::default()
+    };
+    let scroll = 63.0;
+    let line = 11;
+    let index: usize = value.lines().take(line).map(|line| line.len() + 1).sum();
+    for content in [TextContent::plain(value), rich] {
+        let layout = engine().input_layout_content(
+            &content,
+            &style,
+            Size::new(580.0, 483.0),
+            pos(0),
+            None,
+            TextInputScroll::new(Point::new(0.0, scroll), CaretScroll::Preserve),
+        );
+        let stop = layout
+            .stops
+            .iter()
+            .find(|stop| stop.position.index == index)
+            .unwrap();
+
+        assert!(
+            (stop.point.y - (line as f32 * style.line_height - scroll)).abs() < 0.01,
+            "stop {stop:?}, resolved scroll {}",
+            layout.scroll_y
+        );
+    }
 }

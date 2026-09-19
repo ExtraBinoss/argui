@@ -172,7 +172,10 @@ impl TextEngine {
             buffer.set_scroll(Scroll::new(line, vertical, 0.0));
             buffer.shape_until_scroll(&mut self.fonts, false);
         }
-        let y_offset = scroll_y.unwrap_or_default();
+        let y_offset = scroll_y.map_or(0.0, |_| {
+            let shaped = buffer.scroll();
+            shaped.line as f32 * style.line_height + shaped.vertical
+        });
         let mut raw_stops = caret_stops(buffer, line_offsets);
         if no_wrap {
             for stop in &mut raw_stops {

@@ -8,6 +8,14 @@ that do not use them.
 
 _No changes yet._
 
+## [0.3.1] - 2026-09-19
+
+### Fixed
+
+- Kept caret placement, pointer hit testing, and text insertion on the same
+  painted line at the end of scrollable editors, including documents with a
+  trailing newline, on native and WebAssembly hosts.
+
 ## [0.3.0] - 2026-09-18
 
 ### Added
@@ -249,7 +257,8 @@ _No changes yet._
 - Added Windows and macOS workspace checks, Rust build caching, crates.io archive
   validation and ordered publication of all public crates.
 
-[Unreleased]: https://github.com/ExtraBinoss/argui/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/ExtraBinoss/argui/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/ExtraBinoss/argui/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/ExtraBinoss/argui/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/ExtraBinoss/argui/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/ExtraBinoss/argui/releases/tag/v0.2.0
