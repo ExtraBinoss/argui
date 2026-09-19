@@ -17,14 +17,14 @@ use super::SurfaceRenderer;
 #[derive(Clone, Debug)]
 pub(super) struct CachedLayer {
     layer: crate::effect_graph::EffectLayer,
-    target: TextureTarget,
+    pub(super) target: TextureTarget,
 }
 
 #[derive(Default)]
-struct CacheFrameStats {
-    hits: usize,
-    damaged_pixels: u64,
-    used: std::collections::HashSet<argui_paint::RenderObjectId>,
+pub(super) struct CacheFrameStats {
+    pub(super) hits: usize,
+    pub(super) damaged_pixels: u64,
+    pub(super) used: std::collections::HashSet<argui_paint::RenderObjectId>,
 }
 
 struct EffectPass {
@@ -89,62 +89,7 @@ impl SurfaceRenderer {
         Ok(additional_passes)
     }
 
-    pub(super) fn render_effect_graph(
-        &mut self,
-        encoder: &mut wgpu::CommandEncoder,
-        surface: &wgpu::TextureView,
-        graph: &EffectGraph,
-        viewport: [f32; 2],
-        profiler: Option<&GpuFrameCapture>,
-    ) -> (usize, u64) {
-        if self.offscreen.begin_frame() {
-            self.layer_cache.clear();
-        }
-        self.layer_cache
-            .retain(|_, cached| self.offscreen.retain(cached.target.texture));
-        self.effect.begin_frame();
-        let mut cache_stats = CacheFrameStats::default();
-        let region = PixelRegion::viewport(viewport[0] as u32, viewport[1] as u32);
-        let root = self.acquire_target(region, region.size);
-        self.clear_target(encoder, root, self.renderer_config.wgpu_clear_color());
-        self.render_effect_nodes(
-            encoder,
-            &graph.roots,
-            root,
-            viewport,
-            profiler,
-            None,
-            &mut cache_stats,
-        );
-        clear_view(encoder, surface, self.renderer_config.wgpu_clear_color());
-        let mut params = uniform(viewport, region, root, root, region.as_rect());
-        params.mode = 99;
-        params.data[0] = 1.0;
-        self.effect.draw(
-            &self.device,
-            &self.queue,
-            encoder,
-            EffectDraw {
-                target: surface,
-                target_region: region,
-                target_extent: region.size,
-                output_region: region,
-                source: self.offscreen.view(root.texture),
-                backdrop: self.offscreen.view(root.texture),
-                uniform: params,
-                shader: None,
-                parameters: &[],
-                profiler,
-                profile_label: "composite.present",
-                profile_object: None,
-            },
-        );
-        self.layer_cache
-            .retain(|profile, _| cache_stats.used.contains(profile));
-        (cache_stats.hits, cache_stats.damaged_pixels)
-    }
-
-    fn render_effect_nodes(
+    pub(super) fn render_effect_nodes(
         &mut self,
         encoder: &mut wgpu::CommandEncoder,
         nodes: &[EffectNode],
@@ -153,6 +98,7 @@ impl SurfaceRenderer {
         profiler: Option<&GpuFrameCapture>,
         owner: Option<argui_paint::RenderObjectId>,
         cache_stats: &mut CacheFrameStats,
+        clip: Option<PixelRegion>,
     ) {
         let mut index = 0;
         while index < nodes.len() {
@@ -163,7 +109,14 @@ impl SurfaceRenderer {
                     while index < nodes.len() && matches!(nodes[index], EffectNode::Draw(_)) {
                         index += 1;
                     }
-                    self.draw_offscreen(encoder, target, &nodes[start..index], profiler, owner);
+                    self.draw_offscreen(
+                        encoder,
+                        target,
+                        &nodes[start..index],
+                        profiler,
+                        owner,
+                        clip,
+                    );
                 }
                 EffectNode::Layer(layer) if layer.style.opacity <= 0.0 => {
                     if let Some(profile) = layer.style.profile {
@@ -179,10 +132,21 @@ impl SurfaceRenderer {
                         profiler,
                         layer.style.profile,
                         cache_stats,
+                        clip,
                     );
                 }
                 EffectNode::Layer(layer) => {
                     let Some(region) = layer.region else {
+                        continue;
+                    };
+                    let Some(output_region) =
+                        PixelRegion::from_rect(layer.style.transformed_bounds(), target.region)
+                    else {
+                        continue;
+                    };
+                    let Some(composite_region) =
+                        clip.map_or(Some(output_region), |clip| output_region.intersection(clip))
+                    else {
                         continue;
                     };
                     let cached = layer.style.profile.and_then(|profile| {
@@ -208,6 +172,7 @@ impl SurfaceRenderer {
                             profiler,
                             layer.style.profile,
                             cache_stats,
+                            None,
                         );
                         let foreground = self.apply_filters(
                             encoder,
@@ -230,18 +195,13 @@ impl SurfaceRenderer {
                         }
                         foreground
                     };
-                    let Some(output_region) =
-                        PixelRegion::from_rect(layer.style.transformed_bounds(), target.region)
-                    else {
-                        continue;
-                    };
                     self.composite_layer(
                         encoder,
                         target,
                         foreground,
                         &layer.style,
                         viewport,
-                        output_region,
+                        composite_region,
                         profiler,
                     );
                 }
@@ -256,6 +216,7 @@ impl SurfaceRenderer {
         nodes: &[EffectNode],
         profiler: Option<&GpuFrameCapture>,
         owner: Option<argui_paint::RenderObjectId>,
+        clip: Option<PixelRegion>,
     ) {
         let region = target.region.as_f32();
         let quad_offset = self.quad.target_offset(&self.queue, region);
@@ -293,7 +254,17 @@ impl SurfaceRenderer {
             0.0,
             1.0,
         );
-        pass.set_scissor_rect(0, 0, target.extent[0], target.extent[1]);
+        let Some(clip) = clip.map_or(Some(target.region), |clip| target.region.intersection(clip))
+        else {
+            return;
+        };
+        let viewport = target.viewport_for(clip);
+        pass.set_scissor_rect(
+            viewport[0] as u32,
+            viewport[1] as u32,
+            (viewport[2] as u32).max(1),
+            (viewport[3] as u32).max(1),
+        );
         for node in nodes {
             let EffectNode::Draw(batch) = node else {
                 continue;

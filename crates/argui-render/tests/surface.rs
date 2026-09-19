@@ -15,10 +15,11 @@ use argui_paint::{
     RenderObjectId, VectorAsset, VectorId, VectorPrimitive,
 };
 use argui_render::{
-    DamageMode, DamageTracking, EffectDefinition, EffectPassDefinition, EffectRegistry,
-    GpuCanvasDeviceContext, GpuCanvasDiagnosticKind, GpuCanvasError, GpuCanvasFactory,
-    GpuCanvasRegistration, GpuCanvasRegistry, GpuCanvasRenderContext, GpuCanvasRenderer,
-    GpuCanvasRequirements, RenderStatus, RendererConfig, RendererError, SurfaceRenderer,
+    DamageMode, DamageTracking, EffectDamage, EffectDefinition, EffectPassDefinition,
+    EffectRegistry, GpuCanvasDeviceContext, GpuCanvasDiagnosticKind, GpuCanvasError,
+    GpuCanvasFactory, GpuCanvasRegistration, GpuCanvasRegistry, GpuCanvasRenderContext,
+    GpuCanvasRenderer, GpuCanvasRequirements, RenderStatus, RendererConfig, RendererError,
+    SurfaceRenderer,
 };
 use argui_text::{PreparedText, TextEngine};
 use winit::{
@@ -28,6 +29,9 @@ use winit::{
     platform::{pump_events::EventLoopExtPumpEvents, wayland::EventLoopBuilderExtWayland},
     window::{Window, WindowId},
 };
+
+#[path = "surface/effect_damage.rs"]
+mod effect_damage;
 
 const SHADER: &str = "fn argui_effect(uv: vec2<f32>, source: vec4<f32>, backdrop: vec4<f32>) -> vec4<f32> { return source * 0.5; }";
 const NATIVE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
@@ -303,7 +307,7 @@ fn exercise(window: Arc<Window>, mut pump: impl FnMut()) {
     let effect = EffectId::new("test.half");
     let unused = EffectId::new("test.unused");
     let registry = EffectRegistry::new([
-        EffectDefinition::new(effect, &[], PASSES),
+        EffectDefinition::new(effect, &[], PASSES).damage(EffectDamage::Bounded),
         EffectDefinition::new(unused, &[], PASSES),
     ])
     .unwrap();
@@ -382,6 +386,8 @@ fn exercise(window: Arc<Window>, mut pump: impl FnMut()) {
     render(&mut renderer, &moved_again).unwrap();
     assert_eq!(renderer.last_profile().damage.mode, DamageMode::Seed);
 
+    effect_damage::exercise(&mut renderer, effect, &mut render);
+
     let assets: Vec<_> = (0..20).map(|_| asset()).collect();
     for asset in &assets {
         renderer.register_vector(asset).unwrap();
@@ -431,6 +437,9 @@ fn exercise(window: Arc<Window>, mut pump: impl FnMut()) {
         list.end_layer();
         render(&mut renderer, &list).unwrap();
         assert!(renderer.last_profile().effects.filter_passes >= 2);
+        if id == unused {
+            assert_eq!(renderer.last_profile().damage.mode, DamageMode::Full);
+        }
     }
     let mut missing = DisplayList::new();
     missing.begin_layer(

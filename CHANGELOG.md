@@ -11,13 +11,18 @@ that do not use them.
 - Added default-on adaptive GPU damage rendering on native and WebAssembly:
   retained scene snapshots detect changed physical regions, merge them on
   tile boundaries, repaint small updates through GPU scissors, and fall back
-  to direct full-surface rendering for large, fragmented, effect-dependent, or
+  to direct full-surface rendering for large, fragmented, unbounded-effect, or
   invalidated frames. `DamageTracking` configures the thresholds or disables
   the feature, while `DamagePlan`, `DamageSnapshot`, and
   `RenderProfile::damage` expose decisions and profiling statistics.
+- Added effect-aware regional damage composition. Built-in blur and shadows,
+  plus custom shaders declaring `EffectDamage::Bounded`, now propagate sampling
+  bounds from laid-out layers into a persistent effect root instead of forcing
+  a full viewport repaint. Unknown custom shaders remain safely unbounded, and
+  the liquid-glass preset declares its dynamic refraction/blur expansion.
 - Added a live **Damage control** Widget Gallery page that runs the same
-  animated workload and an optional blurred popover with adaptive damage
-  rendering on or off. The public
+  animated workload and optional blur or liquid-glass popovers with adaptive
+  damage rendering on or off. The public
   `AppCommand::SetDamageTracking` command also lets applications select the
   default adaptive policy, tune its thresholds, or force full-frame rendering
   per window at runtime. The page reports repaint coverage, damage regions,

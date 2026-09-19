@@ -1,9 +1,7 @@
-use std::{cell::RefCell, collections::VecDeque, rc::Rc, time::Duration};
-
 use argui::{
     paint::{Border, CornerRadii, PaintStyle, QuadStyle},
     platform::WindowKey,
-    render::{DamageMode, DamageTracking, RenderProfile},
+    render::DamageTracking,
     runtime::{AppCommand, Context, Render},
     ui::{
         AlignItems, Axes, Element, FlexWrap, FloatingPlacement, JustifyContent, Overflow,
@@ -11,119 +9,14 @@ use argui::{
     },
     widgets::{Button, Popover, Tab, Tabs, WidgetTheme, shadcn},
 };
+use argui_effects::LiquidGlass;
 
 use crate::app::text;
 
-const SAMPLE_LIMIT: usize = 120;
+mod metrics;
 
-/// Shared renderer measurements consumed by the damage-control showcase.
-pub(crate) type DamageTelemetryHandle = Rc<RefCell<DamageTelemetry>>;
-
-#[derive(Clone, Copy, Debug, Default)]
-struct DamageSample {
-    mode: DamageMode,
-    regions: usize,
-    damaged_pixels: u64,
-    viewport_pixels: u64,
-    retained_bytes: u64,
-    cpu_time: Duration,
-    gpu_time: Option<Duration>,
-}
-
-#[derive(Clone, Copy, Debug, Default)]
-struct DamageMetrics {
-    samples: usize,
-    mode: DamageMode,
-    regions: usize,
-    damaged_pixels: u64,
-    viewport_pixels: u64,
-    retained_bytes: u64,
-    average_ratio: f64,
-    average_cpu_ms: f64,
-    average_gpu_ms: Option<f64>,
-}
-
-/// Bounded rolling history of renderer profiles for the live comparison page.
-#[derive(Debug, Default)]
-pub(crate) struct DamageTelemetry {
-    samples: VecDeque<DamageSample>,
-}
-
-impl DamageTelemetry {
-    /// Creates an empty handle suitable for sharing with the runtime callback.
-    #[must_use]
-    pub(crate) fn handle() -> DamageTelemetryHandle {
-        Rc::new(RefCell::new(Self::default()))
-    }
-
-    /// Records the relevant counters from one completed renderer frame.
-    ///
-    /// `profile` is the renderer profile emitted after presentation.
-    pub(crate) fn record(&mut self, profile: &RenderProfile) {
-        self.samples.push_back(DamageSample {
-            mode: profile.damage.mode,
-            regions: profile.damage.regions,
-            damaged_pixels: profile.damage.damaged_pixels,
-            viewport_pixels: profile.viewport_pixels,
-            retained_bytes: profile.damage.retained_bytes,
-            cpu_time: profile.cpu_time,
-            gpu_time: profile.gpu.as_ref().map(|gpu| gpu.total),
-        });
-        if self.samples.len() > SAMPLE_LIMIT {
-            self.samples.pop_front();
-        }
-    }
-
-    /// Clears all samples so two renderer modes start with independent history.
-    pub(crate) fn clear(&mut self) {
-        self.samples.clear();
-    }
-
-    /// Summarizes the current rolling history for presentation.
-    fn metrics(&self) -> DamageMetrics {
-        let Some(latest) = self.samples.back().copied() else {
-            return DamageMetrics::default();
-        };
-        let count = self.samples.len() as f64;
-        let average_ratio = self
-            .samples
-            .iter()
-            .map(|sample| {
-                if sample.viewport_pixels == 0 {
-                    0.0
-                } else {
-                    sample.damaged_pixels as f64 / sample.viewport_pixels as f64
-                }
-            })
-            .sum::<f64>()
-            / count;
-        let average_cpu_ms = self
-            .samples
-            .iter()
-            .map(|sample| sample.cpu_time.as_secs_f64() * 1_000.0)
-            .sum::<f64>()
-            / count;
-        let (gpu_total, gpu_count) = self
-            .samples
-            .iter()
-            .filter_map(|sample| sample.gpu_time)
-            .fold((0.0, 0_usize), |(total, count), duration| {
-                (total + duration.as_secs_f64() * 1_000.0, count + 1)
-            });
-        let average_gpu_ms = (gpu_count > 0).then(|| gpu_total / gpu_count as f64);
-        DamageMetrics {
-            samples: self.samples.len(),
-            mode: latest.mode,
-            regions: latest.regions,
-            damaged_pixels: latest.damaged_pixels,
-            viewport_pixels: latest.viewport_pixels,
-            retained_bytes: latest.retained_bytes,
-            average_ratio,
-            average_cpu_ms,
-            average_gpu_ms,
-        }
-    }
-}
+use metrics::{DamageMetrics, damage_mode, format_pixels, metric_card, when_ready};
+pub(crate) use metrics::{DamageTelemetry, DamageTelemetryHandle};
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 enum ComparisonMode {
@@ -152,6 +45,7 @@ pub(crate) struct DamageControlDemo {
     running: bool,
     reduced_motion: bool,
     blur_open: bool,
+    glass_open: bool,
 }
 
 impl DamageControlDemo {
@@ -169,6 +63,7 @@ impl DamageControlDemo {
             running: true,
             reduced_motion: false,
             blur_open: false,
+            glass_open: false,
         }
     }
 
@@ -187,6 +82,7 @@ impl DamageControlDemo {
     /// Closes transient overlays when the gallery navigates away from this page.
     pub(crate) fn deactivate(&mut self) {
         self.blur_open = false;
+        self.glass_open = false;
     }
 
     /// Selects a renderer mode and starts a fresh measurement window.
@@ -212,7 +108,7 @@ impl DamageControlDemo {
     }
 
     /// Builds the animated workload whose changed bounds drive damage tracking.
-    fn workload(&self, theme: &WidgetTheme, blur_popover: Element) -> Element {
+    fn workload(&self, theme: &WidgetTheme, effect_controls: Element) -> Element {
         let travel = triangle_wave(self.phase) * 560.0;
         let orb = Element::container([])
             .keyed("damage-control-orb")
@@ -247,7 +143,7 @@ impl DamageControlDemo {
                         theme.muted_foreground,
                         450,
                     ),
-                    blur_popover,
+                    effect_controls,
                 ])
                 .gap(10.0)
                 .align_items(AlignItems::CENTER)
@@ -460,7 +356,7 @@ impl Render for DamageControlDemo {
                     450,
                 ),
                 text(
-                    "Backdrop-dependent effects require full composition today, even while Auto is selected.",
+                    "Auto expands intersecting damage to this effect's finite layer bounds, not the full viewport.",
                     12.0,
                     theme.muted_foreground,
                     450,
@@ -479,9 +375,67 @@ impl Render for DamageControlDemo {
         .backdrop_blur(14.0)
         .on_open_change(cx.value_callback(|demo, open| {
             demo.blur_open = open;
+            if open {
+                demo.glass_open = false;
+            }
             demo.activate();
         }))
         .build(theme);
+        let glass_popover = Popover::new(
+            "damage-control-glass",
+            "Inspect liquid glass",
+            self.glass_open,
+            Button::new(
+                "damage-control-glass",
+                if self.glass_open {
+                    "Close glass"
+                } else {
+                    "Open glass"
+                },
+                theme.outline_button(),
+            )
+            .build(),
+            Element::column([
+                text("Liquid glass is active", 15.0, theme.foreground, 650),
+                text(
+                    "Three bounded shader passes refract, blur, and tint the moving backdrop.",
+                    13.0,
+                    theme.muted_foreground,
+                    450,
+                ),
+                text(
+                    "Its declared expansion participates in the same regional damage path.",
+                    12.0,
+                    theme.muted_foreground,
+                    450,
+                ),
+            ])
+            .gap(10.0),
+        )
+        .placement(FloatingPlacement::new(Placement::BottomEnd))
+        .size(286.0, 220.0)
+        .paint(PaintStyle::new(
+            QuadStyle::solid(theme.popover.with_alpha(0.52))
+                .border(Border::all(1.0, theme.popover_border))
+                .radius(CornerRadii::all(12.0)),
+        ))
+        .radius(12.0)
+        .layer(
+            theme
+                .overlay_layer(12.0, 0.0)
+                .backdrop(LiquidGlass::new().filter()),
+        )
+        .on_open_change(cx.value_callback(|demo, open| {
+            demo.glass_open = open;
+            if open {
+                demo.blur_open = false;
+            }
+            demo.activate();
+        }))
+        .build(theme);
+        let effect_controls = Element::row([blur_popover, glass_popover])
+            .gap(8.0)
+            .flex_wrap(FlexWrap::Wrap);
         super::preview(
             "Same scene, real renderer modes",
             "Switch modes while the workload runs. The cards come from RenderProfile after each presented frame, not from estimated UI state.",
@@ -493,7 +447,7 @@ impl Render for DamageControlDemo {
                 )
                 .on_select(mode)
                 .build(theme),
-                self.workload(theme, blur_popover),
+                self.workload(theme, effect_controls),
                 self.metrics(theme),
                 Element::row([
                     Button::new(
@@ -525,52 +479,6 @@ impl Render for DamageControlDemo {
             .gap(16.0),
             theme,
         )
-    }
-}
-
-/// Chooses a measured value once renderer samples are available.
-fn when_ready(ready: bool, value: String, pending: &str) -> String {
-    if ready { value } else { pending.into() }
-}
-
-/// Builds one compact renderer-metric card.
-fn metric_card(
-    label: &str,
-    value: String,
-    detail: impl Into<String>,
-    theme: &WidgetTheme,
-) -> Element {
-    Element::column([
-        text(label, 11.0, theme.muted_foreground, 650),
-        text(value, 22.0, theme.foreground, 720),
-        text(detail, 11.0, theme.muted_foreground, 450),
-    ])
-    .width(length(190.0))
-    .min_width(length(150.0))
-    .grow(1.0)
-    .padding(Sides::length(14.0))
-    .gap(4.0)
-    .background(theme.card)
-    .border(Border::all(1.0, theme.border))
-    .radius(CornerRadii::all(10.0))
-}
-
-/// Formats the latest damaged and viewport pixel counts compactly.
-fn format_pixels(damaged: u64, viewport: u64) -> String {
-    format!(
-        "{:.2}M / {:.2}M px",
-        damaged as f64 / 1_000_000.0,
-        viewport as f64 / 1_000_000.0
-    )
-}
-
-/// Returns a concise label for one renderer damage decision.
-const fn damage_mode(mode: DamageMode) -> &'static str {
-    match mode {
-        DamageMode::Full => "Full",
-        DamageMode::Seed => "Seed",
-        DamageMode::Partial => "Partial",
-        DamageMode::Reused => "Reused",
     }
 }
 

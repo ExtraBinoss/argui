@@ -236,6 +236,29 @@ impl EffectGraph {
         visit(&self.roots, &mut effects);
         effects
     }
+
+    /// Returns every stable profile identifier present in active graph layers.
+    #[must_use]
+    pub(crate) fn profiles(&self) -> std::collections::HashSet<argui_paint::RenderObjectId> {
+        fn visit(
+            nodes: &[EffectNode],
+            profiles: &mut std::collections::HashSet<argui_paint::RenderObjectId>,
+        ) {
+            for node in nodes {
+                if let EffectNode::Layer(layer) = node
+                    && layer.style.opacity > 0.0
+                {
+                    if let Some(profile) = layer.style.profile {
+                        profiles.insert(profile);
+                    }
+                    visit(&layer.children, profiles);
+                }
+            }
+        }
+        let mut profiles = std::collections::HashSet::new();
+        visit(&self.roots, &mut profiles);
+        profiles
+    }
 }
 
 fn push_draw(

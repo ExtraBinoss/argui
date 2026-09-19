@@ -29,6 +29,7 @@ use crate::{
 
 mod api;
 mod composite;
+mod effect_damage;
 mod effects;
 mod retained;
 
@@ -111,6 +112,7 @@ pub struct SurfaceRenderer {
     content_revision: u64,
     damage: DamageGpu,
     scene_snapshot: Option<DamageSnapshot>,
+    effect_root: Option<crate::target::TextureTarget>,
 }
 
 #[cfg_attr(coverage_nightly, coverage(off))]
@@ -227,6 +229,7 @@ impl SurfaceRenderer {
             content_revision: 0,
             damage,
             scene_snapshot: None,
+            effect_root: None,
         })
     }
 
@@ -335,6 +338,7 @@ impl SurfaceRenderer {
                     self.scene_snapshot.as_ref(),
                     &snapshot,
                     self.renderer_config.damage_tracking,
+                    &self.renderer_config.effects,
                 );
                 if content_changed && damage_plan == DamagePlan::Unchanged {
                     damage_plan = DamagePlan::Full;
@@ -376,16 +380,23 @@ impl SurfaceRenderer {
             && graph.needs_offscreen_root()
         {
             self.damage.invalidate();
-            if let Some((snapshot, _)) = scene_update {
-                self.scene_snapshot = Some(snapshot);
-            }
-            let (cached_layers, damaged_pixels) = self.render_effect_graph(
+            let full = DamagePlan::Full;
+            let plan = scene_update
+                .as_ref()
+                .map_or(&full, |(_, damage_plan)| damage_plan);
+            let (cached_layers, damaged_pixels, damage_profile) = self.render_effect_graph(
                 &mut encoder,
                 &view,
                 &graph,
                 viewport,
+                plan,
                 gpu_capture.as_ref(),
             );
+            if let Some((snapshot, _)) = scene_update {
+                self.scene_snapshot = Some(snapshot);
+            } else {
+                self.scene_snapshot = None;
+            }
             graph_stats.cached_layers = cached_layers;
             graph_stats.damaged_pixels = damaged_pixels;
             notify();
@@ -395,21 +406,12 @@ impl SurfaceRenderer {
             canvas_commands.push(encoder.finish());
             self.queue.submit(canvas_commands);
             let _ = self.device.poll(wgpu::PollType::Poll);
-            self.finish_profile(
-                profiler,
-                viewport,
-                graph_stats,
-                DamageProfile {
-                    mode: DamageMode::Full,
-                    regions: 1,
-                    damaged_pixels: viewport[0] as u64 * viewport[1] as u64,
-                    retained_bytes: 0,
-                },
-                false,
-            );
+            self.finish_profile(profiler, viewport, graph_stats, damage_profile, false);
             self.queue.present(frame);
             return Ok(status);
         }
+        self.effect_root = None;
+        self.layer_cache.clear();
         self.effect.begin_frame();
         let (damage_profile, direct_surface) = match scene_update {
             Some((snapshot, DamagePlan::Partial(regions))) => {
@@ -480,12 +482,16 @@ impl SurfaceRenderer {
         damage: DamageProfile,
         direct_surface: bool,
     ) {
+        let texture_pool = self.effect_root.map_or_else(
+            || self.offscreen.stats(),
+            |root| self.offscreen.stats_excluding(root.texture),
+        );
         if let Some(profile) = profiler.finish(RenderProfile {
             viewport_pixels: viewport[0] as u64 * viewport[1] as u64,
             draw_batches: self.batches.len(),
             effects,
             damage,
-            texture_pool: self.offscreen.stats(),
+            texture_pool,
             vector_atlas: self.vector.stats(),
             gpu_canvases: self.gpu_canvas.stats(),
             direct_surface,

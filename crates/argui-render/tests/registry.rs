@@ -1,6 +1,7 @@
 use argui_paint::{EffectId, EffectInstance, EffectValue};
 use argui_render::{
-    EffectDefinition, EffectParameter, EffectParameterType, EffectPassDefinition, EffectRegistry,
+    EffectDamage, EffectDefinition, EffectParameter, EffectParameterType, EffectPassDefinition,
+    EffectRegistry,
 };
 
 const WGSL: &str = r#"
@@ -111,6 +112,9 @@ fn parameter_widths_and_builders_are_publicly_consistent() {
         definition(EffectId::new("test.effect")).parameter_words(),
         1
     );
+    let definition = definition(EffectId::new("test.bounded")).damage(EffectDamage::Bounded);
+    assert_eq!(definition.damage, EffectDamage::Bounded);
+    assert_eq!(EffectDamage::default(), EffectDamage::Unbounded);
 }
 
 #[test]

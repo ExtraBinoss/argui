@@ -1,8 +1,8 @@
 use argui_core::{Affine2D, Point, Rect, Size};
-use argui_paint::{ClipChain, DisplayCommand, DisplayList};
+use argui_paint::{ClipChain, DisplayCommand, DisplayList, Filter, LayerStyle};
 use argui_text::{PreparedDecoration, PreparedGlyph, PreparedText};
 
-use crate::{DamagePlan, DamageRegion, DamageTracking};
+use crate::{DamagePlan, DamageRegion, DamageTracking, EffectDamage, EffectRegistry};
 
 #[derive(Clone, Debug, Default, PartialEq)]
 struct TextVisual {
@@ -17,6 +17,13 @@ struct SceneItem {
     bounds: Option<DamageRegion>,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+struct EffectLayer {
+    style: LayerStyle,
+    bounds: DamageRegion,
+    dependency: DamageRegion,
+}
+
 /// Renderer-neutral scene signature used to detect changed pixels.
 ///
 /// Snapshots retain paint command identities, prepared text visuals and their
@@ -24,6 +31,7 @@ struct SceneItem {
 #[derive(Clone, Debug, PartialEq)]
 pub struct DamageSnapshot {
     items: Vec<SceneItem>,
+    effect_layers: Vec<EffectLayer>,
     viewport: [u32; 2],
     scale_factor: f32,
 }
@@ -47,12 +55,24 @@ impl DamageSnapshot {
         let text_visuals = text_visuals(text);
         let mut items = Vec::with_capacity(display_list.commands().len());
         let mut layers = Vec::new();
+        let mut effect_layers = Vec::new();
         for command in display_list.commands() {
             let text = match command {
                 DisplayCommand::Text { block, .. } => text_visuals.get(*block).cloned(),
                 _ => None,
             };
             let bounds = command_bounds(command, text_bounds, viewport, scale_factor);
+            if let Some(style) = command_layer_style(command, scale_factor)
+                && layer_propagates_damage(&style)
+                && let Some(bounds) = bounds
+                && let Some(dependency) = effect_dependency(&style, viewport)
+            {
+                effect_layers.push(EffectLayer {
+                    style,
+                    bounds,
+                    dependency,
+                });
+            }
             let index = items.len();
             match command {
                 DisplayCommand::BeginLayer(_) | DisplayCommand::BeginCompositor(_) => {
@@ -78,6 +98,7 @@ impl DamageSnapshot {
         }
         Self {
             items,
+            effect_layers,
             viewport,
             scale_factor,
         }
@@ -89,13 +110,45 @@ impl DamageSnapshot {
     /// * `tracking` — region-count and area thresholds used by the decision.
     #[must_use]
     pub fn compare(&self, current: &Self, tracking: DamageTracking) -> DamagePlan {
+        self.compare_regions(current, tracking, None)
+    }
+
+    /// Compares this snapshot with `current` and propagates changes through effect layers.
+    ///
+    /// Bounded custom effects expand intersecting changes to their complete
+    /// layout-derived layer bounds. An unbounded or missing custom definition
+    /// conservatively selects a full frame whenever the scene changes.
+    ///
+    /// * `current` — scene that will replace this snapshot.
+    /// * `tracking` — region-count and area thresholds used by the decision.
+    /// * `effects` — custom effect definitions used by the current scene.
+    #[must_use]
+    pub fn compare_with_effects(
+        &self,
+        current: &Self,
+        tracking: DamageTracking,
+        effects: &EffectRegistry,
+    ) -> DamagePlan {
+        self.compare_regions(current, tracking, Some(effects))
+    }
+
+    /// Resolves raw scene differences with optional effect dependency propagation.
+    fn compare_regions(
+        &self,
+        current: &Self,
+        tracking: DamageTracking,
+        effects: Option<&EffectRegistry>,
+    ) -> DamagePlan {
         if self.viewport != current.viewport || self.scale_factor != current.scale_factor {
+            return DamagePlan::Full;
+        }
+        if !tracking.enabled {
             return DamagePlan::Full;
         }
         if self.items == current.items {
             return DamagePlan::Unchanged;
         }
-        let regions = if self.items.len() == current.items.len() {
+        let mut regions = if self.items.len() == current.items.len() {
             self.items
                 .iter()
                 .zip(&current.items)
@@ -106,6 +159,16 @@ impl DamageSnapshot {
         } else {
             changed_middle(self, current)
         };
+        if let Some(effects) = effects {
+            if current
+                .effect_layers
+                .iter()
+                .any(|layer| contains_unbounded_effect(&layer.style, effects))
+            {
+                return DamagePlan::Full;
+            }
+            propagate_effect_bounds(&mut regions, &current.effect_layers);
+        }
         DamagePlan::resolve(regions, current.viewport, tracking)
     }
 }
@@ -115,10 +178,84 @@ pub(crate) fn scene_damage(
     previous: Option<&DamageSnapshot>,
     current: &DamageSnapshot,
     tracking: DamageTracking,
+    effects: &EffectRegistry,
 ) -> DamagePlan {
     previous.map_or(DamagePlan::Full, |previous| {
-        previous.compare(current, tracking)
+        previous.compare_with_effects(current, tracking, effects)
     })
+}
+
+/// Returns a scaled layer style for a layer-opening command.
+fn command_layer_style(command: &DisplayCommand, scale: f32) -> Option<LayerStyle> {
+    match command {
+        DisplayCommand::BeginLayer(style) => Some(style.scaled(scale)),
+        DisplayCommand::BeginCompositor(layer) => Some(layer.style().scaled(scale)),
+        _ => None,
+    }
+}
+
+/// Returns whether changes can spread beyond their original primitive bounds.
+fn layer_propagates_damage(style: &LayerStyle) -> bool {
+    !style.filters.is_empty() || !style.backdrop_filters.is_empty() || !style.shadows.is_empty()
+}
+
+/// Returns whether a layer contains a custom effect without finite dependency bounds.
+fn contains_unbounded_effect(style: &LayerStyle, effects: &EffectRegistry) -> bool {
+    style
+        .filters
+        .iter()
+        .chain(&style.backdrop_filters)
+        .any(|filter| match filter {
+            Filter::Effect(effect) => effects
+                .get(effect.id)
+                .is_none_or(|definition| definition.damage == EffectDamage::Unbounded),
+            _ => false,
+        })
+}
+
+/// Expands intersecting changes to complete effect outputs until nesting stabilizes.
+fn propagate_effect_bounds(regions: &mut Vec<DamageRegion>, layers: &[EffectLayer]) {
+    loop {
+        let mut changed = false;
+        for layer in layers {
+            if regions
+                .iter()
+                .copied()
+                .any(|region| regions_overlap(region, layer.dependency))
+                && !regions.contains(&layer.bounds)
+            {
+                regions.push(layer.bounds);
+                changed = true;
+            }
+        }
+        if !changed {
+            break;
+        }
+    }
+}
+
+/// Returns the conservative input footprint for one effect layer.
+fn effect_dependency(style: &LayerStyle, viewport: [u32; 2]) -> Option<DamageRegion> {
+    let backdrop_expansion = style
+        .backdrop_filters
+        .iter()
+        .map(Filter::expansion)
+        .sum::<f32>()
+        .max(0.0);
+    let mut bounds = style.expanded_bounds();
+    bounds.origin.x -= backdrop_expansion;
+    bounds.origin.y -= backdrop_expansion;
+    bounds.size.width += backdrop_expansion * 2.0;
+    bounds.size.height += backdrop_expansion * 2.0;
+    DamageRegion::from_rect(style.transform.transform_rect(bounds), viewport)
+}
+
+/// Returns whether two non-empty physical regions overlap.
+const fn regions_overlap(left: DamageRegion, right: DamageRegion) -> bool {
+    left.x < right.right()
+        && right.x < left.right()
+        && left.y < right.bottom()
+        && right.y < left.bottom()
 }
 
 /// Returns bounds from the changed middle after equal prefixes and suffixes are removed.

@@ -1,5 +1,6 @@
 use super::*;
 use argui::paint::Filter;
+use argui_effects::LIQUID_GLASS_ID;
 
 #[test]
 fn damage_control_switches_modes_and_keeps_a_controllable_workload() {
@@ -47,6 +48,21 @@ fn damage_control_switches_modes_and_keeps_a_controllable_workload() {
             .backdrop_filters
             .as_slice(),
         [Filter::Blur(radius)] if *radius == 14.0
+    ));
+
+    click("damage-control-glass");
+    let glass = gallery.render(Default::default()).unwrap();
+    assert!(contains_text(&glass, "Liquid glass is active"));
+    assert!(!contains_text(&glass, "Backdrop blur is active"));
+    assert!(matches!(
+        keyed(&glass, "damage-control-glass::content")
+            .unwrap()
+            .layer
+            .as_ref()
+            .unwrap()
+            .backdrop_filters
+            .as_slice(),
+        [Filter::Effect(effect)] if effect.id == LIQUID_GLASS_ID
     ));
 
     let before = keyed(&initial, "damage-control-orb")
@@ -159,6 +175,10 @@ fn damage_control_switches_modes_and_keeps_a_controllable_workload() {
     assert!(!contains_text(
         &gallery.render(Default::default()).unwrap(),
         "Backdrop blur is active"
+    ));
+    assert!(!contains_text(
+        &gallery.render(Default::default()).unwrap(),
+        "Liquid glass is active"
     ));
 
     let reduced = WindowEnvironment {

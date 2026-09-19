@@ -7,6 +7,20 @@ use argui_paint::{EffectId, EffectInstance, EffectValue};
 
 use crate::{RendererError, effect::validated_custom_source};
 
+/// Spatial dependency declared by a custom GPU effect for damage tracking.
+///
+/// Built-in effects already expose conservative bounds to the renderer. Custom
+/// shaders default to [`Self::Unbounded`] until their author confirms that all
+/// texture reads stay inside the layer allocation derived from layout.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum EffectDamage {
+    /// Any scene change may affect the shader output, so partial repainting is unsafe.
+    #[default]
+    Unbounded,
+    /// Every texture read stays inside the effect layer's allocated bounds.
+    Bounded,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum EffectParameterType {
     F32,
@@ -123,6 +137,8 @@ pub struct EffectDefinition {
     pub id: EffectId,
     pub parameters: &'static [EffectParameter],
     pub passes: &'static [EffectPassDefinition],
+    /// Spatial dependency used to propagate scene damage through this effect.
+    pub damage: EffectDamage,
 }
 
 impl EffectDefinition {
@@ -138,7 +154,21 @@ impl EffectDefinition {
             id,
             parameters,
             passes,
+            damage: EffectDamage::Unbounded,
         }
+    }
+
+    /// Declares how scene damage propagates through this effect.
+    ///
+    /// Use [`EffectDamage::Bounded`] only when every pass samples within the
+    /// layer allocation. The allocation already includes the dynamic expansion
+    /// carried by [`EffectInstance`].
+    ///
+    /// * `damage` — conservative spatial dependency of the shader passes.
+    #[must_use]
+    pub const fn damage(mut self, damage: EffectDamage) -> Self {
+        self.damage = damage;
+        self
     }
 
     /// Validates identifiers, parameter names, pass definitions, and shader source.

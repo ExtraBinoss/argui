@@ -38,8 +38,8 @@ pub use profile::{
     AdapterProfile, GpuFrameProfile, GpuPassProfile, RenderProfile, VectorAtlasStats,
 };
 pub use registry::{
-    EffectDefinition, EffectInput, EffectParameter, EffectParameterType, EffectPassDefinition,
-    EffectRegistry,
+    EffectDamage, EffectDefinition, EffectInput, EffectParameter, EffectParameterType,
+    EffectPassDefinition, EffectRegistry,
 };
 pub use surface::{RenderStatus, RendererDevice, SurfaceRenderer};
 /// Exact WGPU version used by Argui's public GPU-canvas contexts.

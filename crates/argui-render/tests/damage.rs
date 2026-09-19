@@ -1,10 +1,14 @@
 use argui_core::{Affine2D, Color, Point, Rect, Size};
 use argui_paint::{
-    Border, ClipChain, ClipRegion, CompositorId, CompositorLayer, CornerRadii, DisplayList, Fill,
-    GpuCanvasId, GpuCanvasPrimitive, ImageFit, ImageId, ImagePrimitive, ImageSampling, LayerStyle,
-    ProfileDomain, Quad, RenderObjectId, VectorId, VectorPrimitive,
+    Border, ClipChain, ClipRegion, CompositorId, CompositorLayer, CornerRadii, DisplayList,
+    EffectId, EffectInstance, Fill, Filter, GpuCanvasId, GpuCanvasPrimitive, ImageFit, ImageId,
+    ImagePrimitive, ImageSampling, LayerStyle, ProfileDomain, Quad, RenderObjectId, VectorId,
+    VectorPrimitive,
 };
-use argui_render::{DamagePlan, DamageRegion, DamageSnapshot, DamageTracking};
+use argui_render::{
+    DamagePlan, DamageRegion, DamageSnapshot, DamageTracking, EffectDamage, EffectDefinition,
+    EffectPassDefinition, EffectRegistry,
+};
 use argui_text::{PreparedText, TextBlock, TextDecoration, TextEngine, TextScene, UnderlineStyle};
 
 const NOTO_SANS: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
@@ -114,8 +118,98 @@ fn scene_snapshots_handle_identity_and_incompatible_viewports() {
         DamagePlan::Unchanged
     );
     assert_eq!(
+        baseline.compare(&baseline.clone(), DamageTracking::disabled()),
+        DamagePlan::Full
+    );
+    assert_eq!(
         baseline.compare(&snapshot(&list, [512, 256], 2.0), DamageTracking::enabled()),
         DamagePlan::Full
+    );
+}
+
+#[test]
+fn bounded_effects_expand_only_intersecting_damage_to_layer_bounds() {
+    let previous = effect_scene(104.0, Filter::Blur(8.0));
+    let current = effect_scene(120.0, Filter::Blur(8.0));
+    let plan = snapshot(&previous, [512, 256], 1.0).compare_with_effects(
+        &snapshot(&current, [512, 256], 1.0),
+        DamageTracking::enabled(),
+        &EffectRegistry::default(),
+    );
+    let DamagePlan::Partial(regions) = plan else {
+        panic!("bounded blur should preserve a partial plan");
+    };
+    assert!(
+        regions
+            .iter()
+            .any(|region| region.x <= 96 && region.right() >= 224)
+    );
+
+    let halo_previous = effect_scene(56.0, Filter::Blur(8.0));
+    let halo_current = effect_scene(64.0, Filter::Blur(8.0));
+    let DamagePlan::Partial(regions) = snapshot(&halo_previous, [512, 256], 1.0)
+        .compare_with_effects(
+            &snapshot(&halo_current, [512, 256], 1.0),
+            DamageTracking::enabled(),
+            &EffectRegistry::default(),
+        )
+    else {
+        panic!("the blur sampling halo should remain partial");
+    };
+    assert!(regions.iter().any(|region| region.right() >= 224));
+
+    let previous = effect_scene(8.0, Filter::Blur(8.0));
+    let current = effect_scene(24.0, Filter::Blur(8.0));
+    let DamagePlan::Partial(regions) = snapshot(&previous, [512, 256], 1.0).compare_with_effects(
+        &snapshot(&current, [512, 256], 1.0),
+        DamageTracking::enabled(),
+        &EffectRegistry::default(),
+    ) else {
+        panic!("unrelated damage should remain partial");
+    };
+    assert!(regions.iter().all(|region| region.right() < 224));
+}
+
+#[test]
+fn custom_effect_damage_policy_is_conservative_by_default() {
+    const WGSL: &str = r#"
+fn argui_effect(_uv: vec2<f32>, source: vec4<f32>, _backdrop: vec4<f32>) -> vec4<f32> {
+    return source;
+}
+"#;
+    const PASSES: &[EffectPassDefinition] = &[EffectPassDefinition::fragment("main", WGSL)];
+    let id = EffectId::new("test.damage");
+    let previous = effect_scene(
+        104.0,
+        Filter::Effect(EffectInstance::new(
+            id,
+            std::iter::empty::<argui_paint::EffectArgument>(),
+        )),
+    );
+    let current = effect_scene(
+        120.0,
+        Filter::Effect(EffectInstance::new(
+            id,
+            std::iter::empty::<argui_paint::EffectArgument>(),
+        )),
+    );
+    let previous = snapshot(&previous, [512, 256], 1.0);
+    let current = snapshot(&current, [512, 256], 1.0);
+    let unbounded = EffectRegistry::new([EffectDefinition::new(id, &[], PASSES)]).unwrap();
+    assert_eq!(
+        previous.compare_with_effects(&current, DamageTracking::enabled(), &unbounded),
+        DamagePlan::Full
+    );
+    let bounded =
+        EffectRegistry::new([EffectDefinition::new(id, &[], PASSES).damage(EffectDamage::Bounded)])
+            .unwrap();
+    assert!(matches!(
+        previous.compare_with_effects(&current, DamageTracking::enabled(), &bounded),
+        DamagePlan::Partial(_)
+    ));
+    assert_eq!(
+        current.compare_with_effects(&current, DamageTracking::enabled(), &unbounded),
+        DamagePlan::Unchanged
     );
 }
 
@@ -190,6 +284,17 @@ fn quad(x: f32, y: f32, size: f32) -> Quad {
         transform: Affine2D::IDENTITY,
         clips: ClipChain::default(),
     }
+}
+
+fn effect_scene(moving_x: f32, filter: Filter) -> DisplayList {
+    let mut list = DisplayList::new();
+    list.push_quad(quad(moving_x, 24.0, 16.0));
+    list.begin_layer(
+        LayerStyle::new(Rect::new(Point::new(96.0, 8.0), Size::new(96.0, 96.0))).backdrop(filter),
+    );
+    list.push_quad(quad(112.0, 24.0, 16.0));
+    list.end_layer();
+    list
 }
 
 fn mixed_list(canvas: GpuCanvasId) -> DisplayList {

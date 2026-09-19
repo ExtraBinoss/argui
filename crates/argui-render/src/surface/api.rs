@@ -199,6 +199,7 @@ impl SurfaceRenderer {
         self.layer_cache.clear();
         self.damage.invalidate();
         self.scene_snapshot = None;
+        self.effect_root = None;
         true
     }
 
@@ -218,6 +219,7 @@ impl SurfaceRenderer {
         self.surface.configure(&self.device, &self.surface_config);
         self.layer_cache.clear();
         self.damage.invalidate();
+        self.effect_root = None;
         Ok(())
     }
 
@@ -408,6 +410,7 @@ impl SurfaceRenderer {
         self.renderer_config.damage_tracking = tracking;
         self.scene_snapshot = None;
         self.damage.invalidate();
+        self.effect_root = None;
     }
 
     /// Enables profiling for subsequent frames when profiling is enabled in the configuration.
@@ -423,6 +426,7 @@ impl SurfaceRenderer {
     pub fn register_image(&mut self, asset: &ImageAsset) -> Result<(), RendererError> {
         self.image.register(&self.device, &self.queue, asset)?;
         self.damage.invalidate();
+        self.effect_root = None;
         Ok(())
     }
 
@@ -433,6 +437,7 @@ impl SurfaceRenderer {
     pub fn register_vector(&mut self, asset: &VectorAsset) -> Result<(), RendererError> {
         self.vector.register(asset)?;
         self.damage.invalidate();
+        self.effect_root = None;
         Ok(())
     }
 }

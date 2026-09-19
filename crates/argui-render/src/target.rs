@@ -47,6 +47,22 @@ impl PixelRegion {
         self.origin[1] + self.size[1]
     }
 
+    /// Returns the overlapping physical region shared with `other`.
+    pub fn intersection(self, other: Self) -> Option<Self> {
+        let left = self.origin[0].max(other.origin[0]);
+        let top = self.origin[1].max(other.origin[1]);
+        let right = self.right().min(other.right());
+        let bottom = self.bottom().min(other.bottom());
+        if right > left && bottom > top {
+            Some(Self {
+                origin: [left, top],
+                size: [right - left, bottom - top],
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn as_rect(self) -> Rect {
         Rect::new(
             Point::new(self.origin[0] as f32, self.origin[1] as f32),

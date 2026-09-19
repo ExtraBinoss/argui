@@ -1,5 +1,7 @@
 use argui_paint::{EffectId, EffectInstance, EffectValue, Filter};
-use argui_render::{EffectDefinition, EffectParameter, EffectParameterType, EffectPassDefinition};
+use argui_render::{
+    EffectDamage, EffectDefinition, EffectParameter, EffectParameterType, EffectPassDefinition,
+};
 
 /// Registry identifier for the liquid-glass effect.
 pub const LIQUID_GLASS_ID: EffectId = EffectId::new("argui.liquid-glass");
@@ -29,7 +31,7 @@ fn argui_effect(uv: vec2<f32>, source: vec4<f32>, backdrop: vec4<f32>) -> vec4<f
     EffectPassDefinition::fragment("glass", include_str!("shaders/effects/liquid_glass.wgsl")),
 ];
 pub(crate) fn definition() -> EffectDefinition {
-    EffectDefinition::new(LIQUID_GLASS_ID, PARAMETERS, PASSES)
+    EffectDefinition::new(LIQUID_GLASS_ID, PARAMETERS, PASSES).damage(EffectDamage::Bounded)
 }
 fn finite(value: f32, fallback: f32) -> f32 {
     if value.is_finite() { value } else { fallback }

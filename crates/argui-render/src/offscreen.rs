@@ -134,6 +134,11 @@ impl TexturePool {
         [self.entries[index].width, self.entries[index].height]
     }
 
+    /// Returns the bytes allocated by the entry at `index`, or zero when it is absent.
+    pub fn bytes(&self, index: usize) -> u64 {
+        self.entries.get(index).map_or(0, |entry| entry.bytes)
+    }
+
     pub fn stats(&self) -> TexturePoolStats {
         TexturePoolStats {
             textures: self.entries.len(),
@@ -141,6 +146,19 @@ impl TexturePool {
             peak_bytes: self.peak,
             reused_this_frame: self.reused,
         }
+    }
+
+    /// Returns pool statistics without counting the entry at `index`.
+    ///
+    /// A missing `index` leaves the aggregate unchanged. Peak and per-frame
+    /// reuse counters still describe the complete pool.
+    pub fn stats_excluding(&self, index: usize) -> TexturePoolStats {
+        let mut stats = self.stats();
+        if let Some(entry) = self.entries.get(index) {
+            stats.textures = stats.textures.saturating_sub(1);
+            stats.allocated_bytes = stats.allocated_bytes.saturating_sub(entry.bytes);
+        }
+        stats
     }
 
     fn allocated_bytes(&self) -> u64 {

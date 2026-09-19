@@ -1,6 +1,7 @@
 #![cfg(feature = "liquid-glass")]
 use argui_effects::{LIQUID_GLASS_ID, LiquidGlass};
 use argui_paint::{EffectValue, Filter};
+use argui_render::EffectDamage;
 use wgpu::util::DeviceExt;
 
 fn effect(glass: LiquidGlass) -> argui_paint::EffectInstance {
@@ -11,6 +12,14 @@ fn effect(glass: LiquidGlass) -> argui_paint::EffectInstance {
 }
 #[test]
 fn parameters_are_bounded_finite_and_scale_in_logical_pixels() {
+    assert_eq!(
+        argui_effects::registry()
+            .unwrap()
+            .get(LIQUID_GLASS_ID)
+            .unwrap()
+            .damage,
+        EffectDamage::Bounded
+    );
     let glass = LiquidGlass::default()
         .refraction(f32::NAN)
         .blur(f32::INFINITY)

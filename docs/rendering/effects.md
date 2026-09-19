@@ -38,13 +38,13 @@ fragment passes:
 ```rust,ignore
 use argui_paint::EffectId;
 use argui_render::{
-    EffectDefinition, EffectParameter, EffectParameterType,
+    EffectDamage, EffectDefinition, EffectParameter, EffectParameterType,
     EffectPassDefinition, EffectRegistry,
 };
 
 const TINT: EffectId = EffectId::new("acme.color.tint");
 
-let registry = EffectRegistry::new([EffectDefinition::new(
+let tint = EffectDefinition::new(
     TINT,
     &[EffectParameter::new("amount", EffectParameterType::F32)],
     &[EffectPassDefinition::fragment("tint", r#"
@@ -58,7 +58,10 @@ fn argui_effect(
     return mix(source, vec4<f32>(tint, source.a), amount);
 }
 "#)],
-)])?;
+)
+.damage(EffectDamage::Bounded);
+
+let registry = EffectRegistry::new([tint])?;
 ```
 
 The registry rejects invalid WGSL, duplicate IDs or parameter names, empty
@@ -76,6 +79,15 @@ let filter = Filter::Effect(EffectInstance::new(
 Parameters support scalars, booleans, vectors, matrices, colors, and logical
 pixels. The adapter packs them into bounded storage; custom definitions never
 receive raw WGPU handles.
+
+Custom effects are damage-safe by default: `EffectDamage::Unbounded` makes any
+scene change choose a full effect composition. Declare `Bounded` only when all
+passes keep their texture reads inside the layer allocation. The renderer then
+gets the output rectangle from the laid-out `LayerStyle`, expands backdrop
+dependencies by each filter's sampling radius, and repaints the complete effect
+output only when those regions intersect. For a shader with a dynamic sampling
+radius, attach the conservative logical-pixel distance to its instance with
+`EffectInstance::expansion`; DPI scaling and physical clipping remain automatic.
 
 `source`, `backdrop`, sampling helpers, and color parameters use straight
 alpha extended linear sRGB. The generated ABI unpremultiplies layer textures
@@ -110,8 +122,10 @@ let pane = pane.backdrop_filter(glass.filter());
 
 The preset uses two separable Gaussian blur passes followed by the lens pass.
 Refraction, rim, dispersion, color controls, tint, and optional radial depth are
-bounded and sanitized. Logical lengths scale with DPI. No animation frame is
-requested while the scene and parameters stay unchanged.
+bounded and sanitized. Its definition declares bounded damage, and each filter
+instance carries the refraction-plus-blur sampling expansion. Logical lengths
+scale with DPI. No animation frame is requested while the scene and parameters
+stay unchanged.
 
 Use `backdrop_filter` for glass over existing content and `filter` to process
 the element itself. Apply a rounded mask when the effect must stay inside a

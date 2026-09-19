@@ -98,11 +98,12 @@ presentation `transform`. Argui promotes transforms to retained compositor
 layers; those exercise compositor reuse rather than root-surface damage, so
 mixing them into this workload would measure a different optimization.
 
-Open the workload's **Open blur** popover to add a translucent backdrop-filter
-surface while the element keeps moving behind it. This intentionally exercises
-an effect boundary: the current renderer uses full effect composition for
-backdrop-dependent filters, so Auto may correctly report full-frame repainting
-while the popover is visible. Closing it returns to the damage-only workload.
+Open **Open blur** or **Open glass** to put a bounded backdrop effect over the
+moving element. Auto includes the filter's sampling halo when deciding whether
+the change reaches that layer, repaints the complete effect output when needed,
+and preserves the rest of the persistent effect root. The glass variant runs
+three custom shader passes through the same path. Off still rebuilds the entire
+effect root on every frame, which makes the comparison directly observable.
 
 ## Correctness boundaries
 
@@ -112,11 +113,12 @@ They receive a small antialiasing margin before tile alignment. Image or vector
 registration, resize, surface recreation, and incompatible render paths
 invalidate the retained root.
 
-Effect graphs that require an offscreen root keep the existing full effect
-composition path. Their retained layer cache still avoids regenerating
-unchanged layer contents, while the final surface composition remains complete.
-This prevents blur, shadow, refraction, and custom shader sampling from reading
-stale pixels outside a local rectangle.
+Effect graphs use a persistent offscreen root. Built-in filters and bounded
+custom effects propagate changed pixels through their layout-derived output and
+sampling bounds before the adaptive threshold is applied. Regional clears and
+scissored graph replay then update that root; unchanged frames only present it.
+Custom shaders remain `Unbounded` unless their definition opts into bounded
+damage, so unknown sampling behavior still selects a safe full composition.
 
 ## Verification checklist
 
@@ -124,6 +126,7 @@ stale pixels outside a local rectangle.
 - [x] Quad, image, vector, text, GPU-canvas, transform, clip, and layer bounds.
 - [x] Region clipping, tile alignment, transitive merging, and adaptive fallback.
 - [x] Persistent WGPU target, regional clear, scissored replay, and presentation.
+- [x] Effect-aware propagation, retained effect roots, and bounded custom shader API.
 - [x] Safe invalidation on resize, surface recreation, and resource registration.
 - [x] Native and WebAssembly compilation through the shared renderer path.
 - [x] Public configuration, decision types, profiling counters, and opt-out.
