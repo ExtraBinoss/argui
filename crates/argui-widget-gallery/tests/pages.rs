@@ -6,6 +6,8 @@ mod buttons;
 mod catalogue;
 #[path = "pages/color_picker.rs"]
 mod color_picker;
+#[path = "pages/damage_control.rs"]
+mod damage_control;
 #[path = "pages/data.rs"]
 mod data;
 #[path = "pages/drag_drop.rs"]
@@ -95,6 +97,7 @@ fn all_pages_keep_finite_layout_when_narrow_dark_or_reduced_motion() {
         ("i18n", "Internationalization"),
         ("layout", "Web layout"),
         ("motion", "Animation lab"),
+        ("damage-control", "Damage control"),
         ("liquid-glass", "Liquid glass"),
         ("scroll-shadow", "Scroll shadow"),
         ("typography", "Typography & selection"),

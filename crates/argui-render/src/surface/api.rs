@@ -397,6 +397,19 @@ impl SurfaceRenderer {
         self.last_profile.clone()
     }
 
+    /// Reconfigures adaptive damage tracking for subsequent frames.
+    ///
+    /// Changing `tracking` invalidates the retained surface so the next frame
+    /// establishes a correct baseline before partial rendering resumes.
+    pub fn set_damage_tracking(&mut self, tracking: crate::DamageTracking) {
+        if self.renderer_config.damage_tracking == tracking {
+            return;
+        }
+        self.renderer_config.damage_tracking = tracking;
+        self.scene_snapshot = None;
+        self.damage.invalidate();
+    }
+
     /// Enables profiling for subsequent frames when profiling is enabled in the configuration.
     /// * `active` — whether subsequent frame profiling is active.
     pub fn set_profiling_active(&mut self, active: bool) {

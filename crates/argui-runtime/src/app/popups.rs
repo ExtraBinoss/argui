@@ -382,6 +382,18 @@ impl Application {
     }
 }
 
+impl Popups {
+    /// Changes damage tracking for every currently open native popup.
+    ///
+    /// `tracking` is also inherited by popups created after this call through
+    /// the owning application's renderer configuration.
+    pub(super) fn set_damage_tracking(&mut self, tracking: argui_render::DamageTracking) {
+        for popup in &mut self.entries {
+            popup.renderer.set_damage_tracking(tracking);
+        }
+    }
+}
+
 impl Drop for Popups {
     fn drop(&mut self) {
         while self.entries.pop().is_some() {}

@@ -51,6 +51,30 @@ policy for custom renderer integrations. `RenderProfile::damage` includes the
 chosen mode, region count, repainted pixel count, and retained texture bytes.
 The runtime inspector forwards the repainted count as `damaged_pixels`.
 
+## Live comparison
+
+Open **Examples → Damage control** in the Widget Gallery to compare the real
+renderer paths without changing the workload. The **Auto** tab uses the default
+adaptive policy; **Off** forces full-surface redraws. Switching tabs invalidates
+the retained root once, clears the rolling sample window, and then reports:
+
+- the latest damage mode and merged-region count;
+- repainted pixels as a count and viewport percentage;
+- retained root memory;
+- rolling renderer CPU encoding time;
+- rolling GPU time when the adapter supports timestamp queries.
+
+The Auto baseline can include a `Full` frame followed by `Seed`; judge the
+steady state after several samples. GPU milliseconds are not GPU utilization,
+and an unavailable value means the backend did not expose timestamp queries.
+Repaint percentage is the portable comparison across native and WebAssembly
+backends.
+
+The controlled element changes its painted layout bounds instead of using a
+presentation `transform`. Argui promotes transforms to retained compositor
+layers; those exercise compositor reuse rather than root-surface damage, so
+mixing them into this workload would measure a different optimization.
+
 ## Correctness boundaries
 
 Damage bounds include both the old and new locations of changed primitives,
@@ -75,4 +99,3 @@ stale pixels outside a local rectangle.
 - [x] Native and WebAssembly compilation through the shared renderer path.
 - [x] Public configuration, decision types, profiling counters, and opt-out.
 - [x] Renderer-neutral policy and scene-diff tests plus native GPU lifecycle coverage.
-

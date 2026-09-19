@@ -4,6 +4,7 @@ use argui_paint::{ImageAsset, VectorAsset};
 use argui_platform::{
     GlobalShortcutEvent, PlatformEvent, TrayConfig, TrayEvent, WindowKey, WindowLevel, WindowSpec,
 };
+use argui_render::DamageTracking;
 use argui_ui::{ClipboardRequest, Element, FocusRequest, TextSelectionRequest, UiEvent};
 
 use crate::{
@@ -62,6 +63,19 @@ pub enum AppCommand {
     SetWindowMousePassthrough {
         window: WindowKey,
         passthrough: bool,
+    },
+    /// Changes adaptive damage rendering for one initialized window.
+    SetDamageTracking {
+        window: WindowKey,
+        tracking: DamageTracking,
+    },
+    /// Enables or disables renderer profile events for one window.
+    ///
+    /// GPU timing is available when the renderer was initialized with profiling
+    /// support, including windows hosted by DevTools.
+    SetRendererProfiling {
+        window: WindowKey,
+        enabled: bool,
     },
     Quit,
 }

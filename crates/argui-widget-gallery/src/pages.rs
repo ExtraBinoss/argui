@@ -29,6 +29,7 @@ mod card;
 pub(crate) mod catalogue;
 mod collapsible;
 pub(crate) mod color_picker;
+pub(crate) mod damage_control;
 pub(crate) mod data;
 pub(crate) mod data_table;
 pub(crate) mod dates;
@@ -176,6 +177,7 @@ pub(crate) fn render(
         Page::I18n => cx.entity(&gallery.i18n),
         Page::Layout => layout_system(theme),
         Page::Motion => cx.entity(&gallery.motion),
+        Page::DamageControl => cx.entity(&gallery.damage_control),
         Page::LiquidGlass => cx.entity(&gallery.glass),
         Page::ScrollShadow => cx.entity(&gallery.scroll_demo),
         Page::Typography => typography::render(theme),

@@ -15,6 +15,10 @@ that do not use them.
   invalidated frames. `DamageTracking` configures the thresholds or disables
   the feature, while `DamagePlan`, `DamageSnapshot`, and
   `RenderProfile::damage` expose decisions and profiling statistics.
+- Added a live **Damage control** Widget Gallery page that runs the same
+  animated workload with adaptive damage rendering on or off. It switches the
+  renderer at runtime and reports repaint coverage, damage regions, retained
+  memory, CPU encoding time, and GPU time when timestamp queries are available.
 
 ## [0.3.2] - 2026-09-19
 

@@ -71,6 +71,7 @@ pub enum Page {
     I18n,
     Layout,
     Motion,
+    DamageControl,
     LiquidGlass,
     ScrollShadow,
     Typography,
@@ -89,7 +90,7 @@ pub enum Page {
 
 impl Page {
     pub const ALL: [Self;
-        79 + cfg!(feature = "updater") as usize
+        80 + cfg!(feature = "updater") as usize
             + cfg!(any(target_os = "android", target_os = "ios")) as usize] = [
         Self::Accordion,
         Self::Alert,
@@ -168,6 +169,7 @@ impl Page {
         Self::HotReload,
         Self::I18n,
         Self::Motion,
+        Self::DamageControl,
         Self::Typography,
         Self::TextSelection,
         Self::Layout,
@@ -252,6 +254,7 @@ impl Page {
             | Self::HotReload
             | Self::I18n
             | Self::Motion
+            | Self::DamageControl
             | Self::Typography
             | Self::TextSelection
             | Self::WebView
@@ -335,6 +338,7 @@ impl Page {
             Self::I18n => "Internationalization",
             Self::Layout => "Web layout",
             Self::Motion => "Animation lab",
+            Self::DamageControl => "Damage control",
             Self::LiquidGlass => "Liquid glass",
             Self::ScrollShadow => "Scroll shadow",
             Self::Typography => "Typography & selection",
@@ -424,6 +428,7 @@ impl Page {
             Self::I18n => "i18n",
             Self::Layout => "layout",
             Self::Motion => "motion",
+            Self::DamageControl => "damage-control",
             Self::LiquidGlass => "liquid-glass",
             Self::ScrollShadow => "scroll-shadow",
             Self::Typography => "typography",
@@ -492,6 +497,7 @@ impl Page {
             }
             Self::Calendar => "Choose dates with arrows and PageUp/PageDown.",
             Self::DatePicker => "Type a date or choose it from the calendar.",
+            Self::DamageControl => "Compare adaptive damage rendering with full-frame redraws.",
             Self::Toast => "Notifications with a bounded queue and explicit dismissal.",
             Self::Avatar => "Images and initials with a shared accessible name.",
             Self::Empty => "Give an empty view a useful message and a next step.",

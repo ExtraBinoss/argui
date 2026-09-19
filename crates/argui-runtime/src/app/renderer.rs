@@ -16,6 +16,45 @@ use super::RendererState;
 
 #[cfg_attr(coverage_nightly, coverage(off))]
 impl Application {
+    /// Changes damage tracking for the main surface and any existing native popups.
+    ///
+    /// `tracking` controls whether subsequent frames may reuse retained pixels.
+    pub(crate) fn set_damage_tracking(&mut self, tracking: argui_render::DamageTracking) {
+        if self.renderer_config.damage_tracking == tracking {
+            return;
+        }
+        self.renderer_config.damage_tracking = tracking;
+        if let RendererState::Ready(renderer) = &mut *self.renderer.borrow_mut() {
+            renderer.set_damage_tracking(tracking);
+        }
+        #[cfg(all(feature = "native-popups", not(target_arch = "wasm32")))]
+        self.popups.set_damage_tracking(tracking);
+        self.pending_ui_frame.request_paint();
+        if let Some(window) = &self.window {
+            window.request_redraw();
+        }
+    }
+
+    /// Changes whether this window emits renderer profiling events.
+    ///
+    /// `enabled` is combined with DevTools' independent GPU profiling request.
+    pub(crate) fn set_renderer_profiling(&mut self, enabled: bool) {
+        if enabled && !self.renderer_config.profiling {
+            (self.on_event)(RuntimeEvent::CommandFailed(
+                "renderer profiling was not enabled when this window was initialized".into(),
+            ));
+            return;
+        }
+        if self.renderer_profiling_requested == enabled {
+            return;
+        }
+        self.renderer_profiling_requested = enabled;
+        self.pending_ui_frame.request_paint();
+        if let Some(window) = &self.window {
+            window.request_redraw();
+        }
+    }
+
     pub(super) fn surface_renderer_config(&self) -> argui_render::RendererConfig {
         self.renderer_config
             .clone()
@@ -183,15 +222,17 @@ impl Application {
             self.renderer_announced = true;
         }
 
-        renderer.set_profiling_active(self.inspector.as_ref().map_or(
-            self.renderer_config.profiling,
-            argui_inspect::InspectorHandle::gpu_profiling,
-        ));
+        let profiling_active = self.renderer_profiling_requested
+            || self
+                .inspector
+                .as_ref()
+                .is_some_and(argui_inspect::InspectorHandle::gpu_profiling);
+        renderer.set_profiling_active(profiling_active);
 
         if let Some(inspector) = &self.inspector {
             inspector.record_ui(self.frame_record.clone());
         }
-        if self.renderer_config.profiling {
+        if self.renderer_profiling_requested {
             (self.on_event)(RuntimeEvent::AnimationProfile(crate::AnimationProfile {
                 frame_interval: self.frame_record.interval,
                 model_time: self.frame_record.model,
@@ -273,7 +314,7 @@ impl Application {
                         ..FrameRecord::default()
                     });
                 }
-                if self.renderer_config.profiling {
+                if self.renderer_profiling_requested {
                     (self.on_event)(RuntimeEvent::RenderProfile(Box::new(
                         renderer.last_profile(),
                     )));

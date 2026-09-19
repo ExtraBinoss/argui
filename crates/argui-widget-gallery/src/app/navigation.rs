@@ -3,7 +3,9 @@ use crate::navigation::Page;
 use argui::{
     core::{CaretAffinity, Key, KeyState, TextPosition},
     paint::{Border, BorderWidths},
-    runtime::Context,
+    platform::WindowKey,
+    render::DamageTracking,
+    runtime::{AppCommand, Context},
     ui::{
         Axes, Element, ElementKind, EventHandler, JustifyContent, Overflow, Role, ScrollAxes,
         ScrollConfig, Semantics, Sides, TextSelection, UiEvent, UiEventKind, length, percent,
@@ -12,8 +14,18 @@ use argui::{
 };
 
 impl WidgetGallery {
-    pub(super) fn select_page(&mut self, page: Page) {
+    pub(super) fn select_page(&mut self, page: Page, cx: &mut Context<Self>) {
         if self.page != page {
+            if self.page == Page::DamageControl {
+                cx.command(AppCommand::SetDamageTracking {
+                    window: WindowKey::main(),
+                    tracking: DamageTracking::enabled(),
+                });
+                cx.command(AppCommand::SetRendererProfiling {
+                    window: WindowKey::main(),
+                    enabled: false,
+                });
+            }
             if let Some(previous) = self.catalogue.get(&self.page) {
                 previous.update(|demo, cx| {
                     demo.reset_transient();
@@ -33,6 +45,22 @@ impl WidgetGallery {
                 });
             }
             self.page = page;
+            if page == Page::DamageControl {
+                let tracking = self.damage_control.read(|demo| demo.tracking());
+                self.damage_control.update(|demo, child_cx| {
+                    demo.activate();
+                    child_cx.notify();
+                });
+                cx.command(AppCommand::SetDamageTracking {
+                    window: WindowKey::main(),
+                    tracking,
+                });
+                cx.command(AppCommand::SetRendererProfiling {
+                    window: WindowKey::main(),
+                    enabled: true,
+                });
+            }
+            cx.notify();
         }
     }
 
@@ -54,7 +82,7 @@ impl WidgetGallery {
             }
             children.push(text(category, 11.0, theme.muted_foreground, 700));
             for page in pages {
-                let select = cx.callback(move |gallery| gallery.select_page(page));
+                let select = cx.event_handler(move |gallery, _, cx| gallery.select_page(page, cx));
                 children.push(self.navigation_button(page, theme, true, select));
             }
         }
@@ -106,7 +134,7 @@ impl WidgetGallery {
                     .shrink(0.0),
             );
             for page in pages {
-                let select = cx.callback(move |gallery| gallery.select_page(page));
+                let select = cx.event_handler(move |gallery, _, cx| gallery.select_page(page, cx));
                 items.push(self.navigation_button(page, theme, false, select));
             }
         }

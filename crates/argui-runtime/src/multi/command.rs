@@ -125,6 +125,16 @@ impl MultiApplication {
                     },
                 );
             }
+            AppCommand::SetDamageTracking { window, tracking } => {
+                if let Some(entry) = self.windows.get_mut(&window) {
+                    entry.runtime.set_damage_tracking(tracking);
+                }
+            }
+            AppCommand::SetRendererProfiling { window, enabled } => {
+                if let Some(entry) = self.windows.get_mut(&window) {
+                    entry.runtime.set_renderer_profiling(enabled);
+                }
+            }
             AppCommand::Quit => event_loop.exit(),
         }
     }

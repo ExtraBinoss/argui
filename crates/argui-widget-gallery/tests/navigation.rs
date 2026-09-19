@@ -64,6 +64,7 @@ fn navigation_rebuilds_widget_and_example_pages_from_public_events() {
         ("nav::i18n", "Live Fluent catalogs"),
         ("nav::layout", "Web layout"),
         ("nav::motion", "Animation laboratory"),
+        ("nav::damage-control", "Same scene, real renderer modes"),
         ("nav::liquid-glass", "Liquid glass"),
         ("nav::scroll-shadow", "Scroll shadow"),
         ("nav::typography", "Typography & selection"),

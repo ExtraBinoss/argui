@@ -83,6 +83,7 @@ pub struct WidgetGallery {
     #[cfg(any(target_os = "android", target_os = "ios"))]
     pub(crate) mobile_activity: Entity<pages::mobile_activity::MobileActivityDemo>,
     pub(crate) motion: Entity<pages::motion::MotionDemo>,
+    pub(crate) damage_control: Entity<pages::damage_control::DamageControlDemo>,
     pub(crate) text_selection: Entity<pages::text_selection::SelectionDemo>,
     pub(crate) editing: Entity<pages::editing::EditingDemo>,
     pub(crate) drag_drop: Entity<pages::drag_drop::DragDropDemo>,
@@ -105,6 +106,17 @@ pub struct WidgetGallery {
 
 impl Default for WidgetGallery {
     fn default() -> Self {
+        Self::with_damage_telemetry(pages::damage_control::DamageTelemetry::handle())
+    }
+}
+
+impl WidgetGallery {
+    /// Creates a gallery connected to the supplied renderer telemetry stream.
+    ///
+    /// `damage_telemetry` is shared with the launch callback that receives profiles.
+    pub(crate) fn with_damage_telemetry(
+        damage_telemetry: pages::damage_control::DamageTelemetryHandle,
+    ) -> Self {
         let mut images = ImageLibrary::new();
         let logo = images
             .insert(include_bytes!(
@@ -159,6 +171,9 @@ impl Default for WidgetGallery {
             #[cfg(any(target_os = "android", target_os = "ios"))]
             mobile_activity: Entity::new(pages::mobile_activity::MobileActivityDemo::default()),
             motion: Entity::new(pages::motion::MotionDemo::default()),
+            damage_control: Entity::new(pages::damage_control::DamageControlDemo::new(
+                damage_telemetry,
+            )),
             text_selection: Entity::new(pages::text_selection::SelectionDemo::default()),
             editing: Entity::new(pages::editing::EditingDemo::default()),
             drag_drop: Entity::new(pages::drag_drop::DragDropDemo::new(logo)),
@@ -280,7 +295,7 @@ impl WidgetGallery {
             return;
         }
         if let Some(page) = self.update_search_keys(event) {
-            self.select_page(page);
+            self.select_page(page, cx);
             cx.notify();
             return;
         }

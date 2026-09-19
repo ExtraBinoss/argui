@@ -69,6 +69,7 @@ pub(crate) struct Application {
     theme_request: crate::ThemeRequest,
     environment: crate::WindowEnvironment,
     pub(super) renderer_config: RendererConfig,
+    pub(super) renderer_profiling_requested: bool,
     window: Option<Rc<dyn crate::host::WindowHost>>,
     #[cfg(all(feature = "desktop-backdrop", not(target_arch = "wasm32")))]
     desktop_backdrop: Option<argui_platform::desktop_backdrop::NativeBackdrop>,
@@ -161,6 +162,7 @@ impl Application {
         on_event: impl FnMut(RuntimeEvent) + 'static,
     ) -> Self {
         let inspector = model.as_ref().and_then(AnyEntity::inspector);
+        let renderer_profiling_requested = renderer_config.profiling;
         let renderer_config = RendererConfig {
             profiling: renderer_config.profiling || inspector.is_some(),
             ..renderer_config
@@ -198,6 +200,7 @@ impl Application {
             system_color_scheme: None,
             theme_request: crate::ThemeRequest::default(),
             renderer_config,
+            renderer_profiling_requested,
             window: None,
             #[cfg(all(feature = "desktop-backdrop", not(target_arch = "wasm32")))]
             desktop_backdrop: None,

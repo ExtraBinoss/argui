@@ -9,6 +9,7 @@ use argui::{
 use argui_devtools::DevtoolsApp;
 
 use crate::WidgetGallery;
+use crate::pages::damage_control::{DamageTelemetry, DamageTelemetryHandle};
 
 type GalleryModel = DevtoolsApp<
     argui::runtime::SingleWindowModel<
@@ -21,6 +22,7 @@ struct GalleryApplication {
     renderer: RendererConfig,
     text: TextEngine,
     model: GalleryModel,
+    damage_telemetry: DamageTelemetryHandle,
 }
 
 const NOTO_SANS: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
@@ -52,6 +54,7 @@ fn application() -> Result<GalleryApplication, Box<dyn std::error::Error>> {
         "Noto Sans",
     );
     let icons = IconSet::single(AppIcon::from_png(APP_ICON)?);
+    let damage_telemetry = DamageTelemetry::handle();
     Ok(GalleryApplication {
         config: ApplicationConfig::new(
             ApplicationIdentity::new(
@@ -77,13 +80,22 @@ fn application() -> Result<GalleryApplication, Box<dyn std::error::Error>> {
         text,
         model: DevtoolsApp::new(argui::runtime::SingleWindowModel::new(
             argui::widgets::TooltipHost::new(argui::widgets::SelectionHost::new(
-                WidgetGallery::default(),
+                WidgetGallery::with_damage_telemetry(damage_telemetry.clone()),
             )),
         )),
+        damage_telemetry,
     })
 }
 
-fn handle_event(event: RuntimeEvent) {
+fn handle_event(event: RuntimeEvent, damage_telemetry: &DamageTelemetryHandle) {
+    match &event {
+        RuntimeEvent::RenderProfile(profile)
+        | RuntimeEvent::Window {
+            event: WindowRuntimeEvent::RenderProfile(profile),
+            ..
+        } => damage_telemetry.borrow_mut().record(profile),
+        _ => {}
+    }
     #[cfg(feature = "hot-reload")]
     if let RuntimeEvent::HotReloaded { generation } = &event {
         eprintln!("argui: applied hot reload generation {generation}");
@@ -146,12 +158,13 @@ fn handle_event(event: RuntimeEvent) {
 /// Returns an error if application configuration or startup fails.
 pub fn launch() -> Result<(), Box<dyn std::error::Error>> {
     let application = application()?;
+    let damage_telemetry = application.damage_telemetry.clone();
     run_application_with_text_engine(
         application.config,
         application.renderer,
         application.text,
         application.model,
-        handle_event,
+        move |event| handle_event(event, &damage_telemetry),
     )?;
     Ok(())
 }
@@ -166,13 +179,14 @@ pub fn launch_android(
     android_app: argui_android::AndroidApp,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let application = application()?;
+    let damage_telemetry = application.damage_telemetry.clone();
     argui_android::run_application_with_text_engine(
         android_app,
         application.config,
         application.renderer,
         application.text,
         application.model,
-        handle_event,
+        move |event| handle_event(event, &damage_telemetry),
     )?;
     Ok(())
 }

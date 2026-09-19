@@ -15,10 +15,10 @@ use argui_paint::{
     RenderObjectId, VectorAsset, VectorId, VectorPrimitive,
 };
 use argui_render::{
-    DamageMode, EffectDefinition, EffectPassDefinition, EffectRegistry, GpuCanvasDeviceContext,
-    GpuCanvasDiagnosticKind, GpuCanvasError, GpuCanvasFactory, GpuCanvasRegistration,
-    GpuCanvasRegistry, GpuCanvasRenderContext, GpuCanvasRenderer, GpuCanvasRequirements,
-    RenderStatus, RendererConfig, RendererError, SurfaceRenderer,
+    DamageMode, DamageTracking, EffectDefinition, EffectPassDefinition, EffectRegistry,
+    GpuCanvasDeviceContext, GpuCanvasDiagnosticKind, GpuCanvasError, GpuCanvasFactory,
+    GpuCanvasRegistration, GpuCanvasRegistry, GpuCanvasRenderContext, GpuCanvasRenderer,
+    GpuCanvasRequirements, RenderStatus, RendererConfig, RendererError, SurfaceRenderer,
 };
 use argui_text::{PreparedText, TextEngine};
 use winit::{
@@ -368,6 +368,16 @@ fn exercise(window: Arc<Window>, mut pump: impl FnMut()) {
     assert!(renderer.last_profile().damage.damaged_pixels < 256 * 256);
     render(&mut renderer, &moved).unwrap();
     assert_eq!(renderer.last_profile().damage.mode, DamageMode::Reused);
+    renderer.set_damage_tracking(DamageTracking::disabled());
+    render(&mut renderer, &moved).unwrap();
+    assert_eq!(renderer.last_profile().damage.mode, DamageMode::Full);
+    renderer.set_damage_tracking(DamageTracking::enabled());
+    render(&mut renderer, &moved).unwrap();
+    assert_eq!(renderer.last_profile().damage.mode, DamageMode::Full);
+    let mut moved_again = DisplayList::new();
+    moved_again.push_quad(colored_quad(80.0, Color::WHITE));
+    render(&mut renderer, &moved_again).unwrap();
+    assert_eq!(renderer.last_profile().damage.mode, DamageMode::Seed);
 
     let assets: Vec<_> = (0..20).map(|_| asset()).collect();
     for asset in &assets {

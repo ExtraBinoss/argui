@@ -2,6 +2,7 @@ use argui_animation::{Duration, Frame, Time};
 use argui_core::{Color, ColorScheme, Insets, Point, PointerId};
 use argui_inspect::InspectorHandle;
 use argui_platform::{WindowConfig, WindowKey, WindowSpec};
+use argui_render::DamageTracking;
 use argui_runtime::{
     AppCommand, AppEvent, AppModel, AppUpdate, Context, LayoutSnapshot, Render, SingleWindowModel,
     ThemeRequest, ViewUpdate, WindowEnvironment,
@@ -99,6 +100,34 @@ fn app_updates_keep_commands_and_explicit_tray_changes() {
         .tray_changed();
     assert_eq!(update.commands, vec![AppCommand::OpenWindow(spec)]);
     assert!(update.tray_changed);
+}
+
+#[test]
+fn renderer_control_commands_preserve_their_window_and_configuration() {
+    let window = WindowKey::new("metrics");
+    let commands = AppUpdate::none()
+        .command(AppCommand::SetDamageTracking {
+            window: window.clone(),
+            tracking: DamageTracking::disabled(),
+        })
+        .command(AppCommand::SetRendererProfiling {
+            window: window.clone(),
+            enabled: true,
+        })
+        .commands;
+    assert_eq!(
+        commands,
+        [
+            AppCommand::SetDamageTracking {
+                window: window.clone(),
+                tracking: DamageTracking::disabled(),
+            },
+            AppCommand::SetRendererProfiling {
+                window,
+                enabled: true,
+            },
+        ]
+    );
 }
 
 #[test]
