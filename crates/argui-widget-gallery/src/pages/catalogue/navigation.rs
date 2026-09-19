@@ -1,7 +1,7 @@
 use super::*;
 use crate::app::text;
 use argui::{
-    ui::{Orientation, WritingDirection, length},
+    ui::{WritingDirection, length},
     widgets::*,
 };
 
@@ -85,33 +85,7 @@ impl CatalogueDemo {
             Page::ToggleGroup => self.toggles().build(theme),
             Page::NavigationMenu => self.navigation_menu(theme).build(theme),
             Page::Sidebar => self.sidebar(theme).build(theme),
-            Page::ButtonGroup => {
-                let group = || {
-                    ["Back", "Refresh", "Forward"].map(|label| {
-                        Button::new(
-                            format!("group-{}", label.to_lowercase()),
-                            label,
-                            theme.outline_button(),
-                        )
-                        .build()
-                    })
-                };
-                let horizontal = ButtonGroup::new("browser", "Browsing", group()).build();
-                let mut vertical = ButtonGroup::new(
-                    "tools",
-                    "Editing",
-                    ["Copy", "Paste"].map(|label| {
-                        Button::new(
-                            format!("group-{}", label.to_lowercase()),
-                            label,
-                            theme.outline_button(),
-                        )
-                        .build()
-                    }),
-                );
-                vertical.orientation = Orientation::Vertical;
-                Element::column([horizontal, vertical.build()]).gap(24.0)
-            }
+            Page::ButtonGroup => self.button_group_view(theme),
             Page::Direction => Element::column([WritingDirection::Ltr, WritingDirection::Rtl].map(
                 |direction| {
                     Element::column([
@@ -237,6 +211,110 @@ impl CatalogueDemo {
                 }
             }
             Page::ButtonGroup => {
+                if let Some(response) = self.button_group_menu().response(event) {
+                    match response {
+                        MenuResponse::Toggle => {
+                            self.button_group.overlay = (self.button_group.overlay
+                                != Some(button_group::ButtonGroupOverlay::Menu))
+                            .then_some(button_group::ButtonGroupOverlay::Menu);
+                        }
+                        MenuResponse::Open { focus } => {
+                            self.button_group.overlay =
+                                Some(button_group::ButtonGroupOverlay::Menu);
+                            cx.request_focus(focus);
+                        }
+                        MenuResponse::Close | MenuResponse::Invoke(_) => {
+                            self.button_group.overlay = None;
+                        }
+                        MenuResponse::Focus(focus) => cx.request_focus(focus),
+                        MenuResponse::Submenu { focus, .. } => cx.request_focus(focus),
+                        MenuResponse::Checked { .. } | MenuResponse::Radio { .. } => {}
+                    }
+                    if let Some(item) = event
+                        .target_key()
+                        .and_then(|key| key.strip_prefix("group-follow-menu::item::"))
+                    {
+                        self.status = format!("Follow option: {item}");
+                    }
+                    return true;
+                }
+                if let Some(action) = self.button_group_select_behavior().action(event) {
+                    match action {
+                        SelectAction::Toggle => {
+                            self.button_group.overlay = (self.button_group.overlay
+                                != Some(button_group::ButtonGroupOverlay::Select))
+                            .then_some(button_group::ButtonGroupOverlay::Select);
+                        }
+                        SelectAction::Close => self.button_group.overlay = None,
+                        SelectAction::Highlight(index) => {
+                            self.button_group.overlay =
+                                Some(button_group::ButtonGroupOverlay::Select);
+                            self.button_group.highlighted_currency = index;
+                            cx.request_focus(self.button_group_select_behavior().option_key(index));
+                        }
+                        SelectAction::Select(index) => {
+                            self.button_group.currency = index;
+                            self.button_group.highlighted_currency = index;
+                            self.button_group.overlay = None;
+                            self.status = format!(
+                                "Currency: {}",
+                                button_group::currency_options()[index].label
+                            );
+                            cx.request_focus("group-currency");
+                        }
+                    }
+                    return true;
+                }
+                if let Some(action) = self.button_group_popover_behavior().action(event) {
+                    self.button_group.overlay = match action {
+                        PopoverAction::Toggle
+                            if self.button_group.overlay
+                                != Some(button_group::ButtonGroupOverlay::Popover) =>
+                        {
+                            Some(button_group::ButtonGroupOverlay::Popover)
+                        }
+                        PopoverAction::Toggle | PopoverAction::Close => None,
+                    };
+                    return true;
+                }
+                if let UiEventKind::TextChanged(value) = &event.kind {
+                    match event.target_key() {
+                        Some("group-search") => self.button_group.search.clone_from(value),
+                        Some("group-composer-input") => {
+                            self.button_group.nested_message.clone_from(value)
+                        }
+                        Some("voice-message-input") => self.button_group.message.clone_from(value),
+                        Some("group-amount") => self.button_group.amount.clone_from(value),
+                        Some("group-copilot-task") => self.button_group.task.clone_from(value),
+                        _ => return false,
+                    }
+                    return true;
+                }
+                if ButtonBehavior::new("group-voice", "Toggle voice mode")
+                    .action(event)
+                    .is_some()
+                {
+                    self.button_group.voice = !self.button_group.voice;
+                    self.status = if self.button_group.voice {
+                        "Voice mode enabled"
+                    } else {
+                        "Voice mode disabled"
+                    }
+                    .into();
+                    return true;
+                }
+                if ButtonBehavior::new("group-copilot-start", "Start task")
+                    .action(event)
+                    .is_some()
+                {
+                    self.status = if self.button_group.task.is_empty() {
+                        "Describe a task first".into()
+                    } else {
+                        format!("Started: {}", self.button_group.task)
+                    };
+                    self.button_group.overlay = None;
+                    return true;
+                }
                 if matches!(event.kind, UiEventKind::Click(_))
                     && let Some(action) = event
                         .target_key()

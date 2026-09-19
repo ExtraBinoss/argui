@@ -57,7 +57,7 @@ including default shadows. Custom WGSL effects use the same filter API; see
 ## Feature selection
 
 ```toml
-argui = { version = "0.3.0", features = [
+argui = { version = "0.3.1", features = [
   "widget-popover",
   "widget-tooltip",
 ] }

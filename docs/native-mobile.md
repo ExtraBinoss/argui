@@ -42,9 +42,9 @@ Mobile entry crates are explicit dependencies. They are not enabled by
 
 ```toml
 [dependencies]
-argui = { version = "0.3.0", features = ["widgets-all"] }
-argui-android = "0.3.0" # Android application only
-# argui-ios = "0.3.0"  # iOS application only
+argui = { version = "0.3.1", features = ["widgets-all"] }
+argui-android = "0.3.1" # Android application only
+# argui-ios = "0.3.1"  # iOS application only
 ```
 
 ## Android

@@ -27,6 +27,9 @@ try {
         assert.ok(r.width > 0 && r.height > 0, selector);
         await page.mouse.click(r.x + r.width / 2, r.y + r.height / 2); await pause();
     };
+    const activate = async selector => {
+        await page.$eval(selector, element => element.click()); await pause();
+    };
     const navigate = async label => {
         await page.$eval(button(label), element => element.click()); await pause(300);
     };
@@ -58,6 +61,19 @@ try {
             await focused(button('Italic'));
             await page.keyboard.press('Space'); await pause();
             assert.equal(await state(button('Italic'), 'aria-pressed'), 'true');
+            await navigate('Button group');
+            await activate(button('Follow options'));
+            await page.waitForSelector('[role="menu"][aria-label="Follow options"]');
+            await activate('[role="menuitem"][aria-label="Mentions only"]');
+            assert.equal(await page.$('[role="menu"][aria-label="Follow options"]'), null);
+            await activate(button('Currency'));
+            await page.waitForSelector('[role="option"][aria-label="£"]');
+            await activate('[role="option"][aria-label="£"]');
+            assert.equal(await state(button('Currency'), 'aria-expanded'), 'false');
+            await activate(button('Open Copilot'));
+            await page.waitForSelector('[role="group"][aria-label="Open Copilot"]');
+            await page.keyboard.press('Escape'); await pause();
+            assert.equal(await page.$('[role="group"][aria-label="Open Copilot"]'), null);
             await navigate('Accordion');
             await click(button('Can I use the keyboard?'));
             assert.equal(await state(button('Can I use the keyboard?'), 'aria-expanded'), 'true');

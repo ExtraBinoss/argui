@@ -128,7 +128,7 @@
   {
     "slug": "button-group",
     "name": "Button group",
-    "description": "Related actions in a named group.",
+    "description": "Joined actions, inputs and menus in a named group.",
     "source": "crates/argui-widgets/src/button_group.rs",
     "feature": "button-group",
     "category": "Components",

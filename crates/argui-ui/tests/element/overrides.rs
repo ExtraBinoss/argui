@@ -1,6 +1,6 @@
 use argui_animation::{Duration, Motion, Transition, Tween};
 use argui_core::Color;
-use argui_paint::{Border, Fill};
+use argui_paint::{Border, BorderWidths, Fill};
 use argui_ui::{Element, StateName, StylePatch, StyleTransition, TransitionRule, UiTree, property};
 
 const ACTIVE: StateName = StateName::new("active");
@@ -68,6 +68,26 @@ fn removing_colors_keeps_unrelated_state_properties_and_bindings() {
     element.override_background(None);
     element.override_border(None);
     assert!(!element.has_state_animation());
+}
+
+#[test]
+fn border_width_override_keeps_conditional_border_colors() {
+    let widths = BorderWidths {
+        left: 0.0,
+        right: 1.0,
+        top: 1.0,
+        bottom: 1.0,
+    };
+    let mut element = button(true);
+    element.override_border_widths(widths);
+    let tree = UiTree::new(element);
+    let border = tree
+        .resolved_quad(tree.node_ids()[0], tree.root())
+        .border
+        .unwrap();
+
+    assert_eq!(border.widths, widths);
+    assert_eq!(border.color, Color::BLACK);
 }
 
 #[test]

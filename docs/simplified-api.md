@@ -11,7 +11,7 @@ widgets. Granular `widget-*` features remain available for smaller builds.
 
 ```toml
 [dependencies]
-argui = { version = "0.3.0", features = ["basic"] }
+argui = { version = "0.3.1", features = ["basic"] }
 ```
 
 Application code can use the small prelude and keep platform configuration

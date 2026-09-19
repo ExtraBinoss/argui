@@ -456,7 +456,7 @@ impl Page {
             Self::AlertDialog => "Confirm an action with a safe initial focus.",
             Self::Attachment => "File previews and transfer states.",
             Self::Bubble => "Conversation surfaces and reactions.",
-            Self::ButtonGroup => "Related actions in a named group.",
+            Self::ButtonGroup => "Joined actions, inputs and menus in a named group.",
             Self::Carousel => "Browse slides with buttons, arrows or a swipe.",
             Self::Chart => "Explore series with a zero baseline and accessible data points.",
             Self::Combobox => "Filter choices while keeping focus in the search field.",

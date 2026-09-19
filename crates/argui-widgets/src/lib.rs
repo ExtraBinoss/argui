@@ -303,7 +303,7 @@ pub use accordion::{Accordion, AccordionAction, AccordionItem};
 #[cfg(feature = "button-group")]
 mod button_group;
 #[cfg(feature = "button-group")]
-pub use button_group::ButtonGroup;
+pub use button_group::{ButtonGroup, ButtonGroupSeparator, ButtonGroupText};
 
 #[cfg(feature = "item")]
 mod item;

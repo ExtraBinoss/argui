@@ -147,7 +147,8 @@ impl Select {
             SelectPart::Trigger,
             Element::row(trigger_children)
                 .width(percent(1.0))
-                .padding(argui_ui::sides(12.0, 9.0))
+                .height(length(36.0))
+                .padding(argui_ui::sides(12.0, 8.0))
                 .align_items(AlignItems::CENTER)
                 .justify_content(JustifyContent::SPACE_BETWEEN)
                 .paint_style(self_theme_input(theme))

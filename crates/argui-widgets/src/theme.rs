@@ -81,7 +81,7 @@ fn widgets(scheme: ColorScheme, primary: Color) -> WidgetTheme {
             Color::from_srgb8(9, 9, 11),
             Color::from_srgb8(244, 244, 245),
             Color::from_srgb8(113, 113, 122),
-            Color::from_srgb8(228, 228, 231),
+            Color::from_srgb8(212, 212, 216),
             Color::from_srgb8(239, 68, 68),
         ),
         ColorScheme::Dark => (
@@ -90,7 +90,7 @@ fn widgets(scheme: ColorScheme, primary: Color) -> WidgetTheme {
             Color::from_srgb8(250, 250, 250),
             Color::from_srgb8(39, 39, 42),
             Color::from_srgb8(161, 161, 170),
-            Color::from_srgb8(39, 39, 42),
+            Color::from_srgb8(63, 63, 70),
             Color::from_srgb8(127, 29, 29),
         ),
     };
@@ -306,6 +306,7 @@ impl WidgetTheme {
     #[must_use]
     pub fn input(&self) -> InputStyle {
         let mut input = InputStyle::new(PaintStyle::new(quad(self.card, self.border)), self.text());
+        input.layout.padding = argui_ui::sides(13.0, 7.0);
         input.hovered = quad(self.card, mix(self.border, self.foreground, 0.28)).into();
         input.focused = quad(self.card, self.primary).into();
         input.placeholder.color = self.muted_foreground;

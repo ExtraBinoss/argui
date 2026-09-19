@@ -123,10 +123,13 @@ fn shadcn_palette_resolves_system_mode_and_contrasting_primary_text() {
     assert_eq!(dark.foreground.to_srgba8(), [250, 250, 250, 255]);
     assert_eq!(dark.muted.to_srgba8(), [39, 39, 42, 255]);
     assert_eq!(dark.input_border, dark.border);
+    assert!(light.border.contrast_ratio(light.background) >= 1.45);
+    assert!(dark.border.contrast_ratio(dark.background) >= 1.45);
     assert!(light.foreground.contrast_ratio(light.background) >= 4.5);
     assert!(dark.foreground.contrast_ratio(dark.background) >= 4.5);
     assert_eq!(light.button().layout.size.height, Dimension::length(36.0));
     assert_eq!(light.button().layout.padding, sides(14.0, 0.0));
+    assert_eq!(light.input().layout.padding, sides(13.0, 7.0));
     themes.set_mode(ThemeMode::Dark);
     assert_eq!(themes.resolve(ColorScheme::Light), &dark);
 

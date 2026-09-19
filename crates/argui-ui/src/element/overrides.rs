@@ -1,4 +1,4 @@
-use argui_paint::{Border, CornerRadii, Fill};
+use argui_paint::{Border, BorderWidths, CornerRadii, Fill};
 
 use crate::{Element, PropertyBinding, PropertyKey};
 
@@ -48,6 +48,20 @@ impl Element {
                 PropertyBinding::BorderColor(_) | PropertyBinding::BorderWidths(_)
             )
         });
+    }
+
+    /// Replaces the widths of an existing border in every visual state.
+    ///
+    /// `widths` supplies the left, right, top, and bottom widths. This method
+    /// does not create a border when the element has none, and it preserves
+    /// state-dependent border colors.
+    pub fn override_border_widths(&mut self, widths: BorderWidths) {
+        if let Some(border) = &mut self.paint.quad.border {
+            border.widths = widths;
+        }
+        self.remove_overridden_states(&[PropertyKey::BorderWidths]);
+        self.bindings
+            .retain(|binding| !matches!(binding, PropertyBinding::BorderWidths(_)));
     }
 
     fn remove_overridden_states(&mut self, properties: &[PropertyKey]) {

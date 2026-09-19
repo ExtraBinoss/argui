@@ -33,7 +33,7 @@ const example = (id: string, filename: keyof typeof docExampleSources): DocExamp
 })
 
 const dependency = `[dependencies]
-argui = { version = "0.3.0", features = ["widget-button"] }`
+argui = { version = "0.3.1", features = ["widget-button"] }`
 
 const launch = `use argui::{
     platform::{ApplicationConfig, ApplicationId, ApplicationIdentity, IconSet, WindowConfig},
@@ -225,7 +225,7 @@ export const docs: DocGuide[] = [
         id: 'requirements',
         title: 'What you need',
         paragraphs: [
-          'Argui 0.3.0 requires Rust 1.89 or newer. The repository itself currently recommends a newer toolchain for contributors, while the workspace manifest remains the source of truth for the minimum supported Rust version.',
+          'Argui 0.3.1 requires Rust 1.89 or newer. The repository itself currently recommends a newer toolchain for contributors, while the workspace manifest remains the source of truth for the minimum supported Rust version.',
         ],
         bullets: [
           'Rust and Cargo',
@@ -726,7 +726,7 @@ export const docs: DocGuide[] = [
         ],
         code: {
           filename: 'Cargo.toml',
-          code: '[dependencies]\nargui = { version = "0.3.0", features = ["tasks", "widget-input", "widget-button", "widget-vlist"] }',
+          code: '[dependencies]\nargui = { version = "0.3.1", features = ["tasks", "widget-input", "widget-button", "widget-vlist"] }',
         },
       },
       {

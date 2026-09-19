@@ -6,7 +6,20 @@ that do not use them.
 
 ## [Unreleased]
 
-_No changes yet._
+### Added
+
+- Added `ButtonGroupSeparator` and `ButtonGroupText`, plus a Widget Gallery
+  page covering the shadcn composition, orientation, size, nested, separator,
+  split, input, input-group, menu, select, popover, and RTL examples.
+
+### Fixed
+
+- Made `ButtonGroup` render as one compact control surface: adjacent children
+  now share higher-contrast borders, keep rounding only on the outside corners,
+  preserve hover border colors through overlay trigger wrappers, align buttons,
+  inputs, input groups and selects to the same control height, and retain
+  intrinsic width in horizontal and vertical layouts. The gallery dropdown,
+  select, popover, input and voice examples now keep real interactive state.
 
 ## [0.3.1] - 2026-09-19
 

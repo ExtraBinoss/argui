@@ -6,6 +6,7 @@ use argui::{
 };
 use std::collections::BTreeSet;
 
+mod button_group;
 mod conversation;
 mod forms;
 mod navigation;
@@ -60,6 +61,7 @@ pub(crate) struct CatalogueDemo {
     message_scroll: MessageScrollState,
     scroll_maximum: f32,
     append_count: Option<usize>,
+    button_group: button_group::ButtonGroupState,
 }
 
 impl CatalogueDemo {
@@ -74,6 +76,9 @@ impl CatalogueDemo {
         }
         if self.page == Page::NavigationMenu {
             self.active = None;
+        }
+        if self.page == Page::ButtonGroup {
+            self.button_group.overlay = None;
         }
         self.offset = 0.0;
     }
@@ -98,6 +103,7 @@ impl CatalogueDemo {
             message_scroll: MessageScrollState::default(),
             scroll_maximum: 0.0,
             append_count: Some(0),
+            button_group: button_group::ButtonGroupState::default(),
         }
     }
 
