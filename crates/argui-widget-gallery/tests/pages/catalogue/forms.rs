@@ -39,6 +39,17 @@ fn forms_edit_validate_filter_and_complete_the_questionnaire() {
     keyboard(&app, "framework", Key::Enter);
     assert!(contains_text(&app.render(), "Selected SvelteKit"));
     click(&app, "framework");
+    assert!(
+        keyed(&app.render(), "framework::option::1")
+            .and_then(|option| option.semantics.as_ref())
+            .is_some_and(|semantics| semantics.state.selected)
+    );
+    dispatch(&app, "framework", UiEventKind::TextChanged(String::new()));
+    assert!(
+        keyed(&app.render(), "framework::option::1")
+            .and_then(|option| option.semantics.as_ref())
+            .is_some_and(|semantics| !semantics.state.selected)
+    );
     keyboard(&app, "framework", Key::Escape);
     assert!(keyed(&app.render(), "framework::list").is_none());
     click(&app, "nav::native-select");

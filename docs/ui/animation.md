@@ -19,7 +19,7 @@ Enable `widget-implicit-animation` on the `argui` facade, or
 `implicit-animation` when depending on `argui-widgets` directly.
 
 ```toml
-argui = { version = "0.3.1", features = ["widget-implicit-animation"] }
+argui = { version = "0.3.2", features = ["widget-implicit-animation"] }
 ```
 
 ### Fade a complete subtree

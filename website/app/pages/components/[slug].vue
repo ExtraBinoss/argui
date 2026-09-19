@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import catalogue from '~/data/catalogue.json'
-import { repository, sourceUrl } from '~/data/project'
+import { currentVersion, sourceUrl } from '~/data/project'
 definePageMeta({
   validate: (route) => catalogue.some((item) => item.slug === route.params.slug),
 })
@@ -22,7 +22,8 @@ function selectPreviewPage(label: string) {
   if (selected) previewItem.value = selected
 }
 const featureCode = computed(
-  () => `[dependencies.argui]\ngit = "${repository}"\nfeatures = ["widget-${item.value?.feature}"]`,
+  () =>
+    `[dependencies]\nargui = { version = "${currentVersion}", features = ["widget-${item.value?.feature}"] }`,
 )
 const related = computed(() => {
   const position = catalogue.findIndex((entry) => entry.slug === item.value?.slug)

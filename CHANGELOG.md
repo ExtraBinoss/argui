@@ -6,6 +6,10 @@ that do not use them.
 
 ## [Unreleased]
 
+_No changes yet._
+
+## [0.3.2] - 2026-09-19
+
 ### Added
 
 - Added `ButtonGroupSeparator` and `ButtonGroupText`, plus a Widget Gallery
@@ -19,7 +23,9 @@ that do not use them.
   controlled applications.
 - Matched the shadcn Combobox composition more closely with an inline chevron,
   full-width active option rows, selected-option checks, an anchor-width popup,
-  compact gallery sizing, and the official framework example labels.
+  compact gallery sizing, and the official framework example labels. Selection
+  now moves the caret to the end of the chosen label, while subsequent edits or
+  clearing the input remove the stale selected-option state.
 - Made direct-touch scrolling wait for the configured touch slop, lock to the
   intended scroll axis and viewport, and yield to widget-owned pointer capture.
   Small finger movement now remains a tap, vertical movement no longer flings a
@@ -292,7 +298,8 @@ that do not use them.
 - Added Windows and macOS workspace checks, Rust build caching, crates.io archive
   validation and ordered publication of all public crates.
 
-[Unreleased]: https://github.com/ExtraBinoss/argui/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/ExtraBinoss/argui/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/ExtraBinoss/argui/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/ExtraBinoss/argui/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/ExtraBinoss/argui/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/ExtraBinoss/argui/compare/v0.2.0...v0.2.1

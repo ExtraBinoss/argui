@@ -1,7 +1,8 @@
 use super::*;
 use crate::app::text;
 use argui::{
-    ui::{UiEventKind, percent},
+    core::{CaretAffinity, TextPosition},
+    ui::{TextSelection, UiEventKind, percent},
     widgets::*,
 };
 
@@ -48,7 +49,13 @@ impl CatalogueDemo {
         combo.query.clone_from(&self.text);
         combo.open = self.open;
         combo.highlighted = self.highlighted;
-        combo.selected = Some(self.selected);
+        combo.selected = self.combobox_selected.filter(|index| {
+            combo
+                .options
+                .get(*index)
+                .map(|option| option.label.as_str())
+                == Some(self.text.as_str())
+        });
         combo
     }
 
@@ -185,6 +192,7 @@ impl CatalogueDemo {
                     match action {
                         ComboboxAction::Query(value) => {
                             self.text = value;
+                            self.combobox_selected = None;
                             self.open = true;
                             self.highlighted = None;
                         }
@@ -197,11 +205,18 @@ impl CatalogueDemo {
                             ));
                         }
                         ComboboxAction::Select(index) => {
-                            self.selected = index;
                             self.text = self.combobox(theme).options[index].label.clone();
+                            self.combobox_selected = Some(index);
                             self.status = format!("Selected {}", self.text);
                             self.open = false;
                             cx.request_focus("framework");
+                            cx.select_text(
+                                "framework",
+                                TextSelection::Caret(TextPosition::new(
+                                    self.text.len(),
+                                    CaretAffinity::After,
+                                )),
+                            );
                         }
                     }
                     return true;

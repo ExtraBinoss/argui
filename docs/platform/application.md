@@ -95,7 +95,7 @@ executable, set `with_linux_application_id` to that filename.
 ## Tray
 
 ```toml
-argui = { version = "0.3.1", features = ["tray"] }
+argui = { version = "0.3.2", features = ["tray"] }
 ```
 
 Windows and macOS use their notification area; Linux uses the

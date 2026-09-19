@@ -6,7 +6,7 @@ bounds. Content, state, placement, scrolling, and input remain in Argui; the
 platform adapter owns the extra surface.
 
 ```toml
-argui = { version = "0.3.1", features = [
+argui = { version = "0.3.2", features = [
   "widget-popover",
   "widget-select",
   "widget-tooltip",

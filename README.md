@@ -125,7 +125,7 @@ not need an OS feature. A focused application can enable capabilities directly:
 
 ```toml
 [dependencies]
-argui = { version = "0.3.1", default-features = false, features = [
+argui = { version = "0.3.2", default-features = false, features = [
   "i18n", "tasks", "widget-button", "widget-input",
 ] }
 ```
@@ -134,12 +134,12 @@ For mobile, add the platform entry crate as a separate dependency:
 
 ```toml
 # Android
-argui = { version = "0.3.1", features = ["i18n", "widgets-all"] }
-argui-android = "0.3.1"
+argui = { version = "0.3.2", features = ["i18n", "widgets-all"] }
+argui-android = "0.3.2"
 
 # iOS
-argui = { version = "0.3.1", features = ["i18n", "widgets-all"] }
-argui-ios = "0.3.1"
+argui = { version = "0.3.2", features = ["i18n", "widgets-all"] }
+argui-ios = "0.3.2"
 ```
 
 Available widget flags are `widget-accordion`, `widget-alert`,
@@ -216,7 +216,7 @@ Add only the widgets your application uses:
 
 ```toml
 [dependencies]
-argui = { version = "0.3.1", features = ["widget-button"] }
+argui = { version = "0.3.2", features = ["widget-button"] }
 ```
 
 ```rust
