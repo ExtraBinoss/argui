@@ -59,7 +59,10 @@ sets axis, threshold, capture, and delivery:
 
 Pinch and rotation can run together. Velocity uses a bounded recent history.
 Touch can drive scroll containers while the same contacts remain available to
-configured gestures.
+configured gestures. Default scrolling starts only after touch slop, selects a
+viewport compatible with the contact's dominant axis, and does not run while a
+widget has captured that pointer. This keeps taps stable and isolates direct
+manipulation from a surrounding scroll area.
 
 Document text selection follows browser-style mouse behavior. Pressing directly
 on selectable text anchors at that glyph; starting a drag in non-interactive

@@ -123,6 +123,7 @@ impl ApplicationHandler<UserEvent> for Application {
             self.pointer_buttons = 0;
             self.touch_points.clear();
             self.primary_touch = None;
+            self.touch_scroll.cancel();
             self.touch_selection = None;
             self.touch_selection_handle = None;
         }

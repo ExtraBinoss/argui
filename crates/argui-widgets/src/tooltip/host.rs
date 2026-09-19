@@ -18,6 +18,7 @@ pub struct TooltipHost<A: Render> {
     root: Element,
     active: Option<(String, TooltipState)>,
     blocked: bool,
+    pointer_focus: Option<String>,
     timer: TaskSlot,
     origin: Instant,
     delay: Duration,
@@ -41,6 +42,7 @@ impl<A: Render> TooltipHost<A> {
             root: Element::container([]),
             active: None,
             blocked: false,
+            pointer_focus: None,
             timer: TaskSlot::default(),
             origin: Instant::now(),
             delay: Duration::from_millis(350),
@@ -118,16 +120,32 @@ impl<A: Render> TooltipHost<A> {
         if self.blocked {
             return;
         }
-        let entering = matches!(event.kind, UiEventKind::Focused)
+        let key = event.target_key();
+        if matches!(&event.kind, UiEventKind::Pointer(pointer)
+            if pointer.phase == PointerPhase::Pressed)
+            && key.is_some_and(|key| candidate(&self.root, key).is_some())
+        {
+            self.pointer_focus = key.map(str::to_owned);
+        } else if matches!(event.kind, UiEventKind::KeyInput(_))
+            || (matches!(event.kind, UiEventKind::Blurred) && self.pointer_focus.as_deref() == key)
+        {
+            self.pointer_focus = None;
+        }
+        let pointer_focused =
+            matches!(event.kind, UiEventKind::Focused) && self.pointer_focus.as_deref() == key;
+        let entering = (matches!(event.kind, UiEventKind::Focused) && !pointer_focused)
             || matches!(&event.kind, UiEventKind::Pointer(pointer)
                 if pointer.phase == PointerPhase::Entered && pointer.kind != PointerKind::Touch);
         if entering
-            && let Some(key) = event.target_key()
+            && let Some(key) = key
             && candidate(&self.root, key).is_some()
             && self.active.as_ref().is_none_or(|(active, _)| active != key)
         {
             self.clear();
             self.active = Some((key.into(), TooltipState::new(key).delay(self.delay)));
+        }
+        if pointer_focused {
+            return;
         }
         if let Some((_, state)) = &mut self.active
             && state.update(event, self.origin.elapsed())

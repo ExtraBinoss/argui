@@ -5,7 +5,7 @@ use winit::event::TouchPhase;
 
 use crate::{
     RuntimeError, RuntimeEvent,
-    app::{Application, inertia::ScrollSample},
+    app::{Application, inertia::ScrollSample, touch_scroll::TouchScrollUpdate},
 };
 
 mod request;
@@ -151,41 +151,34 @@ impl Application {
         }
     }
 
-    pub(super) fn observe_touch_scroll(
+    pub(super) fn apply_touch_scroll(
         &mut self,
+        update: TouchScrollUpdate,
         point: Point,
-        delta: Option<Point>,
-        phase: argui_core::PointerPhase,
         window: &dyn crate::host::WindowHost,
+        event_loop: &dyn crate::host::LoopControl,
     ) {
-        let phase = match phase {
-            argui_core::PointerPhase::Pressed => TouchPhase::Started,
-            argui_core::PointerPhase::Moved => TouchPhase::Moved,
-            argui_core::PointerPhase::Released => TouchPhase::Ended,
-            argui_core::PointerPhase::Cancelled | argui_core::PointerPhase::Left => {
-                TouchPhase::Cancelled
+        let delta = super::inertia::touch_scroll_delta(update.delta, update.natural);
+        if matches!(update.phase, TouchPhase::Started | TouchPhase::Moved)
+            && (delta.x.abs() > f32::EPSILON || delta.y.abs() > f32::EPSILON)
+        {
+            self.programmatic_scroll = None;
+            if let (Some(layout), Some(ui)) = (&self.ui_layout, &mut self.ui_tree) {
+                let scroll = ui.scroll_from(
+                    update.target,
+                    point,
+                    ScrollDelta::Pixels(delta),
+                    &layout.scroll_regions,
+                );
+                self.apply_ui_update(scroll, window, event_loop);
             }
-            argui_core::PointerPhase::Entered => return,
-        };
-        let (target, physics) = self
-            .ui_layout
-            .as_ref()
-            .and_then(|layout| {
-                layout
-                    .scroll_regions
-                    .iter()
-                    .rev()
-                    .find(|region| region.config.enabled && region.contains(point))
-            })
-            .map_or((None, ScrollPhysics::Direct), |region| {
-                (Some(region.node), region.config.physics)
-            });
+        }
         self.scroll_inertia.observe(ScrollSample {
-            delta: ScrollDelta::Pixels(delta.unwrap_or_default()),
-            phase,
+            delta: ScrollDelta::Pixels(delta),
+            phase: update.phase,
             now: self.input_epoch.elapsed(),
-            target,
-            physics,
+            target: Some(update.target),
+            physics: update.physics,
             point,
             dispatch_wheel: false,
             reduced_motion: self.environment.reduced_motion,

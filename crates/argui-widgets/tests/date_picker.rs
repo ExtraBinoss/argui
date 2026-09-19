@@ -168,3 +168,51 @@ fn clicking_month_navigation_keeps_the_picker_open_and_the_value_unchanged() {
         );
     }
 }
+
+#[test]
+fn year_selection_stays_in_the_popup_and_compact_calendar_fits_mobile_width() {
+    use argui_core::Size;
+    use argui_layout::LayoutEngine;
+    use argui_text::TextEngine;
+    let today = date("2026-09-19");
+    let mut state = DatePickerState::new(Some(today), today, &IsoCalendarLocale);
+    state.open = true;
+    let picker = DatePicker::new("date", "Date", &state, today);
+    let opened = picker
+        .action(&event(
+            "date::calendar::heading",
+            UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
+        ))
+        .unwrap();
+    assert!(opened.state.calendar.year_picker_open());
+    assert_eq!(opened.focus, Some("date::calendar::year::2026".into()));
+
+    let selected = DatePicker::new("date", "Date", &opened.state, today)
+        .action(&event(
+            "date::calendar::year::2027",
+            UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
+        ))
+        .unwrap();
+    assert!(selected.state.open);
+    assert!(!selected.committed);
+    assert_eq!(selected.state.value, Some(today));
+    assert_eq!(selected.state.calendar.active.year(), 2027);
+    assert_eq!(
+        selected.focus,
+        Some("date::calendar::day::2027-09-19".into())
+    );
+
+    let themes = shadcn(Color::WHITE);
+    let mut tree = UiTree::new(
+        DatePicker::new("date", "Date", &selected.state, today)
+            .build(themes.resolve(ColorScheme::Light)),
+    );
+    let output = LayoutEngine::new()
+        .compute(&mut tree, &mut TextEngine::new(), Size::new(320.0, 360.0))
+        .unwrap();
+    assert!(
+        output.portals.iter().all(|portal| {
+            portal.bounds.size.width <= 304.0 && portal.bounds.size.height <= 344.0
+        })
+    );
+}

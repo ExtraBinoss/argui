@@ -33,6 +33,7 @@ pub struct CalendarState {
     pub active: Date,
     pub selection: CalendarSelection,
     desired_day: u8,
+    year_picker_open: bool,
 }
 
 impl CalendarState {
@@ -42,7 +43,21 @@ impl CalendarState {
             active,
             selection,
             desired_day: active.day(),
+            year_picker_open: false,
         }
+    }
+
+    /// Returns whether the calendar is presenting its year-selection grid.
+    #[must_use]
+    pub const fn year_picker_open(&self) -> bool {
+        self.year_picker_open
+    }
+
+    /// Shows or hides the year-selection grid and reports whether state changed.
+    pub fn set_year_picker_open(&mut self, open: bool) -> bool {
+        let changed = self.year_picker_open != open;
+        self.year_picker_open = open;
+        changed
     }
 
     /// Returns the first day of the month containing the active date.
@@ -170,6 +185,38 @@ impl CalendarState {
         }
         changed
     }
+
+    /// Moves the visible year page by `years` without changing the selection.
+    ///
+    /// `constraints` bounds the resulting active date and skips unavailable
+    /// dates. Returns whether the active year changed.
+    pub fn navigate_years(&mut self, years: i32, constraints: &CalendarConstraints<'_>) -> bool {
+        let Some(year) = self.active.year().checked_add(years) else {
+            return false;
+        };
+        let Some(candidate) = candidate_in_year(self.active, self.desired_day, year, constraints)
+        else {
+            return false;
+        };
+        let changed = candidate != self.active;
+        self.active = candidate;
+        changed
+    }
+
+    /// Activates `year`, closes the year grid, and preserves the current month
+    /// and preferred day whenever constraints allow it.
+    ///
+    /// Returns whether the active date or year-grid visibility changed.
+    pub fn select_year(&mut self, year: i32, constraints: &CalendarConstraints<'_>) -> bool {
+        let Some(candidate) = candidate_in_year(self.active, self.desired_day, year, constraints)
+        else {
+            return false;
+        };
+        let changed = candidate != self.active || self.year_picker_open;
+        self.active = candidate;
+        self.year_picker_open = false;
+        changed
+    }
 }
 
 pub struct CalendarConstraints<'a> {
@@ -210,4 +257,47 @@ fn shift_month(date: Date, months: i32, desired_day: u8) -> Option<Date> {
     (1..=desired_day)
         .rev()
         .find_map(|day| first.replace_day(day).ok())
+}
+
+/// Finds the nearest enabled date in `year` while preserving the preferred month and day.
+fn candidate_in_year(
+    active: Date,
+    desired_day: u8,
+    year: i32,
+    constraints: &CalendarConstraints<'_>,
+) -> Option<Date> {
+    if constraints
+        .minimum
+        .zip(constraints.maximum)
+        .is_some_and(|(minimum, maximum)| minimum > maximum)
+    {
+        return None;
+    }
+    let months = year.checked_sub(active.year())?.checked_mul(12)?;
+    let candidate = shift_month(active, months, desired_day)?.clamp(
+        constraints.minimum.unwrap_or(Date::MIN),
+        constraints.maximum.unwrap_or(Date::MAX),
+    );
+    if candidate.year() != year {
+        return None;
+    }
+    if constraints.enabled(candidate) {
+        return Some(candidate);
+    }
+    let first = Date::from_calendar_date(year, Month::January, 1).ok()?;
+    let last = Date::from_calendar_date(year, Month::December, 31).ok()?;
+    for distance in 1..=366_i64 {
+        for date in [
+            candidate.checked_add(Duration::days(distance)),
+            candidate.checked_sub(Duration::days(distance)),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            if date >= first && date <= last && constraints.enabled(date) {
+                return Some(date);
+            }
+        }
+    }
+    None
 }

@@ -70,6 +70,19 @@ try {
         await navigate('Date picker');
         await click(button('Choose a date'));
         await capture(`${scheme}-date-picker`);
+        const yearHeading = await page.$$eval('button', elements => {
+            const heading = elements.find(element => {
+                const rect = element.getBoundingClientRect();
+                return rect.width > 0 && /\b-?\d{4}\b/.test(element.getAttribute('aria-label') ?? '');
+            });
+            if (!heading) throw new Error('Date picker month/year heading is missing');
+            return `#${heading.id}`;
+        });
+        await click(yearHeading);
+        assert.equal(await page.$$eval('[role="cell"]', elements => elements.length), 12);
+        await capture(`${scheme}-date-picker-years`);
+        await click('[role="cell"]');
+        assert.equal(await page.$$eval('[role="cell"]', elements => elements.length), 42);
         await page.keyboard.press('Escape'); await pause();
         await navigate('Toast');
         await click(button('Show notification'));

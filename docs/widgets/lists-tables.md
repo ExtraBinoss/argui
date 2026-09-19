@@ -115,7 +115,9 @@ Before a transformation, retain `model.collection()` and then call
 `model.collection().remap_heights(&previous, &mut heights)` so measurements follow
 stable IDs. The collection snapshot is shared without traversing rows. Column
 handles reuse SplitPane gestures and keyboard behavior: forward Gesture events
-and apply `ResizeColumn`.
+and apply `ResizeColumn`. Their visible separator remains compact while hit slop
+provides a 24-pixel pointer target; captured resize drags do not leak into the
+table's horizontal touch scroll.
 
 DataTable owns its horizontal viewport, keeping headers and rows aligned after
 resizing. The vertical viewport contains only rows and preserves virtualization.

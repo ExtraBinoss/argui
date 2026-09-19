@@ -1,9 +1,10 @@
 use argui_core::{Key, KeyState};
 use argui_ui::{
     AlignItems, CursorIcon, Element, EventType, GestureCapture, GestureDelivery, GestureKind,
-    GesturePhase, GestureSet, Interaction, JustifyContent, Orientation, PanAxis, PanGesture, Role,
-    SemanticAction, SemanticValue, Semantics, SplitHandlerValue, StateScopeId, StylePatch, UiEvent,
-    UiEventKind, UserSelect, ValueHandler, VisualState, length, percent, property,
+    GesturePhase, GestureSet, HitTestStyle, Interaction, JustifyContent, Orientation, PanAxis,
+    PanGesture, Role, SemanticAction, SemanticValue, Semantics, SplitHandlerValue, StateScopeId,
+    StylePatch, UiEvent, UiEventKind, UserSelect, ValueHandler, VisualState, length, percent,
+    property,
 };
 
 use crate::WidgetTheme;
@@ -179,6 +180,7 @@ impl SplitPane {
             .justify_content(JustifyContent::CENTER)
             .state_scope(SPLIT_PANE_SCOPE)
             .user_select(UserSelect::None)
+            .hit_test(HitTestStyle::default().slop(argui_ui::Sides::length(9.0)))
             .interaction(
                 Interaction::default()
                     .focus_policy(argui_ui::FocusPolicy::TabStop)

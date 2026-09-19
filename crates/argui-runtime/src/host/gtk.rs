@@ -42,7 +42,15 @@ impl WindowHost for GtkHost {
         self.platform.native().set_focus();
     }
     fn activate_window(&self, token: &str) -> Result<bool, String> {
-        argui_platform::activate_wayland_window(self.platform.native(), token)
+        #[cfg(feature = "global-shortcuts")]
+        {
+            argui_platform::activate_wayland_window(self.platform.native(), token)
+        }
+        #[cfg(not(feature = "global-shortcuts"))]
+        {
+            let _ = token;
+            Ok(false)
+        }
     }
     fn set_title(&self, title: &str) {
         self.platform.native().set_title(title);

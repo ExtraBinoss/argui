@@ -218,6 +218,15 @@ impl UiTree {
             .filter(|cursor| *cursor != crate::CursorIcon::Auto)
     }
 
+    /// Returns whether `pointer` is captured by an active drag interaction.
+    ///
+    /// Runtime hosts use this to avoid running default touch scrolling while a
+    /// widget-owned drag, such as a splitter or slider, owns the contact.
+    #[must_use]
+    pub fn pointer_captured(&self, pointer: PointerId) -> bool {
+        self.interaction.captured_node(pointer).is_some()
+    }
+
     /// Releases a pointer capture owned by `target`.
     ///
     /// * `pointer` — pointer identifier to release.

@@ -28,8 +28,8 @@ as `Element::on`.
 | Popover, HoverCard | `on_open_change(bool)`, `on_dismiss(EventHandler)` | Trigger/focus/hover rules and Escape/outside dismissal request controlled state. |
 | Menu, ContextMenu, Menubar | `on_action(String)`, `on_open_change(bool)` | Roving focus, typeahead, submenus, Enter/Space, context-key, and Escape preserve menu behavior. |
 | CommandPalette | `on_input(String)`, `on_action(String)`, `on_open_change(bool)` | Search and active-command keyboard navigation emit stable command IDs. |
-| Calendar | `on_select(String)` | Day activation emits ISO `YYYY-MM-DD`; constrained days never emit. |
-| DatePicker | `on_input(String)`, `on_select(String)`, `on_open_change(bool)` | Input validation, calendar keyboard behavior, and dismissal remain controlled. |
+| Calendar | `on_select(String)` | Day activation emits ISO `YYYY-MM-DD`; constrained days never emit. Month and year navigation remain controlled through `CalendarState`. |
+| DatePicker | `on_input(String)`, `on_select(String)`, `on_open_change(bool)` | Input validation, compact calendar/year navigation, keyboard behavior, and dismissal remain controlled. |
 | Pagination, Carousel | `on_select(usize)` | Buttons, arrows, swipe (carousel), and accessibility activation emit the next source index/page. |
 | Breadcrumb | `on_activate(String)` | Actionable ancestors emit their stable IDs. |
 | List, VList, Table, TreeView | `on_select(String)`, `on_activate(String)` | Pointer, Enter/Space, arrows, Home/End, typeahead, and accessibility actions emit stable row/node IDs. |

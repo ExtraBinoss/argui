@@ -187,6 +187,11 @@ padding rather than exposing the renderer clear color.
 
 Touch scrolling follows the finger and keeps momentum by default. This affects
 direct touch only; mouse wheels and trackpads retain their platform direction.
+The runtime keeps a contact pending until it exceeds `PointerSettings::touch_slop`:
+small finger jitter therefore remains a tap. Once scrolling starts, Argui locks
+the contact to the topmost scroll viewport matching its dominant axis. A
+widget-owned captured drag, such as a slider or table column separator, wins
+over default scrolling for the lifetime of that contact.
 Applications that intentionally want reversed touch movement can opt out per
 scroll region:
 

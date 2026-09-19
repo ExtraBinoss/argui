@@ -168,7 +168,8 @@ impl<'a> DatePicker<'a> {
             &self.label,
             &self.state.calendar,
             self.today,
-        );
+        )
+        .compact(true);
         calendar.locale = self.locale;
         calendar.constraints = CalendarConstraints {
             minimum: self.constraints.minimum,
@@ -228,7 +229,7 @@ impl<'a> DatePicker<'a> {
         ))
         .trap_focus(true)
         .padding(0.0)
-        .size(300.0, 380.0);
+        .size(288.0, 320.0);
         if let Some(surface) = self.surface {
             popup = popup.surface(surface);
         }
@@ -257,7 +258,7 @@ impl<'a> DatePicker<'a> {
             );
         }
         Element::column(children)
-            .width(argui_ui::length(300.0))
+            .width(argui_ui::length(288.0))
             .max_width(argui_ui::percent(1.0))
             .gap(8.0)
             .keyed(&self.key)
@@ -312,7 +313,14 @@ impl<'a> DatePicker<'a> {
                 committed = state.commit(self.locale, &self.constraints, self.unavailable_message);
                 focus = Some(self.input_key().into());
             } else {
-                focus = Some(calendar.day_key(next.active).into());
+                focus = Some(
+                    if next.year_picker_open() {
+                        calendar.year_key(next.active.year())
+                    } else {
+                        calendar.day_key(next.active)
+                    }
+                    .into(),
+                );
             }
             state.calendar = next;
         } else {

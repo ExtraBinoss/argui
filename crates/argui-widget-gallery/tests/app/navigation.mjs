@@ -160,6 +160,89 @@ try {
         before,
         `A horizontal finger swipe must reveal other navigation buttons (${before} → ${after})`,
     );
+    const mobileButton = label => `button[aria-label="${label}"]`;
+    const mobileNavigate = async label => {
+        await mobile.$eval(mobileButton(label), element => element.click());
+        await pause(350);
+    };
+    const touch = async (x, y, endX = x, endY = y) => {
+        await client.send('Input.dispatchTouchEvent', {
+            type: 'touchStart',
+            touchPoints: [{ x, y }],
+        });
+        if (x !== endX || y !== endY) {
+            await client.send('Input.dispatchTouchEvent', {
+                type: 'touchMove',
+                touchPoints: [{ x: endX, y: endY }],
+            });
+        }
+        await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+        await pause(550);
+    };
+    const center = selector => mobile.$eval(selector, element => {
+        const rect = element.getBoundingClientRect();
+        return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+    });
+
+    await mobileNavigate('Button');
+    const primary = await center(mobileButton('Primary'));
+    await touch(primary.x, primary.y);
+    assert.equal(
+        await mobile.$$eval('[role="tooltip"]', elements => elements.length),
+        0,
+        'Touch focus must not open automatic button help',
+    );
+
+    await mobileNavigate('Date picker');
+    const pickerTrigger = await center(mobileButton('Choose a date'));
+    await touch(pickerTrigger.x, pickerTrigger.y);
+    await mobile.waitForSelector('[role="cell"]');
+    const heading = await mobile.$$eval('button', elements => {
+        const element = elements.find(candidate => {
+            const rect = candidate.getBoundingClientRect();
+            return rect.width > 0 && /\b-?\d{4}\b/.test(candidate.getAttribute('aria-label') ?? '');
+        });
+        if (!element) throw new Error('Mobile date picker year heading is missing');
+        const rect = element.getBoundingClientRect();
+        return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+    });
+    await touch(heading.x, heading.y);
+    assert.equal(await mobile.$$eval('[role="cell"]', elements => elements.length), 12);
+    const yearCellsFit = await mobile.$$eval('[role="cell"]', elements => elements.every(element => {
+        const rect = element.getBoundingClientRect();
+        return rect.left >= 0 && rect.right <= innerWidth && rect.top >= 0 && rect.bottom <= innerHeight;
+    }));
+    assert.ok(yearCellsFit, 'The compact year picker must fit the mobile viewport');
+    const mobileYears = await mobile.screenshot({ path: `${output}/mobile-date-picker-years.png` });
+    assert.ok(mobileYears.length > 15000, 'Blank mobile date picker capture');
+    await mobile.keyboard.press('Escape');
+    await pause();
+
+    await mobileNavigate('Data table');
+    const separator = '[role="separator"]';
+    await mobile.waitForSelector(separator);
+    const firstCell = '[role="cell"]';
+    for (let attempt = 0; attempt < 4; attempt++) {
+        const rect = await mobile.$eval(separator, element => element.getBoundingClientRect().toJSON());
+        if (rect.top >= 0 && rect.bottom <= 844) break;
+        await touch(10, rect.bottom > 844 ? 760 : 360, 10, rect.bottom > 844 ? 360 : 760);
+    }
+    const resizeBounds = await mobile.$eval(separator, element => element.getBoundingClientRect().toJSON());
+    assert.ok(resizeBounds.top >= 0 && resizeBounds.bottom <= 844, 'Resize handle must be visible before touch');
+    const beforeResize = await mobile.$eval(firstCell, element => element.getBoundingClientRect().toJSON());
+    const resize = await center(separator);
+    await touch(resize.x, resize.y);
+    const afterTap = await mobile.$eval(firstCell, element => element.getBoundingClientRect().toJSON());
+    assert.ok(
+        Math.abs(afterTap.x - beforeResize.x) < 1 && Math.abs(afterTap.y - beforeResize.y) < 1,
+        'Tapping a resize handle must not scroll the table',
+    );
+    await touch(resize.x, resize.y, resize.x + 28, resize.y);
+    const afterResize = await mobile.$eval(firstCell, element => element.getBoundingClientRect().toJSON());
+    assert.ok(
+        Math.abs(afterResize.x - beforeResize.x) < 1 && Math.abs(afterResize.y - beforeResize.y) < 1,
+        'Captured column resize must not move the table viewport',
+    );
     const mobilePng = await mobile.screenshot({ path: `${output}/mobile-navigation.png` });
     assert.ok(mobilePng.length > 15000, 'Blank mobile capture');
     assert.deepEqual(mobileErrors, []);

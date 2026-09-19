@@ -14,6 +14,20 @@ that do not use them.
 
 ### Fixed
 
+- Made direct-touch scrolling wait for the configured touch slop, lock to the
+  intended scroll axis and viewport, and yield to widget-owned pointer capture.
+  Small finger movement now remains a tap, vertical movement no longer flings a
+  horizontal table, and column resize handles keep ownership of their drag.
+- Made `DatePicker` use a shorter mobile-friendly calendar and added an
+  accessible month/year heading that opens a 12-year grid with paged, keyboard,
+  RTL, constraint-aware navigation.
+- Prevented automatic tooltips from opening when touch or mouse activation gives
+  a button focus; delayed mouse hover and immediate keyboard focus remain intact.
+- Enlarged `SplitPane` and `DataTable` resize hit targets without changing their
+  visible six-pixel separators.
+- Kept the Linux GTK/webview host buildable when portal-backed global shortcuts
+  are not enabled; activation now reports unsupported instead of referencing an
+  unavailable platform hook.
 - Made `ButtonGroup` render as one compact control surface: adjacent children
   now share higher-contrast borders, keep rounding only on the outside corners,
   preserve hover border colors through overlay trigger wrappers, align buttons,

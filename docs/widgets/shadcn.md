@@ -26,7 +26,7 @@ updater dialog is a separate opt-in.
 | Bubble | [Bubble](../../crates/argui-widgets/src/bubble.rs) | `bubble` | Seven variants, alignment and reactions; content is arbitrary and must use suitable foreground colors. |
 | Button | [Button](../../crates/argui-widgets/src/button.rs) | `button` | Theme variants, icons, loading state and accessible activation. |
 | Button Group | [ButtonGroup](../../crates/argui-widgets/src/button_group.rs) | `button-group` | Compact horizontal/vertical joined controls with shared high-contrast borders, outer-only rounding, aligned input/select/overlay triggers, separators, text segments, nested clusters, explicit `.rtl(true)` physical-edge joining and independent Tab stops. |
-| Calendar | [Calendar](../../crates/argui-widgets/src/calendar.rs) | `calendar` | Calendar and retained CalendarState, locale, bounds, single/multiple/range selection and keyboard navigation. |
+| Calendar | [Calendar](../../crates/argui-widgets/src/calendar.rs) | `calendar` | Calendar and retained CalendarState, locale, bounds, single/multiple/range selection, keyboard navigation, compact presentation and a paged year grid. |
 | Card | [Card](../../crates/argui-widgets/src/card.rs) | `card` | Optional title, description, actions, content and footer with accessible relationships. |
 | Carousel | [Carousel](../../crates/argui-widgets/src/carousel.rs) | `carousel` | Controlled slide, buttons, keyboard, swiping, optional looping and announcements; no autoplay. |
 | Chart | [Chart](../../crates/argui-widgets/src/chart.rs) | `chart` | Multi-series bars and lines, a zero-inclusive scale, legend and actionable accessible points; other plots are not provided. |
@@ -35,8 +35,8 @@ updater dialog is a separate opt-in.
 | Combobox | [Combobox](../../crates/argui-widgets/src/combobox.rs) | `combobox` | Editable search, filtering, disabled options, active descendant and keyboard selection; single selection. |
 | Command | [CommandPalette](../../crates/argui-widgets/src/command_palette.rs) | `command-palette` | Action search and invocation; advanced grouping and variants remain limited. |
 | Context Menu | [ContextMenu](../../crates/argui-widgets/src/context_menu.rs) | `context-menu` | Shared Menu entries with pointer or keyboard anchoring. |
-| Data Table | [DataTable](../../crates/argui-widgets/src/data_table.rs) | `data-table` | Typed model, filters, stable multi-column sorting, pagination, visible columns, virtualization and controlled editing; headers track scrolling. |
-| Date Picker | [DatePicker](../../crates/argui-widgets/src/date_picker.rs) | `date-picker` | Localizable input, controlled draft, validation and a reused calendar. |
+| Data Table | [DataTable](../../crates/argui-widgets/src/data_table.rs) | `data-table` | Typed model, filters, stable multi-column sorting, pagination, visible columns, virtualization and controlled editing; headers track scrolling and captured resize handles remain isolated from touch scroll. |
+| Date Picker | [DatePicker](../../crates/argui-widgets/src/date_picker.rs) | `date-picker` | Localizable input, controlled draft, validation and a compact calendar with direct year selection. |
 | Dialog | [Dialog](../../crates/argui-widgets/src/dialog.rs) | `dialog` | Modal focus trapping/restoration, configurable initial focus, placement and scrollable content. |
 | Direction | [Direction](../../crates/argui-widgets/src/direction.rs) | `direction` | Inherited layout direction with nested scopes; keyboard controllers take an explicit rtl setting. |
 | Drawer | [Drawer](../../crates/argui-widgets/src/drawer.rs) | `drawer` | Modal bottom panel, drag handle, distance/velocity thresholds and cancellation; no intermediate snap positions. |
@@ -77,7 +77,7 @@ updater dialog is a separate opt-in.
 | Toast | [Toast](../../crates/argui-widgets/src/toast.rs) | `toast` | Controlled queue, duration, hover/focus pause, announcements and actions. |
 | Toggle | [Toggle](../../crates/argui-widgets/src/toggle.rs) | `toggle` | Persistent pressed state, disabled state and visual variants. |
 | Toggle Group | [ToggleGroup](../../crates/argui-widgets/src/toggle_group.rs) | `toggle-group` | Single/multiple selection, orientation, RTL and roving focus. |
-| Tooltip | [Tooltip](../../crates/argui-widgets/src/tooltip.rs) | `tooltip` | Delays, hover/focus, descriptive relationships, hoverable content, effects and optional native presentation. |
+| Tooltip | [Tooltip](../../crates/argui-widgets/src/tooltip.rs) | `tooltip` | Delayed mouse hover, immediate keyboard focus, touch-focus suppression, descriptive relationships, hoverable content, effects and optional native presentation. |
 | Typography | [Typography](../../crates/argui-widgets/src/typography.rs) | `typography` | Headings h1–h6, paragraph, lead, large, small, muted, code and quote styles; the engine also supports rich text. |
 
 ## Integration

@@ -154,6 +154,47 @@ fn month_buttons_navigate_without_selecting_and_stop_at_constraints() {
 }
 
 #[test]
+fn heading_opens_an_accessible_year_grid_and_selection_preserves_month_and_day() {
+    use argui_ui::{ClickEvent, Element, Role, UiEvent, UiEventKind, UiTree};
+    let leap_day = Date::from_calendar_date(2024, Month::February, 29).unwrap();
+    let state = CalendarState::new(leap_day, CalendarSelection::Single(Some(leap_day)));
+    let calendar = Calendar::new("calendar", "Date", &state, leap_day);
+    let id = UiTree::new(Element::container([])).node_ids()[0];
+    let click = |key: &str| {
+        UiEvent::new(
+            id,
+            Some(key.into()),
+            UiEventKind::Click(ClickEvent::accessibility()),
+        )
+    };
+
+    let years = calendar.action(&click(&calendar.heading_key())).unwrap();
+    assert!(years.year_picker_open());
+    let year_calendar = Calendar::new("calendar", "Date", &years, leap_day);
+    assert_eq!(year_calendar.focus_key(), "calendar::year::2024");
+    let themes = shadcn(Color::WHITE);
+    let tree = UiTree::new(year_calendar.build(themes.resolve(ColorScheme::Light)));
+    assert_eq!(
+        tree.semantic_tree(&[], 1.0)
+            .nodes
+            .iter()
+            .filter(|node| node.semantics.role == Role::Cell)
+            .count(),
+        12
+    );
+
+    let selected = year_calendar
+        .action(&click(&year_calendar.year_key(2025)))
+        .unwrap();
+    assert_eq!(
+        selected.active,
+        Date::from_calendar_date(2025, Month::February, 28).unwrap()
+    );
+    assert_eq!(selected.selection, state.selection);
+    assert!(!selected.year_picker_open());
+}
+
+#[test]
 fn calendar_days_have_equal_columns_and_single_line_labels_in_both_themes() {
     use argui_core::Size;
     use argui_layout::LayoutEngine;

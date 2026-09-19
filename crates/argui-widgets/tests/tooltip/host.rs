@@ -93,6 +93,12 @@ fn hovered<A: Render>(host: &Entity<TooltipHost<A>>, key: &str, phase: PointerPh
     );
 }
 
+fn touched<A: Render>(host: &Entity<TooltipHost<A>>, key: &str, phase: PointerPhase) {
+    let mut pointer = PointerEvent::mouse(phase, Point::default());
+    pointer.kind = PointerKind::Touch;
+    dispatch(host, key, UiEventKind::Pointer(pointer));
+}
+
 fn tooltips(root: &Element) -> Vec<&Element> {
     let mut result = Vec::new();
     if root
@@ -151,6 +157,31 @@ fn default_custom_and_opted_out_button_help_preserves_actions_and_reopens_after_
         dispatch(&host, key, UiEventKind::Focused);
         assert!(tooltips(&host.render()).is_empty(), "{key}");
     }
+}
+
+#[test]
+fn touch_focus_does_not_open_automatic_help_but_keyboard_focus_still_does() {
+    let app = Entity::new(App::default());
+    let host = Entity::new(TooltipHost::from_entity(app).delay(Duration::ZERO));
+    touched(&host, "run", PointerPhase::Pressed);
+    dispatch(&host, "run", UiEventKind::Focused);
+    touched(&host, "run", PointerPhase::Released);
+    assert!(tooltips(&host.render()).is_empty());
+
+    dispatch(&host, "run", UiEventKind::Blurred);
+    dispatch(
+        &host,
+        "plain",
+        UiEventKind::KeyInput(KeyInput {
+            key: Key::Tab,
+            state: KeyState::Pressed,
+            modifiers: Modifiers::default(),
+            repeat: false,
+            text: None,
+        }),
+    );
+    dispatch(&host, "plain", UiEventKind::Focused);
+    assert_eq!(tooltips(&host.render()).len(), 1);
 }
 
 #[test]

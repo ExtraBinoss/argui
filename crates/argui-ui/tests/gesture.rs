@@ -54,6 +54,42 @@ fn gesture_configuration_composes_without_hidden_defaults() {
 }
 
 #[test]
+fn on_press_capture_is_observable_until_the_contact_ends() {
+    let gestures = GestureSet::EMPTY.pan(
+        PanGesture::default()
+            .immediate()
+            .capture(GestureCapture::OnPress),
+    );
+    let mut tree =
+        UiTree::new(Element::container([]).interaction(Interaction::default().gestures(gestures)));
+    let node = tree.node_ids()[0];
+    let region = HitRegion {
+        node,
+        bounds: argui_core::Rect::new(Point::default(), argui_core::Size::new(100.0, 100.0)),
+        transform: argui_core::Affine2D::IDENTITY,
+        clips: argui_paint::ClipChain::default(),
+        shape: HitShape::Bounds,
+        slop: argui_ui::Sides::default(),
+        enabled: true,
+        focus_policy: argui_ui::FocusPolicy::None,
+        cursor: argui_ui::CursorIcon::Auto,
+        gestures,
+        window_drag: None,
+    };
+    let pointer = PointerId::new(1);
+    tree.pointer_event(
+        touch(1, PointerPhase::Pressed, 10.0, 10.0, 0),
+        std::slice::from_ref(&region),
+    );
+    assert!(tree.pointer_captured(pointer));
+    tree.pointer_event(
+        touch(1, PointerPhase::Released, 10.0, 10.0, 10),
+        std::slice::from_ref(&region),
+    );
+    assert!(!tree.pointer_captured(pointer));
+}
+
+#[test]
 fn pan_axes_filter_delta_total_and_velocity() {
     let node = target();
     for (axis, expected) in [

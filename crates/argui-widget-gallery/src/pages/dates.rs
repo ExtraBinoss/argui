@@ -68,7 +68,7 @@ impl DatesDemo {
         } else if let Some(next) =
             Calendar::new("calendar", "Calendar", &self.calendar, self.today).action(event)
         {
-            let key = Calendar::new("calendar", "Calendar", &next, self.today).day_key(next.active);
+            let key = Calendar::new("calendar", "Calendar", &next, self.today).focus_key();
             self.calendar = next;
             cx.request_focus(key);
             let _ = event.prevent_default();

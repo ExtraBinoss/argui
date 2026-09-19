@@ -43,6 +43,7 @@ mod preferences;
 mod renderer;
 mod scroll;
 mod text_selection;
+mod touch_scroll;
 mod ui_zoom;
 mod window;
 mod zoom;
@@ -118,6 +119,7 @@ pub(crate) struct Application {
     pointer_buttons: u16,
     touch_points: HashMap<PointerId, Point>,
     primary_touch: Option<PointerId>,
+    touch_scroll: touch_scroll::TouchScrollGesture,
     selection_click: text_selection::SelectionClick,
     mouse_selection_origin: Option<Point>,
     touch_selection: Option<text_selection::TouchSelection>,
@@ -246,6 +248,7 @@ impl Application {
             pointer_buttons: 0,
             touch_points: HashMap::new(),
             primary_touch: None,
+            touch_scroll: touch_scroll::TouchScrollGesture::default(),
             selection_click: text_selection::SelectionClick::default(),
             mouse_selection_origin: None,
             touch_selection: None,

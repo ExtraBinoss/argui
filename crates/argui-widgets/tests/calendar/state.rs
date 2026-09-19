@@ -118,3 +118,25 @@ fn week_navigation_skips_disabled_days_and_respects_bounds() {
         &CalendarConstraints::default()
     ));
 }
+
+#[test]
+fn year_picker_navigation_respects_bounds_and_unavailable_dates() {
+    let mut state = CalendarState::new(
+        date(2024, 2, 29),
+        CalendarSelection::Single(Some(date(2024, 2, 29))),
+    );
+    assert!(state.set_year_picker_open(true));
+    assert!(state.year_picker_open());
+    let constraints = CalendarConstraints {
+        minimum: Some(date(2020, 1, 1)),
+        maximum: Some(date(2040, 12, 31)),
+        disabled: &|date| date.month() == Month::February,
+    };
+    assert!(state.navigate_years(12, &constraints));
+    assert_eq!(state.active.year(), 2036);
+    assert_ne!(state.active.month(), Month::February);
+    assert!(!state.navigate_years(12, &constraints));
+    assert!(state.select_year(2030, &constraints));
+    assert_eq!(state.active.year(), 2030);
+    assert!(!state.year_picker_open());
+}

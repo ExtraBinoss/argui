@@ -6,7 +6,9 @@ before its parent and clear child state when the parent closes.
 
 `TooltipState` opens from hover after 350 ms or immediately from keyboard focus.
 It waits 100 ms after pointer exit so the pointer can enter the tooltip. Escape
-and trigger activation close it without changing focus.
+and trigger activation close it without changing focus. Pointer-origin focus
+does not open automatic help, so tapping a button on a touch device never leaves
+a tooltip covering the interface.
 
 Forward relevant events to `TooltipState::update`, schedule `advance` at
 `next_deadline`, and rebuild when state changes. Reset the state and cancel its

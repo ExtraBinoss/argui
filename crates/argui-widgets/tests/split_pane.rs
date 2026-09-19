@@ -255,6 +255,7 @@ fn separator_and_layout_expose_axis_accessibility_and_fixed_side() {
     assert_eq!(separator.style.size.width, Dimension::length(6.0));
     assert_eq!(separator.style.size.height, Dimension::percent(1.0));
     assert_eq!(separator.user_select, UserSelect::None);
+    assert_eq!(separator.hit_test.slop, argui_ui::Sides::length(9.0));
     assert_eq!(
         separator.interaction.as_ref().unwrap().cursor,
         argui_ui::CursorIcon::EwResize
