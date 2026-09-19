@@ -15,7 +15,7 @@ use argui_paint::{
     RenderObjectId, VectorAsset, VectorId, VectorPrimitive,
 };
 use argui_render::{
-    EffectDefinition, EffectPassDefinition, EffectRegistry, GpuCanvasDeviceContext,
+    DamageMode, EffectDefinition, EffectPassDefinition, EffectRegistry, GpuCanvasDeviceContext,
     GpuCanvasDiagnosticKind, GpuCanvasError, GpuCanvasFactory, GpuCanvasRegistration,
     GpuCanvasRegistry, GpuCanvasRenderContext, GpuCanvasRenderer, GpuCanvasRequirements,
     RenderStatus, RendererConfig, RendererError, SurfaceRenderer,
@@ -351,10 +351,23 @@ fn exercise(window: Arc<Window>, mut pump: impl FnMut()) {
         render(renderer, list, &window, &mut pump)
     };
     render(&mut renderer, &DisplayList::new()).unwrap();
+    assert_eq!(renderer.last_profile().damage.mode, DamageMode::Full);
     assert_eq!(
         renderer.last_profile().vector_atlas.allocated_bytes,
         256 * 256 * 4
     );
+
+    let mut first = DisplayList::new();
+    first.push_quad(colored_quad(8.0, Color::WHITE));
+    render(&mut renderer, &first).unwrap();
+    assert_eq!(renderer.last_profile().damage.mode, DamageMode::Seed);
+    let mut moved = DisplayList::new();
+    moved.push_quad(colored_quad(48.0, Color::WHITE));
+    render(&mut renderer, &moved).unwrap();
+    assert_eq!(renderer.last_profile().damage.mode, DamageMode::Partial);
+    assert!(renderer.last_profile().damage.damaged_pixels < 256 * 256);
+    render(&mut renderer, &moved).unwrap();
+    assert_eq!(renderer.last_profile().damage.mode, DamageMode::Reused);
 
     let assets: Vec<_> = (0..20).map(|_| asset()).collect();
     for asset in &assets {
@@ -525,6 +538,18 @@ fn asset() -> VectorAsset {
 
 fn bounds(size: f32) -> Rect {
     Rect::new(Point::default(), Size::new(size, size))
+}
+
+fn colored_quad(x: f32, color: Color) -> Quad {
+    Quad {
+        bounds: Rect::new(Point::new(x, 8.0), Size::new(16.0, 16.0)),
+        background: Some(Fill::Solid(color)),
+        border: Border::all(0.0, Color::TRANSPARENT),
+        radii: CornerRadii::default(),
+        opacity: 1.0,
+        transform: Affine2D::IDENTITY,
+        clips: ClipChain::default(),
+    }
 }
 
 fn vector(id: VectorId, size: f32) -> VectorPrimitive {

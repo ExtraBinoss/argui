@@ -1,4 +1,6 @@
-use argui_render::{EffectQuality, EffectQualitySettings, RendererConfig, SurfaceAlphaMode};
+use argui_render::{
+    DamageTracking, EffectQuality, EffectQualitySettings, RendererConfig, SurfaceAlphaMode,
+};
 
 #[test]
 fn renderer_defaults_to_vsync_and_a_discrete_gpu() {
@@ -36,6 +38,7 @@ fn renderer_defaults_to_vsync_and_a_discrete_gpu() {
     assert_eq!(config.image_cache_bytes, 64 * 1024 * 1024);
     assert_eq!(config.gpu_canvas_cache_bytes, 128 * 1024 * 1024);
     assert_eq!(config.gradient_stop_capacity, 65_536);
+    assert_eq!(config.damage_tracking, DamageTracking::enabled());
     assert_eq!(
         config.clone().image_cache_bytes(1024).image_cache_bytes,
         1024
@@ -88,10 +91,18 @@ fn effect_quality_and_configuration_builders_are_composable() {
         .image_cache_bytes(4096)
         .gpu_canvas_cache_bytes(8192)
         .gradient_stop_capacity(32)
+        .damage_tracking(
+            DamageTracking::enabled()
+                .max_regions(3)
+                .max_area_ratio(0.25),
+        )
         .effect_quality(EffectQuality::Performance);
     assert_eq!(config.clear_color, argui_core::Color::BLACK);
     assert_eq!(config.image_cache_bytes, 4096);
     assert_eq!(config.gpu_canvas_cache_bytes, 8192);
     assert_eq!(config.gradient_stop_capacity, 32);
     assert_eq!(config.effect_quality, EffectQuality::Performance);
+    assert_eq!(config.damage_tracking.max_regions, 3);
+    assert_eq!(config.damage_tracking.max_area_ratio, 0.25);
+    assert!(!DamageTracking::disabled().enabled);
 }

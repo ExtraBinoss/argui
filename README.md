@@ -62,6 +62,7 @@ WebAssembly and the opt-in Android/iOS shells.
 - **Accessible controls.** Keyboard navigation, focus, text editing, native AccessKit integration, browser semantics and mobile Web virtual keyboards.
 - **GPU effects.** Custom WGSL shaders, gradients, shadows, blur and liquid glass.
 - **Retained GPU canvases.** Embed bounded application WGPU compute/render viewports while Argui preserves layout, clipping, effects, input and presentation.
+- **Adaptive damage rendering.** Small visual changes repaint only merged GPU regions, while large changes stay on the direct full-surface path.
 - **Native integrations.** Multiple windows, file pickers, trays, WebViews and popovers that can extend beyond the window on supported backends.
 - **Optional updates.** A signed update engine with a separate, reusable progress dialog.
 - **Inspect as you build.** Element inspection, live styles, theme editing and profiling through optional DevTools.

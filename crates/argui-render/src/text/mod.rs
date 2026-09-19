@@ -3,7 +3,7 @@ mod pipeline;
 
 use std::ops::Range;
 
-use argui_core::Affine2D;
+use argui_core::{Affine2D, Point, Rect, Size};
 use argui_paint::{ClipChain, DisplayCommand, DisplayList};
 use argui_text::{PreparedText, TextEngine};
 
@@ -11,7 +11,12 @@ use crate::RendererError;
 use atlas::GlyphAtlas;
 use pipeline::{GlyphInstance, TextClip, TextPipeline};
 
-type PreparedGlyphs = (Vec<GlyphInstance>, Vec<Range<u32>>, Vec<TextClip>);
+type PreparedGlyphs = (
+    Vec<GlyphInstance>,
+    Vec<Range<u32>>,
+    Vec<TextClip>,
+    Vec<Option<Rect>>,
+);
 
 #[derive(Clone, Debug)]
 struct BlockVisual {
@@ -36,6 +41,7 @@ pub(crate) struct TextGpu {
 
 pub(crate) struct TextDraw {
     ranges: Vec<Range<u32>>,
+    bounds: Vec<Option<Rect>>,
     changed: bool,
 }
 
@@ -46,6 +52,11 @@ impl TextDraw {
 
     pub fn ranges(&self) -> &[Range<u32>] {
         &self.ranges
+    }
+
+    /// Returns conservative physical bounds for every prepared text block.
+    pub fn bounds(&self) -> &[Option<Rect>] {
+        &self.bounds
     }
 
     pub const fn changed(&self) -> bool {
@@ -104,17 +115,22 @@ impl TextGpu {
     ) -> Result<TextDraw, RendererError> {
         let visuals = display_list.map(|list| block_visuals(list, text.blocks));
         match self.prepare_once(queue, engine, text, visuals.as_deref(), scale_factor) {
-            Ok((instances, ranges, clips)) => {
+            Ok((instances, ranges, clips, bounds)) => {
                 let changed = self.pipeline.write(device, queue, &instances, &clips);
-                Ok(TextDraw { ranges, changed })
+                Ok(TextDraw {
+                    ranges,
+                    bounds,
+                    changed,
+                })
             }
             Err(RendererError::GlyphAtlasFull) => {
                 self.atlas.reset();
-                let (instances, ranges, clips) =
+                let (instances, ranges, clips, bounds) =
                     self.prepare_once(queue, engine, text, visuals.as_deref(), scale_factor)?;
                 self.pipeline.write(device, queue, &instances, &clips);
                 Ok(TextDraw {
                     ranges,
+                    bounds,
                     changed: true,
                 })
             }
@@ -133,6 +149,7 @@ impl TextGpu {
     ) -> Result<PreparedGlyphs, RendererError> {
         let mut instances = Vec::with_capacity(text.glyphs.len() + text.decorations.len());
         let mut ranges = vec![0..0; text.blocks];
+        let mut bounds = vec![None; text.blocks];
         let mut clips = Vec::new();
         let prepared = prepare_visuals(text, visuals, scale_factor, &mut clips);
         for (block, visual) in prepared.iter().copied().enumerate() {
@@ -170,9 +187,14 @@ impl TextGpu {
             let end = instances.len() as u32;
             if start != end {
                 ranges[block] = start..end;
+                bounds[block] = instances[start as usize..end as usize]
+                    .iter()
+                    .copied()
+                    .map(GlyphInstance::physical_bounds)
+                    .reduce(union);
             }
         }
-        Ok((instances, ranges, clips))
+        Ok((instances, ranges, clips, bounds))
     }
 
     #[cfg_attr(coverage_nightly, coverage(off))]
@@ -194,6 +216,18 @@ impl TextGpu {
     ) {
         self.pipeline.draw(pass, instances, viewport_offset);
     }
+}
+
+/// Returns the axis-aligned union of two physical glyph rectangles.
+fn union(left: Rect, right: Rect) -> Rect {
+    let left_edge = left.origin.x.min(right.origin.x);
+    let top = left.origin.y.min(right.origin.y);
+    let right_edge = (left.origin.x + left.size.width).max(right.origin.x + right.size.width);
+    let bottom = (left.origin.y + left.size.height).max(right.origin.y + right.size.height);
+    Rect::new(
+        Point::new(left_edge, top),
+        Size::new(right_edge - left_edge, bottom - top),
+    )
 }
 
 fn block_visuals(display_list: &DisplayList, blocks: usize) -> Vec<Option<BlockVisual>> {

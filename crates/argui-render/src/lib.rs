@@ -3,6 +3,7 @@
 
 mod batch;
 mod config;
+mod damage;
 mod effect;
 mod effect_graph;
 mod effect_plan;
@@ -20,7 +21,10 @@ mod text;
 mod upload;
 mod vector;
 
-pub use config::{EffectQuality, EffectQualitySettings, RendererConfig, SurfaceAlphaMode};
+pub use config::{
+    DamageTracking, EffectQuality, EffectQualitySettings, RendererConfig, SurfaceAlphaMode,
+};
+pub use damage::{DamageMode, DamagePlan, DamageProfile, DamageRegion, DamageSnapshot};
 pub use effect_graph::{EffectGraphAnalysis, EffectGraphStats, analyze_display_list};
 pub use error::{RendererAttemptFailure, RendererError};
 pub use gpu_canvas::{

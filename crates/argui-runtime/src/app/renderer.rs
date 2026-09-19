@@ -5,8 +5,8 @@ use std::rc::Rc;
 
 use argui_inspect::{AdapterRecord, FrameRecord, GpuFrameRecord, GpuPassRecord, Invalidation};
 use argui_render::{
-    AdapterProfile, GpuCanvasDiagnosticKind, GpuFrameProfile, RenderStatus, SurfaceAlphaMode,
-    SurfaceRenderer,
+    AdapterProfile, DamageMode, GpuCanvasDiagnosticKind, GpuFrameProfile, RenderStatus,
+    SurfaceAlphaMode, SurfaceRenderer,
 };
 use winit::{event_loop::ActiveEventLoop, window::Window};
 
@@ -243,13 +243,21 @@ impl Application {
                         passes: profile.effects.filter_passes,
                         offscreen_pixels: profile.effects.offscreen_pixels,
                         cached_layers: profile.effects.cached_layers,
-                        damaged_pixels: profile.effects.damaged_pixels,
-                        textures: profile.texture_pool.textures + profile.gpu_canvases.entries + 1,
+                        damaged_pixels: profile.damage.damaged_pixels,
+                        textures: profile.texture_pool.textures
+                            + profile.gpu_canvases.entries
+                            + usize::from(profile.damage.retained_bytes > 0)
+                            + 1,
                         reused_textures: profile.texture_pool.reused_this_frame
-                            + profile.gpu_canvases.hits_this_frame,
+                            + profile.gpu_canvases.hits_this_frame
+                            + usize::from(matches!(
+                                profile.damage.mode,
+                                DamageMode::Partial | DamageMode::Reused
+                            )),
                         texture_bytes: profile.texture_pool.allocated_bytes
                             + profile.vector_atlas.allocated_bytes
-                            + profile.gpu_canvases.allocated_bytes,
+                            + profile.gpu_canvases.allocated_bytes
+                            + profile.damage.retained_bytes,
                         gpu_canvas_entries: profile.gpu_canvases.entries,
                         gpu_canvas_bytes: profile.gpu_canvases.allocated_bytes,
                         gpu_canvas_renders: profile.gpu_canvases.renders_this_frame,

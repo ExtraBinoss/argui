@@ -1,6 +1,6 @@
 use std::{mem::size_of, ops::Range};
 
-use argui_core::Affine2D;
+use argui_core::{Affine2D, Point, Rect, Size};
 use argui_paint::ClipRegion;
 use argui_text::{PreparedDecoration, PreparedGlyph};
 use bytemuck::{Pod, Zeroable};
@@ -121,6 +121,18 @@ impl GlyphInstance {
             transform_b: [transform.translation.x, transform.translation.y, 0.0, 0.0],
             clip_meta: [clip_start, clip_count, 0, 0],
         }
+    }
+
+    /// Returns conservative physical bounds after the instance transform.
+    pub(super) fn physical_bounds(self) -> Rect {
+        let transform = Affine2D {
+            matrix: self.transform_a,
+            translation: Point::new(self.transform_b[0], self.transform_b[1]),
+        };
+        transform.transform_rect(Rect::new(
+            Point::new(self.rect[0], self.rect[1]),
+            Size::new(self.rect[2], self.rect[3]),
+        ))
     }
 }
 

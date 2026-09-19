@@ -1,6 +1,71 @@
 use crate::{EffectRegistry, GpuCanvasRegistry};
 use argui_core::Color;
 
+/// Adaptive thresholds used to choose partial or full-surface rendering.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct DamageTracking {
+    /// Whether retained damage rendering is available.
+    pub enabled: bool,
+    /// Maximum merged damage rectangles allowed in one partial frame.
+    pub max_regions: usize,
+    /// Maximum damaged viewport fraction allowed in one partial frame.
+    pub max_area_ratio: f32,
+}
+
+impl Default for DamageTracking {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            max_regions: 8,
+            max_area_ratio: 0.45,
+        }
+    }
+}
+
+impl DamageTracking {
+    /// Returns damage tracking with the adaptive defaults enabled.
+    #[must_use]
+    pub const fn enabled() -> Self {
+        Self {
+            enabled: true,
+            max_regions: 8,
+            max_area_ratio: 0.45,
+        }
+    }
+
+    /// Returns a configuration that always renders the complete surface.
+    #[must_use]
+    pub const fn disabled() -> Self {
+        Self {
+            enabled: false,
+            max_regions: 0,
+            max_area_ratio: 0.0,
+        }
+    }
+
+    /// Sets the maximum number of merged regions in a partial frame.
+    ///
+    /// * `regions` — requested limit, clamped to at least one.
+    #[must_use]
+    pub fn max_regions(mut self, regions: usize) -> Self {
+        self.max_regions = regions.max(1);
+        self
+    }
+
+    /// Sets the maximum damaged viewport fraction in a partial frame.
+    ///
+    /// * `ratio` — fraction clamped to the inclusive `0.05..=1.0` range.
+    #[must_use]
+    pub fn max_area_ratio(mut self, ratio: f32) -> Self {
+        self.max_area_ratio = if ratio.is_finite() {
+            ratio.clamp(0.05, 1.0)
+        } else {
+            Self::default().max_area_ratio
+        };
+        self
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum SurfaceAlphaMode {
     #[default]
@@ -66,6 +131,8 @@ pub struct RendererConfig {
     /// Immutable factories and device requirements available to GPU canvases.
     pub gpu_canvases: GpuCanvasRegistry,
     pub effect_quality: EffectQuality,
+    /// Adaptive retained-surface damage rendering configuration.
+    pub damage_tracking: DamageTracking,
 }
 
 impl Default for RendererConfig {
@@ -84,6 +151,7 @@ impl Default for RendererConfig {
             effects: EffectRegistry::default(),
             gpu_canvases: GpuCanvasRegistry::default(),
             effect_quality: EffectQuality::Normal,
+            damage_tracking: DamageTracking::default(),
         }
     }
 }
@@ -180,6 +248,15 @@ impl RendererConfig {
     #[must_use]
     pub fn effect_quality(mut self, quality: EffectQuality) -> Self {
         self.effect_quality = quality;
+        self
+    }
+
+    /// Sets adaptive retained-surface damage rendering behavior.
+    ///
+    /// * `damage_tracking` — thresholds or a disabled configuration.
+    #[must_use]
+    pub fn damage_tracking(mut self, damage_tracking: DamageTracking) -> Self {
+        self.damage_tracking = damage_tracking;
         self
     }
 

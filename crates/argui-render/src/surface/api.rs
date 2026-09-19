@@ -197,6 +197,8 @@ impl SurfaceRenderer {
         self.surface_config.height = height;
         self.surface.configure(&self.device, &self.surface_config);
         self.layer_cache.clear();
+        self.damage.invalidate();
+        self.scene_snapshot = None;
         true
     }
 
@@ -215,6 +217,7 @@ impl SurfaceRenderer {
             .map_err(|error| RendererError::SurfaceCreation(error.to_string()))?;
         self.surface.configure(&self.device, &self.surface_config);
         self.layer_cache.clear();
+        self.damage.invalidate();
         Ok(())
     }
 
@@ -405,7 +408,9 @@ impl SurfaceRenderer {
     /// # Errors
     /// Returns a renderer error if the asset cannot be uploaded or registered.
     pub fn register_image(&mut self, asset: &ImageAsset) -> Result<(), RendererError> {
-        self.image.register(&self.device, &self.queue, asset)
+        self.image.register(&self.device, &self.queue, asset)?;
+        self.damage.invalidate();
+        Ok(())
     }
 
     /// Registers an SVG vector asset for rendering.
@@ -413,6 +418,8 @@ impl SurfaceRenderer {
     /// # Errors
     /// Returns a renderer error if the asset cannot be rasterized or registered.
     pub fn register_vector(&mut self, asset: &VectorAsset) -> Result<(), RendererError> {
-        self.vector.register(asset)
+        self.vector.register(asset)?;
+        self.damage.invalidate();
+        Ok(())
     }
 }

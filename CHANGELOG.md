@@ -6,7 +6,15 @@ that do not use them.
 
 ## [Unreleased]
 
-_No changes yet._
+### Added
+
+- Added default-on adaptive GPU damage rendering on native and WebAssembly:
+  retained scene snapshots detect changed physical regions, merge them on
+  tile boundaries, repaint small updates through GPU scissors, and fall back
+  to direct full-surface rendering for large, fragmented, effect-dependent, or
+  invalidated frames. `DamageTracking` configures the thresholds or disables
+  the feature, while `DamagePlan`, `DamageSnapshot`, and
+  `RenderProfile::damage` expose decisions and profiling statistics.
 
 ## [0.3.2] - 2026-09-19
 

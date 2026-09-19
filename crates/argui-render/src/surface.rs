@@ -8,14 +8,13 @@ use std::{
         atomic::{AtomicU64, Ordering},
     },
 };
-use wgpu::{
-    CurrentSurfaceTexture, LoadOp, Operations, RenderPassColorAttachment, RenderPassDescriptor,
-    StoreOp, SurfaceTarget, TextureFormat, TextureViewDescriptor,
-};
+use wgpu::{CurrentSurfaceTexture, SurfaceTarget, TextureFormat, TextureViewDescriptor};
 
 use crate::{
-    EffectGraphStats, RenderProfile, RendererConfig, RendererError,
+    DamageMode, DamagePlan, DamageProfile, EffectGraphStats, RenderProfile, RendererConfig,
+    RendererError,
     batch::{DrawBatch, DrawKind, build_batches},
+    damage::{DamageGpu, DamageSnapshot, scene_damage},
     effect::EffectGpu,
     effect_graph::EffectGraph,
     gpu_canvas::CanvasGpu,
@@ -24,7 +23,6 @@ use crate::{
     offscreen::{TexturePool, TexturePoolStats},
     profile::FrameProfiler,
     quad::QuadGpu,
-    target::PixelRegion,
     text::TextGpu,
     vector::VectorGpu,
 };
@@ -32,6 +30,7 @@ use crate::{
 mod api;
 mod composite;
 mod effects;
+mod retained;
 
 mod configure;
 use configure::{drawable_size, srgb_target, surface_alpha_mode};
@@ -110,6 +109,8 @@ pub struct SurfaceRenderer {
     profiling_active: bool,
     layer_cache: HashMap<argui_paint::RenderObjectId, effects::CachedLayer>,
     content_revision: u64,
+    damage: DamageGpu,
+    scene_snapshot: Option<DamageSnapshot>,
 }
 
 #[cfg_attr(coverage_nightly, coverage(off))]
@@ -196,6 +197,7 @@ impl SurfaceRenderer {
             });
         }
         let effect = EffectGpu::new(&device, target_format, maximum_parameter_words);
+        let damage = DamageGpu::new(&device, target_format);
         let offscreen = TexturePool::new(target_format, 128 * 1024 * 1024);
         let gpu_profiler = GpuProfiler::new(&adapter, &device, &queue, renderer_config.profiling);
 
@@ -223,6 +225,8 @@ impl SurfaceRenderer {
             profiling_active,
             layer_cache: HashMap::new(),
             content_revision: 0,
+            damage,
+            scene_snapshot: None,
         })
     }
 
@@ -252,6 +256,7 @@ impl SurfaceRenderer {
         let mut graph_stats = EffectGraphStats::default();
         let mut effect_graph = None;
         let mut canvas_commands = Vec::new();
+        let mut scene_update = None;
         match content {
             FrameContent::None => {
                 self.vector.clear_frame_stats();
@@ -298,12 +303,12 @@ impl SurfaceRenderer {
                     display_list,
                     scale_factor,
                 )?;
-                if quad_changed
+                let content_changed = quad_changed
                     || image_changed
                     || vector_changed
                     || canvas.changed
-                    || draw.changed()
-                {
+                    || draw.changed();
+                if content_changed {
                     self.content_revision = self.content_revision.wrapping_add(1);
                 }
                 self.text_ranges = draw.ranges().to_vec();
@@ -319,6 +324,22 @@ impl SurfaceRenderer {
                 let additional_effect_passes = self.validate_custom_effects(&graph)?;
                 graph_stats = graph.stats();
                 graph_stats.filter_passes += additional_effect_passes;
+                let snapshot = DamageSnapshot::capture(
+                    display_list,
+                    text,
+                    draw.bounds(),
+                    [viewport[0] as u32, viewport[1] as u32],
+                    scale_factor,
+                );
+                let mut damage_plan = scene_damage(
+                    self.scene_snapshot.as_ref(),
+                    &snapshot,
+                    self.renderer_config.damage_tracking,
+                );
+                if content_changed && damage_plan == DamagePlan::Unchanged {
+                    damage_plan = DamagePlan::Full;
+                }
+                scene_update = Some((snapshot, damage_plan));
                 effect_graph = Some(graph);
             }
             FrameContent::Composite {
@@ -345,15 +366,6 @@ impl SurfaceRenderer {
             format: Some(self.target_format),
             ..Default::default()
         });
-        let attachment = Some(RenderPassColorAttachment {
-            view: &view,
-            depth_slice: None,
-            resolve_target: None,
-            ops: Operations {
-                load: LoadOp::Clear(self.renderer_config.wgpu_clear_color()),
-                store: StoreOp::Store,
-            },
-        });
         let mut encoder = self.device.create_command_encoder(&Default::default());
         self.quad.begin_frame();
         self.text.begin_frame();
@@ -363,6 +375,10 @@ impl SurfaceRenderer {
         if let Some(graph) = effect_graph
             && graph.needs_offscreen_root()
         {
+            self.damage.invalidate();
+            if let Some((snapshot, _)) = scene_update {
+                self.scene_snapshot = Some(snapshot);
+            }
             let (cached_layers, damaged_pixels) = self.render_effect_graph(
                 &mut encoder,
                 &view,
@@ -379,60 +395,65 @@ impl SurfaceRenderer {
             canvas_commands.push(encoder.finish());
             self.queue.submit(canvas_commands);
             let _ = self.device.poll(wgpu::PollType::Poll);
-            self.finish_profile(profiler, viewport, graph_stats);
+            self.finish_profile(
+                profiler,
+                viewport,
+                graph_stats,
+                DamageProfile {
+                    mode: DamageMode::Full,
+                    regions: 1,
+                    damaged_pixels: viewport[0] as u64 * viewport[1] as u64,
+                    retained_bytes: 0,
+                },
+                false,
+            );
             self.queue.present(frame);
             return Ok(status);
         }
-        let target = PixelRegion::viewport(viewport[0] as u32, viewport[1] as u32);
-        let quad_offset = self.quad.target_offset(&self.queue, target.as_f32());
-        let text_offset = self.text.target_offset(&self.queue, target.as_f32());
-        let image_offset = self.image.target_offset(&self.queue, target.as_f32());
-        let vector_offset = self.vector.target_offset(&self.queue, target.as_f32());
-        let canvas_offset = self.gpu_canvas.target_offset(&self.queue, target.as_f32());
-        {
-            let timestamp_writes = gpu_capture.as_ref().and_then(|capture| {
-                capture.timestamp_writes(
-                    "surface.main",
-                    None,
-                    u64::from(target.size[0]) * u64::from(target.size[1]),
-                )
-            });
-            let mut pass = encoder.begin_render_pass(&RenderPassDescriptor {
-                label: Some("argui-clear-pass"),
-                color_attachments: &[attachment],
-                timestamp_writes,
-                ..Default::default()
-            });
-            for batch in &self.batches {
-                match batch.kind {
-                    DrawKind::Quad => {
-                        self.quad
-                            .draw(&mut pass, batch.instances.clone(), quad_offset);
-                    }
-                    DrawKind::Text => {
-                        self.text
-                            .draw(&mut pass, batch.instances.clone(), text_offset);
-                    }
-                    DrawKind::Image(image, sampling) => self.image.draw(
-                        &mut pass,
-                        image,
-                        sampling,
-                        batch.instances.clone(),
-                        image_offset,
-                    ),
-                    DrawKind::GpuCanvas(index) => self.gpu_canvas.draw(
-                        &mut pass,
-                        index,
-                        batch.instances.clone(),
-                        canvas_offset,
-                    ),
-                    DrawKind::Vector => {
-                        self.vector
-                            .draw(&mut pass, batch.instances.clone(), vector_offset)
-                    }
-                }
+        self.effect.begin_frame();
+        let (damage_profile, direct_surface) = match scene_update {
+            Some((snapshot, DamagePlan::Partial(regions))) => {
+                let profile = self.draw_retained_scene(
+                    &mut encoder,
+                    &view,
+                    viewport,
+                    &regions,
+                    gpu_capture.as_ref(),
+                );
+                self.scene_snapshot = Some(snapshot);
+                (profile, false)
             }
-        }
+            Some((snapshot, DamagePlan::Unchanged)) if self.damage.valid() => {
+                let profile =
+                    self.reuse_retained_scene(&mut encoder, &view, viewport, gpu_capture.as_ref());
+                self.scene_snapshot = Some(snapshot);
+                (profile, false)
+            }
+            Some((snapshot, DamagePlan::Full | DamagePlan::Unchanged)) => {
+                self.damage.invalidate();
+                self.draw_full_scene(
+                    &mut encoder,
+                    &view,
+                    viewport,
+                    gpu_capture.as_ref(),
+                    "surface.main",
+                );
+                self.scene_snapshot = Some(snapshot);
+                (full_damage_profile(viewport), true)
+            }
+            None => {
+                self.damage.invalidate();
+                self.scene_snapshot = None;
+                self.draw_full_scene(
+                    &mut encoder,
+                    &view,
+                    viewport,
+                    gpu_capture.as_ref(),
+                    "surface.main",
+                );
+                (full_damage_profile(viewport), true)
+            }
+        };
         notify();
         if let Some(capture) = gpu_capture {
             capture.finish(&mut encoder);
@@ -440,7 +461,13 @@ impl SurfaceRenderer {
         canvas_commands.push(encoder.finish());
         self.queue.submit(canvas_commands);
         let _ = self.device.poll(wgpu::PollType::Poll);
-        self.finish_profile(profiler, viewport, graph_stats);
+        self.finish_profile(
+            profiler,
+            viewport,
+            graph_stats,
+            damage_profile,
+            direct_surface,
+        );
         self.queue.present(frame);
         Ok(status)
     }
@@ -450,20 +477,33 @@ impl SurfaceRenderer {
         profiler: FrameProfiler,
         viewport: [f32; 2],
         effects: EffectGraphStats,
+        damage: DamageProfile,
+        direct_surface: bool,
     ) {
         if let Some(profile) = profiler.finish(RenderProfile {
             viewport_pixels: viewport[0] as u64 * viewport[1] as u64,
             draw_batches: self.batches.len(),
             effects,
+            damage,
             texture_pool: self.offscreen.stats(),
             vector_atlas: self.vector.stats(),
             gpu_canvases: self.gpu_canvas.stats(),
-            direct_surface: effects.offscreen_layers == 0,
+            direct_surface,
             adapter: self.gpu_profiler.adapter().clone(),
             gpu: self.gpu_profiler.take_latest(),
             ..RenderProfile::default()
         }) {
             self.last_profile = profile;
         }
+    }
+}
+
+/// Returns damage statistics for a direct full-viewport render.
+fn full_damage_profile(viewport: [f32; 2]) -> DamageProfile {
+    DamageProfile {
+        mode: DamageMode::Full,
+        regions: 1,
+        damaged_pixels: viewport[0] as u64 * viewport[1] as u64,
+        retained_bytes: 0,
     }
 }
