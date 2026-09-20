@@ -28,6 +28,26 @@ surrounding content must genuinely reflow; do not use an animated margin merely
 to move an otherwise independent visual. No application-specific invalidation
 or damage bookkeeping is required for either path.
 
+## Keep visual loops out of model rebuilds
+
+A component animation frame is appropriate when application state or rendered
+content genuinely changes. Calling `Context::notify` on every display frame
+rebuilds and diffs that component and its dependent parents, even if damage
+rendering later repaints only a few pixels.
+
+For a purely visual loop, bind a typed `Motion` directly to `Transform`,
+`LayerOpacity`, or another retained property. Argui samples the track inside the
+UI tree without rebuilding the model. Transform and layer-opacity bindings use
+the compositor path; `LayerOpacity` automatically promotes plain content and
+does not require an explicit effect layer. This is how the built-in spinner and
+skeleton pulse run. Reduced-motion handling still stops their tracks rather
+than leaving an invisible frame loop active.
+
+The animation registry checks inactive tracks without taking their value lock.
+Only active tracks are locked and sampled, so a screen can keep many dormant
+hover or focus transitions without making an unrelated continuous animation
+more expensive.
+
 ## Frame-coalesce continuous input
 
 Use `GestureDelivery::FrameCoalesced` when a gesture update invalidates a view,

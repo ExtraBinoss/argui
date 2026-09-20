@@ -1,9 +1,9 @@
-use argui_animation::Time;
+use argui_animation::{Duration, Motion, Time, Tween};
 use argui_core::{Affine2D, Point, Size, Transform2D};
 use argui_layout::LayoutEngine;
 use argui_paint::{CompositorId, DisplayCommand, LayerStyle, PaintStyle};
 use argui_text::{TextEngine, TextStyle};
-use argui_ui::{Color, Element, FocusRequest, Interaction, TreeUpdate, UiTree, length};
+use argui_ui::{Color, Element, FocusRequest, Interaction, TreeUpdate, UiTree, length, property};
 use argui_widgets::{Input, InputStyle};
 
 fn scene(transform: Transform2D, opacity: f32) -> Element {
@@ -122,6 +122,70 @@ fn moving_an_offscreen_layer_without_revealing_it_stays_composition_only() {
         TreeUpdate::Composite
     );
     assert!(engine.composite(&ui, &mut output));
+}
+
+#[test]
+fn rotating_a_fully_retained_layer_stays_composition_only() {
+    let mut ui = UiTree::new(scene(Transform2D::IDENTITY, 0.8));
+    let mut engine = LayoutEngine::new();
+    let mut output = engine
+        .compute(&mut ui, &mut TextEngine::new(), Size::new(240.0, 120.0))
+        .unwrap();
+
+    assert_eq!(
+        ui.update(scene(
+            Transform2D::IDENTITY.rotate(std::f32::consts::FRAC_PI_4),
+            0.8,
+        )),
+        TreeUpdate::Composite
+    );
+    assert!(engine.composite(&ui, &mut output));
+}
+
+#[test]
+fn layer_opacity_binding_promotes_plain_content_without_an_effect_layer() {
+    let opacity = Motion::new(1.0_f32);
+    let element = Element::container([])
+        .width(length(80.0))
+        .height(length(40.0))
+        .background(Color::WHITE)
+        .bind(property::LayerOpacity, opacity.clone());
+    let mut ui = UiTree::new(element);
+    let mut engine = LayoutEngine::new();
+    let mut output = engine
+        .compute(&mut ui, &mut TextEngine::new(), Size::new(240.0, 120.0))
+        .unwrap();
+    assert!(
+        output
+            .display_list
+            .commands()
+            .iter()
+            .any(|command| matches!(command, DisplayCommand::BeginCompositor(_)))
+    );
+    assert!(
+        output
+            .display_list
+            .commands()
+            .iter()
+            .all(|command| !matches!(command, DisplayCommand::BeginLayer(_)))
+    );
+
+    opacity.animate_to(0.4, Tween::new(Duration::from_millis(100)));
+    ui.advance_animations(Time::from_nanos(1));
+    assert_eq!(
+        ui.advance_animations(Time::from_nanos(100_000_001)),
+        TreeUpdate::Composite
+    );
+    assert!(engine.composite(&ui, &mut output));
+    assert_eq!(
+        output
+            .display_list
+            .compositor_layers()
+            .next()
+            .expect("promoted compositor")
+            .opacity,
+        0.4
+    );
 }
 
 #[test]

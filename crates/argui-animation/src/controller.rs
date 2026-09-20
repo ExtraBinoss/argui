@@ -4,7 +4,10 @@ use crate::{
 };
 use std::{
     fmt,
-    sync::{Arc, Mutex, MutexGuard, PoisonError},
+    sync::{
+        Arc, Mutex, MutexGuard, PoisonError,
+        atomic::{AtomicBool, Ordering},
+    },
 };
 
 #[derive(Clone, Debug, PartialEq)]
@@ -70,7 +73,7 @@ pub enum MotionState {
 
 /// Cloneable, shared control handle for an animated value.
 #[derive(Clone)]
-pub struct Motion<T>(Arc<Mutex<MotionInner<T>>>);
+pub struct Motion<T>(Arc<MotionShared<T>>);
 
 #[derive(Clone, Debug, PartialEq)]
 /// Associates a motion with its composition rule and priority.
@@ -126,6 +129,11 @@ struct MotionInner<T> {
     completed_iterations: u64,
 }
 
+struct MotionShared<T> {
+    inner: Mutex<MotionInner<T>>,
+    active: AtomicBool,
+}
+
 enum Driver<T> {
     None,
     PendingTween { from: T, tween: Tween },
@@ -153,7 +161,11 @@ impl<T> PartialEq for Motion<T> {
 
 impl<T> Motion<T> {
     fn lock(&self) -> MutexGuard<'_, MotionInner<T>> {
-        self.0.lock().unwrap_or_else(PoisonError::into_inner)
+        self.0.inner.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    fn set_active(&self, active: bool) {
+        self.0.active.store(active, Ordering::Release);
     }
 
     /// Creates an idle motion initialized to `value`.
@@ -162,15 +174,18 @@ impl<T> Motion<T> {
     where
         T: Clone,
     {
-        Self(Arc::new(Mutex::new(MotionInner {
-            value: value.clone(),
-            target: value,
-            driver: Driver::None,
-            state: MotionState::Idle,
-            last_frame: None,
-            resume_pending: false,
-            completed_iterations: 0,
-        })))
+        Self(Arc::new(MotionShared {
+            inner: Mutex::new(MotionInner {
+                value: value.clone(),
+                target: value,
+                driver: Driver::None,
+                state: MotionState::Idle,
+                last_frame: None,
+                resume_pending: false,
+                completed_iterations: 0,
+            }),
+            active: AtomicBool::new(false),
+        }))
     }
 
     /// Returns the current animated value.
@@ -200,7 +215,7 @@ impl<T> Motion<T> {
     /// Returns whether the motion is currently running.
     #[must_use]
     pub fn is_active(&self) -> bool {
-        self.state() == MotionState::Running
+        self.0.active.load(Ordering::Acquire)
     }
 
     /// Returns the number of completed timeline iterations.
@@ -227,6 +242,7 @@ impl<T> Motion<T> {
         inner.state = MotionState::Idle;
         inner.last_frame = None;
         inner.completed_iterations = 0;
+        self.set_active(false);
     }
 
     /// Cancels the current animation without changing the current value.
@@ -235,6 +251,7 @@ impl<T> Motion<T> {
         inner.driver = Driver::None;
         inner.state = MotionState::Canceled;
         inner.last_frame = None;
+        self.set_active(false);
     }
 
     /// Moves directly to the target and marks the motion finished.
@@ -247,6 +264,7 @@ impl<T> Motion<T> {
         inner.driver = Driver::None;
         inner.state = MotionState::Finished;
         inner.last_frame = None;
+        self.set_active(false);
     }
 
     /// Pauses a running motion.
@@ -260,6 +278,7 @@ impl<T> Motion<T> {
             timeline.pause(now);
         }
         inner.state = MotionState::Paused;
+        self.set_active(false);
     }
 
     /// Resumes a paused motion; time spent paused is excluded from playback.
@@ -269,6 +288,7 @@ impl<T> Motion<T> {
             inner.state = MotionState::Running;
             inner.resume_pending = true;
             inner.last_frame = None;
+            self.set_active(true);
         }
     }
 
@@ -284,6 +304,7 @@ impl<T> Motion<T> {
         inner.last_frame = None;
         inner.resume_pending = true;
         inner.completed_iterations = 0;
+        self.set_active(true);
     }
 }
 
@@ -298,6 +319,7 @@ impl<T: Clone + Interpolate + PartialEq> Motion<T> {
             inner.state = MotionState::Finished;
             inner.last_frame = None;
             inner.completed_iterations = 0;
+            self.set_active(false);
             return;
         }
         let from = inner.value.clone();
@@ -307,6 +329,7 @@ impl<T: Clone + Interpolate + PartialEq> Motion<T> {
         inner.last_frame = None;
         inner.resume_pending = false;
         inner.completed_iterations = 0;
+        self.set_active(true);
     }
 
     /// Sets `from` immediately and begins a new tween toward `target`.
@@ -320,8 +343,14 @@ impl<T: Clone + Interpolate + PartialEq> Motion<T> {
     /// # Errors
     /// Returns a timing error if the tween cannot be represented as a valid timeline.
     pub fn advance(&self, now: Time) -> Result<bool, TimingError> {
+        if !self.is_active() {
+            return Ok(false);
+        }
         let mut inner = self.lock();
-        advance_timeline(&mut inner, now)
+        let changed = advance_timeline(&mut inner, now)?;
+        let active = inner.state == MotionState::Running;
+        self.set_active(active);
+        Ok(changed)
     }
 }
 
@@ -360,6 +389,8 @@ impl<T: MotionValue> Motion<T> {
         };
         inner.last_frame = None;
         inner.completed_iterations = 0;
+        let active = inner.state == MotionState::Running;
+        self.set_active(active);
         Ok(())
     }
 
@@ -380,8 +411,14 @@ impl<T: MotionValue> Motion<T> {
 
     /// Advances a spring-driven motion at `now`, returning whether its value changed.
     pub fn advance_spring(&self, now: Time) -> bool {
+        if !self.is_active() {
+            return false;
+        }
         let mut inner = self.lock();
-        advance_spring(&mut inner, now)
+        let changed = advance_spring(&mut inner, now);
+        let active = inner.state == MotionState::Running;
+        self.set_active(active);
+        changed
     }
 }
 
@@ -506,8 +543,11 @@ where
     }
 
     fn advance(&self, now: Time) -> bool {
+        if !self.is_active() {
+            return false;
+        }
         let mut inner = self.lock();
-        if matches!(&inner.driver, Driver::Spring(_)) {
+        let changed = if matches!(&inner.driver, Driver::Spring(_)) {
             advance_spring(&mut inner, now)
         } else {
             advance_timeline(&mut inner, now).unwrap_or_else(|_| {
@@ -516,7 +556,10 @@ where
                 inner.last_frame = None;
                 false
             })
-        }
+        };
+        let active = inner.state == MotionState::Running;
+        self.set_active(active);
+        changed
     }
 
     fn finish(&self) {

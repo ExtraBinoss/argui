@@ -146,9 +146,16 @@ fn compositor_patches(
                         (
                             ui.resolved_transform(node.node, element)
                                 .affine(node.bounds, element.transform_origin),
-                            element.layer.as_ref().map_or(1.0, |style| {
+                            if let Some(style) = &element.layer {
                                 ui.resolved_layer(node.node, element, style).opacity
-                            }),
+                            } else {
+                                ui.resolved_layer(
+                                    node.node,
+                                    element,
+                                    &argui_paint::LayerStyle::new(Default::default()),
+                                )
+                                .opacity
+                            },
                         )
                     } else {
                         let region = output
@@ -222,6 +229,9 @@ fn retained_source_covers(
     let Some(retained_clip) = retained_clip else {
         return true;
     };
+    if contains_rect(retained_clip, source_bounds) {
+        return true;
+    }
     let Some(visible_output) = delta
         .transform_rect(source_bounds)
         .intersection(retained_clip)

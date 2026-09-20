@@ -7,6 +7,7 @@ pub(super) struct RuntimeAnimations {
     clock: MonotonicClock,
     scheduler: Scheduler,
     model_animation: Option<AnimationId>,
+    model_active: bool,
     wake_at: Option<Time>,
 }
 
@@ -16,9 +17,11 @@ impl RuntimeAnimations {
             clock: MonotonicClock::new(),
             scheduler: Scheduler::default(),
             model_animation: None,
+            model_active: false,
             wake_at: None,
         };
-        animations.sync(model.is_some_and(AnyEntity::wants_frame));
+        animations.model_active = model.is_some_and(AnyEntity::wants_frame);
+        animations.sync(animations.model_active);
         animations
     }
 
@@ -50,9 +53,11 @@ impl Application {
     pub(super) fn sync_animations(&mut self) -> bool {
         if !self.presentation_visible {
             self.animations.wake_at = None;
+            self.animations.model_active = false;
             return self.animations.sync(false);
         }
         let model_active = self.model.as_ref().is_some_and(AnyEntity::wants_frame);
+        self.animations.model_active = model_active;
         let tree_active = self
             .ui_tree
             .as_ref()
@@ -96,10 +101,14 @@ impl Application {
             return;
         };
         let model_started = Instant::now();
-        let effects = self.model.as_ref().map(|model| {
-            model.animation_frame(frame);
-            model.take_effects()
-        });
+        let effects = if self.animations.model_active {
+            self.model.as_ref().map(|model| {
+                model.animation_frame(frame);
+                model.take_effects()
+            })
+        } else {
+            None
+        };
         let model_update = effects
             .as_ref()
             .map_or(ViewUpdate::None, |effects| effects.update);

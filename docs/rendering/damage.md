@@ -93,10 +93,11 @@ and an unavailable value means the backend did not expose timestamp queries.
 Repaint percentage is the portable comparison across native and WebAssembly
 backends.
 
-The controlled element changes its painted layout bounds instead of using a
-presentation `transform`. Argui promotes transforms to retained compositor
-layers; those exercise compositor reuse rather than root-surface damage, so
-mixing them into this workload would measure a different optimization.
+The controlled element uses a presentation `transform`, so the demo exercises
+the compositor reuse path without rerunning Taffy. Composition-only frames
+reuse prepared primitives and text, then feed the old and new visual bounds
+through the same adaptive damage policy. The **Off** tab disables that policy
+while keeping the workload identical.
 
 Open **Open blur** or **Open glass** to put a bounded backdrop effect over the
 moving element. Auto includes the filter's sampling halo when deciding whether

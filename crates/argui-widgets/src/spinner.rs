@@ -1,15 +1,14 @@
-use argui_animation::Frame;
+use argui_animation::{Duration, Iterations, Keyframe, Keyframes, Motion, Timeline, Timing};
 use argui_core::Transform2D;
 use argui_paint::VectorId;
 use argui_runtime::{Context, Render};
-use argui_ui::{Dimensions, Element, LayoutStyle};
+use argui_ui::{Dimensions, Element, LayoutStyle, property};
 
 #[derive(Clone, Debug)]
 pub struct Spinner {
     vector: VectorId,
     size: f32,
-    radians: f32,
-    reduced_motion: bool,
+    rotation: Option<Motion<Transform2D>>,
 }
 
 impl Spinner {
@@ -19,34 +18,40 @@ impl Spinner {
         Self {
             vector,
             size,
-            radians: 0.0,
-            reduced_motion: false,
+            rotation: None,
         }
     }
 }
 
 impl Render for Spinner {
     fn render(&mut self, cx: &mut Context<Self>) -> Element {
-        self.reduced_motion = cx.environment().reduced_motion;
+        let rotation = self
+            .rotation
+            .get_or_insert_with(|| Motion::new(Transform2D::IDENTITY));
+        if cx.environment().reduced_motion {
+            rotation.set(Transform2D::IDENTITY);
+        } else if !rotation.is_active() {
+            rotation.set(Transform2D::IDENTITY);
+            rotation.play(rotation_timeline());
+        }
         Element::vector(self.vector)
             .layout_style(LayoutStyle {
                 size: Dimensions::length(self.size),
                 ..LayoutStyle::default()
             })
-            .transform(Transform2D::IDENTITY.rotate(self.radians))
+            .bind(property::Transform, rotation.clone())
             .semantic_hidden(true)
     }
+}
 
-    fn animation_frame(&mut self, frame: Frame, cx: &mut Context<Self>) {
-        if !self.reduced_motion {
-            self.radians = (self.radians
-                + frame.elapsed.as_secs_f64() as f32 * std::f32::consts::TAU)
-                % std::f32::consts::TAU;
-            cx.notify();
-        }
-    }
-
-    fn wants_animation_frame(&self) -> bool {
-        !self.reduced_motion
-    }
+fn rotation_timeline() -> Timeline<Transform2D> {
+    Timeline::new(
+        Keyframes::new([
+            Keyframe::new(0.0, Transform2D::IDENTITY),
+            Keyframe::new(1.0, Transform2D::IDENTITY.rotate(std::f32::consts::TAU)),
+        ])
+        .expect("spinner keyframes cover one complete rotation"),
+        Timing::new(Duration::from_secs(1)).iterations(Iterations::Infinite),
+    )
+    .expect("spinner timing is finite and non-zero")
 }

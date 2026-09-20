@@ -1,7 +1,9 @@
-use argui_animation::Frame;
+use argui_animation::{
+    Duration, Iterations, Keyframe, Keyframes, Motion, Timeline, Timing, curves,
+};
 use argui_paint::CornerRadii;
 use argui_runtime::{Context, Render};
-use argui_ui::{Dimension, Element, length, percent};
+use argui_ui::{Dimension, Element, length, percent, property};
 
 use crate::{WidgetTheme, shadcn};
 
@@ -14,8 +16,7 @@ pub struct Skeleton {
     height: Dimension,
     radius: f32,
     animated: bool,
-    reduced_motion: bool,
-    phase: f32,
+    opacity: Option<Motion<f32>>,
 }
 
 impl Skeleton {
@@ -28,8 +29,7 @@ impl Skeleton {
             height: length(16.0),
             radius: 6.0,
             animated: true,
-            reduced_motion: false,
-            phase: 0.0,
+            opacity: None,
         }
     }
 
@@ -59,16 +59,14 @@ impl Skeleton {
     /// Sets whether the skeleton's shimmer animation is enabled; `animated` toggles the shimmer.
     pub fn set_animated(&mut self, animated: bool) {
         self.animated = animated;
+        if !animated && let Some(opacity) = &self.opacity {
+            opacity.set(1.0);
+        }
     }
 
     #[must_use]
     /// Builds the skeleton using `theme` for its placeholder color.
     pub fn build(&self, theme: &WidgetTheme) -> Element {
-        let opacity = if self.wants_animation_frame() {
-            0.75 + 0.25 * (self.phase * std::f32::consts::TAU).cos()
-        } else {
-            1.0
-        };
         Element::container([])
             .keyed(self.key.clone())
             .width(self.width)
@@ -77,26 +75,38 @@ impl Skeleton {
             .shrink(0.0)
             .background(theme.muted)
             .radius(CornerRadii::all(self.radius))
-            .paint_opacity(opacity)
             .semantic_hidden(true)
     }
 }
 
 impl Render for Skeleton {
     fn render(&mut self, cx: &mut Context<Self>) -> Element {
-        self.reduced_motion = cx.environment().reduced_motion;
         let themes = shadcn(cx.environment());
-        self.build(themes.resolve(cx.environment().color_scheme))
-    }
-
-    fn animation_frame(&mut self, frame: Frame, cx: &mut Context<Self>) {
-        if self.wants_animation_frame() {
-            self.phase = (self.phase + frame.elapsed.as_secs_f64() as f32 / 2.0) % 1.0;
-            cx.notify();
+        let skeleton = self.build(themes.resolve(cx.environment().color_scheme));
+        if !self.animated || cx.environment().reduced_motion {
+            if let Some(opacity) = &self.opacity {
+                opacity.set(1.0);
+            }
+            return skeleton;
         }
+        let opacity = self.opacity.get_or_insert_with(|| Motion::new(1.0));
+        if !opacity.is_active() {
+            opacity.set(1.0);
+            opacity.play(pulse_timeline());
+        }
+        skeleton.bind(property::LayerOpacity, opacity.clone())
     }
+}
 
-    fn wants_animation_frame(&self) -> bool {
-        self.animated && !self.reduced_motion
-    }
+fn pulse_timeline() -> Timeline<f32> {
+    Timeline::new(
+        Keyframes::new([
+            Keyframe::new(0.0, 1.0).easing(curves::EASE_IN_OUT),
+            Keyframe::new(0.5, 0.5).easing(curves::EASE_IN_OUT),
+            Keyframe::new(1.0, 1.0),
+        ])
+        .expect("skeleton pulse keyframes are ordered"),
+        Timing::new(Duration::from_secs(2)).iterations(Iterations::Infinite),
+    )
+    .expect("skeleton pulse timing is finite and non-zero")
 }

@@ -40,6 +40,13 @@ that do not use them.
   moving the Damage Control workload with a transform instead of relayout via
   margin. Its diagnostics now separate model, tree/layout, paint, renderer
   encoding, and GPU time so regressions are visible without external tooling.
+- Moved the built-in spinner and skeleton pulse from model notifications to
+  retained transform and layer-opacity tracks, made inactive `Motion` checks
+  lock-free, and let plain layer-opacity bindings promote themselves to the
+  compositor. Fully captured layers can now rotate beyond their layout box
+  without falling back to a repaint, while partially clipped content retains
+  the safe paint fallback. Retained-only animations also skip the model-frame
+  dispatch entirely, avoiding an otherwise unnecessary model-tree traversal.
 
 ### Fixed
 

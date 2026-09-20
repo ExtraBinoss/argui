@@ -187,9 +187,16 @@ pub(super) fn paint_node(
         output.compositor_owners.insert(node.node, owner);
     }
     if composited {
-        let compositor_opacity = element.layer.as_ref().map_or(1.0, |layer| {
+        let compositor_opacity = if let Some(layer) = &element.layer {
             ui.resolved_layer(node.node, element, layer).opacity
-        });
+        } else {
+            ui.resolved_layer(
+                node.node,
+                element,
+                &argui_paint::LayerStyle::new(Default::default()),
+            )
+            .opacity
+        };
         output.display_list.begin_compositor(CompositorLayer::new(
             compositor_id,
             transform.transform_rect(node.bounds),

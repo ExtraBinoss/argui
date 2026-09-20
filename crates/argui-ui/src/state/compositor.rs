@@ -18,12 +18,13 @@ impl Element {
                 .layer
                 .as_ref()
                 .is_some_and(|layer| layer.opacity != 1.0)
-            || self.bindings.iter().any(|binding| match binding {
-                PropertyBinding::Transform(_) => true,
-                PropertyBinding::LayerOpacity(_) => self.layer.is_some(),
-                _ => false,
+            || self.bindings.iter().any(|binding| {
+                matches!(
+                    binding,
+                    PropertyBinding::Transform(_) | PropertyBinding::LayerOpacity(_)
+                )
             })
             || self.conditional_styles.contains(PropertyKey::Transform)
-            || (self.layer.is_some() && self.conditional_styles.contains(PropertyKey::LayerOpacity))
+            || self.conditional_styles.contains(PropertyKey::LayerOpacity)
     }
 }

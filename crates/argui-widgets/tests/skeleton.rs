@@ -1,9 +1,9 @@
-use argui_animation::{Duration, Frame, Time};
+use argui_animation::Time;
 use argui_core::{Color, ColorScheme, Size};
 use argui_layout::LayoutEngine;
 use argui_runtime::{Context, Entity, Render, WindowEnvironment};
 use argui_text::TextEngine;
-use argui_ui::{UiTree, length, percent};
+use argui_ui::{TreeUpdate, UiTree, length, percent};
 use argui_widgets::{Skeleton, shadcn};
 
 #[test]
@@ -34,21 +34,26 @@ fn pulse_changes_paint_without_changing_layout_and_can_be_stopped() {
     let mut skeleton = Skeleton::new("loading");
     let mut cx = Context::default();
     let initial = skeleton.render(&mut cx);
-    let frame = Frame {
-        now: Time::ZERO,
-        elapsed: Duration::from_millis(500),
-    };
-    assert!(skeleton.wants_animation_frame());
-    skeleton.animation_frame(frame, &mut cx);
-    let pulsed = skeleton.render(&mut cx);
-    assert_ne!(initial.paint.quad.opacity, pulsed.paint.quad.opacity);
-    assert_eq!(initial.style, pulsed.style);
-    skeleton.set_animated(false);
     assert!(!skeleton.wants_animation_frame());
-    skeleton.animation_frame(frame, &mut cx);
-    assert_eq!(skeleton.render(&mut cx).paint.quad.opacity, 1.0);
+    let mut tree = UiTree::new(initial.clone());
+    tree.advance_animations(Time::from_nanos(1));
+    assert_eq!(
+        tree.advance_animations(Time::from_nanos(500_000_001)),
+        TreeUpdate::Composite
+    );
+    let layer = argui_paint::LayerStyle::new(Default::default());
+    assert_ne!(
+        tree.resolved_layer(tree.node_ids()[0], &initial, &layer)
+            .opacity,
+        1.0
+    );
+    skeleton.set_animated(false);
+    tree.update(skeleton.render(&mut cx));
+    assert!(!tree.wants_animation_frame());
+    assert_eq!(tree.element_at(0).unwrap().paint.quad.opacity, 1.0);
     skeleton.set_animated(true);
-    assert!(skeleton.wants_animation_frame());
+    tree.update(skeleton.render(&mut cx));
+    assert!(tree.wants_animation_frame());
 }
 
 #[test]
@@ -59,7 +64,8 @@ fn reduced_motion_freezes_the_pulse_and_normal_motion_can_resume() {
             reduced_motion,
             ..WindowEnvironment::default()
         });
-        entity.read(|skeleton| assert_eq!(skeleton.wants_animation_frame(), !reduced_motion));
+        let tree = UiTree::new(root.clone());
+        assert_eq!(tree.wants_animation_frame(), !reduced_motion);
         if reduced_motion {
             assert_eq!(root.paint.quad.opacity, 1.0);
         }
