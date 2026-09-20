@@ -94,6 +94,11 @@ fn handle_event(event: RuntimeEvent, damage_telemetry: &DamageTelemetryHandle) {
             event: WindowRuntimeEvent::RenderProfile(profile),
             ..
         } => damage_telemetry.borrow_mut().record(profile),
+        RuntimeEvent::AnimationProfile(profile)
+        | RuntimeEvent::Window {
+            event: WindowRuntimeEvent::AnimationProfile(profile),
+            ..
+        } => damage_telemetry.borrow_mut().record_animation(profile),
         _ => {}
     }
     #[cfg(feature = "hot-reload")]

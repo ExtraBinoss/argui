@@ -43,11 +43,15 @@ impl SurfaceRenderer {
         let damage = match plan {
             DamagePlan::Partial(regions) if had_root => {
                 self.clear_effect_regions(encoder, root, regions);
-                for damage in regions {
-                    let clip = PixelRegion {
+                if let Some(clip) = regions
+                    .iter()
+                    .copied()
+                    .map(|damage| PixelRegion {
                         origin: [damage.x, damage.y],
                         size: [damage.width, damage.height],
-                    };
+                    })
+                    .reduce(|acc, r| acc.union(r))
+                {
                     self.render_effect_nodes(
                         encoder,
                         &graph.roots,

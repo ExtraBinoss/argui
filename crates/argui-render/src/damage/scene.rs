@@ -1,6 +1,7 @@
 use argui_core::{Affine2D, Point, Rect, Size};
 use argui_paint::{ClipChain, DisplayCommand, DisplayList, Filter, LayerStyle};
 use argui_text::{PreparedDecoration, PreparedGlyph, PreparedText};
+use std::sync::Arc;
 
 use crate::{DamagePlan, DamageRegion, DamageTracking, EffectDamage, EffectRegistry};
 
@@ -13,7 +14,7 @@ struct TextVisual {
 #[derive(Clone, Debug, PartialEq)]
 struct SceneItem {
     command: DisplayCommand,
-    text: Option<TextVisual>,
+    text: Option<Arc<TextVisual>>,
     bounds: Option<DamageRegion>,
 }
 
@@ -31,6 +32,7 @@ struct EffectLayer {
 #[derive(Clone, Debug, PartialEq)]
 pub struct DamageSnapshot {
     items: Vec<SceneItem>,
+    text_visuals: Vec<Arc<TextVisual>>,
     effect_layers: Vec<EffectLayer>,
     viewport: [u32; 2],
     scale_factor: f32,
@@ -53,6 +55,56 @@ impl DamageSnapshot {
         scale_factor: f32,
     ) -> Self {
         let text_visuals = text_visuals(text);
+        Self::capture_with_visuals(
+            display_list,
+            &text_visuals,
+            text_bounds,
+            viewport,
+            scale_factor,
+        )
+    }
+
+    /// Recaptures composition-only changes while reusing prepared text visuals.
+    ///
+    /// This is valid when `display_list` differs from this snapshot only through
+    /// compositor-layer transforms or opacity. It lets the renderer compute
+    /// old and new damage bounds without reshaping or copying prepared text.
+    ///
+    /// * `display_list` — retained commands with updated compositor properties.
+    /// * `text_bounds` — physical bounds retained from the last paint preparation.
+    /// * `viewport` — physical viewport width and height.
+    /// * `scale_factor` — logical-to-physical scale used by the retained scene.
+    #[must_use]
+    pub(crate) fn capture_composite(
+        &self,
+        display_list: &DisplayList,
+        text_bounds: &[Option<Rect>],
+        viewport: [u32; 2],
+        scale_factor: f32,
+    ) -> Self {
+        Self::capture_with_visuals(
+            display_list,
+            &self.text_visuals,
+            text_bounds,
+            viewport,
+            scale_factor,
+        )
+    }
+
+    /// Captures a scene with text visuals already grouped by display-list block.
+    ///
+    /// * `display_list` — ordered paint commands represented by the snapshot.
+    /// * `text_visuals` — retained glyphs and decorations indexed by text block.
+    /// * `text_bounds` — physical bounds per prepared text block.
+    /// * `viewport` — physical viewport width and height.
+    /// * `scale_factor` — logical-to-physical scale applied to paint commands.
+    fn capture_with_visuals(
+        display_list: &DisplayList,
+        text_visuals: &[Arc<TextVisual>],
+        text_bounds: &[Option<Rect>],
+        viewport: [u32; 2],
+        scale_factor: f32,
+    ) -> Self {
         let mut items = Vec::with_capacity(display_list.commands().len());
         let mut layers = Vec::new();
         let mut effect_layers = Vec::new();
@@ -98,6 +150,7 @@ impl DamageSnapshot {
         }
         Self {
             items,
+            text_visuals: text_visuals.to_vec(),
             effect_layers,
             viewport,
             scale_factor,
@@ -284,7 +337,7 @@ fn changed_middle(previous: &DamageSnapshot, current: &DamageSnapshot) -> Vec<Da
 }
 
 /// Groups prepared glyphs and decorations by their text block.
-fn text_visuals(text: &PreparedText) -> Vec<TextVisual> {
+fn text_visuals(text: &PreparedText) -> Vec<Arc<TextVisual>> {
     let mut visuals = vec![TextVisual::default(); text.blocks];
     for glyph in &text.glyphs {
         if let Some(block) = visuals.get_mut(glyph.block) {
@@ -296,7 +349,7 @@ fn text_visuals(text: &PreparedText) -> Vec<TextVisual> {
             block.decorations.push(*decoration);
         }
     }
-    visuals
+    visuals.into_iter().map(Arc::new).collect()
 }
 
 /// Resolves one display command to conservative physical-pixel bounds.

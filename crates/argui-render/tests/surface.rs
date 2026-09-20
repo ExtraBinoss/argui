@@ -351,6 +351,8 @@ fn exercise(window: Arc<Window>, mut pump: impl FnMut()) {
         Err(RendererError::IncompatibleGpuCanvasDevice { canvas, .. })
             if canvas == "test.required-feature"
     ));
+    effect_damage::exercise_compositor(&mut renderer, &window, &mut pump);
+
     let mut render = |renderer: &mut SurfaceRenderer, list: &DisplayList| {
         render(renderer, list, &window, &mut pump)
     };

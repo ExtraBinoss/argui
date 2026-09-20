@@ -13,6 +13,21 @@ These rules are tested. Timing and memory values depend on hardware, drivers,
 features, viewport, and workload; treat the values below as repository snapshots,
 not guarantees for every application.
 
+## Animate presentation properties first
+
+Transforms and layer opacity are presentation properties: Argui keeps their
+layout geometry stable, patches hit-testing and semantic geometry, reuses the
+prepared GPU primitives and text, then damages only the old and new visual
+bounds. This is the cheapest path for movement, scaling, rotation, and fades.
+The renderer applies the same bounded-damage logic through retained blur,
+shadow, and custom-effect layers.
+
+Animating width, height, padding, margin, gaps, or flex/grid placement changes
+the layout contract and therefore runs Taffy again. Use those properties when
+surrounding content must genuinely reflow; do not use an animated margin merely
+to move an otherwise independent visual. No application-specific invalidation
+or damage bookkeeping is required for either path.
+
 ## Frame-coalesce continuous input
 
 Use `GestureDelivery::FrameCoalesced` when a gesture update invalidates a view,

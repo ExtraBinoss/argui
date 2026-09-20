@@ -20,6 +20,10 @@ that do not use them.
   bounds from laid-out layers into a persistent effect root instead of forcing
   a full viewport repaint. Unknown custom shaders remain safely unbounded, and
   the liquid-glass preset declares its dynamic refraction/blur expansion.
+- Extended adaptive damage to composition-only animation frames. Transform and
+  layer-opacity updates now reuse prepared primitives, text, and cached effect
+  layers while repainting only the previous and current visual bounds; they no
+  longer discard the damage snapshot and compose the full viewport each frame.
 - Added a live **Damage control** Widget Gallery page that runs the same
   animated workload and optional blur or liquid-glass popovers with adaptive
   damage rendering on or off. The public
@@ -28,6 +32,23 @@ that do not use them.
   per window at runtime. The page reports repaint coverage, damage regions,
   retained memory, CPU encoding time, and GPU time when timestamp queries are
   available.
+
+### Changed
+
+- Reduced continuous-animation CPU work by keeping compositor-only frames on
+  the regional retained path, sampling each typed `Motion` under one lock, and
+  moving the Damage Control workload with a transform instead of relayout via
+  margin. Its diagnostics now separate model, tree/layout, paint, renderer
+  encoding, and GPU time so regressions are visible without external tooling.
+
+### Fixed
+
+- Prevented unbounded offscreen texture growth during page transitions by
+  clearing the texture pool on window close and evicting idle textures across
+  animation frames.
+- Resolved rectangular shadow cutouts behind rounded elements by propagating
+  resolved corner radii to compositor layer masks and applying the inverse
+  layer transform to drop-shadow sampling and punch-out bounds.
 
 ## [0.3.2] - 2026-09-19
 

@@ -1,5 +1,5 @@
 use argui_core::{Affine2D, Color, Rect};
-use argui_paint::{ClipChain, ClipRegion, CompositorId, CompositorLayer, DisplayList};
+use argui_paint::{ClipChain, ClipRegion, CompositorId, CompositorLayer, DisplayList, LayerMask};
 use argui_ui::{EffectScope, Element, ElementKind, NodeId, PointerEvents, UiTree};
 
 use crate::{LayoutNode, LayoutOutput, engine::NodeMap, input, scroll};
@@ -415,6 +415,16 @@ fn paint_enter(
         if composited {
             // Group opacity is applied by the retained compositor wrapper.
             layer.opacity = 1.0;
+        }
+        if layer.mask == LayerMask::None {
+            let radii = ui.resolved_quad(node.node, element).radii;
+            if radii.top_left > 0.0
+                || radii.top_right > 0.0
+                || radii.bottom_right > 0.0
+                || radii.bottom_left > 0.0
+            {
+                layer.mask = LayerMask::Rounded(radii);
+            }
         }
         begin_layer(&mut output.display_list, layer, visual_bounds, node.node);
     }

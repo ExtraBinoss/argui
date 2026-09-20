@@ -148,6 +148,9 @@ impl SurfaceRenderer {
         for region in regions {
             crate::damage::DamageGpu::scissor(&mut pass, *region);
             self.damage.clear(&mut pass);
+        }
+        if let Some(union) = regions.iter().copied().reduce(DamageRegion::union) {
+            crate::damage::DamageGpu::scissor(&mut pass, union);
             self.draw_prepared_batches(&mut pass, &offsets);
         }
     }

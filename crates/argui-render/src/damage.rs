@@ -86,7 +86,7 @@ impl DamageRegion {
     }
 
     /// Returns the smallest rectangle containing this region and `other`.
-    fn union(self, other: Self) -> Self {
+    pub(crate) fn union(self, other: Self) -> Self {
         let left = self.x.min(other.x);
         let top = self.y.min(other.y);
         let right = self.right().max(other.right());

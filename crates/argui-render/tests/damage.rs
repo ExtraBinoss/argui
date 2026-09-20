@@ -2,8 +2,8 @@ use argui_core::{Affine2D, Color, Point, Rect, Size};
 use argui_paint::{
     Border, ClipChain, ClipRegion, CompositorId, CompositorLayer, CornerRadii, DisplayList,
     EffectId, EffectInstance, Fill, Filter, GpuCanvasId, GpuCanvasPrimitive, ImageFit, ImageId,
-    ImagePrimitive, ImageSampling, LayerStyle, ProfileDomain, Quad, RenderObjectId, VectorId,
-    VectorPrimitive,
+    ImagePrimitive, ImageSampling, LayerStyle, ProfileDomain, Quad, RenderObjectId, Shadow,
+    VectorId, VectorPrimitive,
 };
 use argui_render::{
     DamagePlan, DamageRegion, DamageSnapshot, DamageTracking, EffectDamage, EffectDefinition,
@@ -125,6 +125,10 @@ fn scene_snapshots_handle_identity_and_incompatible_viewports() {
         baseline.compare(&snapshot(&list, [512, 256], 2.0), DamageTracking::enabled()),
         DamagePlan::Full
     );
+    assert_eq!(
+        baseline.compare(&snapshot(&list, [256, 128], 2.0), DamageTracking::enabled()),
+        DamagePlan::Full
+    );
 }
 
 #[test]
@@ -168,6 +172,19 @@ fn bounded_effects_expand_only_intersecting_damage_to_layer_bounds() {
         panic!("unrelated damage should remain partial");
     };
     assert!(regions.iter().all(|region| region.right() < 224));
+
+    let right_previous = effect_scene(240.0, Filter::Blur(8.0));
+    let right_current = effect_scene(256.0, Filter::Blur(8.0));
+    let DamagePlan::Partial(regions) = snapshot(&right_previous, [512, 256], 1.0)
+        .compare_with_effects(
+            &snapshot(&right_current, [512, 256], 1.0),
+            DamageTracking::enabled(),
+            &EffectRegistry::default(),
+        )
+    else {
+        panic!("unrelated rightward damage should remain partial");
+    };
+    assert!(regions.iter().all(|region| region.x >= 224));
 }
 
 #[test]
@@ -311,6 +328,14 @@ fn mixed_list(canvas: GpuCanvasId) -> DisplayList {
         Affine2D::IDENTITY,
     )]);
     list.push_quad(fully_clipped);
+    let mut y_clipped = quad(8.0, 8.0, 16.0);
+    y_clipped.clips = ClipChain::from_regions([ClipRegion::new(
+        Rect::new(Point::new(8.0, 200.0), Size::new(16.0, 16.0)),
+        Affine2D::IDENTITY,
+    )]);
+    list.push_quad(y_clipped);
+    let outside = quad(600.0, 600.0, 16.0);
+    list.push_quad(outside);
     list.push_image(ImagePrimitive {
         bounds,
         image: ImageId(1),
@@ -345,6 +370,13 @@ fn mixed_list(canvas: GpuCanvasId) -> DisplayList {
     });
     list.begin_layer(LayerStyle::new(bounds));
     list.push_quad(quad(12.0, 12.0, 8.0));
+    list.end_layer();
+    let shadow = Shadow::drop([0.0, 2.0], 4.0, Color::BLACK);
+    let styled_layer = LayerStyle::new(bounds)
+        .filter(Filter::Blur(2.0))
+        .shadow(shadow);
+    list.begin_layer(styled_layer);
+    list.push_quad(quad(14.0, 14.0, 8.0));
     list.end_layer();
     list.begin_compositor(CompositorLayer::new(
         CompositorId::new(5),

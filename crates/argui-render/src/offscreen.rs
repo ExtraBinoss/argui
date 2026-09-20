@@ -21,6 +21,12 @@ struct Entry {
     last_frame: u64,
 }
 
+impl Drop for Entry {
+    fn drop(&mut self) {
+        self.texture.destroy();
+    }
+}
+
 pub(crate) struct TexturePool {
     entries: Vec<Entry>,
     format: TextureFormat,
@@ -49,7 +55,11 @@ impl TexturePool {
         for entry in &mut self.entries {
             entry.used = false;
         }
-        let mut evicted = false;
+        let current_frame = self.frame;
+        let initial_count = self.entries.len();
+        const MAX_IDLE_FRAMES: u64 = 60;
+        self.entries
+            .retain(|entry| current_frame.saturating_sub(entry.last_frame) <= MAX_IDLE_FRAMES);
         while self.allocated_bytes() > self.budget && self.entries.len() > 1 {
             let oldest = self
                 .entries
@@ -59,9 +69,14 @@ impl TexturePool {
                 .map(|(index, _)| index)
                 .unwrap_or(0);
             self.entries.swap_remove(oldest);
-            evicted = true;
         }
-        evicted
+        self.entries.len() != initial_count
+    }
+
+    /// Drops and destroys every allocated texture in the pool.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+        self.reused = 0;
     }
 
     pub fn acquire(&mut self, device: &wgpu::Device, width: u32, height: u32) -> usize {
@@ -72,6 +87,24 @@ impl TexturePool {
             .iter_mut()
             .enumerate()
             .find(|(_, entry)| !entry.used && entry.width == width && entry.height == height)
+        {
+            entry.used = true;
+            entry.last_frame = self.frame;
+            self.reused += 1;
+            return index;
+        }
+        let target_bytes = texture_bytes(self.format, width, height);
+        if let Some((index, entry)) = self
+            .entries
+            .iter_mut()
+            .enumerate()
+            .filter(|(_, entry)| {
+                !entry.used
+                    && entry.width >= width
+                    && entry.height >= height
+                    && entry.bytes <= target_bytes.saturating_mul(2)
+            })
+            .min_by_key(|(_, entry)| entry.bytes)
         {
             entry.used = true;
             entry.last_frame = self.frame;
@@ -167,8 +200,7 @@ impl TexturePool {
 }
 
 fn size_class(size: u32) -> u32 {
-    const TILE: u32 = 64;
-    size.max(1).div_ceil(TILE).saturating_mul(TILE)
+    size.max(64).next_power_of_two()
 }
 
 fn texture_bytes(format: TextureFormat, width: u32, height: u32) -> u64 {

@@ -49,6 +49,30 @@ use argui::{
 };
 use argui_widget_gallery::WidgetGallery;
 
+mod app {
+    use argui::{
+        text::{TextColor, TextStyle, TextWrap},
+        ui::Element,
+    };
+
+    /// Builds text for gallery modules included directly by integration tests.
+    pub(crate) fn text(
+        value: impl Into<String>,
+        size: f32,
+        color: TextColor,
+        weight: u16,
+    ) -> Element {
+        Element::text(value.into()).text_style(TextStyle {
+            font_size: size,
+            line_height: size * 1.35,
+            color,
+            weight,
+            wrap: TextWrap::Word,
+            ..TextStyle::default()
+        })
+    }
+}
+
 fn contains_text(element: &Element, expected: &str) -> bool {
     matches!(&element.kind, argui::ui::ElementKind::Text { content, .. }
         if content.as_str() == expected)

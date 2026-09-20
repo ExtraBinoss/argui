@@ -1,4 +1,5 @@
 use argui::{
+    core::Transform2D,
     paint::{Border, CornerRadii, PaintStyle, QuadStyle},
     platform::WindowKey,
     render::DamageTracking,
@@ -117,12 +118,7 @@ impl DamageControlDemo {
             .background(theme.primary)
             .border(Border::all(6.0, theme.primary.with_alpha(0.22)))
             .radius(CornerRadii::all(999.0))
-            .margin(Sides {
-                left: length(travel),
-                right: length(0.0),
-                top: length(0.0),
-                bottom: length(0.0),
-            });
+            .transform(Transform2D::IDENTITY.translate(travel, 0.0));
         let markers = Element::row((0..9).map(|index| {
             Element::container([])
                 .width(length(if index % 2 == 0 { 34.0 } else { 18.0 }))
@@ -138,7 +134,7 @@ impl DamageControlDemo {
                 text("CONTROLLED WORKLOAD", 11.0, theme.muted_foreground, 700),
                 Element::row([
                     text(
-                        "One moving element · identical in both modes",
+                        "One composited transform · identical in both modes",
                         12.0,
                         theme.muted_foreground,
                         450,
@@ -180,6 +176,9 @@ impl DamageControlDemo {
         } else {
             metrics.damaged_pixels as f64 / metrics.viewport_pixels as f64
         };
+        let animation_ready = metrics.animation_samples > 0;
+        let pipeline_cpu =
+            metrics.average_model_ms + metrics.average_tree_ms + metrics.average_paint_ms;
         let cards = [
             metric_card(
                 "GPU / frame",
@@ -201,6 +200,19 @@ impl DamageControlDemo {
                     "Waiting…",
                 ),
                 "Rolling renderer average",
+                theme,
+            ),
+            metric_card(
+                "CPU pipeline",
+                when_ready(animation_ready, format!("{pipeline_cpu:.3} ms"), "Waiting…"),
+                when_ready(
+                    animation_ready,
+                    format!(
+                        "model {:.2} · tree {:.2} · paint {:.2}",
+                        metrics.average_model_ms, metrics.average_tree_ms, metrics.average_paint_ms
+                    ),
+                    "Runtime stage timings",
+                ),
                 theme,
             ),
             metric_card(
@@ -298,14 +310,10 @@ impl Render for DamageControlDemo {
             self.displayed = self.telemetry.borrow().metrics();
         }
         cx.notify();
-        cx.request_animation_frame();
     }
 
     fn render(&mut self, cx: &mut Context<Self>) -> Element {
         self.reduced_motion = cx.environment().reduced_motion;
-        if self.wants_animation_frame() {
-            cx.request_animation_frame();
-        }
         let themes = shadcn(cx.environment());
         let theme = themes.resolve(cx.environment().color_scheme);
         let auto_panel = text(
@@ -438,7 +446,7 @@ impl Render for DamageControlDemo {
             .flex_wrap(FlexWrap::Wrap);
         super::preview(
             "Same scene, real renderer modes",
-            "Switch modes while the workload runs. The cards come from RenderProfile after each presented frame, not from estimated UI state.",
+            "Switch modes while the workload runs. The cards come from runtime and renderer profiles after each presented frame, not from estimated UI state.",
             Element::column([
                 Tabs::new(
                     "damage-control-mode",

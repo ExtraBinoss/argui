@@ -1,4 +1,5 @@
 use super::*;
+use argui_paint::{CompositorId, CompositorLayer};
 
 /// Exercises retained effect roots with built-in and custom bounded filters.
 pub(super) fn exercise(
@@ -28,6 +29,68 @@ pub(super) fn exercise(
     render(renderer, &custom(80.0)).unwrap();
     render(renderer, &custom(96.0)).unwrap();
     assert_eq!(renderer.last_profile().damage.mode, DamageMode::Partial);
+}
+
+/// Verifies that composition-only frames retain scene damage and cached layers.
+pub(super) fn exercise_compositor(
+    renderer: &mut SurfaceRenderer,
+    window: &Window,
+    pump: &mut impl FnMut(),
+) {
+    let retained = compositor_scene(Affine2D::IDENTITY);
+    render(renderer, &retained, window, pump).unwrap();
+    let transformed = compositor_scene(Affine2D::translation(48.0, 0.0));
+    render_composite(renderer, &transformed, window, pump).unwrap();
+    assert_eq!(renderer.last_profile().damage.mode, DamageMode::Partial);
+    assert!(renderer.last_profile().damage.damaged_pixels < 256 * 256);
+    assert!(renderer.last_profile().effects.cached_layers >= 1);
+    render_composite(renderer, &transformed, window, pump).unwrap();
+    assert_eq!(renderer.last_profile().damage.mode, DamageMode::Reused);
+    renderer.set_damage_tracking(DamageTracking::disabled());
+    renderer.set_damage_tracking(DamageTracking::enabled());
+}
+
+/// Presents retained compositor changes until the Wayland surface accepts a frame.
+fn render_composite(
+    renderer: &mut SurfaceRenderer,
+    list: &DisplayList,
+    window: &Window,
+    pump: &mut impl FnMut(),
+) -> Result<(), RendererError> {
+    let deadline = web_time::Instant::now() + NATIVE_TIMEOUT;
+    loop {
+        window.request_redraw();
+        pump();
+        let status = renderer.render_composite_notified(list, 1.0, || {
+            window.pre_present_notify();
+        })?;
+        if status == RenderStatus::Presented {
+            return Ok(());
+        }
+        assert_eq!(status, RenderStatus::Skipped);
+        assert!(
+            web_time::Instant::now() < deadline,
+            "compositor surface did not present within {NATIVE_TIMEOUT:?}"
+        );
+    }
+}
+
+/// Builds a small retained layer at the supplied composition transform.
+fn compositor_scene(transform: Affine2D) -> DisplayList {
+    let bounds = Rect::new(Point::new(8.0, 8.0), Size::new(32.0, 32.0));
+    let mut layer = CompositorLayer::new(
+        CompositorId::new(41),
+        bounds,
+        Affine2D::IDENTITY,
+        Affine2D::IDENTITY,
+        1.0,
+    );
+    layer.update(transform, 1.0);
+    let mut list = DisplayList::new();
+    list.begin_compositor(layer);
+    list.push_quad(colored_quad(8.0, Color::WHITE));
+    list.end_compositor();
+    list
 }
 
 /// Builds a scene whose moving backdrop intersects one bounded effect layer.

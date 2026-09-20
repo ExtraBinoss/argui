@@ -321,58 +321,7 @@ impl<T: Clone + Interpolate + PartialEq> Motion<T> {
     /// Returns a timing error if the tween cannot be represented as a valid timeline.
     pub fn advance(&self, now: Time) -> Result<bool, TimingError> {
         let mut inner = self.lock();
-        if inner.state != MotionState::Running {
-            return Ok(false);
-        }
-        if let Driver::PendingTween { from, tween } = &inner.driver {
-            let frames = Keyframes::new(vec![
-                Keyframe::new(0.0, from.clone()).easing(tween.easing.clone()),
-                Keyframe::new(1.0, inner.target.clone()),
-            ])?;
-            let mut timeline = Timeline::new(
-                frames,
-                Timing::new(tween.duration)
-                    .delay(tween.delay)
-                    .fill(FillMode::Both),
-            )?;
-            timeline.play(now);
-            inner.driver = Driver::Timeline(timeline);
-        }
-        if inner.resume_pending {
-            if let Driver::Timeline(timeline) = &mut inner.driver {
-                match timeline.state() {
-                    PlaybackState::Idle | PlaybackState::Finished | PlaybackState::Canceled => {
-                        timeline.play(now);
-                    }
-                    PlaybackState::Paused => timeline.resume(now),
-                    PlaybackState::Running => {}
-                }
-            }
-            inner.resume_pending = false;
-        }
-        let sample = match &mut inner.driver {
-            Driver::Timeline(timeline) => Some(timeline.sample(now)),
-            _ => None,
-        };
-        let mut changed = false;
-        if let Some(sample) = sample {
-            inner.completed_iterations = inner
-                .completed_iterations
-                .saturating_add(sample.events.iterations);
-            if let Some(value) = sample.value {
-                changed = value != inner.value;
-                inner.value = value;
-            }
-            if sample.state == PlaybackState::Finished {
-                inner.value = inner.target.clone();
-                inner.driver = Driver::None;
-                inner.state = MotionState::Finished;
-                inner.last_frame = None;
-                return Ok(true);
-            }
-        }
-        inner.last_frame = Some(now);
-        Ok(changed)
+        advance_timeline(&mut inner, now)
     }
 }
 
@@ -432,28 +381,102 @@ impl<T: MotionValue> Motion<T> {
     /// Advances a spring-driven motion at `now`, returning whether its value changed.
     pub fn advance_spring(&self, now: Time) -> bool {
         let mut inner = self.lock();
-        if inner.state != MotionState::Running {
-            return false;
-        }
-        let elapsed = inner
-            .last_frame
-            .map_or(Duration::ZERO, |last| now.duration_since(last));
-        let (changed, value, active) = match &mut inner.driver {
-            Driver::Spring(spring) => {
-                let changed = spring.advance(elapsed);
-                (changed, spring.value(), spring.is_active())
+        advance_spring(&mut inner, now)
+    }
+}
+
+/// Advances a timeline driver while its caller holds the motion lock.
+///
+/// * `inner` — mutable retained motion state protected by its outer mutex.
+/// * `now` — display-linked sample time.
+///
+/// Returns whether the sampled value changed.
+fn advance_timeline<T: Clone + Interpolate + PartialEq>(
+    inner: &mut MotionInner<T>,
+    now: Time,
+) -> Result<bool, TimingError> {
+    if inner.state != MotionState::Running {
+        return Ok(false);
+    }
+    if let Driver::PendingTween { from, tween } = &inner.driver {
+        let frames = Keyframes::new(vec![
+            Keyframe::new(0.0, from.clone()).easing(tween.easing.clone()),
+            Keyframe::new(1.0, inner.target.clone()),
+        ])?;
+        let mut timeline = Timeline::new(
+            frames,
+            Timing::new(tween.duration)
+                .delay(tween.delay)
+                .fill(FillMode::Both),
+        )?;
+        timeline.play(now);
+        inner.driver = Driver::Timeline(timeline);
+    }
+    if inner.resume_pending {
+        if let Driver::Timeline(timeline) = &mut inner.driver {
+            match timeline.state() {
+                PlaybackState::Idle | PlaybackState::Finished | PlaybackState::Canceled => {
+                    timeline.play(now);
+                }
+                PlaybackState::Paused => timeline.resume(now),
+                PlaybackState::Running => {}
             }
-            _ => return false,
-        };
-        inner.value = value;
-        inner.last_frame = Some(now);
-        if !active {
+        }
+        inner.resume_pending = false;
+    }
+    let sample = match &mut inner.driver {
+        Driver::Timeline(timeline) => Some(timeline.sample(now)),
+        _ => None,
+    };
+    let mut changed = false;
+    if let Some(sample) = sample {
+        inner.completed_iterations = inner
+            .completed_iterations
+            .saturating_add(sample.events.iterations);
+        if let Some(value) = sample.value {
+            changed = value != inner.value;
+            inner.value = value;
+        }
+        if sample.state == PlaybackState::Finished {
+            inner.value = inner.target.clone();
             inner.driver = Driver::None;
             inner.state = MotionState::Finished;
             inner.last_frame = None;
+            return Ok(true);
         }
-        changed
     }
+    inner.last_frame = Some(now);
+    Ok(changed)
+}
+
+/// Advances a spring driver while its caller holds the motion lock.
+///
+/// * `inner` — mutable retained motion state protected by its outer mutex.
+/// * `now` — display-linked sample time.
+///
+/// Returns whether the sampled value changed.
+fn advance_spring<T: MotionValue>(inner: &mut MotionInner<T>, now: Time) -> bool {
+    if inner.state != MotionState::Running {
+        return false;
+    }
+    let elapsed = inner
+        .last_frame
+        .map_or(Duration::ZERO, |last| now.duration_since(last));
+    let (changed, value, active) = match &mut inner.driver {
+        Driver::Spring(spring) => {
+            let changed = spring.advance(elapsed);
+            (changed, spring.value(), spring.is_active())
+        }
+        _ => return false,
+    };
+    inner.value = value;
+    inner.last_frame = Some(now);
+    if !active {
+        inner.driver = Driver::None;
+        inner.state = MotionState::Finished;
+        inner.last_frame = None;
+    }
+    changed
 }
 
 /// Type-erased operations used by animation scheduling.
@@ -483,12 +506,14 @@ where
     }
 
     fn advance(&self, now: Time) -> bool {
-        let is_spring = matches!(&self.lock().driver, Driver::Spring(_));
-        if is_spring {
-            self.advance_spring(now)
+        let mut inner = self.lock();
+        if matches!(&inner.driver, Driver::Spring(_)) {
+            advance_spring(&mut inner, now)
         } else {
-            self.advance(now).unwrap_or_else(|_| {
-                self.cancel();
+            advance_timeline(&mut inner, now).unwrap_or_else(|_| {
+                inner.driver = Driver::None;
+                inner.state = MotionState::Canceled;
+                inner.last_frame = None;
                 false
             })
         }

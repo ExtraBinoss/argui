@@ -50,6 +50,7 @@ pub(crate) const fn blend_mode(mode: BlendMode) -> u32 {
 pub(crate) const fn layer_radii(mask: LayerMask) -> [f32; 4] {
     match mask {
         LayerMask::Rounded(radii) => radii.as_array(),
-        LayerMask::None | LayerMask::Bounds => [0.0; 4],
+        LayerMask::Bounds => [0.0; 4],
+        LayerMask::None => [-1.0; 4],
     }
 }

@@ -2,6 +2,7 @@ use std::{cell::RefCell, collections::VecDeque, rc::Rc, time::Duration};
 
 use argui::{
     render::{DamageMode, RenderProfile},
+    runtime::AnimationProfile,
     ui::{Element, Sides, length},
     widgets::WidgetTheme,
 };
@@ -25,6 +26,13 @@ struct DamageSample {
 }
 
 #[derive(Clone, Copy, Debug, Default)]
+struct AnimationSample {
+    model_time: Duration,
+    tree_time: Duration,
+    paint_time: Duration,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
 pub(super) struct DamageMetrics {
     pub(super) samples: usize,
     pub(super) mode: DamageMode,
@@ -35,12 +43,17 @@ pub(super) struct DamageMetrics {
     pub(super) average_ratio: f64,
     pub(super) average_cpu_ms: f64,
     pub(super) average_gpu_ms: Option<f64>,
+    pub(super) animation_samples: usize,
+    pub(super) average_model_ms: f64,
+    pub(super) average_tree_ms: f64,
+    pub(super) average_paint_ms: f64,
 }
 
 /// Bounded rolling history of renderer profiles for the live comparison page.
 #[derive(Debug, Default)]
 pub(crate) struct DamageTelemetry {
     samples: VecDeque<DamageSample>,
+    animation_samples: VecDeque<AnimationSample>,
 }
 
 impl DamageTelemetry {
@@ -63,14 +76,28 @@ impl DamageTelemetry {
             cpu_time: profile.cpu_time,
             gpu_time: profile.gpu.as_ref().map(|gpu| gpu.total),
         });
-        if self.samples.len() > SAMPLE_LIMIT {
-            self.samples.pop_front();
-        }
+        let excess = self.samples.len().saturating_sub(SAMPLE_LIMIT);
+        drop(self.samples.drain(..excess));
+    }
+
+    /// Records CPU stages from one runtime animation frame.
+    ///
+    /// `profile` contains the model, retained-tree/layout, and paint timings
+    /// measured before renderer command encoding.
+    pub(crate) fn record_animation(&mut self, profile: &AnimationProfile) {
+        self.animation_samples.push_back(AnimationSample {
+            model_time: profile.model_time,
+            tree_time: profile.tree_time,
+            paint_time: profile.paint_time,
+        });
+        let excess = self.animation_samples.len().saturating_sub(SAMPLE_LIMIT);
+        drop(self.animation_samples.drain(..excess));
     }
 
     /// Clears all samples so two renderer modes start with independent history.
     pub(crate) fn clear(&mut self) {
         self.samples.clear();
+        self.animation_samples.clear();
     }
 
     /// Summarizes the current rolling history for presentation.
@@ -105,6 +132,15 @@ impl DamageTelemetry {
                 (total + duration.as_secs_f64() * 1_000.0, count + 1)
             });
         let average_gpu_ms = (gpu_count > 0).then(|| gpu_total / gpu_count as f64);
+        let animation_count = self.animation_samples.len();
+        let animation_divisor = animation_count.max(1) as f64;
+        let average_stage = |select: fn(&AnimationSample) -> Duration| {
+            self.animation_samples
+                .iter()
+                .map(|sample| select(sample).as_secs_f64() * 1_000.0)
+                .sum::<f64>()
+                / animation_divisor
+        };
         DamageMetrics {
             samples: self.samples.len(),
             mode: latest.mode,
@@ -115,6 +151,10 @@ impl DamageTelemetry {
             average_ratio,
             average_cpu_ms,
             average_gpu_ms,
+            animation_samples: animation_count,
+            average_model_ms: average_stage(|sample| sample.model_time),
+            average_tree_ms: average_stage(|sample| sample.tree_time),
+            average_paint_ms: average_stage(|sample| sample.paint_time),
         }
     }
 }

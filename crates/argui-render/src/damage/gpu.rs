@@ -9,6 +9,12 @@ struct RetainedTarget {
     bytes: u64,
 }
 
+impl Drop for RetainedTarget {
+    fn drop(&mut self) {
+        self._texture.destroy();
+    }
+}
+
 /// GPU resources used to preserve and selectively refresh direct UI pixels.
 pub(crate) struct DamageGpu {
     clear_pipeline: wgpu::RenderPipeline,

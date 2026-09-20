@@ -63,6 +63,18 @@ impl PixelRegion {
         }
     }
 
+    /// Returns the smallest bounding physical region containing both `self` and `other`.
+    pub fn union(self, other: Self) -> Self {
+        let left = self.origin[0].min(other.origin[0]);
+        let top = self.origin[1].min(other.origin[1]);
+        let right = self.right().max(other.right());
+        let bottom = self.bottom().max(other.bottom());
+        Self {
+            origin: [left, top],
+            size: [right - left, bottom - top],
+        }
+    }
+
     pub fn as_rect(self) -> Rect {
         Rect::new(
             Point::new(self.origin[0] as f32, self.origin[1] as f32),

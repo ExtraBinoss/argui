@@ -88,6 +88,9 @@ fn retained_pixel(pixel: vec2<f32>) -> vec2<f32> {
 }
 
 fn mask_coverage(pixel: vec2<f32>) -> f32 {
+    if params.radii.x < 0.0 {
+        return 1.0;
+    }
     let center = params.bounds.xy + params.bounds.zw * 0.5;
     let local = pixel - center;
     let radius = select(
@@ -133,7 +136,9 @@ fn sample_blur(pixel: vec2<f32>, axis: vec2<f32>) -> vec4<f32> {
 fn fs_main(input: VertexOut) -> @location(0) vec4<f32> {
     let pixel = global_pixel(input.uv);
     var source_pixel = pixel;
-    if params.mode == 0u { source_pixel = retained_pixel(pixel); }
+    if params.mode == 0u || params.mode == 10u || params.mode == 11u {
+        source_pixel = retained_pixel(pixel);
+    }
     let original = sample_source(source_pixel);
     var source = original;
     let backdrop = sample_backdrop(pixel);
@@ -154,12 +159,17 @@ fn fs_main(input: VertexOut) -> @location(0) vec4<f32> {
         source = refracted_backdrop(pixel);
     }
     if params.mode == 10u || params.mode == 11u {
-        let offset_pixel = pixel - params.data.yz;
+        let offset_pixel = source_pixel - params.data.yz;
         var alpha = sample_source(offset_pixel).a;
         if params.mode == 11u { alpha = 1.0 - alpha; }
         let spread_alpha = clamp(alpha * (1.0 + max(params.data.w, 0.0) * 0.08), 0.0, 1.0);
-        let box_coverage = mask_coverage(pixel);
-        let placement = select(1.0 - box_coverage, box_coverage, params.mode == 11u);
+        var placement = 1.0;
+        if params.radii.x >= 0.0 {
+            let box_coverage = mask_coverage(source_pixel);
+            placement = select(1.0 - box_coverage, box_coverage, params.mode == 11u);
+        } else if params.mode == 11u {
+            placement = 0.0;
+        }
         let shadow_alpha = params.color.a * spread_alpha * placement;
         let shadow = vec4<f32>(params.color.rgb * shadow_alpha, shadow_alpha);
         return vec4<f32>(

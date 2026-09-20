@@ -76,6 +76,7 @@ impl SurfaceRenderer {
             params.color[3] *= style.opacity.clamp(0.0, 1.0);
             params.data = [1.0, shadow.offset[0], shadow.offset[1], shadow.spread];
             params.radii = layer_radii(style.mask);
+            params.set_inverse_transform(style.transform.inverse().unwrap_or_default());
             self.draw_effect(
                 encoder,
                 shadowed,
@@ -151,6 +152,7 @@ impl SurfaceRenderer {
 fn expanded_radii(mask: LayerMask, expansion: f32) -> [f32; 4] {
     match mask {
         LayerMask::Rounded(radii) => radii.as_array().map(|radius| radius + expansion),
-        LayerMask::None | LayerMask::Bounds => [0.0; 4],
+        LayerMask::Bounds => [0.0; 4],
+        LayerMask::None => [-1.0; 4],
     }
 }

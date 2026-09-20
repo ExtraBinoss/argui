@@ -98,6 +98,7 @@ pub struct SurfaceRenderer {
     renderer_config: RendererConfig,
     batches: Vec<DrawBatch>,
     text_ranges: Vec<std::ops::Range<u32>>,
+    text_bounds: Vec<Option<argui_core::Rect>>,
     quad: QuadGpu,
     text: TextGpu,
     image: ImageGpu,
@@ -200,7 +201,7 @@ impl SurfaceRenderer {
         }
         let effect = EffectGpu::new(&device, target_format, maximum_parameter_words);
         let damage = DamageGpu::new(&device, target_format);
-        let offscreen = TexturePool::new(target_format, 128 * 1024 * 1024);
+        let offscreen = TexturePool::new(target_format, 32 * 1024 * 1024);
         let gpu_profiler = GpuProfiler::new(&adapter, &device, &queue, renderer_config.profiling);
 
         let profiling_active = renderer_config.profiling;
@@ -215,6 +216,7 @@ impl SurfaceRenderer {
             renderer_config,
             batches: Vec::new(),
             text_ranges: Vec::new(),
+            text_bounds: Vec::new(),
             quad,
             text,
             image,
@@ -265,6 +267,7 @@ impl SurfaceRenderer {
                 self.vector.clear_frame_stats();
                 self.gpu_canvas.clear_frame_stats();
                 self.batches.clear();
+                self.text_bounds.clear();
             }
             FrameContent::Text { engine, text } => {
                 self.vector.clear_frame_stats();
@@ -278,6 +281,7 @@ impl SurfaceRenderer {
                         instances: range,
                     });
                 }
+                self.text_bounds.clear();
             }
             FrameContent::Ui {
                 engine,
@@ -315,6 +319,7 @@ impl SurfaceRenderer {
                     self.content_revision = self.content_revision.wrapping_add(1);
                 }
                 self.text_ranges = draw.ranges().to_vec();
+                self.text_bounds = draw.bounds().to_vec();
                 build_batches(display_list, &self.text_ranges, &mut self.batches);
                 let graph = EffectGraph::build(
                     display_list,
@@ -327,23 +332,25 @@ impl SurfaceRenderer {
                 let additional_effect_passes = self.validate_custom_effects(&graph)?;
                 graph_stats = graph.stats();
                 graph_stats.filter_passes += additional_effect_passes;
-                let snapshot = DamageSnapshot::capture(
-                    display_list,
-                    text,
-                    draw.bounds(),
-                    [viewport[0] as u32, viewport[1] as u32],
-                    scale_factor,
-                );
-                let mut damage_plan = scene_damage(
-                    self.scene_snapshot.as_ref(),
-                    &snapshot,
-                    self.renderer_config.damage_tracking,
-                    &self.renderer_config.effects,
-                );
-                if content_changed && damage_plan == DamagePlan::Unchanged {
-                    damage_plan = DamagePlan::Full;
+                if self.renderer_config.damage_tracking.enabled {
+                    let snapshot = DamageSnapshot::capture(
+                        display_list,
+                        text,
+                        draw.bounds(),
+                        [viewport[0] as u32, viewport[1] as u32],
+                        scale_factor,
+                    );
+                    let mut damage_plan = scene_damage(
+                        self.scene_snapshot.as_ref(),
+                        &snapshot,
+                        self.renderer_config.damage_tracking,
+                        &self.renderer_config.effects,
+                    );
+                    if content_changed && damage_plan == DamagePlan::Unchanged {
+                        damage_plan = DamagePlan::Full;
+                    }
+                    scene_update = Some((snapshot, damage_plan));
                 }
-                scene_update = Some((snapshot, damage_plan));
                 effect_graph = Some(graph);
             }
             FrameContent::Composite {
@@ -363,6 +370,23 @@ impl SurfaceRenderer {
                 let additional_effect_passes = self.validate_custom_effects(&graph)?;
                 graph_stats = graph.stats();
                 graph_stats.filter_passes += additional_effect_passes;
+                if self.renderer_config.damage_tracking.enabled
+                    && let Some(previous) = self.scene_snapshot.as_ref()
+                {
+                    let snapshot = previous.capture_composite(
+                        display_list,
+                        &self.text_bounds,
+                        [viewport[0] as u32, viewport[1] as u32],
+                        scale_factor,
+                    );
+                    let damage_plan = scene_damage(
+                        Some(previous),
+                        &snapshot,
+                        self.renderer_config.damage_tracking,
+                        &self.renderer_config.effects,
+                    );
+                    scene_update = Some((snapshot, damage_plan));
+                }
                 effect_graph = Some(graph);
             }
         }
@@ -412,6 +436,7 @@ impl SurfaceRenderer {
         }
         self.effect_root = None;
         self.layer_cache.clear();
+        self.offscreen.clear();
         self.effect.begin_frame();
         let (damage_profile, direct_surface) = match scene_update {
             Some((snapshot, DamagePlan::Partial(regions))) => {
