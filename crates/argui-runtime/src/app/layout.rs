@@ -19,14 +19,18 @@ impl Application {
                 nodes: layout
                     .nodes
                     .iter()
-                    .map(|node| LayoutBounds {
-                        node: node.node,
-                        key: self
+                    .map(|node| {
+                        let element = self
                             .ui_tree
                             .as_ref()
-                            .and_then(|ui| ui.key(node.node))
-                            .map(ToOwned::to_owned),
-                        bounds: node.bounds,
+                            .and_then(|ui| ui.element_for(node.node));
+                        LayoutBounds {
+                            node: node.node,
+                            key: element.and_then(|element| element.key.clone()),
+                            retained_identity: element
+                                .and_then(|element| element.source_identity().cloned()),
+                            bounds: node.bounds,
+                        }
                     })
                     .collect(),
             };

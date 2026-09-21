@@ -10,6 +10,7 @@ use argui_ui::{Axes, Dimension, EffectScope, Element, ElementKind, Interaction, 
 
 mod cache;
 mod memory;
+mod values;
 
 #[test]
 fn custom_phase_diagnostics_report_retained_work_and_ignore_removed_nodes() {

@@ -1,0 +1,23 @@
+import { Switch } from "@argui/ui"
+import { Column, Text } from "@argui/native"
+
+export component SwitchPage {
+    private property notifications: bool = true
+    private property analytics: bool = false
+
+    Column #switch_page {
+        width: 100%
+        gap: 20.0
+
+        Text { content: "Switch" color: var(--argui-foreground) weight: 700 font_size: 27.0 }
+        Text { content: "A theme-aware toggle with keyboard activation and a checked accessibility state." color: var(--argui-muted-foreground) font_size: 14.0 }
+        Switch { label: "Notifications" checked: notifications on click { notifications = !notifications } }
+        Switch { label: "Analytics" checked: analytics on click { analytics = !analytics } }
+        Switch { label: "Unavailable" checked: false enabled: false }
+        Text {
+            content: notifications ? "Notifications enabled" : "Notifications disabled"
+            color: var(--argui-muted-foreground)
+            font_size: 13.0
+        }
+    }
+}

@@ -169,7 +169,9 @@ fn document_selection_uses_glyph_regions_and_paints_without_relayout() {
     );
     assert!(output.document_selection_bounds(&ui).is_some());
     assert!(output.display_list.commands().iter().any(|command| {
-        matches!(command, DisplayCommand::Quad(quad) if quad.background == Some(Fill::Solid(color)))
+        matches!(command, DisplayCommand::Quad(quad)
+            if quad.background == Some(Fill::Solid(color))
+                && quad.radii == CornerRadii::all(3.0))
     }));
 }
 

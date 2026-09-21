@@ -30,6 +30,8 @@ pub enum GradientError {
     TooFewStops,
     InvalidOffset,
     UnsortedStops,
+    MismatchedStops,
+    InvalidInterpolation,
 }
 
 impl core::fmt::Display for GradientError {
@@ -206,6 +208,42 @@ impl RadialGradient {
         Self {
             center,
             radius,
+            interpolation,
+            stops,
+        }
+    }
+}
+
+/// Angular gradient around a relative center, using any validated stop count.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ConicGradient {
+    /// Center in unit-relative quad coordinates.
+    pub center: Point,
+    /// Starting angle in degrees, measured clockwise from the positive x axis.
+    pub start_angle: f32,
+    /// Color space used to interpolate neighboring stops.
+    pub interpolation: ColorInterpolation,
+    /// Ordered color stops around one complete revolution.
+    pub stops: GradientStops,
+}
+
+impl ConicGradient {
+    /// Creates a conic gradient from validated, reusable stops.
+    ///
+    /// * `center` — relative center of the gradient.
+    /// * `start_angle` — clockwise starting angle in degrees.
+    /// * `interpolation` — color interpolation space.
+    /// * `stops` — at least two ordered stops between zero and one.
+    #[must_use]
+    pub const fn with_stops(
+        center: Point,
+        start_angle: f32,
+        interpolation: ColorInterpolation,
+        stops: GradientStops,
+    ) -> Self {
+        Self {
+            center,
+            start_angle,
             interpolation,
             stops,
         }

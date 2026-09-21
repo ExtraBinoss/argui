@@ -67,6 +67,7 @@ fn command_shortcuts_support_control_command_and_keyboard_layout_variants() {
     let mut unrelated = key("x", control);
     unrelated.key = Key::Other;
     assert_eq!(ZoomCommand::from_key_input(&unrelated), None);
+    assert_eq!(ZoomCommand::from_key_input(&key("x", control)), None);
 }
 
 #[test]
@@ -98,4 +99,19 @@ fn wheel_and_native_magnification_are_continuous_bounded_and_ignore_invalid_samp
     assert_eq!(magnify_zoom(1.0, 0.25), Some(1.25));
     assert_eq!(magnify_zoom(0.5, -0.5), None);
     assert_eq!(magnify_zoom(1.0, f64::NAN), None);
+}
+
+#[test]
+fn zero_motion_is_not_a_zoom_request_and_negative_motion_respects_the_lower_bound() {
+    use argui_core::ScrollDelta;
+
+    assert_eq!(wheel_zoom(1.0, ScrollDelta::Lines(Point::default())), None);
+    assert_eq!(magnify_zoom(1.0, 0.0), None);
+    assert_eq!(
+        wheel_zoom(0.5, ScrollDelta::Lines(Point::new(0.0, -8.0))),
+        None
+    );
+    let reduced = wheel_zoom(1.0, ScrollDelta::Pixels(Point::new(0.0, -50.0))).unwrap();
+    assert!(reduced < 1.0 && reduced > 0.5);
+    assert_eq!(magnify_zoom(1.0, f64::INFINITY), None);
 }

@@ -1,0 +1,27 @@
+[package]
+name = "argui-example-widget-gallery-dsl"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+description = "Responsive widget gallery authored in Argui DSL"
+build = "build.rs"
+
+[features]
+argui-live = ["argui/tasks", "dep:argui-dsl-runtime"]
+
+[dependencies]
+argui.workspace = true
+argui-effects = { workspace = true, features = ["scroll"] }
+argui-dsl-runtime = { path = "../../crates/argui-dsl/dsl-runtime", optional = true }
+
+[build-dependencies]
+argui-dsl-build = { path = "../../crates/argui-dsl/dsl-build" }
+
+[dev-dependencies]
+argui-testing.workspace = true
+
+[lints]
+workspace = true

@@ -114,6 +114,7 @@ fn mounted_gallery_delivers_pad_bounds_to_the_lazy_page() {
                     nodes: vec![LayoutBounds {
                         node,
                         key: Some("gallery-color::pad".into()),
+                        retained_identity: None,
                         bounds: Rect::new(Point::new(100.0, 100.0), Size::new(200.0, 100.0)),
                     }],
                 },

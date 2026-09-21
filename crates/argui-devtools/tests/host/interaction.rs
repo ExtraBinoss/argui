@@ -33,6 +33,7 @@ fn layout_reaches_only_the_child_presentation_of_the_target_devtools_mount() {
         nodes: vec![LayoutBounds {
             node: tree.node_id_at(0).unwrap(),
             key: Some("__devtools-app-root".into()),
+            retained_identity: None,
             bounds,
         }],
     };
@@ -469,16 +470,19 @@ fn render_listener_forwards_clipboard_focus_and_scroll_effects() {
                 LayoutBounds {
                     node,
                     key: Some("__devtools-frames".into()),
+                    retained_identity: None,
                     bounds: Rect::new(Point::default(), Size::new(900.0, 180.0)),
                 },
                 LayoutBounds {
                     node,
                     key: Some("__devtools-tree".into()),
+                    retained_identity: None,
                     bounds: Rect::new(Point::default(), Size::new(300.0, 240.0)),
                 },
                 LayoutBounds {
                     node,
                     key: Some("__devtools-app-root".into()),
+                    retained_identity: None,
                     bounds: Rect::new(Point::new(2.0, 3.0), Size::new(800.0, 500.0)),
                 },
             ],

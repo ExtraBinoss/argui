@@ -185,11 +185,7 @@ pub(crate) fn themes(
                 .filter_map(|node| {
                     let name = direct_name_or_theme(&node)?;
                     Some(IrThemeMode {
-                        id: ThemeModeId::from_raw(derive(
-                            definition.id.raw(),
-                            "mode",
-                            hash_text(&name),
-                        )),
+                        id: ThemeModeId::from_raw(hash_text(&name)),
                         overrides: assignments(&node)
                             .filter_map(|assignment| {
                                 let name = direct_name_or_theme(&assignment)?;
@@ -527,7 +523,12 @@ pub(crate) fn child_expression(node: &SyntaxNode) -> Option<SyntaxNode> {
 pub(crate) fn direct_name_or_theme(node: &SyntaxNode) -> Option<String> {
     node.children_with_tokens()
         .filter_map(|element| element.into_token())
-        .find(|token| matches!(token.kind(), SyntaxKind::Ident | SyntaxKind::ThemeName))
+        .find(|token| {
+            matches!(
+                token.kind(),
+                SyntaxKind::Ident | SyntaxKind::ThemeName | SyntaxKind::FromKw
+            )
+        })
         .map(|token| token.text().to_string())
 }
 

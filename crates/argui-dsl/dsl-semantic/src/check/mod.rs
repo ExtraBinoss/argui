@@ -167,22 +167,68 @@ fn resolve_imports(
                 }
                 continue;
             }
-            if import.source == "@argui/ui" {
-                let standard = path_indices
-                    .get("@argui/ui")
-                    .and_then(|target| modules.get(*target));
-                if let Some(target) = path_indices.get("@argui/ui").copied()
-                    && target != index
-                {
-                    edges[index].push(target);
-                }
+            if import.source == "@argui/icons" {
                 for item in &import.items {
-                    if let Some(definition) = standard.and_then(|module| {
-                        module
-                            .definitions
-                            .iter()
-                            .find(|definition| definition.name == item.name && definition.exported)
-                    }) {
+                    if !cfg!(feature = "icons") {
+                        diagnostics.push(Diagnostic::error(
+                            DiagnosticCode::UnresolvedImport,
+                            "@argui/icons requires the `icons` feature",
+                            item.span,
+                        ));
+                        continue;
+                    }
+                    let target_path = format!("@argui/icons/{}.argui", item.name);
+                    let Some(target) = path_indices.get(&target_path).copied() else {
+                        diagnostics.push(Diagnostic::error(
+                            DiagnosticCode::UnresolvedImport,
+                            format!("`{}` is not exported by @argui/icons", item.name),
+                            item.span,
+                        ));
+                        continue;
+                    };
+                    let Some(definition) = modules[target]
+                        .definitions
+                        .iter()
+                        .find(|definition| definition.name == item.name && definition.exported)
+                    else {
+                        diagnostics.push(Diagnostic::error(
+                            DiagnosticCode::UnresolvedImport,
+                            format!("`{}` is not exported by @argui/icons", item.name),
+                            item.span,
+                        ));
+                        continue;
+                    };
+                    if target != index {
+                        edges[index].push(target);
+                    }
+                    scopes[index]
+                        .symbols
+                        .insert(item.alias.clone(), definition.id);
+                }
+                continue;
+            }
+            if import.source == "@argui/ui" {
+                for item in &import.items {
+                    if let Some((target, definition)) =
+                        modules.iter().enumerate().find_map(|(target, standard)| {
+                            standard
+                                .path
+                                .starts_with("@argui/ui/")
+                                .then(|| {
+                                    standard
+                                        .definitions
+                                        .iter()
+                                        .find(|definition| {
+                                            definition.name == item.name && definition.exported
+                                        })
+                                        .map(|definition| (target, definition))
+                                })
+                                .flatten()
+                        })
+                    {
+                        if target != index {
+                            edges[index].push(target);
+                        }
                         scopes[index]
                             .symbols
                             .insert(item.alias.clone(), definition.id);

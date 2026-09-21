@@ -8,9 +8,15 @@ pub(crate) struct ScrollAnchor {
     container: NodeId,
     target: NodeId,
     relative: Point,
+    offset: Point,
 }
 
-pub(crate) fn capture(root: &NodeMap, output: &LayoutOutput) -> Vec<ScrollAnchor> {
+/// Captures visible keyed content and its current logical scroll position.
+///
+/// `root` is the layout tree, `output` supplies painted bounds, and `ui`
+/// supplies each viewport's logical offset. The returned anchors distinguish
+/// later user scrolling from a content shift during relayout.
+pub(crate) fn capture(root: &NodeMap, output: &LayoutOutput, ui: &UiTree) -> Vec<ScrollAnchor> {
     output
         .scroll_regions
         .iter()
@@ -25,6 +31,7 @@ pub(crate) fn capture(root: &NodeMap, output: &LayoutOutput) -> Vec<ScrollAnchor
                     target.bounds.origin.x - region.bounds.origin.x,
                     target.bounds.origin.y - region.bounds.origin.y,
                 ),
+                offset: ui.scroll_offset(region.node),
             })
         })
         .collect()
@@ -59,6 +66,10 @@ fn first_visible_keyed<'a>(
         })
 }
 
+/// Compensates content movement without undoing a user-initiated scroll.
+///
+/// `anchors` are from the previous layout, `ui` is the current retained tree,
+/// and `output` is the new layout. Returns whether an offset changed.
 pub(crate) fn apply(anchors: &[ScrollAnchor], ui: &mut UiTree, output: &LayoutOutput) -> bool {
     anchors.iter().fold(false, |changed, anchor| {
         let Some(region) = output
@@ -76,12 +87,16 @@ pub(crate) fn apply(anchors: &[ScrollAnchor], ui: &mut UiTree, output: &LayoutOu
             target.bounds.origin.y - region.bounds.origin.y,
         );
         let mut offset = ui.scroll_offset(region.node);
+        let movement = Point::new(
+            relative.x + offset.x - anchor.relative.x - anchor.offset.x,
+            relative.y + offset.y - anchor.relative.y - anchor.offset.y,
+        );
         match region.config.axes {
-            ScrollAxes::Horizontal => offset.x += relative.x - anchor.relative.x,
-            ScrollAxes::Vertical => offset.y += relative.y - anchor.relative.y,
+            ScrollAxes::Horizontal => offset.x += movement.x,
+            ScrollAxes::Vertical => offset.y += movement.y,
             ScrollAxes::Both => {
-                offset.x += relative.x - anchor.relative.x;
-                offset.y += relative.y - anchor.relative.y;
+                offset.x += movement.x;
+                offset.y += movement.y;
             }
         }
         offset.x = offset.x.clamp(0.0, region.max_offset.x);

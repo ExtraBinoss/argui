@@ -1,5 +1,9 @@
 #![cfg(not(target_arch = "wasm32"))]
 
+#[cfg(unix)]
+#[path = "dashboard/console.rs"]
+mod console;
+
 use std::{net::SocketAddr, path::Path};
 
 use argui_cli::{
@@ -68,7 +72,111 @@ fn dashboard_shows_client_rejection_and_survives_small_terminals() {
     assert_eq!(dashboard.phase(), DevPhase::Rejected);
     assert_eq!(dashboard.phase().ratio(), 1.0);
     assert!(rendered(&dashboard, 80, 18).contains("incompatible property"));
-    let _ = rendered(&dashboard, 12, 4);
+    assert!(rendered(&dashboard, 12, 4).contains("Argui dev:"));
+    assert!(rendered(&dashboard, 40, 8).contains("REJECTED"));
+    assert!(!rendered(&dashboard, 80, 18).contains("no mouse input"));
+}
+
+#[test]
+fn dashboard_progress_has_a_visible_gradient_in_full_and_compact_layouts() {
+    let native: SocketAddr = "127.0.0.1:4777".parse().unwrap();
+    let browser: SocketAddr = "127.0.0.1:4778".parse().unwrap();
+    let mut dashboard = DevDashboard::new(Path::new("project"), native, browser);
+    dashboard.client_status(native, &LiveMessage::Committed { generation: 8 });
+    for (width, height) in [(100, 20), (48, 9)] {
+        let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
+        terminal.draw(|frame| dashboard.render(frame)).unwrap();
+        let buffer = terminal.backend().buffer();
+        let filled = buffer
+            .content()
+            .iter()
+            .filter(|cell| cell.symbol() == "━")
+            .map(|cell| cell.fg)
+            .collect::<Vec<_>>();
+        assert!(
+            filled.len() > 10,
+            "progress is not visible at {width}x{height}"
+        );
+        assert_ne!(
+            filled.first(),
+            filled.last(),
+            "gradient is flat at {width}x{height}"
+        );
+    }
+}
+
+#[test]
+fn dashboard_locates_diagnostics_and_keeps_latest_long_error_visible() {
+    let directory = tempfile::tempdir().unwrap();
+    std::fs::create_dir(directory.path().join("ui")).unwrap();
+    std::fs::write(
+        directory.path().join("ui/main.argui"),
+        "export component Main {\n    gap: 100zzz8.0\n}\n",
+    )
+    .unwrap();
+    let native: SocketAddr = "127.0.0.1:4777".parse().unwrap();
+    let browser: SocketAddr = "127.0.0.1:4778".parse().unwrap();
+    let mut dashboard = DevDashboard::new(directory.path(), native, browser);
+    let diagnostic = DiagnosticMessage {
+        path: Some("ui/main.argui".into()),
+        start: Some(33),
+        end: Some(43),
+        severity: Severity::Error,
+        code: "InvalidNumber".into(),
+        message: "invalid numeric literal `100zzz8.0`".into(),
+    };
+    assert_eq!(
+        dashboard.diagnostic_location(&diagnostic),
+        "ui/main.argui:2:10"
+    );
+    dashboard.compilation(&LiveMessage::Diagnostics {
+        generation: 5,
+        diagnostics: vec![diagnostic],
+    });
+    let screen = rendered(&dashboard, 48, 9);
+    assert!(screen.contains("InvalidNumber"));
+    assert!(screen.contains("100zzz8.0"));
+}
+
+/// Missing location metadata and unavailable source retain useful fallbacks.
+#[test]
+fn dashboard_diagnostic_locations_fall_back_without_source_bytes() {
+    let root = tempfile::tempdir().unwrap();
+    let native: SocketAddr = "127.0.0.1:4777".parse().unwrap();
+    let browser: SocketAddr = "127.0.0.1:4778".parse().unwrap();
+    let dashboard = DevDashboard::new(root.path(), native, browser);
+    let mut diagnostic = DiagnosticMessage {
+        path: None,
+        start: None,
+        end: None,
+        severity: Severity::Error,
+        code: "MissingSource".into(),
+        message: "source unavailable".into(),
+    };
+    assert_eq!(
+        dashboard.diagnostic_location(&diagnostic),
+        "source location unavailable"
+    );
+    diagnostic.path = Some("ui/missing.argui".into());
+    assert_eq!(
+        dashboard.diagnostic_location(&diagnostic),
+        "ui/missing.argui"
+    );
+    diagnostic.start = Some(27);
+    assert_eq!(
+        dashboard.diagnostic_location(&diagnostic),
+        "ui/missing.argui:byte 27"
+    );
+
+    std::fs::write(root.path().join("main.argui"), "Text { content: \"é\" }\n").unwrap();
+    diagnostic.path = Some("main.argui".into());
+    diagnostic.start = Some(18);
+    assert_eq!(
+        dashboard.diagnostic_location(&diagnostic),
+        "main.argui:1:18"
+    );
+    diagnostic.start = Some(u32::MAX);
+    assert_eq!(dashboard.diagnostic_location(&diagnostic), "main.argui:2:1");
 }
 
 /// Builds a minimal package so phase transitions can be tested without a compiler.
@@ -220,6 +328,73 @@ fn dashboard_renders_partially_located_changes_and_empty_compilations() {
     let screen = rendered(&dashboard, 110, 20);
     assert!(screen.contains("ui/line-only.argui"));
     assert!(screen.contains("ui/column-only.argui"));
+}
+
+/// Diagnostic locations handle unavailable sources, incomplete spans, and UTF-8 boundaries.
+#[test]
+fn dashboard_diagnostic_locations_cover_missing_and_multibyte_sources() {
+    let directory = tempfile::tempdir().unwrap();
+    std::fs::create_dir(directory.path().join("ui")).unwrap();
+    std::fs::write(
+        directory.path().join("ui/main.argui"),
+        "éclair\nButton {}\n",
+    )
+    .unwrap();
+    let native: SocketAddr = "127.0.0.1:4777".parse().unwrap();
+    let browser: SocketAddr = "127.0.0.1:4778".parse().unwrap();
+    let dashboard = DevDashboard::new(directory.path(), native, browser);
+    let mut diagnostic = DiagnosticMessage {
+        path: None,
+        start: None,
+        end: None,
+        severity: Severity::Error,
+        code: "Test".into(),
+        message: "test diagnostic".into(),
+    };
+    assert_eq!(
+        dashboard.diagnostic_location(&diagnostic),
+        "source location unavailable"
+    );
+    diagnostic.path = Some("ui/main.argui".into());
+    assert_eq!(dashboard.diagnostic_location(&diagnostic), "ui/main.argui");
+    diagnostic.start = Some(1);
+    assert_eq!(
+        dashboard.diagnostic_location(&diagnostic),
+        "ui/main.argui:1:1"
+    );
+    diagnostic.start = Some(u32::MAX);
+    assert_eq!(
+        dashboard.diagnostic_location(&diagnostic),
+        "ui/main.argui:3:1"
+    );
+    diagnostic.path = Some("ui/missing.argui".into());
+    assert_eq!(
+        dashboard.diagnostic_location(&diagnostic),
+        format!("ui/missing.argui:byte {}", diagnostic.start.unwrap())
+    );
+}
+
+/// Terminal breakpoints preserve a legible status at their exact minimum dimensions.
+#[test]
+fn dashboard_renders_at_small_and_compact_breakpoint_edges() {
+    let native: SocketAddr = "127.0.0.1:4777".parse().unwrap();
+    let browser: SocketAddr = "127.0.0.1:4778".parse().unwrap();
+    let mut dashboard = DevDashboard::new(Path::new("project"), native, browser);
+    dashboard.note("latest activity", Color::Cyan);
+    for (width, height, expected) in [
+        (27, 7, "Argui dev:"),
+        (28, 6, "Argui dev:"),
+        (28, 7, "WATCHING"),
+        (67, 20, "WATCHING"),
+        (68, 12, "WATCHING"),
+        (68, 13, "WATCHING"),
+    ] {
+        let screen = rendered(&dashboard, width, height);
+        assert!(
+            screen.contains(expected),
+            "missing {expected:?} at {width}x{height}: {screen:?}"
+        );
+    }
 }
 
 #[test]

@@ -27,7 +27,7 @@ impl Context<'_> {
             Type::Border => "::argui::paint::Border".into(),
             Type::Shadow => "::argui::paint::Shadow".into(),
             Type::Transform => "::argui::core::Transform2D".into(),
-            Type::Asset => "&'static [u8]".into(),
+            Type::Asset => "::argui::schema::AssetHandle".into(),
             Type::Struct(symbol) | Type::Enum(symbol) => self
                 .definitions
                 .get(symbol)
@@ -133,7 +133,9 @@ impl Context<'_> {
             | Type::LineHeight => "0.0_f32".into(),
             Type::String | Type::FontFamily | Type::FontWeight => "String::new()".into(),
             Type::Color => "::argui::core::Color::TRANSPARENT".into(),
-            Type::Asset => "&[]".into(),
+            Type::Asset => {
+                "::argui::schema::AssetHandle::Image(::argui::paint::ImageId::fresh())".into()
+            }
             Type::Array(_) | Type::Model(_) => "Vec::new()".into(),
             Type::Optional(_) => "None".into(),
             Type::Void => "()".into(),

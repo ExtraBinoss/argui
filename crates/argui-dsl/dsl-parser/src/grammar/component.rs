@@ -90,6 +90,10 @@ fn slot_decl(parser: &mut Parser<'_>) {
     parser.start(SyntaxKind::SlotDecl);
     parser.bump();
     parser.expect(SyntaxKind::Ident, "expected slot name");
+    if parser.at(SyntaxKind::Colon) {
+        parser.bump();
+        parser.expect(SyntaxKind::Ident, "expected slot kind after `:`");
+    }
     parser.finish();
 }
 
@@ -245,7 +249,76 @@ fn animate(parser: &mut Parser<'_>) {
     parser.start(SyntaxKind::AnimateDecl);
     parser.bump();
     parser.expect(SyntaxKind::Ident, "expected animated property name");
-    property_block(parser);
+    parser.start(SyntaxKind::Block);
+    parser.expect(
+        SyntaxKind::LBrace,
+        "expected `{` after animated property name",
+    );
+    while !parser.at(SyntaxKind::RBrace) && !parser.at(SyntaxKind::Eof) {
+        if parser.at(SyntaxKind::Ident)
+            && parser.text() == "keyframes"
+            && parser.nth_kind(1) == SyntaxKind::LBrace
+        {
+            keyframes(parser);
+        } else if parser.at(SyntaxKind::Ident) && parser.nth_kind(1) == SyntaxKind::LBrace {
+            parser.start(SyntaxKind::StyleStateDecl);
+            parser.bump();
+            property_block(parser);
+            parser.finish();
+        } else if matches!(parser.kind(), SyntaxKind::Ident | SyntaxKind::FromKw) {
+            animation_assignment(parser);
+        } else {
+            parser.recover("expected an animation parameter or driver block");
+        }
+    }
+    parser.expect(SyntaxKind::RBrace, "expected `}` after animation");
+    parser.finish();
+    parser.finish();
+}
+
+/// Parses an animation parameter, accepting the contextual `in-out` policy.
+///
+/// * `parser` — active parser positioned at a parameter name.
+fn animation_assignment(parser: &mut Parser<'_>) {
+    if parser.text() != "transition"
+        || parser.nth_kind(1) != SyntaxKind::Colon
+        || parser.nth_kind(2) != SyntaxKind::InOutKw
+    {
+        assignment(parser);
+        return;
+    }
+    parser.start(SyntaxKind::PropertyAssignment);
+    parser.bump();
+    parser.bump();
+    parser.start(SyntaxKind::Expr);
+    parser.start(SyntaxKind::PathExpr);
+    parser.bump();
+    parser.finish();
+    parser.finish();
+    if parser.at(SyntaxKind::Semicolon) {
+        parser.bump();
+    }
+    parser.finish();
+}
+
+/// Parses typed value stops inside one animation timeline.
+///
+/// * `parser` — active parser positioned at `keyframes`.
+fn keyframes(parser: &mut Parser<'_>) {
+    parser.start(SyntaxKind::KeyframesDecl);
+    parser.bump();
+    parser.expect(SyntaxKind::LBrace, "expected `{` after `keyframes`");
+    while !parser.at(SyntaxKind::RBrace) && !parser.at(SyntaxKind::Eof) {
+        parser.start(SyntaxKind::KeyframeDecl);
+        parser.expect(SyntaxKind::Number, "expected percentage keyframe offset");
+        parser.expect(SyntaxKind::Colon, "expected `:` after keyframe offset");
+        expression::expression(parser);
+        if matches!(parser.kind(), SyntaxKind::Comma | SyntaxKind::Semicolon) {
+            parser.bump();
+        }
+        parser.finish();
+    }
+    parser.expect(SyntaxKind::RBrace, "expected `}` after keyframes");
     parser.finish();
 }
 
@@ -261,7 +334,10 @@ pub(super) fn property_block(parser: &mut Parser<'_>) {
             parser.bump();
             property_block(parser);
             parser.finish();
-        } else if matches!(parser.kind(), SyntaxKind::Ident | SyntaxKind::ThemeName) {
+        } else if matches!(
+            parser.kind(),
+            SyntaxKind::Ident | SyntaxKind::ThemeName | SyntaxKind::FromKw
+        ) {
             assignment(parser);
         } else {
             parser.recover("expected a style property or state block");

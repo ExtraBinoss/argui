@@ -21,8 +21,10 @@ pub enum DiagnosticCode {
     BindingCycle,
     ThemeCycle,
     MissingRepeaterKey,
+    InvalidNumber,
     InvalidEffect,
     InvalidAsset,
+    InvalidAnimation,
 }
 
 /// Diagnostic importance used consistently by CLI, LSP, and live development.

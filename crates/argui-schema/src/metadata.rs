@@ -21,6 +21,8 @@ pub struct PropertySchema {
     pub required: bool,
     pub default: Option<SchemaValue>,
     pub change_event: Option<EventId>,
+    /// Whether the property supports declarative visual interpolation.
+    pub animatable: bool,
     pub documentation: String,
 }
 
@@ -45,6 +47,7 @@ impl PropertySchema {
             required: false,
             default: None,
             change_event: None,
+            animatable: true,
             documentation: documentation.into(),
         }
     }
@@ -71,6 +74,13 @@ impl PropertySchema {
     #[must_use]
     pub const fn changed_by(mut self, event: EventId) -> Self {
         self.change_event = Some(event);
+        self
+    }
+
+    /// Rejects declarative animation for a structural property that cannot be sampled independently.
+    #[must_use]
+    pub const fn not_animatable(mut self) -> Self {
+        self.animatable = false;
         self
     }
 }

@@ -1,0 +1,52 @@
+import { VirtualList, Separator } from "@argui/ui"
+import { Column, Row, Text } from "@argui/native"
+
+export component VirtualListPage {
+    private property entries: array<string> = [
+        "Button", "Input", "Card", "Badge", "Separator", "Switch", "Media",
+        "Accordion", "Alert", "Avatar", "Breadcrumb", "Calendar", "Checkbox",
+        "Dialog", "Dropdown", "Form", "Hover card", "Menu", "Pagination",
+        "Popover", "Progress", "Radio group", "Scroll area", "Select", "Slider",
+        "Table", "Tabs", "Textarea", "Toast", "Tooltip"
+    ]
+    private property list_offset: float = 0.0
+
+    Column #virtual_list_page {
+        width: 100%
+        gap: 18.0
+
+        Text { content: "Virtual List" color: var(--argui-foreground) weight: 700 font_size: 27.0 }
+        Text { content: "One reusable DSL component renders only visible rows, with a full-height scrollbar and scroll-edge shadows." color: var(--argui-muted-foreground) font_size: 14.0 }
+        Text { content: "Scroll through 30 catalogue entries" color: var(--argui-foreground) weight: 600 font_size: 16.0 }
+
+        Column {
+            width: 100%
+            height: 360px
+            min_height: 0.0
+            VirtualList #examples {
+                row_height: 48.0
+                overscan: 3
+                offset <=> list_offset
+                scrollbar_thumb: var(--argui-scrollbar-thumb)
+                edge_shadow_width: 16.0
+                edge_shadow_intensity: 0.18
+                edge_shadow_color: var(--argui-foreground)
+                for entry in entries key entry {
+                    Column {
+                        width: 100%
+                        height: 48px
+                        background: var(--argui-surface)
+                        Row {
+                            width: 100%
+                            height: 47px
+                            padding: 12.0
+                            Text { content: entry color: var(--argui-foreground) font_size: 14.0 }
+                        }
+                        Separator {}
+                    }
+                }
+            }
+        }
+        Text { content: "Scroll offset: " + str(list_offset) + " px" color: var(--argui-muted-foreground) font_size: 12.0 }
+    }
+}

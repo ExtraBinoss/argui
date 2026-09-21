@@ -11,6 +11,9 @@ use argui_ui::{
 };
 use std::sync::atomic::{AtomicU32, Ordering};
 
+#[path = "event/listener/color.rs"]
+mod color;
+
 static NEXT_LISTENER: AtomicU32 = AtomicU32::new(0);
 
 trait TestListen {

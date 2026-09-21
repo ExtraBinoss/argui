@@ -37,6 +37,31 @@ fn generic_ids_construct_native_elements_without_name_dispatch() {
 }
 
 #[test]
+fn every_builtin_visual_element_exposes_group_opacity() {
+    let registry = builtin::registry().unwrap();
+    for native in registry.schemas() {
+        assert!(
+            native
+                .properties
+                .iter()
+                .any(|property| property.id == builtin::OPACITY
+                    && property.value_type == ValueType::Float),
+            "{} lacks group opacity",
+            native.name
+        );
+    }
+    let text = registry
+        .construct(
+            builtin::TEXT,
+            &NativeElementInput::new()
+                .property(builtin::CONTENT, SchemaValue::String("fade".into()))
+                .property(builtin::OPACITY, SchemaValue::Float(0.25)),
+        )
+        .unwrap();
+    assert_eq!(text.layer.as_ref().unwrap().opacity, 0.25);
+}
+
+#[test]
 fn registry_types_and_adapter_level_cross_property_rules_are_enforced() {
     let registry = builtin::registry().unwrap();
     let error = registry
@@ -152,6 +177,57 @@ fn disabled_pressable_has_noninteractive_accessible_semantics() {
             .as_ref()
             .is_some_and(|interaction| !interaction.enabled)
     );
+}
+
+/// Busy selection triggers expose correct accessibility and suppress tooltips.
+#[test]
+fn busy_select_trigger_is_inert_and_expanded() {
+    let registry = builtin::registry().unwrap();
+    let trigger = registry
+        .construct(
+            builtin::PRESSABLE,
+            &NativeElementInput::new()
+                .property(builtin::KEY, SchemaValue::String("theme".into()))
+                .property(builtin::LABEL, SchemaValue::String("Theme".into()))
+                .property(
+                    builtin::TOOLTIP,
+                    SchemaValue::String("Choose appearance".into()),
+                )
+                .property(builtin::BUSY, SchemaValue::Bool(true))
+                .property(builtin::SELECT_TRIGGER, SchemaValue::Bool(true))
+                .property(builtin::EXPANDED, SchemaValue::Bool(true)),
+        )
+        .unwrap();
+    let semantics = trigger.semantics.as_ref().unwrap();
+    assert_eq!(semantics.role, argui_ui::Role::ComboBox);
+    assert!(semantics.state.busy);
+    assert!(semantics.state.disabled);
+    assert_eq!(semantics.state.expanded, Some(true));
+    assert!(trigger.tooltip.is_none());
+    assert!(
+        trigger
+            .interaction
+            .as_ref()
+            .is_some_and(|value| !value.enabled)
+    );
+}
+
+/// The DSL popover primitive creates an anchored portal with dismiss handling.
+#[test]
+fn popover_panel_keeps_its_anchor_and_dismiss_listener() {
+    let registry = builtin::registry().unwrap();
+    let handler = EventHandler::from_identity(EventHandlerId::new(EventOwnerId(9), 1));
+    let panel = registry
+        .construct(
+            builtin::POPOVER_PANEL,
+            &NativeElementInput::new()
+                .property(builtin::ANCHOR, SchemaValue::String("theme-anchor".into()))
+                .property(builtin::KEY, SchemaValue::String("theme-options".into()))
+                .event(NativeEventValue::new(builtin::DISMISS, handler)),
+        )
+        .unwrap();
+    assert!(panel.portal.is_some());
+    assert_eq!(panel.event_listeners[0].event, EventType::Dismiss);
 }
 
 #[test]

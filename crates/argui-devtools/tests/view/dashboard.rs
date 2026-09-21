@@ -231,6 +231,7 @@ fn profiling_has_one_scrollport_per_pane_and_reserved_scrollbar_space() {
                 .map(|node| LayoutBounds {
                     node: node.node,
                     key: tree.key(node.node).map(str::to_owned),
+                    retained_identity: None,
                     bounds: node.bounds,
                 })
                 .collect(),

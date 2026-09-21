@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use argui_dsl_ir::{
     AssetId, ComponentId, EffectId, IrExpression, IrExpressionKind, IrNode, IrProject, IrType,
-    StyleId, ThemeId,
+    StyleId, ThemeId, TokenId,
 };
 use argui_dsl_semantic::{DefinitionKind, SemanticProject, SymbolId};
 
@@ -13,6 +13,7 @@ pub struct Reachability {
     pub structs: HashSet<SymbolId>,
     pub enums: HashSet<SymbolId>,
     pub themes: HashSet<ThemeId>,
+    pub tokens: HashSet<TokenId>,
     pub styles: HashSet<StyleId>,
     pub effects: HashSet<EffectId>,
     pub assets: HashSet<AssetId>,
@@ -83,17 +84,65 @@ impl Reachability {
             for node in &component.body {
                 visit_node(node, &mut result, &mut queue);
             }
+            for state in &component.states {
+                visit_expression(&state.condition, &mut result);
+                for (_, value) in &state.assignments {
+                    visit_expression(value, &mut result);
+                }
+            }
+            for animation in &component.animations {
+                for parameter in &animation.parameters {
+                    visit_expression(&parameter.value, &mut result);
+                }
+                for frame in &animation.keyframes {
+                    visit_expression(&frame.value, &mut result);
+                }
+            }
+        }
+        for style in &ir.styles {
+            if result.styles.contains(&style.id) {
+                for binding in &style.properties {
+                    visit_expression(&binding.value, &mut result);
+                }
+                for state in &style.states {
+                    for binding in &state.properties {
+                        visit_expression(&binding.value, &mut result);
+                    }
+                }
+            }
         }
         for effect in &ir.effects {
             if result.effects.contains(&effect.id) {
                 result.assets.insert(effect.shader);
             }
         }
-        for theme in &ir.themes {
-            if result.themes.contains(&theme.id) {
-                for token in &theme.tokens {
-                    visit_expression(&token.default, &mut result);
+        loop {
+            let previous = (result.themes.len(), result.tokens.len());
+            for theme in &ir.themes {
+                if result.themes.contains(&theme.id)
+                    || theme
+                        .tokens
+                        .iter()
+                        .any(|token| result.tokens.contains(&token.id))
+                    || theme.modes.iter().any(|mode| {
+                        mode.overrides
+                            .iter()
+                            .any(|(token, _)| result.tokens.contains(token))
+                    })
+                {
+                    result.themes.insert(theme.id);
+                    for token in &theme.tokens {
+                        visit_expression(&token.default, &mut result);
+                    }
+                    for mode in &theme.modes {
+                        for (_, value) in &mode.overrides {
+                            visit_expression(value, &mut result);
+                        }
+                    }
                 }
+            }
+            if previous == (result.themes.len(), result.tokens.len()) {
+                break;
             }
         }
         result
@@ -229,10 +278,12 @@ fn visit_expression(expression: &IrExpression, output: &mut Reachability) {
             visit_expression(then_value, output);
             visit_expression(else_value, output);
         }
+        IrExpressionKind::TokenRead(token) => {
+            output.tokens.insert(*token);
+        }
         IrExpressionKind::Constant(_)
         | IrExpressionKind::PropertyRead(_)
-        | IrExpressionKind::LocalRead(_)
-        | IrExpressionKind::TokenRead(_) => {}
+        | IrExpressionKind::LocalRead(_) => {}
     }
 }
 
@@ -241,7 +292,8 @@ fn visit_statement(statement: &argui_dsl_ir::IrStatement, output: &mut Reachabil
     match statement {
         argui_dsl_ir::IrStatement::Expression(value)
         | argui_dsl_ir::IrStatement::Assignment { value, .. }
-        | argui_dsl_ir::IrStatement::Return(Some(value)) => visit_expression(value, output),
+        | argui_dsl_ir::IrStatement::Return(Some(value))
+        | argui_dsl_ir::IrStatement::SetThemeMode(value) => visit_expression(value, output),
         argui_dsl_ir::IrStatement::Return(None) => {}
     }
 }

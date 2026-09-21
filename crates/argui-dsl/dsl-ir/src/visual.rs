@@ -4,12 +4,13 @@ use argui_dsl_semantic::Module;
 use argui_dsl_syntax::{Span, SyntaxKind, SyntaxNode};
 
 use crate::{
-    AnimationId, AssetId, AssignmentOperator, ComponentId, EventTargetId, IrAnimation,
-    IrAnimationParameter, IrAssignmentTarget, IrElementTarget, IrEventBinding, IrExpression,
-    IrExpressionKind, IrNode, IrPropertyBinding, IrState, IrStatement, IrType, LocalId, LowerError,
-    PropertyId, PropertyTargetId, SiteId, SourceInfo, declaration, expression, id::derive,
-    id::hash_text, lower::ComponentMembers, lower::Tables, site,
+    AssetId, AssignmentOperator, ComponentId, EventTargetId, IrAnimation, IrAssignmentTarget,
+    IrElementTarget, IrEventBinding, IrExpression, IrExpressionKind, IrNode, IrPropertyBinding,
+    IrState, IrStatement, IrType, LocalId, LowerError, PropertyTargetId, SiteId, SourceInfo,
+    declaration, expression, id::derive, lower::ComponentMembers, lower::Tables, site,
 };
+
+mod animation;
 
 /// Resolved properties and events for one element target.
 struct Target {
@@ -252,6 +253,11 @@ impl<'a> VisualLowerer<'a> {
                     .map(|value| self.expression(value, Some(site))),
             ));
         }
+        if let Some(mode) = expressions.first().and_then(theme_mode_call) {
+            return Some(IrStatement::SetThemeMode(
+                self.expression(&mode, Some(site)),
+            ));
+        }
         let operator = assignment_operator(node);
         if let Some(operator) = operator {
             let destination = expressions
@@ -314,43 +320,7 @@ impl<'a> VisualLowerer<'a> {
                 });
             }
         }
-        for animation in node
-            .children()
-            .filter(|child| child.kind() == SyntaxKind::AnimateDecl)
-        {
-            let site = self.register_site(&animation);
-            let Some(name) = identifier_after(&animation, SyntaxKind::AnimateKw) else {
-                continue;
-            };
-            let Some(property) = target.properties.get(&name).map(|entry| entry.0) else {
-                continue;
-            };
-            let parameters = animation
-                .descendants()
-                .filter(|child| child.kind() == SyntaxKind::PropertyAssignment)
-                .filter_map(|assignment| {
-                    let name = declaration::direct_name_or_theme(&assignment)?;
-                    let value = declaration::child_expression(&assignment)
-                        .map(|value| self.expression(&value, Some(site)))?;
-                    Some(IrAnimationParameter {
-                        id: PropertyId::from_raw(derive(
-                            site.raw(),
-                            "animation-parameter",
-                            hash_text(&name),
-                        )),
-                        value,
-                        source: self.source(&assignment, Some(site)),
-                    })
-                })
-                .collect();
-            self.animations.push(IrAnimation {
-                id: AnimationId::from_raw(derive(site.raw(), "animation", 0)),
-                owner,
-                property,
-                parameters,
-                source: self.source(&animation, Some(site)),
-            });
-        }
+        self.lower_animations(node, owner, target);
     }
 
     /// Resolves one element target and all assignable members.
@@ -483,6 +453,28 @@ impl<'a> VisualLowerer<'a> {
             site,
         )
     }
+}
+
+/// Extracts the checked mode expression from a `set_theme_mode()` handler call.
+///
+/// * `node` — complete event statement expression.
+///
+/// Returns the argument expression only when this is a mode-switch call.
+fn theme_mode_call(node: &SyntaxNode) -> Option<SyntaxNode> {
+    let call = node
+        .children()
+        .find(|child| child.kind() == SyntaxKind::CallExpr)?;
+    let callee = call
+        .descendants()
+        .find(|child| child.kind() == SyntaxKind::PathExpr)
+        .and_then(|path| direct_identifier(&path))?;
+    if callee != "set_theme_mode" {
+        return None;
+    }
+    call.children()
+        .find(|child| child.kind() == SyntaxKind::ArgumentList)?
+        .children()
+        .find(|child| child.kind() == SyntaxKind::Expr)
 }
 
 /// Returns the first direct identifier.

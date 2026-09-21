@@ -1,6 +1,7 @@
 #![cfg(feature = "scroll")]
 use argui_effects::{EDGE_FADE_ID, EDGE_SHADOW_ID, EdgeFade, EdgeShadow, registry};
 use argui_paint::{Color, EffectValue, Filter};
+use argui_render::EffectDamage;
 use argui_ui::{ScrollMetric, ScrollMetrics};
 use wgpu::util::DeviceExt;
 
@@ -296,6 +297,7 @@ fn presets_validate_static_parameters_and_registered_wgsl() {
             .unwrap();
         definition.validate().unwrap();
         definition.validate_instance(&effect).unwrap();
+        assert_eq!(definition.damage, EffectDamage::Bounded);
         assert_eq!(effect.parameters[0].name, "width");
         assert_eq!(effect.expansion, 0.0);
     }
@@ -382,5 +384,27 @@ fn scroll_bindings_preserve_per_edge_strength_and_use_logical_viewport_sizes() {
             .scroll()
             .resolve(m)
             .is_none()
+    );
+    assert!(
+        EdgeShadow::new(20.0, Color::BLACK)
+            .strengths([0.0, 0.0, 0.0, 1.0])
+            .scroll()
+            .resolve(m)
+            .is_some()
+    );
+    m.offset.y = m.max_offset.y;
+    assert!(
+        EdgeShadow::new(20.0, Color::BLACK)
+            .strengths([0.0, 0.0, 0.0, 1.0])
+            .scroll()
+            .resolve(m)
+            .is_none()
+    );
+    assert!(
+        EdgeShadow::new(20.0, Color::BLACK)
+            .strengths([0.0, 1.0, 0.0, 0.0])
+            .scroll()
+            .resolve(m)
+            .is_some()
     );
 }

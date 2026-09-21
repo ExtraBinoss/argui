@@ -13,6 +13,18 @@ fn decodes_png_to_renderer_neutral_rgba() {
     assert_eq!(&*asset.rgba8, &[255, 0, 0, 255]);
 }
 
+/// WebP artwork decodes through the same renderer-neutral image pipeline.
+#[test]
+fn decodes_webp_to_renderer_neutral_rgba() {
+    let mut webp = Vec::new();
+    image::codecs::webp::WebPEncoder::new_lossless(&mut webp)
+        .write_image(&[12, 34, 56, 255], 1, 1, image::ExtendedColorType::Rgba8)
+        .unwrap();
+    let asset = decode(ImageId(8), &webp).unwrap();
+    assert_eq!((asset.id, asset.width, asset.height), (ImageId(8), 1, 1));
+    assert_eq!(&*asset.rgba8, &[12, 34, 56, 255]);
+}
+
 #[test]
 fn rejects_unknown_encoded_data() {
     assert!(decode(ImageId(1), b"not an image").is_err());

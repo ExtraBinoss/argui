@@ -9,6 +9,7 @@ fn layout() -> LayoutSnapshot {
             .map(|part| LayoutBounds {
                 node,
                 key: Some(format!("color::{part}")),
+                retained_identity: None,
                 bounds: Rect::new(Point::new(10.0, 20.0), Size::new(200.0, 100.0)),
             })
             .to_vec(),

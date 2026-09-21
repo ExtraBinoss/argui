@@ -4,11 +4,14 @@ use argui_dsl_syntax::{FileId, Span, SyntaxKind, SyntaxNode};
 
 use crate::{
     CallbackDefinition, ComponentDefinition, Definition, DefinitionKind, Diagnostic,
-    DiagnosticCode, PropertyDefinition, PropertyDirection, SymbolId, ThemeDefinition, Type,
-    lower::direct_tokens, types::from_schema,
+    DiagnosticCode, PropertyDefinition, PropertyDirection, SymbolId, Type, lower::direct_tokens,
+    types::from_schema,
 };
 
 use super::super::{Scope, expression};
+use super::animation;
+mod template_slot;
+mod virtual_list;
 
 /// Validates component defaults and recursively validates visual trees.
 #[allow(clippy::too_many_arguments)]
@@ -66,6 +69,16 @@ pub(super) fn validate_component(
             }
         }
     }
+    animation::validate_component(
+        syntax,
+        file,
+        &properties,
+        &callbacks,
+        definitions,
+        theme_tokens,
+        context.diagnostics,
+    );
+    template_slot::validate_usage(syntax, file, &component.slots, scope, context.diagnostics);
     let visual_roots = syntax.children().filter(|node| {
         matches!(
             node.kind(),
@@ -247,6 +260,11 @@ fn validate_element(
             Span::new(file, node.text_range()),
         ));
     }
+    if let Some(template) =
+        user.and_then(|component| component.slots.iter().find(|slot| slot.template))
+    {
+        virtual_list::validate_template_argument(node, file, &template.name, diagnostics);
+    }
     let mut provided = HashSet::new();
     for child in node.children() {
         match child.kind() {
@@ -370,6 +388,19 @@ fn validate_element(
             _ => {}
         }
     }
+    animation::validate_element(
+        node,
+        file,
+        &name,
+        scope,
+        definitions,
+        theme_tokens,
+        schema,
+        component_properties,
+        callbacks,
+        locals,
+        diagnostics,
+    );
     if let Some(native) = native {
         for property in &native.properties {
             if property.required
@@ -428,48 +459,6 @@ fn validate_two_way(
     }
 }
 
-/// Type-checks initial theme token values against their declarations.
-pub(super) fn validate_theme_values(
-    file: FileId,
-    syntax: &SyntaxNode,
-    theme: &ThemeDefinition,
-    definitions: &HashMap<SymbolId, Definition>,
-    theme_tokens: &HashMap<String, Type>,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
-    let empty_properties = HashMap::new();
-    let empty_callbacks = HashMap::new();
-    let empty_locals = HashMap::new();
-    for (definition, node) in theme.tokens.iter().zip(
-        syntax
-            .children()
-            .filter(|node| node.kind() == SyntaxKind::ThemeTokenDecl),
-    ) {
-        if let Some(value) = node.children().find(|node| node.kind() == SyntaxKind::Expr) {
-            let mut context = expression::Context {
-                file,
-                properties: &empty_properties,
-                callbacks: &empty_callbacks,
-                locals: &empty_locals,
-                definitions,
-                theme_tokens,
-                diagnostics,
-            };
-            let actual = expression::infer(&value, &mut context);
-            if !definition.value_type.accepts(&actual) {
-                context.diagnostics.push(Diagnostic::error(
-                    DiagnosticCode::TypeMismatch,
-                    format!(
-                        "theme token `{}` expects `{}`, found `{actual}`",
-                        definition.name, definition.value_type
-                    ),
-                    Span::new(file, value.text_range()),
-                ));
-            }
-        }
-    }
-}
-
 /// Returns an element/block's immediate nested visual nodes.
 fn visual_children(node: &SyntaxNode) -> impl Iterator<Item = SyntaxNode> + '_ {
     node.children()
@@ -504,16 +493,13 @@ fn direct_ident(node: &SyntaxNode) -> Option<String> {
         .map(|token| token.text().to_string())
 }
 
-/// Returns the first direct theme-token name.
-fn direct_theme(node: &SyntaxNode) -> Option<String> {
-    direct_tokens(node)
-        .find(|token| token.kind() == SyntaxKind::ThemeName)
-        .map(|token| token.text().to_string())
-}
-
 /// Returns a direct identifier or theme-token name.
 fn direct_ident_or_theme(node: &SyntaxNode) -> Option<String> {
-    direct_ident(node).or_else(|| direct_theme(node))
+    direct_ident(node).or_else(|| {
+        direct_tokens(node)
+            .find(|token| token.kind() == SyntaxKind::ThemeName)
+            .map(|token| token.text().to_string())
+    })
 }
 
 /// Returns the first identifier after a direct keyword.

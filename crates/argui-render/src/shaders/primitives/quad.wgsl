@@ -99,16 +99,25 @@ fn gradient_color(quad: Quad, value: f32) -> vec4<f32> {
     if value <= gradient_stops[start].offset.x {
         return gradient_to_linear(gradient_stops[start].color, quad.gradient_meta.z);
     }
-    for (var index = 1u; index < count; index++) {
-        let upper = gradient_stops[start + index].offset.x;
-        if value <= upper {
-            let lower = gradient_stops[start + index - 1u].offset.x;
-            let progress = clamp((value - lower) / max(upper - lower, 0.00001), 0.0, 1.0);
-            let color = mix(gradient_stops[start + index - 1u].color, gradient_stops[start + index].color, progress);
-            return gradient_to_linear(color, quad.gradient_meta.z);
+    if value >= gradient_stops[start + count - 1u].offset.x {
+        return gradient_to_linear(gradient_stops[start + count - 1u].color, quad.gradient_meta.z);
+    }
+    var lower_index = 0u;
+    var upper_index = count - 1u;
+    loop {
+        if upper_index - lower_index <= 1u { break; }
+        let middle = lower_index + (upper_index - lower_index) / 2u;
+        if value <= gradient_stops[start + middle].offset.x {
+            upper_index = middle;
+        } else {
+            lower_index = middle;
         }
     }
-    return gradient_to_linear(gradient_stops[start + count - 1u].color, quad.gradient_meta.z);
+    let lower = gradient_stops[start + lower_index].offset.x;
+    let upper = gradient_stops[start + upper_index].offset.x;
+    let progress = clamp((value - lower) / max(upper - lower, 0.00001), 0.0, 1.0);
+    let color = mix(gradient_stops[start + lower_index].color, gradient_stops[start + upper_index].color, progress);
+    return gradient_to_linear(color, quad.gradient_meta.z);
 }
 
 fn fill_color(quad: Quad, local: vec2<f32>) -> vec4<f32> {
@@ -120,6 +129,12 @@ fn fill_color(quad: Quad, local: vec2<f32>) -> vec4<f32> {
     }
     if quad.params.y < 2.5 {
         return gradient_color(quad, length((uv - quad.fill_geometry.xy) / max(quad.fill_geometry.zw, vec2(0.00001))));
+    }
+    if quad.params.y > 3.5 {
+        let direction = uv - quad.fill_geometry.xy;
+        let angle = atan2(direction.y, direction.x) - quad.fill_geometry.z;
+        let turn = fract(angle / 6.283185307179586 + 1.0);
+        return gradient_color(quad, turn);
     }
     let start = quad.gradient_meta.x;
     let position = clamp(uv, vec2(0.0), vec2(1.0));

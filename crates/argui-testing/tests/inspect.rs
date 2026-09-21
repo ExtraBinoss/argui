@@ -1,7 +1,7 @@
-use argui_accessibility::{Role, SemanticState, Semantics};
+use argui_accessibility::{Role, SemanticState, SemanticValue, Semantics};
 use argui_runtime::{Context, Render};
 use argui_testing::{Selector, SelectorCount, SemanticMatcher, TestApp, TestError};
-use argui_ui::{Element, length};
+use argui_ui::{Display, Element, length};
 use argui_widgets::{Button, default_theme};
 
 struct Inspectable;
@@ -61,4 +61,66 @@ fn inspection_exposes_snapshots_bounds_focus_and_diagnostics() {
         }
     ));
     assert!(error.to_string().contains("close candidates"));
+}
+
+struct EdgeInspector;
+
+impl Render for EdgeInspector {
+    /// Renders semantic values, hidden keys, and duplicate visible keys.
+    fn render(&mut self, _: &mut Context<Self>) -> Element {
+        Element::column([
+            Element::container([])
+                .keyed("value")
+                .semantics(
+                    Semantics::new(Role::TextInput)
+                        .value(SemanticValue::Text("semantic value".to_owned())),
+                )
+                .width(length(40.0))
+                .height(length(20.0)),
+            Element::text("hidden")
+                .keyed("hidden")
+                .display(Display::None),
+            Element::container([])
+                .keyed("zero")
+                .width(length(0.0))
+                .height(length(0.0)),
+            Element::text("duplicate").keyed("duplicate"),
+            Element::text("duplicate").keyed("duplicate"),
+        ])
+    }
+}
+
+/// Queries distinguish semantic values, hidden keys, empty bounds, and ambiguity.
+#[test]
+fn semantic_value_and_visibility_edges_have_actionable_diagnostics() {
+    let mut app = TestApp::new(EdgeInspector);
+    app.assert_text("semantic value");
+    app.assert_exists(Selector::text("semantic value"));
+    assert!(matches!(
+        app.bounds("hidden"),
+        Err(TestError::Selector {
+            count: SelectorCount::None,
+            ..
+        })
+    ));
+    assert!(matches!(
+        app.bounds("duplicate"),
+        Err(TestError::Selector {
+            count: SelectorCount::Multiple(2),
+            ..
+        })
+    ));
+    assert!(matches!(
+        app.focused().focus(),
+        Err(TestError::Selector {
+            count: SelectorCount::None,
+            ..
+        })
+    ));
+    assert!(
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            app.assert_visible("zero");
+        }))
+        .is_err()
+    );
 }

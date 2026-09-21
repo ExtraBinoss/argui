@@ -293,10 +293,13 @@ dependencies = [
  "argui-dsl-protocol",
  "argui-dsl-runtime",
  "argui-dsl-semantic",
+ "argui-dsl-stdlib",
+ "argui-dsl-syntax",
  "argui-schema",
  "argui-testing",
  "ctrlc",
  "getrandom 0.3.4",
+ "nix",
  "notify",
  "ratatui",
  "serde_json",
@@ -336,16 +339,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "argui-dsl-aot-fixture"
-version = "0.3.2"
-dependencies = [
- "argui",
- "argui-dsl-build",
- "argui-dsl-runtime",
- "argui-testing",
-]
-
-[[package]]
 name = "argui-dsl-build"
 version = "0.3.2"
 dependencies = [
@@ -357,8 +350,11 @@ dependencies = [
 name = "argui-dsl-compiler"
 version = "0.3.2"
 dependencies = [
+ "argui-assets",
  "argui-dsl-ir",
  "argui-dsl-semantic",
+ "argui-dsl-stdlib",
+ "argui-dsl-syntax",
  "argui-schema",
  "argui-shader",
 ]
@@ -409,14 +405,16 @@ dependencies = [
 name = "argui-dsl-runtime"
 version = "0.3.2"
 dependencies = [
+ "argui-animation",
  "argui-assets",
  "argui-core",
- "argui-dsl-aot-fixture",
  "argui-dsl-compiler",
  "argui-dsl-ir",
  "argui-dsl-protocol",
  "argui-dsl-semantic",
+ "argui-dsl-stdlib",
  "argui-dsl-syntax",
+ "argui-paint",
  "argui-runtime",
  "argui-schema",
  "argui-shader",
@@ -445,6 +443,10 @@ dependencies = [
 [[package]]
 name = "argui-dsl-stdlib"
 version = "0.3.2"
+dependencies = [
+ "icondata_core",
+ "icondata_tb",
+]
 
 [[package]]
 name = "argui-dsl-syntax"
@@ -627,7 +629,11 @@ dependencies = [
 name = "argui-schema"
 version = "0.3.2"
 dependencies = [
+ "argui-animation",
+ "argui-assets",
  "argui-core",
+ "argui-effects",
+ "argui-layout",
  "argui-paint",
  "argui-text",
  "argui-ui",
@@ -2957,11 +2963,22 @@ checksum = "85ab80394333c02fe689eaf900ab500fbd0c2213da414687ebf995a65d5a6104"
 dependencies = [
  "bytemuck",
  "byteorder-lite",
+ "image-webp",
  "moxcms",
  "num-traits",
  "png",
  "zune-core",
  "zune-jpeg",
+]
+
+[[package]]
+name = "image-webp"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "525e9ff3e1a4be2fbea1fdf0e98686a6d98b4d8f937e1bf7402245af1909e8c3"
+dependencies = [
+ "byteorder-lite",
+ "quick-error",
 ]
 
 [[package]]
@@ -4555,6 +4572,12 @@ name = "pxfm"
 version = "0.1.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d55d956fa96f5ec02be2e13af0e20391a5aa83d6a074e3ad368959d0fab299ea"
+
+[[package]]
+name = "quick-error"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a993555f31e5a609f617c12db6250dedcac1b0a85076912c436e6fc9b2c8e6a3"
 
 [[package]]
 name = "quick-xml"

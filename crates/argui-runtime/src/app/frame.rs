@@ -211,6 +211,19 @@ impl Application {
     ) -> TreeUpdate {
         let pending = std::mem::take(&mut self.pending_ui_frame);
         let tree_started = Instant::now();
+        let assets_changed = if pending.rebuild {
+            match self.refresh_media_assets() {
+                Ok(changed) => changed,
+                Err(error) => {
+                    (self.on_event)(RuntimeEvent::RendererFailed(error.to_string()));
+                    self.fatal_error = Some(error.into());
+                    event_loop.exit();
+                    return TreeUpdate::None;
+                }
+            }
+        } else {
+            false
+        };
         let tree_update = if pending.rebuild {
             let root = self.inspected_view();
             match (root, &mut self.ui_tree) {
@@ -227,7 +240,7 @@ impl Application {
                 self.prepare_or_exit(event_loop);
                 self.frame_record.layout += started.elapsed();
             }
-            _ if pending.layout => {
+            _ if pending.layout || assets_changed => {
                 let started = Instant::now();
                 self.prepare_or_exit(event_loop);
                 self.frame_record.layout += started.elapsed();

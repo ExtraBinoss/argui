@@ -484,3 +484,107 @@ fn model_effect_matrix_applies_focus_clipboard_theme_and_scroll_targets() {
     }
     assert!(app.scroll_requests().len() >= 6);
 }
+
+mod clipboard {
+    use argui_runtime::{Context, Render};
+    use argui_testing::TestApp;
+    use argui_ui::{ClipboardRequest, Element, length};
+    use argui_widgets::{Button, Input, default_theme};
+
+    #[derive(Default)]
+    struct ClipboardEffects {
+        value: String,
+    }
+
+    impl Render for ClipboardEffects {
+        fn render(&mut self, cx: &mut Context<Self>) -> Element {
+            let environment = cx.environment();
+            let theme = default_theme(environment.clone())
+                .resolve(environment.color_scheme)
+                .clone();
+            let on_input = cx.input_callback(|state, value| state.value = value);
+            let write = cx.event_handler(|_, _, cx| {
+                cx.write_clipboard(ClipboardRequest::Write("pasted".into()));
+            });
+            let read = cx.event_handler(|_, _, cx| {
+                cx.request_focus("field");
+                cx.write_clipboard(ClipboardRequest::Read { target: None });
+            });
+            Element::column([
+                Input::new("field", &self.value, "", theme.input())
+                    .label("Field")
+                    .on_input(on_input)
+                    .build(),
+                Button::new("write", "Write", theme.button())
+                    .on_click(write)
+                    .build(),
+                Button::new("read", "Read", theme.button())
+                    .on_click(read)
+                    .build(),
+            ])
+            .width(length(300.0))
+        }
+    }
+
+    #[test]
+    fn clipboard_read_pastes_into_the_focus_requested_in_the_same_effect_batch() {
+        let mut app = TestApp::new(ClipboardEffects::default());
+        app.click("read").unwrap();
+        app.assert_input_value("field", "");
+
+        app.click("write").unwrap();
+        app.assert_clipboard("pasted");
+        app.click("read").unwrap();
+        app.assert_focused("field");
+        app.assert_input_value("field", "pasted");
+        assert_eq!(app.entity().read(|state| state.value.clone()), "pasted");
+    }
+}
+
+#[derive(Default)]
+struct OneLayoutFollowup {
+    changed: bool,
+    layouts: usize,
+}
+
+impl Render for OneLayoutFollowup {
+    /// Renders the size selected by the latest layout feedback.
+    ///
+    /// * `cx` — rendering context, unused by this view.
+    fn render(&mut self, _cx: &mut Context<Self>) -> Element {
+        Element::text(if self.changed { "ready" } else { "initial" })
+            .width(length(if self.changed { 120.0 } else { 80.0 }))
+    }
+
+    /// Requests one follow-up layout after observing the initial bounds.
+    ///
+    /// * `layout` — completed layout snapshot, unused by this transition.
+    /// * `cx` — presentation context used to notify the retained view.
+    fn layout_changed(&mut self, _layout: &LayoutSnapshot, cx: &mut Context<Self>) {
+        self.layouts += 1;
+        if !self.changed {
+            self.changed = true;
+            cx.notify();
+        }
+    }
+}
+
+#[test]
+fn finite_layout_feedback_settles_then_idles_without_relayout() {
+    let mut app = TestApp::new(OneLayoutFollowup::default());
+    app.assert_text("ready");
+    let layouts = app.entity().read(|state| state.layouts);
+    assert!(layouts >= 2);
+    app.settle().unwrap();
+    app.run_until_idle().unwrap();
+    assert_eq!(app.entity().read(|state| state.layouts), layouts);
+    app.assert_quiescent();
+}
+
+#[test]
+fn explicit_settle_limit_is_clamped_to_one_for_stable_relayout() {
+    let mut app = TestApp::new(OneLayoutFollowup::default());
+    app.set_settle_limit(0);
+    app.resize(Size::new(0.0, 0.0)).unwrap();
+    app.assert_text("ready");
+}

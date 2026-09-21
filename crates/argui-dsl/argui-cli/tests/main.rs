@@ -135,6 +135,38 @@ fn binary_check_handles_absolute_paths_and_invalid_source() {
     assert!(String::from_utf8_lossy(&invalid.stdout).contains("Diagnostics"));
 }
 
+/// The command dispatcher rejects paths outside the project and malformed queries.
+#[test]
+fn binary_reports_invalid_project_paths_and_query_arguments() {
+    let root = tempfile::tempdir().unwrap();
+    assert!(run(root.path(), &["new", "sample"]).status.success());
+    let project = root.path().join("sample");
+    let outside = root.path().join("outside.argui");
+    fs::write(&outside, "export component Outside {}").unwrap();
+
+    let invalid_entry = run(&project, &["check", outside.to_str().unwrap()]);
+    assert!(!invalid_entry.status.success());
+    let invalid_schema = run(&project, &["schema", "NoSuchComponent"]);
+    assert!(!invalid_schema.status.success());
+    assert!(
+        String::from_utf8_lossy(&invalid_schema.stderr)
+            .contains("unknown component `NoSuchComponent`")
+    );
+
+    for arguments in [
+        ["complete", "ui/main.argui", "0:1"],
+        ["complete", "ui/main.argui", "1:0"],
+        ["complete", "ui/main.argui", "999:1"],
+        ["complete", "ui/main.argui", "1:999"],
+        ["complete", "ui/main.argui", "not-a-position"],
+    ] {
+        assert!(
+            !run(&project, &arguments).status.success(),
+            "invalid completion position {arguments:?} unexpectedly succeeded"
+        );
+    }
+}
+
 /// The real no-run dev host broadcasts an initial and a changed DSL generation.
 #[test]
 fn binary_dev_no_run_watches_and_publishes_changes() {

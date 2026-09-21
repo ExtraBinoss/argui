@@ -106,6 +106,39 @@ fn browser_transport_reports_address_binding_errors() {
     assert!(matches!(error.kind(), std::io::ErrorKind::AddrInUse));
 }
 
+/// A client joining after broadcasts receives the newest generation immediately.
+#[test]
+fn browser_transport_primes_late_clients_with_latest_generation() {
+    let initial = LiveMessage::Diagnostics {
+        generation: 1,
+        diagnostics: Vec::new(),
+    };
+    let hub = WebSocketHub::bind(
+        SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 0),
+        &initial,
+    )
+    .unwrap();
+    for generation in [2, 3] {
+        hub.broadcast(&LiveMessage::Diagnostics {
+            generation,
+            diagnostics: Vec::new(),
+        })
+        .unwrap();
+    }
+    let (mut late, _) = tungstenite::connect(format!("ws://{}", hub.local_addr())).unwrap();
+    assert!(matches!(
+        decode::<LiveMessage>(&binary(late.read().unwrap())).unwrap(),
+        LiveMessage::Hello { .. }
+    ));
+    assert_eq!(
+        decode::<LiveMessage>(&binary(late.read().unwrap())).unwrap(),
+        LiveMessage::Diagnostics {
+            generation: 3,
+            diagnostics: Vec::new(),
+        }
+    );
+}
+
 /// Extracts binary WebSocket frames from the protocol client stream.
 fn binary(message: Message) -> Vec<u8> {
     match message {

@@ -3,9 +3,13 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use argui_dsl_ir::{CallbackId, ComponentId, IrType, LocalId, PropertyId, ThemeModeId, TokenId};
 
 use crate::{
-    AnimationStore, ComponentInstance, DslValue, DynamicProperty, EvaluationContext, InstanceId,
-    LivePackage, RuntimeError,
+    ComponentInstance, DslValue, DynamicProperty, EvaluationContext, InstanceId, LivePackage,
+    RuntimeError,
 };
+
+mod theme;
+
+use theme::{evaluate_theme_defaults, evaluate_theme_mode};
 
 type TranslationResolver = dyn Fn(&str) -> Option<String>;
 
@@ -32,7 +36,8 @@ pub struct LiveRuntime {
     pub(crate) schema: argui_schema::SchemaRegistry,
     pub(crate) instances: HashMap<InstanceId, ComponentInstance>,
     pub(crate) tokens: HashMap<TokenId, DslValue>,
-    pub animations: AnimationStore,
+    pub(crate) property_motions: argui_schema::PropertyMotionStore,
+    pub(crate) virtual_viewports: HashMap<argui_ui::RetainedIdentity, f32>,
     root: Option<InstanceId>,
     next_instance: u64,
     pub(crate) token_revision: u64,
@@ -67,7 +72,8 @@ impl LiveRuntime {
             schema,
             instances: HashMap::new(),
             tokens,
-            animations: AnimationStore::new(),
+            property_motions: argui_schema::PropertyMotionStore::new(),
+            virtual_viewports: HashMap::new(),
             root: None,
             next_instance: 1,
             token_revision: 1,
@@ -145,6 +151,32 @@ impl LiveRuntime {
         &self.assets
     }
 
+    /// Resolves a compiled asset ID to its stable decoded renderer handle.
+    ///
+    /// * `id` — asset expression ID from the current IR generation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an asset error if the ID has no decoded image or SVG record.
+    pub(crate) fn asset_handle(
+        &self,
+        id: argui_dsl_ir::AssetId,
+    ) -> Result<argui_assets::AssetHandle, RuntimeError> {
+        let asset = self
+            .package
+            .ir
+            .assets
+            .iter()
+            .find(|asset| asset.id == id)
+            .ok_or(RuntimeError::MissingAsset(id.raw()))?;
+        let key = argui_assets::AssetKey::new(&asset.path)
+            .map_err(|error| RuntimeError::Asset(error.to_string()))?;
+        self.assets
+            .get(&key)
+            .map(argui_assets::AssetRecord::handle)
+            .ok_or(RuntimeError::MissingAsset(id.raw()))
+    }
+
     /// Returns the most recent render or routed-event failure.
     #[must_use]
     pub fn last_error(&self) -> Option<&RuntimeError> {
@@ -210,7 +242,13 @@ impl LiveRuntime {
         Ok((handler.borrow_mut())(arguments))
     }
 
-    /// Switches a user-defined theme mode by resolved mode ID.
+    /// Applies every theme sharing a resolved mode identity.
+    ///
+    /// * `mode` — stable ID derived from the requested mode name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an unknown-mode or expression error without changing runtime state.
     pub fn set_theme_mode(&mut self, mode: ThemeModeId) -> Result<(), RuntimeError> {
         self.tokens = evaluate_theme_mode(&self.package, mode)?;
         self.active_theme_mode = Some(mode);
@@ -282,27 +320,6 @@ impl LiveRuntime {
         self.event_error = None;
         self.last_valid_element = None;
         self.token_revision = self.token_revision.wrapping_add(1).max(1);
-        let valid_animations = self
-            .package
-            .ir
-            .components
-            .iter()
-            .flat_map(|component| {
-                component.animations.iter().map(|animation| {
-                    (
-                        component.id,
-                        animation.id,
-                        animation.owner,
-                        animation.property,
-                    )
-                })
-            })
-            .collect::<Vec<_>>();
-        self.animations.retain(|key| {
-            valid_animations.iter().any(|candidate| {
-                candidate == &(key.component, key.animation, Some(key.site), key.property)
-            })
-        });
         ReloadOutcome {
             previous_generation,
             generation: self.package.generation,
@@ -390,32 +407,6 @@ fn prepare_assets(
     Ok(registry)
 }
 
-/// Evaluates defaults and then overlays one named theme mode.
-fn evaluate_theme_mode(
-    package: &LivePackage,
-    mode: ThemeModeId,
-) -> Result<HashMap<TokenId, DslValue>, RuntimeError> {
-    let mut values = evaluate_theme_defaults(package)?;
-    let selected = package
-        .ir
-        .themes
-        .iter()
-        .flat_map(|theme| &theme.modes)
-        .find(|candidate| candidate.id == mode)
-        .ok_or_else(|| {
-            RuntimeError::InvalidBytecode(format!("unknown theme mode {}", mode.raw()))
-        })?;
-    for (token, expression) in &selected.overrides {
-        let program = package
-            .program(expression.id)
-            .ok_or(RuntimeError::MissingExpression(expression.id.raw()))?;
-        let properties = HashMap::new();
-        let mut context = ValueContext::new(&properties, &values);
-        values.insert(*token, program.evaluate(&mut context)?);
-    }
-    Ok(values)
-}
-
 /// Initializes one component's properties in dependency/source order.
 pub(crate) fn initialize_instance(
     package: &LivePackage,
@@ -450,24 +441,6 @@ pub(crate) fn initialize_instance(
         component,
         properties.into_values(),
     ))
-}
-
-/// Evaluates default theme tokens in dependency-checked declaration order.
-fn evaluate_theme_defaults(
-    package: &LivePackage,
-) -> Result<HashMap<TokenId, DslValue>, RuntimeError> {
-    let mut values = HashMap::new();
-    for theme in &package.ir.themes {
-        for token in &theme.tokens {
-            let program = package
-                .program(token.default.id)
-                .ok_or(RuntimeError::MissingExpression(token.default.id.raw()))?;
-            let properties = HashMap::new();
-            let mut context = ValueContext::new(&properties, &values);
-            values.insert(token.id, program.evaluate(&mut context)?);
-        }
-    }
-    Ok(values)
 }
 
 /// Provides total initial values for properties without explicit defaults.
@@ -543,6 +516,7 @@ pub(crate) struct InstanceValueContext<'a> {
     locals: &'a HashMap<LocalId, DslValue>,
     tokens: &'a HashMap<TokenId, DslValue>,
     translator: Option<&'a TranslationResolver>,
+    presentation: bool,
 }
 
 impl<'a> InstanceValueContext<'a> {
@@ -558,12 +532,27 @@ impl<'a> InstanceValueContext<'a> {
             locals,
             tokens,
             translator,
+            presentation: true,
         }
+    }
+
+    /// Uses canonical property values while evaluating a child's retained input.
+    ///
+    /// The returned context ignores render-only presentation overlays.
+    #[must_use]
+    pub(crate) const fn canonical(mut self) -> Self {
+        self.presentation = false;
+        self
     }
 }
 
 impl EvaluationContext for InstanceValueContext<'_> {
     fn property(&self, id: PropertyId) -> Option<DslValue> {
+        if self.presentation
+            && let Some(value) = self.instance.presented_properties.get(&id)
+        {
+            return Some(value.clone());
+        }
         self.instance
             .properties
             .get(&id)

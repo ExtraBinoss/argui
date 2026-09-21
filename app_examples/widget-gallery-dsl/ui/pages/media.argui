@@ -1,0 +1,30 @@
+import { Column, Row, Text, Image, Svg } from "@argui/native"
+
+export component MediaPage {
+    Column #media_page {
+        width: 100%
+        gap: 20.0
+
+        Text { content: "Media" color: var(--argui-foreground) weight: 700 font_size: 27.0 }
+        Text { content: "Project images and SVGs use the same typed asset pipeline in development and release." color: var(--argui-muted-foreground) font_size: 14.0 }
+        Row {
+            wrap: true
+            gap: 24.0
+            Column {
+                gap: 8.0
+                Text { content: "Raster · contain" color: var(--argui-foreground) weight: 600 font_size: 14.0 }
+                Image { source: asset("../../assets/argui-icon.png") width: 160px height: 110px fit: "contain" }
+            }
+            Column {
+                gap: 8.0
+                Text { content: "SVG · theme tint" color: var(--argui-foreground) weight: 600 font_size: 14.0 }
+                Svg { source: asset("../../assets/spark.svg") width: 110px height: 110px color: var(--argui-primary) }
+            }
+            Column {
+                gap: 8.0
+                Text { content: "Raster · 16:9 cover" color: var(--argui-foreground) weight: 600 font_size: 14.0 }
+                Image { source: asset("../../assets/gallery-preview.webp") width: 240px height: 135px fit: "cover" }
+            }
+        }
+    }
+}

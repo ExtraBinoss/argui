@@ -278,6 +278,7 @@ pub enum PropertyKey {
     TextColor,
     VectorColor,
     GradientPoint(GradientPointTarget),
+    GradientAngle,
     GradientStopOffset(usize),
     GradientStopColor(usize),
     LayerOpacity,
@@ -322,6 +323,7 @@ impl PropertyKey {
                 | Self::CornerRadii
                 | Self::Opacity
                 | Self::GradientPoint(_)
+                | Self::GradientAngle
                 | Self::GradientStopOffset(_)
                 | Self::GradientStopColor(_)
         )

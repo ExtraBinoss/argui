@@ -70,6 +70,10 @@ impl Replay {
                     .map(|node| LayoutBounds {
                         node: node.node,
                         key: self.tree.key(node.node).map(str::to_owned),
+                        retained_identity: self
+                            .tree
+                            .element_for(node.node)
+                            .and_then(|element| element.source_identity().cloned()),
                         bounds: node.bounds,
                     })
                     .collect(),

@@ -62,7 +62,9 @@ impl CompilerDatabase {
     /// Returns a schema error if built-in metadata violates registry invariants.
     pub fn with_builtins() -> Result<Self, argui_schema::SchemaError> {
         let mut database = Self::new(argui_schema::builtin::registry()?);
-        database.set_file("@argui/ui", argui_dsl_stdlib::UI_SOURCE);
+        for (path, source) in argui_dsl_stdlib::UI_MODULES {
+            database.set_file(path, *source);
+        }
         Ok(database)
     }
 
@@ -204,7 +206,7 @@ impl CompilerDatabase {
         }
         let mut file_ids = self.files.keys().copied().collect::<Vec<_>>();
         file_ids.sort_unstable_by_key(|file| file.raw());
-        let inputs = file_ids
+        let mut inputs = file_ids
             .into_iter()
             .filter_map(|file| {
                 let path = self.files.get(&file)?.path.clone();
@@ -214,7 +216,30 @@ impl CompilerDatabase {
                     parse: self.parse(file)?,
                 })
             })
-            .collect();
+            .collect::<Vec<_>>();
+        let icon_names = inputs
+            .iter()
+            .flat_map(|input| {
+                crate::lower::module(input.clone())
+                    .imports
+                    .into_iter()
+                    .filter(|import| import.source == "@argui/icons")
+                    .flat_map(|import| import.items.into_iter().map(|item| item.name))
+            })
+            .collect::<std::collections::BTreeSet<_>>();
+        for name in icon_names {
+            let Some(source) = argui_dsl_stdlib::icon_component_source(&name) else {
+                continue;
+            };
+            let path = format!("@argui/icons/{name}.argui");
+            let file = self.set_file(&path, source);
+            let parse = self.parse(file).expect("inserted icon module is available");
+            if let Some(input) = inputs.iter_mut().find(|input| input.file == file) {
+                input.parse = parse;
+            } else {
+                inputs.push(InputModule { file, path, parse });
+            }
+        }
         let project = Arc::new(check::project(inputs, &self.schema));
         self.stats.semantic_executions += 1;
         self.project_cache = Some((self.generation, project.clone()));

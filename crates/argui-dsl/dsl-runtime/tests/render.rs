@@ -1,5 +1,103 @@
 //! Runtime element rendering and render edge cases.
 
+#[path = "render/virtual_list.rs"]
+mod virtual_list;
+
+#[path = "render/identity.rs"]
+mod assets;
+
+#[path = "render/motion.rs"]
+mod motion;
+
+mod gradient {
+    use std::collections::HashMap;
+
+    use argui_dsl_compiler::{Compiler, SourceModule};
+    use argui_dsl_runtime::{LivePackage, LiveRuntime};
+    use argui_paint::Fill;
+    use argui_ui::{Element, ElementKind};
+
+    /// Finds the rendered text editor inside its generated root element.
+    ///
+    /// * `element` — current subtree root.
+    ///
+    /// Returns the first editor, if present.
+    fn editor(element: &Element) -> Option<&Element> {
+        if matches!(element.kind, ElementKind::TextEditor { .. }) {
+            return Some(element);
+        }
+        element.children.iter().find_map(editor)
+    }
+
+    /// Live rendering preserves conic selection fill and repeated radial caret geometry.
+    #[test]
+    fn live_text_editor_accepts_generic_gradient_visuals() {
+        let source = r#"import { TextEditor } from "@argui/native"
+export component Main {
+    TextEditor {
+        value: "Select this text"
+        label: "Gradient editor"
+        selection_fill: conic_gradient([#ff0000, #00ff00, #0000ff], [0.0, 0.4, 1.0], 0.5, 0.5, 45.0, "oklab")
+        selection_radius: 7.0
+        caret_fill: radial_gradient([#ffffff, #00ff00], [0.0, 1.0], 0.5, 0.5, 0.7, 0.7, "srgb")
+        caret_width: 4.0
+        caret_height: 4.0
+        caret_radius: 2.0
+        caret_count: 3
+        caret_blink: false
+    }
+}"#;
+        let compiled = Compiler::compile(
+            [SourceModule::new("ui/main.argui", source)],
+            "ui/main.argui",
+            |_| Err("no assets".into()),
+        )
+        .unwrap();
+        let root_component = argui_dsl_ir::ComponentId::from_raw(
+            compiled
+                .semantic
+                .modules
+                .iter()
+                .find(|module| module.path == "ui/main.argui")
+                .unwrap()
+                .definitions
+                .iter()
+                .find(|definition| definition.name == "Main")
+                .unwrap()
+                .id
+                .raw(),
+        );
+        let package =
+            LivePackage::prepare(1, compiled.public_api_hash, compiled.ir, HashMap::new()).unwrap();
+        let mut runtime = LiveRuntime::new(package).unwrap();
+        runtime.mount(root_component, []).unwrap();
+        let rendered = runtime.render().unwrap();
+        let editor = editor(&rendered).expect("the editor is mounted");
+        assert!(matches!(
+            editor.selection_highlight.as_ref().unwrap().background,
+            Fill::Conic(_)
+        ));
+        assert_eq!(
+            editor
+                .selection_highlight
+                .as_ref()
+                .unwrap()
+                .radii
+                .as_array(),
+            [7.0; 4]
+        );
+        let ElementKind::TextEditor { caret, .. } = &editor.kind else {
+            unreachable!();
+        };
+        assert_eq!(caret.visual.primitives.len(), 3);
+        assert!(matches!(
+            caret.visual.primitives[0].paint.background,
+            Some(Fill::Radial(_))
+        ));
+        assert!(!caret.is_animated());
+    }
+}
+
 mod render_behavior {
     use std::collections::HashMap;
 
@@ -99,7 +197,7 @@ export component Main {
             )
             .unwrap();
         runtime.render().unwrap();
-        assert!(!runtime.animations.is_empty());
+        assert!(runtime.inspect().animations > 0);
         let flag = main.properties["flag"];
         runtime
             .set_property(root, flag, DslValue::Bool(false))

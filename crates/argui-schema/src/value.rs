@@ -1,3 +1,4 @@
+use argui_assets::AssetHandle;
 use argui_core::{Color, Insets, Name, Transform2D};
 use argui_paint::{Border, CornerRadii, Fill, Shadow};
 use argui_ui::Dimension;
@@ -18,6 +19,7 @@ pub enum ValueType {
     Border,
     Shadow,
     Transform,
+    Asset,
 }
 
 /// Typed runtime value passed from generated code or a live interpreter to a native adapter.
@@ -36,6 +38,7 @@ pub enum SchemaValue {
     Border(Border),
     Shadow(Shadow),
     Transform(Transform2D),
+    Asset(AssetHandle),
 }
 
 impl SchemaValue {
@@ -56,6 +59,7 @@ impl SchemaValue {
             Self::Border(_) => ValueType::Border,
             Self::Shadow(_) => ValueType::Shadow,
             Self::Transform(_) => ValueType::Transform,
+            Self::Asset(_) => ValueType::Asset,
         }
     }
 }

@@ -1,5 +1,36 @@
 use super::*;
 
+struct NoView;
+
+impl AppModel for NoView {
+    /// Returns no application content for any window.
+    ///
+    /// * `window` — queried window, intentionally unsupported.
+    /// * `environment` — platform environment, unused without a view.
+    fn view(&self, _window: &WindowKey, _environment: WindowEnvironment) -> Option<Element> {
+        None
+    }
+
+    /// Ignores events because this model has no visible application content.
+    ///
+    /// * `event` — event that has no model-owned effect.
+    fn update(&mut self, _event: &AppEvent) -> AppUpdate {
+        AppUpdate::none()
+    }
+}
+
+/// Missing app views remain absent while the detached tools surface stays available.
+#[test]
+fn missing_application_views_do_not_create_phantom_host_content() {
+    let app = DevtoolsApp::new(NoView).open(true);
+    let target = WindowKey::main();
+    let other = WindowKey::new("unmanaged");
+    let detached = WindowKey::new("__argui-devtools");
+    assert!(app.view(&target, WindowEnvironment::default()).is_none());
+    assert!(app.view(&other, WindowEnvironment::default()).is_none());
+    assert!(app.view(&detached, WindowEnvironment::default()).is_some());
+}
+
 fn send(app: &mut DevtoolsApp<Model>, window: &WindowKey, key: &str, kind: UiEventKind) {
     app.update(&AppEvent::Ui {
         window: window.clone(),
@@ -47,6 +78,7 @@ fn detached_theme_edits_receive_geometry_and_remain_scoped_to_the_target_window(
             nodes: vec![LayoutBounds {
                 node,
                 key: Some("__devtools-color-theme-background::pad".into()),
+                retained_identity: None,
                 bounds: Rect::new(Point::new(20.0, 40.0), Size::new(200.0, 160.0)),
             }],
         },

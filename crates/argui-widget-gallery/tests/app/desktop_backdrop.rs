@@ -355,6 +355,7 @@ fn fallback_sliders_accept_track_clicks_and_drag_after_layout() {
             .map(|node| LayoutBounds {
                 node: node.node,
                 key: tree.key(node.node).map(str::to_owned),
+                retained_identity: None,
                 bounds: node.bounds,
             })
             .collect(),

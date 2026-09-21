@@ -502,7 +502,7 @@ export component Main {
         let mut runtime = LiveRuntime::new(package).unwrap();
         let root = runtime.mount(main, []).unwrap();
         runtime.render().unwrap();
-        assert!(!runtime.animations.is_empty());
+        assert!(runtime.inspect().animations > 0);
 
         let definition = runtime
             .ir()

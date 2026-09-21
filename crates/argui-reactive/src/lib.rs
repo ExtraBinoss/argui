@@ -10,6 +10,7 @@ mod error;
 mod graph;
 mod link;
 mod property;
+mod retained;
 mod subscription;
 mod transaction;
 
@@ -17,5 +18,6 @@ pub use computed::Computed;
 pub use error::ReactiveError;
 pub use link::TwoWayLink;
 pub use property::Property;
+pub use retained::RetainedPropertyStore;
 pub use subscription::Subscription;
 pub use transaction::transaction;

@@ -191,3 +191,51 @@ fn application_errors_preserve_their_actionable_message() {
     assert_eq!(error.message(), "pipeline creation failed");
     assert_eq!(error.to_string(), "pipeline creation failed");
 }
+
+#[derive(Clone)]
+struct DeclaredRequirements(GpuCanvasRequirements);
+
+impl GpuCanvasFactory for DeclaredRequirements {
+    /// Returns the device contract declared for this test registration.
+    fn requirements(&self) -> GpuCanvasRequirements {
+        self.0.clone()
+    }
+
+    /// Creates the stateless test renderer without requiring an actual GPU.
+    fn create(
+        &self,
+        _context: &GpuCanvasDeviceContext<'_>,
+    ) -> Result<Box<dyn GpuCanvasRenderer>, GpuCanvasError> {
+        Ok(Box::new(Renderer))
+    }
+}
+
+/// Required features and non-baseline limits both demand a useful explanation.
+#[test]
+fn every_nonbaseline_requirement_needs_a_nonblank_reason() {
+    let required_features =
+        GpuCanvasRequirements::default().required_features(wgpu::Features::TIMESTAMP_QUERY);
+    let required_limits = GpuCanvasRequirements::default().required_limits(wgpu::Limits {
+        max_bind_groups: wgpu::Limits::default().max_bind_groups + 1,
+        ..wgpu::Limits::default()
+    });
+    for (index, requirements) in [required_features, required_limits].into_iter().enumerate() {
+        let label = format!("test.requirement-{index}");
+        let registration =
+            GpuCanvasRegistration::new(label.clone(), DeclaredRequirements(requirements.clone()));
+        assert!(matches!(
+            GpuCanvasRegistry::new([registration]),
+            Err(GpuCanvasRegistryError::MissingRequirementReason(found)) if found == label
+        ));
+
+        let explained = GpuCanvasRegistration::new(
+            label.clone(),
+            DeclaredRequirements(requirements.reason("capability required for test")),
+        );
+        assert_eq!(
+            GpuCanvasRegistry::new([explained]).unwrap().registrations()[0].label(),
+            label
+        );
+    }
+    assert!(GpuCanvasRegistry::default().is_empty());
+}

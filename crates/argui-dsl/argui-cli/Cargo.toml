@@ -19,6 +19,8 @@ argui-dsl-ir = { path = "../dsl-ir" }
 argui-dsl-parser = { path = "../dsl-parser" }
 argui-dsl-protocol = { path = "../dsl-protocol" }
 argui-dsl-semantic = { path = "../dsl-semantic" }
+argui-dsl-stdlib = { path = "../stdlib" }
+argui-dsl-syntax = { path = "../dsl-syntax" }
 argui-schema.workspace = true
 notify.workspace = true
 serde_json.workspace = true
@@ -36,6 +38,9 @@ ratatui = { version = "=0.29.0", default-features = false, features = ["crosster
 argui-dsl-runtime = { path = "../dsl-runtime" }
 argui-testing.workspace = true
 tempfile.workspace = true
+
+[target.'cfg(unix)'.dev-dependencies]
+nix = { version = "0.31.3", features = ["fs", "term"] }
 
 [lints]
 workspace = true

@@ -45,7 +45,7 @@ impl LayoutEngine {
                     self.repaint(ui, &mut output);
                 }
                 let root = self.root.as_ref().ok_or(LayoutError::MissingRoot)?;
-                self.scroll_anchors = crate::anchor::capture(root, &output);
+                self.scroll_anchors = crate::anchor::capture(root, &output, ui);
                 ui.mark_layout_clean();
                 return Ok(output);
             }

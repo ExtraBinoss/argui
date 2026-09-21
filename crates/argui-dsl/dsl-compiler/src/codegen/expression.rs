@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 
 use argui_dsl_ir::{
-    AssignmentOperator, CallbackId, FieldId, IrAssignmentTarget, IrExpression, IrExpressionKind,
-    IrStatement, IrType, IrValue, LocalId, PropertyId, SlotId,
+    AssignmentOperator, CallbackId, FieldId, IrAnimation, IrAssignmentTarget, IrExpression,
+    IrExpressionKind, IrNode, IrState, IrStatement, IrType, IrValue, LocalId, PropertyId,
+    PropertyTargetId, SiteId, SlotId,
 };
 
 use crate::{CompilerError, codegen::Context};
@@ -11,10 +12,23 @@ use crate::{CompilerError, codegen::Context};
 #[derive(Clone, Default)]
 pub(super) struct Scope {
     pub properties: HashMap<PropertyId, String>,
+    pub rendered_properties: HashMap<PropertyId, String>,
     pub callbacks: HashMap<CallbackId, String>,
     pub locals: HashMap<LocalId, String>,
     pub slots: HashMap<SlotId, String>,
     pub translator: Option<String>,
+    pub animations: HashMap<(SiteId, PropertyTargetId), IrAnimation>,
+    pub states: HashMap<SiteId, Vec<IrState>>,
+    pub component_states: Vec<IrState>,
+    pub template: Option<TemplateSlot>,
+}
+
+/// Lazy caller-authored row recipe substituted into a template component.
+#[derive(Clone)]
+pub(super) struct TemplateSlot {
+    pub slot: SlotId,
+    pub repeater: IrNode,
+    pub caller: Box<Scope>,
 }
 
 impl Context<'_> {
@@ -26,16 +40,22 @@ impl Context<'_> {
     ) -> Result<String, CompilerError> {
         Ok(match &value.kind {
             IrExpressionKind::Constant(value) => constant(value),
-            IrExpressionKind::PropertyRead(id) => format!(
-                "{}.get()",
-                scope
-                    .properties
-                    .get(id)
-                    .ok_or_else(|| CompilerError::Codegen(format!(
-                        "property {} is outside the generated scope",
-                        id.raw()
-                    )))?
-            ),
+            IrExpressionKind::PropertyRead(id) => {
+                if let Some(value) = scope.rendered_properties.get(id) {
+                    value.clone()
+                } else {
+                    format!(
+                        "{}.get()",
+                        scope
+                            .properties
+                            .get(id)
+                            .ok_or_else(|| CompilerError::Codegen(format!(
+                                "property {} is outside the generated scope",
+                                id.raw()
+                            )))?
+                    )
+                }
+            }
             IrExpressionKind::LocalRead(id) => format!(
                 "{}.clone()",
                 scope
@@ -57,7 +77,7 @@ impl Context<'_> {
                     CompilerError::Codegen(format!("theme token {} is unavailable", id.raw()))
                 })?
             ),
-            IrExpressionKind::Asset(id) => format!("ASSET_{}", id.raw()),
+            IrExpressionKind::Asset(id) => format!("asset_handle({})", id.raw()),
             IrExpressionKind::BuiltinCall {
                 function: argui_dsl_ir::BuiltinFunction::Translate,
                 arguments,
@@ -70,6 +90,38 @@ impl Context<'_> {
                     format!("{{ let key = {key}; ({translator})(&key).unwrap_or(key) }}")
                 })
             }
+            IrExpressionKind::BuiltinCall {
+                function: argui_dsl_ir::BuiltinFunction::Stringify,
+                arguments,
+            } => {
+                let value = arguments.first().map_or_else(
+                    || Ok("String::new()".into()),
+                    |argument| self.expression(argument, scope),
+                )?;
+                format!("({value}).to_string()")
+            }
+            IrExpressionKind::BuiltinCall {
+                function: argui_dsl_ir::BuiltinFunction::Solid,
+                arguments,
+            } => {
+                let color = self.expression(&arguments[0], scope)?;
+                format!("::argui::paint::Fill::Solid({color})")
+            }
+            IrExpressionKind::BuiltinCall {
+                function: argui_dsl_ir::BuiltinFunction::Contains,
+                arguments,
+            } => {
+                let text = self.expression(&arguments[0], scope)?;
+                let fragment = self.expression(&arguments[1], scope)?;
+                format!("({text}).contains(&({fragment}))")
+            }
+            IrExpressionKind::BuiltinCall {
+                function:
+                    function @ (argui_dsl_ir::BuiltinFunction::LinearGradient
+                    | argui_dsl_ir::BuiltinFunction::RadialGradient
+                    | argui_dsl_ir::BuiltinFunction::ConicGradient),
+                arguments,
+            } => self.gradient_expression(*function, arguments, scope)?,
             IrExpressionKind::CallbackCall {
                 callback,
                 arguments,
@@ -106,22 +158,33 @@ impl Context<'_> {
                 operator,
                 left,
                 right,
-            } => format!(
-                "({} {} {})",
-                self.expression(left, scope)?,
-                binary_operator(*operator),
-                self.expression(right, scope)?
-            ),
+            } => {
+                let left = self.expression(left, scope)?;
+                let right = self.expression(right, scope)?;
+                if *operator == argui_dsl_ir::BinaryOperator::Add
+                    && value.value_type == IrType::String
+                {
+                    format!("{{ let mut text = {left}; text.push_str(&({right})); text }}")
+                } else {
+                    format!("({left} {} {right})", binary_operator(*operator))
+                }
+            }
             IrExpressionKind::Conditional {
                 condition,
                 then_value,
                 else_value,
-            } => format!(
-                "(if {} {{ {} }} else {{ {} }})",
-                self.expression(condition, scope)?,
-                self.expression(then_value, scope)?,
-                self.expression(else_value, scope)?
-            ),
+            } => {
+                let condition = self.expression(condition, scope)?;
+                let condition = condition
+                    .strip_prefix('(')
+                    .and_then(|inner| inner.strip_suffix(')'))
+                    .unwrap_or(&condition);
+                format!(
+                    "if {condition} {{ {} }} else {{ {} }}",
+                    self.expression(then_value, scope)?,
+                    self.expression(else_value, scope)?
+                )
+            }
             IrExpressionKind::Array(values) => format!(
                 "vec![{}]",
                 values
@@ -133,14 +196,78 @@ impl Context<'_> {
         })
     }
 
-    /// Wraps a generated Rust value in the canonical native-schema value enum.
-    pub(super) fn schema_value(
+    /// Emits one validated arbitrary-stop gradient constructor for AOT code.
+    ///
+    /// * `function` — linear, radial, or conic gradient kind.
+    /// * `arguments` — typed color, offset, geometry, and color-space expressions.
+    /// * `scope` — resolved local and property bindings.
+    ///
+    /// # Errors
+    ///
+    /// Returns a code-generation error if the lowered call has missing arguments.
+    fn gradient_expression(
         &self,
-        value: &IrExpression,
+        function: argui_dsl_ir::BuiltinFunction,
+        arguments: &[IrExpression],
         scope: &Scope,
     ) -> Result<String, CompilerError> {
-        let expression = self.expression(value, scope)?;
-        let constructor = match &value.value_type {
+        let argument = |index: usize| {
+            arguments
+                .get(index)
+                .ok_or_else(|| {
+                    CompilerError::Codegen(format!("gradient argument {index} is missing"))
+                })
+                .and_then(|expression| self.expression(expression, scope))
+        };
+        let colors = argument(0)?;
+        let offsets = argument(1)?;
+        let call = match function {
+            argui_dsl_ir::BuiltinFunction::LinearGradient => {
+                let angle = argument(2)?;
+                let space = argument(3)?;
+                format!(
+                    "::argui::paint::Fill::linear_gradient(&({colors}), &({offsets}), ({angle}) as f32, &({space}))"
+                )
+            }
+            argui_dsl_ir::BuiltinFunction::RadialGradient => {
+                let x = argument(2)?;
+                let y = argument(3)?;
+                let radius_x = argument(4)?;
+                let radius_y = argument(5)?;
+                let space = argument(6)?;
+                format!(
+                    "::argui::paint::Fill::radial_gradient(&({colors}), &({offsets}), ::argui::core::Point::new(({x}) as f32, ({y}) as f32), ::argui::core::Point::new(({radius_x}) as f32, ({radius_y}) as f32), &({space}))"
+                )
+            }
+            argui_dsl_ir::BuiltinFunction::ConicGradient => {
+                let x = argument(2)?;
+                let y = argument(3)?;
+                let angle = argument(4)?;
+                let space = argument(5)?;
+                format!(
+                    "::argui::paint::Fill::conic_gradient(&({colors}), &({offsets}), ::argui::core::Point::new(({x}) as f32, ({y}) as f32), ({angle}) as f32, &({space}))"
+                )
+            }
+            _ => return Err(CompilerError::Codegen("not a gradient function".into())),
+        };
+        Ok(format!(
+            "{call}.expect(\"invalid authored gradient stops or color space\")"
+        ))
+    }
+
+    /// Wraps a generated expression using its statically resolved DSL type.
+    ///
+    /// * `value_type` — type of the expression after animation sampling.
+    /// * `expression` — Rust expression producing the typed value.
+    ///
+    /// # Errors
+    ///
+    /// Returns when the type cannot cross the native schema boundary.
+    pub(super) fn schema_value_expression(
+        value_type: &IrType,
+        expression: &str,
+    ) -> Result<String, CompilerError> {
+        let constructor = match value_type {
             IrType::Bool => "Bool",
             IrType::Int => "Int",
             IrType::Float => "Float",
@@ -155,7 +282,7 @@ impl Context<'_> {
             }
             IrType::Percentage => {
                 return Ok(format!(
-                    "::argui::schema::SchemaValue::Dimension(::argui::ui::percent({expression}))"
+                    "::argui::schema::SchemaValue::Dimension(::argui::ui::percent(({expression}) / 100.0_f32))"
                 ));
             }
             IrType::Insets => "Insets",
@@ -163,6 +290,7 @@ impl Context<'_> {
             IrType::Border => "Border",
             IrType::Shadow => "Shadow",
             IrType::Transform => "Transform",
+            IrType::Asset => "Asset",
             unsupported => {
                 return Err(CompilerError::Codegen(format!(
                     "`{unsupported:?}` cannot be assigned to a native property"
@@ -180,7 +308,14 @@ impl Context<'_> {
         statement: &IrStatement,
         scope: &Scope,
     ) -> Result<String, CompilerError> {
+        let mut canonical = scope.clone();
+        canonical.rendered_properties.clear();
+        let scope = &canonical;
         match statement {
+            IrStatement::SetThemeMode(mode) => Ok(format!(
+                "set_theme_mode({});",
+                self.expression(mode, scope)?
+            )),
             IrStatement::Expression(value) => Ok(format!("{};", self.expression(value, scope)?)),
             IrStatement::Return(None) => Ok("return;".into()),
             IrStatement::Return(Some(value)) => {

@@ -37,9 +37,10 @@ cleanup() {
   fi
 }
 trap cleanup EXIT
-# Old feature/build variants contain duplicate coverage maps even after their
-# raw profiles are removed. Keep dependency caches, but discard workspace maps.
-CARGO_TARGET_DIR="$coverage_target" cargo "+$coverage_toolchain" llvm-cov clean --workspace
+# A workspace-only clean can retain old instrumented dependency variants and
+# count their unexecuted maps against current source. Clear this dedicated
+# coverage target completely so each report describes one coherent build.
+CARGO_TARGET_DIR="$coverage_target" cargo "+$coverage_toolchain" llvm-cov clean
 if [[ -n "${ARGUI_NATIVE_TESTS:-}" ]]; then
   # Run the GPU integration in isolation. The workspace pass below retains its profile and
   # produces the final report with the complete set of test binaries.

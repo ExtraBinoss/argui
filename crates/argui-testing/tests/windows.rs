@@ -1,6 +1,6 @@
 use argui_platform::WindowKey;
 use argui_runtime::{Context, Render};
-use argui_testing::{TestError, TestWindows};
+use argui_testing::{TestApp, TestError, TestWindows};
 use argui_ui::Element;
 
 struct WindowContent;
@@ -34,4 +34,12 @@ fn window_collection_reports_duplicate_and_missing_keys() {
         windows.close(&auxiliary).unwrap_err(),
         TestError::MissingWindow { .. }
     ));
+}
+
+#[test]
+fn closed_entity_cannot_start_another_headless_presentation() {
+    let entity = argui_runtime::Entity::new(WindowContent);
+    entity.resources().close();
+    let result = TestApp::from_entity_in_window(entity, WindowKey::main());
+    assert!(matches!(result, Err(TestError::ClosedPresentation)));
 }

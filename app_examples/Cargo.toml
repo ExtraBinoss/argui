@@ -1,5 +1,5 @@
 [workspace]
-members = ["astra-editor", "docs-examples", "fake-ai-harness", "gpu-canvas", "spotlight"]
+members = ["astra-editor", "docs-examples", "dsl-live-demo", "dsl-virtual-list", "fake-ai-harness", "gpu-canvas", "spotlight", "widget-gallery-dsl"]
 resolver = "3"
 
 [workspace.package]

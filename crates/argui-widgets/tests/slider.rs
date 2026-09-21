@@ -28,6 +28,7 @@ fn slider_uses_one_clamped_path_for_keys_pointer_and_semantics() {
             nodes: vec![LayoutBounds {
                 node,
                 key: Some("scale::track".into()),
+                retained_identity: None,
                 bounds: Rect::new(Point::new(10.0, 0.0), Size::new(100.0, 20.0)),
             }],
         },
@@ -148,6 +149,7 @@ fn range_covers_vertical_reverse_and_interaction_boundaries() {
             nodes: vec![LayoutBounds {
                 node,
                 key: Some("scale::track".into()),
+                retained_identity: None,
                 bounds: Rect::new(Point::new(0.0, 10.0), Size::new(20.0, 100.0)),
             }],
         },
@@ -264,6 +266,7 @@ fn range_covers_vertical_reverse_and_interaction_boundaries() {
             nodes: vec![LayoutBounds {
                 node,
                 key: Some(flat.track_key()),
+                retained_identity: None,
                 bounds: Rect::new(Point::default(), Size::new(20.0, 0.0)),
             }],
         },
@@ -290,6 +293,7 @@ fn range_covers_vertical_reverse_and_interaction_boundaries() {
             nodes: vec![LayoutBounds {
                 node,
                 key: Some(flat_horizontal.track_key()),
+                retained_identity: None,
                 bounds: Rect::new(Point::default(), Size::new(0.0, 20.0)),
             }],
         },
@@ -324,6 +328,7 @@ fn range_detents_are_magnetic_only_during_slow_pointer_motion() {
             nodes: vec![LayoutBounds {
                 node,
                 key: Some("scale::track".into()),
+                retained_identity: None,
                 bounds: Rect::new(Point::default(), Size::new(100.0, 20.0)),
             }],
         },

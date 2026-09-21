@@ -44,11 +44,14 @@ impl TextSelectionHighlight {
     /// Creates a text selection highlight from any GPU fill.
     ///
     /// * `background` — fill painted behind selected glyphs.
+    ///
+    /// Selection fragments use a three-pixel corner radius by default. Use
+    /// [`Self::radius`] to choose another radius, including zero.
     #[must_use]
     pub const fn new(background: Fill) -> Self {
         Self {
             background,
-            radii: CornerRadii::all(0.0),
+            radii: CornerRadii::all(3.0),
         }
     }
 

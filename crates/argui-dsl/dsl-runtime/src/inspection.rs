@@ -53,7 +53,7 @@ impl LiveRuntime {
             theme_mode: self.active_theme_mode,
             instances,
             decoded_assets: self.assets().len(),
-            animations: self.animations.len(),
+            animations: self.property_motions.len(),
         }
     }
 }

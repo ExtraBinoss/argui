@@ -52,6 +52,7 @@ pub enum GradientPointTarget {
     LinearEnd,
     RadialCenter,
     RadialRadius,
+    ConicCenter,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -336,6 +337,9 @@ fn resolve_gradient_point(
         }
         (Some(Fill::Radial(gradient)), GradientPointTarget::RadialRadius) => {
             gradient.radius = apply(gradient.radius, binding);
+        }
+        (Some(Fill::Conic(gradient)), GradientPointTarget::ConicCenter) => {
+            gradient.center = apply(gradient.center, binding);
         }
         _ => {}
     }

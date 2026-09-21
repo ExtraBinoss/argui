@@ -11,7 +11,7 @@ description = "Image decoding, caching and resource management for Argui"
 
 [dependencies]
 argui-paint.workspace = true
-image.workspace = true
+image = { workspace = true, features = ["webp"] }
 thiserror.workspace = true
 
 [lints]

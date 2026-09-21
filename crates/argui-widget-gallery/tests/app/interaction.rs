@@ -296,11 +296,13 @@ fn update_layout(app: &Mount<WidgetGallery>) {
             LayoutBounds {
                 node: slider,
                 key: Some("property-slider::track".into()),
+                retained_identity: None,
                 bounds: Rect::new(Point::default(), Size::new(200.0, 28.0)),
             },
             LayoutBounds {
                 node: plain,
                 key: Some("plain-slider::track".into()),
+                retained_identity: None,
                 bounds: Rect::new(Point::default(), Size::new(200.0, 28.0)),
             },
         ],

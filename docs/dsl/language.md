@@ -61,6 +61,26 @@ Button {
 `asset("./logo.svg")`, `var(--accent)` and `tr("editor.save")` are typed
 built-ins. `tr()` resolves through the application’s `argui-i18n` localizer and
 falls back to its message ID when no translation is available.
+`str(value)` converts a scalar to text, `contains(text, fragment)` tests a
+substring, and `solid(color)` creates a GPU brush.
+
+Gradient brushes use parallel color and normalized-offset arrays of any length
+(at least two, with the same number of entries and ascending offsets). The
+last argument selects `oklab`, `srgb`, or `linear-srgb` interpolation:
+
+```text
+linear_gradient([#ff0000, #00ff00, #0000ff], [0.0, 0.5, 1.0], angle, "oklab")
+radial_gradient([#ff0000, #0000ff], [0.0, 1.0], 0.5, 0.5, 0.7, 0.7, "srgb")
+conic_gradient([#ff0000, #0000ff], [0.0, 1.0], 0.5, 0.5, angle, "linear-srgb")
+```
+
+The numeric geometry values and colors can come from animated properties or
+theme tokens. Text, TextEditor, and containers accept `selection_color` for a
+solid highlight or `selection_fill` for a gradient, plus `selection_radius` for
+the actual selected-text overlay. A container's selection style is inherited by
+its text descendants; the default radius is 3 logical pixels. TextEditor additionally
+accepts composable caret fill and primitive geometry; the gallery Input page
+demonstrates bar, dot, and repeated-dot carets without a fixed style enum.
 
 ## Conditional content and models
 

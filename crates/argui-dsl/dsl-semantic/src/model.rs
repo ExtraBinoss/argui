@@ -114,6 +114,7 @@ pub struct CallbackDefinition {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SlotDefinition {
     pub name: String,
+    pub template: bool,
     pub span: Span,
 }
 

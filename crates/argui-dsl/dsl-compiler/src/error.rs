@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 
+use argui_dsl_syntax::Span;
+
 /// Failure produced before an AOT artifact can be committed.
 #[derive(Debug)]
 pub enum CompilerError {
@@ -7,7 +9,11 @@ pub enum CompilerError {
     Semantic(Vec<argui_dsl_semantic::Diagnostic>),
     Lower(Vec<argui_dsl_ir::LowerError>),
     MissingEntry(String),
-    Asset { path: PathBuf, message: String },
+    Asset {
+        path: PathBuf,
+        message: String,
+        source_span: Option<Span>,
+    },
     Codegen(String),
 }
 
@@ -20,7 +26,7 @@ impl std::fmt::Display for CompilerError {
             }
             Self::Lower(errors) => write!(formatter, "{} IR lowering error(s)", errors.len()),
             Self::MissingEntry(path) => write!(formatter, "entry module `{path}` was not found"),
-            Self::Asset { path, message } => {
+            Self::Asset { path, message, .. } => {
                 write!(formatter, "asset `{}`: {message}", path.display())
             }
             Self::Codegen(message) => write!(formatter, "Rust AOT generation: {message}"),

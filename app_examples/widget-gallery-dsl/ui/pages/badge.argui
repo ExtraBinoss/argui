@@ -1,0 +1,19 @@
+import { Badge } from "@argui/ui"
+import { Column, Row, Text } from "@argui/native"
+
+export component BadgePage {
+    Column #badge_page {
+        width: 100%
+        gap: 20.0
+
+        Text { content: "Badge" color: var(--argui-foreground) weight: 700 font_size: 27.0 }
+        Text { content: "Compact status markers using the active theme." color: var(--argui-muted-foreground) font_size: 14.0 }
+        Row {
+            wrap: true
+            gap: 10.0
+            Badge { text: "Primary" variant: "primary" }
+            Badge { text: "Secondary" }
+            Badge { text: "Outline" variant: "outline" }
+        }
+    }
+}

@@ -82,6 +82,71 @@ impl argui_runtime::Render for LiveRuntime {
             }
         }
     }
+
+    /// Advances active DSL property motions and requests a rebuild only on change.
+    ///
+    /// * `frame` — monotonic timestamp supplied by the host scheduler.
+    /// * `context` — host context receiving a notification when values changed.
+    fn animation_frame(
+        &mut self,
+        frame: argui_animation::Frame,
+        context: &mut argui_runtime::Context<Self>,
+    ) {
+        if self.property_motions.advance(frame.now) {
+            context.notify();
+        }
+    }
+
+    /// Returns whether any DSL property motion still needs a frame.
+    fn wants_animation_frame(&self) -> bool {
+        self.property_motions.needs_frame()
+    }
+
+    /// Captures laid-out VList heights and rebuilds only when measured geometry changed.
+    ///
+    /// `layout` contains source-identified bounds; `context` schedules a new tree
+    /// when a virtual viewport must select a different mounted row window.
+    fn layout_changed(
+        &mut self,
+        layout: &argui_runtime::LayoutSnapshot,
+        context: &mut argui_runtime::Context<Self>,
+    ) {
+        let next = layout
+            .nodes
+            .iter()
+            .filter_map(|node| {
+                node.retained_identity
+                    .as_ref()
+                    .map(|identity| (identity.clone(), node.bounds.size.height))
+            })
+            .collect();
+        if self.virtual_viewports != next {
+            self.virtual_viewports = next;
+            context.notify();
+        }
+    }
+
+    /// Returns decoded raster assets for the current live generation.
+    fn image_assets(&self) -> Vec<argui_paint::ImageAsset> {
+        self.assets()
+            .records()
+            .filter_map(|record| match record {
+                argui_assets::AssetRecord::Image { asset, .. } => Some(asset.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// Returns decoded SVG assets for the current live generation.
+    fn vector_assets(&self) -> Vec<argui_paint::VectorAsset> {
+        self.assets()
+            .records()
+            .filter_map(|record| match record {
+                argui_assets::AssetRecord::Vector { asset, .. } => Some(asset.clone()),
+                _ => None,
+            })
+            .collect()
+    }
 }
 
 /// Resolves one native two-way binding into its owning DSL property update.

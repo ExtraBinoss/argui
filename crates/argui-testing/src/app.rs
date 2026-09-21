@@ -223,6 +223,10 @@ impl<A: Render> TestApp<A> {
                 .map(|layout| LayoutBounds {
                     node: layout.node,
                     key: self.ui().key(layout.node).map(str::to_owned),
+                    retained_identity: self
+                        .ui()
+                        .element_for(layout.node)
+                        .and_then(|element| element.source_identity().cloned()),
                     bounds: layout.bounds,
                 })
                 .collect(),

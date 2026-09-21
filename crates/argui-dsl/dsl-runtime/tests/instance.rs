@@ -1,52 +1,11 @@
 use std::collections::BTreeMap;
 
 use argui_dsl_compiler::{Compiler, SourceModule};
-use argui_dsl_ir::{
-    AnimationId, CallbackId, ComponentId, IrType, PropertyId, PropertyTargetId, SiteId,
-};
+use argui_dsl_ir::{CallbackId, ComponentId, IrType, PropertyId};
 use argui_dsl_runtime::{
-    AnimationKey, AnimationStore, ComponentInstance, DslValue, DynamicProperty, InstanceId,
-    LivePackage, LiveRuntime, RuntimeError,
+    ComponentInstance, DslValue, DynamicProperty, InstanceId, LivePackage, LiveRuntime,
+    RuntimeError,
 };
-
-#[test]
-fn animation_store_retargets_updates_and_prunes_stable_slots() {
-    let first = AnimationKey {
-        instance: InstanceId::from_raw(1),
-        component: ComponentId::from_raw(2),
-        site: SiteId::from_raw(3),
-        property: PropertyTargetId::Component(PropertyId::from_raw(4)),
-        animation: AnimationId::from_raw(5),
-    };
-    let second = AnimationKey {
-        site: SiteId::from_raw(6),
-        ..first
-    };
-    let mut store = AnimationStore::new();
-    assert!(store.is_empty());
-    assert_eq!(store.len(), 0);
-    assert!(!store.update(first, 9.0, 1.0));
-    {
-        let state = store.retarget(first, 2.0, 10);
-        assert_eq!(state.value, 2.0);
-        assert_eq!(state.velocity, 0.0);
-        assert_eq!(state.specification, 10);
-        state.velocity = 3.5;
-    }
-    assert_eq!(store.get(first).unwrap().velocity, 3.5);
-    assert_eq!(store.retarget(first, 99.0, 11).value, 2.0);
-    assert_eq!(store.get(first).unwrap().specification, 11);
-    assert!(store.update(first, 7.0, -2.0));
-    assert_eq!(store.get(first).unwrap().value, 7.0);
-    assert_eq!(store.get(first).unwrap().velocity, -2.0);
-    store.retarget(second, 4.0, 12);
-    assert_eq!(store.len(), 2);
-    store.retain(|key| *key == second);
-    assert_eq!(store.get(first), None);
-    assert_eq!(store.get(second).unwrap().value, 4.0);
-    store.retain(|_| false);
-    assert!(store.is_empty());
-}
 
 #[test]
 fn dynamic_property_accepts_compatible_values_and_preserves_state_on_errors() {
@@ -347,7 +306,13 @@ export component Main {
             .and_then(|candidate| candidate.callbacks.first())
             .map(|callback| callback.id)
             .unwrap();
-        let mode = compiled.ir.themes[0].modes[0].id;
+        let mode = compiled
+            .ir
+            .themes
+            .iter()
+            .find_map(|theme| theme.modes.first())
+            .expect("fixture should contain a theme mode")
+            .id;
         let package =
             LivePackage::prepare(1, compiled.public_api_hash, compiled.ir, HashMap::new()).unwrap();
         let mut runtime = LiveRuntime::new(package).unwrap();

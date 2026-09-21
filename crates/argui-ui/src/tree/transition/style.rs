@@ -1,7 +1,6 @@
 use argui_core::{Color, Point, Transform2D};
-use argui_paint::{Border, Fill, GradientStop, GradientStops, LayerMask, LayerStyle, QuadStyle};
+use argui_paint::{Border, Fill, LayerMask, LayerStyle, QuadStyle};
 
-use crate::binding::GradientPointTarget;
 use crate::binding::layout::layout_value;
 use crate::state::StateValue;
 use crate::{Element, NodeId, PropertyKey, StyleCondition, StylePropertyValue, VisualStates};
@@ -10,6 +9,11 @@ use super::{NodeSpec, ResolvedProperty, TransitionRegistry, TransitionTarget};
 
 mod effect;
 use effect::{apply_effect, effect_values};
+mod gradient;
+use gradient::{
+    apply_gradient_point, apply_gradient_stop, gradient_values, is_gradient_property,
+    remove_gradient_values,
+};
 mod layout;
 pub(in crate::tree) use layout::apply as apply_layout;
 mod scrollbar;
@@ -283,40 +287,6 @@ fn quad_values(quad: &QuadStyle) -> Vec<StylePropertyValue> {
     values
 }
 
-fn gradient_values(background: &Fill, values: &mut Vec<StylePropertyValue>) {
-    let (first, second, stops) = match background {
-        Fill::Linear(gradient) => (
-            (GradientPointTarget::LinearStart, gradient.start),
-            (GradientPointTarget::LinearEnd, gradient.end),
-            &gradient.stops,
-        ),
-        Fill::Radial(gradient) => (
-            (GradientPointTarget::RadialCenter, gradient.center),
-            (GradientPointTarget::RadialRadius, gradient.radius),
-            &gradient.stops,
-        ),
-        Fill::Solid(_) | Fill::Bilinear(_) => return,
-    };
-    values.push(value(
-        PropertyKey::GradientPoint(first.0),
-        StateValue::Point(first.1),
-    ));
-    values.push(value(
-        PropertyKey::GradientPoint(second.0),
-        StateValue::Point(second.1),
-    ));
-    for (index, stop) in stops.as_slice().iter().enumerate() {
-        values.push(value(
-            PropertyKey::GradientStopOffset(index),
-            StateValue::F32(stop.offset),
-        ));
-        values.push(value(
-            PropertyKey::GradientStopColor(index),
-            StateValue::Color(stop.color),
-        ));
-    }
-}
-
 fn layer_values(layer: &LayerStyle, values: &mut Vec<StylePropertyValue>) {
     values.push(value(
         PropertyKey::LayerOpacity,
@@ -347,19 +317,6 @@ fn layer_values(layer: &LayerStyle, values: &mut Vec<StylePropertyValue>) {
         ));
     }
     effect_values(layer, values);
-}
-
-fn is_gradient_property(key: &PropertyKey) -> bool {
-    matches!(
-        key,
-        PropertyKey::GradientPoint(_)
-            | PropertyKey::GradientStopOffset(_)
-            | PropertyKey::GradientStopColor(_)
-    )
-}
-
-fn remove_gradient_values(values: &mut Vec<ResolvedProperty>) {
-    values.retain(|value| !is_gradient_property(&value.property.key));
 }
 
 fn value(key: PropertyKey, value: StateValue) -> StylePropertyValue {
@@ -426,6 +383,11 @@ fn apply_quad_target(
             (PropertyKey::GradientPoint(target), StateValue::Point(value)) => {
                 apply_gradient_point(&mut quad.background, *target, value);
             }
+            (PropertyKey::GradientAngle, StateValue::F32(value)) => {
+                if let Some(Fill::Conic(gradient)) = &mut quad.background {
+                    gradient.start_angle = value;
+                }
+            }
             (PropertyKey::GradientStopOffset(index), StateValue::F32(value)) => {
                 apply_gradient_stop(&mut quad.background, *index, |stop| stop.offset = value);
             }
@@ -435,40 +397,6 @@ fn apply_quad_target(
             _ => {}
         }
     });
-}
-
-fn apply_gradient_point(fill: &mut Option<Fill>, target: GradientPointTarget, value: Point) {
-    match (fill, target) {
-        (Some(Fill::Linear(gradient)), GradientPointTarget::LinearStart) => gradient.start = value,
-        (Some(Fill::Linear(gradient)), GradientPointTarget::LinearEnd) => gradient.end = value,
-        (Some(Fill::Radial(gradient)), GradientPointTarget::RadialCenter) => {
-            gradient.center = value;
-        }
-        (Some(Fill::Radial(gradient)), GradientPointTarget::RadialRadius) => {
-            gradient.radius = value;
-        }
-        _ => {}
-    }
-}
-
-fn apply_gradient_stop(
-    fill: &mut Option<Fill>,
-    index: usize,
-    apply: impl FnOnce(&mut GradientStop),
-) {
-    let stops = match fill {
-        Some(Fill::Linear(gradient)) => &mut gradient.stops,
-        Some(Fill::Radial(gradient)) => &mut gradient.stops,
-        _ => return,
-    };
-    let mut resolved = stops.as_slice().to_vec();
-    let Some(stop) = resolved.get_mut(index) else {
-        return;
-    };
-    apply(stop);
-    if let Ok(resolved) = GradientStops::from_vec(resolved) {
-        *stops = resolved;
-    }
 }
 
 pub(in crate::tree) fn apply_transform(

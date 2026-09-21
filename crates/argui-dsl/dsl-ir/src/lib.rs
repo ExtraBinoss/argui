@@ -19,11 +19,12 @@ pub use id::{
 };
 pub use lower::lower;
 pub use model::{
-    AssetKind, AssignmentOperator, BinaryOperator, BuiltinFunction, IrAnimation,
-    IrAnimationParameter, IrAsset, IrAssignmentTarget, IrCallback, IrComponent, IrEffect,
-    IrEffectParameter, IrElementTarget, IrEnum, IrEnumVariant, IrEventBinding, IrExpression,
-    IrExpressionKind, IrImport, IrModule, IrNode, IrProject, IrProperty, IrPropertyBinding,
-    IrState, IrStatement, IrStruct, IrStructField, IrStyle, IrStyleState, IrTheme, IrThemeMode,
-    IrThemeToken, IrValue, SourceInfo, UnaryOperator,
+    AssetKind, AssignmentOperator, BinaryOperator, BuiltinFunction, IrAnimation, IrAnimationDriver,
+    IrAnimationKeyframe, IrAnimationParameter, IrAsset, IrAssignmentTarget, IrCallback,
+    IrComponent, IrEffect, IrEffectParameter, IrElementTarget, IrEnum, IrEnumVariant,
+    IrEventBinding, IrExpression, IrExpressionKind, IrImport, IrModule, IrNode, IrProject,
+    IrProperty, IrPropertyBinding, IrState, IrStatement, IrStruct, IrStructField, IrStyle,
+    IrStyleState, IrTheme, IrThemeMode, IrThemeToken, IrTransitionPolicy, IrValue, SourceInfo,
+    UnaryOperator,
 };
 pub use types::IrType;

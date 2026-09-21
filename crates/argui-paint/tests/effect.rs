@@ -173,3 +173,22 @@ fn compositor_and_effect_layers_must_close_in_stack_order() {
         Err(DisplayListError::MismatchedLayerEnd { command: 1 })
     );
 }
+
+#[test]
+fn owned_effect_names_preserve_identity_and_parameter_order() {
+    let owned = EffectId::from_owned("custom.blur".to_owned());
+    let shared = EffectId::from_name(argui_core::Name::from_owned("custom.blur".to_owned()));
+    assert_eq!(owned, shared);
+    assert_eq!(owned.as_str(), "custom.blur");
+    assert_eq!(owned.to_string(), "custom.blur");
+    let effect = EffectInstance::new(
+        owned,
+        [
+            EffectArgument::from_owned("radius".to_owned(), EffectValue::LogicalPixels(4.0)),
+            EffectArgument::from_owned("enabled".to_owned(), EffectValue::Bool(true)),
+        ],
+    );
+    assert_eq!(effect.parameters[0].name.as_str(), "radius");
+    assert_eq!(effect.parameters[1].name.as_str(), "enabled");
+    assert_eq!(effect.packed_words(), vec![4.0_f32.to_bits(), 1]);
+}

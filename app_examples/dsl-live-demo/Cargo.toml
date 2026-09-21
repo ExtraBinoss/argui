@@ -1,0 +1,27 @@
+[package]
+name = "argui-example-dsl-live-demo"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+description = "A small Argui DSL app with AOT and live development modes"
+build = "build.rs"
+
+[features]
+argui-live = ["argui/tasks", "dep:argui-dsl-runtime"]
+
+[dependencies]
+argui.workspace = true
+argui-dsl-runtime = { path = "../../crates/argui-dsl/dsl-runtime", optional = true }
+
+[build-dependencies]
+argui-dsl-build = { path = "../../crates/argui-dsl/dsl-build" }
+
+[dev-dependencies]
+argui-testing.workspace = true
+argui-dsl-compiler = { path = "../../crates/argui-dsl/dsl-compiler" }
+
+[lints]
+workspace = true

@@ -346,7 +346,7 @@ mod client_edges {
     };
 
     use argui_dsl_protocol::{DiagnosticMessage, LiveMessage, Severity, write_frame};
-    use argui_dsl_runtime::{ClientEvent, LiveClient, RuntimeError};
+    use argui_dsl_runtime::{ClientEvent, LiveClient, LiveRuntime, RuntimeError};
 
     fn hello() -> LiveMessage {
         let versions = argui_dsl_protocol::RuntimeVersions::current();
@@ -444,6 +444,86 @@ mod client_edges {
             Err(error) => error,
         };
         assert!(matches!(error, RuntimeError::IncompatiblePackage(_)));
+        task.join().unwrap();
+    }
+
+    #[test]
+    fn reader_translates_wire_statuses_without_losing_their_order() {
+        let (address, task) = server(|stream| {
+            write_frame(stream, &hello()).unwrap();
+            for message in [
+                LiveMessage::RestartRequired {
+                    generation: 4,
+                    previous_api_hash: 10,
+                    next_api_hash: 11,
+                },
+                LiveMessage::Rejected {
+                    generation: 5,
+                    message: "invalid asset".into(),
+                },
+                LiveMessage::Committed { generation: 6 },
+                hello(),
+            ] {
+                write_frame(stream, &message).unwrap();
+            }
+        });
+        let client = LiveClient::connect(address).unwrap();
+        assert_eq!(
+            client.receive_timeout(Duration::from_secs(1)),
+            Some(ClientEvent::RestartRequired {
+                generation: 4,
+                previous_api_hash: 10,
+                next_api_hash: 11,
+            })
+        );
+        let Some(ClientEvent::Diagnostics {
+            generation,
+            diagnostics,
+        }) = client.receive_timeout(Duration::from_secs(1))
+        else {
+            panic!("rejection must become a diagnostic event");
+        };
+        assert_eq!(generation, 5);
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].code, "rejected");
+        assert_eq!(diagnostics[0].message, "invalid asset");
+        assert_eq!(diagnostics[0].severity, Severity::Error);
+        assert!(matches!(
+            client.receive_timeout(Duration::from_secs(1)),
+            Some(ClientEvent::Diagnostics {
+                generation: 6,
+                diagnostics,
+            }) if diagnostics.is_empty()
+        ));
+        assert_eq!(
+            client.receive_timeout(Duration::from_secs(1)),
+            Some(ClientEvent::Disconnected(
+                "unexpected repeated hello frame".into()
+            ))
+        );
+        task.join().unwrap();
+    }
+
+    #[test]
+    fn initial_restart_status_reports_the_host_request() {
+        let (address, task) = server(|stream| {
+            write_frame(stream, &hello()).unwrap();
+            write_frame(
+                stream,
+                &LiveMessage::RestartRequired {
+                    generation: 2,
+                    previous_api_hash: 3,
+                    next_api_hash: 4,
+                },
+            )
+            .unwrap();
+        });
+        let result = LiveRuntime::connect(address, Duration::from_secs(1));
+        assert!(matches!(
+            result,
+            Err(RuntimeError::IncompatiblePackage(message))
+                if message.contains("requested a restart")
+        ));
         task.join().unwrap();
     }
 }

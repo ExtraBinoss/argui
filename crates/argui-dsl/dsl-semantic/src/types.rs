@@ -111,6 +111,23 @@ impl Type {
                 | Self::LineHeight
         )
     }
+
+    /// Returns whether values of this type have a defined animation interpolation.
+    ///
+    /// Discrete values such as strings, booleans, and assets cannot be interpolated.
+    #[must_use]
+    pub const fn is_interpolable(&self) -> bool {
+        matches!(
+            self,
+            Self::Int
+                | Self::Float
+                | Self::Length
+                | Self::Dimension
+                | Self::Percentage
+                | Self::Angle
+                | Self::Color
+        )
+    }
 }
 
 impl std::fmt::Display for Type {
@@ -151,5 +168,6 @@ pub(crate) fn from_schema(value: argui_schema::ValueType) -> Type {
         argui_schema::ValueType::Border => Type::Border,
         argui_schema::ValueType::Shadow => Type::Shadow,
         argui_schema::ValueType::Transform => Type::Transform,
+        argui_schema::ValueType::Asset => Type::Asset,
     }
 }

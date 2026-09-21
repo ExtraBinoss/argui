@@ -7,6 +7,9 @@ use argui_dsl_ir::{
 use argui_dsl_runtime::{DslValue, EvaluationContext, Instruction, Program, RuntimeError};
 use argui_dsl_syntax::{FileId, Span, TextRange, TextSize};
 
+#[path = "bytecode/gradient.rs"]
+mod gradient;
+
 fn source() -> SourceInfo {
     SourceInfo::new(
         Span::new(FileId::from_raw(1), TextRange::empty(TextSize::from(0))),
@@ -104,6 +107,61 @@ fn malformed(instructions: Vec<Instruction>, result_type: IrType) -> Program {
     program.result_type = result_type;
     program.instructions = instructions;
     program
+}
+
+/// Scalar formatting and substring checks evaluate identically in live bytecode.
+#[test]
+fn builtin_string_functions_evaluate_and_reject_invalid_values() {
+    let mut context = Context::default();
+    for (argument, expected) in [
+        (int(901, 42), "42"),
+        (float(902, 2.5), "2.5"),
+        (bool_value(903, true), "true"),
+        (string(904, "ready"), "ready"),
+    ] {
+        let result = evaluate(
+            expression(
+                905,
+                IrType::String,
+                IrExpressionKind::BuiltinCall {
+                    function: BuiltinFunction::Stringify,
+                    arguments: vec![argument],
+                },
+            ),
+            &mut context,
+        )
+        .unwrap();
+        assert_eq!(result, DslValue::String(expected.into()));
+    }
+    assert_eq!(
+        evaluate(
+            expression(
+                906,
+                IrType::Bool,
+                IrExpressionKind::BuiltinCall {
+                    function: BuiltinFunction::Contains,
+                    arguments: vec![string(907, "ada@example.com"), string(908, "@")],
+                },
+            ),
+            &mut context,
+        )
+        .unwrap(),
+        DslValue::Bool(true)
+    );
+    assert!(matches!(
+        evaluate(
+            expression(
+                909,
+                IrType::Bool,
+                IrExpressionKind::BuiltinCall {
+                    function: BuiltinFunction::Contains,
+                    arguments: vec![string(910, "abc"), int(911, 1)],
+                },
+            ),
+            &mut context,
+        ),
+        Err(RuntimeError::InvalidBytecode(_))
+    ));
 }
 
 #[test]
@@ -517,52 +575,4 @@ fn malformed_programs_return_stable_errors_and_dependencies_are_deduplicated() {
         .evaluate(&mut Context::default()),
         Err(RuntimeError::InvalidBytecode(message)) if message.contains("2 stack values")
     ));
-}
-
-#[test]
-fn value_compatibility_and_type_names_cover_all_dsl_values() {
-    let values = [
-        DslValue::Null,
-        DslValue::Bool(true),
-        DslValue::Int(1),
-        DslValue::Float(1.0),
-        DslValue::String("x".into()),
-        DslValue::Color(argui_core::Color::WHITE),
-        DslValue::Struct(BTreeMap::new()),
-        DslValue::Enum {
-            symbol: 1,
-            variant: 2,
-        },
-        DslValue::Array(Vec::new()),
-        DslValue::Asset(argui_dsl_ir::AssetId::from_raw(1)),
-    ];
-    assert_eq!(
-        values.iter().map(DslValue::type_name).collect::<Vec<_>>(),
-        vec![
-            "null", "bool", "int", "float", "string", "color", "struct", "enum", "array", "asset"
-        ]
-    );
-    assert!(DslValue::Null.compatible_with(&IrType::Optional(Box::new(IrType::String))));
-    assert!(DslValue::Int(1).compatible_with(&IrType::Float));
-    assert!(DslValue::Float(1.0).compatible_with(&IrType::Duration));
-    assert!(DslValue::String("x".into()).compatible_with(&IrType::FontWeight));
-    assert!(DslValue::Color(argui_core::Color::WHITE).compatible_with(&IrType::Color));
-    assert!(
-        DslValue::Struct(BTreeMap::new()).compatible_with(&IrType::Struct {
-            symbol: argui_dsl_semantic::SymbolId::derive("m", "struct", "S"),
-            fields: Vec::new(),
-        })
-    );
-    assert!(
-        DslValue::Enum {
-            symbol: 1,
-            variant: 2
-        }
-        .compatible_with(&IrType::Enum(argui_dsl_semantic::SymbolId::derive(
-            "m", "enum", "E"
-        )))
-    );
-    assert!(DslValue::Array(Vec::new()).compatible_with(&IrType::Model(Box::new(IrType::Int))));
-    assert!(DslValue::Asset(argui_dsl_ir::AssetId::from_raw(1)).compatible_with(&IrType::Asset));
-    assert!(!DslValue::Bool(true).compatible_with(&IrType::String));
 }

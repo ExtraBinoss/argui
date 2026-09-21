@@ -516,3 +516,49 @@ fn explicit_shutdown_cancels_surviving_owners_and_refuses_new_work() {
     });
     runtime.shutdown();
 }
+
+#[test]
+fn closing_the_model_scope_closes_its_mount_and_rejects_new_tasks() {
+    let (runtime, _) = runtime();
+    let model = Entity::new(Model::default());
+    model.set_task_runtime(runtime);
+    let mount = model.mount().unwrap();
+    assert!(!mount.resources().is_closed());
+
+    model.resources().close();
+    assert!(mount.resources().is_closed());
+    assert!(model.mount().is_err());
+    model.update(|_, cx| {
+        assert!(matches!(
+            cx.spawn(async {}, |_, _, _| {}),
+            Err(TaskError::ScopeClosed)
+        ));
+    });
+    assert!(matches!(
+        mount.spawn(async {}, |_, _, _| {}),
+        Err(TaskError::ScopeClosed)
+    ));
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn blocking_worker_panic_is_delivered_as_a_task_error() {
+    let (runtime, wake) = runtime();
+    let model = Entity::new(Model::default());
+    model.set_task_runtime(runtime.clone());
+    let received = Rc::new(Cell::new(false));
+    let observed = received.clone();
+    let handle = model.update_task(move |cx| {
+        cx.spawn_blocking(
+            |_| -> usize { panic!("worker failure") },
+            move |_, result, _| {
+                assert_eq!(result, Err(TaskError::Panicked));
+                observed.set(true);
+            },
+        )
+    });
+    pump(&runtime, &wake);
+    assert!(handle.is_finished());
+    assert!(received.get());
+    assert_eq!(runtime.pending(), 0);
+}

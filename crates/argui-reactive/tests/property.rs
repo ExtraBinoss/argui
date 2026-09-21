@@ -1,6 +1,18 @@
 use std::{cell::RefCell, rc::Rc};
 
-use argui_reactive::{Property, transaction};
+use argui_reactive::{Computed, Property, transaction};
+
+#[test]
+fn borrowed_reads_do_not_clone_large_models_and_track_dependencies() {
+    let rows = Property::new((0..10_000).collect::<Vec<_>>());
+    let original = rows.with(|items| items.as_ptr());
+    assert_eq!(rows.with(|items| items.as_ptr()), original);
+    let observed = rows.clone();
+    let count = Computed::new("row count", move || observed.with(Vec::len));
+    assert_eq!(count.get(), Ok(10_000));
+    rows.set(vec![1, 2, 3]);
+    assert_eq!(count.get(), Ok(3));
+}
 
 #[test]
 fn transactions_coalesce_nested_writes_into_one_notification() {

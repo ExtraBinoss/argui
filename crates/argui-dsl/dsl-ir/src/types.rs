@@ -108,8 +108,13 @@ impl IrType {
         }
     }
 
-    /// Converts a canonical native-schema type to its DSL IR counterpart.
-    pub(crate) const fn from_schema(value: argui_schema::ValueType) -> Self {
+    /// Converts a canonical native-schema value type to the matching IR type.
+    ///
+    /// * `value` — native property type from the shared schema metadata.
+    ///
+    /// Returns the IR type used by both AOT code generation and the live runtime.
+    #[must_use]
+    pub const fn from_schema(value: argui_schema::ValueType) -> Self {
         match value {
             argui_schema::ValueType::Bool => Self::Bool,
             argui_schema::ValueType::Int => Self::Int,
@@ -123,6 +128,7 @@ impl IrType {
             argui_schema::ValueType::Border => Self::Border,
             argui_schema::ValueType::Shadow => Self::Shadow,
             argui_schema::ValueType::Transform => Self::Transform,
+            argui_schema::ValueType::Asset => Self::Asset,
         }
     }
 }

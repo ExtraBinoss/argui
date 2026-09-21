@@ -1,0 +1,21 @@
+import { Separator } from "@argui/ui"
+import { Column, Text } from "@argui/native"
+
+export component SeparatorPage {
+    Column #separator_page {
+        width: 100%
+        gap: 20.0
+
+        Text { content: "Separator" color: var(--argui-foreground) weight: 700 font_size: 27.0 }
+        Text { content: "A quiet divider between related sections." color: var(--argui-muted-foreground) font_size: 14.0 }
+        Column {
+            width: 100%
+            gap: 14.0
+            Text { content: "Account" color: var(--argui-foreground) weight: 600 font_size: 15.0 }
+            Separator {}
+            Text { content: "Preferences" color: var(--argui-foreground) weight: 600 font_size: 15.0 }
+            Separator {}
+            Text { content: "Privacy" color: var(--argui-foreground) weight: 600 font_size: 15.0 }
+        }
+    }
+}

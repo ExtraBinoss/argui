@@ -1,26 +1,26 @@
 //! Read-only, cross-platform terminal presentation for `argui dev`.
 
-use std::{collections::VecDeque, io, io::IsTerminal, net::SocketAddr, path::Path};
+use std::{collections::VecDeque, net::SocketAddr, path::Path};
 
 use ratatui::{
-    Frame, Terminal,
-    backend::CrosstermBackend,
-    crossterm::{
-        ExecutableCommand,
-        terminal::{EnterAlternateScreen, LeaveAlternateScreen},
-    },
+    Frame,
     layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Gauge, Paragraph},
+    widgets::{Block, Borders, Paragraph, Wrap},
 };
 
-use argui_dsl_protocol::LiveMessage;
+use argui_dsl_protocol::{DiagnosticMessage, LiveMessage, Severity};
 
 use crate::SourceChange;
 
 /// Amber accent used for pending generations and recoverable warnings.
 pub const AMBER: Color = Color::Rgb(245, 158, 11);
+
+mod console;
+mod progress;
+pub use console::DevConsole;
+use progress::ProgressBar;
 
 /// Observable stage of a live update, rather than an estimated compiler percentage.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -33,7 +33,7 @@ pub enum DevPhase {
 }
 
 impl DevPhase {
-    /// Returns the stage completion ratio displayed by the progress gauge.
+    /// Returns the stage completion ratio displayed by the progress bar.
     #[must_use]
     pub const fn ratio(self) -> f64 {
         match self {
@@ -65,6 +65,7 @@ pub struct DevDashboard {
     phase: DevPhase,
     generation: Option<u64>,
     native_clients: usize,
+    status: String,
     events: VecDeque<(String, Color)>,
 }
 
@@ -79,6 +80,7 @@ impl DevDashboard {
             phase: DevPhase::Watching,
             generation: None,
             native_clients: 0,
+            status: "Waiting for source changes".into(),
             events: VecDeque::with_capacity(64),
         }
     }
@@ -92,6 +94,7 @@ impl DevDashboard {
     /// Records one source delta with its exact known location and values.
     pub fn change(&mut self, change: &SourceChange) {
         self.phase = DevPhase::Changed;
+        self.status = format!("Compiling change in {}", change.path);
         let location = match (change.line, change.column) {
             (Some(line), Some(column)) => format!("{}:{line}:{column}", change.path),
             _ => change.path.clone(),
@@ -107,6 +110,7 @@ impl DevDashboard {
             LiveMessage::Package(package) => {
                 self.phase = DevPhase::Compiled;
                 self.generation = Some(package.header.generation);
+                self.status = "Package ready; waiting for a connected client".into();
                 self.push(
                     format!(
                         "Generation {} compiled · awaiting client",
@@ -121,11 +125,21 @@ impl DevDashboard {
             } => {
                 self.phase = DevPhase::Rejected;
                 self.generation = Some(*generation);
+                self.status = diagnostics
+                    .iter()
+                    .find(|diagnostic| diagnostic.severity == Severity::Error)
+                    .or_else(|| diagnostics.first())
+                    .map_or_else(
+                        || "Compilation rejected without details".into(),
+                        |diagnostic| format!("{}: {}", diagnostic.code, diagnostic.message),
+                    );
                 for diagnostic in diagnostics {
                     self.push(
                         format!(
-                            "Generation {generation} rejected · {}: {}",
-                            diagnostic.code, diagnostic.message
+                            "Generation {generation} rejected · {} · {}: {}",
+                            self.diagnostic_location(diagnostic),
+                            diagnostic.code,
+                            diagnostic.message
                         ),
                         Color::Red,
                     );
@@ -166,6 +180,7 @@ impl DevDashboard {
             LiveMessage::Committed { generation } => {
                 self.phase = DevPhase::Applied;
                 self.generation = Some(*generation);
+                self.status = format!("Generation {generation} confirmed by {peer}");
                 self.push(
                     format!("Generation {generation} applied by {peer}"),
                     Color::Green,
@@ -177,6 +192,7 @@ impl DevDashboard {
             } => {
                 self.phase = DevPhase::Rejected;
                 self.generation = Some(*generation);
+                self.status = message.clone();
                 self.push(
                     format!("Generation {generation} rejected by {peer} · {message}"),
                     Color::Red,
@@ -185,6 +201,7 @@ impl DevDashboard {
             LiveMessage::RestartRequired { generation, .. } => {
                 self.phase = DevPhase::Rejected;
                 self.generation = Some(*generation);
+                self.status = "Rust API changed; restart the application".into();
                 self.push(
                     format!("Generation {generation} changes Rust ABI · restart the app"),
                     AMBER,
@@ -199,19 +216,39 @@ impl DevDashboard {
         self.push(message.into(), color);
     }
 
-    /// Renders one frame without polling input or scheduling idle redraws.
+    /// Renders a full or compact frame according to the current terminal dimensions.
     pub fn render(&self, frame: &mut Frame<'_>) {
         let area = frame.area();
-        let sections = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Length(3),
-                Constraint::Length(3),
-                Constraint::Length(3),
-                Constraint::Min(1),
-                Constraint::Length(2),
-            ])
-            .split(area);
+        if area.width < 28 || area.height < 7 {
+            frame.render_widget(
+                Paragraph::new("Argui dev: enlarge the terminal")
+                    .style(Style::default().fg(AMBER))
+                    .wrap(Wrap { trim: true }),
+                area,
+            );
+            return;
+        }
+        let compact = area.width < 68 || area.height < 13;
+        let sections = if compact {
+            Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Length(1),
+                    Constraint::Length(4),
+                    Constraint::Min(1),
+                ])
+                .split(area)
+        } else {
+            Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Length(3),
+                    Constraint::Length(4),
+                    Constraint::Length(3),
+                    Constraint::Min(1),
+                ])
+                .split(area)
+        };
         let heading = Line::from(vec![
             Span::styled(
                 "◆ ARGUI ",
@@ -225,67 +262,113 @@ impl DevDashboard {
                     .fg(Color::White)
                     .add_modifier(Modifier::BOLD),
             ),
-            Span::raw(format!("   {}", self.root)),
+            Span::raw(if compact {
+                String::new()
+            } else {
+                format!("   {}", self.root)
+            }),
         ]);
-        frame.render_widget(
-            Paragraph::new(heading).block(Block::default().borders(Borders::ALL)),
-            sections[0],
-        );
-        let (phase_label, phase_color) = self.phase.presentation();
-        frame.render_widget(
-            Gauge::default()
-                .block(
-                    Block::default()
-                        .title(" Live update ")
-                        .borders(Borders::ALL),
-                )
-                .gauge_style(Style::default().fg(phase_color))
-                .label(format!(
-                    "{phase_label} · generation {}",
-                    self.generation
-                        .map_or_else(|| "—".into(), |value| value.to_string())
-                ))
-                .ratio(self.phase.ratio()),
-            sections[1],
-        );
-        let connection_color = if self.native_clients == 0 {
-            AMBER
+        let heading = Paragraph::new(heading);
+        if compact {
+            frame.render_widget(heading, sections[0]);
         } else {
-            Color::Green
+            frame.render_widget(
+                heading.block(Block::default().borders(Borders::ALL)),
+                sections[0],
+            );
+        }
+        let (phase_label, phase_color) = self.phase.presentation();
+        let generation = self
+            .generation
+            .map_or_else(|| "—".into(), |value| value.to_string());
+        let progress = ProgressBar {
+            ratio: self.phase.ratio(),
+            color: phase_color,
         };
-        let connections = Line::from(vec![
-            Span::styled(
-                format!("● {} native  ", self.native_clients),
-                Style::default().fg(connection_color),
-            ),
-            Span::raw(format!("tcp://{}   ws://{}", self.native, self.browser)),
-        ]);
-        frame.render_widget(
-            Paragraph::new(connections).block(
-                Block::default()
-                    .title(" Connections ")
-                    .borders(Borders::ALL),
-            ),
-            sections[2],
-        );
-        let visible = usize::from(sections[3].height.saturating_sub(2));
+        progress.render(frame, sections[1], phase_label, &generation, &self.status);
+        let activity = if compact {
+            sections[2]
+        } else {
+            let connection_color = if self.native_clients == 0 {
+                AMBER
+            } else {
+                Color::Green
+            };
+            let connections = Line::from(vec![
+                Span::styled(
+                    format!("● {} native  ", self.native_clients),
+                    Style::default().fg(connection_color),
+                ),
+                Span::raw(format!("tcp://{}   ws://{}", self.native, self.browser)),
+            ]);
+            frame.render_widget(
+                Paragraph::new(connections).block(
+                    Block::default()
+                        .title(" Connections ")
+                        .borders(Borders::ALL),
+                ),
+                sections[2],
+            );
+            sections[3]
+        };
         let lines = self
             .events
             .iter()
-            .rev()
-            .take(visible)
-            .rev()
             .map(|(message, color)| Line::styled(message.as_str(), Style::default().fg(*color)))
             .collect::<Vec<_>>();
-        frame.render_widget(
-            Paragraph::new(lines).block(Block::default().title(" Activity ").borders(Borders::ALL)),
-            sections[3],
+        let visible = usize::from(activity.height.saturating_sub(2));
+        let content_width = usize::from(activity.width.saturating_sub(2)).max(1);
+        let rows = self
+            .events
+            .iter()
+            .map(|(message, _)| message.chars().count().div_ceil(content_width).max(1))
+            .sum::<usize>();
+        let scroll = rows.saturating_sub(visible);
+        let paragraph = Paragraph::new(lines).wrap(Wrap { trim: false }).block(
+            Block::default()
+                .title(" Activity · Ctrl+C to stop ")
+                .borders(Borders::ALL),
         );
         frame.render_widget(
-            Paragraph::new("Ctrl+C to stop · no mouse input")
-                .style(Style::default().fg(Color::DarkGray)),
-            sections[4],
+            paragraph.scroll((u16::try_from(scroll).unwrap_or(u16::MAX), 0)),
+            activity,
         );
+    }
+
+    /// Resolves a diagnostic byte offset to a one-based source line and column.
+    #[must_use]
+    pub fn diagnostic_location(&self, diagnostic: &DiagnosticMessage) -> String {
+        let Some(path) = diagnostic.path.as_deref() else {
+            return "source location unavailable".into();
+        };
+        let Some(offset) = diagnostic.start else {
+            return path.into();
+        };
+        let source = std::fs::read_to_string(Path::new(&self.root).join(path));
+        let Ok(source) = source else {
+            return format!("{path}:byte {offset}");
+        };
+        let end = usize::try_from(offset)
+            .unwrap_or(usize::MAX)
+            .min(source.len());
+        let boundary = (0..=end)
+            .rev()
+            .find(|index| source.is_char_boundary(*index))
+            .unwrap_or(0);
+        let prefix = &source[..boundary];
+        let line = prefix
+            .chars()
+            .filter(|character| *character == '\n')
+            .count()
+            + 1;
+        let column = prefix
+            .rsplit('\n')
+            .next()
+            .unwrap_or_default()
+            .chars()
+            .count()
+            + 1;
+        format!("{path}:{line}:{column}")
     }
 
     /// Adds an event and drops the oldest one when the history is full.
@@ -294,224 +377,5 @@ impl DevDashboard {
             self.events.pop_front();
         }
         self.events.push_back((message, color));
-    }
-}
-
-/// Optional terminal renderer; redirected runs retain ordinary line-oriented output.
-pub struct DevConsole {
-    dashboard: DevDashboard,
-    terminal: Option<Terminal<CrosstermBackend<io::Stderr>>>,
-}
-
-impl DevConsole {
-    /// Enters the alternate screen only for an interactive terminal.
-    ///
-    /// # Errors
-    ///
-    /// Returns a terminal setup error if the alternate screen cannot be initialized.
-    pub fn new(root: &Path, native: SocketAddr, browser: SocketAddr) -> io::Result<Self> {
-        let interactive = io::stdin().is_terminal()
-            && io::stderr().is_terminal()
-            && std::env::var("TERM").map_or(true, |term| term != "dumb");
-        let terminal = if interactive {
-            let mut output = io::stderr();
-            output.execute(EnterAlternateScreen)?;
-            match Terminal::new(CrosstermBackend::new(output)) {
-                Ok(terminal) => Some(terminal),
-                Err(error) => {
-                    let _ = io::stderr().execute(LeaveAlternateScreen);
-                    return Err(error);
-                }
-            }
-        } else {
-            None
-        };
-        let mut console = Self {
-            dashboard: DevDashboard::new(root, native, browser),
-            terminal,
-        };
-        console.draw()?;
-        Ok(console)
-    }
-
-    /// Returns whether the alternate-screen dashboard is active.
-    #[must_use]
-    pub const fn interactive(&self) -> bool {
-        self.terminal.is_some()
-    }
-
-    /// Applies a change to the dashboard and redraws it once.
-    ///
-    /// # Errors
-    ///
-    /// Returns terminal output errors.
-    pub fn change(&mut self, change: &SourceChange) -> io::Result<()> {
-        let location = match (change.line, change.column) {
-            (Some(line), Some(column)) => format!("{}:{line}:{column}", change.path),
-            _ => change.path.clone(),
-        };
-        let line = format!(
-            "\n  ↻ Change detected · {location}\n    − {}\n    + {}",
-            change.before, change.after
-        );
-        self.dispatch([line], |dashboard| dashboard.change(change))
-    }
-
-    /// Records one compilation result and redraws it once.
-    ///
-    /// # Errors
-    ///
-    /// Returns terminal output errors.
-    pub fn compilation(&mut self, message: &LiveMessage) -> io::Result<()> {
-        let lines = match message {
-            LiveMessage::Package(package) => vec![format!(
-                "  ✓ Generation {} compiled · awaiting client confirmation",
-                package.header.generation
-            )],
-            LiveMessage::Diagnostics {
-                generation,
-                diagnostics,
-            } => diagnostics
-                .iter()
-                .map(|diagnostic| {
-                    format!(
-                        "  ✗ Generation {generation} rejected · {}: {}",
-                        diagnostic.code, diagnostic.message
-                    )
-                })
-                .collect(),
-            _ => Vec::new(),
-        };
-        self.dispatch(lines, |dashboard| dashboard.compilation(message))
-    }
-
-    /// Records a client acknowledgement and redraws the terminal.
-    ///
-    /// # Errors
-    ///
-    /// Returns terminal output errors.
-    pub fn client_status(&mut self, peer: SocketAddr, message: &LiveMessage) -> io::Result<()> {
-        let lines = match message {
-            LiveMessage::Committed { generation } => {
-                vec![format!("  ✓ Generation {generation} applied by {peer}")]
-            }
-            LiveMessage::Rejected {
-                generation,
-                message,
-            } => vec![format!(
-                "  ✗ Generation {generation} rejected by {peer} · {message}"
-            )],
-            LiveMessage::RestartRequired { generation, .. } => vec![format!(
-                "  ⚠ Generation {generation} changes the Rust-facing ABI · restart the app"
-            )],
-            _ => vec![format!("  ⚠ Unexpected client status from {peer}")],
-        };
-        self.dispatch(lines, |dashboard| dashboard.client_status(peer, message))
-    }
-
-    /// Records an informational line and redraws the terminal.
-    ///
-    /// # Errors
-    ///
-    /// Returns terminal output errors.
-    pub fn note(&mut self, message: impl Into<String>, color: Color) -> io::Result<()> {
-        let message = message.into();
-        self.dispatch([format!("  {message}")], |dashboard| {
-            dashboard.note(message, color);
-        })
-    }
-
-    /// Records a burst of application output and performs at most one redraw.
-    ///
-    /// # Errors
-    ///
-    /// Returns terminal output errors.
-    pub fn notes(
-        &mut self,
-        messages: impl IntoIterator<Item = String>,
-        color: Color,
-    ) -> io::Result<()> {
-        let messages = messages.into_iter().collect::<Vec<_>>();
-        if messages.is_empty() {
-            return Ok(());
-        }
-        let lines = messages
-            .iter()
-            .map(|message| format!("  {message}"))
-            .collect::<Vec<_>>();
-        self.dispatch(lines, |dashboard| {
-            for message in messages {
-                dashboard.note(message, color);
-            }
-        })
-    }
-
-    /// Updates the connected native-client count and redraws it once.
-    ///
-    /// # Errors
-    ///
-    /// Returns terminal output errors.
-    pub fn clients(&mut self, count: usize) -> io::Result<()> {
-        if self.dashboard.native_clients == count {
-            return Ok(());
-        }
-        self.dashboard.clients(count);
-        self.draw()
-    }
-
-    /// Records a new native connection and redraws the terminal.
-    ///
-    /// # Errors
-    ///
-    /// Returns terminal output errors.
-    pub fn connected(&mut self, peer: SocketAddr) -> io::Result<()> {
-        self.dispatch(
-            [format!("  ◇ Native client connected · {peer}")],
-            |dashboard| dashboard.connected(peer),
-        )
-    }
-
-    /// Emits non-interactive lines, applies one dashboard mutation, and redraws once.
-    ///
-    /// * `lines` — complete line-oriented messages for redirected console output.
-    /// * `mutate` — dashboard update to apply after any redirected output.
-    ///
-    /// # Errors
-    ///
-    /// Returns terminal output errors from the optional redraw.
-    fn dispatch<I, F>(&mut self, lines: I, mutate: F) -> io::Result<()>
-    where
-        I: IntoIterator<Item = String>,
-        F: FnOnce(&mut DevDashboard),
-    {
-        let lines = lines.into_iter().collect::<Vec<_>>();
-        if !self.interactive() {
-            for line in &lines {
-                eprintln!("{line}");
-            }
-        }
-        mutate(&mut self.dashboard);
-        self.draw()
-    }
-
-    /// Redraws after an event, doing no work while idle.
-    ///
-    /// # Errors
-    ///
-    /// Returns terminal output errors.
-    fn draw(&mut self) -> io::Result<()> {
-        if let Some(terminal) = &mut self.terminal {
-            terminal.draw(|frame| self.dashboard.render(frame))?;
-        }
-        Ok(())
-    }
-}
-
-impl Drop for DevConsole {
-    fn drop(&mut self) {
-        if let Some(terminal) = &mut self.terminal {
-            let _ = terminal.show_cursor();
-            let _ = io::stderr().execute(LeaveAlternateScreen);
-        }
     }
 }

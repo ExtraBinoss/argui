@@ -31,6 +31,18 @@ stable_id!(VariantId, "Stable user-enum variant identity.");
 stable_id!(ThemeId, "Stable theme definition identity.");
 stable_id!(TokenId, "Stable theme-token identity.");
 stable_id!(ThemeModeId, "Stable named theme-mode identity.");
+
+impl ThemeModeId {
+    /// Derives the shared identity of a mode name across all theme declarations.
+    ///
+    /// * `name` — the mode spelling used in a theme or by `set_theme_mode()`.
+    ///
+    /// Returns the stable ID used for matching all overrides of this name.
+    #[must_use]
+    pub fn named(name: &str) -> Self {
+        Self(hash_text(name))
+    }
+}
 stable_id!(StyleId, "Stable named-style identity.");
 stable_id!(StyleStateId, "Stable named style-state identity.");
 stable_id!(EffectId, "Stable DSL effect definition identity.");

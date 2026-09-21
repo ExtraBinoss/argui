@@ -26,8 +26,7 @@ pub(super) fn completions(
             &mut output,
         );
     } else if let Some(import) = ancestor(&context, SyntaxKind::ImportList) {
-        let _ = import;
-        complete_imports(database, &context, &mut output);
+        complete_imports(database, &context, Some(&import), &mut output);
     } else if let Some(element) = ancestor(&context, SyntaxKind::Element) {
         complete_element(database, &context, &element, &mut output);
     } else {
@@ -58,13 +57,35 @@ fn ancestor(context: &SourceContext, kind: SyntaxKind) -> Option<SyntaxNode> {
 fn complete_imports(
     database: &CompilerDatabase,
     context: &SourceContext,
+    import: Option<&SyntaxNode>,
     output: &mut BTreeMap<String, Completion>,
 ) {
-    if let Some(module) = context
+    let source = import
+        .and_then(SyntaxNode::parent)
+        .into_iter()
+        .flat_map(|declaration| declaration.descendants_with_tokens())
+        .filter_map(|element| element.into_token())
+        .find(|token| token.kind() == SyntaxKind::String)
+        .map(|token| token.text().trim_matches('"').to_string());
+    if source.as_deref() == Some("@argui/icons") {
+        for name in argui_dsl_stdlib::icon_names() {
+            output.insert(
+                name.into(),
+                Completion {
+                    label: name.into(),
+                    kind: SymbolKind::Component,
+                    detail: "Tabler icon".into(),
+                    documentation: "Scalable SVG icon from @argui/icons".into(),
+                },
+            );
+        }
+        return;
+    }
+    for module in context
         .project
         .modules
         .iter()
-        .find(|module| module.path == "@argui/ui")
+        .filter(|module| module.path.starts_with("@argui/ui/"))
     {
         for definition in module
             .definitions
@@ -274,7 +295,7 @@ fn complete_scope(
             insert_definition(output, definition);
         }
     }
-    complete_imports(database, context, output);
+    complete_imports(database, context, None, output);
 }
 
 /// Inserts one semantic definition using its canonical completion metadata.

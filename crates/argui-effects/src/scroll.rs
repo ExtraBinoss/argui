@@ -1,6 +1,8 @@
 //! Edge treatments are regular registered effects, optionally driven by scroll metrics.
 use argui_paint::{Color, EffectId, EffectInstance, EffectValue, Filter, LayerStyle};
-use argui_render::{EffectDefinition, EffectParameter, EffectParameterType, EffectPassDefinition};
+use argui_render::{
+    EffectDamage, EffectDefinition, EffectParameter, EffectParameterType, EffectPassDefinition,
+};
 use argui_ui::{ScrollEffect, ScrollMetric};
 
 /// Registry identifier for the scroll edge-fade effect.
@@ -31,6 +33,7 @@ fn definition(id: EffectId) -> EffectDefinition {
             include_str!("shaders/effects/edges.wgsl"),
         )],
     )
+    .damage(EffectDamage::Bounded)
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]

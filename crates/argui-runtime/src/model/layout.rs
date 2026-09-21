@@ -1,5 +1,5 @@
 use argui_core::{Rect, Size};
-use argui_ui::NodeId;
+use argui_ui::{NodeId, RetainedIdentity};
 
 pub use argui_ui::ScrollRequest;
 
@@ -9,6 +9,9 @@ pub struct LayoutBounds {
     pub node: NodeId,
     /// Optional application key assigned to the element.
     pub key: Option<String>,
+    /// Private DSL source identity, independent of the public application key.
+    #[doc(hidden)]
+    pub retained_identity: Option<RetainedIdentity>,
     /// Bounds in logical window coordinates.
     pub bounds: Rect,
 }

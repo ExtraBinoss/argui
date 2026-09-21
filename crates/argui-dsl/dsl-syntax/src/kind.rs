@@ -122,6 +122,8 @@ define_syntax_kinds!(
     StatesBlock,
     StateDecl,
     AnimateDecl,
+    KeyframesDecl,
+    KeyframeDecl,
     ThemeTokenDecl,
     ThemeModeDecl,
     StyleStateDecl,

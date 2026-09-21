@@ -5,6 +5,10 @@ use argui_dsl_ir::{
 
 use crate::{DslValue, RuntimeError};
 
+mod gradient;
+
+use gradient::gradient_value;
+
 /// Pre-resolved stack instruction used only by the development runtime.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Instruction {
@@ -166,6 +170,60 @@ impl Program {
                     };
                     let translated = context.translate(&value).unwrap_or(value);
                     stack.push(DslValue::String(translated));
+                }
+                Instruction::Builtin {
+                    function: BuiltinFunction::Stringify,
+                    arguments,
+                } => {
+                    let arguments = arguments_from(&mut stack, *arguments)?;
+                    let value = arguments.into_iter().next().unwrap_or(DslValue::Null);
+                    let text = match value {
+                        DslValue::Bool(value) => value.to_string(),
+                        DslValue::Int(value) => value.to_string(),
+                        DslValue::Float(value) => value.to_string(),
+                        DslValue::String(value) => value,
+                        other => return Err(type_error("bool, int, float, or string", &other)),
+                    };
+                    stack.push(DslValue::String(text));
+                }
+                Instruction::Builtin {
+                    function: BuiltinFunction::Solid,
+                    arguments,
+                } => {
+                    let arguments = arguments_from(&mut stack, *arguments)?;
+                    let value = arguments.into_iter().next().unwrap_or(DslValue::Null);
+                    let DslValue::Color(color) = value else {
+                        return Err(type_error("color", &value));
+                    };
+                    stack.push(DslValue::Brush(argui_paint::Fill::Solid(color)));
+                }
+                Instruction::Builtin {
+                    function: BuiltinFunction::Contains,
+                    arguments,
+                } => {
+                    let arguments = arguments_from(&mut stack, *arguments)?;
+                    let [DslValue::String(text), DslValue::String(fragment)] =
+                        <[DslValue; 2]>::try_from(arguments).map_err(|_| {
+                            RuntimeError::InvalidBytecode(
+                                "contains() expects two string arguments".into(),
+                            )
+                        })?
+                    else {
+                        return Err(RuntimeError::InvalidBytecode(
+                            "contains() expects two string arguments".into(),
+                        ));
+                    };
+                    stack.push(DslValue::Bool(text.contains(&fragment)));
+                }
+                Instruction::Builtin {
+                    function:
+                        function @ (BuiltinFunction::LinearGradient
+                        | BuiltinFunction::RadialGradient
+                        | BuiltinFunction::ConicGradient),
+                    arguments,
+                } => {
+                    let arguments = arguments_from(&mut stack, *arguments)?;
+                    stack.push(gradient_value(*function, &arguments)?);
                 }
                 Instruction::Callback {
                     callback,

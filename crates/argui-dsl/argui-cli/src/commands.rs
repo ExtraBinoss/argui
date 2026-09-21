@@ -153,7 +153,7 @@ pub fn schema(selected: Option<&str>) -> Result<Value, Box<dyn std::error::Error
         project
             .modules
             .iter()
-            .filter(|module| module.path == "@argui/ui")
+            .filter(|module| module.path.starts_with("@argui/ui/"))
             .flat_map(|module| &module.definitions)
             .filter(|definition| selected.is_none_or(|name| definition.name == name))
             .filter_map(dsl_schema),

@@ -408,6 +408,7 @@ fn frame_layout_resource_and_pending_request_delegation_is_preserved() {
         nodes: vec![LayoutBounds {
             node: root.node_id_at(0).unwrap(),
             key: Some("__devtools-app-root".into()),
+            retained_identity: None,
             bounds: app_bounds,
         }],
     };
@@ -479,6 +480,7 @@ fn repeated_dock_requests_are_idempotent_and_resize_layout_is_reflected() {
         nodes: vec![LayoutBounds {
             node: UiTree::new(Element::container([])).node_id_at(0).unwrap(),
             key: Some("__devtools-frames".into()),
+            retained_identity: None,
             bounds: Rect::new(Point::default(), Size::new(380.0, 110.0)),
         }],
     };
@@ -528,6 +530,7 @@ fn stale_window_events_are_forwarded_and_pending_detach_can_close() {
         nodes: vec![LayoutBounds {
             node: UiTree::new(Element::container([])).node_id_at(0).unwrap(),
             key: Some("__devtools-tree".into()),
+            retained_identity: None,
             bounds: Rect::new(Point::default(), Size::new(900.0, 400.0)),
         }],
     };

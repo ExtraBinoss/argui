@@ -94,6 +94,12 @@ pub(crate) fn components(
                 .iter()
                 .filter_map(|slot| members.slots.get(&slot.name).copied())
                 .collect();
+            let template_slots = value
+                .slots
+                .iter()
+                .filter(|slot| slot.template)
+                .filter_map(|slot| members.slots.get(&slot.name).copied())
+                .collect();
             let mut visual =
                 VisualLowerer::new(module, id, members, tables, schema, assets, errors);
             let body = visual.component_body(&syntax);
@@ -103,6 +109,7 @@ pub(crate) fn components(
                 properties,
                 callbacks,
                 slots,
+                template_slots,
                 body,
                 states,
                 animations,

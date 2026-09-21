@@ -271,7 +271,13 @@ fn package_precompiles_expressions_from_components_themes_styles_and_effects() {
             .iter()
             .any(|component| { !component.states.is_empty() && !component.animations.is_empty() })
     );
-    assert!(!compiled.ir.themes[0].modes.is_empty());
+    assert!(
+        compiled
+            .ir
+            .themes
+            .iter()
+            .any(|theme| !theme.modes.is_empty())
+    );
     assert!(!compiled.ir.styles[0].states.is_empty());
     assert!(!compiled.ir.effects[0].parameters.is_empty());
 
@@ -299,8 +305,14 @@ fn package_precompiles_expressions_from_components_themes_styles_and_effects() {
         .id;
     let state_condition = component.states[0].condition.id;
     let animation_value = component.animations[0].parameters[0].value.id;
-    let theme_default = compiled.ir.themes[0].tokens[0].default.id;
-    let theme_override = compiled.ir.themes[0].modes[0].overrides[0].1.id;
+    let theme = compiled
+        .ir
+        .themes
+        .iter()
+        .find(|theme| !theme.modes.is_empty())
+        .expect("fixture should contain a theme mode");
+    let theme_default = theme.tokens[0].default.id;
+    let theme_override = theme.modes[0].overrides[0].1.id;
     let style_value = compiled.ir.styles[0].properties[0].value.id;
     let style_state_value = compiled.ir.styles[0].states[0].properties[0].value.id;
     let effect_default = compiled.ir.effects[0].parameters[0]

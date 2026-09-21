@@ -164,6 +164,7 @@ fn submenu_geometry_keeps_diagonal_hover_open_and_cancels_on_entry() {
             .map(|node| LayoutBounds {
                 node: node.node,
                 key: tree.key(node.node).map(str::to_owned),
+                retained_identity: None,
                 bounds: node.bounds,
             })
             .collect(),

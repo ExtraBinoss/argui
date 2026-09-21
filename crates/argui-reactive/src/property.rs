@@ -59,6 +59,21 @@ impl<T: Clone + PartialEq + 'static> Property<T> {
         self.node.value.borrow().clone()
     }
 
+    /// Reads the current value without cloning it and registers a dependency.
+    ///
+    /// `read` receives a shared borrow valid only for the callback; its return
+    /// value is forwarded to the caller. This is useful for large model arrays
+    /// whose visible slice is much smaller than the complete collection.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `read` attempts to mutate this property while it is borrowed.
+    pub fn with<R>(&self, read: impl FnOnce(&T) -> R) -> R {
+        let source: Rc<dyn Node> = self.node.clone();
+        graph::track(source);
+        read(&self.node.value.borrow())
+    }
+
     /// Replaces the value when it changed and returns whether a write occurred.
     ///
     /// * `value` — next typed value.

@@ -76,6 +76,68 @@ fn region_count_area_and_viewport_clipping_select_full_frames() {
     );
 }
 
+/// Empty or fully offscreen damage is discarded before threshold evaluation.
+#[test]
+fn zero_extent_and_offscreen_regions_leave_retained_pixels_unchanged() {
+    assert_eq!(DamageRegion::new(u32::MAX - 4, 0, 20, 1).right(), u32::MAX);
+    assert_eq!(DamageRegion::new(0, u32::MAX - 4, 1, 20).bottom(), u32::MAX);
+    assert_eq!(
+        DamagePlan::resolve(
+            [
+                DamageRegion::new(0, 0, 0, 20),
+                DamageRegion::new(0, 0, 20, 0),
+                DamageRegion::new(500, 500, 20, 20),
+            ],
+            [256, 256],
+            DamageTracking::enabled(),
+        ),
+        DamagePlan::Unchanged
+    );
+}
+
+/// A bridge region transitively coalesces neighbors even when inserted last.
+#[test]
+fn bridge_region_merges_separated_tiles_transitively() {
+    assert_eq!(
+        DamagePlan::resolve(
+            [
+                DamageRegion::new(0, 0, 32, 32),
+                DamageRegion::new(64, 0, 32, 32),
+                DamageRegion::new(32, 0, 32, 32),
+            ],
+            [256, 256],
+            DamageTracking::enabled().max_regions(1),
+        ),
+        DamagePlan::Partial(vec![DamageRegion::new(0, 0, 96, 32)])
+    );
+}
+
+/// Non-touching tiles remain separate in either horizontal or vertical order.
+#[test]
+fn separated_tiles_do_not_merge_on_any_axis_or_insertion_order() {
+    let horizontal = [
+        DamageRegion::new(0, 0, 32, 32),
+        DamageRegion::new(96, 0, 32, 32),
+    ];
+    let vertical = [
+        DamageRegion::new(0, 0, 32, 32),
+        DamageRegion::new(0, 96, 32, 32),
+    ];
+    for pair in [
+        horizontal,
+        [horizontal[1], horizontal[0]],
+        vertical,
+        [vertical[1], vertical[0]],
+    ] {
+        let DamagePlan::Partial(regions) =
+            DamagePlan::resolve(pair, [256, 256], DamageTracking::enabled())
+        else {
+            panic!("separated damage must remain partial");
+        };
+        assert_eq!(regions.len(), 2);
+    }
+}
+
 #[test]
 fn scene_snapshots_find_moved_and_inserted_primitives() {
     let mut previous = DisplayList::new();
@@ -128,6 +190,43 @@ fn scene_snapshots_handle_identity_and_incompatible_viewports() {
     assert_eq!(
         baseline.compare(&snapshot(&list, [256, 128], 2.0), DamageTracking::enabled()),
         DamagePlan::Full
+    );
+}
+
+/// Changes wholly outside the viewport do not dirty retained pixels.
+#[test]
+fn offscreen_scene_changes_remain_unchanged_until_they_enter_view() {
+    let mut old = DisplayList::new();
+    old.push_quad(quad(-100.0, -100.0, 16.0));
+    let mut moved = DisplayList::new();
+    moved.push_quad(quad(-80.0, -80.0, 16.0));
+    let old = snapshot(&old, [128, 128], 1.0);
+    let moved = snapshot(&moved, [128, 128], 1.0);
+    assert_eq!(
+        old.compare(&moved, DamageTracking::enabled()),
+        DamagePlan::Unchanged
+    );
+
+    let mut above = DisplayList::new();
+    above.push_quad(quad(8.0, -100.0, 16.0));
+    let mut still_above = DisplayList::new();
+    still_above.push_quad(quad(8.0, -80.0, 16.0));
+    assert_eq!(
+        snapshot(&above, [128, 128], 1.0).compare(
+            &snapshot(&still_above, [128, 128], 1.0),
+            DamageTracking::enabled(),
+        ),
+        DamagePlan::Unchanged
+    );
+
+    let mut visible = DisplayList::new();
+    visible.push_quad(quad(8.0, 8.0, 16.0));
+    assert_eq!(
+        moved.compare(
+            &snapshot(&visible, [128, 128], 1.0),
+            DamageTracking::enabled()
+        ),
+        DamagePlan::Partial(vec![DamageRegion::new(0, 0, 32, 32)])
     );
 }
 

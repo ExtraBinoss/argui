@@ -53,6 +53,18 @@ impl<'a> Parser<'a> {
         self.nth_kind(0)
     }
 
+    /// Returns the spelling of the next non-trivia token, or an empty string at EOF.
+    #[must_use]
+    pub(crate) fn text(&self) -> &str {
+        self.tokens
+            .iter()
+            .skip(self.cursor)
+            .find(|token| !token.kind.is_trivia())
+            .map_or("", |token| {
+                &self.source[std::ops::Range::<usize>::from(token.range)]
+            })
+    }
+
     /// Returns the `offset`th non-trivia token kind.
     pub(crate) fn nth_kind(&self, offset: usize) -> SyntaxKind {
         self.tokens

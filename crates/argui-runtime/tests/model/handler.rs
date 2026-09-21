@@ -132,3 +132,47 @@ fn callback_invalidates_while_event_handler_requires_explicit_invalidation() {
     };
     assert_eq!(content.as_str(), "11");
 }
+
+struct RemovableHandler {
+    enabled: bool,
+    hits: usize,
+}
+
+impl Render for RemovableHandler {
+    /// Registers a callback only while this presentation exposes its action.
+    fn render(&mut self, cx: &mut Context<Self>) -> Element {
+        let element = Element::text("action").keyed("action");
+        if self.enabled {
+            element.on(cx
+                .callback(|model| model.hits += 1)
+                .direct_listener(EventType::Click))
+        } else {
+            element
+        }
+    }
+}
+
+/// A queued delivery cannot invoke a handler removed by a later render.
+#[test]
+fn removed_handler_identity_ignores_stale_event_delivery() {
+    let entity = Entity::new(RemovableHandler {
+        enabled: true,
+        hits: 0,
+    });
+    let mut tree = UiTree::new(entity.render());
+    let event = tree
+        .event_deliveries(
+            tree.node_ids()[0],
+            UiEventKind::Click(ClickEvent::accessibility()),
+        )
+        .into_iter()
+        .next()
+        .unwrap();
+    entity.update(|model, cx| {
+        model.enabled = false;
+        cx.notify();
+    });
+    tree.replace(entity.render());
+    entity.dispatch_event(&event);
+    assert_eq!(entity.read(|model| model.hits), 0);
+}

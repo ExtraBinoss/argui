@@ -7,6 +7,9 @@ use argui_ui::{Element, EventType, UiEventKind, UiTree};
 
 #[path = "model/cache.rs"]
 mod cache;
+#[cfg(feature = "tasks")]
+#[path = "model/context.rs"]
+mod context;
 #[path = "model/dispatch.rs"]
 mod dispatch;
 #[path = "model/entity.rs"]
@@ -157,6 +160,7 @@ fn layout_snapshots_expose_viewport_and_keyed_logical_bounds() {
         nodes: vec![LayoutBounds {
             node,
             key: Some("anchor".into()),
+            retained_identity: None,
             bounds,
         }],
     };
@@ -452,6 +456,50 @@ mod entity_tests {
     }
 
     #[test]
+    fn removed_event_route_drops_a_queued_child_delivery() {
+        struct OptionalRoute {
+            child: Entity<Child>,
+            routed: bool,
+        }
+        impl Render for OptionalRoute {
+            /// Publishes the child event route only while the child is visible.
+            fn render(&mut self, cx: &mut Context<Self>) -> Element {
+                if self.routed {
+                    let child = self.child.render();
+                    cx.route_events_to(self.child.erase());
+                    child
+                } else {
+                    Element::container([])
+                }
+            }
+        }
+        let hits = Rc::new(Cell::new(0));
+        let root = Entity::new(OptionalRoute {
+            child: Entity::new(Child {
+                events: hits.clone(),
+                stop: false,
+            }),
+            routed: true,
+        });
+        let mut tree = UiTree::new(root.render());
+        let event = tree
+            .event_deliveries(
+                tree.node_ids()[0],
+                UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
+            )
+            .into_iter()
+            .next()
+            .unwrap();
+        root.update(|model, cx| {
+            model.routed = false;
+            cx.notify();
+        });
+        tree.replace(root.render());
+        root.dispatch_event(&event);
+        assert_eq!(hits.get(), 0);
+    }
+
+    #[test]
     fn context_observes_stable_layout_bounds() {
         let context = Context::<super::Counter>::default();
         let bounds = Rect::new(Point::new(3.0, 5.0), Size::new(20.0, 30.0));
@@ -460,6 +508,7 @@ mod entity_tests {
             nodes: vec![LayoutBounds {
                 node: UiTree::new(Element::container([])).node_id_at(0).unwrap(),
                 key: Some("observed".into()),
+                retained_identity: None,
                 bounds,
             }],
         };

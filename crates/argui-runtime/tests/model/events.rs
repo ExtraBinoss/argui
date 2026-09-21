@@ -311,3 +311,102 @@ fn new_entities_created_in_context_share_the_event_owner() {
     assert_eq!(count.get(), 1);
     drop(subscription);
 }
+
+/// Closed model scopes reject new event publication and new observations.
+#[test]
+fn closed_source_scope_rejects_emission_and_observation() {
+    let runtime = ModelRuntime::default();
+    let source = runtime.entity(Source);
+    let receiver = runtime.entity(());
+    source.resources().close();
+    source.update(|_, cx| {
+        assert_eq!(cx.emit(1_u32), Err(EventError::ScopeClosed));
+    });
+    receiver.update(|_, cx| {
+        assert!(matches!(cx.observe(&source), Err(EventError::ScopeClosed)));
+        assert!(matches!(
+            cx.subscribe(&source, |_, _: &u32, _| {}),
+            Err(EventError::ScopeClosed)
+        ));
+    });
+    assert_eq!(runtime.pending_events(), 0);
+    assert_eq!(source.resources().resource_count(), 0);
+}
+
+/// Observation reports detached, foreign-runtime, and closed-target failures.
+#[test]
+fn observations_validate_both_endpoints_before_retaining_resources() {
+    let source = Entity::new(Source);
+    let mut detached = Context::<()>::default();
+    assert!(matches!(
+        detached.observe(&source),
+        Err(EventError::DetachedContext)
+    ));
+
+    let other = Entity::new(());
+    other.update(|_, cx| {
+        assert!(matches!(
+            cx.observe(&source),
+            Err(EventError::DifferentRuntime)
+        ));
+    });
+
+    let runtime = ModelRuntime::default();
+    let source = runtime.entity(Source);
+    let receiver = runtime.entity(());
+    receiver.resources().close();
+    receiver.update(|_, cx| {
+        assert!(matches!(cx.observe(&source), Err(EventError::ScopeClosed)));
+        assert!(matches!(
+            cx.subscribe(&source, |_, _: &u32, _| {}),
+            Err(EventError::ScopeClosed)
+        ));
+    });
+    assert_eq!(source.resources().resource_count(), 0);
+}
+
+struct TrackedReader(Entity<usize>);
+
+impl argui_runtime::Render for TrackedReader {
+    /// Reads a dependency from this view so ownership checks occur at render time.
+    fn render(&mut self, cx: &mut Context<Self>) -> argui_ui::Element {
+        argui_ui::Element::text(cx.read(&self.0, |value| value.to_string()))
+    }
+}
+
+/// Tracked reads reject both detached contexts and foreign model runtimes.
+#[test]
+fn tracked_reads_require_an_attached_same_runtime_view() {
+    let source = Entity::new(7_usize);
+    let mut detached = Context::<TrackedReader>::default();
+    assert!(
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            detached.read(&source, |value| *value);
+        }))
+        .is_err()
+    );
+
+    let foreign = Entity::new(TrackedReader(source));
+    assert!(
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _ = foreign.render();
+        }))
+        .is_err()
+    );
+}
+
+/// A closed dependency cannot be subscribed by a retained render.
+#[test]
+fn tracked_reads_reject_closed_source_scope() {
+    let runtime = ModelRuntime::default();
+    let source = runtime.entity(7_usize);
+    let reader = runtime.entity(TrackedReader(source.clone()));
+    source.resources().close();
+    assert!(
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _ = reader.render();
+        }))
+        .is_err()
+    );
+    assert_eq!(source.resources().resource_count(), 0);
+}

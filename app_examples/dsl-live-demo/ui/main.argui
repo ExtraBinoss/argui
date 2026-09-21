@@ -1,0 +1,36 @@
+import { Badge, Button, Card, Column, Input, Separator, Text } from "@argui/ui"
+
+export component Main {
+    in property title: string = "Argui Live Studio"
+    private property name: string = ""
+    private property clicks: int = 0
+
+    Column #root {
+        gap: 18.0
+        padding: 28.0
+        background: var(--argui-background)
+
+        Badge { text: "LIVE DSL" variant: "primary" }
+        Text { content: title }
+        Text { content: "Edit this title or button label in ui/main.argui to see the change." }
+        Separator {}
+
+        Card {
+            Column {
+                gap: 14.0
+                Text { content: "Try an interaction" }
+                Input #name {
+                    value <=> name
+                    label: "Your name"
+                    placeholder: "Ada Lovelace"
+                }
+                Button #greet {
+                    text: "Say hello"
+                    on click { clicks += 1 }
+                }
+                Text { content: name == "" ? "Your greeting appears here" : name }
+                Text { content: clicks == 0 ? "Waiting for a click" : "Hello from Argui!" }
+            }
+        }
+    }
+}

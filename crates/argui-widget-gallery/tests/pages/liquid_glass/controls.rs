@@ -149,6 +149,7 @@ fn blur_drag_uses_track_geometry_cancels_and_supports_keyboard() {
                 nodes: vec![LayoutBounds {
                     node,
                     key: Some("glass-blur::track".into()),
+                    retained_identity: None,
                     bounds: Rect::new(Point::new(100.0, 100.0), Size::new(200.0, 6.0)),
                 }],
             },

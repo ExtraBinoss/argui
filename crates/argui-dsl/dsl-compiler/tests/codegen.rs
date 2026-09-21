@@ -1,5 +1,17 @@
 use argui_dsl_compiler::{Compiler, CompilerError, Reachability, SourceModule};
 
+#[path = "codegen/node/virtual_list.rs"]
+mod virtual_list;
+
+#[path = "codegen/node/motion.rs"]
+mod motion;
+
+#[path = "codegen/node.rs"]
+mod retained_children;
+
+#[path = "codegen/expression.rs"]
+mod expressions;
+
 /// Compiles a source module and returns the AOT code-generation failure.
 fn codegen_error(source: &str) -> CompilerError {
     let result = Compiler::compile(
@@ -12,6 +24,23 @@ fn codegen_error(source: &str) -> CompilerError {
         Err(error) => panic!("expected code-generation error, received {error}"),
         Ok(_) => panic!("source unexpectedly compiled successfully"),
     }
+}
+
+/// String built-ins and concatenation produce valid typed AOT expressions.
+#[test]
+fn compiler_emits_string_conversion_contains_and_concatenation() {
+    let compiled = Compiler::compile(
+        [SourceModule::new(
+            "ui/main.argui",
+            "import { Text } from \"@argui/native\" export component Main { private property count: int = 0 Text { content: contains(\"abc\", \"b\") ? \"Count: \" + str(count) : \"missing\" } }",
+        )],
+        "ui/main.argui",
+        |_| Err("no assets".into()),
+    )
+    .unwrap();
+    assert!(compiled.rust.contains(".contains("));
+    assert!(compiled.rust.contains(".to_string()"));
+    assert!(compiled.rust.contains("text.push_str("));
 }
 
 /// Rejects a native element whose children cannot be represented by a slot.
@@ -114,6 +143,117 @@ fn reachability_handles_missing_entry_and_component_ids() {
     assert_eq!(missing_component.components.len(), 1);
 }
 
+/// Token reads retain the owning theme even when it lives in another module.
+#[test]
+fn external_theme_tokens_are_reachable_from_a_component() {
+    let compiled = Compiler::compile(
+        [
+            SourceModule::new(
+                "ui/main.argui",
+                "import { Text } from \"@argui/ui\"\nexport component Main { Text { color: var(--external) content: \"hello\" } }",
+            ),
+            SourceModule::new(
+                "ui/theme.argui",
+                "export theme Palette { --external: color = #336699 }",
+            ),
+        ],
+        "ui/main.argui",
+        |_| Err("no assets".into()),
+    )
+    .unwrap();
+    assert_eq!(compiled.reachability.themes.len(), 1);
+    assert_eq!(compiled.reachability.tokens.len(), 1);
+    assert!(compiled.rust.contains("fn theme_token_"));
+}
+
+/// Animation stops retain theme dependencies even when no normal binding uses them.
+#[test]
+fn keyframe_only_token_reads_retain_their_theme() {
+    let compiled = Compiler::compile(
+        [
+            SourceModule::new(
+                "ui/main.argui",
+                "import { Container } from \"@argui/native\"\nexport component Main { Container { rotation: 0.0 animate rotation { duration: 100ms keyframes { 0%: var(--start) 100%: var(--end) } } } }",
+            ),
+            SourceModule::new(
+                "ui/theme.argui",
+                "export theme Motion { --start: float = 0.0 --end: float = 90.0 }",
+            ),
+        ],
+        "ui/main.argui",
+        |_| Err("no assets".into()),
+    )
+    .unwrap();
+    assert_eq!(compiled.reachability.themes.len(), 1);
+    assert_eq!(compiled.reachability.tokens.len(), 2);
+    let mut pruned = compiled.ir;
+    compiled.reachability.prune(&mut pruned);
+    assert_eq!(pruned.themes.len(), 1);
+}
+
+/// State overrides retain external tokens even when their base binding is constant.
+#[test]
+fn state_only_token_reads_retain_their_theme() {
+    let compiled = Compiler::compile(
+        [
+            SourceModule::new(
+                "ui/main.argui",
+                "import { Container } from \"@argui/native\"\nexport component Main { in property expanded: bool = false Container { rotation: 0.0 states { open when expanded { rotation: var(--target) } } } }",
+            ),
+            SourceModule::new(
+                "ui/theme.argui",
+                "export theme Motion { --target: float = 90.0 }",
+            ),
+        ],
+        "ui/main.argui",
+        |_| Err("no assets".into()),
+    )
+    .unwrap();
+    assert_eq!(compiled.reachability.themes.len(), 1);
+    assert_eq!(compiled.reachability.tokens.len(), 1);
+}
+
+#[test]
+fn reachability_can_resolve_a_theme_through_a_mode_override_edge() {
+    let compiled = Compiler::compile(
+        [SourceModule::new(
+            "ui/main.argui",
+            r#"import { Text } from "@argui/native"
+theme Palette {
+    --accent: color = #112233
+    dark { --accent: #ffffff }
+}
+export component Main { Text { content: "hello" color: var(--accent) } }"#,
+        )],
+        "ui/main.argui",
+        |_| Err("no assets".into()),
+    )
+    .unwrap();
+    let mut ir = compiled.ir.clone();
+    let palette_id = compiled
+        .semantic
+        .modules
+        .iter()
+        .flat_map(|module| &module.definitions)
+        .find(|definition| definition.name == "Palette")
+        .expect("Palette definition")
+        .id
+        .raw();
+    let palette = ir
+        .themes
+        .iter_mut()
+        .find(|theme| theme.id.raw() == palette_id)
+        .expect("lowered Palette theme");
+    assert_eq!(palette.tokens.len(), 1);
+    assert_eq!(palette.modes.len(), 1);
+    let accent_id = palette.tokens[0].id;
+    // Model an incomplete token table while preserving the mode's token edge.
+    palette.tokens.clear();
+    let reachability = Reachability::analyze(&compiled.semantic, &ir, "ui/main.argui");
+    assert!(reachability.themes.iter().any(|id| id.raw() == palette_id));
+    assert!(reachability.tokens.contains(&accent_id));
+}
+
 /// Prunes every unreachable declaration while retaining the public component ABI.
 #[test]
 fn reachability_prune_removes_private_declarations_and_assets() {
@@ -128,6 +268,7 @@ enum DeadMode { only }
 export theme LiveTheme { --accent: color = #123456 }
 theme DeadTheme { --unused: color = #000000 }
 export style LiveStyle for Text { content: "live" }
+style DeadStyle for Text { content: "dead" }
 effect DeadEffect { shader: "effects/dead.wgsl" }
 export effect LiveEffect { shader: "effects/live.wgsl" }
 export component Main {
@@ -157,4 +298,25 @@ export component Main {
             .iter()
             .all(|component| { compiled.reachability.components.contains(&component.id) })
     );
+}
+
+#[test]
+fn asset_codegen_handles_a_project_without_reachable_media() {
+    let compiled = Compiler::compile(
+        [SourceModule::new(
+            "ui/main.argui",
+            "import { Container } from \"@argui/native\"\nexport component Main { Container {} }",
+        )],
+        "ui/main.argui",
+        |_| Err("no media expected".into()),
+    )
+    .unwrap();
+    assert!(compiled.rust.contains("static MEDIA_ASSETS: ::argui::schema::AssetRegistry = ::argui::schema::AssetRegistry::new();"));
+    assert!(
+        compiled
+            .rust
+            .contains("fn asset_handle(id: u64) -> ::argui::schema::AssetHandle { panic!")
+    );
+    assert!(!compiled.rust.contains("let mut assets ="));
+    assert!(!compiled.rust.contains("let path = match id"));
 }

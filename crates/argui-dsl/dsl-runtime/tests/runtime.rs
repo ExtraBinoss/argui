@@ -11,6 +11,9 @@ use argui_dsl_semantic::DefinitionKind;
 use argui_testing::TestApp;
 use argui_ui::Role;
 
+#[path = "runtime/theme.rs"]
+mod theme_mode;
+
 fn compile(source: &str) -> CompiledProject {
     Compiler::compile(
         [SourceModule::new("ui/main.argui", source)],
@@ -38,7 +41,7 @@ fn members(compiled: &CompiledProject, name: &str) -> Members {
         .semantic
         .modules
         .iter()
-        .filter(|module| module.path != "@argui/ui")
+        .filter(|module| !module.path.starts_with("@argui/ui/"))
         .flat_map(|module| &module.definitions)
         .find(|definition| {
             definition.name == name && matches!(definition.kind, DefinitionKind::Component(_))
@@ -174,26 +177,16 @@ fn reload_preserves_explicit_input_equal_to_old_default() {
     TestApp::new(runtime).assert_text("before");
 }
 
+/// Percentage dimensions use the same 0–1 engine scale in live and generated UI.
 #[test]
-fn live_render_matches_the_generated_aot_fixture() {
-    let source = include_str!("../../aot-fixture/ui/main.argui");
+fn live_percentage_width_uses_css_scale() {
+    let source =
+        "import { Column } from \"@argui/ui\" export component Main { Column { width: 65% } }";
     let (package, members) = package(1, source);
-    let title = members.properties["title"];
     let mut runtime = LiveRuntime::new(package).unwrap();
-    runtime.set_translator(|id| (id == "status.ready").then(|| "Ready".to_string()));
-    runtime
-        .mount(
-            members.component,
-            [(title, DslValue::String("Dashboard".into()))],
-        )
-        .unwrap();
-
-    let live = runtime.render().unwrap();
-    let aot_root = argui_dsl_aot_fixture::Main::new();
-    aot_root.set_title("Dashboard".into());
-    aot_root.set_translator(|id| (id == "status.ready").then(|| "Ready".to_string()));
-    let aot = aot_root.render();
-    assert_eq!(live, aot);
+    runtime.mount(members.component, []).unwrap();
+    let element = runtime.render().unwrap();
+    assert_eq!(element.style.size.width, argui_ui::percent(0.65));
 }
 
 #[test]

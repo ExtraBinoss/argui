@@ -152,6 +152,58 @@ fn call(node: &SyntaxNode, source: SourceInfo, context: &mut Context<'_>) -> IrE
         })
         .unwrap_or_default();
     match callee.as_str() {
+        "solid" => IrExpression {
+            id: expression_id(&source),
+            value_type: IrType::Brush,
+            kind: IrExpressionKind::BuiltinCall {
+                function: BuiltinFunction::Solid,
+                arguments: argument_nodes
+                    .iter()
+                    .map(|argument| lower(argument, context))
+                    .collect(),
+            },
+            source,
+        },
+        "linear_gradient" | "radial_gradient" | "conic_gradient" => IrExpression {
+            id: expression_id(&source),
+            value_type: IrType::Brush,
+            kind: IrExpressionKind::BuiltinCall {
+                function: match callee.as_str() {
+                    "linear_gradient" => BuiltinFunction::LinearGradient,
+                    "radial_gradient" => BuiltinFunction::RadialGradient,
+                    _ => BuiltinFunction::ConicGradient,
+                },
+                arguments: argument_nodes
+                    .iter()
+                    .map(|argument| lower(argument, context))
+                    .collect(),
+            },
+            source,
+        },
+        "contains" => IrExpression {
+            id: expression_id(&source),
+            value_type: IrType::Bool,
+            kind: IrExpressionKind::BuiltinCall {
+                function: BuiltinFunction::Contains,
+                arguments: argument_nodes
+                    .iter()
+                    .map(|argument| lower(argument, context))
+                    .collect(),
+            },
+            source,
+        },
+        "str" => IrExpression {
+            id: expression_id(&source),
+            value_type: IrType::String,
+            kind: IrExpressionKind::BuiltinCall {
+                function: BuiltinFunction::Stringify,
+                arguments: argument_nodes
+                    .iter()
+                    .map(|argument| lower(argument, context))
+                    .collect(),
+            },
+            source,
+        },
         "tr" => IrExpression {
             id: expression_id(&source),
             value_type: IrType::String,
@@ -433,7 +485,10 @@ fn parse_number(text: &str) -> Option<(IrType, IrValue)> {
         .replace('_', "")
         .parse::<f64>()
         .ok()
-        .map(|value| (value_type, IrValue::Float(value)))
+        .map(|value| {
+            let value = if suffix == "s" { value * 1000.0 } else { value };
+            (value_type, IrValue::Float(value))
+        })
 }
 
 /// Parses CSS-style RGB/RGBA hexadecimal digits into RGBA8.

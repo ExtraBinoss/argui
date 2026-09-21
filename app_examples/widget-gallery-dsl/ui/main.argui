@@ -1,0 +1,161 @@
+import { Button, Separator, VirtualList } from "@argui/ui"
+import { Row, Column, Container, Text, PopoverPanel } from "@argui/native"
+import { ButtonPage } from "./pages/button.argui"
+import { InputPage } from "./pages/input.argui"
+import { CardPage } from "./pages/card.argui"
+import { BadgePage } from "./pages/badge.argui"
+import { SeparatorPage } from "./pages/separator.argui"
+import { SwitchPage } from "./pages/switch.argui"
+import { MediaPage } from "./pages/media.argui"
+import { VirtualListPage } from "./pages/virtual-list.argui"
+
+export component Main {
+    private property dark: bool = false
+    private property accent: int = 0
+    private property theme_open: bool = false
+    private property selected: string = "Button"
+    private property navigation: array<string> = ["Button", "Input", "Card", "Badge", "Separator", "Switch", "Media", "Virtual List"]
+    private property navigation_offset: float = 0.0
+
+    Column #gallery {
+        width: 100%
+        height: 100%
+        background: var(--argui-background)
+
+        Row #topbar {
+            width: 100%
+            wrap: true
+            padding: 18.0
+            gap: 16.0
+            background: var(--argui-surface)
+
+            Column {
+                width: 50%
+                min_width: 0.0
+                grow: 1.0
+                gap: 2.0
+                Text { content: "Widget Gallery" color: var(--argui-foreground) font_size: 21.0 weight: 700 }
+                Text { content: "Argui DSL components" color: var(--argui-muted-foreground) font_size: 12.0 }
+            }
+
+            Container #theme_anchor {
+                width: 210px
+                Button #theme_select {
+                    text: dark ? "Dark · appearance" : "Light · appearance"
+                    variant: "outline"
+                    select_trigger: true
+                    expanded: theme_open
+                    on click { theme_open = !theme_open }
+                }
+            }
+        }
+
+        Separator {}
+
+        if theme_open {
+            PopoverPanel #theme_popover {
+                anchor: "theme_anchor"
+                width: 222px
+                padding: 12.0
+                radius: 8.0
+                background: var(--argui-surface)
+                border_color: var(--argui-border)
+                on dismiss { theme_open = false }
+                Column {
+                    gap: 8.0
+                    Text { content: "Appearance" color: var(--argui-foreground) weight: 700 font_size: 14.0 }
+                    Row {
+                        gap: 8.0
+                        Button { text: "Light" variant: "outline" on click {
+                            dark = false
+                            theme_open = false
+                            set_theme_mode(accent == 0 ? "light" : accent == 1 ? "light-violet" : "light-emerald")
+                        } }
+                        Button { text: "Dark" variant: "outline" on click {
+                            dark = true
+                            theme_open = false
+                            set_theme_mode(accent == 0 ? "dark" : accent == 1 ? "dark-violet" : "dark-emerald")
+                        } }
+                    }
+                    Separator {}
+                    Text { content: "Accent" color: var(--argui-muted-foreground) font_size: 12.0 }
+                    Row {
+                        wrap: true
+                        gap: 8.0
+                        Button { text: "Blue" variant: "outline" on click {
+                            accent = 0
+                            theme_open = false
+                            set_theme_mode(dark ? "dark" : "light")
+                        } }
+                        Button { text: "Violet" variant: "outline" on click {
+                            accent = 1
+                            theme_open = false
+                            set_theme_mode(dark ? "dark-violet" : "light-violet")
+                        } }
+                        Button { text: "Emerald" variant: "outline" on click {
+                            accent = 2
+                            theme_open = false
+                            set_theme_mode(dark ? "dark-emerald" : "light-emerald")
+                        } }
+                    }
+                }
+            }
+        }
+
+        Row #workspace {
+            width: 100%
+            grow: 1.0
+            min_height: 0.0
+            wrap: true
+            scroll_y: true
+            scrollbar_thumb: var(--argui-scrollbar-thumb)
+
+            Column #sidebar {
+                width: 250px
+                height: 100%
+                min_width: 0.0
+                min_height: 0.0
+                grow: 1.0
+                padding: 16.0
+                gap: 7.0
+                background: var(--argui-surface)
+
+                Text { content: "COMPONENTS" color: var(--argui-muted-foreground) weight: 700 font_size: 11.0 }
+                VirtualList #navigation {
+                    grow: 1.0
+                    row_height: 44.0
+                    overscan: 3
+                    offset <=> navigation_offset
+                    scrollbar_thumb: var(--argui-scrollbar-thumb)
+                    edge_shadow_width: 14.0
+                    edge_shadow_intensity: 0.14
+                    edge_shadow_color: var(--argui-foreground)
+                    for item in navigation key item {
+                        Button { text: item variant: selected == item ? "secondary" : "ghost" on click { selected = item } }
+                    }
+                }
+            }
+
+            Column #content {
+                width: 65%
+                height: 100%
+                min_width: 0.0
+                min_height: 0.0
+                grow: 3.0
+                padding: 30.0
+                scroll_y: true
+                scrollbar_thumb: var(--argui-scrollbar-thumb)
+                background: var(--argui-background)
+
+                if selected == "Button" { ButtonPage {} }
+                if selected == "Input" { InputPage {} }
+                if selected == "Card" { CardPage {} }
+                if selected == "Badge" { BadgePage {} }
+                if selected == "Separator" { SeparatorPage {} }
+                if selected == "Switch" { SwitchPage {} }
+                if selected == "Media" { MediaPage {} }
+                if selected == "Virtual List" { VirtualListPage {} }
+            }
+        }
+    }
+}

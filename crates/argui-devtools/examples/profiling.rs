@@ -154,6 +154,9 @@ fn main() {
                     .map(|node| argui_runtime::LayoutBounds {
                         node: node.node,
                         key: tree.key(node.node).map(str::to_owned),
+                        retained_identity: tree
+                            .element_for(node.node)
+                            .and_then(|element| element.source_identity().cloned()),
                         bounds: node.bounds,
                     })
                     .collect(),

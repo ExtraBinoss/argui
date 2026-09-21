@@ -4,9 +4,9 @@ use argui_layout::LayoutEngine;
 use argui_paint::{CornerRadii, DisplayCommand, LayerStyle, QuadStyle};
 use argui_text::TextEngine;
 use argui_ui::{
-    Axes, Color, Element, Overflow, Position, ScrollAnchoring, ScrollAxes, ScrollConfig,
+    Axes, Color, Element, FlexWrap, Overflow, Position, ScrollAnchoring, ScrollAxes, ScrollConfig,
     ScrollbarPartStyle, ScrollbarStyle, ScrollbarVisibility, Sides, StylePatch, StyleTransition,
-    Transition, UiTree, VisualState, length, property,
+    Transition, UiTree, VisualState, length, percent, property,
 };
 
 const NOTO_SANS: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
@@ -29,6 +29,68 @@ fn content(scrollbar: ScrollbarStyle) -> Element {
     })
     .scroll_config(ScrollConfig::default().scrollbar(scrollbar))
     .layer(LayerStyle::new(Default::default()).opacity(0.8))
+}
+
+#[test]
+/// Wrapped content extends the workspace scroll range and receives chained wheel input.
+fn wrapped_children_extend_scroll_content_and_wheel_chains_from_sidebar() {
+    let sidebar = Element::column([])
+        .width(length(260.0))
+        .height(length(628.0))
+        .grow(1.0)
+        .overflow(Axes {
+            x: Overflow::Hidden,
+            y: Overflow::Auto,
+        })
+        .scroll_config(ScrollConfig::default());
+    let content = Element::column([])
+        .width(percent(0.65))
+        .height(length(628.0))
+        .grow(3.0);
+    let workspace = Element::row([sidebar, content])
+        .width(percent(1.0))
+        .height(length(628.0))
+        .flex_wrap(FlexWrap::Wrap)
+        .overflow(Axes {
+            x: Overflow::Hidden,
+            y: Overflow::Auto,
+        })
+        .scroll_config(ScrollConfig::default());
+    let root = Element::column([
+        Element::container([]).height(length(132.0)).shrink(0.0),
+        workspace,
+    ])
+    .width(percent(1.0))
+    .height(percent(1.0));
+    let mut ui = UiTree::new(root);
+    let mut layout = LayoutEngine::new();
+    let mut text = text_engine();
+    let output = layout
+        .compute(&mut ui, &mut text, Size::new(420.0, 760.0))
+        .unwrap();
+    let workspace_node = ui.node_id_at(2).unwrap();
+    let workspace_region = output
+        .scroll_regions
+        .iter()
+        .find(|region| region.node == workspace_node)
+        .unwrap();
+    assert!(workspace_region.max_offset.y >= 628.0);
+    assert!(workspace_region.contains(Point::new(100.0, 300.0)));
+
+    let update = ui.scroll(
+        Point::new(100.0, 300.0),
+        ScrollDelta::Pixels(Point::new(0.0, -700.0)),
+        &output.scroll_regions,
+    );
+    assert!(update.scroll_changed);
+    assert!(ui.scroll_offset(workspace_node).y > 0.0);
+    layout
+        .compute(&mut ui, &mut text, Size::new(420.0, 760.0))
+        .unwrap();
+    assert!(
+        ui.scroll_offset(workspace_node).y > 0.0,
+        "a layout pass after wheel input must preserve the user's scroll offset"
+    );
 }
 
 #[test]

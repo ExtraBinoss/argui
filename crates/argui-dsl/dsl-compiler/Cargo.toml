@@ -9,10 +9,17 @@ homepage.workspace = true
 readme.workspace = true
 description = "Incremental Argui DSL compiler and Rust AOT backend"
 
+[features]
+default = ["icons"]
+icons = ["argui-dsl-semantic/icons", "argui-dsl-stdlib/icons"]
+
 [dependencies]
 argui-dsl-ir = { path = "../dsl-ir" }
-argui-dsl-semantic = { path = "../dsl-semantic" }
+argui-dsl-semantic = { path = "../dsl-semantic", default-features = false }
+argui-dsl-syntax = { path = "../dsl-syntax" }
 argui-schema.workspace = true
+argui-assets.workspace = true
+argui-dsl-stdlib = { path = "../stdlib", default-features = false }
 argui-shader.workspace = true
 
 [lints]

@@ -33,6 +33,26 @@ impl LiveRuntime {
     ) -> Result<DslValue, RuntimeError> {
         for statement in statements {
             match statement {
+                IrStatement::SetThemeMode(expression) => {
+                    let value = self.evaluate_event(instance, expression.id, &locals)?;
+                    let DslValue::String(name) = value else {
+                        return Err(RuntimeError::TypeMismatch {
+                            expected: "string theme mode".into(),
+                            actual: format!("{value:?}"),
+                        });
+                    };
+                    self.set_theme_mode(argui_dsl_ir::ThemeModeId::named(&name))
+                        .map_err(|error| match error {
+                            RuntimeError::InvalidBytecode(message)
+                                if message.starts_with("unknown theme mode ") =>
+                            {
+                                RuntimeError::InvalidBytecode(format!(
+                                    "unknown theme mode `{name}`"
+                                ))
+                            }
+                            other => other,
+                        })?;
+                }
                 IrStatement::Expression(expression) => {
                     self.evaluate_event(instance, expression.id, &locals)?;
                 }
@@ -115,6 +135,9 @@ fn native_event_value(
         (argui_ui::UiEventKind::TextChanged(value), argui_schema::ValueType::String)
         | (argui_ui::UiEventKind::Submitted(value), argui_schema::ValueType::String) => {
             Ok(DslValue::String(value.clone()))
+        }
+        (argui_ui::UiEventKind::Scrolled { offset, .. }, argui_schema::ValueType::Float) => {
+            Ok(DslValue::Float(f64::from(offset.y)))
         }
         (kind, expected) => Err(RuntimeError::TypeMismatch {
             expected: format!("native event payload {expected:?}"),

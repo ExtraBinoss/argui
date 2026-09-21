@@ -173,8 +173,31 @@ pub(super) fn component_definition(
         if let Some(name) = identifier_after(&slot, SyntaxKind::SlotKw) {
             let span = Span::new(file, slot.text_range());
             duplicate_member(&name, span, &mut names, diagnostics);
-            slots.push(SlotDefinition { name, span });
+            let kind = direct_tokens(&slot)
+                .filter(|token| token.kind() == SyntaxKind::Ident)
+                .nth(1);
+            if let Some(kind) = &kind
+                && kind.text() != "template"
+            {
+                diagnostics.push(Diagnostic::error(
+                    DiagnosticCode::TypeMismatch,
+                    format!("unknown slot kind `{}`; expected `template`", kind.text()),
+                    Span::new(file, kind.text_range()),
+                ));
+            }
+            slots.push(SlotDefinition {
+                name,
+                template: kind.is_some_and(|token| token.text() == "template"),
+                span,
+            });
         }
+    }
+    if slots.iter().any(|slot| slot.template) && slots.len() != 1 {
+        diagnostics.push(Diagnostic::error(
+            DiagnosticCode::TypeMismatch,
+            "a template slot must be the component's only slot until named slot arguments are supported",
+            Span::new(file, syntax.text_range()),
+        ));
     }
     let assets = asset_dependencies(syntax);
     ComponentDefinition {

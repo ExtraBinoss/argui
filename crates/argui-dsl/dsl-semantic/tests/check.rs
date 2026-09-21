@@ -1,7 +1,54 @@
 //! Semantic checker contracts and edge cases.
 
+#[path = "check/extract/animation.rs"]
+mod animation;
+#[path = "check/mod.rs"]
+mod icons;
+
+#[path = "check/extract/visual/virtual_list.rs"]
+mod virtual_list;
+
 mod expressions {
     use argui_dsl_semantic::{CompilerDatabase, DiagnosticCode, Type};
+
+    #[test]
+    fn string_builtins_validate_arity_and_argument_types() {
+        let mut database = CompilerDatabase::with_builtins().unwrap();
+        database.set_file(
+            "app.argui",
+            "export component App { private property valid: bool = contains(str(42), \"4\") private property invalid: bool = contains(1, true) private property missing: string = str() private property unsupported: string = str(#ffffff) }",
+        );
+        let checked = database.check();
+        let diagnostics = &checked.diagnostics;
+        assert_eq!(
+            diagnostics
+                .iter()
+                .filter(|diagnostic| diagnostic.code == DiagnosticCode::TypeMismatch)
+                .count(),
+            4,
+            "{diagnostics:?}"
+        );
+    }
+
+    #[test]
+    fn gradient_builtins_accept_arrays_and_reject_unknown_color_spaces() {
+        let mut database = CompilerDatabase::with_builtins().unwrap();
+        database.set_file(
+            "app.argui",
+            "export component App { private property linear: brush = linear_gradient([#ff0000, #00ff00, #0000ff], [0.0, 0.5, 1.0], 45.0, \"oklab\") private property radial: brush = radial_gradient([#ff0000, #0000ff], [0.0, 1.0], 0.5, 0.5, 0.7, 0.7, \"srgb\") private property conic: brush = conic_gradient([#ff0000, #0000ff], [0.0, 1.0], 0.5, 0.5, 90.0, \"linear-srgb\") private property bad: brush = linear_gradient([#ffffff, #000000], [0.0, 1.0], 0.0, \"wrong\") private property bad_count: brush = linear_gradient([#ffffff, #000000], [0.0], 0.0, \"oklab\") private property bad_order: brush = linear_gradient([#ffffff, #000000], [0.8, 0.2], 0.0, \"oklab\") }",
+        );
+        let checked = database.check();
+        assert_eq!(
+            checked
+                .diagnostics
+                .iter()
+                .filter(|issue| issue.code == DiagnosticCode::TypeMismatch)
+                .count(),
+            3,
+            "{:?}",
+            checked.diagnostics
+        );
+    }
 
     fn codes(database: &mut CompilerDatabase) -> Vec<DiagnosticCode> {
         database
@@ -219,6 +266,24 @@ export component App {
             }),
             "unexpected numeric diagnostics: {diagnostics:#?}"
         );
+    }
+
+    #[test]
+    fn malformed_number_reports_its_exact_source_span() {
+        let source = "import { Column } from \"@argui/ui\"\nexport component App { Column { gap: 100zzz8.0 } }";
+        let mut database = CompilerDatabase::with_builtins().unwrap();
+        let file = database.set_file("ui/main.argui", source);
+        let project = database.check();
+        let diagnostic = project
+            .diagnostics
+            .iter()
+            .find(|diagnostic| diagnostic.code == DiagnosticCode::InvalidNumber)
+            .expect("malformed literal should be diagnosed");
+        assert_eq!(diagnostic.primary.file, file);
+        let start = u32::from(diagnostic.primary.range.start()) as usize;
+        let end = u32::from(diagnostic.primary.range.end()) as usize;
+        assert_eq!(&source[start..end], "100zzz8.0");
+        assert!(diagnostic.message.contains("100zzz8.0"));
     }
 }
 
@@ -507,44 +572,5 @@ export component App {
         assert!(codes.contains(&DiagnosticCode::TypeMismatch), "{codes:?}");
         assert!(codes.contains(&DiagnosticCode::InvalidAsset), "{codes:?}");
         assert!(codes.contains(&DiagnosticCode::UnitMismatch), "{codes:?}");
-    }
-
-    /// Covers optional/generic declaration extraction and missing native properties.
-    #[test]
-    fn extracts_optional_declarations_and_reports_missing_native_inputs() {
-        let source = r##"import { Pressable } from "@argui/native"
-export struct Data {
-    title: string?
-    values: array<int>
-}
-export component App {
-    private property data: optional<Data> = null
-    Pressable { on click { } }
-}
-"##;
-        let mut database = CompilerDatabase::with_builtins().unwrap();
-        database.set_file("app.argui", source);
-        let project = database.check();
-        let codes = project
-            .diagnostics
-            .iter()
-            .map(|diagnostic| diagnostic.code)
-            .collect::<Vec<_>>();
-
-        assert!(
-            codes.contains(&DiagnosticCode::MissingProperty),
-            "{codes:?}"
-        );
-        let app = project
-            .modules
-            .iter()
-            .flat_map(|module| &module.definitions)
-            .find(|definition| definition.name == "App")
-            .expect("App declaration should survive diagnostics");
-        assert!(matches!(
-            &app.kind,
-            argui_dsl_semantic::DefinitionKind::Component(component)
-                if component.visual_sites == 1
-        ));
     }
 }

@@ -13,12 +13,18 @@ description = "Canonical declarative native schema and adapters for Argui"
 serde = ["dep:serde"]
 
 [dependencies]
+argui-animation.workspace = true
+argui-assets.workspace = true
 argui-core.workspace = true
+argui-effects = { workspace = true, features = ["scroll"] }
 argui-paint.workspace = true
 argui-text.workspace = true
 argui-ui.workspace = true
 thiserror.workspace = true
 serde = { workspace = true, optional = true }
+
+[dev-dependencies]
+argui-layout.workspace = true
 
 [lints]
 workspace = true

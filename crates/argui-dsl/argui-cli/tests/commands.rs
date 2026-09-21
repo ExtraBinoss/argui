@@ -232,3 +232,66 @@ fn schema_exposes_native_fields_and_rejects_unknown_components() {
     let error = schema(Some("not-a-component")).unwrap_err();
     assert_eq!(error.to_string(), "unknown component `not-a-component`");
 }
+
+/// A selected native component and a missing document exercise both query forms.
+#[test]
+fn queries_select_native_schema_and_report_unknown_document() {
+    let root = tempfile::tempdir().unwrap();
+    fs::write(root.path().join("main.argui"), "export component Main {}\n").unwrap();
+    let all = schema(None).unwrap();
+    let name = all["components"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|component| component["kind"] == "native")
+        .unwrap()["name"]
+        .as_str()
+        .unwrap();
+    let selected = schema(Some(name)).unwrap();
+    assert!(
+        selected["components"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|component| component["kind"] == "native" && component["name"] == name)
+    );
+
+    assert!(symbols(root.path(), Some("missing.argui")).is_err());
+}
+
+/// Completion positions are Unicode scalar indices, including the end of a line.
+#[test]
+fn completion_handles_unicode_line_end_and_malformed_numeric_coordinates() {
+    let root = tempfile::tempdir().unwrap();
+    let source = "export component Main { Text { content: \"é\" } }\n";
+    fs::write(root.path().join("main.argui"), source).unwrap();
+    let column = source.trim_end_matches('\n').chars().count() + 1;
+    let end_of_first_line = complete(root.path(), "main.argui", &format!("1:{column}")).unwrap();
+    assert_eq!(end_of_first_line["offset"], (source.len() - 1) as u64);
+    for position in ["x:1", "1:x", "1:1:2", "1:999", "2:2"] {
+        assert!(
+            complete(root.path(), "main.argui", position).is_err(),
+            "{position}"
+        );
+    }
+}
+
+/// Explicit formatter inputs reject nonexistent and extensionless paths.
+#[test]
+fn formatter_rejects_missing_inputs_and_reports_all_drifted_files() {
+    let root = tempfile::tempdir().unwrap();
+    fs::create_dir(root.path().join("ui")).unwrap();
+    for name in ["a.argui", "b.argui"] {
+        fs::write(
+            root.path().join("ui").join(name),
+            "export component Main{Text{content:\"Hi\"}}",
+        )
+        .unwrap();
+    }
+    let error = format(root.path(), &["ui".into()], true).unwrap_err();
+    let report = error.to_string();
+    assert!(report.contains("2 DSL file(s) need formatting"));
+    assert!(report.contains("ui/a.argui, ui/b.argui"));
+    assert!(format(root.path(), &["missing.argui".into()], false).is_err());
+    assert!(format(root.path(), &["missing".into()], false).is_err());
+}

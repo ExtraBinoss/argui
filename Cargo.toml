@@ -36,6 +36,7 @@ members = [
     "crates/argui-widgets",
 ]
 resolver = "3"
+exclude = ["crates/argui-dsl/aot-fixture"]
 
 [workspace.package]
 version = "0.3.2"

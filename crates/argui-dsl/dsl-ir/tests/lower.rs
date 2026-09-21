@@ -1,7 +1,11 @@
 use argui_dsl_ir::{
-    AssetKind, IrElementTarget, IrExpressionKind, IrNode, IrType, PropertyTargetId, lower,
+    AssetKind, IrAnimationDriver, IrElementTarget, IrExpressionKind, IrNode, IrType,
+    PropertyTargetId, lower,
 };
 use argui_dsl_semantic::CompilerDatabase;
+
+#[path = "visual/animation.rs"]
+mod animation;
 
 fn compile(source: &str) -> argui_dsl_ir::IrProject {
     let mut database = CompilerDatabase::with_builtins().unwrap();
@@ -69,8 +73,12 @@ fn lowering_resolves_every_runtime_reference_to_stable_ids() {
     let project = compile(&source(""));
     assert_eq!(project.structs.len(), 1);
     assert_eq!(project.enums.len(), 0);
-    assert_eq!(project.themes.len(), 1);
-    assert_eq!(project.themes[0].modes.len(), 1);
+    let app_theme = project
+        .themes
+        .iter()
+        .find(|theme| theme.tokens.len() == 2)
+        .expect("fixture AppTheme should contain two tokens");
+    assert_eq!(app_theme.modes.len(), 1);
     assert_eq!(project.styles.len(), 1);
     assert_eq!(project.styles[0].states.len(), 1);
     assert_eq!(project.effects.len(), 1);
@@ -81,6 +89,8 @@ fn lowering_resolves_every_runtime_reference_to_stable_ids() {
     let dashboard = project.components.last().unwrap();
     assert_eq!(dashboard.states.len(), 1);
     assert_eq!(dashboard.animations.len(), 1);
+    assert_eq!(dashboard.animations[0].value_type, IrType::Float);
+    assert_eq!(dashboard.animations[0].driver, IrAnimationDriver::Spring);
     let IrNode::Element {
         target,
         properties,
@@ -322,12 +332,11 @@ export component Main {
         content
         states { compact when inverted { gap: 2.0 } }
         animate gap { duration: 10ms }
-        animate missing { duration: 1ms }
     }
 }
 "#;
     let mut database = CompilerDatabase::with_builtins().unwrap();
-    database.set_file("ui/rich.argui", source);
+    let source_file = database.set_file("ui/rich.argui", source);
     let project = database.check();
     assert!(
         project.is_valid(),
@@ -339,8 +348,12 @@ export component Main {
 
     assert_eq!(ir.structs.len(), 1);
     assert_eq!(ir.enums.len(), 1);
-    assert_eq!(ir.themes[0].tokens.len(), 3);
-    assert_eq!(ir.themes[0].modes.len(), 1);
+    let app_theme = ir
+        .themes
+        .iter()
+        .find(|theme| theme.tokens.len() == 3)
+        .expect("fixture AppTheme should contain three tokens");
+    assert_eq!(app_theme.modes.len(), 1);
     assert_eq!(ir.styles[0].states.len(), 1);
     assert!(matches!(
         ir.styles[1].target,
@@ -368,7 +381,13 @@ export component Main {
     let main = ir
         .components
         .iter()
-        .find(|component| component.properties.len() > 10)
+        .find(|component| {
+            component.properties.len() > 10
+                && component
+                    .source
+                    .span
+                    .is_some_and(|span| span.file == source_file)
+        })
         .unwrap();
     assert_eq!(main.states.len(), 1);
     assert_eq!(main.animations.len(), 1);

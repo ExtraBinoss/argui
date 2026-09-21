@@ -7,6 +7,8 @@ use crate::{
     Type,
 };
 
+mod gradient;
+
 pub(super) struct Context<'a, 'd> {
     pub file: FileId,
     pub properties: &'a HashMap<String, PropertyDefinition>,
@@ -23,7 +25,7 @@ pub(super) fn infer(node: &SyntaxNode, context: &mut Context<'_, '_>) -> Type {
         SyntaxKind::Expr => {
             expression_child(node).map_or(Type::Unknown, |child| infer(&child, context))
         }
-        SyntaxKind::LiteralExpr => literal(node),
+        SyntaxKind::LiteralExpr => literal(node, context),
         SyntaxKind::PathExpr => path(node, context),
         SyntaxKind::MemberExpr => member(node, context),
         SyntaxKind::CallExpr => call(node, context),
@@ -51,8 +53,8 @@ pub(super) fn property_dependencies(
     dependencies
 }
 
-/// Infers a literal type without erasing source units.
-fn literal(node: &SyntaxNode) -> Type {
+/// Infers a literal type and reports malformed numeric spelling at its source span.
+fn literal(node: &SyntaxNode, context: &mut Context<'_, '_>) -> Type {
     let tokens = node
         .children_with_tokens()
         .filter_map(|element| element.into_token())
@@ -66,7 +68,17 @@ fn literal(node: &SyntaxNode) -> Type {
         SyntaxKind::TrueKw | SyntaxKind::FalseKw => Type::Bool,
         SyntaxKind::NullKw => Type::Optional(Box::new(Type::Unknown)),
         SyntaxKind::Hash => Type::Color,
-        SyntaxKind::Number => number_type(first.text()),
+        SyntaxKind::Number => match numeric_type(first.text()) {
+            Some(value_type) => value_type,
+            None => {
+                context.diagnostics.push(Diagnostic::error(
+                    DiagnosticCode::InvalidNumber,
+                    format!("invalid numeric literal `{}`", first.text()),
+                    Span::new(context.file, node.text_range()),
+                ));
+                Type::Unknown
+            }
+        },
         _ => Type::Unknown,
     }
 }
@@ -164,6 +176,91 @@ fn call(node: &SyntaxNode, context: &mut Context<'_, '_>) -> Type {
         })
         .unwrap_or_default();
     match callee_name.as_deref() {
+        Some("solid") => {
+            if arguments.len() != 1 {
+                context.diagnostics.push(Diagnostic::error(
+                    DiagnosticCode::TypeMismatch,
+                    "solid() expects exactly one color",
+                    Span::new(context.file, node.text_range()),
+                ));
+            }
+            for argument in &arguments {
+                let actual = infer(argument, context);
+                if !Type::Color.accepts(&actual) {
+                    type_mismatch(context, argument, &Type::Color, &actual);
+                }
+            }
+            Type::Brush
+        }
+        Some(name @ ("linear_gradient" | "radial_gradient" | "conic_gradient")) => {
+            gradient::check(name, node, &arguments, context)
+        }
+        Some("contains") => {
+            if arguments.len() != 2 {
+                context.diagnostics.push(Diagnostic::error(
+                    DiagnosticCode::TypeMismatch,
+                    "contains() expects a string and a string fragment",
+                    Span::new(context.file, node.text_range()),
+                ));
+            }
+            for argument in &arguments {
+                let actual = infer(argument, context);
+                if !Type::String.accepts(&actual) {
+                    type_mismatch(context, argument, &Type::String, &actual);
+                }
+            }
+            Type::Bool
+        }
+        Some("str") => {
+            if arguments.len() != 1 {
+                context.diagnostics.push(Diagnostic::error(
+                    DiagnosticCode::TypeMismatch,
+                    "str() expects exactly one bool, int, float, or string",
+                    Span::new(context.file, node.text_range()),
+                ));
+            }
+            for argument in &arguments {
+                let actual = infer(argument, context);
+                if !matches!(
+                    actual,
+                    Type::Bool | Type::Int | Type::Float | Type::String | Type::Unknown
+                ) {
+                    context.diagnostics.push(Diagnostic::error(
+                        DiagnosticCode::TypeMismatch,
+                        format!("str() cannot convert {actual:?} to string"),
+                        Span::new(context.file, argument.text_range()),
+                    ));
+                }
+            }
+            Type::String
+        }
+        Some("set_theme_mode") => {
+            if arguments.len() != 1 {
+                context.diagnostics.push(Diagnostic::error(
+                    DiagnosticCode::TypeMismatch,
+                    "set_theme_mode() expects one string mode name",
+                    Span::new(context.file, node.text_range()),
+                ));
+            }
+            for argument in &arguments {
+                let actual = infer(argument, context);
+                if !Type::String.accepts(&actual) {
+                    type_mismatch(context, argument, &Type::String, &actual);
+                }
+            }
+            if let Some(mode) = arguments.first().and_then(static_string)
+                && !context.definitions.values().any(|definition| {
+                    matches!(&definition.kind, DefinitionKind::Theme(theme) if theme.modes.contains(&mode))
+                })
+            {
+                context.diagnostics.push(Diagnostic::error(
+                    DiagnosticCode::UnknownName,
+                    format!("unknown theme mode `{mode}`"),
+                    Span::new(context.file, node.text_range()),
+                ));
+            }
+            Type::Void
+        }
         Some("tr") => {
             if arguments.len() != 1 {
                 context.diagnostics.push(Diagnostic::error(
@@ -372,21 +469,31 @@ fn array(node: &SyntaxNode, context: &mut Context<'_, '_>) -> Type {
     Type::Array(Box::new(element))
 }
 
-/// Maps a numeric spelling and suffix to its semantic unit type.
-fn number_type(text: &str) -> Type {
-    if text.ends_with("px") {
-        Type::Length
+/// Parses a numeric spelling into its semantic unit type, returning `None` on failure.
+fn numeric_type(text: &str) -> Option<Type> {
+    let (value_type, suffix) = if text.ends_with("px") {
+        (Type::Length, "px")
     } else if text.ends_with('%') {
-        Type::Percentage
-    } else if text.ends_with("ms") || text.ends_with('s') && !text.ends_with("deg") {
-        Type::Duration
-    } else if text.ends_with("deg") || text.ends_with("rad") {
-        Type::Angle
+        (Type::Percentage, "%")
+    } else if text.ends_with("ms") {
+        (Type::Duration, "ms")
+    } else if text.ends_with("deg") {
+        (Type::Angle, "deg")
+    } else if text.ends_with("rad") {
+        (Type::Angle, "rad")
+    } else if text.ends_with('s') {
+        (Type::Duration, "s")
     } else if text.contains(['.', 'e', 'E']) {
-        Type::Float
+        (Type::Float, "")
     } else {
-        Type::Int
-    }
+        return text.replace('_', "").parse::<i64>().ok().map(|_| Type::Int);
+    };
+    text.strip_suffix(suffix)?
+        .replace('_', "")
+        .parse::<f64>()
+        .ok()
+        .filter(|value| value.is_finite())
+        .map(|_| value_type)
 }
 
 /// Returns the first nested expression child.
@@ -417,6 +524,23 @@ fn direct_ident(node: &SyntaxNode) -> Option<String> {
         .filter_map(|element| element.into_token())
         .find(|token| token.kind() == SyntaxKind::Ident)
         .map(|token| token.text().to_string())
+}
+
+/// Returns a compile-time string only when the whole argument is a literal.
+///
+/// * `node` — parsed call argument expression.
+///
+/// Returns its unquoted value when it is exactly a string literal.
+fn static_string(node: &SyntaxNode) -> Option<String> {
+    let literal = expression_child(node)?;
+    if literal.kind() != SyntaxKind::LiteralExpr {
+        return None;
+    }
+    literal
+        .children_with_tokens()
+        .filter_map(|element| element.into_token())
+        .find(|token| token.kind() == SyntaxKind::String)
+        .map(|token| token.text().trim_matches('"').to_string())
 }
 
 /// Returns the first direct theme-token name.

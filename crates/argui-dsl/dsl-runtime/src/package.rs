@@ -164,6 +164,9 @@ fn collect_project_expressions(project: &IrProject, programs: &mut HashMap<Expre
             for parameter in &animation.parameters {
                 collect_expression(&parameter.value, programs);
             }
+            for keyframe in &animation.keyframes {
+                collect_expression(&keyframe.value, programs);
+            }
         }
     }
     for theme in &project.themes {
@@ -212,7 +215,8 @@ fn collect_node(node: &IrNode, programs: &mut HashMap<ExpressionId, Program>) {
                     match statement {
                         argui_dsl_ir::IrStatement::Expression(value)
                         | argui_dsl_ir::IrStatement::Assignment { value, .. }
-                        | argui_dsl_ir::IrStatement::Return(Some(value)) => {
+                        | argui_dsl_ir::IrStatement::Return(Some(value))
+                        | argui_dsl_ir::IrStatement::SetThemeMode(value) => {
                             collect_expression(value, programs);
                         }
                         argui_dsl_ir::IrStatement::Return(None) => {}

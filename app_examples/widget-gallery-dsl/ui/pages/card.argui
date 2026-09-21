@@ -1,0 +1,23 @@
+import { Card, Badge } from "@argui/ui"
+import { Column, Row, Text } from "@argui/native"
+
+export component CardPage {
+    Column #card_page {
+        width: 100%
+        gap: 20.0
+
+        Text { content: "Card" color: var(--argui-foreground) weight: 700 font_size: 27.0 }
+        Text { content: "A composable surface for related content and actions." color: var(--argui-muted-foreground) font_size: 14.0 }
+        Card {
+            Column {
+                gap: 14.0
+                Row {
+                    gap: 10.0
+                    Text { content: "Project overview" color: var(--argui-foreground) weight: 700 font_size: 17.0 }
+                    Badge { text: "Active" variant: "outline" }
+                }
+                Text { content: "Cards keep their own border and surface. The gallery page itself stays borderless." color: var(--argui-muted-foreground) font_size: 14.0 }
+            }
+        }
+    }
+}

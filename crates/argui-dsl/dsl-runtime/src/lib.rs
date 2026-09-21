@@ -1,6 +1,5 @@
 //! Development-only live runtime for typed, pre-resolved Argui DSL packages.
 
-mod animation;
 mod bytecode;
 #[cfg(not(target_arch = "wasm32"))]
 mod client;
@@ -17,7 +16,6 @@ mod value;
 #[cfg(target_arch = "wasm32")]
 mod web_client;
 
-pub use animation::{AnimationKey, AnimationStore};
 pub use bytecode::{EvaluationContext, Instruction, Program};
 #[cfg(not(target_arch = "wasm32"))]
 pub use client::LiveClient;

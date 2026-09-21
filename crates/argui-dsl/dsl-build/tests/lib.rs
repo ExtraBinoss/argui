@@ -169,7 +169,7 @@ fn compile_to_reports_invalid_utf8_sources_and_output_without_parent() {
 }
 
 #[test]
-/// Embeds reachable binary assets and keeps their Cargo dependency paths current.
+/// Embeds reachable binary assets and rejects missing ones without replacing the output.
 fn compile_to_embeds_reachable_assets_and_reports_loader_failures() {
     let temporary = tempfile::tempdir().unwrap();
     let manifest = temporary.path();
@@ -193,9 +193,17 @@ export component Main {
         source.replace("icon.bin", "missing.bin"),
     )
     .unwrap();
-    argui_dsl_build::compile_to(manifest, Path::new("ui/main.argui"), &output).unwrap();
-    let generated = std::fs::read_to_string(&output).unwrap();
-    assert!(generated.contains("ui/missing.bin"));
+    let error =
+        argui_dsl_build::compile_to(manifest, Path::new("ui/main.argui"), &output).unwrap_err();
+    match error {
+        argui_dsl_build::BuildError::Compiler(CompilerError::Asset {
+            path,
+            source_span: Some(_),
+            ..
+        }) => assert_eq!(path, Path::new("ui/missing.bin")),
+        other => panic!("missing asset should produce a source-located error: {other:?}"),
+    }
+    assert_eq!(std::fs::read_to_string(&output).unwrap(), generated);
 }
 
 #[test]

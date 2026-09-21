@@ -1,0 +1,49 @@
+import { Pressable, Text } from "@argui/native"
+
+export component Button {
+    in property text: string
+    in property enabled: bool = true
+    in property busy: bool = false
+    in property variant: string = "primary"
+    in property radius: float = 7.0
+    in property padding: float = 14.0
+    in property height: length = 36px
+    in property tooltip: string = text
+    in property show_text: bool = true
+    in property select_trigger: bool = false
+    in property expanded: bool = false
+    callback click()
+    slot content
+    slot leading
+    slot trailing
+    slot loading
+
+    Pressable {
+        label: text
+        enabled: enabled
+        busy: busy
+        tooltip: tooltip
+        select_trigger: select_trigger
+        expanded: expanded
+        background: !enabled ? var(--argui-muted) : variant == "primary" ? var(--argui-primary) : variant == "secondary" ? var(--argui-muted) : variant == "destructive" ? var(--argui-destructive) : var(--argui-surface)
+        border_color: !enabled ? var(--argui-border) : variant == "primary" ? var(--argui-primary) : variant == "destructive" ? var(--argui-destructive) : variant == "ghost" ? var(--argui-surface) : var(--argui-border)
+        hover_background: variant == "primary" ? var(--argui-primary-hover) : variant == "destructive" ? var(--argui-destructive-hover) : variant == "secondary" ? var(--argui-neutral-hover) : var(--argui-muted)
+        pressed_background: variant == "primary" ? var(--argui-primary-pressed) : variant == "destructive" ? var(--argui-destructive-pressed) : variant == "secondary" ? var(--argui-neutral-pressed) : var(--argui-neutral-hover)
+        focus_border_color: var(--argui-ring)
+        radius: radius
+        height: height
+        padding: padding
+        gap: 8.0
+        on click { click() }
+
+        if busy {
+            loading
+        }
+        if !busy { leading }
+        if show_text {
+            Text { content: text color: !enabled ? var(--argui-muted-foreground) : variant == "primary" || variant == "destructive" ? var(--argui-primary-foreground) : var(--argui-foreground) weight: 600 font_size: 15.0 no_wrap: true }
+        }
+        content
+        trailing
+    }
+}

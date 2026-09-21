@@ -89,6 +89,12 @@ output only when those regions intersect. For a shader with a dynamic sampling
 radius, attach the conservative logical-pixel distance to its instance with
 `EffectInstance::expansion`; DPI scaling and physical clipping remain automatic.
 
+The scroll edge-fade and edge-shadow presets are bounded: their shader samples
+only the scroll viewport layer. Changes in scroll position update the effect
+parameters and damage that viewport, rather than forcing a full-window effect
+composition. Register the preset definitions in the application's renderer with
+`RendererConfig::effects(argui_effects::registry()?)` when using them.
+
 `source`, `backdrop`, sampling helpers, and color parameters use straight
 alpha extended linear sRGB. The generated ABI unpremultiplies layer textures
 before custom code and premultiplies the result afterward. Use

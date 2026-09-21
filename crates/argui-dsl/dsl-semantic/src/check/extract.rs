@@ -13,10 +13,13 @@ use declaration::{
     theme_definition,
 };
 use named_cycle::report_named_cycles;
-use visual::{validate_component, validate_theme_values};
+use theme::validate_theme_values;
+use visual::validate_component;
 
+mod animation;
 mod declaration;
 mod named_cycle;
+mod theme;
 mod visual;
 
 pub(super) fn definition(

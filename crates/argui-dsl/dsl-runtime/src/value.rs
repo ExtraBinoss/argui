@@ -13,6 +13,7 @@ pub enum DslValue {
     Float(f64),
     String(String),
     Color(argui_core::Color),
+    Brush(argui_paint::Fill),
     Struct(BTreeMap<FieldId, Self>),
     Enum { symbol: u64, variant: u64 },
     Array(Vec<Self>),
@@ -30,6 +31,7 @@ impl DslValue {
             Self::Float(_) => "float",
             Self::String(_) => "string",
             Self::Color(_) => "color",
+            Self::Brush(_) => "brush",
             Self::Struct(_) => "struct",
             Self::Enum { .. } => "enum",
             Self::Array(_) => "array",
@@ -76,6 +78,7 @@ impl DslValue {
                     IrType::String | IrType::FontFamily | IrType::FontWeight
                 )
                 | (Self::Color(_), IrType::Color)
+                | (Self::Brush(_), IrType::Brush)
                 | (Self::Struct(_), IrType::Struct { .. })
                 | (Self::Enum { .. }, IrType::Enum(_))
                 | (Self::Array(_), IrType::Array(_) | IrType::Model(_))
@@ -100,12 +103,13 @@ impl DslValue {
                 Ok(SchemaValue::String(value.clone()))
             }
             (Self::Color(value), IrType::Color) => Ok(SchemaValue::Color(*value)),
+            (Self::Brush(value), IrType::Brush) => Ok(SchemaValue::Brush(value.clone())),
             (Self::Float(value), IrType::Length | IrType::FontSize | IrType::LineHeight) => {
                 Ok(SchemaValue::Dimension(argui_ui::length(*value as f32)))
             }
-            (Self::Float(value), IrType::Percentage) => {
-                Ok(SchemaValue::Dimension(argui_ui::percent(*value as f32)))
-            }
+            (Self::Float(value), IrType::Percentage) => Ok(SchemaValue::Dimension(
+                argui_ui::percent(*value as f32 / 100.0),
+            )),
             _ => Err(RuntimeError::TypeMismatch {
                 expected: format!("{value_type:?}"),
                 actual: self.type_name().into(),

@@ -101,6 +101,9 @@ pub fn compile_to(manifest: &Path, entry: &Path, output: &Path) -> Result<(), Bu
         fs::read(manifest.join(asset)).map_err(|error| error.to_string())
     })?;
     for dependency in &compiled.dependencies {
+        if dependency.starts_with('@') {
+            continue;
+        }
         println!(
             "cargo:rerun-if-changed={}",
             manifest.join(dependency).display()

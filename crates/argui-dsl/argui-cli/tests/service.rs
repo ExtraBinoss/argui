@@ -1,12 +1,32 @@
 #![cfg(not(target_arch = "wasm32"))]
 
 use argui_cli::{DevCompilerService, ServiceError, is_relevant_event, is_relevant_path};
+use argui_dsl_compiler::{CompilerSession, SourceModule};
 use argui_dsl_protocol::{
-    ENGINE_COMPATIBILITY_VERSION, IR_FORMAT_VERSION, LiveMessage, PROTOCOL_VERSION, read_frame,
-    write_frame,
+    ENGINE_COMPATIBILITY_VERSION, IR_FORMAT_VERSION, LiveMessage, LivePackageEnvelope,
+    PROTOCOL_VERSION, PackageHeader, read_frame, write_frame,
 };
 use argui_dsl_runtime::{ClientEvent, LiveClient, LivePackage, LiveRuntime};
 use argui_testing::TestApp;
+
+/// Compiles and prunes one in-memory standard-library generation for a live client.
+///
+/// * `session` — long-lived compiler session with project and stdlib modules.
+/// * `generation` — monotonically increasing version sent to the client.
+///
+/// Returns the exact package shape used by the development service.
+fn compile_stdlib_package(session: &mut CompilerSession, generation: u64) -> LivePackageEnvelope {
+    let mut compiled = session
+        .compile(|path| Err(format!("unexpected asset `{path}`")))
+        .unwrap();
+    compiled.reachability.prune(&mut compiled.ir);
+    LivePackageEnvelope {
+        header: PackageHeader::current(compiled.public_api_hash, generation),
+        roots: compiled.roots,
+        ir: compiled.ir,
+        assets: Vec::new(),
+    }
+}
 
 #[test]
 fn watcher_ignores_compiler_reads_without_losing_real_or_imprecise_edits() {
@@ -60,6 +80,30 @@ export component Main { Text { content: "fixed" } }"#,
         panic!("fixed generation should compile");
     };
     assert_eq!(package.header.generation, 3);
+}
+
+#[test]
+fn malformed_number_rejection_has_file_span_and_specific_message() {
+    let directory = tempfile::tempdir().unwrap();
+    std::fs::create_dir(directory.path().join("ui")).unwrap();
+    let source =
+        "import { Column } from \"@argui/ui\"\nexport component Main { Column { gap: 100zzz8.0 } }";
+    std::fs::write(directory.path().join("ui/main.argui"), source).unwrap();
+    let mut service = DevCompilerService::open(directory.path(), "ui/main.argui").unwrap();
+    let LiveMessage::Diagnostics { diagnostics, .. } = service.compile().message else {
+        panic!("malformed literal should reject the generation");
+    };
+    let diagnostic = diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic.code == "InvalidNumber")
+        .unwrap_or_else(|| {
+            panic!("a specific numeric diagnostic should be emitted: {diagnostics:?}")
+        });
+    assert_eq!(diagnostic.path.as_deref(), Some("ui/main.argui"));
+    let start = diagnostic.start.unwrap() as usize;
+    let end = diagnostic.end.unwrap() as usize;
+    assert_eq!(&source[start..end], "100zzz8.0");
+    assert!(diagnostic.message.contains("100zzz8.0"));
 }
 
 #[test]
@@ -191,6 +235,127 @@ fn a_remote_package_rebuilds_the_visible_tree_without_user_input() {
     server.join().unwrap();
 }
 
+/// Replacing a standard-library module in one live compiler session must
+/// repaint the mounted UI after the client acknowledges the new generation.
+#[test]
+fn edited_stdlib_module_rebuilds_visible_ui_without_input_or_restart() {
+    let mut session = CompilerSession::new("ui/main.argui").unwrap();
+    session.update_module(SourceModule::new(
+        "ui/main.argui",
+        "import { Probe } from \"@argui/ui\" export component Main { Probe {} }",
+    ));
+    let module = |label: &str| {
+        SourceModule::new(
+            "@argui/ui/probe.argui",
+            format!(
+                "import {{ Text }} from \"@argui/native\" export component Probe {{ Text {{ content: \"{label}\" }} }}"
+            ),
+        )
+    };
+    session.update_module(module("before stdlib edit"));
+    let first = compile_stdlib_package(&mut session, 1);
+    session.update_module(module("after stdlib edit"));
+    let second = compile_stdlib_package(&mut session, 2);
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let address = listener.local_addr().unwrap();
+    let (send_change, receive_change) = std::sync::mpsc::channel();
+    let server = std::thread::spawn(move || {
+        let (mut stream, _) = listener.accept().unwrap();
+        write_frame(
+            &mut stream,
+            &LiveMessage::Hello {
+                protocol_version: PROTOCOL_VERSION,
+                ir_format_version: IR_FORMAT_VERSION,
+                engine_version: ENGINE_COMPATIBILITY_VERSION.into(),
+            },
+        )
+        .unwrap();
+        write_frame(&mut stream, &LiveMessage::Package(Box::new(first))).unwrap();
+        assert_eq!(
+            read_frame::<LiveMessage>(&mut stream).unwrap(),
+            LiveMessage::Committed { generation: 1 }
+        );
+        receive_change.recv().unwrap();
+        write_frame(&mut stream, &LiveMessage::Package(Box::new(second))).unwrap();
+        assert_eq!(
+            read_frame::<LiveMessage>(&mut stream).unwrap(),
+            LiveMessage::Committed { generation: 2 }
+        );
+        std::thread::sleep(std::time::Duration::from_millis(300));
+    });
+    let runtime = LiveRuntime::connect(address, std::time::Duration::from_secs(2)).unwrap();
+    let mut app = TestApp::new(runtime);
+    app.assert_text("before stdlib edit");
+    send_change.send(()).unwrap();
+    for _ in 0..40 {
+        std::thread::sleep(std::time::Duration::from_millis(25));
+        app.settle().unwrap();
+        if app.entity().read(LiveRuntime::generation) == 2 {
+            break;
+        }
+    }
+    assert_eq!(app.entity().read(LiveRuntime::generation), 2);
+    app.assert_text("after stdlib edit");
+    server.join().unwrap();
+}
+
+/// Import and asset failures report the exact DSL source site whenever known.
+#[test]
+fn icon_and_asset_diagnostics_include_source_path_and_spans() {
+    let directory = tempfile::tempdir().unwrap();
+    std::fs::create_dir(directory.path().join("ui")).unwrap();
+    let path = directory.path().join("ui/main.argui");
+    let icon_source = "import { NotATablerIcon } from \"@argui/icons\"\nexport component Main {}";
+    std::fs::write(&path, icon_source).unwrap();
+    let mut service = DevCompilerService::open(directory.path(), "ui/main.argui").unwrap();
+    let LiveMessage::Diagnostics { diagnostics, .. } = service.compile().message else {
+        panic!("unknown icon should be rejected");
+    };
+    let icon = diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic.message.contains("NotATablerIcon"))
+        .unwrap();
+    assert_eq!(icon.code, "UnresolvedImport");
+    assert_eq!(icon.path.as_deref(), Some("ui/main.argui"));
+    assert_eq!(
+        &icon_source[icon.start.unwrap() as usize..icon.end.unwrap() as usize],
+        "NotATablerIcon"
+    );
+
+    let invalid_source = "export component Main { private property icon: asset = asset() }";
+    std::fs::write(&path, invalid_source).unwrap();
+    service.refresh_sources().unwrap();
+    let LiveMessage::Diagnostics { diagnostics, .. } = service.compile().message else {
+        panic!("invalid asset expression should be rejected");
+    };
+    let invalid = diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic.code == "InvalidAsset")
+        .unwrap();
+    assert_eq!(invalid.path.as_deref(), Some("ui/main.argui"));
+    assert_eq!(
+        &invalid_source[invalid.start.unwrap() as usize..invalid.end.unwrap() as usize],
+        "asset()"
+    );
+
+    let missing_source = "import { Image } from \"@argui/native\"\nexport component Main { Image { source: asset(\"media/missing.png\") } }";
+    std::fs::write(&path, missing_source).unwrap();
+    service.refresh_sources().unwrap();
+    let LiveMessage::Diagnostics { diagnostics, .. } = service.compile().message else {
+        panic!("missing image source should be rejected");
+    };
+    let missing = diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic.code == "Asset")
+        .unwrap();
+    assert_eq!(missing.path.as_deref(), Some("ui/main.argui"));
+    assert!(missing.message.contains("ui/media/missing.png"));
+    assert_eq!(
+        &missing_source[missing.start.unwrap() as usize..missing.end.unwrap() as usize],
+        "asset(\"media/missing.png\")"
+    );
+}
+
 #[test]
 fn relevant_paths_cover_every_supported_asset_extension_and_metadata_case() {
     for extension in ["argui", "wgsl", "png", "jpg", "jpeg", "webp", "gif", "svg"] {
@@ -296,29 +461,55 @@ export component Main { Text { content: "asset removed" } }"#,
 }
 
 #[test]
-fn service_turns_package_filesystem_failures_into_rejection_diagnostics() {
+fn service_reports_missing_generic_asset_at_its_dsl_expression() {
     let directory = tempfile::tempdir().unwrap();
     std::fs::create_dir(directory.path().join("ui")).unwrap();
-    std::fs::write(
-        directory.path().join("ui/main.argui"),
-        r#"import { Text } from "@argui/ui"
+    let source = r#"import { Text } from "@argui/ui"
 export component Main {
     private property icon: asset = asset("missing.bin")
     Text { content: "asset" }
-}"#,
-    )
-    .unwrap();
+}"#;
+    std::fs::write(directory.path().join("ui/main.argui"), source).unwrap();
     let mut service = DevCompilerService::open(directory.path(), "ui/main.argui").unwrap();
     let LiveMessage::Diagnostics {
         generation,
         diagnostics,
     } = service.compile().message
     else {
-        panic!("missing package asset should reject the generation");
+        panic!("missing generic asset should reject the generation");
     };
     assert_eq!(generation, 1);
-    assert_eq!(diagnostics[0].code, "package");
-    assert!(!diagnostics[0].message.is_empty());
+    assert_eq!(diagnostics[0].code, "Asset");
+    assert_eq!(diagnostics[0].path.as_deref(), Some("ui/main.argui"));
+    assert_eq!(
+        &source[diagnostics[0].start.unwrap() as usize..diagnostics[0].end.unwrap() as usize],
+        "asset(\"missing.bin\")"
+    );
+    assert!(diagnostics[0].message.contains("ui/missing.bin"));
+}
+
+/// Virtual Tabler assets are packaged from the embedded catalog, not project files.
+#[test]
+fn service_packages_embedded_icon_svg_without_a_filesystem_asset() {
+    let directory = tempfile::tempdir().unwrap();
+    std::fs::create_dir(directory.path().join("ui")).unwrap();
+    std::fs::write(
+        directory.path().join("ui/main.argui"),
+        "import { Svg } from \"@argui/native\"\nexport component Main { Svg { source: asset(\"@argui/icons/Loader2.svg\") } }",
+    )
+    .unwrap();
+    let mut service = DevCompilerService::open(directory.path(), "ui/main.argui").unwrap();
+    let LiveMessage::Package(first) = service.compile().message else {
+        panic!("an embedded icon should compile without a project asset");
+    };
+    assert_eq!(first.assets.len(), 1);
+    assert_eq!(first.assets[0].revision, 1);
+    assert!(first.assets[0].bytes.starts_with(b"<svg "));
+    let LiveMessage::Package(second) = service.compile().message else {
+        panic!("an unchanged embedded icon should remain available");
+    };
+    assert_eq!(second.assets[0].revision, 1);
+    assert_eq!(second.assets[0].bytes, first.assets[0].bytes);
 }
 
 #[test]

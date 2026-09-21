@@ -223,8 +223,10 @@ dependencies = [
  "argui-layout",
  "argui-paint",
  "argui-platform",
+ "argui-reactive",
  "argui-render",
  "argui-runtime",
+ "argui-schema",
  "argui-text",
  "argui-theme",
  "argui-ui",
@@ -250,8 +252,117 @@ dependencies = [
 ]
 
 [[package]]
+name = "argui-assets"
+version = "0.3.2"
+dependencies = [
+ "argui-core",
+ "argui-image",
+ "argui-paint",
+ "argui-vector",
+ "thiserror 2.0.20",
+]
+
+[[package]]
 name = "argui-core"
 version = "0.3.2"
+
+[[package]]
+name = "argui-dsl-build"
+version = "0.3.2"
+dependencies = [
+ "argui-dsl-compiler",
+]
+
+[[package]]
+name = "argui-dsl-compiler"
+version = "0.3.2"
+dependencies = [
+ "argui-assets",
+ "argui-dsl-ir",
+ "argui-dsl-semantic",
+ "argui-dsl-stdlib",
+ "argui-dsl-syntax",
+ "argui-schema",
+ "argui-shader",
+]
+
+[[package]]
+name = "argui-dsl-ir"
+version = "0.3.2"
+dependencies = [
+ "argui-dsl-semantic",
+ "argui-dsl-syntax",
+ "argui-schema",
+ "serde",
+]
+
+[[package]]
+name = "argui-dsl-parser"
+version = "0.3.2"
+dependencies = [
+ "argui-dsl-syntax",
+ "rowan",
+]
+
+[[package]]
+name = "argui-dsl-protocol"
+version = "0.3.2"
+dependencies = [
+ "argui-dsl-ir",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "argui-dsl-runtime"
+version = "0.3.2"
+dependencies = [
+ "argui-animation",
+ "argui-assets",
+ "argui-core",
+ "argui-dsl-ir",
+ "argui-dsl-protocol",
+ "argui-paint",
+ "argui-runtime",
+ "argui-schema",
+ "argui-shader",
+ "argui-ui",
+ "futures-channel",
+ "futures-util",
+ "js-sys",
+ "wasm-bindgen",
+ "web-sys",
+]
+
+[[package]]
+name = "argui-dsl-semantic"
+version = "0.3.2"
+dependencies = [
+ "argui-dsl-parser",
+ "argui-dsl-stdlib",
+ "argui-dsl-syntax",
+ "argui-schema",
+ "argui-theme",
+ "serde",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "argui-dsl-stdlib"
+version = "0.3.2"
+dependencies = [
+ "icondata_core",
+ "icondata_tb",
+]
+
+[[package]]
+name = "argui-dsl-syntax"
+version = "0.3.2"
+dependencies = [
+ "rowan",
+ "serde",
+]
 
 [[package]]
 name = "argui-effects"
@@ -295,6 +406,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "argui-example-dsl-live-demo"
+version = "0.1.0"
+dependencies = [
+ "argui",
+ "argui-dsl-build",
+ "argui-dsl-compiler",
+ "argui-dsl-runtime",
+ "argui-testing",
+]
+
+[[package]]
+name = "argui-example-dsl-virtual-list"
+version = "0.1.0"
+dependencies = [
+ "argui",
+ "argui-dsl-build",
+ "argui-dsl-runtime",
+ "argui-effects",
+ "argui-testing",
+]
+
+[[package]]
 name = "argui-example-gpu-canvas"
 version = "0.1.0"
 dependencies = [
@@ -309,6 +442,17 @@ dependencies = [
  "argui",
  "argui-showcase",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "argui-example-widget-gallery-dsl"
+version = "0.1.0"
+dependencies = [
+ "argui",
+ "argui-dsl-build",
+ "argui-dsl-runtime",
+ "argui-effects",
+ "argui-testing",
 ]
 
 [[package]]
@@ -398,14 +542,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "argui-reactive"
+version = "0.3.2"
+
+[[package]]
 name = "argui-render"
 version = "0.3.2"
 dependencies = [
  "argui-core",
  "argui-paint",
+ "argui-shader",
  "argui-text",
  "bytemuck",
- "naga",
  "resvg",
  "web-time",
  "wgpu",
@@ -436,6 +584,30 @@ dependencies = [
  "wasm-bindgen-futures",
  "web-time",
  "winit",
+]
+
+[[package]]
+name = "argui-schema"
+version = "0.3.2"
+dependencies = [
+ "argui-animation",
+ "argui-assets",
+ "argui-core",
+ "argui-effects",
+ "argui-paint",
+ "argui-text",
+ "argui-ui",
+ "serde",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "argui-shader"
+version = "0.3.2"
+dependencies = [
+ "argui-core",
+ "naga",
+ "thiserror 2.0.20",
 ]
 
 [[package]]
@@ -484,6 +656,8 @@ name = "argui-theme"
 version = "0.3.2"
 dependencies = [
  "argui-core",
+ "argui-paint",
+ "argui-reactive",
 ]
 
 [[package]]
@@ -1019,6 +1193,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "countme"
+version = "3.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7704b5fdd17b18ae31c4c1da5a2e0305a2bf17b5249300a9ee9ed7b72114c636"
+
+[[package]]
 name = "crc32fast"
 version = "1.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1087,7 +1267,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1601,6 +1781,12 @@ dependencies = [
 
 [[package]]
 name = "hashbrown"
+version = "0.14.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e5274423e17b7c9fc20b6e7e208532f9b19825d82dfd615708b70edd83df41f1"
+
+[[package]]
+name = "hashbrown"
 version = "0.15.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9229cfe53dfd69f0609a49f65461bd93001ea1ef889cd5529dd176593f5338a1"
@@ -1663,11 +1849,22 @@ checksum = "85ab80394333c02fe689eaf900ab500fbd0c2213da414687ebf995a65d5a6104"
 dependencies = [
  "bytemuck",
  "byteorder-lite",
+ "image-webp",
  "moxcms",
  "num-traits",
  "png",
  "zune-core",
  "zune-jpeg",
+]
+
+[[package]]
+name = "image-webp"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "525e9ff3e1a4be2fbea1fdf0e98686a6d98b4d8f937e1bf7402245af1909e8c3"
+dependencies = [
+ "byteorder-lite",
+ "quick-error",
 ]
 
 [[package]]
@@ -2002,7 +2199,7 @@ dependencies = [
  "once_cell",
  "png",
  "thiserror 2.0.20",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2754,6 +2951,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d55d956fa96f5ec02be2e13af0e20391a5aa83d6a074e3ad368959d0fab299ea"
 
 [[package]]
+name = "quick-error"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a993555f31e5a609f617c12db6250dedcac1b0a85076912c436e6fc9b2c8e6a3"
+
+[[package]]
 name = "quick-xml"
 version = "0.41.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2956,6 +3159,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "47b34b781b31e5d73e9fbc8689c70551fd1ade9a19e3e28cfec8580a79290cc4"
 dependencies = [
  "bytemuck",
+]
+
+[[package]]
+name = "rowan"
+version = "0.17.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "14b574c58582fa59fa43a2feb6608b8744184659f08a2e0117e4b8224d95ed61"
+dependencies = [
+ "countme",
+ "hashbrown 0.14.5",
+ "memoffset",
+ "rustc-hash 1.1.0",
+ "text-size",
 ]
 
 [[package]]
@@ -3400,6 +3616,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "text-size"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f18aa187839b2bdb1ad2fa35ead8c4c2976b64e4363c386d45ac0f7ee85c9233"
+
+[[package]]
 name = "thiserror"
 version = "1.0.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3628,7 +3850,7 @@ dependencies = [
  "once_cell",
  "png",
  "thiserror 2.0.20",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

@@ -364,6 +364,7 @@ fn host_animation_and_layout_delegation_keep_the_app_viewport_explicit() {
             nodes: vec![LayoutBounds {
                 node: tree.node_id_at(0).unwrap(),
                 key: Some("__devtools-app-root".into()),
+                retained_identity: None,
                 bounds: app_bounds,
             }],
         })),
@@ -389,6 +390,7 @@ fn picker_hit_tests_the_application_and_selects_without_clicking_through() {
             nodes: vec![LayoutBounds {
                 node: UiTree::new(Element::container([])).node_id_at(0).unwrap(),
                 key: Some("__devtools-app-root".into()),
+                retained_identity: None,
                 bounds: Rect::new(Point::default(), Size::new(900.0, 380.0)),
             }],
         })

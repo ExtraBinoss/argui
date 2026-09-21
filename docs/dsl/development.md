@@ -84,9 +84,36 @@ argui fmt [PATH ...] --check
 useful when a browser or a development device owns the presentation process.
 In an interactive terminal, `argui dev` shows a read-only Ratatui dashboard:
 the changed file and location, before/after source lines, stage-based update
-gauge, diagnostics, connections, and actual client acknowledgements. It does
-not capture mouse input or redraw while idle. Redirected output remains
-line-oriented for logs and automation.
+gradient progress bar, diagnostics with source location and rejection reason,
+connections, and actual client acknowledgements. Keyboard and stray mouse
+events are drained without activating mouse controls; Ctrl+C exits and a
+terminal resize redraws the layout. Redirected output remains line-oriented
+for logs and automation.
+
+## Theme modes and media
+
+Components reference stable token names such as `var(--argui-surface)` and
+`var(--argui-primary)`. A theme defines a base value and optional `light`,
+`dark`, or custom named mode overrides for the same token. Event handlers can
+call `set_theme_mode("dark")` or pass a string expression; the active mode is
+shared by the application. Custom themes can override the same mode/token pair
+without adding mode checks to every component.
+
+`Image` and `Svg` are native primitives. Their `source` property accepts a
+typed, module-relative `asset("../assets/example.png")` or
+`asset("../assets/example.svg")` (resolved within the project); `Image` supports `fit` (`fill`, `contain`,
+`cover`) and `sampling` (`linear`, `nearest`), while `Svg` supports `fit` and
+`color` tinting for monochrome vectors. Source bytes are validated during
+compilation and embedded in AOT output or revisioned in a live generation.
+Edits to local asset files trigger a new generation. Asset paths cannot escape
+the project root.
+
+With the default `icons` feature enabled, import Tabler components from
+`@argui/icons`, for example `import { Star, Spinner } from "@argui/icons"`.
+Icons are SVGs built on the same asset pipeline; only referenced icons are
+emitted into a release build. Unknown names or a disabled icon feature produce
+an import diagnostic. The import catalogue is compile-time pinned rather than
+requiring an online fetch during builds.
 
 ## Compatibility and performance rules
 

@@ -1,7 +1,8 @@
-use argui_core::{Affine2D, Color, Rect};
+use argui_core::{Affine2D, Color, ColorInterpolation, Point, Rect};
 
 use crate::{
-    BilinearGradient, ClipChain, ImageFit, ImageId, ImageSampling, LinearGradient, RadialGradient,
+    BilinearGradient, ClipChain, ConicGradient, GradientError, GradientStop, GradientStops,
+    ImageFit, ImageId, ImageSampling, LinearGradient, RadialGradient,
 };
 
 #[derive(Clone, Debug, PartialEq)]
@@ -9,7 +10,115 @@ pub enum Fill {
     Solid(Color),
     Linear(LinearGradient),
     Radial(RadialGradient),
+    Conic(ConicGradient),
     Bilinear(BilinearGradient),
+}
+
+impl Fill {
+    /// Creates a linear GPU fill with any number of ordered stops.
+    ///
+    /// * `colors` — colors at each stop.
+    /// * `offsets` — corresponding normalized stop positions.
+    /// * `angle_degrees` — clockwise direction of the color transition.
+    /// * `space` — `oklab`, `linear-srgb`, or `srgb` interpolation.
+    ///
+    /// # Errors
+    ///
+    /// Returns a gradient error for mismatched, invalid, or unordered stops or an unknown color space.
+    pub fn linear_gradient(
+        colors: &[Color],
+        offsets: &[f32],
+        angle_degrees: f32,
+        space: &str,
+    ) -> Result<Self, GradientError> {
+        let radians = angle_degrees.to_radians();
+        let (sine, cosine) = radians.sin_cos();
+        let start = Point::new(0.5 - cosine * 0.5, 0.5 - sine * 0.5);
+        let end = Point::new(0.5 + cosine * 0.5, 0.5 + sine * 0.5);
+        Ok(Self::Linear(LinearGradient::with_stops(
+            start,
+            end,
+            interpolation(space)?,
+            gradient_stops(colors, offsets)?,
+        )))
+    }
+
+    /// Creates a circular or elliptical radial GPU fill with ordered stops.
+    ///
+    /// * `colors` — colors at each stop.
+    /// * `offsets` — corresponding normalized stop positions.
+    /// * `center` — relative center of the gradient.
+    /// * `radius` — relative horizontal and vertical radii.
+    /// * `space` — interpolation color space.
+    ///
+    /// # Errors
+    ///
+    /// Returns a gradient error for invalid stops or color space.
+    pub fn radial_gradient(
+        colors: &[Color],
+        offsets: &[f32],
+        center: Point,
+        radius: Point,
+        space: &str,
+    ) -> Result<Self, GradientError> {
+        Ok(Self::Radial(RadialGradient::with_stops(
+            center,
+            radius,
+            interpolation(space)?,
+            gradient_stops(colors, offsets)?,
+        )))
+    }
+
+    /// Creates an angular GPU fill with ordered stops around one revolution.
+    ///
+    /// * `colors` — colors at each stop.
+    /// * `offsets` — corresponding normalized stop positions.
+    /// * `center` — relative center of the gradient.
+    /// * `start_angle` — clockwise starting angle in degrees.
+    /// * `space` — interpolation color space.
+    ///
+    /// # Errors
+    ///
+    /// Returns a gradient error for invalid stops or color space.
+    pub fn conic_gradient(
+        colors: &[Color],
+        offsets: &[f32],
+        center: Point,
+        start_angle: f32,
+        space: &str,
+    ) -> Result<Self, GradientError> {
+        Ok(Self::Conic(ConicGradient::with_stops(
+            center,
+            start_angle,
+            interpolation(space)?,
+            gradient_stops(colors, offsets)?,
+        )))
+    }
+}
+
+/// Validates matching arbitrary-length arrays before creating reusable GPU stops.
+fn gradient_stops(colors: &[Color], offsets: &[f32]) -> Result<GradientStops, GradientError> {
+    if colors.len() != offsets.len() {
+        return Err(GradientError::MismatchedStops);
+    }
+    GradientStops::from_vec(
+        colors
+            .iter()
+            .copied()
+            .zip(offsets.iter().copied())
+            .map(|(color, offset)| GradientStop::new(offset, color))
+            .collect(),
+    )
+}
+
+/// Resolves an authored color-space name to the GPU interpolation mode.
+fn interpolation(name: &str) -> Result<ColorInterpolation, GradientError> {
+    match name {
+        "oklab" => Ok(ColorInterpolation::Oklab),
+        "linear-srgb" => Ok(ColorInterpolation::LinearSrgb),
+        "srgb" => Ok(ColorInterpolation::Srgb),
+        _ => Err(GradientError::InvalidInterpolation),
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]

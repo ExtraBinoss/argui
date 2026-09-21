@@ -10,12 +10,14 @@ readme.workspace = true
 description = "Incremental module resolution and semantic analysis for the Argui DSL"
 
 [features]
+default = ["icons"]
+icons = ["argui-dsl-stdlib/icons"]
 serde = ["dep:serde"]
 
 [dependencies]
 argui-dsl-parser = { path = "../dsl-parser" }
 argui-dsl-syntax = { path = "../dsl-syntax" }
-argui-dsl-stdlib = { path = "../stdlib" }
+argui-dsl-stdlib = { path = "../stdlib", default-features = false }
 argui-schema.workspace = true
 argui-theme.workspace = true
 serde = { workspace = true, optional = true }

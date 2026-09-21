@@ -75,7 +75,7 @@ impl LayoutEngine {
             output,
         )?;
         crate::overlay::resolve(&self.tree, root, &elements, ui, output)?;
-        self.scroll_anchors = crate::anchor::capture(root, output);
+        self.scroll_anchors = crate::anchor::capture(root, output, ui);
         Ok(())
     }
 

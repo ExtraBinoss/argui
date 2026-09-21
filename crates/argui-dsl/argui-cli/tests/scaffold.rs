@@ -49,3 +49,18 @@ fn scaffold_reports_existing_destinations_before_writing() {
     let error = new_project(root.path(), "existing").unwrap_err();
     assert!(error.to_string().contains("already exists"));
 }
+
+/// Relative project paths retain their nested location and valid package name.
+#[test]
+fn scaffold_accepts_relative_nested_paths_and_underscored_names() {
+    let root = tempfile::tempdir().unwrap();
+    let destination = new_project(root.path(), "apps/hello_world-2").unwrap();
+    assert_eq!(destination, root.path().join("apps/hello_world-2"));
+    let manifest = fs::read_to_string(destination.join("Cargo.toml")).unwrap();
+    assert!(manifest.contains("name = \"hello_world-2\""));
+    assert!(
+        fs::read_to_string(destination.join("ui/main.argui"))
+            .unwrap()
+            .contains("export component Main")
+    );
+}

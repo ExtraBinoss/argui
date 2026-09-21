@@ -7,6 +7,8 @@ use argui_shader::{ShaderParameterMetadata, validate_effect_source};
 
 use crate::{CompilerError, Reachability, codegen};
 
+mod asset_source;
+
 /// One canonical project module supplied to the compiler.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SourceModule {
@@ -77,6 +79,12 @@ impl CompilerSession {
         self.database.stats()
     }
 
+    /// Returns the canonical source path associated with `file`, if it is loaded.
+    #[must_use]
+    pub fn file_path(&self, file: argui_dsl_syntax::FileId) -> Option<&str> {
+        self.database.file_path(file)
+    }
+
     /// Compiles the current snapshot through the shared IR and AOT backend.
     ///
     /// # Errors
@@ -136,6 +144,8 @@ fn compile_semantic(
     let reachability = Reachability::analyze(&semantic, &ir, entry_module);
     let roots = entry_roots(&semantic, entry_module);
     validate_shaders(&semantic, &ir, &reachability, load_asset)?;
+    validate_media_bindings(&ir, &reachability)?;
+    validate_asset_sources(&ir, &reachability, load_asset)?;
     let public_api_hash = public_api_hash(&semantic, entry_module);
     let rust = codegen::emit(
         &semantic,
@@ -162,6 +172,167 @@ fn compile_semantic(
         public_api_hash,
         dependencies,
     })
+}
+
+/// Rejects statically known media kind mismatches at their native element sites.
+///
+/// * `ir` — lowered project containing source asset declarations.
+/// * `reachable` — selected release component graph.
+///
+/// # Errors
+///
+/// Returns an asset error if an Image references SVG or a Svg references raster data.
+fn validate_media_bindings(
+    ir: &argui_dsl_ir::IrProject,
+    reachable: &Reachability,
+) -> Result<(), CompilerError> {
+    for component in &ir.components {
+        if reachable.components.contains(&component.id) {
+            for node in &component.body {
+                validate_media_node(node, ir)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Validates direct `asset(...)` bindings in a nested visual node.
+///
+/// * `node` — visual node under inspection.
+/// * `ir` — project asset table.
+///
+/// # Errors
+///
+/// Returns an asset error for a source kind incompatible with Image or Svg.
+fn validate_media_node(
+    node: &argui_dsl_ir::IrNode,
+    ir: &argui_dsl_ir::IrProject,
+) -> Result<(), CompilerError> {
+    use argui_dsl_ir::{IrElementTarget, IrExpressionKind, IrNode, PropertyTargetId};
+    match node {
+        IrNode::Element {
+            target,
+            properties,
+            children,
+            ..
+        } => {
+            let expected = match target {
+                IrElementTarget::Native(id) if *id == argui_schema::builtin::IMAGE => {
+                    Some(argui_dsl_ir::AssetKind::Image)
+                }
+                IrElementTarget::Native(id) if *id == argui_schema::builtin::SVG => {
+                    Some(argui_dsl_ir::AssetKind::Vector)
+                }
+                _ => None,
+            };
+            if let Some(expected) = expected {
+                for binding in properties {
+                    if binding.target != PropertyTargetId::Native(argui_schema::builtin::SOURCE) {
+                        continue;
+                    }
+                    let IrExpressionKind::Asset(id) = &binding.value.kind else {
+                        continue;
+                    };
+                    let Some(asset) = ir.assets.iter().find(|asset| asset.id == *id) else {
+                        continue;
+                    };
+                    if asset.kind != expected {
+                        return Err(CompilerError::Asset {
+                            path: PathBuf::from(&asset.path),
+                            message: format!(
+                                "expected {expected:?} media for this native element, found {:?}",
+                                asset.kind
+                            ),
+                            source_span: binding.value.source.span,
+                        });
+                    }
+                }
+            }
+            for child in children {
+                validate_media_node(child, ir)?;
+            }
+        }
+        IrNode::Repeater { body, .. } => {
+            for child in body {
+                validate_media_node(child, ir)?;
+            }
+        }
+        IrNode::Conditional {
+            then_body,
+            else_body,
+            ..
+        } => {
+            for child in then_body.iter().chain(else_body) {
+                validate_media_node(child, ir)?;
+            }
+        }
+        IrNode::Slot { .. } => {}
+    }
+    Ok(())
+}
+
+/// Resolves embedded standard-library icons without a project filesystem path.
+///
+/// * `path` — canonical compiler asset path.
+///
+/// Returns icon bytes when the virtual asset exists; otherwise `None`.
+pub(crate) fn builtin_asset_bytes(path: &str) -> Option<Vec<u8>> {
+    let name = path.strip_prefix("@argui/icons/")?.strip_suffix(".svg")?;
+    argui_dsl_stdlib::icon_svg(name).map(String::into_bytes)
+}
+
+/// Validates each reachable non-shader asset before either backend consumes it.
+///
+/// * `ir` — lowered project with asset kinds.
+/// * `reachable` — assets retained by release roots.
+/// * `load` — project-local byte loader for non-builtin assets.
+///
+/// # Errors
+///
+/// Returns an asset error for missing bytes or malformed raster/vector media.
+fn validate_asset_sources(
+    ir: &argui_dsl_ir::IrProject,
+    reachable: &Reachability,
+    load: &mut impl FnMut(&str) -> Result<Vec<u8>, String>,
+) -> Result<(), CompilerError> {
+    let mut registry = argui_assets::AssetRegistry::new();
+    for asset in &ir.assets {
+        if !reachable.assets.contains(&asset.id) {
+            continue;
+        }
+        let bytes = match asset.kind {
+            argui_dsl_ir::AssetKind::Image | argui_dsl_ir::AssetKind::Vector => {
+                builtin_asset_bytes(&asset.path).map_or_else(|| load(&asset.path), Ok)
+            }
+            argui_dsl_ir::AssetKind::Other => load(&asset.path),
+            argui_dsl_ir::AssetKind::Shader => continue,
+        }
+        .map_err(|message| CompilerError::Asset {
+            path: PathBuf::from(&asset.path),
+            message,
+            source_span: asset_source::find(ir, asset.id),
+        })?;
+        if asset.kind == argui_dsl_ir::AssetKind::Other {
+            continue;
+        }
+        let key =
+            argui_assets::AssetKey::new(&asset.path).map_err(|error| CompilerError::Asset {
+                path: PathBuf::from(&asset.path),
+                message: error.to_string(),
+                source_span: asset_source::find(ir, asset.id),
+            })?;
+        let result = match asset.kind {
+            argui_dsl_ir::AssetKind::Image => registry.upsert_image(key, &bytes),
+            argui_dsl_ir::AssetKind::Vector => registry.upsert_vector(key, &bytes),
+            _ => unreachable!("only image and vector assets are decoded"),
+        };
+        result.map_err(|error| CompilerError::Asset {
+            path: PathBuf::from(&asset.path),
+            message: error.to_string(),
+            source_span: asset_source::find(ir, asset.id),
+        })?;
+    }
+    Ok(())
 }
 
 /// Returns exported component roots from the selected entry module in source order.
@@ -200,10 +371,12 @@ fn validate_shaders(
         let bytes = load(&asset.path).map_err(|message| CompilerError::Asset {
             path: PathBuf::from(&asset.path),
             message,
+            source_span: effect.source.span,
         })?;
         let source = std::str::from_utf8(&bytes).map_err(|error| CompilerError::Asset {
             path: PathBuf::from(&asset.path),
             message: error.to_string(),
+            source_span: effect.source.span,
         })?;
         let definition = semantic
             .modules
@@ -232,6 +405,7 @@ fn validate_shaders(
             CompilerError::Asset {
                 path: PathBuf::from(&asset.path),
                 message: error.to_string(),
+                source_span: effect.source.span,
             }
         })?;
     }

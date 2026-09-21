@@ -137,6 +137,8 @@ pub struct IrComponent {
     pub properties: Vec<IrProperty>,
     pub callbacks: Vec<IrCallback>,
     pub slots: Vec<SlotId>,
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub template_slots: Vec<SlotId>,
     pub body: Vec<IrNode>,
     pub states: Vec<IrState>,
     pub animations: Vec<IrAnimation>,
@@ -175,6 +177,8 @@ pub struct IrEventBinding {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum IrStatement {
     Expression(IrExpression),
+    /// Activates every theme override matching a mode-name expression.
+    SetThemeMode(IrExpression),
     Assignment {
         target: IrAssignmentTarget,
         operator: AssignmentOperator,
@@ -255,8 +259,29 @@ pub struct IrAnimation {
     pub id: AnimationId,
     pub owner: Option<SiteId>,
     pub property: PropertyTargetId,
+    pub value_type: IrType,
+    pub driver: IrAnimationDriver,
+    pub transition: Option<IrTransitionPolicy>,
     pub parameters: Vec<IrAnimationParameter>,
+    pub keyframes: Vec<IrAnimationKeyframe>,
     pub source: SourceInfo,
+}
+
+/// Animation timing model selected by the DSL clause.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum IrAnimationDriver {
+    Timeline,
+    Spring,
+}
+
+/// Edge of a named visual state that may start a property transition.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum IrTransitionPolicy {
+    Enter,
+    Leave,
+    InOut,
 }
 
 /// One typed animation-driver parameter.
@@ -264,6 +289,17 @@ pub struct IrAnimation {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct IrAnimationParameter {
     pub id: PropertyId,
+    pub name: String,
+    pub value: IrExpression,
+    pub source: SourceInfo,
+}
+
+/// One typed stop in a property animation timeline.
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct IrAnimationKeyframe {
+    /// Normalized stop position, with `0.0` = 0% and `1.0` = 100%.
+    pub offset: f32,
     pub value: IrExpression,
     pub source: SourceInfo,
 }
@@ -422,6 +458,12 @@ pub enum IrValue {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum BuiltinFunction {
     Translate,
+    Stringify,
+    Contains,
+    LinearGradient,
+    RadialGradient,
+    ConicGradient,
+    Solid,
 }
 
 /// Unary expression operator.

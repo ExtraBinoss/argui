@@ -178,3 +178,29 @@ fn identity_compositor_layers_are_pre_promoted_for_future_animation_frames() {
     assert_eq!(analysis.stats.offscreen_layers, 1);
     assert_eq!(analysis.stats.draw_batches, 1);
 }
+
+/// A nested compositor cannot allocate pixels outside its clipped parent layer.
+#[test]
+fn nested_compositor_in_offscreen_parent_has_no_allocated_pixels() {
+    let mut list = DisplayList::new();
+    list.begin_layer(
+        LayerStyle::new(Rect::new(Point::new(500.0, 500.0), Size::new(40.0, 40.0)))
+            .filter(Filter::Blur(2.0)),
+    );
+    list.begin_compositor(CompositorLayer::new(
+        CompositorId::new(15),
+        bounds(),
+        Affine2D::IDENTITY,
+        Affine2D::IDENTITY,
+        1.0,
+    ));
+    list.push_quad(quad());
+    list.end_compositor();
+    list.end_layer();
+
+    let analysis = analyze_display_list(&list, &[], [100.0, 100.0], 1.0, 1).unwrap();
+    assert_eq!(analysis.stats.layers, 2);
+    assert_eq!(analysis.stats.offscreen_layers, 2);
+    assert_eq!(analysis.stats.offscreen_pixels, 0);
+    assert_eq!(analysis.stats.draw_batches, 1);
+}

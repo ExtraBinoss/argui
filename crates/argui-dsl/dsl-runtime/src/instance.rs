@@ -118,6 +118,7 @@ pub struct ComponentInstance {
     pub id: InstanceId,
     pub component: ComponentId,
     pub properties: HashMap<PropertyId, DynamicProperty>,
+    pub(crate) presented_properties: HashMap<PropertyId, DslValue>,
     pub(crate) callbacks: HashMap<CallbackId, Callback>,
     routes: HashMap<CallbackId, EventRoute>,
     links: HashMap<PropertyId, PropertyLink>,
@@ -151,6 +152,7 @@ impl ComponentInstance {
                 .into_iter()
                 .map(|property| (property.id, property))
                 .collect(),
+            presented_properties: HashMap::new(),
             callbacks: HashMap::new(),
             routes: HashMap::new(),
             links: HashMap::new(),

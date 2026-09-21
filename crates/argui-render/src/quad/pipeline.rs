@@ -106,6 +106,16 @@ impl QuadInstance {
                 ];
                 self.set_stops(gradient.stops.as_slice(), gradient.interpolation, stops);
             }
+            Some(Fill::Conic(gradient)) => {
+                self.params[1] = 4.0;
+                self.fill_geometry = [
+                    gradient.center.x,
+                    gradient.center.y,
+                    gradient.start_angle.to_radians(),
+                    0.0,
+                ];
+                self.set_stops(gradient.stops.as_slice(), gradient.interpolation, stops);
+            }
             Some(Fill::Bilinear(gradient)) => {
                 self.params[1] = 3.0;
                 let corners = gradient

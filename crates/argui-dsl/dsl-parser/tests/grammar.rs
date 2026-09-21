@@ -1,6 +1,54 @@
 use argui_dsl_parser::parse;
 use argui_dsl_syntax::ast::{AstNode, Declaration};
 
+#[test]
+fn template_slot_and_forwarded_virtual_repeater_round_trip_losslessly() {
+    let source = r#"component VirtualList { slot rows: template VList { rows } } component Main { VirtualList { for item in items key item.id { Text { content: item.label } } } }"#;
+    let parsed = parse(source);
+    assert!(
+        parsed.diagnostics().is_empty(),
+        "{:#?}",
+        parsed.diagnostics()
+    );
+    assert_eq!(parsed.syntax().to_string(), source);
+}
+
+#[test]
+fn animation_driver_accepts_from_keyword_as_a_parameter_name() {
+    let source = "component Main { Svg { rotation: 0.0 animate rotation { from: 0.0 to: 360.0 duration: 1000ms iterations: \"infinite\" } } }";
+    let parsed = parse(source);
+    assert!(
+        parsed.diagnostics().is_empty(),
+        "{:#?}",
+        parsed.diagnostics()
+    );
+    assert_eq!(parsed.syntax().to_string(), source);
+}
+
+#[test]
+fn animation_keyframes_and_easing_round_trip_losslessly() {
+    let source = r#"component Main { Svg { rotation: 0.0 animate rotation { duration: 1000ms easing: ease-out keyframes { 0%: 0.0 50%: 360.0 100%: 0.0 } } } }"#;
+    let parsed = parse(source);
+    assert!(
+        parsed.diagnostics().is_empty(),
+        "{:#?}",
+        parsed.diagnostics()
+    );
+    assert_eq!(parsed.syntax().to_string(), source);
+}
+
+#[test]
+fn directional_state_transition_round_trips_losslessly() {
+    let source = r#"component Main { in property expanded: bool = false Container { rotation: 0.0 states { open when expanded { rotation: 90.0 } } animate rotation { transition: in-out duration: 200ms easing: ease-out } } }"#;
+    let parsed = parse(source);
+    assert!(
+        parsed.diagnostics().is_empty(),
+        "{:#?}",
+        parsed.diagnostics()
+    );
+    assert_eq!(parsed.syntax().to_string(), source);
+}
+
 const DASHBOARD: &str = r#"import { Button, Column, Text as Label, Input } from "@argui/ui"
 import { ProjectCard } from "./project-card.argui"
 

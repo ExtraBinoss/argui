@@ -1,0 +1,15 @@
+import { Container } from "@argui/native"
+
+export component Card {
+    in property padding: float = 20.0
+    in property radius: float = 10.0
+    slot content
+
+    Container {
+        padding: padding
+        background: var(--argui-surface)
+        border_color: var(--argui-border)
+        radius: radius
+        content
+    }
+}

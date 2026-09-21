@@ -55,7 +55,7 @@ impl Context<'_> {
         }
         writeln!(
             output,
-            "Self {{ instance: next_instance(), translator: RefCell::new(Rc::new(|_| None)),"
+            "Self {{ instance: next_instance(), translator: RefCell::new(Rc::new(|_| None)), property_motions: RefCell::new(::argui::schema::PropertyMotionStore::new()), child_properties: RefCell::new(::argui::reactive::RetainedPropertyStore::new()), virtual_viewports: RefCell::new(::std::collections::HashMap::new()),"
         )
         .unwrap();
         for property in &source.properties {
@@ -91,6 +91,12 @@ impl Context<'_> {
         )
         .unwrap();
         writeln!(output, "pub fn clear_translator(&self) {{ *self.translator.borrow_mut() = Rc::new(|_| None); }}").unwrap();
+        writeln!(
+            output,
+            "/// Returns the latest invalid dynamic animation value instead of crashing a render."
+        )
+        .unwrap();
+        writeln!(output, "pub fn animation_error(&self) -> Option<String> {{ self.property_motions.borrow().last_error().map(str::to_owned) }}").unwrap();
         for property in &source.properties {
             let field = types::rust_identifier(&property.name);
             let value_type = self.rust_type(&property.value_type)?;
@@ -140,11 +146,11 @@ impl Context<'_> {
             "/// Builds a static snapshot without registering interactive handlers."
         )
         .unwrap();
-        write!(output, "pub fn render(&self) -> ::argui::ui::Element {{ let mut handlers: NativeEventRegistrar<'_> = None; let translator = self.translator.borrow().clone(); render_component_{}(self.instance, &translator", ir.id.raw()).unwrap();
+        write!(output, "pub fn render(&self) -> ::argui::ui::Element {{ let mut handlers: NativeEventRegistrar<'_> = None; let translator = self.translator.borrow().clone(); let mut property_motions = self.property_motions.borrow_mut(); property_motions.begin_render(); let mut child_properties = self.child_properties.borrow_mut(); child_properties.begin_render(); let virtual_viewports = self.virtual_viewports.borrow(); let element = render_component_{}(self.instance, &translator, &mut property_motions, &mut child_properties, &virtual_viewports, false", ir.id.raw()).unwrap();
         for property in &source.properties {
             write!(
                 output,
-                ", self.{}.clone()",
+                ", self.{}.clone(), None",
                 types::rust_identifier(&property.name)
             )
             .unwrap();
@@ -165,7 +171,7 @@ impl Context<'_> {
             )
             .unwrap();
         }
-        writeln!(output, ", &mut handlers) }} }}").unwrap();
+        writeln!(output, ", &mut handlers); property_motions.end_render(); child_properties.end_render(); element }} }}").unwrap();
         if required.is_empty() {
             writeln!(
                 output,
@@ -175,6 +181,11 @@ impl Context<'_> {
         }
         writeln!(output, "impl ::argui::runtime::Render for {name} {{").unwrap();
         writeln!(output, "fn render(&mut self, cx: &mut ::argui::runtime::Context<Self>) -> ::argui::ui::Element {{").unwrap();
+        writeln!(
+            output,
+            "let reduced_motion = cx.environment().reduced_motion;"
+        )
+        .unwrap();
         writeln!(output, "let mut register = |callback: NativeEventCallback| cx.event_handler(move |_, event, cx| {{ callback(event); cx.notify(); }});").unwrap();
         writeln!(
             output,
@@ -182,16 +193,23 @@ impl Context<'_> {
         )
         .unwrap();
         writeln!(output, "let translator = self.translator.borrow().clone();").unwrap();
+        writeln!(output, "let mut property_motions = self.property_motions.borrow_mut(); property_motions.begin_render();").unwrap();
+        writeln!(output, "let mut child_properties = self.child_properties.borrow_mut(); child_properties.begin_render();").unwrap();
+        writeln!(
+            output,
+            "let virtual_viewports = self.virtual_viewports.borrow();"
+        )
+        .unwrap();
         write!(
             output,
-            "render_component_{}(self.instance, &translator",
+            "let element = render_component_{}(self.instance, &translator, &mut property_motions, &mut child_properties, &virtual_viewports, reduced_motion",
             ir.id.raw()
         )
         .unwrap();
         for property in &source.properties {
             write!(
                 output,
-                ", self.{}.clone()",
+                ", self.{}.clone(), None",
                 types::rust_identifier(&property.name)
             )
             .unwrap();
@@ -212,7 +230,22 @@ impl Context<'_> {
             )
             .unwrap();
         }
-        writeln!(output, ", &mut handlers) }} }}").unwrap();
+        writeln!(output, ", &mut handlers); property_motions.end_render(); child_properties.end_render(); element }}").unwrap();
+        writeln!(output, "fn animation_frame(&mut self, frame: ::argui::animation::Frame, cx: &mut ::argui::runtime::Context<Self>) {{ if self.property_motions.borrow().advance(frame.now) {{ cx.notify(); }} }}").unwrap();
+        writeln!(output, "fn wants_animation_frame(&self) -> bool {{ self.property_motions.borrow().needs_frame() }}").unwrap();
+        writeln!(output, "/// Refreshes measured viewport heights and rebuilds virtual rows only when geometry changes.").unwrap();
+        writeln!(output, "fn layout_changed(&mut self, layout: &::argui::runtime::LayoutSnapshot, cx: &mut ::argui::runtime::Context<Self>) {{ let next = layout.nodes.iter().filter_map(|node| node.retained_identity.as_ref().map(|identity| (identity.clone(), node.bounds.size.height))).collect::<::std::collections::HashMap<_, _>>(); if *self.virtual_viewports.borrow() != next {{ *self.virtual_viewports.borrow_mut() = next; cx.notify(); }} }}").unwrap();
+        writeln!(
+            output,
+            "fn image_assets(&self) -> Vec<::argui::paint::ImageAsset> {{ image_assets() }}"
+        )
+        .unwrap();
+        writeln!(
+            output,
+            "fn vector_assets(&self) -> Vec<::argui::paint::VectorAsset> {{ vector_assets() }}"
+        )
+        .unwrap();
+        writeln!(output, "}}").unwrap();
         Ok(())
     }
 }

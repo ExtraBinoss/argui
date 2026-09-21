@@ -203,6 +203,22 @@ fn invalidate_mutates_existing_window_without_losing_the_strongest_update() {
     assert_eq!(update.windows[0].update, ViewUpdate::Rebuild);
 }
 
+/// Repeated invalidations cannot weaken paint or rebuild work for a window.
+#[test]
+fn invalidation_strength_is_monotone_across_repeated_requests() {
+    let window = WindowKey::main();
+    let mut update = AppUpdate::none();
+    update.invalidate(window.clone(), ViewUpdate::None);
+    assert!(update.windows.is_empty());
+    update.invalidate(window.clone(), ViewUpdate::Paint);
+    update.invalidate(window.clone(), ViewUpdate::Paint);
+    assert_eq!(update.windows[0].update, ViewUpdate::Paint);
+    update.invalidate(window.clone(), ViewUpdate::Rebuild);
+    update.invalidate(window.clone(), ViewUpdate::Paint);
+    assert_eq!(update.windows[0].update, ViewUpdate::Rebuild);
+    assert_eq!(update.windows.len(), 1);
+}
+
 struct MinimalModel;
 
 impl AppModel for MinimalModel {

@@ -16,6 +16,41 @@ use super::RendererState;
 
 #[cfg_attr(coverage_nightly, coverage(off))]
 impl Application {
+    /// Synchronizes changed model assets into layout and the active GPU surface.
+    ///
+    /// Returns whether intrinsic media dimensions or pixels changed and layout
+    /// should be recomputed. Only call during a requested model rebuild.
+    ///
+    /// # Errors
+    ///
+    /// Returns a renderer error if an updated image or SVG cannot be registered.
+    pub(super) fn refresh_media_assets(&mut self) -> Result<bool, argui_render::RendererError> {
+        let Some(model) = &self.model else {
+            return Ok(false);
+        };
+        let images = model.image_assets();
+        let vectors = model.vector_assets();
+        if images == self.image_assets && vectors == self.vector_assets {
+            return Ok(false);
+        }
+        if let RendererState::Ready(renderer) = &mut *self.renderer.borrow_mut() {
+            for image in &images {
+                if !self.image_assets.iter().any(|previous| previous == image) {
+                    renderer.register_image(image)?;
+                }
+            }
+            for vector in &vectors {
+                if !self.vector_assets.iter().any(|previous| previous == vector) {
+                    renderer.register_vector(vector)?;
+                }
+            }
+        }
+        self.layout_engine.set_assets(&images, &vectors);
+        self.image_assets = images;
+        self.vector_assets = vectors;
+        Ok(true)
+    }
+
     /// Changes damage tracking for the main surface and any existing native popups.
     ///
     /// `tracking` controls whether subsequent frames may reuse retained pixels.

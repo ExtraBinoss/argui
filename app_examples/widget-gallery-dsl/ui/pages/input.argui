@@ -1,0 +1,180 @@
+import { Input } from "@argui/ui"
+import { Column, Text } from "@argui/native"
+import { Search } from "@argui/icons"
+
+export component InputPage {
+    private property name: string = "Ada Lovelace"
+    private property email: string = "ada@example.com"
+    private property search: string = ""
+    private property invalid_email: string = "broken@"
+    private property submitted: string = ""
+    private property gradient_angle: float = 0.0
+    private property dot_color: color = var(--argui-primary)
+
+    animate gradient_angle { from: 0.0 to: 360.0 duration: 4000ms iterations: "infinite" }
+    animate dot_color { from: var(--argui-primary) to: var(--argui-destructive) duration: 1200ms iterations: "infinite" }
+
+    Column #input_page {
+        width: 100%
+        gap: 22.0
+
+        Text { content: "Input" color: var(--argui-foreground) weight: 700 font_size: 27.0 }
+        Text { content: "Controlled values, search, validation and locked states." color: var(--argui-muted-foreground) font_size: 14.0 }
+
+        Column {
+            width: 100%
+            gap: 12.0
+            Text { content: "Controlled fields" color: var(--argui-foreground) weight: 600 font_size: 16.0 }
+            Text { content: "Edit your profile, try a search, or correct the sample email." color: var(--argui-muted-foreground) font_size: 13.0 }
+
+            Column {
+                width: 100%
+                gap: 6.0
+                Text { content: "Full name" color: var(--argui-foreground) weight: 600 font_size: 13.0 }
+                Input #name_input { value <=> name label: "Full name" placeholder: "Full name" on submit { submitted = "Full name" } }
+            }
+            Column {
+                width: 100%
+                gap: 6.0
+                Text { content: "Email address" color: var(--argui-foreground) weight: 600 font_size: 13.0 }
+                Input #email_input { value <=> email label: "Email address" description: "Used only for this local preview" placeholder: "Email" on submit { submitted = "Email address" } }
+                Text { content: "Used only for this local preview" color: var(--argui-muted-foreground) font_size: 12.0 }
+            }
+            Column {
+                width: 100%
+                gap: 6.0
+                Text { content: "Search the GPU graph" color: var(--argui-foreground) weight: 600 font_size: 13.0 }
+                Input #search_input {
+                    value <=> search
+                    search: true
+                    label: "Search the GPU graph"
+                    placeholder: "Search the GPU graph…"
+                    Search { size: 16px color: var(--argui-muted-foreground) }
+                    on submit { submitted = "Search" }
+                }
+            }
+            Column {
+                width: 100%
+                gap: 6.0
+                Text { content: "Invalid field" color: var(--argui-foreground) weight: 600 font_size: 13.0 }
+                Input #invalid_input {
+                    value <=> invalid_email
+                    label: "Invalid field"
+                    placeholder: "Email"
+                    invalid: !contains(invalid_email, "@") || !contains(invalid_email, ".")
+                    on submit { submitted = "Invalid field" }
+                }
+                Text {
+                    content: contains(invalid_email, "@") && contains(invalid_email, ".") ? "Email looks valid." : "Enter an email with @ and a domain."
+                    color: contains(invalid_email, "@") && contains(invalid_email, ".") ? var(--argui-muted-foreground) : var(--argui-destructive)
+                    font_size: 12.0
+                }
+            }
+            Column {
+                width: 100%
+                gap: 6.0
+                Text { content: "Read-only" color: var(--argui-foreground) weight: 600 font_size: 13.0 }
+                Input #readonly_input { value: "Read-only value" label: "Read-only" read_only: true }
+            }
+            Column {
+                width: 100%
+                gap: 6.0
+                Text { content: "Disabled" color: var(--argui-foreground) weight: 600 font_size: 13.0 }
+                Input #disabled_input { value: "Disabled" label: "Disabled" enabled: false }
+            }
+        }
+
+        Column {
+            width: 100%
+            gap: 12.0
+            Text { content: "Caret playground" color: var(--argui-foreground) weight: 600 font_size: 16.0 }
+            Text { content: "Focus each field to compare a blinking bar, a rounded animated dot, and a three-dot gradient caret." color: var(--argui-muted-foreground) font_size: 13.0 }
+            Input #caret_standard { value: "Standard blinking bar" label: "Standard caret" read_only: true }
+            Input #caret_dot {
+                value: "Rounded animated dot"
+                label: "Rounded dot caret"
+                read_only: true
+                caret_width: 6.0
+                caret_height: 6.0
+                caret_radius: 3.0
+                caret_offset_y: -2.0
+                caret_blink: false
+                caret_fill: solid(dot_color)
+            }
+            Input #caret_ellipsis {
+                value: "Three animated gradient dots"
+                label: "Gradient ellipsis caret"
+                read_only: true
+                caret_width: 4.0
+                caret_height: 4.0
+                caret_radius: 2.0
+                caret_count: 3
+                caret_spacing: 6.0
+                caret_offset_y: -2.0
+                caret_blink: false
+                caret_fill: linear_gradient(
+                    [var(--argui-primary), var(--argui-ring), var(--argui-destructive)],
+                    [0.0, 0.5, 1.0], gradient_angle, "oklab"
+                )
+            }
+        }
+
+        Column {
+            width: 100%
+            gap: 12.0
+            Text { content: "Text selection playground" color: var(--argui-foreground) weight: 600 font_size: 16.0 }
+            Text {
+                content: "Select this ordinary sentence for the theme color and softly rounded default highlight."
+                color: var(--argui-foreground)
+                font_size: 14.0
+                selection_color: var(--argui-selection)
+            }
+            Text {
+                content: "Drag across this sentence to see the real selection overlay, including rounded corners and an animated conic gradient."
+                color: var(--argui-foreground)
+                font_size: 14.0
+                selection_fill: conic_gradient(
+                    [var(--argui-selection), var(--argui-ring), var(--argui-selection)],
+                    [0.0, 0.5, 1.0], 0.5, 0.5, gradient_angle, "oklab"
+                )
+                selection_radius: 7.0
+            }
+            Input #selection_linear {
+                value: "Select this text for a linear highlight"
+                label: "Linear selection highlight"
+                read_only: true
+                selection_fill: linear_gradient(
+                    [var(--argui-selection), var(--argui-ring), var(--argui-selection)],
+                    [0.0, 0.45, 1.0], gradient_angle, "oklab"
+                )
+                selection_radius: 7.0
+            }
+            Input #selection_radial {
+                value: "Select this text for a radial highlight"
+                label: "Radial selection highlight"
+                read_only: true
+                selection_fill: radial_gradient(
+                    [var(--argui-ring), var(--argui-selection), var(--argui-selection)],
+                    [0.0, 0.55, 1.0], 0.5, 0.5, 0.65, 0.65, "oklab"
+                )
+                selection_radius: 7.0
+            }
+            Input #selection_conic {
+                value: "Select this text for a conic highlight"
+                label: "Conic selection highlight"
+                read_only: true
+                selection_fill: conic_gradient(
+                    [var(--argui-selection), var(--argui-ring), var(--argui-selection)],
+                    [0.0, 0.5, 1.0], 0.5, 0.5, gradient_angle, "oklab"
+                )
+                selection_radius: 7.0
+            }
+        }
+
+        Text {
+            content: submitted == "" ? "Press Enter in an editable field to submit." : "Submitted: " + submitted
+            color: var(--argui-muted-foreground)
+            font_size: 13.0
+        }
+    }
+}

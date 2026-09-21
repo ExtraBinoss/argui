@@ -132,3 +132,67 @@ fn multiline_edits_reset_line_and_column_locations() {
     assert_eq!(changes[0].before, "before");
     assert_eq!(changes[0].after, "after");
 }
+
+/// Reports several notifications in path order, including an empty-file edit.
+#[test]
+fn refresh_sorts_changes_and_reports_empty_text_lines() {
+    let directory = tempfile::tempdir().unwrap();
+    let first = directory.path().join("a.argui");
+    let last = directory.path().join("z.argui");
+    std::fs::write(&first, "old\n").unwrap();
+    std::fs::write(&last, "text\n").unwrap();
+    let mut tracker = ChangeTracker::open(directory.path()).unwrap();
+    std::fs::write(&first, "").unwrap();
+    std::fs::write(&last, "changed\n").unwrap();
+
+    let changes = tracker.refresh([last, first]).unwrap();
+    assert_eq!(
+        changes
+            .iter()
+            .map(|change| change.path.as_str())
+            .collect::<Vec<_>>(),
+        ["a.argui", "z.argui"]
+    );
+    assert_eq!(changes[0].before, "old");
+    assert_eq!(changes[0].after, "∅");
+    assert_eq!((changes[0].line, changes[0].column), (Some(1), Some(1)));
+}
+
+/// A non-UTF-8 side makes the change a binary asset update, even for DSL files.
+#[test]
+fn invalid_utf8_edits_use_byte_summaries_and_stable_fingerprints() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("main.argui");
+    std::fs::write(&path, "valid").unwrap();
+    let mut tracker = ChangeTracker::open(directory.path()).unwrap();
+    std::fs::write(&path, [0xff, 0x00]).unwrap();
+    let changed = tracker.refresh([path.clone()]).unwrap();
+    assert_eq!((changed[0].line, changed[0].column), (None, None));
+    assert!(changed[0].before.starts_with("5 bytes · "));
+    assert!(changed[0].after.starts_with("2 bytes · "));
+    let fingerprint = changed[0].after.clone();
+    assert!(tracker.refresh([path.clone()]).unwrap().is_empty());
+
+    std::fs::write(&path, "valid").unwrap();
+    let restored = tracker.refresh([path]).unwrap();
+    assert_eq!(restored[0].before, fingerprint);
+    assert!(restored[0].after.starts_with("5 bytes · "));
+}
+
+/// Display excerpts stop after 120 Unicode scalars without losing the snapshot.
+#[test]
+fn changed_lines_are_bounded_but_full_content_drives_subsequent_changes() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("main.argui");
+    let prefix = "é".repeat(130);
+    std::fs::write(&path, format!("{prefix}a")).unwrap();
+    let mut tracker = ChangeTracker::open(directory.path()).unwrap();
+    std::fs::write(&path, format!("{prefix}b")).unwrap();
+    let changed = tracker.refresh([path.clone()]).unwrap();
+    assert_eq!((changed[0].line, changed[0].column), (Some(1), Some(131)));
+    assert_eq!(changed[0].before.chars().count(), 120);
+    assert_eq!(changed[0].after.chars().count(), 120);
+
+    std::fs::write(&path, format!("{prefix}c")).unwrap();
+    assert_eq!(tracker.refresh([path]).unwrap().len(), 1);
+}

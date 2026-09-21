@@ -138,6 +138,8 @@ fn dev(
     let entry = entry_path(&root, entry)?;
     let mut service = DevCompilerService::open(&root, entry)?;
     let mut changes = ChangeTracker::open(&root)?;
+    let stdlib_root = service.stdlib_root().map(Path::to_path_buf);
+    let mut stdlib_changes = stdlib_root.as_ref().map(ChangeTracker::open).transpose()?;
     let listener = TcpListener::bind(bind)?;
     listener.set_nonblocking(true)?;
     let (sender, receiver) = mpsc::channel();
@@ -148,6 +150,9 @@ fn dev(
         Config::default(),
     )?;
     watcher.watch(&root, RecursiveMode::Recursive)?;
+    if let Some(path) = &stdlib_root {
+        watcher.watch(path, RecursiveMode::Recursive)?;
+    }
     let mut clients = Vec::new();
     let (status_sender, status_receiver) = mpsc::channel();
     let mut latest = service.compile().message;
@@ -171,7 +176,7 @@ fn dev(
         (None, None)
     };
     loop {
-        if STOP.load(Ordering::Relaxed) {
+        if console.pump_input()? || STOP.load(Ordering::Relaxed) {
             return Ok(());
         }
         if let Some(logs) = &application_logs {
@@ -200,7 +205,14 @@ fn dev(
         match receiver.recv_timeout(Duration::from_millis(100)) {
             Ok(Ok(event)) if is_relevant_event(&event) => {
                 let paths = settled_paths(event, &receiver, &mut console)?;
-                let detected = changes.refresh(paths)?;
+                let mut detected = changes.refresh(paths.iter().cloned())?;
+                if let Some(tracker) = &mut stdlib_changes {
+                    let mut library = tracker.refresh(paths)?;
+                    for change in &mut library {
+                        change.path = format!("@argui/ui/{}", change.path);
+                    }
+                    detected.extend(library);
+                }
                 if detected.is_empty() {
                     continue;
                 }

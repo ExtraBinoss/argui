@@ -79,6 +79,37 @@ fn detection_only_records_and_reader_failures_remain_visible_without_false_measu
     );
 }
 
+/// Malformed optional fields do not invent measurements or hide useful errors.
+#[test]
+fn snapshot_decoding_handles_optional_field_shapes_and_boundary_counts() {
+    let empty_errors = AllSmi::decode(r#"{"schema":1,"errors":[],"gpus":[]}"#).unwrap();
+    assert!(empty_errors.is_empty());
+    let sensor = AllSmi::decode(r#"{"schema":1,"errors":"not a reader list","gpus":[{"name":7,"uuid":null,"utilization":"busy","used_memory":-1,"total_memory":0,"temperature":-3,"power_consumption":null,"frequency":0,"vendor":{"name":"example"}}]}"#).unwrap();
+    assert_eq!(sensor.len(), 1);
+    assert!(sensor[0].name.is_empty());
+    assert!(sensor[0].identifier.is_empty());
+    assert_eq!(sensor[0].utilization_percent, None);
+    assert_eq!(sensor[0].used_memory_bytes, None);
+    assert_eq!(sensor[0].total_memory_bytes, None);
+    assert_eq!(sensor[0].temperature_celsius, None);
+    assert!(
+        sensor[0]
+            .details
+            .iter()
+            .any(|(key, value)| { key == "vendor" && value.contains("example") })
+    );
+    assert!(
+        !sensor[0]
+            .details
+            .iter()
+            .any(|(key, _)| key == "Reader warnings")
+    );
+    let missing = AllSmi::decode(r#"{"schema":1,"errors":["reader timed out"]}"#).unwrap_err();
+    assert!(missing.contains("reader timed out"));
+    let maximum = serde_json::json!({ "schema": 1, "gpus": vec![serde_json::json!({}); 128] });
+    assert_eq!(AllSmi::decode(&maximum.to_string()).unwrap().len(), 128);
+}
+
 #[cfg(target_os = "linux")]
 #[test]
 fn command_adapter_reads_json_checks_status_and_bounds_timeout_and_output() {

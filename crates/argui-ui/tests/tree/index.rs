@@ -74,6 +74,27 @@ fn selection_highlights_inherit_and_refresh_independently_from_handle_colors() {
 }
 
 #[test]
+fn ordinary_text_selection_defaults_to_rounded_fragments() {
+    let child = Element::text("select me");
+    let mut tree = UiTree::new(Element::column([child.clone()]));
+    let node = tree.node_ids()[1];
+    assert_eq!(
+        tree.resolved_selection_highlight(node).radii.as_array(),
+        [3.0; 4]
+    );
+
+    tree.update(
+        Element::column([child]).selection_highlight(
+            TextSelectionHighlight::solid(argui_core::Color::WHITE).radius(0.0),
+        ),
+    );
+    assert_eq!(
+        tree.resolved_selection_highlight(node).radii.as_array(),
+        [0.0; 4]
+    );
+}
+
+#[test]
 fn compact_parents_and_selection_owners_follow_nested_scopes_and_stale_ids() {
     use argui_core::Color;
     use argui_ui::{FocusTarget, WritingDirection};

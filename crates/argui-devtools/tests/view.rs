@@ -47,6 +47,7 @@ fn opening_tools_survives_the_transient_zero_height_application_viewport() {
             .map(|layout| LayoutBounds {
                 node: layout.node,
                 key: tree.key(layout.node).map(str::to_owned),
+                retained_identity: None,
                 bounds: layout.bounds,
             })
             .collect(),

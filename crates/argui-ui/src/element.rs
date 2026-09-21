@@ -166,6 +166,16 @@ impl Element {
         self
     }
 
+    /// Returns the private compiled source identity, if this element has one.
+    ///
+    /// Hosts use this read-only identity to associate layout measurements with
+    /// the correct DSL instance without changing public element keys.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn source_identity(&self) -> Option<&crate::RetainedIdentity> {
+        self.retained_identity.as_ref()
+    }
+
     /// Sets the descriptive tooltip text associated with this element.
     /// * `description` — tooltip text associated with the element.
     #[must_use]

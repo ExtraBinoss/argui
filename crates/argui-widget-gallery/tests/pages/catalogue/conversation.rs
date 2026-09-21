@@ -29,6 +29,7 @@ fn conversation_controls_update_reactions_file_details_and_reading_position() {
             .map(|node| argui::runtime::LayoutBounds {
                 node: node.node,
                 key: tree.key(node.node).map(str::to_owned),
+                retained_identity: None,
                 bounds: node.bounds,
             })
             .collect(),

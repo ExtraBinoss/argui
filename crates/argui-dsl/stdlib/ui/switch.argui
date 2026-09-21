@@ -1,0 +1,31 @@
+import { SwitchControl, Row, Container, Text } from "@argui/native"
+
+export component Switch {
+    in property label: string
+    in property checked: bool = false
+    in property enabled: bool = true
+    callback click()
+
+    SwitchControl {
+        label: label
+        checked: checked
+        enabled: enabled
+        on click { click() }
+
+        Row {
+            gap: 12.0
+            Text { content: label color: enabled ? var(--argui-foreground) : var(--argui-muted-foreground) font_size: 14.0 }
+            Container {
+                width: 38px
+                height: 22px
+                radius: 11.0
+                padding: 3.0
+                background: checked ? var(--argui-primary) : var(--argui-muted)
+                Row {
+                    if checked { Container { width: 16px height: 16px } }
+                    Container { width: 16px height: 16px radius: 8.0 background: var(--argui-surface) }
+                }
+            }
+        }
+    }
+}
