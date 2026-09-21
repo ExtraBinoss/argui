@@ -7,6 +7,7 @@ mod geometry;
 mod input;
 mod insets;
 mod keyboard;
+mod name;
 mod text;
 
 pub use backdrop::BackdropMaterial;
@@ -19,4 +20,5 @@ pub use input::{
 };
 pub use insets::Insets;
 pub use keyboard::{ImeInput, Key, KeyInput, KeyState, Modifiers};
+pub use name::Name;
 pub use text::{CaretAffinity, TextPosition};

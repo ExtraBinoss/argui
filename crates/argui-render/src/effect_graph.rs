@@ -74,7 +74,7 @@ pub fn analyze_display_list(
         custom_effects: graph
             .effects()
             .into_iter()
-            .map(|effect| effect.id)
+            .map(|effect| effect.id.clone())
             .collect(),
     })
 }

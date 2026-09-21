@@ -29,6 +29,21 @@ def entry(branches, count):
 
 
 class SourceCoverage(unittest.TestCase):
+    def test_nested_dsl_packages_are_individually_gated(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            for crate in ("argui-core", "argui-dsl/dsl-runtime"):
+                manifest = root / "crates" / crate / "Cargo.toml"
+                manifest.parent.mkdir(parents=True)
+                manifest.write_text("[package]\nname = \"example\"\n")
+            previous = Path.cwd()
+            try:
+                os.chdir(root)
+                self.assertEqual(gate.workspace_crates(),
+                                 ["argui-core", "argui-dsl/dsl-runtime"])
+            finally:
+                os.chdir(previous)
+
     def test_nested_prelude_with_only_reexports_has_no_coverable_code(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)
@@ -46,6 +61,41 @@ class SourceCoverage(unittest.TestCase):
             try:
                 os.chdir(root)
                 self.assertTrue(gate.only_reexports("facade"))
+            finally:
+                os.chdir(previous)
+
+    def test_facade_include_macro_has_no_instrumentable_runtime_code(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "crates" / "facade" / "src"
+            source.mkdir(parents=True)
+            (source / "lib.rs").write_text(
+                "pub use dependency as api;\n"
+                "#[macro_export]\n"
+                "macro_rules! include_ui {\n"
+                "    () => { include!(concat!(env!(\"OUT_DIR\"), \"/ui.rs\")); };\n"
+                "}\n"
+            )
+            previous = Path.cwd()
+            try:
+                os.chdir(root)
+                self.assertTrue(gate.only_reexports("facade"))
+            finally:
+                os.chdir(previous)
+
+    def test_embedded_dsl_source_has_no_instrumentable_runtime_code(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "crates" / "stdlib" / "src"
+            source.mkdir(parents=True)
+            (source / "lib.rs").write_text(
+                "/// DSL source.\n"
+                "pub const UI_SOURCE: &str = include_str!(\"../ui.argui\");\n"
+            )
+            previous = Path.cwd()
+            try:
+                os.chdir(root)
+                self.assertTrue(gate.only_reexports("stdlib"))
             finally:
                 os.chdir(previous)
 

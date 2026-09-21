@@ -59,13 +59,6 @@ impl<T: 'static> Entity<T> {
             return super::ContextEffects::default();
         }
         self.update_view(|value, cx| {
-            #[cfg(all(feature = "hot-reload", debug_assertions, not(target_arch = "wasm32")))]
-            crate::hot_reload::tasks_ready(value, cx);
-            #[cfg(not(all(
-                feature = "hot-reload",
-                debug_assertions,
-                not(target_arch = "wasm32")
-            )))]
             value.tasks_ready(cx);
         });
         let mut effects = self.take_effects();

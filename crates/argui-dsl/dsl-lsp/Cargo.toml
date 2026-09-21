@@ -1,0 +1,28 @@
+[package]
+name = "argui-dsl-lsp"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+description = "Thin Language Server Protocol adapter for the Argui DSL semantic frontend"
+
+[[bin]]
+name = "argui-lsp"
+path = "src/main.rs"
+
+[dependencies]
+argui-dsl-parser = { path = "../dsl-parser" }
+argui-dsl-semantic = { path = "../dsl-semantic" }
+argui-dsl-syntax = { path = "../dsl-syntax" }
+argui-schema.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

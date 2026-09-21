@@ -101,10 +101,6 @@ fn handle_event(event: RuntimeEvent, damage_telemetry: &DamageTelemetryHandle) {
         } => damage_telemetry.borrow_mut().record_animation(profile),
         _ => {}
     }
-    #[cfg(feature = "hot-reload")]
-    if let RuntimeEvent::HotReloaded { generation } = &event {
-        eprintln!("argui: applied hot reload generation {generation}");
-    }
     #[cfg(target_arch = "wasm32")]
     if matches!(
         &event,

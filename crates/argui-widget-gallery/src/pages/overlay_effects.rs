@@ -11,11 +11,13 @@ use argui::{
 };
 
 pub(crate) const PRISM: EffectId = EffectId::new("gallery.overlay.prism");
-const PARAMETERS: &[EffectParameter] =
-    &[EffectParameter::new("strength", EffectParameterType::F32)];
-const PASSES: &[EffectPassDefinition] = &[EffectPassDefinition::fragment(
-    "prism",
-    r"
+pub(crate) fn definition() -> EffectDefinition {
+    EffectDefinition::new(
+        PRISM,
+        [EffectParameter::new("strength", EffectParameterType::F32)],
+        [EffectPassDefinition::fragment(
+            "prism",
+            r"
 fn argui_effect(uv: vec2<f32>, source: vec4<f32>, backdrop: vec4<f32>) -> vec4<f32> {
     let band = 0.5 + 0.5 * sin((uv.x + uv.y * 0.7) * 12.0);
     let tint = mix(argui_srgb_to_linear(vec3<f32>(0.30, 0.50, 1.0)),
@@ -23,10 +25,8 @@ fn argui_effect(uv: vec2<f32>, source: vec4<f32>, backdrop: vec4<f32>) -> vec4<f
     return vec4<f32>(mix(source.rgb, tint, argui_param_f32(0u)), source.a);
 }
 ",
-)];
-
-pub(crate) fn definition() -> EffectDefinition {
-    EffectDefinition::new(PRISM, PARAMETERS, PASSES)
+        )],
+    )
 }
 
 #[derive(Clone, Copy)]

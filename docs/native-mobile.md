@@ -246,9 +246,11 @@ activity** example is available only on Android and iOS.
 Models, layout, text, images, vectors, effects, i18n, tasks, widgets, WGPU,
 touch, keyboard, and IME cross-compile on mobile.
 
-Desktop backdrops, native popovers, tray, desktop WebView, updater, and native
-hot reload are desktop integrations. The file-picker widget compiles but has no
-mobile document-provider adapter; clipboard requests report unavailable. One
+Desktop backdrops, native popovers, tray, desktop WebView and updater are
+desktop integrations. A development mobile application may connect to the host
+DSL compiler over the versioned TCP transport; release packages contain only
+the generated UI. The file-picker widget compiles but has no mobile
+document-provider adapter; clipboard requests report unavailable. One
 full-screen Argui window is the supported mobile application model.
 
 ## Verify cross-compilation

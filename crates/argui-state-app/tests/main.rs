@@ -61,7 +61,7 @@ fn entrypoint_reports_the_missing_graphical_backend_without_using_the_user_sessi
     }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(all(target_os = "linux", not(coverage_nightly)))]
 #[test]
 fn profiled_application_renders_and_closes_normally_on_a_private_display() {
     use std::{path::PathBuf, process::Command};

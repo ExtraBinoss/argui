@@ -115,8 +115,9 @@ ABI shells, while the model, layout, text, paint, and renderer remain shared.
 
 Target-specific code belongs at the platform edge. Do not put Winit handles in
 UI state, WGPU resources in paint descriptions, or OS policy in reusable
-widgets. Optional integrations such as localization, WebView, updater,
-DevTools, and hot reload remain feature-gated.
+widgets. Optional integrations such as localization, WebView, updater and
+DevTools remain feature-gated. DSL compilation and transactional development
+reload live outside the engine and never become release runtime dependencies.
 
 ## Where to change code
 
@@ -129,6 +130,7 @@ DevTools, and hot reload remain feature-gated.
 | Add a paint primitive | `argui-paint`, then `argui-render` |
 | Add an OS capability | `crates/argui-platform`, then expose it through the runtime |
 | Change model lifetime or scheduling | `crates/argui-runtime` |
+| Change DSL syntax, semantics, AOT or live development | `argui-dsl` |
 | Add an application example | `app_examples` or `crates/argui-widget-gallery` |
 
 Follow the [development guide](contributing/development.md) before crossing a

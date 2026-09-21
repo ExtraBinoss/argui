@@ -115,7 +115,7 @@ pub(in crate::tree) fn apply(
         |key, value| match (key, value) {
             (PropertyKey::LayoutStyle, StateValue::LayoutStyle(value)) => *style = *value,
             (PropertyKey::Layout(target), StateValue::F32(value)) => {
-                set_layout_value(style, target, value);
+                set_layout_value(style, *target, value);
             }
             _ => {}
         },

@@ -194,32 +194,41 @@ fn argui_effect(_uv: vec2<f32>, source: vec4<f32>, _backdrop: vec4<f32>) -> vec4
     return source;
 }
 "#;
-    const PASSES: &[EffectPassDefinition] = &[EffectPassDefinition::fragment("main", WGSL)];
     let id = EffectId::new("test.damage");
     let previous = effect_scene(
         104.0,
         Filter::Effect(EffectInstance::new(
-            id,
+            id.clone(),
             std::iter::empty::<argui_paint::EffectArgument>(),
         )),
     );
     let current = effect_scene(
         120.0,
         Filter::Effect(EffectInstance::new(
-            id,
+            id.clone(),
             std::iter::empty::<argui_paint::EffectArgument>(),
         )),
     );
     let previous = snapshot(&previous, [512, 256], 1.0);
     let current = snapshot(&current, [512, 256], 1.0);
-    let unbounded = EffectRegistry::new([EffectDefinition::new(id, &[], PASSES)]).unwrap();
+    let passes = || [EffectPassDefinition::fragment("main", WGSL)];
+    let unbounded = EffectRegistry::new([EffectDefinition::new(
+        id.clone(),
+        Vec::<argui_render::EffectParameter>::new(),
+        passes(),
+    )])
+    .unwrap();
     assert_eq!(
         previous.compare_with_effects(&current, DamageTracking::enabled(), &unbounded),
         DamagePlan::Full
     );
-    let bounded =
-        EffectRegistry::new([EffectDefinition::new(id, &[], PASSES).damage(EffectDamage::Bounded)])
-            .unwrap();
+    let bounded = EffectRegistry::new([EffectDefinition::new(
+        id,
+        Vec::<argui_render::EffectParameter>::new(),
+        passes(),
+    )
+    .damage(EffectDamage::Bounded)])
+    .unwrap();
     assert!(matches!(
         previous.compare_with_effects(&current, DamageTracking::enabled(), &bounded),
         DamagePlan::Partial(_)

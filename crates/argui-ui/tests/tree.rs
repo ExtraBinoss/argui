@@ -244,7 +244,7 @@ fn responsive_and_scroll_configuration_changes_have_exact_invalidation() {
     let base = Element::container([]);
 
     assert_eq!(
-        UiTree::new(base.clone()).update(base.clone().container_scope(scope)),
+        UiTree::new(base.clone()).update(base.clone().container_scope(scope.clone())),
         TreeUpdate::Layout
     );
     assert_eq!(
@@ -265,14 +265,14 @@ fn responsive_and_scroll_configuration_changes_have_exact_invalidation() {
     );
     let responsive_scrollbar = ScrollbarStyle::new(
         ScrollbarPartStyle::new(Default::default()).when(
-            ContainerQuery::min_width(scope, 100.0),
+            ContainerQuery::min_width(scope.clone(), 100.0),
             StylePatch::new().set(property::Opacity, 0.5),
         ),
         ScrollbarPartStyle::new(Default::default()),
     );
     let plain = base
         .clone()
-        .container_scope(scope)
+        .container_scope(scope.clone())
         .scroll_config(ScrollConfig::default().scrollbar(plain_scrollbar));
     let responsive = base
         .clone()

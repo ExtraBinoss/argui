@@ -11,6 +11,8 @@ description = "Theme tokens and appearance settings for Argui"
 
 [dependencies]
 argui-core.workspace = true
+argui-paint.workspace = true
+argui-reactive.workspace = true
 
 [lints]
 workspace = true

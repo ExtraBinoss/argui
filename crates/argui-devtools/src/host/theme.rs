@@ -73,7 +73,7 @@ impl ThemeEditing {
                 .palette()
                 .tokens()
                 .iter()
-                .any(|(token, value)| *token == name && matches!(value, ThemeValue::Number(_)))
+                .any(|(token, value)| *token == name && matches!(value, ThemeValue::Float(_)))
             {
                 return false;
             }
@@ -85,7 +85,7 @@ impl ThemeEditing {
                         .filter(|value| value.is_finite() && (0.0..=100.0).contains(value));
                     self.draft = Some((name.into(), text.clone(), value.is_none()));
                     if let Some(value) = value {
-                        self.overrides.set(name, ThemeValue::Number(value));
+                        self.overrides.set(name, ThemeValue::Float(value));
                         self.refresh();
                     }
                     return true;
@@ -181,7 +181,11 @@ impl ThemeEditing {
                         let [r, g, b, a] = color.to_srgba8();
                         serde_json::Value::String(format!("#{r:02X}{g:02X}{b:02X}{a:02X}"))
                     }
-                    ThemeValue::Number(number) => serde_json::json!(number),
+                    ThemeValue::Float(number) => serde_json::json!(number),
+                    value => serde_json::json!({
+                        "type": format!("{:?}", value.value_type()),
+                        "value": format!("{value:?}"),
+                    }),
                 };
                 (name.into(), value)
             })

@@ -81,7 +81,7 @@ fn spring_surface(theme: &WidgetTheme) -> Element {
             argui_text::TextWrap::None,
         ))
         .when(
-            StateSelector::scope(scope, VisualState::Pressed),
+            StateSelector::scope(scope.clone(), VisualState::Pressed),
             StylePatch::new().set(
                 property::Transform,
                 Transform2D::IDENTITY.translate(4.0, 0.0),

@@ -158,10 +158,6 @@ impl ApplicationHandler<UserEvent> for Application {
         {
             match event {
                 UserEvent::ModelsReady => self.models_ready(event_loop),
-                #[cfg(all(feature = "hot-reload", debug_assertions))]
-                UserEvent::HotReload { generation } => {
-                    crate::hot_reload::notify(self, generation);
-                }
                 #[cfg(feature = "tasks")]
                 UserEvent::TasksReady => {
                     if let Some(tasks) = &self.tasks {

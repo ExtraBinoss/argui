@@ -1,0 +1,24 @@
+[package]
+name = "argui-schema"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+description = "Canonical declarative native schema and adapters for Argui"
+
+[features]
+serde = ["dep:serde"]
+
+[dependencies]
+argui-core.workspace = true
+argui-paint.workspace = true
+argui-text.workspace = true
+argui-ui.workspace = true
+thiserror.workspace = true
+serde = { workspace = true, optional = true }
+
+[lints]
+workspace = true

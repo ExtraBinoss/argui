@@ -433,7 +433,7 @@ fn single_window_adapter_exposes_every_component_effect_without_a_native_window(
         matches!(&commands[1], argui_ui::UiCommand::ReplaceText { value, .. } if value == "atomic edit")
     );
     assert!(
-        matches!(commands[2], argui_ui::UiCommand::Action(invocation) if invocation.id == argui_ui::ActionId::UNDO)
+        matches!(commands[2], argui_ui::UiCommand::Action(ref invocation) if invocation.id == argui_ui::ActionId::UNDO)
     );
     assert!(model.take_ui_commands(&main).is_empty());
     assert!(model.take_theme_request(&other).is_none());

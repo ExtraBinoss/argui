@@ -31,10 +31,10 @@ impl WidgetTheme {
             .into_iter()
             .map(|(name, color)| (name, ThemeValue::Color(color)))
             .chain([
-                ("overlay-blur", ThemeValue::Number(self.overlay_blur)),
+                ("overlay-blur", ThemeValue::Float(self.overlay_blur)),
                 (
                     "dialog-backdrop-blur",
-                    ThemeValue::Number(self.dialog_backdrop_blur),
+                    ThemeValue::Float(self.dialog_backdrop_blur),
                 ),
             ])
             .collect()
@@ -44,8 +44,8 @@ impl WidgetTheme {
     pub fn apply_overrides(&mut self, overrides: &ThemeOverrides) {
         for (name, value) in overrides.iter() {
             match (name, value) {
-                ("overlay-blur", ThemeValue::Number(value)) => self.overlay_blur = value.max(0.0),
-                ("dialog-backdrop-blur", ThemeValue::Number(value)) => {
+                ("overlay-blur", ThemeValue::Float(value)) => self.overlay_blur = value.max(0.0),
+                ("dialog-backdrop-blur", ThemeValue::Float(value)) => {
                     self.dialog_backdrop_blur = value.max(0.0)
                 }
                 (name, ThemeValue::Color(color)) => {

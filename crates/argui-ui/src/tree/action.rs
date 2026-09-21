@@ -39,7 +39,7 @@ impl UiTree {
     }
     fn action_binding(
         &self,
-        invocation: ActionInvocation,
+        invocation: &ActionInvocation,
     ) -> Result<Option<(usize, &ActionBinding)>, ActionError> {
         for index in self.action_ancestry(invocation.origin)? {
             if let Some(binding) = self
@@ -67,7 +67,7 @@ impl UiTree {
     /// Returns [`ActionError::StaleOrigin`] when the origin is no longer in the tree,
     /// or [`ActionError::Unavailable`] when the action cannot be resolved in scope.
     pub fn action_state(&self, invocation: ActionInvocation) -> Result<ActionState, ActionError> {
-        if let Some((_, binding)) = self.action_binding(invocation)? {
+        if let Some((_, binding)) = self.action_binding(&invocation)? {
             return Ok(binding.state.clone());
         }
         let node = invocation.origin.or(self.focused_node());
@@ -78,22 +78,29 @@ impl UiTree {
         let cancel_preedit = node
             .and_then(|node| self.text_inputs.get(node))
             .is_some_and(|state| state.composing() && !state.read_only() && !state.protected());
-        let enabled = match invocation.id {
-            ActionId::UNDO => cancel_preedit || node.is_some_and(|node| self.can_undo(node)),
-            ActionId::REDO => cancel_preedit || node.is_some_and(|node| self.can_redo(node)),
-            ActionId::COPY => caps.copy,
-            ActionId::CUT => caps.cut,
-            ActionId::PASTE => caps.paste,
-            ActionId::SELECT_ALL => caps.select_all,
-            _ => return Err(ActionError::Unavailable),
+        let command = invocation
+            .id
+            .selection_command()
+            .ok_or(ActionError::Unavailable)?;
+        let enabled = match command {
+            crate::SelectionCommand::Undo => {
+                cancel_preedit || node.is_some_and(|node| self.can_undo(node))
+            }
+            crate::SelectionCommand::Redo => {
+                cancel_preedit || node.is_some_and(|node| self.can_redo(node))
+            }
+            crate::SelectionCommand::Copy => caps.copy,
+            crate::SelectionCommand::Cut => caps.cut,
+            crate::SelectionCommand::Paste => caps.paste,
+            crate::SelectionCommand::SelectAll => caps.select_all,
         };
-        Ok(ActionState::new(match invocation.id {
-            ActionId::UNDO => "Undo",
-            ActionId::REDO => "Redo",
-            ActionId::COPY => "Copy",
-            ActionId::CUT => "Cut",
-            ActionId::PASTE => "Paste",
-            _ => "Select all",
+        Ok(ActionState::new(match command {
+            crate::SelectionCommand::Undo => "Undo",
+            crate::SelectionCommand::Redo => "Redo",
+            crate::SelectionCommand::Copy => "Copy",
+            crate::SelectionCommand::Cut => "Cut",
+            crate::SelectionCommand::Paste => "Paste",
+            crate::SelectionCommand::SelectAll => "Select all",
         })
         .enabled(enabled))
     }
@@ -102,17 +109,17 @@ impl UiTree {
     /// * `invocation` — action identifier and optional origin node.
     pub fn invoke_action(&mut self, invocation: ActionInvocation) -> InteractionUpdate {
         if !self
-            .action_state(invocation)
+            .action_state(invocation.clone())
             .is_ok_and(|state| state.enabled)
         {
             return InteractionUpdate::default();
         }
-        if let Ok(Some((index, binding))) = self.action_binding(invocation) {
+        if let Ok(Some((index, binding))) = self.action_binding(&invocation) {
             let node = self.node_ids[index];
             let mut base = UiEvent::new(
                 node,
                 self.key_for(node).map(str::to_owned),
-                UiEventKind::Action(invocation),
+                UiEventKind::Action(invocation.clone()),
             );
             base.set_focused_node(invocation.origin.or(self.focused_node()));
             return InteractionUpdate {
@@ -145,7 +152,7 @@ impl UiTree {
             UiEventKind::Click(_) => {
                 let mut index = self.index.position(base.target)?;
                 loop {
-                    if let Some(invocation) = self.element_at(index)?.action {
+                    if let Some(invocation) = self.element_at(index)?.action.clone() {
                         break ActionInvocation {
                             origin: invocation.origin.or(Some(self.node_ids[index])),
                             ..invocation
@@ -178,7 +185,7 @@ impl UiTree {
                                 })
                             })
                     {
-                        found = Some(binding.id);
+                        found = Some(binding.id.clone());
                         break;
                     }
                 }

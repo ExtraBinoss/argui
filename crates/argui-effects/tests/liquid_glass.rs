@@ -15,7 +15,7 @@ fn parameters_are_bounded_finite_and_scale_in_logical_pixels() {
     assert_eq!(
         argui_effects::registry()
             .unwrap()
-            .get(LIQUID_GLASS_ID)
+            .get(&LIQUID_GLASS_ID)
             .unwrap()
             .damage,
         EffectDamage::Bounded
@@ -71,7 +71,11 @@ fn parameters_are_bounded_finite_and_scale_in_logical_pixels() {
         .find(|d| d.id == LIQUID_GLASS_ID)
         .unwrap();
     assert_eq!(
-        definition.passes.iter().map(|p| p.name).collect::<Vec<_>>(),
+        definition
+            .passes
+            .iter()
+            .map(|pass| pass.name.as_str())
+            .collect::<Vec<_>>(),
         ["blur-x", "blur-y", "glass"]
     );
 }
@@ -96,16 +100,16 @@ fn gpu_lens_matches_circle_profile_and_composes_blur_color_and_dispersion() {
         .map(|pass| {
             let source = [
                 include_str!("../../argui-render/src/shaders/effects/custom_abi_header.wgsl"),
-                pass.wgsl,
+                &pass.wgsl,
                 include_str!("../../argui-render/src/shaders/effects/custom_abi_footer.wgsl"),
             ]
             .join("\n");
             let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-                label: Some(pass.name),
+                label: Some(pass.name.as_str()),
                 source: wgpu::ShaderSource::Wgsl(source.into()),
             });
             device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                label: Some(pass.name),
+                label: Some(pass.name.as_str()),
                 layout: None,
                 vertex: wgpu::VertexState {
                     module: &shader,

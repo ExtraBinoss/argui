@@ -24,7 +24,7 @@ impl Element {
                     PropertyBinding::Transform(_) | PropertyBinding::LayerOpacity(_)
                 )
             })
-            || self.conditional_styles.contains(PropertyKey::Transform)
-            || self.conditional_styles.contains(PropertyKey::LayerOpacity)
+            || self.conditional_styles.contains(&PropertyKey::Transform)
+            || self.conditional_styles.contains(&PropertyKey::LayerOpacity)
     }
 }

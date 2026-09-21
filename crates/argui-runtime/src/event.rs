@@ -49,10 +49,6 @@ pub enum RuntimeEvent {
     /// Native global shortcut initialization or registration failed.
     GlobalShortcutsFailed(String),
     CommandFailed(String),
-    #[cfg(feature = "hot-reload")]
-    HotReloaded {
-        generation: u64,
-    },
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -108,10 +104,6 @@ impl RuntimeEvent {
 #[derive(Debug)]
 pub(crate) enum UserEvent {
     ModelsReady,
-    #[cfg(all(feature = "hot-reload", debug_assertions, not(target_arch = "wasm32")))]
-    HotReload {
-        generation: u64,
-    },
     #[cfg(feature = "tasks")]
     TasksReady,
     #[cfg(all(feature = "webview", target_os = "linux"))]

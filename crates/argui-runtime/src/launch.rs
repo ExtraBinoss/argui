@@ -297,8 +297,6 @@ fn launch(mut application: Application) -> Result<(), RuntimeError> {
         .build()
         .map_err(PlatformError::from)?;
     let proxy = event_loop.create_proxy();
-    #[cfg(all(feature = "hot-reload", debug_assertions))]
-    crate::hot_reload::connect(proxy.clone().into());
     application.set_event_proxy(proxy);
     event_loop.set_control_flow(ControlFlow::Wait);
     event_loop
@@ -340,8 +338,6 @@ fn run_event_loop(
     mut application: MultiApplication,
 ) -> Result<(), RuntimeError> {
     let proxy = event_loop.create_proxy();
-    #[cfg(all(feature = "hot-reload", debug_assertions))]
-    crate::hot_reload::connect(proxy.clone().into());
     application.set_event_proxy(proxy);
     event_loop.set_control_flow(ControlFlow::Wait);
     event_loop

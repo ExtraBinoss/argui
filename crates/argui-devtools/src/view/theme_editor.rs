@@ -73,7 +73,7 @@ pub(super) fn panel<A>(tools: &DevtoolsHost<A>, theme: &WidgetTheme) -> Element 
                 .build()
                 .padding(Sides::length(6.0))
             }
-            ThemeValue::Number(number) => {
+            ThemeValue::Float(number) => {
                 let draft = editor.draft.as_ref().filter(|draft| draft.0 == name);
                 Input::new(
                     format!("__devtools-theme-number-{name}"),
@@ -87,6 +87,9 @@ pub(super) fn panel<A>(tools: &DevtoolsHost<A>, theme: &WidgetTheme) -> Element 
                 .build()
                 .width(length(100.0))
             }
+            value => Element::text(format!("{value:?}"))
+                .text_style(text(12.0, theme.muted_foreground))
+                .max_width(length(360.0)),
         };
         let header = Element::row([label, control, reset])
             .gap(8.0)

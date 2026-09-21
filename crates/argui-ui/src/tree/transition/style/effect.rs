@@ -10,8 +10,8 @@ pub(super) fn effect_values(layer: &LayerStyle, values: &mut Vec<StylePropertyVa
         };
         for argument in &effect.parameters {
             let target = EffectPropertyKey {
-                effect: effect.id,
-                parameter: argument.name,
+                effect: effect.id.clone(),
+                parameter: argument.name.clone(),
             };
             let property = match argument.value {
                 EffectValue::F32(value) => {
@@ -48,7 +48,7 @@ pub(super) fn effect_values(layer: &LayerStyle, values: &mut Vec<StylePropertyVa
     }
 }
 
-pub(super) fn apply_effect(layer: &mut LayerStyle, key: PropertyKey, value: &StateValue) {
+pub(super) fn apply_effect(layer: &mut LayerStyle, key: &PropertyKey, value: &StateValue) {
     let (target, effect_value) = match (key, value) {
         (PropertyKey::EffectF32(target), StateValue::F32(value)) => {
             (target, EffectValue::F32(*value))

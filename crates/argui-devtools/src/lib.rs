@@ -21,16 +21,15 @@ pub use host::DevtoolsHost;
 pub fn configure_renderer(
     mut config: argui_render::RendererConfig,
 ) -> Result<argui_render::RendererConfig, argui_render::RendererError> {
-    if config.effects.get(argui_effects::EDGE_FADE_ID).is_some()
-        && config.effects.get(argui_effects::EDGE_SHADOW_ID).is_some()
+    if config.effects.get(&argui_effects::EDGE_FADE_ID).is_some()
+        && config.effects.get(&argui_effects::EDGE_SHADOW_ID).is_some()
     {
         return Ok(config);
     }
     for definition in argui_effects::registry()?.definitions() {
-        if matches!(
-            definition.id,
-            argui_effects::EDGE_FADE_ID | argui_effects::EDGE_SHADOW_ID
-        ) && config.effects.get(definition.id).is_none()
+        if (definition.id == argui_effects::EDGE_FADE_ID
+            || definition.id == argui_effects::EDGE_SHADOW_ID)
+            && config.effects.get(&definition.id).is_none()
         {
             config.effects = config.effects.with_definition(definition.clone())?;
         }

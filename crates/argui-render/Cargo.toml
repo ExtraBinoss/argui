@@ -12,14 +12,15 @@ description = "GPU rendering for Argui native and WebAssembly interfaces"
 [dependencies]
 argui-core.workspace = true
 argui-paint.workspace = true
+argui-shader.workspace = true
 argui-text.workspace = true
 bytemuck.workspace = true
-naga.workspace = true
 resvg.workspace = true
 wgpu.workspace = true
 web-time.workspace = true
 
 [dev-dependencies]
+naga.workspace = true
 pollster.workspace = true
 
 [target.'cfg(target_os = "linux")'.dev-dependencies]

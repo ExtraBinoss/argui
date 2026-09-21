@@ -1,11 +1,12 @@
-use argui_animation::Transition;
-use argui_core::{Color, Point, Transform2D};
+use argui_core::{Color, Name, Point, Transform2D};
 use argui_paint::{Border, EffectId, Fill, QuadStyle};
 
 use crate::binding::{GradientPointTarget, LayoutTarget};
 use crate::{BindingImpact, ContainerQuery};
 
 mod compositor;
+mod transition;
+pub use transition::{StyleTransition, TransitionDirection, TransitionRule};
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum VisualState {
@@ -16,8 +17,8 @@ pub enum VisualState {
     Disabled,
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct StateName(&'static str);
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct StateName(Name);
 
 impl StateName {
     /// Creates an application-defined visual state name.
@@ -25,18 +26,26 @@ impl StateName {
     /// * `name` — stable name used by state selectors.
     #[must_use]
     pub const fn new(name: &'static str) -> Self {
-        Self(name)
+        Self(Name::from_static(name))
+    }
+
+    /// Creates an application-defined visual state from dynamically loaded text.
+    ///
+    /// * `name` — state name whose allocation becomes shared immutable storage.
+    #[must_use]
+    pub fn from_owned(name: String) -> Self {
+        Self(Name::from_owned(name))
     }
 
     /// Returns the stable name of this state.
     #[must_use]
-    pub const fn as_str(self) -> &'static str {
-        self.0
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct StateScopeId(&'static str);
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct StateScopeId(Name);
 
 impl StateScopeId {
     /// Creates an identifier for a named state scope.
@@ -44,17 +53,25 @@ impl StateScopeId {
     /// * `name` — stable application-defined scope name.
     #[must_use]
     pub const fn new(name: &'static str) -> Self {
-        Self(name)
+        Self(Name::from_static(name))
+    }
+
+    /// Creates a scope identifier from dynamically loaded text.
+    ///
+    /// * `name` — scope name whose allocation becomes shared immutable storage.
+    #[must_use]
+    pub fn from_owned(name: String) -> Self {
+        Self(Name::from_owned(name))
     }
 
     /// Returns the stable name of this scope.
     #[must_use]
-    pub const fn as_str(self) -> &'static str {
-        self.0
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum State {
     Visual(VisualState),
     Named(StateName),
@@ -72,7 +89,7 @@ impl From<StateName> for State {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum StateSelector {
     Own(State),
     Scope { scope: StateScopeId, state: State },
@@ -160,8 +177,8 @@ impl StyleCondition {
         container: &impl Fn(ContainerQuery) -> bool,
     ) -> bool {
         match self {
-            Self::State(selector) => state(*selector),
-            Self::Container(query) => container(*query),
+            Self::State(selector) => state(selector.clone()),
+            Self::Container(query) => container(query.clone()),
             Self::All(conditions) => conditions.iter().all(|item| item.matches(state, container)),
             Self::Any(conditions) => conditions.iter().any(|item| item.matches(state, container)),
             Self::Not(condition) => !condition.matches(state, container),
@@ -242,13 +259,13 @@ impl VisualState {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct EffectPropertyKey {
     pub effect: EffectId,
-    pub parameter: &'static str,
+    pub parameter: argui_core::Name,
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum PropertyKey {
     Transform,
     Background,
@@ -285,7 +302,7 @@ pub enum PropertyKey {
 impl PropertyKey {
     /// Returns the strongest invalidation required when this property changes.
     #[must_use]
-    pub const fn impact(self) -> BindingImpact {
+    pub const fn impact(&self) -> BindingImpact {
         match self {
             Self::Transform | Self::LayerOpacity => BindingImpact::Composite,
             Self::Layout(_) | Self::LayoutStyle => BindingImpact::Layout,
@@ -294,7 +311,7 @@ impl PropertyKey {
         }
     }
 
-    pub(crate) const fn is_quad(self) -> bool {
+    pub(crate) const fn is_quad(&self) -> bool {
         matches!(
             self,
             Self::Background
@@ -413,11 +430,11 @@ impl ConditionalStyles {
             })
     }
 
-    pub(crate) fn contains(&self, key: PropertyKey) -> bool {
+    pub(crate) fn contains(&self, key: &PropertyKey) -> bool {
         self.rules
             .iter()
             .flat_map(|rule| rule.style.values())
-            .any(|value| value.key == key)
+            .any(|value| &value.key == key)
     }
 
     pub(crate) fn has_container_queries(&self) -> bool {
@@ -480,116 +497,5 @@ impl StylePatch {
 impl From<QuadStyle> for StylePatch {
     fn from(value: QuadStyle) -> Self {
         Self::from_quad(value)
-    }
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum TransitionDirection {
-    Enter(StyleCondition),
-    Exit(StyleCondition),
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct TransitionRule {
-    pub property: Option<PropertyKey>,
-    pub direction: Option<TransitionDirection>,
-    pub transition: Transition,
-}
-
-impl TransitionRule {
-    /// Creates a transition rule that applies to all properties and directions.
-    ///
-    /// * `transition` — transition used when this rule matches.
-    #[must_use]
-    pub const fn new(transition: Transition) -> Self {
-        Self {
-            property: None,
-            direction: None,
-            transition,
-        }
-    }
-
-    /// Restricts this rule to one property.
-    #[must_use]
-    pub const fn property(mut self, property: PropertyKey) -> Self {
-        self.property = Some(property);
-        self
-    }
-
-    /// Restricts this rule to entering or exiting a condition.
-    /// * `direction` — transition direction to which this rule applies.
-    #[must_use]
-    pub fn direction(mut self, direction: TransitionDirection) -> Self {
-        self.direction = Some(direction);
-        self
-    }
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct StyleTransition {
-    pub default: Transition,
-    rules: Vec<TransitionRule>,
-}
-
-impl StyleTransition {
-    pub(crate) fn make_immediate(&mut self, properties: &[PropertyKey]) {
-        self.rules
-            .retain(|rule| !rule.property.is_some_and(|key| properties.contains(&key)));
-        for &property in properties {
-            self.rules.push(
-                TransitionRule::new(Transition::tween(argui_animation::Tween::new(
-                    argui_animation::Duration::ZERO,
-                )))
-                .property(property),
-            );
-        }
-    }
-
-    /// Creates a policy using `default` when no more specific rule matches.
-    #[must_use]
-    pub const fn new(default: Transition) -> Self {
-        Self {
-            default,
-            rules: Vec::new(),
-        }
-    }
-
-    /// Adds `rule`; later rules win when specificity ties.
-    #[must_use]
-    pub fn rule(mut self, rule: TransitionRule) -> Self {
-        self.rules.push(rule);
-        self
-    }
-
-    pub(crate) fn resolve(
-        &self,
-        property: PropertyKey,
-        direction: Option<TransitionDirection>,
-    ) -> &Transition {
-        self.rules
-            .iter()
-            .enumerate()
-            .filter(|(_, rule)| {
-                rule.property.is_none_or(|candidate| candidate == property)
-                    && rule
-                        .direction
-                        .as_ref()
-                        .is_none_or(|candidate| Some(candidate) == direction.as_ref())
-            })
-            .max_by_key(|(index, rule)| {
-                (
-                    u8::from(rule.property.is_some()) + u8::from(rule.direction.is_some()),
-                    *index,
-                )
-            })
-            .map_or(&self.default, |(_, rule)| &rule.transition)
-    }
-}
-
-impl Default for StyleTransition {
-    fn default() -> Self {
-        Self::new(Transition::tween(argui_animation::Tween::new(
-            argui_animation::Duration::from_millis(120),
-        )))
     }
 }

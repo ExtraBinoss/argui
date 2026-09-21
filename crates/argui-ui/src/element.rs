@@ -152,6 +152,20 @@ impl Element {
         self
     }
 
+    /// Assigns the private compiled source identity used by retained reconciliation.
+    ///
+    /// Application code should use [`Self::keyed`]. This channel exists for the
+    /// Argui DSL live runtime and generated AOT code, so source edits do not
+    /// overload public keys or focus identities.
+    ///
+    /// * `identity` — component-instance and stable source-site identity.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn retained_identity(mut self, identity: crate::RetainedIdentity) -> Self {
+        self.retained_identity = Some(identity);
+        self
+    }
+
     /// Sets the descriptive tooltip text associated with this element.
     /// * `description` — tooltip text associated with the element.
     #[must_use]

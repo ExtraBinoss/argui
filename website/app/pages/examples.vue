@@ -10,7 +10,7 @@ usePageSeo(
   () => t('meta.examples'),
   () => t('meta.examplesDescription'),
 )
-const moreExamples = ['motion', 'i18n', 'hot-reload', 'liquid-glass'] as const
+const moreExamples = ['motion', 'i18n', 'liquid-glass'] as const
 const isHarness = computed(() => selectedApp.value === 'ai-harness')
 const isGallery = computed(() => selectedApp.value === 'widget-gallery')
 const isGpuCanvas = computed(() => selectedApp.value === 'gpu-canvas')

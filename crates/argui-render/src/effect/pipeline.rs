@@ -79,7 +79,7 @@ impl EffectUniform {
 
 pub(crate) struct EffectGpu {
     pipeline: wgpu::RenderPipeline,
-    custom: HashMap<(EffectId, usize), wgpu::RenderPipeline>,
+    custom: HashMap<(EffectId, u64, usize), wgpu::RenderPipeline>,
     layout: wgpu::BindGroupLayout,
     format: wgpu::TextureFormat,
     sampler: wgpu::Sampler,
@@ -87,6 +87,7 @@ pub(crate) struct EffectGpu {
     parameters: wgpu::Buffer,
     parameter_stride: u64,
     parameter_binding_size: u64,
+    parameter_word_capacity: usize,
     next_slot: u64,
 }
 
@@ -98,7 +99,7 @@ pub(crate) struct EffectDraw<'a> {
     pub source: &'a wgpu::TextureView,
     pub backdrop: &'a wgpu::TextureView,
     pub uniform: EffectUniform,
-    pub shader: Option<(EffectId, usize)>,
+    pub shader: Option<(EffectId, u64, usize)>,
     pub parameters: &'a [u32],
     pub profiler: Option<&'a GpuFrameCapture>,
     pub profile_label: &'a str,
@@ -180,6 +181,7 @@ impl EffectGpu {
             parameters,
             parameter_stride,
             parameter_binding_size,
+            parameter_word_capacity: maximum_parameter_words.max(1),
             next_slot: 0,
         }
     }
@@ -192,23 +194,35 @@ impl EffectGpu {
         &mut self,
         device: &wgpu::Device,
         id: EffectId,
+        revision: u64,
         pass: usize,
         source: &str,
     ) -> Result<(), RendererError> {
-        let source = validated_custom_source(source)?;
+        let source =
+            argui_shader::validate_effect_source(format!("effect://{id}/{pass}"), source, &[])
+                .map_err(|error| RendererError::InvalidShader(error.to_string()))?
+                .source;
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("argui-custom-effect"),
             source: wgpu::ShaderSource::Wgsl(source.into()),
         });
         self.custom.insert(
-            (id, pass),
+            (id, revision, pass),
             create_pipeline(device, self.format, &self.layout, &shader),
         );
         Ok(())
     }
 
-    pub fn contains(&self, id: EffectId) -> bool {
-        self.custom.keys().any(|(candidate, _)| *candidate == id)
+    pub fn contains(&self, id: &EffectId, revision: u64) -> bool {
+        self.custom
+            .keys()
+            .any(|(candidate, candidate_revision, _)| {
+                candidate == id && *candidate_revision == revision
+            })
+    }
+
+    pub fn parameter_word_capacity(&self) -> usize {
+        self.parameter_word_capacity
     }
 
     pub fn draw(
@@ -303,24 +317,6 @@ impl EffectGpu {
         pass.set_bind_group(0, &bind_group, &[offset as u32, parameter_offset as u32]);
         pass.draw(0..3, 0..1);
     }
-}
-
-pub(crate) fn validated_custom_source(source: &str) -> Result<String, RendererError> {
-    let source = format!(
-        "{}\n{}\n{}",
-        include_str!("../shaders/effects/custom_abi_header.wgsl"),
-        source,
-        include_str!("../shaders/effects/custom_abi_footer.wgsl")
-    );
-    let module = naga::front::wgsl::parse_str(&source)
-        .map_err(|error| RendererError::InvalidShader(error.emit_to_string(&source)))?;
-    naga::valid::Validator::new(
-        naga::valid::ValidationFlags::all(),
-        naga::valid::Capabilities::empty(),
-    )
-    .validate(&module)
-    .map_err(|error| RendererError::InvalidShader(error.to_string()))?;
-    Ok(source)
 }
 
 fn built_in_source() -> String {

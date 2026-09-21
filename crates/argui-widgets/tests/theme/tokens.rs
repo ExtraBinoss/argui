@@ -19,12 +19,13 @@ fn every_exposed_token_updates_its_widget_theme_and_primary_regenerates_contrast
     for (name, value) in original.resolve(ColorScheme::Light).tokens() {
         let replacement = match value {
             ThemeValue::Color(_) => ThemeValue::Color(Color::srgb(0.2, 0.5, 0.8)),
-            ThemeValue::Number(_) => ThemeValue::Number(9.0),
+            ThemeValue::Float(_) => ThemeValue::Float(9.0),
+            value => value,
         };
         source.0.set(name, replacement);
     }
     source.0.set("unknown", ThemeValue::Color(Color::WHITE));
-    source.0.set("unknown-number", ThemeValue::Number(2.0));
+    source.0.set("unknown-number", ThemeValue::Float(2.0));
     for scheme in [ColorScheme::Light, ColorScheme::Dark] {
         let themes = shadcn(&source);
         for (name, value) in themes.resolve(scheme).tokens() {
@@ -37,7 +38,7 @@ fn every_exposed_token_updates_its_widget_theme_and_primary_regenerates_contrast
     let palette = themes.resolve(ColorScheme::Dark);
     assert_eq!(palette.primary, Color::WHITE);
     assert!(palette.primary_foreground.contrast_ratio(palette.primary) >= 4.5);
-    source.0.set("primary", ThemeValue::Number(0.0));
+    source.0.set("primary", ThemeValue::Float(0.0));
     assert_eq!(
         shadcn(&source).resolve(ColorScheme::Dark).primary,
         Color::BLACK

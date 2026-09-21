@@ -11,7 +11,7 @@ done < <(
   {
     find "$repo_root/crates" -type f -path '*/src/*' \
       \( -name 'tests.rs' -o -name '*_tests.rs' \) -print
-    rg --files-with-matches --color never --pcre2 \
+    rg --files-with-matches --color never \
       '(?:#\s*\[\s*(?:(?:[A-Za-z_]\w*::)*test\b|wasm_bindgen_test\b|(?:cfg|cfg_attr)\s*\([^]]*\btest\b)|\bcfg!\s*\(\s*test\b)' \
       "$repo_root/crates" -g '**/src/**/*.rs' || true
   } | sort -u
@@ -22,7 +22,8 @@ while IFS= read -r -d '' test_file; do
   relative="${test_file#*/tests/}"
   source="$crate/src/$relative"
 
-  if [[ ! -f "$source" ]]; then
+  module_source="$crate/src/${relative%.rs}/mod.rs"
+  if [[ ! -f "$source" && ! -f "$module_source" ]]; then
     echo "error: ${test_file#"$repo_root"/} does not mirror ${source#"$repo_root"/}" >&2
     failed=1
   fi

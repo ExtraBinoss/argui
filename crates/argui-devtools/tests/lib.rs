@@ -18,13 +18,13 @@ fn renderer_configuration_registers_scroll_effects_once_and_preserves_settings()
 fn renderer_configuration_adds_only_missing_scroll_effects() {
     let available = argui_effects::registry().unwrap();
     for id in [argui_effects::EDGE_FADE_ID, argui_effects::EDGE_SHADOW_ID] {
-        let existing = available.get(id).unwrap().clone();
+        let existing = available.get(&id).unwrap().clone();
         let config = RendererConfig::default()
             .effects(argui_render::EffectRegistry::new([existing.clone()]).unwrap());
         let configured = configure_renderer(config).unwrap();
         assert_eq!(configured.effects.definitions().len(), 2);
         assert_eq!(configured.effects.definitions().first(), Some(&existing));
-        assert_eq!(configured.effects.get(id), Some(&existing));
+        assert_eq!(configured.effects.get(&id), Some(&existing));
     }
 }
 

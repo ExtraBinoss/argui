@@ -1,27 +1,22 @@
 use argui_core::Color;
 use std::collections::BTreeMap;
 
-/// Renderer-independent theme values. Token names belong to the theme provider.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum ThemeValue {
-    Color(Color),
-    Number(f32),
-}
+pub use crate::value::ThemeValue;
 
-/// Sparse overrides shared by a window's presentations. Mutating a copied
-/// snapshot leaves the previously rendered environment intact for invalidation.
+/// Sparse named overrides accepted by existing Rust theme factories.
+///
+/// Compiled DSL themes use [`crate::ThemeRuntime`] and numeric token IDs. This
+/// string-keyed adapter remains at the Rust theme-provider boundary.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct ThemeOverrides(BTreeMap<String, ThemeValue>);
 
 impl ThemeOverrides {
-    /// Inserts or replaces a token, returning whether the snapshot changed.
-    ///
-    /// Non-finite numeric values and values identical to the current value are rejected.
+    /// Inserts or replaces a valid token, returning whether the snapshot changed.
     ///
     /// * `name` — token name to set.
-    /// * `value` — token value to store.
+    /// * `value` — typed token value to store.
     pub fn set(&mut self, name: impl Into<String>, value: ThemeValue) -> bool {
-        if matches!(value, ThemeValue::Number(number) if !number.is_finite()) {
+        if !value.is_valid() {
             return false;
         }
         let name = name.into();
@@ -39,31 +34,33 @@ impl ThemeOverrides {
         self.0.remove(name).is_some()
     }
 
-    #[must_use]
-    /// Returns a copy of the named token value, if present.
+    /// Returns a clone of the named token value, if present.
     ///
     /// * `name` — token name to look up.
+    #[must_use]
     pub fn get(&self, name: &str) -> Option<ThemeValue> {
-        self.0.get(name).copied()
+        self.0.get(name).cloned()
     }
 
-    #[must_use]
     /// Returns whether this snapshot contains no token overrides.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 
-    /// Iterates over token names and copied values in key order.
+    /// Iterates over token names and cloned values in key order.
     pub fn iter(&self) -> impl Iterator<Item = (&str, ThemeValue)> {
-        self.0.iter().map(|(name, value)| (name.as_str(), *value))
+        self.0
+            .iter()
+            .map(|(name, value)| (name.as_str(), value.clone()))
     }
 }
 
-/// Input to a theme factory. A plain accent color needs no override storage;
-/// a window environment can provide its own sparse token snapshot.
+/// Input to a Rust theme factory.
 pub trait ThemeSource {
     /// Returns the primary color used to construct theme tokens.
     fn primary_color(&self) -> Color;
+
     /// Returns optional sparse overrides supplied by this theme source.
     fn theme_overrides(&self) -> Option<&ThemeOverrides> {
         None
@@ -80,6 +77,7 @@ impl<T: ThemeSource + ?Sized> ThemeSource for &T {
     fn primary_color(&self) -> Color {
         T::primary_color(self)
     }
+
     fn theme_overrides(&self) -> Option<&ThemeOverrides> {
         T::theme_overrides(self)
     }

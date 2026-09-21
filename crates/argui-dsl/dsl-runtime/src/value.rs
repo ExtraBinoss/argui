@@ -1,0 +1,115 @@
+use std::collections::BTreeMap;
+
+use argui_dsl_ir::{AssetId, FieldId, IrType};
+
+use crate::RuntimeError;
+
+/// Bounded, type-erased development value; never crosses into engine crates.
+#[derive(Clone, Debug, PartialEq)]
+pub enum DslValue {
+    Null,
+    Bool(bool),
+    Int(i64),
+    Float(f64),
+    String(String),
+    Color(argui_core::Color),
+    Struct(BTreeMap<FieldId, Self>),
+    Enum { symbol: u64, variant: u64 },
+    Array(Vec<Self>),
+    Asset(AssetId),
+}
+
+impl DslValue {
+    /// Returns a concise runtime type name for diagnostics.
+    #[must_use]
+    pub const fn type_name(&self) -> &'static str {
+        match self {
+            Self::Null => "null",
+            Self::Bool(_) => "bool",
+            Self::Int(_) => "int",
+            Self::Float(_) => "float",
+            Self::String(_) => "string",
+            Self::Color(_) => "color",
+            Self::Struct(_) => "struct",
+            Self::Enum { .. } => "enum",
+            Self::Array(_) => "array",
+            Self::Asset(_) => "asset",
+        }
+    }
+
+    /// Converts a constant IR value without parsing source text.
+    pub(crate) fn constant(value: &argui_dsl_ir::IrValue) -> Self {
+        match value {
+            argui_dsl_ir::IrValue::Null => Self::Null,
+            argui_dsl_ir::IrValue::Bool(value) => Self::Bool(*value),
+            argui_dsl_ir::IrValue::Int(value) => Self::Int(*value),
+            argui_dsl_ir::IrValue::Float(value) => Self::Float(*value),
+            argui_dsl_ir::IrValue::String(value) => Self::String(value.clone()),
+            argui_dsl_ir::IrValue::Color(value) => {
+                let [red, green, blue, alpha] = value.to_be_bytes();
+                Self::Color(argui_core::Color::from_srgba8(red, green, blue, alpha))
+            }
+        }
+    }
+
+    /// Returns whether the value can migrate into `expected` without coercion.
+    #[must_use]
+    pub fn compatible_with(&self, expected: &IrType) -> bool {
+        matches!(
+            (self, expected),
+            (Self::Null, IrType::Optional(_))
+                | (Self::Bool(_), IrType::Bool)
+                | (Self::Int(_), IrType::Int | IrType::Float)
+                | (
+                    Self::Float(_),
+                    IrType::Float
+                        | IrType::Length
+                        | IrType::Dimension
+                        | IrType::Percentage
+                        | IrType::Duration
+                        | IrType::Angle
+                        | IrType::FontSize
+                        | IrType::LineHeight
+                )
+                | (
+                    Self::String(_),
+                    IrType::String | IrType::FontFamily | IrType::FontWeight
+                )
+                | (Self::Color(_), IrType::Color)
+                | (Self::Struct(_), IrType::Struct { .. })
+                | (Self::Enum { .. }, IrType::Enum(_))
+                | (Self::Array(_), IrType::Array(_) | IrType::Model(_))
+                | (Self::Asset(_), IrType::Asset)
+        ) || match expected {
+            IrType::Optional(inner) => self.compatible_with(inner),
+            _ => false,
+        }
+    }
+
+    /// Converts to a native schema value using the statically known IR type.
+    pub(crate) fn to_schema(
+        &self,
+        value_type: &IrType,
+    ) -> Result<argui_schema::SchemaValue, RuntimeError> {
+        use argui_schema::SchemaValue;
+        match (self, value_type) {
+            (Self::Bool(value), IrType::Bool) => Ok(SchemaValue::Bool(*value)),
+            (Self::Int(value), IrType::Int) => Ok(SchemaValue::Int(*value)),
+            (Self::Float(value), IrType::Float) => Ok(SchemaValue::Float(*value as f32)),
+            (Self::String(value), IrType::String | IrType::FontFamily | IrType::FontWeight) => {
+                Ok(SchemaValue::String(value.clone()))
+            }
+            (Self::Color(value), IrType::Color) => Ok(SchemaValue::Color(*value)),
+            (Self::Float(value), IrType::Length | IrType::FontSize | IrType::LineHeight) => {
+                Ok(SchemaValue::Dimension(argui_ui::length(*value as f32)))
+            }
+            (Self::Float(value), IrType::Percentage) => {
+                Ok(SchemaValue::Dimension(argui_ui::percent(*value as f32)))
+            }
+            _ => Err(RuntimeError::TypeMismatch {
+                expected: format!("{value_type:?}"),
+                actual: self.type_name().into(),
+            }),
+        }
+    }
+}

@@ -260,7 +260,7 @@ fn contains_unbounded_effect(style: &LayerStyle, effects: &EffectRegistry) -> bo
         .chain(&style.backdrop_filters)
         .any(|filter| match filter {
             Filter::Effect(effect) => effects
-                .get(effect.id)
+                .get(&effect.id)
                 .is_none_or(|definition| definition.damage == EffectDamage::Unbounded),
             _ => false,
         })

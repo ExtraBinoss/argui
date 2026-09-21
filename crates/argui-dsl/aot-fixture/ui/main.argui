@@ -1,0 +1,18 @@
+import { Button, Column, Text } from "@argui/ui"
+
+export component Main {
+    in property title: string = "Argui DSL"
+    private property expanded: bool = true
+
+    Column #root {
+        gap: 12.0
+        Text { content: title }
+        Button #toggle {
+            text: "Toggle details"
+            on click { expanded = !expanded }
+        }
+        if expanded {
+            Text { content: tr("status.ready") }
+        }
+    }
+}

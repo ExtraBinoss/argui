@@ -9,8 +9,6 @@ mod environment;
 mod error;
 mod event;
 mod host;
-#[cfg(all(feature = "hot-reload", debug_assertions, not(target_arch = "wasm32")))]
-mod hot_reload;
 mod input;
 mod launch;
 mod model;

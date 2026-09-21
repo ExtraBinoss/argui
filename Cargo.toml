@@ -1,5 +1,40 @@
 [workspace]
-members = ["crates/*"]
+members = [
+    "crates/argui",
+    "crates/argui-accessibility",
+    "crates/argui-android",
+    "crates/argui-animation",
+    "crates/argui-assets",
+    "crates/argui-core",
+    "crates/argui-devtools",
+    "crates/argui-dsl/*",
+    "crates/argui-effects",
+    "crates/argui-i18n",
+    "crates/argui-image",
+    "crates/argui-inspect",
+    "crates/argui-ios",
+    "crates/argui-layout",
+    "crates/argui-paint",
+    "crates/argui-perf-showcase",
+    "crates/argui-platform",
+    "crates/argui-reactive",
+    "crates/argui-render",
+    "crates/argui-runtime",
+    "crates/argui-schema",
+    "crates/argui-shader",
+    "crates/argui-showcase",
+    "crates/argui-state-app",
+    "crates/argui-testing",
+    "crates/argui-text",
+    "crates/argui-theme",
+    "crates/argui-ui",
+    "crates/argui-updater",
+    "crates/argui-vector",
+    "crates/argui-web-demo",
+    "crates/argui-webview",
+    "crates/argui-widget-gallery",
+    "crates/argui-widgets",
+]
 resolver = "3"
 
 [workspace.package]
@@ -15,6 +50,7 @@ readme = "README.md"
 argui = { path = "crates/argui", version = "0.3.2" }
 argui-android = { path = "crates/argui-android", version = "0.3.2" }
 argui-accessibility = { path = "crates/argui-accessibility", version = "0.3.2" }
+argui-assets = { path = "crates/argui-assets", version = "0.3.2" }
 argui-animation = { path = "crates/argui-animation", version = "0.3.2" }
 argui-core = { path = "crates/argui-core", version = "0.3.2" }
 argui-devtools = { path = "crates/argui-devtools", version = "0.3.2" }
@@ -27,8 +63,11 @@ argui-inspect = { path = "crates/argui-inspect", version = "0.3.2" }
 argui-paint = { path = "crates/argui-paint", version = "0.3.2" }
 argui-platform = { path = "crates/argui-platform", version = "0.3.2" }
 argui-render = { path = "crates/argui-render", version = "0.3.2" }
+argui-reactive = { path = "crates/argui-reactive", version = "0.3.2" }
 argui-showcase = { path = "crates/argui-showcase" }
 argui-runtime = { path = "crates/argui-runtime", version = "0.3.2" }
+argui-schema = { path = "crates/argui-schema", version = "0.3.2" }
+argui-shader = { path = "crates/argui-shader", version = "0.3.2" }
 argui-text = { path = "crates/argui-text", version = "0.3.2" }
 argui-testing = { path = "crates/argui-testing", version = "0.3.2" }
 argui-theme = { path = "crates/argui-theme", version = "0.3.2" }
@@ -45,12 +84,12 @@ cosmic-text = { version = "=0.19.0", default-features = false }
 futures-util = "=0.3.34"
 fluent-bundle = "=0.16.0"
 fluent-langneg = "=0.13.1"
-dioxus-devtools = "=0.7.10"
 naga = { version = "=30.0.1", features = ["wgsl-in"] }
 pollster = "=1.0.1"
 taffy = { version = "=0.14.0", default-features = false, features = ["std", "taffy_tree", "flexbox", "grid", "block_layout", "content_size"] }
 thiserror = "=2.0.20"
 reqwest = { version = "=0.12.28", default-features = false, features = ["blocking", "rustls-tls"] }
+rowan = "=0.17.0"
 semver = { version = "=1.0.28", features = ["serde"] }
 minisign-verify = "=0.2.5"
 tempfile = "=3.27.0"
@@ -70,9 +109,12 @@ sysinfo = { version = "=0.37.2", default-features = false }
 unicode-segmentation = "=1.13.3"
 unic-langid = { version = "=0.9.6", features = ["macros"] }
 image = { version = "=0.25.10", default-features = false, features = ["png", "jpeg"] }
+notify = "=8.2.0"
+tungstenite = { version = "=0.28.0", default-features = false, features = ["handshake"] }
 ksni = { version = "=0.3.6", default-features = false, features = ["async-io", "blocking"] }
 tray-icon = { version = "=0.24.2", default-features = false }
 global-hotkey = "=0.8.0"
+getrandom = { version = "=0.3.4", features = ["wasm_js"] }
 winresource = "=0.1.31"
 usvg = { version = "=0.48.1", default-features = false }
 resvg = { version = "=0.48.1", default-features = false }

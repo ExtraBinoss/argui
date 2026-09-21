@@ -8,10 +8,10 @@ fn tokens_are_sparse_typed_and_reject_nonfinite_values_without_changing_snapshot
     assert!(tokens.set("accent", ThemeValue::Color(Color::BLACK)));
     assert!(!tokens.set("accent", ThemeValue::Color(Color::BLACK)));
     let snapshot = tokens.clone();
-    assert!(!tokens.set("radius", ThemeValue::Number(f32::NAN)));
-    assert!(!tokens.set("radius", ThemeValue::Number(f32::INFINITY)));
+    assert!(!tokens.set("radius", ThemeValue::Float(f32::NAN)));
+    assert!(!tokens.set("radius", ThemeValue::Float(f32::INFINITY)));
     assert_eq!(tokens, snapshot);
-    assert!(tokens.set("radius", ThemeValue::Number(12.0)));
+    assert!(tokens.set("radius", ThemeValue::Float(12.0)));
     assert_eq!(tokens.iter().count(), 2);
     assert_eq!(snapshot.get("radius"), None);
     assert!(tokens.remove("accent"));

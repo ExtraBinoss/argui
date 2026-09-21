@@ -14,6 +14,7 @@ impl Element {
         Self(std::rc::Rc::new(super::kind::ElementNode {
             inspectable: true,
             layout_boundary: false,
+            retained_identity: None,
             native_content: None,
             desktop_backdrop: None,
             key: None,

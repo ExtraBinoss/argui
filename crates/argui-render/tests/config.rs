@@ -106,3 +106,24 @@ fn effect_quality_and_configuration_builders_are_composable() {
     assert_eq!(config.damage_tracking.max_area_ratio, 0.25);
     assert!(!DamageTracking::disabled().enabled);
 }
+
+#[test]
+fn invalid_damage_thresholds_fall_back_to_safe_limits() {
+    assert_eq!(DamageTracking::enabled().max_regions(0).max_regions, 1);
+    assert_eq!(
+        DamageTracking::enabled()
+            .max_area_ratio(f32::NAN)
+            .max_area_ratio,
+        DamageTracking::default().max_area_ratio
+    );
+    assert_eq!(
+        DamageTracking::enabled()
+            .max_area_ratio(-5.0)
+            .max_area_ratio,
+        0.05
+    );
+    assert_eq!(
+        DamageTracking::enabled().max_area_ratio(5.0).max_area_ratio,
+        1.0
+    );
+}

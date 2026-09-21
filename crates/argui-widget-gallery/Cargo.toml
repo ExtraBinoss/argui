@@ -8,7 +8,6 @@ publish = false
 
 [features]
 default = []
-hot-reload = ["argui/hot-reload"]
 updater = ["argui/widget-updater", "dep:argui-updater"]
 all-smi = ["argui-devtools/all-smi"]
 desktop-backdrop = ["argui/desktop-backdrop"]

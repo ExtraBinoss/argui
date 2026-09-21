@@ -373,11 +373,11 @@ impl Application {
             if !event.should_dispatch() {
                 continue;
             }
-            if let argui_ui::UiEventKind::Action(invocation) = event.kind
+            if let argui_ui::UiEventKind::Action(invocation) = &event.kind
                 && event.current_handler().is_none()
                 && let Some(ui) = &mut self.ui_tree
             {
-                let action_update = ui.invoke_action(invocation);
+                let action_update = ui.invoke_action(invocation.clone());
                 self.apply_ui_update(action_update, window, event_loop);
                 continue;
             }

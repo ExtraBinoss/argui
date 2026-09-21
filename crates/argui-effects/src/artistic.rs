@@ -6,30 +6,33 @@ pub const WORLEY_BORDER_FIRE_ID: EffectId = EffectId::new("argui.artistic.worley
 /// Registry identifier for the animated-gradient effect.
 pub const ANIMATED_GRADIENT_ID: EffectId = EffectId::new("argui.artistic.animated-gradient");
 
-const GRADIENT_PARAMETERS: &[EffectParameter] = &[
-    EffectParameter::new("phase", EffectParameterType::F32),
-    EffectParameter::new("frequency", EffectParameterType::F32),
-    EffectParameter::new("intensity", EffectParameterType::F32),
-];
-const FIRE_PARAMETERS: &[EffectParameter] = &[
-    EffectParameter::new("phase", EffectParameterType::F32),
-    EffectParameter::new("intensity", EffectParameterType::F32),
-    EffectParameter::new("frequency", EffectParameterType::F32),
-    EffectParameter::new("expansion", EffectParameterType::LogicalPixels),
-];
-const GRADIENT_PASSES: &[EffectPassDefinition] = &[EffectPassDefinition::fragment(
-    "gradient",
-    include_str!("shaders/effects/animated_gradient.wgsl"),
-)];
-const FIRE_PASSES: &[EffectPassDefinition] = &[EffectPassDefinition::fragment(
-    "fire",
-    include_str!("shaders/effects/worley_border_fire.wgsl"),
-)];
-
 pub(crate) fn definitions() -> [EffectDefinition; 2] {
     [
-        EffectDefinition::new(WORLEY_BORDER_FIRE_ID, FIRE_PARAMETERS, FIRE_PASSES),
-        EffectDefinition::new(ANIMATED_GRADIENT_ID, GRADIENT_PARAMETERS, GRADIENT_PASSES),
+        EffectDefinition::new(
+            WORLEY_BORDER_FIRE_ID,
+            [
+                EffectParameter::new("phase", EffectParameterType::F32),
+                EffectParameter::new("intensity", EffectParameterType::F32),
+                EffectParameter::new("frequency", EffectParameterType::F32),
+                EffectParameter::new("expansion", EffectParameterType::LogicalPixels),
+            ],
+            [EffectPassDefinition::fragment(
+                "fire",
+                include_str!("shaders/effects/worley_border_fire.wgsl"),
+            )],
+        ),
+        EffectDefinition::new(
+            ANIMATED_GRADIENT_ID,
+            [
+                EffectParameter::new("phase", EffectParameterType::F32),
+                EffectParameter::new("frequency", EffectParameterType::F32),
+                EffectParameter::new("intensity", EffectParameterType::F32),
+            ],
+            [EffectPassDefinition::fragment(
+                "gradient",
+                include_str!("shaders/effects/animated_gradient.wgsl"),
+            )],
+        ),
     ]
 }
 

@@ -205,7 +205,7 @@ pub(crate) fn instant_hover(
     hover: argui_ui::StateSelector,
 ) -> argui_ui::StyleTransition {
     for direction in [
-        argui_ui::TransitionDirection::Enter(hover.into()),
+        argui_ui::TransitionDirection::Enter(hover.clone().into()),
         argui_ui::TransitionDirection::Exit(hover.into()),
     ] {
         transition = transition.rule(

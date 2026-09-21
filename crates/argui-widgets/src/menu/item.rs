@@ -44,8 +44,8 @@ impl MenuItem {
     }
     /// Returns the action invocation for actionable entries.
     pub fn invocation(&self) -> Option<ActionInvocation> {
-        if let MenuItemKind::Action(invocation) = self.kind {
-            Some(invocation)
+        if let MenuItemKind::Action(invocation) = &self.kind {
+            Some(invocation.clone())
         } else {
             None
         }

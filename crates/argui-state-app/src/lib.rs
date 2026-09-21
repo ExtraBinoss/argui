@@ -1,4 +1,5 @@
 //! Native packaged application for the Argui state showcase.
+#![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 use std::error::Error;
 
 use argui::{
@@ -98,6 +99,7 @@ pub fn profile_message(profiling: bool, event: RuntimeEvent) -> Option<String> {
 /// # Errors
 ///
 /// Returns an error if application setup or runtime startup fails.
+#[cfg_attr(coverage_nightly, coverage(off))]
 pub fn run() -> Result<(), Box<dyn Error>> {
     let profiling = std::env::var_os("ARGUI_PROFILE").is_some();
     run_app_with_text_engine(
@@ -106,9 +108,9 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         text_engine(),
         DevtoolsHost::new(StateShowcase::default()),
         move |event| {
-            if let Some(message) = profile_message(profiling, event) {
-                eprintln!("{message}");
-            }
+            profile_message(profiling, event)
+                .into_iter()
+                .for_each(|message| eprintln!("{message}"));
         },
     )?;
     Ok(())

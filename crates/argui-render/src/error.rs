@@ -1,5 +1,7 @@
 use std::{error::Error, fmt};
 
+use argui_paint::EffectId;
+
 /// Describes one renderer configuration that failed during GPU initialization.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RendererAttemptFailure {
@@ -23,11 +25,11 @@ pub enum RendererError {
     GlyphAtlasFull,
     InvalidDisplayList(String),
     InvalidShader(String),
-    MissingEffect(&'static str),
-    DuplicateEffect(&'static str),
+    MissingEffect(EffectId),
+    DuplicateEffect(EffectId),
     InvalidEffectDefinition(String),
     InvalidEffectParameters {
-        effect: &'static str,
+        effect: EffectId,
         message: String,
     },
     EffectParametersTooLarge {

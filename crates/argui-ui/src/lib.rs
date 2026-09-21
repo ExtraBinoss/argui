@@ -27,6 +27,8 @@ pub use argui_accessibility::FocusPolicy;
 mod gesture;
 mod gpu_canvas;
 mod identity;
+#[doc(hidden)]
+pub use identity::RetainedIdentity;
 mod interaction;
 mod layout_builders;
 mod overlay;

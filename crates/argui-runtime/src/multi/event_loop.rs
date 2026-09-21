@@ -49,8 +49,6 @@ impl ApplicationHandler<UserEvent> for MultiApplication {
         let _ = event_loop;
         match event {
             UserEvent::ModelsReady => self.models_ready(event_loop),
-            #[cfg(all(feature = "hot-reload", debug_assertions, not(target_arch = "wasm32")))]
-            UserEvent::HotReload { generation } => self.hot_reload(generation),
             #[cfg(feature = "tasks")]
             UserEvent::TasksReady => self.tasks_ready(event_loop),
             #[cfg(all(feature = "webview", target_os = "linux"))]

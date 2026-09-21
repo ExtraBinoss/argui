@@ -36,7 +36,6 @@ desktop = [
     "widget-updater",
 ]
 web = ["basic", "webview"]
-hot-reload = ["argui-runtime/hot-reload"]
 global-shortcuts = ["argui-platform/global-shortcuts", "argui-runtime/global-shortcuts"]
 i18n = ["dep:argui-i18n"]
 updater = ["dep:argui-updater", "argui-updater/native"]
@@ -135,6 +134,8 @@ argui-layout.workspace = true
 argui-paint.workspace = true
 argui-platform.workspace = true
 argui-render.workspace = true
+argui-reactive.workspace = true
+argui-schema.workspace = true
 argui-runtime.workspace = true
 argui-text.workspace = true
 argui-theme.workspace = true

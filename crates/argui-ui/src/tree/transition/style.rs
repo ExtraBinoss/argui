@@ -142,7 +142,7 @@ fn apply_target(
         (PropertyKey::Background, _) => {
             values.retain(|value| {
                 value.property.key != PropertyKey::BackgroundColor
-                    && !is_gradient_property(value.property.key)
+                    && !is_gradient_property(&value.property.key)
             });
         }
         (PropertyKey::BorderColor | PropertyKey::BorderWidths, _)
@@ -197,7 +197,7 @@ fn base_values(element: &Element, scroll: Point) -> Vec<StylePropertyValue> {
     // whole-style conditional override needs a retained base to return to.
     if element
         .conditional_styles
-        .contains(PropertyKey::LayoutStyle)
+        .contains(&PropertyKey::LayoutStyle)
     {
         values.push(value(
             PropertyKey::LayoutStyle,
@@ -226,7 +226,7 @@ fn base_values(element: &Element, scroll: Point) -> Vec<StylePropertyValue> {
         | crate::ElementKind::Container
         | crate::ElementKind::Image { .. } => {}
     }
-    if element.conditional_styles.contains(PropertyKey::Scroll) {
+    if element.conditional_styles.contains(&PropertyKey::Scroll) {
         values.push(value(PropertyKey::Scroll, StateValue::Point(scroll)));
     }
     for target in layout::targets(&element.style) {
@@ -349,7 +349,7 @@ fn layer_values(layer: &LayerStyle, values: &mut Vec<StylePropertyValue>) {
     effect_values(layer, values);
 }
 
-fn is_gradient_property(key: PropertyKey) -> bool {
+fn is_gradient_property(key: &PropertyKey) -> bool {
     matches!(
         key,
         PropertyKey::GradientPoint(_)
@@ -359,7 +359,7 @@ fn is_gradient_property(key: PropertyKey) -> bool {
 }
 
 fn remove_gradient_values(values: &mut Vec<ResolvedProperty>) {
-    values.retain(|value| !is_gradient_property(value.property.key));
+    values.retain(|value| !is_gradient_property(&value.property.key));
 }
 
 fn value(key: PropertyKey, value: StateValue) -> StylePropertyValue {
@@ -424,13 +424,13 @@ fn apply_quad_target(
                 quad.opacity = value;
             }
             (PropertyKey::GradientPoint(target), StateValue::Point(value)) => {
-                apply_gradient_point(&mut quad.background, target, value);
+                apply_gradient_point(&mut quad.background, *target, value);
             }
             (PropertyKey::GradientStopOffset(index), StateValue::F32(value)) => {
-                apply_gradient_stop(&mut quad.background, index, |stop| stop.offset = value);
+                apply_gradient_stop(&mut quad.background, *index, |stop| stop.offset = value);
             }
             (PropertyKey::GradientStopColor(index), StateValue::Color(value)) => {
-                apply_gradient_stop(&mut quad.background, index, |stop| stop.color = value);
+                apply_gradient_stop(&mut quad.background, *index, |stop| stop.color = value);
             }
             _ => {}
         }
@@ -478,9 +478,9 @@ pub(in crate::tree) fn apply_transform(
 ) {
     registry.visit(
         TransitionTarget::Element(node),
-        |key| key == PropertyKey::Transform,
+        |key| key == &PropertyKey::Transform,
         |key, value| {
-            if key == PropertyKey::Transform
+            if key == &PropertyKey::Transform
                 && let StateValue::Transform(value) = value
             {
                 *transform = value;
@@ -496,9 +496,9 @@ pub(in crate::tree) fn apply_scroll(
 ) {
     registry.visit(
         TransitionTarget::Element(node),
-        |key| key == PropertyKey::Scroll,
+        |key| key == &PropertyKey::Scroll,
         |key, value| {
-            if key == PropertyKey::Scroll
+            if key == &PropertyKey::Scroll
                 && let StateValue::Point(value) = value
             {
                 *offset = value;
@@ -514,9 +514,9 @@ pub(in crate::tree) fn apply_text_color(
 ) {
     registry.visit(
         TransitionTarget::Element(node),
-        |key| key == PropertyKey::TextColor,
+        |key| key == &PropertyKey::TextColor,
         |key, value| {
-            if key == PropertyKey::TextColor
+            if key == &PropertyKey::TextColor
                 && let StateValue::Color(value) = value
             {
                 *color = value;
@@ -532,9 +532,9 @@ pub(in crate::tree) fn apply_vector_color(
 ) {
     registry.visit(
         TransitionTarget::Element(node),
-        |key| key == PropertyKey::VectorColor,
+        |key| key == &PropertyKey::VectorColor,
         |key, value| {
-            if key == PropertyKey::VectorColor
+            if key == &PropertyKey::VectorColor
                 && let StateValue::Color(value) = value
             {
                 *color = value;
@@ -569,22 +569,22 @@ pub(in crate::tree) fn apply_layer(
                 layer.mask = LayerMask::Rounded(radii(value));
             }
             (PropertyKey::ShadowOffset(index), StateValue::Vec2(value)) => {
-                if let Some(shadow) = layer.shadows.get_mut(index) {
+                if let Some(shadow) = layer.shadows.get_mut(*index) {
                     shadow.offset = value;
                 }
             }
             (PropertyKey::ShadowBlur(index), StateValue::F32(value)) => {
-                if let Some(shadow) = layer.shadows.get_mut(index) {
+                if let Some(shadow) = layer.shadows.get_mut(*index) {
                     shadow.blur = value;
                 }
             }
             (PropertyKey::ShadowSpread(index), StateValue::F32(value)) => {
-                if let Some(shadow) = layer.shadows.get_mut(index) {
+                if let Some(shadow) = layer.shadows.get_mut(*index) {
                     shadow.spread = value;
                 }
             }
             (PropertyKey::ShadowColor(index), StateValue::Color(value)) => {
-                if let Some(shadow) = layer.shadows.get_mut(index) {
+                if let Some(shadow) = layer.shadows.get_mut(*index) {
                     shadow.color = value;
                 }
             }

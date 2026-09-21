@@ -240,7 +240,7 @@ impl Menu {
             semantics.role = Role::MenuItem;
             match &item.kind {
                 MenuItemKind::Action(invocation) => {
-                    element = element.action_from(*invocation);
+                    element = element.action_from(invocation.clone());
                 }
                 MenuItemKind::Checkbox(checked) => {
                     semantics.role = Role::MenuItemCheckBox;

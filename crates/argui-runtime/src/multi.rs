@@ -104,9 +104,6 @@ impl MultiApplication {
         config
             .validate()
             .map_err(|error| RuntimeError::Configuration(error.to_string()))?;
-        #[cfg(all(feature = "hot-reload", debug_assertions, not(target_arch = "wasm32")))]
-        let model = crate::hot_reload::app_model(model);
-        #[cfg(not(all(feature = "hot-reload", debug_assertions, not(target_arch = "wasm32"))))]
         let model: Box<dyn AppModel> = Box::new(model);
         #[cfg(all(feature = "global-shortcuts", target_os = "linux"))]
         let global_shortcut_setup_error = (!config.global_shortcuts.is_empty()
@@ -498,14 +495,21 @@ impl Render for WindowModel {
     }
 
     fn render(&mut self, cx: &mut Context<Self>) -> Element {
+        let mut router = self.model.borrow().event_router(&self.key);
+        if let Some(router) = router.clone() {
+            cx.route_events_to(router);
+        }
         let mut root = self
             .view(cx.environment())
             .unwrap_or_else(|| Element::container(Vec::<Element>::new()));
-        if let Some(router) = self.model.borrow().event_router(&self.key) {
-            cx.route_events_to(router);
-            if !self.model.borrow().captures_ui_events() {
-                return root;
+        if router.is_none() {
+            router = self.model.borrow().event_router(&self.key);
+            if let Some(router) = router.clone() {
+                cx.route_events_to(router);
             }
+        }
+        if router.is_some() && !self.model.borrow().captures_ui_events() {
+            return root;
         }
         for event in argui_ui::EventType::ALL {
             root = root.on(cx

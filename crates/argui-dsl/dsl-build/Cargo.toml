@@ -1,0 +1,19 @@
+[package]
+name = "argui-dsl-build"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+description = "Cargo build-script integration for Argui DSL AOT compilation"
+
+[dependencies]
+argui-dsl-compiler = { path = "../dsl-compiler" }
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

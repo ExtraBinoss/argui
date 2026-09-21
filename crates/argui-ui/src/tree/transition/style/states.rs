@@ -132,7 +132,7 @@ impl StateContext {
                 }
             }
         }
-        if let Some(id) = element.state_scope {
+        if let Some(id) = element.state_scope.clone() {
             let scope = self.scopes.len();
             self.scopes.push(ResolvedScope {
                 id,
@@ -144,7 +144,7 @@ impl StateContext {
             });
             self.scope_at[root] = Some(scope);
         }
-        if let Some(id) = element.container_scope {
+        if let Some(id) = element.container_scope.clone() {
             let container = self.containers.len();
             self.containers.push(ResolvedContainer {
                 id,
@@ -157,14 +157,14 @@ impl StateContext {
     }
 
     fn matches(&self, selector: StateSelector, node: usize, stack: &ScopeStack) -> bool {
-        let states = match selector {
+        let states = match &selector {
             StateSelector::Own(_) => &self.nodes[node],
             StateSelector::Scope { scope, .. } => {
                 let Some(index) = stack
                     .states
                     .iter()
                     .rev()
-                    .find(|index| self.scopes[**index].id == scope)
+                    .find(|index| &self.scopes[**index].id == scope)
                 else {
                     return false;
                 };
@@ -222,7 +222,7 @@ struct ResolvedScope {
     states: NodeStates,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 struct ResolvedContainer {
     id: crate::ContainerScopeId,
     node: NodeId,

@@ -190,57 +190,9 @@ impl<T: Render> Entity<T> {
             frame: Rc::new(move |value| frame.dispatch_frame(value)),
             layout: Rc::new(move |snapshot| layout.dispatch_layout(snapshot)),
             owns: Rc::new(move |owner| owns.owns(owner)),
-            image_assets: Rc::new(move || {
-                image_assets.read(|value| {
-                    #[cfg(all(
-                        feature = "hot-reload",
-                        debug_assertions,
-                        not(target_arch = "wasm32")
-                    ))]
-                    return crate::hot_reload::image_assets(value);
-
-                    #[cfg(not(all(
-                        feature = "hot-reload",
-                        debug_assertions,
-                        not(target_arch = "wasm32")
-                    )))]
-                    value.image_assets()
-                })
-            }),
-            vector_assets: Rc::new(move || {
-                vector_assets.read(|value| {
-                    #[cfg(all(
-                        feature = "hot-reload",
-                        debug_assertions,
-                        not(target_arch = "wasm32")
-                    ))]
-                    return crate::hot_reload::vector_assets(value);
-
-                    #[cfg(not(all(
-                        feature = "hot-reload",
-                        debug_assertions,
-                        not(target_arch = "wasm32")
-                    )))]
-                    value.vector_assets()
-                })
-            }),
-            inspector: Rc::new(move || {
-                inspector.read(|value| {
-                    #[cfg(all(
-                        feature = "hot-reload",
-                        debug_assertions,
-                        not(target_arch = "wasm32")
-                    ))]
-                    return crate::hot_reload::inspector(value);
-
-                    #[cfg(not(all(
-                        feature = "hot-reload",
-                        debug_assertions,
-                        not(target_arch = "wasm32")
-                    )))]
-                    value.inspector()
-                })
-            }),
+            image_assets: Rc::new(move || image_assets.read(Render::image_assets)),
+            vector_assets: Rc::new(move || vector_assets.read(Render::vector_assets)),
+            inspector: Rc::new(move || inspector.read(Render::inspector)),
             take_effects: Rc::new(move || take_effects.take_effects()),
         }
     }
@@ -279,13 +231,6 @@ impl<T: Render> Entity<T> {
         };
         let element = {
             let mut value = self.0.model.value.borrow_mut();
-            #[cfg(all(feature = "hot-reload", debug_assertions, not(target_arch = "wasm32")))]
-            let element = crate::hot_reload::render(&mut *value, &mut cx);
-            #[cfg(not(all(
-                feature = "hot-reload",
-                debug_assertions,
-                not(target_arch = "wasm32")
-            )))]
             let element = value.render(&mut cx);
             element.semantic_scope()
         };
@@ -346,15 +291,7 @@ impl<T: Render> Entity<T> {
         self.0.presentation.is_visible()
             && ({
                 let value = self.0.model.value.borrow();
-                #[cfg(all(feature = "hot-reload", debug_assertions, not(target_arch = "wasm32")))]
-                let wants_frame = crate::hot_reload::wants_animation_frame(&*value);
-                #[cfg(not(all(
-                    feature = "hot-reload",
-                    debug_assertions,
-                    not(target_arch = "wasm32")
-                )))]
-                let wants_frame = value.wants_animation_frame();
-                wants_frame
+                value.wants_animation_frame()
             } || self
                 .0
                 .presentation
@@ -385,9 +322,6 @@ impl<T: Render> Entity<T> {
             ..Context::default()
         };
         let mut value = self.0.model.value.borrow_mut();
-        #[cfg(all(feature = "hot-reload", debug_assertions, not(target_arch = "wasm32")))]
-        crate::hot_reload::animation_frame(&mut *value, frame, &mut cx);
-        #[cfg(not(all(feature = "hot-reload", debug_assertions, not(target_arch = "wasm32"))))]
         value.animation_frame(frame, &mut cx);
         drop(value);
         merge_effects(&mut effects, cx.effects);
@@ -406,9 +340,6 @@ impl<T: Render> Entity<T> {
             ..Context::default()
         };
         let mut value = self.0.model.value.borrow_mut();
-        #[cfg(all(feature = "hot-reload", debug_assertions, not(target_arch = "wasm32")))]
-        crate::hot_reload::layout_changed(&mut *value, layout, &mut cx);
-        #[cfg(not(all(feature = "hot-reload", debug_assertions, not(target_arch = "wasm32"))))]
         value.layout_changed(layout, &mut cx);
         drop(value);
         self.0.model.signal.apply_update(cx.effects.update);

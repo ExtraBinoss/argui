@@ -363,7 +363,7 @@ export const docs: DocGuide[] = [
       'Store application state in a model, handle a click, and invalidate only the presentation that changed.',
     example: example('counter', 'counter'),
     demoTitle: 'A compiled counter running in WebAssembly',
-    sources: ['crates/argui-widget-gallery/src/pages/hot_reload.rs', 'docs/runtime/models.md'],
+    sources: ['crates/argui-dsl/aot-fixture/ui/main.argui', 'docs/dsl/getting-started.md'],
     sections: [
       {
         id: 'model',

@@ -5,33 +5,39 @@ use argui_render::{
 
 /// Registry identifier for the liquid-glass effect.
 pub const LIQUID_GLASS_ID: EffectId = EffectId::new("argui.liquid-glass");
-const PARAMETERS: &[EffectParameter] = &[
-    EffectParameter::new("refraction", EffectParameterType::LogicalPixels),
-    EffectParameter::new("chromatic-aberration", EffectParameterType::F32),
-    EffectParameter::new("blur", EffectParameterType::LogicalPixels),
-    EffectParameter::new("highlight", EffectParameterType::F32),
-    EffectParameter::new("edge-width", EffectParameterType::LogicalPixels),
-    EffectParameter::new("saturation", EffectParameterType::F32),
-    EffectParameter::new("brightness", EffectParameterType::F32),
-    EffectParameter::new("contrast", EffectParameterType::F32),
-    EffectParameter::new("depth-effect", EffectParameterType::Bool),
-    EffectParameter::new("tint", EffectParameterType::Vec4),
-];
-const PASSES: &[EffectPassDefinition] = &[
-    EffectPassDefinition::fragment("blur-x", concat!(
-        include_str!("shaders/effects/liquid_glass_blur.wgsl"),
-        "
-fn argui_effect(uv: vec2<f32>, source: vec4<f32>, backdrop: vec4<f32>) -> vec4<f32> { return glass_blur_axis(uv, source, vec2<f32>(1.0, 0.0)); }"
-    )),
-    EffectPassDefinition::fragment("blur-y", concat!(
-        include_str!("shaders/effects/liquid_glass_blur.wgsl"),
-        "
-fn argui_effect(uv: vec2<f32>, source: vec4<f32>, backdrop: vec4<f32>) -> vec4<f32> { return glass_blur_axis(uv, source, vec2<f32>(0.0, 1.0)); }"
-    )),
-    EffectPassDefinition::fragment("glass", include_str!("shaders/effects/liquid_glass.wgsl")),
-];
 pub(crate) fn definition() -> EffectDefinition {
-    EffectDefinition::new(LIQUID_GLASS_ID, PARAMETERS, PASSES).damage(EffectDamage::Bounded)
+    EffectDefinition::new(
+        LIQUID_GLASS_ID,
+        [
+            EffectParameter::new("refraction", EffectParameterType::LogicalPixels),
+            EffectParameter::new("chromatic-aberration", EffectParameterType::F32),
+            EffectParameter::new("blur", EffectParameterType::LogicalPixels),
+            EffectParameter::new("highlight", EffectParameterType::F32),
+            EffectParameter::new("edge-width", EffectParameterType::LogicalPixels),
+            EffectParameter::new("saturation", EffectParameterType::F32),
+            EffectParameter::new("brightness", EffectParameterType::F32),
+            EffectParameter::new("contrast", EffectParameterType::F32),
+            EffectParameter::new("depth-effect", EffectParameterType::Bool),
+            EffectParameter::new("tint", EffectParameterType::Vec4),
+        ],
+        [
+            EffectPassDefinition::fragment("blur-x", concat!(
+                include_str!("shaders/effects/liquid_glass_blur.wgsl"),
+                "
+fn argui_effect(uv: vec2<f32>, source: vec4<f32>, backdrop: vec4<f32>) -> vec4<f32> { return glass_blur_axis(uv, source, vec2<f32>(1.0, 0.0)); }"
+            )),
+            EffectPassDefinition::fragment("blur-y", concat!(
+                include_str!("shaders/effects/liquid_glass_blur.wgsl"),
+                "
+fn argui_effect(uv: vec2<f32>, source: vec4<f32>, backdrop: vec4<f32>) -> vec4<f32> { return glass_blur_axis(uv, source, vec2<f32>(0.0, 1.0)); }"
+            )),
+            EffectPassDefinition::fragment(
+                "glass",
+                include_str!("shaders/effects/liquid_glass.wgsl"),
+            ),
+        ],
+    )
+    .damage(EffectDamage::Bounded)
 }
 fn finite(value: f32, fallback: f32) -> f32 {
     if value.is_finite() { value } else { fallback }

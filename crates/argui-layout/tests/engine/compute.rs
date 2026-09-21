@@ -51,11 +51,11 @@ fn container_query_reflows_before_paint_and_reacts_to_resize() {
     let mut compact = base.style.clone();
     compact.flex_direction = FlexDirection::Column;
     let content = base.when(
-        ContainerQuery::max_width(scope, 200.0),
+        ContainerQuery::max_width(scope.clone(), 200.0),
         StylePatch::new().layout(compact),
     );
     let root = Element::container([content])
-        .container_scope(scope)
+        .container_scope(scope.clone())
         .width(percent(1.0))
         .height(percent(1.0));
     let mut ui = UiTree::new(root);
@@ -81,7 +81,7 @@ fn oscillating_container_query_returns_a_deterministic_error() {
     let mut expanded = base.style.clone();
     expanded.size.width = length(200.0);
     let root = base
-        .container_scope(scope)
+        .container_scope(scope.clone())
         .when(
             ContainerQuery::max_width(scope, 150.0),
             StylePatch::new().layout(expanded),
@@ -101,7 +101,7 @@ fn layout_recovers_after_nonconvergent_queries_are_removed() {
     let base = Element::container([]).width(length(100.0));
     let mut expanded = base.style.clone();
     expanded.size.width = length(200.0);
-    let mut ui = UiTree::new(base.container_scope(scope).when(
+    let mut ui = UiTree::new(base.container_scope(scope.clone()).when(
         ContainerQuery::max_width(scope, 150.0),
         StylePatch::new().layout(expanded),
     ));

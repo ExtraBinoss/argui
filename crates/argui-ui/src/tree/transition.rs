@@ -147,13 +147,13 @@ impl TransitionRegistry {
     fn visit(
         &self,
         target: TransitionTarget,
-        accepts: impl Fn(PropertyKey) -> bool,
-        mut visit: impl FnMut(PropertyKey, StateValue),
+        accepts: impl Fn(&PropertyKey) -> bool,
+        mut visit: impl FnMut(&PropertyKey, StateValue),
     ) {
         if let Some(entry) = self.entries.get(&target) {
             for property in &entry.values {
-                if accepts(property.key) {
-                    visit(property.key, property.value.value());
+                if accepts(&property.key) {
+                    visit(&property.key, property.value.value());
                 }
             }
         }
@@ -276,13 +276,14 @@ impl NodeTransition {
             let target = resolved.property;
             let Some(property) = self.values.iter_mut().find(|value| value.key == target.key)
             else {
+                let impact = target.key.impact();
                 self.values.push(AnimatedProperty {
                     key: target.key,
                     target: target.value.clone(),
                     source: resolved.source,
                     value: AnimatedValue::new(target.value),
                 });
-                update = strongest(update, target.key.impact().into());
+                update = strongest(update, impact.into());
                 continue;
             };
             if property.target == target.value {
@@ -302,7 +303,7 @@ impl NodeTransition {
             } else if let Some(style_transition) = spec.transition {
                 property.value.retarget(
                     target.value,
-                    style_transition.resolve(target.key, direction),
+                    style_transition.resolve(&target.key, direction),
                 );
             }
             update = strongest(update, target.key.impact().into());

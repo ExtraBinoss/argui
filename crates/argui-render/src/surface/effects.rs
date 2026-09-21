@@ -32,7 +32,7 @@ struct EffectPass {
     data: [f32; 4],
     matrix: Option<[f32; 20]>,
     bounds: Rect,
-    shader: Option<(EffectId, usize)>,
+    shader: Option<(EffectId, u64, usize)>,
     parameters: Vec<u32>,
     extent: Option<[u32; 2]>,
     radii: [f32; 4],
@@ -75,14 +75,19 @@ impl SurfaceRenderer {
             let definition = self
                 .renderer_config
                 .effects
-                .get(effect.id)
-                .ok_or(RendererError::MissingEffect(effect.id.0))?;
+                .get(&effect.id)
+                .ok_or_else(|| RendererError::MissingEffect(effect.id.clone()))?;
             definition.validate_instance(effect)?;
             additional_passes += definition.passes.len().saturating_sub(1);
-            if !self.effect.contains(effect.id) {
+            if !self.effect.contains(&effect.id, definition.revision) {
                 for (index, pass) in definition.passes.iter().enumerate() {
-                    self.effect
-                        .register(&self.device, definition.id, index, pass.wgsl)?;
+                    self.effect.register(
+                        &self.device,
+                        definition.id.clone(),
+                        definition.revision,
+                        index,
+                        &pass.wgsl,
+                    )?;
                 }
             }
         }
@@ -341,18 +346,19 @@ impl SurfaceRenderer {
                 }
                 PlannedFilter::Effect(effect) => {
                     let parameters = effect.packed_words();
-                    let passes = self
+                    let definition = self
                         .renderer_config
                         .effects
-                        .get(effect.id)
-                        .expect("validated effect registry")
-                        .passes;
+                        .get(&effect.id)
+                        .expect("validated effect registry");
+                    let definition_revision = definition.revision;
+                    let passes = definition.passes.clone();
                     for (pass_index, definition) in passes.iter().enumerate() {
                         let mut pass = EffectPass::new(99, [0.0; 4], bounds);
-                        pass.shader = Some((effect.id, pass_index));
+                        pass.shader = Some((effect.id.clone(), definition_revision, pass_index));
                         pass.parameters.clone_from(&parameters);
                         pass.radii = layer_radii(mask);
-                        pass.label = format!("effect.{}.{}", effect.id.0, definition.name);
+                        pass.label = format!("effect.{}.{}", effect.id.as_str(), definition.name);
                         pass.object = object;
                         let divisor = definition
                             .scale_divisor
@@ -465,7 +471,7 @@ impl SurfaceRenderer {
         output: PixelRegion,
         sources: EffectSources,
         params: EffectUniform,
-        shader: Option<(EffectId, usize)>,
+        shader: Option<(EffectId, u64, usize)>,
         parameters: &[u32],
         profiler: Option<&GpuFrameCapture>,
         label: &str,

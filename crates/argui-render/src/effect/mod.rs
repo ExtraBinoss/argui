@@ -5,7 +5,6 @@ use argui_paint::{BlendMode, LayerMask};
 
 use crate::target::{PixelRegion, TextureTarget};
 
-pub(crate) use pipeline::validated_custom_source;
 pub(crate) use pipeline::{EffectDraw, EffectGpu, EffectUniform};
 
 pub(crate) fn uniform(

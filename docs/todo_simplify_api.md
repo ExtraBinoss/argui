@@ -61,7 +61,7 @@ The implementation must follow these principles:
    low-level listeners. There must not be a second dispatch system.
 5. Closures remain in the runtime handler registry. Do not store closures in
    `Element`; elements must remain cloneable, comparable and suitable for
-   retained reconciliation and hot reload.
+   retained reconciliation and DSL generation replacement.
 6. Application state remains controlled by the application. Argui may retain
    temporary interaction state such as focus, pointer capture, drag state and
    typeahead state, but must not silently become the owner of business data.
@@ -260,7 +260,7 @@ state; do not blindly reproduce stale fixes.
 3. Implement `Context::event_handler` with access to `UiEvent` and `Context` and
    no implicit invalidation.
 4. Reimplement `Context::listener` using the shared registration path.
-5. Preserve hot-reload and presentation-owned handler identity.
+5. Preserve presentation-owned handler identity across DSL generation replacement.
 
 ### Required tests
 

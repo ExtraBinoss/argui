@@ -23,7 +23,7 @@ parser.add_argument(
     action="append",
     default=[],
     metavar="KIND:NAME:VALUE",
-    help="ordered click, type, or chord action followed by a named capture",
+    help="ordered click, type, chord, or wait action followed by a named capture",
 )
 parser.add_argument("command", nargs=argparse.REMAINDER)
 args = parser.parse_args()
@@ -177,9 +177,12 @@ try:
                 for key in reversed(chord):
                     keysym(key, False)
                     spin(0.08)
+            elif kind == "wait":
+                spin(float(value))
             else:
                 raise AssertionError(f"Unknown action kind: {kind}")
-            spin(2.0)
+            if kind != "wait":
+                spin(2.0)
             capture(name)
 finally:
     # Stop streaming before Python releases its callback, then only terminate our own children.

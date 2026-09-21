@@ -1,0 +1,37 @@
+[package]
+name = "argui-dsl-runtime"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+description = "Development-only typed live runtime for pre-resolved Argui DSL packages"
+
+[dependencies]
+argui-assets.workspace = true
+argui-core.workspace = true
+argui-dsl-ir = { path = "../dsl-ir" }
+argui-dsl-protocol = { path = "../dsl-protocol" }
+argui-schema.workspace = true
+argui-shader.workspace = true
+argui-ui.workspace = true
+argui-runtime = { workspace = true, features = ["tasks"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+futures-channel = "=0.3.34"
+futures-util.workspace = true
+js-sys = "=0.3.104"
+wasm-bindgen.workspace = true
+web-sys = { workspace = true, features = ["BinaryType", "CloseEvent", "ErrorEvent", "MessageEvent", "WebSocket"] }
+
+[dev-dependencies]
+argui-dsl-aot-fixture = { path = "../aot-fixture" }
+argui-dsl-compiler = { path = "../dsl-compiler" }
+argui-dsl-semantic = { path = "../dsl-semantic" }
+argui-dsl-syntax = { path = "../dsl-syntax" }
+argui-testing.workspace = true
+
+[lints]
+workspace = true

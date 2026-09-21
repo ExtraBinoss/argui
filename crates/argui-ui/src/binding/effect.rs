@@ -26,7 +26,7 @@ pub(super) fn resolve(layer: &mut LayerStyle, motion: &EffectMotion) {
 }
 
 impl EffectMotion {
-    const fn target(&self) -> EffectTarget {
+    fn target(&self) -> &EffectTarget {
         match self {
             Self::F32(target, _)
             | Self::LogicalPixels(target, _)
@@ -35,7 +35,7 @@ impl EffectMotion {
             | Self::Vec4(target, _)
             | Self::Mat3(target, _)
             | Self::Mat4(target, _)
-            | Self::Color(target, _) => *target,
+            | Self::Color(target, _) => target,
         }
     }
 

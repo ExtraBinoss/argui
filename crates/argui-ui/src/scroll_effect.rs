@@ -109,7 +109,7 @@ pub struct ScrollEffect {
 #[derive(Clone, Debug, PartialEq)]
 struct ScrollEffectBinding {
     filter: usize,
-    parameter: &'static str,
+    parameter: argui_core::Name,
     source: ScrollMetric,
 }
 
@@ -153,7 +153,13 @@ impl ScrollEffect {
     /// Panics if the filter is missing or is not a custom effect, if the parameter
     /// does not exist, or if its value type does not match the selected metric.
     #[must_use]
-    pub fn bind(mut self, filter: usize, parameter: &'static str, source: ScrollMetric) -> Self {
+    pub fn bind(
+        mut self,
+        filter: usize,
+        parameter: impl Into<argui_core::Name>,
+        source: ScrollMetric,
+    ) -> Self {
+        let parameter = parameter.into();
         let Some(Filter::Effect(effect)) = self.layer.filters.get(filter) else {
             panic!("scroll binding requires a custom filter");
         };

@@ -310,7 +310,7 @@ impl<'a> ToastHost<'a> {
                     )
                     .enabled(state.enabled)
                     .build()
-                    .action_from(*invocation)
+                    .action_from(invocation.clone())
                 });
             let (icon, color) = match toast.variant {
                 ToastVariant::Information => (TablerIcon::Information, theme.foreground),

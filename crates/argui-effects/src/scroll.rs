@@ -8,27 +8,29 @@ pub const EDGE_FADE_ID: EffectId = EffectId::new("argui.scroll.edge-fade");
 /// Registry identifier for the scroll edge-shadow effect.
 pub const EDGE_SHADOW_ID: EffectId = EffectId::new("argui.scroll.edge-shadow");
 
-const PARAMETERS: &[EffectParameter] = &[
-    EffectParameter::new("width", EffectParameterType::LogicalPixels),
-    EffectParameter::new("intensity", EffectParameterType::F32),
-    EffectParameter::new("edges", EffectParameterType::Vec4),
-    EffectParameter::new("local-x", EffectParameterType::Vec3),
-    EffectParameter::new("local-y", EffectParameterType::Vec3),
-    EffectParameter::new("viewport-width", EffectParameterType::LogicalPixels),
-    EffectParameter::new("viewport-height", EffectParameterType::LogicalPixels),
-    EffectParameter::new("color", EffectParameterType::Color),
-    EffectParameter::new("shadow", EffectParameterType::Bool),
-];
-const PASSES: &[EffectPassDefinition] = &[EffectPassDefinition::fragment(
-    "edges",
-    include_str!("shaders/effects/edges.wgsl"),
-)];
-
 pub(crate) fn definitions() -> [EffectDefinition; 2] {
-    [
-        EffectDefinition::new(EDGE_FADE_ID, PARAMETERS, PASSES),
-        EffectDefinition::new(EDGE_SHADOW_ID, PARAMETERS, PASSES),
-    ]
+    [definition(EDGE_FADE_ID), definition(EDGE_SHADOW_ID)]
+}
+
+fn definition(id: EffectId) -> EffectDefinition {
+    EffectDefinition::new(
+        id,
+        [
+            EffectParameter::new("width", EffectParameterType::LogicalPixels),
+            EffectParameter::new("intensity", EffectParameterType::F32),
+            EffectParameter::new("edges", EffectParameterType::Vec4),
+            EffectParameter::new("local-x", EffectParameterType::Vec3),
+            EffectParameter::new("local-y", EffectParameterType::Vec3),
+            EffectParameter::new("viewport-width", EffectParameterType::LogicalPixels),
+            EffectParameter::new("viewport-height", EffectParameterType::LogicalPixels),
+            EffectParameter::new("color", EffectParameterType::Color),
+            EffectParameter::new("shadow", EffectParameterType::Bool),
+        ],
+        [EffectPassDefinition::fragment(
+            "edges",
+            include_str!("shaders/effects/edges.wgsl"),
+        )],
+    )
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]

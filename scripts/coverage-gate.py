@@ -9,8 +9,9 @@ METRICS = ("branches", "functions", "lines", "regions")
 
 
 def workspace_crates():
-    # The workspace manifest includes every package under crates/*.
-    return sorted(path.parent.name for path in Path("crates").glob("*/Cargo.toml"))
+    # Workspace packages include both engine crates and the nested DSL toolchain.
+    return sorted(str(path.parent.relative_to("crates"))
+                  for path in Path("crates").glob("**/Cargo.toml"))
 
 
 def only_reexports(crate):
@@ -21,7 +22,9 @@ def only_reexports(crate):
         text = re.sub(r"//[^\n]*", "", source.read_text())
         text = re.sub(r"#!?\[[^\]]*\]", "", text)
         text = re.sub(r"pub\s+use\s+[^;]+;", "", text)
+        text = re.sub(r"pub\s+const\s+[A-Z][A-Z0-9_]*\s*:\s*&str\s*=\s*include_str!\([^;]+\);", "", text)
         text = re.sub(r"pub\s+mod\s+[A-Za-z_][A-Za-z0-9_]*\s*\{", "", text)
+        text = re.sub(r"(?ms)^macro_rules!\s+[A-Za-z_][A-Za-z0-9_]*\s*\{.*?^\}", "", text)
         text = text.replace("}", "")
         if text.strip():
             return False

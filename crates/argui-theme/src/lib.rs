@@ -2,8 +2,14 @@
 
 use argui_core::ColorScheme;
 
+mod runtime;
+mod schema;
 mod tokens;
+mod value;
+pub use runtime::{ThemeChange, ThemeRuntime};
+pub use schema::{ThemeError, ThemeImpact, ThemeSchema, ThemeTokenDefinition, ThemeTokenId};
 pub use tokens::{ThemeOverrides, ThemeSource, ThemeValue};
+pub use value::{ThemeDimension, ThemeValueType};
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub enum ThemeMode {

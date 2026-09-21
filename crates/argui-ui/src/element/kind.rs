@@ -20,6 +20,7 @@ pub struct ElementNode {
     pub inspectable: bool,
     /// Isolates content sizing; see [`super::Element::layout_boundary`] for the contract.
     pub layout_boundary: bool,
+    pub(crate) retained_identity: Option<crate::RetainedIdentity>,
     pub key: Option<String>,
     pub kind: ElementKind,
     pub native_content: Option<crate::NativeContent>,

@@ -1,4 +1,4 @@
-use argui_core::{Affine2D, Color, Point, Rect, Size};
+use argui_core::{Affine2D, Color, Name, Point, Rect, Size};
 
 use crate::CornerRadii;
 
@@ -24,15 +24,43 @@ impl RenderObjectId {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct EffectId(pub &'static str);
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct EffectId(Name);
 
 impl EffectId {
     /// Creates an effect identifier from a namespaced static name.
     /// * `namespaced_name` — stable namespaced effect name.
     #[must_use]
     pub const fn new(namespaced_name: &'static str) -> Self {
-        Self(namespaced_name)
+        Self(Name::from_static(namespaced_name))
+    }
+
+    /// Creates an effect identifier from dynamically loaded owned text.
+    ///
+    /// * `namespaced_name` — stable namespaced effect name owned by this identifier.
+    #[must_use]
+    pub fn from_owned(namespaced_name: String) -> Self {
+        Self(Name::from_owned(namespaced_name))
+    }
+
+    /// Creates an effect identifier from an existing engine name.
+    ///
+    /// * `name` — shared engine-level name to wrap.
+    #[must_use]
+    pub fn from_name(name: Name) -> Self {
+        Self(name)
+    }
+
+    /// Returns the namespaced effect name.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
+impl std::fmt::Display for EffectId {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(self.as_str())
     }
 }
 
@@ -85,7 +113,7 @@ fn write_f32_words(words: &mut Vec<u32>, values: &[f32]) {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct EffectArgument {
-    pub name: &'static str,
+    pub name: Name,
     pub value: EffectValue,
 }
 
@@ -94,7 +122,21 @@ impl EffectArgument {
     /// * `name` — parameter name; `value` — parameter value.
     #[must_use]
     pub const fn new(name: &'static str, value: EffectValue) -> Self {
-        Self { name, value }
+        Self {
+            name: Name::from_static(name),
+            value,
+        }
+    }
+
+    /// Creates a parameter from a dynamically loaded owned name.
+    ///
+    /// * `name` — parameter name owned by the argument; `value` — parameter value.
+    #[must_use]
+    pub fn from_owned(name: String, value: EffectValue) -> Self {
+        Self {
+            name: Name::from_owned(name),
+            value,
+        }
     }
 }
 
@@ -202,12 +244,12 @@ impl Filter {
         match self {
             Self::Blur(radius) => Self::Blur(radius * factor),
             Self::Effect(effect) => Self::Effect(EffectInstance {
-                id: effect.id,
+                id: effect.id.clone(),
                 parameters: effect
                     .parameters
                     .iter()
                     .map(|argument| EffectArgument {
-                        name: argument.name,
+                        name: argument.name.clone(),
                         value: argument.value.scaled(factor),
                     })
                     .collect(),

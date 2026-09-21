@@ -19,7 +19,7 @@ fn popover_examples_edit_settings_and_dismiss_with_distinct_effect_surfaces() {
             0 => assert!(filters.is_empty()),
             1 => assert!(matches!(filters.as_slice(), [Filter::Blur(6.0)])),
             _ => assert!(
-                matches!(filters.as_slice(), [Filter::Effect(effect)] if effect.id.0 == "gallery.overlay.prism")
+                matches!(filters.as_slice(), [Filter::Effect(effect)] if effect.id.as_str() == "gallery.overlay.prism")
             ),
         }
         match index {

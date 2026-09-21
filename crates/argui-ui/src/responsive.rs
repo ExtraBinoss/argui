@@ -1,21 +1,31 @@
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct ContainerScopeId(&'static str);
+use argui_core::Name;
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct ContainerScopeId(Name);
 
 impl ContainerScopeId {
     /// Creates a container scope identifier from a stable application-defined name.
     #[must_use]
     pub const fn new(name: &'static str) -> Self {
-        Self(name)
+        Self(Name::from_static(name))
+    }
+
+    /// Creates a container-query scope from dynamically loaded text.
+    ///
+    /// * `name` — scope name whose allocation becomes shared immutable storage.
+    #[must_use]
+    pub fn from_owned(name: String) -> Self {
+        Self(Name::from_owned(name))
     }
 
     /// Returns the name used to create this scope identifier.
     #[must_use]
-    pub const fn as_str(self) -> &'static str {
-        self.0
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ContainerQuery {
     MinWidth { scope: ContainerScopeId, value: f32 },
     MaxWidth { scope: ContainerScopeId, value: f32 },
@@ -70,14 +80,14 @@ impl ContainerQuery {
 
     /// Returns the scope whose dimensions this query examines.
     #[must_use]
-    pub const fn scope(self) -> ContainerScopeId {
+    pub fn scope(&self) -> ContainerScopeId {
         match self {
             Self::MinWidth { scope, .. }
             | Self::MaxWidth { scope, .. }
             | Self::MinHeight { scope, .. }
             | Self::MaxHeight { scope, .. }
             | Self::Landscape(scope)
-            | Self::Portrait(scope) => scope,
+            | Self::Portrait(scope) => scope.clone(),
         }
     }
 

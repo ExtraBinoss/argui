@@ -140,12 +140,12 @@ fn nearest_scope_wins_and_disabled_local_command_blocks_parent() {
     let mut tree = nested(true);
     let editor = tree.node_ids()[2];
     let invoke = ActionInvocation::new(SAVE).at(editor);
-    let events = tree.invoke_action(invoke).events;
+    let events = tree.invoke_action(invoke.clone()).events;
     assert_eq!(events.len(), 1);
     assert_eq!(events[0].current_handler().unwrap().slot(), 2);
     let root = nested(false).root().clone();
     tree.replace(root);
-    assert!(!tree.action_state(invoke).unwrap().enabled);
+    assert!(!tree.action_state(invoke.clone()).unwrap().enabled);
     assert!(tree.invoke_action(invoke).events.is_empty());
     let root = tree.node_ids()[0];
     assert_eq!(
@@ -165,23 +165,26 @@ fn captured_origin_is_used_from_a_menu_and_removed_origins_fail_closed() {
     let invoke = ActionInvocation::new(SAVE).at(origin);
     let menu = tree.node_ids()[3];
     let mut next = tree.root().clone();
-    next.children[1] = next.children[1].clone().action_from(invoke);
+    next.children[1] = next.children[1].clone().action_from(invoke.clone());
     tree.replace(next);
     let click = tree.event_deliveries(menu, UiEventKind::Click(ClickEvent::accessibility()));
     assert!(click[0].should_dispatch());
     assert!(!click[0].should_dispatch());
-    let UiEventKind::Action(invocation) = click[0].kind else {
+    let UiEventKind::Action(invocation) = &click[0].kind else {
         panic!("action default");
     };
     assert_eq!(
-        tree.invoke_action(invocation).events[0]
+        tree.invoke_action(invocation.clone()).events[0]
             .current_handler()
             .unwrap()
             .slot(),
         2
     );
     tree.replace(Element::column([Element::container([])]).action_scope(scope(1, true)));
-    assert_eq!(tree.action_state(invoke), Err(ActionError::StaleOrigin));
+    assert_eq!(
+        tree.action_state(invoke.clone()),
+        Err(ActionError::StaleOrigin)
+    );
     assert!(tree.invoke_action(invoke).events.is_empty());
 }
 
@@ -213,10 +216,10 @@ fn keyboard_without_focus_can_use_window_actions_but_ignores_other_keys() {
     assert_eq!(events.len(), 1);
     assert!(events[0].should_dispatch());
     assert!(events[0].default_prevented());
-    let UiEventKind::Action(invocation) = events[0].kind else {
+    let UiEventKind::Action(invocation) = &events[0].kind else {
         panic!("shortcut action");
     };
-    assert_eq!(tree.invoke_action(invocation).events.len(), 1);
+    assert_eq!(tree.invoke_action(invocation.clone()).events.len(), 1);
     assert!(tree.keyboard_event(&pressed("q"), &[]).events.is_empty());
 }
 

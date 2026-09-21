@@ -57,6 +57,7 @@ impl VectorGpu {
                 tintable: asset.tintable,
             },
         );
+        self.variants.remove(&asset.id);
         Ok(())
     }
 

@@ -180,7 +180,7 @@ error.
 The registry is fixed for a renderer device in 0.3. Applications may change
 scene data and content revisions at runtime, but adding a factory that requires
 new device capabilities requires creating a new renderer. This also avoids
-keeping a hot-reloaded trait-object vtable alive past the code that created it.
+keeping a dynamically replaced trait-object vtable alive past the code that created it.
 
 ### 5. Retained revisions control GPU work
 
@@ -929,7 +929,7 @@ documentation exist. Do not check an item because a stub compiles.
 - [ ] Add canvas statistics to `RenderProfile`, `argui-inspect` and DevTools.
 - [ ] Keep runtime failures actionable without exiting for recoverable canvas errors.
 - [ ] Test main window, secondary window, popup, fallback and profiling paths.
-- [ ] Audit hot-reload lifetime safety; keep the 0.3 registry startup-only.
+- [ ] Audit dynamic-registry lifetime safety; keep the 0.3 registry startup-only.
 
 ### Phase 6 — native and Wasm GPU Canvas Lab
 

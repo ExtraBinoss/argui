@@ -1,3 +1,4 @@
+use argui_paint::EffectId;
 use argui_render::{RendererAttemptFailure, RendererError};
 
 #[test]
@@ -35,7 +36,7 @@ fn renderer_errors_keep_actionable_context() {
         "invalid effect shader: bad WGSL"
     );
     assert_eq!(
-        RendererError::MissingEffect("test.effect").to_string(),
+        RendererError::MissingEffect(EffectId::new("test.effect")).to_string(),
         "effect 'test.effect' is not registered"
     );
     assert_eq!(
@@ -107,7 +108,7 @@ fn resource_and_effect_validation_errors_are_human_readable() {
         "the surface does not support premultiplied transparent composition"
     );
     assert_eq!(
-        RendererError::DuplicateEffect("blur").to_string(),
+        RendererError::DuplicateEffect(EffectId::new("blur")).to_string(),
         "effect 'blur' is registered twice"
     );
     assert_eq!(
@@ -116,7 +117,7 @@ fn resource_and_effect_validation_errors_are_human_readable() {
     );
     assert_eq!(
         RendererError::InvalidEffectParameters {
-            effect: "blur",
+            effect: EffectId::new("blur"),
             message: "negative radius".into(),
         }
         .to_string(),

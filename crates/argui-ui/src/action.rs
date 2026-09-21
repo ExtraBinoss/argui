@@ -1,9 +1,23 @@
 use crate::{Element, EventListener, NodeId, SelectionCommand};
-use argui_core::{Key, KeyInput, KeyState};
+use argui_core::{Key, KeyInput, KeyState, Name};
 
 /// Stable application-defined command identity. No process-global registry.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct ActionId(pub &'static str);
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct ActionId {
+    name: Name,
+}
+
+/// Creates an action identifier from a static name.
+///
+/// This compatibility constructor keeps literal `ActionId("name")` call sites
+/// concise while [`ActionId::from_owned`] accepts live-compiled names.
+///
+/// * `name` — stable application-defined action name.
+#[allow(non_snake_case)]
+#[must_use]
+pub const fn ActionId(name: &'static str) -> ActionId {
+    ActionId::new(name)
+}
 
 impl From<SelectionCommand> for ActionId {
     fn from(command: SelectionCommand) -> Self {
@@ -19,22 +33,49 @@ impl From<SelectionCommand> for ActionId {
 }
 
 impl ActionId {
-    pub const COPY: Self = Self("argui.copy");
-    pub const CUT: Self = Self("argui.cut");
-    pub const PASTE: Self = Self("argui.paste");
-    pub const SELECT_ALL: Self = Self("argui.select-all");
-    pub const UNDO: Self = Self("argui.undo");
-    pub const REDO: Self = Self("argui.redo");
+    pub const COPY: Self = Self::new("argui.copy");
+    pub const CUT: Self = Self::new("argui.cut");
+    pub const PASTE: Self = Self::new("argui.paste");
+    pub const SELECT_ALL: Self = Self::new("argui.select-all");
+    pub const UNDO: Self = Self::new("argui.undo");
+    pub const REDO: Self = Self::new("argui.redo");
+
+    /// Creates an action identifier from a static name.
+    ///
+    /// * `name` — stable application-defined action name.
+    #[must_use]
+    pub const fn new(name: &'static str) -> Self {
+        Self {
+            name: Name::from_static(name),
+        }
+    }
+
+    /// Creates an action identifier from dynamically loaded owned text.
+    ///
+    /// * `name` — action name whose allocation becomes shared immutable storage.
+    #[must_use]
+    pub fn from_owned(name: String) -> Self {
+        Self {
+            name: Name::from_owned(name),
+        }
+    }
+
+    /// Returns the action name.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        self.name.as_str()
+    }
+
     /// Returns the built-in text-selection command represented by this identifier.
     #[must_use]
-    pub fn selection_command(self) -> Option<SelectionCommand> {
-        match self {
-            Self::COPY => Some(SelectionCommand::Copy),
-            Self::CUT => Some(SelectionCommand::Cut),
-            Self::PASTE => Some(SelectionCommand::Paste),
-            Self::SELECT_ALL => Some(SelectionCommand::SelectAll),
-            Self::UNDO => Some(SelectionCommand::Undo),
-            Self::REDO => Some(SelectionCommand::Redo),
+    pub fn selection_command(&self) -> Option<SelectionCommand> {
+        match self.as_str() {
+            "argui.copy" => Some(SelectionCommand::Copy),
+            "argui.cut" => Some(SelectionCommand::Cut),
+            "argui.paste" => Some(SelectionCommand::Paste),
+            "argui.select-all" => Some(SelectionCommand::SelectAll),
+            "argui.undo" => Some(SelectionCommand::Undo),
+            "argui.redo" => Some(SelectionCommand::Redo),
             _ => None,
         }
     }
@@ -156,7 +197,9 @@ pub enum ActionError {
 impl std::fmt::Display for ActionError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::DuplicateId(id) => write!(formatter, "duplicate action {} in one scope", id.0),
+            Self::DuplicateId(id) => {
+                write!(formatter, "duplicate action {} in one scope", id.as_str())
+            }
             Self::ShortcutConflict(shortcut) => write!(
                 formatter,
                 "conflicting shortcut {} in one scope",
@@ -207,7 +250,7 @@ impl ActionScope {
 }
 
 /// Capture `origin` before opening a menu/palette. Removed nodes fail closed.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ActionInvocation {
     pub id: ActionId,
     pub origin: Option<NodeId>,

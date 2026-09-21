@@ -45,6 +45,7 @@ impl UiTree {
             .filter_map(|(index, element)| {
                 element
                     .container_scope
+                    .as_ref()
                     .map(|_| (self.node_ids[index], index))
             })
             .collect();

@@ -11,8 +11,7 @@ use std::sync::{
 use argui_core::{Affine2D, Color, Point, Rect, Size};
 use argui_paint::{
     Border, ClipChain, CornerRadii, DisplayList, EffectId, EffectInstance, Fill, Filter,
-    GpuCanvasId, GpuCanvasPrimitive, ImageFit, ImageSampling, LayerStyle, ProfileDomain, Quad,
-    RenderObjectId, VectorAsset, VectorId, VectorPrimitive,
+    GpuCanvasId, GpuCanvasPrimitive, LayerStyle, Quad,
 };
 use argui_render::{
     DamageMode, DamageTracking, EffectDamage, EffectDefinition, EffectPassDefinition,
@@ -21,7 +20,6 @@ use argui_render::{
     GpuCanvasRenderer, GpuCanvasRequirements, RenderStatus, RendererConfig, RendererError,
     SurfaceRenderer,
 };
-use argui_text::{PreparedText, TextEngine};
 use winit::{
     application::ApplicationHandler,
     event::WindowEvent,
@@ -32,13 +30,18 @@ use winit::{
 
 #[path = "surface/effect_damage.rs"]
 mod effect_damage;
+#[path = "surface/api.rs"]
+mod helpers;
+use helpers::*;
 
 const SHADER: &str = "fn argui_effect(uv: vec2<f32>, source: vec4<f32>, backdrop: vec4<f32>) -> vec4<f32> { return source * 0.5; }";
 const NATIVE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
-const PASSES: &[EffectPassDefinition] = &[
-    EffectPassDefinition::fragment("first", SHADER),
-    EffectPassDefinition::fragment("second", SHADER),
-];
+fn effect_passes() -> [EffectPassDefinition; 2] {
+    [
+        EffectPassDefinition::fragment("first", SHADER),
+        EffectPassDefinition::fragment("second", SHADER),
+    ]
+}
 
 const COMPUTE_SHADER: &str = r#"
 @group(0) @binding(0) var<storage, read_write> output: array<vec4<f32>, 1>;
@@ -307,8 +310,17 @@ fn exercise(window: Arc<Window>, mut pump: impl FnMut()) {
     let effect = EffectId::new("test.half");
     let unused = EffectId::new("test.unused");
     let registry = EffectRegistry::new([
-        EffectDefinition::new(effect, &[], PASSES).damage(EffectDamage::Bounded),
-        EffectDefinition::new(unused, &[], PASSES),
+        EffectDefinition::new(
+            effect.clone(),
+            Vec::<argui_render::EffectParameter>::new(),
+            effect_passes(),
+        )
+        .damage(EffectDamage::Bounded),
+        EffectDefinition::new(
+            unused.clone(),
+            Vec::<argui_render::EffectParameter>::new(),
+            effect_passes(),
+        ),
     ])
     .unwrap();
     let probe = Arc::new(CanvasProbe::default());
@@ -388,7 +400,7 @@ fn exercise(window: Arc<Window>, mut pump: impl FnMut()) {
     render(&mut renderer, &moved_again).unwrap();
     assert_eq!(renderer.last_profile().damage.mode, DamageMode::Seed);
 
-    effect_damage::exercise(&mut renderer, effect, &mut render);
+    effect_damage::exercise(&mut renderer, effect.clone(), &mut render);
 
     let assets: Vec<_> = (0..20).map(|_| asset()).collect();
     for asset in &assets {
@@ -430,10 +442,13 @@ fn exercise(window: Arc<Window>, mut pump: impl FnMut()) {
         2048 * 2048 * 4
     );
 
-    for id in [effect, effect, unused] {
+    for id in [effect.clone(), effect, unused.clone()] {
         let mut list = DisplayList::new();
         list.begin_layer(LayerStyle::new(bounds(32.0)).filter(Filter::Effect(
-            EffectInstance::new(id, std::iter::empty::<argui_paint::EffectArgument>()),
+            EffectInstance::new(
+                id.clone(),
+                std::iter::empty::<argui_paint::EffectArgument>(),
+            ),
         )));
         list.push_vector(vector(assets[0].id, 32.0));
         list.end_layer();
@@ -454,7 +469,7 @@ fn exercise(window: Arc<Window>, mut pump: impl FnMut()) {
     missing.end_layer();
     assert!(matches!(
         render(&mut renderer, &missing),
-        Err(RendererError::MissingEffect("test.missing"))
+        Err(RendererError::MissingEffect(id)) if id == EffectId::new("test.missing")
     ));
 
     gpu_canvas::exercise(
@@ -466,132 +481,4 @@ fn exercise(window: Arc<Window>, mut pump: impl FnMut()) {
         &window,
         &mut render,
     );
-}
-
-fn canvas_list(id: GpuCanvasId, revision: u64, size: Size, slot: u32, effect: bool) -> DisplayList {
-    let mut list = DisplayList::new();
-    list.push_quad(Quad {
-        bounds: bounds(size.width),
-        background: Some(Fill::Solid(Color::BLACK)),
-        border: Border::all(0.0, Color::TRANSPARENT),
-        radii: CornerRadii::default(),
-        opacity: 1.0,
-        transform: Affine2D::IDENTITY,
-        clips: ClipChain::default(),
-    });
-    if effect {
-        list.begin_layer(LayerStyle::new(bounds(size.width)).filter(Filter::Blur(2.0)));
-    }
-    list.push_gpu_canvas(canvas_primitive(id, revision, size, slot));
-    if effect {
-        list.end_layer();
-    }
-    list.push_quad(Quad {
-        bounds: Rect::new(Point::new(8.0, 8.0), Size::new(10.0, 10.0)),
-        background: Some(Fill::Solid(Color::WHITE)),
-        border: Border::all(0.0, Color::TRANSPARENT),
-        radii: CornerRadii::all(2.0),
-        opacity: 0.5,
-        transform: Affine2D::IDENTITY,
-        clips: ClipChain::default(),
-    });
-    list
-}
-
-fn canvas_primitive(id: GpuCanvasId, revision: u64, size: Size, slot: u32) -> GpuCanvasPrimitive {
-    GpuCanvasPrimitive {
-        canvas: id,
-        object: RenderObjectId::new(ProfileDomain::Ui, 777),
-        slot,
-        bounds: Rect::new(Point::new(0.0, 0.0), size),
-        content_revision: revision,
-        resolution_scale: 1.0,
-        sampling: if revision.is_multiple_of(2) {
-            ImageSampling::Nearest
-        } else {
-            ImageSampling::Linear
-        },
-        opacity: 0.9,
-        radii: CornerRadii::all(3.0),
-        transform: Affine2D::IDENTITY,
-        clips: ClipChain::from_regions([argui_paint::ClipRegion::new(
-            Rect::new(Point::default(), size),
-            Affine2D::IDENTITY,
-        )]),
-    }
-}
-
-fn render(
-    renderer: &mut SurfaceRenderer,
-    list: &DisplayList,
-    window: &Window,
-    pump: &mut impl FnMut(),
-) -> Result<(), RendererError> {
-    let mut text = TextEngine::from_embedded_fonts([], "sans-serif", "serif", "monospace");
-    let deadline = web_time::Instant::now() + NATIVE_TIMEOUT;
-    loop {
-        // A Wayland surface needs configure/frame callbacks between submissions.
-        window.request_redraw();
-        pump();
-        let status =
-            renderer.render_ui_notified(&mut text, &PreparedText::default(), list, 1.0, || {
-                window.pre_present_notify()
-            })?;
-        if status == RenderStatus::Presented {
-            return Ok(());
-        }
-        assert_eq!(status, RenderStatus::Skipped);
-        assert!(
-            web_time::Instant::now() < deadline,
-            "surface did not present within {NATIVE_TIMEOUT:?}: {} commands, atlas {:?}, size {:?}",
-            list.commands().len(),
-            renderer.last_profile().vector_atlas,
-            window.inner_size(),
-        );
-    }
-}
-
-fn asset() -> VectorAsset {
-    VectorAsset {
-        id: VectorId::fresh(),
-        size: Size::new(16.0, 16.0),
-        svg: Arc::from(br#"<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><rect width="16" height="16" fill="red"/></svg>"#.as_slice()),
-        tintable: false,
-    }
-}
-
-fn bounds(size: f32) -> Rect {
-    Rect::new(Point::default(), Size::new(size, size))
-}
-
-fn colored_quad(x: f32, color: Color) -> Quad {
-    Quad {
-        bounds: Rect::new(Point::new(x, 8.0), Size::new(16.0, 16.0)),
-        background: Some(Fill::Solid(color)),
-        border: Border::all(0.0, Color::TRANSPARENT),
-        radii: CornerRadii::default(),
-        opacity: 1.0,
-        transform: Affine2D::IDENTITY,
-        clips: ClipChain::default(),
-    }
-}
-
-fn vector(id: VectorId, size: f32) -> VectorPrimitive {
-    VectorPrimitive {
-        vector: id,
-        bounds: bounds(size),
-        fit: ImageFit::Contain,
-        color: Color::WHITE,
-        opacity: 1.0,
-        transform: Affine2D::IDENTITY,
-        clips: ClipChain::default(),
-    }
-}
-
-fn vectors(assets: &[VectorAsset], size: f32) -> DisplayList {
-    let mut list = DisplayList::new();
-    for asset in assets {
-        list.push_vector(vector(asset.id, size));
-    }
-    list
 }

@@ -47,6 +47,30 @@ fn hit_region(node: argui_ui::NodeId, bounds: Rect) -> HitRegion {
         window_drag: None,
     }
 }
+#[test]
+fn scrollbar_hit_testing_respects_disabled_regions_and_inverse_transforms() {
+    let tree = UiTree::new(Element::container([]));
+    let node = tree.node_id_at(0).unwrap();
+    let style = ScrollbarStyle::new(
+        ScrollbarPartStyle::new(QuadStyle::default()),
+        ScrollbarPartStyle::new(QuadStyle::default()),
+    );
+    let mut scroll = region(node, ScrollConfig::default(), 120.0);
+    scroll.transform = Affine2D::translation(20.0, 30.0);
+    scroll.interaction_order = 1;
+    scroll.scrollbar = Some(vertical_scrollbar(scroll.bounds, scroll.bounds, style));
+    assert_eq!(
+        scroll.local_point(Point::new(25.0, 35.0)),
+        Some(Point::new(5.0, 5.0))
+    );
+    let hit = hit_region(
+        node,
+        Rect::new(Point::new(20.0, 30.0), Size::new(200.0, 200.0)),
+    );
+    assert!(scrollbar_at(Point::new(25.0, 35.0), &[scroll.clone()], &[hit]).is_some());
+    scroll.config = scroll.config.enabled(false);
+    assert!(scrollbar_at(Point::new(25.0, 35.0), &[scroll], &[]).is_none());
+}
 
 fn listens_for_scroll(element: Element) -> Element {
     element.on(EventListener::new(
@@ -344,9 +368,12 @@ fn scrollbar_parts_share_named_and_scoped_state_resolution() {
     let style = ScrollbarStyle::new(
         ScrollbarPartStyle::new(QuadStyle::default()),
         ScrollbarPartStyle::new(QuadStyle::solid(Color::WHITE))
-            .when(active, StylePatch::new().set(property::Opacity, 0.6))
             .when(
-                StateSelector::scope(scope, active),
+                active.clone(),
+                StylePatch::new().set(property::Opacity, 0.6),
+            )
+            .when(
+                StateSelector::scope(scope.clone(), active.clone()),
                 StylePatch::new().set(property::BackgroundColor, selected),
             ),
     )
@@ -569,31 +596,4 @@ fn horizontal_scrollbar_thumb_drag_uses_horizontal_geometry() {
     tree.scrollbar_dragged(Point::new(180.0, 100.0), &regions)
         .unwrap();
     assert_eq!(tree.scroll_offset(node), Point::new(500.0, 0.0));
-}
-
-#[test]
-fn scrollbar_hit_testing_respects_disabled_regions_and_inverse_transforms() {
-    let tree = UiTree::new(Element::container([]));
-    let node = tree.node_id_at(0).unwrap();
-    let style = ScrollbarStyle::new(
-        ScrollbarPartStyle::new(QuadStyle::default()),
-        ScrollbarPartStyle::new(QuadStyle::default()),
-    );
-    let mut scroll = region(node, ScrollConfig::default(), 120.0);
-    scroll.transform = Affine2D::translation(20.0, 30.0);
-    scroll.interaction_order = 1;
-    scroll.scrollbar = Some(vertical_scrollbar(scroll.bounds, scroll.bounds, style));
-
-    assert_eq!(
-        scroll.local_point(Point::new(25.0, 35.0)),
-        Some(Point::new(5.0, 5.0))
-    );
-    let hit = hit_region(
-        node,
-        Rect::new(Point::new(20.0, 30.0), Size::new(200.0, 200.0)),
-    );
-    assert!(scrollbar_at(Point::new(25.0, 35.0), &[scroll.clone()], &[hit]).is_some());
-
-    scroll.config = scroll.config.enabled(false);
-    assert!(scrollbar_at(Point::new(25.0, 35.0), &[scroll], &[]).is_none());
 }

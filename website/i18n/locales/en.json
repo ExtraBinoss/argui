@@ -73,8 +73,8 @@
       "body": "A WGPU renderer for desktop and WebAssembly. Native window integration on Linux, macOS and Windows; WebGPU in the browser."
     },
     "hotReload": {
-      "title": "Keep state while Rust changes.",
-      "body": "Optional Subsecond hot patching refreshes render functions, handlers and application callbacks in native debug builds while retaining live model state."
+      "title": "Keep state while UI changes.",
+      "body": "The Argui DSL compiler reloads UI, WGSL and assets transactionally while retaining compatible application and interface state."
     },
     "i18n": {
       "title": "Internationalization",
@@ -181,10 +181,6 @@
       "i18n": {
         "title": "Fluent internationalization",
         "category": "Localization"
-      },
-      "hot-reload": {
-        "title": "Native hot reload",
-        "category": "Developer tools"
       },
       "liquid-glass": {
         "title": "Liquid glass",

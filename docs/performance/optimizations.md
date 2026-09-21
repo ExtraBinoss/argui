@@ -125,13 +125,12 @@ application rather than a minimal example:
 | Gallery configuration | Executable | After `strip` |
 | --- | ---: | ---: |
 | Base | 36.04 MiB | 26.81 MiB |
-| Hot reload | 36.03 MiB | 26.79 MiB |
 | All desktop integrations | 39.21 MiB | 29.17 MiB |
 
 The base gallery includes its widgets, localization, tasks, effects, and
 DevTools. The complete build adds the updater, WebView, native popups, desktop
-backdrop, and hardware sensors. Release builds remove the hot-reload runtime
-path, so its measured difference is build noise.
+backdrop, and hardware sensors. The external DSL compiler, watcher, live
+runtime and language server are not linked into normal release applications.
 
 Build a configuration with:
 
@@ -140,10 +139,10 @@ cargo build -p argui-widget-gallery --bin argui-widget-gallery \
   --release --no-default-features
 ```
 
-Add `--features hot-reload` or replace the feature arguments with
-`--all-features`. The stripped measurement comes from a copied executable
-processed by GNU `strip`; shared system libraries and installer compression are
-outside the measurement.
+Replace the feature arguments with `--all-features` for the complete integration
+profile. The stripped measurement comes from a copied executable processed by
+GNU `strip`; shared system libraries and installer compression are outside the
+measurement.
 
 ## Measure a native application
 

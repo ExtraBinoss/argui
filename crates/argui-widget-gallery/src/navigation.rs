@@ -67,7 +67,6 @@ pub enum Page {
     Menu,
     ContextMenu,
     Menubar,
-    HotReload,
     I18n,
     Layout,
     Motion,
@@ -90,7 +89,7 @@ pub enum Page {
 
 impl Page {
     pub const ALL: [Self;
-        80 + cfg!(feature = "updater") as usize
+        79 + cfg!(feature = "updater") as usize
             + cfg!(any(target_os = "android", target_os = "ios")) as usize] = [
         Self::Accordion,
         Self::Alert,
@@ -166,7 +165,6 @@ impl Page {
         Self::DragDrop,
         Self::SplitPane,
         Self::Editing,
-        Self::HotReload,
         Self::I18n,
         Self::Motion,
         Self::DamageControl,
@@ -251,7 +249,6 @@ impl Page {
             | Self::Table => "Widgets",
             Self::LiquidGlass | Self::ScrollShadow => "Effects",
             Self::Layout
-            | Self::HotReload
             | Self::I18n
             | Self::Motion
             | Self::DamageControl
@@ -334,7 +331,6 @@ impl Page {
             Self::Menu => "Menu",
             Self::ContextMenu => "Context menu",
             Self::Menubar => "Menubar",
-            Self::HotReload => "Hot reload",
             Self::I18n => "Internationalization",
             Self::Layout => "Web layout",
             Self::Motion => "Animation lab",
@@ -424,7 +420,6 @@ impl Page {
             Self::Menu => "menu",
             Self::ContextMenu => "context-menu",
             Self::Menubar => "menubar",
-            Self::HotReload => "hot-reload",
             Self::I18n => "i18n",
             Self::Layout => "layout",
             Self::Motion => "motion",
@@ -540,7 +535,6 @@ impl Page {
             Self::Tooltip => {
                 "Helpful descriptions on hover or keyboard focus, with customizable surfaces."
             }
-            Self::HotReload => "Patch Rust UI code while preserving live application state.",
             Self::I18n => "Switch Fluent catalogs, plurals, fallback copy and writing direction.",
             Self::Layout => "CSS-shaped Block, Flex, Grid, box model and text alignment.",
             Self::Motion => {

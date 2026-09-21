@@ -334,7 +334,7 @@ layout_property!(InsetBottomPx, InsetBottomPx);
 
 macro_rules! effect_property {
     ($name:ident, $constructor:ident, $value:ty, $binding:ident, $key:ident, $state:ident) => {
-        #[derive(Clone, Copy, Debug)]
+        #[derive(Clone, Debug)]
         pub struct $name(EffectTarget);
 
         /// Creates a selector for an effect parameter.
@@ -343,7 +343,10 @@ macro_rules! effect_property {
         /// * `parameter` — name of the parameter within that effect.
         #[must_use]
         pub const fn $constructor(effect: EffectId, parameter: &'static str) -> $name {
-            $name(EffectTarget { effect, parameter })
+            $name(EffectTarget {
+                effect,
+                parameter: argui_core::Name::from_static(parameter),
+            })
         }
 
         impl private::Sealed for $name {}
@@ -361,8 +364,8 @@ macro_rules! effect_property {
 
             fn into_state_value(self, value: Self::Value) -> StylePropertyValue {
                 let target = EffectPropertyKey {
-                    effect: self.0.effect,
-                    parameter: self.0.parameter,
+                    effect: self.0.effect.clone(),
+                    parameter: self.0.parameter.clone(),
                 };
                 StylePropertyValue {
                     key: PropertyKey::$key(target),

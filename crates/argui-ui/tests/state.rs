@@ -47,10 +47,10 @@ fn compound_conditions_compose_all_any_and_not() {
     let selected = StateName::new("selected");
     let blocked = StateName::new("blocked");
     let condition = StyleCondition::all([
-        StyleCondition::state(selected),
-        !StyleCondition::state(blocked),
+        StyleCondition::state(selected.clone()),
+        !StyleCondition::state(blocked.clone()),
         StyleCondition::any([
-            StyleCondition::state(selected),
+            StyleCondition::state(selected.clone()),
             StyleCondition::state(VisualState::Hovered),
         ]),
     ]);
@@ -71,17 +71,17 @@ fn inherited_state_promotes_the_retained_update_to_layout() {
     let scope = StateScopeId::new("layout-owner");
     let expanded = StateName::new("expanded");
     let child = Element::container([]).when(
-        StateSelector::scope(scope, expanded),
+        StateSelector::scope(scope.clone(), expanded.clone()),
         StylePatch::new().set(property::WidthPx, 240.0),
     );
     let root = Element::container([child.clone()])
-        .state_scope(scope)
-        .active_state(expanded, false);
+        .state_scope(scope.clone())
+        .active_state(expanded.clone(), false);
     let mut tree = UiTree::new(root);
 
     let update = tree.update(
         Element::container([child])
-            .state_scope(scope)
+            .state_scope(scope.clone())
             .active_state(expanded, true),
     );
 
@@ -151,7 +151,7 @@ fn composed_and_inherited_states_keep_each_property() {
         .keyed("child")
         .background(black())
         .when(
-            StateSelector::scope(scope, VisualState::Hovered),
+            StateSelector::scope(scope.clone(), VisualState::Hovered),
             StylePatch::new()
                 .set(property::BackgroundColor, Color::WHITE)
                 .set(property::Opacity, 0.6),
@@ -176,11 +176,11 @@ fn descendant_interaction_and_named_state_compose_in_declaration_order() {
     let child = Element::container([])
         .background(black())
         .when(
-            StateSelector::scope(scope, selected),
+            StateSelector::scope(scope.clone(), selected.clone()),
             StylePatch::new().set(property::BackgroundColor, Color::WHITE),
         )
         .when(
-            StateSelector::scope(scope, VisualState::Hovered),
+            StateSelector::scope(scope.clone(), VisualState::Hovered),
             StylePatch::new()
                 .set(property::BackgroundColor, Color::srgb(1.0, 0.0, 0.0))
                 .set(property::Opacity, 0.7),
@@ -202,10 +202,10 @@ fn a_nested_scope_with_the_same_identity_shadows_its_ancestor() {
     let scope = StateScopeId::new("nested-control");
     let outer = StateName::new("outer");
     let leaf = Element::container([]).when(
-        StateSelector::scope(scope, outer),
+        StateSelector::scope(scope.clone(), outer.clone()),
         StylePatch::new().set(property::Opacity, 0.2),
     );
-    let inner = Element::container([leaf]).state_scope(scope);
+    let inner = Element::container([leaf]).state_scope(scope.clone());
     let root = Element::container([inner])
         .state_scope(scope)
         .active_state(outer, true);
@@ -385,7 +385,7 @@ fn radial_gradient_state_updates_each_compatible_component() {
 fn layer_and_custom_effect_properties_animate_from_the_authored_values() {
     let effect_id = EffectId::new("tests.state");
     let effect = EffectInstance::new(
-        effect_id,
+        effect_id.clone(),
         [
             ("f32", EffectValue::F32(0.0)),
             ("logical", EffectValue::LogicalPixels(2.0)),
@@ -412,13 +412,16 @@ fn layer_and_custom_effect_properties_animate_from_the_authored_values() {
         .set(property::shadow_blur(0), 10.0)
         .set(property::shadow_spread(0), 4.0)
         .set(property::shadow_color(0), Color::WHITE)
-        .set(property::effect_f32(effect_id, "f32"), 1.0)
-        .set(property::effect_logical_pixels(effect_id, "logical"), 6.0)
-        .set(property::effect_vec2(effect_id, "vec2"), [2.0; 2])
-        .set(property::effect_vec3(effect_id, "vec3"), [3.0; 3])
-        .set(property::effect_vec4(effect_id, "vec4"), [4.0; 4])
-        .set(property::effect_mat3(effect_id, "mat3"), [3.0; 9])
-        .set(property::effect_mat4(effect_id, "mat4"), [4.0; 16])
+        .set(property::effect_f32(effect_id.clone(), "f32"), 1.0)
+        .set(
+            property::effect_logical_pixels(effect_id.clone(), "logical"),
+            6.0,
+        )
+        .set(property::effect_vec2(effect_id.clone(), "vec2"), [2.0; 2])
+        .set(property::effect_vec3(effect_id.clone(), "vec3"), [3.0; 3])
+        .set(property::effect_vec4(effect_id.clone(), "vec4"), [4.0; 4])
+        .set(property::effect_mat3(effect_id.clone(), "mat3"), [3.0; 9])
+        .set(property::effect_mat4(effect_id.clone(), "mat4"), [4.0; 16])
         .set(property::effect_color(effect_id, "color"), Color::WHITE);
     let element = Element::container([])
         .interaction(Interaction::default())

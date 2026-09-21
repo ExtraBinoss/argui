@@ -21,7 +21,7 @@ pub(super) fn exercise(
         backdrop_scene(
             x,
             Filter::Effect(EffectInstance::new(
-                custom_effect,
+                custom_effect.clone(),
                 std::iter::empty::<argui_paint::EffectArgument>(),
             )),
         )

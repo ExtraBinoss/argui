@@ -1,5 +1,5 @@
 use argui_animation::{Compose, Composition, MotionBinding, MotionTrack};
-use argui_core::{Color, Point, Transform2D};
+use argui_core::{Color, Name, Point, Transform2D};
 use argui_paint::{
     BorderWidths, CornerRadii, EffectId, Fill, GradientStop, GradientStops, LayerMask, LayerStyle,
     QuadStyle,
@@ -90,10 +90,10 @@ pub enum EffectMotion {
     Color(EffectTarget, MotionBinding<Color>),
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct EffectTarget {
     pub effect: EffectId,
-    pub parameter: &'static str,
+    pub parameter: Name,
 }
 
 impl PropertyBinding {
