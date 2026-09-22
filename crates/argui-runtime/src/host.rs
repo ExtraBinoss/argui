@@ -45,6 +45,8 @@ pub(crate) trait WindowHost {
     fn safe_area_insets(&self, _scale_factor: f32) -> Option<Insets> {
         None
     }
+    /// Hints the native window system that a frame is about to be presented.
+    /// Linux leaves Wayland redraw requests unthrottled; WGPU's vsync mode paces presentation.
     fn pre_present_notify(&self);
     fn set_cursor(&self, cursor: CursorIcon);
     fn set_ime_allowed(&self, allowed: bool);
@@ -138,6 +140,7 @@ impl WindowHost for Arc<Window> {
         }
     }
     fn pre_present_notify(&self) {
+        #[cfg(not(target_os = "linux"))]
         self.as_ref().pre_present_notify();
     }
     fn set_cursor(&self, cursor: CursorIcon) {

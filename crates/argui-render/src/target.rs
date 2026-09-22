@@ -1,4 +1,5 @@
 use argui_core::{Point, Rect, Size};
+use argui_paint::LayerStyle;
 
 const LAYER_TILE: u32 = 32;
 
@@ -90,6 +91,36 @@ impl PixelRegion {
             self.size[1] as f32,
         ]
     }
+}
+
+/// Returns the backdrop sampling region, including the full composited output.
+///
+/// `style` determines the filter sampling margin, `viewport` clips the available scene, and
+/// `output` includes foreground filters and shadows. The returned region covers `output`, even
+/// when its shadow margin exceeds the backdrop filter margin.
+pub(crate) fn backdrop_sample_region(
+    style: &LayerStyle,
+    viewport: PixelRegion,
+    output: PixelRegion,
+) -> PixelRegion {
+    let expansion: f32 = style
+        .backdrop_filters
+        .iter()
+        .map(|filter| filter.expansion())
+        .sum();
+    if expansion <= 0.0 {
+        return output;
+    }
+    let bounds = style.bounds;
+    let expanded = Rect::new(
+        Point::new(bounds.origin.x - expansion, bounds.origin.y - expansion),
+        Size::new(
+            bounds.size.width + expansion * 2.0,
+            bounds.size.height + expansion * 2.0,
+        ),
+    );
+    PixelRegion::from_rect(style.transform.transform_rect(expanded), viewport)
+        .map_or(output, |sample| sample.union(output))
 }
 
 const fn align_down(value: u32) -> u32 {

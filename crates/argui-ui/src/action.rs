@@ -91,6 +91,21 @@ pub struct Shortcut {
 }
 
 impl Shortcut {
+    /// Creates a shortcut for a typed key with no modifiers.
+    ///
+    /// * `key` — normalized key matched on a non-repeating press.
+    ///
+    /// Returns the unmodified shortcut.
+    #[must_use]
+    pub const fn new(key: Key) -> Self {
+        Self {
+            key,
+            primary: false,
+            shift: false,
+            alt: false,
+        }
+    }
+
     /// Creates a shortcut using the platform's primary modifier and the given key.
     #[must_use]
     pub fn primary(key: impl Into<String>) -> Self {
@@ -105,6 +120,14 @@ impl Shortcut {
     #[must_use]
     pub const fn shift(mut self) -> Self {
         self.shift = true;
+        self
+    }
+    /// Adds Alt or Option to this shortcut.
+    ///
+    /// Returns the modified shortcut.
+    #[must_use]
+    pub const fn alt(mut self) -> Self {
+        self.alt = true;
         self
     }
     /// Reports whether a key input activates this shortcut.

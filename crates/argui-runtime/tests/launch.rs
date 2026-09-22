@@ -86,7 +86,10 @@ mod native {
                 .push((self.main, phase, cx.mount_id().unwrap()));
             if self.main && phase > self.issued {
                 self.issued = phase;
-                exercise_scroll(phase, cx);
+                if phase == 2 {
+                    cx.request_focus("native-editor");
+                }
+                cx.scroll(crate::model_free::scroll_request(phase));
                 eprintln!("native lifecycle phase {phase}");
             }
             if self.main && phase > 0 && self.pending.borrow().is_empty() {
@@ -168,28 +171,6 @@ mod native {
         })
         .width(length(400.0))
     }
-    fn exercise_scroll(phase: usize, cx: &mut Context<Panel>) {
-        use argui_core::{Point, Rect, Size};
-        use argui_ui::{ScrollAlignment, ScrollRequest};
-        let request = match phase {
-            1 => ScrollRequest::offset("native-scroll", Point::new(0.0, 80.0)),
-            2 => {
-                cx.request_focus("native-editor");
-                ScrollRequest::rect(
-                    "native-scroll",
-                    Rect::new(Point::new(0.0, 400.0), Size::new(100.0, 80.0)),
-                )
-                .align(ScrollAlignment::Start, ScrollAlignment::Center)
-            }
-            3 => ScrollRequest::reveal("native-last")
-                .align(ScrollAlignment::End, ScrollAlignment::Nearest),
-            4 => ScrollRequest::reveal("native-first"),
-            5 => ScrollRequest::reveal("missing"),
-            6 => ScrollRequest::offset("missing", Point::new(0.0, 10.0)),
-            _ => ScrollRequest::reveal("native-editor"),
-        };
-        cx.scroll(request);
-    }
     struct App {
         issued: usize,
         edit_issued: bool,
@@ -262,7 +243,17 @@ mod native {
                 )),
                 2 => AppCommand::HideWindow(auxiliary),
                 3 => AppCommand::ShowWindow(auxiliary),
-                4 => AppCommand::CloseWindow(auxiliary),
+                4 => {
+                    #[cfg(all(feature = "webview", target_os = "linux"))]
+                    {
+                        crate::gtk_input::close_auxiliary();
+                        AppCommand::FocusWindow(WindowKey::main())
+                    }
+                    #[cfg(not(all(feature = "webview", target_os = "linux")))]
+                    {
+                        AppCommand::CloseWindow(auxiliary)
+                    }
+                }
                 6 => AppCommand::MinimizeWindow(auxiliary),
                 7 => AppCommand::FocusWindow(auxiliary),
                 8 => AppCommand::Quit,
@@ -285,6 +276,7 @@ mod native {
                 }),
                 6 => update
                     .command(AppCommand::FocusWindow(WindowKey::new("auxiliary")))
+                    .command(AppCommand::CloseWindow(WindowKey::new("auxiliary")))
                     .command(AppCommand::Quit),
                 _ => update,
             }

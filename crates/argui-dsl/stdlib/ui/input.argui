@@ -1,4 +1,4 @@
-import { Row, TextEditor } from "@argui/native"
+import { Column, Row, TextInput } from "@argui/native"
 
 export component Input {
     in-out property value: string = ""
@@ -33,33 +33,37 @@ export component Input {
         background: enabled ? var(--argui-input) : var(--argui-muted)
         border_color: invalid ? var(--argui-destructive) : focused ? var(--argui-ring) : var(--argui-border)
         leading
-        TextEditor {
-            width: 100%
-            value <=> value
-            placeholder: placeholder
-            label: label
-            description: description
-            enabled: enabled
-            read_only: read_only
-            search: search
-            invalid: invalid
-            text_color: enabled ? var(--argui-foreground) : var(--argui-muted-foreground)
-            placeholder_color: var(--argui-muted-foreground)
-            selection_color: selection_color
-            selection_fill: selection_fill
-            selection_radius: selection_radius
-            caret_fill: caret_fill
-            caret_width: caret_width
-            caret_height: caret_height
-            caret_radius: caret_radius
-            caret_count: caret_count
-            caret_spacing: caret_spacing
-            caret_offset_y: caret_offset_y
-            caret_blink: caret_blink
-            background: enabled ? var(--argui-input) : var(--argui-muted)
-            on focus { focused = true }
-            on blur { focused = false }
-            on submit { submit(value) }
+        Column {
+            width: 50%
+            min_width: 0.0
+            grow: 1.0
+            TextInput {
+                width: 100%
+                value <=> value
+                placeholder: placeholder
+                label: label
+                description: description
+                enabled: enabled
+                read_only: read_only
+                search: search
+                invalid: invalid
+                text_color: enabled ? var(--argui-foreground) : var(--argui-muted-foreground)
+                placeholder_color: var(--argui-muted-foreground)
+                selection_color: selection_color
+                selection_fill: selection_fill
+                selection_radius: selection_radius
+                caret_fill: caret_fill
+                caret_width: caret_width
+                caret_height: caret_height
+                caret_radius: caret_radius
+                caret_count: caret_count
+                caret_spacing: caret_spacing
+                caret_offset_y: caret_offset_y
+                caret_blink: caret_blink
+                on focus { focused = true }
+                on blur { focused = false }
+                on submit { submit(value) }
+            }
         }
     }
 }

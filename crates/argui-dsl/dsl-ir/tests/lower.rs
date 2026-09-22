@@ -2,10 +2,16 @@ use argui_dsl_ir::{
     AssetKind, IrAnimationDriver, IrElementTarget, IrExpressionKind, IrNode, IrType,
     PropertyTargetId, lower,
 };
-use argui_dsl_semantic::CompilerDatabase;
+use argui_dsl_semantic::{CompilerDatabase, DiagnosticCode};
 
 #[path = "visual/animation.rs"]
 mod animation;
+#[path = "visual/effect.rs"]
+mod effect;
+#[path = "expression/vector_path.rs"]
+mod path;
+#[path = "visual/reference.rs"]
+mod reference;
 
 fn compile(source: &str) -> argui_dsl_ir::IrProject {
     let mut database = CompilerDatabase::with_builtins().unwrap();
@@ -513,23 +519,71 @@ fn lowering_resolves_relative_assets_from_a_root_module() {
 }
 
 #[test]
-fn lowering_rejects_colliding_explicit_visual_ids() {
+fn duplicate_explicit_visual_ids_are_rejected_before_lowering() {
     let mut database = CompilerDatabase::with_builtins().unwrap();
     database.set_file(
         "ui/colliding.argui",
-        r#"import { Text } from "@argui/ui"
+        r#"component Child {}
 export component Colliding {
-    Text #same { content: "first" }
-    Text #same { content: "second" }
+    Child #same {}
+    Child #same {}
 }"#,
     );
     let project = database.check();
-    assert!(project.is_valid(), "unexpected semantic diagnostics");
-    let schema = argui_schema::builtin::registry().unwrap();
-    let errors = lower(&project, &schema).unwrap_err();
     assert!(
-        errors
-            .iter()
-            .any(|error| error.message.contains("source sites"))
+        project.diagnostics.iter().any(|diagnostic| diagnostic.code
+            == DiagnosticCode::DuplicateMember
+            && diagnostic
+                .message
+                .contains("element identity `#same` is declared more than once")),
+        "{:#?}",
+        project.diagnostics
     );
+}
+
+#[test]
+fn observed_native_read_uses_the_referenced_site_and_schema_property() {
+    let ir = compile(
+        r#"import { Rectangle, TouchArea } from "@argui/native"
+export component Main {
+    Rectangle { opacity: touch.pressed ? 0.5 : 1.0 }
+    TouchArea #touch {}
+}"#,
+    );
+    let main = ir
+        .components
+        .iter()
+        .find(|component| {
+            matches!(
+                component.body.as_slice(),
+                [
+                    IrNode::Element {
+                        target: IrElementTarget::Native(argui_schema::builtin::RECTANGLE),
+                        ..
+                    },
+                    IrNode::Element {
+                        target: IrElementTarget::Native(argui_schema::builtin::TOUCH_AREA),
+                        ..
+                    }
+                ]
+            )
+        })
+        .unwrap();
+    let IrNode::Element { properties, .. } = &main.body[0] else {
+        panic!("expected Rectangle");
+    };
+    let IrNode::Element { site, .. } = &main.body[1] else {
+        panic!("expected TouchArea");
+    };
+    let IrExpressionKind::Conditional { condition, .. } = &properties[0].value.kind else {
+        panic!("expected reactive conditional");
+    };
+    assert!(matches!(
+        &condition.kind,
+        IrExpressionKind::ObservedRead {
+            site: observed,
+            property: argui_schema::builtin::PRESSED,
+            observation: argui_dsl_ir::IrObservation::Pressed,
+        } if *observed == *site
+    ));
 }

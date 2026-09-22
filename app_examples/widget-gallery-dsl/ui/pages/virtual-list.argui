@@ -1,52 +1,72 @@
-import { VirtualList, Separator } from "@argui/ui"
-import { Column, Row, Text } from "@argui/native"
+import { Button, ListView, Separator } from "@argui/ui"
+import { Column, FocusScope, KeyBinding, Row, Text, TouchArea } from "@argui/native"
 
 export component VirtualListPage {
-    private property entries: array<string> = [
-        "Button", "Input", "Card", "Badge", "Separator", "Switch", "Media",
-        "Accordion", "Alert", "Avatar", "Breadcrumb", "Calendar", "Checkbox",
-        "Dialog", "Dropdown", "Form", "Hover card", "Menu", "Pagination",
-        "Popover", "Progress", "Radio group", "Scroll area", "Select", "Slider",
-        "Table", "Tabs", "Textarea", "Toast", "Tooltip"
-    ]
+    private property entries: array<int> = range(10000)
     private property list_offset: float = 0.0
+    private property selected_entry: int = 0
 
     Column #virtual_list_page {
         width: 100%
         gap: 18.0
 
-        Text { content: "Virtual List" color: var(--argui-foreground) weight: 700 font_size: 27.0 }
-        Text { content: "One reusable DSL component renders only visible rows, with a full-height scrollbar and scroll-edge shadows." color: var(--argui-muted-foreground) font_size: 14.0 }
-        Text { content: "Scroll through 30 catalogue entries" color: var(--argui-foreground) weight: 600 font_size: 16.0 }
+        Text { content: "VList" color: var(--argui-foreground) weight: 700 font_size: 27.0 }
+        Text { content: "Only nearby rows are mounted while scrolling; select a row by pointer or keyboard." color: var(--argui-muted-foreground) font_size: 14.0 }
+        Text { content: "Scroll through 10,000 catalogue entries" color: var(--argui-foreground) weight: 600 font_size: 16.0 }
+        Row { gap: 8.0
+            Button { text: "Jump to top" variant: "outline" on click { list_offset = 0.0 } }
+            Button { text: "Jump to end" variant: "outline" on click { list_offset = 479640.0 } }
+        }
 
-        Column {
+        Column #examples_frame {
             width: 100%
             height: 360px
             min_height: 0.0
-            VirtualList #examples {
-                row_height: 48.0
-                overscan: 3
-                offset <=> list_offset
-                scrollbar_thumb: var(--argui-scrollbar-thumb)
-                edge_shadow_width: 16.0
-                edge_shadow_intensity: 0.18
-                edge_shadow_color: var(--argui-foreground)
-                for entry in entries key entry {
-                    Column {
-                        width: 100%
-                        height: 48px
-                        background: var(--argui-surface)
-                        Row {
-                            width: 100%
-                            height: 47px
-                            padding: 12.0
-                            Text { content: entry color: var(--argui-foreground) font_size: 14.0 }
+            FocusScope {
+                width: 100%
+                height: 100%
+                role: "list_box"
+                accessible_name: "Component catalogue"
+                focus_on_tab_navigation: false
+                focus_on_click: false
+                KeyBinding { shortcut: "ArrowDown" on activated { focus_next() } }
+                KeyBinding { shortcut: "ArrowUp" on activated { focus_previous() } }
+                ListView #examples {
+                    row_height: 48.0
+                    viewport_height: 360px
+                    overscan: 3
+                    offset <=> list_offset
+                    scrollbar_thumb: var(--argui-scrollbar-thumb)
+                    edge_shadow_width: 16.0
+                    edge_shadow_intensity: 0.18
+                    edge_shadow_color: var(--argui-foreground)
+                    for entry in entries key entry {
+                        FocusScope {
+                            role: "option"
+                            accessible_name: entry == selected_entry ? "Entry " + str(entry + 1) + ", selected" : "Entry " + str(entry + 1)
+                            keyboard_activation: "enter_or_space"
+                            on click { selected_entry = entry }
+                            on focus { selected_entry = entry }
+                            TouchArea {
+                                mouse_cursor: "pointer"
+                                Column {
+                                    width: 100%
+                                    height: 48px
+                                    background: selected_entry == entry ? var(--argui-selection) : var(--argui-surface)
+                                    Row {
+                                        width: 100%
+                                        height: 47px
+                                        padding: 12.0
+                                        Text { content: "Entry " + str(entry + 1) color: var(--argui-foreground) font_size: 14.0 }
+                                    }
+                                    Separator {}
+                                }
+                            }
                         }
-                        Separator {}
                     }
                 }
             }
         }
-        Text { content: "Scroll offset: " + str(list_offset) + " px" color: var(--argui-muted-foreground) font_size: 12.0 }
+        Text { content: "Selected: Entry " + str(selected_entry + 1) + " · Scroll offset: " + str(list_offset) + " px" color: var(--argui-muted-foreground) font_size: 12.0 }
     }
 }

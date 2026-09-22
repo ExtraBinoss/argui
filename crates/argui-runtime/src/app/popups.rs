@@ -383,6 +383,20 @@ impl Application {
 }
 
 impl Popups {
+    /// Replaces the complete effect registry for every open native popup.
+    ///
+    /// `registry` is the validated next generation. Returns an error if any
+    /// popup renderer cannot prepare its WGSL pipelines.
+    pub(super) fn replace_effect_registry(
+        &mut self,
+        registry: &argui_render::EffectRegistry,
+    ) -> Result<(), argui_render::RendererError> {
+        for popup in &mut self.entries {
+            popup.renderer.replace_effect_registry(registry.clone())?;
+        }
+        Ok(())
+    }
+
     /// Changes damage tracking for every currently open native popup.
     ///
     /// `tracking` is also inherited by popups created after this call through

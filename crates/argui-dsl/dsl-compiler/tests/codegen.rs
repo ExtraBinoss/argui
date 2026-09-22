@@ -43,6 +43,27 @@ fn compiler_emits_string_conversion_contains_and_concatenation() {
     assert!(compiled.rust.contains("text.push_str("));
 }
 
+/// Rust-reserved field names remain legal in generated structs.
+#[test]
+fn compiler_escapes_rust_keyword_fields() {
+    let compiled = Compiler::compile(
+        [SourceModule::new(
+            "ui/main.argui",
+            r#"import { Text } from "@argui/native"
+export struct raw_record { type: string }
+export component Main {
+    in property record: raw_record
+    Text { content: record.type }
+}"#,
+        )],
+        "ui/main.argui",
+        |_| Err("no assets".into()),
+    )
+    .unwrap();
+    assert!(compiled.rust.contains("type_"));
+    assert!(compiled.rust.contains("struct RawRecord"));
+}
+
 /// Rejects a native element whose children cannot be represented by a slot.
 #[test]
 fn compiler_rejects_children_for_slotless_native_elements() {
@@ -63,10 +84,10 @@ export component Main {
 #[test]
 fn compiler_rejects_non_property_native_two_way_sources() {
     let error = codegen_error(
-        r#"import { TextEditor } from "@argui/native"
+        r#"import { TextInput } from "@argui/native"
 export component Main {
     private property query: string = ""
-    TextEditor { value <=> query + "" }
+    TextInput { value <=> query + "" }
 }"#,
     );
     let message = error.to_string();
@@ -320,3 +341,6 @@ fn asset_codegen_handles_a_project_without_reachable_media() {
     assert!(!compiled.rust.contains("let mut assets ="));
     assert!(!compiled.rust.contains("let path = match id"));
 }
+
+#[path = "codegen/child_reference.rs"]
+mod child_reference;

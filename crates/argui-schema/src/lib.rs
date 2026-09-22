@@ -1,6 +1,7 @@
 //! Canonical, DSL-independent metadata and adapters for Argui native primitives.
 
 mod adapter;
+pub mod backdrop_filter;
 pub mod builtin;
 mod error;
 mod id;
@@ -14,8 +15,8 @@ pub use argui_assets::{AssetHandle, AssetKey, AssetRecord, AssetRegistry};
 pub use error::SchemaError;
 pub use id::{EventId, NativeTypeId, PropertyId, SlotId, StylePartId, VariantId};
 pub use metadata::{
-    EventSchema, NativeSchema, PropertySchema, SlotArity, SlotSchema, StylePartSchema,
-    VariantSchema,
+    EventSchema, NativeSchema, ObservationKind, PropertySchema, SlotArity, SlotSchema,
+    StylePartSchema, VariantSchema,
 };
 pub use property_motion::{
     PropertyAnimation, PropertyMotionKey, PropertyMotionStore, StateTransitionPolicy,

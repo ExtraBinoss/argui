@@ -222,6 +222,7 @@ pub enum Filter {
     HueRotate(f32),
     Opacity(f32),
     ColorMatrix([f32; 20]),
+    DropShadow(Shadow),
     Refraction(Refraction),
     Effect(EffectInstance),
 }
@@ -232,6 +233,9 @@ impl Filter {
     pub fn expansion(&self) -> f32 {
         match self {
             Self::Blur(radius) => radius.max(0.0) * 3.0,
+            Self::DropShadow(shadow) => {
+                shadow.blur.max(0.0) * 3.0 + shadow.offset[0].abs().max(shadow.offset[1].abs())
+            }
             Self::Effect(effect) => effect.expansion,
             _ => 0.0,
         }
@@ -243,6 +247,12 @@ impl Filter {
     pub fn scaled(&self, factor: f32) -> Self {
         match self {
             Self::Blur(radius) => Self::Blur(radius * factor),
+            Self::DropShadow(shadow) => Self::DropShadow(Shadow {
+                offset: shadow.offset.map(|value| value * factor),
+                blur: shadow.blur * factor,
+                spread: shadow.spread * factor,
+                ..*shadow
+            }),
             Self::Effect(effect) => Self::Effect(EffectInstance {
                 id: effect.id.clone(),
                 parameters: effect

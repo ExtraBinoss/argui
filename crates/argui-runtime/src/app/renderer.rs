@@ -5,8 +5,8 @@ use std::rc::Rc;
 
 use argui_inspect::{AdapterRecord, FrameRecord, GpuFrameRecord, GpuPassRecord, Invalidation};
 use argui_render::{
-    AdapterProfile, DamageMode, GpuCanvasDiagnosticKind, GpuFrameProfile, RenderStatus,
-    SurfaceAlphaMode, SurfaceRenderer,
+    AdapterProfile, DamageMode, EffectDefinition, EffectRegistry, GpuCanvasDiagnosticKind,
+    GpuFrameProfile, RenderStatus, SurfaceAlphaMode, SurfaceRenderer,
 };
 use winit::{event_loop::ActiveEventLoop, window::Window};
 
@@ -16,23 +16,29 @@ use super::RendererState;
 
 #[cfg_attr(coverage_nightly, coverage(off))]
 impl Application {
-    /// Synchronizes changed model assets into layout and the active GPU surface.
+    /// Synchronizes changed model assets and effects into the GPU surfaces.
     ///
-    /// Returns whether intrinsic media dimensions or pixels changed and layout
-    /// should be recomputed. Only call during a requested model rebuild.
+    /// Returns whether resources changed and the frame should be recomputed.
+    /// Only call during a requested model rebuild.
     ///
     /// # Errors
     ///
-    /// Returns a renderer error if an updated image or SVG cannot be registered.
+    /// Returns a renderer error if updated media or effects cannot be registered.
     pub(super) fn refresh_media_assets(&mut self) -> Result<bool, argui_render::RendererError> {
         let Some(model) = &self.model else {
             return Ok(false);
         };
         let images = model.image_assets();
         let vectors = model.vector_assets();
-        if images == self.image_assets && vectors == self.vector_assets {
+        let effects = model.effect_definitions();
+        let media_changed = images != self.image_assets || vectors != self.vector_assets;
+        let effects_changed = effects != self.effect_definitions;
+        if !media_changed && !effects_changed {
             return Ok(false);
         }
+        let next_registry = effects_changed
+            .then(|| combine_effect_definitions(&self.base_effects, &effects))
+            .transpose()?;
         if let RendererState::Ready(renderer) = &mut *self.renderer.borrow_mut() {
             for image in &images {
                 if !self.image_assets.iter().any(|previous| previous == image) {
@@ -44,10 +50,21 @@ impl Application {
                     renderer.register_vector(vector)?;
                 }
             }
+            if let Some(registry) = &next_registry {
+                renderer.replace_effect_registry(registry.clone())?;
+            }
+        }
+        #[cfg(all(feature = "native-popups", not(target_arch = "wasm32")))]
+        if let Some(registry) = &next_registry {
+            self.popups.replace_effect_registry(registry)?;
         }
         self.layout_engine.set_assets(&images, &vectors);
         self.image_assets = images;
         self.vector_assets = vectors;
+        self.effect_definitions = effects;
+        if let Some(registry) = next_registry {
+            self.renderer_config.effects = registry;
+        }
         Ok(true)
     }
 
@@ -176,6 +193,25 @@ impl Application {
                     event_loop.exit();
                     return;
                 }
+                let effects = if self.effect_definitions.is_empty() {
+                    Ok(self.base_effects.clone())
+                } else {
+                    combine_effect_definitions(&self.base_effects, &self.effect_definitions)
+                        .and_then(|registry| {
+                            renderer.replace_effect_registry(registry.clone())?;
+                            Ok(registry)
+                        })
+                };
+                let registry = match effects {
+                    Ok(registry) => registry,
+                    Err(error) => {
+                        (self.on_event)(RuntimeEvent::RendererFailed(error.to_string()));
+                        self.fatal_error = Some(error.into());
+                        event_loop.exit();
+                        return;
+                    }
+                };
+                self.renderer_config.effects = registry;
                 *self.renderer.borrow_mut() = RendererState::Ready(Box::new(renderer));
                 window.request_redraw();
             }
@@ -200,6 +236,8 @@ impl Application {
         let config = self.surface_renderer_config();
         let image_assets = self.image_assets.clone();
         let vector_assets = self.vector_assets.clone();
+        let base_effects = self.base_effects.clone();
+        let model = self.model.clone();
 
         wasm_bindgen_futures::spawn_local(async move {
             let shared = renderer_device.borrow().clone();
@@ -224,6 +262,14 @@ impl Application {
                     surface.resize(current_size.width, current_size.height);
                     register_images(&mut surface, &image_assets).and_then(|()| {
                         register_vectors(&mut surface, &vector_assets)?;
+                        let definitions = model
+                            .as_ref()
+                            .map(crate::AnyEntity::effect_definitions)
+                            .unwrap_or_default();
+                        if !definitions.is_empty() {
+                            let registry = combine_effect_definitions(&base_effects, &definitions)?;
+                            surface.replace_effect_registry(registry)?;
+                        }
                         Ok(surface)
                     })
                 }
@@ -433,4 +479,19 @@ fn register_images(
         renderer.register_image(image)?;
     }
     Ok(())
+}
+
+/// Combines configured effects with the model's current definitions.
+///
+/// `base` contains definitions supplied by renderer configuration, and
+/// `definitions` contains current model-owned definitions. Returns a complete
+/// validated registry, or an error for an invalid or duplicate definition.
+fn combine_effect_definitions(
+    base: &EffectRegistry,
+    definitions: &[EffectDefinition],
+) -> Result<EffectRegistry, argui_render::RendererError> {
+    definitions
+        .iter()
+        .cloned()
+        .try_fold(base.clone(), EffectRegistry::with_definition)
 }

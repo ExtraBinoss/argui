@@ -350,8 +350,8 @@ export component Main { in property expanded: bool = false Container {
 #[test]
 fn native_schema_can_mark_structural_properties_non_animatable() {
     let issues = diagnostics(
-        r#"import { VList, Text } from "@argui/native"
-export component Main { private property items: array<string> = ["one"] VList {
+        r#"import { VirtualWindow, Text } from "@argui/native"
+export component Main { private property items: array<string> = ["one"] VirtualWindow {
     row_height: 32.0 opacity: 1.0 rotation: 0.0
     animate row_height { duration: 100ms }
     animate opacity { duration: 100ms }
@@ -413,5 +413,72 @@ export component Main {
             })
             .count(),
         2
+    );
+}
+
+/// Driver combinations fail independently, including legal endpoints with illegal timing.
+#[test]
+fn animation_rejects_conflicting_driver_options() {
+    let cases = [
+        ("duration: 100ms easing: \"bounce\"", "`easing` must be"),
+        (
+            "from: 0.0 to: 10.0 stiffness: 220.0 easing: ease",
+            "cannot use timeline `easing`",
+        ),
+        (
+            "keyframes { 0%: 0.0 100%: 10.0 } stiffness: 220.0",
+            "cannot be combined with `from`, `to`, or `spring`",
+        ),
+        (
+            "from: 0.0 to: 10.0 iterations: \"infinite\"",
+            "requires `duration`",
+        ),
+        ("transition: enter duration: 100ms", "requires a state"),
+    ];
+    for (options, expected) in cases {
+        let source = format!(
+            "import {{ Column }} from \"@argui/native\"\nexport component Main {{ Column {{ gap: 4.0 animate gap {{ {options} }} }} }}"
+        );
+        let issues = diagnostics(&source);
+        assert!(
+            issues
+                .iter()
+                .any(|issue| issue.code == DiagnosticCode::InvalidAnimation
+                    && issue.message.contains(expected)),
+            "{options}: missing {expected:?}: {issues:#?}"
+        );
+    }
+}
+
+/// Unknown driver blocks and unbound state transitions fail before lowering.
+#[test]
+fn animation_rejects_unknown_driver_and_transition_without_base() {
+    let unknown = diagnostics(
+        r#"import { Column } from "@argui/native"
+export component Main { Column { gap: 4.0 animate gap { wobble {} } } }"#,
+    );
+    assert!(
+        unknown
+            .iter()
+            .any(|issue| issue.code == DiagnosticCode::InvalidAnimation
+                && issue.message.contains("unknown animation driver")),
+        "{unknown:#?}"
+    );
+
+    let missing_base = diagnostics(
+        r#"import { Container } from "@argui/native"
+export component Main { Container {
+    states { open when true { width: 30px } }
+    animate width { transition: enter duration: 100ms }
+} }"#,
+    );
+    assert!(
+        missing_base
+            .iter()
+            .any(|issue| issue.code == DiagnosticCode::InvalidAnimation
+                && issue
+                    .message
+                    .contains("requires a base assignment or schema default")),
+        "{missing_base:#?}"
     );
 }

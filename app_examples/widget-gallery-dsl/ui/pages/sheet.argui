@@ -1,0 +1,27 @@
+import { Button, Drawer } from "@argui/ui"
+import { Column, Text } from "@argui/native"
+
+export component SheetPage {
+    private property open: bool = false
+
+    Column #sheet_page {
+        width: 100%
+        gap: 18.0
+
+        Text { content: "Sheet" color: var(--argui-foreground) weight: 700 font_size: 27.0 }
+        Text { content: "Keep settings within reach in a panel at the edge of the window." color: var(--argui-muted-foreground) font_size: 14.0 }
+        Button { text: "Open settings" on click { open = true } }
+
+        Drawer {
+            open: open
+            title: "Settings"
+            width: 400px
+            on dismiss { open = false }
+            Column { gap: 16.0
+                Text { content: "Appearance" color: var(--argui-foreground) font_size: 24.0 weight: 650 }
+                Text { content: "Keep your preferences close at hand." color: var(--argui-muted-foreground) font_size: 14.0 }
+                Button { text: "Done" variant: "outline" on click { open = false } }
+            }
+        }
+    }
+}

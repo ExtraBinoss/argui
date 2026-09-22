@@ -15,6 +15,7 @@ pub enum DiagnosticCode {
     UnitMismatch,
     UnknownComponent,
     UnknownProperty,
+    ReadOnlyProperty,
     MissingProperty,
     UnknownEvent,
     InvalidTwoWayBinding,

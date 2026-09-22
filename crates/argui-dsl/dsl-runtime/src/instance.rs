@@ -1,7 +1,7 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use argui_dsl_ir::{
-    CallbackId, ComponentId, ExpressionId, IrStatement, IrType, LocalId, PropertyId,
+    CallbackId, ComponentId, ExpressionId, IrStatement, IrType, LocalId, PropertyId, SiteId,
 };
 
 use crate::{DslValue, RuntimeError};
@@ -79,6 +79,60 @@ impl DynamicProperty {
         self.revision = self.revision.wrapping_add(1);
         Ok(true)
     }
+
+    /// Applies one UTF-8 text replacement to a string property in place.
+    ///
+    /// * `edit` — replacement whose range addresses the current string value.
+    ///
+    /// Returns whether the text changed. An invalid range or non-string property
+    /// produces a type mismatch without changing the property.
+    ///
+    /// # Errors
+    ///
+    /// Returns a type mismatch for a non-string value or invalid UTF-8 range.
+    pub fn apply_text_edit(&mut self, edit: &argui_ui::TextEdit) -> Result<bool, RuntimeError> {
+        let DslValue::String(value) = &mut self.value else {
+            return Err(RuntimeError::TypeMismatch {
+                expected: "string property".into(),
+                actual: self.value.type_name().into(),
+            });
+        };
+        let changed = value
+            .get(edit.range.clone())
+            .is_some_and(|previous| previous != edit.replacement);
+        edit.apply_to(value)
+            .map_err(|error| RuntimeError::TypeMismatch {
+                expected: "valid UTF-8 text edit".into(),
+                actual: error.to_string(),
+            })?;
+        self.modified = true;
+        if changed {
+            self.revision = self.revision.wrapping_add(1);
+        }
+        Ok(changed)
+    }
+
+    /// Refreshes a derived default while preserving an explicit property write.
+    ///
+    /// `value` is the current checked expression result. Returns whether the
+    /// retained value changed, or a type error for an invalid live package.
+    pub(crate) fn refresh_default(&mut self, value: DslValue) -> Result<bool, RuntimeError> {
+        if self.modified {
+            return Ok(false);
+        }
+        if !value.compatible_with(&self.value_type) {
+            return Err(RuntimeError::TypeMismatch {
+                expected: format!("{:?}", self.value_type),
+                actual: value.type_name().into(),
+            });
+        }
+        if self.value == value {
+            return Ok(false);
+        }
+        self.value = value;
+        self.revision = self.revision.wrapping_add(1);
+        Ok(true)
+    }
 }
 
 pub(crate) type Callback = Rc<RefCell<Box<dyn FnMut(Vec<DslValue>) -> DslValue>>>;
@@ -102,6 +156,7 @@ struct CachedExpression {
 pub(crate) struct EventRoute {
     pub parent: InstanceId,
     pub statements: Vec<IrStatement>,
+    pub parameters: Vec<LocalId>,
     pub locals: HashMap<LocalId, DslValue>,
 }
 
@@ -119,6 +174,8 @@ pub struct ComponentInstance {
     pub component: ComponentId,
     pub properties: HashMap<PropertyId, DynamicProperty>,
     pub(crate) presented_properties: HashMap<PropertyId, DslValue>,
+    pub(crate) observations: HashMap<SiteId, argui_runtime::ObservedInteraction>,
+    pub(crate) child_outputs: HashMap<(SiteId, PropertyId), DslValue>,
     pub(crate) callbacks: HashMap<CallbackId, Callback>,
     routes: HashMap<CallbackId, EventRoute>,
     links: HashMap<PropertyId, PropertyLink>,
@@ -153,6 +210,8 @@ impl ComponentInstance {
                 .map(|property| (property.id, property))
                 .collect(),
             presented_properties: HashMap::new(),
+            observations: HashMap::new(),
+            child_outputs: HashMap::new(),
             callbacks: HashMap::new(),
             routes: HashMap::new(),
             links: HashMap::new(),

@@ -1,12 +1,34 @@
 use std::collections::HashMap;
 
+mod builtin;
+mod member;
+mod vector_path;
+
 use argui_dsl_syntax::{FileId, Span, SyntaxKind, SyntaxNode};
 
 use crate::{
-    AssetId, BinaryOperator, BuiltinFunction, CallbackId, ExpressionId, FieldId, IrExpression,
-    IrExpressionKind, IrType, IrValue, LocalId, LowerError, PropertyId, SourceInfo, TokenId,
+    AssetId, BinaryOperator, CallbackId, ExpressionId, FieldId, IrExpression, IrExpressionKind,
+    IrObservation, IrType, IrValue, LocalId, LowerError, PropertyId, SiteId, SourceInfo, TokenId,
     UnaryOperator, id::hash_text,
 };
+
+/// Checked output resolved by an explicit visual source identity.
+pub(crate) enum ReferenceProperty {
+    Observed {
+        site: SiteId,
+        property: argui_schema::PropertyId,
+        observation: IrObservation,
+        value_type: IrType,
+    },
+    Child {
+        site: SiteId,
+        property: PropertyId,
+        value_type: IrType,
+    },
+}
+
+/// Readable outputs of explicitly identified visual elements.
+pub(crate) type References = HashMap<String, HashMap<String, ReferenceProperty>>;
 
 pub(crate) struct Context<'a> {
     pub file: FileId,
@@ -18,7 +40,8 @@ pub(crate) struct Context<'a> {
     pub locals: &'a HashMap<String, (LocalId, IrType)>,
     pub tokens: &'a HashMap<String, (TokenId, IrType)>,
     pub fields: &'a HashMap<argui_dsl_semantic::SymbolId, HashMap<String, (FieldId, IrType)>>,
-    pub assets: &'a mut HashMap<String, AssetId>,
+    pub references: Option<&'a References>,
+    pub assets: &'a mut HashMap<String, crate::IrAsset>,
     pub errors: &'a mut Vec<LowerError>,
 }
 
@@ -35,7 +58,7 @@ pub(crate) fn lower(node: &SyntaxNode, context: &mut Context<'_>) -> IrExpressio
         }
         SyntaxKind::LiteralExpr => literal(node, source, context),
         SyntaxKind::PathExpr => path(node, source, context),
-        SyntaxKind::MemberExpr => member(node, source, context),
+        SyntaxKind::MemberExpr => member::lower(node, source, context),
         SyntaxKind::CallExpr => call(node, source, context),
         SyntaxKind::UnaryExpr => unary(node, source, context),
         SyntaxKind::BinaryExpr => binary(node, source, context),
@@ -103,37 +126,6 @@ fn path(node: &SyntaxNode, source: SourceInfo, context: &mut Context<'_>) -> IrE
     )
 }
 
-/// Resolves a user-struct field read to a stable field ID.
-fn member(node: &SyntaxNode, source: SourceInfo, context: &mut Context<'_>) -> IrExpression {
-    let Some(base_node) = expression_children(node).next() else {
-        return invalid(node, context, "member read has no base expression");
-    };
-    let base = lower(&base_node, context);
-    let member = tokens(node)
-        .rfind(|token| token.kind() == SyntaxKind::Ident)
-        .map(|token| token.text().to_string())
-        .unwrap_or_default();
-    let IrType::Struct { symbol, .. } = &base.value_type else {
-        return invalid(node, context, "member read base is not a struct");
-    };
-    let Some((field, value_type)) = context
-        .fields
-        .get(symbol)
-        .and_then(|fields| fields.get(&member))
-    else {
-        return invalid(node, context, format!("unresolved struct field `{member}`"));
-    };
-    IrExpression {
-        id: expression_id(&source),
-        value_type: value_type.clone(),
-        kind: IrExpressionKind::FieldRead {
-            base: Box::new(base),
-            field: *field,
-        },
-        source,
-    }
-}
-
 /// Resolves built-in, theme, asset, and component-callback calls.
 fn call(node: &SyntaxNode, source: SourceInfo, context: &mut Context<'_>) -> IrExpression {
     let callee = node
@@ -151,71 +143,10 @@ fn call(node: &SyntaxNode, source: SourceInfo, context: &mut Context<'_>) -> IrE
                 .collect::<Vec<_>>()
         })
         .unwrap_or_default();
+    if let Some(expression) = builtin::lower_call(&callee, &argument_nodes, &source, context) {
+        return expression;
+    }
     match callee.as_str() {
-        "solid" => IrExpression {
-            id: expression_id(&source),
-            value_type: IrType::Brush,
-            kind: IrExpressionKind::BuiltinCall {
-                function: BuiltinFunction::Solid,
-                arguments: argument_nodes
-                    .iter()
-                    .map(|argument| lower(argument, context))
-                    .collect(),
-            },
-            source,
-        },
-        "linear_gradient" | "radial_gradient" | "conic_gradient" => IrExpression {
-            id: expression_id(&source),
-            value_type: IrType::Brush,
-            kind: IrExpressionKind::BuiltinCall {
-                function: match callee.as_str() {
-                    "linear_gradient" => BuiltinFunction::LinearGradient,
-                    "radial_gradient" => BuiltinFunction::RadialGradient,
-                    _ => BuiltinFunction::ConicGradient,
-                },
-                arguments: argument_nodes
-                    .iter()
-                    .map(|argument| lower(argument, context))
-                    .collect(),
-            },
-            source,
-        },
-        "contains" => IrExpression {
-            id: expression_id(&source),
-            value_type: IrType::Bool,
-            kind: IrExpressionKind::BuiltinCall {
-                function: BuiltinFunction::Contains,
-                arguments: argument_nodes
-                    .iter()
-                    .map(|argument| lower(argument, context))
-                    .collect(),
-            },
-            source,
-        },
-        "str" => IrExpression {
-            id: expression_id(&source),
-            value_type: IrType::String,
-            kind: IrExpressionKind::BuiltinCall {
-                function: BuiltinFunction::Stringify,
-                arguments: argument_nodes
-                    .iter()
-                    .map(|argument| lower(argument, context))
-                    .collect(),
-            },
-            source,
-        },
-        "tr" => IrExpression {
-            id: expression_id(&source),
-            value_type: IrType::String,
-            kind: IrExpressionKind::BuiltinCall {
-                function: BuiltinFunction::Translate,
-                arguments: argument_nodes
-                    .iter()
-                    .map(|argument| lower(argument, context))
-                    .collect(),
-            },
-            source,
-        },
         "var" => {
             let name = argument_nodes
                 .first()
@@ -252,10 +183,7 @@ fn call(node: &SyntaxNode, source: SourceInfo, context: &mut Context<'_>) -> IrE
                 return invalid(node, context, "asset() requires a static string path");
             }
             let path = crate::declaration::resolve_asset_path(context.module_path, &path);
-            let id = *context
-                .assets
-                .entry(path.clone())
-                .or_insert_with(|| AssetId::from_raw(hash_text(&path)));
+            let id = crate::declaration::register_asset(context.assets, &path);
             IrExpression {
                 id: expression_id(&source),
                 value_type: IrType::Asset,
@@ -263,6 +191,7 @@ fn call(node: &SyntaxNode, source: SourceInfo, context: &mut Context<'_>) -> IrE
                 source,
             }
         }
+        "path" => vector_path::lower(node, source, context),
         _ => {
             let Some((callback, parameters, result)) = context.callbacks.get(&callee).cloned()
             else {
@@ -357,6 +286,18 @@ fn binary(node: &SyntaxNode, source: SourceInfo, context: &mut Context<'_>) -> I
             | BinaryOperator::Or
     ) {
         IrType::Bool
+    } else if operator == BinaryOperator::Divide
+        && left.value_type == IrType::Length
+        && right.value_type == IrType::Length
+    {
+        IrType::Float
+    } else if operator == BinaryOperator::Multiply
+        && matches!(
+            (&left.value_type, &right.value_type),
+            (IrType::Float | IrType::Int, IrType::Length)
+        )
+    {
+        IrType::Length
     } else if left.value_type == IrType::Int && right.value_type == IrType::Float
         || left.value_type == IrType::Float && right.value_type == IrType::Int
     {

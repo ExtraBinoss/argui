@@ -1,0 +1,26 @@
+import { ScrollView } from "@argui/ui"
+import { Column, Container, Text } from "@argui/native"
+
+export component ScrollAreaPage {
+    private property documents: array<int> = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24]
+
+    Column #scroll_area_page {
+        width: 100%
+        gap: 18.0
+
+        Text { content: "Scroll area" color: var(--argui-foreground) weight: 700 font_size: 27.0 }
+        Text { content: "Browse a longer document list inside a bounded viewport." color: var(--argui-muted-foreground) font_size: 14.0 }
+
+        ScrollView {
+            width: 420px
+            height: 280px
+            Column { width: 100% gap: 8.0
+                for document in documents key document {
+                    Container { width: 100% height: 32px shrink: 0.0
+                        Text { content: "Document " + (document < 10 ? "0" : "") + str(document) + " · Project notes" color: var(--argui-foreground) font_size: 14.0 }
+                    }
+                }
+            }
+        }
+    }
+}

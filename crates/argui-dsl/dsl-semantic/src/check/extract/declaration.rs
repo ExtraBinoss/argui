@@ -295,16 +295,53 @@ pub(super) fn effect_definition(
     modules: &[LoweredModule],
     diagnostics: &mut Vec<Diagnostic>,
 ) -> EffectDefinition {
-    let shader = syntax
+    let mut shader = None;
+    let mut bounded_damage = false;
+    let mut seen_damage = false;
+    for assignment in syntax
         .children()
-        .find(|node| node.kind() == SyntaxKind::PropertyAssignment)
-        .and_then(|assignment| {
-            assignment
-                .descendants_with_tokens()
-                .filter_map(|element| element.into_token())
-                .find(|token| token.kind() == SyntaxKind::String)
-                .map(|token| unquote(token.text()))
-        });
+        .filter(|node| node.kind() == SyntaxKind::PropertyAssignment)
+    {
+        let setting = assignment
+            .children_with_tokens()
+            .filter_map(|element| element.into_token())
+            .find(|token| !token.kind().is_trivia());
+        match setting.as_ref().map(|token| token.text()) {
+            Some("shader") => {
+                shader = assignment
+                    .descendants_with_tokens()
+                    .filter_map(|element| element.into_token())
+                    .find(|token| token.kind() == SyntaxKind::String)
+                    .map(|token| unquote(token.text()));
+            }
+            Some("damage") => {
+                if seen_damage {
+                    diagnostics.push(Diagnostic::error(
+                        DiagnosticCode::DuplicateMember,
+                        "effect damage is declared more than once",
+                        Span::new(file, assignment.text_range()),
+                    ));
+                    continue;
+                }
+                seen_damage = true;
+                let value = assignment
+                    .descendants_with_tokens()
+                    .filter_map(|element| element.into_token())
+                    .find(|token| token.kind() == SyntaxKind::String)
+                    .map(|token| unquote(token.text()));
+                match value.as_deref() {
+                    Some("bounded") => bounded_damage = true,
+                    Some("unbounded") => {}
+                    _ => diagnostics.push(Diagnostic::error(
+                        DiagnosticCode::InvalidEffect,
+                        "effect damage must be `\"bounded\"` or `\"unbounded\"`",
+                        Span::new(file, assignment.text_range()),
+                    )),
+                }
+            }
+            _ => {}
+        }
+    }
     let mut names = HashMap::new();
     let parameters = syntax
         .children()
@@ -312,6 +349,13 @@ pub(super) fn effect_definition(
         .filter_map(|parameter| {
             let name = identifier_after(&parameter, SyntaxKind::ParameterKw)?;
             let span = Span::new(file, parameter.text_range());
+            if name == "scope" {
+                diagnostics.push(Diagnostic::error(
+                    DiagnosticCode::InvalidEffect,
+                    "`scope` is reserved for selecting an effect's paint region",
+                    span,
+                ));
+            }
             duplicate_member(&name, span, &mut names, diagnostics);
             let value_type = parameter
                 .children()
@@ -322,11 +366,18 @@ pub(super) fn effect_definition(
             Some(EffectParameterDefinition {
                 name,
                 value_type,
+                has_default: parameter
+                    .children()
+                    .any(|child| child.kind() == SyntaxKind::Expr),
                 span,
             })
         })
         .collect();
-    EffectDefinition { shader, parameters }
+    EffectDefinition {
+        shader,
+        bounded_damage,
+        parameters,
+    }
 }
 
 /// Resolves a parsed type reference including generic collection/domain types.

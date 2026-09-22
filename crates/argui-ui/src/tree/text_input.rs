@@ -74,7 +74,7 @@ impl UiTree {
 
     /// Applies a text selection request to its resolved input target.
     ///
-    /// * `request` — target node or key and requested selection.
+    /// * `request` — target node, key, or identity and requested selection.
     ///
     /// Returns the resulting interaction update, or an empty update if the target
     /// is not a text input in the current tree.
@@ -88,6 +88,12 @@ impl UiTree {
                     .copied()
                     .find(|node| self.key_for(*node) == Some(key.as_str()))
                 else {
+                    return InteractionUpdate::default();
+                };
+                node
+            }
+            crate::FocusTarget::Identity(identity) => {
+                let Some(node) = self.resolve_node(&crate::FocusTarget::Identity(identity)) else {
                     return InteractionUpdate::default();
                 };
                 node

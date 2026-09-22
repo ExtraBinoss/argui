@@ -174,6 +174,7 @@ impl<A: Render> TestApp<A> {
                     .layout_changed(&self.window, &self.layout_snapshot());
                 self.record_app_update(update);
             }
+            self.refresh_interaction_observations();
             let effects = self.apply_model_effects()?;
             if !self.pending && !effects {
                 return Ok(());
@@ -237,6 +238,7 @@ impl<A: Render> TestApp<A> {
         &mut self,
         update: InteractionUpdate,
     ) -> Result<(), TestError> {
+        self.refresh_interaction_observations();
         if let Some(request) = update.clipboard {
             self.apply_clipboard_request(request)?;
         }
@@ -253,6 +255,25 @@ impl<A: Render> TestApp<A> {
         }
         self.apply_model_effects()?;
         Ok(())
+    }
+
+    /// Publishes UI state before handlers run and schedules watched visual changes.
+    fn refresh_interaction_observations(&mut self) {
+        let Some(ui) = self.ui.as_ref() else {
+            return;
+        };
+        let regions = self
+            .layout
+            .as_ref()
+            .map_or(&[][..], |layout| layout.hit_regions.as_slice());
+        let scroll_regions = self
+            .layout
+            .as_ref()
+            .map_or(&[][..], |layout| layout.scroll_regions.as_slice());
+        let changed =
+            self.model
+                .refresh_interaction_observations(ui, regions, scroll_regions, None);
+        self.pending |= changed;
     }
 
     pub(crate) fn record_app_update(&mut self, update: AppUpdate) {

@@ -1,0 +1,116 @@
+import { Button } from "@argui/ui"
+import { Column, Container, Flickable, FocusScope, KeyBinding, Rectangle, Row, Text, TouchArea } from "@argui/native"
+
+component TimelineClip {
+    in property index: int
+    in property start: float
+    in property duration: float
+    in property zoom: float
+    in property selected: bool
+    callback select(index: int)
+    callback move(index: int, delta: float)
+
+    FocusScope #clip_focus {
+        x: start * 40px * zoom
+        y: 28px + index * 62.0 * 1px
+        width: duration * 40px * zoom
+        height: 40px
+        role: "button"
+        accessible_name: "Clip " + str(index + 1) + " · " + str(duration) + " seconds"
+        keyboard_activation: "enter_or_space"
+        on click { select(index) }
+        KeyBinding { shortcut: "ArrowLeft" on activated { move(index, -0.5) } }
+        KeyBinding { shortcut: "ArrowRight" on activated { move(index, 0.5) } }
+        TouchArea { width: 100% height: 40px mouse_cursor: "pointer"
+            Rectangle { width: 100% height: 40px radius: 7.0 background: solid(selected ? var(--argui-primary) : var(--argui-muted)) border_color: clip_focus.focus_visible ? var(--argui-ring) : var(--argui-border) border_width: 1.0
+                Row { width: 100% height: 40px padding: 8.0 align_items: "center"
+                    Text { content: "Clip " + str(index + 1) + " · " + str(duration) + "s" color: selected ? var(--argui-primary-foreground) : var(--argui-foreground) font_size: 13.0 no_wrap: true }
+                }
+            }
+        }
+    }
+}
+
+component TimelineView {
+    in property title: string
+    in-out property zoom: float = 1.0
+    in-out property start1: float = 1.0
+    in-out property start2: float = 3.0
+    in-out property start3: float = 10.0
+    in-out property duration1: float = 4.0
+    in-out property duration2: float = 6.0
+    in-out property duration3: float = 5.0
+    private property selected: int = 0
+
+    Column { width: 100% gap: 14.0
+        Text { content: title color: var(--argui-foreground) font_size: 24.0 weight: 600 }
+        Text { content: "Select a clip. Arrow keys or the controls move and resize it; pointer dragging needs native gesture capture." color: var(--argui-muted-foreground) font_size: 14.0 }
+        Row { gap: 8.0 wrap: true
+            Button { text: "Zoom −" variant: "ghost" on click { zoom = zoom <= 0.5 ? 0.5 : zoom / 1.25 } }
+            Button { text: "Zoom +" variant: "ghost" on click { zoom = zoom >= 4.0 ? 4.0 : zoom * 1.25 } }
+            Button { text: "Move left" variant: "ghost" on click {
+                start1 = selected == 0 ? (start1 <= 0.5 ? 0.0 : start1 - 0.5) : start1
+                start2 = selected == 1 ? (start2 <= 0.5 ? 0.0 : start2 - 0.5) : start2
+                start3 = selected == 2 ? (start3 <= 0.5 ? 0.0 : start3 - 0.5) : start3
+            } }
+            Button { text: "Move right" variant: "ghost" on click {
+                start1 = selected == 0 ? (start1 + duration1 >= 19.5 ? 20.0 - duration1 : start1 + 0.5) : start1
+                start2 = selected == 1 ? (start2 + duration2 >= 19.5 ? 20.0 - duration2 : start2 + 0.5) : start2
+                start3 = selected == 2 ? (start3 + duration3 >= 19.5 ? 20.0 - duration3 : start3 + 0.5) : start3
+            } }
+            Button { text: "Shorten selected" variant: "ghost" on click {
+                duration1 = selected == 0 ? (duration1 <= 1.0 ? 1.0 : duration1 - 0.5) : duration1
+                duration2 = selected == 1 ? (duration2 <= 1.0 ? 1.0 : duration2 - 0.5) : duration2
+                duration3 = selected == 2 ? (duration3 <= 1.0 ? 1.0 : duration3 - 0.5) : duration3
+            } }
+            Button { text: "Extend selected" variant: "ghost" on click {
+                duration1 = selected == 0 ? (duration1 + start1 >= 19.5 ? 20.0 - start1 : duration1 + 0.5) : duration1
+                duration2 = selected == 1 ? (duration2 + start2 >= 19.5 ? 20.0 - start2 : duration2 + 0.5) : duration2
+                duration3 = selected == 2 ? (duration3 + start3 >= 19.5 ? 20.0 - start3 : duration3 + 0.5) : duration3
+            } }
+        }
+
+        Flickable { width: 100% height: 240px scroll_x: true scroll_y: false
+            Container { width: 800px * zoom height: 230px
+                for tick in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] key tick {
+                    Rectangle { x: tick * 80.0 * 1px * zoom y: 0px width: 1px height: 220px background: solid(var(--argui-border)) }
+                    Text { x: tick * 80.0 * 1px * zoom + 3px y: 2px content: str(tick * 2) + "s" color: var(--argui-muted-foreground) font_size: 12.0 }
+                }
+                TimelineClip { index: 0 start: start1 duration: duration1 zoom: zoom selected: selected == 0
+                    on select(index) { selected = index }
+                    on move(index, delta) { start1 = start1 + delta < 0.0 ? 0.0 : start1 + delta > 20.0 - duration1 ? 20.0 - duration1 : start1 + delta selected = index }
+                }
+                TimelineClip { index: 1 start: start2 duration: duration2 zoom: zoom selected: selected == 1
+                    on select(index) { selected = index }
+                    on move(index, delta) { start2 = start2 + delta < 0.0 ? 0.0 : start2 + delta > 20.0 - duration2 ? 20.0 - duration2 : start2 + delta selected = index }
+                }
+                TimelineClip { index: 2 start: start3 duration: duration3 zoom: zoom selected: selected == 2
+                    on select(index) { selected = index }
+                    on move(index, delta) { start3 = start3 + delta < 0.0 ? 0.0 : start3 + delta > 20.0 - duration3 ? 20.0 - duration3 : start3 + delta selected = index }
+                }
+            }
+        }
+        Column { gap: 8.0
+            Text { content: "Clip 1    start " + str(start1) + "s    duration " + str(duration1) + "s" color: var(--argui-foreground) font_size: 14.0 }
+            Text { content: "Clip 2    start " + str(start2) + "s    duration " + str(duration2) + "s" color: var(--argui-foreground) font_size: 14.0 }
+            Text { content: "Clip 3    start " + str(start3) + "s    duration " + str(duration3) + "s" color: var(--argui-foreground) font_size: 14.0 }
+        }
+    }
+}
+
+export component CustomTimelinePage {
+    private property start1: float = 1.0
+    private property start2: float = 3.0
+    private property start3: float = 10.0
+    private property duration1: float = 4.0
+    private property duration2: float = 6.0
+    private property duration3: float = 5.0
+    private property zoom_primary: float = 1.0
+    private property zoom_secondary: float = 1.0
+
+    Column #custom_timeline_page { width: 100% gap: 28.0
+        Text { content: "Custom timeline" color: var(--argui-foreground) weight: 700 font_size: 27.0 }
+        TimelineView { title: "Custom Timeline" zoom <=> zoom_primary start1 <=> start1 start2 <=> start2 start3 <=> start3 duration1 <=> duration1 duration2 <=> duration2 duration3 <=> duration3 }
+        TimelineView { title: "Shared Timeline · independent view" zoom <=> zoom_secondary start1 <=> start1 start2 <=> start2 start3 <=> start3 duration1 <=> duration1 duration2 <=> duration2 duration3 <=> duration3 }
+    }
+}

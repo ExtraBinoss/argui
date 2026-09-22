@@ -1,0 +1,34 @@
+import { Toggle } from "@argui/ui"
+import { Column, FocusScope, KeyBinding, Row, Text } from "@argui/native"
+
+export component ToggleGroupPage {
+    private property bold: bool = false
+    private property italic: bool = false
+    private property underline: bool = false
+
+    Column #toggle_group_page {
+        width: 100%
+        gap: 18.0
+
+        Text { content: "Toggle group" color: var(--argui-foreground) weight: 700 font_size: 27.0 }
+        Text { content: "Apply any combination of text formatting options." color: var(--argui-muted-foreground) font_size: 14.0 }
+
+        FocusScope {
+            role: "group"
+            accessible_name: "Text formatting"
+            focus_on_tab_navigation: false
+            KeyBinding { shortcut: "ArrowRight" on activated { focus_next() } }
+            KeyBinding { shortcut: "ArrowLeft" on activated { focus_previous() } }
+            Row { gap: 2.0 wrap: true
+                Toggle { label: "Bold" pressed <=> bold }
+                Toggle { label: "Italic" pressed <=> italic }
+                Toggle { label: "Underline" pressed <=> underline }
+            }
+        }
+        Text {
+            content: "Active: " + (bold ? "Bold " : "") + (italic ? "Italic " : "") + (underline ? "Underline" : "")
+            color: var(--argui-muted-foreground)
+            font_size: 13.0
+        }
+    }
+}

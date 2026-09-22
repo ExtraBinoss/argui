@@ -1,0 +1,19 @@
+import { FocusScope, Text, TouchArea } from "@argui/native"
+
+export component Label {
+    in property text: string
+    in property enabled: bool = true
+
+    FocusScope {
+        role: "text"
+        accessible_name: text
+        enabled: enabled
+        focus_on_tab_navigation: false
+        on click { focus_next() }
+        TouchArea {
+            enabled: enabled
+            mouse_cursor: enabled ? "pointer" : "not_allowed"
+            Text { content: text color: enabled ? var(--argui-foreground) : var(--argui-muted-foreground) weight: 500 font_size: 14.0 }
+        }
+    }
+}

@@ -1,0 +1,42 @@
+import { Button } from "@argui/ui"
+import { Column, Rectangle, Row, Text } from "@argui/native"
+
+export component WebViewPage {
+    private property selected: string = "Email"
+    private property message: int = 1
+
+    Column #webview_page {
+        width: 100%
+        gap: 14.0
+
+        Text { content: "WebView" color: var(--argui-foreground) weight: 700 font_size: 27.0 }
+        Text { content: "A DSL preview of the host WebView example. Embedded browsing is unavailable without a native WebView primitive." color: var(--argui-muted-foreground) font_size: 14.0 }
+
+        Row { gap: 8.0
+            Button { text: "Email" variant: selected == "Email" ? "secondary" : "ghost" on click { selected = "Email" } }
+            Button { text: "Webpage" variant: selected == "Webpage" ? "secondary" : "ghost" on click { selected = "Webpage" } }
+        }
+        Row { gap: 8.0 wrap: true
+            Button { text: "Reload" variant: "ghost" enabled: false }
+            if selected == "Email" {
+                Button { text: "Next email" variant: "ghost" on click { message = message + 1 } }
+            }
+        }
+        Text { content: selected == "Email" ? "Message " + str(message) + " · preview only" : "Webpage · no embedded navigation" color: var(--argui-muted-foreground) font_size: 14.0 }
+
+        Rectangle { width: 100% height: 380px radius: 8.0 border_color: var(--argui-border) border_width: 1.0 background: solid(var(--argui-surface))
+            Column { width: 100% padding: 22.0 gap: 16.0
+                if selected == "Email" {
+                    Text { content: "ARGUI MAIL · Message " + str(message) color: var(--argui-muted-foreground) font_size: 13.0 weight: 600 }
+                    Text { content: "Your inbox is ready" color: var(--argui-foreground) font_size: 24.0 weight: 700 }
+                    Text { content: "From: Ada <ada@example.com>" color: var(--argui-foreground) font_size: 14.0 }
+                    Text { content: "Hello! This message is shown as DSL text. The native example renders HTML in an isolated WebView." color: var(--argui-foreground) font_size: 14.0 }
+                }
+                if selected == "Webpage" {
+                    Text { content: "https://example.com" color: var(--argui-foreground) font_size: 18.0 weight: 600 }
+                    Text { content: "No page is loaded in this preview. HTTP navigation, reload, isolation and compatibility mode require the host WebView." color: var(--argui-muted-foreground) font_size: 14.0 }
+                }
+            }
+        }
+    }
+}

@@ -3,9 +3,10 @@ use argui_core::{Affine2D, Point, Rect, Size};
 use argui_paint::{ClipChain, Color};
 use argui_text::TextStyle;
 use argui_ui::{
-    CaretStyle, CursorIcon, Element, FocusPolicy, FocusRequest, GestureSet, HitRegion, Interaction,
-    RetainedIdentity, ScrollConfig, StylePatch, StyleTransition, TextEditorSpec, TextInputFilter,
-    TextSelection, TextSelectionRequest, UiTree, VisualState, property,
+    CaretStyle, CursorIcon, Element, FocusPolicy, FocusRequest, FocusScope, GestureSet, HitRegion,
+    InitialFocus, Interaction, RetainedIdentity, ScrollConfig, StylePatch, StyleTransition,
+    TextEditorSpec, TextInputFilter, TextSelection, TextSelectionRequest, UiCommand, UiTree,
+    VisualState, property,
 };
 
 fn source(site: u64) -> RetainedIdentity {
@@ -93,6 +94,56 @@ fn repeater_keys_preserve_items_across_reordering() {
         tree.node_ids()[1..],
         [original[2], original[0], original[1]]
     );
+}
+
+#[test]
+fn retained_identity_target_requires_a_unique_current_node() {
+    let identity = source(50);
+    let mut tree = UiTree::new(Element::container([
+        Element::container([]).retained_identity(identity.clone()),
+        Element::container([]).retained_identity(identity.clone()),
+    ]));
+    assert_eq!(tree.resolve_node(&identity.clone().into()), None);
+    assert_eq!(tree.resolve_node(&source(51).into()), None);
+
+    tree.update(Element::container([
+        Element::container([]).retained_identity(identity.clone()),
+        Element::container([]).retained_identity(source(52)),
+    ]));
+    assert_eq!(tree.resolve_node(&identity.into()), tree.node_id_at(1));
+}
+
+#[test]
+fn retained_identity_focus_target_respects_active_trap() {
+    let outside_identity = source(61);
+    let inside_identity = source(62);
+    let mut tree = UiTree::new(Element::container([
+        input(61),
+        Element::container([input(62)]).focus_scope(FocusScope::trapped(InitialFocus::First)),
+    ]));
+    let outside = tree.node_id_at(1).unwrap();
+    let inside = tree.node_id_at(3).unwrap();
+    let regions = [focus_region(outside), focus_region(inside)];
+    tree.sync_focus(&regions, None);
+    assert_eq!(tree.focused_node(), Some(inside));
+
+    tree.sync_focus(&regions, Some(FocusRequest::Focus(outside_identity.into())));
+    assert_eq!(tree.focused_node(), Some(inside));
+    tree.sync_focus(&regions, Some(FocusRequest::Focus(inside_identity.into())));
+    assert_eq!(tree.focused_node(), Some(inside));
+}
+
+#[test]
+fn retained_identity_targets_text_replacement_and_selection() {
+    let mut tree = UiTree::new(input(63));
+    let node = tree.node_id_at(0).unwrap();
+    tree.apply_command(UiCommand::ReplaceText {
+        target: source(63).into(),
+        value: "updated".into(),
+    });
+    assert_eq!(tree.text_input_value(node), Some("updated"));
+    tree.select_text(TextSelectionRequest::new(source(63), TextSelection::All));
+    assert_eq!(tree.text_input_selection(node), Some((0, 7)));
 }
 
 #[test]

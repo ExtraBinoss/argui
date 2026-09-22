@@ -1,10 +1,11 @@
 use argui_dsl_ir::{
-    BinaryOperator, BuiltinFunction, CallbackId, FieldId, IrExpression, IrExpressionKind, IrType,
-    LocalId, PropertyId, TokenId, UnaryOperator,
+    BinaryOperator, BuiltinFunction, CallbackId, FieldId, IrExpression, IrExpressionKind,
+    IrObservation, IrType, LocalId, PropertyId, SiteId, TokenId, UnaryOperator,
 };
 
 use crate::{DslValue, RuntimeError};
 
+mod builtin;
 mod gradient;
 
 use gradient::gradient_value;
@@ -14,6 +15,8 @@ use gradient::gradient_value;
 pub enum Instruction {
     Constant(DslValue),
     Property(PropertyId),
+    Observed(SiteId, IrObservation),
+    ChildProperty(SiteId, PropertyId),
     Local(LocalId),
     Field(FieldId),
     Token(TokenId),
@@ -36,6 +39,8 @@ pub enum Instruction {
 /// Immutable typed expression bytecode compiled once per accepted package.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Program {
+    /// Component whose instance owns observed element sites in this program.
+    pub owner: Option<argui_dsl_ir::ComponentId>,
     pub result_type: IrType,
     pub instructions: Vec<Instruction>,
     property_dependencies: Vec<PropertyId>,
@@ -47,6 +52,24 @@ pub struct Program {
 pub trait EvaluationContext {
     /// Reads a component property by resolved ID.
     fn property(&self, id: PropertyId) -> Option<DslValue>;
+    /// Reads an engine-observed output at one retained native element site.
+    ///
+    /// * `site` — stable source identity of the referenced element.
+    /// * `observation` — interaction value requested by the expression.
+    ///
+    /// Returns the current value or `None` when observation is unavailable.
+    fn observed(&self, site: SiteId, observation: IrObservation) -> Option<DslValue> {
+        let _ = (site, observation);
+        None
+    }
+    /// Reads an identified child component's public property.
+    ///
+    /// `site` identifies the child call and `property` its stable member.
+    /// Returns the current retained value, or `None` when unavailable.
+    fn child_property(&self, site: SiteId, property: PropertyId) -> Option<DslValue> {
+        let _ = (site, property);
+        None
+    }
     /// Reads a repeater or handler local by resolved ID.
     fn local(&self, id: LocalId) -> Option<DslValue>;
     /// Reads the active theme value by resolved token ID.
@@ -87,6 +110,8 @@ impl Program {
             matches!(
                 instruction,
                 Instruction::Local(_)
+                    | Instruction::Observed(_, _)
+                    | Instruction::ChildProperty(_, _)
                     | Instruction::Callback { .. }
                     | Instruction::Builtin {
                         function: BuiltinFunction::Translate,
@@ -95,6 +120,7 @@ impl Program {
             )
         });
         Self {
+            owner: expression.source.component,
             result_type: expression.value_type.clone(),
             instructions,
             property_dependencies,
@@ -139,6 +165,19 @@ impl Program {
                     context
                         .property(*id)
                         .ok_or(RuntimeError::MissingProperty(id.raw()))?,
+                ),
+                Instruction::Observed(site, observation) => {
+                    stack.push(context.observed(*site, *observation).ok_or_else(|| {
+                        RuntimeError::InvalidBytecode(format!(
+                            "observation at site {} is unavailable",
+                            site.raw()
+                        ))
+                    })?);
+                }
+                Instruction::ChildProperty(site, property) => stack.push(
+                    context
+                        .child_property(*site, *property)
+                        .ok_or_else(|| RuntimeError::MissingProperty(property.raw()))?,
                 ),
                 Instruction::Local(id) => stack.push(context.local(*id).ok_or_else(|| {
                     RuntimeError::InvalidBytecode(format!("local {} is unavailable", id.raw()))
@@ -198,22 +237,20 @@ impl Program {
                     stack.push(DslValue::Brush(argui_paint::Fill::Solid(color)));
                 }
                 Instruction::Builtin {
-                    function: BuiltinFunction::Contains,
+                    function:
+                        function @ (BuiltinFunction::Contains
+                        | BuiltinFunction::Lower
+                        | BuiltinFunction::Range
+                        | BuiltinFunction::Slice
+                        | BuiltinFunction::Hsv
+                        | BuiltinFunction::ColorHex
+                        | BuiltinFunction::ColorRed
+                        | BuiltinFunction::ColorGreen
+                        | BuiltinFunction::ColorBlue),
                     arguments,
                 } => {
                     let arguments = arguments_from(&mut stack, *arguments)?;
-                    let [DslValue::String(text), DslValue::String(fragment)] =
-                        <[DslValue; 2]>::try_from(arguments).map_err(|_| {
-                            RuntimeError::InvalidBytecode(
-                                "contains() expects two string arguments".into(),
-                            )
-                        })?
-                    else {
-                        return Err(RuntimeError::InvalidBytecode(
-                            "contains() expects two string arguments".into(),
-                        ));
-                    };
-                    stack.push(DslValue::Bool(text.contains(&fragment)));
+                    stack.push(builtin::evaluate(*function, &arguments)?);
                 }
                 Instruction::Builtin {
                     function:
@@ -282,6 +319,14 @@ fn compile_expression(expression: &IrExpression, output: &mut Vec<Instruction>) 
             output.push(Instruction::Constant(DslValue::constant(value)));
         }
         IrExpressionKind::PropertyRead(id) => output.push(Instruction::Property(*id)),
+        IrExpressionKind::ObservedRead {
+            site, observation, ..
+        } => {
+            output.push(Instruction::Observed(*site, *observation));
+        }
+        IrExpressionKind::ChildPropertyRead { site, property } => {
+            output.push(Instruction::ChildProperty(*site, *property));
+        }
         IrExpressionKind::LocalRead(id) => output.push(Instruction::Local(*id)),
         IrExpressionKind::FieldRead { base, field } => {
             compile_expression(base, output);

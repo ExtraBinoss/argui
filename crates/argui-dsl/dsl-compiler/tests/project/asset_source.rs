@@ -341,10 +341,10 @@ fn missing_asset_in_array_default_retains_element_span() {
 
 #[test]
 fn missing_asset_in_event_assignment_retains_handler_expression_span() {
-    let source = r#"import { Pressable, Svg } from "@argui/native"
+    let source = r#"import { TouchArea, Svg } from "@argui/native"
 export component Main {
     private property logo: asset
-    Pressable { label: "swap" on click { logo = asset("clicked.svg") } }
+    TouchArea { on click { logo = asset("clicked.svg") } }
     Svg { source: logo }
 }"#;
     let error = Compiler::compile(

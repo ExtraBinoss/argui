@@ -1,0 +1,30 @@
+import { Button, HoverCard } from "@argui/ui"
+import { Column, Container, Text } from "@argui/native"
+
+export component HoverCardPage {
+    private property open: bool = false
+    private property following: bool = false
+
+    Column #hover_card_page {
+        width: 100%
+        gap: 18.0
+        Text { content: "Hover card" color: var(--argui-foreground) weight: 700 font_size: 27.0 }
+        Text { content: "Hover, focus, or activate a profile to see a rich preview." color: var(--argui-muted-foreground) font_size: 14.0 }
+
+        Container #profile_anchor {
+            width: 180px
+            HoverCard {
+                label: "Ada Lovelace"
+                anchor: "profile_anchor"
+                open <=> open
+                Column {
+                    gap: 12.0
+                    Text { content: "Ada Lovelace" color: var(--argui-foreground) weight: 700 font_size: 18.0 }
+                    Text { content: "Designing thoughtful interfaces with Argui." color: var(--argui-muted-foreground) font_size: 14.0 }
+                    Button { text: following ? "Following" : "Follow" on click { following = !following } }
+                }
+            }
+        }
+        Text { content: following ? "You are now following Ada." : open ? "Profile preview open" : "Profile preview closed" color: var(--argui-muted-foreground) font_size: 13.0 }
+    }
+}

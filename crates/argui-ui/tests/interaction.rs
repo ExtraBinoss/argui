@@ -9,6 +9,8 @@ use argui_ui::{
     StylePatch, TreeUpdate, UiEventKind, UiTree, VisualState, VisualStates, WindowDragBehavior,
 };
 
+#[path = "tree/pointer.rs"]
+mod capture;
 #[path = "interaction/pointer.rs"]
 mod pointer;
 

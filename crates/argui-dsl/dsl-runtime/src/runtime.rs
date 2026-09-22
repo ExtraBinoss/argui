@@ -1,14 +1,19 @@
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 
-use argui_dsl_ir::{CallbackId, ComponentId, IrType, LocalId, PropertyId, ThemeModeId, TokenId};
+use argui_dsl_ir::{CallbackId, ComponentId, LocalId, PropertyId, SiteId, ThemeModeId, TokenId};
 
 use crate::{
     ComponentInstance, DslValue, DynamicProperty, EvaluationContext, InstanceId, LivePackage,
     RuntimeError,
 };
 
+mod effect;
+mod host_effect;
+mod initialize;
+mod text_edit;
 mod theme;
 
+pub(crate) use initialize::initialize_instance;
 use theme::{evaluate_theme_defaults, evaluate_theme_mode};
 
 type TranslationResolver = dyn Fn(&str) -> Option<String>;
@@ -46,6 +51,11 @@ pub struct LiveRuntime {
     assets: argui_assets::AssetRegistry,
     pub(crate) rendered_instances: HashSet<InstanceId>,
     pub(crate) event_error: Option<RuntimeError>,
+    pub(crate) pending_focus: Option<argui_ui::FocusRequest>,
+    pub(crate) pending_scroll: Option<argui_ui::ScrollRequest>,
+    pub(crate) pending_prevent_default: bool,
+    pub(crate) pending_stop_propagation: bool,
+    effect_revisions: HashMap<argui_dsl_ir::EffectId, (u64, u64)>,
     pub(crate) render_error: Option<RuntimeError>,
     pub(crate) last_valid_element: Option<argui_ui::Element>,
     #[cfg(not(target_arch = "wasm32"))]
@@ -67,6 +77,7 @@ impl LiveRuntime {
             .map_err(|error| RuntimeError::Schema(error.to_string()))?;
         let tokens = evaluate_theme_defaults(&package)?;
         let assets = prepare_assets(&package, None)?;
+        let effect_revisions = effect::revisions(&package, None);
         Ok(Self {
             package,
             schema,
@@ -82,6 +93,11 @@ impl LiveRuntime {
             assets,
             rendered_instances: HashSet::new(),
             event_error: None,
+            pending_focus: None,
+            pending_scroll: None,
+            pending_prevent_default: false,
+            pending_stop_propagation: false,
+            effect_revisions,
             render_error: None,
             last_valid_element: None,
             #[cfg(not(target_arch = "wasm32"))]
@@ -177,21 +193,10 @@ impl LiveRuntime {
             .ok_or(RuntimeError::MissingAsset(id.raw()))
     }
 
-    /// Returns the most recent render or routed-event failure.
-    #[must_use]
-    pub fn last_error(&self) -> Option<&RuntimeError> {
-        self.render_error.as_ref().or(self.event_error.as_ref())
-    }
-
     /// Returns the most recent compiler, commit, restart, or disconnect event.
     #[must_use]
     pub fn last_client_event(&self) -> Option<&crate::ClientEvent> {
         self.last_client_event.as_ref()
-    }
-
-    /// Removes and returns a routed-event failure recorded by the UI host.
-    pub fn take_event_error(&mut self) -> Option<RuntimeError> {
-        self.event_error.take()
     }
 
     /// Updates one dynamic property transactionally.
@@ -230,7 +235,11 @@ impl LiveRuntime {
             .get(&instance)
             .ok_or(RuntimeError::MissingComponent(instance.raw()))?;
         if let Some(route) = mounted.route(callback) {
-            return self.execute_statements(route.parent, &route.statements, route.locals);
+            let mut locals = route.locals;
+            for (parameter, value) in route.parameters.into_iter().zip(arguments) {
+                locals.insert(parameter, value);
+            }
+            return self.execute_statements(route.parent, &route.statements, locals);
         }
         let handler = mounted.callback(callback).ok_or_else(|| {
             RuntimeError::InvalidBytecode(format!(
@@ -311,6 +320,7 @@ impl LiveRuntime {
     pub fn commit_reload(&mut self, prepared: PreparedReload) -> ReloadOutcome {
         let previous_generation = self.package.generation;
         let migrated_instances = prepared.instances.len();
+        self.effect_revisions = effect::revisions(&prepared.package, Some(&self.effect_revisions));
         self.package = prepared.package;
         self.instances = prepared.instances;
         self.tokens = prepared.tokens;
@@ -318,6 +328,8 @@ impl LiveRuntime {
         self.assets = prepared.assets;
         self.render_error = None;
         self.event_error = None;
+        self.pending_focus = None;
+        self.pending_scroll = None;
         self.last_valid_element = None;
         self.token_revision = self.token_revision.wrapping_add(1).max(1);
         ReloadOutcome {
@@ -407,69 +419,6 @@ fn prepare_assets(
     Ok(registry)
 }
 
-/// Initializes one component's properties in dependency/source order.
-pub(crate) fn initialize_instance(
-    package: &LivePackage,
-    component: ComponentId,
-    id: InstanceId,
-    tokens: &HashMap<TokenId, DslValue>,
-) -> Result<ComponentInstance, RuntimeError> {
-    let definition = package
-        .ir
-        .components
-        .iter()
-        .find(|definition| definition.id == component)
-        .ok_or(RuntimeError::MissingComponent(component.raw()))?;
-    let mut properties = HashMap::new();
-    for property in &definition.properties {
-        let value = if let Some(default) = &property.default {
-            let program = package
-                .program(default.id)
-                .ok_or(RuntimeError::MissingExpression(default.id.raw()))?;
-            let mut context = ValueContext::new(&properties, tokens);
-            program.evaluate(&mut context)?
-        } else {
-            default_value(&property.value_type)
-        };
-        properties.insert(
-            property.id,
-            DynamicProperty::new(property.id, property.value_type.clone(), value),
-        );
-    }
-    Ok(ComponentInstance::new(
-        id,
-        component,
-        properties.into_values(),
-    ))
-}
-
-/// Provides total initial values for properties without explicit defaults.
-fn default_value(value_type: &IrType) -> DslValue {
-    match value_type {
-        IrType::Bool => DslValue::Bool(false),
-        IrType::Int => DslValue::Int(0),
-        IrType::Float
-        | IrType::Length
-        | IrType::Dimension
-        | IrType::Percentage
-        | IrType::Duration
-        | IrType::Angle
-        | IrType::FontSize
-        | IrType::LineHeight => DslValue::Float(0.0),
-        IrType::String | IrType::FontFamily | IrType::FontWeight => DslValue::String(String::new()),
-        IrType::Color => DslValue::Color(argui_core::Color::TRANSPARENT),
-        IrType::Struct { .. } => DslValue::Struct(BTreeMap::new()),
-        IrType::Enum(symbol) => DslValue::Enum {
-            symbol: symbol.raw(),
-            variant: 0,
-        },
-        IrType::Array(_) | IrType::Model(_) => DslValue::Array(Vec::new()),
-        IrType::Optional(_) | IrType::Void | IrType::Unknown => DslValue::Null,
-        IrType::Asset => DslValue::Asset(argui_dsl_ir::AssetId::from_raw(0)),
-        _ => DslValue::Null,
-    }
-}
-
 /// Minimal evaluation environment for defaults and theme expressions.
 pub(crate) struct ValueContext<'a> {
     properties: &'a HashMap<PropertyId, DynamicProperty>,
@@ -557,6 +506,21 @@ impl EvaluationContext for InstanceValueContext<'_> {
             .properties
             .get(&id)
             .map(|property| property.get().clone())
+    }
+
+    fn observed(
+        &self,
+        site: argui_dsl_ir::SiteId,
+        observation: argui_dsl_ir::IrObservation,
+    ) -> Option<DslValue> {
+        self.instance
+            .observations
+            .get(&site)
+            .map(|value| crate::observation::value(*value, observation))
+    }
+
+    fn child_property(&self, site: SiteId, property: PropertyId) -> Option<DslValue> {
+        self.instance.child_outputs.get(&(site, property)).cloned()
     }
 
     fn local(&self, id: LocalId) -> Option<DslValue> {

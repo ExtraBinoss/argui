@@ -472,6 +472,8 @@ impl WindowModel {
             match request {
                 argui_ui::FocusRequest::Focus(target) => cx.request_focus(target),
                 argui_ui::FocusRequest::Clear => cx.clear_focus(),
+                argui_ui::FocusRequest::Next => cx.focus_next(),
+                argui_ui::FocusRequest::Previous => cx.focus_previous(),
             }
         }
         if let Some(request) = self
@@ -535,6 +537,10 @@ impl Render for WindowModel {
 
     fn vector_assets(&self) -> Vec<argui_paint::VectorAsset> {
         self.model.borrow().vector_assets()
+    }
+
+    fn effect_definitions(&self) -> Vec<argui_render::EffectDefinition> {
+        self.model.borrow().effect_definitions()
     }
 
     fn inspector(&self) -> Option<argui_inspect::InspectorHandle> {

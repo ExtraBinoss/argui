@@ -237,6 +237,11 @@ fn inspector_serializes_and_applies_every_filter_parameter() {
             .cloned()
             .fold(LayerStyle::new(Rect::default()), LayerStyle::filter)
             .backdrop(Filter::Blur(1.0))
+            .backdrop(Filter::DropShadow(Shadow::drop(
+                [1.0, -1.0],
+                1.0,
+                Color::srgb(0.1, 0.2, 0.3),
+            )))
             .shadow(Shadow::drop([1.0, 1.0], 1.0, Color::srgb(0.1, 0.2, 0.3)).spread(1.0)),
     );
     let tree = UiTree::new(element.clone());
@@ -283,6 +288,9 @@ fn inspector_serializes_and_applies_every_filter_parameter() {
                 && value.parameters[10].value == EffectValue::Color(Color::srgba(2.0, 2.0, 2.0, 2.0))
     ));
     assert_eq!(layer.shadows[0].offset, [2.0, 2.0]);
+    assert!(
+        matches!(layer.backdrop_filters[1], Filter::DropShadow(shadow) if shadow.offset == [2.0, 2.0] && shadow.blur == 2.0)
+    );
 
     let mut sparse_fields = match property(
         &Inspection::snapshot(&tree, &LayoutOutput::default()).nodes[0],
@@ -500,7 +508,6 @@ fn applying_overrides_handles_missing_values_and_stale_tree_ids() {
     Inspection::apply_overrides(&mut without_layer, &tree, &inspector);
     assert_eq!(without_layer.style.size.width, Dimension::auto());
     assert!(without_layer.layer.is_none());
-
     let stale_tree = UiTree::new(Element::container([]));
     let stale_node = InspectNodeId(stale_tree.node_ids()[0].get());
     let stale_inspector = InspectorHandle::default();
@@ -551,7 +558,6 @@ fn snapshots_distinguish_visual_interactive_and_hidden_structure() {
     assert!(!text.visible);
     assert!(text.summary.as_ref().unwrap().ends_with('…'));
 }
-
 #[test]
 fn snapshots_cover_every_media_summary_and_empty_identity_input() {
     let text_input = |initial_value: &str, multiline| {
@@ -584,7 +590,6 @@ fn snapshots_cover_every_media_summary_and_empty_identity_input() {
     assert_eq!(snapshots[3].kind, "text-area");
     assert_eq!(snapshots[4].kind, "vector");
     assert_eq!(snapshots[4].summary.as_deref(), Some("id=8 · Contain"));
-
     let empty = UiTree::new(Element::container([]));
     assert_eq!(
         Inspection::snapshot(&empty, &LayoutOutput::default())

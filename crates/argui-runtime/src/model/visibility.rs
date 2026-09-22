@@ -103,7 +103,8 @@ impl<T: Render> Context<T> {
         }
         #[cfg(feature = "tasks")]
         self.inherit_tasks(&entity);
-        let element = entity.render_in(self.environment.clone());
+        let element = entity
+            .render_with_observations(self.environment.clone(), self.observations.borrow().clone());
         inherit_environment_use(
             &self.environment_read,
             &entity.0.presentation.environment_used,

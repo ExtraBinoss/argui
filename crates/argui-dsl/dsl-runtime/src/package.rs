@@ -29,6 +29,8 @@ pub struct LivePackage {
     pub roots: Vec<argui_dsl_ir::ComponentId>,
     pub ir: Arc<IrProject>,
     pub programs: HashMap<ExpressionId, Program>,
+    /// Referenced native sites indexed by owning component for render subscriptions.
+    pub observed_sites: HashMap<argui_dsl_ir::ComponentId, Vec<argui_dsl_ir::SiteId>>,
     pub assets: HashMap<AssetId, AssetPayload>,
     pub shader_hashes: HashMap<argui_dsl_ir::EffectId, u64>,
 }
@@ -82,8 +84,25 @@ impl LivePackage {
         generation: u64,
         public_api_hash: u64,
         ir: IrProject,
-        assets: HashMap<AssetId, AssetPayload>,
+        mut assets: HashMap<AssetId, AssetPayload>,
     ) -> Result<Self, RuntimeError> {
+        for asset in &ir.assets {
+            if let Some(bytes) = &asset.inline_bytes {
+                match assets.entry(asset.id) {
+                    std::collections::hash_map::Entry::Occupied(entry) => {
+                        if entry.get().bytes.as_ref() != bytes.as_slice() {
+                            return Err(RuntimeError::IncompatiblePackage(format!(
+                                "inline asset {} differs from its wire payload",
+                                asset.id.raw()
+                            )));
+                        }
+                    }
+                    std::collections::hash_map::Entry::Vacant(entry) => {
+                        entry.insert(AssetPayload::new(1, bytes.clone()));
+                    }
+                }
+            }
+        }
         for asset in &ir.assets {
             if !assets.contains_key(&asset.id) {
                 return Err(RuntimeError::MissingAsset(asset.id.raw()));
@@ -91,6 +110,22 @@ impl LivePackage {
         }
         let mut shader_hashes = HashMap::new();
         for effect in &ir.effects {
+            if let Some(parameter) = effect.parameters.iter().find(|parameter| {
+                !matches!(
+                    parameter.value_type,
+                    argui_dsl_ir::IrType::Float
+                        | argui_dsl_ir::IrType::Int
+                        | argui_dsl_ir::IrType::Bool
+                        | argui_dsl_ir::IrType::Color
+                        | argui_dsl_ir::IrType::Length
+                        | argui_dsl_ir::IrType::Transform
+                )
+            }) {
+                return Err(RuntimeError::InvalidShader(format!(
+                    "unsupported effect parameter type {:?}",
+                    parameter.value_type
+                )));
+            }
             let payload = assets
                 .get(&effect.shader)
                 .ok_or(RuntimeError::MissingAsset(effect.shader.raw()))?;
@@ -101,7 +136,7 @@ impl LivePackage {
                 .iter()
                 .map(|parameter| {
                     argui_shader::ShaderParameterMetadata::new(
-                        format!("p_{}", parameter.id.raw()),
+                        parameter.name.clone(),
                         shader_words(&parameter.value_type),
                     )
                 })
@@ -116,12 +151,31 @@ impl LivePackage {
         }
         let mut programs = HashMap::new();
         collect_project_expressions(&ir, &mut programs);
+        let mut observed_sites = HashMap::<_, std::collections::HashSet<_>>::new();
+        for program in programs.values() {
+            if let Some(owner) = program.owner {
+                for instruction in &program.instructions {
+                    if let crate::Instruction::Observed(site, _) = instruction {
+                        observed_sites.entry(owner).or_default().insert(*site);
+                    }
+                }
+            }
+        }
+        let observed_sites = observed_sites
+            .into_iter()
+            .map(|(owner, sites)| {
+                let mut sites = sites.into_iter().collect::<Vec<_>>();
+                sites.sort_unstable();
+                (owner, sites)
+            })
+            .collect();
         Ok(Self {
             generation: generation.max(1),
             public_api_hash,
             roots: Vec::new(),
             ir: Arc::new(ir),
             programs,
+            observed_sites,
             assets,
             shader_hashes,
         })
@@ -203,12 +257,18 @@ fn collect_node(node: &IrNode, programs: &mut HashMap<ExpressionId, Program>) {
     match node {
         IrNode::Element {
             properties,
+            effect,
             events,
             children,
             ..
         } => {
             for property in properties {
                 collect_expression(&property.value, programs);
+            }
+            if let Some(binding) = effect {
+                for parameter in &binding.parameters {
+                    collect_expression(&parameter.value, programs);
+                }
             }
             for event in events {
                 for statement in &event.statements {
@@ -219,7 +279,15 @@ fn collect_node(node: &IrNode, programs: &mut HashMap<ExpressionId, Program>) {
                         | argui_dsl_ir::IrStatement::SetThemeMode(value) => {
                             collect_expression(value, programs);
                         }
-                        argui_dsl_ir::IrStatement::Return(None) => {}
+                        argui_dsl_ir::IrStatement::ScrollTo { x, y, .. } => {
+                            collect_expression(x, programs);
+                            collect_expression(y, programs);
+                        }
+                        argui_dsl_ir::IrStatement::Return(None)
+                        | argui_dsl_ir::IrStatement::FocusNext
+                        | argui_dsl_ir::IrStatement::FocusPrevious
+                        | argui_dsl_ir::IrStatement::PreventDefault
+                        | argui_dsl_ir::IrStatement::StopPropagation => {}
                     }
                 }
             }

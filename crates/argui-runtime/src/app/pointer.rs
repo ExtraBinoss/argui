@@ -113,6 +113,7 @@ impl Application {
         };
         let hit_blocks_selection = hit_target
             .is_some_and(|target| ui.resolved_user_select(target) == argui_ui::UserSelect::None);
+        let static_placement = static_placement.filter(|_| !hit_blocks_selection);
         if state == ButtonState::Pressed
             && let Some(point) = self.pointer
             && let Some(region) =
@@ -172,6 +173,17 @@ impl Application {
             })
             .cloned();
         self.apply_ui_update(update, window, event_loop);
+        if state == ButtonState::Pressed {
+            let capture_update = match (&mut self.ui_tree, &self.ui_layout) {
+                (Some(ui), Some(layout)) => ui.pointer_press_default(
+                    argui_core::PointerId::MOUSE,
+                    pointer_default.as_ref(),
+                    &layout.hit_regions,
+                ),
+                _ => InteractionUpdate::default(),
+            };
+            self.apply_ui_update(capture_update, window, event_loop);
+        }
         let default_prevented = pointer_default.is_some_and(|event| event.default_prevented());
         let granularity = if state == ButtonState::Pressed
             && !default_prevented
@@ -376,6 +388,7 @@ impl Application {
     ) -> PointerEvent {
         if event.phase == PointerPhase::Pressed && self.primary_touch.is_none() {
             self.primary_touch = Some(event.id);
+            self.last_touch = Some(event.id);
         }
         event.primary = self.primary_touch == Some(event.id);
         if zoom.started {
@@ -461,7 +474,6 @@ impl Application {
         }
         let mut pointer_default = None;
         let mut selecting = false;
-        let mut captured = false;
         let update = if let (Some(layout), Some(ui)) = (&self.ui_layout, &mut self.ui_tree) {
             let is_selecting = ui.document_selection_dragging() && event.primary;
             let update = if dragging_selection_handle && event.phase == PointerPhase::Moved {
@@ -487,7 +499,6 @@ impl Application {
                     if pointer.id == event.id && pointer.phase == event.phase)
                 })
                 .cloned();
-            captured = ui.pointer_captured(event.id);
             selecting = is_selecting;
             Some(update)
         } else {
@@ -496,6 +507,21 @@ impl Application {
         if let Some(update) = update {
             self.apply_ui_update(update, window, event_loop);
         }
+        if event.phase == PointerPhase::Pressed {
+            let capture_update = match (&mut self.ui_tree, &self.ui_layout) {
+                (Some(ui), Some(layout)) => ui.pointer_press_default(
+                    event.id,
+                    pointer_default.as_ref(),
+                    &layout.hit_regions,
+                ),
+                _ => InteractionUpdate::default(),
+            };
+            self.apply_ui_update(capture_update, window, event_loop);
+        }
+        let captured = self
+            .ui_tree
+            .as_ref()
+            .is_some_and(|ui| ui.pointer_captured(event.id));
         let default_prevented = pointer_default
             .as_ref()
             .is_some_and(argui_ui::UiEvent::default_prevented);

@@ -1,0 +1,130 @@
+import { Button, Menu, MenuBar, MenuItem, SubMenu, Separator } from "@argui/ui"
+import { Column, Container, Row, Text } from "@argui/native"
+
+export component MenuPage {
+    private property active_menu: string = ""
+    private property export_open: bool = false
+    private property image_open: bool = false
+    private property transform_open: bool = false
+    private property last_action: string = "Nothing selected yet"
+
+    Column {
+        width: 100%
+        gap: 18.0
+        Text { content: "Menu" color: var(--argui-foreground) weight: 700 font_size: 27.0 }
+        Text { content: "Desktop-style menu bar, nested flyouts and keyboard navigation." color: var(--argui-muted-foreground) font_size: 14.0 }
+
+        MenuBar { label: "Editor menu bar"
+            Container #file_anchor {
+                Button {
+                    text: "File"
+                    variant: "ghost"
+                    select_trigger: true
+                    expanded: active_menu == "File"
+                    on click { active_menu = active_menu == "File" ? "" : "File" export_open = false image_open = false }
+                    on hover { active_menu = active_menu == "" ? "" : "File" }
+                }
+            }
+            Container #edit_anchor {
+                Button {
+                    text: "Edit"
+                    variant: "ghost"
+                    select_trigger: true
+                    expanded: active_menu == "Edit"
+                    on click { active_menu = active_menu == "Edit" ? "" : "Edit" transform_open = false }
+                    on hover { active_menu = active_menu == "" ? "" : "Edit" }
+                }
+            }
+            Container #view_anchor {
+                Button {
+                    text: "View"
+                    variant: "ghost"
+                    select_trigger: true
+                    expanded: active_menu == "View"
+                    on click { active_menu = active_menu == "View" ? "" : "View" }
+                    on hover { active_menu = active_menu == "" ? "" : "View" }
+                }
+            }
+        }
+
+        Menu {
+            open: active_menu == "File"
+            anchor: "file_anchor"
+            label: "File"
+            width: 230px
+            on dismiss { active_menu = "" export_open = false image_open = false }
+            MenuItem { text: "New document" shortcut: "Ctrl+N" on select { last_action = "File › New document" active_menu = "" } }
+            MenuItem { text: "Open…" shortcut: "Ctrl+O" on select { last_action = "File › Open" active_menu = "" } }
+            Separator {}
+            Container #export_anchor {
+                SubMenu {
+                    anchor: "export_anchor"
+                    text: "Export"
+                    parent_open: active_menu == "File"
+                    open: export_open
+                    on activate { export_open = true image_open = false }
+                    on hover { export_open = true image_open = false }
+                    on dismiss { export_open = false image_open = false }
+                    MenuItem { text: "PDF…" on select { last_action = "File › Export › PDF" active_menu = "" export_open = false } }
+                    Container #image_anchor {
+                        SubMenu {
+                            anchor: "image_anchor"
+                            text: "Image"
+                            width: 170px
+                            parent_open: active_menu == "File" && export_open
+                            open: image_open
+                            on activate { image_open = true }
+                            on hover { image_open = true }
+                            on dismiss { image_open = false }
+                            MenuItem { text: "PNG…" on select { last_action = "File › Export › Image › PNG" active_menu = "" export_open = false image_open = false } }
+                            MenuItem { text: "JPEG…" on select { last_action = "File › Export › Image › JPEG" active_menu = "" export_open = false image_open = false } }
+                        }
+                    }
+                }
+            }
+            Separator {}
+            MenuItem { text: "Close document" shortcut: "Ctrl+W" on select { last_action = "File › Close document" active_menu = "" } }
+        }
+
+        Menu {
+            open: active_menu == "Edit"
+            anchor: "edit_anchor"
+            label: "Edit"
+            width: 230px
+            on dismiss { active_menu = "" transform_open = false }
+            MenuItem { text: "Undo" shortcut: "Ctrl+Z" on select { last_action = "Edit › Undo" active_menu = "" } }
+            MenuItem { text: "Redo" shortcut: "Ctrl+Shift+Z" on select { last_action = "Edit › Redo" active_menu = "" } }
+            Separator {}
+            Container #transform_anchor {
+                SubMenu {
+                    anchor: "transform_anchor"
+                    text: "Transform"
+                    parent_open: active_menu == "Edit"
+                    open: transform_open
+                    on activate { transform_open = true }
+                    on hover { transform_open = true }
+                    on dismiss { transform_open = false }
+                    MenuItem { text: "Flip horizontal" on select { last_action = "Edit › Transform › Flip horizontal" active_menu = "" transform_open = false } }
+                    MenuItem { text: "Rotate 90°" on select { last_action = "Edit › Transform › Rotate 90°" active_menu = "" transform_open = false } }
+                }
+            }
+        }
+
+        Menu {
+            open: active_menu == "View"
+            anchor: "view_anchor"
+            label: "View"
+            width: 230px
+            on dismiss { active_menu = "" }
+            MenuItem { text: "Zoom in" shortcut: "Ctrl++" on select { last_action = "View › Zoom in" active_menu = "" } }
+            MenuItem { text: "Fit canvas" shortcut: "Ctrl+0" on select { last_action = "View › Fit canvas" active_menu = "" } }
+        }
+
+        Row {
+            gap: 8.0
+            Text { content: "Clicked:" color: var(--argui-muted-foreground) font_size: 13.0 }
+            Text { content: last_action color: var(--argui-foreground) font_size: 13.0 weight: 600 }
+        }
+        Text { content: "Hover another top-level menu while one is open. Hover or click a › item to open its flyout." color: var(--argui-muted-foreground) font_size: 12.0 }
+    }
+}

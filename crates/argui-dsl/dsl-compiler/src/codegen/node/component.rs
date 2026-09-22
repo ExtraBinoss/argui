@@ -51,7 +51,10 @@ impl Context<'_> {
         let child_identity = format!("child_identity_{site}");
         let identity = self.identity(site, outer, repeater_key)?;
         writeln!(output, "{pad}let {child_identity} = {identity};").unwrap();
-        let mut inner = Scope::default();
+        let mut inner = Scope {
+            translator: outer.translator.clone(),
+            ..Scope::default()
+        };
         let mut canonical_outer = outer.clone();
         canonical_outer.rendered_properties.clear();
         let mut presented_inputs = Vec::new();
@@ -68,9 +71,9 @@ impl Context<'_> {
                             .properties
                             .get(&source)
                             .map(|value| format!("{value}.clone()"))
-                            .ok_or_else(|| {
-                                CompilerError::Codegen("two-way source is outside scope".into())
-                            })?
+                            .ok_or(CompilerError::Codegen(
+                                "two-way source is outside scope".into(),
+                            ))?
                     } else {
                         return Err(CompilerError::Codegen(
                             "two-way binding did not lower to a property ID".into(),
@@ -86,7 +89,10 @@ impl Context<'_> {
                 }
             } else {
                 let value = if let Some(default) = &lowered.default {
-                    self.expression(default, &inner)?
+                    let expression = self.expression(default, &inner)?;
+                    format!(
+                        "{{ let owner = child_owner(&{child_identity}); let _ = owner; {expression} }}"
+                    )
                 } else {
                     self.default_value(&property.value_type)?
                 };
@@ -148,11 +154,32 @@ impl Context<'_> {
                 .iter()
                 .find(|event| event.target == EventTargetId::Component(lowered.id));
             if let Some(event) = event {
-                let captures = statement_capture_names(outer, &event.statements, &[])
+                let (captured_names, observed_sites) =
+                    statement_capture_names(outer, &event.statements, &[]);
+                let watches = observed_sites
+                    .into_iter()
+                    .map(|site| {
+                        format!(
+                            "observer.watch(&::argui::ui::RetainedIdentity::new(owner, {}));",
+                            site.raw()
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                let captures = captured_names
                     .into_iter()
                     .map(|name| format!("let {name} = {name}.clone();"))
                     .collect::<Vec<_>>()
                     .join(" ");
+                let captures = if event
+                    .statements
+                    .iter()
+                    .any(super::statement_has_host_effect)
+                {
+                    format!("let host_effects = host_effects.clone(); {captures}")
+                } else {
+                    captures
+                };
                 let parameters = callback
                     .parameters
                     .iter()
@@ -160,13 +187,19 @@ impl Context<'_> {
                     .map(|(index, _)| format!("_parameter_{index}"))
                     .collect::<Vec<_>>()
                     .join(", ");
+                let mut handler_scope = outer.clone();
+                for (index, parameter) in event.parameters.iter().enumerate() {
+                    handler_scope
+                        .locals
+                        .insert(*parameter, format!("_parameter_{index}"));
+                }
                 let statements = event
                     .statements
                     .iter()
-                    .map(|statement| self.statement(statement, outer))
+                    .map(|statement| self.statement(statement, &handler_scope))
                     .collect::<Result<Vec<_>, _>>()?
                     .join(" ");
-                writeln!(output, "{pad}let {variable}: {} = {{ {captures} Rc::new(RefCell::new(Some(Box::new(move |{parameters}| {{ {statements} }})))) }};", self.callback_type(callback)?).unwrap();
+                writeln!(output, "{pad}let {variable}: {} = {{ {watches} {captures} Rc::new(RefCell::new(Some(Box::new(move |{parameters}| {{ {statements} }})))) }};", self.callback_type(callback)?).unwrap();
             } else {
                 writeln!(
                     output,
@@ -221,7 +254,7 @@ impl Context<'_> {
         let owner = format!("child_owner(&{child_identity})");
         write!(
             output,
-            "{pad}{destination}.push(render_component_{}({owner}, translator, property_motions, child_properties, virtual_viewports, reduced_motion",
+            "{pad}{destination}.push(render_component_{}({owner}, translator, property_motions, child_properties, virtual_viewports, reduced_motion, observer.clone(), host_effects.clone()",
             component.raw()
         )
         .unwrap();
@@ -267,6 +300,7 @@ impl Context<'_> {
     ) -> Result<(), CompilerError> {
         let pad = "    ".repeat(depth);
         writeln!(output, "{pad}let owner = child_owner(&{identity});").unwrap();
+        writeln!(output, "{pad}let _ = owner;").unwrap();
         let mut scope = scope.clone();
         scope.translator = Some("translator".into());
         for (index, property) in component.properties.iter().enumerate() {

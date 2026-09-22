@@ -282,10 +282,11 @@ export component Main { Text { content: "live" } }
             stop_receiver.recv().unwrap();
         });
 
-        let runtime = LiveRuntime::connect(address, Duration::from_millis(200)).unwrap();
+        let runtime = LiveRuntime::connect(address, Duration::from_secs(2)).unwrap();
         diagnostics_ready_receiver.recv().unwrap();
         let mut app = TestApp::new(runtime);
-        for _ in 0..20 {
+        // Pump the paused task runtime while the transport decodes each package.
+        for _ in 0..400 {
             if app.entity().read(|runtime| {
                 matches!(
                     runtime.last_client_event(),
@@ -305,7 +306,7 @@ export component Main { Text { content: "live" } }
         }));
         continue_sender.send(()).unwrap();
 
-        for _ in 0..20 {
+        for _ in 0..400 {
             if app.entity().read(|runtime| {
                 matches!(
                     runtime.last_client_event(),
@@ -317,7 +318,13 @@ export component Main { Text { content: "live" } }
             thread::sleep(Duration::from_millis(5));
             app.settle().unwrap();
         }
-        assert_eq!(app.entity().read(LiveRuntime::generation), 2);
+        assert_eq!(
+            app.entity().read(LiveRuntime::generation),
+            2,
+            "last client event: {:?}",
+            app.entity()
+                .read(|runtime| runtime.last_client_event().cloned())
+        );
         assert!(app.entity().read(|runtime| {
             matches!(
                 runtime.last_client_event(),

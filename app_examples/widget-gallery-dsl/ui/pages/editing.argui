@@ -1,0 +1,45 @@
+import { Button, Input, TextArea } from "@argui/ui"
+import { Column, Row, Text } from "@argui/native"
+
+export component EditingPage {
+    private property unicode_text: string = "Hello 👋🏽 — مرحبا"
+    private property draft: string = "A multiline draft.\nTry typing, pasting, then undo."
+    private property number_text: string = "12.5"
+    private property arithmetic_text: string = "(50 + 10) / 2"
+    private property resets: int = 0
+    private property status: string = ""
+
+    Column #editing_page {
+        width: 100%
+        gap: 14.0
+
+        Text { content: "Editing" color: var(--argui-foreground) weight: 700 font_size: 27.0 }
+        Text { content: "Edit Unicode text and a multiline draft. Native undo transactions and typed input kinds are not exposed here." color: var(--argui-muted-foreground) font_size: 14.0 }
+
+        Text { content: "Unicode text" color: var(--argui-muted-foreground) font_size: 13.0 }
+        Input { value <=> unicode_text label: "Unicode text" }
+        Text { content: "Multiline draft" color: var(--argui-muted-foreground) font_size: 13.0 }
+        TextArea { value <=> draft label: "Multiline draft" height: 130px }
+        Text { content: "Number (text input)" color: var(--argui-muted-foreground) font_size: 13.0 }
+        Input { value <=> number_text label: "Number" }
+        Text { content: "Arithmetic expression (text input)" color: var(--argui-muted-foreground) font_size: 13.0 }
+        Input { value <=> arithmetic_text label: "Arithmetic expression" }
+        Text { content: "Password" color: var(--argui-muted-foreground) font_size: 13.0 }
+        Input { label: "Password unavailable" placeholder: "Private password input requires native support" enabled: false }
+
+        Row { gap: 8.0 wrap: true
+            Button { text: "Undo" variant: "outline" enabled: false }
+            Button { text: "Redo" variant: "outline" enabled: false }
+            Button { text: "Replace text" variant: "outline" on click {
+                unicode_text = "One direct replacement 👩‍🚀"
+                status = "Text replaced directly; no undo transaction was created."
+            } }
+            Button { text: "External reset" variant: "ghost" on click {
+                resets = resets + 1
+                unicode_text = "External reset " + str(resets)
+                status = "External text reset."
+            } }
+        }
+        Text { content: status == "" ? "Password masking, reveal, and shared edit-command buttons require the native editor API." : status color: var(--argui-muted-foreground) font_size: 13.0 }
+    }
+}

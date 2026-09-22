@@ -5,6 +5,7 @@ mod animation;
 mod app;
 mod application;
 mod clipboard;
+mod effect;
 mod environment;
 mod error;
 mod event;
@@ -21,6 +22,7 @@ pub use app::{Inspection, InspectionCache};
 pub use application::{
     AppCommand, AppEvent, AppModel, AppUpdate, SingleWindowModel, WindowInvalidation,
 };
+pub use effect::{VisualEffectTarget, apply_visual_effect, apply_visual_effect_scoped};
 pub use environment::{ThemeRequest, WindowEnvironment};
 pub use error::RuntimeError;
 pub use event::{AnimationProfile, RuntimeEvent, WindowRuntimeEvent};
@@ -33,8 +35,9 @@ pub use launch::{
 pub use launch::{run_android_application, run_android_application_with_text_engine};
 pub use model::{
     AnyEntity, Context, Entity, EntityId, EventEmitter, EventError, LayoutBounds, LayoutSnapshot,
-    ModelContext, ModelRuntime, Mount, MountEvent, MountId, MountTransition, Render, ResourceLease,
-    ResourceScope, ScopeClosed, ScrollRequest, ServiceAlreadyRegistered, ServiceRegistration,
+    ModelContext, ModelRuntime, Mount, MountEvent, MountId, MountTransition, ObservationReader,
+    ObservedInteraction, ObservedScroll, Render, ResourceLease, ResourceScope, ScopeClosed,
+    ScrollRequest, ServiceAlreadyRegistered, ServiceRegistration, SourceIdentityIndex,
     Subscription, ViewUpdate, WeakEntity, WeakMount,
 };
 

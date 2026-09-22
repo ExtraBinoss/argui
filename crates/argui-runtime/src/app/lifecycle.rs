@@ -28,6 +28,8 @@ impl Application {
         if self.model.is_none() {
             return;
         }
+        self.source_index.borrow_mut().clear();
+        self.interaction_snapshot = crate::model::InteractionSnapshot::default();
         self.ui_tree = self.inspected_view().map(argui_ui::UiTree::new);
         if let Some(tree) = &mut self.ui_tree {
             tree.set_pointer_settings(self.pointer_settings);

@@ -1,0 +1,62 @@
+import { PopupWindow, Rectangle, Row, Column, Text, TouchArea } from "@argui/native"
+
+export component Dialog {
+    in property open: bool = false
+    in property title: string = ""
+    in property description: string = ""
+    in property width: length = 400px
+    callback dismiss()
+    slot content
+    slot actions
+
+    PopupWindow {
+        visible: open
+        placement: "fill"
+        window_layer: "modal"
+        containment: "modal"
+        initial_focus: "first"
+        restore_focus: true
+        dismiss_policy: "escape"
+        width: 100%
+        height: 100%
+        on dismiss { dismiss() }
+        Rectangle {
+            width: 100%
+            height: 100%
+            background: solid(#0b10264d)
+            backdrop_filter: "blur(9px)"
+            TouchArea { x: 0px y: 0px width: 100% height: 100% }
+            Row {
+                x: 0px
+                y: 0px
+                width: 100%
+                height: 100%
+                align_items: "center"
+                justify_content: "center"
+                Rectangle {
+                    width: width
+                    background: solid(var(--argui-surface))
+                    border_color: var(--argui-border)
+                    border_width: 1.0
+                    radius: 12.0
+                    shadow_blur: 18.0
+                    shadow_offset_y: 8.0
+                    shadow_color: #00000033
+                    Column {
+                        width: 100%
+                        padding: 20.0
+                        gap: 12.0
+                        if title != "" {
+                            Text { content: title color: var(--argui-foreground) weight: 700 font_size: 20.0 }
+                        }
+                        if description != "" {
+                            Text { content: description color: var(--argui-muted-foreground) font_size: 14.0 }
+                        }
+                        content
+                        actions
+                    }
+                }
+            }
+        }
+    }
+}

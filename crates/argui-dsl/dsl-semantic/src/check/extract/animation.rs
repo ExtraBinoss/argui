@@ -30,6 +30,7 @@ struct AnimationTarget<'a> {
 /// * `callbacks` — callbacks visible in animation expressions.
 /// * `definitions` — resolved project definitions.
 /// * `theme_tokens` — theme token types visible to expressions.
+/// * `references` — explicitly identified observable native children.
 /// * `diagnostics` — output receiving animation errors.
 #[allow(clippy::too_many_arguments)]
 pub(super) fn validate_component(
@@ -39,6 +40,7 @@ pub(super) fn validate_component(
     callbacks: &HashMap<String, CallbackDefinition>,
     definitions: &HashMap<SymbolId, Definition>,
     theme_tokens: &HashMap<String, Type>,
+    references: &HashMap<String, HashMap<String, Type>>,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     let locals = HashMap::new();
@@ -59,6 +61,8 @@ pub(super) fn validate_component(
             locals: &locals,
             definitions,
             theme_tokens,
+            references: Some(references),
+            event_handler: false,
             diagnostics,
         };
         let state_target =
@@ -94,6 +98,7 @@ pub(super) fn validate_component(
 /// * `component_properties` — local expression bindings.
 /// * `callbacks` — callbacks visible to expressions.
 /// * `locals` — active repeater bindings.
+/// * `references` — explicitly identified observable native children.
 /// * `diagnostics` — output receiving animation errors.
 #[allow(clippy::too_many_arguments)]
 pub(super) fn validate_element(
@@ -104,6 +109,7 @@ pub(super) fn validate_element(
     definitions: &HashMap<SymbolId, Definition>,
     theme_tokens: &HashMap<String, Type>,
     schema: &argui_schema::SchemaRegistry,
+    references: &HashMap<String, HashMap<String, Type>>,
     component_properties: &HashMap<String, PropertyDefinition>,
     callbacks: &HashMap<String, CallbackDefinition>,
     locals: &HashMap<String, Type>,
@@ -131,6 +137,8 @@ pub(super) fn validate_element(
         locals,
         definitions,
         theme_tokens,
+        references: Some(references),
+        event_handler: false,
         diagnostics,
     };
     let mut seen = HashSet::new();

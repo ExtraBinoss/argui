@@ -1,4 +1,4 @@
-import { SwitchControl, Row, Container, Text } from "@argui/native"
+import { FocusScope, TouchArea, Rectangle, Row, Text } from "@argui/native"
 
 export component Switch {
     in property label: string
@@ -6,24 +6,38 @@ export component Switch {
     in property enabled: bool = true
     callback click()
 
-    SwitchControl {
-        label: label
-        checked: checked
+    FocusScope #focus_area {
         enabled: enabled
+        keyboard_activation: "enter_or_space"
+        role: "switch"
+        accessible_name: label
+        checked: checked
         on click { click() }
 
-        Row {
-            gap: 12.0
-            Text { content: label color: enabled ? var(--argui-foreground) : var(--argui-muted-foreground) font_size: 14.0 }
-            Container {
-                width: 38px
-                height: 22px
-                radius: 11.0
-                padding: 3.0
-                background: checked ? var(--argui-primary) : var(--argui-muted)
-                Row {
-                    if checked { Container { width: 16px height: 16px } }
-                    Container { width: 16px height: 16px radius: 8.0 background: var(--argui-surface) }
+        TouchArea #touch {
+            enabled: enabled
+            mouse_cursor: enabled ? "pointer" : "not_allowed"
+            Row {
+                gap: 12.0
+                align_items: "center"
+                Text { content: label color: enabled ? var(--argui-foreground) : var(--argui-muted-foreground) font_size: 14.0 }
+                Rectangle {
+                    width: 40px
+                    height: 24px
+                    radius: 12.0
+                    background: solid(!enabled ? var(--argui-muted) : checked ? var(--argui-primary) : var(--argui-neutral-pressed))
+                    border_color: focus_area.focus_visible ? var(--argui-ring) : checked ? var(--argui-primary) : var(--argui-border)
+                    border_width: focus_area.focus_visible ? 2.0 : 1.0
+                    Rectangle {
+                        x: 3px
+                        y: 3px
+                        width: 18px
+                        height: 18px
+                        radius: 9.0
+                        background: solid(enabled ? #ffffff : var(--argui-muted-foreground))
+                        states { active when checked { x: 19px } }
+                        animate x { transition: in-out duration: 180ms }
+                    }
                 }
             }
         }

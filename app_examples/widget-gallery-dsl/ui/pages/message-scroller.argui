@@ -1,0 +1,58 @@
+import { Button, Message } from "@argui/ui"
+import { Column, Flickable, Rectangle, Row, Text } from "@argui/native"
+
+export component MessageScrollerPage {
+    private property message_count: int = 2
+    private property liked: bool = false
+    private property unread: int = 0
+    private property following: bool = chat_viewport.content_height - chat_viewport.viewport_height - chat_viewport.offset_y <= 8px
+
+    Column #message_scroller_page {
+        width: 100%
+        gap: 18.0
+
+        Text { content: "Message scroller" color: var(--argui-foreground) weight: 700 font_size: 27.0 }
+        Text { content: "Read earlier replies and jump back to the latest message." color: var(--argui-muted-foreground) font_size: 14.0 }
+
+        Rectangle { width: 100% height: 360px radius: 8.0 border_color: var(--argui-border) border_width: 1.0 background: solid(var(--argui-surface))
+            Flickable #chat_viewport {
+                width: 100%
+                height: 360px
+                on scroll(next) { unread = following ? 0 : unread }
+                Column { width: 100% padding: 14.0 gap: 18.0 shrink: 0.0
+                    for index in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19] key index {
+                        if index < message_count {
+                            Message {
+                                author: index % 2 == 0 ? "You" : "Ada"
+                                timestamp: index < 2 ? (index == 0 ? "10:42" : "10:43") : "Now"
+                                body: index % 2 == 0 ? "Could you review the new layout?" : "Yes, the spacing is clearer and the controls are easier to reach."
+                                end: index % 2 == 0
+                                show_reaction: index == 1
+                                liked: liked
+                                on react(next) { liked = next }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Row { gap: 10.0 wrap: true align_items: "center"
+            Button {
+                text: "Receive a message"
+                enabled: message_count < 20
+                on click {
+                    unread = following ? 0 : unread + 1
+                    message_count = message_count + 1
+                    scroll_to(#chat_viewport, 0px, following ? 100000px : chat_viewport.offset_y)
+                }
+            }
+            if !following || unread > 0 {
+                Button { text: "Jump to latest (" + str(unread) + ")" variant: "outline" on click {
+                    scroll_to(#chat_viewport, 0px, 100000px)
+                    unread = 0
+                } }
+            }
+        }
+    }
+}

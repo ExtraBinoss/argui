@@ -1,11 +1,23 @@
+#[path = "builtin/flickable.rs"]
+mod flickable;
+#[path = "builtin/focus_scope.rs"]
+mod focus_scope;
+#[path = "builtin/key_binding.rs"]
+mod key_binding;
 #[path = "builtin/media.rs"]
 mod media;
-#[path = "builtin/switch.rs"]
-mod switch;
+#[path = "builtin/path.rs"]
+mod path;
+#[path = "builtin/popup_window.rs"]
+mod popup_window;
+#[path = "builtin/rectangle.rs"]
+mod rectangle;
 #[path = "builtin/text_editor.rs"]
 mod text_editor;
-#[path = "builtin/virtual_list.rs"]
-mod virtual_list;
+#[path = "builtin/touch_area.rs"]
+mod touch_area;
+#[path = "builtin/virtual_window.rs"]
+mod virtual_window;
 
 #[test]
 fn builtin_catalogue_preserves_stable_names_and_public_members() {
@@ -15,13 +27,17 @@ fn builtin_catalogue_preserves_stable_names_and_public_members() {
         (builtin::ROW, "Row"),
         (builtin::COLUMN, "Column"),
         (builtin::TEXT, "Text"),
-        (builtin::PRESSABLE, "Pressable"),
-        (builtin::TEXT_EDITOR, "TextEditor"),
-        (builtin::POPOVER_PANEL, "PopoverPanel"),
+        (builtin::TEXT_INPUT, "TextInput"),
         (builtin::IMAGE, "Image"),
         (builtin::SVG, "Svg"),
-        (builtin::SWITCH, "SwitchControl"),
-        (builtin::VIRTUAL_LIST, "VList"),
+        (builtin::RECTANGLE, "Rectangle"),
+        (builtin::TOUCH_AREA, "TouchArea"),
+        (builtin::FOCUS_SCOPE, "FocusScope"),
+        (builtin::PATH, "Path"),
+        (builtin::FLICKABLE, "Flickable"),
+        (builtin::KEY_BINDING, "KeyBinding"),
+        (builtin::POPUP_WINDOW, "PopupWindow"),
+        (builtin::VIRTUAL_WINDOW, "VirtualWindow"),
     ] {
         let schema = registry.schema(id).unwrap();
         assert_eq!(schema.name.as_str(), name);
@@ -33,13 +49,76 @@ fn builtin_catalogue_preserves_stable_names_and_public_members() {
                 .iter()
                 .any(|property| property.id == builtin::OPACITY)
         );
+        assert!(
+            schema
+                .properties
+                .iter()
+                .any(|property| property.id == builtin::VISIBLE)
+        );
+        if id != builtin::KEY_BINDING {
+            assert!(
+                schema
+                    .properties
+                    .iter()
+                    .any(|property| property.id == builtin::BACKDROP_FILTER),
+                "{name} must support backdrop_filter"
+            );
+        }
     }
-    assert_eq!(registry.schemas().count(), 11);
+    assert_eq!(registry.schemas().count(), 15);
+    for name in [
+        "Pressable",
+        "PopoverPanel",
+        "SwitchControl",
+        "TextEditor",
+        "VList",
+    ] {
+        assert!(
+            registry.schema_named(name).is_none(),
+            "{name} is still native"
+        );
+    }
 }
 use argui_core::Color;
+use argui_paint::Filter;
 use argui_schema::{NativeElementInput, NativeSlotValue, SchemaValue, builtin};
 use argui_text::TextWrap;
-use argui_ui::{Element, ElementKind, FlexWrap, Overflow, Role, length};
+use argui_ui::{
+    AlignItems, Display, Element, ElementKind, FlexWrap, JustifyContent, Overflow, length,
+};
+
+#[test]
+fn visibility_is_shared_by_visual_primitives() {
+    let registry = builtin::registry().unwrap();
+    let hidden = registry
+        .construct(
+            builtin::RECTANGLE,
+            &NativeElementInput::new().property(builtin::VISIBLE, SchemaValue::Bool(false)),
+        )
+        .unwrap();
+    assert_eq!(hidden.style.display, Display::None);
+}
+
+#[test]
+fn ordered_backdrop_filters_apply_to_text_and_layout_surfaces() {
+    let registry = builtin::registry().unwrap();
+    for id in [builtin::TEXT, builtin::CONTAINER] {
+        let input = NativeElementInput::new().property(
+            builtin::BACKDROP_FILTER,
+            SchemaValue::String("blur(4px) brightness(60%)".into()),
+        );
+        let input = if id == builtin::TEXT {
+            input.property(builtin::CONTENT, SchemaValue::String("Glass".into()))
+        } else {
+            input
+        };
+        let element = registry.construct(id, &input).unwrap();
+        assert_eq!(
+            element.layer.as_ref().unwrap().backdrop_filters,
+            vec![Filter::Blur(4.0), Filter::Brightness(0.6)]
+        );
+    }
+}
 
 #[test]
 fn text_alias_takes_precedence_and_clamps_font_weight() {
@@ -85,6 +164,11 @@ fn layout_primitives_apply_optional_spacing_shape_and_scroll_policy() {
                     .property(builtin::GROW, SchemaValue::Float(2.0))
                     .property(builtin::BORDER_COLOR, SchemaValue::Color(Color::BLACK))
                     .property(builtin::RADIUS, SchemaValue::Float(5.0))
+                    .property(builtin::ALIGN_ITEMS, SchemaValue::String("center".into()))
+                    .property(
+                        builtin::JUSTIFY_CONTENT,
+                        SchemaValue::String("center".into()),
+                    )
                     .property(builtin::SCROLL_Y, SchemaValue::Bool(true))
                     .slot(NativeSlotValue::new(
                         builtin::CHILDREN,
@@ -97,66 +181,11 @@ fn layout_primitives_apply_optional_spacing_shape_and_scroll_policy() {
         assert_eq!(element.style.padding.left, length(4.0));
         assert_eq!(element.style.flex_wrap, FlexWrap::Wrap);
         assert_eq!(element.style.flex_grow, 2.0);
+        assert_eq!(element.style.align_items, Some(AlignItems::CENTER));
+        assert_eq!(element.style.justify_content, Some(JustifyContent::CENTER));
         let border = element.paint.quad.border.unwrap();
         assert_eq!(border.widths.left, 1.0);
         assert_eq!(border.color, Color::BLACK);
         assert_eq!(element.style.overflow.y, Overflow::Auto);
     }
-}
-
-#[test]
-fn enabled_pressable_keeps_tooltip_and_select_trigger_semantics() {
-    let registry = builtin::registry().unwrap();
-    let button = registry
-        .construct(
-            builtin::PRESSABLE,
-            &NativeElementInput::new()
-                .property(builtin::KEY, SchemaValue::String("menu".into()))
-                .property(builtin::LABEL, SchemaValue::String("Menu".into()))
-                .property(builtin::TOOLTIP, SchemaValue::String("Open menu".into()))
-                .property(builtin::SELECT_TRIGGER, SchemaValue::Bool(true))
-                .property(builtin::BORDER_COLOR, SchemaValue::Color(Color::BLACK))
-                .property(builtin::HOVER_BACKGROUND, SchemaValue::Color(Color::BLACK))
-                .property(
-                    builtin::PRESSED_BACKGROUND,
-                    SchemaValue::Color(Color::BLACK),
-                )
-                .property(
-                    builtin::FOCUS_BORDER_COLOR,
-                    SchemaValue::Color(Color::BLACK),
-                )
-                .property(builtin::RADIUS, SchemaValue::Float(6.0))
-                .slot(NativeSlotValue::new(
-                    builtin::CHILDREN,
-                    [Element::text("Menu")],
-                )),
-        )
-        .unwrap();
-    assert_eq!(button.tooltip.as_deref(), Some("Open menu"));
-    assert_eq!(button.semantics.as_ref().unwrap().role, Role::ComboBox);
-    assert_eq!(
-        button.semantics.as_ref().unwrap().state.expanded,
-        Some(false)
-    );
-    assert!(button.interaction.as_ref().unwrap().enabled);
-    assert!(button.children[0].semantic_hidden);
-    let border = button.paint.quad.border.unwrap();
-    assert_eq!(border.widths.left, 1.0);
-    assert_eq!(border.color, Color::BLACK);
-
-    let empty_tooltip = registry
-        .construct(
-            builtin::PRESSABLE,
-            &NativeElementInput::new()
-                .property(builtin::KEY, SchemaValue::String("plain".into()))
-                .property(builtin::LABEL, SchemaValue::String("Plain".into()))
-                .property(builtin::TOOLTIP, SchemaValue::String(String::new())),
-        )
-        .unwrap();
-    assert_eq!(empty_tooltip.tooltip, None);
-    assert_eq!(empty_tooltip.semantics.as_ref().unwrap().role, Role::Button);
-    assert_eq!(
-        empty_tooltip.semantics.as_ref().unwrap().state.expanded,
-        None
-    );
 }

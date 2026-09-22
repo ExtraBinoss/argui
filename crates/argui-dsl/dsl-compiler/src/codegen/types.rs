@@ -32,7 +32,9 @@ impl Context<'_> {
                 .definitions
                 .get(symbol)
                 .map(|definition| type_name(&definition.name))
-                .ok_or_else(|| CompilerError::Codegen(format!("unknown user type {symbol}")))?,
+                .ok_or(CompilerError::Codegen(format!(
+                    "unknown user type {symbol}"
+                )))?,
             Type::Optional(inner) => format!("Option<{}>", self.rust_type(inner)?),
             Type::Array(inner) | Type::Model(inner) => {
                 format!("Vec<{}>", self.rust_type(inner)?)

@@ -65,6 +65,27 @@ fn canvas(revision: u64) -> GpuCanvasPrimitive {
 }
 
 #[test]
+fn drop_shadow_keeps_color_filters_on_either_side_as_separate_passes() {
+    let mut list = DisplayList::new();
+    list.begin_layer(
+        LayerStyle::new(bounds())
+            .filter(Filter::Brightness(0.8))
+            .filter(Filter::DropShadow(Shadow::drop(
+                [4.0, -3.0],
+                6.0,
+                Color::BLACK,
+            )))
+            .filter(Filter::Contrast(1.2)),
+    );
+    list.push_quad(quad());
+    list.end_layer();
+
+    let analysis = analyze_display_list(&list, &[], [200.0, 200.0], 1.0, 0).unwrap();
+    assert_eq!(analysis.stats.filter_passes, 3);
+    assert_eq!(analysis.stats.offscreen_layers, 1);
+}
+
+#[test]
 fn analysis_counts_merged_draws_nested_layers_filters_and_custom_effects() {
     let custom = EffectInstance::new(
         EffectId::new("test.effect"),

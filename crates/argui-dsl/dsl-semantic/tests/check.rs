@@ -2,11 +2,28 @@
 
 #[path = "check/extract/animation.rs"]
 mod animation;
+#[path = "check/extract/declaration.rs"]
+mod declaration;
 #[path = "check/mod.rs"]
 mod icons;
 
 #[path = "check/extract/visual/virtual_list.rs"]
 mod virtual_list;
+
+#[path = "check/extract/visual/binding.rs"]
+mod observation;
+
+#[path = "vector_path.rs"]
+mod path;
+
+#[path = "check/expression/gradient.rs"]
+mod gradient;
+
+#[path = "check/expression/scroll.rs"]
+mod scroll;
+
+#[path = "check/extract/visual/effect.rs"]
+mod effect;
 
 mod expressions {
     use argui_dsl_semantic::{CompilerDatabase, DiagnosticCode, Type};
@@ -446,7 +463,7 @@ mod visual_edges {
     /// Reports visual-tree contract failures while continuing through nested nodes.
     #[test]
     fn validates_native_user_component_repeater_condition_and_event_edges() {
-        let source = r##"import { Pressable, Text, TextEditor } from "@argui/native"
+        let source = r##"import { FocusScope, Text, TextInput } from "@argui/native"
 component Child {
     in property required: string
     in property input: string
@@ -461,13 +478,13 @@ export component App {
     private property scalar: int = 1
     Child { required: source }
     Child { }
-    TextEditor {
+    TextInput {
         value <=> source
         on input { output = source }
     }
-    Pressable {
-        label: "go"
-        label: "duplicate"
+    FocusScope {
+        accessible_name: "go"
+        accessible_name: "duplicate"
         on missing { }
     }
     for item in values { Text { content: item } }

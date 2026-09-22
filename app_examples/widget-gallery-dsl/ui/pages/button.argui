@@ -1,11 +1,12 @@
 import { Button } from "@argui/ui"
-import { Column, Row, Container, Text } from "@argui/native"
-import { Spinner, Star } from "@argui/icons"
+import { Column, Row, Text } from "@argui/native"
+import { Spinner, Star, StarFilled } from "@argui/icons"
 
 export component ButtonPage {
     private property click_count: int = 0
     private property last_used: string = "None"
     private property star_active: bool = false
+    private property star_hovered: bool = false
 
     Column #button_page {
         width: 100%
@@ -49,20 +50,13 @@ export component ButtonPage {
                 text: "Star"
                 variant: "outline"
                 show_text: false
-                padding: 8.0
-                Container {
-                    width: 21px
-                    height: 21px
-                    radius: 11.0
-                    background: star_active ? var(--argui-selection) : var(--argui-surface)
-                    Star {
-                        size: 17px
-                        color: var(--argui-foreground)
-                        states { lit when star_active { color: var(--argui-primary) rotation: 18.0 } }
-                        animate color { transition: in-out duration: 180ms }
-                        animate rotation { transition: in-out duration: 180ms }
-                    }
-                }
+                padding: 9.0
+                hover_background: var(--argui-surface)
+                down_background: var(--argui-surface)
+                if star_active || star_hovered { StarFilled { size: 18px color: var(--argui-primary) } }
+                if !star_active && !star_hovered { Star { size: 18px color: var(--argui-foreground) } }
+                on hover { star_hovered = true }
+                on hover_end { star_hovered = false }
                 on click { click_count = click_count + 1 last_used = "Star" star_active = !star_active }
             }
         }

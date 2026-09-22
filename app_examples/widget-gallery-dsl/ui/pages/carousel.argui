@@ -1,0 +1,52 @@
+import { Button } from "@argui/ui"
+import { Column, Container, FocusScope, KeyBinding, Rectangle, Row, Text } from "@argui/native"
+
+export component CarouselPage {
+    private property selected: int = 0
+
+    Column #carousel_page {
+        width: 100%
+        gap: 18.0
+
+        Text { content: "Carousel" color: var(--argui-foreground) weight: 700 font_size: 27.0 }
+        Text { content: "Browse collections with the buttons or arrow keys." color: var(--argui-muted-foreground) font_size: 14.0 }
+
+        FocusScope {
+            role: "group"
+            accessible_name: "Collections"
+            KeyBinding { shortcut: "ArrowLeft" on activated { selected = selected > 0 ? selected - 1 : 0 } }
+            KeyBinding { shortcut: "ArrowRight" on activated { selected = selected < 2 ? selected + 1 : 2 } }
+            KeyBinding { shortcut: "Home" on activated { selected = 0 } }
+            KeyBinding { shortcut: "End" on activated { selected = 2 } }
+
+            Rectangle {
+                width: 100%
+                height: 220px
+                radius: 12.0
+                background: solid(var(--argui-muted))
+
+                Column {
+                    width: 100%
+                    height: 220px
+                    padding: 24.0
+                    gap: 12.0
+                    Text { content: selected == 0 ? "01" : selected == 1 ? "02" : "03" color: var(--argui-muted-foreground) weight: 600 font_size: 14.0 }
+                    Text { content: selected == 0 ? "Summer" : selected == 1 ? "Autumn" : "Winter" color: var(--argui-foreground) weight: 700 font_size: 32.0 }
+                    Text { content: "A new collection to explore" color: var(--argui-muted-foreground) font_size: 14.0 }
+                    Container { grow: 1.0 }
+                    Row { gap: 6.0
+                        Rectangle { width: selected == 0 ? 28px : 8px height: 8px radius: 4.0 background: solid(selected == 0 ? var(--argui-primary) : var(--argui-border)) }
+                        Rectangle { width: selected == 1 ? 28px : 8px height: 8px radius: 4.0 background: solid(selected == 1 ? var(--argui-primary) : var(--argui-border)) }
+                        Rectangle { width: selected == 2 ? 28px : 8px height: 8px radius: 4.0 background: solid(selected == 2 ? var(--argui-primary) : var(--argui-border)) }
+                    }
+                }
+            }
+        }
+
+        Row { gap: 12.0 align_items: "center"
+            Button { text: "Previous slide" variant: "outline" enabled: selected > 0 on click { selected = selected - 1 } }
+            Text { content: str(selected + 1) + " / 3" color: var(--argui-muted-foreground) font_size: 14.0 }
+            Button { text: "Next slide" variant: "outline" enabled: selected < 2 on click { selected = selected + 1 } }
+        }
+    }
+}

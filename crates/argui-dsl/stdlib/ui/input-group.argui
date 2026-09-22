@@ -1,0 +1,54 @@
+import { Button } from "@argui/ui/button.argui"
+import { Container, FocusScope, Row, Text, TextInput } from "@argui/native"
+
+export component InputGroup {
+    in property label: string
+    in property leading_text: string = ""
+    in property action_text: string = ""
+    in property placeholder: string = ""
+    in-out property value: string = ""
+    in property invalid: bool = false
+    in property enabled: bool = true
+    callback action(value: string)
+
+    FocusScope {
+        role: "group"
+        accessible_name: label
+        focus_on_tab_navigation: false
+        focus_on_click: false
+        Row {
+            width: 100%
+            height: 44px
+            padding: 4.0
+            gap: 6.0
+            align_items: "center"
+            background: var(--argui-surface)
+            border_color: invalid ? var(--argui-destructive) : var(--argui-border)
+            radius: 8.0
+            if leading_text != "" {
+                Text { content: leading_text color: var(--argui-muted-foreground) font_size: 14.0 no_wrap: true }
+            }
+            Container {
+                width: 50%
+                grow: 1.0
+                min_width: 0.0
+                height: 20px
+                TextInput #editor {
+                    width: 100%
+                    height: 20px
+                    value <=> value
+                    placeholder: placeholder
+                    label: label
+                    enabled: enabled
+                    invalid: invalid
+                    text_color: var(--argui-foreground)
+                    placeholder_color: var(--argui-muted-foreground)
+                    caret_fill: solid(var(--argui-primary))
+                }
+            }
+            if action_text != "" {
+                Button { text: action_text variant: "outline" enabled: enabled height: 32px on click { action(value) } }
+            }
+        }
+    }
+}

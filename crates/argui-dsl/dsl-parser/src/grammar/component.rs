@@ -115,6 +115,7 @@ pub(super) fn element(parser: &mut Parser<'_>) {
             SyntaxKind::IfKw => condition(parser),
             SyntaxKind::StatesKw => states(parser),
             SyntaxKind::AnimateKw => animate(parser),
+            SyntaxKind::EffectKw => effect_application(parser),
             SyntaxKind::Ident if is_element(parser) => element(parser),
             SyntaxKind::Ident
                 if matches!(parser.nth_kind(1), SyntaxKind::Colon | SyntaxKind::TwoWay) =>
@@ -127,6 +128,27 @@ pub(super) fn element(parser: &mut Parser<'_>) {
         }
     }
     parser.expect(SyntaxKind::RBrace, "expected `}` after element");
+    parser.finish();
+}
+
+/// Parses one named effect and its parameter expressions on a visual element.
+fn effect_application(parser: &mut Parser<'_>) {
+    parser.start(SyntaxKind::EffectApplication);
+    parser.bump();
+    parser.expect(SyntaxKind::Colon, "expected `:` after `effect`");
+    parser.expect(SyntaxKind::Ident, "expected effect name");
+    parser.expect(SyntaxKind::LBrace, "expected `{` after effect name");
+    while !parser.at(SyntaxKind::RBrace) && !parser.at(SyntaxKind::Eof) {
+        if parser.at(SyntaxKind::Ident) && parser.nth_kind(1) == SyntaxKind::Colon {
+            assignment(parser);
+        } else {
+            parser.recover("expected an effect parameter assignment");
+        }
+    }
+    parser.expect(SyntaxKind::RBrace, "expected `}` after effect parameters");
+    if parser.at(SyntaxKind::Semicolon) {
+        parser.bump();
+    }
     parser.finish();
 }
 
@@ -161,11 +183,23 @@ fn assignment(parser: &mut Parser<'_>) {
     parser.finish();
 }
 
-/// Parses an event handler and its restricted statement block.
+/// Parses an event handler, optional payload names, and its restricted statements.
 fn event(parser: &mut Parser<'_>) {
     parser.start(SyntaxKind::EventBlock);
     parser.bump();
     parser.expect(SyntaxKind::Ident, "expected event name");
+    if parser.at(SyntaxKind::LParen) {
+        parser.bump();
+        while !parser.at(SyntaxKind::RParen) && !parser.at(SyntaxKind::Eof) {
+            parser.expect(SyntaxKind::Ident, "expected event parameter name");
+            if parser.at(SyntaxKind::Comma) {
+                parser.bump();
+            } else {
+                break;
+            }
+        }
+        parser.expect(SyntaxKind::RParen, "expected `)` after event parameters");
+    }
     parser.expect(SyntaxKind::LBrace, "expected `{` after event name");
     while !parser.at(SyntaxKind::RBrace) && !parser.at(SyntaxKind::Eof) {
         parser.start(SyntaxKind::Statement);

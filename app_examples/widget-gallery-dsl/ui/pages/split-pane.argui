@@ -1,0 +1,61 @@
+import { SplitHandle, SplitPanel } from "@argui/ui/split-pane.argui"
+import { Column, Container, Flickable, Row, Text } from "@argui/native"
+
+export component SplitPanePage {
+    private property navigator: float = 220.0
+    private property preview: float = 118.0
+    private property inspector: float = 245.0
+    private property ide_navigator: float = 175.0
+    private property ide_console: float = 105.0
+
+    Column { width: 100% gap: 24.0
+        Text { content: "Split pane" color: var(--argui-foreground) weight: 700 font_size: 27.0 }
+        Text { content: "Drag a divider, use arrow keys or Home/End, and double-click to reset." color: var(--argui-muted-foreground) font_size: 14.0 }
+
+        Column { width: 100% gap: 9.0
+            Text { content: "Explorer and editor · Explorer: " + str(navigator) + " px" color: var(--argui-foreground) weight: 600 font_size: 15.0 }
+            Flickable { width: 100% height: 214px scroll_x: true scroll_y: false
+                Row { width: 680px height: 210px
+                    Container { width: navigator * 1px height: 100% SplitPanel { title: "FILES" detail: "src\n  app.rs\n  workspace.rs\ntests\n  interaction.rs" accent: #2563eb } }
+                    SplitHandle { size <=> navigator minimum: 120.0 maximum: 420.0 reset_size: 220.0 label: "Resize file explorer" length: 210px }
+                    Container { grow: 1.0 height: 100% SplitPanel { title: "EDITOR · workspace.rs" detail: "pub fn workspace() -> Element {\n    split.build(sidebar, editor)\n}" accent: #7c3aed } }
+                }
+            }
+        }
+
+        Column { gap: 9.0
+            Text { content: "Preview over console · Preview: " + str(preview) + " px" color: var(--argui-foreground) weight: 600 font_size: 15.0 }
+            Column { width: 440px height: 270px
+                Container { width: 100% height: preview * 1px SplitPanel { title: "LIVE PREVIEW" detail: "The rendered application updates above its build output." accent: #059669 } }
+                SplitHandle { size <=> preview minimum: 92.0 maximum: 210.0 reset_size: 118.0 vertical: true label: "Resize preview and console" length: 440px }
+                Container { width: 100% grow: 1.0 SplitPanel { title: "CONSOLE" detail: "Finished dev build in 184ms\nListening on localhost:3100" accent: #ea580c } }
+            }
+        }
+
+        Column { width: 100% gap: 9.0
+            Text { content: "Trailing inspector · Inspector: " + str(inspector) + " px" color: var(--argui-foreground) weight: 600 font_size: 15.0 }
+            Flickable { width: 100% height: 214px scroll_x: true scroll_y: false
+                Row { width: 680px height: 210px
+                    Container { grow: 1.0 height: 100% SplitPanel { title: "CANVAS" detail: "Select a layer to edit its layout, paint and interaction properties." accent: #0891b2 } }
+                    SplitHandle { size <=> inspector minimum: 150.0 maximum: 380.0 reset_size: 245.0 trailing: true label: "Resize trailing inspector" length: 210px }
+                    Container { width: inspector * 1px height: 100% SplitPanel { title: "INSPECTOR" detail: "Layout  Flex\nWidth   Fill\nGap     12px\nRadius  14px" accent: #db2777 } }
+                }
+            }
+        }
+
+        Column { width: 100% gap: 9.0
+            Text { content: "Nested IDE · Navigator " + str(ide_navigator) + " px · Console " + str(ide_console) + " px" color: var(--argui-foreground) weight: 600 font_size: 15.0 }
+            Flickable { width: 100% height: 314px scroll_x: true scroll_y: false
+                Row { width: 680px height: 310px
+                    Container { width: ide_navigator * 1px height: 100% SplitPanel { title: "PROJECT" detail: "crates\n  argui-ui\n  argui-widgets\nwebsite\n  app" accent: #ea580c } }
+                    SplitHandle { size <=> ide_navigator minimum: 110.0 maximum: 320.0 reset_size: 175.0 label: "Resize IDE navigator" length: 310px }
+                    Column { grow: 1.0 height: 100%
+                        Container { width: 100% grow: 1.0 SplitPanel { title: "main.rs" detail: "fn main() {\n    argui::run(App::default());\n}" accent: #2563eb } }
+                        SplitHandle { size <=> ide_console minimum: 84.0 maximum: 190.0 reset_size: 105.0 vertical: true trailing: true label: "Resize IDE console" length: 497px }
+                        Container { width: 100% height: ide_console * 1px SplitPanel { title: "TERMINAL" detail: "$ cargo nextest run\nPASS 1358 tests" accent: #059669 } }
+                    }
+                }
+            }
+        }
+    }
+}

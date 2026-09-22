@@ -363,9 +363,12 @@ dependencies = [
 name = "argui-dsl-ir"
 version = "0.3.2"
 dependencies = [
+ "argui-core",
  "argui-dsl-semantic",
  "argui-dsl-syntax",
+ "argui-paint",
  "argui-schema",
+ "argui-vector",
  "serde",
 ]
 
@@ -415,6 +418,7 @@ dependencies = [
  "argui-dsl-stdlib",
  "argui-dsl-syntax",
  "argui-paint",
+ "argui-render",
  "argui-runtime",
  "argui-schema",
  "argui-shader",

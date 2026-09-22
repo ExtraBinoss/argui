@@ -1,11 +1,14 @@
 //! Shared schema declarations and style application for built-in primitives.
 
-use argui_ui::{Element, EventType, Sides, TextSelectionHighlight};
+use argui_ui::{
+    Dimension, Display, Element, EventType, ExpandedDimension, LengthPercentageAuto, Sides,
+    TextSelectionHighlight,
+};
 
 use super::{
-    BACKGROUND, BLUR, CLICK, DISMISS, FOCUS, GAP, HEIGHT, INPUT_CHANGED, KEY, MIN_HEIGHT,
-    MIN_WIDTH, OPACITY, PADDING, ROTATION, SCROLL, SELECTION_COLOR, SELECTION_FILL,
-    SELECTION_RADIUS, SUBMIT, TOOLTIP, WIDTH,
+    BACKDROP_FILTER, BACKGROUND, BLUR, CLICK, DISMISS, FOCUS, GAP, HEIGHT, INPUT_CHANGED, KEY,
+    MIN_HEIGHT, MIN_WIDTH, OPACITY, PADDING, ROTATION, SCROLL, SELECTION_COLOR, SELECTION_FILL,
+    SELECTION_RADIUS, SUBMIT, TEXT_EDIT, TOOLTIP, VISIBLE, WIDTH, X, Y,
 };
 use crate::{
     EventId, EventSchema, NativeElementInput, PropertyId, PropertySchema, SchemaError, SchemaValue,
@@ -19,8 +22,12 @@ pub(super) enum CommonProperty {
     Tooltip,
     Width,
     Height,
+    X,
+    Y,
     Rotation,
     Opacity,
+    BackdropFilter,
+    Visible,
     MinWidth,
     MinHeight,
     Background,
@@ -51,6 +58,18 @@ pub(super) fn common_property(property: CommonProperty) -> PropertySchema {
         CommonProperty::Height => {
             PropertySchema::new(HEIGHT, "height", ValueType::Dimension, "Preferred height.")
         }
+        CommonProperty::X => PropertySchema::new(
+            X,
+            "x",
+            ValueType::Dimension,
+            "Horizontal position within the parent.",
+        ),
+        CommonProperty::Y => PropertySchema::new(
+            Y,
+            "y",
+            ValueType::Dimension,
+            "Vertical position within the parent.",
+        ),
         CommonProperty::Rotation => PropertySchema::new(
             ROTATION,
             "rotation",
@@ -65,6 +84,20 @@ pub(super) fn common_property(property: CommonProperty) -> PropertySchema {
             "Group opacity for the element and its descendants.",
         )
         .default_value(SchemaValue::Float(1.0)),
+        CommonProperty::BackdropFilter => PropertySchema::new(
+            BACKDROP_FILTER,
+            "backdrop_filter",
+            ValueType::String,
+            "CSS-like ordered filters applied to pixels already painted behind this element.",
+        )
+        .default_value(SchemaValue::String("none".into())),
+        CommonProperty::Visible => PropertySchema::new(
+            VISIBLE,
+            "visible",
+            ValueType::Bool,
+            "Whether the element participates in layout and painting.",
+        )
+        .default_value(SchemaValue::Bool(true)),
         CommonProperty::MinWidth => PropertySchema::new(
             MIN_WIDTH,
             "min_width",
@@ -132,6 +165,7 @@ pub(super) fn apply_events(mut element: Element, input: &NativeElementInput) -> 
             FOCUS => EventType::Focus,
             BLUR => EventType::Blur,
             INPUT_CHANGED => EventType::Input,
+            TEXT_EDIT => EventType::TextEdit,
             SUBMIT => EventType::Submit,
             DISMISS => EventType::Dismiss,
             SCROLL => EventType::Scroll,
@@ -146,7 +180,14 @@ pub(super) fn apply_events(mut element: Element, input: &NativeElementInput) -> 
 ///
 /// * `element` — native element receiving common properties.
 /// * `input` — validated native property input.
-pub(super) fn apply_common(mut element: Element, input: &NativeElementInput) -> Element {
+///
+/// # Errors
+///
+/// Returns an adapter error when `backdrop_filter` has invalid syntax or values.
+pub(super) fn apply_common(
+    mut element: Element,
+    input: &NativeElementInput,
+) -> Result<Element, SchemaError> {
     if let Some(SchemaValue::String(value)) = input.get(KEY) {
         element = element.keyed(value.clone());
     }
@@ -158,6 +199,22 @@ pub(super) fn apply_common(mut element: Element, input: &NativeElementInput) -> 
     }
     if let Some(SchemaValue::Dimension(value)) = input.get(HEIGHT) {
         element = element.height(*value);
+    }
+    let x = input.get(X).and_then(|value| match value {
+        SchemaValue::Dimension(value) => Some(*value),
+        _ => None,
+    });
+    let y = input.get(Y).and_then(|value| match value {
+        SchemaValue::Dimension(value) => Some(*value),
+        _ => None,
+    });
+    if x.is_some() || y.is_some() {
+        element = element.absolute(Sides {
+            left: inset_coordinate(x),
+            right: LengthPercentageAuto::auto(),
+            top: inset_coordinate(y),
+            bottom: LengthPercentageAuto::auto(),
+        });
     }
     if let Some(SchemaValue::Float(value)) = input.get(MIN_WIDTH) {
         element = element.min_width(argui_ui::length(*value));
@@ -196,7 +253,28 @@ pub(super) fn apply_common(mut element: Element, input: &NativeElementInput) -> 
     if let Some(SchemaValue::Float(value)) = input.get(OPACITY) {
         element = element.opacity(*value);
     }
-    element
+    if let Some(SchemaValue::String(value)) = input.get(BACKDROP_FILTER) {
+        for filter in crate::backdrop_filter::parse(value).map_err(|message| {
+            SchemaError::Adapter(format!("invalid backdrop_filter: {message}"))
+        })? {
+            element = element.backdrop_filter(filter);
+        }
+    }
+    if matches!(input.get(VISIBLE), Some(SchemaValue::Bool(false))) {
+        element = element.display(Display::None);
+    }
+    Ok(element)
+}
+
+/// Converts an authored position coordinate to a Taffy inset value.
+///
+/// * `value` — optional dimension bound to `x` or `y`.
+fn inset_coordinate(value: Option<Dimension>) -> LengthPercentageAuto {
+    match value.map(Dimension::expand) {
+        Some(ExpandedDimension::Length(pixels)) => LengthPercentageAuto::length(pixels),
+        Some(ExpandedDimension::Percent(fraction)) => LengthPercentageAuto::percent(fraction),
+        Some(_) | None => LengthPercentageAuto::auto(),
+    }
 }
 
 /// Applies child spacing shared by native containers and controls.

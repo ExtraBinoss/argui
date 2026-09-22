@@ -1,4 +1,28 @@
+use argui_core::{Point, Rect, Size};
 use argui_platform::WindowConfig;
+use argui_ui::{ScrollAlignment, ScrollRequest};
+
+/// Returns the scroll request exercised by a native lifecycle phase.
+///
+/// * `phase` — selects an offset, rectangle, reveal, or missing target request.
+///
+/// Returns the request delivered by the retained panel during rendering.
+pub fn scroll_request(phase: usize) -> ScrollRequest {
+    match phase {
+        1 => ScrollRequest::offset("native-scroll", Point::new(0.0, 80.0)),
+        2 => ScrollRequest::rect(
+            "native-scroll",
+            Rect::new(Point::new(0.0, 400.0), Size::new(100.0, 80.0)),
+        )
+        .align(ScrollAlignment::Start, ScrollAlignment::Center),
+        3 => ScrollRequest::reveal("native-last")
+            .align(ScrollAlignment::End, ScrollAlignment::Nearest),
+        4 => ScrollRequest::reveal("native-first"),
+        5 => ScrollRequest::reveal("missing"),
+        6 => ScrollRequest::offset("missing", Point::new(0.0, 10.0)),
+        _ => ScrollRequest::reveal("native-editor"),
+    }
+}
 
 /// Runs the model-free launch and close integration scenario.
 pub fn run() {

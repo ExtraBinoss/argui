@@ -144,10 +144,12 @@ fn effect(parser: &mut Parser<'_>) {
     parser.expect(SyntaxKind::Ident, "expected effect name");
     parser.expect(SyntaxKind::LBrace, "expected `{` after effect name");
     while !parser.at(SyntaxKind::RBrace) && !parser.at(SyntaxKind::Eof) {
-        if parser.at(SyntaxKind::ShaderKw) {
+        if parser.at(SyntaxKind::ShaderKw)
+            || (parser.at(SyntaxKind::Ident) && parser.text() == "damage")
+        {
             parser.start(SyntaxKind::PropertyAssignment);
             parser.bump();
-            parser.expect(SyntaxKind::Colon, "expected `:` after `shader`");
+            parser.expect(SyntaxKind::Colon, "expected `:` after effect setting");
             expression::expression(parser);
             parser.finish();
         } else if parser.at(SyntaxKind::ParameterKw) {
@@ -162,7 +164,7 @@ fn effect(parser: &mut Parser<'_>) {
             }
             parser.finish();
         } else {
-            parser.recover("expected `shader` or `parameter` in effect");
+            parser.recover("expected `shader`, `damage`, or `parameter` in effect");
         }
     }
     parser.expect(SyntaxKind::RBrace, "expected `}` after effect");

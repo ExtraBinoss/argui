@@ -112,6 +112,40 @@ pub fn send() {
         event.as_mut().send_event = 1;
         event.put();
     }
+    send_control_scroll(&native_window);
+}
+
+/// Sends a Control-wheel gesture to exercise runtime zoom without scrolling the UI.
+fn send_control_scroll(window: &gtk::gdk::Window) {
+    use gtk::{gdk, glib::translate::ToGlibPtr};
+    for kind in [gdk::EventType::KeyPress, gdk::EventType::KeyRelease] {
+        let mut key = gdk::Event::new(kind).downcast::<gdk::EventKey>().unwrap();
+        key.as_mut().window = window.to_glib_full();
+        key.as_mut().keyval = *gdk::keys::constants::Control_L;
+        key.as_mut().send_event = 1;
+        key.put();
+        if kind == gdk::EventType::KeyPress {
+            let mut scroll = gdk::Event::new(gdk::EventType::Scroll)
+                .downcast::<gdk::EventScroll>()
+                .unwrap();
+            scroll.as_mut().window = window.to_glib_full();
+            scroll.as_mut().direction = gdk::ffi::GDK_SCROLL_SMOOTH;
+            scroll.as_mut().state = gdk::ffi::GDK_CONTROL_MASK as _;
+            scroll.as_mut().delta_y = -2.0;
+            scroll.put();
+        }
+    }
+}
+
+/// Closes the auxiliary window through GTK so the runtime receives CloseRequested.
+pub fn close_auxiliary() {
+    use gtk::prelude::*;
+    let window = gtk::Window::list_toplevels()
+        .into_iter()
+        .filter_map(|widget| widget.downcast::<gtk::Window>().ok())
+        .find(|window| window.title().as_deref() == Some("Argui lifecycle auxiliary"))
+        .expect("the auxiliary lifecycle window is mounted");
+    window.close();
 }
 
 fn buttons() -> [(u32, argui_core::PointerButton, u16); 5] {
@@ -128,6 +162,14 @@ fn buttons() -> [(u32, argui_core::PointerButton, u16); 5] {
 fn send_pointer(window: &gtk::Window) {
     use gtk::{gdk, glib::translate::ToGlibPtr, prelude::*};
     let native_window = window.window().expect("the lifecycle window is realized");
+    for kind in [gdk::EventType::EnterNotify, gdk::EventType::LeaveNotify] {
+        let mut crossing = gdk::Event::new(kind)
+            .downcast::<gdk::EventCrossing>()
+            .unwrap();
+        crossing.as_mut().window = native_window.to_glib_full();
+        crossing.as_mut().send_event = 1;
+        crossing.put();
+    }
     let mut motion = gdk::Event::new(gdk::EventType::MotionNotify)
         .downcast::<gdk::EventMotion>()
         .unwrap();
@@ -163,6 +205,16 @@ pub fn assert_pointer(pointer: &[argui_core::PointerEvent], wheel: &[argui_core:
     assert!(
         pointer
             .iter()
+            .any(|event| event.phase == PointerPhase::Entered)
+    );
+    assert!(
+        pointer
+            .iter()
+            .any(|event| event.phase == PointerPhase::Left)
+    );
+    assert!(
+        pointer
+            .iter()
             .any(|event| event.phase == PointerPhase::Moved)
     );
     let expected: Vec<_> = buttons()
@@ -182,5 +234,11 @@ pub fn assert_pointer(pointer: &[argui_core::PointerEvent], wheel: &[argui_core:
             .collect::<Vec<_>>(),
         expected
     );
-    assert_eq!(wheel, [ScrollDelta::Lines(Point::new(-2.0, 3.0))]);
+    assert_eq!(
+        wheel,
+        [
+            ScrollDelta::Lines(Point::new(-2.0, 3.0)),
+            ScrollDelta::Lines(Point::new(0.0, 2.0)),
+        ]
+    );
 }

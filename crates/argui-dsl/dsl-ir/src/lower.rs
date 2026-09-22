@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use argui_dsl_semantic::{DefinitionKind, SemanticProject, SymbolId};
 
 use crate::{
-    AssetId, CallbackId, ComponentId, FieldId, IrProject, IrType, LocalId, LowerError, PropertyId,
-    SlotId, TokenId, component, declaration, id::derive, id::hash_text,
+    CallbackId, ComponentId, FieldId, IrProject, IrType, LocalId, LowerError, PropertyId, SlotId,
+    TokenId, component, declaration, id::derive, id::hash_text,
 };
 
 /// Resolved public members of one DSL component.
@@ -46,21 +46,19 @@ pub fn lower(
     }
     let tables = Tables::build(project);
     let mut errors = Vec::new();
-    let mut assets = HashMap::<String, AssetId>::new();
+    let mut assets = HashMap::<String, crate::IrAsset>::new();
     let modules = declaration::modules(project);
     let structs = declaration::structs(project, &tables);
     let enums = declaration::enums(project);
     let themes = declaration::themes(project, &tables, &mut assets, &mut errors);
     let styles = declaration::styles(project, schema, &tables, &mut assets, &mut errors);
     let effects = declaration::effects(project, &tables, &mut assets, &mut errors);
-    let components = component::components(project, schema, &tables, &mut assets, &mut errors);
+    let components =
+        component::components(project, schema, &tables, &effects, &mut assets, &mut errors);
     if !errors.is_empty() {
         return Err(errors);
     }
-    let mut assets = assets
-        .into_iter()
-        .map(|(path, id)| declaration::asset(id, path))
-        .collect::<Vec<_>>();
+    let mut assets = assets.into_values().collect::<Vec<_>>();
     assets.sort_unstable_by_key(|asset| asset.id);
     Ok(IrProject {
         modules,

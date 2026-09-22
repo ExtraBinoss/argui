@@ -1,7 +1,12 @@
 use super::{
     AnyEntity, ContextEffects, HandlerRegistry, RenderCache, WindowEnvironment, signal::ModelSignal,
 };
-use std::cell::{Cell, RefCell};
+use argui_ui::RetainedIdentity;
+use std::collections::HashSet;
+use std::{
+    cell::{Cell, RefCell},
+    rc::Rc,
+};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) struct PresentationId(super::EntityId);
@@ -28,6 +33,8 @@ pub(super) struct Presentation<T> {
     pub(super) event_routes: RefCell<Vec<AnyEntity>>,
     pub(super) environment: RefCell<WindowEnvironment>,
     pub(super) environment_used: Cell<bool>,
+    pub(super) observed_identities: RefCell<HashSet<RetainedIdentity>>,
+    pub(super) interaction_snapshot: Rc<RefCell<super::InteractionSnapshot>>,
     pub(super) handlers: RefCell<HandlerRegistry<T>>,
 }
 
@@ -53,6 +60,8 @@ impl<T> Presentation<T> {
             event_routes: RefCell::default(),
             environment: RefCell::default(),
             environment_used: Cell::new(false),
+            observed_identities: RefCell::default(),
+            interaction_snapshot: Rc::default(),
             handlers: RefCell::new(HandlerRegistry::default()),
         }
     }
@@ -60,6 +69,7 @@ impl<T> Presentation<T> {
     pub(super) fn clear(&self) {
         self.lifecycle.end();
         self.cache.clear();
+        self.observed_identities.borrow_mut().clear();
         let handlers = self.handlers.replace(HandlerRegistry::default());
         let children = self.children.take();
         let routes = self.event_routes.take();

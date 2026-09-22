@@ -207,6 +207,7 @@ fn visit_node(node: &IrNode, output: &mut Reachability, queue: &mut VecDeque<Com
         IrNode::Element {
             target,
             properties,
+            effect,
             events,
             children,
             ..
@@ -216,6 +217,12 @@ fn visit_node(node: &IrNode, output: &mut Reachability, queue: &mut VecDeque<Com
             }
             for property in properties {
                 visit_expression(&property.value, output);
+            }
+            if let Some(binding) = effect {
+                output.effects.insert(binding.effect);
+                for parameter in &binding.parameters {
+                    visit_expression(&parameter.value, output);
+                }
             }
             for event in events {
                 for statement in &event.statements {
@@ -283,6 +290,8 @@ fn visit_expression(expression: &IrExpression, output: &mut Reachability) {
         }
         IrExpressionKind::Constant(_)
         | IrExpressionKind::PropertyRead(_)
+        | IrExpressionKind::ChildPropertyRead { .. }
+        | IrExpressionKind::ObservedRead { .. }
         | IrExpressionKind::LocalRead(_) => {}
     }
 }
@@ -294,6 +303,14 @@ fn visit_statement(statement: &argui_dsl_ir::IrStatement, output: &mut Reachabil
         | argui_dsl_ir::IrStatement::Assignment { value, .. }
         | argui_dsl_ir::IrStatement::Return(Some(value))
         | argui_dsl_ir::IrStatement::SetThemeMode(value) => visit_expression(value, output),
-        argui_dsl_ir::IrStatement::Return(None) => {}
+        argui_dsl_ir::IrStatement::ScrollTo { x, y, .. } => {
+            visit_expression(x, output);
+            visit_expression(y, output);
+        }
+        argui_dsl_ir::IrStatement::Return(None)
+        | argui_dsl_ir::IrStatement::FocusNext
+        | argui_dsl_ir::IrStatement::FocusPrevious
+        | argui_dsl_ir::IrStatement::PreventDefault
+        | argui_dsl_ir::IrStatement::StopPropagation => {}
     }
 }

@@ -54,6 +54,7 @@ pub struct UiTree {
     focus: FocusRegistry,
     gestures: GestureArena,
     scroll: ScrollState,
+    declared_scroll_offsets: std::collections::HashMap<NodeId, argui_core::Point>,
     pub(crate) text_inputs: TextInputStates,
     pub(crate) document_selection: crate::text_selection::DocumentSelectionState,
     caret: crate::caret::CaretAnimator,
@@ -70,6 +71,8 @@ pub struct UiTree {
     pending_gestures: Vec<crate::GestureEvent>,
     native_portals: std::collections::HashMap<NodeId, argui_core::Rect>,
     interaction_bounds: std::collections::HashMap<NodeId, argui_core::Rect>,
+    pressed_positions:
+        std::collections::HashMap<NodeId, (argui_core::PointerId, argui_core::Point)>,
 }
 
 impl UiTree {
@@ -93,6 +96,7 @@ impl UiTree {
             focus,
             gestures: GestureArena::default(),
             scroll: ScrollState::default(),
+            declared_scroll_offsets: std::collections::HashMap::new(),
             text_inputs: TextInputStates::default(),
             document_selection: crate::text_selection::DocumentSelectionState::default(),
             caret: crate::caret::CaretAnimator::default(),
@@ -109,10 +113,12 @@ impl UiTree {
             pending_gestures: Vec::new(),
             native_portals: Default::default(),
             interaction_bounds: Default::default(),
+            pressed_positions: Default::default(),
         };
         tree.sync_text_inputs();
         tree.sync_responsive_registry();
         tree.sync_transitions();
+        tree.sync_declared_scroll_offsets();
         tree
     }
     /// Returns the root element of the retained tree.
@@ -214,6 +220,8 @@ impl UiTree {
                 self.interaction.retain(&self.node_ids);
                 self.interaction_bounds
                     .retain(|node, _| self.node_ids.contains(node));
+                self.pressed_positions
+                    .retain(|node, _| self.node_ids.contains(node));
                 self.pending_gestures
                     .retain(|gesture| self.node_ids.contains(&gesture.target));
                 self.scroll.retain(&self.node_ids);
@@ -244,7 +252,12 @@ impl UiTree {
             self.sync_responsive_registry();
         }
         let transition_update = self.sync_transitions();
-        let update = strongest_update(update, transition_update);
+        let scroll_update = if self.sync_declared_scroll_offsets() {
+            TreeUpdate::Scroll
+        } else {
+            TreeUpdate::None
+        };
+        let update = strongest_update(update, strongest_update(transition_update, scroll_update));
         self.layout_dirty |= update == TreeUpdate::Layout;
         update
     }
@@ -277,9 +290,9 @@ impl UiTree {
         self.key_for(node)
     }
 
-    /// Resolves a node or key focus target against the current tree.
+    /// Resolves a node, key, or unique retained identity against the current tree.
     ///
-    /// * `target` — node identifier or explicit element key.
+    /// * `target` — node identifier, explicit key, or retained identity.
     #[must_use]
     pub fn resolve_node(&self, target: &crate::FocusTarget) -> Option<NodeId> {
         match target {
@@ -289,6 +302,7 @@ impl UiTree {
                 .iter()
                 .copied()
                 .find(|node| self.key_for(*node) == Some(key.as_str())),
+            crate::FocusTarget::Identity(identity) => self.index.identity(identity),
         }
     }
 
@@ -364,6 +378,7 @@ impl UiTree {
         } = result;
         let mut events = Vec::with_capacity(2);
         if let Some(edit) = edit {
+            events.extend(self.event_deliveries(node, UiEventKind::TextEdited(edit.edit)));
             if self.has_event_listener(node, crate::EventType::Input) {
                 let value = self
                     .text_inputs
@@ -371,7 +386,6 @@ impl UiTree {
                     .map_or_else(String::new, |state| state.value().to_owned());
                 events.extend(self.event_deliveries(node, UiEventKind::TextChanged(value)));
             }
-            events.extend(self.event_deliveries(node, UiEventKind::TextEdited(edit.edit)));
         }
         if submitted {
             let value = self

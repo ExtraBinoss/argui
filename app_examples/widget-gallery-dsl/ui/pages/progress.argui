@@ -1,0 +1,38 @@
+import { Button, Progress } from "@argui/ui"
+import { Column, Row, Text } from "@argui/native"
+
+export component ProgressPage {
+    private property value: float = 45.0
+    private property indeterminate: bool = false
+
+    Column #progress_page {
+        width: 100%
+        gap: 20.0
+
+        Text { content: "Progress" color: var(--argui-foreground) weight: 700 font_size: 27.0 }
+        Text { content: "Use a percentage when the total is known, or an indeterminate indicator while waiting." color: var(--argui-muted-foreground) font_size: 14.0 }
+
+        Text {
+            content: indeterminate ? "Preparing your upload…" : "Uploading files · " + str(value) + "%"
+            color: var(--argui-foreground)
+            weight: 500
+            font_size: 14.0
+        }
+        Progress { label: "Upload progress" value: value indeterminate: indeterminate width: 360px }
+
+        Row {
+            wrap: true
+            gap: 8.0
+            Button { text: "Advance" enabled: !indeterminate && value < 100.0 on click { value = value >= 75.0 ? 100.0 : value + 25.0 } }
+            Button { text: "Reset" variant: "outline" on click { value = 0.0 indeterminate = false } }
+            Button {
+                text: indeterminate ? "Determinate" : "Indeterminate"
+                variant: "outline"
+                on click {
+                    indeterminate = !indeterminate
+                    value = indeterminate ? value : 45.0
+                }
+            }
+        }
+    }
+}

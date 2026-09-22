@@ -234,6 +234,7 @@ pub struct UiEvent {
     once: Option<Rc<Cell<bool>>>,
     control: Rc<EventControl>,
     default_action: bool,
+    default_sensitive: bool,
     focused_node: Option<NodeId>,
     history: Option<(bool, bool)>,
 }
@@ -247,6 +248,7 @@ pub(crate) struct EventDelivery {
     pub(crate) passive: bool,
     pub(crate) once: Option<Rc<Cell<bool>>>,
     pub(crate) handler_value: Option<HandlerValue>,
+    pub(crate) default_sensitive: bool,
 }
 
 impl PartialEq for UiEvent {
@@ -294,6 +296,7 @@ impl UiEvent {
             once: None,
             control: Rc::new(EventControl::default()),
             default_action: false,
+            default_sensitive: false,
             focused_node: None,
             history: None,
         }
@@ -314,6 +317,7 @@ impl UiEvent {
             once: delivery.once,
             control: Rc::clone(&self.control),
             default_action: self.default_action,
+            default_sensitive: delivery.default_sensitive,
             focused_node: self.focused_node,
             history: self.history,
         }
@@ -420,6 +424,9 @@ impl UiEvent {
     pub fn should_dispatch(&self) -> bool {
         if self.default_action {
             return !self.control.default_prevented.replace(true);
+        }
+        if self.default_sensitive && self.control.default_prevented.get() {
+            return false;
         }
         if self.control.immediate_target.get().is_some() {
             return false;

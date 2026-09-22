@@ -1,0 +1,40 @@
+import { ScrollView } from "@argui/ui"
+import { Column, Container, Text } from "@argui/native"
+
+export component ScrollViewPage {
+    private property entries: array<string> = [
+        "Aster", "Birch", "Cedar", "Dahlia", "Elm", "Fern", "Ginkgo", "Hazel",
+        "Iris", "Juniper", "Kale", "Laurel", "Maple", "Nettle", "Oak", "Pine",
+        "Quince", "Rose", "Sage", "Thyme", "Umber", "Violet", "Willow", "Yarrow"
+    ]
+
+    Column {
+        width: 100%
+        gap: 18.0
+        Text { content: "ScrollView" color: var(--argui-foreground) weight: 700 font_size: 27.0 }
+        Text { content: "The scrollbar and edge shadows are drawn by DSL bindings." color: var(--argui-muted-foreground) font_size: 14.0 }
+        Text { content: "Scroll position: " + str(scroll_view.offset_y / 1px) + " px" color: var(--argui-muted-foreground) font_size: 13.0 }
+        Container #scroll_preview {
+            width: 320px
+            height: 180px
+            ScrollView #scroll_view {
+                width: 320px
+                height: 180px
+                show_edge_shadows: true
+                Column {
+                    width: 100%
+                    gap: 2.0
+                    for item in entries key item {
+                        Container {
+                            width: 100%
+                            height: 30px
+                            shrink: 0.0
+                            background: var(--argui-surface)
+                            Text { content: item color: var(--argui-foreground) font_size: 13.0 }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

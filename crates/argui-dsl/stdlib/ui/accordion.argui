@@ -1,0 +1,63 @@
+import { Column, FocusScope, KeyBinding, Rectangle, Row, Text, TouchArea } from "@argui/native"
+
+export component AccordionSection {
+    in property title: string
+    in property open: bool = false
+    in property previous: bool = false
+    in property next: bool = false
+    callback toggle()
+    slot content
+
+    Rectangle {
+        width: 100%
+        background: solid(var(--argui-surface))
+        border_color: var(--argui-border)
+        border_width: 1.0
+        radius: 10.0
+        Column {
+            width: 100%
+            FocusScope #trigger {
+                keyboard_activation: "enter_or_space"
+                role: "button"
+                accessible_name: title
+                expandable: true
+                expanded: open
+                on click { toggle() }
+                if previous {
+                    KeyBinding { shortcut: "ArrowUp" on activated { focus_previous() } }
+                }
+                if next {
+                    KeyBinding { shortcut: "ArrowDown" on activated { focus_next() } }
+                }
+                TouchArea #touch {
+                    mouse_cursor: "pointer"
+                    Rectangle {
+                        width: 100%
+                        background: solid(touch.pressed ? var(--argui-neutral-pressed) : touch.has_hover ? var(--argui-muted) : var(--argui-surface))
+                        border_color: trigger.focus_visible ? var(--argui-ring) : var(--argui-surface)
+                        border_width: trigger.focus_visible ? 2.0 : 0.0
+                        radius: 9.0
+                        Row {
+                            width: 100%
+                            padding: 16.0
+                            gap: 12.0
+                            align_items: "center"
+                            Column {
+                                grow: 1.0
+                                Text { content: title color: var(--argui-foreground) weight: 600 font_size: 15.0 }
+                            }
+                            Text { content: open ? "−" : "+" color: var(--argui-muted-foreground) weight: 700 font_size: 20.0 }
+                        }
+                    }
+                }
+            }
+            if open {
+                Column {
+                    width: 100%
+                    padding: 16.0
+                    content
+                }
+            }
+        }
+    }
+}

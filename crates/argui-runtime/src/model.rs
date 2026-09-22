@@ -2,10 +2,12 @@ use crate::AppCommand;
 use argui_animation::Frame;
 use argui_inspect::InspectorHandle;
 use argui_paint::{ImageAsset, VectorAsset};
-use argui_ui::{Element, EventHandlerId, EventOwnerId, UiEvent};
+use argui_render::EffectDefinition;
+use argui_ui::{Element, EventHandlerId, EventOwnerId, RetainedIdentity, UiEvent};
 use std::{
     any::Any,
     cell::{Cell, RefCell},
+    collections::HashSet,
     rc::{Rc, Weak},
 };
 
@@ -20,6 +22,11 @@ pub use effects::ViewUpdate;
 use effects::{ContextEffects, merge_effects};
 mod context;
 pub use context::{Context, Render};
+mod observation;
+pub(crate) use observation::InteractionSnapshot;
+pub use observation::{
+    ObservationReader, ObservedInteraction, ObservedScroll, SourceIdentityIndex,
+};
 mod editing;
 pub use layout::{LayoutBounds, LayoutSnapshot, ScrollRequest};
 
@@ -118,7 +125,10 @@ pub struct AnyEntity {
     identity: Rc<dyn Any>,
     #[cfg(feature = "tasks")]
     tasks: Rc<dyn Fn(crate::tasks::TaskRuntime)>,
-    render: Rc<dyn Fn(WindowEnvironment) -> Element>,
+    render: Rc<dyn Fn(WindowEnvironment, InteractionSnapshot) -> Element>,
+    collect_observed: Rc<ObservationCollector>,
+    invalidate_observed: Rc<ObservationInvalidator>,
+    set_interaction_snapshot: Rc<dyn Fn(&InteractionSnapshot)>,
     dispatch_handler: Rc<HandlerDispatch>,
     store: Rc<dyn Fn(ContextEffects)>,
     wants_frame: Rc<dyn Fn() -> bool>,
@@ -127,9 +137,16 @@ pub struct AnyEntity {
     owns: Rc<dyn Fn(EventOwnerId) -> bool>,
     image_assets: Rc<dyn Fn() -> Vec<ImageAsset>>,
     vector_assets: Rc<dyn Fn() -> Vec<VectorAsset>>,
+    effect_definitions: Rc<dyn Fn() -> Vec<EffectDefinition>>,
     inspector: Rc<dyn Fn() -> Option<InspectorHandle>>,
     take_effects: Rc<dyn Fn() -> ContextEffects>,
 }
+
+/// Collects native identities read by an entity during rendering.
+type ObservationCollector = dyn Fn(&mut HashSet<RetainedIdentity>);
+
+/// Invalidates an entity when one of its observed native identities changed.
+type ObservationInvalidator = dyn Fn(&HashSet<RetainedIdentity>) -> bool;
 
 fn inherit_environment_use(parent: &Cell<bool>, child: &Cell<bool>) {
     if child.get() {
@@ -157,6 +174,9 @@ impl<T: Render> Entity<T> {
         let host_visibility = self.clone();
         let close_host = self.clone();
         let render = self.clone();
+        let collect_observed = self.clone();
+        let invalidate_observed = self.clone();
+        let set_interaction_snapshot = self.clone();
         let handler = self.clone();
         let store = self.clone();
         let wants_frame = self.clone();
@@ -165,6 +185,7 @@ impl<T: Render> Entity<T> {
         let owns = self.clone();
         let image_assets = self.clone();
         let vector_assets = self.clone();
+        let effect_definitions = self.clone();
         let inspector = self.clone();
         let take_effects = self.clone();
         let model_runtimes = self.clone();
@@ -183,7 +204,18 @@ impl<T: Render> Entity<T> {
             identity: self.0.clone(),
             #[cfg(feature = "tasks")]
             tasks: Rc::new(move |runtime| tasks.set_task_runtime(runtime)),
-            render: Rc::new(move |environment| render.render_in(environment)),
+            render: Rc::new(move |environment, observations| {
+                render.render_with_observations(environment, observations)
+            }),
+            collect_observed: Rc::new(move |identities| {
+                collect_observed.collect_observed(identities)
+            }),
+            invalidate_observed: Rc::new(move |changed| {
+                invalidate_observed.invalidate_observed(changed)
+            }),
+            set_interaction_snapshot: Rc::new(move |snapshot| {
+                set_interaction_snapshot.set_interaction_snapshot(snapshot)
+            }),
             dispatch_handler: Rc::new(move |id, event| handler.dispatch_handler(id, event)),
             store: Rc::new(move |effects| store.store_effects(effects)),
             wants_frame: Rc::new(move || wants_frame.wants_frame()),
@@ -192,6 +224,9 @@ impl<T: Render> Entity<T> {
             owns: Rc::new(move |owner| owns.owns(owner)),
             image_assets: Rc::new(move || image_assets.read(Render::image_assets)),
             vector_assets: Rc::new(move || vector_assets.read(Render::vector_assets)),
+            effect_definitions: Rc::new(move || {
+                effect_definitions.read(Render::effect_definitions)
+            }),
             inspector: Rc::new(move || inspector.read(Render::inspector)),
             take_effects: Rc::new(move || take_effects.take_effects()),
         }
@@ -207,9 +242,25 @@ impl<T: Render> Entity<T> {
 
     #[must_use]
     /// Renders this entity using `environment` for platform and theme state.
-    /// Returns the retained UI subtree, or an empty container when hidden.
+    /// Reuses the latest interaction observations published by its host. Returns
+    /// the retained UI subtree, or an empty container when hidden.
     pub fn render_in(&self, environment: WindowEnvironment) -> Element {
+        let observations = self.0.presentation.interaction_snapshot.borrow().clone();
+        self.render_with_observations(environment, observations)
+    }
+
+    /// Renders in `environment` using the host's `observations` snapshot.
+    /// Returns the retained subtree, reusing its cache when still valid.
+    fn render_with_observations(
+        &self,
+        environment: WindowEnvironment,
+        observations: InteractionSnapshot,
+    ) -> Element {
         let _transaction = self.0.model.runtime.enter();
+        self.0
+            .presentation
+            .interaction_snapshot
+            .replace(observations.clone());
         if !self.0.presentation.is_visible() {
             return Element::container([]);
         }
@@ -227,6 +278,7 @@ impl<T: Render> Entity<T> {
             entity: Some(self.downgrade()),
             owner: Some((self.0.presentation.id, observer)),
             environment,
+            observations: self.0.presentation.interaction_snapshot.clone(),
             ..Context::default()
         };
         let element = {
@@ -258,6 +310,8 @@ impl<T: Render> Entity<T> {
             .presentation
             .environment_used
             .set(cx.environment_read.get());
+        *self.0.presentation.observed_identities.borrow_mut() =
+            std::mem::take(&mut *cx.observed_identities.borrow_mut());
         self.0.presentation.cache.store(&element);
         self.0
             .presentation

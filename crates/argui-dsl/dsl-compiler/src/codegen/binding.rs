@@ -41,7 +41,9 @@ impl Context<'_> {
             let field = types::rust_identifier(&property.name);
             let initial = if property.required {
                 field.clone()
-            } else if let Some(default) = &lowered.default {
+            } else if let Some(default) = &lowered.default
+                && !super::child_reference::contextual_default(default)
+            {
                 self.expression(default, &scope)?
             } else {
                 self.default_value(&property.value_type)?
@@ -146,7 +148,7 @@ impl Context<'_> {
             "/// Builds a static snapshot without registering interactive handlers."
         )
         .unwrap();
-        write!(output, "pub fn render(&self) -> ::argui::ui::Element {{ let mut handlers: NativeEventRegistrar<'_> = None; let translator = self.translator.borrow().clone(); let mut property_motions = self.property_motions.borrow_mut(); property_motions.begin_render(); let mut child_properties = self.child_properties.borrow_mut(); child_properties.begin_render(); let virtual_viewports = self.virtual_viewports.borrow(); let element = render_component_{}(self.instance, &translator, &mut property_motions, &mut child_properties, &virtual_viewports, false", ir.id.raw()).unwrap();
+        write!(output, "pub fn render(&self) -> ::argui::ui::Element {{ let mut handlers: NativeEventRegistrar<'_> = None; let translator = self.translator.borrow().clone(); let mut property_motions = self.property_motions.borrow_mut(); property_motions.begin_render(); let mut child_properties = self.child_properties.borrow_mut(); child_properties.begin_render(); let virtual_viewports = self.virtual_viewports.borrow(); let element = render_component_{}(self.instance, &translator, &mut property_motions, &mut child_properties, &virtual_viewports, false, ::argui::runtime::ObservationReader::default(), Rc::new(RefCell::new(Vec::new()))", ir.id.raw()).unwrap();
         for property in &source.properties {
             write!(
                 output,
@@ -186,7 +188,13 @@ impl Context<'_> {
             "let reduced_motion = cx.environment().reduced_motion;"
         )
         .unwrap();
-        writeln!(output, "let mut register = |callback: NativeEventCallback| cx.event_handler(move |_, event, cx| {{ callback(event); cx.notify(); }});").unwrap();
+        writeln!(output, "let observer = cx.observation_reader();").unwrap();
+        writeln!(
+            output,
+            "let host_effects: Rc<RefCell<Vec<HostEffect>>> = Rc::new(RefCell::new(Vec::new()));"
+        )
+        .unwrap();
+        writeln!(output, "let mut register = |callback: NativeEventCallback| {{ let host_effects = host_effects.clone(); cx.event_handler(move |_, event, cx| {{ host_effects.borrow_mut().clear(); callback(event); for effect in host_effects.borrow_mut().drain(..) {{ match effect {{ HostEffect::Focus(::argui::ui::FocusRequest::Next) => cx.focus_next(), HostEffect::Focus(::argui::ui::FocusRequest::Previous) => cx.focus_previous(), HostEffect::Scroll(request) => cx.scroll(request), HostEffect::PreventDefault => {{ let _ = event.prevent_default(); }}, HostEffect::StopPropagation => event.stop_propagation(), _ => {{}} }} }} cx.notify(); }}) }};").unwrap();
         writeln!(
             output,
             "let mut handlers: NativeEventRegistrar<'_> = Some(&mut register);"
@@ -202,7 +210,7 @@ impl Context<'_> {
         .unwrap();
         write!(
             output,
-            "let element = render_component_{}(self.instance, &translator, &mut property_motions, &mut child_properties, &virtual_viewports, reduced_motion",
+            "let element = render_component_{}(self.instance, &translator, &mut property_motions, &mut child_properties, &virtual_viewports, reduced_motion, observer, host_effects.clone()",
             ir.id.raw()
         )
         .unwrap();
@@ -243,6 +251,11 @@ impl Context<'_> {
         writeln!(
             output,
             "fn vector_assets(&self) -> Vec<::argui::paint::VectorAsset> {{ vector_assets() }}"
+        )
+        .unwrap();
+        writeln!(
+            output,
+            "fn effect_definitions(&self) -> Vec<::argui::render::EffectDefinition> {{ effect_definitions() }}"
         )
         .unwrap();
         writeln!(output, "}}").unwrap();

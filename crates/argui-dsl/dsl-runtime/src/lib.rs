@@ -8,6 +8,7 @@ mod event;
 mod inspection;
 mod instance;
 mod native;
+mod observation;
 mod package;
 mod render;
 mod runtime;

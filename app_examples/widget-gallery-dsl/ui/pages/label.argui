@@ -1,0 +1,30 @@
+import { Input, Label } from "@argui/ui"
+import { Column, Text } from "@argui/native"
+
+export component LabelPage {
+    private property name: string = "Ada Lovelace"
+    private property workspace_id: string = "argui-studio"
+
+    Column #label_page {
+        width: 100%
+        gap: 20.0
+        Text { content: "Label" color: var(--argui-foreground) weight: 700 font_size: 27.0 }
+        Text { content: "Click a label to focus its field. Use Tab to move between controls." color: var(--argui-muted-foreground) font_size: 14.0 }
+        Text { content: "Make every field clear" color: var(--argui-foreground) weight: 600 font_size: 17.0 }
+
+        Column {
+            width: 100%
+            gap: 8.0
+            Label { text: "Display name" }
+            Input { label: "Display name" value <=> name placeholder: "Your name" }
+            Text { content: "This is how your name appears to your team." color: var(--argui-muted-foreground) font_size: 13.0 }
+        }
+        Column {
+            width: 100%
+            gap: 8.0
+            Label { text: "Workspace ID" }
+            Input { label: "Workspace ID" value <=> workspace_id placeholder: "Workspace ID" }
+        }
+        Text { content: "Display name: " + name + " · Workspace ID: " + workspace_id color: var(--argui-muted-foreground) font_size: 13.0 }
+    }
+}

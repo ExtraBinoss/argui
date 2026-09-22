@@ -127,8 +127,9 @@ fn editing_respects_graphemes_selection_and_clipboard_requests() {
 
     let deleted = tree.edit_text_input(&key(Key::Backspace, None, Modifiers::default()));
     assert_eq!(tree.text_input_value(node), Some("A"));
+    assert!(matches!(deleted.events[0].kind, UiEventKind::TextEdited(_)));
     assert!(matches!(
-        &deleted.events[0].kind,
+        &deleted.events[1].kind,
         UiEventKind::TextChanged(value) if value == "A"
     ));
 
@@ -197,8 +198,9 @@ fn ime_preedit_is_visible_but_only_commit_changes_the_value() {
     assert_eq!(tree.text_input_value(node), Some(""));
 
     let commit = tree.ime_input(ImeInput::Commit("é".into()));
+    assert!(matches!(commit.events[0].kind, UiEventKind::TextEdited(_)));
     assert!(matches!(
-        &commit.events[0].kind,
+        &commit.events[1].kind,
         UiEventKind::TextChanged(value) if value == "é"
     ));
     assert_eq!(tree.text_input_value(node), Some("é"));
@@ -482,8 +484,9 @@ fn text_area_inserts_lines_and_command_enter_submits() {
     };
     focus(&mut tree, &region);
     let newline = tree.edit_text_input(&key(Key::Enter, None, Modifiers::default()));
+    assert!(matches!(newline.events[0].kind, UiEventKind::TextEdited(_)));
     assert!(matches!(
-        &newline.events[0].kind,
+        &newline.events[1].kind,
         UiEventKind::TextChanged(value) if value == "first\n"
     ));
     let command = Modifiers {

@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
 use crate::{
-    Element, NodeId, TextSelectionHighlight, TextSelectionStyle, UserSelect, WritingDirection,
+    Element, NodeId, RetainedIdentity, TextSelectionHighlight, TextSelectionStyle, UserSelect,
+    WritingDirection,
 };
 
 const NONE: u32 = u32::MAX;
@@ -12,6 +13,7 @@ const NONE: u32 = u32::MAX;
 pub(crate) struct TreeIndex {
     elements: Vec<Element>,
     positions: HashMap<NodeId, usize>,
+    identities: HashMap<RetainedIdentity, Option<NodeId>>,
     parents: Vec<u32>,
     subtree_ends: Vec<u32>,
     selection: Vec<UserSelect>,
@@ -43,6 +45,7 @@ impl TreeIndex {
         let mut index = Self {
             elements: Vec::with_capacity(ids.len()),
             positions: HashMap::with_capacity(ids.len()),
+            identities: HashMap::new(),
             parents: Vec::with_capacity(ids.len()),
             subtree_ends: Vec::with_capacity(ids.len()),
             selection: Vec::with_capacity(ids.len()),
@@ -54,6 +57,7 @@ impl TreeIndex {
             layout_roots: Vec::new(),
         };
         index.visit(root, ids, NONE);
+        index.sync_identities();
         index
     }
 
@@ -110,7 +114,30 @@ impl TreeIndex {
     /// Refresh descriptions while identities and topology are unchanged. Shared
     /// subtrees need no visit unless their inherited selection/direction changed.
     pub(super) fn sync(&mut self, root: &Element) -> bool {
-        self.sync_node(root, 0).1
+        let bindings_changed = self.sync_node(root, 0).1;
+        self.sync_identities();
+        bindings_changed
+    }
+
+    /// Rebuilds unique source-identity targets after element descriptions change.
+    fn sync_identities(&mut self) {
+        self.identities.clear();
+        for (node, index) in &self.positions {
+            let Some(identity) = self.elements[*index].source_identity() else {
+                continue;
+            };
+            self.identities
+                .entry(identity.clone())
+                .and_modify(|target| *target = None)
+                .or_insert(Some(*node));
+        }
+    }
+
+    /// Resolves a source identity only when exactly one retained node owns it.
+    ///
+    /// * `identity` — compiler/runtime identity of a current element.
+    pub(super) fn identity(&self, identity: &RetainedIdentity) -> Option<NodeId> {
+        self.identities.get(identity).copied().flatten()
     }
 
     fn sync_node(&mut self, element: &Element, position: usize) -> (usize, bool) {

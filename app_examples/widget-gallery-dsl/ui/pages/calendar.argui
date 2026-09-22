@@ -1,0 +1,37 @@
+import { Calendar } from "@argui/ui"
+import { Column, Text } from "@argui/native"
+
+export component CalendarPage {
+    private property view_year: int = 2026
+    private property view_month: int = 9
+    private property chosen_year: int = 0
+    private property chosen_month: int = 0
+    private property chosen_day: int = 0
+
+    Column #calendar_page {
+        width: 100%
+        gap: 18.0
+
+        Text { content: "Calendar" color: var(--argui-foreground) weight: 700 font_size: 27.0 }
+        Text { content: "Choose a date. Click the year to change it; arrow keys move within the month, and PageUp and PageDown browse months." color: var(--argui-muted-foreground) font_size: 14.0 }
+
+        Calendar {
+            year <=> view_year
+            month <=> view_month
+            selected_year: chosen_year
+            selected_month: chosen_month
+            selected_day: chosen_day
+            on select(year, month, day) {
+                chosen_year = year
+                chosen_month = month
+                chosen_day = day
+            }
+        }
+
+        Text {
+            content: chosen_day == 0 ? "No date selected" : "Selected: " + str(chosen_year) + "-" + (chosen_month < 10 ? "0" : "") + str(chosen_month) + "-" + (chosen_day < 10 ? "0" : "") + str(chosen_day)
+            color: var(--argui-muted-foreground)
+            font_size: 14.0
+        }
+    }
+}

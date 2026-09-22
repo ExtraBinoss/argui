@@ -1,8 +1,43 @@
 use argui_core::Rect;
 
-use crate::{NodeId, OverlaySurface, UiTree};
+use crate::{InteractionUpdate, NodeId, OverlaySurface, UiEventKind, UiTree};
 
 impl UiTree {
+    /// Requests dismissal when the topmost portal closes on Escape.
+    ///
+    /// Returns that portal's dismiss deliveries, or an empty update when the
+    /// topmost portal is manual or no portal is mounted. Hosts call this after
+    /// cancelable key delivery.
+    pub(crate) fn dismiss_portal_on_escape(&mut self) -> InteractionUpdate {
+        let target = crate::traversal::flattened(self.root())
+            .into_iter()
+            .enumerate()
+            .filter_map(|(index, element)| {
+                let portal = element.portal.as_ref()?;
+                Some((
+                    portal.layer,
+                    element.z_index,
+                    index,
+                    self.node_ids[index],
+                    portal.dismiss,
+                ))
+            })
+            .max_by_key(|(layer, z_index, index, _, _)| (*layer, *z_index, *index))
+            .filter(|(_, _, _, _, policy)| {
+                matches!(
+                    policy,
+                    crate::DismissPolicy::Escape
+                        | crate::DismissPolicy::OutsidePointerOrEscape
+                        | crate::DismissPolicy::OutsideHoverOrEscape
+                )
+            })
+            .map(|(_, _, _, node, _)| node);
+        target.map_or_else(InteractionUpdate::default, |node| InteractionUpdate {
+            events: self.event_deliveries(node, UiEventKind::DismissRequested),
+            ..InteractionUpdate::default()
+        })
+    }
+
     /// The requested policy is independent of whether the current host supports native popups.
     ///
     /// * `node` — portal node whose requested surface is queried.

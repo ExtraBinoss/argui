@@ -69,7 +69,7 @@ fn image_and_svg_accept_typed_handles_and_reject_wrong_media_kinds() {
 }
 
 #[test]
-fn scrollable_container_and_switch_expose_native_behavior() {
+fn scrollable_container_and_focus_scope_expose_native_behavior() {
     let registry = builtin::registry().unwrap();
     let scroll = registry
         .construct(
@@ -92,17 +92,21 @@ fn scrollable_container_and_switch_expose_native_behavior() {
     );
     assert_eq!(scroll.style.overflow.y, Overflow::Auto);
 
-    let switch = registry
+    let toggle_scope = registry
         .construct(
-            builtin::SWITCH,
+            builtin::FOCUS_SCOPE,
             &NativeElementInput::new()
                 .property(builtin::KEY, SchemaValue::String("toggle".into()))
-                .property(builtin::LABEL, SchemaValue::String("Notifications".into()))
+                .property(builtin::SEMANTIC_ROLE, SchemaValue::String("switch".into()))
+                .property(
+                    builtin::SEMANTIC_LABEL,
+                    SchemaValue::String("Notifications".into()),
+                )
                 .property(builtin::CHECKED, SchemaValue::Bool(true)),
         )
         .unwrap();
     assert_eq!(
-        switch.semantics.as_ref().unwrap().state.checked,
+        toggle_scope.semantics.as_ref().unwrap().state.checked,
         Some(CheckedState::Checked)
     );
 }

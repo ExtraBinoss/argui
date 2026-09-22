@@ -12,7 +12,7 @@ fn event_mode_switch_composes_custom_theme_and_rejects_unknown_dynamic_name() {
     let compiled = Compiler::compile(
         [SourceModule::new(
             "ui/main.argui",
-            r#"import { Pressable } from "@argui/native"
+            r#"import { TouchArea } from "@argui/native"
 export theme CustomTheme {
     --argui-background: color = #112233
     light { --argui-background: #abcdef }
@@ -21,8 +21,7 @@ export theme CustomTheme {
 export component Main {
     in-out property selected: string = "dark"
     in-out property observed: color = #000000
-    Pressable {
-        label: "Toggle"
+    TouchArea {
         on click { set_theme_mode(selected) observed = var(--argui-background) }
     }
 }"#,
@@ -49,7 +48,7 @@ export component Main {
     let component_id = component.id;
     let site = match &component.body[0] {
         IrNode::Element { site, .. } => *site,
-        _ => panic!("expected Pressable"),
+        _ => panic!("expected TouchArea"),
     };
     let package =
         LivePackage::prepare(1, compiled.public_api_hash, compiled.ir, HashMap::new()).unwrap();
@@ -98,9 +97,9 @@ fn unknown_literal_mode_is_a_compile_diagnostic() {
     let error = Compiler::compile(
         [SourceModule::new(
             "ui/main.argui",
-            r#"import { Pressable } from "@argui/native"
+            r#"import { TouchArea } from "@argui/native"
 export component Main {
-    Pressable { label: "Go" on click { set_theme_mode("missing") } }
+    TouchArea { on click { set_theme_mode("missing") } }
 }"#,
         )],
         "ui/main.argui",
@@ -121,12 +120,11 @@ fn mode_only_custom_theme_overrides_builtin_token_in_aot() {
     let compiled = Compiler::compile(
         [SourceModule::new(
             "ui/main.argui",
-            r#"import { Pressable } from "@argui/native"
+            r#"import { TouchArea, Rectangle } from "@argui/native"
 export theme OverrideOnly { dark { --argui-primary: #aabbcc } }
 export component Main {
-    Pressable {
-        label: "Go"
-        background: var(--argui-primary)
+    TouchArea {
+        Rectangle { background: solid(var(--argui-primary)) }
         on click { set_theme_mode("dark") }
     }
 }"#,

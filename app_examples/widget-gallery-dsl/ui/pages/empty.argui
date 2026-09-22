@@ -1,0 +1,41 @@
+import { Button } from "@argui/ui"
+import { Column, Rectangle, Row, Text } from "@argui/native"
+
+export component EmptyPage {
+    callback browse_components()
+
+    Column #empty_page {
+        width: 100%
+        gap: 20.0
+        Text { content: "Empty" color: var(--argui-foreground) weight: 700 font_size: 27.0 }
+        Text { content: "Give an empty view a useful message and a next step." color: var(--argui-muted-foreground) font_size: 14.0 }
+        Text { content: "A useful starting point" color: var(--argui-foreground) weight: 600 font_size: 17.0 }
+        Text { content: "Explain what belongs here and offer a way forward." color: var(--argui-muted-foreground) font_size: 13.0 }
+
+        Rectangle {
+            width: 100%
+            background: solid(var(--argui-surface))
+            border_color: var(--argui-border)
+            border_width: 1.0
+            radius: 12.0
+            Column {
+                width: 100%
+                padding: 32.0
+                gap: 12.0
+                align_items: "center"
+                Rectangle {
+                    width: 48px
+                    height: 48px
+                    radius: 10.0
+                    background: solid(var(--argui-muted))
+                    Row { width: 100% height: 100% align_items: "center" justify_content: "center"
+                        Text { content: "▢" color: var(--argui-foreground) font_size: 25.0 }
+                    }
+                }
+                Text { content: "No projects yet" color: var(--argui-foreground) weight: 600 font_size: 18.0 }
+                Text { content: "Your projects will appear here. Explore the component library to start building your first interface." color: var(--argui-muted-foreground) font_size: 14.0 }
+                Button { text: "Browse components" on click { browse_components() } }
+            }
+        }
+    }
+}

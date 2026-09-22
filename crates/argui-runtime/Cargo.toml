@@ -63,3 +63,9 @@ name = "native_popups"
 path = "tests/app/popups.rs"
 harness = false
 required-features = ["native-popups"]
+
+[[test]]
+name = "multi_gtk_failure"
+path = "tests/multi/gtk.rs"
+harness = false
+required-features = ["webview"]

@@ -1,0 +1,25 @@
+import { Select } from "@argui/ui"
+import { Column, Container, Text } from "@argui/native"
+
+export component NativeSelectPage {
+    private property language: string = "English"
+
+    Column #native_select_page {
+        width: 100%
+        gap: 18.0
+
+        Text { content: "Native select" color: var(--argui-foreground) weight: 700 font_size: 27.0 }
+        Text { content: "A compact platform-independent language selector." color: var(--argui-muted-foreground) font_size: 14.0 }
+
+        Container #native_select_anchor { width: 190px
+            Select {
+                anchor: "native_select_anchor"
+                label: "Language"
+                value <=> language
+                options: ["English", "Français", "Deutsch"]
+                width: 190px
+            }
+        }
+        Text { content: "Selected " + language color: var(--argui-muted-foreground) font_size: 13.0 }
+    }
+}

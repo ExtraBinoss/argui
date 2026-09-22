@@ -1,0 +1,30 @@
+import { Button } from "@argui/ui"
+import { Column, Rectangle, Row, Text } from "@argui/native"
+
+export component ItemPage {
+    private property opened: bool = false
+
+    Column #item_page {
+        width: 100%
+        gap: 18.0
+
+        Text { content: "Item" color: var(--argui-foreground) weight: 700 font_size: 27.0 }
+        Text { content: "A reusable row can carry media, details, and a separate action." color: var(--argui-muted-foreground) font_size: 14.0 }
+
+        Rectangle { width: 100% radius: 8.0 border_color: var(--argui-border) border_width: 1.0 background: solid(var(--argui-surface))
+            Row { width: 100% padding: 12.0 gap: 12.0 align_items: "center"
+                Rectangle { width: 42px height: 42px radius: 8.0 background: solid(var(--argui-muted))
+                    Row { width: 42px height: 42px justify_content: "center" align_items: "center"
+                        Text { content: "W" color: var(--argui-primary) font_size: 24.0 weight: 700 }
+                    }
+                }
+                Column { grow: 1.0 min_width: 0.0 gap: 3.0
+                    Text { content: "Website redesign" color: var(--argui-foreground) font_size: 14.0 weight: 600 }
+                    Text { content: "12 screens · Updated today" color: var(--argui-muted-foreground) font_size: 13.0 }
+                }
+                Button { text: "Open" variant: "outline" on click { opened = true } }
+            }
+        }
+        Text { content: opened ? "Opened Website redesign" : "Select Open to view this item." color: var(--argui-muted-foreground) font_size: 13.0 }
+    }
+}

@@ -18,7 +18,9 @@ impl UiTree {
         let update = self
             .interaction
             .pointer_moved(PointerEvent::mouse(PointerPhase::Moved, point), regions);
-        self.decorate_pointer(update)
+        let mut update = self.decorate_pointer(update);
+        self.dismiss_on_hover_exit(point, regions, &mut update);
+        update
     }
 
     fn decorate_pointer(&mut self, update: crate::interaction::RawUpdate) -> InteractionUpdate {
@@ -33,6 +35,32 @@ impl UiTree {
                 .collect(),
             ..InteractionUpdate::default()
         }
+    }
+
+    /// Updates pointer location during another phase without delivering a synthetic move.
+    ///
+    /// * `event` — press or release sample whose location should be observed.
+    /// * `regions` — current hit regions for hover and drag-slop calculation.
+    ///
+    /// Returns hover and visual-state changes caused by positioning the pointer.
+    fn position_for_transition(
+        &mut self,
+        event: PointerEvent,
+        regions: &[HitRegion],
+    ) -> InteractionUpdate {
+        let mut raw = self
+            .interaction
+            .pointer_moved(with_phase(event, PointerPhase::Moved), regions);
+        raw.events.retain(|(_, kind)| {
+            !matches!(
+                kind,
+                UiEventKind::Pointer(PointerEvent {
+                    phase: PointerPhase::Moved,
+                    ..
+                })
+            )
+        });
+        self.decorate(raw)
     }
 
     /// Processes a pointer phase, dispatching interactions and gesture events.
@@ -68,10 +96,7 @@ impl UiTree {
                     self.decorate_pointer(update)
                 }
                 PointerPhase::Pressed => {
-                    let moved = self
-                        .interaction
-                        .pointer_moved(with_phase(event, PointerPhase::Moved), regions);
-                    let mut moved = self.decorate(moved);
+                    let mut moved = self.position_for_transition(event, regions);
                     moved.merge(self.primary_pressed_for(event, regions));
                     if let Some((node, gestures)) = hit
                         && gestures.captures_on_press()
@@ -81,10 +106,7 @@ impl UiTree {
                     moved
                 }
                 PointerPhase::Released => {
-                    let moved = self
-                        .interaction
-                        .pointer_moved(with_phase(event, PointerPhase::Moved), regions);
-                    let mut moved = self.decorate(moved);
+                    let mut moved = self.position_for_transition(event, regions);
                     moved.merge(self.primary_released_for(event));
                     if event.kind == PointerKind::Touch {
                         let left = self
@@ -118,31 +140,99 @@ impl UiTree {
                 .events
                 .extend(self.event_deliveries(portal, UiEventKind::PointerOutside(event)));
         }
+        if event.kind == PointerKind::Mouse
+            && matches!(event.phase, PointerPhase::Moved | PointerPhase::Left)
+        {
+            self.dismiss_on_hover_exit(event.position, regions, &mut update);
+        }
         self.dispatch_gestures(gestures, &mut update);
         update
     }
 
     fn light_dismiss_outside(&self, hit: Option<NodeId>) -> Option<NodeId> {
         let hit_index = hit.and_then(|node| self.index.position(node));
-        crate::traversal::flattened(self.root())
-            .into_iter()
+        let elements = crate::traversal::flattened(self.root());
+        let topmost = elements
+            .iter()
             .enumerate()
             .filter_map(|(index, element)| {
                 let portal = element.portal.as_ref()?;
-                (portal.dismiss == crate::DismissPolicy::OutsidePointer
-                    && hit_index.is_none_or(|hit| {
-                        !self.contains_index(index, hit)
-                            && !self.portal_anchor_contains(portal, hit)
-                    }))
-                .then_some((
-                    portal.layer,
-                    element.z_index,
-                    index,
-                    self.node_ids[index],
-                ))
+                Some((portal.layer, element.z_index, index))
+            })
+            .max()?;
+        elements
+            .iter()
+            .enumerate()
+            .filter_map(|(index, element)| {
+                let portal = element.portal.as_ref()?;
+                (self.contains_index(index, topmost.2)
+                    && matches!(
+                        portal.dismiss,
+                        crate::DismissPolicy::OutsidePointer
+                            | crate::DismissPolicy::OutsidePointerOrEscape
+                            | crate::DismissPolicy::OutsideHoverOrEscape
+                    ))
+                .then_some((portal.layer, element.z_index, index, portal))
             })
             .max_by_key(|(layer, z_index, index, _)| (*layer, *z_index, *index))
-            .map(|(_, _, _, node)| node)
+            .and_then(|(_, _, index, portal)| {
+                hit_index
+                    .is_none_or(|hit| {
+                        !self.contains_index(index, hit)
+                            && !self.portal_anchor_contains(portal, hit)
+                    })
+                    .then_some(self.node_ids[index])
+            })
+    }
+
+    /// Requests hover dismissal after the pointer leaves both a portal and its anchor.
+    ///
+    /// * `point` — current pointer position in window coordinates.
+    /// * `regions` — hit geometry for the current frame.
+    /// * `update` — interaction update receiving a dismissal delivery when applicable.
+    fn dismiss_on_hover_exit(
+        &mut self,
+        point: Point,
+        regions: &[HitRegion],
+        update: &mut InteractionUpdate,
+    ) {
+        let elements = crate::traversal::flattened(self.root());
+        let Some((index, portal)) = elements
+            .iter()
+            .enumerate()
+            .filter_map(|(index, element)| {
+                element
+                    .portal
+                    .as_ref()
+                    .map(|portal| (portal.layer, element.z_index, index, portal))
+            })
+            .max_by_key(|(layer, z_index, index, _)| (*layer, *z_index, *index))
+            .and_then(|(_, _, index, portal)| {
+                (portal.dismiss == crate::DismissPolicy::OutsideHoverOrEscape)
+                    .then_some((index, portal))
+            })
+        else {
+            return;
+        };
+        let anchor_index = match &portal.target {
+            crate::PortalTarget::Anchor(anchor) => elements
+                .iter()
+                .position(|element| element.key.as_deref() == Some(anchor.key.as_str())),
+            _ => None,
+        };
+        let near_surface = regions.iter().any(|region| {
+            let Some(region_index) = self.index.position(region.node) else {
+                return false;
+            };
+            (self.contains_index(index, region_index)
+                || anchor_index.is_some_and(|anchor| self.contains_index(anchor, region_index)))
+                && near_region(region, point, 8.0)
+        });
+        if !near_surface {
+            update
+                .events
+                .extend(self.event_deliveries(self.node_ids[index], UiEventKind::DismissRequested));
+        }
     }
 
     fn portal_anchor_contains(&self, portal: &crate::Portal, hit: usize) -> bool {
@@ -227,6 +317,103 @@ impl UiTree {
         self.interaction.captured_node(pointer).is_some()
     }
 
+    /// Applies the accepted pointer press's opt-in capture policy.
+    ///
+    /// * `pointer` — pointer whose press may begin capture.
+    /// * `press_event` — delivered PointerDown event after listeners run, or
+    ///   `None` when there were no listeners. A prevented or mismatched event
+    ///   cannot start capture.
+    /// * `regions` — current hit regions used to verify the pressed target is enabled.
+    ///
+    /// Returns capture events and visual changes, or an empty update when the
+    /// press was rejected or the target did not opt into capture. Hosts call
+    /// this after delivering PointerDown, before routing subsequent movement.
+    pub fn pointer_press_default(
+        &mut self,
+        pointer: PointerId,
+        press_event: Option<&crate::UiEvent>,
+        regions: &[HitRegion],
+    ) -> InteractionUpdate {
+        let Some(target) = self.interaction.pressed_target(pointer) else {
+            return InteractionUpdate::default();
+        };
+        if press_event.is_some_and(|delivery| {
+            delivery.default_prevented()
+                || delivery.target != target
+                || !matches!(
+                    &delivery.kind,
+                    UiEventKind::Pointer(event)
+                        if event.id == pointer && event.phase == PointerPhase::Pressed
+                )
+        }) {
+            return InteractionUpdate::default();
+        }
+        if !regions
+            .iter()
+            .any(|region| region.node == target && region.enabled)
+            || !self.element_for(target).is_some_and(|element| {
+                element
+                    .interaction
+                    .as_ref()
+                    .is_some_and(|interaction| interaction.enabled && interaction.capture_on_press)
+            })
+        {
+            return InteractionUpdate::default();
+        }
+        self.capture_pointer(pointer, target)
+    }
+
+    /// Returns a pointer's position relative to an interacting node.
+    ///
+    /// * `pointer` — mouse, pen, or touch contact to observe.
+    /// * `node` — hovered or captured node whose local coordinates are requested.
+    /// * `regions` — current hit regions providing the node's bounds and transform.
+    ///
+    /// Returns `None` when the pointer is neither hovering nor captured by the
+    /// node, the region is absent, or its transform is not invertible. Captured
+    /// pointers can report positions outside the node's bounds.
+    #[must_use]
+    pub fn pointer_position(
+        &self,
+        pointer: PointerId,
+        node: NodeId,
+        regions: &[HitRegion],
+    ) -> Option<Point> {
+        let position = self.interaction.pointer_position(pointer, node)?;
+        regions
+            .iter()
+            .find(|region| region.node == node)
+            .and_then(|region| region.local_point(position))
+    }
+
+    /// Returns a pointer's window position while it hovers or is captured by a node.
+    ///
+    /// * `pointer` — mouse, pen, or touch contact to observe.
+    /// * `node` — hovered or captured interaction target.
+    ///
+    /// Returns `None` when the pointer no longer interacts with the node. The
+    /// coordinate remains stable when the node moves during a captured drag.
+    #[must_use]
+    pub fn pointer_global_position(&self, pointer: PointerId, node: NodeId) -> Option<Point> {
+        self.interaction.pointer_position(pointer, node)
+    }
+
+    /// Returns the last press position relative to the node's bounds at press time.
+    ///
+    /// * `pointer` — pointer whose most recent press is requested.
+    /// * `node` — node that received that press.
+    ///
+    /// Returns `None` until the specified pointer presses the node. The last
+    /// position remains available after release and is replaced by a later press.
+    #[must_use]
+    pub fn pressed_position(&self, pointer: PointerId, node: NodeId) -> Option<Point> {
+        self.pressed_positions
+            .get(&node)
+            .and_then(|(pressed_pointer, position)| {
+                (*pressed_pointer == pointer).then_some(*position)
+            })
+    }
+
     /// Releases a pointer capture owned by `target`.
     ///
     /// * `pointer` — pointer identifier to release.
@@ -307,6 +494,20 @@ impl UiTree {
             }
         }
     }
+}
+
+/// Returns whether a pointer is inside a hit region or its small hover bridge.
+///
+/// * `region` — region to inspect in its local coordinate space.
+/// * `point` — pointer position in window coordinates.
+/// * `margin` — extra distance around every side in logical pixels.
+fn near_region(region: &HitRegion, point: Point, margin: f32) -> bool {
+    region.local_point(point).is_some_and(|local| {
+        local.x >= -margin
+            && local.y >= -margin
+            && local.x <= region.bounds.size.width + margin
+            && local.y <= region.bounds.size.height + margin
+    })
 }
 
 /// Keeps the latest frame sample while preserving motion accumulated since the last delivery.

@@ -1,0 +1,45 @@
+import { Column, Rectangle, Row, Text } from "@argui/native"
+
+export component InlineAlert {
+    in property title: string
+    in property description: string = ""
+    in property destructive: bool = false
+    slot content
+
+    Rectangle {
+        width: 100%
+        background: solid(var(--argui-surface))
+        border_color: destructive ? var(--argui-destructive) : var(--argui-border)
+        border_width: 1.0
+        radius: 10.0
+        Row {
+            width: 100%
+            padding: 16.0
+            gap: 12.0
+            Rectangle {
+                width: 24px
+                height: 24px
+                radius: 12.0
+                background: solid(destructive ? var(--argui-destructive) : var(--argui-primary))
+                Row {
+                    width: 100%
+                    height: 100%
+                    align_items: "center"
+                    justify_content: "center"
+                    Text { content: destructive ? "!" : "i" color: var(--argui-primary-foreground) weight: 700 font_size: 14.0 }
+                }
+            }
+            Column {
+                width: 85%
+                min_width: 0.0
+                grow: 1.0
+                gap: 7.0
+                Text { content: title color: destructive ? var(--argui-destructive) : var(--argui-foreground) weight: 650 font_size: 15.0 }
+                if description != "" {
+                    Text { content: description color: var(--argui-muted-foreground) font_size: 14.0 }
+                }
+                content
+            }
+        }
+    }
+}

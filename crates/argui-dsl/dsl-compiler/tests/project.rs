@@ -4,8 +4,8 @@ use argui_dsl_semantic::DiagnosticCode;
 #[path = "project/asset_source.rs"]
 mod asset_source;
 
-const SOURCE: &str = r#"import { VList, Text } from "@argui/native"
-export component Main { private property items: array<string> = ["one"] VList {
+const SOURCE: &str = r#"import { VirtualWindow, Text } from "@argui/native"
+export component Main { private property items: array<string> = ["one"] VirtualWindow {
     row_height: 32.0
     animate row_height { duration: 100ms }
     for item in items key item { Text { content: item } }

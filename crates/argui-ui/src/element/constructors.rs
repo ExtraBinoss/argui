@@ -40,6 +40,7 @@ impl Element {
             layer: None,
             effects: Vec::new(),
             scroll: None,
+            declared_scroll_offset: None,
             virtual_item: None,
             portal: None,
             focus_scope: None,

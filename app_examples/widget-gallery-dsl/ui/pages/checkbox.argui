@@ -1,0 +1,28 @@
+import { Checkbox } from "@argui/ui"
+import { Column, Text } from "@argui/native"
+
+export component CheckboxPage {
+    private property review_requests: bool = true
+    private property weekly_digest: bool = false
+
+    Column #checkbox_page {
+        width: 100%
+        gap: 18.0
+        Text { content: "Checkbox" color: var(--argui-foreground) weight: 700 font_size: 27.0 }
+        Text { content: "Choose which project updates you receive. Space toggles the focused option." color: var(--argui-muted-foreground) font_size: 14.0 }
+        Text { content: "Team notifications" color: var(--argui-foreground) weight: 600 font_size: 17.0 }
+
+        Column {
+            gap: 8.0
+            Checkbox { label: "Notify me when a review is requested" checked <=> review_requests }
+            Checkbox { label: "Send a weekly email digest" checked <=> weekly_digest }
+            Checkbox { label: "Security alerts (required)" checked: true enabled: false }
+        }
+
+        Text {
+            content: "Selected: " + (review_requests ? "review requests" : "no review requests") + ", " + (weekly_digest ? "weekly digest" : "no weekly digest")
+            color: var(--argui-muted-foreground)
+            font_size: 13.0
+        }
+    }
+}

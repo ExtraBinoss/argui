@@ -1,0 +1,42 @@
+import { FocusScope, KeyBinding, Rectangle, TouchArea } from "@argui/native"
+
+export component DataTableResizeHandle {
+    in-out property value: float
+    in property minimum: float = 80.0
+    in property maximum: float = 480.0
+    in property x: length = 0px
+    in property height: length = 46px
+    in property label: string = "Resize column"
+    private property start_value: float = 0.0
+    private property start_x: length = 0px
+
+    FocusScope #focus_area {
+        x: x
+        width: 10px
+        height: height
+        role: "separator"
+        accessible_name: label
+        KeyBinding { shortcut: "ArrowLeft" on activated { value = value - 10.0 < minimum ? minimum : value - 10.0 } }
+        KeyBinding { shortcut: "ArrowRight" on activated { value = value + 10.0 > maximum ? maximum : value + 10.0 } }
+        TouchArea #touch {
+            width: 10px
+            height: height
+            mouse_cursor: "ew_resize"
+            on pointer_down {
+                start_value = value
+                start_x = touch.mouse_global_x
+            }
+            on moved {
+                value = touch.pressed ? (start_value + (touch.mouse_global_x - start_x) / 1px < minimum ? minimum : start_value + (touch.mouse_global_x - start_x) / 1px > maximum ? maximum : start_value + (touch.mouse_global_x - start_x) / 1px) : value
+            }
+            Rectangle {
+                x: 4px
+                y: 7px
+                width: 2px
+                height: height - 14px
+                radius: 1.0
+                background: solid(touch.has_hover || touch.pressed || focus_area.focus_visible ? var(--argui-primary) : var(--argui-border))
+            }
+        }
+    }
+}

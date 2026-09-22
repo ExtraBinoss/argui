@@ -1,21 +1,120 @@
-import { Button, Separator, VirtualList } from "@argui/ui"
-import { Row, Column, Container, Text, PopoverPanel } from "@argui/native"
+import { Button, Popover, Separator } from "@argui/ui"
+import { Row, Column, Container, Text } from "@argui/native"
 import { ButtonPage } from "./pages/button.argui"
+import { AccordionPage } from "./pages/accordion.argui"
+import { AlertPage } from "./pages/alert.argui"
+import { AlertDialogPage } from "./pages/alert-dialog.argui"
+import { AttachmentPage } from "./pages/attachment.argui"
+import { BubblePage } from "./pages/bubble.argui"
+import { ButtonGroupPage } from "./pages/button-group.argui"
+import { CarouselPage } from "./pages/carousel.argui"
+import { CalendarPage } from "./pages/calendar.argui"
+import { DatePickerPage } from "./pages/date-picker.argui"
+import { AspectRatioPage } from "./pages/aspect-ratio.argui"
+import { CollapsiblePage } from "./pages/collapsible.argui"
+import { EmptyPage } from "./pages/empty.argui"
+import { AvatarPage } from "./pages/avatar.argui"
+import { BreadcrumbPage } from "./pages/breadcrumb.argui"
+import { ProgressPage } from "./pages/progress.argui"
+import { CheckboxPage } from "./pages/checkbox.argui"
+import { RadioGroupPage } from "./pages/radio-group.argui"
+import { TabsPage } from "./pages/tabs.argui"
+import { AnimationLabPage } from "./pages/animation-lab.argui"
+import { ScrollShadowPage } from "./pages/scroll-shadow.argui"
+import { LiquidGlassPage } from "./pages/liquid-glass.argui"
+import { DirectionPage } from "./pages/direction.argui"
+import { DrawerPage } from "./pages/drawer.argui"
+import { FieldPage } from "./pages/field.argui"
+import { FilePickerPage } from "./pages/file-picker.argui"
+import { HoverCardPage } from "./pages/hover-card.argui"
+import { InputGroupPage } from "./pages/input-group.argui"
+import { InputOtpPage } from "./pages/input-otp.argui"
+import { ItemPage } from "./pages/item.argui"
+import { MarkerPage } from "./pages/marker.argui"
+import { TypographyPage } from "./pages/typography.argui"
+import { ComboboxPage } from "./pages/combobox.argui"
+import { ContextMenuPage } from "./pages/context-menu.argui"
+import { DataTablePage } from "./pages/data-table.argui"
+import { MessagePage } from "./pages/message.argui"
+import { MessageScrollerPage } from "./pages/message-scroller.argui"
+import { NativeSelectPage } from "./pages/native-select.argui"
+import { KbdPage } from "./pages/kbd.argui"
+import { LabelPage } from "./pages/label.argui"
+import { SkeletonPage } from "./pages/skeleton.argui"
+import { NavigationMenuPage } from "./pages/navigation-menu.argui"
+import { QuestionnairePage } from "./pages/questionnaire.argui"
+import { ScrollAreaPage } from "./pages/scroll-area.argui"
+import { TextSelectionPage } from "./pages/text-selection.argui"
+import { SheetPage } from "./pages/sheet.argui"
+import { SidebarPage } from "./pages/sidebar.argui"
+import { TogglePage } from "./pages/toggle.argui"
+import { DialogPage } from "./pages/dialog.argui"
+import { PopoverPage } from "./pages/popover.argui"
+import { TooltipPage } from "./pages/tooltip.argui"
+import { ChartPage } from "./pages/chart.argui"
+import { ColorPickerPage } from "./pages/color-picker.argui"
+import { PaginationPage } from "./pages/pagination.argui"
+import { ToggleGroupPage } from "./pages/toggle-group.argui"
+import { SelectPage } from "./pages/select.argui"
+import { ListPage } from "./pages/list.argui"
+import { TablePage } from "./pages/table.argui"
+import { ToastPage } from "./pages/toast.argui"
+import { MenubarPage } from "./pages/menubar.argui"
+import { I18nPage } from "./pages/i18n.argui"
+import { WebLayoutPage } from "./pages/web-layout.argui"
+import { DragDropPage } from "./pages/drag-drop.argui"
+import { EditingPage } from "./pages/editing.argui"
+import { WebViewPage } from "./pages/webview.argui"
+import { AnimatedTextPage } from "./pages/animated-text.argui"
+import { AsyncTasksPage } from "./pages/async-tasks.argui"
+import { SplitPanePage } from "./pages/split-pane.argui"
+import { CustomTimelinePage } from "./pages/custom-timeline.argui"
+import { DamageControlPage } from "./pages/damage-control.argui"
+import { SliderPage } from "./pages/slider.argui"
 import { InputPage } from "./pages/input.argui"
+import { TextAreaPage } from "./pages/text-area.argui"
+import { OverlaysPage } from "./pages/overlays.argui"
+import { SelectionPage } from "./pages/selection.argui"
+import { ScrollViewPage } from "./pages/scroll-view.argui"
+import { ScrollbarStylingPage } from "./pages/scrollbar-styling.argui"
+import { MenuPage } from "./pages/menu.argui"
 import { CardPage } from "./pages/card.argui"
 import { BadgePage } from "./pages/badge.argui"
 import { SeparatorPage } from "./pages/separator.argui"
 import { SwitchPage } from "./pages/switch.argui"
 import { MediaPage } from "./pages/media.argui"
+import { VisualCompositionPage } from "./pages/visual-composition.argui"
 import { VirtualListPage } from "./pages/virtual-list.argui"
 
 export component Main {
+    callback request_file(mode: string) -> string
     private property dark: bool = false
     private property accent: int = 0
     private property theme_open: bool = false
     private property selected: string = "Button"
-    private property navigation: array<string> = ["Button", "Input", "Card", "Badge", "Separator", "Switch", "Media", "Virtual List"]
-    private property navigation_offset: float = 0.0
+    private property navigation: array<string> = [
+        "Accordion", "Alert", "Alert dialog", "Animated text", "Aspect ratio",
+        "Attachment", "Avatar", "Badge", "Breadcrumb", "Bubble",
+        "Button", "Button group", "Calendar", "Card", "Carousel",
+        "Chart", "Checkbox", "Collapsible", "Color picker", "Combobox",
+        "Context menu", "Data table", "Date picker", "Dialog", "Direction",
+        "Drawer", "Empty", "Field", "File picker", "Hover card",
+        "Input & Search", "Input group", "Input OTP", "Item", "Kbd",
+        "Label", "List", "Marker", "Media", "Menu",
+        "Menubar", "Message", "Message scroller", "Native select", "Navigation menu",
+        "Overlays", "Pagination", "Popover", "Progress", "Questionnaire",
+        "Radio group", "Scroll area", "ScrollView", "Select", "Selection",
+        "Separator", "Sheet", "Sidebar", "Skeleton", "Slider",
+        "Switch", "Table", "Tabs", "Text area", "Toast",
+        "Toggle", "Toggle group", "Tooltip", "Visual composition", "VList"
+    ]
+
+    private property examples: array<string> = [
+        "Animation lab", "Async tasks", "Custom Timeline", "Damage control",
+        "Drag & Drop", "Editing & Password", "Internationalization", "Liquid glass",
+        "Scroll shadow", "Scrollbar styling", "Split Pane", "Text selection",
+        "Typography & selection", "Web layout", "WebView"
+    ]
 
     Column #gallery {
         width: 100%
@@ -53,13 +152,10 @@ export component Main {
         Separator {}
 
         if theme_open {
-            PopoverPanel #theme_popover {
+            Popover #theme_popover {
+                open: theme_open
                 anchor: "theme_anchor"
                 width: 222px
-                padding: 12.0
-                radius: 8.0
-                background: var(--argui-surface)
-                border_color: var(--argui-border)
                 on dismiss { theme_open = false }
                 Column {
                     gap: 8.0
@@ -117,21 +213,21 @@ export component Main {
                 min_height: 0.0
                 grow: 1.0
                 padding: 16.0
-                gap: 7.0
+                gap: 4.0
                 background: var(--argui-surface)
+                scroll_y: true
+                scrollbar_thumb: var(--argui-scrollbar-thumb)
 
                 Text { content: "COMPONENTS" color: var(--argui-muted-foreground) weight: 700 font_size: 11.0 }
-                VirtualList #navigation {
-                    grow: 1.0
-                    row_height: 44.0
-                    overscan: 3
-                    offset <=> navigation_offset
-                    scrollbar_thumb: var(--argui-scrollbar-thumb)
-                    edge_shadow_width: 14.0
-                    edge_shadow_intensity: 0.14
-                    edge_shadow_color: var(--argui-foreground)
-                    for item in navigation key item {
-                        Button { text: item variant: selected == item ? "secondary" : "ghost" on click { selected = item } }
+                for item in navigation key item {
+                    Container { width: 100% height: 34px shrink: 0.0
+                        Button { text: item height: 32px variant: selected == item ? "secondary" : "ghost" on click { selected = item } }
+                    }
+                }
+                Text { content: "EXAMPLES" color: var(--argui-muted-foreground) weight: 700 font_size: 11.0 }
+                for item in examples key item {
+                    Container { width: 100% height: 34px shrink: 0.0
+                        Button { text: item height: 32px variant: selected == item ? "secondary" : "ghost" on click { selected = item } }
                     }
                 }
             }
@@ -148,13 +244,90 @@ export component Main {
                 background: var(--argui-background)
 
                 if selected == "Button" { ButtonPage {} }
-                if selected == "Input" { InputPage {} }
+                if selected == "Accordion" { AccordionPage {} }
+                if selected == "Alert" { AlertPage {} }
+                if selected == "Alert dialog" { AlertDialogPage {} }
+                if selected == "Attachment" { AttachmentPage {} }
+                if selected == "Bubble" { BubblePage {} }
+                if selected == "Button group" { ButtonGroupPage {} }
+                if selected == "Carousel" { CarouselPage {} }
+                if selected == "Calendar" { CalendarPage {} }
+                if selected == "Date picker" { DatePickerPage {} }
+                if selected == "Aspect ratio" { AspectRatioPage {} }
+                if selected == "Collapsible" { CollapsiblePage {} }
+                if selected == "Empty" { EmptyPage { on browse_components { selected = "Card" } } }
+                if selected == "Direction" { DirectionPage {} }
+                if selected == "Drawer" { DrawerPage {} }
+                if selected == "Field" { FieldPage {} }
+                if selected == "File picker" { FilePickerPage { on request_file(mode) { return request_file(mode) } } }
+                if selected == "Hover card" { HoverCardPage {} }
+                if selected == "Input group" { InputGroupPage {} }
+                if selected == "Input OTP" { InputOtpPage {} }
+                if selected == "Item" { ItemPage {} }
+                if selected == "Marker" { MarkerPage {} }
+                if selected == "Combobox" { ComboboxPage {} }
+                if selected == "Context menu" { ContextMenuPage {} }
+                if selected == "Data table" { DataTablePage {} }
+                if selected == "Message" { MessagePage {} }
+                if selected == "Message scroller" { MessageScrollerPage {} }
+                if selected == "Native select" { NativeSelectPage {} }
+                if selected == "Kbd" { KbdPage {} }
+                if selected == "Label" { LabelPage {} }
+                if selected == "Skeleton" { SkeletonPage {} }
+                if selected == "Navigation menu" { NavigationMenuPage {} }
+                if selected == "Questionnaire" { QuestionnairePage {} }
+                if selected == "Scroll area" { ScrollAreaPage {} }
+                if selected == "Sheet" { SheetPage {} }
+                if selected == "Sidebar" { SidebarPage {} }
+                if selected == "Toggle" { TogglePage {} }
+                if selected == "Dialog" { DialogPage {} }
+                if selected == "Popover" { PopoverPage {} }
+                if selected == "Tooltip" { TooltipPage {} }
+                if selected == "Chart" { ChartPage {} }
+                if selected == "Color picker" { ColorPickerPage {} }
+                if selected == "Pagination" { PaginationPage {} }
+                if selected == "Toggle group" { ToggleGroupPage {} }
+                if selected == "Select" { SelectPage {} }
+                if selected == "List" { ListPage {} }
+                if selected == "Table" { TablePage {} }
+                if selected == "Toast" { ToastPage {} }
+                if selected == "Menubar" { MenubarPage {} }
+                if selected == "Avatar" { AvatarPage {} }
+                if selected == "Breadcrumb" { BreadcrumbPage {} }
+                if selected == "Progress" { ProgressPage {} }
+                if selected == "Checkbox" { CheckboxPage {} }
+                if selected == "Radio group" { RadioGroupPage {} }
+                if selected == "Tabs" { TabsPage {} }
+                if selected == "Slider" { SliderPage {} }
+                if selected == "Input & Search" { InputPage {} }
+                if selected == "Text area" { TextAreaPage {} }
+                if selected == "Overlays" { OverlaysPage {} }
+                if selected == "Selection" { SelectionPage {} }
+                if selected == "Menu" { MenuPage {} }
+                if selected == "ScrollView" { ScrollViewPage {} }
+                if selected == "Scrollbar styling" { ScrollbarStylingPage {} }
+                if selected == "Animation lab" { AnimationLabPage {} }
+                if selected == "Scroll shadow" { ScrollShadowPage {} }
+                if selected == "Liquid glass" { LiquidGlassPage {} }
+                if selected == "Typography & selection" { TypographyPage {} }
+                if selected == "Text selection" { TextSelectionPage {} }
+                if selected == "Internationalization" { I18nPage {} }
+                if selected == "Web layout" { WebLayoutPage {} }
+                if selected == "Drag & Drop" { DragDropPage {} }
+                if selected == "Editing & Password" { EditingPage {} }
+                if selected == "WebView" { WebViewPage {} }
+                if selected == "Animated text" { AnimatedTextPage {} }
+                if selected == "Async tasks" { AsyncTasksPage {} }
+                if selected == "Split Pane" { SplitPanePage {} }
+                if selected == "Custom Timeline" { CustomTimelinePage {} }
+                if selected == "Damage control" { DamageControlPage {} }
                 if selected == "Card" { CardPage {} }
                 if selected == "Badge" { BadgePage {} }
                 if selected == "Separator" { SeparatorPage {} }
                 if selected == "Switch" { SwitchPage {} }
                 if selected == "Media" { MediaPage {} }
-                if selected == "Virtual List" { VirtualListPage {} }
+                if selected == "Visual composition" { VisualCompositionPage {} }
+                if selected == "VList" { VirtualListPage {} }
             }
         }
     }

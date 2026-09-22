@@ -158,7 +158,10 @@ impl DevCompilerService {
         compiled.reachability.prune(&mut compiled.ir);
         let mut assets = Vec::new();
         for asset in &compiled.ir.assets {
-            let bytes = read_asset(&self.root, &asset.path)?;
+            let bytes = match &asset.inline_bytes {
+                Some(bytes) => bytes.clone(),
+                None => read_asset(&self.root, &asset.path)?,
+            };
             let hash = content_hash(&bytes);
             let revision = match self.assets.get(&asset.id) {
                 Some((previous, revision)) if *previous == hash => *revision,

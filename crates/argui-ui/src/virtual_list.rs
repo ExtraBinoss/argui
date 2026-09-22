@@ -476,6 +476,7 @@ impl VirtualList {
                 y: Overflow::Auto,
             })
             .scroll_config(self.scroll.clone())
+            .scroll_offset(argui_core::Point::new(0.0, offset))
     }
 }
 

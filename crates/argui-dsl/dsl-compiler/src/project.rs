@@ -158,11 +158,16 @@ fn compile_semantic(
     let mut dependencies = ir
         .assets
         .iter()
-        .filter(|asset| reachability.assets.contains(&asset.id))
+        .filter(|asset| reachability.assets.contains(&asset.id) && asset.inline_bytes.is_none())
         .map(|asset| asset.path.clone())
         .collect::<Vec<_>>();
     dependencies.sort();
     dependencies.dedup();
+    let mut ir = ir;
+    ir.assets
+        .retain(|asset| reachability.assets.contains(&asset.id));
+    ir.effects
+        .retain(|effect| reachability.effects.contains(&effect.id));
     Ok(CompiledProject {
         semantic,
         ir,
@@ -203,7 +208,7 @@ fn validate_media_bindings(
 ///
 /// # Errors
 ///
-/// Returns an asset error for a source kind incompatible with Image or Svg.
+/// Returns an asset error for a source kind incompatible with Image, Svg, or Path.
 fn validate_media_node(
     node: &argui_dsl_ir::IrNode,
     ir: &argui_dsl_ir::IrProject,
@@ -220,7 +225,9 @@ fn validate_media_node(
                 IrElementTarget::Native(id) if *id == argui_schema::builtin::IMAGE => {
                     Some(argui_dsl_ir::AssetKind::Image)
                 }
-                IrElementTarget::Native(id) if *id == argui_schema::builtin::SVG => {
+                IrElementTarget::Native(id)
+                    if *id == argui_schema::builtin::SVG || *id == argui_schema::builtin::PATH =>
+                {
                     Some(argui_dsl_ir::AssetKind::Vector)
                 }
                 _ => None,
@@ -300,12 +307,16 @@ fn validate_asset_sources(
         if !reachable.assets.contains(&asset.id) {
             continue;
         }
-        let bytes = match asset.kind {
-            argui_dsl_ir::AssetKind::Image | argui_dsl_ir::AssetKind::Vector => {
-                builtin_asset_bytes(&asset.path).map_or_else(|| load(&asset.path), Ok)
+        let bytes = if let Some(bytes) = &asset.inline_bytes {
+            Ok(bytes.clone())
+        } else {
+            match asset.kind {
+                argui_dsl_ir::AssetKind::Image | argui_dsl_ir::AssetKind::Vector => {
+                    builtin_asset_bytes(&asset.path).map_or_else(|| load(&asset.path), Ok)
+                }
+                argui_dsl_ir::AssetKind::Other => load(&asset.path),
+                argui_dsl_ir::AssetKind::Shader => continue,
             }
-            argui_dsl_ir::AssetKind::Other => load(&asset.path),
-            argui_dsl_ir::AssetKind::Shader => continue,
         }
         .map_err(|message| CompilerError::Asset {
             path: PathBuf::from(&asset.path),

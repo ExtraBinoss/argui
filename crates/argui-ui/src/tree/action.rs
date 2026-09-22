@@ -136,6 +136,7 @@ impl UiTree {
                             self.interaction_bounds.get(&base.target).copied(),
                         )
                     }),
+                    default_sensitive: false,
                 })],
                 ..Default::default()
             };

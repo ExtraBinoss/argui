@@ -10,7 +10,7 @@ use super::{TemplateSlot, identity::retained};
 use crate::{ComponentInstance, DslValue, InstanceId, LiveRuntime, RuntimeError};
 
 impl LiveRuntime {
-    /// Renders only mounted VList rows, preserving each repeater key and component instance.
+    /// Renders only mounted VirtualWindow rows, preserving each repeater key and component instance.
     ///
     /// `instance` is the owning component and `component` its IR. `site`,
     /// `identity_owner`, and `repeater_key` identify the measured viewport;
@@ -82,19 +82,19 @@ impl LiveRuntime {
             || viewport < 0.0
             || !offset.is_finite()
         {
-            return Err(RuntimeError::Schema("VList requires finite positive row_height, nonnegative viewport_height, and finite offset".into()));
+            return Err(RuntimeError::Schema("VirtualWindow requires finite positive row_height, nonnegative viewport_height, and finite offset".into()));
         }
         let (repeater, row_instance, row_component, row_locals, row_slots) = match children {
             [repeater @ IrNode::Repeater { .. }] => (repeater, instance, component, locals, slots),
             [IrNode::Slot { slot, .. }] => {
                 let template = template.ok_or_else(|| {
                     RuntimeError::InvalidBytecode(
-                        "VList template slot is outside its caller".into(),
+                        "VirtualWindow template slot is outside its caller".into(),
                     )
                 })?;
                 if template.slot != *slot {
                     return Err(RuntimeError::InvalidBytecode(
-                        "VList template slot identity does not match its caller".into(),
+                        "VirtualWindow template slot identity does not match its caller".into(),
                     ));
                 }
                 (
@@ -107,7 +107,7 @@ impl LiveRuntime {
             }
             _ => {
                 return Err(RuntimeError::InvalidBytecode(
-                    "VList requires exactly one keyed repeater".into(),
+                    "VirtualWindow requires exactly one keyed repeater".into(),
                 ));
             }
         };
@@ -120,7 +120,7 @@ impl LiveRuntime {
         } = repeater
         else {
             return Err(RuntimeError::InvalidBytecode(
-                "VList template requires one keyed repeater".into(),
+                "VirtualWindow template requires one keyed repeater".into(),
             ));
         };
         let mounted = |items: &[DslValue]| {
@@ -188,7 +188,7 @@ impl LiveRuntime {
         Ok((rows, count, start, viewport))
     }
 
-    /// Evaluates one VList float property, with a fallback for optional values.
+    /// Evaluates one VirtualWindow float property, with a fallback for optional values.
     ///
     /// `instance` owns the binding, `properties` are native assignments,
     /// `id` selects one, `locals` resolves its expression, and `fallback`
@@ -210,7 +210,7 @@ impl LiveRuntime {
             .find(|binding| binding.target == PropertyTargetId::Native(id));
         let Some(binding) = binding else {
             return fallback.ok_or_else(|| {
-                RuntimeError::Schema(format!("VList requires property {}", id.raw()))
+                RuntimeError::Schema(format!("VirtualWindow requires property {}", id.raw()))
             });
         };
         let value = self.evaluate(instance, &binding.value, locals)?;
@@ -223,7 +223,7 @@ impl LiveRuntime {
         }
     }
 
-    /// Evaluates a nonnegative VList integer property, using `fallback` when absent.
+    /// Evaluates a nonnegative VirtualWindow integer property, using `fallback` when absent.
     ///
     /// `instance` owns the binding, `properties` are assignments, `id` selects
     /// one, and `locals` resolves its expression. Returns the row count.
@@ -247,8 +247,9 @@ impl LiveRuntime {
         };
         let value = self.evaluate(instance, &binding.value, locals)?;
         match value {
-            DslValue::Int(value) => usize::try_from(value)
-                .map_err(|_| RuntimeError::Schema("VList overscan must be nonnegative".into())),
+            DslValue::Int(value) => usize::try_from(value).map_err(|_| {
+                RuntimeError::Schema("VirtualWindow overscan must be nonnegative".into())
+            }),
             _ => Err(RuntimeError::TypeMismatch {
                 expected: "int".into(),
                 actual: value.type_name().into(),

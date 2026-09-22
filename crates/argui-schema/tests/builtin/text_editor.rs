@@ -1,21 +1,89 @@
 use argui_core::Color;
 use argui_paint::Fill;
 use argui_schema::{NativeElementInput, SchemaError, SchemaValue, ValueType, builtin};
-use argui_ui::{CaretHeight, ElementKind, Role};
+use argui_text::TextWrap;
+use argui_ui::{CaretHeight, ElementKind, Overflow, Role, ScrollbarGutter, ScrollbarVisibility};
+
+/// Controlled text uses the delta event while the full-value event stays optional.
+#[test]
+fn text_input_schema_separates_edit_from_full_input() {
+    let registry = builtin::registry().unwrap();
+    let schema = registry.schema(builtin::TEXT_INPUT).unwrap();
+    let value = schema
+        .properties
+        .iter()
+        .find(|property| property.id == builtin::VALUE)
+        .unwrap();
+    assert_eq!(value.change_event, Some(builtin::TEXT_EDIT));
+    let edit = schema
+        .events
+        .iter()
+        .find(|event| event.id == builtin::TEXT_EDIT)
+        .unwrap();
+    assert_eq!(edit.name.as_str(), "edit");
+    assert_eq!(edit.payload, None);
+    assert_eq!(edit.event_type, argui_ui::EventType::TextEdit);
+    assert!(schema.events.iter().any(
+        |event| event.id == builtin::INPUT_CHANGED && event.payload == Some(ValueType::String)
+    ));
+}
 
 /// Search editors expose the search role without changing their controlled value behavior.
 #[test]
-fn text_editor_can_expose_search_semantics() {
+fn text_input_can_expose_search_semantics() {
     let editor = builtin::registry()
         .unwrap()
         .construct(
-            builtin::TEXT_EDITOR,
+            builtin::TEXT_INPUT,
             &NativeElementInput::new()
                 .property(builtin::KEY, SchemaValue::String("search".into()))
                 .property(builtin::SEARCH_INPUT, SchemaValue::Bool(true)),
         )
         .unwrap();
     assert_eq!(editor.semantics.as_ref().unwrap().role, Role::SearchInput);
+}
+
+/// TextInput exposes multiline editing without supplying a surrounding frame.
+#[test]
+fn text_input_multiline_uses_the_shared_editing_engine() {
+    let editor = builtin::registry()
+        .unwrap()
+        .construct(
+            builtin::TEXT_INPUT,
+            &NativeElementInput::new()
+                .property(builtin::KEY, SchemaValue::String("notes".into()))
+                .property(builtin::VALUE, SchemaValue::String("first\nsecond".into()))
+                .property(builtin::MULTILINE, SchemaValue::Bool(true))
+                .property(builtin::LABEL, SchemaValue::String("Notes".into())),
+        )
+        .unwrap();
+    let ElementKind::TextEditor {
+        multiline,
+        text,
+        placeholder_text,
+        ..
+    } = &editor.kind
+    else {
+        panic!("TextInput must use the native editing engine");
+    };
+    assert!(*multiline);
+    assert_eq!(text.wrap, TextWrap::WordOrGlyph);
+    assert_eq!(placeholder_text.wrap, TextWrap::WordOrGlyph);
+    assert_eq!(editor.style.overflow.y, Overflow::Auto);
+    assert_eq!(editor.style.overflow.x, Overflow::Hidden);
+    assert_eq!(editor.style.scrollbar_gutter, ScrollbarGutter::Stable);
+    assert_eq!(
+        editor
+            .scroll
+            .as_ref()
+            .unwrap()
+            .scrollbar
+            .as_ref()
+            .unwrap()
+            .visibility,
+        ScrollbarVisibility::Always
+    );
+    assert_eq!(editor.semantics.as_ref().unwrap().role, Role::TextInput);
 }
 
 /// Ordinary Text and container scopes share the same selected-text style API as editors.
@@ -52,7 +120,7 @@ fn ordinary_text_and_container_accept_selection_styles() {
 
 /// The same generic fill and geometry inputs compose text selection and carets.
 #[test]
-fn text_editor_composes_rounded_selection_and_repeated_caret_primitives() {
+fn text_input_composes_rounded_selection_and_repeated_caret_primitives() {
     let registry = builtin::registry().unwrap();
     let colors = [Color::WHITE, Color::BLACK, Color::WHITE];
     let fill = Fill::conic_gradient(
@@ -65,7 +133,7 @@ fn text_editor_composes_rounded_selection_and_repeated_caret_primitives() {
     .unwrap();
     let editor = registry
         .construct(
-            builtin::TEXT_EDITOR,
+            builtin::TEXT_INPUT,
             &NativeElementInput::new()
                 .property(builtin::KEY, SchemaValue::String("caret".into()))
                 .property(builtin::SELECTION_FILL, SchemaValue::Brush(fill.clone()))
@@ -83,7 +151,7 @@ fn text_editor_composes_rounded_selection_and_repeated_caret_primitives() {
     assert_eq!(highlight.background, fill);
     assert_eq!(highlight.radii.as_array(), [7.0; 4]);
     let ElementKind::TextEditor { caret, .. } = &editor.kind else {
-        panic!("TextEditor schema should construct a text editor");
+        panic!("TextInput should use the editor engine");
     };
     assert_eq!(caret.visual.primitives.len(), 3);
     assert!(
@@ -98,16 +166,16 @@ fn text_editor_composes_rounded_selection_and_repeated_caret_primitives() {
     assert!(!caret.is_animated());
 }
 
-/// The native TextEditor adapter applies selection and caret colors without
+/// The native TextInput adapter applies selection and caret colors without
 /// replacing its retained caret animation.
 #[test]
-fn text_editor_applies_themeable_selection_and_caret_colors() {
+fn text_input_applies_themeable_selection_and_caret_colors() {
     let registry = builtin::registry().unwrap();
     let selection_color = Color::srgba(0.4, 0.3, 0.8, 0.32);
     let caret_color = Color::srgba(0.7, 0.2, 0.5, 1.0);
     let editor = registry
         .construct(
-            builtin::TEXT_EDITOR,
+            builtin::TEXT_INPUT,
             &NativeElementInput::new()
                 .property(builtin::KEY, SchemaValue::String("query".into()))
                 .property(builtin::VALUE, SchemaValue::String("hello".into()))
@@ -122,7 +190,7 @@ fn text_editor_applies_themeable_selection_and_caret_colors() {
         selection, caret, ..
     } = &editor.kind
     else {
-        panic!("TextEditor schema should construct a text editor");
+        panic!("TextInput should use the editor engine");
     };
     assert_eq!(*selection, selection_color);
     assert_eq!(
@@ -134,9 +202,9 @@ fn text_editor_applies_themeable_selection_and_caret_colors() {
 
 /// The declared native colors are validated before reaching the adapter.
 #[test]
-fn text_editor_color_schema_rejects_wrong_value_type() {
+fn text_input_color_schema_rejects_wrong_value_type() {
     let registry = builtin::registry().unwrap();
-    let schema = registry.schema(builtin::TEXT_EDITOR).unwrap();
+    let schema = registry.schema(builtin::TEXT_INPUT).unwrap();
     for (id, name) in [
         (builtin::SELECTION_COLOR, "selection_color"),
         (builtin::CARET_COLOR, "caret_color"),
@@ -148,7 +216,7 @@ fn text_editor_color_schema_rejects_wrong_value_type() {
         }));
         let error = registry
             .construct(
-                builtin::TEXT_EDITOR,
+                builtin::TEXT_INPUT,
                 &NativeElementInput::new()
                     .property(builtin::KEY, SchemaValue::String("query".into()))
                     .property(id, SchemaValue::String("wrong".into())),

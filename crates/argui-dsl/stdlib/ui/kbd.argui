@@ -1,0 +1,34 @@
+import { FocusScope, Rectangle, Row, Text } from "@argui/native"
+
+export component Kbd {
+    in property keys: array<string> = []
+    in property label: string
+
+    FocusScope {
+        role: "text"
+        accessible_name: label
+        focus_on_tab_navigation: false
+        focus_on_click: false
+        Row {
+            gap: 4.0
+            align_items: "center"
+            for part in keys key part {
+                Rectangle {
+                    min_width: 24.0
+                    height: 24px
+                    radius: 5.0
+                    background: solid(var(--argui-muted))
+                    border_color: var(--argui-border)
+                    border_width: 1.0
+                    Row {
+                        padding: 5.0
+                        height: 100%
+                        align_items: "center"
+                        justify_content: "center"
+                        Text { content: part color: var(--argui-muted-foreground) weight: 500 font_size: 12.0 no_wrap: true }
+                    }
+                }
+            }
+        }
+    }
+}

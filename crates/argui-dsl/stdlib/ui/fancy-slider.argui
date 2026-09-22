@@ -1,0 +1,78 @@
+import { FocusScope, KeyBinding, Rectangle, Text, TouchArea } from "@argui/native"
+
+export component FancySlider {
+    in-out property value: float = 50.0
+    in property minimum: float = 0.0
+    in property maximum: float = 100.0
+    in property width: length = 320px
+    in property enabled: bool = true
+    in property label: string = "Value"
+    in property accent: color = var(--argui-primary)
+    private property fraction: float = maximum <= minimum ? 0.0 : value <= minimum ? 0.0 : value >= maximum ? 1.0 : (value - minimum) / (maximum - minimum)
+
+    FocusScope #focus_area {
+        role: "slider"
+        accessible_name: label
+        enabled: enabled
+        KeyBinding { shortcut: "ArrowLeft" on activated { value = value - 1.0 < minimum ? minimum : value - 1.0 } }
+        KeyBinding { shortcut: "ArrowRight" on activated { value = value + 1.0 > maximum ? maximum : value + 1.0 } }
+        KeyBinding { shortcut: "Home" on activated { value = minimum } }
+        KeyBinding { shortcut: "End" on activated { value = maximum } }
+        TouchArea #touch {
+            width: width
+            height: 74px
+            enabled: enabled
+            mouse_cursor: enabled ? "pointer" : "not_allowed"
+            on pointer_down {
+                value = minimum + (touch.mouse_x / width < 0.0 ? 0.0 : touch.mouse_x / width > 1.0 ? 1.0 : touch.mouse_x / width) * (maximum - minimum)
+            }
+            on moved {
+                value = touch.pressed ? minimum + (touch.mouse_x / width < 0.0 ? 0.0 : touch.mouse_x / width > 1.0 ? 1.0 : touch.mouse_x / width) * (maximum - minimum) : value
+            }
+            Rectangle {
+                y: 33px width: width height: 8px radius: 4.0
+                background: solid(var(--argui-muted))
+            }
+            Rectangle {
+                y: 33px width: width * fraction height: 8px radius: 4.0
+                background: solid(accent)
+            }
+            Rectangle { x: width * 0.0 - 1px y: 48px width: 2px height: 11px radius: 1.0 background: solid(fraction >= 0.0 ? accent : var(--argui-border)) }
+            Rectangle { x: width * 0.1 - 1px y: 48px width: 2px height: 6px radius: 1.0 background: solid(fraction >= 0.1 ? accent : var(--argui-border)) }
+            Rectangle { x: width * 0.2 - 1px y: 48px width: 2px height: 6px radius: 1.0 background: solid(fraction >= 0.2 ? accent : var(--argui-border)) }
+            Rectangle { x: width * 0.3 - 1px y: 48px width: 2px height: 6px radius: 1.0 background: solid(fraction >= 0.3 ? accent : var(--argui-border)) }
+            Rectangle { x: width * 0.4 - 1px y: 48px width: 2px height: 6px radius: 1.0 background: solid(fraction >= 0.4 ? accent : var(--argui-border)) }
+            Rectangle { x: width * 0.5 - 1px y: 48px width: 2px height: 11px radius: 1.0 background: solid(fraction >= 0.5 ? accent : var(--argui-border)) }
+            Rectangle { x: width * 0.6 - 1px y: 48px width: 2px height: 6px radius: 1.0 background: solid(fraction >= 0.6 ? accent : var(--argui-border)) }
+            Rectangle { x: width * 0.7 - 1px y: 48px width: 2px height: 6px radius: 1.0 background: solid(fraction >= 0.7 ? accent : var(--argui-border)) }
+            Rectangle { x: width * 0.8 - 1px y: 48px width: 2px height: 6px radius: 1.0 background: solid(fraction >= 0.8 ? accent : var(--argui-border)) }
+            Rectangle { x: width * 0.9 - 1px y: 48px width: 2px height: 6px radius: 1.0 background: solid(fraction >= 0.9 ? accent : var(--argui-border)) }
+            Rectangle { x: width * 1.0 - 1px y: 48px width: 2px height: 11px radius: 1.0 background: solid(fraction >= 1.0 ? accent : var(--argui-border)) }
+            Rectangle {
+                x: width * fraction - 19px y: 18px width: 38px height: 38px radius: 19.0
+                background: solid(accent)
+                opacity: 0.0
+                states { hovered when touch.has_hover || touch.pressed { opacity: 0.16 } }
+                animate opacity { transition: in-out duration: 180ms }
+            }
+            Rectangle {
+                x: width * fraction - 10px y: 27px width: 20px height: 20px radius: 10.0
+                background: solid(var(--argui-surface))
+                border_color: focus_area.focus_visible ? var(--argui-ring) : accent
+                border_width: focus_area.focus_visible ? 3.0 : 2.0
+                shadow_color: #00000033
+                shadow_blur: 7.0
+            }
+            Rectangle {
+                x: width * fraction - 24px
+                y: 0px
+                width: 48px height: 23px radius: 6.0
+                background: solid(var(--argui-foreground))
+                opacity: 0.0
+                states { hovered when touch.has_hover || touch.pressed { opacity: 1.0 } }
+                animate opacity { transition: in-out duration: 180ms }
+                Text { x: 8px y: 4px content: str(value) color: var(--argui-surface) font_size: 11.0 weight: 600 no_wrap: true }
+            }
+        }
+    }
+}

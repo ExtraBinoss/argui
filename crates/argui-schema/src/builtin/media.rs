@@ -25,8 +25,12 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
         .property(common_property(CommonProperty::Tooltip))
         .property(common_property(CommonProperty::Width))
         .property(common_property(CommonProperty::Height))
+        .property(common_property(CommonProperty::X))
+        .property(common_property(CommonProperty::Y))
         .property(common_property(CommonProperty::Rotation))
         .property(common_property(CommonProperty::Opacity))
+        .property(common_property(CommonProperty::BackdropFilter))
+        .property(common_property(CommonProperty::Visible))
         .property(
             PropertySchema::new(SOURCE, "source", ValueType::Asset, "Imported image asset.")
                 .required(),
@@ -61,10 +65,10 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
             }
             _ => ImageSampling::Linear,
         };
-        Ok(apply_common(
+        apply_common(
             Element::image(id).image_fit(fit).image_sampling(sampling),
             input,
-        ))
+        )
     })?;
 
     let svg = NativeSchema::new(SVG, "Svg", "Displays an imported SVG vector.")
@@ -72,8 +76,12 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
         .property(common_property(CommonProperty::Tooltip))
         .property(common_property(CommonProperty::Width))
         .property(common_property(CommonProperty::Height))
+        .property(common_property(CommonProperty::X))
+        .property(common_property(CommonProperty::Y))
         .property(common_property(CommonProperty::Rotation))
         .property(common_property(CommonProperty::Opacity))
+        .property(common_property(CommonProperty::BackdropFilter))
+        .property(common_property(CommonProperty::Visible))
         .property(
             PropertySchema::new(SOURCE, "source", ValueType::Asset, "Imported SVG asset.")
                 .required(),
@@ -100,7 +108,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
         if let Some(SchemaValue::Color(color)) = input.get(TEXT_COLOR) {
             element = element.vector_color(*color);
         }
-        Ok(apply_common(element, input))
+        apply_common(element, input)
     })
 }
 

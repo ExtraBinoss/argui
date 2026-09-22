@@ -1,0 +1,48 @@
+import { Button } from "@argui/ui"
+import { Column, Text } from "@argui/native"
+import { InlineAlert } from "@argui/ui/alert.argui"
+
+export component AlertPage {
+    private property synced: bool = false
+    private property announcement_visible: bool = true
+
+    Column {
+        width: 100%
+        gap: 20.0
+        Text { content: "Alert" color: var(--argui-foreground) weight: 700 font_size: 27.0 }
+        Text { content: "Inline messages stay beside the content they describe." color: var(--argui-muted-foreground) font_size: 14.0 }
+
+        Column {
+            width: 100%
+            gap: 14.0
+            InlineAlert {
+                title: "Your changes have been saved"
+                description: "Everyone in your workspace can now see the latest version."
+            }
+            if !synced {
+                InlineAlert {
+                    title: "We couldn't sync your changes"
+                    description: "Your work is saved on this device. Check your connection and try again."
+                    destructive: true
+                    Button { text: "Retry sync" variant: "outline" on click { synced = true } }
+                }
+            }
+            if synced {
+                InlineAlert {
+                    title: "Changes synced"
+                    description: "Your workspace is up to date."
+                    Button { text: "Simulate a sync error" variant: "ghost" on click { synced = false } }
+                }
+            }
+            if announcement_visible {
+                InlineAlert {
+                    title: "A new version is available."
+                    Button { text: "Dismiss" variant: "ghost" on click { announcement_visible = false } }
+                }
+            }
+            if !announcement_visible {
+                Button { text: "Show announcement" variant: "outline" on click { announcement_visible = true } }
+            }
+        }
+    }
+}

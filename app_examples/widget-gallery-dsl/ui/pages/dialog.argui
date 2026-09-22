@@ -1,0 +1,23 @@
+import { Button, Dialog } from "@argui/ui"
+import { Column, Text } from "@argui/native"
+
+export component DialogPage {
+    private property open: bool = false
+
+    Column #dialog_page {
+        width: 100%
+        gap: 20.0
+        Text { content: "Dialog" color: var(--argui-foreground) weight: 700 font_size: 27.0 }
+        Text { content: "Background controls cannot receive focus while the modal scope is active." color: var(--argui-muted-foreground) font_size: 14.0 }
+        Text { content: "Modal dialog" color: var(--argui-foreground) weight: 600 font_size: 17.0 }
+        Button { text: "Open dialog" on click { open = true } }
+        Dialog {
+            open: open
+            title: "Delete GPU cache?"
+            description: "This demonstrates a modal focus trap, Escape handling and focus restoration."
+            on dismiss { open = false }
+            Button { text: "Close dialog" variant: "outline" on click { open = false } }
+        }
+        Text { content: open ? "Dialog open" : "Dialog closed" color: var(--argui-muted-foreground) font_size: 13.0 }
+    }
+}

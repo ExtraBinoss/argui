@@ -18,7 +18,7 @@ export component InputPage {
         width: 100%
         gap: 22.0
 
-        Text { content: "Input" color: var(--argui-foreground) weight: 700 font_size: 27.0 }
+        Text { content: "Input & Search" color: var(--argui-foreground) weight: 700 font_size: 27.0 }
         Text { content: "Controlled values, search, validation and locked states." color: var(--argui-muted-foreground) font_size: 14.0 }
 
         Column {
@@ -31,13 +31,13 @@ export component InputPage {
                 width: 100%
                 gap: 6.0
                 Text { content: "Full name" color: var(--argui-foreground) weight: 600 font_size: 13.0 }
-                Input #name_input { value <=> name label: "Full name" placeholder: "Full name" on submit { submitted = "Full name" } }
+                Input #name_input { value <=> name label: "Full name" placeholder: "Full name" on submit(next) { submitted = "Full name: " + next } }
             }
             Column {
                 width: 100%
                 gap: 6.0
                 Text { content: "Email address" color: var(--argui-foreground) weight: 600 font_size: 13.0 }
-                Input #email_input { value <=> email label: "Email address" description: "Used only for this local preview" placeholder: "Email" on submit { submitted = "Email address" } }
+                Input #email_input { value <=> email label: "Email address" description: "Used only for this local preview" placeholder: "Email" on submit(next) { submitted = "Email address: " + next } }
                 Text { content: "Used only for this local preview" color: var(--argui-muted-foreground) font_size: 12.0 }
             }
             Column {
@@ -50,7 +50,7 @@ export component InputPage {
                     label: "Search the GPU graph"
                     placeholder: "Search the GPU graph…"
                     Search { size: 16px color: var(--argui-muted-foreground) }
-                    on submit { submitted = "Search" }
+                    on submit(next) { submitted = "Search: " + next }
                 }
             }
             Column {
@@ -62,7 +62,7 @@ export component InputPage {
                     label: "Invalid field"
                     placeholder: "Email"
                     invalid: !contains(invalid_email, "@") || !contains(invalid_email, ".")
-                    on submit { submitted = "Invalid field" }
+                    on submit(next) { submitted = "Invalid field: " + next }
                 }
                 Text {
                     content: contains(invalid_email, "@") && contains(invalid_email, ".") ? "Email looks valid." : "Enter an email with @ and a domain."

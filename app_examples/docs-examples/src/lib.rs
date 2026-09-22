@@ -97,10 +97,7 @@ pub fn launch_example(example: &str) -> Result<(), Box<dyn std::error::Error>> {
         "data" => launch("Data", examples::data::Example::default()),
         "overlays" => launch("Overlays", examples::overlays::Example::default()),
         "performance" => launch("Performance", examples::performance::Example::default()),
-        "text-fidelity" => launch(
-            "Text fidelity",
-            examples::text_fidelity::Example,
-        ),
+        "text-fidelity" => launch("Text fidelity", examples::text_fidelity::Example),
         "platform-support" => launch("Platform support", examples::platform_support::Example),
         "platform-roadmap" => launch(
             "Platform roadmap",

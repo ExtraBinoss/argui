@@ -23,7 +23,7 @@ parser.add_argument(
     action="append",
     default=[],
     metavar="KIND:NAME:VALUE",
-    help="ordered click, type, chord, or wait action followed by a named capture",
+    help="ordered click, drag, wheel, type, chord, or wait action followed by a named capture",
 )
 parser.add_argument("command", nargs=argparse.REMAINDER)
 args = parser.parse_args()
@@ -161,6 +161,30 @@ try:
             if kind == "click":
                 x, y = value.split(":", 1)
                 click(x, y)
+            elif kind == "drag":
+                x1, y1, x2, y2 = (float(part) for part in value.split(":"))
+                call(rd_destination, remote, rd_interface, "NotifyPointerMotionRelative",
+                     "(dd)", (-10000.0, -10000.0))
+                spin(0.15)
+                call(rd_destination, remote, rd_interface, "NotifyPointerMotionRelative",
+                     "(dd)", (x1, y1))
+                spin(0.15)
+                call(rd_destination, remote, rd_interface, "NotifyPointerButton", "(ib)", (272, True))
+                for step in range(1, 7):
+                    call(rd_destination, remote, rd_interface, "NotifyPointerMotionRelative",
+                         "(dd)", ((x2 - x1) / 6.0, (y2 - y1) / 6.0))
+                    spin(0.08)
+                call(rd_destination, remote, rd_interface, "NotifyPointerButton", "(ib)", (272, False))
+                spin(0.3)
+            elif kind == "wheel":
+                x, y, delta = value.split(":", 2)
+                call(rd_destination, remote, rd_interface, "NotifyPointerMotionRelative",
+                     "(dd)", (-10000.0, -10000.0))
+                call(rd_destination, remote, rd_interface, "NotifyPointerMotionRelative",
+                     "(dd)", (float(x), float(y)))
+                spin(0.15)
+                call(rd_destination, remote, rd_interface, "NotifyPointerAxis",
+                     "(ddu)", (0.0, float(delta), 0))
             elif kind == "type":
                 for character in value:
                     keysym(ord(character), True)

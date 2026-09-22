@@ -13,6 +13,8 @@ use std::sync::atomic::{AtomicU32, Ordering};
 
 #[path = "event/listener/color.rs"]
 mod color;
+#[path = "event/listener.rs"]
+mod filter;
 
 static NEXT_LISTENER: AtomicU32 = AtomicU32::new(0);
 

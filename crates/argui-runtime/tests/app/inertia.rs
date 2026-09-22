@@ -323,6 +323,41 @@ fn out_of_order_timestamps_use_bounded_positive_frame_time() {
     assert!(!dispatch_wheel);
 }
 
+/// An end phase without displacement cannot leave a frame loop running.
+#[test]
+fn release_without_movement_stops_before_dispatching_momentum() {
+    let mut inertia = ScrollInertia::default();
+    inertia.observe(sample(
+        Point::default(),
+        TouchPhase::Ended,
+        Duration::from_millis(16),
+    ));
+    assert!(inertia.needs_frame());
+    assert!(inertia.advance(Duration::from_millis(32)).is_none());
+    assert!(!inertia.needs_frame());
+}
+
+/// A finite zero sample weight cannot create velocity even after release.
+#[test]
+fn fully_filtered_gesture_never_dispatches_momentum() {
+    let mut inertia = ScrollInertia::default();
+    let physics = ScrollPhysics::Inertial(InertialScroll {
+        sample_weight: 0.0,
+        ..InertialScroll::default()
+    });
+    let mut input = sample(Point::new(50.0, -50.0), TouchPhase::Started, Duration::ZERO);
+    input.physics = physics;
+    inertia.observe(input);
+    input.phase = TouchPhase::Moved;
+    input.now = Duration::from_millis(16);
+    inertia.observe(input);
+    input.phase = TouchPhase::Ended;
+    input.now = Duration::from_millis(32);
+    inertia.observe(input);
+    assert!(inertia.advance(Duration::from_millis(48)).is_none());
+    assert!(!inertia.needs_frame());
+}
+
 /// Cancelling a gesture clears both its target and any pending animation frame.
 #[test]
 fn explicit_cancel_clears_target_and_pending_momentum() {

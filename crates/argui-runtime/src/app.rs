@@ -6,7 +6,9 @@ use argui_inspect::InspectorHandle;
 use argui_layout::{LayoutEngine, LayoutOutput};
 use argui_paint::{ImageAsset, VectorAsset};
 use argui_platform::{ApplicationIdentity, Modifiers, WindowConfig};
-use argui_render::{RendererConfig, RendererDevice, SurfaceRenderer};
+use argui_render::{
+    EffectDefinition, EffectRegistry, RendererConfig, RendererDevice, SurfaceRenderer,
+};
 use argui_text::{PreparedText, TextEngine, TextScene};
 use argui_ui::{InteractionUpdate, UiTree};
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
@@ -36,6 +38,7 @@ mod lifecycle;
     )
 ))]
 mod native_views;
+mod observations;
 mod pointer;
 #[cfg(all(feature = "native-popups", not(target_arch = "wasm32")))]
 mod popups;
@@ -98,11 +101,15 @@ pub(crate) struct Application {
     renderer_announced: bool,
     image_assets: Vec<ImageAsset>,
     vector_assets: Vec<VectorAsset>,
+    base_effects: EffectRegistry,
+    effect_definitions: Vec<EffectDefinition>,
     pub(super) inspector: Option<InspectorHandle>,
     inspection_cache: InspectionCache,
     pub(super) text_engine: TextEngine,
     text_scene: Option<TextScene>,
     pub(super) ui_tree: Option<UiTree>,
+    pub(super) interaction_snapshot: crate::model::InteractionSnapshot,
+    pub(super) source_index: RefCell<crate::SourceIdentityIndex>,
     pub(super) animations: RuntimeAnimations,
     pub(super) model: Option<AnyEntity>,
     pub(super) ui_layout: Option<LayoutOutput>,
@@ -120,6 +127,7 @@ pub(crate) struct Application {
     pointer_buttons: u16,
     touch_points: HashMap<PointerId, Point>,
     primary_touch: Option<PointerId>,
+    last_touch: Option<PointerId>,
     touch_scroll: touch_scroll::TouchScrollGesture,
     selection_click: text_selection::SelectionClick,
     mouse_selection_origin: Option<Point>,
@@ -175,6 +183,11 @@ impl Application {
             .as_ref()
             .map(AnyEntity::vector_assets)
             .unwrap_or_default();
+        let effect_definitions = model
+            .as_ref()
+            .map(AnyEntity::effect_definitions)
+            .unwrap_or_default();
+        let base_effects = renderer_config.effects.clone();
         let mut layout_engine = LayoutEngine::new();
         layout_engine.set_assets(&image_assets, &vector_assets);
         let pointer_settings = window_config.pointer;
@@ -229,11 +242,15 @@ impl Application {
             renderer_announced: false,
             image_assets,
             vector_assets,
+            base_effects,
+            effect_definitions,
             inspector,
             inspection_cache: InspectionCache::default(),
             text_engine,
             text_scene,
             ui_tree,
+            interaction_snapshot: crate::model::InteractionSnapshot::default(),
+            source_index: RefCell::default(),
             animations: RuntimeAnimations::new(model.as_ref()),
             model,
             ui_layout: None,
@@ -251,6 +268,7 @@ impl Application {
             pointer_buttons: 0,
             touch_points: HashMap::new(),
             primary_touch: None,
+            last_touch: None,
             touch_scroll: touch_scroll::TouchScrollGesture::default(),
             selection_click: text_selection::SelectionClick::default(),
             mouse_selection_origin: None,
@@ -347,6 +365,7 @@ impl Application {
         if update.scroll_changed && self.scroll_or_exit(event_loop) {
             update.scroll_changed = false;
         }
+        self.refresh_observed_interactions();
         for event in &mut update.events {
             if let argui_ui::UiEventKind::DocumentSelectionChanged { bounds, .. } = &mut event.kind
                 && bounds.is_none()

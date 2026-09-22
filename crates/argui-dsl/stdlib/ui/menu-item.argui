@@ -1,0 +1,59 @@
+import { FocusScope, TouchArea, Rectangle, Row, Container, Text } from "@argui/native"
+
+export component MenuItem {
+    in property text: string
+    in property enabled: bool = true
+    in property selected: bool = false
+    in property shortcut: string = ""
+    in property submenu: bool = false
+    in property height: length = 34px
+    callback select()
+    callback hover()
+    slot leading
+    slot trailing
+
+    FocusScope #focus_area {
+        enabled: enabled
+        keyboard_activation: "enter_or_space"
+        role: "menu_item"
+        accessible_name: text
+        on click { select() }
+
+        TouchArea #touch {
+            enabled: enabled
+            mouse_cursor: enabled ? "pointer" : "not_allowed"
+            on pointer_enter { hover() }
+
+            Rectangle {
+                width: 100%
+                background: solid(!enabled ? var(--argui-surface) : touch.pressed ? var(--argui-neutral-pressed) : touch.has_hover || selected ? var(--argui-neutral-hover) : var(--argui-surface))
+                border_color: focus_area.focus_visible ? var(--argui-ring) : var(--argui-surface)
+                border_width: focus_area.focus_visible ? 2.0 : 0.0
+                radius: 5.0
+
+                Row {
+                    width: 100%
+                    height: height
+                    padding: 10.0
+                    gap: 8.0
+                    align_items: "center"
+                    leading
+                    Text {
+                        content: text
+                        color: enabled ? var(--argui-foreground) : var(--argui-muted-foreground)
+                        font_size: 14.0
+                        no_wrap: true
+                    }
+                    Container { grow: 1.0 }
+                    if shortcut != "" {
+                        Text { content: shortcut color: var(--argui-muted-foreground) font_size: 12.0 no_wrap: true }
+                    }
+                    if submenu {
+                        Text { content: "›" color: var(--argui-muted-foreground) font_size: 17.0 no_wrap: true }
+                    }
+                    trailing
+                }
+            }
+        }
+    }
+}

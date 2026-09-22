@@ -13,7 +13,7 @@ build = "build.rs"
 argui-live = ["argui/tasks", "dep:argui-dsl-runtime"]
 
 [dependencies]
-argui.workspace = true
+argui = { workspace = true, features = ["file-picker"] }
 argui-effects = { workspace = true, features = ["scroll"] }
 argui-dsl-runtime = { path = "../../crates/argui-dsl/dsl-runtime", optional = true }
 
@@ -22,6 +22,11 @@ argui-dsl-build = { path = "../../crates/argui-dsl/dsl-build" }
 
 [dev-dependencies]
 argui-testing.workspace = true
+argui-cli = { path = "../../crates/argui-dsl/argui-cli" }
+argui-dsl-protocol = { path = "../../crates/argui-dsl/dsl-protocol" }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+pollster = "=1.0.1"
 
 [lints]
 workspace = true

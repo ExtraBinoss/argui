@@ -38,6 +38,8 @@ pub(super) fn validate_theme_values(
                 locals: &empty_locals,
                 definitions,
                 theme_tokens,
+                references: None,
+                event_handler: false,
                 diagnostics,
             };
             let actual = expression::infer(&value, &mut context);
@@ -84,6 +86,8 @@ pub(super) fn validate_theme_values(
             locals: &empty_locals,
             definitions,
             theme_tokens,
+            references: None,
+            event_handler: false,
             diagnostics,
         };
         let actual = expression::infer(&value, &mut context);

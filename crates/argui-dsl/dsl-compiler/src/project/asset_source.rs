@@ -95,12 +95,21 @@ fn visual_node(node: &IrNode, id: AssetId) -> Option<Span> {
     match node {
         IrNode::Element {
             properties,
+            effect,
             events,
             children,
             ..
         } => properties
             .iter()
             .find_map(|binding| expression(&binding.value, id))
+            .or_else(|| {
+                effect.as_ref().and_then(|binding| {
+                    binding
+                        .parameters
+                        .iter()
+                        .find_map(|parameter| expression(&parameter.value, id))
+                })
+            })
             .or_else(|| {
                 events.iter().find_map(|event| {
                     event
@@ -142,7 +151,12 @@ fn event_statement(statement: &IrStatement, id: AssetId) -> Option<Span> {
         | IrStatement::SetThemeMode(value)
         | IrStatement::Assignment { value, .. }
         | IrStatement::Return(Some(value)) => expression(value, id),
-        IrStatement::Return(None) => None,
+        IrStatement::ScrollTo { x, y, .. } => expression(x, id).or_else(|| expression(y, id)),
+        IrStatement::Return(None)
+        | IrStatement::FocusNext
+        | IrStatement::FocusPrevious
+        | IrStatement::PreventDefault
+        | IrStatement::StopPropagation => None,
     }
 }
 
@@ -174,6 +188,8 @@ fn expression(value: &IrExpression, id: AssetId) -> Option<Span> {
             .or_else(|| expression(else_value, id)),
         IrExpressionKind::Constant(_)
         | IrExpressionKind::PropertyRead(_)
+        | IrExpressionKind::ChildPropertyRead { .. }
+        | IrExpressionKind::ObservedRead { .. }
         | IrExpressionKind::LocalRead(_)
         | IrExpressionKind::TokenRead(_)
         | IrExpressionKind::Asset(_) => None,

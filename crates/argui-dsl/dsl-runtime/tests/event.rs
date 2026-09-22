@@ -1,5 +1,8 @@
 //! Runtime event dispatch and related render-state behavior.
 
+#[path = "runtime/text_edit.rs"]
+mod text_edit;
+
 mod event_behavior {
     use std::collections::HashMap;
 
@@ -55,13 +58,12 @@ mod event_behavior {
 
     #[test]
     fn native_handler_executes_all_property_assignment_operators_and_returns_value() {
-        let source = r#"import { Pressable } from "@argui/native"
+        let source = r#"import { TouchArea } from "@argui/native"
 export component Main {
     private property count: int = 10
     private property ratio: float = 8.0
     private property text: string = "start"
-    Pressable {
-        label: "Go"
+    TouchArea {
         on click {
             count = 4
             count += 2
@@ -94,7 +96,7 @@ export component Main {
             .unwrap();
         let site = match &definition.body[0] {
             IrNode::Element { site, .. } => *site,
-            _ => panic!("expected Pressable element"),
+            _ => panic!("expected TouchArea element"),
         };
         let result = runtime
             .dispatch_native_event(root, site, argui_schema::builtin::CLICK)
@@ -117,21 +119,20 @@ export component Main {
 
     #[test]
     fn native_handler_resolves_translations_theme_tokens_and_callbacks() {
-        let source = r#"import { Pressable } from "@argui/native"
+        let source = r#"import { TouchArea } from "@argui/native"
 export theme Palette { --accent: color = #123456 }
 export component Main {
     private property title: string = "initial"
     private property color: color = #000000
     callback changed(value: string) -> string
-    Pressable {
-        label: "Go"
-        background: var(--accent)
+    TouchArea {
         on click {
             title = tr("title")
             color = var(--accent)
             return changed(title)
         }
     }
+
 }
 "#;
         let compiled = compile(source);
@@ -165,7 +166,7 @@ export component Main {
             .body[0]
         {
             IrNode::Element { site, .. } => *site,
-            _ => panic!("expected Pressable element"),
+            _ => panic!("expected TouchArea element"),
         };
         let result = runtime
             .dispatch_native_event(root, site, argui_schema::builtin::CLICK)
@@ -228,11 +229,10 @@ mod event_errors {
     /// Dispatches an assignment and returns its runtime error.
     fn dispatch_error(declaration: &str, assignment: &str) -> RuntimeError {
         let source = format!(
-            r#"import {{ Pressable }} from "@argui/native"
+            r#"import {{ TouchArea }} from "@argui/native"
 export component Main {{
     private property value: {declaration}
-    Pressable {{
-        label: "Go"
+    TouchArea {{
         on click {{ value {assignment} }}
     }}
 }}
@@ -324,10 +324,10 @@ mod event_host {
 
     #[test]
     fn text_editor_input_and_submit_events_update_two_way_state() {
-        let source = r#"import { TextEditor } from "@argui/native"
+        let source = r#"import { TextInput } from "@argui/native"
 export component Main {
     in-out property value: string = "initial"
-    TextEditor {
+    TextInput {
         value <=> value
         on input { value += "!" }
         on submit { value += "?" }
@@ -346,6 +346,12 @@ export component Main {
         let mut tree = UiTree::new(element);
         let node = tree.node_id_at(0).expect("text editor should be the root");
 
+        for event in tree.event_deliveries(
+            node,
+            UiEventKind::TextEdited(argui_ui::TextEdit::new(0..7, "typed")),
+        ) {
+            mount.dispatch_event(&event).unwrap();
+        }
         for event in tree.event_deliveries(node, UiEventKind::TextChanged("typed".into())) {
             mount.dispatch_event(&event).unwrap();
         }
@@ -368,6 +374,35 @@ export component Main {
                     .clone()
             }),
             DslValue::String("typed!?".into())
+        );
+    }
+
+    #[test]
+    fn native_input_payload_is_available_to_handler_expressions() {
+        let source = r#"import { TextInput } from "@argui/native"
+export component Main {
+    in-out property value: string = "initial"
+    TextInput { on input(incoming) { value = incoming + "!" } }
+}"#;
+        let compiled = compile(source);
+        let (component, value) = members(&compiled);
+        let package =
+            LivePackage::prepare(1, compiled.public_api_hash, compiled.ir, HashMap::new()).unwrap();
+        let mut runtime = LiveRuntime::new(package).unwrap();
+        let root = runtime.mount(component, []).unwrap();
+        let entity = Entity::new(runtime);
+        let mount = entity.mount().unwrap();
+        let element = mount.render(WindowEnvironment::default()).unwrap();
+        let mut tree = UiTree::new(element);
+        let node = tree.node_id_at(0).expect("text editor should be the root");
+        for event in tree.event_deliveries(node, UiEventKind::TextChanged("typed".into())) {
+            mount.dispatch_event(&event).unwrap();
+        }
+        assert_eq!(
+            mount.read(|runtime| runtime.instance(root).unwrap().properties[&value]
+                .get()
+                .clone()),
+            DslValue::String("typed!".into())
         );
     }
 }
@@ -473,7 +508,7 @@ mod render_more {
     fn render_reaches_state_animation_and_nested_event_paths() {
         let compiled = compile(
             r#"import { Column, Text } from "@argui/ui"
-import { Pressable } from "@argui/native"
+import { TouchArea } from "@argui/native"
 export component Main {
     private property active: bool = false
     private property items: array<int> = [1]
@@ -485,10 +520,10 @@ export component Main {
         Text { content: "header" }
         if active {
             for item in items key item {
-                Pressable { label: "row" on click { count += 1 } }
+                TouchArea { on click { count += 1 } }
             }
         } else {
-            Pressable { label: "fallback" on click { count += 10 } }
+            TouchArea { on click { count += 10 } }
         }
     }
 }

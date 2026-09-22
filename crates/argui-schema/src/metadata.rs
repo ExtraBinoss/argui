@@ -4,6 +4,49 @@ use crate::{
     EventId, NativeTypeId, PropertyId, SchemaValue, SlotId, StylePartId, ValueType, VariantId,
 };
 
+/// Engine interaction value sampled for a native output property.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ObservationKind {
+    Hover,
+    Pressed,
+    Focused,
+    FocusVisible,
+    PointerX,
+    PointerY,
+    PointerGlobalX,
+    PointerGlobalY,
+    PressedX,
+    PressedY,
+    ScrollX,
+    ScrollY,
+    ViewportWidth,
+    ViewportHeight,
+    ContentWidth,
+    ContentHeight,
+}
+
+impl ObservationKind {
+    /// Returns the schema value type supplied by this observation.
+    #[must_use]
+    pub const fn value_type(self) -> ValueType {
+        match self {
+            Self::Hover | Self::Pressed | Self::Focused | Self::FocusVisible => ValueType::Bool,
+            Self::PointerX
+            | Self::PointerY
+            | Self::PointerGlobalX
+            | Self::PointerGlobalY
+            | Self::PressedX
+            | Self::PressedY
+            | Self::ScrollX
+            | Self::ScrollY
+            | Self::ViewportWidth
+            | Self::ViewportHeight
+            | Self::ContentWidth
+            | Self::ContentHeight => ValueType::Dimension,
+        }
+    }
+}
+
 /// Whether a child slot accepts one element or a sequence.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SlotArity {
@@ -19,6 +62,10 @@ pub struct PropertySchema {
     pub name: Name,
     pub value_type: ValueType,
     pub required: bool,
+    /// Whether the value is supplied by the engine and cannot be assigned by authored UI.
+    pub read_only: bool,
+    /// Engine observation supplying this output property's value, when applicable.
+    pub observation: Option<ObservationKind>,
     pub default: Option<SchemaValue>,
     pub change_event: Option<EventId>,
     /// Whether the property supports declarative visual interpolation.
@@ -45,6 +92,8 @@ impl PropertySchema {
             name: name.into(),
             value_type,
             required: false,
+            read_only: false,
+            observation: None,
             default: None,
             change_event: None,
             animatable: true,
@@ -56,6 +105,23 @@ impl PropertySchema {
     #[must_use]
     pub const fn required(mut self) -> Self {
         self.required = true;
+        self
+    }
+
+    /// Marks an engine-observed property as readable but not assignable.
+    #[must_use]
+    pub const fn read_only(mut self) -> Self {
+        self.read_only = true;
+        self
+    }
+
+    /// Binds a read-only property to a generic engine interaction observation.
+    ///
+    /// * `kind` — interaction value to sample during rendering and event handling.
+    #[must_use]
+    pub const fn observed(mut self, kind: ObservationKind) -> Self {
+        self.read_only = true;
+        self.observation = Some(kind);
         self
     }
 
@@ -164,6 +230,8 @@ pub struct NativeSchema {
     pub slots: Vec<SlotSchema>,
     pub variants: Vec<VariantSchema>,
     pub style_parts: Vec<StylePartSchema>,
+    /// The adapter consumes a compiler-mounted keyed virtual row window.
+    pub virtual_window: bool,
 }
 
 impl NativeSchema {
@@ -183,6 +251,7 @@ impl NativeSchema {
             slots: Vec::new(),
             variants: Vec::new(),
             style_parts: Vec::new(),
+            virtual_window: false,
         }
     }
 
@@ -218,6 +287,13 @@ impl NativeSchema {
     #[must_use]
     pub fn style_part(mut self, part: StylePartSchema) -> Self {
         self.style_parts.push(part);
+        self
+    }
+
+    /// Marks this adapter as consuming a compiler-mounted virtual row window.
+    #[must_use]
+    pub const fn virtual_window(mut self) -> Self {
+        self.virtual_window = true;
         self
     }
 }

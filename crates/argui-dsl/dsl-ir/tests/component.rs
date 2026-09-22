@@ -24,7 +24,7 @@ fn lowering_reports_a_component_whose_module_file_has_no_syntax_tree() {
         .find(|module| module.path == "ui/snapshot.argui")
         .unwrap();
     let original_span = module.definitions[0].span;
-    module.file = FileId::from_raw(module.file.raw() + 1);
+    module.file = FileId::from_raw(u32::MAX);
     let missing_file = module.file;
     assert!(project.syntax(missing_file).is_none());
 
@@ -59,12 +59,12 @@ fn template_slot_preserves_lazy_caller_repeater_and_owner() {
     let mut database = CompilerDatabase::with_builtins().unwrap();
     database.set_file(
         "ui/main.argui",
-        r#"import { VList, Text } from "@argui/native"
+        r#"import { VirtualWindow, Text } from "@argui/native"
 component VirtualList {
     in property row_height: float
     in-out property scroll: float = 0.0
     slot rows: template
-    VList { row_height: row_height offset <=> scroll rows }
+    VirtualWindow { row_height: row_height offset <=> scroll rows }
 }
 export component Main {
     private property items: array<string> = ["one"]
@@ -114,10 +114,10 @@ export component Main {
         ..
     } = &wrapper.body[0]
     else {
-        panic!("wrapper must own the native VList");
+        panic!("wrapper must own the native VirtualWindow");
     };
     let [IrNode::Slot { slot, .. }] = children.as_slice() else {
-        panic!("VList must contain one lazy template slot");
+        panic!("VirtualWindow must contain one lazy template slot");
     };
     assert_eq!(*slot, wrapper.template_slots[0]);
     let IrNode::Element {

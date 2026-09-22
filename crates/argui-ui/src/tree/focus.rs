@@ -36,6 +36,9 @@ enum FocusIntent {
         visible: Option<bool>,
     },
     Clear,
+    Move {
+        backwards: bool,
+    },
 }
 
 #[derive(Clone, Debug, Default)]
@@ -173,6 +176,9 @@ impl UiTree {
     /// Processes a primary-button press and applies pointer focus defaults.
     ///
     /// * `regions` — current hit regions used to resolve focus behavior.
+    ///
+    /// Call [`UiTree::pointer_press_default`] after delivering the returned
+    /// PointerDown event to apply opt-in pointer capture when accepted.
     pub fn primary_pressed(&mut self, regions: &[HitRegion]) -> InteractionUpdate {
         let position = self.interaction.mouse_position().unwrap_or_default();
         let event = argui_core::PointerEvent {
@@ -187,9 +193,19 @@ impl UiTree {
     pub(crate) fn primary_pressed_for(
         &mut self,
         event: argui_core::PointerEvent,
-        _regions: &[HitRegion],
+        regions: &[HitRegion],
     ) -> InteractionUpdate {
         let raw = self.interaction.primary_pressed(event);
+        let target = raw.events.first().map(|(target, _)| *target);
+        if let Some((target, position)) = target.and_then(|target| {
+            regions
+                .iter()
+                .find(|region| region.node == target)
+                .and_then(|region| region.local_point(event.position))
+                .map(|position| (target, position))
+        }) {
+            self.pressed_positions.insert(target, (event.id, position));
+        }
         self.decorate(raw)
     }
 
@@ -213,9 +229,31 @@ impl UiTree {
                 region
             })
             .collect::<Vec<_>>();
-        let raw = self
+        let target = self
             .interaction
-            .focus_pressed(pointer, &scoped, active.is_some());
+            .pressed_target(pointer)
+            .and_then(|pressed| {
+                let mut candidate = Some(pressed);
+                while let Some(node) = candidate {
+                    let eligible = node == pressed
+                        || self
+                            .element_for(node)
+                            .and_then(|element| element.interaction.as_ref())
+                            .is_some_and(|interaction| interaction.focus_on_descendant_press);
+                    if eligible
+                        && scoped.iter().any(|region| {
+                            region.node == node
+                                && region.enabled
+                                && region.focus_policy.is_focusable()
+                        })
+                    {
+                        return Some(node);
+                    }
+                    candidate = self.parent_of(node);
+                }
+                None
+            });
+        let raw = self.interaction.focus_pressed(target, active.is_some());
         self.decorate(raw)
     }
 
@@ -230,6 +268,7 @@ impl UiTree {
             .focused()
             .or_else(|| self.node_ids.first().copied());
         if self.interaction.focused().is_none()
+            && !self.has_global_key_listener()
             && target.is_some_and(|node| {
                 self.default_action(&UiEvent::new(
                     node,
@@ -258,6 +297,12 @@ impl UiTree {
         input: &KeyInput,
         regions: &[HitRegion],
     ) -> InteractionUpdate {
+        if input.state == KeyState::Pressed && input.key == Key::Escape && !input.repeat {
+            let dismiss = self.dismiss_portal_on_escape();
+            if !dismiss.is_empty() {
+                return dismiss;
+            }
+        }
         let Some(node) = self.interaction.focused() else {
             return if input.state == KeyState::Pressed && input.key == Key::Tab && !input.repeat {
                 self.focus_next_scoped(regions, input.modifiers.shift)
@@ -326,7 +371,7 @@ impl UiTree {
     /// Resolves queued and explicit focus requests against current hit regions.
     ///
     /// * `regions` — current focusable hit regions.
-    /// * `request` — optional explicit focus or clear request.
+    /// * `request` — optional explicit focus, clear, or traversal request.
     pub fn sync_focus(
         &mut self,
         regions: &[HitRegion],
@@ -346,6 +391,8 @@ impl UiTree {
                     visible: Some(true),
                 },
                 FocusRequest::Clear => FocusIntent::Clear,
+                FocusRequest::Next => FocusIntent::Move { backwards: false },
+                FocusRequest::Previous => FocusIntent::Move { backwards: true },
             });
         }
         for intent in intents {
@@ -356,6 +403,10 @@ impl UiTree {
             }
             let active = self.focus.active_trap();
             let (target, visible) = match intent {
+                FocusIntent::Move { backwards } => {
+                    update.merge(self.focus_next_scoped(regions, backwards));
+                    continue;
+                }
                 FocusIntent::First { scope, visible } => {
                     (self.first_focusable(regions, scope), visible)
                 }
@@ -446,6 +497,9 @@ impl UiTree {
                 && match target {
                     FocusTarget::Node(node) => region.node == *node,
                     FocusTarget::Key(key) => self.key_for(region.node) == Some(key.as_str()),
+                    FocusTarget::Identity(identity) => {
+                        self.index.identity(identity) == Some(region.node)
+                    }
                 }
         });
         let node = matches.next()?.node;

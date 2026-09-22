@@ -176,3 +176,42 @@ fn removed_handler_identity_ignores_stale_event_delivery() {
     entity.dispatch_event(&event);
     assert_eq!(entity.read(|model| model.hits), 0);
 }
+
+#[derive(Default)]
+struct InputProbe {
+    text: String,
+    calls: usize,
+}
+
+impl Render for InputProbe {
+    /// Binds a typed input value to this retained element.
+    fn render(&mut self, cx: &mut Context<Self>) -> Element {
+        let input = cx.input_callback(|model, value| {
+            model.text = value;
+            model.calls += 1;
+        });
+        Element::text("input").on(input.direct_listener(EventType::Input))
+    }
+}
+
+/// A compatible text delivery reaches a typed callback; a click cannot reuse it.
+#[test]
+fn typed_input_callback_accepts_text_and_ignores_incompatible_click() {
+    let entity = Entity::new(InputProbe::default());
+    let mut tree = UiTree::new(entity.render());
+    let target = tree.node_ids()[0];
+    for kind in [
+        UiEventKind::TextChanged("edited".into()),
+        UiEventKind::Click(ClickEvent::accessibility()),
+    ] {
+        for delivery in tree.event_deliveries(target, kind) {
+            if delivery.should_dispatch() {
+                entity.dispatch_event(&delivery);
+            }
+        }
+    }
+    assert_eq!(
+        entity.read(|model| (model.text.clone(), model.calls)),
+        ("edited".into(), 1)
+    );
+}

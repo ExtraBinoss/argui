@@ -109,6 +109,7 @@ define_syntax_kinds!(
     CallbackParameter,
     SlotDecl,
     EffectParameterDecl,
+    EffectApplication,
     Element,
     ElementId,
     PropertyAssignment,

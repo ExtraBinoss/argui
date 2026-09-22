@@ -3,7 +3,7 @@ use argui_paint::{LayerMask, LayerStyle};
 use crate::{
     effect::{blend_mode, layer_radii, uniform},
     gpu_profile::GpuFrameCapture,
-    target::{PixelRegion, TextureTarget},
+    target::{PixelRegion, TextureTarget, backdrop_sample_region},
 };
 
 use super::{SurfaceRenderer, effects::EffectSources};
@@ -20,8 +20,26 @@ impl SurfaceRenderer {
         viewport: [f32; 2],
         output_region: PixelRegion,
         profiler: Option<&GpuFrameCapture>,
+        backdrop_stack: &[TextureTarget],
     ) {
-        let snapshot = self.snapshot(encoder, target, output_region);
+        let sample_region = backdrop_sample_region(
+            style,
+            backdrop_stack.first().copied().unwrap_or(target).region,
+            output_region,
+        );
+        let snapshot = if style.backdrop_filters.is_empty() {
+            self.snapshot(encoder, target, output_region)
+        } else {
+            self.snapshot_backdrop(
+                encoder,
+                target,
+                backdrop_stack,
+                sample_region,
+                viewport,
+                profiler,
+                style,
+            )
+        };
         let filtered = self.apply_filters(
             encoder,
             snapshot,
@@ -146,6 +164,54 @@ impl SurfaceRenderer {
             },
         );
         target
+    }
+
+    /// Captures the visible scene behind a layer, including earlier ancestor content.
+    ///
+    /// * `encoder` — command encoder receiving the copy and composition passes.
+    /// * `target` — current layer target containing already painted siblings.
+    /// * `stack` — ancestor targets from the root toward the current layer.
+    /// * `region` — sampling region, including a blur margin around the layer.
+    /// * `viewport` — physical viewport dimensions used by the effect shader.
+    /// * `profiler` — optional GPU timing collector.
+    /// * `style` — current layer style used for profile attribution.
+    ///
+    /// Returns an immutable texture containing the visible backdrop in `region`.
+    #[allow(clippy::too_many_arguments)]
+    fn snapshot_backdrop(
+        &mut self,
+        encoder: &mut wgpu::CommandEncoder,
+        target: TextureTarget,
+        stack: &[TextureTarget],
+        region: PixelRegion,
+        viewport: [f32; 2],
+        profiler: Option<&GpuFrameCapture>,
+        style: &LayerStyle,
+    ) -> TextureTarget {
+        let Some((&root, ancestors)) = stack.split_first() else {
+            return self.snapshot(encoder, target, region);
+        };
+        let mut backdrop = self.snapshot(encoder, root, region);
+        for source in ancestors.iter().copied().chain(std::iter::once(target)) {
+            let merged = self.acquire_target(region, region.size);
+            self.clear_target(encoder, merged, wgpu::Color::TRANSPARENT);
+            let mut params = uniform(viewport, region, source, backdrop, style.bounds);
+            params.radii = [-1.0; 4];
+            self.draw_effect(
+                encoder,
+                merged,
+                region,
+                EffectSources { source, backdrop },
+                params,
+                None,
+                &[],
+                profiler,
+                "composite.ancestor-backdrop",
+                style.profile,
+            );
+            backdrop = merged;
+        }
+        backdrop
     }
 }
 

@@ -4,18 +4,22 @@ use argui_dsl_semantic::{DefinitionKind, SemanticProject};
 use argui_dsl_syntax::{Span, SyntaxKind};
 
 use crate::{
-    AssetId, ComponentId, IrCallback, IrComponent, IrProperty, LowerError, SourceInfo, declaration,
-    expression,
+    ComponentId, IrCallback, IrComponent, IrEffect, IrProperty, LowerError, SourceInfo,
+    declaration, expression,
     lower::{Tables, no_locals},
-    visual::VisualLowerer,
+    visual::{VisualLowerer, reference},
 };
 
-/// Lowers every component API and visual tree.
+/// Lowers every component API and visual tree in `project` using `schema` and
+/// stable `tables`. `effects` resolves visual applications; `assets` collects
+/// reached files and `errors` receives lowering failures. Returns components
+/// in source order.
 pub(crate) fn components(
     project: &SemanticProject,
     schema: &argui_schema::SchemaRegistry,
     tables: &Tables,
-    assets: &mut HashMap<String, AssetId>,
+    effects: &[IrEffect],
+    assets: &mut HashMap<String, crate::IrAsset>,
     errors: &mut Vec<LowerError>,
 ) -> Vec<IrComponent> {
     let mut output = Vec::new();
@@ -35,6 +39,7 @@ pub(crate) fn components(
             let id = tables.components[&definition.id];
             let members = &tables.component_members[&definition.id];
             let locals = no_locals();
+            let references = reference::collect(id, module, schema, tables, &syntax);
             let properties = value
                 .properties
                 .iter()
@@ -54,6 +59,7 @@ pub(crate) fn components(
                         locals: &locals,
                         tokens: &tables.tokens,
                         fields: &tables.named_fields,
+                        references: Some(&references),
                         assets,
                         errors,
                     };
@@ -101,7 +107,7 @@ pub(crate) fn components(
                 .filter_map(|slot| members.slots.get(&slot.name).copied())
                 .collect();
             let mut visual =
-                VisualLowerer::new(module, id, members, tables, schema, assets, errors);
+                VisualLowerer::new(module, id, members, tables, effects, schema, assets, errors);
             let body = visual.component_body(&syntax);
             let (states, animations) = visual.finish();
             output.push(IrComponent {

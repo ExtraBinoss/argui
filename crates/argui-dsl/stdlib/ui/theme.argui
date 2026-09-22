@@ -1,6 +1,7 @@
 export theme ArguiDefaultTheme {
     --argui-background: color = #ffffff
     --argui-surface: color = #ffffff
+    --argui-glass-surface: color = #f8fafc99
     --argui-foreground: color = #09090b
     --argui-muted: color = #f4f4f5
     --argui-neutral-hover: color = #e4e4e7
@@ -23,6 +24,7 @@ export theme ArguiDefaultTheme {
     dark {
         --argui-background: #09090b
         --argui-surface: #18181b
+        --argui-glass-surface: #18181b99
         --argui-foreground: #fafafa
         --argui-muted: #27272a
         --argui-neutral-hover: #3f3f46
@@ -44,6 +46,7 @@ export theme ArguiDefaultTheme {
     dark-violet {
         --argui-background: #09090b
         --argui-surface: #18181b
+        --argui-glass-surface: #18181b99
         --argui-foreground: #fafafa
         --argui-muted: #27272a
         --argui-neutral-hover: #3f3f46
@@ -68,6 +71,7 @@ export theme ArguiDefaultTheme {
     dark-emerald {
         --argui-background: #09090b
         --argui-surface: #18181b
+        --argui-glass-surface: #18181b99
         --argui-foreground: #fafafa
         --argui-muted: #27272a
         --argui-neutral-hover: #3f3f46

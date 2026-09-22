@@ -1,0 +1,152 @@
+import { Button } from "@argui/ui"
+import { Column, Container, FocusScope, KeyBinding, Row, Text } from "@argui/native"
+import { ChevronLeft, ChevronRight } from "@argui/icons"
+
+export component Calendar {
+    in-out property year: int = 2026
+    in-out property month: int = 9
+    in property selected_year: int = 0
+    in property selected_month: int = 0
+    in property selected_day: int = 0
+    in property label: string = "Calendar"
+    callback select(year: int, month: int, day: int)
+
+    private property adjusted_year: int = month < 3 ? year - 1 : year
+    private property month_code: int = month == 1 ? 0 : month == 2 ? 3 : month == 3 ? 2 : month == 4 ? 5 : month == 5 ? 0 : month == 6 ? 3 : month == 7 ? 5 : month == 8 ? 1 : month == 9 ? 4 : month == 10 ? 6 : month == 11 ? 2 : 4
+    private property first_weekday: int = (adjusted_year + adjusted_year / 4 - adjusted_year / 100 + adjusted_year / 400 + month_code) % 7
+    private property leap_year: bool = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
+    private property days_in_month: int = month == 2 ? (leap_year ? 29 : 28) : month == 4 || month == 6 || month == 9 || month == 11 ? 30 : 31
+    private property active_day: int = 1
+    private property active_weekday: int = (first_weekday + active_day - 1) % 7
+    private property year_picker_open: bool = false
+    private property year_page: int = 2026
+    private property month_name: string = month == 1 ? "January" : month == 2 ? "February" : month == 3 ? "March" : month == 4 ? "April" : month == 5 ? "May" : month == 6 ? "June" : month == 7 ? "July" : month == 8 ? "August" : month == 9 ? "September" : month == 10 ? "October" : month == 11 ? "November" : "December"
+
+    FocusScope {
+        role: "group"
+        accessible_name: label
+        focus_on_tab_navigation: false
+        focus_on_click: false
+        KeyBinding { shortcut: "PageUp" on activated {
+            month = month == 1 ? 12 : month - 1
+            year = month == 12 ? year - 1 : year
+            active_day = 1
+        } }
+        KeyBinding { shortcut: "PageDown" on activated {
+            month = month == 12 ? 1 : month + 1
+            year = month == 1 ? year + 1 : year
+            active_day = 1
+        } }
+        KeyBinding { shortcut: "ArrowLeft" on activated {
+            active_day = active_day > 1 ? active_day - 1 : 1
+            select(year, month, active_day)
+        } }
+        KeyBinding { shortcut: "ArrowRight" on activated {
+            active_day = active_day < days_in_month ? active_day + 1 : days_in_month
+            select(year, month, active_day)
+        } }
+        KeyBinding { shortcut: "ArrowUp" on activated {
+            active_day = active_day > 7 ? active_day - 7 : active_day
+            select(year, month, active_day)
+        } }
+        KeyBinding { shortcut: "ArrowDown" on activated {
+            active_day = active_day + 7 <= days_in_month ? active_day + 7 : active_day
+            select(year, month, active_day)
+        } }
+        KeyBinding { shortcut: "Home" on activated {
+            active_day = active_day > active_weekday ? active_day - active_weekday : 1
+            select(year, month, active_day)
+        } }
+        KeyBinding { shortcut: "End" on activated {
+            active_day = active_day + 6 - active_weekday <= days_in_month ? active_day + 6 - active_weekday : days_in_month
+            select(year, month, active_day)
+        } }
+
+        Column {
+            width: 290px
+            gap: 10.0
+
+            Row {
+                width: 290px
+                align_items: "center"
+                gap: 8.0
+                Button {
+                    text: "Previous month"
+                    variant: "outline"
+                    show_text: false
+                    padding: 7.0
+                    on click {
+                        month = month == 1 ? 12 : month - 1
+                        year = month == 12 ? year - 1 : year
+                        active_day = 1
+                    }
+                    ChevronLeft { size: 17px }
+                }
+                Container { grow: 1.0 }
+                Text { content: month_name color: var(--argui-foreground) weight: 600 font_size: 15.0 }
+                Button { text: str(year) variant: year_picker_open ? "secondary" : "ghost" padding: 6.0 height: 30px on click { year_page = year year_picker_open = !year_picker_open } }
+                Container { grow: 1.0 }
+                Button {
+                    text: "Next month"
+                    variant: "outline"
+                    show_text: false
+                    padding: 7.0
+                    on click {
+                        month = month == 12 ? 1 : month + 1
+                        year = month == 1 ? year + 1 : year
+                        active_day = 1
+                    }
+                    ChevronRight { size: 17px }
+                }
+            }
+
+            if year_picker_open {
+                Row { width: 290px align_items: "center"
+                    Button { text: "Earlier years" variant: "ghost" show_text: false padding: 6.0 on click { year_page = year_page > 15 ? year_page - 10 : 6 } ChevronLeft { size: 16px } }
+                    Container { grow: 1.0 }
+                    Text { content: str(year_page - 5) + "–" + str(year_page + 5) color: var(--argui-muted-foreground) font_size: 13.0 }
+                    Container { grow: 1.0 }
+                    Button { text: "Later years" variant: "ghost" show_text: false padding: 6.0 on click { year_page = year_page + 10 } ChevronRight { size: 16px } }
+                }
+                Row { width: 290px wrap: true gap: 5.0
+                    for offset in [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5] key offset {
+                        Button { text: str(year_page + offset) variant: year_page + offset == year ? "secondary" : "ghost" height: 34px padding: 9.0 on click {
+                            year = year_page + offset
+                            active_day = 1
+                            year_picker_open = false
+                        } }
+                    }
+                }
+            }
+
+            if !year_picker_open {
+            Row { width: 290px gap: 4.0
+                for weekday in ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"] key weekday {
+                    Row { width: 38px height: 24px justify_content: "center" align_items: "center"
+                        Text { content: weekday color: var(--argui-muted-foreground) font_size: 12.0 weight: 600 }
+                    }
+                }
+            }
+
+            Row { width: 290px wrap: true gap: 4.0
+                for cell in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41] key cell {
+                    Container { width: 38px height: 36px
+                        if cell >= first_weekday && cell < first_weekday + days_in_month {
+                            Button {
+                                text: str(cell - first_weekday + 1)
+                                variant: selected_year == year && selected_month == month && selected_day == cell - first_weekday + 1 ? "primary" : active_day == cell - first_weekday + 1 ? "outline" : "ghost"
+                                height: 34px
+                                padding: 8.0
+                                on click {
+                                    active_day = cell - first_weekday + 1
+                                    select(year, month, active_day)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            }
+        }
+    }
+}

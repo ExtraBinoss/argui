@@ -1,4 +1,4 @@
-import { VirtualList, Separator } from "@argui/ui"
+import { ListView, Separator } from "@argui/ui"
 import { Column, Row, Text } from "@argui/native"
 
 export component Main {
@@ -21,10 +21,10 @@ export component Main {
         background: var(--argui-background)
 
         Text { content: "Virtual list · DSL" color: var(--argui-foreground) font_size: 23.0 weight: 700 }
-        Text { content: "The row template is authored here; VirtualList.argui mounts only the visible window." color: var(--argui-muted-foreground) font_size: 13.0 }
+        Text { content: "The row template is authored here; ListView.argui mounts only the visible window." color: var(--argui-muted-foreground) font_size: 13.0 }
         Separator {}
 
-        VirtualList #records {
+        ListView #records {
             row_height: 44.0
             overscan: 3
             offset <=> list_offset

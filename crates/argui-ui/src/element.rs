@@ -580,6 +580,16 @@ impl Element {
         self
     }
 
+    /// Requests a scroll offset when the declared value changes and returns the element.
+    ///
+    /// * `offset` — horizontal and vertical content offset in logical pixels.
+    ///
+    /// User scrolling remains active between changes to this value.
+    #[must_use]
+    pub fn scroll_offset(mut self, offset: argui_core::Point) -> Self {
+        self.declared_scroll_offset = Some(offset);
+        self
+    }
     /// Sets the element's stacking order within its window layer.
     /// * `z_index` — stacking order within the window layer.
     #[must_use]

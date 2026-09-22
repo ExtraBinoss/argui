@@ -342,3 +342,252 @@ fn secondary_touches_do_not_replace_primary_interaction_capture() {
     )));
     assert_eq!(tree.visual_states(node), VisualStates::NONE);
 }
+
+#[test]
+fn pointer_position_uses_local_transformed_coordinates_through_capture() {
+    let mut tree = UiTree::new(interactive("drag-position"));
+    let node = tree.node_id_at(0).unwrap();
+    let mut hit = region(node);
+    hit.clips = ClipChain::default();
+    hit.transform = Affine2D::translation(20.0, 30.0);
+    let regions = [hit];
+
+    assert_eq!(
+        tree.pointer_position(PointerId::MOUSE, node, &regions),
+        None
+    );
+    tree.pointer_moved(Point::new(35.0, 45.0), &regions);
+    assert_eq!(
+        tree.pointer_position(PointerId::MOUSE, node, &regions),
+        Some(Point::new(5.0, 5.0))
+    );
+
+    tree.capture_pointer(PointerId::MOUSE, node);
+    tree.pointer_moved(Point::new(120.0, 45.0), &regions);
+    assert_eq!(
+        tree.pointer_position(PointerId::MOUSE, node, &regions),
+        Some(Point::new(90.0, 5.0))
+    );
+    tree.release_pointer_capture(PointerId::MOUSE, node);
+    assert_eq!(
+        tree.pointer_position(PointerId::MOUSE, node, &regions),
+        None
+    );
+}
+
+#[test]
+fn touch_positions_clear_after_release_and_window_blur() {
+    let mut tree = UiTree::new(interactive("touch-position"));
+    let node = tree.node_id_at(0).unwrap();
+    let regions = [region(node)];
+    let pointer = PointerId::new(62);
+    let point = Point::new(30.0, 20.0);
+
+    tree.pointer_event(
+        pointer_event(pointer, PointerKind::Touch, PointerPhase::Pressed, point),
+        &regions,
+    );
+    assert_eq!(
+        tree.pointer_position(pointer, node, &regions),
+        Some(Point::new(20.0, 10.0))
+    );
+    tree.pointer_event(
+        pointer_event(pointer, PointerKind::Touch, PointerPhase::Released, point),
+        &regions,
+    );
+    assert_eq!(tree.pointer_position(pointer, node, &regions), None);
+
+    tree.pointer_moved(point, &regions);
+    assert!(
+        tree.pointer_position(PointerId::MOUSE, node, &regions)
+            .is_some()
+    );
+    tree.window_blurred();
+    assert_eq!(
+        tree.pointer_position(PointerId::MOUSE, node, &regions),
+        None
+    );
+}
+
+#[test]
+fn pointer_position_rejects_singular_transforms_and_unrelated_nodes() {
+    let mut tree = UiTree::new(Element::row([interactive("first"), interactive("second")]));
+    let first = tree.node_id_at(1).unwrap();
+    let second = tree.node_id_at(2).unwrap();
+    let mut hit = region(first);
+    hit.clips = ClipChain::default();
+    let point = Point::new(30.0, 20.0);
+    tree.pointer_moved(point, std::slice::from_ref(&hit));
+    assert_eq!(
+        tree.pointer_position(PointerId::MOUSE, second, &[hit.clone()]),
+        None
+    );
+    hit.transform.matrix = [0.0; 4];
+    assert_eq!(tree.pointer_position(PointerId::MOUSE, first, &[hit]), None);
+}
+
+#[test]
+fn capture_on_press_routes_drag_outside_and_releases_on_up_or_cancel() {
+    let element = listeners(
+        Element::container([]).interaction(Interaction::default().capture_on_press(true)),
+    );
+    let mut tree = UiTree::new(element);
+    let node = tree.node_id_at(0).unwrap();
+    let regions = [region(node)];
+    let origin = Point::new(30.0, 20.0);
+    let outside = Point::new(150.0, 20.0);
+    let event =
+        |phase, position| pointer_event(PointerId::MOUSE, PointerKind::Mouse, phase, position);
+
+    let pressed = tree.pointer_event(event(PointerPhase::Pressed, origin), &regions);
+    assert!(pressed.events.iter().all(|event| {
+        !matches!(
+            event.kind,
+            UiEventKind::Pointer(PointerEvent {
+                phase: PointerPhase::Moved,
+                ..
+            })
+        )
+    }));
+    let down = pressed.events.iter().find(|event| {
+        matches!(
+            event.kind,
+            UiEventKind::Pointer(PointerEvent {
+                phase: PointerPhase::Pressed,
+                ..
+            })
+        )
+    });
+    let captured = tree.pointer_press_default(PointerId::MOUSE, down, &regions);
+    assert!(
+        captured
+            .events
+            .iter()
+            .any(|event| { event.kind == UiEventKind::GotPointerCapture(PointerId::MOUSE) })
+    );
+    assert!(tree.pointer_captured(PointerId::MOUSE));
+    assert_eq!(
+        tree.pressed_position(PointerId::MOUSE, node),
+        Some(Point::new(20.0, 10.0))
+    );
+
+    let moved = tree.pointer_event(event(PointerPhase::Moved, outside), &regions);
+    assert!(moved.events.iter().any(|event| {
+        event.target == node
+            && matches!(
+                event.kind,
+                UiEventKind::Pointer(PointerEvent {
+                    phase: PointerPhase::Moved,
+                    ..
+                })
+            )
+    }));
+    assert_eq!(
+        tree.pointer_position(PointerId::MOUSE, node, &regions),
+        Some(Point::new(140.0, 10.0))
+    );
+
+    let released = tree.pointer_event(event(PointerPhase::Released, outside), &regions);
+    assert!(released.events.iter().all(|event| {
+        !matches!(
+            event.kind,
+            UiEventKind::Pointer(PointerEvent {
+                phase: PointerPhase::Moved,
+                ..
+            })
+        )
+    }));
+    assert!(
+        released
+            .events
+            .iter()
+            .any(|event| { event.kind == UiEventKind::LostPointerCapture(PointerId::MOUSE) })
+    );
+    assert!(!tree.pointer_captured(PointerId::MOUSE));
+    assert_eq!(
+        tree.pressed_position(PointerId::MOUSE, node),
+        Some(Point::new(20.0, 10.0))
+    );
+
+    let pressed = tree.pointer_event(event(PointerPhase::Pressed, origin), &regions);
+    let down = pressed.events.iter().find(|event| {
+        matches!(
+            event.kind,
+            UiEventKind::Pointer(PointerEvent {
+                phase: PointerPhase::Pressed,
+                ..
+            })
+        )
+    });
+    tree.pointer_press_default(PointerId::MOUSE, down, &regions);
+    let cancelled = tree.pointer_event(event(PointerPhase::Cancelled, origin), &regions);
+    assert!(
+        cancelled
+            .events
+            .iter()
+            .any(|event| { event.kind == UiEventKind::LostPointerCapture(PointerId::MOUSE) })
+    );
+    assert!(!tree.pointer_captured(PointerId::MOUSE));
+}
+
+#[test]
+fn capture_on_press_skips_disabled_hit_regions() {
+    let mut tree = UiTree::new(
+        Element::container([]).interaction(Interaction::default().capture_on_press(true)),
+    );
+    let node = tree.node_id_at(0).unwrap();
+    let mut disabled = region(node);
+    disabled.enabled = false;
+    tree.pointer_event(
+        pointer_event(
+            PointerId::MOUSE,
+            PointerKind::Mouse,
+            PointerPhase::Pressed,
+            Point::new(30.0, 20.0),
+        ),
+        std::slice::from_ref(&disabled),
+    );
+    assert!(
+        tree.pointer_press_default(PointerId::MOUSE, None, std::slice::from_ref(&disabled))
+            .is_empty()
+    );
+    assert!(!tree.pointer_captured(PointerId::MOUSE));
+}
+
+#[test]
+fn pressed_position_stays_local_after_geometry_changes_and_release() {
+    let mut tree = UiTree::new(interactive("press-position"));
+    let node = tree.node_id_at(0).unwrap();
+    let mut hit = region(node);
+    hit.clips = ClipChain::default();
+    hit.transform = Affine2D::translation(20.0, 30.0);
+    let point = Point::new(35.0, 45.0);
+    tree.pointer_event(
+        pointer_event(
+            PointerId::MOUSE,
+            PointerKind::Mouse,
+            PointerPhase::Pressed,
+            point,
+        ),
+        std::slice::from_ref(&hit),
+    );
+    assert_eq!(
+        tree.pressed_position(PointerId::MOUSE, node),
+        Some(Point::new(5.0, 5.0))
+    );
+
+    hit.transform = Affine2D::IDENTITY;
+    tree.pointer_event(
+        pointer_event(
+            PointerId::MOUSE,
+            PointerKind::Mouse,
+            PointerPhase::Released,
+            point,
+        ),
+        &[hit],
+    );
+    assert_eq!(
+        tree.pressed_position(PointerId::MOUSE, node),
+        Some(Point::new(5.0, 5.0))
+    );
+}

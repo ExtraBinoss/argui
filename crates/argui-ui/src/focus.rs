@@ -1,15 +1,21 @@
-use crate::NodeId;
+use crate::{NodeId, RetainedIdentity};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum FocusTarget {
     Node(NodeId),
     Key(String),
+    /// Unique source identity of a retained element.
+    Identity(RetainedIdentity),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum FocusRequest {
     Focus(FocusTarget),
     Clear,
+    /// Advance to the next enabled Tab stop within the active focus scope.
+    Next,
+    /// Move to the previous enabled Tab stop within the active focus scope.
+    Previous,
 }
 
 impl From<NodeId> for FocusTarget {
@@ -27,6 +33,12 @@ impl From<String> for FocusTarget {
 impl From<&str> for FocusTarget {
     fn from(value: &str) -> Self {
         Self::Key(value.to_owned())
+    }
+}
+
+impl From<RetainedIdentity> for FocusTarget {
+    fn from(value: RetainedIdentity) -> Self {
+        Self::Identity(value)
     }
 }
 

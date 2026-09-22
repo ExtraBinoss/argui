@@ -1,0 +1,173 @@
+import { ScrollView } from "@argui/ui"
+import { Column, Container, Flickable, FocusScope, Rectangle, Row, Text, TouchArea } from "@argui/native"
+
+export effect AuroraThumb {
+    shader: "../../assets/aurora-tint.wgsl"
+    damage: "bounded"
+    parameter strength: float = 0.6
+}
+
+component ScrollRow {
+    in property label: string
+    callback select()
+
+    FocusScope #row_focus {
+        width: 100%
+        height: 30px
+        role: "button"
+        accessible_name: label
+        keyboard_activation: "enter_or_space"
+        on click { select() }
+        TouchArea #row_touch {
+            width: 100%
+            height: 30px
+            mouse_cursor: "pointer"
+            Rectangle {
+                width: 100%
+                height: 30px
+                radius: 5.0
+                background: solid(row_touch.has_hover ? var(--argui-neutral-hover) : var(--argui-surface))
+                border_color: row_focus.focus_visible ? var(--argui-ring) : var(--argui-border)
+                border_width: row_focus.focus_visible ? 2.0 : 1.0
+                Row { width: 100% height: 30px padding: 7.0 align_items: "center"
+                    Text { content: label color: var(--argui-foreground) font_size: 13.0 }
+                }
+            }
+        }
+    }
+}
+
+export component ScrollbarStylingPage {
+    private property entries: array<string> = ["Layers", "Effects", "History", "Brushes", "Swatches", "Masks", "Assets", "Symbols", "Styles", "Export", "Guides", "Canvas"]
+    private property selected_item: string = "None"
+    private property effect_dragging: bool = false
+
+    Column {
+        width: 100%
+        gap: 18.0
+        Text { content: "Scrollbar styling" color: var(--argui-foreground) weight: 700 font_size: 27.0 }
+        Text { content: "Scrollbars reserve their own gutter outside the row buttons. Hover a rail, drag its thumb or select a row." color: var(--argui-muted-foreground) font_size: 14.0 }
+        Text { content: "Selected row: " + selected_item color: var(--argui-foreground) font_size: 13.0 }
+
+        Row {
+            width: 100%
+            wrap: true
+            gap: 24.0
+            Column {
+                width: 260px
+                height: 225px
+                min_height: 0.0
+                gap: 8.0
+                Text { content: "WGSL thumb" color: var(--argui-foreground) weight: 600 font_size: 16.0 }
+                Text { content: "Base primitives with a scoped shader" color: var(--argui-muted-foreground) font_size: 12.0 }
+                Container {
+                    width: 260px
+                    height: 160px
+                    Flickable #effect_viewport {
+                        width: 248px
+                        height: 160px
+                        Column { width: 100% shrink: 0.0 gap: 3.0
+                            for item in entries key item {
+                                ScrollRow { label: item on select { selected_item = item } }
+                            }
+                        }
+                    }
+                    if effect_viewport.content_height > effect_viewport.viewport_height {
+                        TouchArea #effect_drag {
+                            x: 248px
+                            y: 0px
+                            width: 12px
+                            height: 160px
+                            mouse_cursor: "pointer"
+                            on pointer_down {
+                                effect_dragging = true
+                                scroll_to(#effect_viewport, 0px, (effect_drag.mouse_y - effect_viewport.viewport_height / effect_viewport.content_height * effect_viewport.viewport_height / 2.0) / (effect_viewport.viewport_height - effect_viewport.viewport_height / effect_viewport.content_height * effect_viewport.viewport_height) * (effect_viewport.content_height - effect_viewport.viewport_height))
+                            }
+                            on moved {
+                                scroll_to(#effect_viewport, 0px, effect_dragging ? (effect_drag.mouse_y - effect_viewport.viewport_height / effect_viewport.content_height * effect_viewport.viewport_height / 2.0) / (effect_viewport.viewport_height - effect_viewport.viewport_height / effect_viewport.content_height * effect_viewport.viewport_height) * (effect_viewport.content_height - effect_viewport.viewport_height) : effect_viewport.offset_y)
+                            }
+                            on pointer_up { effect_dragging = false }
+                            on pointer_cancel { effect_dragging = false }
+                            Rectangle { width: 12px height: 160px radius: 6.0 background: solid(#172b45) }
+                            Rectangle {
+                                x: 1px
+                                y: effect_viewport.offset_y / (effect_viewport.content_height - effect_viewport.viewport_height) * (effect_viewport.viewport_height - effect_viewport.viewport_height / effect_viewport.content_height * effect_viewport.viewport_height)
+                                width: 10px
+                                height: effect_viewport.viewport_height / effect_viewport.content_height * effect_viewport.viewport_height
+                                radius: 5.0
+                                background: solid(effect_drag.has_hover ? #2563eb : #1d4ed8)
+                                effect: AuroraThumb { scope: "whole" strength: effect_drag.has_hover ? 0.95 : 0.55 }
+                            }
+                        }
+                    }
+                }
+            }
+            Column {
+                width: 260px
+                height: 225px
+                min_height: 0.0
+                gap: 8.0
+                Text { content: "Quiet" color: var(--argui-foreground) weight: 600 font_size: 16.0 }
+                Text { content: "Slim thumb, soft hover" color: var(--argui-muted-foreground) font_size: 12.0 }
+                ScrollView {
+                    width: 260px
+                    height: 160px
+                    scrollbar_color: var(--argui-scrollbar-thumb)
+                    scrollbar_hover_color: var(--argui-primary)
+                    Column { width: 100% gap: 3.0
+                        for item in entries key item {
+                            ScrollRow { label: item on select { selected_item = item } }
+                        }
+                    }
+                }
+            }
+            Column {
+                width: 260px
+                height: 225px
+                min_height: 0.0
+                gap: 8.0
+                Text { content: "High contrast" color: var(--argui-foreground) weight: 600 font_size: 16.0 }
+                Text { content: "Wide rail and distinct hover" color: var(--argui-muted-foreground) font_size: 12.0 }
+                ScrollView {
+                    width: 260px
+                    height: 160px
+                    scrollbar_width: 18px
+                    scrollbar_thumb_width: 10px
+                    scrollbar_radius: 5.0
+                    scrollbar_track_color: var(--argui-muted)
+                    scrollbar_color: var(--argui-primary)
+                    scrollbar_hover_color: var(--argui-primary-hover)
+                    Column { width: 100% gap: 3.0
+                        for item in entries key item {
+                            ScrollRow { label: item on select { selected_item = item } }
+                        }
+                    }
+                }
+            }
+            Column {
+                width: 260px
+                height: 225px
+                min_height: 0.0
+                gap: 8.0
+                Text { content: "Colored rail" color: var(--argui-foreground) weight: 600 font_size: 16.0 }
+                Text { content: "Palette can change independently of content" color: var(--argui-muted-foreground) font_size: 12.0 }
+                ScrollView {
+                    width: 260px
+                    height: 160px
+                    scrollbar_width: 16px
+                    scrollbar_thumb_width: 8px
+                    scrollbar_radius: 4.0
+                    scrollbar_track_color: #172b45
+                    scrollbar_color: #60a5fa
+                    scrollbar_hover_color: #f59e0b
+                    Column { width: 100% gap: 3.0
+                        for item in entries key item {
+                            ScrollRow { label: item on select { selected_item = item } }
+                        }
+                    }
+                }
+            }
+
+        }
+    }
+}

@@ -35,7 +35,7 @@ pub(super) fn exercise(
 pub(super) fn exercise_compositor(
     renderer: &mut SurfaceRenderer,
     window: &Window,
-    pump: &mut impl FnMut(),
+    pump: &mut FramePump<'_>,
 ) {
     let retained = compositor_scene(Affine2D::IDENTITY);
     render(renderer, &retained, window, pump).unwrap();
@@ -55,15 +55,20 @@ fn render_composite(
     renderer: &mut SurfaceRenderer,
     list: &DisplayList,
     window: &Window,
-    pump: &mut impl FnMut(),
+    pump: &mut FramePump<'_>,
 ) -> Result<(), RendererError> {
     let deadline = web_time::Instant::now() + NATIVE_TIMEOUT;
     loop {
         window.request_redraw();
-        pump();
-        let status = renderer.render_composite_notified(list, 1.0, || {
-            window.pre_present_notify();
-        })?;
+        let Some(status) = pump(&mut || renderer.render_composite_notified(list, 1.0, || {}))
+        else {
+            assert!(
+                web_time::Instant::now() < deadline,
+                "redraw callback did not arrive"
+            );
+            continue;
+        };
+        let status = status?;
         if status == RenderStatus::Presented {
             return Ok(());
         }

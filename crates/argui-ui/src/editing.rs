@@ -39,6 +39,9 @@ impl UiTree {
                         let first = nodes.next();
                         if nodes.next().is_some() { None } else { first }
                     }
+                    FocusTarget::Identity(identity) => {
+                        self.resolve_node(&FocusTarget::Identity(identity))
+                    }
                 };
                 node.map_or_else(InteractionUpdate::default, |node| {
                     self.replace_text_input(node, &value)

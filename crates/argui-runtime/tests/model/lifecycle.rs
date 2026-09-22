@@ -2,6 +2,28 @@ use argui_runtime::{Context, Entity, ModelRuntime, MountTransition, Render};
 use argui_ui::Element;
 use std::{cell::RefCell, rc::Rc};
 
+struct ClosingOnRender {
+    mount: Option<argui_runtime::Mount<ClosingOnRender>>,
+}
+
+impl Render for ClosingOnRender {
+    fn render(&mut self, _: &mut Context<Self>) -> Element {
+        self.mount.take().unwrap().close();
+        Element::text("stale content")
+    }
+}
+
+/// Closing during render discards the just-built tree and its retained callbacks.
+#[test]
+fn close_during_render_discards_stale_output() {
+    let entity = Entity::new(ClosingOnRender { mount: None });
+    let mount = entity.mount().unwrap();
+    entity.update(|model, _| model.mount = Some(mount.clone()));
+    let rendered = mount.render(Default::default()).unwrap();
+    assert!(matches!(rendered.kind, argui_ui::ElementKind::Container));
+    assert!(mount.resources().is_closed());
+}
+
 #[test]
 fn host_visibility_before_first_render_does_not_emit_phantom_mount_events() {
     let runtime = ModelRuntime::default();

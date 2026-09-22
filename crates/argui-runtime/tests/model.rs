@@ -12,6 +12,8 @@ mod cache;
 mod context;
 #[path = "model/dispatch.rs"]
 mod dispatch;
+#[path = "model/entity_api.rs"]
+mod effect;
 #[path = "model/entity.rs"]
 mod entity;
 #[path = "model/events.rs"]
@@ -24,6 +26,8 @@ mod host;
 mod lifecycle;
 #[path = "model/mount.rs"]
 mod mount;
+#[path = "model/observation.rs"]
+mod observation;
 #[path = "model/presentation.rs"]
 mod presentation;
 #[path = "model/scope.rs"]
@@ -198,6 +202,7 @@ fn render_defaults_are_noop_and_do_not_publish_assets_or_inspection() {
     assert!(!render.wants_animation_frame());
     assert!(render.image_assets().is_empty());
     assert!(render.vector_assets().is_empty());
+    assert!(render.effect_definitions().is_empty());
     assert!(render.inspector().is_none());
     assert_eq!(context.view_update(), ViewUpdate::None);
 }

@@ -15,6 +15,8 @@ pub(super) struct ProgressBar {
 
 impl ProgressBar {
     /// Renders the stage, colored bar, and current status within `area`.
+    ///
+    /// The dashboard supplies an area at least 28 columns wide and four rows high.
     pub(super) fn render(
         self,
         frame: &mut Frame<'_>,
@@ -23,9 +25,6 @@ impl ProgressBar {
         generation: &str,
         status: &str,
     ) {
-        if area.width == 0 || area.height == 0 {
-            return;
-        }
         frame.render_widget(
             Block::default()
                 .title(" Live update ")
@@ -38,9 +37,6 @@ impl ProgressBar {
             area.width.saturating_sub(2),
             area.height.saturating_sub(2),
         );
-        if inner.width == 0 || inner.height == 0 {
-            return;
-        }
         let label = format!("{phase} · gen {generation} · {status}");
         frame.render_widget(
             Paragraph::new(label)
@@ -48,18 +44,17 @@ impl ProgressBar {
                 .wrap(Wrap { trim: true }),
             Rect::new(inner.x, inner.y, inner.width, 1),
         );
-        if inner.height < 2 {
-            return;
-        }
         let filled = (f64::from(inner.width) * self.ratio.clamp(0.0, 1.0)).round() as u16;
         for index in 0..inner.width {
-            if let Some(cell) = frame.buffer_mut().cell_mut((inner.x + index, inner.y + 1)) {
-                if index < filled {
-                    cell.set_symbol("━")
-                        .set_fg(gradient_color(index, inner.width, self.color));
-                } else {
-                    cell.set_symbol("─").set_fg(Color::DarkGray);
-                }
+            let cell = frame
+                .buffer_mut()
+                .cell_mut((inner.x + index, inner.y + 1))
+                .expect("progress bar cell is inside its frame");
+            if index < filled {
+                cell.set_symbol("━")
+                    .set_fg(gradient_color(index, inner.width, self.color));
+            } else {
+                cell.set_symbol("─").set_fg(Color::DarkGray);
             }
         }
     }

@@ -1,4 +1,4 @@
-import { Pressable, Text } from "@argui/native"
+import { FocusScope, TouchArea, Rectangle, Row, Text } from "@argui/native"
 
 export component Button {
     in property text: string
@@ -12,38 +12,61 @@ export component Button {
     in property show_text: bool = true
     in property select_trigger: bool = false
     in property expanded: bool = false
+    in property backdrop_filter: string = "none"
+    in property surface_color: color = variant == "primary" ? var(--argui-primary) : variant == "secondary" ? var(--argui-muted) : variant == "destructive" ? var(--argui-destructive) : var(--argui-surface)
+    in property text_color: color = variant == "primary" || variant == "destructive" ? var(--argui-primary-foreground) : var(--argui-foreground)
+    in property hover_background: color = variant == "primary" ? var(--argui-primary-hover) : variant == "destructive" ? var(--argui-destructive-hover) : variant == "secondary" ? var(--argui-neutral-hover) : var(--argui-muted)
+    in property down_background: color = variant == "primary" ? var(--argui-primary-pressed) : variant == "destructive" ? var(--argui-destructive-pressed) : variant == "secondary" ? var(--argui-neutral-pressed) : var(--argui-neutral-hover)
     callback click()
+    callback hover()
+    callback hover_end()
     slot content
     slot leading
     slot trailing
     slot loading
 
-    Pressable {
-        label: text
-        enabled: enabled
+    private property normal_border: color = variant == "primary" ? var(--argui-primary) : variant == "destructive" ? var(--argui-destructive) : variant == "ghost" ? var(--argui-surface) : var(--argui-border)
+
+    FocusScope #focus_area {
+        enabled: enabled && !busy
+        keyboard_activation: "enter_or_space"
+        role: select_trigger ? "combo_box" : "button"
+        accessible_name: text
         busy: busy
-        tooltip: tooltip
-        select_trigger: select_trigger
+        expandable: select_trigger
         expanded: expanded
-        background: !enabled ? var(--argui-muted) : variant == "primary" ? var(--argui-primary) : variant == "secondary" ? var(--argui-muted) : variant == "destructive" ? var(--argui-destructive) : var(--argui-surface)
-        border_color: !enabled ? var(--argui-border) : variant == "primary" ? var(--argui-primary) : variant == "destructive" ? var(--argui-destructive) : variant == "ghost" ? var(--argui-surface) : var(--argui-border)
-        hover_background: variant == "primary" ? var(--argui-primary-hover) : variant == "destructive" ? var(--argui-destructive-hover) : variant == "secondary" ? var(--argui-neutral-hover) : var(--argui-muted)
-        pressed_background: variant == "primary" ? var(--argui-primary-pressed) : variant == "destructive" ? var(--argui-destructive-pressed) : variant == "secondary" ? var(--argui-neutral-pressed) : var(--argui-neutral-hover)
-        focus_border_color: var(--argui-ring)
-        radius: radius
-        height: height
-        padding: padding
-        gap: 8.0
+        tooltip: enabled && !busy ? tooltip : ""
         on click { click() }
 
-        if busy {
-            loading
+        TouchArea #touch {
+            enabled: enabled && !busy
+            mouse_cursor: !enabled ? "not_allowed" : busy ? "progress" : "pointer"
+            on pointer_enter { hover() }
+            on pointer_leave { hover_end() }
+
+            Rectangle {
+                background: solid(!enabled ? var(--argui-muted) : touch.pressed ? down_background : touch.has_hover ? hover_background : surface_color)
+                backdrop_filter: backdrop_filter
+                border_color: focus_area.focus_visible ? var(--argui-ring) : !enabled ? var(--argui-border) : normal_border
+                border_width: focus_area.focus_visible ? 2.0 : 1.0
+                radius: radius
+
+                Row {
+                    height: height
+                    padding: padding
+                    gap: 8.0
+                    align_items: "center"
+                    justify_content: "center"
+
+                    if busy { loading }
+                    if !busy { leading }
+                    if show_text {
+                        Text { content: text color: !enabled ? var(--argui-muted-foreground) : text_color weight: 600 font_size: 15.0 no_wrap: true }
+                    }
+                    content
+                    trailing
+                }
+            }
         }
-        if !busy { leading }
-        if show_text {
-            Text { content: text color: !enabled ? var(--argui-muted-foreground) : variant == "primary" || variant == "destructive" ? var(--argui-primary-foreground) : var(--argui-foreground) weight: 600 font_size: 15.0 no_wrap: true }
-        }
-        content
-        trailing
     }
 }

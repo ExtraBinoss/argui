@@ -9,6 +9,8 @@ use argui_ui::{FocusRequest, InteractionUpdate, UiEventKind};
 
 use crate::{Selector, SemanticMatcher, TestApp, TestError, TestNode};
 
+mod click;
+
 impl<A: Render> TestApp<A> {
     /// Returns an operation handle for a unique application `key`.
     #[must_use]
@@ -44,38 +46,6 @@ impl<A: Render> TestApp<A> {
     #[must_use]
     pub fn focused(&mut self) -> TestNode<'_, A> {
         TestNode::new(self, Selector::Focused)
-    }
-
-    /// Clicks the unique element with application `key` using real hit testing.
-    ///
-    /// # Errors
-    ///
-    /// Returns a selector, bounds, layout, or stabilization error.
-    pub fn click(&mut self, key: &str) -> Result<(), TestError> {
-        self.click_selector(&Selector::key(key))
-    }
-
-    pub(crate) fn click_selector(&mut self, selector: &Selector) -> Result<(), TestError> {
-        let point = self.center(selector)?;
-        let regions = self.output().hit_regions.clone();
-        let moved = self.ui_mut().pointer_moved(point, &regions);
-        self.dispatch_interaction(moved)?;
-        for phase in [PointerPhase::Pressed, PointerPhase::Released] {
-            let mut event = PointerEvent::mouse(phase, point);
-            event.timestamp = std::time::Duration::from_nanos(self.now.as_nanos());
-            let update = self.ui_mut().pointer_event(event, &regions);
-            let deliveries = update.events.clone();
-            self.dispatch_interaction(update)?;
-            if phase == PointerPhase::Pressed
-                && deliveries.iter().all(|event| !event.default_prevented())
-            {
-                let focus = self
-                    .ui_mut()
-                    .focus_pointer_default(PointerId::MOUSE, &regions);
-                self.dispatch_interaction(focus)?;
-            }
-        }
-        self.settle()
     }
 
     /// Taps `selector` with a primary touch contact through gesture and hit testing.
@@ -151,23 +121,50 @@ impl<A: Render> TestApp<A> {
             });
         }
         let regions = self.output().hit_regions.clone();
-        let pressed = PointerEvent::mouse(PointerPhase::Pressed, start);
+        let pressed = PointerEvent {
+            button: Some(argui_core::PointerButton::Primary),
+            buttons: 1,
+            ..PointerEvent::mouse(PointerPhase::Pressed, start)
+        };
         let update = self.ui_mut().pointer_event(pressed, &regions);
+        let press_delivery = update
+            .events
+            .iter()
+            .find(|event| {
+                matches!(
+                    event.kind,
+                    UiEventKind::Pointer(PointerEvent {
+                        phase: PointerPhase::Pressed,
+                        ..
+                    })
+                )
+            })
+            .cloned();
         self.dispatch_interaction(update)?;
+        let capture = self.ui_mut().pointer_press_default(
+            PointerId::MOUSE,
+            press_delivery.as_ref(),
+            &regions,
+        );
+        self.dispatch_interaction(capture)?;
         for index in 1..=steps.max(1) {
             let ratio = index as f32 / steps.max(1) as f32;
             let point = Point::new(
                 start.x + (end.x - start.x) * ratio,
                 start.y + (end.y - start.y) * ratio,
             );
-            let update = self
-                .ui_mut()
-                .pointer_event(PointerEvent::mouse(PointerPhase::Moved, point), &regions);
+            let moved = PointerEvent {
+                buttons: 1,
+                ..PointerEvent::mouse(PointerPhase::Moved, point)
+            };
+            let update = self.ui_mut().pointer_event(moved, &regions);
             self.dispatch_interaction(update)?;
         }
-        let update = self
-            .ui_mut()
-            .pointer_event(PointerEvent::mouse(PointerPhase::Released, end), &regions);
+        let released = PointerEvent {
+            button: Some(argui_core::PointerButton::Primary),
+            ..PointerEvent::mouse(PointerPhase::Released, end)
+        };
+        let update = self.ui_mut().pointer_event(released, &regions);
         self.dispatch_interaction(update)?;
         self.settle()
     }

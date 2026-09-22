@@ -104,6 +104,7 @@ impl SurfaceRenderer {
         owner: Option<argui_paint::RenderObjectId>,
         cache_stats: &mut CacheFrameStats,
         clip: Option<PixelRegion>,
+        backdrop_stack: &[TextureTarget],
     ) {
         let mut index = 0;
         while index < nodes.len() {
@@ -138,6 +139,7 @@ impl SurfaceRenderer {
                         layer.style.profile,
                         cache_stats,
                         clip,
+                        backdrop_stack,
                     );
                 }
                 EffectNode::Layer(layer) => {
@@ -154,13 +156,18 @@ impl SurfaceRenderer {
                     else {
                         continue;
                     };
-                    let cached = layer.style.profile.and_then(|profile| {
-                        cache_stats.used.insert(profile);
-                        self.layer_cache
-                            .get(&profile)
-                            .filter(|cached| same_layer_content(&cached.layer, layer))
-                            .map(|cached| cached.target)
-                    });
+                    let cacheable = !layer.content_reads_backdrop();
+                    let cached = layer
+                        .style
+                        .profile
+                        .filter(|_| cacheable)
+                        .and_then(|profile| {
+                            cache_stats.used.insert(profile);
+                            self.layer_cache
+                                .get(&profile)
+                                .filter(|cached| same_layer_content(&cached.layer, layer))
+                                .map(|cached| cached.target)
+                        });
                     let foreground = if let Some(cached) = cached {
                         cache_stats.hits += 1;
                         cached
@@ -169,6 +176,8 @@ impl SurfaceRenderer {
                             u64::from(region.size[0]) * u64::from(region.size[1]);
                         let layer_target = self.acquire_target(region, region.size);
                         self.clear_target(encoder, layer_target, wgpu::Color::TRANSPARENT);
+                        let mut child_backdrops = backdrop_stack.to_vec();
+                        child_backdrops.push(target);
                         self.render_effect_nodes(
                             encoder,
                             &layer.children,
@@ -178,6 +187,7 @@ impl SurfaceRenderer {
                             layer.style.profile,
                             cache_stats,
                             None,
+                            &child_backdrops,
                         );
                         let foreground = self.apply_filters(
                             encoder,
@@ -189,7 +199,7 @@ impl SurfaceRenderer {
                             profiler,
                             layer.style.profile,
                         );
-                        if let Some(profile) = layer.style.profile {
+                        if let Some(profile) = layer.style.profile.filter(|_| cacheable) {
                             self.layer_cache.insert(
                                 profile,
                                 CachedLayer {
@@ -208,6 +218,7 @@ impl SurfaceRenderer {
                         viewport,
                         composite_region,
                         profiler,
+                        backdrop_stack,
                     );
                 }
             }
@@ -317,6 +328,9 @@ impl SurfaceRenderer {
                 PlannedFilter::Blur(radius) => {
                     self.apply_blur(encoder, current, radius, viewport, bounds, profiler, object)
                 }
+                PlannedFilter::DropShadow(shadow) => self.apply_filter_shadow(
+                    encoder, current, shadow, viewport, bounds, profiler, object,
+                ),
                 PlannedFilter::ColorMatrix(matrix) => {
                     let mut pass = EffectPass::new(8, [0.0; 4], bounds);
                     pass.matrix = Some(matrix);

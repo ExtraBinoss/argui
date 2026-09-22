@@ -1,0 +1,55 @@
+import { Button } from "@argui/ui"
+import { Column, Rectangle, Row, Text } from "@argui/native"
+
+export component TextSelectionPage {
+    private property animate_rainbow: bool = true
+    private property phase: float = 0.0
+
+    animate phase { from: 0.0 to: 360.0 duration: 2400ms iterations: "infinite" }
+
+    Column {
+        width: 100%
+        gap: 18.0
+        Text { content: "Text selection" color: var(--argui-foreground) weight: 700 font_size: 27.0 }
+        Text { content: "Drag over each paragraph to compare GPU painted selection fills." color: var(--argui-muted-foreground) font_size: 14.0 }
+        Button { text: animate_rainbow ? "Pause rainbow" : "Play rainbow" variant: "outline" on click { animate_rainbow = !animate_rainbow } }
+
+        Row {
+            width: 100%
+            wrap: true
+            gap: 14.0
+            Rectangle {
+                width: 260px height: 160px radius: 10.0 background: solid(var(--argui-surface))
+                border_color: var(--argui-border) border_width: 1.0
+                Column { padding: 16.0 gap: 10.0
+                    Text { content: "Default" color: var(--argui-foreground) weight: 700 font_size: 16.0 }
+                    Text { content: "A familiar solid highlight follows every selected glyph and line." color: var(--argui-foreground) font_size: 14.0 }
+                }
+            }
+            Rectangle {
+                width: 260px height: 160px radius: 10.0 background: solid(var(--argui-surface))
+                border_color: var(--argui-border) border_width: 1.0
+                Column { padding: 16.0 gap: 10.0
+                    Text { content: "Rounded solid" color: var(--argui-foreground) weight: 700 font_size: 16.0 }
+                    Text { content: "Soft corners make a selected paragraph read like a gentle pill." color: var(--argui-foreground) font_size: 14.0 selection_color: var(--argui-primary) selection_radius: 7.0 }
+                }
+            }
+            Rectangle {
+                width: 260px height: 160px radius: 10.0 background: solid(var(--argui-surface))
+                border_color: var(--argui-border) border_width: 1.0
+                Column { padding: 16.0 gap: 10.0
+                    Text { content: "Oklab gradient" color: var(--argui-foreground) weight: 700 font_size: 16.0 }
+                    Text { content: "The gradient is clipped to the text selection fragments." color: var(--argui-foreground) font_size: 14.0 selection_fill: linear_gradient([#5b8ff9aa, #db8df5aa], [0.0, 1.0], 25.0, "oklab") selection_radius: 7.0 }
+                }
+            }
+            Rectangle {
+                width: 260px height: 160px radius: 10.0 background: solid(var(--argui-surface))
+                border_color: var(--argui-border) border_width: 1.0
+                Column { padding: 16.0 gap: 10.0
+                    Text { content: "Animated rainbow" color: var(--argui-foreground) weight: 700 font_size: 16.0 }
+                    Text { content: "A moving gradient runs through the same public selection fill API." color: var(--argui-foreground) font_size: 14.0 selection_fill: linear_gradient([#f6a6aacc, #f9db90cc, #92d9b8cc, #91bafacc, #d7a5facc], [0.0, 0.25, 0.5, 0.75, 1.0], animate_rainbow ? phase : 25.0, "oklab") selection_radius: 8.0 }
+                }
+            }
+        }
+    }
+}

@@ -1,6 +1,6 @@
 //! Read-only, cross-platform terminal presentation for `argui dev`.
 
-use std::{collections::VecDeque, net::SocketAddr, path::Path};
+use std::{collections::VecDeque, net::SocketAddr, path::Path, time::Instant};
 
 use ratatui::{
     Frame,
@@ -28,6 +28,7 @@ pub enum DevPhase {
     Watching,
     Changed,
     Compiled,
+    BuildingClient,
     Applied,
     Rejected,
 }
@@ -40,6 +41,7 @@ impl DevPhase {
             Self::Watching => 0.0,
             Self::Changed => 0.25,
             Self::Compiled => 0.65,
+            Self::BuildingClient => 0.0,
             Self::Applied | Self::Rejected => 1.0,
         }
     }
@@ -51,6 +53,7 @@ impl DevPhase {
             Self::Watching => ("WATCHING", Color::Cyan),
             Self::Changed => ("CHANGE DETECTED", AMBER),
             Self::Compiled => ("COMPILED · AWAITING CLIENT", AMBER),
+            Self::BuildingClient => ("BUILDING NATIVE CLIENT", AMBER),
             Self::Applied => ("APPLIED", Color::Green),
             Self::Rejected => ("REJECTED", Color::Red),
         }
@@ -66,7 +69,17 @@ pub struct DevDashboard {
     generation: Option<u64>,
     native_clients: usize,
     status: String,
+    native_build: Option<NativeBuild>,
     events: VecDeque<(String, Color)>,
+}
+
+/// Observed Cargo progress for the native client build.
+struct NativeBuild {
+    started: Instant,
+    completed: usize,
+    total: usize,
+    crate_name: String,
+    shown_second: u64,
 }
 
 impl DevDashboard {
@@ -81,6 +94,7 @@ impl DevDashboard {
             generation: None,
             native_clients: 0,
             status: "Waiting for source changes".into(),
+            native_build: None,
             events: VecDeque::with_capacity(64),
         }
     }
@@ -108,9 +122,11 @@ impl DevDashboard {
     pub fn compilation(&mut self, message: &LiveMessage) {
         match message {
             LiveMessage::Package(package) => {
-                self.phase = DevPhase::Compiled;
+                if self.native_build.is_none() {
+                    self.phase = DevPhase::Compiled;
+                    self.status = "Package ready; waiting for a connected client".into();
+                }
                 self.generation = Some(package.header.generation);
-                self.status = "Package ready; waiting for a connected client".into();
                 self.push(
                     format!(
                         "Generation {} compiled · awaiting client",
@@ -149,6 +165,77 @@ impl DevDashboard {
         }
     }
 
+    /// Starts a separately observable Cargo build for the native live client.
+    pub(crate) fn native_build_started(&mut self) {
+        self.phase = DevPhase::BuildingClient;
+        self.native_build = Some(NativeBuild {
+            started: Instant::now(),
+            completed: 0,
+            total: 0,
+            crate_name: "starting Cargo".into(),
+            shown_second: 0,
+        });
+        self.refresh_native_build_status();
+        self.push("Building native client with Cargo".into(), AMBER);
+    }
+
+    /// Records a Cargo compilation target and any exact completed/total step count.
+    ///
+    /// `crate_name` is Cargo's current target; `steps` is present for a progress frame.
+    pub(crate) fn native_build_progress(
+        &mut self,
+        crate_name: &str,
+        steps: Option<(usize, usize)>,
+    ) {
+        if let Some(build) = &mut self.native_build {
+            build.crate_name = crate_name.to_owned();
+            if let Some((completed, total)) = steps {
+                build.completed = completed;
+                build.total = total;
+            }
+            self.refresh_native_build_status();
+        }
+    }
+
+    /// Updates the build elapsed time, returning whether the dashboard needs a redraw.
+    pub(crate) fn native_build_tick(&mut self) -> bool {
+        let Some(build) = &mut self.native_build else {
+            return false;
+        };
+        let second = build.started.elapsed().as_secs();
+        if second == build.shown_second {
+            return false;
+        }
+        build.shown_second = second;
+        self.refresh_native_build_status();
+        true
+    }
+
+    /// Marks Cargo's handoff to the running native application.
+    pub(crate) fn native_build_finished(&mut self) {
+        if self.native_build.take().is_some() {
+            self.phase = DevPhase::Compiled;
+            self.status = "Native client started; waiting for its connection".into();
+            self.push("Native client started".into(), Color::Green);
+        }
+    }
+
+    /// Formats the current Cargo count, target and elapsed time in the status line.
+    fn refresh_native_build_status(&mut self) {
+        if let Some(build) = &self.native_build {
+            let count = if build.total > 0 {
+                format!("{}/{} · ", build.completed, build.total)
+            } else {
+                String::new()
+            };
+            self.status = format!(
+                "Cargo {count}{} · {}s",
+                build.crate_name,
+                build.started.elapsed().as_secs()
+            );
+        }
+    }
+
     /// Records the count of native clients that remain connected.
     pub fn clients(&mut self, count: usize) {
         self.native_clients = count;
@@ -178,6 +265,7 @@ impl DevDashboard {
         }
         match message {
             LiveMessage::Committed { generation } => {
+                self.native_build = None;
                 self.phase = DevPhase::Applied;
                 self.generation = Some(*generation);
                 self.status = format!("Generation {generation} confirmed by {peer}");
@@ -190,6 +278,7 @@ impl DevDashboard {
                 generation,
                 message,
             } => {
+                self.native_build = None;
                 self.phase = DevPhase::Rejected;
                 self.generation = Some(*generation);
                 self.status = message.clone();
@@ -199,6 +288,7 @@ impl DevDashboard {
                 );
             }
             LiveMessage::RestartRequired { generation, .. } => {
+                self.native_build = None;
                 self.phase = DevPhase::Rejected;
                 self.generation = Some(*generation);
                 self.status = "Rust API changed; restart the application".into();
@@ -282,7 +372,16 @@ impl DevDashboard {
             .generation
             .map_or_else(|| "—".into(), |value| value.to_string());
         let progress = ProgressBar {
-            ratio: self.phase.ratio(),
+            ratio: self.native_build.as_ref().map_or_else(
+                || self.phase.ratio(),
+                |build| {
+                    if build.total == 0 {
+                        0.0
+                    } else {
+                        build.completed as f64 / build.total as f64
+                    }
+                },
+            ),
             color: phase_color,
         };
         progress.render(frame, sections[1], phase_label, &generation, &self.status);

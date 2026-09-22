@@ -1,0 +1,19 @@
+import { Button } from "@argui/ui"
+
+export component Toggle {
+    in property label: string
+    in-out property pressed: bool = false
+    in property enabled: bool = true
+    in property outline: bool = false
+    callback changed(pressed: bool)
+
+    Button {
+        text: label
+        enabled: enabled
+        variant: pressed ? "secondary" : outline ? "outline" : "ghost"
+        on click {
+            pressed = !pressed
+            changed(pressed)
+        }
+    }
+}

@@ -46,3 +46,45 @@ export component App { Container { width: 20px animate width {
         );
     }
 }
+
+/// Percentages outside the legal interval and incomplete stops are diagnosed.
+#[test]
+fn keyframes_reject_out_of_range_and_missing_values() {
+    let issues = diagnostics(
+        r#"import { Column } from "@argui/native"
+export component App { Column { gap: 4.0 animate gap {
+    duration: 100ms keyframes { 0%: 0.0 120%: 1.0 100%: }
+} } }"#,
+    );
+    assert!(
+        issues
+            .iter()
+            .any(|issue| issue.code == DiagnosticCode::InvalidAnimation
+                && issue.message.contains("between 0% and 100%")),
+        "{issues:#?}"
+    );
+    assert!(
+        issues
+            .iter()
+            .any(|issue| issue.message.contains("expected expression")),
+        "{issues:#?}"
+    );
+}
+
+/// Every stop must be assignable to its animated target, even at valid offsets.
+#[test]
+fn keyframes_reject_values_with_the_wrong_type() {
+    let issues = diagnostics(
+        r#"import { Column } from "@argui/native"
+export component App { Column { gap: 4.0 animate gap {
+    duration: 100ms keyframes { 0%: false 100%: true }
+} } }"#,
+    );
+    assert!(
+        issues
+            .iter()
+            .any(|issue| issue.code == DiagnosticCode::TypeMismatch
+                && issue.message.contains("keyframe expects")),
+        "{issues:#?}"
+    );
+}

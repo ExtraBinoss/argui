@@ -1,9 +1,9 @@
 # Argui DSL: Slint-style composition architecture
 
-> **Status: proposed future architecture, not an implemented feature claim.**
+> **Status: implementation in progress; final quality and platform gates remain.**
 > This plan complements the existing [DSL implementation plan](ARGUI_DSL_IMPLEMENTATION_PLAN.md)
-> and [delivery checklist](README.md). Do not check off a milestone merely because
-> a current native widget has been wrapped in `.argui`.
+> and [delivery checklist](README.md). The implemented primitive boundary is
+> recorded in the [composition inventory](composition-inventory.md).
 
 ## Mission and architectural rule
 

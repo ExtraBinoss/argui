@@ -72,6 +72,33 @@ impl Color {
         )
     }
 
+    /// Creates a color from HSV coordinates and opacity.
+    ///
+    /// `hue` is an angle in degrees; `saturation`, `value`, and `alpha` are
+    /// normalized to the 0–1 range. Nonfinite inputs use zero before clamping.
+    /// Returns the resulting color in the library's linear-light storage.
+    #[must_use]
+    pub fn hsva(hue: f32, saturation: f32, value: f32, alpha: f32) -> Self {
+        let finite = |channel: f32| if channel.is_finite() { channel } else { 0.0 };
+        let hue = finite(hue).rem_euclid(360.0);
+        let saturation = finite(saturation).clamp(0.0, 1.0);
+        let value = finite(value).clamp(0.0, 1.0);
+        let alpha = finite(alpha).clamp(0.0, 1.0);
+        let chroma = value * saturation;
+        let sector = hue / 60.0;
+        let secondary = chroma * (1.0 - (sector % 2.0 - 1.0).abs());
+        let [red, green, blue] = match sector as u32 {
+            0 => [chroma, secondary, 0.0],
+            1 => [secondary, chroma, 0.0],
+            2 => [0.0, chroma, secondary],
+            3 => [0.0, secondary, chroma],
+            4 => [secondary, 0.0, chroma],
+            _ => [chroma, 0.0, secondary],
+        };
+        let minimum = value - chroma;
+        Self::srgba(red + minimum, green + minimum, blue + minimum, alpha)
+    }
+
     /// Creates an opaque color from linear-light sRGB channels.
     /// * `red`, `green`, `blue` — linear-light color channels.
     #[must_use]
@@ -171,6 +198,15 @@ impl Color {
     /// Converts the color to 8-bit gamma-encoded sRGB and alpha channels.
     pub fn to_srgba8(self) -> [u8; 4] {
         self.to_srgba().map(unit_to_byte)
+    }
+
+    /// Returns the color as an eight-digit sRGB hexadecimal string.
+    ///
+    /// The return value has `#RRGGBBAA` spelling, including its alpha channel.
+    #[must_use]
+    pub fn to_hex_rgba(self) -> String {
+        let [red, green, blue, alpha] = self.to_srgba8();
+        format!("#{red:02X}{green:02X}{blue:02X}{alpha:02X}")
     }
 
     #[must_use]

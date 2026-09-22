@@ -283,6 +283,7 @@ fn failed_package_preparation_cannot_replace_the_active_generation() {
         id: argui_dsl_ir::AssetId::from_raw(99),
         path: "missing.png".into(),
         kind: argui_dsl_ir::AssetKind::Image,
+        inline_bytes: None,
     });
     let invalid = LivePackage::prepare(2, runtime.public_api_hash(), invalid_ir, HashMap::new());
     assert!(matches!(invalid, Err(RuntimeError::MissingAsset(99))));
@@ -471,7 +472,7 @@ export component Main {
     }
 }"#;
     let compiled = compile(source);
-    assert!(compiled.rust.contains("UiEventKind::TextChanged"));
+    assert!(compiled.rust.contains("UiEventKind::TextEdited"));
     let members = members(&compiled, "Main");
     let count = members.properties["count"];
     let name = members.properties["name"];

@@ -1,0 +1,81 @@
+import { Button } from "@argui/ui"
+import { Column, Container, PopupWindow, Rectangle, Row, Text } from "@argui/native"
+
+export component AlertDialogPage {
+    private property dialog_open: bool = false
+    private property archived: bool = false
+
+    Column {
+        width: 100%
+        gap: 20.0
+        Text { content: "Alert dialog" color: var(--argui-foreground) weight: 700 font_size: 27.0 }
+        Text { content: "Confirm a consequential action before changing project state." color: var(--argui-muted-foreground) font_size: 14.0 }
+
+        Container {
+            width: 100%
+            padding: 18.0
+            background: var(--argui-surface)
+            border_color: var(--argui-border)
+            radius: 10.0
+            Column {
+                gap: 12.0
+                Text { content: "Summer collection" color: var(--argui-foreground) weight: 650 font_size: 17.0 }
+                Text { content: archived ? "In archive · Can be restored" : "Active project · Updated today" color: var(--argui-muted-foreground) font_size: 14.0 }
+                Row {
+                    gap: 10.0
+                    if !archived {
+                        Button { text: "Archive project" variant: "destructive" on click { dialog_open = true } }
+                    }
+                    if archived {
+                        Button { text: "Restore project" variant: "outline" on click { archived = false } }
+                    }
+                }
+            }
+        }
+
+        PopupWindow {
+            visible: dialog_open
+            placement: "fill"
+            window_layer: "modal"
+            containment: "modal"
+            dismiss_policy: "escape"
+            initial_focus: "first"
+            restore_focus: true
+            width: 100%
+            height: 100%
+            on dismiss { dialog_open = false }
+            Rectangle {
+                width: 100%
+                height: 100%
+                background: solid(#0b10264d)
+                backdrop_filter: "blur(9px)"
+                Row {
+                    width: 100%
+                    height: 100%
+                    align_items: "center"
+                    justify_content: "center"
+                    Rectangle {
+                        width: 420px
+                        background: solid(var(--argui-surface))
+                        border_color: var(--argui-border)
+                        border_width: 1.0
+                        radius: 12.0
+                        Column {
+                            width: 100%
+                            padding: 22.0
+                            gap: 16.0
+                            Text { content: "Archive this project?" color: var(--argui-foreground) weight: 700 font_size: 21.0 }
+                            Text { content: "The project will move to your archive. You can restore it later." color: var(--argui-muted-foreground) font_size: 14.0 }
+                            Row {
+                                wrap: true
+                                gap: 10.0
+                                Button { text: "Cancel" variant: "outline" on click { dialog_open = false } }
+                                Button { text: "Archive project" variant: "destructive" on click { archived = true dialog_open = false } }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

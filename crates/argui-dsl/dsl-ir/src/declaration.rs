@@ -122,7 +122,7 @@ pub(crate) fn enums(project: &SemanticProject) -> Vec<IrEnum> {
 pub(crate) fn themes(
     project: &SemanticProject,
     tables: &Tables,
-    assets: &mut HashMap<String, AssetId>,
+    assets: &mut HashMap<String, crate::IrAsset>,
     errors: &mut Vec<LowerError>,
 ) -> Vec<IrTheme> {
     definitions(project)
@@ -144,6 +144,7 @@ pub(crate) fn themes(
                 locals: &locals,
                 tokens: &tables.tokens,
                 fields: &tables.named_fields,
+                references: None,
                 assets,
                 errors,
             };
@@ -214,7 +215,7 @@ pub(crate) fn styles(
     project: &SemanticProject,
     schema: &argui_schema::SchemaRegistry,
     tables: &Tables,
-    assets: &mut HashMap<String, AssetId>,
+    assets: &mut HashMap<String, crate::IrAsset>,
     errors: &mut Vec<LowerError>,
 ) -> Vec<IrStyle> {
     definitions(project)
@@ -237,6 +238,7 @@ pub(crate) fn styles(
                 locals: &locals,
                 tokens: &tables.tokens,
                 fields: &tables.named_fields,
+                references: None,
                 assets,
                 errors,
             };
@@ -281,7 +283,7 @@ pub(crate) fn styles(
 pub(crate) fn effects(
     project: &SemanticProject,
     tables: &Tables,
-    assets: &mut HashMap<String, AssetId>,
+    assets: &mut HashMap<String, crate::IrAsset>,
     errors: &mut Vec<LowerError>,
 ) -> Vec<IrEffect> {
     definitions(project)
@@ -305,6 +307,7 @@ pub(crate) fn effects(
                 locals: &locals,
                 tokens: &tables.tokens,
                 fields: &tables.named_fields,
+                references: None,
                 assets,
                 errors,
             };
@@ -322,6 +325,7 @@ pub(crate) fn effects(
                         "effect-parameter",
                         hash_text(&parameter.name),
                     )),
+                    name: parameter.name.clone(),
                     value_type: crate::IrType::resolved(
                         &parameter.value_type,
                         &tables.struct_fields,
@@ -334,6 +338,7 @@ pub(crate) fn effects(
             Some(IrEffect {
                 id: EffectId::from_raw(definition.id.raw()),
                 shader,
+                bounded_damage: value.bounded_damage,
                 parameters,
                 source: source(definition.span),
             })
@@ -356,7 +361,12 @@ pub(crate) fn asset(id: AssetId, path: String) -> crate::IrAsset {
     } else {
         AssetKind::Other
     };
-    crate::IrAsset { id, path, kind }
+    crate::IrAsset {
+        id,
+        path,
+        kind,
+        inline_bytes: None,
+    }
 }
 
 /// Resolves one style target through the module's native and symbol scopes.
@@ -441,10 +451,11 @@ fn lower_style_assignment(
 }
 
 /// Registers an asset path and returns its content-addressed identity.
-pub(crate) fn register_asset(assets: &mut HashMap<String, AssetId>, path: &str) -> AssetId {
-    *assets
+pub(crate) fn register_asset(assets: &mut HashMap<String, crate::IrAsset>, path: &str) -> AssetId {
+    assets
         .entry(path.to_string())
-        .or_insert_with(|| AssetId::from_raw(hash_text(path)))
+        .or_insert_with(|| asset(AssetId::from_raw(hash_text(path)), path.to_string()))
+        .id
 }
 
 /// Resolves an asset path lexically relative to its declaring module.

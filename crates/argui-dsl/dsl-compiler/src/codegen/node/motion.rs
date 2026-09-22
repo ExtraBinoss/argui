@@ -52,7 +52,7 @@ impl Context<'_> {
         identity: &str,
     ) -> Result<(), CompilerError> {
         for native_property in &native_schema.properties {
-            if native_schema.id == argui_schema::builtin::VIRTUAL_LIST
+            if native_schema.virtual_window
                 && native_property.id == argui_schema::builtin::VIEWPORT_HEIGHT
             {
                 continue;

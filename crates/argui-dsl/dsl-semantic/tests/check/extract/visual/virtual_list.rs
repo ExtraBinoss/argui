@@ -10,11 +10,11 @@ fn diagnostics(source: &str) -> Vec<argui_dsl_semantic::Diagnostic> {
 #[test]
 fn keyed_virtual_repeater_accepts_typed_rows_and_two_way_scroll() {
     let diagnostics = diagnostics(
-        r#"import { VList, Text } from "@argui/native"
+        r#"import { VirtualWindow, Text } from "@argui/native"
 export component Main {
     private property items: array<string> = ["one", "two"]
     private property offset: float = 0.0
-    VList { row_height: 32.0 height: 100% offset <=> offset opacity: 1.0
+    VirtualWindow { row_height: 32.0 height: 100% offset <=> offset opacity: 1.0
         states { dim when false { opacity: 0.5 } }
         for item in items key item { Text { content: item } }
     }
@@ -28,11 +28,30 @@ export component Main {
     );
 }
 
+/// The generic virtual window capability accepts the same keyed lazy template.
+#[test]
+fn virtual_window_accepts_keyed_lazy_rows() {
+    let issues = diagnostics(
+        r#"import { VirtualWindow, Text } from "@argui/native"
+export component Main {
+    private property rows: array<string> = ["one", "two"]
+    private property offset: float = 0.0
+    VirtualWindow #viewport { row_height: 24.0 viewport_height: 48.0 offset <=> offset
+        for row in rows key row { Text { content: row } }
+    }
+}"#,
+    );
+    assert!(
+        issues.iter().all(|issue| issue.severity != Severity::Error),
+        "{issues:#?}"
+    );
+}
+
 #[test]
 fn virtual_list_requires_reactive_scroll_offset() {
     for assignment in ["", "offset: 0.0"] {
         let source = format!(
-            "import {{ VList, Text }} from \"@argui/native\"\nexport component Main {{\n    private property items: array<string> = [\"one\"]\n    private property scroll: float = 0.0\n    VList {{ row_height: 32.0 {assignment}\n        for item in items key item {{ Text {{ content: item }} }}\n    }}\n}}"
+            "import {{ VirtualWindow, Text }} from \"@argui/native\"\nexport component Main {{\n    private property items: array<string> = [\"one\"]\n    private property scroll: float = 0.0\n    VirtualWindow {{ row_height: 32.0 {assignment}\n        for item in items key item {{ Text {{ content: item }} }}\n    }}\n}}"
         );
         let issues = diagnostics(&source);
         assert!(
@@ -70,7 +89,7 @@ fn virtual_list_requires_one_keyed_repeater_and_owns_window_metadata() {
         ),
     ] {
         let source = format!(
-            "import {{ VList, Text }} from \"@argui/native\"\nexport component Main {{ private property items: array<string> = [\"one\"] VList {{ row_height: 32.0 {body} }} }}"
+            "import {{ VirtualWindow, Text }} from \"@argui/native\"\nexport component Main {{ private property items: array<string> = [\"one\"] VirtualWindow {{ row_height: 32.0 {body} }} }}"
         );
         let diagnostics = diagnostics(&source);
         assert!(
@@ -81,8 +100,9 @@ fn virtual_list_requires_one_keyed_repeater_and_owns_window_metadata() {
             "{body}: {diagnostics:#?}"
         );
     }
-    let missing =
-        diagnostics("import { VList } from \"@argui/native\"\nexport component Main { VList { } }");
+    let missing = diagnostics(
+        "import { VirtualWindow } from \"@argui/native\"\nexport component Main { VirtualWindow { } }",
+    );
     assert!(
         missing
             .iter()
@@ -93,13 +113,13 @@ fn virtual_list_requires_one_keyed_repeater_and_owns_window_metadata() {
 #[test]
 fn template_slot_forwards_one_caller_scoped_repeater() {
     let issues = diagnostics(
-        r#"import { VList, Text } from "@argui/native"
+        r#"import { VirtualWindow, Text } from "@argui/native"
 export struct Item { id: int label: string }
 component VirtualList {
     in property row_height: float
     in-out property scroll: float = 0.0
     slot rows: template
-    VList { row_height: row_height offset <=> scroll rows }
+    VirtualWindow { row_height: row_height offset <=> scroll rows }
 }
 export component Main {
     private property items: array<Item>
@@ -117,12 +137,12 @@ export component Main {
 
 #[test]
 fn template_slot_rejects_eager_children_unkeyed_rows_and_wrong_forwarding() {
-    let wrapper = r#"import { VList, Text } from "@argui/native"
+    let wrapper = r#"import { VirtualWindow, Text } from "@argui/native"
 component VirtualList {
     in property row_height: float
     in-out property scroll: float = 0.0
     slot rows: template
-    VList { row_height: row_height offset <=> scroll rows }
+    VirtualWindow { row_height: row_height offset <=> scroll rows }
 }
 export component Main {
     private property items: array<string> = ["one"]
@@ -159,8 +179,8 @@ export component Main {
                 "for item in items key item { Text { content: item } }",
             )
             .replace(
-                "VList { row_height: row_height offset <=> scroll rows }",
-                "VList { row_height: row_height offset <=> scroll Text { content: \"wrong\" } }",
+                "VirtualWindow { row_height: row_height offset <=> scroll rows }",
+                "VirtualWindow { row_height: row_height offset <=> scroll Text { content: \"wrong\" } }",
             ),
     );
     assert!(
@@ -174,11 +194,11 @@ export component Main {
 #[test]
 fn template_slot_kind_and_usage_are_source_located() {
     let issues = diagnostics(
-        r#"import { VList, Text } from "@argui/native"
+        r#"import { VirtualWindow, Text } from "@argui/native"
 component Broken {
     in-out property scroll: float = 0.0
     slot rows: eager
-    VList { row_height: 24.0 offset <=> scroll rows }
+    VirtualWindow { row_height: 24.0 offset <=> scroll rows }
 }"#,
     );
     assert!(
@@ -189,27 +209,27 @@ component Broken {
         "{issues:#?}"
     );
     let issues = diagnostics(
-        r#"import { VList } from "@argui/native"
+        r#"import { VirtualWindow } from "@argui/native"
 component Broken {
     in-out property scroll: float = 0.0
     slot rows: template
-    VList { row_height: 24.0 offset <=> scroll }
+    VirtualWindow { row_height: 24.0 offset <=> scroll }
 }"#,
     );
     assert!(
         issues
             .iter()
-            .any(|issue| issue.message.contains("exactly one native VList")),
+            .any(|issue| issue.message.contains("exactly one native virtual window")),
         "{issues:#?}"
     );
 
     let issues = diagnostics(
-        r#"import { VList } from "@argui/native"
+        r#"import { VirtualWindow } from "@argui/native"
 component Broken {
     in-out property scroll: float = 0.0
     slot rows: template
     slot footer
-    VList { row_height: 24.0 offset <=> scroll rows }
+    VirtualWindow { row_height: 24.0 offset <=> scroll rows }
 }"#,
     );
     assert!(
@@ -223,11 +243,11 @@ component Broken {
 #[test]
 fn template_slot_does_not_skip_native_metadata_or_structural_state_checks() {
     let issues = diagnostics(
-        r#"import { VList } from "@argui/native"
+        r#"import { VirtualWindow } from "@argui/native"
 component VirtualList {
     in-out property scroll: float = 0.0
     slot rows: template
-    VList {
+    VirtualWindow {
         row_height: 24.0
         offset <=> scroll
         __item_count: 5

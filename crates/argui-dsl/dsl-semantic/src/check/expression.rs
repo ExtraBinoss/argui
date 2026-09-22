@@ -7,7 +7,15 @@ use crate::{
     Type,
 };
 
+mod builtins;
+mod control;
+mod focus;
 mod gradient;
+mod member;
+mod operator;
+mod scroll;
+
+use operator::direct_operator;
 
 pub(super) struct Context<'a, 'd> {
     pub file: FileId,
@@ -16,6 +24,8 @@ pub(super) struct Context<'a, 'd> {
     pub locals: &'a HashMap<String, Type>,
     pub definitions: &'a HashMap<crate::SymbolId, Definition>,
     pub theme_tokens: &'a HashMap<String, Type>,
+    pub references: Option<&'a HashMap<String, HashMap<String, Type>>>,
+    pub event_handler: bool,
     pub diagnostics: &'d mut Vec<Diagnostic>,
 }
 
@@ -27,7 +37,7 @@ pub(super) fn infer(node: &SyntaxNode, context: &mut Context<'_, '_>) -> Type {
         }
         SyntaxKind::LiteralExpr => literal(node, context),
         SyntaxKind::PathExpr => path(node, context),
-        SyntaxKind::MemberExpr => member(node, context),
+        SyntaxKind::MemberExpr => member::infer(node, context),
         SyntaxKind::CallExpr => call(node, context),
         SyntaxKind::UnaryExpr => unary(node, context),
         SyntaxKind::BinaryExpr => binary(node, context),
@@ -115,50 +125,6 @@ fn path(node: &SyntaxNode, context: &mut Context<'_, '_>) -> Type {
     Type::Unknown
 }
 
-/// Resolves a struct member after inferring its base expression.
-fn member(node: &SyntaxNode, context: &mut Context<'_, '_>) -> Type {
-    let base = node
-        .children()
-        .find(|child| is_expression_kind(child.kind()))
-        .map_or(Type::Unknown, |child| infer(&child, context));
-    let member = node
-        .children_with_tokens()
-        .filter_map(|element| element.into_token())
-        .filter(|token| token.kind() == SyntaxKind::Ident)
-        .last()
-        .map(|token| token.text().to_string());
-    let Some(member) = member else {
-        return Type::Unknown;
-    };
-    let Type::Struct(id) = base else {
-        if base != Type::Unknown {
-            context.diagnostics.push(Diagnostic::error(
-                DiagnosticCode::TypeMismatch,
-                format!("type `{base}` has no member `{member}`"),
-                Span::new(context.file, node.text_range()),
-            ));
-        }
-        return Type::Unknown;
-    };
-    let Some(Definition {
-        kind: DefinitionKind::Struct(definition),
-        ..
-    }) = context.definitions.get(&id)
-    else {
-        return Type::Unknown;
-    };
-    if let Some(field) = definition.fields.iter().find(|field| field.name == member) {
-        field.value_type.clone()
-    } else {
-        context.diagnostics.push(Diagnostic::error(
-            DiagnosticCode::UnknownName,
-            format!("struct has no field `{member}`"),
-            Span::new(context.file, node.text_range()),
-        ));
-        Type::Unknown
-    }
-}
-
 /// Validates built-in and callback calls and returns their result type.
 fn call(node: &SyntaxNode, context: &mut Context<'_, '_>) -> Type {
     let callee_name = node
@@ -175,6 +141,11 @@ fn call(node: &SyntaxNode, context: &mut Context<'_, '_>) -> Type {
                 .collect::<Vec<_>>()
         })
         .unwrap_or_default();
+    if let Some(name) = callee_name.as_deref()
+        && let Some(result) = builtins::check(name, node, &arguments, context)
+    {
+        return result;
+    }
     match callee_name.as_deref() {
         Some("solid") => {
             if arguments.len() != 1 {
@@ -194,22 +165,6 @@ fn call(node: &SyntaxNode, context: &mut Context<'_, '_>) -> Type {
         }
         Some(name @ ("linear_gradient" | "radial_gradient" | "conic_gradient")) => {
             gradient::check(name, node, &arguments, context)
-        }
-        Some("contains") => {
-            if arguments.len() != 2 {
-                context.diagnostics.push(Diagnostic::error(
-                    DiagnosticCode::TypeMismatch,
-                    "contains() expects a string and a string fragment",
-                    Span::new(context.file, node.text_range()),
-                ));
-            }
-            for argument in &arguments {
-                let actual = infer(argument, context);
-                if !Type::String.accepts(&actual) {
-                    type_mismatch(context, argument, &Type::String, &actual);
-                }
-            }
-            Type::Bool
         }
         Some("str") => {
             if arguments.len() != 1 {
@@ -261,6 +216,13 @@ fn call(node: &SyntaxNode, context: &mut Context<'_, '_>) -> Type {
             }
             Type::Void
         }
+        Some(name @ ("focus_next" | "focus_previous")) => {
+            focus::check(name, node, &arguments, context)
+        }
+        Some("scroll_to") => scroll::check(node, &arguments, context),
+        Some(name @ ("prevent_default" | "stop_propagation")) => {
+            control::check(name, node, &arguments, context)
+        }
         Some("tr") => {
             if arguments.len() != 1 {
                 context.diagnostics.push(Diagnostic::error(
@@ -290,6 +252,16 @@ fn call(node: &SyntaxNode, context: &mut Context<'_, '_>) -> Type {
                 if !Type::String.accepts(&actual) {
                     type_mismatch(context, &argument, &Type::String, &actual);
                 }
+            }
+            Type::Asset
+        }
+        Some("path") => {
+            if let Err(error) = crate::vector_path::parse(node) {
+                context.diagnostics.push(Diagnostic::error(
+                    DiagnosticCode::InvalidAsset,
+                    error.message,
+                    Span::new(context.file, error.range),
+                ));
             }
             Type::Asset
         }
@@ -392,19 +364,45 @@ fn binary(node: &SyntaxNode, context: &mut Context<'_, '_>) -> Type {
         }
         Some(SyntaxKind::Plus) if left == Type::String && right == Type::String => Type::String,
         Some(
-            SyntaxKind::Plus
+            operator @ (SyntaxKind::Plus
             | SyntaxKind::Minus
             | SyntaxKind::Star
             | SyntaxKind::Slash
-            | SyntaxKind::Percent,
-        ) => arithmetic(context, node, left, right),
+            | SyntaxKind::Percent),
+        ) => arithmetic(context, node, operator, left, right),
         _ => Type::Unknown,
     }
 }
 
 /// Produces the result of unit-preserving arithmetic.
-fn arithmetic(context: &mut Context<'_, '_>, node: &SyntaxNode, left: Type, right: Type) -> Type {
+fn arithmetic(
+    context: &mut Context<'_, '_>,
+    node: &SyntaxNode,
+    operator: SyntaxKind,
+    left: Type,
+    right: Type,
+) -> Type {
     if !left.is_numeric() || !right.is_numeric() {
+        type_mismatch(context, node, &left, &right);
+        return Type::Unknown;
+    }
+    if left == Type::Length && right == Type::Length && operator == SyntaxKind::Slash {
+        return Type::Float;
+    }
+    if operator == SyntaxKind::Star
+        && matches!(
+            (&left, &right),
+            (Type::Length, Type::Float) | (Type::Float, Type::Length)
+        )
+        || operator == SyntaxKind::Slash && left == Type::Length && right == Type::Float
+    {
+        return Type::Length;
+    }
+    if matches!(
+        operator,
+        SyntaxKind::Star | SyntaxKind::Slash | SyntaxKind::Percent
+    ) && (left == Type::Length || right == Type::Length)
+    {
         type_mismatch(context, node, &left, &right);
         return Type::Unknown;
     }
@@ -554,32 +552,6 @@ fn direct_theme(node: &SyntaxNode) -> Option<String> {
 /// Returns a direct identifier or theme-token name.
 fn direct_ident_or_theme(node: &SyntaxNode) -> Option<String> {
     direct_ident(node).or_else(|| direct_theme(node))
-}
-
-/// Returns the direct operator token owned by an expression node.
-fn direct_operator(node: &SyntaxNode) -> Option<SyntaxKind> {
-    node.children_with_tokens()
-        .filter_map(|element| element.into_token())
-        .map(|token| token.kind())
-        .find(|kind| {
-            matches!(
-                kind,
-                SyntaxKind::Bang
-                    | SyntaxKind::Plus
-                    | SyntaxKind::Minus
-                    | SyntaxKind::Star
-                    | SyntaxKind::Slash
-                    | SyntaxKind::Percent
-                    | SyntaxKind::EqEq
-                    | SyntaxKind::BangEq
-                    | SyntaxKind::Lt
-                    | SyntaxKind::LtEq
-                    | SyntaxKind::Gt
-                    | SyntaxKind::GtEq
-                    | SyntaxKind::AndAnd
-                    | SyntaxKind::OrOr
-            )
-        })
 }
 
 /// Emits a mismatch when `expected` does not accept `actual`.

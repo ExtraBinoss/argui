@@ -52,9 +52,24 @@ impl Render for Example {
         let themes = default_theme(cx.environment());
         let theme = themes.resolve(cx.environment().color_scheme);
         let samples = Element::row([
-            sample("Dark on light", "#18181B on #FFFFFF", Color::WHITE, Color::from_srgb8(24, 24, 27)),
-            sample("Light on dark", "#FFFFFF on #18181B", Color::from_srgb8(24, 24, 27), Color::WHITE),
-            sample("Light on blue", "#FFFFFF on #2563EB", Color::from_srgb8(37, 99, 235), Color::WHITE),
+            sample(
+                "Dark on light",
+                "#18181B on #FFFFFF",
+                Color::WHITE,
+                Color::from_srgb8(24, 24, 27),
+            ),
+            sample(
+                "Light on dark",
+                "#FFFFFF on #18181B",
+                Color::from_srgb8(24, 24, 27),
+                Color::WHITE,
+            ),
+            sample(
+                "Light on blue",
+                "#FFFFFF on #2563EB",
+                Color::from_srgb8(37, 99, 235),
+                Color::WHITE,
+            ),
         ])
         .width(percent(1.0))
         .flex_wrap(FlexWrap::Wrap)

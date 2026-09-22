@@ -5,6 +5,7 @@ use super::{
     ScrollRequest, Subscription, WeakEntity,
     effects::{merge_effects, strongest_update},
     handler::LocalHandler,
+    observation::{InteractionSnapshot, ObservationReader, ObservedInteraction},
     presentation::PresentationId,
 };
 use crate::{AppCommand, ThemeRequest, WindowEnvironment};
@@ -12,10 +13,17 @@ use argui_animation::Frame;
 use argui_core::{PointerId, Rect};
 use argui_inspect::InspectorHandle;
 use argui_paint::{ImageAsset, VectorAsset};
+use argui_render::EffectDefinition;
 use argui_ui::{
-    ClipboardRequest, Element, FocusRequest, FocusTarget, TextSelection, TextSelectionRequest,
+    ClipboardRequest, Element, FocusRequest, FocusTarget, RetainedIdentity, TextSelection,
+    TextSelectionRequest,
 };
-use std::{cell::Cell, marker::PhantomData};
+use std::{
+    cell::{Cell, RefCell},
+    collections::HashSet,
+    marker::PhantomData,
+    rc::Rc,
+};
 
 /// Mutation and scheduling access scoped to one retained component.
 pub struct Context<T> {
@@ -27,6 +35,8 @@ pub struct Context<T> {
     pub(super) event_target: Option<argui_ui::NodeId>,
     pub(super) handlers: Vec<LocalHandler<T>>,
     pub(super) dependencies: Vec<Subscription>,
+    pub(super) observations: Rc<RefCell<InteractionSnapshot>>,
+    pub(super) observed_identities: Rc<RefCell<HashSet<RetainedIdentity>>>,
     pub(super) _marker: PhantomData<fn() -> T>,
 }
 
@@ -41,6 +51,8 @@ impl<T> Default for Context<T> {
             event_target: None,
             handlers: Vec::new(),
             dependencies: Vec::new(),
+            observations: Rc::default(),
+            observed_identities: Rc::default(),
             _marker: PhantomData,
         }
     }
@@ -82,6 +94,30 @@ impl<T: 'static> Context<T> {
 }
 
 impl<T: Render> Context<T> {
+    /// Reads current interaction state for a retained source identity.
+    ///
+    /// `identity` identifies the source element being observed. A read during
+    /// rendering subscribes this presentation to later hover, press, focus,
+    /// and pointer position changes. Event handlers read the latest state
+    /// without changing render dependencies. Returns the idle state if the
+    /// identity is absent from the previous retained tree, including on its
+    /// first render.
+    #[must_use]
+    pub fn observed_interaction(&self, identity: &RetainedIdentity) -> ObservedInteraction {
+        self.observation_reader().get(identity)
+    }
+
+    /// Returns a cloneable reader for this context's interaction snapshot.
+    ///
+    /// The reader can be moved into rendering closures that cannot borrow
+    /// `self`. Reads made while rendering register source identities so later
+    /// interaction changes invalidate this presentation. A retained event
+    /// closure reads the latest host snapshot when its handler runs.
+    #[must_use]
+    pub fn observation_reader(&self) -> ObservationReader {
+        ObservationReader::new(self.observations.clone(), self.observed_identities.clone())
+    }
+
     /// Returns the environment used for the current render.
     /// Reading it makes future environment changes invalidate the cached view.
     #[must_use]
@@ -155,6 +191,18 @@ impl<T: Render> Context<T> {
     /// Requests that the current UI focus be cleared and schedules a repaint.
     pub fn clear_focus(&mut self) {
         self.effects.focus = Some(FocusRequest::Clear);
+        self.request_paint();
+    }
+
+    /// Requests focus on the next enabled Tab stop within the active focus scope.
+    pub fn focus_next(&mut self) {
+        self.effects.focus = Some(FocusRequest::Next);
+        self.request_paint();
+    }
+
+    /// Requests focus on the previous enabled Tab stop within the active focus scope.
+    pub fn focus_previous(&mut self) {
+        self.effects.focus = Some(FocusRequest::Previous);
         self.request_paint();
     }
 
@@ -252,6 +300,14 @@ pub trait Render: 'static {
 
     /// Returns vector assets used by this component.
     fn vector_assets(&self) -> Vec<VectorAsset> {
+        Vec::new()
+    }
+
+    /// Returns custom GPU effect definitions used by this component.
+    ///
+    /// The host registers these definitions before drawing the returned UI
+    /// tree and refreshes them when the component requests a rebuild.
+    fn effect_definitions(&self) -> Vec<EffectDefinition> {
         Vec::new()
     }
 

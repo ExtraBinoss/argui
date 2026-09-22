@@ -6,25 +6,25 @@ use crate::{Diagnostic, DiagnosticCode, SlotDefinition};
 
 use super::{Scope, direct_ident, virtual_list};
 
-/// Validates native VLists and ensures each lazy slot is forwarded exactly once.
+/// Validates virtual windows and ensures each lazy slot is forwarded exactly once.
 ///
 /// `syntax` is the defining component, `file` identifies its source, `slots`
-/// are its declared content slots, `scope` resolves native aliases, and
+/// are its declared content slots, `scope` resolves native aliases, `schema`
+/// declares virtual-window capability, and
 /// `diagnostics` receives errors at misplaced or missing references.
 pub(super) fn validate_usage(
     syntax: &SyntaxNode,
     file: FileId,
     slots: &[SlotDefinition],
     scope: &Scope,
+    schema: &argui_schema::SchemaRegistry,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     for element in syntax
         .descendants()
         .filter(|node| node.kind() == SyntaxKind::Element)
     {
-        if direct_ident(&element).and_then(|name| scope.natives.get(&name).copied())
-            == Some(argui_schema::builtin::VIRTUAL_LIST)
-        {
+        if is_virtual_window(&element, scope, schema) {
             virtual_list::validate(&element, file, slots, diagnostics);
         }
     }
@@ -35,9 +35,7 @@ pub(super) fn validate_usage(
                 && direct_ident(node).as_deref() == Some(slot.name.as_str())
         }) {
             let forwarded = reference.parent().is_some_and(|parent| {
-                parent.kind() == SyntaxKind::Element
-                    && direct_ident(&parent).and_then(|name| scope.natives.get(&name).copied())
-                        == Some(argui_schema::builtin::VIRTUAL_LIST)
+                parent.kind() == SyntaxKind::Element && is_virtual_window(&parent, scope, schema)
             });
             if forwarded {
                 uses += 1;
@@ -45,7 +43,7 @@ pub(super) fn validate_usage(
                 diagnostics.push(Diagnostic::error(
                     DiagnosticCode::TypeMismatch,
                     format!(
-                        "template slot `{}` must be forwarded directly as a VList child",
+                        "template slot `{}` must be forwarded directly as a virtual window child",
                         slot.name
                     ),
                     Span::new(file, reference.text_range()),
@@ -56,11 +54,26 @@ pub(super) fn validate_usage(
             diagnostics.push(Diagnostic::error(
                 DiagnosticCode::TypeMismatch,
                 format!(
-                    "template slot `{}` must be forwarded into exactly one native VList",
+                    "template slot `{}` must be forwarded into exactly one native virtual window",
                     slot.name
                 ),
                 slot.span,
             ));
         }
     }
+}
+
+/// Returns whether an element's resolved native schema supports lazy windowing.
+///
+/// `element` names a native, `scope` resolves imports, and `schema` supplies
+/// the capability flag. Returns false for unresolved or ordinary elements.
+fn is_virtual_window(
+    element: &SyntaxNode,
+    scope: &Scope,
+    schema: &argui_schema::SchemaRegistry,
+) -> bool {
+    direct_ident(element)
+        .and_then(|name| scope.natives.get(&name).copied())
+        .and_then(|id| schema.schema(id))
+        .is_some_and(|native| native.virtual_window)
 }

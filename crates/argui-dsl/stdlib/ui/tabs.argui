@@ -1,0 +1,75 @@
+import { Column, FocusScope, KeyBinding, Rectangle, Row, Text, TouchArea } from "@argui/native"
+
+export component Tabs {
+    in property label: string = "Tabs"
+    in property tabs: array<string> = []
+    in-out property value: string = ""
+    callback changed(value: string)
+    slot content
+
+    Column {
+        gap: 14.0
+        FocusScope {
+            role: "tab_list"
+            accessible_name: label
+            focus_on_tab_navigation: false
+            focus_on_click: false
+            KeyBinding { shortcut: "ArrowRight" on activated { focus_next() } }
+            KeyBinding { shortcut: "ArrowLeft" on activated { focus_previous() } }
+
+            Rectangle {
+                background: solid(var(--argui-muted))
+                border_color: var(--argui-border)
+                border_width: 1.0
+                radius: 8.0
+                Row {
+                    padding: 4.0
+                    gap: 3.0
+                    for tab in tabs key tab {
+                        FocusScope {
+                            role: "tab"
+                            accessible_name: value == tab ? tab + ", selected" : tab
+                            keyboard_activation: "enter_or_space"
+                            on click {
+                                value = tab
+                                changed(value)
+                            }
+                            on focus {
+                                value = tab
+                                changed(value)
+                            }
+                            TouchArea {
+                                mouse_cursor: "pointer"
+                                Rectangle {
+                                    background: solid(value == tab ? var(--argui-surface) : var(--argui-muted))
+                                    border_color: value == tab ? var(--argui-border) : var(--argui-muted)
+                                    border_width: 1.0
+                                    radius: 6.0
+                                    Row {
+                                        padding: 9.0
+                                        Text { content: tab color: value == tab ? var(--argui-foreground) : var(--argui-muted-foreground) weight: value == tab ? 600 : 500 font_size: 14.0 }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        FocusScope {
+            role: "tab_panel"
+            accessible_name: value + " panel"
+            focus_on_tab_navigation: false
+            focus_on_click: false
+            Rectangle {
+                width: 100%
+                background: solid(var(--argui-background))
+                border_color: var(--argui-border)
+                border_width: 1.0
+                radius: 8.0
+                Column { width: 100% padding: 18.0 content }
+            }
+        }
+    }
+}

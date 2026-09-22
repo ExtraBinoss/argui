@@ -48,6 +48,7 @@ pub struct ElementNode {
     pub layer: Option<Box<argui_paint::LayerStyle>>,
     pub effects: Vec<crate::ScopedEffect>,
     pub scroll: Option<Box<crate::ScrollConfig>>,
+    pub(crate) declared_scroll_offset: Option<argui_core::Point>,
     pub(crate) virtual_item: Option<crate::VirtualItem>,
     pub portal: Option<crate::Portal>,
     pub focus_scope: Option<crate::FocusScope>,

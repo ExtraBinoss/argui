@@ -1,26 +1,71 @@
 use std::collections::HashMap;
 
 use argui_dsl_ir::{
-    AssignmentOperator, CallbackId, IrAssignmentTarget, IrStatement, LocalId, PropertyId, TokenId,
+    AssignmentOperator, CallbackId, IrAssignmentTarget, IrStatement, LocalId, PropertyId, SiteId,
+    TokenId,
 };
 
 use crate::{DslValue, EvaluationContext, InstanceId, LiveRuntime, RuntimeError};
 
 impl LiveRuntime {
-    /// Applies a native event payload, two-way updates, and its explicit handler block.
+    /// Applies a native event payload, optional named argument, two-way updates, and its handler.
+    ///
+    /// `instance` owns `statements`; `locals` contains lexical values;
+    /// `event_id` selects the schema payload conversion;
+    /// `parameter` and `payload_type` describe the optional event argument;
+    /// `updates` forwards edited native values; `event` supplies the payload.
+    ///
+    /// # Errors
+    ///
+    /// Returns schema, evaluation, or assignment errors from the event body.
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn deliver_native_event(
         &mut self,
         instance: InstanceId,
+        event_id: argui_schema::EventId,
         statements: &[IrStatement],
-        locals: HashMap<LocalId, DslValue>,
+        mut locals: HashMap<LocalId, DslValue>,
+        parameter: Option<LocalId>,
+        payload_type: Option<argui_schema::ValueType>,
         updates: &[(PropertyId, argui_schema::ValueType)],
         event: &argui_ui::UiEvent,
     ) -> Result<(), RuntimeError> {
+        self.pending_prevent_default = false;
+        self.pending_stop_propagation = false;
+        if let Some(parameter) = parameter {
+            let payload_type = payload_type.ok_or_else(|| {
+                RuntimeError::Schema(
+                    "event handler binds a payload absent from the native schema".into(),
+                )
+            })?;
+            locals.insert(
+                parameter,
+                native_event_value(event, event_id, payload_type)?,
+            );
+        }
         for (property, value_type) in updates {
-            let value = native_event_value(event, *value_type)?;
-            self.set_property(instance, *property, value)?;
+            if event_id == argui_schema::builtin::TEXT_EDIT {
+                let argui_ui::UiEventKind::TextEdited(edit) = &event.kind else {
+                    return Err(RuntimeError::TypeMismatch {
+                        expected: "native text edit".into(),
+                        actual: format!("{:?}", event.kind.event_type()),
+                    });
+                };
+                self.apply_text_edit(instance, *property, edit)?;
+            } else {
+                let value = native_event_value(event, event_id, *value_type)?;
+                self.set_property(instance, *property, value)?;
+            }
         }
         self.execute_statements(instance, statements, locals)?;
+        if self.pending_prevent_default {
+            let _ = event.prevent_default();
+        }
+        if self.pending_stop_propagation {
+            event.stop_propagation();
+        }
+        self.pending_prevent_default = false;
+        self.pending_stop_propagation = false;
         Ok(())
     }
 
@@ -33,6 +78,29 @@ impl LiveRuntime {
     ) -> Result<DslValue, RuntimeError> {
         for statement in statements {
             match statement {
+                IrStatement::PreventDefault => self.pending_prevent_default = true,
+                IrStatement::StopPropagation => self.pending_stop_propagation = true,
+                IrStatement::FocusNext => {
+                    self.pending_focus = Some(argui_ui::FocusRequest::Next);
+                }
+                IrStatement::FocusPrevious => {
+                    self.pending_focus = Some(argui_ui::FocusRequest::Previous);
+                }
+                IrStatement::ScrollTo { site, x, y } => {
+                    let x = self.evaluate_event(instance, x.id, &locals)?;
+                    let y = self.evaluate_event(instance, y.id, &locals)?;
+                    let (DslValue::Float(x), DslValue::Float(y)) = (x, y) else {
+                        return Err(RuntimeError::TypeMismatch {
+                            expected: "two length coordinates".into(),
+                            actual: "non-length scroll offset".into(),
+                        });
+                    };
+                    let identity = argui_ui::RetainedIdentity::new(instance.raw(), site.raw());
+                    self.pending_scroll = Some(argui_ui::ScrollRequest::offset(
+                        identity,
+                        argui_core::Point::new(x as f32, y as f32),
+                    ));
+                }
                 IrStatement::SetThemeMode(expression) => {
                     let value = self.evaluate_event(instance, expression.id, &locals)?;
                     let DslValue::String(name) = value else {
@@ -127,8 +195,16 @@ impl LiveRuntime {
 }
 
 /// Converts a schema-declared engine event payload into a live DSL value.
+///
+/// `event` carries the native payload, `event_id` selects its schema event, and
+/// `expected` is the declared value type. Returns the string or numeric value.
+///
+/// # Errors
+///
+/// Returns a type mismatch when the event kind or payload does not match the schema.
 fn native_event_value(
     event: &argui_ui::UiEvent,
+    event_id: argui_schema::EventId,
     expected: argui_schema::ValueType,
 ) -> Result<DslValue, RuntimeError> {
     match (&event.kind, expected) {
@@ -138,6 +214,25 @@ fn native_event_value(
         }
         (argui_ui::UiEventKind::Scrolled { offset, .. }, argui_schema::ValueType::Float) => {
             Ok(DslValue::Float(f64::from(offset.y)))
+        }
+        (argui_ui::UiEventKind::Gesture(gesture), argui_schema::ValueType::Float) => {
+            let argui_ui::GestureKind::Pan { total, .. } = gesture.kind else {
+                return Err(RuntimeError::TypeMismatch {
+                    expected: "pan displacement".into(),
+                    actual: format!("{:?}", gesture.kind),
+                });
+            };
+            let delta = if event_id == argui_schema::builtin::DRAG_X {
+                total.x
+            } else if event_id == argui_schema::builtin::DRAG_Y {
+                total.y
+            } else {
+                return Err(RuntimeError::TypeMismatch {
+                    expected: "native drag event".into(),
+                    actual: format!("event {}", event_id.raw()),
+                });
+            };
+            Ok(DslValue::Float(f64::from(delta)))
         }
         (kind, expected) => Err(RuntimeError::TypeMismatch {
             expected: format!("native event payload {expected:?}"),
@@ -161,6 +256,28 @@ impl EvaluationContext for EventValueContext<'_> {
             .properties
             .get(&id)
             .map(|property| property.get().clone())
+    }
+
+    fn observed(
+        &self,
+        site: argui_dsl_ir::SiteId,
+        observation: argui_dsl_ir::IrObservation,
+    ) -> Option<DslValue> {
+        self.runtime
+            .instances
+            .get(&self.instance)?
+            .observations
+            .get(&site)
+            .map(|value| crate::observation::value(*value, observation))
+    }
+
+    fn child_property(&self, site: SiteId, property: PropertyId) -> Option<DslValue> {
+        self.runtime
+            .instances
+            .get(&self.instance)?
+            .child_outputs
+            .get(&(site, property))
+            .cloned()
     }
 
     fn local(&self, id: LocalId) -> Option<DslValue> {

@@ -1,12 +1,12 @@
-//! Source-located constraints for the VList virtual repeater contract.
+//! Source-located constraints for the VirtualWindow virtual repeater contract.
 
 use argui_dsl_syntax::{FileId, Span, SyntaxKind, SyntaxNode};
 
 use crate::{Diagnostic, DiagnosticCode, SlotDefinition, lower::direct_tokens};
 
-/// Rejects VList trees that could not form one stable row per model item.
+/// Rejects VirtualWindow trees that could not form one stable row per model item.
 ///
-/// `node` is the VList element, `file` identifies its source, `slots` are
+/// `node` is the VirtualWindow element, `file` identifies its source, `slots` are
 /// declarations in the enclosing component, and `diagnostics` collects errors.
 pub(super) fn validate(
     node: &SyntaxNode,
@@ -28,7 +28,7 @@ pub(super) fn validate(
     {
         diagnostics.push(Diagnostic::error(
             DiagnosticCode::InvalidTwoWayBinding,
-            "VList requires `offset <=> writable_property` so scrolling updates the virtual window",
+            "VirtualWindow requires `offset <=> writable_property` so scrolling updates the virtual window",
             Span::new(file, offset_binding.as_ref().unwrap_or(node).text_range()),
         ));
     }
@@ -43,7 +43,7 @@ pub(super) fn validate(
         {
             diagnostics.push(Diagnostic::error(
                 DiagnosticCode::UnknownProperty,
-                "VList window metadata is compiler-owned and cannot be assigned",
+                "VirtualWindow window metadata is compiler-owned and cannot be assigned",
                 Span::new(file, assignment.text_range()),
             ));
         }
@@ -66,7 +66,7 @@ pub(super) fn validate(
                 });
             if structural {
                 diagnostics.push(Diagnostic::error(DiagnosticCode::TypeMismatch,
-                    "VList structural properties cannot be overridden by `states`; bind a component property instead",
+                    "VirtualWindow structural properties cannot be overridden by `states`; bind a component property instead",
                     Span::new(file, assignment.text_range())));
             }
         }
@@ -86,7 +86,7 @@ pub(super) fn validate(
     let [repeater] = children.as_slice() else {
         diagnostics.push(Diagnostic::error(
             DiagnosticCode::TypeMismatch,
-            "VList requires exactly one keyed `for` repeater as its visual child",
+            "VirtualWindow requires exactly one keyed `for` repeater as its visual child",
             Span::new(file, node.text_range()),
         ));
         return;
@@ -101,7 +101,7 @@ pub(super) fn validate(
         {
             diagnostics.push(Diagnostic::error(
                 DiagnosticCode::TypeMismatch,
-                "VList child must reference a declared `slot ...: template`",
+                "VirtualWindow child must reference a declared `slot ...: template`",
                 Span::new(file, repeater.text_range()),
             ));
         }
@@ -110,7 +110,7 @@ pub(super) fn validate(
     if repeater.kind() != SyntaxKind::ForExpr {
         diagnostics.push(Diagnostic::error(
             DiagnosticCode::TypeMismatch,
-            "VList's visual child must be a keyed `for` repeater",
+            "VirtualWindow's visual child must be a keyed `for` repeater",
             Span::new(file, repeater.text_range()),
         ));
         return;
@@ -118,7 +118,7 @@ pub(super) fn validate(
     if !direct_tokens(repeater).any(|token| token.kind() == SyntaxKind::KeyKw) {
         diagnostics.push(Diagnostic::error(
             DiagnosticCode::MissingRepeaterKey,
-            "VList rows require a stable `key` expression",
+            "VirtualWindow rows require a stable `key` expression",
             Span::new(file, repeater.text_range()),
         ));
     }

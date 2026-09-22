@@ -1,0 +1,48 @@
+import { Button } from "@argui/ui"
+import { Column, FocusScope, KeyBinding, Rectangle, Row, Text } from "@argui/native"
+
+export component NavigationMenuPage {
+    private property guide_open: bool = false
+    private property status: string = ""
+
+    Column #navigation_menu_page {
+        width: 100%
+        gap: 18.0
+
+        Text { content: "Navigation menu" color: var(--argui-foreground) weight: 700 font_size: 27.0 }
+        Text { content: "Browse documentation or open the guide panel." color: var(--argui-muted-foreground) font_size: 14.0 }
+
+        FocusScope {
+            role: "navigation"
+            accessible_name: "Documentation"
+            focus_on_tab_navigation: false
+            KeyBinding { shortcut: "ArrowRight" on activated { focus_next() } }
+            KeyBinding { shortcut: "ArrowLeft" on activated { focus_previous() } }
+            KeyBinding { shortcut: "Escape" on activated { guide_open = false } }
+
+            Column { width: 100% gap: 8.0
+                Row { gap: 8.0 wrap: true
+                    Button { text: "Overview" variant: "secondary" on click { status = "Opened overview" guide_open = false } }
+                    Button { text: "Guide" variant: guide_open ? "secondary" : "ghost" on click { guide_open = !guide_open } }
+                    Button { text: "Examples" variant: "ghost" on click { status = "Opened examples" guide_open = false } }
+                }
+                if guide_open {
+                    Rectangle { width: 100% radius: 8.0 border_color: var(--argui-border) border_width: 1.0 background: solid(var(--argui-surface))
+                        Column { padding: 16.0 gap: 10.0
+                            Text { content: "Build your first interface" color: var(--argui-foreground) font_size: 17.0 weight: 600 }
+                            Text { content: "Start with a window, a layout and a few controls." color: var(--argui-muted-foreground) font_size: 14.0 }
+                            Button { text: "Open getting started" on click {
+                                status = "Getting started: create a window and add a Button."
+                                guide_open = false
+                            } }
+                        }
+                    }
+                }
+            }
+        }
+
+        if status != "" {
+            Text { content: status color: var(--argui-muted-foreground) font_size: 13.0 }
+        }
+    }
+}

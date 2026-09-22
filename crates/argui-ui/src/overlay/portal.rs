@@ -61,7 +61,15 @@ impl Portal {
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum DismissPolicy {
+    /// Dismissal is controlled by application state.
     #[default]
     Manual,
+    /// A press outside the portal requests dismissal.
     OutsidePointer,
+    /// Escape requests dismissal after key listeners accept it.
+    Escape,
+    /// Either an outside press or Escape requests dismissal.
+    OutsidePointerOrEscape,
+    /// Leaving both the portal and its anchor by more than a small pointer gap requests dismissal; Escape also dismisses.
+    OutsideHoverOrEscape,
 }

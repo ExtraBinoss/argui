@@ -79,6 +79,33 @@ fn clearing_focus_replaces_a_pending_target_and_is_consumed_only_by_its_window()
 }
 
 #[test]
+fn context_requests_scoped_focus_traversal() {
+    struct Panel {
+        previous: bool,
+    }
+    impl Render for Panel {
+        fn render(&mut self, _: &mut Context<Self>) -> Element {
+            Element::text("panel")
+        }
+        fn layout_changed(&mut self, _: &LayoutSnapshot, cx: &mut Context<Self>) {
+            if self.previous {
+                cx.focus_previous();
+            } else {
+                cx.focus_next();
+            }
+        }
+    }
+
+    let key = WindowKey::main();
+    for (previous, expected) in [(false, FocusRequest::Next), (true, FocusRequest::Previous)] {
+        let mut app = SingleWindowModel::new(Panel { previous });
+        app.view(&key, WindowEnvironment::default()).unwrap();
+        app.layout_changed(&key, &LayoutSnapshot::default());
+        assert_eq!(app.take_focus_request(&key), Some(expected));
+    }
+}
+
+#[test]
 fn app_updates_coalesce_each_window_to_its_strongest_invalidation() {
     let main = WindowKey::main();
     let auxiliary = WindowKey::new("auxiliary");
@@ -100,6 +127,32 @@ fn app_updates_keep_commands_and_explicit_tray_changes() {
         .tray_changed();
     assert_eq!(update.commands, vec![AppCommand::OpenWindow(spec)]);
     assert!(update.tray_changed);
+}
+
+/// Draining an idle layout callback leaves every one-shot window request empty.
+#[test]
+fn idle_layout_drain_does_not_invent_window_effects() {
+    struct Idle;
+    impl Render for Idle {
+        fn render(&mut self, _: &mut Context<Self>) -> Element {
+            Element::text("idle")
+        }
+    }
+    let main = WindowKey::main();
+    let mut app = SingleWindowModel::new(Idle);
+    app.view(&main, WindowEnvironment::default()).unwrap();
+    assert_eq!(
+        app.layout_changed(&main, &LayoutSnapshot::default())
+            .windows
+            .len(),
+        0
+    );
+    assert_eq!(app.take_clipboard_request(&main), None);
+    assert_eq!(app.take_scroll_request(&main), None);
+    assert_eq!(app.take_focus_request(&main), None);
+    assert_eq!(app.take_text_selection_request(&main), None);
+    assert_eq!(app.take_theme_request(&main), None);
+    assert!(app.take_ui_commands(&main).is_empty());
 }
 
 #[test]
@@ -250,6 +303,7 @@ fn app_model_defaults_are_noop_and_return_empty_resources() {
     assert_eq!(model.tray(), None);
     assert!(model.image_assets().is_empty());
     assert!(model.vector_assets().is_empty());
+    assert!(model.effect_definitions().is_empty());
     assert!(model.inspector(&main).is_none());
     assert_eq!(model.take_clipboard_request(&main), None);
     assert_eq!(model.take_scroll_request(&main), None);
@@ -486,13 +540,49 @@ fn single_window_adapter_routes_frame_layout_and_ignores_unrelated_events() {
             )
             .windows[0]
             .update,
-        ViewUpdate::Rebuild
+        ViewUpdate::Paint
     );
     assert_eq!(
         model
             .layout_changed(&main, &LayoutSnapshot::default())
             .windows[0]
             .update,
-        ViewUpdate::Paint
+        ViewUpdate::Rebuild
     );
+}
+
+/// A later paint-only drain cannot discard unconsumed one-shot window requests.
+#[test]
+fn paint_only_drain_preserves_pending_component_effects() {
+    let main = WindowKey::main();
+    let mut app = SingleWindowModel::new(EffectsSurface);
+    let root = app.view(&main, WindowEnvironment::default()).unwrap();
+    let mut tree = UiTree::new(root);
+    for delivery in tree
+        .event_deliveries(
+            tree.node_ids()[0],
+            UiEventKind::Click(ClickEvent::accessibility()),
+        )
+        .into_iter()
+        .filter(|delivery| delivery.should_dispatch())
+    {
+        app.update(&AppEvent::Ui {
+            window: main.clone(),
+            event: delivery,
+        });
+    }
+    assert_eq!(
+        app.layout_changed(&main, &LayoutSnapshot::default())
+            .windows[0]
+            .update,
+        ViewUpdate::Rebuild
+    );
+    assert_eq!(
+        app.take_clipboard_request(&main),
+        Some(ClipboardRequest::Write("copied".into()))
+    );
+    assert!(app.take_scroll_request(&main).is_some());
+    assert!(app.take_focus_request(&main).is_some());
+    assert!(app.take_text_selection_request(&main).is_some());
+    assert!(app.take_theme_request(&main).is_some());
 }

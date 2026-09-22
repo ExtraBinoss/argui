@@ -45,6 +45,18 @@ impl EventRegistry {
 }
 
 impl UiTree {
+    /// Returns whether a mounted element observes key input beyond its ancestry path.
+    pub(crate) fn has_global_key_listener(&self) -> bool {
+        (0..self.node_ids.len()).any(|index| {
+            self.element_at(index).is_some_and(|element| {
+                element
+                    .event_listeners
+                    .iter()
+                    .any(|listener| listener.global_key && listener.event == EventType::Key)
+            })
+        })
+    }
+
     /// Returns whether `event_type` has a potential listener from `target` to the root.
     pub(crate) fn has_event_listener(&self, target: NodeId, event_type: EventType) -> bool {
         let Some(mut index) = self.index.position(target) else {
@@ -115,6 +127,7 @@ impl UiTree {
                 event_type,
                 true,
                 EventPhase::Capture,
+                false,
                 &mut deliveries,
             );
         }
@@ -125,6 +138,7 @@ impl UiTree {
             event_type,
             true,
             EventPhase::Target,
+            false,
             &mut deliveries,
         );
         self.push_listeners(
@@ -133,6 +147,7 @@ impl UiTree {
             event_type,
             false,
             EventPhase::Target,
+            false,
             &mut deliveries,
         );
         if base.bubbles() {
@@ -143,6 +158,26 @@ impl UiTree {
                     event_type,
                     false,
                     EventPhase::Bubble,
+                    false,
+                    &mut deliveries,
+                );
+            }
+        }
+        if event_type == EventType::Key {
+            for index in 0..self.node_ids.len() {
+                if self
+                    .active_modal_scope()
+                    .is_some_and(|scope| !self.focus.contains(scope, self.node_ids[index]))
+                {
+                    continue;
+                }
+                self.push_listeners(
+                    &base,
+                    index,
+                    event_type,
+                    false,
+                    EventPhase::Bubble,
+                    true,
                     &mut deliveries,
                 );
             }
@@ -153,6 +188,12 @@ impl UiTree {
         deliveries
     }
 
+    /// Appends matching listeners for one mounted element and dispatch phase.
+    ///
+    /// `base` is the source event; `index` selects the mounted element;
+    /// `event_type`, `capture`, `phase`, and `global_key` select listener policy;
+    /// `output` receives routed deliveries.
+    #[allow(clippy::too_many_arguments)]
     fn push_listeners(
         &mut self,
         base: &UiEvent,
@@ -160,6 +201,7 @@ impl UiTree {
         event_type: EventType,
         capture: bool,
         phase: EventPhase,
+        global_key: bool,
         output: &mut Vec<UiEvent>,
     ) {
         let node = self.node_ids[index];
@@ -169,6 +211,7 @@ impl UiTree {
             .unwrap_or_default();
         for listener in listeners.into_iter().filter(|listener| {
             listener.event == event_type
+                && listener.global_key == global_key
                 && listener.options.capture == capture
                 && (!listener.options.target_only || base.target == node)
                 && listener
@@ -176,6 +219,9 @@ impl UiTree {
                     .as_deref()
                     .is_none_or(|key| base.target_key() == Some(key))
                 && listener.options.filter.accepts(&base.kind)
+                && listener.shortcut.as_ref().is_none_or(|shortcut| {
+                    matches!(&base.kind, UiEventKind::KeyInput(input) if shortcut.matches(input))
+                })
         }) {
             let value = match &listener.value {
                 Some(source) => {
@@ -202,6 +248,7 @@ impl UiTree {
                 passive: listener.options.passive,
                 once,
                 handler_value: value,
+                default_sensitive: global_key,
             }));
         }
     }

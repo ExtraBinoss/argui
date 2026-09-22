@@ -2,8 +2,32 @@ use argui_dsl_parser::parse;
 use argui_dsl_syntax::ast::{AstNode, Declaration};
 
 #[test]
+fn visual_effect_application_round_trips_losslessly() {
+    let source = r#"component Main { Rectangle { effect: Glow { amount: active ? 1.0 : 0.2 tint: #ff0000 } } }"#;
+    let parsed = parse(source);
+    assert!(
+        parsed.diagnostics().is_empty(),
+        "{:#?}",
+        parsed.diagnostics()
+    );
+    assert_eq!(parsed.syntax().to_string(), source);
+}
+
+#[test]
+fn event_parameters_round_trip_losslessly() {
+    let source = "component Main { Text { on input(value) { changed(value) } on click { changed(\"click\") } } }";
+    let parsed = parse(source);
+    assert!(
+        parsed.diagnostics().is_empty(),
+        "{:#?}",
+        parsed.diagnostics()
+    );
+    assert_eq!(parsed.syntax().to_string(), source);
+}
+
+#[test]
 fn template_slot_and_forwarded_virtual_repeater_round_trip_losslessly() {
-    let source = r#"component VirtualList { slot rows: template VList { rows } } component Main { VirtualList { for item in items key item.id { Text { content: item.label } } } }"#;
+    let source = r#"component VirtualList { slot rows: template VirtualWindow { rows } } component Main { VirtualList { for item in items key item.id { Text { content: item.label } } } }"#;
     let parsed = parse(source);
     assert!(
         parsed.diagnostics().is_empty(),

@@ -5,6 +5,29 @@ use crate::{InteractionUpdate, NodeId, ScrollRegion, UiEventKind};
 use super::UiTree;
 
 impl UiTree {
+    /// Applies newly declared offsets while preserving user scrolling between declarations.
+    ///
+    /// Returns whether any retained scroll position changed.
+    pub(super) fn sync_declared_scroll_offsets(&mut self) -> bool {
+        let declarations = crate::traversal::flattened(&self.root)
+            .into_iter()
+            .zip(self.node_ids.iter().copied())
+            .filter_map(|(element, node)| {
+                element.declared_scroll_offset.map(|offset| (node, offset))
+            })
+            .collect::<Vec<_>>();
+        let mut changed = false;
+        let mut next = std::collections::HashMap::with_capacity(declarations.len());
+        for (node, offset) in declarations {
+            if self.declared_scroll_offsets.get(&node) != Some(&offset) {
+                changed |= self.set_scroll_offset(node, offset);
+            }
+            next.insert(node, offset);
+        }
+        self.declared_scroll_offsets = next;
+        changed
+    }
+
     /// Default keyboard scrolling for a focused viewport. Editors and collection controls
     /// retain their own arrow-key contracts. Hosts call this after cancelable key delivery.
     ///

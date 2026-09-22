@@ -100,6 +100,32 @@ impl<T: Clone + PartialEq + 'static> Property<T> {
         self.set(value)
     }
 
+    /// Mutates the stored value directly and invalidates dependents when changed.
+    ///
+    /// * `edit` — mutates the value and returns whether it changed. It must leave
+    ///   the value unchanged when returning `false`.
+    ///
+    /// Returns whether the value changed.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the property is already borrowed.
+    pub fn mutate(&self, edit: impl FnOnce(&mut T) -> bool) -> bool {
+        let changed = {
+            let mut value = self.node.value.borrow_mut();
+            edit(&mut value)
+        };
+        if changed {
+            self.node
+                .revision
+                .set(self.node.revision.get().wrapping_add(1));
+            graph::invalidate(&self.node.dependents);
+            let pending: Rc<dyn Node> = self.node.clone();
+            graph::schedule(pending);
+        }
+        changed
+    }
+
     /// Returns the number of accepted value changes.
     #[must_use]
     pub fn revision(&self) -> u64 {

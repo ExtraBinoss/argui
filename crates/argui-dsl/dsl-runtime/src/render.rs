@@ -10,6 +10,8 @@ use crate::{
     runtime::initialize_instance,
 };
 
+mod child_reference;
+mod effect;
 mod evaluate;
 mod identity;
 mod instance;
@@ -79,44 +81,44 @@ impl LiveRuntime {
                     events,
                     children,
                     source_id,
+                    effect,
                     ..
                 } => match target {
                     IrElementTarget::Native(native) => {
-                        let (children, virtual_window) =
-                            if *native == argui_schema::builtin::VIRTUAL_LIST {
-                                let (rows, count, start, viewport) = self.render_virtual_children(
+                        let schema = self.schema.schema(*native).cloned().ok_or_else(|| {
+                            RuntimeError::Schema(format!("unknown native {}", native.raw()))
+                        })?;
+                        let (children, virtual_window) = if schema.virtual_window {
+                            let (rows, count, start, viewport) = self.render_virtual_children(
+                                instance,
+                                component,
+                                *site,
+                                children,
+                                properties,
+                                locals,
+                                slots,
+                                template.as_deref_mut(),
+                                identity_owner,
+                                repeater_key,
+                                context,
+                            )?;
+                            (rows, Some((count, start, viewport)))
+                        } else {
+                            (
+                                self.render_nodes(
                                     instance,
                                     component,
-                                    *site,
                                     children,
-                                    properties,
                                     locals,
                                     slots,
                                     template.as_deref_mut(),
                                     identity_owner,
                                     repeater_key,
                                     context,
-                                )?;
-                                (rows, Some((count, start, viewport)))
-                            } else {
-                                (
-                                    self.render_nodes(
-                                        instance,
-                                        component,
-                                        children,
-                                        locals,
-                                        slots,
-                                        template.as_deref_mut(),
-                                        identity_owner,
-                                        repeater_key,
-                                        context,
-                                    )?,
-                                    None,
-                                )
-                            };
-                        let schema = self.schema.schema(*native).cloned().ok_or_else(|| {
-                            RuntimeError::Schema(format!("unknown native {}", native.raw()))
-                        })?;
+                                )?,
+                                None,
+                            )
+                        };
                         if schema.slots.is_empty() && !children.is_empty() {
                             return Err(RuntimeError::Schema(format!(
                                 "native `{}` does not accept children",
@@ -148,7 +150,7 @@ impl LiveRuntime {
                             );
                         }
                         for binding in properties {
-                            if *native == argui_schema::builtin::VIRTUAL_LIST
+                            if schema.virtual_window
                                 && binding.target
                                     == PropertyTargetId::Native(
                                         argui_schema::builtin::VIEWPORT_HEIGHT,
@@ -193,7 +195,7 @@ impl LiveRuntime {
                         for native_property in &schema.properties {
                             let property = native_property.id;
                             let target_property = PropertyTargetId::Native(property);
-                            if *native == argui_schema::builtin::VIRTUAL_LIST
+                            if schema.virtual_window
                                 && property == argui_schema::builtin::VIEWPORT_HEIGHT
                             {
                                 continue;
@@ -285,6 +287,8 @@ impl LiveRuntime {
                             .schema
                             .construct(*native, &input)
                             .map_err(|error| RuntimeError::Schema(error.to_string()))?;
+                        let element =
+                            self.apply_effect(instance, effect.as_ref(), locals, element)?;
                         output.push(element.retained_identity(identity));
                     }
                     IrElementTarget::Component(target) => {
@@ -501,6 +505,7 @@ impl LiveRuntime {
                                 .map(|event| EventRoute {
                                     parent: instance.id,
                                     statements: event.statements.clone(),
+                                    parameters: event.parameters.clone(),
                                     locals: locals.clone(),
                                 });
                             child.set_route(callback, route);
@@ -513,11 +518,13 @@ impl LiveRuntime {
                             locals,
                             slots,
                         });
-                        output.push(self.render_instance(
-                            child_id,
-                            child_slots,
-                            row_template,
-                            context,
+                        let element =
+                            self.render_instance(child_id, child_slots, row_template, context)?;
+                        output.push(self.apply_effect(
+                            instance,
+                            effect.as_ref(),
+                            locals,
+                            element,
                         )?);
                     }
                 },

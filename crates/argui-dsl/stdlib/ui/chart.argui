@@ -1,0 +1,68 @@
+import { Container, FocusScope, Rectangle, TouchArea } from "@argui/native"
+
+export component ChartFrame {
+    in property label: string = "Chart"
+    in property width: length = 480px
+    in property height: length = 260px
+    slot content
+
+    FocusScope {
+        role: "group"
+        accessible_name: label
+        focus_on_tab_navigation: false
+        Container { width: width height: height content }
+    }
+}
+
+export component ChartMark {
+    in property label: string
+    in property color: color
+    in property bar_x: length
+    in property point_x: length
+    in property point_y: length
+    in property bar_height: length
+    in property line: bool = false
+    in property selected: bool = false
+    callback activate()
+
+    FocusScope #focus_area {
+        x: line ? point_x - 6px : bar_x
+        y: line ? point_y - 6px : 190px - bar_height
+        width: line ? 12px : 22px
+        height: line ? 12px : bar_height
+        role: "button"
+        accessible_name: label
+        tooltip: label
+        keyboard_activation: "enter_or_space"
+        on click { activate() }
+        TouchArea #touch {
+            width: line ? 12px : 22px
+            height: line ? 12px : bar_height
+            mouse_cursor: "pointer"
+            on pointer_enter { activate() }
+            Rectangle {
+                x: 0px
+                y: 0px
+                width: line ? 12px : 22px
+                height: line ? 12px : bar_height
+                radius: line ? 6.0 : 3.0
+                background: solid(color)
+                opacity: selected ? 1.0 : 0.78
+                border_color: focus_area.focus_visible || selected ? var(--argui-foreground) : color
+                border_width: focus_area.focus_visible || selected ? 2.0 : 0.0
+                states { hovered when touch.has_hover {
+                    x: line ? -2px : 0px
+                    y: line ? -2px : -8px
+                    width: line ? 16px : 22px
+                    height: line ? 16px : bar_height + 8px
+                    opacity: 1.0
+                } }
+                animate x { transition: in-out duration: 180ms }
+                animate y { transition: in-out duration: 180ms }
+                animate width { transition: in-out duration: 180ms }
+                animate height { transition: in-out duration: 180ms }
+                animate opacity { transition: in-out duration: 180ms }
+            }
+        }
+    }
+}

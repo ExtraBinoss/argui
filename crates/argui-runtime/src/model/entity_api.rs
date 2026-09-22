@@ -3,6 +3,7 @@ use std::rc::Rc;
 use argui_animation::Frame;
 use argui_inspect::InspectorHandle;
 use argui_paint::{ImageAsset, VectorAsset};
+use argui_render::EffectDefinition;
 use argui_ui::{Element, EventHandlerId, UiEvent};
 
 use super::{
@@ -36,8 +37,14 @@ impl AnyEntity {
         Rc::ptr_eq(&self.identity, &other.identity)
     }
 
-    pub(crate) fn render(&self, environment: WindowEnvironment) -> Element {
-        (self.render)(environment)
+    /// Renders this erased entity in `environment` with current `observations`.
+    /// Returns its retained element subtree.
+    pub(crate) fn render(
+        &self,
+        environment: WindowEnvironment,
+        observations: super::InteractionSnapshot,
+    ) -> Element {
+        (self.render)(environment, observations)
     }
 
     pub(crate) fn event(&self, event: &UiEvent) {
@@ -64,6 +71,13 @@ impl AnyEntity {
 
     pub(crate) fn vector_assets(&self) -> Vec<VectorAsset> {
         (self.vector_assets)()
+    }
+
+    /// Reads this retained component's current custom effect definitions.
+    ///
+    /// Returns the definitions to register with its presentation's renderer.
+    pub(crate) fn effect_definitions(&self) -> Vec<EffectDefinition> {
+        (self.effect_definitions)()
     }
 
     pub(crate) fn inspector(&self) -> Option<InspectorHandle> {

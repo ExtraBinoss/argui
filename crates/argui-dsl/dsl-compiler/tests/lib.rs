@@ -268,7 +268,7 @@ export component Main {
     assert!(compiled.rust.contains("fn theme_token_"));
     assert!(compiled.rust.contains("effect_definitions()"));
     assert!(compiled.rust.contains("with_signed_key"));
-    assert!(compiled.rust.contains("TextChanged(value)"));
+    assert!(compiled.rust.contains("TextEdited(edit)"));
     assert!(compiled.rust.contains("set_translator"));
 }
 

@@ -1,9 +1,10 @@
-use argui_paint::{EffectInstance, Filter, Refraction};
+use argui_paint::{EffectInstance, Filter, Refraction, Shadow};
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum PlannedFilter {
     Blur(f32),
     ColorMatrix([f32; 20]),
+    DropShadow(Shadow),
     Refraction(Refraction),
     Effect(EffectInstance),
 }
@@ -22,6 +23,7 @@ pub(crate) fn plan_filters(filters: &[Filter]) -> Vec<PlannedFilter> {
         flush_color(&mut planned, &mut color);
         planned.push(match filter {
             Filter::Blur(radius) => PlannedFilter::Blur(*radius),
+            Filter::DropShadow(shadow) => PlannedFilter::DropShadow(*shadow),
             Filter::Refraction(value) => PlannedFilter::Refraction(*value),
             Filter::Effect(effect) => PlannedFilter::Effect(effect.clone()),
             Filter::Brightness(_)
@@ -55,7 +57,7 @@ fn color_matrix(filter: &Filter) -> Option<[f32; 20]> {
         Filter::HueRotate(angle) => Some(hue_rotation(*angle)),
         Filter::Opacity(value) => Some(diagonal([1.0, 1.0, 1.0, *value])),
         Filter::ColorMatrix(matrix) => Some(*matrix),
-        Filter::Blur(_) | Filter::Refraction(_) | Filter::Effect(_) => None,
+        Filter::Blur(_) | Filter::DropShadow(_) | Filter::Refraction(_) | Filter::Effect(_) => None,
     }
 }
 

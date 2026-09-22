@@ -1,0 +1,82 @@
+import { FocusScope, TouchArea, Rectangle, Row, Text } from "@argui/native"
+import { Menu } from "@argui/ui/menu.argui"
+import { MenuItem } from "@argui/ui/menu-item.argui"
+import { ChevronDown } from "@argui/icons"
+
+export component Select {
+    in-out property value: string = ""
+    in-out property open: bool = false
+    in property options: array<string> = []
+    in property anchor: string
+    in property label: string = "Select"
+    in property placeholder: string = "Select an option"
+    in property enabled: bool = true
+    in property width: length = 220px
+    callback changed(value: string)
+    callback open_changed(open: bool)
+
+    FocusScope #focus_area {
+        enabled: enabled
+        keyboard_activation: "enter_or_space"
+        role: "combo_box"
+        accessible_name: label
+        expandable: true
+        expanded: open
+        on click {
+            open = !open
+            open_changed(open)
+        }
+
+        TouchArea #touch {
+            enabled: enabled
+            mouse_cursor: enabled ? "pointer" : "not_allowed"
+
+            Rectangle {
+                width: width
+                background: solid(enabled ? var(--argui-input) : var(--argui-muted))
+                border_color: focus_area.focus_visible ? var(--argui-ring) : var(--argui-border)
+                border_width: focus_area.focus_visible ? 2.0 : 1.0
+                radius: 8.0
+
+                Row {
+                    width: 100%
+                    height: 40px
+                    padding: 11.0
+                    align_items: "center"
+                    Text {
+                        content: value == "" ? placeholder : value
+                        color: !enabled || value == "" ? var(--argui-muted-foreground) : var(--argui-foreground)
+                        font_size: 14.0
+                        no_wrap: true
+                    }
+                    Row { grow: 1.0 }
+                    ChevronDown { size: 16px color: enabled ? var(--argui-muted-foreground) : var(--argui-border) rotation: 0.0 states { expanded when open { rotation: 180.0 } } animate rotation { transition: in-out duration: 160ms } }
+                }
+            }
+        }
+    }
+
+    Menu {
+        open: open && enabled
+        anchor: anchor
+        label: label
+        width: width
+        on dismiss {
+            open = false
+            open_changed(false)
+        }
+
+        for option in options key option {
+            MenuItem {
+                text: option
+                selected: option == value
+                on select {
+                    value = option
+                    open = false
+                    changed(value)
+                    open_changed(false)
+                }
+            }
+        }
+    }
+}

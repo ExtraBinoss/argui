@@ -176,3 +176,36 @@ fn gradient_bytecode_rejects_missing_and_mistyped_operands() {
         Ok(DslValue::Brush(_))
     ));
 }
+
+mod observation {
+    //! Live bytecode observation context reads.
+
+    use super::*;
+
+    #[test]
+    fn observed_read_uses_current_context_without_caching() {
+        let site = SiteId::from_raw(7);
+        let value = expression(
+            22,
+            IrType::Bool,
+            IrExpressionKind::ObservedRead {
+                site,
+                property: argui_schema::builtin::PRESSED,
+                observation: IrObservation::Pressed,
+            },
+        );
+        let program = Program::compile(&value);
+        assert!(program.is_contextual());
+        let mut context = Context::default();
+        context.observations.insert(site, DslValue::Bool(false));
+        assert_eq!(
+            program.evaluate(&mut context).unwrap(),
+            DslValue::Bool(false)
+        );
+        context.observations.insert(site, DslValue::Bool(true));
+        assert_eq!(
+            program.evaluate(&mut context).unwrap(),
+            DslValue::Bool(true)
+        );
+    }
+}

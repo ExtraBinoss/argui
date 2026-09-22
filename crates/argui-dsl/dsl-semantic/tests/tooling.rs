@@ -76,6 +76,33 @@ export component App {
     );
 }
 
+/// Navigation at whitespace or the end of a document has no symbol identity.
+#[test]
+fn navigation_ignores_non_symbol_offsets_and_rejects_invalid_renames() {
+    let source = "export component App { private property value: int = 1 }\n";
+    let mut database = database_with(source);
+    for position in [source.len() as u32, offset(source, " App") - 1] {
+        assert_eq!(database.hover("app.argui", position).unwrap(), None);
+        assert_eq!(database.definition("app.argui", position).unwrap(), None);
+        assert!(
+            database
+                .references("app.argui", position)
+                .unwrap()
+                .is_empty()
+        );
+    }
+    for invalid in ["", "1value", "has space", "with.dot"] {
+        assert_eq!(
+            database.rename("app.argui", offset(source, "value"), invalid),
+            Err(ToolingError::InvalidIdentifier(invalid.into()))
+        );
+    }
+    assert_eq!(
+        database.symbols(Some("missing.argui")),
+        Err(ToolingError::UnknownModule("missing.argui".into()))
+    );
+}
+
 #[test]
 fn symbols_highlights_colors_and_quick_fixes_share_the_checked_frontend() {
     let source = r#"import { Container } from "@argui/native"
@@ -411,7 +438,7 @@ mod navigation_edges {
     }
 
     fn fixture() -> (CompilerDatabase, String) {
-        let source = r##"import { Pressable } from "@argui/native"
+        let source = r##"import { FocusScope } from "@argui/native"
 export theme AppTheme { --accent: color = #369c }
 export component App {
     in property input: string
@@ -419,8 +446,9 @@ export component App {
     in-out property both: string
     callback changed(value: int)
     slot content
-    Pressable {
-        label: input
+    FocusScope {
+        role: "button"
+        accessible_name: input
         on click { changed(1) }
     }
 }
@@ -451,7 +479,7 @@ export component App {
             .hover("app.argui", offset(&source, "click", 0))
             .unwrap()
             .unwrap();
-        assert!(event.contains("Pressable.on click"));
+        assert!(event.contains("FocusScope.on click"));
     }
 
     #[test]

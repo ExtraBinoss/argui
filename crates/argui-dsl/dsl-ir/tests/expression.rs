@@ -169,3 +169,36 @@ fn lowering_reports_a_callback_name_stale_against_valid_syntax() {
             .any(|error| error.message == "unresolved function `clicked`")
     );
 }
+
+/// A stale struct schema is diagnosed where its member expression is lowered.
+#[test]
+fn lowering_reports_a_struct_field_removed_after_checking() {
+    let mut database = checked_database(
+        r#"import { Text } from "@argui/native"
+export struct Profile { name: string }
+export component Main {
+    private property profile: Profile
+    Text { content: profile.name }
+}"#,
+    );
+    let mut project = (*database.check()).clone();
+    let profile = project
+        .modules
+        .iter_mut()
+        .flat_map(|module| &mut module.definitions)
+        .find_map(|definition| match &mut definition.kind {
+            DefinitionKind::Struct(profile) if definition.name == "Profile" => Some(profile),
+            _ => None,
+        })
+        .unwrap();
+    profile.fields.clear();
+
+    let schema = argui_schema::builtin::registry().unwrap();
+    let errors = lower(&project, &schema).unwrap_err();
+    assert!(
+        errors
+            .iter()
+            .any(|error| error.message == "unresolved struct field `name`"),
+        "{errors:#?}"
+    );
+}

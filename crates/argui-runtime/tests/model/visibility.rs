@@ -141,6 +141,64 @@ fn hiding_a_child_retains_its_mount_without_invalidating_the_hidden_parent() {
     assert_ne!(shown.event_listeners[0], remounted.event_listeners[0]);
 }
 
+/// A mounted parent tracks a visible child but does not repaint for hidden child data.
+#[test]
+fn mounted_parent_subscribes_only_to_visible_child_changes() {
+    let child = Entity::new(View::default());
+    let parent = Entity::new(Parent {
+        child: child.clone(),
+        visible: true,
+        mounted: true,
+    });
+    let mount = parent.mount().unwrap();
+    let first = mount.render(Default::default()).unwrap();
+    child.update(|view, cx| {
+        view.value = 1;
+        cx.notify();
+    });
+    let changed = mount.render(Default::default()).unwrap();
+    assert!(!changed.ptr_eq(&first));
+    assert!(matches!(&changed.kind, ElementKind::Text { content, .. } if content.as_str() == "1"));
+
+    parent.update(|parent, cx| {
+        parent.visible = false;
+        cx.notify();
+    });
+    let hidden = mount.render(Default::default()).unwrap();
+    child.update(|view, cx| {
+        view.value = 2;
+        cx.notify();
+    });
+    assert!(mount.render(Default::default()).unwrap().ptr_eq(&hidden));
+    parent.update(|parent, cx| {
+        parent.visible = true;
+        cx.notify();
+    });
+    let shown = mount.render(Default::default()).unwrap();
+    assert!(matches!(&shown.kind, ElementKind::Text { content, .. } if content.as_str() == "2"));
+}
+
+/// Repeated host visibility requests do not rebuild an unchanged presentation.
+#[test]
+fn repeated_host_hide_and_show_do_not_duplicate_view_rebuilds() {
+    let model = Entity::new(View::default());
+    let mount = model.mount().unwrap();
+    let host = mount.erase();
+    let first = mount.render(Default::default()).unwrap();
+    host.set_host_visible(false);
+    host.set_host_visible(false);
+    assert!(!mount.is_visible());
+    let _ = mount.render(Default::default()).unwrap();
+    let _ = mount.render(Default::default()).unwrap();
+    assert_eq!(model.read(|view| view.renders), 1);
+    host.set_host_visible(true);
+    let shown = mount.render(Default::default()).unwrap();
+    assert!(!shown.ptr_eq(&first));
+    host.set_host_visible(true);
+    assert!(mount.render(Default::default()).unwrap().ptr_eq(&shown));
+    assert_eq!(model.read(|view| view.renders), 2);
+}
+
 #[cfg(all(feature = "tasks", not(target_arch = "wasm32")))]
 #[test]
 fn hiding_keeps_view_tasks_alive_until_unmount() {

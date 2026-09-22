@@ -1,0 +1,56 @@
+import { Button } from "@argui/ui/button.argui"
+import { Column, FocusScope, PopupWindow, Rectangle, Row, Text } from "@argui/native"
+
+export component Toast {
+    in property title: string
+    in property description: string = ""
+    in property variant: string = "information"
+    callback dismiss()
+
+    FocusScope {
+        role: variant == "error" ? "alert" : "status"
+        accessible_name: title + (description == "" ? "" : ". " + description)
+        focus_on_tab_navigation: false
+        focus_on_click: false
+        Rectangle {
+            width: 100%
+            background: solid(var(--argui-surface))
+            border_color: variant == "error" ? var(--argui-destructive) : var(--argui-border)
+            border_width: 1.0
+            radius: 9.0
+            Row {
+                width: 100%
+                padding: 12.0
+                gap: 10.0
+                align_items: "center"
+                Rectangle { width: 8px height: 8px radius: 4.0 background: solid(variant == "success" ? var(--argui-primary) : variant == "error" ? var(--argui-destructive) : var(--argui-muted-foreground)) }
+                Column {
+                    width: 60%
+                    grow: 1.0
+                    gap: 4.0
+                    Text { content: title color: var(--argui-foreground) weight: 600 font_size: 14.0 }
+                    if description != "" {
+                        Text { content: description color: var(--argui-muted-foreground) font_size: 13.0 }
+                    }
+                }
+                Button { text: "Close" variant: "ghost" height: 28px padding: 6.0 on click { dismiss() } }
+            }
+        }
+    }
+}
+
+export component ToastHost {
+    in property open: bool = false
+    in property width: length = 320px
+    slot content
+
+    PopupWindow {
+        visible: open
+        placement: "top_end"
+        dismiss_policy: "manual"
+        width: width
+        initial_focus: ""
+        restore_focus: false
+        Column { width: width gap: 8.0 content }
+    }
+}

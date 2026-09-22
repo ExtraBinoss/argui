@@ -12,6 +12,7 @@ use crate::{CompilerError, codegen::Context};
 #[derive(Clone, Default)]
 pub(super) struct Scope {
     pub properties: HashMap<PropertyId, String>,
+    pub child_properties: HashMap<(SiteId, PropertyId), String>,
     pub rendered_properties: HashMap<PropertyId, String>,
     pub callbacks: HashMap<CallbackId, String>,
     pub locals: HashMap<LocalId, String>,
@@ -49,22 +50,88 @@ impl Context<'_> {
                         scope
                             .properties
                             .get(id)
-                            .ok_or_else(|| CompilerError::Codegen(format!(
+                            .ok_or(CompilerError::Codegen(format!(
                                 "property {} is outside the generated scope",
                                 id.raw()
                             )))?
                     )
                 }
             }
+            IrExpressionKind::ChildPropertyRead { site, property } => format!(
+                "{}.get()",
+                scope
+                    .child_properties
+                    .get(&(*site, *property))
+                    .ok_or(CompilerError::Codegen(format!(
+                        "child property {} at site {} is outside the generated scope",
+                        property.raw(),
+                        site.raw()
+                    )))?
+            ),
+            IrExpressionKind::ObservedRead {
+                site, observation, ..
+            } => {
+                let state = format!(
+                    "observer.get(&::argui::ui::RetainedIdentity::new(owner, {}))",
+                    site.raw()
+                );
+                match observation {
+                    argui_dsl_ir::IrObservation::Hover => {
+                        format!("{state}.states.contains(::argui::ui::VisualState::Hovered)")
+                    }
+                    argui_dsl_ir::IrObservation::Pressed => {
+                        format!("{state}.states.contains(::argui::ui::VisualState::Pressed)")
+                    }
+                    argui_dsl_ir::IrObservation::Focused => {
+                        format!("{state}.states.contains(::argui::ui::VisualState::Focused)")
+                    }
+                    argui_dsl_ir::IrObservation::FocusVisible => {
+                        format!("{state}.states.contains(::argui::ui::VisualState::FocusVisible)")
+                    }
+                    argui_dsl_ir::IrObservation::PointerX => {
+                        format!("{state}.pointer_position.map_or(0.0, |point| point.x)")
+                    }
+                    argui_dsl_ir::IrObservation::PointerY => {
+                        format!("{state}.pointer_position.map_or(0.0, |point| point.y)")
+                    }
+                    argui_dsl_ir::IrObservation::PointerGlobalX => {
+                        format!("{state}.pointer_global_position.map_or(0.0, |point| point.x)")
+                    }
+                    argui_dsl_ir::IrObservation::PointerGlobalY => {
+                        format!("{state}.pointer_global_position.map_or(0.0, |point| point.y)")
+                    }
+                    argui_dsl_ir::IrObservation::PressedX => {
+                        format!("{state}.pressed_position.map_or(0.0, |point| point.x)")
+                    }
+                    argui_dsl_ir::IrObservation::PressedY => {
+                        format!("{state}.pressed_position.map_or(0.0, |point| point.y)")
+                    }
+                    argui_dsl_ir::IrObservation::ScrollX => {
+                        format!("{state}.scroll.map_or(0.0, |scroll| scroll.offset.x)")
+                    }
+                    argui_dsl_ir::IrObservation::ScrollY => {
+                        format!("{state}.scroll.map_or(0.0, |scroll| scroll.offset.y)")
+                    }
+                    argui_dsl_ir::IrObservation::ViewportWidth => {
+                        format!("{state}.scroll.map_or(0.0, |scroll| scroll.viewport.width)")
+                    }
+                    argui_dsl_ir::IrObservation::ViewportHeight => {
+                        format!("{state}.scroll.map_or(0.0, |scroll| scroll.viewport.height)")
+                    }
+                    argui_dsl_ir::IrObservation::ContentWidth => {
+                        format!("{state}.scroll.map_or(0.0, |scroll| scroll.content.width)")
+                    }
+                    argui_dsl_ir::IrObservation::ContentHeight => {
+                        format!("{state}.scroll.map_or(0.0, |scroll| scroll.content.height)")
+                    }
+                }
+            }
             IrExpressionKind::LocalRead(id) => format!(
                 "{}.clone()",
-                scope
-                    .locals
-                    .get(id)
-                    .ok_or_else(|| CompilerError::Codegen(format!(
-                        "local {} is outside the generated scope",
-                        id.raw()
-                    )))?
+                scope.locals.get(id).ok_or(CompilerError::Codegen(format!(
+                    "local {} is outside the generated scope",
+                    id.raw()
+                )))?
             ),
             IrExpressionKind::FieldRead { base, field } => format!(
                 "({}).{}.clone()",
@@ -73,19 +140,23 @@ impl Context<'_> {
             ),
             IrExpressionKind::TokenRead(id) => format!(
                 "{}()",
-                self.token_functions.get(id).ok_or_else(|| {
-                    CompilerError::Codegen(format!("theme token {} is unavailable", id.raw()))
-                })?
+                self.token_functions
+                    .get(id)
+                    .ok_or(CompilerError::Codegen(format!(
+                        "theme token {} is unavailable",
+                        id.raw()
+                    )))?
             ),
             IrExpressionKind::Asset(id) => format!("asset_handle({})", id.raw()),
             IrExpressionKind::BuiltinCall {
                 function: argui_dsl_ir::BuiltinFunction::Translate,
                 arguments,
             } => {
-                let key = arguments.first().map_or_else(
-                    || Ok("String::new()".into()),
-                    |argument| self.expression(argument, scope),
-                )?;
+                let key = arguments
+                    .first()
+                    .map(|argument| self.expression(argument, scope))
+                    .transpose()?
+                    .unwrap_or("String::new()".into());
                 scope.translator.as_ref().map_or(key.clone(), |translator| {
                     format!("{{ let key = {key}; ({translator})(&key).unwrap_or(key) }}")
                 })
@@ -94,10 +165,11 @@ impl Context<'_> {
                 function: argui_dsl_ir::BuiltinFunction::Stringify,
                 arguments,
             } => {
-                let value = arguments.first().map_or_else(
-                    || Ok("String::new()".into()),
-                    |argument| self.expression(argument, scope),
-                )?;
+                let value = arguments
+                    .first()
+                    .map(|argument| self.expression(argument, scope))
+                    .transpose()?
+                    .unwrap_or("String::new()".into());
                 format!("({value}).to_string()")
             }
             IrExpressionKind::BuiltinCall {
@@ -116,6 +188,66 @@ impl Context<'_> {
                 format!("({text}).contains(&({fragment}))")
             }
             IrExpressionKind::BuiltinCall {
+                function: argui_dsl_ir::BuiltinFunction::Lower,
+                arguments,
+            } => {
+                let value = self.expression(&arguments[0], scope)?;
+                format!("({value}).to_lowercase()")
+            }
+            IrExpressionKind::BuiltinCall {
+                function: argui_dsl_ir::BuiltinFunction::Range,
+                arguments,
+            } => {
+                let count = self.expression(&arguments[0], scope)?;
+                format!("(0_i64..({count}).clamp(0, 100_000)).collect::<Vec<i64>>()")
+            }
+            IrExpressionKind::BuiltinCall {
+                function: argui_dsl_ir::BuiltinFunction::Slice,
+                arguments,
+            } => {
+                let value = self.expression(&arguments[0], scope)?;
+                let start = self.expression(&arguments[1], scope)?;
+                let count = self.expression(&arguments[2], scope)?;
+                format!(
+                    "({value}).chars().skip(({start}).max(0) as usize).take(({count}).max(0) as usize).collect::<String>()"
+                )
+            }
+            IrExpressionKind::BuiltinCall {
+                function: argui_dsl_ir::BuiltinFunction::Hsv,
+                arguments,
+            } => {
+                let values = arguments
+                    .iter()
+                    .map(|argument| self.expression(argument, scope))
+                    .collect::<Result<Vec<_>, _>>()?;
+                format!(
+                    "::argui::core::Color::hsva(({}) as f32, ({}) as f32, ({}) as f32, ({}) as f32)",
+                    values[0], values[1], values[2], values[3]
+                )
+            }
+            IrExpressionKind::BuiltinCall {
+                function: argui_dsl_ir::BuiltinFunction::ColorHex,
+                arguments,
+            } => {
+                let value = self.expression(&arguments[0], scope)?;
+                format!("({value}).to_hex_rgba()")
+            }
+            IrExpressionKind::BuiltinCall {
+                function:
+                    function @ (argui_dsl_ir::BuiltinFunction::ColorRed
+                    | argui_dsl_ir::BuiltinFunction::ColorGreen
+                    | argui_dsl_ir::BuiltinFunction::ColorBlue),
+                arguments,
+            } => {
+                let value = self.expression(&arguments[0], scope)?;
+                let index = match function {
+                    argui_dsl_ir::BuiltinFunction::ColorRed => 0,
+                    argui_dsl_ir::BuiltinFunction::ColorGreen => 1,
+                    _ => 2,
+                };
+                format!("i64::from(({value}).to_srgba8()[{index}])")
+            }
+            IrExpressionKind::BuiltinCall {
                 function:
                     function @ (argui_dsl_ir::BuiltinFunction::LinearGradient
                     | argui_dsl_ir::BuiltinFunction::RadialGradient
@@ -126,12 +258,14 @@ impl Context<'_> {
                 callback,
                 arguments,
             } => {
-                let callback = scope.callbacks.get(callback).ok_or_else(|| {
-                    CompilerError::Codegen(format!(
-                        "callback {} is outside the generated scope",
-                        callback.raw()
-                    ))
-                })?;
+                let callback =
+                    scope
+                        .callbacks
+                        .get(callback)
+                        .ok_or(CompilerError::Codegen(format!(
+                            "callback {} is outside the generated scope",
+                            callback.raw()
+                        )))?;
                 let arguments = arguments
                     .iter()
                     .map(|argument| self.expression(argument, scope))
@@ -159,14 +293,28 @@ impl Context<'_> {
                 left,
                 right,
             } => {
-                let left = self.expression(left, scope)?;
-                let right = self.expression(right, scope)?;
+                let mut left_code = self.expression(left, scope)?;
+                let mut right_code = self.expression(right, scope)?;
+                let float_like = |value: &IrType| {
+                    matches!(
+                        value,
+                        IrType::Float | IrType::Length | IrType::Dimension | IrType::Percentage
+                    )
+                };
+                if left.value_type == IrType::Int && float_like(&right.value_type) {
+                    left_code = format!("({left_code} as f32)");
+                }
+                if right.value_type == IrType::Int && float_like(&left.value_type) {
+                    right_code = format!("({right_code} as f32)");
+                }
                 if *operator == argui_dsl_ir::BinaryOperator::Add
                     && value.value_type == IrType::String
                 {
-                    format!("{{ let mut text = {left}; text.push_str(&({right})); text }}")
+                    format!(
+                        "{{ let mut text = {left_code}; text.push_str(&({right_code})); text }}"
+                    )
                 } else {
-                    format!("({left} {} {right})", binary_operator(*operator))
+                    format!("({left_code} {} {right_code})", binary_operator(*operator))
                 }
             }
             IrExpressionKind::Conditional {
@@ -214,9 +362,9 @@ impl Context<'_> {
         let argument = |index: usize| {
             arguments
                 .get(index)
-                .ok_or_else(|| {
-                    CompilerError::Codegen(format!("gradient argument {index} is missing"))
-                })
+                .ok_or(CompilerError::Codegen(format!(
+                    "gradient argument {index} is missing"
+                )))
                 .and_then(|expression| self.expression(expression, scope))
         };
         let colors = argument(0)?;
@@ -312,6 +460,11 @@ impl Context<'_> {
         canonical.rendered_properties.clear();
         let scope = &canonical;
         match statement {
+            IrStatement::PreventDefault => Ok("host_effects.borrow_mut().push(HostEffect::PreventDefault);".into()),
+            IrStatement::StopPropagation => Ok("host_effects.borrow_mut().push(HostEffect::StopPropagation);".into()),
+            IrStatement::FocusNext => Ok("host_effects.borrow_mut().push(HostEffect::Focus(::argui::ui::FocusRequest::Next));".into()),
+            IrStatement::FocusPrevious => Ok("host_effects.borrow_mut().push(HostEffect::Focus(::argui::ui::FocusRequest::Previous));".into()),
+            IrStatement::ScrollTo { site, x, y } => Ok(format!("host_effects.borrow_mut().push(HostEffect::Scroll(::argui::ui::ScrollRequest::offset(::argui::ui::RetainedIdentity::new(owner, {}), ::argui::core::Point::new(({}) as f32, ({}) as f32))));", site.raw(), self.expression(x, scope)?, self.expression(y, scope)?)),
             IrStatement::SetThemeMode(mode) => Ok(format!(
                 "set_theme_mode({});",
                 self.expression(mode, scope)?
@@ -331,9 +484,9 @@ impl Context<'_> {
                         "mutable event locals are not part of the restricted handler ABI".into(),
                     ));
                 };
-                let property = scope.properties.get(property).ok_or_else(|| {
-                    CompilerError::Codegen("assignment target is outside component scope".into())
-                })?;
+                let property = scope.properties.get(property).ok_or(CompilerError::Codegen(
+                    "assignment target is outside component scope".into(),
+                ))?;
                 let value = self.expression(value, scope)?;
                 Ok(match operator {
                     AssignmentOperator::Set => format!("{property}.set({value});"),
@@ -359,7 +512,10 @@ impl Context<'_> {
         self.field_names
             .get(&field)
             .map(String::as_str)
-            .ok_or_else(|| CompilerError::Codegen(format!("unknown struct field {}", field.raw())))
+            .ok_or(CompilerError::Codegen(format!(
+                "unknown struct field {}",
+                field.raw()
+            )))
     }
 }
 

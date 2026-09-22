@@ -1,11 +1,16 @@
 use argui_animation::Frame;
+use argui_core::PointerId;
 use argui_inspect::InspectorHandle;
 use argui_paint::{ImageAsset, VectorAsset};
 use argui_platform::{
     GlobalShortcutEvent, PlatformEvent, TrayConfig, TrayEvent, WindowKey, WindowLevel, WindowSpec,
 };
-use argui_render::DamageTracking;
-use argui_ui::{ClipboardRequest, Element, FocusRequest, TextSelectionRequest, UiEvent};
+use argui_render::{DamageTracking, EffectDefinition};
+use argui_ui::{
+    ClipboardRequest, Element, FocusRequest, HitRegion, RetainedIdentity, TextSelectionRequest,
+    UiEvent, UiTree,
+};
+use std::collections::HashSet;
 
 use crate::{
     Entity, LayoutSnapshot, Render, ScrollRequest, ThemeRequest, ViewUpdate, WindowEnvironment,
@@ -225,6 +230,13 @@ pub trait AppModel: 'static {
         Vec::new()
     }
 
+    /// Returns custom GPU effect definitions referenced by this application.
+    ///
+    /// The host refreshes these on model rebuilds for every window.
+    fn effect_definitions(&self) -> Vec<EffectDefinition> {
+        Vec::new()
+    }
+
     /// Returns the inspection handle for the window, if inspection is enabled.
     ///
     /// `_window` identifies the window whose inspector is requested.
@@ -279,6 +291,8 @@ pub struct SingleWindowModel<A: Render> {
     text_selection: std::cell::RefCell<Option<TextSelectionRequest>>,
     theme: std::cell::RefCell<Option<ThemeRequest>>,
     animation_requested: std::cell::Cell<bool>,
+    observation_index: std::cell::RefCell<crate::SourceIdentityIndex>,
+    observation_snapshot: std::cell::RefCell<crate::model::InteractionSnapshot>,
 }
 
 impl<A: Render> SingleWindowModel<A> {
@@ -309,6 +323,8 @@ impl<A: Render> SingleWindowModel<A> {
             text_selection: std::cell::RefCell::new(None),
             theme: std::cell::RefCell::new(None),
             animation_requested: std::cell::Cell::new(false),
+            observation_index: std::cell::RefCell::new(crate::SourceIdentityIndex::default()),
+            observation_snapshot: std::cell::RefCell::new(Default::default()),
         })
     }
 
@@ -317,6 +333,37 @@ impl<A: Render> SingleWindowModel<A> {
     pub fn window_key(mut self, window: WindowKey) -> Self {
         self.window = window;
         self
+    }
+
+    /// Publishes current interaction observations to render and event handlers.
+    ///
+    /// `tree` holds current retained interaction state, `regions` supplies local
+    /// hit geometry, `scroll_regions` supplies bounded scroll geometry, and
+    /// `primary_touch` selects a touch pointer ahead of the
+    /// mouse when one is active. Returns whether watched values changed and a
+    /// presentation needs another render. Sampling is limited to identities
+    /// watched by this presentation or its descendants.
+    pub fn refresh_interaction_observations(
+        &self,
+        tree: &UiTree,
+        regions: &[HitRegion],
+        scroll_regions: &[argui_ui::ScrollRegion],
+        primary_touch: Option<PointerId>,
+    ) -> bool {
+        let mut watched = HashSet::<RetainedIdentity>::new();
+        self.app.entity.collect_observed(&mut watched);
+        let next = crate::model::InteractionSnapshot::capture(
+            Some(tree),
+            regions,
+            scroll_regions,
+            primary_touch,
+            &watched,
+            &mut self.observation_index.borrow_mut(),
+        );
+        let previous = self.observation_snapshot.replace(next.clone());
+        self.app.entity.set_interaction_snapshot(&next);
+        let changed = previous.changed(&next, &watched);
+        !changed.is_empty() && self.app.entity.invalidate_observed(&changed)
     }
 
     fn drain_effects(&self, window: &WindowKey) -> AppUpdate {
@@ -428,6 +475,10 @@ impl<A: Render> AppModel for SingleWindowModel<A> {
 
     fn vector_assets(&self) -> Vec<VectorAsset> {
         self.app.entity.erase().vector_assets()
+    }
+
+    fn effect_definitions(&self) -> Vec<EffectDefinition> {
+        self.app.entity.erase().effect_definitions()
     }
 
     fn inspector(&self, window: &WindowKey) -> Option<InspectorHandle> {

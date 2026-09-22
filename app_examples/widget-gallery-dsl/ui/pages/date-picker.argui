@@ -1,0 +1,58 @@
+import { Button, Calendar, Input, Popover } from "@argui/ui"
+import { Column, Container, Row, Text } from "@argui/native"
+
+export component DatePickerPage {
+    private property view_year: int = 2026
+    private property view_month: int = 9
+    private property chosen_year: int = 0
+    private property chosen_month: int = 0
+    private property chosen_day: int = 0
+    private property date_text: string = ""
+    private property calendar_open: bool = false
+
+    Column #date_picker_page {
+        width: 100%
+        gap: 18.0
+
+        Text { content: "Date picker" color: var(--argui-foreground) weight: 700 font_size: 27.0 }
+        Text { content: "Type a date or choose one from the calendar." color: var(--argui-muted-foreground) font_size: 14.0 }
+
+        Row { gap: 8.0 align_items: "center" wrap: true
+            Container #date_picker_anchor { width: 240px
+                Input {
+                    value <=> date_text
+                    label: "Choose a date"
+                    placeholder: "YYYY-MM-DD"
+                    on submit(value) { date_text = value chosen_day = 0 }
+                }
+            }
+            Button { text: "Open calendar" variant: "outline" on click { calendar_open = !calendar_open } }
+        }
+
+        if calendar_open {
+            Popover {
+                open: calendar_open
+                anchor: "date_picker_anchor"
+                width: 330px
+                on dismiss { calendar_open = false }
+                Calendar {
+                    label: "Choose a date"
+                    year <=> view_year
+                    month <=> view_month
+                    selected_year: chosen_year
+                    selected_month: chosen_month
+                    selected_day: chosen_day
+                    on select(year, month, day) {
+                        chosen_year = year
+                        chosen_month = month
+                        chosen_day = day
+                        date_text = str(year) + "-" + (month < 10 ? "0" : "") + str(month) + "-" + (day < 10 ? "0" : "") + str(day)
+                        calendar_open = false
+                    }
+                }
+            }
+        }
+
+        Text { content: date_text == "" ? "No date selected" : "Date: " + date_text color: var(--argui-muted-foreground) font_size: 14.0 }
+    }
+}

@@ -365,3 +365,160 @@ export component Main {
         );
     }
 }
+
+mod event_control {
+    //! Event control builtins across semantic, AOT, and live paths.
+
+    use std::collections::HashMap;
+
+    use argui_dsl_compiler::{Compiler, SourceModule};
+    use argui_dsl_runtime::{LivePackage, LiveRuntime};
+    use argui_dsl_semantic::{CompilerDatabase, DiagnosticCode};
+    use argui_runtime::{Entity, WindowEnvironment};
+    use argui_ui::{ClickEvent, UiEventKind, UiTree};
+
+    /// Builtins require a handler and reject unexpected arguments at source spans.
+    #[test]
+    fn event_control_calls_are_checked_in_context() {
+        let mut database = CompilerDatabase::with_builtins().unwrap();
+        database.set_file(
+            "ui/main.argui",
+            r#"import { TouchArea } from "@argui/native"
+export component Main {
+    private property invalid: bool = prevent_default()
+    TouchArea { on click { stop_propagation(1) } }
+}"#,
+        );
+        let issues = &database.check().diagnostics;
+        assert!(issues.iter().any(|issue| {
+            issue.code == DiagnosticCode::TypeMismatch
+                && issue.message.contains("only valid inside an event handler")
+        }));
+        assert!(issues.iter().any(|issue| {
+            issue.code == DiagnosticCode::TypeMismatch
+                && issue
+                    .message
+                    .contains("stop_propagation() expects no arguments")
+        }));
+    }
+
+    /// One checked handler emits both AOT host actions and applies them to the
+    /// current live event before the UI tree continues propagation.
+    #[test]
+    fn event_control_actions_have_aot_and_live_parity() {
+        let compiled = Compiler::compile(
+            [SourceModule::new(
+                "ui/main.argui",
+                r#"import { TouchArea } from "@argui/native"
+export component Main {
+    TouchArea { on click { prevent_default() stop_propagation() } }
+}"#,
+            )],
+            "ui/main.argui",
+            |_| Err("no external assets".into()),
+        )
+        .unwrap();
+        assert!(compiled.rust.contains("HostEffect::PreventDefault"));
+        assert!(compiled.rust.contains("HostEffect::StopPropagation"));
+        assert!(compiled.rust.contains("event.prevent_default()"));
+        assert!(compiled.rust.contains("event.stop_propagation()"));
+
+        let root = compiled.roots[0];
+        let package =
+            LivePackage::prepare(1, compiled.public_api_hash, compiled.ir, HashMap::new()).unwrap();
+        let mut runtime = LiveRuntime::new(package).unwrap();
+        runtime.mount(root, []).unwrap();
+        let mount = Entity::new(runtime).mount().unwrap();
+        let element = mount.render(WindowEnvironment::default()).unwrap();
+        let mut tree = UiTree::new(element);
+        let node = tree.node_id_at(0).unwrap();
+        let events = tree.event_deliveries(node, UiEventKind::Click(ClickEvent::accessibility()));
+        let event = events.iter().find(|event| event.should_dispatch()).unwrap();
+        mount.dispatch_event(event).unwrap();
+        assert!(event.default_prevented());
+        assert!(event.propagation_stopped());
+    }
+}
+
+mod callback_payload {
+    //! Callback payload dispatch across nested components.
+
+    use std::collections::HashMap;
+
+    use argui_dsl_compiler::{Compiler, SourceModule};
+    use argui_dsl_runtime::{DslValue, LivePackage, LiveRuntime};
+
+    #[test]
+    fn nested_component_callback_arguments_reach_parent_handler() {
+        let compiled = Compiler::compile(
+            [SourceModule::new(
+                "ui/main.argui",
+                r#"component Child { callback changed(value: string) }
+export component Main {
+    private property result: string = "initial"
+    Child { on changed(incoming) { result = incoming } }
+}"#,
+            )],
+            "ui/main.argui",
+            |_| Err("tests do not load external assets".into()),
+        )
+        .unwrap();
+        let main_symbol = compiled
+            .semantic
+            .modules
+            .iter()
+            .filter(|module| module.path == "ui/main.argui")
+            .flat_map(|module| &module.definitions)
+            .find(|definition| definition.name == "Main")
+            .unwrap()
+            .id;
+        let main = compiled
+            .ir
+            .components
+            .iter()
+            .find(|component| component.id.raw() == main_symbol.raw())
+            .unwrap();
+        let main_component = main.id;
+        let result_property = main.properties[0].id;
+        let child_symbol = compiled
+            .semantic
+            .modules
+            .iter()
+            .filter(|module| module.path == "ui/main.argui")
+            .flat_map(|module| &module.definitions)
+            .find(|definition| definition.name == "Child")
+            .unwrap()
+            .id;
+        let child = compiled
+            .ir
+            .components
+            .iter()
+            .find(|component| component.id.raw() == child_symbol.raw())
+            .unwrap();
+        let child_component = child.id;
+        let callback = child.callbacks[0].id;
+        let package =
+            LivePackage::prepare(1, compiled.public_api_hash, compiled.ir, HashMap::new()).unwrap();
+        let mut runtime = LiveRuntime::new(package).unwrap();
+        let root = runtime.mount(main_component, []).unwrap();
+        runtime.render().unwrap();
+        let child_instance = runtime
+            .inspect()
+            .instances
+            .iter()
+            .find(|instance| instance.component == child_component)
+            .unwrap()
+            .id;
+        runtime
+            .invoke_callback(
+                child_instance,
+                callback,
+                vec![DslValue::String("received".into())],
+            )
+            .unwrap();
+        assert_eq!(
+            runtime.instance(root).unwrap().properties[&result_property].get(),
+            &DslValue::String("received".into())
+        );
+    }
+}

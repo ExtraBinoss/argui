@@ -21,6 +21,9 @@ serde = [
 argui-dsl-semantic = { path = "../dsl-semantic" }
 argui-dsl-syntax = { path = "../dsl-syntax" }
 argui-schema.workspace = true
+argui-core.workspace = true
+argui-paint.workspace = true
+argui-vector.workspace = true
 serde = { workspace = true, optional = true }
 
 [lints]

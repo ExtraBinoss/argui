@@ -13,7 +13,7 @@ packages and dependency graphs do not include them.
 | [Spotlight](spotlight/)                  | A translucent launcher with animated filtering, native desktop backdrop, tray lifecycle, and a global activation shortcut.                    |
 | [Widget Gallery DSL](widget-gallery-dsl/) | Responsive DSL-authored component gallery with theme modes, virtual navigation, live reload, and bundled image/SVG assets.                |
 | [DSL Live Demo](dsl-live-demo/)          | Small focused application for trying transactional `argui dev` updates.                                                                 |
-| [VirtualList DSL](dsl-virtual-list/)     | Standalone large-data list sharing the gallery's reusable DSL VirtualList and row-template API.                                         |
+| [VirtualList DSL](dsl-virtual-list/)     | Standalone large-data list sharing the gallery's reusable DSL ListView and row-template API.                                            |
 
 Run an application from the repository root:
 

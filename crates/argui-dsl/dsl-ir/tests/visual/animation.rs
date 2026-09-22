@@ -126,3 +126,41 @@ export component Main {{ in property expanded: bool = false Container {{
         );
     }
 }
+
+/// A checked component whose target property disappeared reports the stale animation.
+#[test]
+fn lowering_rejects_animation_target_removed_after_checking() {
+    let mut database = CompilerDatabase::with_builtins().unwrap();
+    database.set_file(
+        "ui/main.argui",
+        "export component Main { private property progress: float = 0.0 animate progress { duration: 100ms } }",
+    );
+    let mut checked = (*database.check()).clone();
+    assert!(checked.is_valid(), "{:#?}", checked.diagnostics);
+    let component = checked
+        .modules
+        .iter_mut()
+        .find(|module| module.path == "ui/main.argui")
+        .unwrap()
+        .definitions
+        .iter_mut()
+        .find_map(|definition| match &mut definition.kind {
+            argui_dsl_semantic::DefinitionKind::Component(component)
+                if definition.name == "Main" =>
+            {
+                Some(component)
+            }
+            _ => None,
+        })
+        .unwrap();
+    component
+        .properties
+        .retain(|property| property.name != "progress");
+    let schema = argui_schema::builtin::registry().unwrap();
+    let errors = lower(&checked, &schema).unwrap_err();
+    assert!(
+        errors.iter().any(|error| error.message
+            == "animation target property `progress` is unavailable during IR lowering"),
+        "{errors:#?}"
+    );
+}

@@ -43,6 +43,17 @@ Directions define the generated ABI:
 Use `<=>` only with a writable property. Other assignments are reactive
 one-way bindings.
 
+For `TextInput`, `value <=> draft` applies each accepted `on edit` replacement
+to the controlled string. Edit ranges use UTF-8 byte offsets and always refer
+to the value before that edit. `on edit` has no payload and runs after the
+two-way value update; it is suitable for counters or other reactions that do
+not need a copy of the full text. `Input` and `TextArea` in the standard library
+use this path. `TextArea.changed()` fires after its value updates.
+
+Use `on input(value)` on a native `TextInput` only when the handler needs the
+complete edited string. That event supplies a copy of the whole value after
+the edit. `on submit(value)` likewise supplies the submitted string.
+
 ## Expressions and handlers
 
 Expressions include literals with units, property/local reads, struct fields,
@@ -63,6 +74,13 @@ built-ins. `tr()` resolves through the application’s `argui-i18n` localizer an
 falls back to its message ID when no translation is available.
 `str(value)` converts a scalar to text, `contains(text, fragment)` tests a
 substring, and `solid(color)` creates a GPU brush.
+`lower(text)` performs case-insensitive search preparation, and
+`slice(text, start, length)` extracts characters for segmented inputs.
+`range(count)` returns integers from zero up to (but excluding) `count`
+(limited to 100,000 entries), which can feed a virtual repeater.
+`hsv(hue, saturation, value, alpha)` creates a color with hue in degrees and
+the other channels in the 0–1 range. `color_hex(color)` returns `#RRGGBBAA`;
+`color_red/green/blue(color)` return 0–255 sRGB channel integers.
 
 Gradient brushes use parallel color and normalized-offset arrays of any length
 (at least two, with the same number of entries and ascending offsets). The
@@ -81,6 +99,28 @@ the actual selected-text overlay. A container's selection style is inherited by
 its text descendants; the default radius is 3 logical pixels. TextEditor additionally
 accepts composable caret fill and primitive geometry; the gallery Input page
 demonstrates bar, dot, and repeated-dot carets without a fixed style enum.
+The `Text` primitive also accepts `line_height`, `font_style` (`normal`,
+`italic`, `oblique`), `letter_spacing` in logical pixels, `underline` (`none`,
+`single`, `double`), `strikethrough`, `text_align` (`start`, `end`, `left`,
+`right`, `center`, `justify`), `line_clamp` (zero for no clamp), and
+`text_overflow` (`clip` or `ellipsis_end`). These properties use the same text
+shaper in live and generated builds.
+
+## Drag handling
+
+`TouchArea` exposes `drag_x(delta)` and `drag_y(delta)` for resize handles.
+Each float is the total pointer displacement from the press in logical pixels.
+Pan updates are coalesced once per frame, and release delivers the final
+displacement. Record the starting size on `pointer_down`, then add the delta:
+
+```text
+TouchArea {
+    on pointer_down { start_width = width }
+    on drag_x(delta) { width = start_width + delta }
+}
+```
+
+Use `moved` when every raw pointer movement needs an immediate callback.
 
 ## Conditional content and models
 
@@ -149,6 +189,31 @@ State conditions and animation parameters are ordinary typed expressions.
 Animation slots are keyed by component instance, source site, property and
 animation declaration, allowing compatible live edits to preserve presentation
 state and velocity. The engine’s reduced-motion policy remains authoritative.
+
+## Backdrop filters
+
+Every native visual surface, including `Rectangle`, `Text`, images, vector
+paths, containers, and popup surfaces, accepts an ordered filter list:
+
+```text
+Rectangle {
+    background: solid(#ffffff66)
+    backdrop_filter: "blur(12px) saturate(150%) contrast(110%)"
+}
+```
+
+The functions operate on pixels already painted behind the surface, in source
+order. Supported CSS-style functions are `blur`, `brightness`, `contrast`,
+`drop-shadow`, `grayscale`, `hue-rotate`, `invert`, `opacity`, `sepia`, and
+`saturate`. Numbers, percentages, pixel lengths, and angle units follow their
+CSS spellings. Argui also exposes its built-in `refraction` and `color-matrix`
+filters. Use `none` to clear the list; `initial` and `unset` have the same
+effect because DSL properties do not use the CSS cascade. Invalid syntax is an
+adapter error.
+
+The DSL cannot resolve a browser's external SVG `url()` filter or cascade
+keywords such as `inherit` and `revert`, so these produce explicit errors.
+For project WGSL effects, use an `effect` declaration with `scope: "backdrop"`.
 
 ## External WGSL effects
 

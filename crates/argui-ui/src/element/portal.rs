@@ -1,5 +1,5 @@
 use argui_core::Rect;
-use argui_paint::{Filter, LayerStyle};
+use argui_paint::{Filter, LayerStyle, Shadow};
 
 use crate::{
     AnchorPortal, DismissPolicy, Element, FloatingPlacement, LengthPercentageAuto, Portal,
@@ -139,6 +139,18 @@ impl Element {
             .get_or_insert_with(|| Box::new(LayerStyle::new(Rect::default())))
             .backdrop_filters
             .push(filter);
+        self
+    }
+
+    /// Appends a shadow around the element's painted surface.
+    ///
+    /// * `shadow` — shadow geometry and color used while compositing the element.
+    #[must_use]
+    pub fn shadow(mut self, shadow: Shadow) -> Self {
+        self.layer
+            .get_or_insert_with(|| Box::new(LayerStyle::new(Rect::default())))
+            .shadows
+            .push(shadow);
         self
     }
 

@@ -4,14 +4,17 @@ use argui_dsl_syntax::{FileId, Span, SyntaxKind, SyntaxNode};
 
 use crate::{
     CallbackDefinition, ComponentDefinition, Definition, DefinitionKind, Diagnostic,
-    DiagnosticCode, PropertyDefinition, PropertyDirection, SymbolId, Type, lower::direct_tokens,
-    types::from_schema,
+    DiagnosticCode, PropertyDefinition, SymbolId, Type, types::from_schema,
 };
 
 use super::super::{Scope, expression};
 use super::animation;
+mod binding;
+mod effect;
+mod helpers;
 mod template_slot;
 mod virtual_list;
+use helpers::*;
 
 /// Validates component defaults and recursively validates visual trees.
 #[allow(clippy::too_many_arguments)]
@@ -25,6 +28,8 @@ pub(super) fn validate_component(
     schema: &argui_schema::SchemaRegistry,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
+    let references =
+        binding::native_references(syntax, scope, schema, definitions, file, diagnostics);
     let properties = component
         .properties
         .iter()
@@ -45,6 +50,8 @@ pub(super) fn validate_component(
         locals: &locals,
         definitions,
         theme_tokens,
+        references: Some(&references),
+        event_handler: false,
         diagnostics,
     };
     for (property, declaration) in component.properties.iter().zip(
@@ -76,9 +83,17 @@ pub(super) fn validate_component(
         &callbacks,
         definitions,
         theme_tokens,
+        &references,
         context.diagnostics,
     );
-    template_slot::validate_usage(syntax, file, &component.slots, scope, context.diagnostics);
+    template_slot::validate_usage(
+        syntax,
+        file,
+        &component.slots,
+        scope,
+        schema,
+        context.diagnostics,
+    );
     let visual_roots = syntax.children().filter(|node| {
         matches!(
             node.kind(),
@@ -93,6 +108,7 @@ pub(super) fn validate_component(
             definitions,
             theme_tokens,
             schema,
+            &references,
             &properties,
             &callbacks,
             &locals,
@@ -110,6 +126,7 @@ fn validate_visual(
     definitions: &HashMap<SymbolId, Definition>,
     theme_tokens: &HashMap<String, Type>,
     schema: &argui_schema::SchemaRegistry,
+    references: &HashMap<String, HashMap<String, Type>>,
     component_properties: &HashMap<String, PropertyDefinition>,
     callbacks: &HashMap<String, CallbackDefinition>,
     locals: &HashMap<String, Type>,
@@ -123,6 +140,7 @@ fn validate_visual(
             definitions,
             theme_tokens,
             schema,
+            references,
             component_properties,
             callbacks,
             locals,
@@ -141,6 +159,8 @@ fn validate_visual(
                     locals,
                     definitions,
                     theme_tokens,
+                    references: Some(references),
+                    event_handler: false,
                     diagnostics,
                 };
                 let value = expression::infer(&collection, &mut context);
@@ -177,6 +197,7 @@ fn validate_visual(
                     definitions,
                     theme_tokens,
                     schema,
+                    references,
                     component_properties,
                     callbacks,
                     &next_locals,
@@ -197,6 +218,8 @@ fn validate_visual(
                     locals,
                     definitions,
                     theme_tokens,
+                    references: Some(references),
+                    event_handler: false,
                     diagnostics,
                 };
                 let actual = expression::infer(&condition, &mut context);
@@ -216,6 +239,7 @@ fn validate_visual(
                     definitions,
                     theme_tokens,
                     schema,
+                    references,
                     component_properties,
                     callbacks,
                     locals,
@@ -236,6 +260,7 @@ fn validate_element(
     definitions: &HashMap<SymbolId, Definition>,
     theme_tokens: &HashMap<String, Type>,
     schema: &argui_schema::SchemaRegistry,
+    references: &HashMap<String, HashMap<String, Type>>,
     component_properties: &HashMap<String, PropertyDefinition>,
     callbacks: &HashMap<String, CallbackDefinition>,
     locals: &HashMap<String, Type>,
@@ -266,6 +291,7 @@ fn validate_element(
         virtual_list::validate_template_argument(node, file, &template.name, diagnostics);
     }
     let mut provided = HashSet::new();
+    let mut effect_seen = false;
     for child in node.children() {
         match child.kind() {
             SyntaxKind::PropertyAssignment | SyntaxKind::TwoWayBinding => {
@@ -304,6 +330,18 @@ fn validate_element(
                     ));
                     continue;
                 };
+                if native.is_some_and(|schema| {
+                    schema.properties.iter().any(|property| {
+                        property.name.as_str() == property_name && property.read_only
+                    })
+                }) {
+                    diagnostics.push(Diagnostic::error(
+                        DiagnosticCode::ReadOnlyProperty,
+                        format!("`{name}.{property_name}` is read-only"),
+                        Span::new(file, child.text_range()),
+                    ));
+                    continue;
+                }
                 if let Some(value) = child
                     .children()
                     .find(|value| value.kind() == SyntaxKind::Expr)
@@ -315,6 +353,8 @@ fn validate_element(
                         locals,
                         definitions,
                         theme_tokens,
+                        references: Some(references),
+                        event_handler: false,
                         diagnostics,
                     };
                     let actual = expression::infer(&value, &mut context);
@@ -328,29 +368,108 @@ fn validate_element(
                         ));
                     }
                     if child.kind() == SyntaxKind::TwoWayBinding {
-                        validate_two_way(&value, file, component_properties, context.diagnostics);
+                        binding::validate_two_way(
+                            &value,
+                            file,
+                            component_properties,
+                            context.diagnostics,
+                        );
                     }
                 }
             }
+            SyntaxKind::EffectApplication => {
+                if effect_seen {
+                    diagnostics.push(Diagnostic::error(
+                        DiagnosticCode::InvalidEffect,
+                        "only one effect may be applied to an element",
+                        Span::new(file, child.text_range()),
+                    ));
+                }
+                effect_seen = true;
+                effect::validate(
+                    &child,
+                    file,
+                    scope,
+                    definitions,
+                    theme_tokens,
+                    references,
+                    component_properties,
+                    callbacks,
+                    locals,
+                    diagnostics,
+                );
+            }
             SyntaxKind::EventBlock => {
                 let event_name = identifier_after(&child, SyntaxKind::OnKw).unwrap_or_default();
-                let known = native.is_some_and(|native| {
+                let native_event = native.and_then(|native| {
                     native
                         .events
                         .iter()
-                        .any(|event| event.name.as_str() == event_name)
-                }) || user.is_some_and(|component| {
+                        .find(|event| event.name.as_str() == event_name)
+                });
+                let component_event = user.and_then(|component| {
                     component
                         .callbacks
                         .iter()
-                        .any(|callback| callback.name == event_name)
+                        .find(|callback| callback.name == event_name)
                 });
-                if !known {
+                if native_event.is_none() && component_event.is_none() {
                     diagnostics.push(Diagnostic::error(
                         DiagnosticCode::UnknownEvent,
                         format!("`{name}` has no event `{event_name}`"),
                         Span::new(file, child.text_range()),
                     ));
+                }
+                let parameters = event_parameters(&child);
+                let expected = native_event
+                    .map(|event| {
+                        event
+                            .payload
+                            .map(from_schema)
+                            .into_iter()
+                            .collect::<Vec<_>>()
+                    })
+                    .or_else(|| {
+                        component_event.map(|callback| {
+                            callback
+                                .parameters
+                                .iter()
+                                .map(|parameter| parameter.value_type.clone())
+                                .collect::<Vec<_>>()
+                        })
+                    });
+                if let Some(expected) = &expected
+                    && parameters.len() != expected.len()
+                    && !parameters.is_empty()
+                {
+                    diagnostics.push(Diagnostic::error(
+                        DiagnosticCode::TypeMismatch,
+                        format!(
+                            "event `{event_name}` expects {} bound parameters, found {}",
+                            expected.len(),
+                            parameters.len()
+                        ),
+                        Span::new(file, child.text_range()),
+                    ));
+                }
+                let mut event_locals = locals.clone();
+                let mut seen = HashSet::new();
+                for (index, parameter) in parameters.iter().enumerate() {
+                    if !seen.insert(parameter.clone()) {
+                        diagnostics.push(Diagnostic::error(
+                            DiagnosticCode::DuplicateMember,
+                            format!("event parameter `{parameter}` is repeated"),
+                            Span::new(file, child.text_range()),
+                        ));
+                    }
+                    event_locals.insert(
+                        parameter.clone(),
+                        expected
+                            .as_ref()
+                            .and_then(|types| types.get(index))
+                            .cloned()
+                            .unwrap_or(Type::Unknown),
+                    );
                 }
                 for statement in child
                     .children()
@@ -364,9 +483,11 @@ fn validate_element(
                             file,
                             properties: component_properties,
                             callbacks,
-                            locals,
+                            locals: &event_locals,
                             definitions,
                             theme_tokens,
+                            references: Some(references),
+                            event_handler: true,
                             diagnostics,
                         };
                         let _ = expression::infer(&value, &mut context);
@@ -380,6 +501,7 @@ fn validate_element(
                 definitions,
                 theme_tokens,
                 schema,
+                references,
                 component_properties,
                 callbacks,
                 locals,
@@ -396,6 +518,7 @@ fn validate_element(
         definitions,
         theme_tokens,
         schema,
+        references,
         component_properties,
         callbacks,
         locals,
@@ -426,90 +549,4 @@ fn validate_element(
             }
         }
     }
-}
-
-/// Validates that a two-way binding targets a writable component property.
-fn validate_two_way(
-    value: &SyntaxNode,
-    file: FileId,
-    properties: &HashMap<String, PropertyDefinition>,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
-    let target = value
-        .descendants()
-        .find(|node| node.kind() == SyntaxKind::PathExpr)
-        .and_then(|node| direct_ident(&node));
-    let writable = target
-        .as_ref()
-        .and_then(|name| properties.get(name))
-        .is_some_and(|property| {
-            matches!(
-                property.direction,
-                PropertyDirection::Private
-                    | PropertyDirection::Output
-                    | PropertyDirection::InputOutput
-            )
-        });
-    if !writable {
-        diagnostics.push(Diagnostic::error(
-            DiagnosticCode::InvalidTwoWayBinding,
-            "two-way binding target must be a writable local property",
-            Span::new(file, value.text_range()),
-        ));
-    }
-}
-
-/// Returns an element/block's immediate nested visual nodes.
-fn visual_children(node: &SyntaxNode) -> impl Iterator<Item = SyntaxNode> + '_ {
-    node.children()
-        .flat_map(|child| {
-            if child.kind() == SyntaxKind::Block {
-                child.children().collect::<Vec<_>>()
-            } else {
-                vec![child]
-            }
-        })
-        .filter(|child| {
-            matches!(
-                child.kind(),
-                SyntaxKind::Element
-                    | SyntaxKind::ForExpr
-                    | SyntaxKind::IfExpr
-                    | SyntaxKind::ElseBranch
-                    | SyntaxKind::Block
-            )
-        })
-}
-
-/// Returns whether a node directly owns a token kind.
-fn has_direct_token(node: &SyntaxNode, kind: SyntaxKind) -> bool {
-    direct_tokens(node).any(|token| token.kind() == kind)
-}
-
-/// Returns the first direct identifier token.
-fn direct_ident(node: &SyntaxNode) -> Option<String> {
-    direct_tokens(node)
-        .find(|token| token.kind() == SyntaxKind::Ident)
-        .map(|token| token.text().to_string())
-}
-
-/// Returns a direct identifier or theme-token name.
-fn direct_ident_or_theme(node: &SyntaxNode) -> Option<String> {
-    direct_ident(node).or_else(|| {
-        direct_tokens(node)
-            .find(|token| token.kind() == SyntaxKind::ThemeName)
-            .map(|token| token.text().to_string())
-    })
-}
-
-/// Returns the first identifier after a direct keyword.
-fn identifier_after(node: &SyntaxNode, keyword: SyntaxKind) -> Option<String> {
-    let mut seen = false;
-    for token in direct_tokens(node) {
-        if seen && token.kind() == SyntaxKind::Ident {
-            return Some(token.text().to_string());
-        }
-        seen |= token.kind() == keyword;
-    }
-    None
 }

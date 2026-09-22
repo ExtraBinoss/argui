@@ -232,6 +232,22 @@ impl SurfaceRenderer {
         self.install_effect_registry(registry)
     }
 
+    /// Replaces the complete GPU effect registry after preparing every shader.
+    ///
+    /// `registry` contains the definitions to use for subsequent frames. The
+    /// current pipelines remain active if any definition cannot be prepared.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the registry exceeds adapter limits or a WGSL pass
+    /// fails to compile.
+    pub fn replace_effect_registry(
+        &mut self,
+        registry: crate::EffectRegistry,
+    ) -> Result<(), RendererError> {
+        self.install_effect_registry(registry)
+    }
+
     /// Prepares a complete GPU effect generation and commits it atomically.
     ///
     /// * `registry` — already validated next registry generation.

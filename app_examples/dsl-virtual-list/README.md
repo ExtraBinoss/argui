@@ -1,11 +1,11 @@
 # VirtualList DSL example
 
-This standalone app uses the same [`VirtualList.argui`](../../crates/argui-dsl/stdlib/ui/virtual-list.argui)
+This standalone app uses the same [`ListView.argui`](../../crates/argui-dsl/stdlib/ui/list-view.argui)
 as the widget gallery. The component owns scrolling, virtualization, the themed
 scrollbar, and optional top/bottom edge shadows. This app leaves the shadows
 off by default; the widget gallery enables them on its sidebar with
 `edge_shadow_width`, `edge_shadow_intensity`, and `edge_shadow_color`. Set those
-three properties on the `VirtualList` in `ui/main.argui` to try them here.
+three properties on the `ListView` in `ui/main.argui` to try them here.
 The caller supplies a keyed `for` template; only rows in the visible window
 are rendered. The default DSL
 data has 24 rows so `argui dev` works immediately; the release app injects

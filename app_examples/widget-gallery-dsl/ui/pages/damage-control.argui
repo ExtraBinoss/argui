@@ -1,0 +1,99 @@
+import { Button, Popover } from "@argui/ui"
+import { Column, Container, Rectangle, Row, Text } from "@argui/native"
+
+export effect DamageGlassBorder {
+    shader: "../../assets/worley-border.wgsl"
+    damage: "bounded"
+    parameter intensity: float = 0.75
+    parameter scale: float = 0.035
+}
+
+export component DamageControlPage {
+    private property mode: string = "Auto"
+    private property running: bool = true
+    private property step: int = 0
+    private property blur_open: bool = false
+    private property glass_open: bool = false
+
+    Column #damage_control_page { width: 100% gap: 18.0
+        Text { content: "Damage control" color: var(--argui-foreground) weight: 700 font_size: 27.0 }
+        Text { content: "A moving primitive illustrates changed bounds. Renderer damage modes and timing profiles require the native runtime." color: var(--argui-muted-foreground) font_size: 14.0 }
+
+        Row { gap: 8.0 wrap: true
+            Button { text: "Auto · adaptive" variant: mode == "Auto" ? "secondary" : "ghost" on click { mode = "Auto" } }
+            Button { text: "Off · full frame" variant: mode == "Off" ? "secondary" : "ghost" on click { mode = "Off" } }
+        }
+        Text { content: mode == "Auto" ? "Adaptive mode would repaint changed regions." : "Off would force full-frame rendering." color: var(--argui-muted-foreground) font_size: 13.0 }
+        Text { content: "This selector changes the explanation only; it does not reconfigure the renderer." color: var(--argui-muted-foreground) font_size: 12.0 }
+
+        Rectangle { width: 100% height: 190px radius: 14.0 clip: true background: solid(var(--argui-muted)) border_color: var(--argui-border) border_width: 1.0
+            Row { x: 174px y: 67px
+                Rectangle { width: 72px height: 82px background: solid(#172b45) }
+                Rectangle { width: 72px height: 82px background: solid(#ffe7b8) }
+                Rectangle { width: 72px height: 82px background: solid(#172b45) }
+                Rectangle { width: 72px height: 82px background: solid(#ffe7b8) }
+            }
+            Column { width: 100% height: 190px padding: 22.0 gap: 18.0
+                Row { gap: 10.0 wrap: true align_items: "center"
+                    Text { content: "CONTROLLED WORKLOAD" color: var(--argui-muted-foreground) font_size: 11.0 weight: 700 }
+                    Container #blur_anchor {
+                        Button { text: blur_open ? "Close blur" : "Open blur" variant: "outline" on click { blur_open = !blur_open } }
+                    }
+                    Button { text: glass_open ? "Hide liquid glass" : "Show liquid glass" variant: "outline" on click { glass_open = !glass_open } }
+                }
+                Container { width: 100% height: 72px
+                    if running {
+                        Rectangle { y: 4px width: 54px height: 54px radius: 27.0 background: solid(var(--argui-primary))
+                            animate x { duration: 3200ms iterations: "infinite" keyframes { 0%: 0px 50%: 560px 100%: 0px } }
+                        }
+                    }
+                    if !running {
+                        Rectangle { x: step * 70.0 * 1px y: 4px width: 54px height: 54px radius: 27.0 background: solid(var(--argui-primary)) }
+                    }
+                }
+                Row { gap: 18.0
+                    for tick in [0, 1, 2, 3, 4, 5, 6, 7, 8] key tick {
+                        Rectangle { width: tick % 2 == 0 ? 34px : 18px height: 4px radius: 2.0 background: solid(var(--argui-border)) }
+                    }
+                }
+            }
+            if glass_open {
+                Rectangle {
+                    x: 300px
+                    y: 85px
+                    width: 278px
+                    height: 78px
+                    radius: 18.0
+                    background: solid(var(--argui-glass-surface))
+                    backdrop_filter: "blur(20px)"
+                    border_color: var(--argui-border)
+                    border_width: 1.0
+                    shadow_blur: 16.0
+                    shadow_offset_y: 6.0
+                    shadow_color: #00000030
+                    effect: DamageGlassBorder { scope: "border" intensity: 0.75 scale: 0.035 }
+                    Column { padding: 14.0 gap: 4.0
+                        Text { content: "Liquid glass" color: var(--argui-foreground) weight: 700 font_size: 14.0 }
+                        Text { content: "Live blur, translucent fill and shaded edge" color: var(--argui-muted-foreground) font_size: 12.0 }
+                    }
+                }
+            }
+        }
+
+        if blur_open {
+            Popover { open: blur_open anchor: "blur_anchor" width: 290px surface_fill: solid(var(--argui-glass-surface)) backdrop_filter: "blur(14px)" on dismiss { blur_open = false }
+                Column { gap: 10.0
+                    Text { content: "Backdrop blur is active" color: var(--argui-foreground) font_size: 15.0 weight: 650 }
+                    Text { content: "The moving primitive continues behind this translucent surface." color: var(--argui-muted-foreground) font_size: 13.0 }
+                }
+            }
+        }
+
+        Row { gap: 8.0 wrap: true
+            Button { text: running ? "Stop loop" : "Run loop" variant: "outline" on click { running = !running } }
+            Button { text: "Step" variant: "outline" on click { running = false step = step >= 8 ? 0 : step + 1 } }
+            Button { text: "Reset local steps" variant: "ghost" on click { step = 0 } }
+        }
+        Text { content: "GPU time, CPU pipeline, repainted pixels, damage regions, and retained memory: unavailable without renderer telemetry." color: var(--argui-muted-foreground) font_size: 12.0 }
+    }
+}

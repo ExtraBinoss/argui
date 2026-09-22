@@ -1,0 +1,28 @@
+import { Message } from "@argui/ui"
+import { Column, Text } from "@argui/native"
+
+export component MessagePage {
+    private property liked: bool = false
+    private property reaction_status: string = ""
+
+    Column #message_page {
+        width: 100%
+        gap: 18.0
+
+        Text { content: "Message" color: var(--argui-foreground) weight: 700 font_size: 27.0 }
+        Text { content: "A conversation row combines a header, bubble, and optional action." color: var(--argui-muted-foreground) font_size: 14.0 }
+
+        Message { author: "You" timestamp: "10:42" body: "Could you review the new layout?" end: true }
+        Message {
+            author: "Ada"
+            timestamp: "10:43"
+            body: "Yes, the spacing is clearer and the controls are easier to reach."
+            show_reaction: true
+            liked <=> liked
+            on react(next) { reaction_status = next ? "Message liked" : "Reaction removed" }
+        }
+        if reaction_status != "" {
+            Text { content: reaction_status color: var(--argui-muted-foreground) font_size: 13.0 }
+        }
+    }
+}

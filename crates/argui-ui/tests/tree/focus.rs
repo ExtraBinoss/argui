@@ -124,3 +124,96 @@ fn click_inside_input_preserves_focus_and_blank_area_respects_modal_traps() {
         assert_eq!(tree.focused_node(), trapped.then_some(input));
     }
 }
+
+#[test]
+fn opted_focus_scope_focuses_when_nonfocusable_descendant_is_pressed() {
+    for focus_on_descendant in [false, true] {
+        let root = Element::container([Element::container([]).interaction(Interaction::default())])
+            .focus_scope(FocusScope::restoring())
+            .interaction(
+                Interaction::default()
+                    .focus_policy(FocusPolicy::TabStop)
+                    .focus_on_descendant_press(focus_on_descendant),
+            );
+        let mut tree = UiTree::new(listen(root));
+        let scope = tree.node_id_at(0).unwrap();
+        let child = tree.node_id_at(1).unwrap();
+        let regions = [
+            region(scope, 0.0, FocusPolicy::TabStop),
+            region(child, 0.0, FocusPolicy::None),
+        ];
+
+        tree.pointer_moved(Point::new(10.0, 10.0), &regions);
+        let pressed = tree.primary_pressed(&regions);
+
+        assert_eq!(tree.focused_node(), focus_on_descendant.then_some(scope));
+        assert_eq!(
+            pressed
+                .events
+                .iter()
+                .any(|event| event.target == scope && event.kind == UiEventKind::Focused),
+            focus_on_descendant
+        );
+    }
+}
+
+#[test]
+fn focusable_descendant_takes_precedence_over_opted_focus_scope() {
+    let root = Element::container([Element::container([])
+        .interaction(Interaction::default().focus_policy(FocusPolicy::TabStop))])
+    .focus_scope(FocusScope::restoring())
+    .interaction(
+        Interaction::default()
+            .focus_policy(FocusPolicy::TabStop)
+            .focus_on_descendant_press(true),
+    );
+    let mut tree = UiTree::new(root);
+    let scope = tree.node_id_at(0).unwrap();
+    let child = tree.node_id_at(1).unwrap();
+    let regions = [
+        region(scope, 0.0, FocusPolicy::TabStop),
+        region(child, 0.0, FocusPolicy::TabStop),
+    ];
+
+    tree.pointer_moved(Point::new(10.0, 10.0), &regions);
+    tree.primary_pressed(&regions);
+
+    assert_eq!(tree.focused_node(), Some(child));
+}
+
+#[test]
+fn programmatic_traversal_stays_in_trap_and_skips_disabled_entries() {
+    let popup = Element::container([
+        Element::container([]).keyed("first"),
+        Element::container([]).keyed("disabled"),
+        Element::container([]).keyed("last"),
+    ])
+    .focus_scope(FocusScope::trapped(InitialFocus::First));
+    let mut tree = UiTree::new(Element::container([
+        Element::container([]).keyed("outside"),
+        popup,
+    ]));
+    let outside = tree.node_id_at(1).unwrap();
+    let first = tree.node_id_at(3).unwrap();
+    let disabled = tree.node_id_at(4).unwrap();
+    let last = tree.node_id_at(5).unwrap();
+    let mut disabled_region = region(disabled, 80.0, FocusPolicy::TabStop);
+    disabled_region.enabled = false;
+    let regions = [
+        region(outside, 0.0, FocusPolicy::TabStop),
+        region(first, 40.0, FocusPolicy::TabStop),
+        disabled_region,
+        region(last, 120.0, FocusPolicy::TabStop),
+    ];
+
+    tree.sync_focus(&regions, None);
+    assert_eq!(tree.focused_node(), Some(first));
+    tree.sync_focus(&regions, Some(FocusRequest::Next));
+    assert_eq!(tree.focused_node(), Some(last));
+    tree.sync_focus(&regions, Some(FocusRequest::Next));
+    assert_eq!(tree.focused_node(), Some(first));
+    tree.sync_focus(&regions, Some(FocusRequest::Previous));
+    assert_eq!(tree.focused_node(), Some(last));
+    tree.sync_focus(&regions, Some(FocusRequest::Focus(outside.into())));
+    assert_eq!(tree.focused_node(), Some(last));
+}

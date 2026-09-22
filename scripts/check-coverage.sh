@@ -31,23 +31,18 @@ if ! flock -n 9; then
   echo "error: another Argui coverage run is already active" >&2
   exit 1
 fi
-cleanup() {
-  if [[ -z "${ARGUI_KEEP_COVERAGE_ARTIFACTS:-}" ]]; then
-    cargo clean --target-dir "$coverage_target" >/dev/null 2>&1 || true
-  fi
-}
-trap cleanup EXIT
-# A workspace-only clean can retain old instrumented dependency variants and
-# count their unexecuted maps against current source. Clear this dedicated
-# coverage target completely so each report describes one coherent build.
-CARGO_TARGET_DIR="$coverage_target" cargo "+$coverage_toolchain" llvm-cov clean
+# Remove prior workspace binaries and profile data before measuring a new run.
+# Instrumented third-party dependencies stay cached in the dedicated target.
+CARGO_TARGET_DIR="$coverage_target" cargo "+$coverage_toolchain" llvm-cov clean --workspace
 if [[ -n "${ARGUI_NATIVE_TESTS:-}" ]]; then
-  # Run the GPU integration in isolation. The workspace pass below retains its profile and
-  # produces the final report with the complete set of test binaries.
-  CARGO_TARGET_DIR="$coverage_target" CARGO_INCREMENTAL=0 \
+  # The canvas stress test presents reliably on private X11. Run it in isolation;
+  # the workspace pass below retains its profile for the combined report.
+  ARGUI_TEST_BACKEND=x11 "$repo_root/scripts/linux-hidden-display.sh" env \
+    ARGUI_SURFACE_STRESS=1 CARGO_TARGET_DIR="$coverage_target" CARGO_INCREMENTAL=0 \
     CARGO_PROFILE_TEST_OPT_LEVEL=0 CARGO_PROFILE_TEST_DEBUG=0 \
     cargo "+$coverage_toolchain" llvm-cov nextest \
-    --package argui-render --all-features --test surface --branch --no-report \
+    --package argui-render --all-features --test surface --branch --no-clean \
+    --json --output-path "$repo_root/target/coverage-native-report.json" \
     --jobs 1 --run-ignored only
 fi
 echo "coverage: running workspace library and integration tests"
@@ -57,7 +52,7 @@ CARGO_TARGET_DIR="$coverage_target" CARGO_INCREMENTAL=0 \
   --workspace --all-features --lib --tests --branch --no-clean \
   --ignore-filename-regex "$boundary_regex" \
   --jobs "$coverage_jobs" --status-level fail --final-status-level fail \
-  --success-output never --failure-output immediate-final \
+  --no-fail-fast --success-output never --failure-output immediate-final \
   --json --output-path "$report"
 
 python3 "$repo_root/scripts/coverage-gate.py" "$report" "$minimum"

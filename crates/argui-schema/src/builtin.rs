@@ -1,12 +1,11 @@
 //! Stable schemas for the deliberately small Rust-backed visual and behavior surface.
 
 use argui_paint::{Border, CornerRadii};
-use argui_text::{TextStyle, TextWrap};
-use argui_ui::{
-    AlignItems, CursorIcon, Element, EventType, FlexWrap, FocusPolicy, GestureSet, Interaction,
-    JustifyContent, KeyboardActivation, Role, SemanticAction, SemanticState, Semantics, StateName,
-    StateScopeId, StylePatch, UserSelect, VisualState, property,
+use argui_text::{
+    EllipsisPosition, FontStyle, LetterSpacing, TextAlign, TextOverflow, TextStyle, TextWrap,
+    UnderlineStyle,
 };
+use argui_ui::{AlignItems, Element, EventType, FlexWrap, JustifyContent};
 
 use crate::{
     EventId, NativeElementInput, NativeSchema, NativeTypeId, PropertyId, PropertySchema,
@@ -14,24 +13,33 @@ use crate::{
 };
 
 mod common;
+mod flickable;
+mod focus_scope;
+mod key_binding;
 mod media;
-mod popover;
-mod switch;
+mod path;
+mod popup_window;
+mod rectangle;
 mod text_editor;
-mod virtual_list;
+mod touch_area;
+mod virtual_window;
 use common::*;
 
 pub const CONTAINER: NativeTypeId = NativeTypeId::from_raw(1);
 pub const ROW: NativeTypeId = NativeTypeId::from_raw(2);
 pub const COLUMN: NativeTypeId = NativeTypeId::from_raw(3);
 pub const TEXT: NativeTypeId = NativeTypeId::from_raw(4);
-pub const PRESSABLE: NativeTypeId = NativeTypeId::from_raw(5);
-pub const TEXT_EDITOR: NativeTypeId = NativeTypeId::from_raw(6);
-pub const POPOVER_PANEL: NativeTypeId = NativeTypeId::from_raw(7);
 pub const IMAGE: NativeTypeId = NativeTypeId::from_raw(8);
 pub const SVG: NativeTypeId = NativeTypeId::from_raw(9);
-pub const SWITCH: NativeTypeId = NativeTypeId::from_raw(10);
-pub const VIRTUAL_LIST: NativeTypeId = NativeTypeId::from_raw(11);
+pub const RECTANGLE: NativeTypeId = NativeTypeId::from_raw(12);
+pub const TOUCH_AREA: NativeTypeId = NativeTypeId::from_raw(13);
+pub const FOCUS_SCOPE: NativeTypeId = NativeTypeId::from_raw(14);
+pub const PATH: NativeTypeId = NativeTypeId::from_raw(15);
+pub const TEXT_INPUT: NativeTypeId = NativeTypeId::from_raw(16);
+pub const KEY_BINDING: NativeTypeId = NativeTypeId::from_raw(17);
+pub const POPUP_WINDOW: NativeTypeId = NativeTypeId::from_raw(18);
+pub const FLICKABLE: NativeTypeId = NativeTypeId::from_raw(19);
+pub const VIRTUAL_WINDOW: NativeTypeId = NativeTypeId::from_raw(20);
 
 pub const CHILDREN: SlotId = SlotId::from_raw(1);
 pub const KEY: PropertyId = PropertyId::from_raw(1);
@@ -98,6 +106,60 @@ pub const CARET_SPACING: PropertyId = PropertyId::from_raw(61);
 pub const CARET_OFFSET_Y: PropertyId = PropertyId::from_raw(62);
 pub const CARET_BLINK: PropertyId = PropertyId::from_raw(63);
 pub const SEARCH_INPUT: PropertyId = PropertyId::from_raw(64);
+pub const BORDER_WIDTH: PropertyId = PropertyId::from_raw(65);
+pub const CLIP: PropertyId = PropertyId::from_raw(66);
+pub const HAS_HOVER: PropertyId = PropertyId::from_raw(67);
+pub const PRESSED: PropertyId = PropertyId::from_raw(68);
+pub const MOUSE_X: PropertyId = PropertyId::from_raw(69);
+pub const MOUSE_Y: PropertyId = PropertyId::from_raw(70);
+pub const PRESSED_X: PropertyId = PropertyId::from_raw(71);
+pub const PRESSED_Y: PropertyId = PropertyId::from_raw(72);
+pub const MOUSE_CURSOR: PropertyId = PropertyId::from_raw(73);
+pub const X: PropertyId = PropertyId::from_raw(74);
+pub const Y: PropertyId = PropertyId::from_raw(75);
+pub const VISIBLE: PropertyId = PropertyId::from_raw(76);
+pub const FOCUS_ON_CLICK: PropertyId = PropertyId::from_raw(77);
+pub const FOCUS_ON_TAB: PropertyId = PropertyId::from_raw(78);
+pub const HAS_FOCUS: PropertyId = PropertyId::from_raw(79);
+pub const FOCUS_VISIBLE: PropertyId = PropertyId::from_raw(80);
+pub const FOCUS_CONTAINMENT: PropertyId = PropertyId::from_raw(81);
+pub const RESTORE_FOCUS: PropertyId = PropertyId::from_raw(82);
+pub const INITIAL_FOCUS: PropertyId = PropertyId::from_raw(83);
+pub const KEYBOARD_ACTIVATION: PropertyId = PropertyId::from_raw(84);
+pub const SEMANTIC_ROLE: PropertyId = PropertyId::from_raw(85);
+pub const SEMANTIC_LABEL: PropertyId = PropertyId::from_raw(86);
+pub const SEMANTIC_EXPANDABLE: PropertyId = PropertyId::from_raw(87);
+pub const ALIGN_ITEMS: PropertyId = PropertyId::from_raw(88);
+pub const JUSTIFY_CONTENT: PropertyId = PropertyId::from_raw(89);
+pub const MULTILINE: PropertyId = PropertyId::from_raw(90);
+pub const SHORTCUT: PropertyId = PropertyId::from_raw(91);
+pub const PLACEMENT: PropertyId = PropertyId::from_raw(92);
+pub const DISMISS_POLICY: PropertyId = PropertyId::from_raw(93);
+pub const WINDOW_LAYER: PropertyId = PropertyId::from_raw(94);
+pub const SCROLL_X: PropertyId = PropertyId::from_raw(95);
+pub const OFFSET_X: PropertyId = PropertyId::from_raw(96);
+pub const OFFSET_Y: PropertyId = PropertyId::from_raw(97);
+pub const FLICK_VIEWPORT_WIDTH: PropertyId = PropertyId::from_raw(98);
+pub const FLICK_VIEWPORT_HEIGHT: PropertyId = PropertyId::from_raw(99);
+pub const CONTENT_WIDTH: PropertyId = PropertyId::from_raw(100);
+pub const CONTENT_HEIGHT: PropertyId = PropertyId::from_raw(101);
+pub const SHRINK: PropertyId = PropertyId::from_raw(102);
+pub const VISIBLE_HEIGHT: PropertyId = PropertyId::from_raw(103);
+pub const BACKDROP_FILTER: PropertyId = PropertyId::from_raw(104);
+pub const TEXT_LINE_HEIGHT: PropertyId = PropertyId::from_raw(105);
+pub const TEXT_FONT_STYLE: PropertyId = PropertyId::from_raw(106);
+pub const TEXT_LETTER_SPACING: PropertyId = PropertyId::from_raw(107);
+pub const TEXT_UNDERLINE: PropertyId = PropertyId::from_raw(108);
+pub const TEXT_STRIKETHROUGH: PropertyId = PropertyId::from_raw(109);
+pub const TEXT_ALIGN: PropertyId = PropertyId::from_raw(110);
+pub const TEXT_LINE_CLAMP: PropertyId = PropertyId::from_raw(111);
+pub const TEXT_OVERFLOW: PropertyId = PropertyId::from_raw(112);
+pub const SHADOW_BLUR: PropertyId = PropertyId::from_raw(113);
+pub const SHADOW_OFFSET_Y: PropertyId = PropertyId::from_raw(114);
+pub const SHADOW_COLOR: PropertyId = PropertyId::from_raw(115);
+pub const MAX_DIGITS: PropertyId = PropertyId::from_raw(116);
+pub const MOUSE_GLOBAL_X: PropertyId = PropertyId::from_raw(117);
+pub const MOUSE_GLOBAL_Y: PropertyId = PropertyId::from_raw(118);
 
 pub const CLICK: EventId = EventId::from_raw(1);
 pub const FOCUS: EventId = EventId::from_raw(2);
@@ -106,6 +168,22 @@ pub const INPUT_CHANGED: EventId = EventId::from_raw(4);
 pub const SUBMIT: EventId = EventId::from_raw(5);
 pub const DISMISS: EventId = EventId::from_raw(6);
 pub const SCROLL: EventId = EventId::from_raw(7);
+pub const POINTER_ENTER: EventId = EventId::from_raw(8);
+pub const POINTER_LEAVE: EventId = EventId::from_raw(9);
+pub const POINTER_DOWN: EventId = EventId::from_raw(10);
+pub const POINTER_UP: EventId = EventId::from_raw(11);
+pub const POINTER_MOVE: EventId = EventId::from_raw(12);
+pub const POINTER_CANCEL: EventId = EventId::from_raw(13);
+pub const WHEEL: EventId = EventId::from_raw(14);
+pub const MOVED: EventId = EventId::from_raw(15);
+pub const DOUBLE_CLICK: EventId = EventId::from_raw(16);
+pub const KEY_INPUT: EventId = EventId::from_raw(17);
+pub const CAPTURE_KEY_INPUT: EventId = EventId::from_raw(18);
+pub const ACTIVATED: EventId = EventId::from_raw(19);
+pub const CONTEXT_MENU: EventId = EventId::from_raw(20);
+pub const DRAG_X: EventId = EventId::from_raw(21);
+pub const DRAG_Y: EventId = EventId::from_raw(22);
+pub const TEXT_EDIT: EventId = EventId::from_raw(23);
 
 /// Creates the canonical registry of built-in native visual primitives.
 ///
@@ -117,6 +195,13 @@ pub fn registry() -> Result<SchemaRegistry, SchemaError> {
     register_container(&mut registry, CONTAINER, "Container", Element::container)?;
     register_container(&mut registry, ROW, "Row", Element::row)?;
     register_container(&mut registry, COLUMN, "Column", Element::column)?;
+    rectangle::register(&mut registry)?;
+    touch_area::register(&mut registry)?;
+    focus_scope::register(&mut registry)?;
+    path::register(&mut registry)?;
+    flickable::register(&mut registry)?;
+    key_binding::register(&mut registry)?;
+    popup_window::register(&mut registry)?;
     let text = NativeSchema::new(TEXT, "Text", "Displays styled text content.")
         .property(PropertySchema::new(
             CONTENT,
@@ -134,8 +219,12 @@ pub fn registry() -> Result<SchemaRegistry, SchemaError> {
         .property(common_property(CommonProperty::Tooltip))
         .property(common_property(CommonProperty::Width))
         .property(common_property(CommonProperty::Height))
+        .property(common_property(CommonProperty::X))
+        .property(common_property(CommonProperty::Y))
         .property(common_property(CommonProperty::Rotation))
         .property(common_property(CommonProperty::Opacity))
+        .property(common_property(CommonProperty::BackdropFilter))
+        .property(common_property(CommonProperty::Visible))
         .property(common_property(CommonProperty::Background));
     let text = text
         .property(common_property(CommonProperty::SelectionFill))
@@ -165,6 +254,54 @@ pub fn registry() -> Result<SchemaRegistry, SchemaError> {
             "no_wrap",
             ValueType::Bool,
             "Keep text on one line.",
+        ))
+        .property(PropertySchema::new(
+            TEXT_LINE_HEIGHT,
+            "line_height",
+            ValueType::Float,
+            "Line height in logical pixels.",
+        ))
+        .property(PropertySchema::new(
+            TEXT_FONT_STYLE,
+            "font_style",
+            ValueType::String,
+            "Font style: normal, italic or oblique.",
+        ))
+        .property(PropertySchema::new(
+            TEXT_LETTER_SPACING,
+            "letter_spacing",
+            ValueType::Float,
+            "Additional spacing between glyphs in logical pixels.",
+        ))
+        .property(PropertySchema::new(
+            TEXT_UNDERLINE,
+            "underline",
+            ValueType::String,
+            "Underline style: none, single or double.",
+        ))
+        .property(PropertySchema::new(
+            TEXT_STRIKETHROUGH,
+            "strikethrough",
+            ValueType::Bool,
+            "Strike a line through the text.",
+        ))
+        .property(PropertySchema::new(
+            TEXT_ALIGN,
+            "text_align",
+            ValueType::String,
+            "Text alignment: start, end, left, right, center or justify.",
+        ))
+        .property(PropertySchema::new(
+            TEXT_LINE_CLAMP,
+            "line_clamp",
+            ValueType::Int,
+            "Maximum number of visual lines; zero means unlimited.",
+        ))
+        .property(PropertySchema::new(
+            TEXT_OVERFLOW,
+            "text_overflow",
+            ValueType::String,
+            "Overflow behavior: clip or ellipsis_end.",
         ));
     registry.register(text, |input: &NativeElementInput| {
         let content = optional_string(input, TEXT_VALUE)
@@ -184,17 +321,75 @@ pub fn registry() -> Result<SchemaRegistry, SchemaError> {
             style.font_size = *size;
             style.line_height = *size * 1.25;
         }
-        Ok(apply_common(
-            Element::text(content.clone()).text_style(style),
-            input,
-        ))
+        if let Some(SchemaValue::Float(height)) = input.get(TEXT_LINE_HEIGHT) {
+            style.line_height = (*height).max(0.0);
+        }
+        if let Some(SchemaValue::String(value)) = input.get(TEXT_FONT_STYLE) {
+            style.font_style = match value.as_str() {
+                "normal" => FontStyle::Normal,
+                "italic" => FontStyle::Italic,
+                "oblique" => FontStyle::Oblique,
+                _ => {
+                    return Err(SchemaError::Adapter(format!(
+                        "unsupported font_style `{value}`"
+                    )));
+                }
+            };
+        }
+        if let Some(SchemaValue::Float(spacing)) = input.get(TEXT_LETTER_SPACING) {
+            style.letter_spacing = LetterSpacing::Px(*spacing);
+        }
+        if let Some(SchemaValue::String(value)) = input.get(TEXT_UNDERLINE) {
+            style.decoration.underline = match value.as_str() {
+                "none" => UnderlineStyle::None,
+                "single" => UnderlineStyle::Single,
+                "double" => UnderlineStyle::Double,
+                _ => {
+                    return Err(SchemaError::Adapter(format!(
+                        "unsupported underline `{value}`"
+                    )));
+                }
+            };
+        }
+        if let Some(SchemaValue::Bool(strikethrough)) = input.get(TEXT_STRIKETHROUGH) {
+            style.decoration.strikethrough = *strikethrough;
+        }
+        if let Some(SchemaValue::String(value)) = input.get(TEXT_ALIGN) {
+            style.align = match value.as_str() {
+                "start" => TextAlign::Start,
+                "end" => TextAlign::End,
+                "left" => TextAlign::Left,
+                "right" => TextAlign::Right,
+                "center" => TextAlign::Center,
+                "justify" => TextAlign::Justify,
+                _ => {
+                    return Err(SchemaError::Adapter(format!(
+                        "unsupported text_align `{value}`"
+                    )));
+                }
+            };
+        }
+        if let Some(SchemaValue::Int(lines)) = input.get(TEXT_LINE_CLAMP) {
+            style.line_clamp = usize::try_from(*lines)
+                .ok()
+                .and_then(std::num::NonZeroUsize::new);
+        }
+        if let Some(SchemaValue::String(value)) = input.get(TEXT_OVERFLOW) {
+            style.overflow = match value.as_str() {
+                "clip" => TextOverflow::Clip,
+                "ellipsis_end" => TextOverflow::Ellipsis(EllipsisPosition::End),
+                _ => {
+                    return Err(SchemaError::Adapter(format!(
+                        "unsupported text_overflow `{value}`"
+                    )));
+                }
+            };
+        }
+        apply_common(Element::text(content.clone()).text_style(style), input)
     })?;
-    register_pressable(&mut registry)?;
     text_editor::register(&mut registry)?;
-    popover::register(&mut registry)?;
     media::register(&mut registry)?;
-    switch::register(&mut registry)?;
-    virtual_list::register(&mut registry)?;
+    virtual_window::register(&mut registry)?;
     Ok(registry)
 }
 
@@ -209,8 +404,12 @@ fn register_container(
         .property(common_property(CommonProperty::Tooltip))
         .property(common_property(CommonProperty::Width))
         .property(common_property(CommonProperty::Height))
+        .property(common_property(CommonProperty::X))
+        .property(common_property(CommonProperty::Y))
         .property(common_property(CommonProperty::Rotation))
         .property(common_property(CommonProperty::Opacity))
+        .property(common_property(CommonProperty::BackdropFilter))
+        .property(common_property(CommonProperty::Visible))
         .property(common_property(CommonProperty::MinWidth))
         .property(common_property(CommonProperty::MinHeight))
         .property(common_property(CommonProperty::Background))
@@ -244,6 +443,12 @@ fn register_container(
             "Flex growth factor.",
         ))
         .property(PropertySchema::new(
+            SHRINK,
+            "shrink",
+            ValueType::Float,
+            "Flex shrink factor.",
+        ))
+        .property(PropertySchema::new(
             BORDER_COLOR,
             "border_color",
             ValueType::Color,
@@ -254,6 +459,18 @@ fn register_container(
             "radius",
             ValueType::Float,
             "Corner radius in logical pixels.",
+        ))
+        .property(PropertySchema::new(
+            ALIGN_ITEMS,
+            "align_items",
+            ValueType::String,
+            "Cross-axis alignment of children.",
+        ))
+        .property(PropertySchema::new(
+            JUSTIFY_CONTENT,
+            "justify_content",
+            ValueType::String,
+            "Main-axis distribution of children.",
         ))
         .event(common_event(CLICK, "click", EventType::Click))
         .event(common_event(FOCUS, "focus", EventType::Focus))
@@ -266,18 +483,49 @@ fn register_container(
         });
     registry.register(schema, move |input: &NativeElementInput| {
         let children = input.children(CHILDREN).to_vec();
-        let mut element = apply_container(apply_common(constructor(children), input), input);
+        let mut element = apply_container(apply_common(constructor(children), input)?, input);
         if optional_bool(input, WRAP) == Some(true) {
             element = element.flex_wrap(FlexWrap::Wrap);
         }
         if let Some(SchemaValue::Float(grow)) = input.get(GROW) {
             element = element.grow(*grow);
         }
+        if let Some(SchemaValue::Float(shrink)) = input.get(SHRINK) {
+            element = element.shrink(*shrink);
+        }
         if let Some(SchemaValue::Color(color)) = input.get(BORDER_COLOR) {
             element = element.border(Border::all(1.0, *color));
         }
         if let Some(SchemaValue::Float(radius)) = input.get(RADIUS) {
             element = element.radius(CornerRadii::all(*radius));
+        }
+        if let Some(SchemaValue::String(value)) = input.get(ALIGN_ITEMS) {
+            element = element.align_items(match value.as_str() {
+                "start" => AlignItems::START,
+                "center" => AlignItems::CENTER,
+                "end" => AlignItems::END,
+                "stretch" => AlignItems::STRETCH,
+                _ => {
+                    return Err(SchemaError::Adapter(format!(
+                        "{name} does not support align_items `{value}`"
+                    )));
+                }
+            });
+        }
+        if let Some(SchemaValue::String(value)) = input.get(JUSTIFY_CONTENT) {
+            element = element.justify_content(match value.as_str() {
+                "start" => JustifyContent::START,
+                "center" => JustifyContent::CENTER,
+                "end" => JustifyContent::END,
+                "space_between" => JustifyContent::SPACE_BETWEEN,
+                "space_around" => JustifyContent::SPACE_AROUND,
+                "space_evenly" => JustifyContent::SPACE_EVENLY,
+                _ => {
+                    return Err(SchemaError::Adapter(format!(
+                        "{name} does not support justify_content `{value}`"
+                    )));
+                }
+            });
         }
         if optional_bool(input, SCROLL_Y) == Some(true) {
             let thumb = match input.get(SCROLLBAR_THUMB) {
@@ -295,182 +543,8 @@ fn register_container(
                     x: argui_ui::Overflow::Hidden,
                     y: argui_ui::Overflow::Auto,
                 })
-                .scroll_config(argui_ui::ScrollConfig::default().scrollbar(scrollbar));
-        }
-        Ok(apply_events(element, input))
-    })
-}
-
-/// Registers the accessible press behavior used by standard-library controls.
-fn register_pressable(registry: &mut SchemaRegistry) -> Result<(), SchemaError> {
-    let schema = NativeSchema::new(PRESSABLE, "Pressable", "Accessible press behavior.")
-        .property(common_property(CommonProperty::Key))
-        .property(
-            PropertySchema::new(
-                LABEL,
-                "label",
-                ValueType::String,
-                "Accessible control label.",
-            )
-            .required(),
-        )
-        .property(common_property(CommonProperty::Tooltip))
-        .property(common_property(CommonProperty::Width))
-        .property(common_property(CommonProperty::Height))
-        .property(common_property(CommonProperty::Rotation))
-        .property(common_property(CommonProperty::Opacity))
-        .property(common_property(CommonProperty::MinWidth))
-        .property(common_property(CommonProperty::Background))
-        .property(common_property(CommonProperty::Gap))
-        .property(common_property(CommonProperty::Padding))
-        .property(PropertySchema::new(
-            BUSY,
-            "busy",
-            ValueType::Bool,
-            "Reject activation while work is in progress.",
-        ))
-        .property(PropertySchema::new(
-            BORDER_COLOR,
-            "border_color",
-            ValueType::Color,
-            "Resting border color.",
-        ))
-        .property(PropertySchema::new(
-            HOVER_BACKGROUND,
-            "hover_background",
-            ValueType::Color,
-            "Hover background color.",
-        ))
-        .property(PropertySchema::new(
-            PRESSED_BACKGROUND,
-            "pressed_background",
-            ValueType::Color,
-            "Pressed background color.",
-        ))
-        .property(PropertySchema::new(
-            FOCUS_BORDER_COLOR,
-            "focus_border_color",
-            ValueType::Color,
-            "Visible keyboard focus border color.",
-        ))
-        .property(PropertySchema::new(
-            RADIUS,
-            "radius",
-            ValueType::Float,
-            "Corner radius in logical pixels.",
-        ))
-        .property(PropertySchema::new(
-            SELECT_TRIGGER,
-            "select_trigger",
-            ValueType::Bool,
-            "Expose selection-trigger semantics.",
-        ))
-        .property(PropertySchema::new(
-            EXPANDED,
-            "expanded",
-            ValueType::Bool,
-            "Whether the selection popup is expanded.",
-        ))
-        .property(
-            PropertySchema::new(
-                ENABLED,
-                "enabled",
-                ValueType::Bool,
-                "Whether the control accepts activation.",
-            )
-            .default_value(SchemaValue::Bool(true)),
-        )
-        .event(common_event(CLICK, "click", EventType::Click))
-        .event(common_event(FOCUS, "focus", EventType::Focus))
-        .event(common_event(BLUR, "blur", EventType::Blur))
-        .slot(SlotSchema {
-            id: CHILDREN,
-            name: "children".into(),
-            arity: SlotArity::Many,
-            documentation: "Visual button content.".into(),
-        });
-    registry.register(schema, |input: &NativeElementInput| {
-        let key = required_string(input, KEY, "key")?;
-        let label = required_string(input, LABEL, "label")?;
-        let enabled = optional_bool(input, ENABLED).unwrap_or(true);
-        let busy = optional_bool(input, BUSY).unwrap_or(false);
-        let interactive = enabled && !busy;
-        let children = input
-            .children(CHILDREN)
-            .iter()
-            .cloned()
-            .map(|child| child.semantic_hidden(true));
-        let element = Element::row(children)
-            .keyed(key.clone())
-            .user_select(UserSelect::None)
-            .interaction(
-                Interaction::default()
-                    .enabled(interactive)
-                    .focus_policy(if interactive {
-                        FocusPolicy::TabStop
-                    } else {
-                        FocusPolicy::None
-                    })
-                    .cursor(if !enabled {
-                        CursorIcon::NotAllowed
-                    } else if busy {
-                        CursorIcon::Progress
-                    } else {
-                        CursorIcon::Pointer
-                    })
-                    .gestures(GestureSet::default().tap(argui_ui::TapGesture::default()))
-                    .keyboard_activation(KeyboardActivation::EnterOrSpace),
-            )
-            .semantics(
-                Semantics::new(if optional_bool(input, SELECT_TRIGGER) == Some(true) {
-                    Role::ComboBox
-                } else {
-                    Role::Button
-                })
-                .label(label.clone())
-                .state(SemanticState {
-                    disabled: !interactive,
-                    busy,
-                    expanded: optional_bool(input, SELECT_TRIGGER)
-                        .filter(|value| *value)
-                        .map(|_| optional_bool(input, EXPANDED).unwrap_or(false)),
-                    ..SemanticState::default()
-                })
-                .action(SemanticAction::Click)
-                .action(SemanticAction::Focus),
-            );
-        let mut element = apply_container(apply_common(element, input), input)
-            .align_items(AlignItems::CENTER)
-            .justify_content(JustifyContent::CENTER)
-            .state_scope(StateScopeId::new("button"))
-            .active_state(StateName::new("busy"), busy);
-        if let Some(SchemaValue::Color(color)) = input.get(BORDER_COLOR) {
-            element = element.border(Border::all(1.0, *color));
-        }
-        if let Some(SchemaValue::Float(radius)) = input.get(RADIUS) {
-            element = element.radius(CornerRadii::all(*radius));
-        }
-        for (id, state) in [
-            (HOVER_BACKGROUND, VisualState::Hovered),
-            (PRESSED_BACKGROUND, VisualState::Pressed),
-        ] {
-            if let Some(SchemaValue::Color(color)) = input.get(id) {
-                element = element.when(
-                    state,
-                    StylePatch::new().set(property::BackgroundColor, *color),
-                );
-            }
-        }
-        if let Some(SchemaValue::Color(color)) = input.get(FOCUS_BORDER_COLOR) {
-            element = element.when(
-                VisualState::FocusVisible,
-                StylePatch::new()
-                    .set(property::BorderColor, *color)
-                    .set(property::BorderWidths, [2.0; 4]),
-            );
-        }
-        if !interactive || element.tooltip.as_deref() == Some("") {
-            element.tooltip = None;
+                .scroll_config(argui_ui::ScrollConfig::default().scrollbar(scrollbar))
+                .scrollbar_gutter(argui_ui::ScrollbarGutter::Stable);
         }
         Ok(apply_events(element, input))
     })

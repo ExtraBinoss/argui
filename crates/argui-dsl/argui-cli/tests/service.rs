@@ -82,6 +82,42 @@ export component Main { Text { content: "fixed" } }"#,
     assert_eq!(package.header.generation, 3);
 }
 
+/// The dev service sends generated path bytes without looking for a disk SVG.
+#[test]
+fn authored_path_bytes_are_included_in_live_packages() {
+    let directory = tempfile::tempdir().unwrap();
+    std::fs::create_dir(directory.path().join("ui")).unwrap();
+    std::fs::write(
+        directory.path().join("ui/main.argui"),
+        r#"import { Path } from "@argui/native"
+export component Main {
+    Path { source: path(20.0, 20.0, [move_to(0.0, 0.0), line_to(20.0, 20.0)], false, 2.0, false) }
+}"#,
+    )
+    .unwrap();
+    let mut service = DevCompilerService::open(directory.path(), "ui/main.argui").unwrap();
+    let LiveMessage::Package(package) = service.compile().message else {
+        panic!("authored path should compile without a source SVG file");
+    };
+    let generated = package
+        .ir
+        .assets
+        .iter()
+        .find(|asset| asset.inline_bytes.is_some())
+        .unwrap();
+    let payload = package
+        .assets
+        .iter()
+        .find(|asset| asset.id == generated.id)
+        .unwrap();
+    assert_eq!(payload.bytes, *generated.inline_bytes.as_ref().unwrap());
+    assert!(
+        std::str::from_utf8(&payload.bytes)
+            .unwrap()
+            .contains("stroke-width=\"2\"")
+    );
+}
+
 #[test]
 fn malformed_number_rejection_has_file_span_and_specific_message() {
     let directory = tempfile::tempdir().unwrap();
@@ -354,6 +390,17 @@ fn icon_and_asset_diagnostics_include_source_path_and_spans() {
         &missing_source[missing.start.unwrap() as usize..missing.end.unwrap() as usize],
         "asset(\"media/missing.png\")"
     );
+    let unknown_icon_source = "import { Svg } from \"@argui/native\"\nexport component Main { Svg { source: asset(\"@argui/icons/NoSuchIcon.svg\") } }";
+    std::fs::write(&path, unknown_icon_source).unwrap();
+    service.refresh_sources().unwrap();
+    let LiveMessage::Diagnostics { diagnostics, .. } = service.compile().message else {
+        panic!("unknown virtual icon should reject the generation");
+    };
+    assert!(diagnostics.iter().any(|diagnostic| {
+        diagnostic.code == "Asset"
+            && diagnostic.path.as_deref() == Some("ui/main.argui")
+            && diagnostic.message.contains("NoSuchIcon")
+    }));
 }
 
 #[test]

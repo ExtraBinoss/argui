@@ -1,0 +1,42 @@
+import { Container } from "@argui/native"
+import { Menu } from "@argui/ui/menu.argui"
+import { MenuItem } from "@argui/ui/menu-item.argui"
+
+export component SubMenu {
+    in property anchor: string
+    in property text: string
+    in property enabled: bool = true
+    in property parent_open: bool = true
+    in property width: length = 190px
+    in property open: bool = false
+    callback hover()
+    callback activate()
+    callback dismiss()
+    slot content
+
+    Container {
+        width: 100%
+        MenuItem {
+            text: text
+            enabled: enabled
+            selected: open
+            submenu: true
+            on hover { hover() }
+            on select { activate() }
+        }
+        Menu {
+            open: parent_open && open && enabled
+            anchor: anchor
+            label: text
+            width: width
+            placement: "right_start"
+            dismiss_policy: "manual"
+            focus_containment: "none"
+            restore_focus: false
+            on dismiss {
+                dismiss()
+            }
+            content
+        }
+    }
+}

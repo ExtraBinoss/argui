@@ -20,7 +20,7 @@ pub(super) struct VirtualListNode<'a> {
 }
 
 impl Context<'_> {
-    /// Emits the mounted rows for one VList and its compiler-owned window metadata.
+    /// Emits the mounted rows for one VirtualWindow and its compiler-owned window metadata.
     ///
     /// `output` receives generated Rust, `node` supplies the repeater, native
     /// properties, and retained identity, `destination` names the row vector,
@@ -29,7 +29,7 @@ impl Context<'_> {
     ///
     /// # Errors
     ///
-    /// Returns a code-generation error for an invalid VList body or missing dimensions.
+    /// Returns a code-generation error for an invalid VirtualWindow body or missing dimensions.
     pub(super) fn emit_virtual_children(
         &self,
         output: &mut String,
@@ -68,19 +68,19 @@ impl Context<'_> {
         let (repeater, rows_scope) = match node.children {
             [repeater @ IrNode::Repeater { .. }] => (repeater, scope),
             [IrNode::Slot { slot, .. }] => {
-                let template = scope.template.as_ref().ok_or_else(|| {
-                    CompilerError::Codegen("VList template slot is outside its call site".into())
-                })?;
+                let template = scope.template.as_ref().ok_or(CompilerError::Codegen(
+                    "VirtualWindow template slot is outside its call site".into(),
+                ))?;
                 if template.slot != *slot {
                     return Err(CompilerError::Codegen(
-                        "VList template slot identity does not match its call site".into(),
+                        "VirtualWindow template slot identity does not match its call site".into(),
                     ));
                 }
                 (&template.repeater, template.caller.as_ref())
             }
             _ => {
                 return Err(CompilerError::Codegen(
-                    "VList requires exactly one keyed `for` repeater".into(),
+                    "VirtualWindow requires exactly one keyed `for` repeater".into(),
                 ));
             }
         };
@@ -97,7 +97,7 @@ impl Context<'_> {
         )
     }
 
-    /// Emits the caller's row template after the VList configuration is resolved.
+    /// Emits the caller's row template after the VirtualWindow configuration is resolved.
     ///
     /// `repeater` is the original keyed loop and `scope` is its lexical owner;
     /// `destination` receives only mounted rows. The remaining expressions are
@@ -128,7 +128,7 @@ impl Context<'_> {
         } = repeater
         else {
             return Err(CompilerError::Codegen(
-                "VList template requires one keyed `for` repeater".into(),
+                "VirtualWindow template requires one keyed `for` repeater".into(),
             ));
         };
         let pad = "    ".repeat(depth);
@@ -139,9 +139,12 @@ impl Context<'_> {
         let local_name = format!("local_{}", local.raw());
         let row = format!("{destination}_row");
         if let IrExpressionKind::PropertyRead(property) = &model.kind {
-            let source = scope.properties.get(property).ok_or_else(|| {
-                CompilerError::Codegen("VList model property is outside its scope".into())
-            })?;
+            let source = scope
+                .properties
+                .get(property)
+                .ok_or(CompilerError::Codegen(
+                    "VirtualWindow model property is outside its scope".into(),
+                ))?;
             writeln!(output, "{pad}let ({destination}_count, {destination}_start, {mounted}) = {source}.with(|{items}| {{").unwrap();
             writeln!(output, "{pad}    let {window} = ::argui::ui::VirtualList::fixed({items}.len(), {row_height}, {viewport}).overscan(usize::try_from({overscan}).unwrap_or(0)).window({offset});").unwrap();
             writeln!(output, "{pad}    let start = {window}.range.start;").unwrap();
@@ -179,7 +182,7 @@ impl Context<'_> {
         Ok(())
     }
 
-    /// Resolves one VList property as a typed Rust expression.
+    /// Resolves one VirtualWindow property as a typed Rust expression.
     ///
     /// `properties` are the lowered assignments, `id` selects one property,
     /// `scope` resolves its expression, and `fallback` is used only for optional properties.
@@ -199,9 +202,12 @@ impl Context<'_> {
             .find(|binding| binding.target == PropertyTargetId::Native(id));
         match binding {
             Some(binding) => self.expression(&binding.value, scope),
-            None => fallback.map(str::to_owned).ok_or_else(|| {
-                CompilerError::Codegen(format!("VList requires property {}", id.raw()))
-            }),
+            None => fallback
+                .map(str::to_owned)
+                .ok_or(CompilerError::Codegen(format!(
+                    "VirtualWindow requires property {}",
+                    id.raw()
+                ))),
         }
     }
 }

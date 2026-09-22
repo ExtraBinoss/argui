@@ -286,6 +286,12 @@ fn collect_layout(
     let mut text_index = None;
     let mut text_scroll = None;
     if let Some((content, style)) = crate::text::content(ui, node.node, element) {
+        let editor = matches!(element.kind, ElementKind::TextEditor { .. });
+        let gutter = if editor && node.style.scrollbar_gutter == argui_ui::ScrollbarGutter::Stable {
+            node.style.scrollbar_width.max(0.0)
+        } else {
+            0.0
+        };
         let text_bounds = Rect::new(
             Point::new(
                 origin.x + layout.border.left + layout.padding.left,
@@ -296,14 +302,24 @@ fn collect_layout(
                     - layout.border.left
                     - layout.border.right
                     - layout.padding.left
-                    - layout.padding.right)
-                    .max(0.0),
+                    - layout.padding.right
+                    - if node.style.overflow.y.scrolls() {
+                        gutter
+                    } else {
+                        0.0
+                    })
+                .max(0.0),
                 (layout.size.height
                     - layout.border.top
                     - layout.border.bottom
                     - layout.padding.top
-                    - layout.padding.bottom)
-                    .max(0.0),
+                    - layout.padding.bottom
+                    - if node.style.overflow.x.scrolls() {
+                        gutter
+                    } else {
+                        0.0
+                    })
+                .max(0.0),
             ),
         );
         let text_clip = crate::text::clip(node, element, placement.clip, bounds);

@@ -115,10 +115,8 @@ fn search_backdrop_is_modal_and_dismisses_without_clicking_through() {
 fn a_preloaded_highlighted_rust_file_scrolls_to_its_real_document_end() {
     let source = include_str!("../../docs-examples/src/examples/custom_elements.rs");
     assert!(source.lines().count() > 500);
-    let project = Project::from_documents(
-        "argui",
-        [("custom_elements.rs".into(), source.to_owned())],
-    );
+    let project =
+        Project::from_documents("argui", [("custom_elements.rs".into(), source.to_owned())]);
     assert!(project.documents[0].highlighted_content(false).is_some());
     let mut app = TestApp::new(AstraEditor::with_project(project));
     let editor = app.bounds("code-editor").unwrap();
@@ -127,11 +125,8 @@ fn a_preloaded_highlighted_rust_file_scrolls_to_its_real_document_end() {
         editor.origin.y + editor.size.height * 0.5,
     );
 
-    app.wheel(
-        center,
-        ScrollDelta::Pixels(Point::new(0.0, -50_000.0)),
-    )
-    .unwrap();
+    app.wheel(center, ScrollDelta::Pixels(Point::new(0.0, -50_000.0)))
+        .unwrap();
 
     let offset = app.scroll_offset("code-editor").unwrap();
     assert!(

@@ -1,8 +1,6 @@
 use std::fmt::Write;
 
-use argui_dsl_ir::{
-    EventTargetId, IrElementTarget, IrNode, IrPropertyBinding, IrType, PropertyTargetId,
-};
+use argui_dsl_ir::{IrElementTarget, IrNode, IrType, PropertyTargetId};
 
 use crate::{
     CompilerError,
@@ -10,6 +8,8 @@ use crate::{
 };
 
 mod component;
+mod effect;
+mod events;
 mod motion;
 mod state;
 mod virtual_list;
@@ -52,6 +52,7 @@ impl Context<'_> {
                 events,
                 children,
                 source_id,
+                effect,
                 ..
             } => match target {
                 IrElementTarget::Native(native) => {
@@ -69,7 +70,7 @@ impl Context<'_> {
                     let identity = self.identity(site.raw(), scope, repeater_key)?;
                     writeln!(output, "{pad}let {motion_identity} = {identity};").unwrap();
                     let children_name = format!("children_{}_{}", site.raw(), depth);
-                    if *native == argui_schema::builtin::VIRTUAL_LIST {
+                    if native_schema.virtual_window {
                         self.emit_virtual_children(
                             output,
                             VirtualListNode {
@@ -116,7 +117,7 @@ impl Context<'_> {
                         writeln!(output, "{pad}{input} = {input}.property(::argui::schema::PropertyId::from_raw({}), ::argui::schema::SchemaValue::String({value}));", key.id.raw()).unwrap();
                     }
                     for property in properties {
-                        if *native == argui_schema::builtin::VIRTUAL_LIST
+                        if native_schema.virtual_window
                             && property.target
                                 == PropertyTargetId::Native(argui_schema::builtin::VIEWPORT_HEIGHT)
                         {
@@ -170,7 +171,7 @@ impl Context<'_> {
                         scope,
                         &motion_identity,
                     )?;
-                    if *native == argui_schema::builtin::VIRTUAL_LIST {
+                    if native_schema.virtual_window {
                         writeln!(output, "{pad}{input} = {input}.property(::argui::schema::PropertyId::from_raw({}), ::argui::schema::SchemaValue::Float({children_name}_viewport)).property(::argui::schema::PropertyId::from_raw({}), ::argui::schema::SchemaValue::Int({children_name}_count as i64)).property(::argui::schema::PropertyId::from_raw({}), ::argui::schema::SchemaValue::Int({children_name}_start as i64));", argui_schema::builtin::VIEWPORT_HEIGHT.raw(), argui_schema::builtin::ITEM_COUNT.raw(), argui_schema::builtin::WINDOW_START.raw()).unwrap();
                     }
                     if let Some(slot) = child_slot {
@@ -186,6 +187,9 @@ impl Context<'_> {
                         scope,
                     )?;
                     writeln!(output, "{pad}{destination}.push(construct_native(::argui::schema::NativeTypeId::from_raw({}), &{input}).retained_identity({motion_identity}));", native.raw()).unwrap();
+                    if let Some(effect) = effect {
+                        self.emit_applied_effect(output, effect, destination, depth, scope)?;
+                    }
                 }
                 IrElementTarget::Component(component) => {
                     self.emit_component_call(
@@ -200,6 +204,9 @@ impl Context<'_> {
                         scope,
                         repeater_key,
                     )?;
+                    if let Some(effect) = effect {
+                        self.emit_applied_effect(output, effect, destination, depth, scope)?;
+                    }
                 }
             },
             IrNode::Repeater {
@@ -270,110 +277,6 @@ impl Context<'_> {
         Ok(())
     }
 
-    /// Emits native event registration and two-way payload propagation.
-    #[allow(clippy::too_many_arguments)]
-    fn emit_native_events(
-        &self,
-        output: &mut String,
-        schema: &argui_schema::NativeSchema,
-        properties: &[IrPropertyBinding],
-        events: &[argui_dsl_ir::IrEventBinding],
-        input: &str,
-        pad: &str,
-        scope: &Scope,
-    ) -> Result<(), CompilerError> {
-        for event_schema in &schema.events {
-            let explicit = events
-                .iter()
-                .find(|event| event.target == EventTargetId::Native(event_schema.id));
-            let updates = properties
-                .iter()
-                .filter(|binding| binding.two_way)
-                .filter_map(|binding| {
-                    let PropertyTargetId::Native(property) = binding.target else {
-                        return None;
-                    };
-                    schema
-                        .properties
-                        .iter()
-                        .find(|candidate| {
-                            candidate.id == property
-                                && candidate.change_event == Some(event_schema.id)
-                        })
-                        .map(|property_schema| (binding, property_schema.value_type))
-                })
-                .collect::<Vec<_>>();
-            if explicit.is_none() && updates.is_empty() {
-                continue;
-            }
-            writeln!(
-                output,
-                "{pad}if let Some(register) = handlers.as_deref_mut() {{"
-            )
-            .unwrap();
-            let update_properties = updates
-                .iter()
-                .filter_map(|(binding, _)| match binding.value.kind {
-                    argui_dsl_ir::IrExpressionKind::PropertyRead(property) => Some(property),
-                    _ => None,
-                })
-                .collect::<Vec<_>>();
-            let statements = explicit
-                .map(|binding| binding.statements.as_slice())
-                .unwrap_or_default();
-            for name in statement_capture_names(scope, statements, &update_properties) {
-                writeln!(output, "{pad}    let {name} = {name}.clone();").unwrap();
-            }
-            writeln!(
-                output,
-                "{pad}    let handler = register(Box::new(move |event| {{"
-            )
-            .unwrap();
-            writeln!(output, "{pad}        let _ = event;").unwrap();
-            for (binding, value_type) in updates {
-                self.emit_two_way_update(output, binding, value_type, pad, scope)?;
-            }
-            if let Some(explicit) = explicit {
-                for statement in &explicit.statements {
-                    writeln!(output, "{pad}        {}", self.statement(statement, scope)?).unwrap();
-                }
-            }
-            writeln!(output, "{pad}    }}));").unwrap();
-            writeln!(output, "{pad}    {input} = {input}.event(::argui::schema::NativeEventValue::new(::argui::schema::EventId::from_raw({}), handler));", event_schema.id.raw()).unwrap();
-            writeln!(output, "{pad}}}").unwrap();
-        }
-        Ok(())
-    }
-
-    /// Emits the statically typed update for one schema two-way event payload.
-    fn emit_two_way_update(
-        &self,
-        output: &mut String,
-        binding: &IrPropertyBinding,
-        value_type: argui_schema::ValueType,
-        pad: &str,
-        scope: &Scope,
-    ) -> Result<(), CompilerError> {
-        let argui_dsl_ir::IrExpressionKind::PropertyRead(property) = binding.value.kind else {
-            return Err(CompilerError::Codegen(
-                "native two-way source is not a property".into(),
-            ));
-        };
-        let property = scope.properties.get(&property).ok_or_else(|| {
-            CompilerError::Codegen("native two-way source is outside component scope".into())
-        })?;
-        match value_type {
-            argui_schema::ValueType::String => writeln!(output, "{pad}        let value = match &event.kind {{ ::argui::ui::UiEventKind::TextChanged(value) | ::argui::ui::UiEventKind::Submitted(value) => value.clone(), _ => return }}; {property}.set(value);").unwrap(),
-            argui_schema::ValueType::Float => writeln!(output, "{pad}        let value = match &event.kind {{ ::argui::ui::UiEventKind::Scrolled {{ offset, .. }} => offset.y, _ => return }}; {property}.set(value);").unwrap(),
-            unsupported => {
-                return Err(CompilerError::Codegen(format!(
-                    "native two-way event payload `{unsupported:?}` has no AOT conversion"
-                )));
-            }
-        }
-        Ok(())
-    }
-
     /// Emits retained identity with an optional typed repeater key.
     fn identity(
         &self,
@@ -398,13 +301,20 @@ impl Context<'_> {
     }
 }
 
-/// Returns only runtime values referenced by a generated event closure.
+/// Finds captured runtime values and observed sites used by an event closure.
+///
+/// * `scope` — generated names available to the handler.
+/// * `statements` — checked handler body to inspect.
+/// * `extra_properties` — two-way targets also captured by the handler.
+///
+/// Returns sorted capture names and sites to watch before dispatch.
 fn statement_capture_names(
     scope: &Scope,
     statements: &[argui_dsl_ir::IrStatement],
     extra_properties: &[argui_dsl_ir::PropertyId],
-) -> Vec<String> {
+) -> (Vec<String>, Vec<argui_dsl_ir::SiteId>) {
     let mut names = std::collections::BTreeSet::new();
+    let mut observed_sites = std::collections::BTreeSet::new();
     for property in extra_properties {
         if let Some(name) = scope.properties.get(property) {
             names.insert(name.clone());
@@ -415,7 +325,11 @@ fn statement_capture_names(
             argui_dsl_ir::IrStatement::Expression(expression)
             | argui_dsl_ir::IrStatement::Return(Some(expression))
             | argui_dsl_ir::IrStatement::SetThemeMode(expression) => {
-                expression_capture_names(scope, expression, &mut names);
+                expression_capture_names(scope, expression, &mut names, &mut observed_sites);
+            }
+            argui_dsl_ir::IrStatement::ScrollTo { x, y, .. } => {
+                expression_capture_names(scope, x, &mut names, &mut observed_sites);
+                expression_capture_names(scope, y, &mut names, &mut observed_sites);
             }
             argui_dsl_ir::IrStatement::Assignment { target, value, .. } => {
                 match target {
@@ -430,24 +344,60 @@ fn statement_capture_names(
                         }
                     }
                 }
-                expression_capture_names(scope, value, &mut names);
+                expression_capture_names(scope, value, &mut names, &mut observed_sites);
             }
-            argui_dsl_ir::IrStatement::Return(None) => {}
+            argui_dsl_ir::IrStatement::Return(None)
+            | argui_dsl_ir::IrStatement::FocusNext
+            | argui_dsl_ir::IrStatement::FocusPrevious
+            | argui_dsl_ir::IrStatement::PreventDefault
+            | argui_dsl_ir::IrStatement::StopPropagation => {}
         }
     }
-    names.into_iter().collect()
+    (
+        names.into_iter().collect(),
+        observed_sites.into_iter().collect(),
+    )
 }
 
-/// Adds expression dependencies to the generated closure capture set.
+/// Returns whether a handler statement needs the shared host-effect queue.
+///
+/// `statement` is the lowered handler operation. The result controls closure
+/// capture so handlers without host effects emit no unused variables.
+fn statement_has_host_effect(statement: &argui_dsl_ir::IrStatement) -> bool {
+    matches!(
+        statement,
+        argui_dsl_ir::IrStatement::FocusNext
+            | argui_dsl_ir::IrStatement::FocusPrevious
+            | argui_dsl_ir::IrStatement::PreventDefault
+            | argui_dsl_ir::IrStatement::StopPropagation
+            | argui_dsl_ir::IrStatement::ScrollTo { .. }
+    )
+}
+
+/// Adds expression dependencies to the generated closure capture and watch sets.
+///
+/// * `scope` — generated names available to the handler.
+/// * `expression` — expression to traverse recursively.
+/// * `names` — output receiving captured generated values.
+/// * `observed_sites` — output receiving native sites sampled for input updates.
 fn expression_capture_names(
     scope: &Scope,
     expression: &argui_dsl_ir::IrExpression,
     names: &mut std::collections::BTreeSet<String>,
+    observed_sites: &mut std::collections::BTreeSet<argui_dsl_ir::SiteId>,
 ) {
     use argui_dsl_ir::IrExpressionKind as Kind;
     match &expression.kind {
         Kind::PropertyRead(property) => {
             names.extend(scope.properties.get(property).cloned());
+        }
+        Kind::ChildPropertyRead { site, property } => {
+            names.extend(scope.child_properties.get(&(*site, *property)).cloned());
+        }
+        Kind::ObservedRead { site, .. } => {
+            names.insert("observer".into());
+            names.insert("owner".into());
+            observed_sites.insert(*site);
         }
         Kind::LocalRead(local) => {
             names.extend(scope.locals.get(local).cloned());
@@ -458,31 +408,31 @@ fn expression_capture_names(
         } => {
             names.extend(scope.callbacks.get(callback).cloned());
             for argument in arguments {
-                expression_capture_names(scope, argument, names);
+                expression_capture_names(scope, argument, names, observed_sites);
             }
         }
         Kind::FieldRead { base, .. } | Kind::Unary { operand: base, .. } => {
-            expression_capture_names(scope, base, names);
+            expression_capture_names(scope, base, names, observed_sites);
         }
         Kind::Binary { left, right, .. } => {
-            expression_capture_names(scope, left, names);
-            expression_capture_names(scope, right, names);
+            expression_capture_names(scope, left, names, observed_sites);
+            expression_capture_names(scope, right, names, observed_sites);
         }
         Kind::Conditional {
             condition,
             then_value,
             else_value,
         } => {
-            expression_capture_names(scope, condition, names);
-            expression_capture_names(scope, then_value, names);
-            expression_capture_names(scope, else_value, names);
+            expression_capture_names(scope, condition, names, observed_sites);
+            expression_capture_names(scope, then_value, names, observed_sites);
+            expression_capture_names(scope, else_value, names, observed_sites);
         }
         Kind::Array(values)
         | Kind::BuiltinCall {
             arguments: values, ..
         } => {
             for value in values {
-                expression_capture_names(scope, value, names);
+                expression_capture_names(scope, value, names, observed_sites);
             }
         }
         Kind::Constant(_) | Kind::TokenRead(_) | Kind::Asset(_) => {}

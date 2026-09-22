@@ -21,6 +21,22 @@ pub(crate) struct EffectLayer {
     pub content_revision: u64,
 }
 
+impl EffectLayer {
+    /// Returns whether any child samples the scene behind this layer.
+    ///
+    /// A backdrop-reading child makes the parent foreground depend on pixels
+    /// outside its own content and therefore unsuitable for the layer cache.
+    #[must_use]
+    pub(crate) fn content_reads_backdrop(&self) -> bool {
+        self.children.iter().any(|node| match node {
+            EffectNode::Draw(_) => false,
+            EffectNode::Layer(child) => {
+                !child.style.backdrop_filters.is_empty() || child.content_reads_backdrop()
+            }
+        })
+    }
+}
+
 #[derive(Clone, Debug, Default)]
 pub(crate) struct EffectGraph {
     pub roots: Vec<EffectNode>,

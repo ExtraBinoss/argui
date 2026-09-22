@@ -1,6 +1,6 @@
 use argui_core::Name;
 
-use crate::{EventId, NativeTypeId, PropertyId, SlotId, ValueType};
+use crate::{EventId, NativeTypeId, ObservationKind, PropertyId, SlotId, ValueType};
 
 /// Schema registration, validation, or construction failure.
 #[derive(Clone, Debug, PartialEq, thiserror::Error)]
@@ -29,6 +29,15 @@ pub enum SchemaError {
     },
     #[error("property `{property}` uses an absent or incompatible change event {event:?}")]
     InvalidChangeEvent { property: Name, event: EventId },
+    #[error(
+        "property `{property}` observes {observation:?} with type {actual:?}, expected {expected:?}"
+    )]
+    InvalidObservation {
+        property: Name,
+        observation: ObservationKind,
+        expected: ValueType,
+        actual: ValueType,
+    },
     #[error("native schema ID {0:?} is not registered")]
     UnknownNative(NativeTypeId),
     #[error("property ID {property:?} is not defined by native schema `{native}`")]
@@ -43,6 +52,8 @@ pub enum SchemaError {
         expected: ValueType,
         actual: ValueType,
     },
+    #[error("property `{0}` is read-only")]
+    ReadOnlyProperty(Name),
     #[error("required property `{property}` is missing")]
     MissingProperty { property: Name },
     #[error("property ID {0:?} was supplied more than once")]

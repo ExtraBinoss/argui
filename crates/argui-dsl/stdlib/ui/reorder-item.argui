@@ -1,0 +1,36 @@
+import { Button } from "@argui/ui"
+import { Column, FocusScope, KeyBinding, Rectangle, Row, Text } from "@argui/native"
+
+export component ReorderItem {
+    in property title: string
+    in property detail: string
+    in property accent: color = var(--argui-primary)
+    in property position: int
+    in property first: bool = false
+    in property last: bool = false
+    callback move_up(position: int)
+    callback move_down(position: int)
+
+    FocusScope {
+        role: "list_item"
+        accessible_name: title + " at position " + str(position + 1)
+        focus_on_tab_navigation: false
+        KeyBinding { shortcut: "ArrowUp" on activated { move_up(position) } }
+        KeyBinding { shortcut: "ArrowDown" on activated { move_down(position) } }
+        Rectangle { width: 100% height: 78px radius: 14.0 background: solid(var(--argui-surface)) border_color: var(--argui-border) border_width: 1.0
+            Row { width: 100% height: 78px padding: 10.0 gap: 12.0 align_items: "center"
+                Rectangle { width: 58px height: 58px radius: 10.0 background: solid(accent)
+                    Row { width: 58px height: 58px align_items: "center" justify_content: "center"
+                        Text { content: str(position + 1) color: var(--argui-primary-foreground) font_size: 22.0 weight: 700 }
+                    }
+                }
+                Column { grow: 1.0 min_width: 0.0 gap: 3.0
+                    Text { content: title color: var(--argui-foreground) font_size: 15.0 weight: 680 no_wrap: true }
+                    Text { content: detail color: var(--argui-muted-foreground) font_size: 12.0 no_wrap: true }
+                }
+                Button { text: "Up" variant: "outline" enabled: !first on click { move_up(position) } }
+                Button { text: "Down" variant: "outline" enabled: !last on click { move_down(position) } }
+            }
+        }
+    }
+}

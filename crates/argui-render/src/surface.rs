@@ -31,6 +31,7 @@ mod api;
 mod composite;
 mod effect_damage;
 mod effects;
+mod filter_shadow;
 mod retained;
 
 mod configure;

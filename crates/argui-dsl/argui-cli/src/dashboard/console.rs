@@ -188,6 +188,63 @@ impl DevConsole {
         })
     }
 
+    /// Shows the native client's Cargo build as a separate startup phase.
+    ///
+    /// # Errors
+    ///
+    /// Returns terminal output errors.
+    pub fn native_build_started(&mut self) -> io::Result<()> {
+        self.dispatch(
+            ["  Building native client with Cargo".into()],
+            |dashboard| {
+                dashboard.native_build_started();
+            },
+        )
+    }
+
+    /// Routes one Cargo progress frame or application output line to the dashboard.
+    ///
+    /// `message` is one carriage-return or newline-delimited child output frame.
+    ///
+    /// # Errors
+    ///
+    /// Returns terminal output errors.
+    pub fn application_output(&mut self, message: String) -> io::Result<()> {
+        let line = message.trim();
+        if let Some((completed, total, target)) = cargo_progress(line) {
+            return self.dispatch(
+                [format!("  Cargo {completed}/{total}: {target}")],
+                |dashboard| {
+                    dashboard.native_build_progress(target, Some((completed, total)));
+                },
+            );
+        }
+        if let Some(target) = line.strip_prefix("Compiling ") {
+            let target = target.split_whitespace().next().unwrap_or(target);
+            return self.dispatch([format!("  Compiling {target}")], |dashboard| {
+                dashboard.native_build_progress(target, None);
+            });
+        }
+        if line.starts_with("Running ") {
+            return self.dispatch([format!("  {line}")], |dashboard| {
+                dashboard.native_build_finished();
+            });
+        }
+        self.note(message, Color::Gray)
+    }
+
+    /// Redraws the elapsed native build time once per second while Cargo is active.
+    ///
+    /// # Errors
+    ///
+    /// Returns terminal output errors.
+    pub fn native_build_tick(&mut self) -> io::Result<()> {
+        if self.dashboard.native_build_tick() {
+            self.draw()?;
+        }
+        Ok(())
+    }
+
     /// Updates the connected native-client count and redraws it once.
     ///
     /// # Errors
@@ -275,6 +332,18 @@ impl DevConsole {
         }
         Ok(false)
     }
+}
+
+/// Extracts Cargo's exact completed/total count and current target from one progress frame.
+///
+/// `line` is a trimmed Cargo output frame; returns `None` for other output.
+fn cargo_progress(line: &str) -> Option<(usize, usize, &str)> {
+    let rest = line.strip_prefix("Building [")?.split_once("] ")?.1;
+    let (count, target) = rest.split_once(':')?;
+    let (completed, total) = count.trim().split_once('/')?;
+    let completed = completed.trim().parse().ok()?;
+    let total = total.trim().parse().ok()?;
+    Some((completed, total, target.trim()))
 }
 
 impl Drop for DevConsole {

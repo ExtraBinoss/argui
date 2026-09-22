@@ -6,8 +6,23 @@ mod virtual_list;
 #[path = "render/identity.rs"]
 mod assets;
 
+#[path = "render/evaluate.rs"]
+mod observation;
+
+#[path = "render/instance.rs"]
+mod path;
+
+#[path = "render/state.rs"]
+mod focus;
+
 #[path = "render/motion.rs"]
 mod motion;
+
+#[path = "render/effect.rs"]
+mod effect;
+
+#[path = "render/child_reference.rs"]
+mod child_reference;
 
 mod gradient {
     use std::collections::HashMap;
@@ -32,9 +47,9 @@ mod gradient {
     /// Live rendering preserves conic selection fill and repeated radial caret geometry.
     #[test]
     fn live_text_editor_accepts_generic_gradient_visuals() {
-        let source = r#"import { TextEditor } from "@argui/native"
+        let source = r#"import { TextInput } from "@argui/native"
 export component Main {
-    TextEditor {
+    TextInput {
         value: "Select this text"
         label: "Gradient editor"
         selection_fill: conic_gradient([#ff0000, #00ff00, #0000ff], [0.0, 0.4, 1.0], 0.5, 0.5, 45.0, "oklab")
@@ -243,10 +258,10 @@ export component Main { private property text: string = "ok" Text { content: tex
 
     #[test]
     fn dispatch_native_event_routes_nested_bindings_and_reports_unknown_sites() {
-        let source = r#"import { Pressable } from "@argui/native"
+        let source = r#"import { TouchArea } from "@argui/native"
 export component Main {
     private property count: int = 0
-    Pressable { label: "Go" on click { count += 1 } }
+    TouchArea { on click { count += 1 } }
 }
 "#;
         let compiled = compile(source);
@@ -485,7 +500,7 @@ export component Main {
             panic!("expected container element");
         };
         assert!(!children.is_empty());
-        *target = IrElementTarget::Native(argui_schema::builtin::TEXT_EDITOR);
+        *target = IrElementTarget::Native(argui_schema::builtin::TEXT_INPUT);
         let mut runtime = LiveRuntime::new(package).unwrap();
         runtime.mount(main.component, []).unwrap();
         let result = runtime.render();

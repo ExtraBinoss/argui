@@ -6,8 +6,9 @@ an unchecked exit gate still needs verification or work. Keep this file accurate
 as the language and examples evolve.
 
 The [Slint-style composition architecture plan](SLINT_COMPOSITION_ARCHITECTURE_PLAN.md)
-is a separate, future migration target; its proposed primitives and widgets
-must not be confused with the current delivery state below.
+tracks the composition migration. Its implemented boundary and historical
+baseline are recorded in the [composition inventory](composition-inventory.md).
+Unchecked gates below still require work or final verification.
 
 ## Phase A — Architecture contracts
 
@@ -71,7 +72,8 @@ must not be confused with the current delivery state below.
 ## Phase M — Live runtime
 
 - [x] AOT/live rendering and state migration have integration tests.
-- [ ] Repeat AOT/live parity after the final animation and virtual-list changes.
+- [x] AOT/live parity covers every gallery page, button/input/switch/theme
+  changes, overlays, slider drags, and private-display pixel captures.
 
 ## Phase N — Development service
 

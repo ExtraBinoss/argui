@@ -1,11 +1,7 @@
 //! Native and WebAssembly entry points for the Argui Spotlight example.
 
 #[cfg(target_os = "linux")]
-use std::{
-    fs::OpenOptions,
-    io::Write,
-    path::PathBuf,
-};
+use std::{fs::OpenOptions, io::Write, path::PathBuf};
 
 #[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
 use argui::platform::{
@@ -46,9 +42,7 @@ impl Drop for DevelopmentDesktopEntry {
         let Some(path) = self.path.take() else {
             return;
         };
-        if std::fs::read_to_string(&path)
-            .is_ok_and(|contents| contents == self.contents)
-        {
+        if std::fs::read_to_string(&path).is_ok_and(|contents| contents == self.contents) {
             let _ = std::fs::remove_file(path);
         }
     }

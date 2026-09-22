@@ -1,11 +1,63 @@
 use super::{
-    AnyEntity, Entity, ModelRuntime,
+    AnyEntity, Entity, ModelRuntime, RetainedIdentity, ViewUpdate,
     effects::{ContextEffects, merge_effects},
 };
+use std::collections::HashSet;
 
 pub(super) type ModelRuntimeVisitor = dyn Fn(&mut Vec<ModelRuntime>);
 
 impl<T: 'static> Entity<T> {
+    /// Publishes `snapshot` to this presentation and descendant handler contexts.
+    pub(crate) fn set_interaction_snapshot(&self, snapshot: &super::InteractionSnapshot) {
+        let presentation = &self.0.presentation;
+        presentation.interaction_snapshot.replace(snapshot.clone());
+        for child in presentation
+            .children
+            .borrow()
+            .iter()
+            .chain(presentation.event_routes.borrow().iter())
+        {
+            (child.set_interaction_snapshot)(snapshot);
+        }
+    }
+
+    /// Adds source identities read by this presentation and its children to `identities`.
+    pub(crate) fn collect_observed(&self, identities: &mut HashSet<RetainedIdentity>) {
+        let presentation = &self.0.presentation;
+        identities.extend(presentation.observed_identities.borrow().iter().cloned());
+        for child in presentation
+            .children
+            .borrow()
+            .iter()
+            .chain(presentation.event_routes.borrow().iter())
+        {
+            (child.collect_observed)(identities);
+        }
+    }
+
+    /// Invalidates presentations reading identities in `changed`.
+    /// Returns whether this presentation or a descendant was affected.
+    pub(crate) fn invalidate_observed(&self, changed: &HashSet<RetainedIdentity>) -> bool {
+        let presentation = &self.0.presentation;
+        let mut affected = presentation
+            .observed_identities
+            .borrow()
+            .iter()
+            .any(|identity| changed.contains(identity));
+        for child in presentation
+            .children
+            .borrow()
+            .iter()
+            .chain(presentation.event_routes.borrow().iter())
+        {
+            affected |= (child.invalidate_observed)(changed);
+        }
+        if affected {
+            presentation.cache.apply_update(ViewUpdate::Rebuild);
+        }
+        affected
+    }
+
     pub(super) fn bind_model_wake(&self, runtime: &ModelRuntime) {
         self.0.model.runtime.inherit_wake(runtime);
         let children: Vec<_> = self
@@ -56,6 +108,22 @@ impl<T: 'static> Entity<T> {
 }
 
 impl AnyEntity {
+    /// Publishes `snapshot` to all current event handlers before dispatch.
+    pub(crate) fn set_interaction_snapshot(&self, snapshot: &super::InteractionSnapshot) {
+        (self.set_interaction_snapshot)(snapshot);
+    }
+
+    /// Adds observed source identities in this presentation tree to `identities`.
+    pub(crate) fn collect_observed(&self, identities: &mut HashSet<RetainedIdentity>) {
+        (self.collect_observed)(identities);
+    }
+
+    /// Invalidates presentation caches reading identities in `changed`.
+    /// Returns whether any presentation was affected.
+    pub(crate) fn invalidate_observed(&self, changed: &HashSet<RetainedIdentity>) -> bool {
+        (self.invalidate_observed)(changed)
+    }
+
     pub(crate) fn set_model_wake(&self, wake: impl Fn() + 'static) {
         self.runtime.set_wake(wake);
         (self.bind_model_wake)(&self.runtime);

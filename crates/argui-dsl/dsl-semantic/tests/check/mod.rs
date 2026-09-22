@@ -79,14 +79,14 @@ fn disabled_icon_feature_is_diagnosed_at_import() {
 /// Covers optional/generic declarations and missing native properties.
 #[test]
 fn extracts_optional_declarations_and_reports_missing_native_inputs() {
-    let source = r##"import { Pressable } from "@argui/native"
+    let source = r##"import { Path } from "@argui/native"
 export struct Data {
     title: string?
     values: array<int>
 }
 export component App {
     private property data: optional<Data> = null
-    Pressable { on click { } }
+    Path { }
 }
 "##;
     let mut database = CompilerDatabase::with_builtins().unwrap();

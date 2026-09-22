@@ -159,6 +159,8 @@ pub struct StyleDefinition {
 pub struct EffectParameterDefinition {
     pub name: String,
     pub value_type: Type,
+    /// Whether the declaration supplies a value when an application omits it.
+    pub has_default: bool,
     pub span: Span,
 }
 
@@ -166,6 +168,8 @@ pub struct EffectParameterDefinition {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct EffectDefinition {
     pub shader: Option<String>,
+    /// Explicit promise that every shader sample stays inside its layer.
+    pub bounded_damage: bool,
     pub parameters: Vec<EffectParameterDefinition>,
 }
 

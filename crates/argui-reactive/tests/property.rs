@@ -47,3 +47,28 @@ fn updating_and_cancelling_observers_are_explicit() {
 
     assert_eq!(calls.borrow().as_slice(), ["ab"]);
 }
+
+#[test]
+fn in_place_mutation_keeps_string_storage_and_notifies_after_releasing_borrow() {
+    let mut initial = String::with_capacity(32);
+    initial.push_str("é🙂");
+    let value = Property::new(initial);
+    let pointer = value.with(|text| text.as_ptr());
+    let observed = value.clone();
+    let calls = Rc::new(RefCell::new(Vec::new()));
+    let output = Rc::clone(&calls);
+    let _subscription = value.observe(move |_| {
+        output.borrow_mut().push(observed.with(|text| text.clone()));
+    });
+
+    assert!(value.mutate(|text| {
+        text.replace_range(2..2, "中");
+        true
+    }));
+    assert_eq!(value.with(|text| text.as_ptr()), pointer);
+    assert_eq!(value.revision(), 1);
+    assert_eq!(calls.borrow().as_slice(), ["é中🙂"]);
+    assert!(!value.mutate(|_| false));
+    assert_eq!(value.revision(), 1);
+    assert_eq!(calls.borrow().len(), 1);
+}

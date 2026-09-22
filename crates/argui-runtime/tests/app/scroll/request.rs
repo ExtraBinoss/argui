@@ -1,7 +1,7 @@
 use argui_core::{Affine2D, Point, Rect, Size};
 use argui_layout::{LayoutNode, LayoutOutput, PortalLayout};
 use argui_paint::ClipChain;
-use argui_ui::{Element, ScrollConfig, ScrollRegion, UiTree, WindowLayer};
+use argui_ui::{Element, RetainedIdentity, ScrollConfig, ScrollRegion, UiTree, WindowLayer};
 
 #[path = "../../../src/app/scroll/request.rs"]
 mod implementation;
@@ -118,4 +118,42 @@ fn explicit_offset_and_rectangle_requests_keep_the_selected_region() {
     assert_eq!(rect.len(), 1);
     assert_eq!(rect[0].node, tree.node_ids()[1]);
     assert_eq!(rect[0].to.y, 140.0);
+}
+
+#[test]
+fn retained_identity_selects_one_of_two_same_key_scroll_views() {
+    use argui_ui::ScrollRequest;
+
+    let first = RetainedIdentity::new(100, 9);
+    let second = RetainedIdentity::new(101, 9);
+    let tree = UiTree::new(Element::container([
+        Element::container([])
+            .keyed("viewport")
+            .retained_identity(first.clone()),
+        Element::container([])
+            .keyed("viewport")
+            .retained_identity(second.clone()),
+    ]));
+    let mut layout = LayoutOutput::default();
+    layout.scroll_regions = vec![
+        region(tree.node_ids()[1], 0.0),
+        region(tree.node_ids()[2], 0.0),
+    ];
+
+    let tracks = scroll_tracks(
+        &tree,
+        &layout,
+        &ScrollRequest::offset(second, Point::new(0.0, 70.0)),
+    );
+    assert_eq!(tracks.len(), 1);
+    assert_eq!(tracks[0].node, tree.node_ids()[2]);
+    assert_eq!(tracks[0].to, Point::new(0.0, 70.0));
+    assert!(
+        scroll_tracks(
+            &tree,
+            &layout,
+            &ScrollRequest::offset(RetainedIdentity::new(999, 9), Point::new(0.0, 70.0)),
+        )
+        .is_empty()
+    );
 }

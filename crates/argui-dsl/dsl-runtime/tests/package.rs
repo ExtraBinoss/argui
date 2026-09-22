@@ -55,6 +55,7 @@ fn package_rejects_missing_and_invalid_assets_before_runtime_commit() {
         id: AssetId::from_raw(9),
         path: "images/icon.png".into(),
         kind: AssetKind::Image,
+        inline_bytes: None,
     };
     let mut project = empty_project();
     project.assets.push(asset.clone());
@@ -66,6 +67,7 @@ fn package_rejects_missing_and_invalid_assets_before_runtime_commit() {
     effect_project.effects.push(IrEffect {
         id: EffectId::from_raw(11),
         shader: AssetId::from_raw(11),
+        bounded_damage: false,
         parameters: Vec::new(),
         source: source(),
     });
@@ -87,6 +89,7 @@ fn package_rejects_missing_and_invalid_assets_before_runtime_commit() {
         id: AssetId::from_raw(10),
         path: "/bad path.png".into(),
         kind: AssetKind::Image,
+        inline_bytes: None,
     });
     let mut assets = HashMap::new();
     assets.insert(AssetId::from_raw(10), AssetPayload::new(1, vec![1]));
@@ -105,25 +108,30 @@ fn package_validates_shader_parameter_word_widths_and_source() {
         id: shader,
         path: "effects/glow.wgsl".into(),
         kind: AssetKind::Shader,
+        inline_bytes: None,
     });
     project.effects.push(IrEffect {
         id: EffectId::from_raw(21),
         shader,
+        bounded_damage: false,
         parameters: vec![
             IrEffectParameter {
                 id: PropertyId::from_raw(1),
+                name: "tint".into(),
                 value_type: IrType::Color,
                 default: None,
                 source: source(),
             },
             IrEffectParameter {
                 id: PropertyId::from_raw(2),
+                name: "matrix".into(),
                 value_type: IrType::Transform,
                 default: None,
                 source: source(),
             },
             IrEffectParameter {
                 id: PropertyId::from_raw(3),
+                name: "amount".into(),
                 value_type: IrType::Float,
                 default: None,
                 source: source(),
@@ -339,4 +347,60 @@ fn package_precompiles_expressions_from_components_themes_styles_and_effects() {
     }
     assert!(package.programs.len() >= 20);
     assert_eq!(package.shader_hashes.len(), 1);
+}
+
+/// A live shader keeps its registry revision on an identical reload and
+/// increments it when validated shader bytes change.
+#[test]
+fn effect_definitions_track_shader_revisions_across_reload() {
+    let shader = AssetId::from_raw(71);
+    let effect = EffectId::from_raw(72);
+    let mut project = empty_project();
+    project.assets.push(IrAsset {
+        id: shader,
+        path: "effects/glow.wgsl".into(),
+        kind: AssetKind::Shader,
+        inline_bytes: None,
+    });
+    project.effects.push(IrEffect {
+        id: effect,
+        shader,
+        bounded_damage: false,
+        parameters: vec![IrEffectParameter {
+            id: PropertyId::from_raw(73),
+            name: "amount".into(),
+            value_type: IrType::Float,
+            default: None,
+            source: source(),
+        }],
+        source: source(),
+    });
+    let compile = |generation, extra: &str| {
+        let shader_source = format!(
+            "fn argui_effect(_uv: vec2<f32>, source: vec4<f32>, _backdrop: vec4<f32>) -> vec4<f32> {{ return source * argui_param_f32(0u); }}{extra}"
+        );
+        LivePackage::prepare(
+            generation,
+            99,
+            project.clone(),
+            HashMap::from([(
+                shader,
+                AssetPayload::new(generation, shader_source.into_bytes()),
+            )]),
+        )
+        .unwrap()
+    };
+    let mut runtime = LiveRuntime::new(compile(1, "")).unwrap();
+    let definitions = runtime.effect_definitions();
+    assert_eq!(definitions.len(), 1);
+    assert_eq!(definitions[0].revision, 1);
+    assert_eq!(definitions[0].parameters[0].name.as_str(), "amount");
+
+    let same = runtime.prepare_reload(compile(2, "")).unwrap();
+    let _ = runtime.commit_reload(same);
+    assert_eq!(runtime.effect_definitions()[0].revision, 1);
+
+    let changed = runtime.prepare_reload(compile(3, "\n")).unwrap();
+    let _ = runtime.commit_reload(changed);
+    assert_eq!(runtime.effect_definitions()[0].revision, 2);
 }

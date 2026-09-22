@@ -34,21 +34,50 @@ impl LiveRuntime {
             let Some(host) = context.as_deref_mut() else {
                 continue;
             };
+            let observer = host.observation_reader();
+            let observed_sites = self
+                .package
+                .observed_sites
+                .get(&instance.component)
+                .cloned()
+                .unwrap_or_default();
             let statements = explicit
                 .map(|binding| binding.statements.clone())
                 .unwrap_or_default();
+            let parameter = explicit.and_then(|binding| binding.parameters.first().copied());
+            let payload_type = event_schema.payload;
+            let event_id = event_schema.id;
             let locals = locals.clone();
             let instance = instance.id;
             let handler = host.event_handler(move |runtime, event, host| {
+                runtime.pending_focus = None;
+                runtime.pending_scroll = None;
+                if let Some(mounted) = runtime.instances.get_mut(&instance) {
+                    for site in &observed_sites {
+                        let identity = argui_ui::RetainedIdentity::new(instance.raw(), site.raw());
+                        mounted.observations.insert(*site, observer.get(&identity));
+                    }
+                }
                 match runtime.deliver_native_event(
                     instance,
+                    event_id,
                     &statements,
                     locals.clone(),
+                    parameter,
+                    payload_type,
                     &updates,
                     event,
                 ) {
                     Ok(()) => runtime.event_error = None,
                     Err(error) => runtime.event_error = Some(error),
+                }
+                match runtime.pending_focus.take() {
+                    Some(argui_ui::FocusRequest::Next) => host.focus_next(),
+                    Some(argui_ui::FocusRequest::Previous) => host.focus_previous(),
+                    _ => {}
+                }
+                if let Some(request) = runtime.pending_scroll.take() {
+                    host.scroll(request);
                 }
                 host.notify();
             });
@@ -62,6 +91,11 @@ impl LiveRuntime {
 }
 
 impl argui_runtime::Render for LiveRuntime {
+    /// Returns the current validated effect definitions for renderer registration.
+    fn effect_definitions(&self) -> Vec<argui_render::EffectDefinition> {
+        LiveRuntime::effect_definitions(self)
+    }
+
     /// Renders the live package and preserves the last valid tree if evaluation fails.
     fn render(&mut self, context: &mut argui_runtime::Context<Self>) -> argui_ui::Element {
         #[cfg(not(target_arch = "wasm32"))]
@@ -102,7 +136,7 @@ impl argui_runtime::Render for LiveRuntime {
         self.property_motions.needs_frame()
     }
 
-    /// Captures laid-out VList heights and rebuilds only when measured geometry changed.
+    /// Captures laid-out VirtualWindow heights and rebuilds when geometry changes.
     ///
     /// `layout` contains source-identified bounds; `context` schedules a new tree
     /// when a virtual viewport must select a different mounted row window.

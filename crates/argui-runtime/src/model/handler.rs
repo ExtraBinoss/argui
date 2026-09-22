@@ -325,6 +325,7 @@ impl<T: Render> Entity<T> {
         let mut cx = Context {
             entity: Some(self.downgrade()),
             environment: self.0.presentation.environment.borrow().clone(),
+            observations: self.0.presentation.interaction_snapshot.clone(),
             event_target: Some(event.current_target()),
             ..Context::default()
         };

@@ -1,8 +1,8 @@
 use std::borrow::Cow;
 
-use argui_core::Rect;
+use argui_core::{Rect, Size};
 use argui_text::TextContent;
-use argui_ui::{Element, ElementKind, NodeId, UiTree};
+use argui_ui::{Element, ElementKind, NodeId, ScrollbarGutter, UiTree};
 
 use crate::engine::NodeMap;
 
@@ -46,6 +46,11 @@ pub(super) fn content<'a>(
     }
 }
 
+/// Clips editor paint before reserved scrollbar gutters without narrowing other text.
+///
+/// `node` supplies the resolved gutter and overflow, `element` identifies an editor,
+/// `parent` is the inherited clip, and `bounds` is the element's laid-out rectangle.
+/// Returns the intersection with the editor's visible area, if any.
 pub(super) fn clip(
     node: &NodeMap,
     element: &Element,
@@ -53,7 +58,31 @@ pub(super) fn clip(
     bounds: Rect,
 ) -> Option<Rect> {
     if matches!(element.kind, ElementKind::TextEditor { .. }) {
-        parent.and_then(|clip| clip.intersection(bounds))
+        let gutter = if node.style.scrollbar_gutter == ScrollbarGutter::Stable {
+            node.style.scrollbar_width.max(0.0)
+        } else {
+            0.0
+        };
+        let visible = Rect::new(
+            bounds.origin,
+            Size::new(
+                (bounds.size.width
+                    - if node.style.overflow.y.scrolls() {
+                        gutter
+                    } else {
+                        0.0
+                    })
+                .max(0.0),
+                (bounds.size.height
+                    - if node.style.overflow.x.scrolls() {
+                        gutter
+                    } else {
+                        0.0
+                    })
+                .max(0.0),
+            ),
+        );
+        parent.and_then(|clip| clip.intersection(visible))
     } else {
         crate::scroll::clipped(node, parent, bounds)
     }

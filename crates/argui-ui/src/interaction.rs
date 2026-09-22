@@ -5,6 +5,7 @@ use argui_paint::{ClipChain, CornerRadii};
 
 use crate::{CursorIcon, GestureSet, Sides, UiEventKind, VisualState, VisualStates};
 
+mod focus;
 mod pointer;
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -108,6 +109,8 @@ pub struct Interaction {
     pub focus_policy: crate::FocusPolicy,
     pub cursor: CursorIcon,
     pub gestures: GestureSet,
+    pub capture_on_press: bool,
+    pub focus_on_descendant_press: bool,
     pub keyboard_activation: KeyboardActivation,
     pub window_drag: Option<WindowDragBehavior>,
 }
@@ -119,6 +122,8 @@ impl Default for Interaction {
             focus_policy: crate::FocusPolicy::None,
             cursor: CursorIcon::Auto,
             gestures: GestureSet::EMPTY,
+            capture_on_press: false,
+            focus_on_descendant_press: false,
             keyboard_activation: KeyboardActivation::None,
             window_drag: None,
         }
@@ -144,6 +149,8 @@ impl Interaction {
             focus_policy: crate::FocusPolicy::None,
             cursor: CursorIcon::Auto,
             gestures: GestureSet::EMPTY,
+            capture_on_press: false,
+            focus_on_descendant_press: false,
             keyboard_activation: KeyboardActivation::None,
             window_drag: None,
         }
@@ -167,6 +174,30 @@ impl Interaction {
     #[must_use]
     pub const fn gestures(mut self, gestures: GestureSet) -> Self {
         self.gestures = gestures;
+        self
+    }
+
+    /// Captures the primary pointer when it presses this element.
+    ///
+    /// * `capture` — whether a successful press should keep routing moves and
+    ///   release to this element outside its hit region.
+    ///
+    /// Returns the updated policy; capture ends on release, cancellation, or host-window blur.
+    #[must_use]
+    pub const fn capture_on_press(mut self, capture: bool) -> Self {
+        self.capture_on_press = capture;
+        self
+    }
+
+    /// Focuses this element when an eligible descendant receives a pointer press.
+    ///
+    /// * `focus` — whether a press on a non-focusable descendant may focus this element.
+    ///
+    /// Returns the updated policy. This element must have a focusable policy
+    /// such as [`crate::FocusPolicy::TabStop`].
+    #[must_use]
+    pub const fn focus_on_descendant_press(mut self, focus: bool) -> Self {
+        self.focus_on_descendant_press = focus;
         self
     }
 
@@ -334,7 +365,7 @@ impl RawUpdate {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct InteractionState {
     hovered: HashMap<PointerId, NodeId>,
-    mouse_position: Option<Point>,
+    pointer_positions: HashMap<PointerId, Point>,
     pressed: HashMap<PointerId, pointer::PressRecord>,
     keyboard_pressed: Option<NodeId>,
     focused: Option<NodeId>,
@@ -361,8 +392,8 @@ impl InteractionState {
     /// Returns the most recently observed mouse position.
     ///
     /// Returns `None` before the tree receives a mouse position or after the pointer leaves.
-    pub(crate) const fn mouse_position(&self) -> Option<Point> {
-        self.mouse_position
+    pub(crate) fn mouse_position(&self) -> Option<Point> {
+        self.pointer_positions.get(&PointerId::MOUSE).copied()
     }
 
     pub fn visual_states(&self, node: NodeId) -> VisualStates {
@@ -384,41 +415,6 @@ impl InteractionState {
             states.insert(VisualState::Pressed);
         }
         states
-    }
-
-    pub fn focus_pressed(
-        &mut self,
-        pointer: PointerId,
-        regions: &[HitRegion],
-        preserve_on_background: bool,
-    ) -> RawUpdate {
-        let target = self
-            .pressed
-            .get(&pointer)
-            .map(|press| press.target)
-            .filter(|target| {
-                regions.iter().any(|region| {
-                    region.node == *target && region.enabled && region.focus_policy.is_focusable()
-                })
-            });
-        let Some(target) = target else {
-            return if preserve_on_background {
-                RawUpdate::default()
-            } else {
-                self.clear_focus()
-            };
-        };
-        let mut update = RawUpdate::default();
-        let focus_changed = self.focused != Some(target);
-        self.release_keyboard(&mut update, None);
-        if focus_changed {
-            if let Some(previous) = self.focused.replace(target) {
-                update.push(previous, UiEventKind::Blurred);
-            }
-            update.push(target, UiEventKind::Focused);
-        }
-        self.focus_visible = false;
-        update
     }
 
     pub fn focus_next(&mut self, regions: &[HitRegion], backwards: bool) -> RawUpdate {
@@ -547,6 +543,11 @@ impl InteractionState {
             self.focus_visible = false;
         }
         self.captured.retain(|_, node| ids.contains(node));
+        self.pointer_positions.retain(|pointer, _| {
+            *pointer == PointerId::MOUSE
+                || self.hovered.contains_key(pointer)
+                || self.captured.contains_key(pointer)
+        });
     }
 
     fn release_keyboard(

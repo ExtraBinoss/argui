@@ -304,6 +304,9 @@ fn text_area_shapes_and_clips_scrollable_content_with_a_live_scrollbar() {
     assert!(scroll.max_offset.y > 0.0);
     let scrollbar = scroll.scrollbar.as_ref().unwrap();
     let scrollbar = scrollbar.vertical.as_ref().unwrap();
+    let text_right = region.viewport.origin.x + region.viewport.size.width;
+    assert!(text_right <= scrollbar.track.origin.x);
+    assert!(region.clip.origin.x + region.clip.size.width <= scrollbar.track.origin.x);
     assert_eq!(scrollbar.track.origin.y, scroll.bounds.origin.y + 7.0);
     assert_eq!(
         scrollbar.track.origin.x + scrollbar.track.size.width,
@@ -321,6 +324,15 @@ fn text_area_shapes_and_clips_scrollable_content_with_a_live_scrollbar() {
     assert!(output.scroll_regions[0].max_offset.y > 0.0);
     assert!(output.scroll_regions[0].scrollbar.is_some());
     let region = &output.text_inputs[0];
+    let track = output.scroll_regions[0]
+        .scrollbar
+        .as_ref()
+        .unwrap()
+        .vertical
+        .as_ref()
+        .unwrap()
+        .track;
+    assert!(region.viewport.origin.x + region.viewport.size.width <= track.origin.x);
     let prepared = text.prepare(&output.text, 1.0);
     let first_y = prepared.glyphs.iter().map(|glyph| glyph.y).min().unwrap();
     let last_y = prepared.glyphs.iter().map(|glyph| glyph.y).max().unwrap();
@@ -345,6 +357,8 @@ fn text_area_shapes_and_clips_scrollable_content_with_a_live_scrollbar() {
     layout.apply_scroll(&ui, &mut output).unwrap();
     assert!(output.text.blocks()[0].bounds.origin.y > before);
     assert!(output.scroll_regions[0].scrollbar.is_some());
+    let clip = output.text_inputs[0].clip;
+    assert!(clip.origin.x + clip.size.width <= track.origin.x);
 }
 
 #[test]

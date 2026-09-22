@@ -124,3 +124,116 @@ fn semantic_value_and_visibility_edges_have_actionable_diagnostics() {
         .is_err()
     );
 }
+
+mod observations {
+    use argui_core::{Key, Modifiers, Point, ScrollDelta};
+    use argui_runtime::{Context, Render};
+    use argui_testing::TestApp;
+    use argui_ui::{
+        Axes, Element, FocusPolicy, Interaction, Overflow, RetainedIdentity, VisualState, length,
+    };
+
+    struct ObservedSurface;
+
+    impl Render for ObservedSurface {
+        /// Displays a focusable visual surface and its current retained states.
+        ///
+        /// * `cx` — render context supplying the current observation snapshot.
+        fn render(&mut self, cx: &mut Context<Self>) -> Element {
+            let identity = RetainedIdentity::new(1, 1);
+            let observed = cx.observed_interaction(&identity);
+            let hovered = observed.states.contains(VisualState::Hovered);
+            let focused = observed.states.contains(VisualState::Focused);
+            let pointer_x = observed.pointer_position.map_or(-1.0, |point| point.x);
+            Element::column([
+                Element::container([])
+                    .keyed("surface")
+                    .retained_identity(identity)
+                    .interaction(Interaction::default().focus_policy(FocusPolicy::TabStop))
+                    .width(length(100.0))
+                    .height(length(60.0)),
+                Element::text(format!(
+                    "hovered={hovered} focused={focused} pointer_x={pointer_x}"
+                )),
+            ])
+        }
+    }
+
+    #[test]
+    fn pointer_motion_refreshes_observed_hover_and_local_position() {
+        let mut app = TestApp::new(ObservedSurface);
+        app.assert_text("hovered=false focused=false pointer_x=-1");
+
+        app.pointer_move(Point::new(20.0, 20.0)).unwrap();
+        app.assert_text("hovered=true focused=false pointer_x=20");
+
+        app.pointer_move(Point::new(40.0, 20.0)).unwrap();
+        app.assert_text("hovered=true focused=false pointer_x=40");
+
+        app.pointer_move(Point::new(200.0, 20.0)).unwrap();
+        app.assert_text("hovered=false focused=false pointer_x=-1");
+    }
+
+    #[test]
+    fn click_and_keyboard_focus_refresh_observed_focus() {
+        let mut app = TestApp::new(ObservedSurface);
+        app.click("surface").unwrap();
+        app.assert_text("focused=true");
+
+        app.blur().unwrap();
+        app.assert_text("focused=false");
+
+        app.key(Key::Tab, Modifiers::default()).unwrap();
+        app.assert_text("focused=true");
+    }
+
+    struct ObservedScrollSurface;
+
+    impl Render for ObservedScrollSurface {
+        /// Renders a scroll container and its retained scroll observation.
+        ///
+        /// * `cx` — render context supplying the current scroll snapshot.
+        fn render(&mut self, cx: &mut Context<Self>) -> Element {
+            let identity = RetainedIdentity::new(2, 1);
+            let observed = cx.observed_interaction(&identity);
+            let scroll_y = observed.scroll.map_or(-1.0, |scroll| scroll.offset.y);
+            let viewport_h = observed
+                .scroll
+                .map_or(-1.0, |scroll| scroll.viewport.height);
+            let content_h = observed.scroll.map_or(-1.0, |scroll| scroll.content.height);
+            Element::column([
+                Element::column([Element::container([])
+                    .width(length(100.0))
+                    .height(length(200.0))
+                    .shrink(0.0)])
+                .keyed("scroll")
+                .retained_identity(identity)
+                .width(length(100.0))
+                .height(length(50.0))
+                .overflow(Axes {
+                    x: Overflow::Hidden,
+                    y: Overflow::Auto,
+                }),
+                Element::text(format!(
+                    "scroll_y={scroll_y} viewport_h={viewport_h} content_h={content_h}"
+                )),
+            ])
+        }
+    }
+
+    #[test]
+    fn wheel_refreshes_retained_scroll_observation() {
+        let mut app = TestApp::new(ObservedScrollSurface);
+        app.assert_text("scroll_y=0 viewport_h=50 content_h=200");
+
+        let bounds = app.bounds("scroll").unwrap();
+        app.wheel(
+            Point::new(bounds.origin.x + 10.0, bounds.origin.y + 10.0),
+            ScrollDelta::Pixels(Point::new(0.0, -40.0)),
+        )
+        .unwrap();
+        let offset = app.scroll_offset("scroll").unwrap().y;
+        assert!(offset > 0.0);
+        app.assert_text(&format!("scroll_y={offset}"));
+    }
+}

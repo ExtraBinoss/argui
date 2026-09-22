@@ -26,6 +26,12 @@ fn effect_layers_are_explicit_and_compute_conservative_bounds() {
     assert_eq!(layer.expanded_bounds().size, Size::new(188.0, 138.0));
     assert!(!LayerStyle::new(bounds()).requires_offscreen());
     assert_eq!(Filter::Contrast(2.0).expansion(), 0.0);
+    let shadow_filter = Filter::DropShadow(Shadow::drop([4.0, -6.0], 8.0, Color::BLACK));
+    assert_eq!(shadow_filter.expansion(), 30.0);
+    assert_eq!(
+        shadow_filter.scaled(2.0),
+        Filter::DropShadow(Shadow::drop([8.0, -12.0], 16.0, Color::BLACK))
+    );
 
     let scaled = layer.scaled(1.5);
     assert_eq!(scaled.bounds.origin, Point::new(30.0, 45.0));

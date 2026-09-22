@@ -49,6 +49,17 @@ impl LiveRuntime {
             .find(|component| component.id == instance.component)
             .cloned()
             .ok_or(RuntimeError::MissingComponent(instance.component.raw()))?;
+        if let Some(sites) = self.package.observed_sites.get(&definition.id) {
+            for site in sites {
+                let identity = argui_ui::RetainedIdentity::new(instance_id.raw(), site.raw());
+                let observation = context.as_deref().map_or_else(Default::default, |host| {
+                    host.observed_interaction(&identity)
+                });
+                instance.observations.insert(*site, observation);
+            }
+        }
+        self.prepare_child_references(&mut instance, &definition, context)?;
+        self.refresh_derived_defaults(&mut instance, &definition)?;
         let result = self
             .apply_own_animations(&mut instance, &definition, context)
             .and_then(|()| {

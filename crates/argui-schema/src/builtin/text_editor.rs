@@ -1,18 +1,19 @@
 //! Accessible controlled text editing with themeable native paint properties.
 
 use argui_paint::{CornerRadii, Fill, QuadStyle};
-use argui_text::{TextColor, TextStyle};
+use argui_text::{TextColor, TextStyle, TextWrap};
 use argui_ui::{
-    CaretAlign, CaretHeight, CaretPrimitive, CaretStyle, CaretVisual, CursorIcon, Element,
-    EventType, FocusPolicy, GestureSet, Interaction, Role, SemanticAction, SemanticState,
-    SemanticValue, Semantics, TextEditorSpec, TextInputFilter,
+    Axes, CaretAlign, CaretHeight, CaretPrimitive, CaretStyle, CaretVisual, CursorIcon, Element,
+    EventType, FocusPolicy, GestureSet, Interaction, Overflow, Role, ScrollConfig,
+    ScrollPropagation, ScrollbarGutter, ScrollbarPartStyle, ScrollbarStyle, ScrollbarVisibility,
+    SemanticAction, SemanticState, SemanticValue, Semantics, TextEditorSpec, TextInputFilter,
 };
 
 use super::{
     BLUR, CARET_BLINK, CARET_COLOR, CARET_COUNT, CARET_FILL, CARET_HEIGHT, CARET_OFFSET_Y,
     CARET_RADIUS, CARET_SPACING, CARET_WIDTH, DESCRIPTION, ENABLED, FOCUS, INPUT_CHANGED,
-    INPUT_PLACEHOLDER, INVALID, KEY, LABEL, PLACEHOLDER_COLOR, READ_ONLY, SEARCH_INPUT,
-    SELECTION_COLOR, SUBMIT, TEXT_COLOR, TEXT_EDITOR, VALUE,
+    INPUT_PLACEHOLDER, INVALID, KEY, LABEL, MAX_DIGITS, MULTILINE, PLACEHOLDER_COLOR, READ_ONLY,
+    SEARCH_INPUT, SELECTION_COLOR, SUBMIT, TEXT_COLOR, TEXT_EDIT, TEXT_INPUT, VALUE,
     common::{
         CommonProperty, apply_common, apply_events, common_event, common_property, optional_bool,
         optional_string, required_string,
@@ -23,7 +24,7 @@ use crate::{
     ValueType,
 };
 
-/// Registers the accessible controlled text-editing primitive.
+/// Registers the accessible TextInput primitive backed by the editor engine.
 ///
 /// * `registry` — canonical native registry receiving the editor schema and adapter.
 ///
@@ -32,15 +33,15 @@ use crate::{
 /// Returns when the schema conflicts with another registered native definition.
 pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError> {
     let schema = NativeSchema::new(
-        TEXT_EDITOR,
-        "TextEditor",
-        "Accessible controlled text-editing behavior.",
+        TEXT_INPUT,
+        "TextInput",
+        "Accessible controlled text editing, IME, selection, and caret behavior.",
     )
     .property(common_property(CommonProperty::Key))
     .property(
         PropertySchema::new(VALUE, "value", ValueType::String, "Controlled text value.")
             .default_value(SchemaValue::String(String::new()))
-            .changed_by(INPUT_CHANGED),
+            .changed_by(TEXT_EDIT),
     )
     .property(
         PropertySchema::new(
@@ -78,6 +79,24 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
         )
         .default_value(SchemaValue::Bool(false)),
     )
+    .property(
+        PropertySchema::new(
+            MULTILINE,
+            "multiline",
+            ValueType::Bool,
+            "Allow line breaks and vertically editable text.",
+        )
+        .default_value(SchemaValue::Bool(false)),
+    )
+    .property(
+        PropertySchema::new(
+            MAX_DIGITS,
+            "max_digits",
+            ValueType::Int,
+            "Accept only ASCII digits up to this length when positive.",
+        )
+        .default_value(SchemaValue::Int(0)),
+    )
     .property(PropertySchema::new(
         LABEL,
         "label",
@@ -101,8 +120,12 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     )
     .property(common_property(CommonProperty::Width))
     .property(common_property(CommonProperty::Height))
+    .property(common_property(CommonProperty::X))
+    .property(common_property(CommonProperty::Y))
     .property(common_property(CommonProperty::Rotation))
     .property(common_property(CommonProperty::Opacity))
+    .property(common_property(CommonProperty::BackdropFilter))
+    .property(common_property(CommonProperty::Visible))
     .property(common_property(CommonProperty::Background))
     .property(common_property(CommonProperty::SelectionFill))
     .property(common_property(CommonProperty::SelectionRadius))
@@ -174,6 +197,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
         "Whether to use the standard blinking timeline.",
     ))
     .event(common_event(INPUT_CHANGED, "input", EventType::Input).payload(ValueType::String))
+    .event(common_event(TEXT_EDIT, "edit", EventType::TextEdit))
     .event(common_event(SUBMIT, "submit", EventType::Submit).payload(ValueType::String))
     .event(common_event(FOCUS, "focus", EventType::Focus))
     .event(common_event(BLUR, "blur", EventType::Blur));
@@ -196,9 +220,14 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
         if let Some(SchemaValue::Color(color)) = input.get(PLACEHOLDER_COLOR) {
             placeholder_style.color = *color;
         }
+        let multiline = optional_bool(input, MULTILINE).unwrap_or(false);
         let mut input_style = TextStyle::default();
         if let Some(SchemaValue::Color(color)) = input.get(TEXT_COLOR) {
             input_style.color = *color;
+        }
+        if multiline {
+            input_style.wrap = TextWrap::WordOrGlyph;
+            placeholder_style.wrap = TextWrap::WordOrGlyph;
         }
         let role = if optional_bool(input, SEARCH_INPUT) == Some(true) {
             Role::SearchInput
@@ -273,12 +302,17 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
         if optional_bool(input, CARET_BLINK) == Some(false) {
             caret.animation = None;
         }
-        let element = Element::text_editor(TextEditorSpec {
+        let mut element = Element::text_editor(TextEditorSpec {
             value,
             placeholder,
-            multiline: false,
+            multiline,
             read_only,
-            filter: TextInputFilter::Any,
+            filter: match input.get(MAX_DIGITS) {
+                Some(SchemaValue::Int(maximum)) if *maximum > 0 => TextInputFilter::Digits {
+                    max_length: (*maximum).min(u16::MAX as i64) as u16,
+                },
+                _ => TextInputFilter::Any,
+            },
             text: input_style,
             placeholder_text: placeholder_style,
             selection,
@@ -301,6 +335,38 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
                 ),
         )
         .semantics(semantics);
-        Ok(apply_events(apply_common(element, input), input))
+        if multiline {
+            let thumb_color = match input.get(TEXT_COLOR) {
+                Some(SchemaValue::Color(color)) => color.with_alpha(0.48),
+                _ => argui_core::Color::srgba(0.45, 0.48, 0.53, 0.7),
+            };
+            let scrollbar = ScrollbarStyle::new(
+                ScrollbarPartStyle::new(QuadStyle::solid(argui_core::Color::TRANSPARENT)),
+                ScrollbarPartStyle::new(
+                    QuadStyle::solid(thumb_color).radius(CornerRadii::all(999.0)),
+                ),
+            )
+            .width(8.0)
+            .insets(argui_ui::Sides {
+                left: 4.0,
+                right: 4.0,
+                top: 4.0,
+                bottom: 22.0,
+            })
+            .min_thumb(24.0)
+            .visibility(ScrollbarVisibility::Always);
+            element = element
+                .overflow(Axes {
+                    x: Overflow::Hidden,
+                    y: Overflow::Auto,
+                })
+                .scrollbar_gutter(ScrollbarGutter::Stable)
+                .scroll_config(
+                    ScrollConfig::default()
+                        .propagation(ScrollPropagation::Contain)
+                        .scrollbar(scrollbar),
+                );
+        }
+        Ok(apply_events(apply_common(element, input)?, input))
     })
 }

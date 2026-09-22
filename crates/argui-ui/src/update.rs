@@ -103,6 +103,8 @@ fn visual_update(old: &Element, new: &Element) -> Option<TreeUpdate> {
         || old.z_index != new.z_index;
     if paint {
         Some(TreeUpdate::Paint)
+    } else if old.declared_scroll_offset != new.declared_scroll_offset {
+        Some(TreeUpdate::Scroll)
     } else if (old.transform != new.transform
         || old.transform_origin != new.transform_origin
         || layer_composition(old) != layer_composition(new))

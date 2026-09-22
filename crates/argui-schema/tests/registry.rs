@@ -128,40 +128,42 @@ fn required_slot_arity_is_enforced() {
 fn native_event_handlers_are_validated_and_attached_by_id() {
     let registry = builtin::registry().unwrap();
     let handler = EventHandler::from_identity(EventHandlerId::new(EventOwnerId(7), 3));
-    let button = registry
+    let area = registry
         .construct(
-            builtin::PRESSABLE,
+            builtin::TOUCH_AREA,
             &NativeElementInput::new()
                 .property(builtin::KEY, SchemaValue::String("save".into()))
-                .property(builtin::LABEL, SchemaValue::String("Save".into()))
                 .event(NativeEventValue::new(builtin::CLICK, handler)),
         )
         .unwrap();
-    assert_eq!(button.event_listeners.len(), 1);
-    assert_eq!(button.event_listeners[0].event, EventType::Click);
+    assert_eq!(area.event_listeners.len(), 1);
+    assert_eq!(area.event_listeners[0].event, EventType::Click);
 
     let unknown = registry
         .construct(
-            builtin::PRESSABLE,
+            builtin::TOUCH_AREA,
             &NativeElementInput::new()
                 .property(builtin::KEY, SchemaValue::String("save".into()))
-                .property(builtin::LABEL, SchemaValue::String("Save".into()))
                 .event(NativeEventValue::new(EventId::from_raw(99), handler)),
         )
         .unwrap_err();
     assert!(matches!(unknown, SchemaError::UnknownEvent { .. }));
 }
 
-/// Disabled press behavior retains a label but cannot receive pointer or keyboard focus.
+/// A composed control can disable focus while retaining accessible semantics.
 #[test]
-fn disabled_pressable_has_noninteractive_accessible_semantics() {
+fn disabled_focus_scope_has_noninteractive_accessible_semantics() {
     let registry = builtin::registry().unwrap();
     let disabled = registry
         .construct(
-            builtin::PRESSABLE,
+            builtin::FOCUS_SCOPE,
             &NativeElementInput::new()
                 .property(builtin::KEY, SchemaValue::String("disabled".into()))
-                .property(builtin::LABEL, SchemaValue::String("Disabled".into()))
+                .property(builtin::SEMANTIC_ROLE, SchemaValue::String("button".into()))
+                .property(
+                    builtin::SEMANTIC_LABEL,
+                    SchemaValue::String("Disabled".into()),
+                )
                 .property(builtin::ENABLED, SchemaValue::Bool(false)),
         )
         .unwrap();
@@ -179,47 +181,45 @@ fn disabled_pressable_has_noninteractive_accessible_semantics() {
     );
 }
 
-/// Busy selection triggers expose correct accessibility and suppress tooltips.
+/// A generic focus scope exposes composed selection semantics.
 #[test]
-fn busy_select_trigger_is_inert_and_expanded() {
+fn focus_scope_exposes_busy_and_expanded_selection_semantics() {
     let registry = builtin::registry().unwrap();
     let trigger = registry
         .construct(
-            builtin::PRESSABLE,
+            builtin::FOCUS_SCOPE,
             &NativeElementInput::new()
                 .property(builtin::KEY, SchemaValue::String("theme".into()))
-                .property(builtin::LABEL, SchemaValue::String("Theme".into()))
                 .property(
-                    builtin::TOOLTIP,
-                    SchemaValue::String("Choose appearance".into()),
+                    builtin::SEMANTIC_ROLE,
+                    SchemaValue::String("combo_box".into()),
                 )
+                .property(builtin::SEMANTIC_LABEL, SchemaValue::String("Theme".into()))
                 .property(builtin::BUSY, SchemaValue::Bool(true))
-                .property(builtin::SELECT_TRIGGER, SchemaValue::Bool(true))
+                .property(builtin::SEMANTIC_EXPANDABLE, SchemaValue::Bool(true))
                 .property(builtin::EXPANDED, SchemaValue::Bool(true)),
         )
         .unwrap();
     let semantics = trigger.semantics.as_ref().unwrap();
     assert_eq!(semantics.role, argui_ui::Role::ComboBox);
     assert!(semantics.state.busy);
-    assert!(semantics.state.disabled);
     assert_eq!(semantics.state.expanded, Some(true));
-    assert!(trigger.tooltip.is_none());
     assert!(
         trigger
             .interaction
             .as_ref()
-            .is_some_and(|value| !value.enabled)
+            .is_some_and(|value| value.enabled)
     );
 }
 
-/// The DSL popover primitive creates an anchored portal with dismiss handling.
+/// The generic popup primitive creates an anchored portal with dismiss handling.
 #[test]
-fn popover_panel_keeps_its_anchor_and_dismiss_listener() {
+fn popup_window_keeps_its_anchor_and_dismiss_listener() {
     let registry = builtin::registry().unwrap();
     let handler = EventHandler::from_identity(EventHandlerId::new(EventOwnerId(9), 1));
     let panel = registry
         .construct(
-            builtin::POPOVER_PANEL,
+            builtin::POPUP_WINDOW,
             &NativeElementInput::new()
                 .property(builtin::ANCHOR, SchemaValue::String("theme-anchor".into()))
                 .property(builtin::KEY, SchemaValue::String("theme-options".into()))
@@ -249,6 +249,33 @@ fn two_way_property_requires_a_compatible_declared_event() {
         })
         .unwrap_err();
     assert!(matches!(error, SchemaError::InvalidChangeEvent { .. }));
+}
+
+#[test]
+fn payloadless_change_events_are_reserved_for_string_text_edits() {
+    for (value_type, event_type) in [
+        (ValueType::Bool, EventType::TextEdit),
+        (ValueType::String, EventType::Input),
+    ] {
+        let event = EventId::from_raw(1);
+        let schema = NativeSchema::new(NativeTypeId::from_raw(93), "Editor", "Editor")
+            .property(
+                PropertySchema::new(PropertyId::from_raw(1), "value", value_type, "Value")
+                    .changed_by(event),
+            )
+            .event(EventSchema::new(
+                event,
+                "changed",
+                event_type,
+                "Change event",
+            ));
+        let error = SchemaRegistry::new()
+            .register(schema, |_input: &NativeElementInput| {
+                Ok(Element::container([]))
+            })
+            .unwrap_err();
+        assert!(matches!(error, SchemaError::InvalidChangeEvent { .. }));
+    }
 }
 
 #[test]

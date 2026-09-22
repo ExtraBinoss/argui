@@ -1,0 +1,34 @@
+import { Card } from "@argui/ui"
+import { Pagination } from "@argui/ui/pagination.argui"
+import { Column, Text } from "@argui/native"
+
+export component PaginationPage {
+    private property page: int = 1
+
+    Column {
+        width: 100%
+        gap: 24.0
+        Text { content: "Pagination" color: var(--argui-foreground) weight: 700 font_size: 27.0 }
+        Text { content: "Browse a bounded set of results with page numbers, Previous and Next." color: var(--argui-muted-foreground) font_size: 14.0 }
+
+        Card {
+            Column { width: 100% gap: 18.0
+                Text { content: "Library notes" color: var(--argui-foreground) weight: 700 font_size: 18.0 }
+                Text { content: "Page " + str(page) + " of 12 · 36 notes" color: var(--argui-muted-foreground) font_size: 13.0 }
+                for offset in [1, 2, 3] key offset {
+                    Column { gap: 4.0
+                        Text { content: str((page - 1) * 3 + offset) + "  " + (offset == 1 ? "Navigation patterns" : offset == 2 ? "Designing with contrast" : "A shared component library") color: var(--argui-foreground) weight: 600 font_size: 15.0 }
+                        Text { content: "Notes from the design system" color: var(--argui-muted-foreground) font_size: 13.0 }
+                    }
+                }
+                Pagination { page <=> page total: 12 }
+            }
+        }
+
+        Column { gap: 9.0
+            Text { content: "Only one page" color: var(--argui-foreground) weight: 600 font_size: 16.0 }
+            Text { content: "Navigation stays visible when there is nowhere else to go." color: var(--argui-muted-foreground) font_size: 13.0 }
+            Pagination { page: 1 total: 1 }
+        }
+    }
+}

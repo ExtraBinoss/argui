@@ -15,6 +15,14 @@ pub(crate) struct ResolvedNode {
 }
 
 impl<A: Render> TestApp<A> {
+    /// Returns the settled retained tree for paint and portal assertions.
+    ///
+    /// The returned tree reflects the most recent input and render pass.
+    #[must_use]
+    pub fn rendered_tree(&self) -> &argui_ui::UiTree {
+        self.ui()
+    }
+
     /// Returns the current renderer-independent accessibility snapshot.
     #[must_use]
     pub fn semantics(&self) -> SemanticTree {

@@ -189,6 +189,16 @@ fn filter_fields(prefix: &str, filter: &Filter, output: &mut Vec<StyleField>) {
                 push(&format!("matrix {index}"), *value);
             }
         }
+        Filter::DropShadow(shadow) => {
+            push("offset x", shadow.offset[0]);
+            push("offset y", shadow.offset[1]);
+            push("blur", shadow.blur);
+            let [red, green, blue, alpha] = shadow.color.to_srgba();
+            push("red", red);
+            push("green", green);
+            push("blue", blue);
+            push("alpha", alpha);
+        }
         Filter::Refraction(value) => {
             push("strength", value.strength);
             push("chromatic aberration", value.chromatic_aberration);

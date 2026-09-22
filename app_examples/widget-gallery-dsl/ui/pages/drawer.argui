@@ -1,0 +1,28 @@
+import { Button, Drawer } from "@argui/ui"
+import { Column, Text } from "@argui/native"
+
+export component DrawerPage {
+    private property open: bool = false
+
+    Column #drawer_page {
+        width: 100%
+        gap: 18.0
+
+        Text { content: "Drawer" color: var(--argui-foreground) weight: 700 font_size: 27.0 }
+        Text { content: "Open a panel for details without leaving the page." color: var(--argui-muted-foreground) font_size: 14.0 }
+        Button { text: "Open project details" on click { open = true } }
+        Text { content: open ? "Project details are open" : "Project details are closed" color: var(--argui-muted-foreground) font_size: 13.0 }
+
+        Drawer {
+            open: open
+            title: "Project details"
+            description: "Keep context while viewing a collection."
+            on dismiss { open = false }
+            Column { gap: 10.0
+                Text { content: "Summer collection" color: var(--argui-foreground) font_size: 20.0 weight: 700 }
+                Text { content: "12 designs · Updated today" color: var(--argui-muted-foreground) font_size: 14.0 }
+                Button { text: "Done" variant: "outline" on click { open = false } }
+            }
+        }
+    }
+}

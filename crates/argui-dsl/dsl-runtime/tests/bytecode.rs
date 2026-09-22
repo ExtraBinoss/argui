@@ -2,7 +2,8 @@ use std::collections::{BTreeMap, HashMap};
 
 use argui_dsl_ir::{
     BinaryOperator, BuiltinFunction, CallbackId, ExpressionId, FieldId, IrExpression,
-    IrExpressionKind, IrType, IrValue, LocalId, PropertyId, SourceInfo, TokenId, UnaryOperator,
+    IrExpressionKind, IrObservation, IrType, IrValue, LocalId, PropertyId, SiteId, SourceInfo,
+    TokenId, UnaryOperator,
 };
 use argui_dsl_runtime::{DslValue, EvaluationContext, Instruction, Program, RuntimeError};
 use argui_dsl_syntax::{FileId, Span, TextRange, TextSize};
@@ -73,11 +74,16 @@ struct Context {
     translated: HashMap<String, String>,
     callbacks: HashMap<CallbackId, DslValue>,
     callback_arguments: Vec<(CallbackId, Vec<DslValue>)>,
+    observations: HashMap<SiteId, DslValue>,
 }
 
 impl EvaluationContext for Context {
     fn property(&self, id: PropertyId) -> Option<DslValue> {
         self.properties.get(&id).cloned()
+    }
+
+    fn observed(&self, site: SiteId, _observation: IrObservation) -> Option<DslValue> {
+        self.observations.get(&site).cloned()
     }
 
     fn local(&self, id: LocalId) -> Option<DslValue> {

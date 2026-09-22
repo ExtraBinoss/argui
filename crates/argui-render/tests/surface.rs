@@ -3,9 +3,9 @@
 #[path = "gpu_canvas/pipeline.rs"]
 mod gpu_canvas;
 
-use std::sync::{
-    Arc,
-    atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
+use std::{
+    cell::Cell,
+    sync::{Arc, atomic::Ordering},
 };
 
 use argui_core::{Affine2D, Color, Point, Rect, Size};
@@ -15,23 +15,27 @@ use argui_paint::{
 };
 use argui_render::{
     DamageMode, DamageTracking, EffectDamage, EffectDefinition, EffectPassDefinition,
-    EffectRegistry, GpuCanvasDeviceContext, GpuCanvasDiagnosticKind, GpuCanvasError,
-    GpuCanvasFactory, GpuCanvasRegistration, GpuCanvasRegistry, GpuCanvasRenderContext,
-    GpuCanvasRenderer, GpuCanvasRequirements, RenderStatus, RendererConfig, RendererError,
-    SurfaceRenderer,
+    EffectRegistry, GpuCanvasDiagnosticKind, GpuCanvasRegistration, GpuCanvasRegistry,
+    RenderStatus, RendererConfig, RendererError, SurfaceRenderer,
 };
 use winit::{
     application::ApplicationHandler,
     event::WindowEvent,
     event_loop::{ActiveEventLoop, EventLoop},
-    platform::{pump_events::EventLoopExtPumpEvents, wayland::EventLoopBuilderExtWayland},
+    platform::{
+        pump_events::EventLoopExtPumpEvents, wayland::EventLoopBuilderExtWayland,
+        x11::EventLoopBuilderExtX11,
+    },
     window::{Window, WindowId},
 };
 
 #[path = "surface/effect_damage.rs"]
 mod effect_damage;
+#[path = "surface/composite.rs"]
+mod headless;
 #[path = "surface/api.rs"]
 mod helpers;
+use gpu_canvas::{CanvasProbe, ComputeFactory, RequiredFeatureFactory, RequiredLimitFactory};
 use helpers::*;
 
 const SHADER: &str = "fn argui_effect(uv: vec2<f32>, source: vec4<f32>, backdrop: vec4<f32>) -> vec4<f32> { return source * 0.5; }";
@@ -43,230 +47,13 @@ fn effect_passes() -> [EffectPassDefinition; 2] {
     ]
 }
 
-const COMPUTE_SHADER: &str = r#"
-@group(0) @binding(0) var<storage, read_write> output: array<vec4<f32>, 1>;
-@compute @workgroup_size(1)
-fn main() { output[0] = vec4<f32>(0.08, 0.6, 0.25, 0.8); }
-"#;
-const CANVAS_SHADER: &str = r#"
-@group(0) @binding(0) var<storage, read> color: array<vec4<f32>, 1>;
-@vertex
-fn vertex(@builtin(vertex_index) index: u32) -> @builtin(position) vec4<f32> {
-    let positions = array<vec2<f32>, 3>(
-        vec2<f32>(-1.0, -1.0), vec2<f32>(3.0, -1.0), vec2<f32>(-1.0, 3.0));
-    return vec4<f32>(positions[index], 0.0, 1.0);
-}
-@fragment
-fn fragment() -> @location(0) vec4<f32> { return color[0]; }
-"#;
-
-#[derive(Default)]
-struct CanvasProbe {
-    creates: AtomicUsize,
-    renders: AtomicUsize,
-    extent: AtomicU64,
-    create_fail: AtomicBool,
-    fail: AtomicBool,
-}
-
-struct ComputeFactory(Arc<CanvasProbe>);
-
-struct RequiredFeatureFactory;
-
-impl GpuCanvasFactory for RequiredFeatureFactory {
-    fn requirements(&self) -> GpuCanvasRequirements {
-        GpuCanvasRequirements::default()
-            .required_features(wgpu::Features::TEXTURE_COMPRESSION_BC)
-            .reason("validates shared-device capability rejection")
-    }
-
-    fn create(
-        &self,
-        _context: &GpuCanvasDeviceContext<'_>,
-    ) -> Result<Box<dyn GpuCanvasRenderer>, GpuCanvasError> {
-        Err(GpuCanvasError::new(
-            "shared device validation should run before factory creation",
-        ))
-    }
-}
-
-impl GpuCanvasFactory for ComputeFactory {
-    fn create(
-        &self,
-        context: &GpuCanvasDeviceContext<'_>,
-    ) -> Result<Box<dyn GpuCanvasRenderer>, GpuCanvasError> {
-        self.0.creates.fetch_add(1, Ordering::Relaxed);
-        if self.0.create_fail.load(Ordering::Relaxed) {
-            return Err(GpuCanvasError::new(
-                "intentional integration-test factory failure",
-            ));
-        }
-        Ok(Box::new(ComputeRenderer::new(context, self.0.clone())))
-    }
-}
-
-struct ComputeRenderer {
-    probe: Arc<CanvasProbe>,
-    compute: wgpu::ComputePipeline,
-    compute_group: wgpu::BindGroup,
-    render: wgpu::RenderPipeline,
-    render_group: wgpu::BindGroup,
-    _color: wgpu::Buffer,
-}
-
-impl ComputeRenderer {
-    fn new(context: &GpuCanvasDeviceContext<'_>, probe: Arc<CanvasProbe>) -> Self {
-        let device = context.device();
-        let color = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("argui-test-canvas-color"),
-            size: 16,
-            usage: wgpu::BufferUsages::STORAGE,
-            mapped_at_creation: false,
-        });
-        let compute_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("argui-test-canvas-compute-layout"),
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::COMPUTE,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Storage { read_only: false },
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            }],
-        });
-        let render_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("argui-test-canvas-render-layout"),
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Storage { read_only: true },
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            }],
-        });
-        let group = |label, layout: &wgpu::BindGroupLayout| {
-            device.create_bind_group(&wgpu::BindGroupDescriptor {
-                label: Some(label),
-                layout,
-                entries: &[wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: color.as_entire_binding(),
-                }],
-            })
-        };
-        let compute_group = group("argui-test-canvas-compute-group", &compute_layout);
-        let render_group = group("argui-test-canvas-render-group", &render_layout);
-        let compute_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("argui-test-canvas-compute"),
-            source: wgpu::ShaderSource::Wgsl(COMPUTE_SHADER.into()),
-        });
-        let compute_pipeline_layout =
-            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("argui-test-canvas-compute-pipeline-layout"),
-                bind_group_layouts: &[Some(&compute_layout)],
-                immediate_size: 0,
-            });
-        let compute = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-            label: Some("argui-test-canvas-compute-pipeline"),
-            layout: Some(&compute_pipeline_layout),
-            module: &compute_module,
-            entry_point: Some("main"),
-            compilation_options: Default::default(),
-            cache: None,
-        });
-        let render_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("argui-test-canvas-render"),
-            source: wgpu::ShaderSource::Wgsl(CANVAS_SHADER.into()),
-        });
-        let render_pipeline_layout =
-            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("argui-test-canvas-render-pipeline-layout"),
-                bind_group_layouts: &[Some(&render_layout)],
-                immediate_size: 0,
-            });
-        let render = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("argui-test-canvas-render-pipeline"),
-            layout: Some(&render_pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &render_module,
-                entry_point: Some("vertex"),
-                compilation_options: Default::default(),
-                buffers: &[],
-            },
-            primitive: Default::default(),
-            depth_stencil: None,
-            multisample: Default::default(),
-            fragment: Some(wgpu::FragmentState {
-                module: &render_module,
-                entry_point: Some("fragment"),
-                compilation_options: Default::default(),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: context.target_format(),
-                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            multiview_mask: None,
-            cache: None,
-        });
-        Self {
-            probe,
-            compute,
-            compute_group,
-            render,
-            render_group,
-            _color: color,
-        }
-    }
-}
-
-impl GpuCanvasRenderer for ComputeRenderer {
-    fn render(&mut self, context: &mut GpuCanvasRenderContext<'_>) -> Result<(), GpuCanvasError> {
-        self.probe.renders.fetch_add(1, Ordering::Relaxed);
-        let [width, height] = context.physical_extent();
-        self.probe.extent.store(
-            (u64::from(width) << 32) | u64::from(height),
-            Ordering::Relaxed,
-        );
-        if self.probe.fail.load(Ordering::Relaxed) {
-            return Err(GpuCanvasError::new("intentional integration-test failure"));
-        }
-        let (encoder, target) = context.encoder_and_target();
-        {
-            let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor::default());
-            pass.set_pipeline(&self.compute);
-            pass.set_bind_group(0, &self.compute_group, &[]);
-            pass.dispatch_workgroups(1, 1, 1);
-        }
-        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("argui-test-canvas-render-pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: target,
-                depth_slice: None,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Load,
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            ..Default::default()
-        });
-        pass.set_pipeline(&self.render);
-        pass.set_bind_group(0, &self.render_group, &[]);
-        pass.draw(0..3, 0..1);
-        Ok(())
-    }
-}
-
 #[test]
-#[ignore = "Native surface integration: requires a dedicated Wayland test display"]
+#[ignore = "Native surface stress: set ARGUI_SURFACE_STRESS=1 on a working compositor"]
 fn native_surface_grows_its_atlas_recovers_from_capacity_and_uses_custom_effects() {
-    struct TestApp(Option<Arc<Window>>, bool);
+    if std::env::var_os("ARGUI_SURFACE_STRESS").is_none() {
+        return;
+    }
+    struct TestApp(Option<Arc<Window>>);
     impl ApplicationHandler for TestApp {
         fn resumed(&mut self, event_loop: &ActiveEventLoop) {
             let window = Arc::new(
@@ -274,39 +61,66 @@ fn native_surface_grows_its_atlas_recovers_from_capacity_and_uses_custom_effects
                     .create_window(
                         Window::default_attributes()
                             .with_title("Argui renderer tests")
-                            .with_inner_size(winit::dpi::PhysicalSize::new(256, 256)),
+                            .with_inner_size(winit::dpi::PhysicalSize::new(256, 256))
+                            .with_visible(false),
                     )
                     .unwrap(),
             );
-            window.request_redraw();
             self.0 = Some(window);
         }
 
-        fn window_event(&mut self, _: &ActiveEventLoop, _: WindowId, event: WindowEvent) {
-            self.1 |= matches!(event, WindowEvent::RedrawRequested);
-        }
+        fn window_event(&mut self, _: &ActiveEventLoop, _: WindowId, _: WindowEvent) {}
     }
-    let mut event_loop = EventLoop::builder()
-        .with_wayland()
-        .with_any_thread(true)
-        .build()
-        .unwrap();
-    let mut app = TestApp(None, false);
+    let mut builder = EventLoop::builder();
+    if std::env::var("ARGUI_TEST_BACKEND").as_deref() == Ok("x11") {
+        builder.with_x11();
+        EventLoopBuilderExtX11::with_any_thread(&mut builder, true);
+    } else {
+        builder.with_wayland();
+        EventLoopBuilderExtWayland::with_any_thread(&mut builder, true);
+    }
+    let mut event_loop = builder.build().unwrap();
+    let mut app = TestApp(None);
     let deadline = web_time::Instant::now() + NATIVE_TIMEOUT;
-    while !app.1 {
+    while app.0.is_none() {
         event_loop.pump_app_events(Some(std::time::Duration::from_millis(16)), &mut app);
         assert!(
             web_time::Instant::now() < deadline,
-            "window was not configured"
+            "test window was not created"
         );
     }
     let window = app.0.as_ref().unwrap().clone();
-    exercise(window, || {
-        event_loop.pump_app_events(Some(std::time::Duration::from_millis(16)), &mut app);
+    exercise(window.clone(), |render| {
+        let mut frame = FrameEvent {
+            window_id: window.id(),
+            render,
+            outcome: None,
+        };
+        event_loop.pump_app_events(Some(std::time::Duration::from_millis(16)), &mut frame);
+        frame.outcome
     });
 }
 
-fn exercise(window: Arc<Window>, mut pump: impl FnMut()) {
+struct FrameEvent<'a> {
+    window_id: WindowId,
+    render: &'a mut dyn FnMut() -> helpers::FrameResult,
+    outcome: Option<helpers::FrameResult>,
+}
+
+impl ApplicationHandler for FrameEvent<'_> {
+    fn resumed(&mut self, _: &ActiveEventLoop) {}
+
+    fn window_event(&mut self, _: &ActiveEventLoop, id: WindowId, event: WindowEvent) {
+        if id == self.window_id && matches!(event, WindowEvent::RedrawRequested) {
+            self.outcome = Some((self.render)());
+        }
+    }
+}
+
+fn exercise(
+    window: Arc<Window>,
+    mut pump: impl FnMut(&mut dyn FnMut() -> helpers::FrameResult) -> Option<helpers::FrameResult>,
+) {
     let effect = EffectId::new("test.half");
     let unused = EffectId::new("test.unused");
     let registry = EffectRegistry::new([
@@ -327,22 +141,21 @@ fn exercise(window: Arc<Window>, mut pump: impl FnMut()) {
     let canvas_registration =
         GpuCanvasRegistration::new("test.compute-canvas", ComputeFactory(probe.clone()));
     let canvas_id = canvas_registration.id();
+    probe.canvas.store(canvas_id.get(), Ordering::Relaxed);
     let retry_probe = Arc::new(CanvasProbe::default());
     retry_probe.create_fail.store(true, Ordering::Relaxed);
     let retry_registration =
         GpuCanvasRegistration::new("test.creation-retry", ComputeFactory(retry_probe.clone()));
     let retry_id = retry_registration.id();
+    retry_probe.canvas.store(retry_id.get(), Ordering::Relaxed);
     let canvas_registry =
         GpuCanvasRegistry::new([canvas_registration, retry_registration]).unwrap();
     let size = window.inner_size();
-    let mut config = RendererConfig::default()
+    let config = RendererConfig::default()
         .profiling(true)
         .effects(registry)
         .gpu_canvas_cache_bytes(16 * 1024)
         .gpu_canvases(canvas_registry);
-    // This test submits many frames without application work between them. An
-    // automatic non-vsync mode avoids depending on compositor frame throttling.
-    config.present_mode = wgpu::PresentMode::AutoNoVsync;
     let mut renderer = pollster::block_on(SurfaceRenderer::new(
         window.clone(),
         size.width,
@@ -350,23 +163,13 @@ fn exercise(window: Arc<Window>, mut pump: impl FnMut()) {
         config,
     ))
     .unwrap();
-    let required = GpuCanvasRegistration::new("test.required-feature", RequiredFeatureFactory);
-    let incompatible = pollster::block_on(SurfaceRenderer::new_with_device(
-        window.clone(),
-        size.width,
-        size.height,
-        RendererConfig::default().gpu_canvases(GpuCanvasRegistry::new([required]).unwrap()),
-        renderer.device_handle(),
-    ));
-    assert!(matches!(
-        incompatible,
-        Err(RendererError::IncompatibleGpuCanvasDevice { canvas, .. })
-            if canvas == "test.required-feature"
-    ));
+    window.set_visible(true);
+    window.request_redraw();
     effect_damage::exercise_compositor(&mut renderer, &window, &mut pump);
 
+    let scale_factor = Cell::new(1.0);
     let mut render = |renderer: &mut SurfaceRenderer, list: &DisplayList| {
-        render(renderer, list, &window, &mut pump)
+        helpers::render_at_scale(renderer, list, &window, &mut pump, scale_factor.get())
     };
     render(&mut renderer, &DisplayList::new()).unwrap();
     assert_eq!(renderer.last_profile().damage.mode, DamageMode::Full);
@@ -436,13 +239,17 @@ fn exercise(window: Arc<Window>, mut pump: impl FnMut()) {
         render(&mut renderer, &vectors(&assets, 512.0)),
         Err(RendererError::VectorAtlasFull)
     ));
+    // The expected preparation error discarded an acquired swapchain image.
+    // Reconfigure the private-display surface before checking atlas recovery.
+    assert!(renderer.resize(size.width + 1, size.height));
+    assert!(renderer.resize(size.width, size.height));
     render(&mut renderer, &small).unwrap();
     assert_eq!(
         renderer.last_profile().vector_atlas.allocated_bytes,
         2048 * 2048 * 4
     );
 
-    for id in [effect.clone(), effect, unused.clone()] {
+    for id in [effect.clone(), effect.clone(), unused.clone()] {
         let mut list = DisplayList::new();
         list.begin_layer(LayerStyle::new(bounds(32.0)).filter(Filter::Effect(
             EffectInstance::new(
@@ -472,6 +279,33 @@ fn exercise(window: Arc<Window>, mut pump: impl FnMut()) {
         Err(RendererError::MissingEffect(id)) if id == EffectId::new("test.missing")
     ));
 
+    let replacement = EffectRegistry::new([EffectDefinition::new(
+        effect.clone(),
+        Vec::<argui_render::EffectParameter>::new(),
+        [EffectPassDefinition::fragment("replacement", SHADER)],
+    )
+    .with_revision(2)])
+    .unwrap();
+    renderer.replace_effect_registry(replacement).unwrap();
+    let mut replaced = DisplayList::new();
+    replaced.begin_layer(LayerStyle::new(bounds(32.0)).filter(Filter::Effect(
+        EffectInstance::new(
+            effect.clone(),
+            std::iter::empty::<argui_paint::EffectArgument>(),
+        ),
+    )));
+    replaced.push_vector(vector(assets[0].id, 32.0));
+    replaced.end_layer();
+    render(&mut renderer, &replaced).unwrap();
+    assert!(renderer.last_profile().effects.filter_passes >= 1);
+    renderer
+        .replace_effect_registry(EffectRegistry::default())
+        .unwrap();
+    assert!(matches!(
+        render(&mut renderer, &replaced),
+        Err(RendererError::MissingEffect(id)) if id == effect
+    ));
+
     gpu_canvas::exercise(
         &mut renderer,
         canvas_id,
@@ -481,4 +315,65 @@ fn exercise(window: Arc<Window>, mut pump: impl FnMut()) {
         &window,
         &mut render,
     );
+
+    let mut canvas_only = DisplayList::new();
+    canvas_only.push_gpu_canvas(canvas_primitive(canvas_id, 9, Size::new(8.0, 6.0), 35));
+    for invalid_scale in [0.0, f32::NAN] {
+        scale_factor.set(invalid_scale);
+        render(&mut renderer, &canvas_only).unwrap();
+        assert!(
+            renderer
+                .take_gpu_canvas_diagnostics()
+                .iter()
+                .any(|diagnostic| diagnostic.message.contains("invalid window scale factor"))
+        );
+    }
+    scale_factor.set(1.0);
+    assert_ne!(probe.generation.load(Ordering::Relaxed), 0);
+    assert_eq!(
+        probe.generation.load(Ordering::Relaxed),
+        retry_probe.generation.load(Ordering::Relaxed)
+    );
+
+    // Additional WGPU surfaces on the same window can invalidate presentation,
+    // so perform the rejected-device probes after all rendered frames.
+    let required = GpuCanvasRegistration::new("test.required-feature", RequiredFeatureFactory);
+    let incompatible = pollster::block_on(SurfaceRenderer::new_with_device(
+        window.clone(),
+        size.width,
+        size.height,
+        RendererConfig::default().gpu_canvases(GpuCanvasRegistry::new([required]).unwrap()),
+        renderer.device_handle(),
+    ));
+    assert!(matches!(
+        incompatible,
+        Err(RendererError::IncompatibleGpuCanvasDevice { canvas, .. })
+            if canvas == "test.required-feature"
+    ));
+
+    let required_limit = GpuCanvasRegistration::new("test.required-limit", RequiredLimitFactory);
+    let limit_registry = GpuCanvasRegistry::new([required_limit]).unwrap();
+    let incompatible_limit = pollster::block_on(SurfaceRenderer::new_with_device(
+        window.clone(),
+        size.width,
+        size.height,
+        RendererConfig::default().gpu_canvases(limit_registry.clone()),
+        renderer.device_handle(),
+    ));
+    assert!(matches!(
+        incompatible_limit,
+        Err(RendererError::IncompatibleGpuCanvasDevice { canvas, message })
+            if canvas == "test.required-limit" && message.contains("max_bind_groups")
+    ));
+    let unavailable_limit = pollster::block_on(SurfaceRenderer::new(
+        window.clone(),
+        size.width,
+        size.height,
+        RendererConfig::default().gpu_canvases(limit_registry),
+    ));
+    assert!(matches!(
+        unavailable_limit,
+        Err(RendererError::GpuCanvasCapability { canvas, message })
+            if canvas == "test.required-limit" && message.contains("max_bind_groups")
+    ));
 }

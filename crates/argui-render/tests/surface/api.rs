@@ -12,6 +12,11 @@ use winit::window::Window;
 
 const NATIVE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 
+pub(super) type FrameResult = Result<RenderStatus, RendererError>;
+
+pub(super) type FramePump<'a> =
+    dyn FnMut(&mut dyn FnMut() -> FrameResult) -> Option<FrameResult> + 'a;
+
 pub(super) fn canvas_list(
     id: GpuCanvasId,
     revision: u64,
@@ -80,17 +85,45 @@ pub(super) fn render(
     renderer: &mut SurfaceRenderer,
     list: &DisplayList,
     window: &Window,
-    pump: &mut impl FnMut(),
+    pump: &mut FramePump<'_>,
+) -> Result<(), RendererError> {
+    render_at_scale(renderer, list, window, pump, 1.0)
+}
+
+/// Presents `list` with `renderer` in `window` at logical-to-physical `scale_factor`.
+///
+/// `pump` runs the render callback on a window redraw. Returns after a frame is
+/// presented.
+///
+/// # Errors
+/// Returns an error if frame acquisition or rendering fails.
+pub(super) fn render_at_scale(
+    renderer: &mut SurfaceRenderer,
+    list: &DisplayList,
+    window: &Window,
+    pump: &mut FramePump<'_>,
+    scale_factor: f32,
 ) -> Result<(), RendererError> {
     let mut text = TextEngine::from_embedded_fonts([], "sans-serif", "serif", "monospace");
     let deadline = web_time::Instant::now() + NATIVE_TIMEOUT;
     loop {
         window.request_redraw();
-        pump();
-        let status =
-            renderer.render_ui_notified(&mut text, &PreparedText::default(), list, 1.0, || {
-                window.pre_present_notify()
-            })?;
+        let Some(status) = pump(&mut || {
+            renderer.render_ui_notified(
+                &mut text,
+                &PreparedText::default(),
+                list,
+                scale_factor,
+                || {},
+            )
+        }) else {
+            assert!(
+                web_time::Instant::now() < deadline,
+                "redraw callback did not arrive"
+            );
+            continue;
+        };
+        let status = status?;
         if status == RenderStatus::Presented {
             return Ok(());
         }

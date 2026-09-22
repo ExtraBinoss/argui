@@ -1,0 +1,59 @@
+import { Button } from "@argui/ui"
+import { Column, Container, PopupWindow, Rectangle, Row, Text, TouchArea } from "@argui/native"
+
+export component Drawer {
+    in property open: bool = false
+    in property title: string = ""
+    in property description: string = ""
+    in property width: length = 360px
+    callback dismiss()
+    slot content
+
+    PopupWindow {
+        visible: open
+        placement: "fill"
+        window_layer: "modal"
+        containment: "modal"
+        dismiss_policy: "escape"
+        width: 100%
+        height: 100%
+        on dismiss { dismiss() }
+
+        Rectangle {
+            width: 100%
+            height: 100%
+            background: solid(#0b10264d)
+            Row {
+                width: 100%
+                height: 100%
+                Container {
+                    grow: 1.0
+                    height: 100%
+                    TouchArea { width: 100% height: 100% on click { dismiss() } }
+                }
+                Rectangle {
+                    width: width
+                    height: 100%
+                    background: solid(var(--argui-surface))
+                    border_color: var(--argui-border)
+                    border_width: 1.0
+                    Column {
+                        width: 100%
+                        height: 100%
+                        padding: 24.0
+                        gap: 16.0
+                        Row { width: 100% align_items: "center" gap: 12.0
+                            Text { content: title color: var(--argui-foreground) font_size: 22.0 weight: 700 }
+                            Container { grow: 1.0 }
+                            Button { text: "Close" variant: "outline" on click { dismiss() } }
+                        }
+                        if description != "" {
+                            Text { content: description color: var(--argui-muted-foreground) font_size: 14.0 }
+                        }
+                        content
+                    }
+                }
+            }
+        }
+    }
+}

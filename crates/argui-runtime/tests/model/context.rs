@@ -3,9 +3,45 @@ use argui_runtime::{
     tasks::{TaskError, TaskRuntime},
 };
 use argui_ui::Element;
-use std::{cell::Cell, rc::Rc, sync::mpsc, time::Duration};
+use std::sync::mpsc;
+#[cfg(not(target_arch = "wasm32"))]
+use std::{cell::Cell, rc::Rc, time::Duration};
 
 struct TaskLeaf;
+
+#[derive(Default)]
+struct CaptureProbe {
+    outside_handler: (bool, bool),
+    inside_handler: (bool, bool),
+}
+
+impl Render for CaptureProbe {
+    /// Records capture availability while building a view and handling a click.
+    fn render(&mut self, cx: &mut Context<Self>) -> Element {
+        let pointer = argui_core::PointerId::MOUSE;
+        self.outside_handler = (cx.capture_pointer(pointer), cx.release_pointer(pointer));
+        Element::text("capture").on(cx.listener(argui_ui::EventType::Click, |model, _, cx| {
+            let pointer = argui_core::PointerId::MOUSE;
+            model.inside_handler = (cx.capture_pointer(pointer), cx.release_pointer(pointer));
+        }))
+    }
+}
+
+/// Pointer capture requests require a current event target.
+#[test]
+fn pointer_capture_is_rejected_during_render_and_accepted_in_a_handler() {
+    let model = Entity::new(CaptureProbe::default());
+    let mount = model.mount().unwrap();
+    let mut tree = argui_ui::UiTree::new(mount.render(Default::default()).unwrap());
+    assert_eq!(model.read(|probe| probe.outside_handler), (false, false));
+    for delivery in tree.event_deliveries(
+        tree.node_ids()[0],
+        argui_ui::UiEventKind::Click(argui_ui::ClickEvent::accessibility()),
+    ) {
+        mount.dispatch_event(&delivery).unwrap();
+    }
+    assert_eq!(model.read(|probe| probe.inside_handler), (true, true));
+}
 
 impl Render for TaskLeaf {
     /// Renders a routed task owner with no native window dependency.
@@ -74,6 +110,7 @@ fn context_task_runtime() -> (TaskRuntime, mpsc::Receiver<()>) {
 /// Drains one pending task notification into the model thread.
 ///
 /// `runtime` owns the pending completion and `wake` receives its signal.
+#[cfg(not(target_arch = "wasm32"))]
 fn drain_task(runtime: &TaskRuntime, wake: &mpsc::Receiver<()>) {
     wake.recv_timeout(Duration::from_secs(5)).unwrap();
     runtime.drain();

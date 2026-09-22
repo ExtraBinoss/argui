@@ -20,10 +20,9 @@ use values::properties;
 impl Application {
     #[cfg_attr(coverage_nightly, coverage(off))]
     pub(crate) fn inspected_view(&self) -> Option<Element> {
-        let mut root = self
-            .model
-            .as_ref()
-            .map(|model| model.render(self.environment.clone()))?;
+        let mut root = self.model.as_ref().map(|model| {
+            model.render(self.environment.clone(), self.interaction_snapshot.clone())
+        })?;
         #[cfg(all(feature = "webview", target_os = "linux"))]
         if let Some(host) = self.window.as_ref().and_then(|window| window.gtk()) {
             let radius = host.platform.corner_radius();
@@ -487,6 +486,17 @@ fn apply_filter_fields(
                     *current = value;
                 }
             }
+        }
+        Filter::DropShadow(shadow) => {
+            set_filter_value(&mut shadow.offset[0], value("offset x"));
+            set_filter_value(&mut shadow.offset[1], value("offset y"));
+            set_filter_value(&mut shadow.blur, value("blur"));
+            let [mut red, mut green, mut blue, mut alpha] = shadow.color.to_srgba();
+            set_filter_value(&mut red, value("red"));
+            set_filter_value(&mut green, value("green"));
+            set_filter_value(&mut blue, value("blue"));
+            set_filter_value(&mut alpha, value("alpha"));
+            shadow.color = Color::srgba(red, green, blue, alpha);
         }
         Filter::Refraction(current) => {
             if let Some(value) = value("strength") {

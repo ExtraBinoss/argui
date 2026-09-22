@@ -8,6 +8,7 @@ mod model;
 mod path;
 mod tooling;
 mod types;
+pub mod vector_path;
 
 pub use db::{CompilerDatabase, QueryStats};
 pub use diagnostic::{Diagnostic, DiagnosticCode, Severity};

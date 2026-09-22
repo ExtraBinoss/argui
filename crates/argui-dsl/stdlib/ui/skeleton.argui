@@ -1,0 +1,20 @@
+import { Rectangle } from "@argui/native"
+
+export component Skeleton {
+    in property width: length = 200px
+    in property height: length = 16px
+    in property radius: float = 6.0
+    in property animated: bool = true
+    private property pulse: float = 1.0
+
+    animate pulse { duration: 2000ms iterations: "infinite" keyframes { 0%: 1.0 50%: 0.5 100%: 1.0 } }
+
+    Rectangle {
+        width: width
+        height: height
+        min_width: 0.0
+        radius: radius
+        background: solid(var(--argui-muted))
+        opacity: animated ? pulse : 1.0
+    }
+}

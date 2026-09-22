@@ -19,14 +19,64 @@ fn visible_text(element: &Element, output: &mut Vec<String>) {
     }
 }
 
+/// VirtualWindow lazily mounts the same bounded keyed rows as the DSL ListView.
+#[test]
+fn live_virtual_window_mounts_only_visible_rows() {
+    let compiled = Compiler::compile(
+        [SourceModule::new(
+            "ui/main.argui",
+            r#"import { VirtualWindow, Text } from "@argui/native"
+export component Main {
+    in property items: model<string>
+    private property offset: float = 0.0
+    VirtualWindow #viewport { row_height: 20.0 viewport_height: 60.0 overscan: 2 offset <=> offset
+        for item in items key item { Text { content: item } }
+    }
+}"#,
+        )],
+        "ui/main.argui",
+        |_| Err("no external assets".into()),
+    )
+    .unwrap();
+    let root = compiled.roots[0];
+    let definition = compiled
+        .ir
+        .components
+        .iter()
+        .find(|part| part.id == root)
+        .unwrap();
+    let items = definition.properties[0].id;
+    let offset = definition.properties[1].id;
+    let package =
+        LivePackage::prepare(1, compiled.public_api_hash, compiled.ir, HashMap::new()).unwrap();
+    let mut runtime = LiveRuntime::new(package).unwrap();
+    let values = (0..1000)
+        .map(|index| DslValue::String(format!("row-{index}")))
+        .collect();
+    let instance = runtime
+        .mount(root, [(items, DslValue::Array(values))])
+        .unwrap();
+    let mut visible = Vec::new();
+    visible_text(&runtime.render().unwrap(), &mut visible);
+    assert!(visible.len() <= 12, "mounted {} rows", visible.len());
+    assert!(visible.iter().any(|value| value == "row-0"));
+    runtime
+        .set_property(instance, offset, DslValue::Float(2000.0))
+        .unwrap();
+    visible.clear();
+    visible_text(&runtime.render().unwrap(), &mut visible);
+    assert!(visible.len() <= 12, "mounted {} rows", visible.len());
+    assert!(visible.iter().any(|value| value == "row-100"));
+}
+
 #[test]
 fn live_virtual_list_mounts_only_visible_model_rows_and_moves_its_window() {
-    let source = r#"import { VList, Text } from "@argui/native"
+    let source = r#"import { VirtualWindow, Text } from "@argui/native"
 export component Main {
     in property items: model<string>
     private property row_height: float = 20.0
     private property offset: float = 0.0
-    VList #rows {
+    VirtualWindow #rows {
         row_height: row_height
         viewport_height: 60.0
         overscan: 2
@@ -98,11 +148,11 @@ export component Main {
 #[test]
 fn live_virtual_list_recomputes_its_window_from_layout_height() {
     let compiled = Compiler::compile(
-        [SourceModule::new("ui/main.argui", r#"import { VList, Text } from "@argui/native"
+        [SourceModule::new("ui/main.argui", r#"import { VirtualWindow, Text } from "@argui/native"
 export component Main {
     private property items: array<string> = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"]
     private property offset: float = 0.0
-    VList #measured { row_height: 20.0 height: 100% overscan: 1
+    VirtualWindow #measured { row_height: 20.0 height: 100% overscan: 1
         offset <=> offset
         for item in items key item { Text { content: item } }
     }
@@ -149,7 +199,7 @@ export component Main {
 
 #[test]
 fn template_lists_with_equal_row_keys_keep_handlers_and_instances_independent() {
-    let source = r#"import { VirtualList, Button } from "@argui/ui"
+    let source = r#"import { ListView, Button } from "@argui/ui"
 import { Column } from "@argui/native"
 export component Main {
     private property items: array<string> = ["same"]
@@ -160,14 +210,14 @@ export component Main {
     Column {
         width: 100%
         height: 100%
-        VirtualList #left {
+        ListView #left {
             row_height: 40.0
             offset <=> left_offset
             for item in items key item {
                 Button { text: "Left " + item on click { left_selected = item } }
             }
         }
-        VirtualList #right {
+        ListView #right {
             row_height: 40.0
             offset <=> right_offset
             for item in items key item {
@@ -225,7 +275,7 @@ export component Main {
 
 #[test]
 fn sibling_template_lists_keep_separate_measured_viewport_heights() {
-    let source = r#"import { VirtualList } from "@argui/ui"
+    let source = r#"import { ListView } from "@argui/ui"
 import { Column, Text } from "@argui/native"
 export component Main {
     in property items: array<string>
@@ -234,13 +284,15 @@ export component Main {
     Column {
         width: 100%
         height: 100%
-        VirtualList #upper {
+        ListView #upper {
             row_height: 20.0
+            viewport_height: 0px
             offset <=> upper_offset
             for item in items key item { Text { content: item } }
         }
-        VirtualList #lower {
+        ListView #lower {
             row_height: 20.0
+            viewport_height: 0px
             offset <=> lower_offset
             for item in items key item { Text { content: item } }
         }
@@ -290,7 +342,7 @@ export component Main {
                     element
                         .source_identity()
                         .cloned()
-                        .expect("retained VList identity"),
+                        .expect("retained VirtualWindow identity"),
                 )
             })
         })
@@ -329,13 +381,13 @@ export component Main {
 
 #[test]
 fn virtual_list_rejects_invalid_window_settings_and_recovers() {
-    let source = r#"import { VList, Text } from "@argui/native"
+    let source = r#"import { VirtualWindow, Text } from "@argui/native"
 export component Main {
     private property row_height: float = 20.0
     private property viewport_height: float = 60.0
     private property offset: float = 0.0
     private property overscan: int = 1
-    VList {
+    VirtualWindow {
         row_height: row_height
         viewport_height: viewport_height
         offset <=> offset

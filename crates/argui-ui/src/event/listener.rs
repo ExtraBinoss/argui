@@ -32,6 +32,10 @@ pub enum EventFilter {
     EndPressed,
     PageUpPressed,
     PageDownPressed,
+    /// Pointer movement while a button or touch contact is active.
+    PressedPointerMove,
+    /// Pan gesture movement and its final release position.
+    Pan,
     PanEndedLeft,
     PanEndedRight,
     DoubleClick,
@@ -69,6 +73,26 @@ impl EventFilter {
             Self::EndPressed => pressed(argui_core::Key::End),
             Self::PageUpPressed => pressed(argui_core::Key::PageUp),
             Self::PageDownPressed => pressed(argui_core::Key::PageDown),
+            Self::PressedPointerMove => matches!(
+                kind,
+                UiEventKind::Pointer(argui_core::PointerEvent {
+                    phase: argui_core::PointerPhase::Moved,
+                    buttons,
+                    kind,
+                    pressure,
+                    ..
+                }) if *buttons != 0
+                    || *kind == argui_core::PointerKind::Touch
+                    || pressure.is_some_and(|value| value > 0.0)
+            ),
+            Self::Pan => matches!(
+                kind,
+                UiEventKind::Gesture(crate::GestureEvent {
+                    kind: crate::GestureKind::Pan { .. },
+                    phase: crate::GesturePhase::Changed | crate::GesturePhase::Ended,
+                    ..
+                })
+            ),
             Self::PanEndedLeft => matches!(
                 kind,
                 UiEventKind::Gesture(crate::GestureEvent {
@@ -307,6 +331,8 @@ pub struct EventListener {
     pub(crate) handler: EventHandlerId,
     pub(crate) value: Option<HandlerValueSource>,
     pub(crate) target_key: Option<String>,
+    pub(crate) shortcut: Option<crate::Shortcut>,
+    pub(crate) global_key: bool,
 }
 
 impl EventListener {
@@ -329,6 +355,8 @@ impl EventListener {
             handler,
             value: None,
             target_key: None,
+            shortcut: None,
+            global_key: false,
         }
     }
 
@@ -369,6 +397,29 @@ impl EventListener {
     #[must_use]
     pub const fn filter(mut self, filter: EventFilter) -> Self {
         self.options.filter = filter;
+        self
+    }
+
+    /// Delivers this listener only for a matching typed, non-repeating key press.
+    ///
+    /// * `shortcut` — key and modifier combination to match.
+    ///
+    /// Returns the updated listener. Use with [`EventType::Key`]; a listener
+    /// for another event type does not match a shortcut.
+    #[must_use]
+    pub fn shortcut(mut self, shortcut: crate::Shortcut) -> Self {
+        self.shortcut = Some(shortcut);
+        self
+    }
+
+    /// Delivers a typed key listener after the focused target's propagation path,
+    /// even when this element is outside that path or no element has focus.
+    ///
+    /// A focused listener can prevent the default key action or stop propagation
+    /// to suppress this listener. This has no effect for non-key event types.
+    #[must_use]
+    pub const fn global_key(mut self) -> Self {
+        self.global_key = true;
         self
     }
 

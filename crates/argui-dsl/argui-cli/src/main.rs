@@ -4,7 +4,7 @@ use std::{
 };
 #[cfg(not(target_arch = "wasm32"))]
 use std::{
-    io::{BufRead, Read},
+    io::Read,
     net::{SocketAddr, TcpListener, TcpStream},
     process::{Child, Command, Stdio},
     sync::{
@@ -170,6 +170,7 @@ fn dev(
     }
     console.compilation(&latest)?;
     let (mut application, application_logs) = if launch_application {
+        console.native_build_started()?;
         let (application, logs) = launch_dev_application(&root, bind, console.interactive())?;
         (Some(application), logs)
     } else {
@@ -180,8 +181,11 @@ fn dev(
             return Ok(());
         }
         if let Some(logs) = &application_logs {
-            console.notes(logs.try_iter().take(128), Color::Gray)?;
+            for line in logs.try_iter().take(128) {
+                console.application_output(line)?;
+            }
         }
+        console.native_build_tick()?;
         let status = application
             .as_mut()
             .map(|application| application.child.try_wait())
@@ -259,8 +263,13 @@ fn launch_dev_application(
     command
         .args(["run", "--features", "argui-live"])
         .current_dir(root)
-        .env("ARGUI_DEV_ADDRESS", bind.to_string());
+        .env("ARGUI_DEV_ADDRESS", bind.to_string())
+        .env("ARGUI_DEV_CLIENT", "1");
     if capture_output {
+        command
+            .env("CARGO_TERM_PROGRESS_WHEN", "always")
+            .env("CARGO_TERM_PROGRESS_WIDTH", "80")
+            .env("CARGO_TERM_COLOR", "never");
         command.stdout(Stdio::piped()).stderr(Stdio::piped());
     }
     let mut application = ChildGuard {
@@ -286,24 +295,45 @@ fn launch_dev_application(
             let sender = sender.clone();
             std::thread::Builder::new()
                 .name("argui-dev-application-output".into())
-                .spawn(move || {
-                    for line in io::BufReader::new(output).lines() {
-                        match line {
-                            Ok(line) => {
-                                if sender.send(line).is_err() {
-                                    break;
-                                }
-                            }
-                            Err(_) => break,
-                        }
-                    }
-                })?;
+                .spawn(move || forward_application_output(output, sender))?;
         }
         Some(receiver)
     } else {
         None
     };
     Ok((application, logs))
+}
+
+/// Forwards both Cargo carriage-return progress and ordinary newline output.
+///
+/// `output` is one child pipe and `sender` receives each complete UTF-8-lossy frame.
+/// Read errors and a dropped receiver end the forwarding thread.
+#[cfg(not(target_arch = "wasm32"))]
+fn forward_application_output(mut output: Box<dyn Read + Send>, sender: mpsc::Sender<String>) {
+    let mut buffer = [0_u8; 4096];
+    let mut pending = Vec::new();
+    loop {
+        let count = match output.read(&mut buffer) {
+            Ok(0) | Err(_) => break,
+            Ok(count) => count,
+        };
+        for byte in &buffer[..count] {
+            if *byte == b'\r' || *byte == b'\n' {
+                if !pending.is_empty() {
+                    let line = String::from_utf8_lossy(&pending).into_owned();
+                    pending.clear();
+                    if sender.send(line).is_err() {
+                        return;
+                    }
+                }
+            } else {
+                pending.push(*byte);
+            }
+        }
+    }
+    if !pending.is_empty() {
+        let _ = sender.send(String::from_utf8_lossy(&pending).into_owned());
+    }
 }
 
 /// Child process guard which prevents an orphaned development application.

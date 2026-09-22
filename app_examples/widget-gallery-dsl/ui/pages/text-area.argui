@@ -1,0 +1,85 @@
+import { Button, TextArea } from "@argui/ui"
+import { Column, Container, FocusScope, KeyBinding, Rectangle, Row, Text, TouchArea } from "@argui/native"
+import { Resize } from "@argui/icons"
+
+component EditorResizeHandle {
+    in-out property width: float
+    in-out property height: float
+    private property start_width: float = 0.0
+    private property start_height: float = 0.0
+
+    FocusScope #focus_area {
+        x: width * 1px - 18px
+        y: height * 1px - 18px
+        width: 18px
+        height: 18px
+        role: "separator"
+        accessible_name: "Resize notes editor"
+        KeyBinding { shortcut: "ArrowLeft" on activated { width = width <= 290.0 ? 280.0 : width - 10.0 } }
+        KeyBinding { shortcut: "ArrowRight" on activated { width = width >= 750.0 ? 760.0 : width + 10.0 } }
+        KeyBinding { shortcut: "ArrowUp" on activated { height = height <= 130.0 ? 120.0 : height - 10.0 } }
+        KeyBinding { shortcut: "ArrowDown" on activated { height = height >= 470.0 ? 480.0 : height + 10.0 } }
+        TouchArea #handle {
+            width: 18px
+            height: 18px
+            mouse_cursor: "nwse_resize"
+            on pointer_down {
+                start_width = width
+                start_height = height
+            }
+            on drag_x(delta) {
+                width = start_width + delta < 280.0 ? 280.0 : start_width + delta > 760.0 ? 760.0 : start_width + delta
+            }
+            on drag_y(delta) {
+                height = start_height + delta < 120.0 ? 120.0 : start_height + delta > 480.0 ? 480.0 : start_height + delta
+            }
+            on double_clicked { width = 520.0 height = 170.0 }
+            Rectangle {
+                width: 18px
+                height: 18px
+                radius: 4.0
+                background: solid(var(--argui-muted))
+                border_color: focus_area.focus_visible ? var(--argui-ring) : var(--argui-border)
+                border_width: focus_area.focus_visible ? 2.0 : 1.0
+                Row { width: 100% height: 100% align_items: "center" justify_content: "center"
+                    Resize { size: 16px color: var(--argui-muted-foreground) }
+                }
+            }
+        }
+    }
+}
+
+export component TextAreaPage {
+    private property notes: string = "A first line"
+    private property edits: int = 0
+    private property editor_width: float = 520.0
+    private property editor_height: float = 170.0
+
+    Column #text_area_page {
+        width: 100%
+        gap: 18.0
+        Text { content: "Text area" color: var(--argui-foreground) weight: 700 font_size: 27.0 }
+        Text { content: "Edit multiple lines, then drag the corner to resize the editor." color: var(--argui-muted-foreground) font_size: 14.0 }
+        Text { content: "Resizable multiline input" color: var(--argui-foreground) weight: 600 font_size: 17.0 }
+
+        Container {
+            width: editor_width * 1px
+            min_width: 0.0
+            Column {
+                width: 100%
+                TextArea #notes_area {
+                    value <=> notes
+                    label: "Notes"
+                    description: "Your notes stay in this preview."
+                    placeholder: "Write a note…"
+                    height: editor_height * 1px
+                    on changed { edits = edits + 1 }
+                    EditorResizeHandle { width <=> editor_width height <=> editor_height }
+                }
+            }
+        }
+        Text { content: "Edits: " + str(edits) + " · " + str(editor_width) + " × " + str(editor_height) color: var(--argui-muted-foreground) font_size: 13.0 }
+        Button { text: "Reset size" variant: "outline" on click { editor_width = 520.0 editor_height = 170.0 } }
+        TextArea { label: "Read-only notes" value: "This text cannot be changed." read_only: true }
+    }
+}

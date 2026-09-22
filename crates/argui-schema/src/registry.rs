@@ -144,6 +144,16 @@ impl SchemaRegistry {
             schema.parts_iter().map(|part| (part.id.raw(), &part.name)),
         )?;
         for property in &schema.properties {
+            if let Some(observation) = property.observation
+                && (property.value_type != observation.value_type() || !property.read_only)
+            {
+                return Err(SchemaError::InvalidObservation {
+                    property: property.name.clone(),
+                    observation,
+                    expected: observation.value_type(),
+                    actual: property.value_type,
+                });
+            }
             if let Some(default) = &property.default
                 && default.value_type() != property.value_type
             {
@@ -155,7 +165,11 @@ impl SchemaRegistry {
             }
             if let Some(event) = property.change_event
                 && !schema.events.iter().any(|candidate| {
-                    candidate.id == event && candidate.payload == Some(property.value_type)
+                    candidate.id == event
+                        && (candidate.payload == Some(property.value_type)
+                            || (property.value_type == crate::ValueType::String
+                                && candidate.payload.is_none()
+                                && candidate.event_type == argui_ui::EventType::TextEdit))
                 })
             {
                 return Err(SchemaError::InvalidChangeEvent {
@@ -214,6 +228,9 @@ fn validate_input(schema: &NativeSchema, input: &NativeElementInput) -> Result<(
                 native: schema.name.clone(),
                 property: *id,
             })?;
+        if property.read_only {
+            return Err(SchemaError::ReadOnlyProperty(property.name.clone()));
+        }
         if value.value_type() != property.value_type {
             return Err(SchemaError::PropertyType {
                 property: property.name.clone(),

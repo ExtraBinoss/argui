@@ -1,0 +1,52 @@
+import { Switch } from "@argui/ui"
+import { ChartFrame, ChartMark } from "@argui/ui/chart.argui"
+import { Column, Container, Flickable, Path, Rectangle, Row, Text } from "@argui/native"
+
+export component ChartPage {
+    private property line: bool = false
+    private property selected: string = "Select a mark to inspect its value."
+
+    Column {
+        width: 100%
+        gap: 18.0
+        Text { content: "Chart" color: var(--argui-foreground) weight: 700 font_size: 27.0 }
+        Text { content: "Quarterly revenue across two series. Hover a mark to inspect it, or switch between bars and lines." color: var(--argui-muted-foreground) font_size: 14.0 }
+        Switch { label: "Line chart" checked: line on click { line = !line } }
+
+        Flickable { width: 100% height: 295px scroll_x: true scroll_y: false
+            ChartFrame { label: "Quarterly revenue" width: 480px height: 275px
+                Rectangle { x: 40px y: 190px width: 420px height: 1px background: solid(var(--argui-border)) }
+                Text { content: "50" x: 5px y: 30px color: var(--argui-muted-foreground) font_size: 11.0 }
+                Text { content: "0" x: 13px y: 179px color: var(--argui-muted-foreground) font_size: 11.0 }
+                if line {
+                    Path {
+                        source: path(480.0, 190.0, [move_to(88.0, 136.0), line_to(196.0, 94.0), line_to(304.0, 118.0), line_to(412.0, 52.0)], false, 2.0, false)
+                        width: 480px height: 190px color: #3b82f6
+                    }
+                    Path {
+                        source: path(480.0, 190.0, [move_to(88.0, 166.0), line_to(196.0, 124.0), line_to(304.0, 100.0), line_to(412.0, 76.0)], false, 2.0, false)
+                        width: 480px height: 190px color: #10b981
+                    }
+                }
+                ChartMark { label: "Studio · Q1: 18" color: #3b82f6 bar_x: 64px point_x: 88px point_y: 136px bar_height: 54px line: line selected: selected == "Studio · Q1: 18" on activate { selected = "Studio · Q1: 18" } }
+                ChartMark { label: "Team · Q1: 8" color: #10b981 bar_x: 88px point_x: 88px point_y: 166px bar_height: 24px line: line selected: selected == "Team · Q1: 8" on activate { selected = "Team · Q1: 8" } }
+                ChartMark { label: "Studio · Q2: 32" color: #3b82f6 bar_x: 172px point_x: 196px point_y: 94px bar_height: 96px line: line selected: selected == "Studio · Q2: 32" on activate { selected = "Studio · Q2: 32" } }
+                ChartMark { label: "Team · Q2: 22" color: #10b981 bar_x: 196px point_x: 196px point_y: 124px bar_height: 66px line: line selected: selected == "Team · Q2: 22" on activate { selected = "Team · Q2: 22" } }
+                ChartMark { label: "Studio · Q3: 24" color: #3b82f6 bar_x: 280px point_x: 304px point_y: 118px bar_height: 72px line: line selected: selected == "Studio · Q3: 24" on activate { selected = "Studio · Q3: 24" } }
+                ChartMark { label: "Team · Q3: 30" color: #10b981 bar_x: 304px point_x: 304px point_y: 100px bar_height: 90px line: line selected: selected == "Team · Q3: 30" on activate { selected = "Team · Q3: 30" } }
+                ChartMark { label: "Studio · Q4: 46" color: #3b82f6 bar_x: 388px point_x: 412px point_y: 52px bar_height: 138px line: line selected: selected == "Studio · Q4: 46" on activate { selected = "Studio · Q4: 46" } }
+                ChartMark { label: "Team · Q4: 38" color: #10b981 bar_x: 412px point_x: 412px point_y: 76px bar_height: 114px line: line selected: selected == "Team · Q4: 38" on activate { selected = "Team · Q4: 38" } }
+                Text { content: "Q1" x: 75px y: 202px color: var(--argui-muted-foreground) font_size: 12.0 }
+                Text { content: "Q2" x: 183px y: 202px color: var(--argui-muted-foreground) font_size: 12.0 }
+                Text { content: "Q3" x: 291px y: 202px color: var(--argui-muted-foreground) font_size: 12.0 }
+                Text { content: "Q4" x: 399px y: 202px color: var(--argui-muted-foreground) font_size: 12.0 }
+            }
+        }
+
+        Row { gap: 20.0 wrap: true align_items: "center"
+            Row { gap: 6.0 align_items: "center" Container { width: 11px height: 11px background: #3b82f6 } Text { content: "Studio" color: var(--argui-foreground) font_size: 13.0 } }
+            Row { gap: 6.0 align_items: "center" Container { width: 11px height: 11px background: #10b981 } Text { content: "Team" color: var(--argui-foreground) font_size: 13.0 } }
+            Text { content: selected color: var(--argui-primary) weight: 600 font_size: 13.0 }
+        }
+    }
+}

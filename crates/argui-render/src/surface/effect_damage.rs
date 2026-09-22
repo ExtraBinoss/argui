@@ -61,6 +61,7 @@ impl SurfaceRenderer {
                         None,
                         &mut cache_stats,
                         Some(clip),
+                        &[],
                     );
                 }
                 DamageProfile {
@@ -86,6 +87,7 @@ impl SurfaceRenderer {
                     None,
                     &mut cache_stats,
                     None,
+                    &[],
                 );
                 DamageProfile {
                     mode: if matches!(plan, DamagePlan::Full) {
