@@ -263,6 +263,7 @@ impl SurfaceRenderer {
         let mut effect_graph = None;
         let mut canvas_commands = Vec::new();
         let mut scene_update = None;
+        self.text.clear_frame_stats();
         match content {
             FrameContent::None => {
                 self.vector.clear_frame_stats();
@@ -519,6 +520,7 @@ impl SurfaceRenderer {
             damage,
             texture_pool,
             vector_atlas: self.vector.stats(),
+            text_atlas: self.text.stats(),
             gpu_canvases: self.gpu_canvas.stats(),
             direct_surface,
             adapter: self.gpu_profiler.adapter().clone(),

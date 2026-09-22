@@ -111,7 +111,8 @@ pub(super) fn panel<A>(
     }
     rows.extend([
         title("Argui GPU allocations", theme),
-        row("Texture pool", bytes(frame.texture_bytes.saturating_sub(frame.vector_atlas_bytes).saturating_sub(frame.gpu_canvas_bytes)), theme),
+        row("Texture pool", bytes(frame.texture_bytes.saturating_sub(frame.vector_atlas_bytes).saturating_sub(frame.gpu_canvas_bytes).saturating_sub(frame.text_atlas_bytes)), theme),
+        row("Glyph atlases", bytes(frame.text_atlas_bytes), theme),
         row("Vector atlas", bytes(frame.vector_atlas_bytes), theme),
         row("GPU canvases", bytes(frame.gpu_canvas_bytes), theme),
         row("Tracked GPU total", bytes(frame.texture_bytes), theme),

@@ -73,7 +73,18 @@ fn lowering_preserves_float_arithmetic_without_integer_promotion() {
     let project = database.check();
     let schema = argui_schema::builtin::registry().unwrap();
     let ir = lower(&project, &schema).unwrap();
-    let property = &ir.components.last().unwrap().properties[0];
+    let source_file = database.file_id("ui/edges.argui").unwrap();
+    let main = ir
+        .components
+        .iter()
+        .find(|component| {
+            component
+                .source
+                .span
+                .is_some_and(|span| span.file == source_file)
+        })
+        .unwrap();
+    let property = &main.properties[0];
     assert_eq!(property.value_type, IrType::Float);
     let value = property.default.as_ref().unwrap();
     assert_eq!(value.value_type, IrType::Float);

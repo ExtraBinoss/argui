@@ -133,7 +133,9 @@ impl TextEngine {
             .input_buffers
             .iter()
             .position(|entry| entry.matches(content, style, viewport))
+            .inspect(|_| self.stats.layout_hits += 1)
             .unwrap_or_else(|| {
+                self.stats.layout_misses += 1;
                 let entry = InputBuffer::new(&mut self.fonts, content, style, viewport);
                 if self.input_buffers.len() == INPUT_BUFFER_CACHE_CAPACITY {
                     self.input_buffers.remove(0);
@@ -491,8 +493,11 @@ impl InputBuffer {
         }
     }
 
+    /// Returns whether `content`, `style`, and `viewport` reuse this editor layout, ignoring paint.
     fn matches(&self, content: &TextContent, style: &TextStyle, viewport: Size) -> bool {
-        self.content == *content && self.style == *style && self.viewport == viewport
+        self.viewport == viewport
+            && crate::cache::same_style_layout(&self.style, style)
+            && crate::cache::same_content_layout(&self.content, content)
     }
 }
 

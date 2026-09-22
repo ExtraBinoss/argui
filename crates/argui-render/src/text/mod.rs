@@ -1,5 +1,9 @@
 mod atlas;
+mod pages;
 mod pipeline;
+mod pixels;
+
+pub use atlas::TextAtlasStats;
 
 use std::ops::Range;
 
@@ -65,13 +69,27 @@ impl TextDraw {
 }
 
 impl TextGpu {
+    /// Creates the glyph renderer on `device` for a linear-blended target `format`.
+    /// Allocates bounded mask and sRGB color arrays and their shared instance pipeline.
     #[cfg_attr(coverage_nightly, coverage(off))]
     pub fn new(device: &wgpu::Device, format: wgpu::TextureFormat) -> Self {
-        let atlas = GlyphAtlas::new(device, 1024);
-        let pipeline = TextPipeline::new(device, format, atlas.view(), atlas.sampler());
+        let atlas = GlyphAtlas::new(device);
+        let pipeline = TextPipeline::new(
+            device,
+            format,
+            atlas.mask_view(),
+            atlas.color_view(),
+            atlas.sampler(),
+        );
         Self { atlas, pipeline }
     }
 
+    /// Prepares physical `text` without UI transforms, resolving atlas misses through
+    /// `engine` and uploading changed data using `device` and `queue`.
+    /// Returns ordered draw ranges and physical damage bounds.
+    ///
+    /// # Errors
+    /// Returns an atlas capacity error when the visible glyph set cannot fit.
     #[cfg_attr(coverage_nightly, coverage(off))]
     pub fn prepare(
         &mut self,
@@ -83,6 +101,13 @@ impl TextGpu {
         self.prepare_with_visuals(device, queue, engine, text, None, 1.0)
     }
 
+    /// Prepares `text` with `display_list` transforms and clips at window `scale_factor`.
+    /// Uses `engine` to rasterize positive uniform scales and fractional translations
+    /// at their final physical positions; `device` and `queue` receive changed GPU data.
+    /// Returns ordered draw ranges and conservative physical damage bounds.
+    ///
+    /// # Errors
+    /// Returns an atlas capacity error when the visible glyph set cannot fit.
     #[cfg_attr(coverage_nightly, coverage(off))]
     pub fn prepare_ui(
         &mut self,
@@ -114,30 +139,33 @@ impl TextGpu {
         scale_factor: f32,
     ) -> Result<TextDraw, RendererError> {
         let visuals = display_list.map(|list| block_visuals(list, text.blocks));
-        match self.prepare_once(queue, engine, text, visuals.as_deref(), scale_factor) {
-            Ok((instances, ranges, clips, bounds)) => {
-                let changed = self.pipeline.write(device, queue, &instances, &clips);
-                Ok(TextDraw {
-                    ranges,
-                    bounds,
-                    changed,
-                })
-            }
-            Err(RendererError::GlyphAtlasFull) => {
-                self.atlas.reset();
-                let (instances, ranges, clips, bounds) =
-                    self.prepare_once(queue, engine, text, visuals.as_deref(), scale_factor)?;
-                self.pipeline.write(device, queue, &instances, &clips);
-                Ok(TextDraw {
-                    ranges,
-                    bounds,
-                    changed: true,
-                })
-            }
-            Err(error) => Err(error),
-        }
+        let (instances, ranges, clips, bounds) =
+            self.prepare_once(queue, engine, text, visuals.as_deref(), scale_factor)?;
+        let changed = self.pipeline.write(device, queue, &instances, &clips)
+            || self.atlas.stats().uploaded_bytes_this_frame != 0;
+        Ok(TextDraw {
+            ranges,
+            bounds,
+            changed,
+        })
     }
 
+    /// Clears per-frame atlas work counters while preserving resident glyphs.
+    pub fn clear_frame_stats(&mut self) {
+        self.atlas.clear_frame_stats();
+    }
+
+    /// Returns bounded atlas residency and work counters for the last preparation.
+    pub fn stats(&self) -> TextAtlasStats {
+        self.atlas.stats()
+    }
+
+    /// Resolves physical glyphs from `text`, optional display `visuals` and window
+    /// `scale_factor`, uploading cache misses through `engine` and `queue`.
+    /// Returns instances, block ranges, physical clips and conservative damage bounds.
+    ///
+    /// # Errors
+    /// Returns the atlas capacity error when the visible glyph set cannot fit.
     #[cfg_attr(coverage_nightly, coverage(off))]
     fn prepare_once(
         &mut self,
@@ -152,6 +180,21 @@ impl TextGpu {
         let mut bounds = vec![None; text.blocks];
         let mut clips = Vec::new();
         let prepared = prepare_visuals(text, visuals, scale_factor, &mut clips);
+        let mut drawable = vec![Vec::new(); text.blocks];
+        for glyph in &text.glyphs {
+            let visual = prepared[glyph.block];
+            if !visual.active {
+                continue;
+            }
+            let (glyph, transform) = glyph
+                .transform_for_raster(visual.transform)
+                .map_or((*glyph, visual.transform), |glyph| {
+                    (glyph, Affine2D::IDENTITY)
+                });
+            drawable[glyph.block].push((glyph, transform));
+        }
+        self.atlas
+            .begin_frame(drawable.iter().flatten().map(|(glyph, _)| glyph.key));
         for (block, visual) in prepared.iter().copied().enumerate() {
             if !visual.active {
                 continue;
@@ -170,19 +213,28 @@ impl TextGpu {
                         )
                     }),
             );
-            for glyph in text.glyphs.iter().filter(|glyph| glyph.block == block) {
+            for (glyph, transform) in &drawable[block] {
                 let Some(entry) = self.atlas.get_or_insert(queue, engine, glyph.key)? else {
                     continue;
                 };
-                instances.push(GlyphInstance::new(
+                let instance = GlyphInstance::new(
                     *glyph,
                     entry,
                     self.atlas.size(),
-                    visual.transform,
+                    *transform,
                     visual.clip_start,
                     visual.clip_count,
                     visual.backdrop,
-                ));
+                );
+                let physical = instance.physical_bounds();
+                let clip_range =
+                    visual.clip_start as usize..(visual.clip_start + visual.clip_count) as usize;
+                if clips[clip_range]
+                    .iter()
+                    .all(|clip| clip.intersects(physical))
+                {
+                    instances.push(instance);
+                }
             }
             let end = instances.len() as u32;
             if start != end {

@@ -46,9 +46,13 @@ it.
 | Identical description | tree, layout, text, paint | nothing |
 | Semantics only | layout, text, paint | accessibility diff |
 | Color, primitive opacity, or effects | layout, shaped text, node identity | paint data |
-| Transform or group opacity | layout, shaped text, paint primitives, GPU uploads | compositor properties and presentation geometry |
+| Active transform animation or group opacity | layout, shaped text, paint primitives, GPU uploads | compositor properties and presentation geometry |
+| Settled transform animation or authored text transform | layout and shaped text | paint data and glyphs at their final physical size |
 | Scroll offset | layout and shaped text | translated paint and hit geometry |
 | Text, size, structure, or layout style | stable keyed nodes where possible | affected layout, text, and paint |
+
+See [text fidelity](rendering/text.md) for subpixel positioning, atlas budgets,
+and the independent logical-layout and physical-raster caches.
 
 `Element::layout_boundary` stops a child's intrinsic size from invalidating an
 ancestor. Use it only when the parent supplies the child's size and clips or

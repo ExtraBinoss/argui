@@ -7,6 +7,7 @@ mod theme_edges;
 
 use argui_dsl_semantic::{CompilerDatabase, DiagnosticCode};
 
+/// Resolves imported icons and aliases without eagerly loading unrelated catalog entries.
 #[cfg(feature = "icons")]
 #[test]
 fn icons_are_resolved_on_demand_with_aliases_and_precise_errors() {
@@ -28,11 +29,13 @@ fn icons_are_resolved_on_demand_with_aliases_and_precise_errors() {
             .iter()
             .any(|module| module.path == "@argui/icons/Star.argui")
     );
+    // Check is imported by the built-in Checkbox; Abacus has no built-in consumers.
+    assert!(argui_dsl_stdlib::icon_component_source("Abacus").is_some());
     assert!(
         !project
             .modules
             .iter()
-            .any(|module| module.path == "@argui/icons/Check.argui")
+            .any(|module| module.path == "@argui/icons/Abacus.argui")
     );
     let diagnostic = project
         .diagnostics

@@ -3,7 +3,8 @@ struct Viewport {
     origin: vec2<f32>,
 }
 
-@group(0) @binding(0) var glyph_atlas: texture_2d<f32>;
+@group(0) @binding(0) var glyph_atlas: texture_2d_array<f32>;
+@group(0) @binding(4) var color_atlas: texture_2d_array<f32>;
 @group(0) @binding(1) var glyph_sampler: sampler;
 @group(0) @binding(2) var<uniform> viewport: Viewport;
 struct Clip { inverse_a: vec4<f32>, inverse_b: vec4<f32>, bounds: vec4<f32>, radii: vec4<f32> }
@@ -15,6 +16,7 @@ struct VertexOutput {
     @location(1) color: vec4<f32>,
     @location(2) mode: vec4<f32>,
     @location(3) @interpolate(flat) clip_meta: vec2<u32>,
+    @location(4) @interpolate(flat) atlas_page: u32,
 }
 
 fn rounded_distance(point: vec2<f32>, size: vec2<f32>, radii: vec4<f32>) -> f32 {
@@ -55,6 +57,7 @@ fn vertex(
     output.color = color;
     output.mode = mode;
     output.clip_meta = clip_meta.xy;
+    output.atlas_page = clip_meta.z;
     return output;
 }
 
@@ -152,17 +155,18 @@ fn fragment(input: VertexOutput) -> @location(0) vec4<f32> {
         let clip_width = max(gradient.x + gradient.y, 0.75);
         clip_coverage *= 1.0 - smoothstep(-clip_width, clip_width, clip_distance);
     }
-    let sampled = textureSample(glyph_atlas, glyph_sampler, input.uv);
-    if input.mode.x > 2.5 {
-        let coverage = sampled.a * input.color.a * clip_coverage;
-        return backdrop_aware_text(coverage, input.color.rgb, input.mode.yzw);
-    }
-    if input.mode.x > 1.5 {
+    if input.mode.x > 1.5 && input.mode.x < 2.5 {
         return input.color * vec4(1.0, 1.0, 1.0, clip_coverage);
     }
-    if input.mode.x > 0.5 {
+    if input.mode.x > 0.5 && input.mode.x < 1.5 {
+        let sampled = textureSampleLevel(color_atlas, glyph_sampler, input.uv, i32(input.atlas_page), 0.0);
         return sampled * vec4(1.0, 1.0, 1.0, input.color.a * clip_coverage);
     }
-    let coverage = text_coverage(sampled.a, input.color.rgb);
+    let mask = textureSampleLevel(glyph_atlas, glyph_sampler, input.uv, i32(input.atlas_page), 0.0).r;
+    if input.mode.x > 2.5 {
+        let coverage = mask * input.color.a * clip_coverage;
+        return backdrop_aware_text(coverage, input.color.rgb, input.mode.yzw);
+    }
+    let coverage = text_coverage(mask, input.color.rgb);
     return vec4(input.color.rgb, input.color.a * coverage * clip_coverage);
 }

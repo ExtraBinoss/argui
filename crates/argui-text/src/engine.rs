@@ -1,21 +1,31 @@
-use std::sync::Arc;
+use std::sync::{
+    Arc,
+    atomic::{AtomicUsize, Ordering},
+};
+
+static FONT_GENERATION: AtomicUsize = AtomicUsize::new(1);
 
 use argui_core::Size;
 use cosmic_text::{
     Align, Attrs, Buffer, Color, Ellipsize, EllipsizeHeightLimit, Family, FontSystem, Metrics,
-    Renderer, Shaping, SwashCache, SwashContent, Weight, Wrap, fontdb, render_decoration,
+    Shaping, Weight, Wrap, fontdb,
 };
 
 use crate::{
-    EllipsisPosition, FontFamily, FontStretch, FontStyle, GlyphContent, GlyphImage, GlyphKey,
-    LetterSpacing, PreparedDecoration, PreparedGlyph, PreparedText, TextContent, TextOverflow,
-    TextScene, TextSpanStyle, TextStyle, TextWrap, UnderlineStyle,
-    cache::{CachedDecoration, CachedGlyph, CachedShape, MeasureKey, ShapeKey, TextCache},
+    EllipsisPosition, FontFamily, FontStretch, FontStyle, GlyphImage, GlyphKey, LetterSpacing,
+    PreparedText, TextContent, TextOverflow, TextScene, TextSpanStyle, TextStyle, TextWrap,
+    UnderlineStyle,
+    cache::{CachedGlyph, CachedShape, MeasureKey, TextCache, TextLayoutKey},
+    layout::LogicalGlyph,
+    paint::{append_shape, collect_decorations},
+    raster::RasterCache,
 };
 
 pub struct TextEngine {
     pub(crate) fonts: FontSystem,
-    rasterizer: SwashCache,
+    font_generation: usize,
+    rasterizer: RasterCache,
+    pub(crate) stats: crate::TextStats,
     pub(crate) input_buffers: Vec<crate::input::InputBuffer>,
     pub(crate) cache: TextCache,
 }
@@ -24,7 +34,9 @@ impl Default for TextEngine {
     fn default() -> Self {
         Self {
             fonts: FontSystem::new(),
-            rasterizer: SwashCache::new(),
+            font_generation: FONT_GENERATION.fetch_add(1, Ordering::Relaxed),
+            rasterizer: RasterCache::default(),
+            stats: crate::TextStats::default(),
             input_buffers: Vec::new(),
             cache: TextCache::default(),
         }
@@ -62,16 +74,33 @@ impl TextEngine {
 
         Self {
             fonts: FontSystem::new_with_locale_and_db("en-US".into(), database),
-            rasterizer: SwashCache::new(),
+            font_generation: FONT_GENERATION.fetch_add(1, Ordering::Relaxed),
+            rasterizer: RasterCache::default(),
+            stats: crate::TextStats::default(),
             input_buffers: Vec::new(),
             cache: TextCache::default(),
         }
     }
 
-    /// Returns mutable access to the font database, clearing cached text first.
+    /// Returns mutable access to fonts, invalidating all layout and raster caches.
+    ///
+    /// Existing prepared text must be prepared again after changing fonts.
     pub fn fonts_mut(&mut self) -> &mut FontSystem {
+        self.font_generation = FONT_GENERATION.fetch_add(1, Ordering::Relaxed);
         self.cache.clear();
+        self.input_buffers.clear();
+        self.rasterizer = RasterCache::default();
         &mut self.fonts
+    }
+
+    /// Returns cumulative cache activity and current bounded CPU bitmap residency.
+    #[must_use]
+    pub fn stats(&self) -> crate::TextStats {
+        crate::TextStats {
+            raster_entries: self.rasterizer.len(),
+            raster_bytes: self.rasterizer.bytes,
+            ..self.stats
+        }
     }
 
     /// Measures plain text with the supplied style and optional width constraint.
@@ -113,8 +142,10 @@ impl TextEngine {
     ) -> crate::TextMeasurement {
         let key = MeasureKey::new(content, style, width);
         if let Some(measurement) = self.cache.measurement(&key) {
+            self.stats.layout_hits += 1;
             return measurement;
         }
+        self.stats.layout_misses += 1;
         let mut buffer = Buffer::new(&mut self.fonts, metrics(style));
         configure_buffer(&mut buffer, style, width, None);
         set_content(&mut buffer, content, style);
@@ -133,7 +164,7 @@ impl TextEngine {
         measurement
     }
 
-    /// Shapes a scene into positioned glyph and decoration data for painting.
+    /// Prepares physical glyphs and decorations, reusing paint-independent logical layouts.
     ///
     /// * `scene` — blocks to shape.
     /// * `scale_factor` — logical-to-physical pixel scale.
@@ -144,11 +175,13 @@ impl TextEngine {
             ..PreparedText::default()
         };
         for (block_index, block) in scene.blocks().iter().enumerate() {
-            let key = ShapeKey::new(block, scale_factor);
+            let key = TextLayoutKey::new(&block.content, &block.style, block.bounds.size);
             let shape = if let Some(shape) = self.cache.shape(&key) {
+                self.stats.layout_hits += 1;
                 shape
             } else {
-                let shape = self.shape_block(block, scale_factor, key.subpixel_origin());
+                self.stats.layout_misses += 1;
+                let shape = self.shape_block(block);
                 self.cache.insert_shape(key, shape)
             };
             append_shape(&mut prepared, block_index, block, scale_factor, &shape);
@@ -156,12 +189,8 @@ impl TextEngine {
         prepared
     }
 
-    fn shape_block(
-        &mut self,
-        block: &crate::TextBlock,
-        scale_factor: f32,
-        subpixel_origin: [f32; 2],
-    ) -> CachedShape {
+    /// Shapes `block` into reusable logical glyph and decoration geometry.
+    fn shape_block(&mut self, block: &crate::TextBlock) -> CachedShape {
         let mut buffer = Buffer::new(&mut self.fonts, metrics(&block.style));
         configure_buffer(
             &mut buffer,
@@ -172,57 +201,45 @@ impl TextEngine {
         set_content(&mut buffer, &block.content, &block.style);
         buffer.shape_until_scroll(&mut self.fonts, false);
 
-        let default_color = cosmic_color(block.style.color);
         let mut glyphs = Vec::new();
-        let mut decorations = DecorationCollector::new(scale_factor);
+        let mut decorations = Vec::new();
         let line_offsets = source_line_offsets(block.content.as_str());
         for run in buffer.layout_runs() {
             let line_start = line_offsets.get(run.line_i).copied().unwrap_or_default();
             for glyph in run.glyphs {
-                let physical = glyph.physical(
-                    (
-                        subpixel_origin[0],
-                        subpixel_origin[1] + run.line_y * scale_factor,
-                    ),
-                    scale_factor,
-                );
                 glyphs.push(CachedGlyph {
-                    key: GlyphKey(physical.cache_key),
+                    key: GlyphKey(
+                        glyph.physical((0.0, 0.0), 1.0).cache_key,
+                        self.font_generation,
+                    ),
                     start: line_start + glyph.start,
                     end: line_start + glyph.end,
                     rtl: glyph.level.is_rtl(),
-                    local: [physical.x, physical.y],
-                    color: from_cosmic(glyph.color_opt.unwrap_or(default_color)),
+                    local: LogicalGlyph::new(glyph, run.line_y),
+                    span: glyph.metadata,
                 });
             }
-            render_decoration(&mut decorations, &run, default_color);
+            collect_decorations(&mut decorations, &run);
         }
         CachedShape {
             glyphs: Arc::from(glyphs),
-            decorations: Arc::from(decorations.items),
+            decorations: Arc::from(decorations),
         }
     }
 
-    /// Rasterizes a shaped glyph key into bitmap image data when available.
+    /// Returns a glyph bitmap, reusing a bounded CPU raster cache when possible.
     ///
     /// * `key` — glyph cache key produced by text shaping.
     ///
     /// Returns `None` when the rasterizer has no image for the key.
     pub fn rasterize(&mut self, key: GlyphKey) -> Option<GlyphImage> {
-        let image = self.rasterizer.get_image_uncached(&mut self.fonts, key.0)?;
-        let content = match image.content {
-            SwashContent::Mask => GlyphContent::Mask,
-            SwashContent::Color => GlyphContent::Color,
-            SwashContent::SubpixelMask => GlyphContent::SubpixelMask,
-        };
-        Some(GlyphImage {
-            left: image.placement.left,
-            top: image.placement.top,
-            width: image.placement.width,
-            height: image.placement.height,
-            content,
-            data: image.data,
-        })
+        let (image, hit) = self.rasterizer.rasterize(&mut self.fonts, key);
+        if hit {
+            self.stats.raster_hits += 1;
+        } else {
+            self.stats.raster_misses += 1;
+        }
+        image
     }
 }
 
@@ -269,6 +286,7 @@ pub(crate) fn configure_buffer(
     }
 }
 
+/// Configures `buffer` with `content` and layout `style`; span metadata identifies paint sources.
 pub(crate) fn set_content(buffer: &mut Buffer, content: &TextContent, style: &TextStyle) {
     let defaults = attrs(style);
     if content.is_rich() {
@@ -276,7 +294,13 @@ pub(crate) fn set_content(buffer: &mut Buffer, content: &TextContent, style: &Te
             content
                 .runs()
                 .iter()
-                .map(|(range, span)| (&content.as_str()[range.clone()], span_attrs(style, span))),
+                .enumerate()
+                .map(|(index, (range, span))| {
+                    (
+                        &content.as_str()[range.clone()],
+                        span_attrs(style, span).metadata(index + 1),
+                    )
+                }),
             &defaults,
             Shaping::Advanced,
             text_align(style.align),
@@ -340,85 +364,6 @@ fn apply_decoration(mut attrs: Attrs<'_>, value: crate::TextDecoration) -> Attrs
     attrs
 }
 
-fn append_shape(
-    prepared: &mut PreparedText,
-    block_index: usize,
-    block: &crate::TextBlock,
-    scale_factor: f32,
-    shape: &CachedShape,
-) {
-    let anchor = [
-        (block.bounds.origin.x * scale_factor).round() as i32,
-        (block.bounds.origin.y * scale_factor).round() as i32,
-    ];
-    let clip = [
-        block.clip.origin.x * scale_factor,
-        block.clip.origin.y * scale_factor,
-        (block.clip.origin.x + block.clip.size.width) * scale_factor,
-        (block.clip.origin.y + block.clip.size.height) * scale_factor,
-    ];
-    prepared
-        .glyphs
-        .extend(shape.glyphs.iter().map(|glyph| PreparedGlyph {
-            key: glyph.key,
-            block: block_index,
-            start: glyph.start,
-            end: glyph.end,
-            rtl: glyph.rtl,
-            x: anchor[0] + glyph.local[0],
-            y: anchor[1] + glyph.local[1],
-            color: glyph.color,
-            clip,
-            local: glyph.local,
-        }));
-    prepared.decorations.extend(
-        shape
-            .decorations
-            .iter()
-            .map(|decoration| PreparedDecoration {
-                block: block_index,
-                rect: [
-                    (anchor[0] + decoration.local[0]) as f32,
-                    (anchor[1] + decoration.local[1]) as f32,
-                    decoration.local[2] as f32,
-                    decoration.local[3] as f32,
-                ],
-                color: decoration.color,
-                local: decoration.local,
-            }),
-    );
-}
-
-struct DecorationCollector {
-    scale: f32,
-    items: Vec<CachedDecoration>,
-}
-
-impl DecorationCollector {
-    fn new(scale: f32) -> Self {
-        Self {
-            scale,
-            items: Vec::new(),
-        }
-    }
-}
-
-impl Renderer for DecorationCollector {
-    fn rectangle(&mut self, x: i32, y: i32, width: u32, height: u32, color: Color) {
-        self.items.push(CachedDecoration {
-            local: [
-                (x as f32 * self.scale).round() as i32,
-                (y as f32 * self.scale).round() as i32,
-                (width as f32 * self.scale).ceil() as i32,
-                (height as f32 * self.scale).ceil() as i32,
-            ],
-            color: from_cosmic(color),
-        });
-    }
-
-    fn glyph(&mut self, _glyph: cosmic_text::PhysicalGlyph, _color: Color) {}
-}
-
 fn metrics(style: &TextStyle) -> Metrics {
     Metrics::new(style.font_size, style.line_height)
 }
@@ -435,10 +380,6 @@ fn cosmic_color(value: argui_core::Color) -> Color {
     let [r, g, b, a] = value.to_linear_rgba();
     let channel = |value: f32| (value.clamp(0.0, 1.0) * 255.0).round() as u8;
     Color::rgba(channel(r), channel(g), channel(b), channel(a))
-}
-
-fn from_cosmic(value: Color) -> [f32; 4] {
-    value.as_rgba().map(|channel| f32::from(channel) / 255.0)
 }
 
 pub(crate) fn source_line_offsets(text: &str) -> Vec<usize> {

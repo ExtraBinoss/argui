@@ -75,6 +75,20 @@ pub(super) fn details(frame: &FrameRecord, theme: &WidgetTheme) -> Element {
                 ),
                 ("Offscreen pixels", frame.offscreen_pixels.to_string()),
                 (
+                    "Glyphs cached / hits / raster requests",
+                    format!(
+                        "{} / {} / {}",
+                        frame.text_atlas_entries, frame.text_atlas_hits, frame.text_raster_requests
+                    ),
+                ),
+                (
+                    "Glyph uploads / page evictions",
+                    format!(
+                        "{} B / {}",
+                        frame.text_upload_bytes, frame.text_page_evictions
+                    ),
+                ),
+                (
                     "Vectors cached / hits / rasterized",
                     format!(
                         "{} / {} / {}",

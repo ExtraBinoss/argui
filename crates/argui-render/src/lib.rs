@@ -42,5 +42,6 @@ pub use registry::{
     EffectPassDefinition, EffectRegistry,
 };
 pub use surface::{RenderStatus, RendererDevice, SurfaceRenderer};
+pub use text::TextAtlasStats;
 /// Exact WGPU version used by Argui's public GPU-canvas contexts.
 pub use wgpu;

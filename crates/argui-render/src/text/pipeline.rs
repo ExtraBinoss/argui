@@ -44,6 +44,29 @@ impl TextClip {
         })
     }
 
+    /// Returns whether physical `glyph` bounds can touch this clip's antialiased shape.
+    /// Expands the local clip by an upper bound on the shader's antialiasing width
+    /// before transforming it; clips that cannot be inverted never reject a glyph.
+    pub fn intersects(&self, glyph: Rect) -> bool {
+        let inverse = Affine2D {
+            matrix: self.inverse_a,
+            translation: Point::new(self.inverse_b[0], self.inverse_b[1]),
+        };
+        let Some(transform) = inverse.inverse() else {
+            return true;
+        };
+        // The rounded-rectangle SDF is 1-Lipschitz: each shader finite
+        // difference is bounded by the length of its inverse-affine step.
+        let fringe = (self.inverse_a[0].hypot(self.inverse_a[1])
+            + self.inverse_a[2].hypot(self.inverse_a[3]))
+        .max(0.75);
+        let bounds = transform.transform_rect(Rect::new(
+            Point::new(self.bounds[0] - fringe, self.bounds[1] - fringe),
+            Size::new(self.bounds[2] + fringe * 2.0, self.bounds[3] + fringe * 2.0),
+        ));
+        bounds.intersection(glyph).is_some()
+    }
+
     pub fn physical(bounds: [f32; 4]) -> Self {
         Self {
             inverse_a: Affine2D::IDENTITY.matrix,
@@ -68,6 +91,9 @@ impl GlyphInstance {
         attributes: &Self::ATTRIBUTES,
     };
 
+    /// Creates a glyph instance from physical `glyph`, its resident `entry` and page size.
+    /// `transform` handles remaining affine effects; clip indices select the clip chain,
+    /// and `backdrop` optionally supplies the opaque linear background for coverage correction.
     pub fn new(
         glyph: PreparedGlyph,
         entry: AtlasEntry,
@@ -102,7 +128,7 @@ impl GlyphInstance {
             mode,
             transform_a: transform.matrix,
             transform_b: [transform.translation.x, transform.translation.y, 0.0, 0.0],
-            clip_meta: [clip_start, clip_count, 0, 0],
+            clip_meta: [clip_start, clip_count, entry.page as u32, 0],
         }
     }
 
@@ -150,6 +176,7 @@ pub(super) struct TextPipeline {
     pipeline: wgpu::RenderPipeline,
     layout: wgpu::BindGroupLayout,
     atlas_view: wgpu::TextureView,
+    color_view: wgpu::TextureView,
     atlas_sampler: wgpu::Sampler,
     bind_group: wgpu::BindGroup,
     viewport_buffer: wgpu::Buffer,
@@ -164,10 +191,13 @@ pub(super) struct TextPipeline {
 
 #[cfg_attr(coverage_nightly, coverage(off))]
 impl TextPipeline {
+    /// Creates the text pipeline for `format` on `device`, sampling the mask and color
+    /// array views with `atlas_sampler`; both atlases share physical glyph instances.
     pub fn new(
         device: &wgpu::Device,
         format: wgpu::TextureFormat,
         atlas_view: &wgpu::TextureView,
+        color_view: &wgpu::TextureView,
         atlas_sampler: &wgpu::Sampler,
     ) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -185,7 +215,17 @@ impl TextPipeline {
                         visibility: wgpu::ShaderStages::FRAGMENT,
                         ty: wgpu::BindingType::Texture {
                             sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                            view_dimension: wgpu::TextureViewDimension::D2,
+                            view_dimension: wgpu::TextureViewDimension::D2Array,
+                            multisampled: false,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 4,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                            view_dimension: wgpu::TextureViewDimension::D2Array,
                             multisampled: false,
                         },
                         count: None,
@@ -269,6 +309,10 @@ impl TextPipeline {
                     resource: wgpu::BindingResource::TextureView(atlas_view),
                 },
                 wgpu::BindGroupEntry {
+                    binding: 4,
+                    resource: wgpu::BindingResource::TextureView(color_view),
+                },
+                wgpu::BindGroupEntry {
                     binding: 3,
                     resource: clip_buffer.as_entire_binding(),
                 },
@@ -290,6 +334,7 @@ impl TextPipeline {
             pipeline,
             layout,
             atlas_view: atlas_view.clone(),
+            color_view: color_view.clone(),
             atlas_sampler: atlas_sampler.clone(),
             bind_group,
             viewport_buffer,
@@ -328,6 +373,7 @@ impl TextPipeline {
                 device,
                 &self.layout,
                 &self.atlas_view,
+                &self.color_view,
                 &self.atlas_sampler,
                 &self.viewport_buffer,
                 &self.clip_buffer,
@@ -405,11 +451,14 @@ fn create_clip_buffer(device: &wgpu::Device, capacity: usize) -> wgpu::Buffer {
     })
 }
 
+/// Binds both atlas views, `atlas_sampler`, the dynamic `viewport` uniform and `clips`
+/// to `layout` on `device`, returning the replacement group after buffer growth.
 #[cfg_attr(coverage_nightly, coverage(off))]
 fn create_bind_group(
     device: &wgpu::Device,
     layout: &wgpu::BindGroupLayout,
     atlas_view: &wgpu::TextureView,
+    color_view: &wgpu::TextureView,
     atlas_sampler: &wgpu::Sampler,
     viewport: &wgpu::Buffer,
     clips: &wgpu::Buffer,
@@ -421,6 +470,10 @@ fn create_bind_group(
             wgpu::BindGroupEntry {
                 binding: 0,
                 resource: wgpu::BindingResource::TextureView(atlas_view),
+            },
+            wgpu::BindGroupEntry {
+                binding: 4,
+                resource: wgpu::BindingResource::TextureView(color_view),
             },
             wgpu::BindGroupEntry {
                 binding: 1,

@@ -155,3 +155,99 @@ fn paint_changes_remain_stronger_than_compositor_changes() {
         .transform(Transform2D::IDENTITY.translate(20.0, 0.0));
     assert_eq!(UiTree::new(original).update(changed), TreeUpdate::Paint);
 }
+
+/// Authored transforms rerasterize descendant text, while opacity keeps its retained path.
+#[test]
+fn direct_text_transform_changes_repaint_at_their_final_scale() {
+    let view = |scale, opacity| {
+        Element::container([Element::text("Nested text")])
+            .transform(Transform2D::IDENTITY.scale(scale, scale))
+            .layer(LayerStyle::new(Default::default()).opacity(opacity))
+    };
+    let mut tree = UiTree::new(view(1.25, 0.9));
+    tree.mark_layout_clean();
+    assert_eq!(tree.update(view(1.5, 0.9)), TreeUpdate::Paint);
+    assert!(!tree.layout_dirty());
+    assert_eq!(tree.update(view(1.5, 0.5)), TreeUpdate::Composite);
+    assert_eq!(
+        tree.update(view(1.5, 0.5).transform_origin(argui_core::TransformOrigin::TOP_LEFT)),
+        TreeUpdate::Paint
+    );
+
+    let view = |scale| {
+        Element::text("Bound text").bind(
+            argui_ui::property::Transform,
+            argui_animation::Motion::new(Transform2D::IDENTITY.scale(scale, scale)),
+        )
+    };
+    assert_eq!(UiTree::new(view(1.25)).update(view(1.5)), TreeUpdate::Paint);
+}
+
+/// Removing an active transform refreshes text without changing nontext or opacity policy.
+#[test]
+fn removing_active_transform_binding_repaints_only_text_subtrees() {
+    use argui_animation::{Duration, Motion, Time, Tween};
+    use argui_ui::property;
+
+    let transform = Motion::new(Transform2D::IDENTITY);
+    let mut text = UiTree::new(Element::text("Text").bind(property::Transform, transform.clone()));
+    let mut nontext =
+        UiTree::new(Element::container([]).bind(property::Transform, transform.clone()));
+    transform.animate_to(
+        Transform2D::IDENTITY.scale(2.0, 2.0),
+        Tween::new(Duration::from_secs(1)),
+    );
+    text.advance_animations(Time::from_nanos(1));
+    text.advance_animations(Time::from_nanos(500_000_001));
+    assert!(transform.is_active());
+    assert_eq!(text.update(Element::text("Text")), TreeUpdate::Paint);
+    assert_eq!(
+        nontext.update(Element::container([])),
+        TreeUpdate::Composite
+    );
+
+    let opacity = Motion::new(1.0_f32);
+    let mut text = UiTree::new(Element::text("Text").bind(property::LayerOpacity, opacity.clone()));
+    opacity.animate_to(0.5, Tween::new(Duration::from_secs(1)));
+    assert_eq!(text.update(Element::text("Text")), TreeUpdate::Composite);
+}
+
+/// Updating an animated transform's authored target preserves composition until it settles.
+#[test]
+fn active_transform_keeps_authored_target_updates_on_the_compositor() {
+    use argui_animation::{Duration, Motion, Time, Tween};
+    use argui_ui::property;
+
+    let motion = Motion::new(Transform2D::IDENTITY);
+    let view = |scale| {
+        Element::container([Element::text("Animated text")])
+            .transform(Transform2D::IDENTITY.scale(scale, scale))
+            .bind(property::Transform, motion.clone())
+    };
+    let mut tree = UiTree::new(view(1.0));
+    motion.animate_to(
+        Transform2D::IDENTITY.scale(2.0, 2.0),
+        Tween::new(Duration::from_secs(1)),
+    );
+    assert_eq!(tree.update(view(2.0)), TreeUpdate::Composite);
+    tree.advance_animations(Time::ZERO);
+    assert_eq!(
+        tree.advance_animations(Time::from_nanos(500_000_000)),
+        TreeUpdate::Composite
+    );
+    assert_eq!(
+        tree.advance_animations(Time::from_nanos(1_000_000_000)),
+        TreeUpdate::Paint
+    );
+    assert!(!motion.is_active());
+    assert_eq!(tree.update(view(3.0)), TreeUpdate::Paint);
+
+    motion.animate_to(
+        Transform2D::IDENTITY.scale(4.0, 4.0),
+        Tween::new(Duration::from_secs(1)),
+    );
+    assert_eq!(
+        tree.update(view(4.0).background(Color::BLACK)),
+        TreeUpdate::Paint
+    );
+}

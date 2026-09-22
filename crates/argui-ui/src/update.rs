@@ -79,7 +79,9 @@ const fn update_priority(update: TreeUpdate) -> u8 {
     }
 }
 
-/// Classifies non-layout element changes by their strongest visual phase.
+/// Classifies changes from `old` to `new`, repainting authored text transforms
+/// unless a bound transform is actively animating the same element.
+/// Returns `None` when neither paint nor presentation properties changed.
 fn visual_update(old: &Element, new: &Element) -> Option<TreeUpdate> {
     let paint = old.inspectable != new.inspectable
         || old.kind != new.kind
@@ -101,7 +103,9 @@ fn visual_update(old: &Element, new: &Element) -> Option<TreeUpdate> {
         || old.selection_style != new.selection_style
         || old.selection_highlight != new.selection_highlight
         || old.z_index != new.z_index;
-    if paint {
+    let transform_changed =
+        old.transform != new.transform || old.transform_origin != new.transform_origin;
+    if paint || (transform_changed && contains_text(new) && !has_active_transform(new)) {
         Some(TreeUpdate::Paint)
     } else if old.declared_scroll_offset != new.declared_scroll_offset {
         Some(TreeUpdate::Scroll)
@@ -119,6 +123,21 @@ fn visual_update(old: &Element, new: &Element) -> Option<TreeUpdate> {
     } else {
         None
     }
+}
+
+/// Returns whether `element` has a transform binding whose motion is still active.
+fn has_active_transform(element: &Element) -> bool {
+    element.bindings.iter().any(|binding| {
+        matches!(binding, crate::PropertyBinding::Transform(_)) && binding.track().is_active()
+    })
+}
+
+/// Returns whether `element` or any descendant paints text, including editors.
+fn contains_text(element: &Element) -> bool {
+    matches!(
+        element.kind,
+        ElementKind::Text { .. } | ElementKind::TextEditor { .. }
+    ) || element.children.iter().any(contains_text)
 }
 
 /// Returns layer properties that affect retained pixels rather than presentation.
@@ -167,15 +186,26 @@ fn state_update(old: &Element, new: &Element) -> TreeUpdate {
         })
 }
 
+/// Classifies changed bindings from `old` to `new`, repainting text transforms unless
+/// the new description retains an active transform animation.
 fn binding_update(old: &Element, new: &Element) -> TreeUpdate {
     if old.bindings == new.bindings {
         return TreeUpdate::None;
     }
+    let text = contains_text(new);
+    let active_transform = has_active_transform(new);
     old.bindings
         .iter()
         .chain(&new.bindings)
         .fold(TreeUpdate::None, |update, binding| {
             let next = match binding.impact() {
+                BindingImpact::Composite
+                    if text
+                        && matches!(binding, crate::PropertyBinding::Transform(_))
+                        && !active_transform =>
+                {
+                    TreeUpdate::Paint
+                }
                 BindingImpact::Composite => TreeUpdate::Composite,
                 BindingImpact::Paint => TreeUpdate::Paint,
                 BindingImpact::Scroll => TreeUpdate::Scroll,

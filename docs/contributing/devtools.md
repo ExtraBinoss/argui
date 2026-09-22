@@ -43,11 +43,13 @@ See [styling](../ui/styling.md#themes).
 
 `argui-inspect` owns renderer-independent snapshots and a bounded 300-frame
 ring. Records contain CPU stages, draw counts, invalidations, GPU passes,
-processed pixels, offscreen textures, and vector-atlas activity.
+processed pixels, offscreen textures, and vector/glyph-atlas activity. Glyph
+counters include cache hits, raster requests, upload bytes, page evictions,
+and the allocated mask/color texture bytes.
 
 GPU durations require timestamp-query support and remain separate from CPU
 durations. Pause freezes collection; Clear releases history. Export writes
-strict `argui-gpu-trace-v4` JSON; import rejects unknown versions and fields.
+strict `argui-gpu-trace-v5` JSON; import rejects unknown versions and fields.
 
 Detailed GPU profiling runs only while the Profiling pane is open and unpaused.
 Closing the tools stops recording. Selecting a frame freezes its details; Live

@@ -8,6 +8,9 @@ use argui_dsl_ir::{
 use argui_dsl_runtime::{DslValue, EvaluationContext, Instruction, Program, RuntimeError};
 use argui_dsl_syntax::{FileId, Span, TextRange, TextSize};
 
+#[path = "bytecode/builtin.rs"]
+mod builtin;
+
 #[path = "bytecode/gradient.rs"]
 mod gradient;
 

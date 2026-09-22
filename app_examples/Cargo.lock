@@ -676,6 +676,7 @@ version = "0.3.2"
 dependencies = [
  "argui-core",
  "cosmic-text",
+ "swash",
  "unicode-segmentation",
 ]
 

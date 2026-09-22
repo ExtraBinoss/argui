@@ -10,6 +10,9 @@ use argui_ui::{
 #[path = "tree/event.rs"]
 mod event;
 
+#[path = "tree/animation.rs"]
+mod animation;
+
 #[test]
 fn replacing_editor_value_obeys_read_only_filters_and_emits_input() {
     use argui_ui::{EventHandlerId, EventListener, EventOwnerId, EventType, UiEventKind};

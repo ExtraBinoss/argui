@@ -31,5 +31,9 @@ winit.workspace = true
 name = "gpu_canvas"
 path = "tests/gpu_canvas/mod.rs"
 
+[[test]]
+name = "text_pipeline"
+path = "tests/text/pipeline.rs"
+
 [lints]
 workspace = true

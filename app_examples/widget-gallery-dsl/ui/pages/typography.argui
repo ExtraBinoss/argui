@@ -7,6 +7,31 @@ export component TypographyPage {
         Text { content: "Typography" color: var(--argui-foreground) weight: 700 font_size: 27.0 }
         Text { content: "A readable scale for headings, prose and supporting text." color: var(--argui-muted-foreground) font_size: 14.0 }
 
+        Text { content: "Small text, precise detail" color: var(--argui-foreground) weight: 700 font_size: 18.0 }
+        Row {
+            width: 100% wrap: true gap: 16.0
+            Rectangle {
+                width: 320px radius: 10.0 background: solid(#f8fafc)
+                Column { width: 100% padding: 18.0 gap: 10.0
+                    Text { content: "Light surface" color: #0f172a weight: 650 font_size: 16.0 }
+                    Text { content: "Minimum · ffi fl · AVATAR · 0123456789" color: #0f172a font_size: 12.0 line_height: 18.0 }
+                    Text { content: "Crème brûlée · naïve · coöperate" color: #0f172a font_size: 14.0 line_height: 21.0 }
+                    Text { content: "Argui العربية עברית" color: #0f172a font_size: 16.0 line_height: 26.0 }
+                    Text { content: "Supporting text stays readable." color: #64748b font_size: 12.0 line_height: 18.0 }
+                }
+            }
+            Rectangle {
+                width: 320px radius: 10.0 background: solid(#0f172a)
+                Column { width: 100% padding: 18.0 gap: 10.0
+                    Text { content: "Dark surface" color: #f8fafc weight: 650 font_size: 16.0 }
+                    Text { content: "Minimum · ffi fl · AVATAR · 0123456789" color: #f8fafc font_size: 12.0 line_height: 18.0 }
+                    Text { content: "Crème brûlée · naïve · coöperate" color: #f8fafc font_size: 14.0 line_height: 21.0 }
+                    Text { content: "Argui العربية עברית" color: #f8fafc font_size: 16.0 line_height: 26.0 }
+                    Text { content: "Supporting text stays readable." color: #94a3b8 font_size: 12.0 line_height: 18.0 }
+                }
+            }
+        }
+
         Rectangle {
             width: 100%
             radius: 12.0

@@ -262,6 +262,8 @@ impl NodeTransition {
         }
     }
 
+    /// Applies `spec`, animating its changes unless `reduced_motion` requests immediate values.
+    /// Returns the strongest update, including paint for an immediately settled transform.
     fn sync(&mut self, spec: NodeSpec<'_>, reduced_motion: bool) -> TreeUpdate {
         self.element = spec
             .element
@@ -276,14 +278,14 @@ impl NodeTransition {
             let target = resolved.property;
             let Some(property) = self.values.iter_mut().find(|value| value.key == target.key)
             else {
-                let impact = target.key.impact();
+                let update_kind = property_update(&target.key, true);
                 self.values.push(AnimatedProperty {
                     key: target.key,
                     target: target.value.clone(),
                     source: resolved.source,
                     value: AnimatedValue::new(target.value),
                 });
-                update = strongest(update, impact.into());
+                update = strongest(update, update_kind);
                 continue;
             };
             if property.target == target.value {
@@ -306,7 +308,10 @@ impl NodeTransition {
                     style_transition.resolve(&target.key, direction),
                 );
             }
-            update = strongest(update, target.key.impact().into());
+            update = strongest(
+                update,
+                property_update(&target.key, !property.value.is_active()),
+            );
         }
         self.matched = spec.matched;
         if update != TreeUpdate::None {
@@ -315,13 +320,18 @@ impl NodeTransition {
         update
     }
 
+    /// Samples properties at `now`, repainting each transform independently when it settles.
+    /// Returns the strongest required invalidation and advances this node's revision.
     fn advance(&mut self, now: Time) -> TreeUpdate {
         let update = self
             .values
             .iter()
             .fold(TreeUpdate::None, |update, property| {
-                if property.value.advance(now) {
-                    strongest(update, property.key.impact().into())
+                let was_active = property.value.is_active();
+                let changed = property.value.advance(now);
+                let settled = was_active && !property.value.is_active();
+                if changed || settled {
+                    strongest(update, property_update(&property.key, settled))
                 } else {
                     update
                 }
@@ -332,13 +342,14 @@ impl NodeTransition {
         update
     }
 
+    /// Finishes active properties and returns the invalidation for their final pixels.
     fn finish(&mut self) -> TreeUpdate {
         let update = self
             .values
             .iter()
             .fold(TreeUpdate::None, |update, property| {
                 if property.value.finish() {
-                    strongest(update, property.key.impact().into())
+                    strongest(update, property_update(&property.key, true))
                 } else {
                     update
                 }
@@ -353,6 +364,15 @@ impl NodeTransition {
         self.values
             .iter()
             .any(|property| property.value.is_active())
+    }
+}
+
+/// Returns `key`'s update, repainting settled transforms while preserving opacity composition.
+fn property_update(key: &PropertyKey, settled: bool) -> TreeUpdate {
+    if settled && *key == PropertyKey::Transform {
+        TreeUpdate::Paint
+    } else {
+        key.impact().into()
     }
 }
 

@@ -232,3 +232,57 @@ fn caret_blink_updates_its_retained_layer_without_repainting_text() {
     assert_eq!(caret.opacity, 0.0);
     assert_eq!(output.text, retained_text);
 }
+
+/// A transform's terminal paint rebases text commands instead of retaining scaled bitmaps.
+#[test]
+fn settled_text_transform_repaints_at_the_current_physical_scale() {
+    let motion = Motion::new(Transform2D::IDENTITY);
+    let mut ui = UiTree::new(
+        Element::text("Crisp at rest")
+            .width(length(120.0))
+            .height(length(32.0))
+            .bind(property::Transform, motion.clone()),
+    );
+    let mut engine = LayoutEngine::new();
+    let mut text = TextEngine::new();
+    let mut output = engine
+        .compute(&mut ui, &mut text, Size::new(360.0, 120.0))
+        .unwrap();
+    let terminal = Transform2D::IDENTITY.scale(1.5, 1.5).translate(0.25, 0.0);
+    motion.animate_to(terminal, Tween::new(Duration::from_millis(100)));
+    ui.advance_animations(Time::from_nanos(1));
+    assert_eq!(
+        ui.advance_animations(Time::from_nanos(50_000_001)),
+        TreeUpdate::Composite
+    );
+    assert!(engine.composite(&ui, &mut output));
+    assert_ne!(
+        output
+            .display_list
+            .compositor_layers()
+            .next()
+            .unwrap()
+            .transform,
+        Affine2D::IDENTITY
+    );
+    assert_eq!(
+        ui.advance_animations(Time::from_nanos(100_000_001)),
+        TreeUpdate::Paint
+    );
+    engine.repaint(&ui, &mut output);
+
+    let layer = output.display_list.compositor_layers().next().unwrap();
+    assert_eq!(layer.transform, Affine2D::IDENTITY);
+    assert_eq!(layer.base_transform.matrix, [1.5, 0.0, 0.0, 1.5]);
+    let text_transform = output
+        .display_list
+        .commands()
+        .iter()
+        .find_map(|command| match command {
+            DisplayCommand::Text { transform, .. } => Some(*transform),
+            _ => None,
+        })
+        .unwrap();
+    assert_eq!(text_transform, layer.base_transform);
+    assert!(!ui.wants_animation_frame());
+}

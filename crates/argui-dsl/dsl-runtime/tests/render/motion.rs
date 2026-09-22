@@ -464,3 +464,97 @@ fn nested_child_keeps_canonical_input_while_inheriting_parent_animation() {
         );
     }
 }
+
+mod integer_values {
+    //! Typed motion output and state-edge behavior at the live runtime boundary.
+
+    use std::collections::HashMap;
+
+    use argui_animation::{Duration, Frame, Time};
+    use argui_dsl_compiler::{Compiler, SourceModule};
+    use argui_dsl_runtime::{DslValue, LivePackage, LiveRuntime};
+    use argui_runtime::{Context, Render};
+    use argui_ui::{Element, ElementKind};
+
+    /// Compiles and mounts `source`, returning its live runtime without advancing time.
+    ///
+    /// Panics when the fixture fails compilation, package preparation, or mounting.
+    fn mounted(source: &str) -> LiveRuntime {
+        let compiled = Compiler::compile(
+            [SourceModule::new("ui/main.argui", source)],
+            "ui/main.argui",
+            |_| Err("motion fixtures have no assets".into()),
+        )
+        .unwrap();
+        let root = compiled.roots[0];
+        let package =
+            LivePackage::prepare(1, compiled.public_api_hash, compiled.ir, HashMap::new()).unwrap();
+        let mut runtime = LiveRuntime::new(package).unwrap();
+        runtime.mount(root, []).unwrap();
+        runtime
+    }
+
+    /// Advances `runtime` from `previous_ms` to `now_ms` using a deterministic clock.
+    fn advance(runtime: &mut LiveRuntime, previous_ms: u64, now_ms: u64) {
+        runtime.animation_frame(
+            Frame {
+                now: Time::from_nanos(now_ms * 1_000_000 + 1),
+                elapsed: Duration::from_millis(now_ms - previous_ms),
+            },
+            &mut Context::default(),
+        );
+    }
+
+    /// Returns the number of rendered caret primitives on the editor `element`.
+    ///
+    /// Panics if `element` is not an editor.
+    fn caret_count(element: &Element) -> usize {
+        let ElementKind::TextEditor { caret, .. } = &element.kind else {
+            panic!("expected an editor");
+        };
+        caret.visual.primitives.len()
+    }
+
+    /// Integer component inputs and native properties round at the same frame boundary.
+    #[test]
+    fn integer_motion_rounds_editor_caret_counts_without_mutating_inputs() {
+        let mut runtime = mounted(
+            r#"import { Container, TextInput } from "@argui/native"
+component Editor {
+    in property count: int = 1
+    TextInput { caret_count: count caret_blink: false }
+}
+export component Main {
+    Container {
+        TextInput {
+            caret_count: 3
+            caret_blink: false
+            animate caret_count { from: 1 to: 3 duration: 100ms }
+        }
+        Editor { count: 3 animate count { from: 1 to: 3 duration: 100ms } }
+    }
+}"#,
+        );
+        let first = runtime.render().unwrap();
+        assert_eq!(caret_count(&first.children[0]), 1);
+        assert_eq!(caret_count(&first.children[1]), 1);
+        advance(&mut runtime, 0, 0);
+        advance(&mut runtime, 0, 26);
+        let middle = runtime.render().unwrap();
+        assert_eq!(caret_count(&middle.children[0]), 2);
+        assert_eq!(caret_count(&middle.children[1]), 2);
+        let root = runtime.root().unwrap();
+        let inspection = runtime.inspect();
+        let child = inspection
+            .instances
+            .iter()
+            .find(|item| item.id != root)
+            .unwrap();
+        assert_eq!(child.properties[0].1, DslValue::Int(3));
+        advance(&mut runtime, 26, 100);
+        let final_frame = runtime.render().unwrap();
+        assert_eq!(caret_count(&final_frame.children[0]), 3);
+        assert_eq!(caret_count(&final_frame.children[1]), 3);
+        assert!(!runtime.wants_animation_frame());
+    }
+}

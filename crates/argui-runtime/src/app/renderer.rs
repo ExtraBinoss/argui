@@ -370,6 +370,7 @@ impl Application {
                         cached_layers: profile.effects.cached_layers,
                         damaged_pixels: profile.damage.damaged_pixels,
                         textures: profile.texture_pool.textures
+                            + 2
                             + profile.gpu_canvases.entries
                             + usize::from(profile.damage.retained_bytes > 0)
                             + 1,
@@ -380,6 +381,7 @@ impl Application {
                                 DamageMode::Partial | DamageMode::Reused
                             )),
                         texture_bytes: profile.texture_pool.allocated_bytes
+                            + profile.text_atlas.allocated_bytes
                             + profile.vector_atlas.allocated_bytes
                             + profile.gpu_canvases.allocated_bytes
                             + profile.damage.retained_bytes,
@@ -389,6 +391,12 @@ impl Application {
                         gpu_canvas_hits: profile.gpu_canvases.hits_this_frame,
                         gpu_canvas_failures: profile.gpu_canvases.failures_this_frame,
                         gpu_canvas_encode_cpu: profile.gpu_canvases.encode_time,
+                        text_atlas_bytes: profile.text_atlas.allocated_bytes,
+                        text_atlas_entries: profile.text_atlas.entries,
+                        text_atlas_hits: profile.text_atlas.hits_this_frame,
+                        text_raster_requests: profile.text_atlas.raster_requests_this_frame,
+                        text_upload_bytes: profile.text_atlas.uploaded_bytes_this_frame,
+                        text_page_evictions: profile.text_atlas.evictions_this_frame,
                         vector_atlas_entries: profile.vector_atlas.entries,
                         vector_atlas_bytes: profile.vector_atlas.allocated_bytes,
                         vector_atlas_hits: profile.vector_atlas.hits_this_frame,

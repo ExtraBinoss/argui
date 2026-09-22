@@ -20,7 +20,7 @@ Start with:
 | Models and lifetime | [Models](runtime/models.md) · [Tasks](runtime/tasks.md) |
 | Layout and input | [Styling](ui/styling.md) · [Interaction](ui/interaction.md) · [Scroll](ui/scroll.md) |
 | UI behavior | [Editing](ui/editing.md) · [Animation](ui/animation.md) · [Custom elements](ui/custom-elements.md) |
-| Rendering | [Primitives](rendering/primitives.md) · [Adaptive damage](rendering/damage.md) · [Compositor](rendering/compositor.md) · [Effects](rendering/effects.md) · [GPU canvases](rendering/gpu-canvas.md) |
+| Rendering | [Primitives](rendering/primitives.md) · [Text fidelity](rendering/text.md) · [Adaptive damage](rendering/damage.md) · [Compositor](rendering/compositor.md) · [Effects](rendering/effects.md) · [GPU canvases](rendering/gpu-canvas.md) |
 | Application authoring | [DSL quickstart](dsl/getting-started.md) · [Language](dsl/language.md) · [Transactional reload and tooling](dsl/development.md) |
 | Optional capabilities | [Localization](i18n.md) |
 | Widgets | [Interaction APIs](widgets/interaction-api.md) · [Builder inventory](widgets/builder-inventory.md) · [Catalogue](widgets/shadcn.md) · [Lists and tables](widgets/lists-tables.md) · [Overlays](widgets/overlays.md) |
