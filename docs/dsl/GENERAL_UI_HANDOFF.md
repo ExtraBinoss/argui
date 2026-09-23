@@ -20,8 +20,8 @@ mesures utilisateur ci-dessous portent sur la galerie avant cette fusion.
 
 | Phase | État réel | Travail restant principal |
 | --- | --- | --- |
-| P0 | Partiel | Terminer l'inventaire et les reproductions slots/styles et repeater ; compléter le registre de preuves. |
-| P1 | Avancé, non validé comme phase entière | Validation sémantique des écritures, directions, types, clés de repeater, court-circuit, arithmétique contrôlée et warnings CLI/LSP ajoutés. Les 18 fixtures de conformité AOT/live passent. Revoir les cas limites et rejouer les régressions complètes avant de cocher les critères. |
+| P0 | Baseline établie, non bloquant | L'inventaire et quelques preuves administratives de la checklist restent ouverts ; ne pas relancer l'audit pour avancer. |
+| P1 | Correctifs principaux implémentés, non bloquant | Validation sémantique des écritures, directions, types, clés de repeater, court-circuit, arithmétique contrôlée et warnings CLI/LSP ajoutés. Les 18 fixtures de conformité AOT/live passent. Ne revenir sur les cas limites que si un défaut concret apparaît. |
 | P2 | Partiel | Slots nommés, défauts, forwarding et styles/états fonctionnels sur les exemples couverts ; Dialog et Input adaptés. Restent cardinalité, paramètres typés des templates, références lexicales générales par instance et enfant conditionnel absent, ainsi que les preuves complètes de précédence. |
 | P3 | À faire | Grid, layout général, propriétés visuelles, transformations, hit testing et preuves responsive. |
 | P4 | À faire | Expressions et modèles réactifs mutables, hauteurs variables, maintien du focus/scroll et mesures. |
@@ -105,8 +105,12 @@ d'une page de la sidebar n'apparaît qu'après un scroll : ce symptôme n'a pas
 2. Prendre les mesures utilisateur ci-dessus comme nouveau point de référence.
    La performance ne bloque plus la suite ; ne rouvrir l'enquête CPU que si
    une régression apparaît, notamment après la fusion.
-3. Finir P0/P1 et P2 avec régression ciblée, puis suivre les dépendances P3–P10
-   du plan, sans déduire qu'une phase est finie de quelques fixtures vertes.
+3. Ne pas relancer un audit ou une campagne de commandes pour P0 : sa baseline
+   existe déjà. Les correctifs principaux de P1 sont implémentés et les 18
+   scénarios AOT/live passent ; ne rouvrir P1 que pour un défaut concret ou
+   une dépendance rencontrée. Compléter les vrais manques de P2 (cardinalité
+   des slots, paramètres typés des templates, références lexicales par
+   instance, enfant conditionnel absent), puis avancer sur P3–P10.
 4. Mettre à jour les cases et le registre de preuves seulement après validation.
    Appliquer `docs/contributing/code-quality.md` et
    `docs/contributing/linux-testing.md`. Les contrôles GUI de l'agent vont
