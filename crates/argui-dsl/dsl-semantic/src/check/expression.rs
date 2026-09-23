@@ -283,6 +283,13 @@ fn call(node: &SyntaxNode, context: &mut Context<'_, '_>) -> Type {
                 })
         }
         Some(name) if context.callbacks.contains_key(name) => {
+            if !context.event_handler {
+                context.diagnostics.push(Diagnostic::error(
+                    DiagnosticCode::TypeMismatch,
+                    format!("callback `{name}` has effects and may only be invoked in a handler"),
+                    Span::new(context.file, node.text_range()),
+                ));
+            }
             let callback = context.callbacks[name].clone();
             if callback.parameters.len() != arguments.len() {
                 context.diagnostics.push(Diagnostic::error(
@@ -375,7 +382,7 @@ fn binary(node: &SyntaxNode, context: &mut Context<'_, '_>) -> Type {
 }
 
 /// Produces the result of unit-preserving arithmetic.
-fn arithmetic(
+pub(super) fn arithmetic(
     context: &mut Context<'_, '_>,
     node: &SyntaxNode,
     operator: SyntaxKind,

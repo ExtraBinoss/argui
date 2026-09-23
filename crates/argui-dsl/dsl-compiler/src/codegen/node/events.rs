@@ -67,8 +67,8 @@ impl Context<'_> {
             for site in observed_sites {
                 writeln!(
                     output,
-                    "{pad}    observer.watch(&::argui::ui::RetainedIdentity::new(owner, {}));",
-                    site.raw()
+                    "{pad}    observer.watch(&{});",
+                    scope.observation_identity(site)
                 )
                 .unwrap();
             }

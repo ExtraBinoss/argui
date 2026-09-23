@@ -272,15 +272,21 @@ pub(super) fn theme_definition(
 }
 
 /// Extracts a style target and assigned property names.
-pub(super) fn style_definition(syntax: &SyntaxNode) -> StyleDefinition {
+pub(super) fn style_definition(syntax: &SyntaxNode, scope: &Scope) -> StyleDefinition {
+    let target = syntax
+        .children()
+        .find(|node| node.kind() == SyntaxKind::TypeRef)
+        .and_then(|node| direct_ident(&node))
+        .unwrap_or_default();
     StyleDefinition {
-        target: syntax
-            .children()
-            .find(|node| node.kind() == SyntaxKind::TypeRef)
-            .and_then(|node| direct_ident(&node))
-            .unwrap_or_default(),
+        native_target: scope.natives.get(&target).copied(),
+        component_target: scope.symbols.get(&target).copied(),
+        target,
         properties: syntax
-            .descendants()
+            .children()
+            .find(|node| node.kind() == SyntaxKind::Block)
+            .into_iter()
+            .flat_map(|block| block.children())
             .filter(|node| node.kind() == SyntaxKind::PropertyAssignment)
             .filter_map(|assignment| direct_ident_or_theme(&assignment))
             .collect(),

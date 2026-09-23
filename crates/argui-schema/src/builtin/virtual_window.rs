@@ -1,11 +1,14 @@
 //! Visually neutral fixed-row virtual viewport fed by a keyed repeater.
 
-use argui_ui::{EventType, VirtualList};
+use argui_ui::{
+    EventType, ScrollConfig, ScrollbarGutter, ScrollbarPartStyle, ScrollbarStyle,
+    ScrollbarVisibility, VirtualList,
+};
 
 use super::{
     CHILDREN, CONTENT_HEIGHT, CommonProperty, GROW, ITEM_COUNT, KEY, OFFSET_Y, OVERSCAN,
-    ROW_HEIGHT, SCROLL, SCROLL_OFFSET, VIEWPORT_HEIGHT, VIRTUAL_WINDOW, VISIBLE_HEIGHT,
-    WINDOW_START, apply_common, apply_events, common_property, required_string,
+    ROW_HEIGHT, SCROLL, SCROLL_OFFSET, SCROLLBAR_THUMB, VIEWPORT_HEIGHT, VIRTUAL_WINDOW,
+    VISIBLE_HEIGHT, WINDOW_START, apply_common, apply_events, common_property, required_string,
 };
 use crate::{
     EventSchema, NativeElementInput, NativeSchema, ObservationKind, PropertyId, PropertySchema,
@@ -74,6 +77,12 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
         .changed_by(SCROLL)
         .not_animatable(),
     )
+    .property(PropertySchema::new(
+        SCROLLBAR_THUMB,
+        "scrollbar_thumb",
+        ValueType::Color,
+        "Optional thumb color; omitted windows remain visually neutral.",
+    ))
     .property(
         PropertySchema::new(
             OFFSET_Y,
@@ -163,6 +172,21 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
             )));
         }
         let mut element = list.build(key.clone(), offset, |index| rows[index - first].clone());
+        if let Some(SchemaValue::Color(thumb)) = input.get(SCROLLBAR_THUMB) {
+            let scrollbar = ScrollbarStyle::new(
+                ScrollbarPartStyle::new(argui_paint::QuadStyle::default()),
+                ScrollbarPartStyle::new(argui_paint::QuadStyle::solid(*thumb)),
+            )
+            .width(8.0)
+            .visibility(ScrollbarVisibility::Always);
+            element = element
+                .scroll_config(
+                    ScrollConfig::default()
+                        .line_size(row_height)
+                        .scrollbar(scrollbar),
+                )
+                .scrollbar_gutter(ScrollbarGutter::Stable);
+        }
         if let Some(SchemaValue::Float(grow)) = input.get(GROW) {
             element = element.grow(*grow);
         }

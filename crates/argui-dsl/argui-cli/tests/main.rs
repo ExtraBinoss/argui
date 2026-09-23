@@ -338,3 +338,5 @@ fn binary_dev_exits_after_a_successful_child_application() {
     );
     assert!(String::from_utf8_lossy(&output.stdout).contains("child ready"));
 }
+#[path = "service/warnings.rs"]
+mod warnings;

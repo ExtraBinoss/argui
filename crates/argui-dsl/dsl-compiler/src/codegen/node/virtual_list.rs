@@ -64,7 +64,7 @@ impl Context<'_> {
         )?;
         let pad = "    ".repeat(depth);
         let identity = node.identity;
-        writeln!(output, "{pad}let {destination}_viewport = if ({viewport}) > 0.0 {{ {viewport} }} else {{ virtual_viewports.get(&{identity}).copied().unwrap_or(0.0) }};").unwrap();
+        writeln!(output, "{pad}let {destination}_viewport = if ({viewport}) > 0.0 {{ {viewport} }} else {{ virtual_viewports.height(&{identity}) }};").unwrap();
         let (repeater, rows_scope) = match node.children {
             [repeater @ IrNode::Repeater { .. }] => (repeater, scope),
             [IrNode::Slot { slot, .. }] => {
@@ -94,6 +94,7 @@ impl Context<'_> {
             &format!("{destination}_viewport"),
             &offset,
             &overscan,
+            identity,
         )
     }
 
@@ -101,7 +102,8 @@ impl Context<'_> {
     ///
     /// `repeater` is the original keyed loop and `scope` is its lexical owner;
     /// `destination` receives only mounted rows. The remaining expressions are
-    /// the effective row height, viewport, offset, and overscan for this window.
+    /// the effective row height, viewport, offset, and overscan for this window;
+    /// `identity` supplies the retained viewport identity that scopes row keys.
     ///
     /// # Errors
     ///
@@ -118,8 +120,10 @@ impl Context<'_> {
         viewport: &str,
         offset: &str,
         overscan: &str,
+        identity: &str,
     ) -> Result<(), CompilerError> {
         let IrNode::Repeater {
+            site,
             local,
             model,
             key,
@@ -168,6 +172,7 @@ impl Context<'_> {
             writeln!(output, "{pad}let {mounted} = {window}.range.map(|{index}| {items}[{index}].clone()).collect::<Vec<_>>();").unwrap();
         }
         writeln!(output, "{pad}let mut {destination}: Vec<::argui::ui::Element> = Vec::with_capacity({mounted}.len());").unwrap();
+        writeln!(output, "{pad}{{ let owner = child_owner(&({identity})); let mut keys = ::std::collections::HashSet::new();").unwrap();
         writeln!(output, "{pad}for {local_name} in {mounted} {{").unwrap();
         writeln!(
             output,
@@ -176,9 +181,15 @@ impl Context<'_> {
         .unwrap();
         let mut nested = scope.clone();
         nested.locals.insert(*local, local_name);
+        let identity = self.identity(site.raw(), &nested, Some(key))?;
+        writeln!(
+            output,
+            "{pad}assert!(keys.insert({identity}), \"duplicate repeater key\");"
+        )
+        .unwrap();
         self.emit_nodes(output, body, &row, depth + 1, &nested, Some(key))?;
         writeln!(output, "{pad}    {destination}.push(if {row}.len() == 1 {{ {row}.into_iter().next().unwrap() }} else {{ ::argui::ui::Element::column({row}) }});").unwrap();
-        writeln!(output, "{pad}}}").unwrap();
+        writeln!(output, "{pad}}} }}").unwrap();
         Ok(())
     }
 

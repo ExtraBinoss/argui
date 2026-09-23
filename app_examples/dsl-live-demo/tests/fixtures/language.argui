@@ -1,0 +1,125 @@
+import { Button, Column, Text } from "@argui/ui"
+import { TouchArea } from "@argui/native"
+
+export component Conformance {
+    out property count: int = 2
+    out property precision: float = 16777216.0 + 1.0
+    out property exact: bool = 9223372036854775806 < 9223372036854775807
+    out property ratio: float = 1
+    out property optional: optional<float> = 2
+    out property conditional: float = true ? 1 : 2.5
+    out property label: string = "start"
+    private property skipped: bool = false
+    callback probe() -> bool
+
+    Column {
+        Button {
+            text: "Run"
+            on click {
+                skipped = false && probe()
+                skipped = true || probe()
+                skipped = true ? true : probe()
+                count += count
+                ratio = count
+                ratio += 1
+                label += "!"
+            }
+        }
+        Text { content: str(precision) + ":" + str(exact) }
+        Text { content: str(count) + ":" + str(ratio) + ":" + label }
+    }
+}
+
+component Counter {
+    in property name: string
+    private property count: int = 0
+    Button { text: name + ":" + str(count) on click { count += 1 } }
+}
+
+export component KeyedRows {
+    private property groups: array<int> = [1, 2]
+    Column {
+        Button { text: "Reverse" on click { groups = [2, 1] } }
+        for group in groups key group {
+            for row in [1, 2] key row {
+                Counter { name: str(group) + str(row) }
+            }
+        }
+    }
+}
+
+style SharedText for Text { content: "styled" }
+style HoverText for Text {
+    content: "rest"
+    hover { content: "hovered" }
+}
+export component Styled {
+    Column {
+        Text { style: SharedText }
+        Text { style: SharedText content: "inline" }
+        Text #hover { style: HoverText }
+    }
+}
+
+component MultiSlot {
+    slot header { Text { content: "default header" } }
+    slot body
+    slot actions { Text { content: "default actions" } }
+    Column { header body actions }
+}
+component ForwardSlots {
+    slot header
+    slot body
+    slot actions
+    MultiSlot {
+        slot header { header }
+        slot body { body }
+        slot actions { actions }
+    }
+}
+export component NamedSlots {
+    private property count: int = 0
+    Column {
+        ForwardSlots {
+            slot header { Text { content: "supplied header" } }
+            slot body { Text { content: "body:" + str(count) } }
+            slot actions { Button { text: "Add from slot" on click { count += 1 } } }
+        }
+        MultiSlot {}
+    }
+}
+export component Playback {
+    private property running: bool = true
+    private property phase: float = 0.0
+    animate phase { from: 0.0 to: 1.0 duration: 1000ms iterations: "infinite" playing: running }
+    Column {
+        Button { text: running ? "Pause" : "Resume" on click { running = !running } }
+        Text #phase { content: str(phase) }
+    }
+}
+
+export component Retained {
+    private property count: int = 0
+    Column {
+        Text #unchanged { content: "Unchanged" }
+        Button { text: "Increment" on click { count += 1 } }
+        Text { content: str(count) }
+    }
+}
+
+export component StyledRows {
+    Column {
+        for row in [1, 2] key row {
+            Text { style: HoverText content: str(row) }
+        }
+    }
+}
+
+export component OuterObservation {
+    Column {
+        TouchArea #outer { width: 120px height: 30px }
+        for row in [1, 2] key row {
+            Text { content: (outer.has_hover ? "inside:" : "outside:") + str(row) }
+        }
+    }
+}

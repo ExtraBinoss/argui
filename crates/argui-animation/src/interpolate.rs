@@ -29,8 +29,16 @@ impl<const N: usize> Interpolate for [f32; N] {
 }
 
 impl Interpolate for Color {
+    /// Mixes toward `target` in Oklab at `progress`, preserving equal colors and
+    /// exact zero/one endpoints to avoid rounding drift when playback resumes.
     fn interpolate(self, target: Self, progress: f32) -> Self {
-        self.mix(target, progress, ColorInterpolation::Oklab)
+        if progress == 0.0 || self == target {
+            self
+        } else if progress == 1.0 {
+            target
+        } else {
+            self.mix(target, progress, ColorInterpolation::Oklab)
+        }
     }
 }
 

@@ -80,7 +80,8 @@ impl Context<'_> {
                         ));
                     }
                 } else {
-                    let value = self.expression(&binding.value, &canonical_outer)?;
+                    let value =
+                        self.expression_as(&binding.value, &lowered.value_type, &canonical_outer)?;
                     format!(
                         "child_properties.controlled({child_identity}.clone(), {}_u64, {})",
                         lowered.id.raw(),
@@ -89,7 +90,7 @@ impl Context<'_> {
                 }
             } else {
                 let value = if let Some(default) = &lowered.default {
-                    let expression = self.expression(default, &inner)?;
+                    let expression = self.expression_as(default, &lowered.value_type, &inner)?;
                     format!(
                         "{{ let owner = child_owner(&{child_identity}); let _ = owner; {expression} }}"
                     )
@@ -158,12 +159,7 @@ impl Context<'_> {
                     statement_capture_names(outer, &event.statements, &[]);
                 let watches = observed_sites
                     .into_iter()
-                    .map(|site| {
-                        format!(
-                            "observer.watch(&::argui::ui::RetainedIdentity::new(owner, {}));",
-                            site.raw()
-                        )
-                    })
+                    .map(|site| format!("observer.watch(&{});", outer.observation_identity(site)))
                     .collect::<Vec<_>>()
                     .join(" ");
                 let captures = captured_names
@@ -188,6 +184,7 @@ impl Context<'_> {
                     .collect::<Vec<_>>()
                     .join(", ");
                 let mut handler_scope = outer.clone();
+                handler_scope.return_type = Some(lowered.result.clone());
                 for (index, parameter) in event.parameters.iter().enumerate() {
                     handler_scope
                         .locals
@@ -212,6 +209,18 @@ impl Context<'_> {
         }
         let mut slot_values = Vec::new();
         for (index, slot) in ir.slots.iter().enumerate() {
+            let named = children
+                .iter()
+                .any(|child| matches!(child, IrNode::SlotContent { .. }));
+            let children = children
+                .iter()
+                .find_map(|child| match child {
+                    IrNode::SlotContent {
+                        slot: target, body, ..
+                    } if target == slot => Some(body.as_slice()),
+                    _ => None,
+                })
+                .unwrap_or(if index == 0 && !named { children } else { &[] });
             if ir.template_slots.contains(slot) {
                 let [repeater] = children else {
                     return Err(CompilerError::Codegen(
@@ -226,13 +235,9 @@ impl Context<'_> {
                 continue;
             }
             let variable = format!("child_s_{}_{}", site, slot.raw());
-            let mutability = if index == 0 && !children.is_empty() {
-                "mut "
-            } else {
-                ""
-            };
+            let mutability = if !children.is_empty() { "mut " } else { "" };
             writeln!(output, "{pad}let {mutability}{variable} = Vec::new();").unwrap();
-            if index == 0 {
+            if !children.is_empty() {
                 self.emit_nodes(output, children, &variable, depth, outer, repeater_key)?;
             }
             inner.slots.insert(*slot, variable.clone());
@@ -254,7 +259,7 @@ impl Context<'_> {
         let owner = format!("child_owner(&{child_identity})");
         write!(
             output,
-            "{pad}{destination}.push(render_component_{}({owner}, translator, property_motions, child_properties, virtual_viewports, reduced_motion, observer.clone(), host_effects.clone()",
+            "{pad}{destination}.push(render_component_{}({owner}, translator, property_motions, child_properties, virtual_viewports, native_cache, reduced_motion, observer.clone(), host_effects.clone()",
             component.raw()
         )
         .unwrap();
@@ -303,6 +308,13 @@ impl Context<'_> {
         writeln!(output, "{pad}let _ = owner;").unwrap();
         let mut scope = scope.clone();
         scope.translator = Some("translator".into());
+        let observed_owner = format!("template_observed_{identity}");
+        writeln!(
+            output,
+            "{pad}let {observed_owner} = owner; let _ = {observed_owner};"
+        )
+        .unwrap();
+        scope.observation_owner = Some(observed_owner);
         for (index, property) in component.properties.iter().enumerate() {
             let canonical = &scope.properties[&property.id];
             let rendered = format!("template_rendered_{}_{}", identity, property.id.raw());

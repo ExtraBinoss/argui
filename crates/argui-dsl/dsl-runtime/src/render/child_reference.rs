@@ -16,10 +16,10 @@ use super::identity::child_instance_id;
 /// expressions, and `output` receives stable site, target, and bindings.
 /// Conditional/repeated calls are excluded because they do not identify a
 /// single mounted child for a sibling expression.
-fn collect_children(
-    nodes: &[IrNode],
+fn collect_children<'a>(
+    nodes: &'a [IrNode],
     referenced: &HashSet<SiteId>,
-    output: &mut Vec<(SiteId, ComponentId, Vec<IrPropertyBinding>)>,
+    output: &mut Vec<(SiteId, ComponentId, &'a [IrPropertyBinding])>,
 ) {
     for node in nodes {
         if let IrNode::Element {
@@ -35,7 +35,7 @@ fn collect_children(
                 IrElementTarget::Component(component)
                     if source_id.is_some() && referenced.contains(site) =>
                 {
-                    output.push((*site, *component, properties.clone()));
+                    output.push((*site, *component, properties.as_slice()));
                 }
                 IrElementTarget::Native(_) => collect_children(children, referenced, output),
                 _ => {}
@@ -57,12 +57,11 @@ impl LiveRuntime {
         context: &mut Option<&mut argui_runtime::Context<Self>>,
     ) -> Result<(), RuntimeError> {
         parent.child_outputs.clear();
+        let Some(referenced) = self.package.child_reference_sites.get(&definition.id) else {
+            return Ok(());
+        };
         let mut children = Vec::new();
-        collect_children(
-            &definition.body,
-            &definition.referenced_child_sites(),
-            &mut children,
-        );
+        collect_children(&definition.body, referenced, &mut children);
         for (site, component, bindings) in children {
             let child_id = child_instance_id(parent.id, site, None);
             if self
@@ -76,7 +75,7 @@ impl LiveRuntime {
                 );
             }
             self.rendered_instances.insert(child_id);
-            for binding in &bindings {
+            for binding in bindings {
                 let PropertyTargetId::Component(property) = binding.target else {
                     return Err(RuntimeError::Schema(
                         "native binding on referenced child component".into(),
@@ -91,13 +90,11 @@ impl LiveRuntime {
                     .ok_or(RuntimeError::MissingProperty(property.raw()))?
                     .set(value)?;
             }
-            let child_definition = self
-                .package
-                .ir
+            let project = std::sync::Arc::clone(&self.package.ir);
+            let child_definition = project
                 .components
                 .iter()
                 .find(|candidate| candidate.id == component)
-                .cloned()
                 .ok_or(RuntimeError::MissingComponent(component.raw()))?;
             let mut child = self
                 .instances
@@ -114,8 +111,8 @@ impl LiveRuntime {
                         child.observations.insert(*native_site, observed);
                     }
                 }
-                self.prepare_child_references(&mut child, &child_definition, context)?;
-                self.refresh_derived_defaults(&mut child, &child_definition)
+                self.prepare_child_references(&mut child, child_definition, context)?;
+                self.refresh_derived_defaults(&mut child, child_definition)
             })();
             if let Err(error) = prepared {
                 self.instances.insert(child_id, child);
@@ -145,9 +142,19 @@ impl LiveRuntime {
         definition: &IrComponent,
     ) -> Result<(), RuntimeError> {
         for property in &definition.properties {
+            if instance
+                .properties
+                .get(&property.id)
+                .is_some_and(crate::DynamicProperty::has_override)
+            {
+                continue;
+            }
             let Some(default) = &property.default else {
                 continue;
             };
+            if matches!(default.kind, argui_dsl_ir::IrExpressionKind::Constant(_)) {
+                continue;
+            }
             let value = self.evaluate(instance, default, &HashMap::new())?;
             instance
                 .properties

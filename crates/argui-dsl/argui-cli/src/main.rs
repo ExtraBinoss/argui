@@ -155,7 +155,8 @@ fn dev(
     }
     let mut clients = Vec::new();
     let (status_sender, status_receiver) = mpsc::channel();
-    let mut latest = service.compile().message;
+    let attempt = service.compile();
+    let mut latest = attempt.message;
     let websocket_address = SocketAddr::new(bind.ip(), bind.port().saturating_add(1));
     let websocket = WebSocketHub::bind(websocket_address, &latest)?;
     let mut console = DevConsole::new(&root, bind, websocket_address)?;
@@ -169,6 +170,12 @@ fn dev(
         console.note(format!("◇ Browser ws://{websocket_address}"), Color::Cyan)?;
     }
     console.compilation(&latest)?;
+    for warning in &attempt.warnings {
+        console.note(
+            format!("warning · {}: {}", warning.code, warning.message),
+            AMBER,
+        )?;
+    }
     let (mut application, application_logs) = if launch_application {
         console.native_build_started()?;
         let (application, logs) = launch_dev_application(&root, bind, console.interactive())?;
@@ -224,8 +231,15 @@ fn dev(
                     console.change(change)?;
                 }
                 service.refresh_sources()?;
-                latest = service.compile().message;
+                let attempt = service.compile();
+                latest = attempt.message;
                 console.compilation(&latest)?;
+                for warning in &attempt.warnings {
+                    console.note(
+                        format!("warning · {}: {}", warning.code, warning.message),
+                        AMBER,
+                    )?;
+                }
                 broadcast(&mut clients, &latest);
                 websocket.broadcast(&latest)?;
                 console.clients(clients.len())?;
@@ -359,7 +373,10 @@ fn check(root: PathBuf, entry: &str) -> Result<(), Box<dyn std::error::Error>> {
     let attempt = service.compile();
     match attempt.message {
         LiveMessage::Package(_) => {
-            println!("{{\"ok\":true,\"generation\":{}}}", attempt.generation);
+            println!(
+                "{}",
+                serde_json::json!({"ok": true, "generation": attempt.generation, "diagnostics": attempt.warnings})
+            );
             Ok(())
         }
         message => {

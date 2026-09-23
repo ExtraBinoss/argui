@@ -26,6 +26,18 @@ fn codegen_error(source: &str) -> CompilerError {
     }
 }
 
+/// Compiles `source` and returns source-located semantic failures before code generation.
+fn semantic_error(source: &str) -> Vec<argui_dsl_semantic::Diagnostic> {
+    match Compiler::compile(
+        [SourceModule::new("ui/main.argui", source)],
+        "ui/main.argui",
+        |_| Err("no assets".into()),
+    ) {
+        Err(CompilerError::Semantic(diagnostics)) => diagnostics,
+        _ => panic!("expected semantic diagnostics"),
+    }
+}
+
 /// String built-ins and concatenation produce valid typed AOT expressions.
 #[test]
 fn compiler_emits_string_conversion_contains_and_concatenation() {
@@ -83,24 +95,24 @@ export component Main {
 /// Rejects a native two-way binding whose expression is not a property read.
 #[test]
 fn compiler_rejects_non_property_native_two_way_sources() {
-    let error = codegen_error(
+    let error = semantic_error(
         r#"import { TextInput } from "@argui/native"
 export component Main {
     private property query: string = ""
     TextInput { value <=> query + "" }
 }"#,
     );
-    let message = error.to_string();
     assert!(
-        message.contains("native two-way source is not a property"),
-        "unexpected codegen error: {message}"
+        error
+            .iter()
+            .any(|issue| issue.code == argui_dsl_semantic::DiagnosticCode::InvalidTwoWayBinding)
     );
 }
 
 /// Rejects a component two-way binding whose expression is not a property read.
 #[test]
 fn compiler_rejects_non_property_component_two_way_sources() {
-    let error = codegen_error(
+    let error = semantic_error(
         r#"import { Text } from "@argui/ui"
 export component Child {
     in-out property value: string
@@ -113,15 +125,15 @@ export component Main {
     );
     assert!(
         error
-            .to_string()
-            .contains("two-way binding did not lower to a property ID")
+            .iter()
+            .any(|issue| issue.code == argui_dsl_semantic::DiagnosticCode::InvalidTwoWayBinding)
     );
 }
 
 /// Rejects event assignments to a repeater local instead of generating an invalid closure.
 #[test]
 fn compiler_rejects_repeater_local_assignments_in_events() {
-    let error = codegen_error(
+    let error = semantic_error(
         r#"import { Button, Column } from "@argui/ui"
 export struct Item { id: int }
 export component Main {
@@ -135,8 +147,8 @@ export component Main {
     );
     assert!(
         error
-            .to_string()
-            .contains("mutable event locals are not part of the restricted handler ABI")
+            .iter()
+            .any(|issue| issue.code == argui_dsl_semantic::DiagnosticCode::ReadOnlyProperty)
     );
 }
 

@@ -256,6 +256,13 @@ pub enum IrNode {
     Slot {
         site: SiteId,
         slot: SlotId,
+        fallback: Vec<IrNode>,
+        source: SourceInfo,
+    },
+    /// Caller-scoped visual content assigned to a resolved component slot.
+    SlotContent {
+        slot: SlotId,
+        body: Vec<IrNode>,
         source: SourceInfo,
     },
 }
@@ -369,6 +376,7 @@ pub struct IrStyle {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct IrStyleState {
     pub id: StyleStateId,
+    pub observation: crate::IrObservation,
     pub properties: Vec<IrPropertyBinding>,
     pub source: SourceInfo,
 }

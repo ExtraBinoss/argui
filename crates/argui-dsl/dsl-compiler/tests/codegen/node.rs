@@ -163,7 +163,7 @@ export component Main {
     assert!(
         compiled
             .rust
-            .contains("observer.get(&::argui::ui::RetainedIdentity::new(owner,")
+            .contains("observer.get(&::argui::ui::RetainedIdentity::new(_component_owner,")
     );
     assert!(compiled.rust.contains("::argui::ui::VisualState::Hovered"));
 }
@@ -186,7 +186,7 @@ export component Main {
     assert!(
         compiled
             .rust
-            .contains("observer.watch(&::argui::ui::RetainedIdentity::new(owner,")
+            .contains("observer.watch(&::argui::ui::RetainedIdentity::new(_component_owner,")
     );
     assert!(compiled.rust.contains(".pointer_position.map_or(0.0"));
 }
@@ -239,7 +239,7 @@ export component Main {
     assert!(
         compiled
             .rust
-            .contains("observer.get(&::argui::ui::RetainedIdentity::new(owner,")
+            .contains("observer.get(&::argui::ui::RetainedIdentity::new(_component_owner,")
     );
 }
 

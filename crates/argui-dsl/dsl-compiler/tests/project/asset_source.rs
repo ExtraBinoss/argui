@@ -282,7 +282,7 @@ export component Main {}"#;
 #[test]
 fn missing_asset_in_exported_style_state_retains_binding_span() {
     let source = r#"import { Svg } from "@argui/native"
-export style Icon for Svg { hovered { source: asset("hover.svg") } }
+export style Icon for Svg { hover { source: asset("hover.svg") } }
 export component Main {}"#;
     let error = Compiler::compile(
         [SourceModule::new("ui/main.argui", source)],

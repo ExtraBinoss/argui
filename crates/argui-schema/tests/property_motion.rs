@@ -8,6 +8,9 @@ use argui_ui::{Dimension, ExpandedDimension, RetainedIdentity};
 #[path = "property_motion/engine.rs"]
 mod engine;
 
+#[path = "property_motion/playback.rs"]
+mod playback;
+
 fn key(property: u64) -> PropertyMotionKey {
     PropertyMotionKey::new(RetainedIdentity::new(7, 11), property, 13)
 }

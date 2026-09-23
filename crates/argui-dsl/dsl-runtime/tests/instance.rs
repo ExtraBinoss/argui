@@ -30,7 +30,7 @@ fn dynamic_property_accepts_compatible_values_and_preserves_state_on_errors() {
     assert_eq!(property.revision(), 1);
     let mut float = DynamicProperty::new(PropertyId::from_raw(10), IrType::Float, DslValue::Int(1));
     assert!(float.set(DslValue::Int(2)).unwrap());
-    assert_eq!(float.get(), &DslValue::Int(2));
+    assert_eq!(float.get(), &DslValue::Float(2.0));
     let mut optional = DynamicProperty::new(
         PropertyId::from_raw(11),
         IrType::Optional(Box::new(IrType::String)),
@@ -151,15 +151,19 @@ fn component_instance_keeps_latest_property_and_reports_callback_state() {
     assert!(format!("{instance:?}").contains("callback_count: 1"));
 }
 
-/// Compiles a component whose visual expression invokes a runtime callback.
+/// Compiles a component whose event handler invokes a runtime callback.
 fn callback_expression_package() -> (ComponentId, CallbackId, LivePackage) {
     let compiled = Compiler::compile(
         [SourceModule::new(
             "ui/main.argui",
-            r#"import { Text } from "@argui/ui"
+            r#"import { Button, Column, Text } from "@argui/ui"
 export component Main {
     callback changed(value: string) -> string
-    Text { content: changed("from expression") }
+    private property title: string = "initial"
+    Column {
+        Button { text: "run" on click { title = changed("from handler") } }
+        Text { content: title }
+    }
 }
 "#,
         )],
@@ -167,17 +171,15 @@ export component Main {
         |_| Err("instance test source has no assets".into()),
     )
     .expect("callback expression source should compile");
-    let (component, callback) = compiled
+    let component = compiled.roots[0];
+    let callback = compiled
         .ir
         .components
         .iter()
-        .find_map(|component| {
-            component
-                .callbacks
-                .first()
-                .map(|callback| (component.id, callback.id))
-        })
-        .expect("compiled component should expose its callback");
+        .find(|part| part.id == component)
+        .unwrap()
+        .callbacks[0]
+        .id;
     let package = LivePackage::prepare(
         1,
         compiled.public_api_hash,
@@ -188,7 +190,7 @@ export component Main {
     (component, callback, package)
 }
 
-/// Verifies callback binding, callback expression dispatch, and cache invalidation after mounting.
+/// Verifies callback binding and that handler results update rendered properties.
 #[test]
 fn component_instance_callback_state_is_used_by_rendering() {
     let (component, callback, package) = callback_expression_package();
@@ -212,6 +214,11 @@ fn component_instance_callback_state_is_used_by_rendering() {
         runtime.invoke_callback(root, callback, vec![DslValue::String("from host".into())],),
         Ok(DslValue::String("from host".into()))
     );
+    let mut app = argui_testing::TestApp::new(runtime);
+    app.get_by_role(argui_ui::Role::Button, "run")
+        .click()
+        .unwrap();
+    app.assert_text("from handler");
 }
 
 mod runtime_edges {
@@ -335,7 +342,7 @@ export component Main {
         );
         assert!(matches!(
             runtime.invoke_callback(root, CallbackId::from_raw(99), Vec::new()),
-            Err(RuntimeError::InvalidBytecode(message)) if message.contains("not bound")
+            Err(RuntimeError::InvalidBytecode(message)) if message.contains("unknown callback signature")
         ));
         assert_eq!(runtime.take_event_error(), None);
         assert_eq!(runtime.last_client_event(), None);

@@ -14,6 +14,9 @@ use argui_ui::Role;
 #[path = "runtime/theme.rs"]
 mod theme_mode;
 
+#[path = "runtime/reload.rs"]
+mod reload;
+
 fn compile(source: &str) -> CompiledProject {
     Compiler::compile(
         [SourceModule::new("ui/main.argui", source)],

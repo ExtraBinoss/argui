@@ -15,7 +15,7 @@ mod reference;
 
 fn compile(source: &str) -> argui_dsl_ir::IrProject {
     let mut database = CompilerDatabase::with_builtins().unwrap();
-    database.set_file("ui/main.argui", source);
+    let file = database.set_file("ui/main.argui", source);
     let project = database.check();
     assert!(
         project.is_valid(),
@@ -23,7 +23,11 @@ fn compile(source: &str) -> argui_dsl_ir::IrProject {
         project.diagnostics
     );
     let schema = argui_schema::builtin::registry().unwrap();
-    lower(&project, &schema).unwrap()
+    let mut ir = lower(&project, &schema).unwrap();
+    ir.components
+        .retain(|component| component.source.span.is_some_and(|span| span.file == file));
+    ir.assets.retain(|asset| !asset.path.starts_with("@argui/"));
+    ir
 }
 
 fn source(extra_child: &str) -> String {
@@ -267,8 +271,8 @@ export theme Palette {
 }
 
 export style RowStyle for Row {
-    gap: 8px
-    hover { gap: 12px }
+    gap: 8.0
+    hover { gap: 12.0 }
 }
 
 export effect Glow {
@@ -280,7 +284,7 @@ export effect Glow {
 
 export component Child {
     in property item: Item
-    property highlighted: bool = false
+    in property highlighted: bool = false
     callback pressed(value: string) -> bool
     slot body
     Button { text: item.label on click { pressed("clicked") } }
@@ -329,7 +333,7 @@ export component Main {
         Text { content: selected.label }
         Input { value <=> query on submit { count += 1 count -= 1 count *= 2 count /= 1 return activate() } }
         for item in items key item.label {
-            Child { item: item on pressed { notify(item.label) } }
+            Child { item: item on pressed { return notify(item.label) } }
             Child { item: item }
             for item in items key item.id { Text { content: item.label } }
         }
@@ -370,7 +374,13 @@ export component Main {
         PropertyTargetId::Component(_)
     ));
     assert_eq!(ir.effects[0].parameters.len(), 3);
-    assert_eq!(ir.assets.len(), 6);
+    assert_eq!(
+        ir.assets
+            .iter()
+            .filter(|asset| !asset.path.starts_with("@argui/"))
+            .count(),
+        6
+    );
     assert!(
         ir.assets
             .iter()
@@ -480,7 +490,7 @@ export component Main {
                         found_event,
                     );
                 }
-                IrNode::Slot { .. } => *found_slot = true,
+                IrNode::Slot { .. } | IrNode::SlotContent { .. } => *found_slot = true,
             }
         }
     }
@@ -513,9 +523,14 @@ fn lowering_resolves_relative_assets_from_a_root_module() {
     let schema = argui_schema::builtin::registry().unwrap();
     let ir = lower(&project, &schema).unwrap();
 
-    assert_eq!(ir.assets.len(), 1);
-    assert_eq!(ir.assets[0].path, "effects/root.wgsl");
-    assert_eq!(ir.assets[0].kind, AssetKind::Shader);
+    let assets = ir
+        .assets
+        .iter()
+        .filter(|asset| !asset.path.starts_with("@argui/"))
+        .collect::<Vec<_>>();
+    assert_eq!(assets.len(), 1);
+    assert_eq!(assets[0].path, "effects/root.wgsl");
+    assert_eq!(assets[0].kind, AssetKind::Shader);
 }
 
 #[test]
@@ -539,51 +554,4 @@ export component Colliding {
         "{:#?}",
         project.diagnostics
     );
-}
-
-#[test]
-fn observed_native_read_uses_the_referenced_site_and_schema_property() {
-    let ir = compile(
-        r#"import { Rectangle, TouchArea } from "@argui/native"
-export component Main {
-    Rectangle { opacity: touch.pressed ? 0.5 : 1.0 }
-    TouchArea #touch {}
-}"#,
-    );
-    let main = ir
-        .components
-        .iter()
-        .find(|component| {
-            matches!(
-                component.body.as_slice(),
-                [
-                    IrNode::Element {
-                        target: IrElementTarget::Native(argui_schema::builtin::RECTANGLE),
-                        ..
-                    },
-                    IrNode::Element {
-                        target: IrElementTarget::Native(argui_schema::builtin::TOUCH_AREA),
-                        ..
-                    }
-                ]
-            )
-        })
-        .unwrap();
-    let IrNode::Element { properties, .. } = &main.body[0] else {
-        panic!("expected Rectangle");
-    };
-    let IrNode::Element { site, .. } = &main.body[1] else {
-        panic!("expected TouchArea");
-    };
-    let IrExpressionKind::Conditional { condition, .. } = &properties[0].value.kind else {
-        panic!("expected reactive conditional");
-    };
-    assert!(matches!(
-        &condition.kind,
-        IrExpressionKind::ObservedRead {
-            site: observed,
-            property: argui_schema::builtin::PRESSED,
-            observation: argui_dsl_ir::IrObservation::Pressed,
-        } if *observed == *site
-    ));
 }

@@ -31,6 +31,9 @@ pub struct LivePackage {
     pub programs: HashMap<ExpressionId, Program>,
     /// Referenced native sites indexed by owning component for render subscriptions.
     pub observed_sites: HashMap<argui_dsl_ir::ComponentId, Vec<argui_dsl_ir::SiteId>>,
+    /// Child output dependencies computed once for this immutable generation.
+    pub(crate) child_reference_sites:
+        HashMap<argui_dsl_ir::ComponentId, std::collections::HashSet<argui_dsl_ir::SiteId>>,
     pub assets: HashMap<AssetId, AssetPayload>,
     pub shader_hashes: HashMap<argui_dsl_ir::EffectId, u64>,
 }
@@ -169,6 +172,14 @@ impl LivePackage {
                 (owner, sites)
             })
             .collect();
+        let child_reference_sites = ir
+            .components
+            .iter()
+            .filter_map(|component| {
+                let sites = component.referenced_child_sites();
+                (!sites.is_empty()).then_some((component.id, sites))
+            })
+            .collect();
         Ok(Self {
             generation: generation.max(1),
             public_api_hash,
@@ -176,6 +187,7 @@ impl LivePackage {
             ir: Arc::new(ir),
             programs,
             observed_sites,
+            child_reference_sites,
             assets,
             shader_hashes,
         })
@@ -315,7 +327,11 @@ fn collect_node(node: &IrNode, programs: &mut HashMap<ExpressionId, Program>) {
                 collect_node(child, programs);
             }
         }
-        IrNode::Slot { .. } => {}
+        IrNode::Slot { fallback: body, .. } | IrNode::SlotContent { body, .. } => {
+            for child in body {
+                collect_node(child, programs);
+            }
+        }
     }
 }
 

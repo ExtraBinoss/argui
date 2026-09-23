@@ -57,7 +57,7 @@ mod event_behavior {
     }
 
     #[test]
-    fn native_handler_executes_all_property_assignment_operators_and_returns_value() {
+    fn native_handler_executes_all_property_assignment_operators() {
         let source = r#"import { TouchArea } from "@argui/native"
 export component Main {
     private property count: int = 10
@@ -76,7 +76,6 @@ export component Main {
             ratio /= 2.0
             text = "a"
             text += "b"
-            return count
         }
     }
 }
@@ -101,7 +100,7 @@ export component Main {
         let result = runtime
             .dispatch_native_event(root, site, argui_schema::builtin::CLICK)
             .unwrap();
-        assert_eq!(result, DslValue::Int(3));
+        assert_eq!(result, DslValue::Null);
         let instance = runtime.instance(root).unwrap();
         assert_eq!(
             instance.properties[&members.properties["count"]].get(),
@@ -129,7 +128,7 @@ export component Main {
         on click {
             title = tr("title")
             color = var(--accent)
-            return changed(title)
+            title = changed(title)
         }
     }
 
@@ -171,7 +170,7 @@ export component Main {
         let result = runtime
             .dispatch_native_event(root, site, argui_schema::builtin::CLICK)
             .unwrap();
-        assert_eq!(result, DslValue::String("localized".into()));
+        assert_eq!(result, DslValue::Null);
         assert_eq!(
             runtime.instance(root).unwrap().properties[&members.properties["title"]].get(),
             &DslValue::String("localized".into())
@@ -499,7 +498,7 @@ mod render_more {
                     event_sites(then_body, output);
                     event_sites(else_body, output);
                 }
-                IrNode::Slot { .. } => {}
+                IrNode::Slot { .. } | IrNode::SlotContent { .. } => {}
             }
         }
     }

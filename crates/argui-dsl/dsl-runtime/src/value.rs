@@ -21,6 +21,24 @@ pub enum DslValue {
 }
 
 impl DslValue {
+    /// Normalizes this value to the checked destination `expected`.
+    /// Returns the value with integers widened inside floats and containers.
+    pub(crate) fn coerce(self, expected: &IrType) -> Self {
+        match (self, expected) {
+            (Self::Int(value), IrType::Float) => Self::Float(f64::from(value as f32)),
+            (Self::Float(value), _) => Self::Float(f64::from(value as f32)),
+            (Self::Null, IrType::Optional(_)) => Self::Null,
+            (value, IrType::Optional(inner)) => value.coerce(inner),
+            (Self::Array(values), IrType::Array(inner) | IrType::Model(inner)) => Self::Array(
+                values
+                    .into_iter()
+                    .map(|value| value.coerce(inner))
+                    .collect(),
+            ),
+            (value, _) => value,
+        }
+    }
+
     /// Returns a concise runtime type name for diagnostics.
     #[must_use]
     pub const fn type_name(&self) -> &'static str {
@@ -45,7 +63,7 @@ impl DslValue {
             argui_dsl_ir::IrValue::Null => Self::Null,
             argui_dsl_ir::IrValue::Bool(value) => Self::Bool(*value),
             argui_dsl_ir::IrValue::Int(value) => Self::Int(*value),
-            argui_dsl_ir::IrValue::Float(value) => Self::Float(*value),
+            argui_dsl_ir::IrValue::Float(value) => Self::Float(f64::from(*value as f32)),
             argui_dsl_ir::IrValue::String(value) => Self::String(value.clone()),
             argui_dsl_ir::IrValue::Color(value) => {
                 let [red, green, blue, alpha] = value.to_be_bytes();
@@ -54,7 +72,7 @@ impl DslValue {
         }
     }
 
-    /// Returns whether the value can migrate into `expected` without coercion.
+    /// Returns whether this value can be assigned to `expected`, including widening.
     #[must_use]
     pub fn compatible_with(&self, expected: &IrType) -> bool {
         matches!(
@@ -81,10 +99,12 @@ impl DslValue {
                 | (Self::Brush(_), IrType::Brush)
                 | (Self::Struct(_), IrType::Struct { .. })
                 | (Self::Enum { .. }, IrType::Enum(_))
-                | (Self::Array(_), IrType::Array(_) | IrType::Model(_))
                 | (Self::Asset(_), IrType::Asset)
-        ) || match expected {
-            IrType::Optional(inner) => self.compatible_with(inner),
+        ) || match (self, expected) {
+            (Self::Array(values), IrType::Array(inner) | IrType::Model(inner)) => {
+                values.iter().all(|value| value.compatible_with(inner))
+            }
+            (_, IrType::Optional(inner)) => self.compatible_with(inner),
             _ => false,
         }
     }

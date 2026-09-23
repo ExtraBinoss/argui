@@ -4,7 +4,7 @@ use argui_dsl_syntax::{FileId, Span, SyntaxKind, SyntaxNode};
 
 use crate::{
     CallbackDefinition, ComponentDefinition, Definition, DefinitionKind, Diagnostic,
-    DiagnosticCode, PropertyDefinition, SymbolId, Type, types::from_schema,
+    DiagnosticCode, PropertyDefinition, PropertyDirection, SymbolId, Type, types::from_schema,
 };
 
 use super::super::{Scope, expression};
@@ -12,6 +12,7 @@ use super::animation;
 mod binding;
 mod effect;
 mod helpers;
+mod slot;
 mod template_slot;
 mod virtual_list;
 use helpers::*;
@@ -28,6 +29,7 @@ pub(super) fn validate_component(
     schema: &argui_schema::SchemaRegistry,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
+    slot::references(syntax, file, component, diagnostics);
     let references =
         binding::native_references(syntax, scope, schema, definitions, file, diagnostics);
     let properties = component
@@ -97,7 +99,7 @@ pub(super) fn validate_component(
     let visual_roots = syntax.children().filter(|node| {
         matches!(
             node.kind(),
-            SyntaxKind::Element | SyntaxKind::ForExpr | SyntaxKind::IfExpr
+            SyntaxKind::Element | SyntaxKind::ForExpr | SyntaxKind::IfExpr | SyntaxKind::SlotDecl
         )
     });
     for root in visual_roots {
@@ -183,11 +185,35 @@ fn validate_visual(
                 }
             }
             if !has_direct_token(node, SyntaxKind::KeyKw) {
-                diagnostics.push(Diagnostic::warning(
+                diagnostics.push(Diagnostic::error(
                     DiagnosticCode::MissingRepeaterKey,
-                    "stateful repeater has no stable `key` expression",
+                    "repeater requires a stable `key` expression of type int or string",
                     Span::new(file, node.text_range()),
                 ));
+            } else if let Some(key) = node
+                .children()
+                .filter(|child| child.kind() == SyntaxKind::Expr)
+                .nth(1)
+            {
+                let mut context = expression::Context {
+                    file,
+                    properties: component_properties,
+                    callbacks,
+                    locals: &next_locals,
+                    definitions,
+                    theme_tokens,
+                    references: Some(references),
+                    event_handler: false,
+                    diagnostics,
+                };
+                let actual = expression::infer(&key, &mut context);
+                if !matches!(actual, Type::Int | Type::String | Type::Unknown) {
+                    context.diagnostics.push(Diagnostic::error(
+                        DiagnosticCode::TypeMismatch,
+                        "repeater key must be int or string",
+                        Span::new(file, key.text_range()),
+                    ));
+                }
             }
             for child in visual_children(node) {
                 validate_visual(
@@ -205,7 +231,11 @@ fn validate_visual(
                 );
             }
         }
-        SyntaxKind::IfExpr | SyntaxKind::Block | SyntaxKind::ElseBranch => {
+        SyntaxKind::IfExpr
+        | SyntaxKind::Block
+        | SyntaxKind::ElseBranch
+        | SyntaxKind::SlotDecl
+        | SyntaxKind::SlotContent => {
             if node.kind() == SyntaxKind::IfExpr
                 && let Some(condition) = node
                     .children()
@@ -285,11 +315,13 @@ fn validate_element(
             Span::new(file, node.text_range()),
         ));
     }
+    slot::supplied(node, file, user, diagnostics);
     if let Some(template) =
         user.and_then(|component| component.slots.iter().find(|slot| slot.template))
     {
         virtual_list::validate_template_argument(node, file, &template.name, diagnostics);
     }
+    let styled = super::style::applications(node, file, scope, definitions, diagnostics);
     let mut provided = HashSet::new();
     let mut effect_seen = false;
     for child in node.children() {
@@ -334,6 +366,14 @@ fn validate_element(
                     schema.properties.iter().any(|property| {
                         property.name.as_str() == property_name && property.read_only
                     })
+                }) || user.is_some_and(|component| {
+                    component.properties.iter().any(|property| {
+                        property.name == property_name
+                            && matches!(
+                                property.direction,
+                                PropertyDirection::Private | PropertyDirection::Output
+                            )
+                    })
                 }) {
                     diagnostics.push(Diagnostic::error(
                         DiagnosticCode::ReadOnlyProperty,
@@ -372,6 +412,18 @@ fn validate_element(
                             &value,
                             file,
                             component_properties,
+                            &expected,
+                            native.is_some_and(|native| {
+                                native.properties.iter().any(|property| {
+                                    property.name.as_str() == property_name
+                                        && property.change_event.is_some()
+                                })
+                            }) || user.is_some_and(|component| {
+                                component.properties.iter().any(|property| {
+                                    property.name == property_name
+                                        && property.direction == PropertyDirection::InputOutput
+                                })
+                            }),
                             context.diagnostics,
                         );
                     }
@@ -471,30 +523,24 @@ fn validate_element(
                             .unwrap_or(Type::Unknown),
                     );
                 }
-                for statement in child
-                    .children()
-                    .filter(|statement| statement.kind() == SyntaxKind::Statement)
-                {
-                    for value in statement
-                        .children()
-                        .filter(|value| value.kind() == SyntaxKind::Expr)
-                    {
-                        let mut context = expression::Context {
-                            file,
-                            properties: component_properties,
-                            callbacks,
-                            locals: &event_locals,
-                            definitions,
-                            theme_tokens,
-                            references: Some(references),
-                            event_handler: true,
-                            diagnostics,
-                        };
-                        let _ = expression::infer(&value, &mut context);
-                    }
-                }
+                let mut context = expression::Context {
+                    file,
+                    properties: component_properties,
+                    callbacks,
+                    locals: &event_locals,
+                    definitions,
+                    theme_tokens,
+                    references: Some(references),
+                    event_handler: true,
+                    diagnostics,
+                };
+                let result = component_event.map_or(&Type::Void, |callback| &callback.result);
+                crate::check::handler::check(&child, result, &mut context);
             }
-            SyntaxKind::Element | SyntaxKind::ForExpr | SyntaxKind::IfExpr => validate_visual(
+            SyntaxKind::Element
+            | SyntaxKind::ForExpr
+            | SyntaxKind::IfExpr
+            | SyntaxKind::SlotContent => validate_visual(
                 &child,
                 file,
                 scope,
@@ -524,6 +570,7 @@ fn validate_element(
         locals,
         diagnostics,
     );
+    provided.extend(styled);
     if let Some(native) = native {
         for property in &native.properties {
             if property.required

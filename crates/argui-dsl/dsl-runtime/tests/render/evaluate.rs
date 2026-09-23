@@ -162,12 +162,12 @@ export component Main {
     assert!(
         first
             .rust
-            .contains("observer.get(&::argui::ui::RetainedIdentity::new(owner,")
+            .contains("observer.get(&::argui::ui::RetainedIdentity::new(_component_owner,")
     );
     assert!(
         second
             .rust
-            .contains("observer.get(&::argui::ui::RetainedIdentity::new(owner,")
+            .contains("observer.get(&::argui::ui::RetainedIdentity::new(_component_owner,")
     );
     let root = first.roots[0];
     let package = LivePackage::prepare(1, first.public_api_hash, first.ir, HashMap::new()).unwrap();

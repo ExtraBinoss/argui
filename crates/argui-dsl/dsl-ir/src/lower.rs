@@ -53,8 +53,15 @@ pub fn lower(
     let themes = declaration::themes(project, &tables, &mut assets, &mut errors);
     let styles = declaration::styles(project, schema, &tables, &mut assets, &mut errors);
     let effects = declaration::effects(project, &tables, &mut assets, &mut errors);
-    let components =
-        component::components(project, schema, &tables, &effects, &mut assets, &mut errors);
+    let components = component::components(
+        project,
+        schema,
+        &tables,
+        &effects,
+        &styles,
+        &mut assets,
+        &mut errors,
+    );
     if !errors.is_empty() {
         return Err(errors);
     }

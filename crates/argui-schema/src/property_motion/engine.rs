@@ -216,6 +216,29 @@ pub(super) fn sample_record<T>(
 where
     T: Clone + Interpolate + MotionValue + PartialEq,
 {
+    let playing = specification.playing;
+    // Playback changes affect scheduling, not the timeline's specification.
+    record.specification.playing = playing;
+    sample_target(record, target, specification, reduced_motion);
+    if !playing {
+        record.motion.pause();
+    } else if record.motion.state() == MotionState::Paused && !reduced_motion {
+        record.motion.resume();
+    }
+    record.motion.value()
+}
+
+/// Applies `target`, driver `specification` and `reduced_motion` to `record`.
+/// Returns the current presentation without changing playback pause policy.
+fn sample_target<T>(
+    record: &mut Record<T>,
+    target: T,
+    specification: PropertyAnimation<T>,
+    reduced_motion: bool,
+) -> T
+where
+    T: Clone + Interpolate + MotionValue + PartialEq,
+{
     if reduced_motion {
         if record.motion.is_active() || record.motion.value() != target {
             record.motion.set(target);
@@ -240,7 +263,7 @@ where
                 StateTransitionPolicy::InOut => true,
             };
         let target_changed = record.target != target;
-        let was_active = record.motion.is_active();
+        let was_active = record.motion.is_active() || record.motion.state() == MotionState::Paused;
         record.target = target;
         record.previous_active = Some(state.active);
         record.specification = specification;

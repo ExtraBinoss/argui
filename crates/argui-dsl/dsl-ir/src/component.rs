@@ -14,11 +14,13 @@ use crate::{
 /// stable `tables`. `effects` resolves visual applications; `assets` collects
 /// reached files and `errors` receives lowering failures. Returns components
 /// in source order.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn components(
     project: &SemanticProject,
     schema: &argui_schema::SchemaRegistry,
     tables: &Tables,
     effects: &[IrEffect],
+    styles: &[crate::IrStyle],
     assets: &mut HashMap<String, crate::IrAsset>,
     errors: &mut Vec<LowerError>,
 ) -> Vec<IrComponent> {
@@ -106,8 +108,9 @@ pub(crate) fn components(
                 .filter(|slot| slot.template)
                 .filter_map(|slot| members.slots.get(&slot.name).copied())
                 .collect();
-            let mut visual =
-                VisualLowerer::new(module, id, members, tables, effects, schema, assets, errors);
+            let mut visual = VisualLowerer::new(
+                module, id, members, tables, effects, styles, schema, assets, errors,
+            );
             let body = visual.component_body(&syntax);
             let (states, animations) = visual.finish();
             output.push(IrComponent {

@@ -79,3 +79,51 @@ export component Main {
         "{errors:#?}"
     );
 }
+
+/// Native observation resolves to the identified visual site.
+#[test]
+fn observed_native_read_uses_the_referenced_site_and_schema_property() {
+    let ir = compile(
+        r#"import { Rectangle, TouchArea } from "@argui/native"
+export component Main {
+    Rectangle { opacity: touch.pressed ? 0.5 : 1.0 }
+    TouchArea #touch {}
+}"#,
+    );
+    let main = ir
+        .components
+        .iter()
+        .find(|component| {
+            matches!(
+                component.body.as_slice(),
+                [
+                    IrNode::Element {
+                        target: IrElementTarget::Native(argui_schema::builtin::RECTANGLE),
+                        ..
+                    },
+                    IrNode::Element {
+                        target: IrElementTarget::Native(argui_schema::builtin::TOUCH_AREA),
+                        ..
+                    }
+                ]
+            )
+        })
+        .unwrap();
+    let IrNode::Element { properties, .. } = &main.body[0] else {
+        panic!("expected Rectangle");
+    };
+    let IrNode::Element { site, .. } = &main.body[1] else {
+        panic!("expected TouchArea");
+    };
+    let IrExpressionKind::Conditional { condition, .. } = &properties[0].value.kind else {
+        panic!("expected reactive conditional");
+    };
+    assert!(matches!(
+        &condition.kind,
+        IrExpressionKind::ObservedRead {
+            site: observed,
+            property: argui_schema::builtin::PRESSED,
+            observation: argui_dsl_ir::IrObservation::Pressed,
+        } if *observed == *site
+    ));
+}

@@ -124,3 +124,33 @@ export component Main {
     app.assert_text("ready");
     app.assert_no_text("waiting");
 }
+
+/// An explicit value detaches its default, even if that default later becomes invalid.
+#[test]
+fn explicit_binding_stops_evaluating_a_replaced_default() {
+    let compiled = Compiler::compile(
+        [SourceModule::new(
+            "ui/main.argui",
+            r#"
+import { Text, Column } from "@argui/native"
+component Child {
+    in property divisor: int = 1
+    in property value: int = 10 / divisor
+    Column { Text { content: str(value) } }
+}
+export component Main { Child { divisor: 0 value: 42 } }
+"#,
+        )],
+        "ui/main.argui",
+        |_| Err("no assets".into()),
+    )
+    .unwrap();
+    let root = compiled.roots[0];
+    let package =
+        LivePackage::prepare(1, compiled.public_api_hash, compiled.ir, HashMap::new()).unwrap();
+    let mut runtime = LiveRuntime::new(package).unwrap();
+    runtime.mount(root, []).unwrap();
+    let app = TestApp::new(runtime);
+    app.assert_text("42");
+    assert!(app.entity().read(|runtime| runtime.last_error().is_none()));
+}

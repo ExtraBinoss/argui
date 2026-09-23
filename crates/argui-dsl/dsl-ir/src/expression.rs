@@ -328,7 +328,13 @@ fn conditional(node: &SyntaxNode, source: SourceInfo, context: &mut Context<'_>)
     let else_value = lower(&values[2], context);
     IrExpression {
         id: expression_id(&source),
-        value_type: then_value.value_type.clone(),
+        value_type: if then_value.value_type == IrType::Int
+            && else_value.value_type == IrType::Float
+        {
+            IrType::Float
+        } else {
+            then_value.value_type.clone()
+        },
         kind: IrExpressionKind::Conditional {
             condition: Box::new(condition),
             then_value: Box::new(then_value),

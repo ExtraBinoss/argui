@@ -55,11 +55,7 @@ fn virtual_window_mounts_only_visible_rows_without_visual_policy() {
     for name in ["offset_y", "visible_height", "content_height"] {
         assert!(schema.properties.iter().any(|entry| entry.name == name));
     }
-    for property in [
-        builtin::BACKGROUND,
-        builtin::SCROLLBAR_THUMB,
-        builtin::EDGE_SHADOW_WIDTH,
-    ] {
+    for property in [builtin::BACKGROUND, builtin::EDGE_SHADOW_WIDTH] {
         assert!(!schema.properties.iter().any(|entry| entry.id == property));
     }
     let root = registry
@@ -71,6 +67,21 @@ fn virtual_window_mounts_only_visible_rows_without_visual_policy() {
     let scroll = root.scroll.as_ref().unwrap();
     assert!(scroll.scrollbar.is_none());
     assert!(scroll.effects.is_empty());
+}
+
+#[test]
+fn virtual_window_can_expose_an_explicit_scrollbar() {
+    let registry = builtin::registry().unwrap();
+    let root = registry
+        .construct(
+            builtin::VIRTUAL_WINDOW,
+            &input(100, 600.0).property(
+                builtin::SCROLLBAR_THUMB,
+                SchemaValue::Color(argui_core::Color::srgba(0.3, 0.4, 0.5, 1.0)),
+            ),
+        )
+        .unwrap();
+    assert!(root.scroll.as_ref().unwrap().scrollbar.is_some());
 }
 
 #[test]

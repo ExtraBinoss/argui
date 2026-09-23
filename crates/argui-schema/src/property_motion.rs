@@ -57,6 +57,8 @@ impl PropertyMotionKey {
 pub struct PropertyAnimation<T> {
     pub from: Option<T>,
     pub to: Option<T>,
+    /// Whether playback advances; false retains its current presented value.
+    pub playing: bool,
     pub duration: Duration,
     pub iterations: Iterations,
     pub spring: Option<SpringConfig>,
@@ -103,6 +105,7 @@ impl<T> PropertyAnimation<T> {
         Ok(Self {
             from,
             to,
+            playing: true,
             duration: Duration::from_nanos((duration_ms * 1_000_000.0).round() as u64),
             iterations,
             spring: None,
@@ -138,6 +141,7 @@ impl<T> PropertyAnimation<T> {
         Ok(Self {
             from,
             to,
+            playing: true,
             duration: Duration::ZERO,
             iterations: Iterations::Finite(1.0),
             spring: Some(config),
@@ -172,6 +176,16 @@ impl<T> PropertyAnimation<T> {
             }
         };
         Ok(animation)
+    }
+
+    /// Selects playback without restarting or discarding the retained timeline.
+    ///
+    /// `playing` resumes when true and freezes presentation when false. Returns
+    /// this specification; paused motions request no frames and exclude paused time.
+    #[must_use]
+    pub fn with_playing(mut self, playing: bool) -> Self {
+        self.playing = playing;
+        self
     }
 
     /// Applies a named CSS-compatible easing curve to a timeline.
@@ -405,6 +419,7 @@ impl PropertyMotionStore {
         let specification = PropertyAnimation {
             from: specification.from.map(AnimatedDimension),
             to: specification.to.map(AnimatedDimension),
+            playing: specification.playing,
             duration: specification.duration,
             iterations: specification.iterations,
             spring: specification.spring,

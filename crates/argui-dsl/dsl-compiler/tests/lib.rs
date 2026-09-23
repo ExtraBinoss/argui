@@ -150,7 +150,7 @@ fn zero_argument_components_implement_default_but_required_inputs_do_not() {
 
 #[test]
 fn rich_aot_source_emits_types_tokens_effects_bindings_and_control_flow() {
-    let source = r#"import { Button, Column, Input, Text } from "@argui/ui"
+    let source = r#"import { Button, Column, Input, Row, Text } from "@argui/ui"
 export struct Item { id: int label: string }
 export enum Mode { idle active }
 export enum Empty { }

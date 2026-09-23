@@ -57,10 +57,7 @@ impl LiveRuntime {
         let viewport = if explicit_viewport > 0.0 {
             explicit_viewport
         } else {
-            self.virtual_viewports
-                .get(&viewport_identity)
-                .copied()
-                .unwrap_or(0.0)
+            self.virtual_viewports.height(&viewport_identity)
         };
         let offset = self.virtual_float(
             instance,
@@ -161,10 +158,17 @@ impl LiveRuntime {
             mounted(&items)
         };
         let mut rows = Vec::with_capacity(selected.len());
+        let mut keys = std::collections::HashSet::new();
+        let row_owner = super::identity::child_instance_id(identity_owner, site, repeater_key);
         for item in selected {
             let mut nested = row_locals.clone();
             nested.insert(*local, item);
             let row_key = self.evaluate(row_instance, key, &nested)?;
+            if !keys.insert(retained(row_owner, site, Some(&row_key))?) {
+                return Err(RuntimeError::InvalidBytecode(format!(
+                    "duplicate repeater key {row_key:?}"
+                )));
+            }
             let rendered = self.render_nodes(
                 row_instance,
                 row_component,
@@ -172,7 +176,7 @@ impl LiveRuntime {
                 &nested,
                 row_slots,
                 None,
-                identity_owner,
+                row_owner,
                 Some(&row_key),
                 context,
             )?;

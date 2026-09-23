@@ -88,6 +88,9 @@ impl LiveRuntime {
         locals: &HashMap<LocalId, DslValue>,
         presentation: bool,
     ) -> Result<DslValue, RuntimeError> {
+        if let argui_dsl_ir::IrExpressionKind::Constant(value) = &expression.kind {
+            return Ok(DslValue::constant(value));
+        }
         let program = self
             .package
             .program(expression.id)
@@ -177,7 +180,11 @@ fn find_native_event(
                     return Some(binding);
                 }
             }
-            IrNode::Slot { .. } => {}
+            IrNode::Slot { fallback: body, .. } | IrNode::SlotContent { body, .. } => {
+                if let Some(binding) = find_native_event(body, site, event) {
+                    return Some(binding);
+                }
+            }
         }
     }
     None

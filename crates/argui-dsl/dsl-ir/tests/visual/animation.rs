@@ -12,7 +12,7 @@ use argui_dsl_semantic::CompilerDatabase;
 /// Returns the resolved IR or panics with semantic diagnostics.
 fn compile(source: &str) -> argui_dsl_ir::IrProject {
     let mut database = CompilerDatabase::with_builtins().unwrap();
-    database.set_file("ui/main.argui", source);
+    let file = database.set_file("ui/main.argui", source);
     let project = database.check();
     assert!(
         project.is_valid(),
@@ -20,7 +20,11 @@ fn compile(source: &str) -> argui_dsl_ir::IrProject {
         project.diagnostics
     );
     let schema = argui_schema::builtin::registry().unwrap();
-    lower(&project, &schema).unwrap()
+    let mut ir = lower(&project, &schema).unwrap();
+    ir.components
+        .retain(|component| component.source.span.is_some_and(|span| span.file == file));
+    ir.assets.retain(|asset| !asset.path.starts_with("@argui/"));
+    ir
 }
 
 #[test]

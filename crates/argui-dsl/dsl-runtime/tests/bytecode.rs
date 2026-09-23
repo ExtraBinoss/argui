@@ -8,8 +8,14 @@ use argui_dsl_ir::{
 use argui_dsl_runtime::{DslValue, EvaluationContext, Instruction, Program, RuntimeError};
 use argui_dsl_syntax::{FileId, Span, TextRange, TextSize};
 
+#[path = "bytecode/arithmetic.rs"]
+mod arithmetic;
+
 #[path = "bytecode/gradient.rs"]
 mod gradient;
+
+#[path = "bytecode/short_circuit.rs"]
+mod short_circuit;
 
 fn source() -> SourceInfo {
     SourceInfo::new(

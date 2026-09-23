@@ -3,6 +3,9 @@ use std::{fs, path::Path};
 use argui_dsl_lsp::LanguageServer;
 use serde_json::{Value, json};
 
+#[path = "server/warnings.rs"]
+mod warnings;
+
 fn file_uri(path: &Path) -> String {
     let text = path
         .to_string_lossy()
@@ -230,7 +233,7 @@ export component Main {
     }));
     let diagnostics = closed[0]["params"]["diagnostics"].as_array().unwrap();
     assert!(diagnostics.iter().any(|diagnostic| {
-        diagnostic["code"] == "MissingRepeaterKey" && diagnostic["severity"] == 2
+        diagnostic["code"] == "MissingRepeaterKey" && diagnostic["severity"] == 1
     }));
 
     let malformed = server.handle_message(&json!({

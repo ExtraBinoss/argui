@@ -86,7 +86,11 @@ fn collect_node(node: &IrNode, sites: &mut HashSet<SiteId>) {
                 collect_node(child, sites);
             }
         }
-        IrNode::Slot { .. } => {}
+        IrNode::Slot { fallback: body, .. } | IrNode::SlotContent { body, .. } => {
+            for child in body {
+                collect_node(child, sites);
+            }
+        }
     }
 }
 

@@ -69,6 +69,13 @@ impl Context<'_> {
                     let motion_identity = format!("identity_{}_{}", site.raw(), depth);
                     let identity = self.identity(site.raw(), scope, repeater_key)?;
                     writeln!(output, "{pad}let {motion_identity} = {identity};").unwrap();
+                    let mut native_scope = scope.clone();
+                    if repeater_key.is_some() {
+                        native_scope
+                            .observed_identities
+                            .insert(*site, motion_identity.clone());
+                    }
+                    let scope = &native_scope;
                     let children_name = format!("children_{}_{}", site.raw(), depth);
                     if native_schema.virtual_window {
                         self.emit_virtual_children(
@@ -186,7 +193,9 @@ impl Context<'_> {
                         &pad,
                         scope,
                     )?;
-                    writeln!(output, "{pad}{destination}.push(construct_native(::argui::schema::NativeTypeId::from_raw({}), &{input}).retained_identity({motion_identity}));", native.raw()).unwrap();
+                    let interactive = scope.states.get(site).is_some_and(|states| states.iter().any(|state|
+                        matches!(state.condition.kind, argui_dsl_ir::IrExpressionKind::ObservedRead { site: observed, .. } if observed == *site)));
+                    writeln!(output, "{pad}{destination}.push(construct_native(::argui::schema::NativeTypeId::from_raw({}), {input}, {motion_identity}, {interactive}, native_cache));", native.raw()).unwrap();
                     if let Some(effect) = effect {
                         self.emit_applied_effect(output, effect, destination, depth, scope)?;
                     }
@@ -210,12 +219,15 @@ impl Context<'_> {
                 }
             },
             IrNode::Repeater {
+                site,
                 local,
                 model,
                 key,
                 body,
                 ..
             } => {
+                let identity = self.identity(site.raw(), scope, repeater_key)?;
+                writeln!(output, "{pad}{{ let owner = child_owner(&({identity})); let mut keys = ::std::collections::HashSet::new();").unwrap();
                 let local_name = format!("local_{}", local.raw());
                 writeln!(
                     output,
@@ -225,8 +237,14 @@ impl Context<'_> {
                 .unwrap();
                 let mut nested = scope.clone();
                 nested.locals.insert(*local, local_name);
+                let identity = self.identity(site.raw(), &nested, Some(key))?;
+                writeln!(
+                    output,
+                    "{pad}assert!(keys.insert({identity}), \"duplicate repeater key\");"
+                )
+                .unwrap();
                 self.emit_nodes(output, body, destination, depth + 1, &nested, Some(key))?;
-                writeln!(output, "{pad}}}").unwrap();
+                writeln!(output, "{pad}}} }}").unwrap();
             }
             IrNode::Conditional {
                 condition,
@@ -267,11 +285,29 @@ impl Context<'_> {
                 )?;
                 writeln!(output, "{pad}}}").unwrap();
             }
-            IrNode::Slot { slot, .. } => {
+            IrNode::SlotContent { .. } => {
+                return Err(CompilerError::Codegen(
+                    "named slot content outside component call".into(),
+                ));
+            }
+            IrNode::Slot { slot, fallback, .. } => {
                 let value = scope.slots.get(slot).ok_or_else(|| {
                     CompilerError::Codegen(format!("slot {} is unavailable", slot.raw()))
                 })?;
-                writeln!(output, "{pad}{destination}.extend({value}.clone());").unwrap();
+                writeln!(output, "{pad}if {value}.is_empty() {{").unwrap();
+                self.emit_nodes(
+                    output,
+                    fallback,
+                    destination,
+                    depth + 1,
+                    scope,
+                    repeater_key,
+                )?;
+                writeln!(
+                    output,
+                    "{pad}}} else {{ {destination}.extend({value}.clone()); }}"
+                )
+                .unwrap();
             }
         }
         Ok(())
@@ -396,7 +432,7 @@ fn expression_capture_names(
         }
         Kind::ObservedRead { site, .. } => {
             names.insert("observer".into());
-            names.insert("owner".into());
+            names.insert(scope.observation_capture(*site));
             observed_sites.insert(*site);
         }
         Kind::LocalRead(local) => {

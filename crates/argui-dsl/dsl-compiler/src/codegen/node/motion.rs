@@ -22,6 +22,7 @@ struct AnimationParameters {
     stiffness: Option<String>,
     damping: Option<String>,
     easing: Option<String>,
+    playing: Option<String>,
 }
 
 impl Context<'_> {
@@ -166,6 +167,7 @@ impl Context<'_> {
             stiffness,
             damping,
             easing,
+            playing,
         } = self.animation_parameters(animation, scope)?;
         let base = &selection.effective;
         let (method, target, from, to, suffix, canonical) = match &animation.value_type {
@@ -246,6 +248,11 @@ impl Context<'_> {
                 "({specification}).and_then(|specification| specification.with_easing_name(&({easing})))"
             );
         }
+        if let Some(playing) = playing {
+            specification = format!(
+                "({specification}).map(|specification| specification.with_playing({playing}))"
+            );
+        }
         if let Some(policy) = animation.transition {
             let policy = match policy {
                 IrTransitionPolicy::Enter => "Enter",
@@ -323,6 +330,7 @@ impl Context<'_> {
                 "stiffness" => values.stiffness = Some(expression),
                 "damping" => values.damping = Some(expression),
                 "easing" => values.easing = Some(expression),
+                "playing" => values.playing = Some(expression),
                 name => {
                     return Err(CompilerError::Codegen(format!(
                         "unsupported animation parameter `{name}`"

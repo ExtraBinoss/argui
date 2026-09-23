@@ -1,8 +1,10 @@
 mod binding;
 mod child_reference;
+mod conversion;
 mod effect;
 mod expression;
 mod node;
+mod statement;
 mod types;
 
 use std::{collections::HashMap, fmt::Write};
@@ -92,7 +94,7 @@ pub(super) fn emit(
         format!("matches!(id, {mode_ids})")
     };
     writeln!(output, "#[allow(dead_code)] fn set_theme_mode(name: String) {{ let id = theme_mode_id(&name); if !{valid_mode} {{ eprintln!(\"unknown theme mode `{{name}}`\"); return; }} ACTIVE_THEME_MODE.with(|active| active.set(id)); }}").unwrap();
-    writeln!(output, "fn construct_native(id: ::argui::schema::NativeTypeId, input: &::argui::schema::NativeElementInput) -> ::argui::ui::Element {{ NATIVE_REGISTRY.with(|registry| registry.construct(id, input).expect(\"AOT input was schema checked\")) }}").unwrap();
+    writeln!(output, "fn construct_native(id: ::argui::schema::NativeTypeId, input: ::argui::schema::NativeElementInput, identity: ::argui::ui::RetainedIdentity, interactive: bool, cache: &mut ::argui::schema::NativeElementCache) -> ::argui::ui::Element {{ NATIVE_REGISTRY.with(|registry| cache.construct(registry, id, identity, input, interactive).expect(\"AOT input was schema checked\")) }}").unwrap();
     context.emit_types(&mut output)?;
     context.emit_tokens(&mut output)?;
     context.emit_assets(&mut output)?;
@@ -367,7 +369,7 @@ impl<'a> Context<'a> {
         let definition = self.component_definition(component.id)?;
         write!(
             output,
-            "fn render_component_{}(owner: u64, translator: &Translator, property_motions: &mut ::argui::schema::PropertyMotionStore, child_properties: &mut ::argui::reactive::RetainedPropertyStore<::argui::ui::RetainedIdentity>, virtual_viewports: &::std::collections::HashMap<::argui::ui::RetainedIdentity, f32>, reduced_motion: bool, observer: ::argui::runtime::ObservationReader, host_effects: Rc<RefCell<Vec<HostEffect>>>",
+            "fn render_component_{}(owner: u64, translator: &Translator, property_motions: &mut ::argui::schema::PropertyMotionStore, child_properties: &mut ::argui::reactive::RetainedPropertyStore<::argui::ui::RetainedIdentity>, virtual_viewports: &mut ::argui::schema::VirtualViewportStore, native_cache: &mut ::argui::schema::NativeElementCache, reduced_motion: bool, observer: ::argui::runtime::ObservationReader, host_effects: Rc<RefCell<Vec<HostEffect>>>",
             component.id.raw()
         )
         .unwrap();
@@ -399,7 +401,7 @@ impl<'a> Context<'a> {
             ", handlers: &mut NativeEventRegistrar<'_>) -> ::argui::ui::Element {{"
         )
         .unwrap();
-        writeln!(output, "let _ = translator;").unwrap();
+        writeln!(output, "let _ = translator; let _component_owner = owner;").unwrap();
         writeln!(output, "let _ = &observer;").unwrap();
         writeln!(output, "let _ = &host_effects;").unwrap();
         writeln!(
@@ -408,10 +410,15 @@ impl<'a> Context<'a> {
         )
         .unwrap();
         writeln!(output, "let _ = &mut *child_properties;").unwrap();
-        writeln!(output, "let _ = virtual_viewports;").unwrap();
+        writeln!(
+            output,
+            "let _ = virtual_viewports; let _ = &mut *native_cache;"
+        )
+        .unwrap();
         writeln!(output, "let _ = &mut *handlers;").unwrap();
         writeln!(output, "let mut roots = Vec::new();").unwrap();
         let mut scope = expression::Scope {
+            observation_owner: Some("_component_owner".into()),
             translator: Some("translator".into()),
             ..expression::Scope::default()
         };
@@ -515,7 +522,7 @@ impl<'a> Context<'a> {
         let name = types::type_name(&definition.name);
         writeln!(
             output,
-            "pub struct {name} {{ instance: u64, translator: RefCell<Translator>, property_motions: RefCell<::argui::schema::PropertyMotionStore>, child_properties: RefCell<::argui::reactive::RetainedPropertyStore<::argui::ui::RetainedIdentity>>, virtual_viewports: RefCell<::std::collections::HashMap<::argui::ui::RetainedIdentity, f32>> ,"
+            "pub struct {name} {{ instance: u64, translator: RefCell<Translator>, property_motions: RefCell<::argui::schema::PropertyMotionStore>, child_properties: RefCell<::argui::reactive::RetainedPropertyStore<::argui::ui::RetainedIdentity>>, virtual_viewports: RefCell<::argui::schema::VirtualViewportStore>, native_cache: RefCell<::argui::schema::NativeElementCache>,"
         )
         .unwrap();
         for property in &source.properties {

@@ -135,7 +135,9 @@ fn visual_node(node: &IrNode, id: AssetId) -> Option<Span> {
                 .chain(else_body)
                 .find_map(|child| visual_node(child, id))
         }),
-        IrNode::Slot { .. } => None,
+        IrNode::Slot { fallback: body, .. } | IrNode::SlotContent { body, .. } => {
+            body.iter().find_map(|child| visual_node(child, id))
+        }
     }
 }
 

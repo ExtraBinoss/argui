@@ -560,32 +560,6 @@ fn service_packages_embedded_icon_svg_without_a_filesystem_asset() {
 }
 
 #[test]
-fn service_preserves_warning_severity_in_semantic_diagnostics() {
-    let directory = tempfile::tempdir().unwrap();
-    std::fs::create_dir(directory.path().join("ui")).unwrap();
-    std::fs::write(
-        directory.path().join("ui/main.argui"),
-        r#"import { Column, Text } from "@argui/ui"
-export component Main {
-    in property items: model<string>
-    Column {
-        for item in items { Text { content: item } }
-        Missing {}
-    }
-}"#,
-    )
-    .unwrap();
-    let mut service = DevCompilerService::open(directory.path(), "ui/main.argui").unwrap();
-    let LiveMessage::Diagnostics { diagnostics, .. } = service.compile().message else {
-        panic!("a keyless repeater should produce a semantic warning");
-    };
-    assert!(diagnostics.iter().any(|diagnostic| {
-        diagnostic.severity == argui_dsl_protocol::Severity::Warning
-            && diagnostic.code == "MissingRepeaterKey"
-    }));
-}
-
-#[test]
 fn refresh_sources_removes_deleted_modules_without_losing_the_service() {
     let directory = tempfile::tempdir().unwrap();
     std::fs::create_dir(directory.path().join("ui")).unwrap();

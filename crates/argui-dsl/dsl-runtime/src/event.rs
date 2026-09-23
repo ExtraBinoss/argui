@@ -302,43 +302,30 @@ impl EvaluationContext for EventValueContext<'_> {
     }
 }
 
-/// Applies a restricted assignment operator without implicit type coercion.
+/// Applies `operator` to `current` and `value`, sharing expression arithmetic.
+/// Returns the assigned value or an incompatible-operand/overflow error.
 fn assignment_value(
     operator: AssignmentOperator,
     current: DslValue,
     value: DslValue,
 ) -> Result<DslValue, RuntimeError> {
-    use AssignmentOperator as Op;
-    match (operator, current, value) {
-        (Op::Set, _, value) => Ok(value),
-        (Op::Add, DslValue::Int(left), DslValue::Int(right)) => Ok(DslValue::Int(left + right)),
-        (Op::Subtract, DslValue::Int(left), DslValue::Int(right)) => {
-            Ok(DslValue::Int(left - right))
+    use argui_dsl_ir::BinaryOperator;
+    let operator = match operator {
+        AssignmentOperator::Set => return Ok(value),
+        AssignmentOperator::Add => BinaryOperator::Add,
+        AssignmentOperator::Subtract => BinaryOperator::Subtract,
+        AssignmentOperator::Multiply => BinaryOperator::Multiply,
+        AssignmentOperator::Divide => {
+            if matches!(value, DslValue::Float(number) if number == 0.0)
+                || value == DslValue::Int(0)
+            {
+                return Err(RuntimeError::TypeMismatch {
+                    expected: "assignment-compatible operands".into(),
+                    actual: format!("{} and {}", current.type_name(), value.type_name()),
+                });
+            }
+            BinaryOperator::Divide
         }
-        (Op::Multiply, DslValue::Int(left), DslValue::Int(right)) => {
-            Ok(DslValue::Int(left * right))
-        }
-        (Op::Divide, DslValue::Int(left), DslValue::Int(right)) if right != 0 => {
-            Ok(DslValue::Int(left / right))
-        }
-        (Op::Add, DslValue::Float(left), DslValue::Float(right)) => {
-            Ok(DslValue::Float(left + right))
-        }
-        (Op::Subtract, DslValue::Float(left), DslValue::Float(right)) => {
-            Ok(DslValue::Float(left - right))
-        }
-        (Op::Multiply, DslValue::Float(left), DslValue::Float(right)) => {
-            Ok(DslValue::Float(left * right))
-        }
-        (Op::Divide, DslValue::Float(left), DslValue::Float(right)) if right != 0.0 => {
-            Ok(DslValue::Float(left / right))
-        }
-        (Op::Add, DslValue::String(left), DslValue::String(right)) => {
-            Ok(DslValue::String(left + &right))
-        }
-        (_, left, right) => Err(RuntimeError::TypeMismatch {
-            expected: "assignment-compatible operands".into(),
-            actual: format!("{} and {}", left.type_name(), right.type_name()),
-        }),
-    }
+    };
+    crate::bytecode::binary_value(operator, current, value)
 }

@@ -273,7 +273,11 @@ fn validate_media_node(
                 validate_media_node(child, ir)?;
             }
         }
-        IrNode::Slot { .. } => {}
+        IrNode::Slot { fallback: body, .. } | IrNode::SlotContent { body, .. } => {
+            for child in body {
+                validate_media_node(child, ir)?;
+            }
+        }
     }
     Ok(())
 }

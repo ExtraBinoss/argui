@@ -53,7 +53,7 @@ export component Main {
         |_| Err("no assets".into()),
     )
     .unwrap();
-    for operator in [" % ", " == ", " && ", " >= ", " || ", " < "] {
+    for operator in [".checked_rem(", " == ", " && ", " >= ", " || ", " < "] {
         assert!(compiled.rust.contains(operator), "missing {operator}");
     }
 }

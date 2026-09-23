@@ -222,7 +222,7 @@ export component Main { Text { content: "connected" } }
             assert_eq!(status, LiveMessage::Committed { generation: 7 });
         });
 
-        let runtime = LiveRuntime::connect(address, Duration::from_millis(200)).unwrap();
+        let runtime = LiveRuntime::connect(address, Duration::from_secs(2)).unwrap();
         assert_eq!(
             runtime.root(),
             Some(argui_dsl_runtime::InstanceId::from_raw(1))

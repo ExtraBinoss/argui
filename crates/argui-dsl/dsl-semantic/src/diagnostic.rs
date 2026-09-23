@@ -26,6 +26,7 @@ pub enum DiagnosticCode {
     InvalidEffect,
     InvalidAsset,
     InvalidAnimation,
+    UnreachableStatement,
 }
 
 /// Diagnostic importance used consistently by CLI, LSP, and live development.

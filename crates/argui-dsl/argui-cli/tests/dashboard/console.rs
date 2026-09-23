@@ -135,11 +135,7 @@ fn terminal_dashboard_reports_launched_application_output() {
         "terminal output: {}",
         String::from_utf8_lossy(&host.captured)
     );
-    assert!(
-        host.captured
-            .windows(b"child ready".len())
-            .any(|window| window == b"child ready")
-    );
+    assert!(host.read_until(b"child ready", Duration::from_secs(3)));
     let transcript = String::from_utf8_lossy(&host.captured);
     assert!(transcript.contains("BUILDING") && transcript.contains("CLIENT"));
     assert!(transcript.contains("0/") || transcript.contains("1/"));

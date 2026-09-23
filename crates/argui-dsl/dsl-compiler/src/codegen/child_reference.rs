@@ -123,7 +123,8 @@ impl Context<'_> {
                         ))?
                     )
                 } else {
-                    let value = self.expression(&binding.value, &canonical)?;
+                    let value =
+                        self.expression_as(&binding.value, &lowered.value_type, &canonical)?;
                     format!(
                         "child_properties.controlled({identity}.clone(), {}_u64, {value})",
                         lowered.id.raw()
@@ -131,7 +132,7 @@ impl Context<'_> {
                 }
             } else {
                 let value = if let Some(default) = &lowered.default {
-                    let expression = self.expression(default, &inner)?;
+                    let expression = self.expression_as(default, &lowered.value_type, &inner)?;
                     format!(
                         "{{ let owner = child_owner(&{identity}); let _ = owner; {expression} }}"
                     )

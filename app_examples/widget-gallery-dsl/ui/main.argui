@@ -1,5 +1,5 @@
 import { Button, Popover, Separator } from "@argui/ui"
-import { Row, Column, Container, Text } from "@argui/native"
+import { Row, Column, Container, Text, VirtualWindow } from "@argui/native"
 import { ButtonPage } from "./pages/button.argui"
 import { AccordionPage } from "./pages/accordion.argui"
 import { AlertPage } from "./pages/alert.argui"
@@ -92,8 +92,9 @@ export component Main {
     private property accent: int = 0
     private property theme_open: bool = false
     private property selected: string = "Button"
+    private property sidebar_offset: float = 0.0
     private property navigation: array<string> = [
-        "Accordion", "Alert", "Alert dialog", "Animated text", "Aspect ratio",
+        "COMPONENTS", "Accordion", "Alert", "Alert dialog", "Animated text", "Aspect ratio",
         "Attachment", "Avatar", "Badge", "Breadcrumb", "Bubble",
         "Button", "Button group", "Calendar", "Card", "Carousel",
         "Chart", "Checkbox", "Collapsible", "Color picker", "Combobox",
@@ -106,11 +107,8 @@ export component Main {
         "Radio group", "Scroll area", "ScrollView", "Select", "Selection",
         "Separator", "Sheet", "Sidebar", "Skeleton", "Slider",
         "Switch", "Table", "Tabs", "Text area", "Toast",
-        "Toggle", "Toggle group", "Tooltip", "Visual composition", "VList"
-    ]
-
-    private property examples: array<string> = [
-        "Animation lab", "Async tasks", "Custom Timeline", "Damage control",
+        "Toggle", "Toggle group", "Tooltip", "Visual composition", "VList",
+        "EXAMPLES", "Animation lab", "Async tasks", "Custom Timeline", "Damage control",
         "Drag & Drop", "Editing & Password", "Internationalization", "Liquid glass",
         "Scroll shadow", "Scrollbar styling", "Split Pane", "Text selection",
         "Typography & selection", "Web layout", "WebView"
@@ -203,8 +201,6 @@ export component Main {
             grow: 1.0
             min_height: 0.0
             wrap: true
-            scroll_y: true
-            scrollbar_thumb: var(--argui-scrollbar-thumb)
 
             Column #sidebar {
                 width: 250px
@@ -213,21 +209,24 @@ export component Main {
                 min_height: 0.0
                 grow: 1.0
                 padding: 16.0
-                gap: 4.0
                 background: var(--argui-surface)
-                scroll_y: true
-                scrollbar_thumb: var(--argui-scrollbar-thumb)
 
-                Text { content: "COMPONENTS" color: var(--argui-muted-foreground) weight: 700 font_size: 11.0 }
-                for item in navigation key item {
-                    Container { width: 100% height: 34px shrink: 0.0
-                        Button { text: item height: 32px variant: selected == item ? "secondary" : "ghost" on click { selected = item } }
-                    }
-                }
-                Text { content: "EXAMPLES" color: var(--argui-muted-foreground) weight: 700 font_size: 11.0 }
-                for item in examples key item {
-                    Container { width: 100% height: 34px shrink: 0.0
-                        Button { text: item height: 32px variant: selected == item ? "secondary" : "ghost" on click { selected = item } }
+                VirtualWindow #sidebar_list {
+                    width: 100%
+                    height: 100%
+                    row_height: 38.0
+                    overscan: 2
+                    offset <=> sidebar_offset
+                    scrollbar_thumb: var(--argui-scrollbar-thumb)
+                    for item in navigation key item {
+                        Container { width: 100% height: 38px
+                            if item == "COMPONENTS" || item == "EXAMPLES" {
+                                Text { y: 11px content: item color: var(--argui-muted-foreground) weight: 700 font_size: 11.0 }
+                            }
+                            if item != "COMPONENTS" && item != "EXAMPLES" {
+                                Button { text: item height: 32px variant: selected == item ? "secondary" : "ghost" on click { selected = item } }
+                            }
+                        }
                     }
                 }
             }

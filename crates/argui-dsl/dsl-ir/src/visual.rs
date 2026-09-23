@@ -14,6 +14,9 @@ mod animation;
 mod effect;
 mod handler;
 pub(crate) mod reference;
+mod slot;
+mod style;
+mod target;
 
 /// Resolved properties and events for one element target.
 struct Target {
@@ -29,6 +32,7 @@ pub(crate) struct VisualLowerer<'a> {
     members: &'a ComponentMembers,
     tables: &'a Tables,
     effects: &'a [IrEffect],
+    styles: &'a [crate::IrStyle],
     schema: &'a argui_schema::SchemaRegistry,
     assets: &'a mut HashMap<String, crate::IrAsset>,
     errors: &'a mut Vec<LowerError>,
@@ -38,6 +42,7 @@ pub(crate) struct VisualLowerer<'a> {
     animations: Vec<IrAnimation>,
     references: expression::References,
     reference_sites: HashMap<String, SiteId>,
+    slot_defaults: HashMap<String, SyntaxNode>,
 }
 
 impl<'a> VisualLowerer<'a> {
@@ -51,6 +56,7 @@ impl<'a> VisualLowerer<'a> {
         members: &'a ComponentMembers,
         tables: &'a Tables,
         effects: &'a [IrEffect],
+        styles: &'a [crate::IrStyle],
         schema: &'a argui_schema::SchemaRegistry,
         assets: &'a mut HashMap<String, crate::IrAsset>,
         errors: &'a mut Vec<LowerError>,
@@ -61,6 +67,7 @@ impl<'a> VisualLowerer<'a> {
             members,
             tables,
             effects,
+            styles,
             schema,
             assets,
             errors,
@@ -70,11 +77,22 @@ impl<'a> VisualLowerer<'a> {
             animations: Vec::new(),
             references: HashMap::new(),
             reference_sites: HashMap::new(),
+            slot_defaults: HashMap::new(),
         }
     }
 
     /// Lowers direct component visual content and component-level behavior.
     pub(crate) fn component_body(&mut self, node: &SyntaxNode) -> Vec<IrNode> {
+        self.slot_defaults = node
+            .children()
+            .filter(|node| node.kind() == SyntaxKind::SlotDecl)
+            .filter_map(|node| {
+                direct_identifier(&node).zip(
+                    node.children()
+                        .find(|child| child.kind() == SyntaxKind::Block),
+                )
+            })
+            .collect();
         self.references =
             reference::collect(self.component, self.module, self.schema, self.tables, node);
         self.reference_sites = reference::collect_sites(self.component, self.module, node);
@@ -114,7 +132,7 @@ impl<'a> VisualLowerer<'a> {
         let name = direct_identifier(node)?;
         let target = self.target(&name, node)?;
         let site = self.register_site(node);
-        let properties = node
+        let mut properties = node
             .children()
             .filter(|child| {
                 matches!(
@@ -133,8 +151,10 @@ impl<'a> VisualLowerer<'a> {
             .filter(|child| child.kind() == SyntaxKind::EventBlock)
             .filter_map(|event| self.event(&event, site, &target))
             .collect();
+        self.apply_styles(node, site, &mut properties);
         self.lower_behavior(node, Some(site), &target);
-        let children = self.visual_children(node);
+        let mut children = self.visual_children(node);
+        children.extend(self.slot_contents(node, &target.element));
         Some(IrNode::Element {
             site,
             target: target.element,
@@ -215,9 +235,16 @@ impl<'a> VisualLowerer<'a> {
         let name = direct_identifier(node)?;
         let slot = self.members.slots.get(&name).copied()?;
         let site = self.register_site(node);
+        let fallback = self
+            .slot_defaults
+            .get(&name)
+            .cloned()
+            .map(|default| self.visual_children(&default))
+            .unwrap_or_default();
         Some(IrNode::Slot {
             site,
             slot,
+            fallback,
             source: self.source(node, Some(site)),
         })
     }
@@ -382,103 +409,6 @@ impl<'a> VisualLowerer<'a> {
             }
         }
         self.lower_animations(node, owner, target);
-    }
-
-    /// Resolves one element target and all assignable members.
-    fn target(&mut self, name: &str, node: &SyntaxNode) -> Option<Target> {
-        if let Some(native) = self.module.native_scope.get(name).copied() {
-            let Some(schema) = self.schema.schema(native) else {
-                self.errors.push(LowerError::new(
-                    format!("native schema `{name}` is unavailable during IR lowering"),
-                    Span::new(self.module.file, node.text_range()),
-                ));
-                return None;
-            };
-            return Some(Target {
-                element: IrElementTarget::Native(native),
-                properties: schema
-                    .properties
-                    .iter()
-                    .map(|property| {
-                        (
-                            property.name.as_str().to_string(),
-                            (
-                                PropertyTargetId::Native(property.id),
-                                IrType::from_schema(property.value_type),
-                            ),
-                        )
-                    })
-                    .collect(),
-                events: schema
-                    .events
-                    .iter()
-                    .map(|event| {
-                        (
-                            event.name.as_str().to_string(),
-                            (
-                                EventTargetId::Native(event.id),
-                                event.payload.map(IrType::from_schema).into_iter().collect(),
-                            ),
-                        )
-                    })
-                    .collect(),
-            });
-        }
-        let symbol = self.module.scope.get(name)?;
-        let component = *self.tables.components.get(symbol)?;
-        let members = self.tables.component_members.get(symbol)?;
-        Some(Target {
-            element: IrElementTarget::Component(component),
-            properties: members
-                .properties
-                .iter()
-                .map(|(name, (id, value_type))| {
-                    (
-                        name.clone(),
-                        (PropertyTargetId::Component(*id), value_type.clone()),
-                    )
-                })
-                .collect(),
-            events: members
-                .callbacks
-                .iter()
-                .map(|(name, (id, parameters, _))| {
-                    (
-                        name.clone(),
-                        (EventTargetId::Component(*id), parameters.clone()),
-                    )
-                })
-                .collect(),
-        })
-    }
-
-    /// Constructs the current component itself as a behavior assignment target.
-    fn component_target(&self) -> Target {
-        Target {
-            element: IrElementTarget::Component(self.component),
-            properties: self
-                .members
-                .properties
-                .iter()
-                .map(|(name, (id, value_type))| {
-                    (
-                        name.clone(),
-                        (PropertyTargetId::Component(*id), value_type.clone()),
-                    )
-                })
-                .collect(),
-            events: self
-                .members
-                .callbacks
-                .iter()
-                .map(|(name, (id, parameters, _))| {
-                    (
-                        name.clone(),
-                        (EventTargetId::Component(*id), parameters.clone()),
-                    )
-                })
-                .collect(),
-        }
     }
 
     /// Lowers an expression using the current component and local environment.

@@ -35,9 +35,11 @@ pub struct DynamicProperty {
 }
 
 impl DynamicProperty {
-    /// Creates a typed property at revision zero.
+    /// Creates property `id` of `value_type` at revision zero, normalizing `value`.
+    /// The caller supplies a checked initial value; numeric containers are widened.
     #[must_use]
     pub fn new(id: PropertyId, value_type: IrType, value: DslValue) -> Self {
+        let value = value.coerce(&value_type);
         Self {
             id,
             value_type,
@@ -59,12 +61,19 @@ impl DynamicProperty {
         self.revision
     }
 
-    /// Replaces a compatible value, marks it explicit, and reports whether it changed.
+    /// Returns whether a binding or explicit write replaced this property's default.
+    /// Renderers can skip evaluating defaults whose result would be discarded.
+    pub(crate) const fn has_override(&self) -> bool {
+        self.modified
+    }
+
+    /// Normalizes compatible `value`, marks it explicit, and returns whether it changed.
     ///
     /// # Errors
     ///
     /// Returns a type mismatch without changing the previous value.
     pub fn set(&mut self, value: DslValue) -> Result<bool, RuntimeError> {
+        let value = value.coerce(&self.value_type);
         if !value.compatible_with(&self.value_type) {
             return Err(RuntimeError::TypeMismatch {
                 expected: format!("{:?}", self.value_type),
@@ -120,6 +129,7 @@ impl DynamicProperty {
         if self.modified {
             return Ok(false);
         }
+        let value = value.coerce(&self.value_type);
         if !value.compatible_with(&self.value_type) {
             return Err(RuntimeError::TypeMismatch {
                 expected: format!("{:?}", self.value_type),

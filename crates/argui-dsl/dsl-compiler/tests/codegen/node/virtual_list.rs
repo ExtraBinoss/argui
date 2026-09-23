@@ -48,11 +48,15 @@ export component Main {
         "{}",
         compiled.rust
     );
-    assert!(compiled.rust.contains("virtual_viewports.get(&identity_"));
     assert!(
         compiled
             .rust
-            .contains("HashMap<::argui::ui::RetainedIdentity, f32>")
+            .contains("virtual_viewports.height(&identity_")
+    );
+    assert!(
+        compiled
+            .rust
+            .contains("::argui::schema::VirtualViewportStore")
     );
     assert!(compiled.rust.contains("fn layout_changed(&mut self"));
     assert!(

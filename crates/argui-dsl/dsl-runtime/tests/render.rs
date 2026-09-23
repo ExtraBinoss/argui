@@ -567,3 +567,5 @@ export component Main {
         ));
     }
 }
+#[path = "render/repeater.rs"]
+mod repeater;

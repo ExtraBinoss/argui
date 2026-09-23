@@ -126,10 +126,14 @@ export component Main {
         "ui/main.argui",
         |_| Err("no assets".into()),
     );
-    let Err(CompilerError::Codegen(message)) = result else {
-        panic!("computed two-way source should fail code generation");
+    let Err(CompilerError::Semantic(diagnostics)) = result else {
+        panic!("computed two-way source should fail semantic validation");
     };
-    assert!(message.contains("two-way child reference source is not a property"));
+    assert!(
+        diagnostics
+            .iter()
+            .any(|issue| issue.code == argui_dsl_semantic::DiagnosticCode::InvalidTwoWayBinding)
+    );
 }
 
 /// An output without an authored default still gets a stable fallback handle.

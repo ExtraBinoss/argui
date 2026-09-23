@@ -20,9 +20,13 @@ impl LiveRuntime {
         self.rendered_instances.clear();
         self.rendered_instances.insert(root);
         self.property_motions.begin_render();
+        self.virtual_viewports.begin_render();
+        self.native_cache.begin_render();
         let element = self.render_instance(root, HashMap::new(), None, context);
         if element.is_ok() {
             self.property_motions.end_render();
+            self.virtual_viewports.end_render();
+            self.native_cache.end_render();
         }
         self.instances
             .retain(|id, _| self.rendered_instances.contains(id));
@@ -41,13 +45,11 @@ impl LiveRuntime {
             .instances
             .remove(&instance_id)
             .ok_or(RuntimeError::MissingComponent(instance_id.raw()))?;
-        let definition = self
-            .package
-            .ir
+        let project = std::sync::Arc::clone(&self.package.ir);
+        let definition = project
             .components
             .iter()
             .find(|component| component.id == instance.component)
-            .cloned()
             .ok_or(RuntimeError::MissingComponent(instance.component.raw()))?;
         if let Some(sites) = self.package.observed_sites.get(&definition.id) {
             for site in sites {
@@ -58,14 +60,14 @@ impl LiveRuntime {
                 instance.observations.insert(*site, observation);
             }
         }
-        self.prepare_child_references(&mut instance, &definition, context)?;
-        self.refresh_derived_defaults(&mut instance, &definition)?;
+        self.prepare_child_references(&mut instance, definition, context)?;
+        self.refresh_derived_defaults(&mut instance, definition)?;
         let result = self
-            .apply_own_animations(&mut instance, &definition, context)
+            .apply_own_animations(&mut instance, definition, context)
             .and_then(|()| {
                 self.render_nodes(
                     &mut instance,
-                    &definition,
+                    definition,
                     &definition.body,
                     &HashMap::new(),
                     &slots,

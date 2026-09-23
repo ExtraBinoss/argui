@@ -134,6 +134,18 @@ pub(super) fn validate_template_argument(
     slot_name: &str,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
+    let supplied = node
+        .children()
+        .find(|child| {
+            child.kind() == SyntaxKind::SlotContent
+                && super::direct_ident(child).as_deref() == Some(slot_name)
+        })
+        .and_then(|child| {
+            child
+                .children()
+                .find(|node| node.kind() == SyntaxKind::Block)
+        });
+    let node = supplied.as_ref().unwrap_or(node);
     let children = node
         .children()
         .filter(|child| {

@@ -32,7 +32,7 @@ fn icons_are_resolved_on_demand_with_aliases_and_precise_errors() {
         !project
             .modules
             .iter()
-            .any(|module| module.path == "@argui/icons/Check.argui")
+            .any(|module| module.path == "@argui/icons/StarFilled.argui")
     );
     let diagnostic = project
         .diagnostics

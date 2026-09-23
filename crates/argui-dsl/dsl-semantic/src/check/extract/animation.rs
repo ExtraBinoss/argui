@@ -368,6 +368,7 @@ fn validate(
                 let expected = match parameter.as_str() {
                     "from" | "to" => Some(&value_type),
                     "duration" => Some(&Type::Duration),
+                    "playing" => Some(&Type::Bool),
                     "iterations" | "easing" => Some(&Type::String),
                     "stiffness" | "damping" => Some(&Type::Float),
                     _ => None,

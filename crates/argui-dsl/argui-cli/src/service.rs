@@ -16,6 +16,8 @@ use crate::ProjectFiles;
 pub struct CompileAttempt {
     pub generation: u64,
     pub message: LiveMessage,
+    /// Non-fatal source diagnostics retained alongside an accepted package.
+    pub warnings: Vec<DiagnosticMessage>,
 }
 
 /// Long-lived incremental compiler and asset revision tracker.
@@ -137,6 +139,16 @@ impl DevCompilerService {
         let result = self
             .session
             .compile(|path| read_asset(&root, path).map_err(|error| error.to_string()));
+        let warnings = result
+            .as_ref()
+            .ok()
+            .map(|compiled| {
+                semantic_diagnostics(&compiled.semantic.diagnostics, &self.session)
+                    .into_iter()
+                    .filter(|diagnostic| diagnostic.severity == Severity::Warning)
+                    .collect()
+            })
+            .unwrap_or_default();
         let message = match result {
             Ok(mut compiled) => match self.package(&mut compiled) {
                 Ok(package) => LiveMessage::Package(Box::new(package)),
@@ -147,6 +159,7 @@ impl DevCompilerService {
         CompileAttempt {
             generation: self.generation,
             message,
+            warnings,
         }
     }
 
@@ -224,6 +237,30 @@ pub enum ServiceError {
     Protocol(String),
 }
 
+/// Converts semantic `values` to protocol diagnostics using `session` source paths.
+/// Returns source ranges, severity and messages without dropping non-fatal warnings.
+fn semantic_diagnostics(
+    values: &[argui_dsl_semantic::Diagnostic],
+    session: &CompilerSession,
+) -> Vec<DiagnosticMessage> {
+    values
+        .iter()
+        .map(|diagnostic| DiagnosticMessage {
+            path: session
+                .file_path(diagnostic.primary.file)
+                .map(str::to_owned),
+            start: Some(u32::from(diagnostic.primary.range.start())),
+            end: Some(u32::from(diagnostic.primary.range.end())),
+            severity: match diagnostic.severity {
+                argui_dsl_semantic::Severity::Error => Severity::Error,
+                argui_dsl_semantic::Severity::Warning => Severity::Warning,
+            },
+            code: format!("{:?}", diagnostic.code),
+            message: diagnostic.message.clone(),
+        })
+        .collect()
+}
+
 /// Converts compiler failures to source diagnostics suitable for remote clients.
 fn compiler_diagnostics(
     generation: u64,
@@ -238,23 +275,7 @@ fn compiler_diagnostics(
         )
     };
     let diagnostics = match error {
-        CompilerError::Semantic(values) => values
-            .into_iter()
-            .map(|diagnostic| {
-                let (path, start, end) = location(diagnostic.primary);
-                DiagnosticMessage {
-                    path,
-                    start,
-                    end,
-                    severity: match diagnostic.severity {
-                        argui_dsl_semantic::Severity::Error => Severity::Error,
-                        argui_dsl_semantic::Severity::Warning => Severity::Warning,
-                    },
-                    code: format!("{:?}", diagnostic.code),
-                    message: diagnostic.message,
-                }
-            })
-            .collect(),
+        CompilerError::Semantic(values) => semantic_diagnostics(&values, session),
         CompilerError::Lower(values) => values
             .into_iter()
             .map(|error| {

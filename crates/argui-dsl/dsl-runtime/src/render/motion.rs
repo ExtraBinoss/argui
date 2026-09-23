@@ -17,6 +17,7 @@ struct DriverValues {
     stiffness: f64,
     damping: f64,
     easing: Option<String>,
+    playing: bool,
     keyframes: Vec<(f32, DslValue, IrType)>,
 }
 
@@ -89,7 +90,7 @@ impl DriverValues {
                 .with_easing_name(&easing)
                 .map_err(RuntimeError::Schema)?;
         }
-        Ok(specification)
+        Ok(specification.with_playing(self.playing))
     }
 }
 
@@ -406,6 +407,7 @@ impl LiveRuntime {
     ) -> Result<DriverValues, RuntimeError> {
         let (mut from, mut to, mut duration_ms) = (None, None, None);
         let mut iterations = String::from("once");
+        let mut playing = true;
         let (mut stiffness, mut damping, mut easing) = (170.0, 26.0, None);
         for parameter in &animation.parameters {
             let value = self.evaluate(instance, &parameter.value, locals)?;
@@ -413,6 +415,15 @@ impl LiveRuntime {
                 "from" => from = Some((value, parameter.value.value_type.clone())),
                 "to" => to = Some((value, parameter.value.value_type.clone())),
                 "duration" => duration_ms = Some(animation_number("duration", value)?),
+                "playing" => match value {
+                    DslValue::Bool(value) => playing = value,
+                    other => {
+                        return Err(RuntimeError::Schema(format!(
+                            "animation `playing` must be a bool, found {}",
+                            other.type_name()
+                        )));
+                    }
+                },
                 "iterations" => match value {
                     DslValue::String(value) => iterations = value,
                     other => {
@@ -456,6 +467,7 @@ impl LiveRuntime {
             stiffness,
             damping,
             easing,
+            playing,
             keyframes,
         })
     }

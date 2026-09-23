@@ -9,17 +9,18 @@ use crate::{
     SymbolId, Type, check::Scope, lower::direct_tokens,
 };
 
-/// Validates that a two-way binding targets a writable component property.
+/// Checks that `value` names a writable member of `properties` with `expected` type.
+/// `updates` indicates that the child/native can publish changes; errors are
+/// appended to `diagnostics` at the expression's span in `file`.
 pub(super) fn validate_two_way(
     value: &SyntaxNode,
     file: FileId,
     properties: &HashMap<String, PropertyDefinition>,
+    expected: &Type,
+    updates: bool,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
-    let target = value
-        .descendants()
-        .find(|node| node.kind() == SyntaxKind::PathExpr)
-        .and_then(|node| direct_ident(&node));
+    let target = crate::check::statement::property_name(value);
     let writable = target
         .as_ref()
         .and_then(|name| properties.get(name))
@@ -31,10 +32,14 @@ pub(super) fn validate_two_way(
                     | PropertyDirection::InputOutput
             )
         });
-    if !writable {
+    let same_type = target
+        .as_ref()
+        .and_then(|name| properties.get(name))
+        .is_none_or(|property| &property.value_type == expected);
+    if !writable || !same_type || !updates {
         diagnostics.push(Diagnostic::error(
             DiagnosticCode::InvalidTwoWayBinding,
-            "two-way binding target must be a writable local property",
+            "two-way binding requires a writable local property of the same type and a child property that publishes changes",
             Span::new(file, value.text_range()),
         ));
     }

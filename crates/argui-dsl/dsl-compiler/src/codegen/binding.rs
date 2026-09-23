@@ -44,7 +44,7 @@ impl Context<'_> {
             } else if let Some(default) = &lowered.default
                 && !super::child_reference::contextual_default(default)
             {
-                self.expression(default, &scope)?
+                self.expression_as(default, &lowered.value_type, &scope)?
             } else {
                 self.default_value(&property.value_type)?
             };
@@ -57,7 +57,7 @@ impl Context<'_> {
         }
         writeln!(
             output,
-            "Self {{ instance: next_instance(), translator: RefCell::new(Rc::new(|_| None)), property_motions: RefCell::new(::argui::schema::PropertyMotionStore::new()), child_properties: RefCell::new(::argui::reactive::RetainedPropertyStore::new()), virtual_viewports: RefCell::new(::std::collections::HashMap::new()),"
+            "Self {{ instance: next_instance(), translator: RefCell::new(Rc::new(|_| None)), property_motions: RefCell::new(::argui::schema::PropertyMotionStore::new()), child_properties: RefCell::new(::argui::reactive::RetainedPropertyStore::new()), virtual_viewports: RefCell::new(::argui::schema::VirtualViewportStore::new()), native_cache: RefCell::new(::argui::schema::NativeElementCache::new()),"
         )
         .unwrap();
         for property in &source.properties {
@@ -148,7 +148,7 @@ impl Context<'_> {
             "/// Builds a static snapshot without registering interactive handlers."
         )
         .unwrap();
-        write!(output, "pub fn render(&self) -> ::argui::ui::Element {{ let mut handlers: NativeEventRegistrar<'_> = None; let translator = self.translator.borrow().clone(); let mut property_motions = self.property_motions.borrow_mut(); property_motions.begin_render(); let mut child_properties = self.child_properties.borrow_mut(); child_properties.begin_render(); let virtual_viewports = self.virtual_viewports.borrow(); let element = render_component_{}(self.instance, &translator, &mut property_motions, &mut child_properties, &virtual_viewports, false, ::argui::runtime::ObservationReader::default(), Rc::new(RefCell::new(Vec::new()))", ir.id.raw()).unwrap();
+        write!(output, "pub fn render(&self) -> ::argui::ui::Element {{ let mut handlers: NativeEventRegistrar<'_> = None; let translator = self.translator.borrow().clone(); let mut property_motions = self.property_motions.borrow_mut(); property_motions.begin_render(); let mut child_properties = self.child_properties.borrow_mut(); child_properties.begin_render(); let mut virtual_viewports = self.virtual_viewports.borrow_mut(); virtual_viewports.begin_render(); let mut native_cache = self.native_cache.borrow_mut(); native_cache.begin_render(); let element = render_component_{}(self.instance, &translator, &mut property_motions, &mut child_properties, &mut virtual_viewports, &mut native_cache, false, ::argui::runtime::ObservationReader::default(), Rc::new(RefCell::new(Vec::new()))", ir.id.raw()).unwrap();
         for property in &source.properties {
             write!(
                 output,
@@ -173,7 +173,7 @@ impl Context<'_> {
             )
             .unwrap();
         }
-        writeln!(output, ", &mut handlers); property_motions.end_render(); child_properties.end_render(); element }} }}").unwrap();
+        writeln!(output, ", &mut handlers); property_motions.end_render(); child_properties.end_render(); virtual_viewports.end_render(); native_cache.end_render(); element }} }}").unwrap();
         if required.is_empty() {
             writeln!(
                 output,
@@ -205,12 +205,12 @@ impl Context<'_> {
         writeln!(output, "let mut child_properties = self.child_properties.borrow_mut(); child_properties.begin_render();").unwrap();
         writeln!(
             output,
-            "let virtual_viewports = self.virtual_viewports.borrow();"
+            "let mut virtual_viewports = self.virtual_viewports.borrow_mut(); virtual_viewports.begin_render(); let mut native_cache = self.native_cache.borrow_mut(); native_cache.begin_render();"
         )
         .unwrap();
         write!(
             output,
-            "let element = render_component_{}(self.instance, &translator, &mut property_motions, &mut child_properties, &virtual_viewports, reduced_motion, observer, host_effects.clone()",
+            "let element = render_component_{}(self.instance, &translator, &mut property_motions, &mut child_properties, &mut virtual_viewports, &mut native_cache, reduced_motion, observer, host_effects.clone()",
             ir.id.raw()
         )
         .unwrap();
@@ -238,11 +238,11 @@ impl Context<'_> {
             )
             .unwrap();
         }
-        writeln!(output, ", &mut handlers); property_motions.end_render(); child_properties.end_render(); element }}").unwrap();
+        writeln!(output, ", &mut handlers); property_motions.end_render(); child_properties.end_render(); virtual_viewports.end_render(); native_cache.end_render(); element }}").unwrap();
         writeln!(output, "fn animation_frame(&mut self, frame: ::argui::animation::Frame, cx: &mut ::argui::runtime::Context<Self>) {{ if self.property_motions.borrow().advance(frame.now) {{ cx.notify(); }} }}").unwrap();
         writeln!(output, "fn wants_animation_frame(&self) -> bool {{ self.property_motions.borrow().needs_frame() }}").unwrap();
         writeln!(output, "/// Refreshes measured viewport heights and rebuilds virtual rows only when geometry changes.").unwrap();
-        writeln!(output, "fn layout_changed(&mut self, layout: &::argui::runtime::LayoutSnapshot, cx: &mut ::argui::runtime::Context<Self>) {{ let next = layout.nodes.iter().filter_map(|node| node.retained_identity.as_ref().map(|identity| (identity.clone(), node.bounds.size.height))).collect::<::std::collections::HashMap<_, _>>(); if *self.virtual_viewports.borrow() != next {{ *self.virtual_viewports.borrow_mut() = next; cx.notify(); }} }}").unwrap();
+        writeln!(output, "fn layout_changed(&mut self, layout: &::argui::runtime::LayoutSnapshot, cx: &mut ::argui::runtime::Context<Self>) {{ if self.virtual_viewports.borrow_mut().update(layout.nodes.iter().filter_map(|node| node.retained_identity.as_ref().map(|identity| (identity, node.bounds.size.height)))) {{ cx.notify(); }} }}").unwrap();
         writeln!(
             output,
             "fn image_assets(&self) -> Vec<::argui::paint::ImageAsset> {{ image_assets() }}"

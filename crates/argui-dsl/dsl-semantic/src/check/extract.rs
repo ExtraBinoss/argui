@@ -19,6 +19,7 @@ use visual::validate_component;
 mod animation;
 mod declaration;
 mod named_cycle;
+mod style;
 mod theme;
 mod visual;
 
@@ -54,7 +55,7 @@ pub(super) fn definition(
             modules,
             diagnostics,
         )),
-        LoweredKind::Style => DefinitionKind::Style(style_definition(&lowered.syntax)),
+        LoweredKind::Style => DefinitionKind::Style(style_definition(&lowered.syntax, scope)),
         LoweredKind::Effect => DefinitionKind::Effect(effect_definition(
             &lowered.syntax,
             file,
@@ -106,6 +107,15 @@ pub(super) fn validate_module(
                 &lowered.syntax,
                 component,
                 scope,
+                definitions,
+                theme_tokens,
+                schema,
+                diagnostics,
+            ),
+            DefinitionKind::Style(style) => style::validate(
+                &lowered.syntax,
+                module.file,
+                style,
                 definitions,
                 theme_tokens,
                 schema,

@@ -16,6 +16,9 @@ use argui_testing::{Selector, TestApp};
 mod navigation;
 use navigation::navigate_to_page;
 
+#[path = "parity/performance.rs"]
+mod performance;
+
 /// Compiles the real gallery through the development service and mounts its root.
 ///
 /// Returns a headless live app using the same package as `argui dev`.

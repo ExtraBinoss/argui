@@ -1,9 +1,8 @@
 use std::collections::HashMap;
 
 use argui_dsl_ir::{
-    AssignmentOperator, CallbackId, FieldId, IrAnimation, IrAssignmentTarget, IrExpression,
-    IrExpressionKind, IrNode, IrState, IrStatement, IrType, IrValue, LocalId, PropertyId,
-    PropertyTargetId, SiteId, SlotId,
+    CallbackId, FieldId, IrAnimation, IrExpression, IrExpressionKind, IrNode, IrState, IrType,
+    IrValue, LocalId, PropertyId, PropertyTargetId, SiteId, SlotId,
 };
 
 use crate::{CompilerError, codegen::Context};
@@ -11,6 +10,9 @@ use crate::{CompilerError, codegen::Context};
 /// Resolved generated variable names available at one expression site.
 #[derive(Clone, Default)]
 pub(super) struct Scope {
+    pub observation_owner: Option<String>,
+    pub observed_identities: HashMap<SiteId, String>,
+    pub return_type: Option<IrType>,
     pub properties: HashMap<PropertyId, String>,
     pub child_properties: HashMap<(SiteId, PropertyId), String>,
     pub rendered_properties: HashMap<PropertyId, String>,
@@ -22,6 +24,31 @@ pub(super) struct Scope {
     pub states: HashMap<SiteId, Vec<IrState>>,
     pub component_states: Vec<IrState>,
     pub template: Option<TemplateSlot>,
+}
+
+impl Scope {
+    /// Returns the retained identity expression for observed `site` in this scope.
+    pub(super) fn observation_identity(&self, site: SiteId) -> String {
+        self.observed_identities
+            .get(&site)
+            .cloned()
+            .unwrap_or_else(|| {
+                format!(
+                    "::argui::ui::RetainedIdentity::new({}, {})",
+                    self.observation_owner.as_deref().unwrap_or("owner"),
+                    site.raw()
+                )
+            })
+    }
+
+    /// Returns the generated variable a closure must capture to observe `site`.
+    pub(super) fn observation_capture(&self, site: SiteId) -> String {
+        self.observed_identities
+            .get(&site)
+            .or(self.observation_owner.as_ref())
+            .cloned()
+            .unwrap_or_else(|| "owner".into())
+    }
 }
 
 /// Lazy caller-authored row recipe substituted into a template component.
@@ -71,10 +98,7 @@ impl Context<'_> {
             IrExpressionKind::ObservedRead {
                 site, observation, ..
             } => {
-                let state = format!(
-                    "observer.get(&::argui::ui::RetainedIdentity::new(owner, {}))",
-                    site.raw()
-                );
+                let state = format!("observer.get(&{})", scope.observation_identity(*site));
                 match observation {
                     argui_dsl_ir::IrObservation::Hover => {
                         format!("{state}.states.contains(::argui::ui::VisualState::Hovered)")
@@ -258,6 +282,15 @@ impl Context<'_> {
                 callback,
                 arguments,
             } => {
+                let signature = self
+                    .ir
+                    .components
+                    .iter()
+                    .flat_map(|component| &component.callbacks)
+                    .find(|candidate| candidate.id == *callback)
+                    .ok_or_else(|| {
+                        CompilerError::Codegen("callback signature is unavailable".into())
+                    })?;
                 let callback =
                     scope
                         .callbacks
@@ -268,7 +301,8 @@ impl Context<'_> {
                         )))?;
                 let arguments = arguments
                     .iter()
-                    .map(|argument| self.expression(argument, scope))
+                    .zip(&signature.parameters)
+                    .map(|(argument, expected)| self.expression_as(argument, expected, scope))
                     .collect::<Result<Vec<_>, _>>()?
                     .join(", ");
                 format!(
@@ -276,6 +310,14 @@ impl Context<'_> {
                 )
             }
             IrExpressionKind::Unary { operator, operand } => {
+                if *operator == argui_dsl_ir::UnaryOperator::Negate
+                    && operand.value_type == IrType::Int
+                {
+                    return Ok(format!(
+                        "({}).checked_neg().expect(\"invalid integer arithmetic\")",
+                        self.expression(operand, scope)?
+                    ));
+                }
                 let operator = match operator {
                     argui_dsl_ir::UnaryOperator::Not => "!",
                     argui_dsl_ir::UnaryOperator::Negate => "-",
@@ -313,6 +355,34 @@ impl Context<'_> {
                     format!(
                         "{{ let mut text = {left_code}; text.push_str(&({right_code})); text }}"
                     )
+                } else if value.value_type == IrType::Int
+                    && matches!(
+                        operator,
+                        argui_dsl_ir::BinaryOperator::Add
+                            | argui_dsl_ir::BinaryOperator::Subtract
+                            | argui_dsl_ir::BinaryOperator::Multiply
+                            | argui_dsl_ir::BinaryOperator::Divide
+                            | argui_dsl_ir::BinaryOperator::Remainder
+                    )
+                {
+                    let method = match operator {
+                        argui_dsl_ir::BinaryOperator::Add => "checked_add",
+                        argui_dsl_ir::BinaryOperator::Subtract => "checked_sub",
+                        argui_dsl_ir::BinaryOperator::Multiply => "checked_mul",
+                        argui_dsl_ir::BinaryOperator::Divide => "checked_div",
+                        _ => "checked_rem",
+                    };
+                    format!(
+                        "(({left_code}).{method}({right_code}).expect(\"invalid integer arithmetic\"))"
+                    )
+                } else if matches!(
+                    operator,
+                    argui_dsl_ir::BinaryOperator::Divide | argui_dsl_ir::BinaryOperator::Remainder
+                ) {
+                    format!(
+                        "({{ let left = {left_code}; let right = {right_code}; assert!(right != 0.0, \"zero divisor\"); left {} right }})",
+                        binary_operator(*operator)
+                    )
                 } else {
                     format!("({left_code} {} {right_code})", binary_operator(*operator))
                 }
@@ -329,8 +399,8 @@ impl Context<'_> {
                     .unwrap_or(&condition);
                 format!(
                     "if {condition} {{ {} }} else {{ {} }}",
-                    self.expression(then_value, scope)?,
-                    self.expression(else_value, scope)?
+                    self.expression_as(then_value, &value.value_type, scope)?,
+                    self.expression_as(else_value, &value.value_type, scope)?
                 )
             }
             IrExpressionKind::Array(values) => format!(
@@ -448,63 +518,6 @@ impl Context<'_> {
         Ok(format!(
             "::argui::schema::SchemaValue::{constructor}({expression})"
         ))
-    }
-
-    /// Emits a restricted handler statement against typed property handles.
-    pub(super) fn statement(
-        &self,
-        statement: &IrStatement,
-        scope: &Scope,
-    ) -> Result<String, CompilerError> {
-        let mut canonical = scope.clone();
-        canonical.rendered_properties.clear();
-        let scope = &canonical;
-        match statement {
-            IrStatement::PreventDefault => Ok("host_effects.borrow_mut().push(HostEffect::PreventDefault);".into()),
-            IrStatement::StopPropagation => Ok("host_effects.borrow_mut().push(HostEffect::StopPropagation);".into()),
-            IrStatement::FocusNext => Ok("host_effects.borrow_mut().push(HostEffect::Focus(::argui::ui::FocusRequest::Next));".into()),
-            IrStatement::FocusPrevious => Ok("host_effects.borrow_mut().push(HostEffect::Focus(::argui::ui::FocusRequest::Previous));".into()),
-            IrStatement::ScrollTo { site, x, y } => Ok(format!("host_effects.borrow_mut().push(HostEffect::Scroll(::argui::ui::ScrollRequest::offset(::argui::ui::RetainedIdentity::new(owner, {}), ::argui::core::Point::new(({}) as f32, ({}) as f32))));", site.raw(), self.expression(x, scope)?, self.expression(y, scope)?)),
-            IrStatement::SetThemeMode(mode) => Ok(format!(
-                "set_theme_mode({});",
-                self.expression(mode, scope)?
-            )),
-            IrStatement::Expression(value) => Ok(format!("{};", self.expression(value, scope)?)),
-            IrStatement::Return(None) => Ok("return;".into()),
-            IrStatement::Return(Some(value)) => {
-                Ok(format!("return {};", self.expression(value, scope)?))
-            }
-            IrStatement::Assignment {
-                target,
-                operator,
-                value,
-            } => {
-                let IrAssignmentTarget::Property(property) = target else {
-                    return Err(CompilerError::Codegen(
-                        "mutable event locals are not part of the restricted handler ABI".into(),
-                    ));
-                };
-                let property = scope.properties.get(property).ok_or(CompilerError::Codegen(
-                    "assignment target is outside component scope".into(),
-                ))?;
-                let value = self.expression(value, scope)?;
-                Ok(match operator {
-                    AssignmentOperator::Set => format!("{property}.set({value});"),
-                    AssignmentOperator::Add => {
-                        format!("{property}.update(|current| *current += {value});")
-                    }
-                    AssignmentOperator::Subtract => {
-                        format!("{property}.update(|current| *current -= {value});")
-                    }
-                    AssignmentOperator::Multiply => {
-                        format!("{property}.update(|current| *current *= {value});")
-                    }
-                    AssignmentOperator::Divide => {
-                        format!("{property}.update(|current| *current /= {value});")
-                    }
-                })
-            }
-        }
     }
 
     /// Resolves a stable field ID to its generated Rust name.

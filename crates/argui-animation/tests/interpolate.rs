@@ -1,6 +1,16 @@
 use argui_animation::Interpolate;
 use argui_core::{Color, ColorInterpolation, Point, Rect, Size};
 
+/// Resampling a stopped or newly resumed color must not introduce Oklab drift.
+#[test]
+fn color_endpoints_and_equal_colors_remain_exact() {
+    let from = Color::srgba(0.15, 0.39, 0.92, 1.0);
+    let target = Color::srgba(0.82, 0.17, 0.24, 0.8);
+    assert_eq!(from.interpolate(target, 0.0), from);
+    assert_eq!(from.interpolate(target, 1.0), target);
+    assert_eq!(from.interpolate(from, 0.43), from);
+}
+
 #[test]
 fn scalar_interpolation_supports_endpoints_and_extrapolation() {
     assert_eq!(2.0_f32.interpolate(6.0, 0.0), 2.0);

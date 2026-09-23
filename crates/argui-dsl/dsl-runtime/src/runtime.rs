@@ -38,11 +38,12 @@ pub struct PreparedReload {
 /// Live package, component state, theme state, and retained animation ownership.
 pub struct LiveRuntime {
     pub(crate) package: LivePackage,
-    pub(crate) schema: argui_schema::SchemaRegistry,
+    pub(crate) schema: std::sync::Arc<argui_schema::SchemaRegistry>,
     pub(crate) instances: HashMap<InstanceId, ComponentInstance>,
     pub(crate) tokens: HashMap<TokenId, DslValue>,
     pub(crate) property_motions: argui_schema::PropertyMotionStore,
-    pub(crate) virtual_viewports: HashMap<argui_ui::RetainedIdentity, f32>,
+    pub(crate) native_cache: argui_schema::NativeElementCache,
+    pub(crate) virtual_viewports: argui_schema::VirtualViewportStore,
     root: Option<InstanceId>,
     next_instance: u64,
     pub(crate) token_revision: u64,
@@ -80,11 +81,12 @@ impl LiveRuntime {
         let effect_revisions = effect::revisions(&package, None);
         Ok(Self {
             package,
-            schema,
+            schema: std::sync::Arc::new(schema),
             instances: HashMap::new(),
             tokens,
             property_motions: argui_schema::PropertyMotionStore::new(),
-            virtual_viewports: HashMap::new(),
+            native_cache: argui_schema::NativeElementCache::new(),
+            virtual_viewports: argui_schema::VirtualViewportStore::new(),
             root: None,
             next_instance: 1,
             token_revision: 1,
@@ -223,7 +225,11 @@ impl LiveRuntime {
         Ok(())
     }
 
-    /// Invokes a bound callback for tests, host bridges, or generated event routing.
+    /// Invokes `callback` on `instance`, normalizing typed `arguments` and its result.
+    /// Returns the routed or host-produced value using the declared result type.
+    ///
+    /// # Errors
+    /// Returns for an absent instance, callback, invalid arguments, or handler failure.
     pub fn invoke_callback(
         &mut self,
         instance: InstanceId,
@@ -234,12 +240,44 @@ impl LiveRuntime {
             .instances
             .get(&instance)
             .ok_or(RuntimeError::MissingComponent(instance.raw()))?;
+        let signature = self
+            .package
+            .ir
+            .components
+            .iter()
+            .find(|component| component.id == mounted.component)
+            .and_then(|component| {
+                component
+                    .callbacks
+                    .iter()
+                    .find(|candidate| candidate.id == callback)
+            })
+            .ok_or_else(|| RuntimeError::InvalidBytecode("unknown callback signature".into()))?
+            .clone();
+        if arguments.len() != signature.parameters.len()
+            || arguments
+                .iter()
+                .zip(&signature.parameters)
+                .any(|(value, expected)| !value.compatible_with(expected))
+        {
+            return Err(RuntimeError::TypeMismatch {
+                expected: format!("{:?}", signature.parameters),
+                actual: format!("{arguments:?}"),
+            });
+        }
+        let arguments = arguments
+            .into_iter()
+            .zip(&signature.parameters)
+            .map(|(value, expected)| value.coerce(expected))
+            .collect::<Vec<_>>();
         if let Some(route) = mounted.route(callback) {
             let mut locals = route.locals;
             for (parameter, value) in route.parameters.into_iter().zip(arguments) {
                 locals.insert(parameter, value);
             }
-            return self.execute_statements(route.parent, &route.statements, locals);
+            return self
+                .execute_statements(route.parent, &route.statements, locals)
+                .map(|value| value.coerce(&signature.result));
         }
         let handler = mounted.callback(callback).ok_or_else(|| {
             RuntimeError::InvalidBytecode(format!(
@@ -248,7 +286,7 @@ impl LiveRuntime {
                 instance.raw()
             ))
         })?;
-        Ok((handler.borrow_mut())(arguments))
+        Ok((handler.borrow_mut())(arguments).coerce(&signature.result))
     }
 
     /// Applies every theme sharing a resolved mode identity.
@@ -285,6 +323,14 @@ impl LiveRuntime {
     }
 
     /// Prepares an all-or-nothing reload and state migration without changing live state.
+    ///
+    /// `package` supplies the next accepted generation. Returns migrated instances
+    /// whose component definitions still exist; removed private children are dropped.
+    ///
+    /// # Errors
+    ///
+    /// Returns for a changed public ABI, a missing mounted root, or invalid defaults
+    /// or assets. On failure, the current generation and its state remain usable.
     pub fn prepare_reload(&self, package: LivePackage) -> Result<PreparedReload, RuntimeError> {
         if package.public_api_hash != self.package.public_api_hash {
             return Err(RuntimeError::RestartRequired {
@@ -300,7 +346,16 @@ impl LiveRuntime {
             None => (evaluate_theme_defaults(&package)?, None),
         };
         let mut instances = HashMap::new();
+        let components = package
+            .ir
+            .components
+            .iter()
+            .map(|component| component.id)
+            .collect::<HashSet<_>>();
         for (id, previous) in &self.instances {
+            if !components.contains(&previous.component) && Some(*id) != self.root {
+                continue;
+            }
             let mut replacement = initialize_instance(&package, previous.component, *id, &tokens)?;
             previous.clone().migrate_into(&mut replacement);
             instances.insert(*id, replacement);

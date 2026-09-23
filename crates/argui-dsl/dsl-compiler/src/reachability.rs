@@ -253,7 +253,11 @@ fn visit_node(node: &IrNode, output: &mut Reachability, queue: &mut VecDeque<Com
                 visit_node(child, output, queue);
             }
         }
-        IrNode::Slot { .. } => {}
+        IrNode::Slot { fallback: body, .. } | IrNode::SlotContent { body, .. } => {
+            for child in body {
+                visit_node(child, output, queue);
+            }
+        }
     }
 }
 

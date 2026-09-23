@@ -94,6 +94,18 @@ fn slot_decl(parser: &mut Parser<'_>) {
         parser.bump();
         parser.expect(SyntaxKind::Ident, "expected slot kind after `:`");
     }
+    if parser.at(SyntaxKind::LBrace) {
+        visual_block(parser);
+    }
+    parser.finish();
+}
+
+/// Parses caller-authored content for one named component slot.
+fn slot_content(parser: &mut Parser<'_>) {
+    parser.start(SyntaxKind::SlotContent);
+    parser.bump();
+    parser.expect(SyntaxKind::Ident, "expected supplied slot name");
+    visual_block(parser);
     parser.finish();
 }
 
@@ -111,11 +123,13 @@ pub(super) fn element(parser: &mut Parser<'_>) {
     while !parser.at(SyntaxKind::RBrace) && !parser.at(SyntaxKind::Eof) {
         match parser.kind() {
             SyntaxKind::OnKw => event(parser),
+            SyntaxKind::SlotKw => slot_content(parser),
             SyntaxKind::ForKw => repeater(parser),
             SyntaxKind::IfKw => condition(parser),
             SyntaxKind::StatesKw => states(parser),
             SyntaxKind::AnimateKw => animate(parser),
             SyntaxKind::EffectKw => effect_application(parser),
+            SyntaxKind::StyleKw => style_application(parser),
             SyntaxKind::Ident if is_element(parser) => element(parser),
             SyntaxKind::Ident
                 if matches!(parser.nth_kind(1), SyntaxKind::Colon | SyntaxKind::TwoWay) =>
@@ -128,6 +142,18 @@ pub(super) fn element(parser: &mut Parser<'_>) {
         }
     }
     parser.expect(SyntaxKind::RBrace, "expected `}` after element");
+    parser.finish();
+}
+
+/// Parses an explicit named style application on an element.
+fn style_application(parser: &mut Parser<'_>) {
+    parser.start(SyntaxKind::StyleApplication);
+    parser.bump();
+    parser.expect(SyntaxKind::Colon, "expected `:` after `style`");
+    parser.expect(SyntaxKind::Ident, "expected style name");
+    if parser.at(SyntaxKind::Semicolon) {
+        parser.bump();
+    }
     parser.finish();
 }
 
@@ -204,7 +230,15 @@ fn event(parser: &mut Parser<'_>) {
     while !parser.at(SyntaxKind::RBrace) && !parser.at(SyntaxKind::Eof) {
         parser.start(SyntaxKind::Statement);
         if parser.at(SyntaxKind::LetKw) || parser.at(SyntaxKind::ReturnKw) {
+            let returning = parser.at(SyntaxKind::ReturnKw);
             parser.bump();
+            if returning && matches!(parser.kind(), SyntaxKind::Semicolon | SyntaxKind::RBrace) {
+                if parser.at(SyntaxKind::Semicolon) {
+                    parser.bump();
+                }
+                parser.finish();
+                continue;
+            }
         }
         expression::expression(parser);
         if matches!(

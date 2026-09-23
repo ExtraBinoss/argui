@@ -5,7 +5,10 @@ use argui_dsl_ir::{
 
 use crate::{DslValue, RuntimeError};
 
+mod arithmetic;
 mod builtin;
+pub(crate) use arithmetic::binary as binary_value;
+use arithmetic::{binary, unary};
 mod gradient;
 
 use gradient::gradient_value;
@@ -219,7 +222,7 @@ impl Program {
                     let text = match value {
                         DslValue::Bool(value) => value.to_string(),
                         DslValue::Int(value) => value.to_string(),
-                        DslValue::Float(value) => value.to_string(),
+                        DslValue::Float(value) => (value as f32).to_string(),
                         DslValue::String(value) => value,
                         other => return Err(type_error("bool, int, float, or string", &other)),
                     };
@@ -308,6 +311,7 @@ impl Program {
         }
         stack
             .pop()
+            .map(|value| value.coerce(&self.result_type))
             .ok_or_else(|| RuntimeError::InvalidBytecode("empty result stack".into()))
     }
 }
@@ -357,6 +361,30 @@ fn compile_expression(expression: &IrExpression, output: &mut Vec<Instruction>) 
         IrExpressionKind::Unary { operator, operand } => {
             compile_expression(operand, output);
             output.push(Instruction::Unary(*operator));
+        }
+        IrExpressionKind::Binary {
+            operator: operator @ (BinaryOperator::And | BinaryOperator::Or),
+            left,
+            right,
+        } => {
+            compile_expression(left, output);
+            let false_jump = output.len();
+            output.push(Instruction::JumpIfFalse(0));
+            if *operator == BinaryOperator::And {
+                compile_expression(right, output);
+            } else {
+                output.push(Instruction::Constant(DslValue::Bool(true)));
+            }
+            let end_jump = output.len();
+            output.push(Instruction::Jump(0));
+            let false_target = output.len();
+            if *operator == BinaryOperator::And {
+                output.push(Instruction::Constant(DslValue::Bool(false)));
+            } else {
+                compile_expression(right, output);
+            }
+            output[false_jump] = Instruction::JumpIfFalse(false_target);
+            output[end_jump] = Instruction::Jump(output.len());
         }
         IrExpressionKind::Binary {
             operator,
@@ -420,88 +448,6 @@ fn checked_target(target: usize, length: usize) -> Result<usize, RuntimeError> {
     (target <= length)
         .then_some(target)
         .ok_or_else(|| RuntimeError::InvalidBytecode(format!("jump {target} exceeds {length}")))
-}
-
-/// Evaluates a unary operation.
-fn unary(operator: UnaryOperator, value: DslValue) -> Result<DslValue, RuntimeError> {
-    match (operator, value) {
-        (UnaryOperator::Not, DslValue::Bool(value)) => Ok(DslValue::Bool(!value)),
-        (UnaryOperator::Negate, DslValue::Int(value)) => Ok(DslValue::Int(-value)),
-        (UnaryOperator::Negate, DslValue::Float(value)) => Ok(DslValue::Float(-value)),
-        (UnaryOperator::Positive, value @ (DslValue::Int(_) | DslValue::Float(_))) => Ok(value),
-        (_, value) => Err(type_error("unary-compatible number/bool", &value)),
-    }
-}
-
-/// Evaluates one closed binary operation.
-fn binary(
-    operator: BinaryOperator,
-    left: DslValue,
-    right: DslValue,
-) -> Result<DslValue, RuntimeError> {
-    use BinaryOperator as Op;
-    match (operator, left, right) {
-        (Op::Add, DslValue::Int(left), DslValue::Int(right)) => Ok(DslValue::Int(left + right)),
-        (Op::Subtract, DslValue::Int(left), DslValue::Int(right)) => {
-            Ok(DslValue::Int(left - right))
-        }
-        (Op::Multiply, DslValue::Int(left), DslValue::Int(right)) => {
-            Ok(DslValue::Int(left * right))
-        }
-        (Op::Divide, DslValue::Int(left), DslValue::Int(right)) if right != 0 => {
-            Ok(DslValue::Int(left / right))
-        }
-        (Op::Remainder, DslValue::Int(left), DslValue::Int(right)) if right != 0 => {
-            Ok(DslValue::Int(left % right))
-        }
-        (Op::Add, DslValue::Float(left), DslValue::Float(right)) => {
-            Ok(DslValue::Float(left + right))
-        }
-        (Op::Subtract, DslValue::Float(left), DslValue::Float(right)) => {
-            Ok(DslValue::Float(left - right))
-        }
-        (Op::Multiply, DslValue::Float(left), DslValue::Float(right)) => {
-            Ok(DslValue::Float(left * right))
-        }
-        (Op::Divide, DslValue::Float(left), DslValue::Float(right)) => {
-            Ok(DslValue::Float(left / right))
-        }
-        (Op::Remainder, DslValue::Float(left), DslValue::Float(right)) => {
-            Ok(DslValue::Float(left % right))
-        }
-        (Op::Add, DslValue::String(left), DslValue::String(right)) => {
-            Ok(DslValue::String(left + &right))
-        }
-        (Op::Equal, left, right) => Ok(DslValue::Bool(left == right)),
-        (Op::NotEqual, left, right) => Ok(DslValue::Bool(left != right)),
-        (Op::And, DslValue::Bool(left), DslValue::Bool(right)) => Ok(DslValue::Bool(left && right)),
-        (Op::Or, DslValue::Bool(left), DslValue::Bool(right)) => Ok(DslValue::Bool(left || right)),
-        (
-            operator @ (Op::Less | Op::LessEqual | Op::Greater | Op::GreaterEqual),
-            DslValue::Int(left),
-            DslValue::Int(right),
-        ) => Ok(DslValue::Bool(compare(operator, left as f64, right as f64))),
-        (
-            operator @ (Op::Less | Op::LessEqual | Op::Greater | Op::GreaterEqual),
-            DslValue::Float(left),
-            DslValue::Float(right),
-        ) => Ok(DslValue::Bool(compare(operator, left, right))),
-        (_, left, right) => Err(RuntimeError::TypeMismatch {
-            expected: "compatible binary operands".into(),
-            actual: format!("{} and {}", left.type_name(), right.type_name()),
-        }),
-    }
-}
-
-/// Evaluates an ordered numeric comparison.
-fn compare(operator: BinaryOperator, left: f64, right: f64) -> bool {
-    match operator {
-        BinaryOperator::Less => left < right,
-        BinaryOperator::LessEqual => left <= right,
-        BinaryOperator::Greater => left > right,
-        BinaryOperator::GreaterEqual => left >= right,
-        _ => false,
-    }
 }
 
 /// Creates a consistent type mismatch diagnostic.

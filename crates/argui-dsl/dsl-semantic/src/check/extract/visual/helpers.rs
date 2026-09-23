@@ -22,6 +22,7 @@ pub(super) fn visual_children(node: &SyntaxNode) -> impl Iterator<Item = SyntaxN
                     | SyntaxKind::IfExpr
                     | SyntaxKind::ElseBranch
                     | SyntaxKind::Block
+                    | SyntaxKind::SlotContent
             )
         })
 }

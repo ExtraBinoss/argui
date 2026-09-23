@@ -145,17 +145,14 @@ impl argui_runtime::Render for LiveRuntime {
         layout: &argui_runtime::LayoutSnapshot,
         context: &mut argui_runtime::Context<Self>,
     ) {
-        let next = layout
-            .nodes
-            .iter()
-            .filter_map(|node| {
+        if self
+            .virtual_viewports
+            .update(layout.nodes.iter().filter_map(|node| {
                 node.retained_identity
                     .as_ref()
-                    .map(|identity| (identity.clone(), node.bounds.size.height))
-            })
-            .collect();
-        if self.virtual_viewports != next {
-            self.virtual_viewports = next;
+                    .map(|identity| (identity, node.bounds.size.height))
+            }))
+        {
             context.notify();
         }
     }

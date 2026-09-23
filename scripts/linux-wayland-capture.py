@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Capture a command on linux-hidden-display.sh's private Wayland display."""
 import argparse
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -23,7 +24,7 @@ parser.add_argument(
     action="append",
     default=[],
     metavar="KIND:NAME:VALUE",
-    help="ordered click, drag, wheel, type, chord, or wait action followed by a named capture",
+    help="ordered click, drag, wheel, wheel_burst, type, chord, wait, or measure action followed by a named capture",
 )
 parser.add_argument("command", nargs=argparse.REMAINDER)
 args = parser.parse_args()
@@ -122,6 +123,12 @@ try:
         application = launch(command)
         spin(args.settle)
 
+        def cpu_seconds():
+            """Return CPU seconds consumed by the launched application process."""
+            stat = Path(f"/proc/{application.pid}/stat").read_text()
+            fields = stat.rpartition(") ")[2].split()
+            return (int(fields[11]) + int(fields[12])) / os.sysconf("SC_CLK_TCK")
+
         def capture(name):
             assert application.poll() is None, "Application exited before the capture"
             assert frames, "Blank capture: no frames"
@@ -185,6 +192,26 @@ try:
                 spin(0.15)
                 call(rd_destination, remote, rd_interface, "NotifyPointerAxis",
                      "(ddu)", (0.0, float(delta), 0))
+            elif kind == "wheel_burst":
+                x, y, delta, count = value.split(":", 3)
+                count = int(count)
+                assert 0 < count <= 100
+                call(rd_destination, remote, rd_interface, "NotifyPointerMotionRelative",
+                     "(dd)", (-10000.0, -10000.0))
+                call(rd_destination, remote, rd_interface, "NotifyPointerMotionRelative",
+                     "(dd)", (float(x), float(y)))
+                spin(0.15)
+                started = time.monotonic()
+                before = cpu_seconds()
+                for _ in range(count):
+                    call(rd_destination, remote, rd_interface, "NotifyPointerAxis",
+                         "(ddu)", (0.0, float(delta), 0))
+                    spin(0.08)
+                elapsed = time.monotonic() - started
+                print(json.dumps({"name": name, "events": count,
+                                  "elapsed_s": round(elapsed, 2),
+                                  "cpu_percent_one_core": round(100 * (cpu_seconds() - before) / elapsed, 2)}),
+                      flush=True)
             elif kind == "type":
                 for character in value:
                     keysym(ord(character), True)
@@ -203,6 +230,16 @@ try:
                     spin(0.08)
             elif kind == "wait":
                 spin(float(value))
+            elif kind == "measure":
+                seconds = float(value)
+                assert seconds > 0 and seconds < float("inf")
+                started = time.monotonic()
+                before = cpu_seconds()
+                spin(seconds)
+                elapsed = time.monotonic() - started
+                print(json.dumps({"name": name, "elapsed_s": round(elapsed, 2),
+                                  "cpu_percent_one_core": round(100 * (cpu_seconds() - before) / elapsed, 2)}),
+                      flush=True)
             else:
                 raise AssertionError(f"Unknown action kind: {kind}")
             if kind != "wait":

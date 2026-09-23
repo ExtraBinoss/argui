@@ -35,13 +35,36 @@ export component ProfileCard {
 
 Directions define the generated ABI:
 
-- `in` accepts values from a parent or Rust.
+- `in` accepts values from a parent or Rust and is read-only inside a handler.
 - `out` exposes component-owned values.
 - `in-out` supports explicit two-way binding.
 - `private` survives compatible live reload but is absent from the public ABI.
 
-Use `<=>` only with a writable property. Other assignments are reactive
-one-way bindings.
+Callers can assign only `in` and `in-out` properties. Use `<=>` with a direct
+writable property of the exact same type and a target that publishes changes.
+Computed expressions, private/output child inputs and read-only destinations
+are rejected. Other assignments are reactive one-way bindings.
+
+Slots accept zero or more elements. Supply several slots by name:
+
+```text
+Dialog {
+    open: true
+    slot header { Text { content: "Delete item?" } }
+    slot body { Text { content: "This action removes the selected item." } }
+    slot actions { Button { text: "Cancel" } }
+}
+```
+
+Declare a default with `slot header { Text { content: "Default" } }`. It is
+rendered when the supplied slot has no visible elements. Bare slot references
+project content and can forward it through another component's named slot.
+Content retains the caller's properties and handlers. Implicit content goes
+to the first declared slot; mixing implicit and named content is rejected.
+Unknown and duplicate names, slot cycles, and content on a slotless component
+produce diagnostics. Lazy list templates retain their existing keyed-repeater
+contract; typed template parameters and required/single-child DSL slots are
+not yet supported.
 
 For `TextInput`, `value <=> draft` applies each accepted `on edit` replacement
 to the controlled string. Edit ranges use UTF-8 byte offsets and always refer
@@ -60,6 +83,19 @@ Expressions include literals with units, property/local reads, struct fields,
 arrays, unary/binary operations and conditionals. Event handlers are restricted
 to callback calls, returns and assignments; they cannot embed Rust or perform
 untracked side effects.
+
+Callbacks may run only in handlers; bindings and animation expressions must be
+pure. `&&`, `||`, and conditional expressions evaluate only the selected branch
+in both backends. Assignments, compound operators, callback arguments and return
+values are checked. A bare `return` exits a void handler; statements after a
+return produce warnings in CLI and LSP.
+
+Integers use signed 64-bit arithmetic and floats use 32-bit precision in both
+backends. Compatible int-to-float conversions also apply inside optionals and
+arrays. Integer overflow and division by zero are errors, rather than wrapping;
+live reports the evaluation error, while generated AOT code panics with an
+arithmetic diagnostic. This error-delivery difference remains part of the
+current runtime boundary.
 
 ```text
 Button {
@@ -136,9 +172,11 @@ for item in items key item.id {
 }
 ```
 
-Stateful repeaters should provide a stable string or integer key. The compiler
-warns when a key is absent. Source sites use structural identities rather than
-line numbers, so unrelated edits do not reset focus, selection or child state.
+Every repeater requires a stable string or integer key; omission is a compiler
+error. Keys are scoped to the repeater and its enclosing keyed instance, so the
+same key in two different outer rows denotes different state. Duplicate keys
+are rejected at runtime (within the mounted window for virtual lists). Source
+sites use structural identities rather than line numbers.
 
 ## Themes and modes
 
@@ -160,17 +198,22 @@ only expressions that depend on tokens.
 Named styles declare typed property sets for a component/native target:
 
 ```text
-export style PrimaryButton for Button {
-    background: var(--accent)
-    padding: var(--space-md)
-
-    hovered { background: #856fff }
+import { Rectangle } from "@argui/native"
+export style AccentSurface for Rectangle {
+    background: solid(var(--argui-primary))
+    radius: 12.0
+    hover { background: solid(var(--argui-primary-hover)) }
 }
+
+Rectangle { style: AccentSurface width: 120px height: 40px radius: 8.0 }
 ```
 
 There is no CSS selector engine or specificity algorithm. Precedence is
 deterministic: target defaults, theme defaults, component/named style, inline
 properties, active state overrides, then animation presentation.
+Apply exactly one matching style with `style: Name`. Styles can read constants,
+pure built-ins and theme tokens. Native styles support `hover`, `pressed`,
+`focus`, and `focus_visible`; state blocks on DSL-component styles are rejected.
 
 ## States and animation
 
@@ -189,6 +232,12 @@ State conditions and animation parameters are ordinary typed expressions.
 Animation slots are keyed by component instance, source site, property and
 animation declaration, allowing compatible live edits to preserve presentation
 state and velocity. The engine’s reduced-motion policy remains authoritative.
+
+An animation can bind `playing: running` to a boolean property. False freezes
+its current presentation and stops requesting frames; true resumes the same
+phase and excludes paused time. This works for numeric, dimension and color
+timelines, keyframes, springs and state transitions. Omitting `playing` means
+true. Unmounting the owner releases its retained animation slots.
 
 ## Backdrop filters
 

@@ -254,6 +254,12 @@ pub(crate) fn styles(
                 .filter_map(|node| {
                     let name = direct_name_or_theme(&node)?;
                     Some(IrStyleState {
+                        observation: match name.as_str() {
+                            "hover" => crate::IrObservation::Hover,
+                            "pressed" => crate::IrObservation::Pressed,
+                            "focus" => crate::IrObservation::Focused,
+                            _ => crate::IrObservation::FocusVisible,
+                        },
                         id: StyleStateId::from_raw(derive(
                             definition.id.raw(),
                             "style-state",

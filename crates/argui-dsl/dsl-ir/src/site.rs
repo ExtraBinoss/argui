@@ -53,6 +53,8 @@ fn is_identity_node(kind: SyntaxKind) -> bool {
             | SyntaxKind::StateDecl
             | SyntaxKind::AnimateDecl
             | SyntaxKind::PathExpr
+            | SyntaxKind::SlotDecl
+            | SyntaxKind::SlotContent
     )
 }
 
@@ -66,6 +68,8 @@ fn signature(node: &SyntaxNode) -> String {
         SyntaxKind::StateDecl => "state",
         SyntaxKind::AnimateDecl => "animate",
         SyntaxKind::PathExpr => "slot",
+        SyntaxKind::SlotDecl => "slot-default",
+        SyntaxKind::SlotContent => "slot-content",
         _ => "site",
     };
     let name = node

@@ -151,6 +151,8 @@ pub struct ThemeDefinition {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct StyleDefinition {
     pub target: String,
+    pub native_target: Option<argui_schema::NativeTypeId>,
+    pub component_target: Option<SymbolId>,
     pub properties: Vec<String>,
 }
 
