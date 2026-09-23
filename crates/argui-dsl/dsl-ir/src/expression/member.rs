@@ -48,11 +48,13 @@ pub(super) fn lower(
                 site,
                 property,
                 value_type,
+                optional,
             } => (
                 value_type.clone(),
                 IrExpressionKind::ChildPropertyRead {
                     site: *site,
                     property: *property,
+                    optional: *optional,
                 },
             ),
         };
@@ -60,6 +62,25 @@ pub(super) fn lower(
             id: expression_id(&source),
             value_type,
             kind,
+            source,
+        };
+    }
+    if base_node.kind() == SyntaxKind::PathExpr
+        && let Some(name) = direct_name(&base_node)
+        && !context.locals.contains_key(&name)
+        && !context.properties.contains_key(&name)
+        && let Some(symbol) = context.symbols.get(&name).copied()
+        && !context.fields.contains_key(&symbol)
+    {
+        let variant = crate::VariantId::from_raw(crate::id::derive(
+            symbol.raw(),
+            "variant",
+            crate::id::hash_text(&member),
+        ));
+        return IrExpression {
+            id: expression_id(&source),
+            value_type: IrType::Enum(symbol),
+            kind: IrExpressionKind::EnumVariant { symbol, variant },
             source,
         };
     }

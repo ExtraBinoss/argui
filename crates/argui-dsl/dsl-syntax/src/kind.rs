@@ -33,6 +33,7 @@ define_syntax_kinds!(
     ThemeKw,
     StyleKw,
     EffectKw,
+    FnKw,
     ForKw,
     InKw,
     KeyKw,
@@ -102,12 +103,15 @@ define_syntax_kinds!(
     ThemeDecl,
     StyleDecl,
     EffectDecl,
+    FunctionDecl,
+    FunctionParameter,
     FieldDecl,
     VariantDecl,
     PropertyDecl,
     CallbackDecl,
     CallbackParameter,
     SlotDecl,
+    SlotParameter,
     SlotContent,
     EffectParameterDecl,
     EffectApplication,
@@ -117,6 +121,7 @@ define_syntax_kinds!(
     TwoWayBinding,
     EventBlock,
     Statement,
+    IfStatement,
     Block,
     ForExpr,
     IfExpr,
@@ -140,6 +145,9 @@ define_syntax_kinds!(
     BinaryExpr,
     ConditionalExpr,
     ArrayExpr,
+    IndexExpr,
+    StructExpr,
+    StructFieldExpr,
     ArgumentList,
     Missing,
 );
@@ -167,6 +175,7 @@ impl SyntaxKind {
                 | Self::ThemeKw
                 | Self::StyleKw
                 | Self::EffectKw
+                | Self::FnKw
         )
     }
 }

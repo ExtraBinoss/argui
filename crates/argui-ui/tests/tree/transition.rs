@@ -1,5 +1,5 @@
 use argui_animation::{Duration, Time, Transition, Tween};
-use argui_core::{Affine2D, Point, Rect, Size};
+use argui_core::{Affine2D, Point, Rect, Size, Transform2D};
 use argui_paint::{ClipChain, Fill, GradientStop, LayerStyle, LinearGradient, Shadow};
 use argui_ui::{
     Color, CursorIcon, Element, ElementKind, GestureSet, HitRegion, HitShape, Interaction,
@@ -24,6 +24,74 @@ fn region(node: argui_ui::NodeId) -> HitRegion {
         gestures: GestureSet::EMPTY,
         window_drag: None,
     }
+}
+
+/// State transforms repaint at completion even while another binding remains active.
+#[test]
+fn transform_transition_repaints_its_final_sample_independently() {
+    let opacity = argui_animation::Motion::new(1.0_f32);
+    let element = Element::text("State text")
+        .interaction(Interaction::default())
+        .when(
+            VisualState::Hovered,
+            StylePatch::new().set(property::Transform, Transform2D::IDENTITY.scale(1.5, 1.5)),
+        )
+        .transition(transition());
+    let mut tree = UiTree::new(Element::row([
+        element,
+        Element::container([]).bind(property::LayerOpacity, opacity.clone()),
+    ]));
+    let node = tree.node_ids()[1];
+    assert!(
+        tree.pointer_moved(Point::new(10.0, 10.0), &[region(node)])
+            .composite_changed
+    );
+    opacity.animate_to(0.5, Tween::new(Duration::from_millis(200)));
+    assert_eq!(
+        tree.advance_animations(Time::from_nanos(1)),
+        TreeUpdate::None
+    );
+    assert_eq!(
+        tree.advance_animations(Time::from_nanos(50_000_001)),
+        TreeUpdate::Composite
+    );
+    assert_eq!(
+        tree.advance_animations(Time::from_nanos(100_000_001)),
+        TreeUpdate::Paint
+    );
+    assert!(tree.wants_animation_frame());
+    assert_eq!(
+        tree.advance_animations(Time::from_nanos(150_000_001)),
+        TreeUpdate::Composite
+    );
+}
+
+/// Immediate and reduced-motion state transforms always refresh their final text pixels.
+#[test]
+fn immediate_and_reduced_motion_transforms_request_paint() {
+    let element = Element::text("State text")
+        .interaction(Interaction::default())
+        .when(
+            VisualState::Hovered,
+            StylePatch::new().set(
+                property::Transform,
+                Transform2D::IDENTITY.translate(0.25, 0.0),
+            ),
+        );
+    let mut immediate = UiTree::new(element.clone());
+    let node = immediate.node_ids()[0];
+    assert!(
+        immediate
+            .pointer_moved(Point::new(10.0, 10.0), &[region(node)])
+            .paint_changed
+    );
+
+    let mut animated = UiTree::new(element.transition(transition()));
+    let node = animated.node_ids()[0];
+    animated.pointer_moved(Point::new(10.0, 10.0), &[region(node)]);
+    assert_eq!(animated.set_reduced_motion(true), TreeUpdate::Paint);
+    assert!(!animated.wants_animation_frame());
+    assert!(animated.pointer_left().paint_changed);
 }
 
 #[test]

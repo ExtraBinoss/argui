@@ -142,7 +142,7 @@ fn dock_controls_cover_filter_scroll_pause_clear_and_resize() {
     assert!(matches!(
         change_tools(&host, |tools| tools.take_clipboard_request()),
         Some(argui_ui::ClipboardRequest::Write(trace))
-            if trace.contains("argui-gpu-trace-v4")
+            if trace.contains("argui-gpu-trace-v5")
     ));
     assert_eq!(
         change_tools(&host, |tools| tools.take_clipboard_request()),

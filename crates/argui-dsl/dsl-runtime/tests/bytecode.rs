@@ -10,6 +10,8 @@ use argui_dsl_syntax::{FileId, Span, TextRange, TextSize};
 
 #[path = "bytecode/arithmetic.rs"]
 mod arithmetic;
+#[path = "bytecode/builtin.rs"]
+mod builtin;
 
 #[path = "bytecode/gradient.rs"]
 mod gradient;

@@ -32,10 +32,11 @@ pub(super) fn validate_theme_values(
     ) {
         if let Some(value) = node.children().find(|node| node.kind() == SyntaxKind::Expr) {
             let mut context = expression::Context {
+                symbols: HashMap::new(),
                 file,
                 properties: &empty_properties,
                 callbacks: &empty_callbacks,
-                locals: &empty_locals,
+                locals: empty_locals.clone(),
                 definitions,
                 theme_tokens,
                 references: None,
@@ -80,10 +81,11 @@ pub(super) fn validate_theme_values(
             continue;
         };
         let mut context = expression::Context {
+            symbols: HashMap::new(),
             file,
             properties: &empty_properties,
             callbacks: &empty_callbacks,
-            locals: &empty_locals,
+            locals: empty_locals.clone(),
             definitions,
             theme_tokens,
             references: None,

@@ -23,6 +23,8 @@ pub enum ObservationKind {
     ViewportHeight,
     ContentWidth,
     ContentHeight,
+    MeasuredWidth,
+    MeasuredHeight,
 }
 
 impl ObservationKind {
@@ -42,7 +44,9 @@ impl ObservationKind {
             | Self::ViewportWidth
             | Self::ViewportHeight
             | Self::ContentWidth
-            | Self::ContentHeight => ValueType::Dimension,
+            | Self::ContentHeight
+            | Self::MeasuredWidth
+            | Self::MeasuredHeight => ValueType::Dimension,
         }
     }
 }
@@ -223,6 +227,8 @@ pub struct StylePartSchema {
 #[derive(Clone, Debug, PartialEq)]
 pub struct NativeSchema {
     pub id: NativeTypeId,
+    /// Application-owned contract version; changing the Rust adapter requires a rebuild.
+    pub abi_version: u32,
     pub name: Name,
     pub documentation: String,
     pub properties: Vec<PropertySchema>,
@@ -244,6 +250,7 @@ impl NativeSchema {
     pub fn new(id: NativeTypeId, name: impl Into<Name>, documentation: impl Into<String>) -> Self {
         Self {
             id,
+            abi_version: 1,
             name: name.into(),
             documentation: documentation.into(),
             properties: Vec::new(),
@@ -253,6 +260,17 @@ impl NativeSchema {
             style_parts: Vec::new(),
             virtual_window: false,
         }
+    }
+
+    /// Sets the application-owned ABI version of this native primitive.
+    ///
+    /// * `version` — nonzero contract revision; properties/events/slots are also hashed.
+    ///
+    /// Returns this schema with the requested version.
+    #[must_use]
+    pub const fn abi_version(mut self, version: u32) -> Self {
+        self.abi_version = version;
+        self
     }
 
     /// Appends a property definition.

@@ -1,8 +1,35 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet, VecDeque};
 
-use argui_text::{GlyphContent, GlyphKey, TextEngine};
+use argui_text::{GlyphKey, TextEngine};
 
+use super::{pages::AtlasPages, pixels::padded_pixels};
 use crate::RendererError;
+
+const PAGE_SIZE: u32 = 1024;
+const MASK_PAGES: usize = 4;
+const COLOR_PAGES: usize = 2;
+const EMPTY_CAPACITY: usize = 4096;
+
+/// Bounded glyph residency and work performed during the most recent preparation.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct TextAtlasStats {
+    /// Resident drawable glyphs across both texture arrays.
+    pub entries: usize,
+    /// Glyph lookups served by existing atlas or empty-glyph entries.
+    pub hits_this_frame: usize,
+    /// Requests sent to the CPU raster cache during this preparation.
+    pub raster_requests_this_frame: usize,
+    /// Padded texture bytes uploaded during this preparation.
+    pub uploaded_bytes_this_frame: u64,
+    /// Old pages evicted during this preparation.
+    pub evictions_this_frame: usize,
+    /// Populated monochrome pages, out of four available pages.
+    pub mask_pages: usize,
+    /// Populated color pages, out of two available pages.
+    pub color_pages: usize,
+    /// Fixed GPU residency budget including currently empty texture-array layers.
+    pub allocated_bytes: u64,
+}
 
 #[derive(Clone, Copy, Debug)]
 pub(super) struct AtlasEntry {
@@ -13,67 +40,136 @@ pub(super) struct AtlasEntry {
     pub left: i32,
     pub top: i32,
     pub color: bool,
+    pub page: usize,
 }
 
-pub(super) struct GlyphAtlas {
+struct AtlasTexture {
     texture: wgpu::Texture,
     view: wgpu::TextureView,
-    sampler: wgpu::Sampler,
-    entries: HashMap<GlyphKey, Option<AtlasEntry>>,
-    size: u32,
-    cursor_x: u32,
-    cursor_y: u32,
-    row_height: u32,
+    pages: AtlasPages,
 }
 
-#[cfg_attr(coverage_nightly, coverage(off))]
-impl GlyphAtlas {
-    pub fn new(device: &wgpu::Device, size: u32) -> Self {
+impl AtlasTexture {
+    /// Creates `count` bounded array layers in `format` using `device`.
+    #[cfg_attr(coverage_nightly, coverage(off))]
+    fn new(device: &wgpu::Device, format: wgpu::TextureFormat, count: usize) -> Self {
         let texture = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("argui-glyph-atlas"),
             size: wgpu::Extent3d {
-                width: size,
-                height: size,
-                depth_or_array_layers: 1,
+                width: PAGE_SIZE,
+                height: PAGE_SIZE,
+                depth_or_array_layers: count as u32,
             },
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8Unorm,
+            format,
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
             view_formats: &[],
         });
-        let view = texture.create_view(&Default::default());
-        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            label: Some("argui-glyph-sampler"),
-            mag_filter: wgpu::FilterMode::Linear,
-            min_filter: wgpu::FilterMode::Linear,
+        let view = texture.create_view(&wgpu::TextureViewDescriptor {
+            dimension: Some(wgpu::TextureViewDimension::D2Array),
             ..Default::default()
         });
         Self {
             texture,
             view,
-            sampler,
+            pages: AtlasPages::new(PAGE_SIZE, count),
+        }
+    }
+}
+
+pub(super) struct GlyphAtlas {
+    mask: AtlasTexture,
+    color: AtlasTexture,
+    sampler: wgpu::Sampler,
+    entries: HashMap<GlyphKey, AtlasEntry>,
+    empty: HashSet<GlyphKey>,
+    empty_order: VecDeque<GlyphKey>,
+    stats: TextAtlasStats,
+}
+
+impl GlyphAtlas {
+    /// Creates separate mask and sRGB color arrays with a total 12 MiB budget.
+    #[cfg_attr(coverage_nightly, coverage(off))]
+    pub fn new(device: &wgpu::Device) -> Self {
+        Self {
+            mask: AtlasTexture::new(device, wgpu::TextureFormat::R8Unorm, MASK_PAGES),
+            color: AtlasTexture::new(device, wgpu::TextureFormat::Rgba8UnormSrgb, COLOR_PAGES),
+            sampler: device.create_sampler(&wgpu::SamplerDescriptor {
+                label: Some("argui-glyph-sampler"),
+                mag_filter: wgpu::FilterMode::Linear,
+                min_filter: wgpu::FilterMode::Linear,
+                ..Default::default()
+            }),
             entries: HashMap::new(),
-            size,
-            cursor_x: 1,
-            cursor_y: 1,
-            row_height: 0,
+            empty: HashSet::new(),
+            empty_order: VecDeque::new(),
+            stats: TextAtlasStats::default(),
         }
     }
 
+    /// Returns the common square page side in physical texels.
     pub const fn size(&self) -> u32 {
-        self.size
+        PAGE_SIZE
     }
 
-    pub const fn view(&self) -> &wgpu::TextureView {
-        &self.view
+    /// Returns the monochrome coverage texture-array view.
+    pub const fn mask_view(&self) -> &wgpu::TextureView {
+        &self.mask.view
     }
 
+    /// Returns the sRGB color texture-array view.
+    pub const fn color_view(&self) -> &wgpu::TextureView {
+        &self.color.view
+    }
+
+    /// Returns the shared linear sampler without mipmaps.
     pub const fn sampler(&self) -> &wgpu::Sampler {
         &self.sampler
     }
 
+    /// Clears preparation counters without changing resident glyphs or page pins.
+    pub fn clear_frame_stats(&mut self) {
+        self.stats = TextAtlasStats::default();
+    }
+
+    /// Protects every resident glyph in `keys` before allocating any new glyphs.
+    /// This prevents eviction of layers referenced by earlier or later frame instances.
+    pub fn begin_frame(&mut self, keys: impl IntoIterator<Item = GlyphKey>) {
+        self.clear_frame_stats();
+        self.mask.pages.begin_frame();
+        self.color.pages.begin_frame();
+        for key in keys {
+            if let Some(entry) = self.entries.get(&key) {
+                let texture = if entry.color {
+                    &mut self.color
+                } else {
+                    &mut self.mask
+                };
+                texture.pages.pin(entry.page);
+            }
+        }
+    }
+
+    /// Returns residency and preparation counters for both bounded texture arrays.
+    pub fn stats(&self) -> TextAtlasStats {
+        TextAtlasStats {
+            entries: self.entries.len(),
+            mask_pages: self.mask.pages.used(),
+            color_pages: self.color.pages.used(),
+            allocated_bytes: u64::from(PAGE_SIZE).pow(2) * (MASK_PAGES + COLOR_PAGES * 4) as u64,
+            ..self.stats
+        }
+    }
+
+    /// Resolves `key`, rasterizing through `engine` and uploading via `queue` on misses.
+    /// Returns the resident entry, or `None` for a glyph without visible pixels.
+    ///
+    /// # Errors
+    /// Returns `GlyphAtlasFull` when the glyph is oversized or the visible frame
+    /// cannot fit without evicting a page already referenced by that frame.
+    #[cfg_attr(coverage_nightly, coverage(off))]
     pub fn get_or_insert(
         &mut self,
         queue: &wgpu::Queue,
@@ -81,85 +177,79 @@ impl GlyphAtlas {
         key: GlyphKey,
     ) -> Result<Option<AtlasEntry>, RendererError> {
         if let Some(entry) = self.entries.get(&key) {
-            return Ok(*entry);
+            self.stats.hits_this_frame += 1;
+            return Ok(Some(*entry));
         }
-        let Some(image) = engine.rasterize(key) else {
-            self.entries.insert(key, None);
+        if self.empty.contains(&key) {
+            self.stats.hits_this_frame += 1;
+            return Ok(None);
+        }
+        self.stats.raster_requests_this_frame += 1;
+        let Some(image) = engine
+            .rasterize(key)
+            .filter(|image| image.width != 0 && image.height != 0)
+        else {
+            if self.empty.len() == EMPTY_CAPACITY
+                && let Some(oldest) = self.empty_order.pop_front()
+            {
+                self.empty.remove(&oldest);
+            }
+            self.empty.insert(key);
+            self.empty_order.push_back(key);
             return Ok(None);
         };
-        if image.width == 0 || image.height == 0 {
-            self.entries.insert(key, None);
-            return Ok(None);
+        let color = image.content == argui_text::GlyphContent::Color;
+        let texture = if color {
+            &mut self.color
+        } else {
+            &mut self.mask
+        };
+        let allocation = texture
+            .pages
+            .allocate(image.width, image.height)
+            .ok_or(RendererError::GlyphAtlasFull)?;
+        if allocation.evicted {
+            self.entries
+                .retain(|_, entry| entry.color != color || entry.page != allocation.page);
+            self.stats.evictions_this_frame += 1;
         }
-        let (x, y) = self.allocate(image.width, image.height)?;
-        let pixels = rgba_pixels(image.content, &image.data);
+        let pixels = padded_pixels(&image);
+        let channels = if color { 4 } else { 1 };
         queue.write_texture(
             wgpu::TexelCopyTextureInfo {
-                texture: &self.texture,
+                texture: &texture.texture,
                 mip_level: 0,
-                origin: wgpu::Origin3d { x, y, z: 0 },
+                origin: wgpu::Origin3d {
+                    x: allocation.origin[0],
+                    y: allocation.origin[1],
+                    z: allocation.page as u32,
+                },
                 aspect: wgpu::TextureAspect::All,
             },
             &pixels,
             wgpu::TexelCopyBufferLayout {
                 offset: 0,
-                bytes_per_row: Some(image.width * 4),
-                rows_per_image: Some(image.height),
+                bytes_per_row: Some((image.width + 2) * channels),
+                rows_per_image: Some(image.height + 2),
             },
             wgpu::Extent3d {
-                width: image.width,
-                height: image.height,
+                width: image.width + 2,
+                height: image.height + 2,
                 depth_or_array_layers: 1,
             },
         );
+        self.stats.uploaded_bytes_this_frame += pixels.len() as u64;
         let entry = AtlasEntry {
-            x,
-            y,
+            x: allocation.origin[0] + 1,
+            y: allocation.origin[1] + 1,
             width: image.width,
             height: image.height,
             left: image.left,
             top: image.top,
-            color: image.content == GlyphContent::Color,
+            color,
+            page: allocation.page,
         };
-        self.entries.insert(key, Some(entry));
+        self.entries.insert(key, entry);
         Ok(Some(entry))
-    }
-
-    pub fn reset(&mut self) {
-        self.entries.clear();
-        self.cursor_x = 1;
-        self.cursor_y = 1;
-        self.row_height = 0;
-    }
-
-    fn allocate(&mut self, width: u32, height: u32) -> Result<(u32, u32), RendererError> {
-        if self.cursor_x + width + 1 > self.size {
-            self.cursor_x = 1;
-            self.cursor_y += self.row_height + 1;
-            self.row_height = 0;
-        }
-        if self.cursor_y + height + 1 > self.size {
-            return Err(RendererError::GlyphAtlasFull);
-        }
-        let position = (self.cursor_x, self.cursor_y);
-        self.cursor_x += width + 1;
-        self.row_height = self.row_height.max(height);
-        Ok(position)
-    }
-}
-
-fn rgba_pixels(content: GlyphContent, data: &[u8]) -> Vec<u8> {
-    match content {
-        GlyphContent::Color => data.to_vec(),
-        GlyphContent::Mask => data
-            .iter()
-            .flat_map(|alpha| [255, 255, 255, *alpha])
-            .collect(),
-        GlyphContent::SubpixelMask => data
-            .as_chunks::<3>()
-            .0
-            .iter()
-            .flat_map(|rgb| [255, 255, 255, *rgb.iter().max().unwrap_or(&0)])
-            .collect(),
     }
 }

@@ -14,9 +14,9 @@ pub use db::{CompilerDatabase, QueryStats};
 pub use diagnostic::{Diagnostic, DiagnosticCode, Severity};
 pub use model::{
     CallbackDefinition, ComponentDefinition, Definition, DefinitionKind, EffectDefinition,
-    EffectParameterDefinition, EnumDefinition, FieldDefinition, Import, ImportItem, Module,
-    PropertyDefinition, PropertyDirection, SemanticProject, SlotDefinition, StructDefinition,
-    StyleDefinition, SymbolId, ThemeDefinition, ThemeTokenDefinition,
+    EffectParameterDefinition, EnumDefinition, FieldDefinition, FunctionDefinition, Import,
+    ImportItem, Module, PropertyDefinition, PropertyDirection, SemanticProject, SlotDefinition,
+    StructDefinition, StyleDefinition, SymbolId, ThemeDefinition, ThemeTokenDefinition,
 };
 pub use tooling::{
     CodeAction, ColorPresentation, Completion, Location, RenameEdit, SemanticClass,

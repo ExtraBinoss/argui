@@ -13,6 +13,7 @@ fn runtime() -> LiveRuntime {
         1,
         1,
         argui_dsl_ir::IrProject {
+            native_schema_hash: 0,
             modules: Vec::new(),
             structs: Vec::new(),
             enums: Vec::new(),

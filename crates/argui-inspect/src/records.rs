@@ -108,6 +108,18 @@ pub struct FrameRecord {
     pub textures: usize,
     pub reused_textures: usize,
     pub texture_bytes: u64,
+    /// Allocated mask and color glyph texture bytes.
+    pub text_atlas_bytes: u64,
+    /// Resident glyph cache entries.
+    pub text_atlas_entries: usize,
+    /// GPU glyph cache hits in this frame.
+    pub text_atlas_hits: usize,
+    /// CPU glyph image requests on GPU cache misses.
+    pub text_raster_requests: usize,
+    /// Glyph texture bytes uploaded in this frame.
+    pub text_upload_bytes: u64,
+    /// Glyph atlas pages recycled in this frame.
+    pub text_page_evictions: usize,
     pub vector_atlas_bytes: u64,
     pub vector_atlas_entries: usize,
     pub vector_atlas_hits: usize,

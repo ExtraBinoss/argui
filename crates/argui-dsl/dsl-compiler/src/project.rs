@@ -63,6 +63,23 @@ impl CompilerSession {
         })
     }
 
+    /// Creates an incremental session with the same application native registry as runtime.
+    ///
+    /// * `entry_module` — canonical root module path.
+    /// * `registry` — validated built-ins plus application native extensions.
+    ///
+    /// Returns an empty source session with standard DSL modules loaded.
+    #[must_use]
+    pub fn with_registry(
+        entry_module: impl Into<String>,
+        registry: argui_schema::SchemaRegistry,
+    ) -> Self {
+        Self {
+            database: CompilerDatabase::with_registry(registry),
+            entry_module: entry_module.into(),
+        }
+    }
+
     /// Adds or updates one module while retaining every unaffected parse cache.
     pub fn update_module(&mut self, module: SourceModule) {
         self.database.set_file(&module.path, module.source);
@@ -95,7 +112,12 @@ impl CompilerSession {
         mut load_asset: impl FnMut(&str) -> Result<Vec<u8>, String>,
     ) -> Result<CompiledProject, CompilerError> {
         let semantic = self.database.check();
-        compile_semantic(semantic, &self.entry_module, &mut load_asset)
+        compile_semantic(
+            semantic,
+            &self.entry_module,
+            &mut load_asset,
+            self.database.schema(),
+        )
     }
 }
 
@@ -112,14 +134,38 @@ impl Compiler {
     pub fn compile(
         modules: impl IntoIterator<Item = SourceModule>,
         entry_module: &str,
+        load_asset: impl FnMut(&str) -> Result<Vec<u8>, String>,
+    ) -> Result<CompiledProject, CompilerError> {
+        Self::compile_with_registry(
+            modules,
+            entry_module,
+            argui_schema::builtin::registry()?,
+            load_asset,
+        )
+    }
+
+    /// Compiles against one application-owned native registry used by every backend.
+    ///
+    /// * `modules` — complete source graph snapshot.
+    /// * `entry_module` — module exporting release roots.
+    /// * `registry` — built-ins and application extensions with stable ABI IDs.
+    /// * `load_asset` — loader for reachable project assets.
+    ///
+    /// # Errors
+    ///
+    /// Returns semantic, lowering, asset, ABI, or code-generation errors.
+    pub fn compile_with_registry(
+        modules: impl IntoIterator<Item = SourceModule>,
+        entry_module: &str,
+        registry: argui_schema::SchemaRegistry,
         mut load_asset: impl FnMut(&str) -> Result<Vec<u8>, String>,
     ) -> Result<CompiledProject, CompilerError> {
-        let mut database = CompilerDatabase::with_builtins()?;
+        let mut database = CompilerDatabase::with_registry(registry);
         for module in modules {
             database.set_file(&module.path, module.source);
         }
         let semantic = database.check();
-        compile_semantic(semantic, entry_module, &mut load_asset)
+        compile_semantic(semantic, entry_module, &mut load_asset, database.schema())
     }
 }
 
@@ -128,6 +174,7 @@ fn compile_semantic(
     semantic: Arc<SemanticProject>,
     entry_module: &str,
     load_asset: &mut impl FnMut(&str) -> Result<Vec<u8>, String>,
+    schema: &argui_schema::SchemaRegistry,
 ) -> Result<CompiledProject, CompilerError> {
     if !semantic.is_valid() {
         return Err(CompilerError::Semantic(semantic.diagnostics.clone()));
@@ -139,8 +186,7 @@ fn compile_semantic(
     {
         return Err(CompilerError::MissingEntry(entry_module.into()));
     }
-    let schema = argui_schema::builtin::registry()?;
-    let ir = argui_dsl_ir::lower(&semantic, &schema).map_err(CompilerError::Lower)?;
+    let ir = argui_dsl_ir::lower(&semantic, schema).map_err(CompilerError::Lower)?;
     let reachability = Reachability::analyze(&semantic, &ir, entry_module);
     let roots = entry_roots(&semantic, entry_module);
     validate_shaders(&semantic, &ir, &reachability, load_asset)?;
@@ -153,7 +199,7 @@ fn compile_semantic(
         &reachability,
         entry_module,
         public_api_hash,
-        &schema,
+        schema,
     )?;
     let mut dependencies = ir
         .assets
@@ -490,6 +536,15 @@ fn public_api_hash(project: &SemanticProject, entry: &str) -> u64 {
                     for (variant, _) in &enumeration.variants {
                         hash_text(&mut hash, &format!("variant:{variant}"));
                     }
+                }
+                DefinitionKind::Function(function) => {
+                    for parameter in &function.parameters {
+                        hash_text(
+                            &mut hash,
+                            &format!("parameter:{}:{:?}", parameter.name, parameter.value_type),
+                        );
+                    }
+                    hash_text(&mut hash, &format!("result:{:?}", function.result));
                 }
                 _ => {}
             }

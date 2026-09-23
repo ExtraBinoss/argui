@@ -55,10 +55,11 @@ pub(super) fn validate_component(
     {
         validate_unique(&animation, &mut seen, file, diagnostics);
         let mut context = expression::Context {
+            symbols: HashMap::new(),
             file,
             properties,
             callbacks,
-            locals: &locals,
+            locals: locals.clone(),
             definitions,
             theme_tokens,
             references: Some(references),
@@ -131,10 +132,11 @@ pub(super) fn validate_element(
         return;
     }
     let mut context = expression::Context {
+        symbols: HashMap::new(),
         file,
         properties: component_properties,
         callbacks,
-        locals,
+        locals: locals.clone(),
         definitions,
         theme_tokens,
         references: Some(references),

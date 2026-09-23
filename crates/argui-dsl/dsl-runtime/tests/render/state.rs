@@ -122,3 +122,126 @@ export component Main {
         );
     }
 }
+
+mod motion_edges {
+    //! Typed motion output and state-edge behavior at the live runtime boundary.
+
+    use std::collections::HashMap;
+
+    use argui_animation::{Duration, Frame, Time};
+    use argui_core::Color;
+    use argui_dsl_compiler::{Compiler, SourceModule};
+    use argui_dsl_runtime::{DslValue, LivePackage, LiveRuntime};
+    use argui_runtime::{Context, Render};
+    use argui_ui::ExpandedDimension;
+
+    /// Compiles and mounts `source`, returning its live runtime without advancing time.
+    ///
+    /// Panics when the fixture fails compilation, package preparation, or mounting.
+    fn mounted(source: &str) -> LiveRuntime {
+        let compiled = Compiler::compile(
+            [SourceModule::new("ui/main.argui", source)],
+            "ui/main.argui",
+            |_| Err("motion fixtures have no assets".into()),
+        )
+        .unwrap();
+        let root = compiled.roots[0];
+        let package =
+            LivePackage::prepare(1, compiled.public_api_hash, compiled.ir, HashMap::new()).unwrap();
+        let mut runtime = LiveRuntime::new(package).unwrap();
+        runtime.mount(root, []).unwrap();
+        runtime
+    }
+
+    /// Advances `runtime` from `previous_ms` to `now_ms` using a deterministic clock.
+    fn advance(runtime: &mut LiveRuntime, previous_ms: u64, now_ms: u64) {
+        runtime.animation_frame(
+            Frame {
+                now: Time::from_nanos(now_ms * 1_000_000 + 1),
+                elapsed: Duration::from_millis(now_ms - previous_ms),
+            },
+            &mut Context::default(),
+        );
+    }
+
+    /// Color and percentage state transitions jump on entry and animate only on exit.
+    #[test]
+    fn leave_transition_restores_color_and_percentage_base_values() {
+        let mut runtime = mounted(
+            r##"import { Container } from "@argui/native"
+export component Main {
+    in property active: bool = false
+    in property angle: float = 0.0
+    states { open when active { angle: 90.0 } }
+    Container {
+        rotation: angle
+        width: 25%
+        background: #ff0000
+        states { open when active { width: 75% background: #0000ff } }
+        animate width { transition: leave duration: 100ms }
+        animate background { transition: leave duration: 100ms }
+    }
+}"##,
+        );
+        let root = runtime.root().unwrap();
+        let definition = runtime.instance(root).unwrap().component;
+        let properties = &runtime
+            .ir()
+            .components
+            .iter()
+            .find(|item| item.id == definition)
+            .unwrap()
+            .properties;
+        let active = properties[0].id;
+        let angle = properties[1].id;
+        let first = runtime.render().unwrap();
+        assert_eq!(
+            first.style.size.width.expand(),
+            ExpandedDimension::Percent(0.25)
+        );
+        runtime
+            .set_property(root, active, DslValue::Bool(true))
+            .unwrap();
+        let entered = runtime.render().unwrap();
+        assert_eq!(
+            entered.style.size.width.expand(),
+            ExpandedDimension::Percent(0.75)
+        );
+        assert!((entered.transform.rotation - std::f32::consts::FRAC_PI_2).abs() < 0.001);
+        assert_eq!(
+            runtime.instance(root).unwrap().properties[&angle].get(),
+            &DslValue::Float(0.0)
+        );
+        assert!(!runtime.wants_animation_frame());
+        runtime
+            .set_property(root, active, DslValue::Bool(false))
+            .unwrap();
+        assert_eq!(
+            runtime.render().unwrap().style.size.width.expand(),
+            ExpandedDimension::Percent(0.75)
+        );
+        advance(&mut runtime, 0, 0);
+        advance(&mut runtime, 0, 50);
+        let middle = runtime.render().unwrap();
+        assert_eq!(
+            middle.style.size.width.expand(),
+            ExpandedDimension::Percent(0.5)
+        );
+        let Some(argui_paint::Fill::Solid(color)) = &middle.paint.quad.background else {
+            panic!("expected animated background");
+        };
+        assert_ne!(*color, Color::from_srgba8(255, 0, 0, 255));
+        assert_ne!(*color, Color::from_srgba8(0, 0, 255, 255));
+        advance(&mut runtime, 50, 100);
+        let restored = runtime.render().unwrap();
+        assert_eq!(
+            restored.style.size.width.expand(),
+            ExpandedDimension::Percent(0.25)
+        );
+        assert_eq!(
+            restored.paint.quad.background,
+            Some(argui_paint::Fill::Solid(Color::from_srgba8(255, 0, 0, 255)))
+        );
+        assert!(!runtime.wants_animation_frame());
+    }
+}

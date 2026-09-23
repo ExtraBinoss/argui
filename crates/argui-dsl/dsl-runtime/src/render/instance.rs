@@ -22,7 +22,7 @@ impl LiveRuntime {
         self.property_motions.begin_render();
         self.virtual_viewports.begin_render();
         self.native_cache.begin_render();
-        let element = self.render_instance(root, HashMap::new(), None, context);
+        let element = self.render_instance(root, self.root_slots.clone(), None, context);
         if element.is_ok() {
             self.property_motions.end_render();
             self.virtual_viewports.end_render();

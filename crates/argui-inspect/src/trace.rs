@@ -7,7 +7,7 @@ use crate::{
 };
 
 /// Version identifier written to and required by serialized inspector traces.
-pub const TRACE_VERSION: &str = "argui-gpu-trace-v4";
+pub const TRACE_VERSION: &str = "argui-gpu-trace-v5";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 /// Failure encountered while serializing or importing a trace.
@@ -80,6 +80,12 @@ struct TraceFrame {
     textures: usize,
     reused_textures: usize,
     texture_bytes: u64,
+    text_atlas_bytes: u64,
+    text_atlas_entries: usize,
+    text_atlas_hits: usize,
+    text_raster_requests: usize,
+    text_upload_bytes: u64,
+    text_page_evictions: usize,
     vector_atlas_bytes: u64,
     vector_atlas_entries: usize,
     vector_atlas_hits: usize,
@@ -221,6 +227,12 @@ impl From<&FrameRecord> for TraceFrame {
             textures: value.textures,
             reused_textures: value.reused_textures,
             texture_bytes: value.texture_bytes,
+            text_atlas_bytes: value.text_atlas_bytes,
+            text_atlas_entries: value.text_atlas_entries,
+            text_atlas_hits: value.text_atlas_hits,
+            text_raster_requests: value.text_raster_requests,
+            text_upload_bytes: value.text_upload_bytes,
+            text_page_evictions: value.text_page_evictions,
             vector_atlas_bytes: value.vector_atlas_bytes,
             vector_atlas_entries: value.vector_atlas_entries,
             vector_atlas_hits: value.vector_atlas_hits,
@@ -256,6 +268,12 @@ impl TraceFrame {
             textures: self.textures,
             reused_textures: self.reused_textures,
             texture_bytes: self.texture_bytes,
+            text_atlas_bytes: self.text_atlas_bytes,
+            text_atlas_entries: self.text_atlas_entries,
+            text_atlas_hits: self.text_atlas_hits,
+            text_raster_requests: self.text_raster_requests,
+            text_upload_bytes: self.text_upload_bytes,
+            text_page_evictions: self.text_page_evictions,
             vector_atlas_bytes: self.vector_atlas_bytes,
             vector_atlas_entries: self.vector_atlas_entries,
             vector_atlas_hits: self.vector_atlas_hits,

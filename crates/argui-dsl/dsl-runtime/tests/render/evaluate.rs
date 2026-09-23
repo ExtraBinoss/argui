@@ -272,3 +272,178 @@ export component Main {
             .contains(VisualState::Pressed)
     );
 }
+
+mod animation_validation {
+    //! Malformed live animation packages report actionable render errors.
+
+    use std::collections::HashMap;
+
+    use argui_dsl_compiler::{Compiler, SourceModule};
+    use argui_dsl_ir::{
+        IrAnimation, IrAnimationDriver, IrAnimationKeyframe, IrExpressionKind, IrTransitionPolicy,
+        IrType, IrValue,
+    };
+    use argui_dsl_runtime::{LivePackage, LiveRuntime, RuntimeError};
+
+    const ROTATION: &str = r#"import { Container } from "@argui/native"
+export component Main {
+    Container { rotation: 90.0 animate rotation { from: 0.0 to: 90.0 duration: 100ms } }
+}"#;
+
+    /// Checks that editing the compiled `source` with `mutate` reports `diagnostic`.
+    ///
+    /// The mutation models malformed IR arriving through the public live-package API.
+    /// Panics if the valid fixture fails setup or the runtime accepts the invalid animation.
+    fn assert_invalid(source: &str, mutate: impl FnOnce(&mut IrAnimation), diagnostic: &str) {
+        let mut compiled = Compiler::compile(
+            [SourceModule::new("ui/main.argui", source)],
+            "ui/main.argui",
+            |_| Err("motion fixtures have no assets".into()),
+        )
+        .unwrap();
+        let root = compiled.roots[0];
+        let animation = &mut compiled
+            .ir
+            .components
+            .iter_mut()
+            .find(|component| component.id == root)
+            .unwrap()
+            .animations[0];
+        mutate(animation);
+        let package =
+            LivePackage::prepare(1, compiled.public_api_hash, compiled.ir, HashMap::new()).unwrap();
+        let mut runtime = LiveRuntime::new(package).unwrap();
+        let instance = runtime.mount(root, []).unwrap();
+        let error = runtime.render().expect_err("invalid animation must fail");
+        assert!(
+            matches!(&error, RuntimeError::Schema(message) if message.contains(diagnostic)),
+            "expected {diagnostic:?}, got {error:?}"
+        );
+        assert_eq!(runtime.root(), Some(instance));
+    }
+
+    /// Adds two keyframes from `animation`'s existing endpoints, keeping those endpoints.
+    ///
+    /// Panics when the animation fixture does not contain both endpoint parameters.
+    fn add_keyframes(animation: &mut IrAnimation) {
+        animation.keyframes = [(0.0, "from"), (1.0, "to")]
+            .into_iter()
+            .map(|(offset, name)| {
+                let parameter = animation
+                    .parameters
+                    .iter()
+                    .find(|item| item.name == name)
+                    .unwrap();
+                IrAnimationKeyframe {
+                    offset,
+                    value: parameter.value.clone(),
+                    source: parameter.source.clone(),
+                }
+            })
+            .collect();
+    }
+
+    /// Invalid wire driver combinations fail before creating an active motion.
+    #[test]
+    fn malformed_timing_and_keyframe_combinations_report_the_cause() {
+        assert_invalid(
+            ROTATION,
+            |animation| animation.parameters.retain(|item| item.name != "duration"),
+            "timeline animation requires `duration`",
+        );
+        for retained_endpoint in ["from", "to"] {
+            assert_invalid(
+                ROTATION,
+                |animation| {
+                    add_keyframes(animation);
+                    animation
+                        .parameters
+                        .retain(|item| item.name == "duration" || item.name == retained_endpoint);
+                },
+                "keyframes cannot be mixed with `from` or `to`",
+            );
+        }
+        assert_invalid(
+            ROTATION,
+            |animation| {
+                add_keyframes(animation);
+                animation.parameters.clear();
+            },
+            "timeline animation requires `duration`",
+        );
+        assert_invalid(
+            ROTATION,
+            |animation| {
+                add_keyframes(animation);
+                animation.parameters.clear();
+                animation.driver = IrAnimationDriver::Spring;
+            },
+            "spring animations do not accept keyframes",
+        );
+        assert_invalid(
+            ROTATION,
+            |animation| animation.transition = Some(IrTransitionPolicy::Leave),
+            "state transition has no state assignment",
+        );
+    }
+
+    /// Typed driver diagnostics name the invalid parameter instead of failing silently.
+    #[test]
+    fn malformed_parameter_types_and_names_are_rejected() {
+        for (name, value, diagnostic) in [
+            (
+                "from",
+                IrValue::Bool(true),
+                "animation `from` must be numeric",
+            ),
+            (
+                "iterations",
+                IrValue::Bool(true),
+                "animation `iterations` must be a string",
+            ),
+            (
+                "easing",
+                IrValue::Bool(true),
+                "animation `easing` must be a string",
+            ),
+            (
+                "misspelled",
+                IrValue::Float(1.0),
+                "unsupported animation parameter `misspelled`",
+            ),
+        ] {
+            assert_invalid(
+                ROTATION,
+                |animation| {
+                    let parameter = &mut animation.parameters[0];
+                    parameter.name = name.into();
+                    parameter.value.kind = IrExpressionKind::Constant(value);
+                },
+                diagnostic,
+            );
+        }
+    }
+
+    /// Endpoint conversion rejects payloads that cannot represent the authored target.
+    #[test]
+    fn malformed_color_and_dimension_endpoints_report_the_target_type() {
+        assert_invalid(
+            r##"import { Container } from "@argui/native"
+export component Main {
+    Container { background: #ffffff animate background { from: #000000 to: #ffffff duration: 100ms } }
+}"##,
+            |animation| {
+                animation.parameters[0].value.kind = IrExpressionKind::Constant(IrValue::Bool(true))
+            },
+            "animation `from` must be a color",
+        );
+        assert_invalid(
+            r#"import { Container } from "@argui/native"
+export component Main {
+    Container { width: 100px animate width { from: 50px to: 100px duration: 100ms } }
+}"#,
+            |animation| animation.parameters[0].value.value_type = IrType::Float,
+            "cannot convert `Float` to a dimension",
+        );
+    }
+}

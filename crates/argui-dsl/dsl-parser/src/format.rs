@@ -217,6 +217,7 @@ fn is_top_level(kind: SyntaxKind) -> bool {
             | SyntaxKind::ThemeDecl
             | SyntaxKind::StyleDecl
             | SyntaxKind::EffectDecl
+            | SyntaxKind::FunctionDecl
     )
 }
 

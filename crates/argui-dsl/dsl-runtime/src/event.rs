@@ -76,8 +76,47 @@ impl LiveRuntime {
         statements: &[IrStatement],
         mut locals: HashMap<LocalId, DslValue>,
     ) -> Result<DslValue, RuntimeError> {
+        Ok(self
+            .execute_block(instance, statements, &mut locals)?
+            .unwrap_or(DslValue::Null))
+    }
+
+    /// Executes one lexical handler block and propagates an explicit return.
+    /// Mutations to outer locals remain visible; declarations are scoped by the caller.
+    fn execute_block(
+        &mut self,
+        instance: InstanceId,
+        statements: &[IrStatement],
+        locals: &mut HashMap<LocalId, DslValue>,
+    ) -> Result<Option<DslValue>, RuntimeError> {
         for statement in statements {
             match statement {
+                IrStatement::Let { local, value } => {
+                    let value = self.evaluate_event(instance, value.id, locals)?;
+                    locals.insert(*local, value);
+                }
+                IrStatement::If {
+                    condition,
+                    then_body,
+                    else_body,
+                } => {
+                    let condition = self.evaluate_event(instance, condition.id, locals)?;
+                    let DslValue::Bool(condition) = condition else {
+                        return Err(RuntimeError::InvalidBytecode(
+                            "handler condition is not bool".into(),
+                        ));
+                    };
+                    let mut branch_locals = locals.clone();
+                    let branch = if condition { then_body } else { else_body };
+                    if let Some(value) = self.execute_block(instance, branch, &mut branch_locals)? {
+                        return Ok(Some(value));
+                    }
+                    for (id, value) in locals.iter_mut() {
+                        if let Some(updated) = branch_locals.get(id) {
+                            *value = updated.clone();
+                        }
+                    }
+                }
                 IrStatement::PreventDefault => self.pending_prevent_default = true,
                 IrStatement::StopPropagation => self.pending_stop_propagation = true,
                 IrStatement::FocusNext => {
@@ -87,8 +126,8 @@ impl LiveRuntime {
                     self.pending_focus = Some(argui_ui::FocusRequest::Previous);
                 }
                 IrStatement::ScrollTo { site, x, y } => {
-                    let x = self.evaluate_event(instance, x.id, &locals)?;
-                    let y = self.evaluate_event(instance, y.id, &locals)?;
+                    let x = self.evaluate_event(instance, x.id, locals)?;
+                    let y = self.evaluate_event(instance, y.id, locals)?;
                     let (DslValue::Float(x), DslValue::Float(y)) = (x, y) else {
                         return Err(RuntimeError::TypeMismatch {
                             expected: "two length coordinates".into(),
@@ -102,7 +141,7 @@ impl LiveRuntime {
                     ));
                 }
                 IrStatement::SetThemeMode(expression) => {
-                    let value = self.evaluate_event(instance, expression.id, &locals)?;
+                    let value = self.evaluate_event(instance, expression.id, locals)?;
                     let DslValue::String(name) = value else {
                         return Err(RuntimeError::TypeMismatch {
                             expected: "string theme mode".into(),
@@ -122,24 +161,24 @@ impl LiveRuntime {
                         })?;
                 }
                 IrStatement::Expression(expression) => {
-                    self.evaluate_event(instance, expression.id, &locals)?;
+                    self.evaluate_event(instance, expression.id, locals)?;
                 }
                 IrStatement::Assignment {
                     target,
                     operator,
                     value,
                 } => {
-                    let value = self.evaluate_event(instance, value.id, &locals)?;
-                    self.assign_event(instance, *target, *operator, value, &mut locals)?;
+                    let value = self.evaluate_event(instance, value.id, locals)?;
+                    self.assign_event(instance, *target, *operator, value, locals)?;
                 }
                 IrStatement::Return(value) => {
-                    return value.as_ref().map_or(Ok(DslValue::Null), |value| {
-                        self.evaluate_event(instance, value.id, &locals)
+                    return value.as_ref().map_or(Ok(Some(DslValue::Null)), |value| {
+                        self.evaluate_event(instance, value.id, locals).map(Some)
                     });
                 }
             }
         }
-        Ok(DslValue::Null)
+        Ok(None)
     }
 
     /// Applies one event assignment to a property or mutable handler local.

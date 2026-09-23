@@ -7,8 +7,9 @@ use argui_ui::{
 
 use super::{
     CHILDREN, CONTENT_HEIGHT, CommonProperty, GROW, ITEM_COUNT, KEY, OFFSET_Y, OVERSCAN,
-    ROW_HEIGHT, SCROLL, SCROLL_OFFSET, SCROLLBAR_THUMB, VIEWPORT_HEIGHT, VIRTUAL_WINDOW,
-    VISIBLE_HEIGHT, WINDOW_START, apply_common, apply_events, common_property, required_string,
+    ROW_HEIGHT, SCROLL, SCROLL_OFFSET, SCROLLBAR_THUMB, VARIABLE_HEIGHT, VIEWPORT_HEIGHT,
+    VIRTUAL_WINDOW, VISIBLE_HEIGHT, WINDOW_START, apply_common, apply_events, common_property,
+    required_string,
 };
 use crate::{
     EventSchema, NativeElementInput, NativeSchema, ObservationKind, PropertyId, PropertySchema,
@@ -26,7 +27,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     let schema = NativeSchema::new(
         VIRTUAL_WINDOW,
         "VirtualWindow",
-        "Fixed-row window that mounts only the keyed repeater rows near its viewport.",
+        "Measured or fixed-row window that mounts only keyed rows near its viewport.",
     )
     .virtual_window()
     .property(common_property(CommonProperty::Key))
@@ -52,9 +53,19 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
             ROW_HEIGHT,
             "row_height",
             ValueType::Float,
-            "Positive fixed height of each row in logical pixels.",
+            "Positive row height or estimate before variable rows are measured.",
         )
         .required()
+        .not_animatable(),
+    )
+    .property(
+        PropertySchema::new(
+            VARIABLE_HEIGHT,
+            "variable_height",
+            ValueType::Bool,
+            "Measure rich row heights and retain their scroll anchor.",
+        )
+        .default_value(SchemaValue::Bool(false))
         .not_animatable(),
     )
     .property(
@@ -161,7 +172,10 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
         let first = nonnegative_int(input, WINDOW_START, "__window_start", None)?;
         let overscan = nonnegative_int(input, OVERSCAN, "overscan", Some(3))?;
         let rows = input.children(CHILDREN);
-        let list = VirtualList::fixed(count, row_height, viewport).overscan(overscan);
+        let list = input
+            .virtual_list
+            .clone()
+            .unwrap_or_else(|| VirtualList::fixed(count, row_height, viewport).overscan(overscan));
         let window = list.window(offset);
         if first != window.range.start || rows.len() != window.range.len() {
             return Err(SchemaError::Adapter(format!(

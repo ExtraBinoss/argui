@@ -40,6 +40,7 @@ ast_node!(ComponentDecl, ComponentDecl);
 ast_node!(ThemeDecl, ThemeDecl);
 ast_node!(StyleDecl, StyleDecl);
 ast_node!(EffectDecl, EffectDecl);
+ast_node!(FunctionDecl, FunctionDecl);
 ast_node!(PropertyDecl, PropertyDecl);
 ast_node!(CallbackDecl, CallbackDecl);
 ast_node!(SlotDecl, SlotDecl);
@@ -57,6 +58,7 @@ pub enum Declaration {
     Theme(ThemeDecl),
     Style(StyleDecl),
     Effect(EffectDecl),
+    Function(FunctionDecl),
 }
 
 impl SourceFile {
@@ -80,6 +82,7 @@ impl Declaration {
             SyntaxKind::ThemeDecl => ThemeDecl::cast(node).map(Self::Theme),
             SyntaxKind::StyleDecl => StyleDecl::cast(node).map(Self::Style),
             SyntaxKind::EffectDecl => EffectDecl::cast(node).map(Self::Effect),
+            SyntaxKind::FunctionDecl => FunctionDecl::cast(node).map(Self::Function),
             _ => None,
         }
     }
@@ -95,6 +98,7 @@ impl Declaration {
             Self::Theme(node) => node.syntax(),
             Self::Style(node) => node.syntax(),
             Self::Effect(node) => node.syntax(),
+            Self::Function(node) => node.syntax(),
         }
     }
 }

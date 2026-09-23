@@ -62,6 +62,12 @@ impl Context<'_> {
             scope,
             Some("3"),
         )?;
+        let variable = self.virtual_property(
+            node.properties,
+            argui_schema::builtin::VARIABLE_HEIGHT,
+            scope,
+            Some("false"),
+        )?;
         let pad = "    ".repeat(depth);
         let identity = node.identity;
         writeln!(output, "{pad}let {destination}_viewport = if ({viewport}) > 0.0 {{ {viewport} }} else {{ virtual_viewports.height(&{identity}) }};").unwrap();
@@ -94,6 +100,7 @@ impl Context<'_> {
             &format!("{destination}_viewport"),
             &offset,
             &overscan,
+            &variable,
             identity,
         )
     }
@@ -120,6 +127,7 @@ impl Context<'_> {
         viewport: &str,
         offset: &str,
         overscan: &str,
+        variable: &str,
         identity: &str,
     ) -> Result<(), CompilerError> {
         let IrNode::Repeater {
@@ -142,6 +150,20 @@ impl Context<'_> {
         let mounted = format!("{destination}_mounted");
         let local_name = format!("local_{}", local.raw());
         let row = format!("{destination}_row");
+        let list = format!("{destination}_list");
+        let variable_name = format!("{destination}_variable");
+        let overscan_name = format!("{destination}_overscan");
+        writeln!(output, "{pad}let {variable_name} = {variable};").unwrap();
+        writeln!(
+            output,
+            "{pad}let {overscan_name} = usize::try_from({overscan}).unwrap_or(0);"
+        )
+        .unwrap();
+        let ids = if matches!(&model.value_type, argui_dsl_ir::IrType::Model(_)) {
+            format!("{items}.row_ids().to_vec();")
+        } else {
+            format!("(1..={items}.len() as u64).collect::<Vec<_>>();")
+        };
         if let IrExpressionKind::PropertyRead(property) = &model.kind {
             let source = scope
                 .properties
@@ -149,11 +171,12 @@ impl Context<'_> {
                 .ok_or(CompilerError::Codegen(
                     "VirtualWindow model property is outside its scope".into(),
                 ))?;
-            writeln!(output, "{pad}let ({destination}_count, {destination}_start, {mounted}) = {source}.with(|{items}| {{").unwrap();
-            writeln!(output, "{pad}    let {window} = ::argui::ui::VirtualList::fixed({items}.len(), {row_height}, {viewport}).overscan(usize::try_from({overscan}).unwrap_or(0)).window({offset});").unwrap();
+            writeln!(output, "{pad}let ({destination}_count, {destination}_start, {mounted}, {list}) = {source}.with(|{items}| {{").unwrap();
+            writeln!(output, "{pad}    let {list} = if {variable_name} {{ let ids = {ids} ::argui::schema::VirtualViewportStore::list(virtual_viewports, &({identity}), &ids, {row_height}, {viewport}, {overscan_name}) }} else {{ ::argui::ui::VirtualList::fixed({items}.len(), {row_height}, {viewport}).overscan({overscan_name}) }};").unwrap();
+            writeln!(output, "{pad}    let {window} = {list}.window({offset});").unwrap();
             writeln!(output, "{pad}    let start = {window}.range.start;").unwrap();
             writeln!(output, "{pad}    let {mounted} = {window}.range.map(|{index}| {items}[{index}].clone()).collect::<Vec<_>>();").unwrap();
-            writeln!(output, "{pad}    ({items}.len(), start, {mounted})").unwrap();
+            writeln!(output, "{pad}    ({items}.len(), start, {mounted}, {list})").unwrap();
             writeln!(output, "{pad}}});").unwrap();
         } else {
             writeln!(
@@ -163,7 +186,8 @@ impl Context<'_> {
             )
             .unwrap();
             writeln!(output, "{pad}let {destination}_count = {items}.len();").unwrap();
-            writeln!(output, "{pad}let {window} = ::argui::ui::VirtualList::fixed({destination}_count, {row_height}, {viewport}).overscan(usize::try_from({overscan}).unwrap_or(0)).window({offset});").unwrap();
+            writeln!(output, "{pad}let {list} = if {variable_name} {{ let ids = {ids} ::argui::schema::VirtualViewportStore::list(virtual_viewports, &({identity}), &ids, {row_height}, {viewport}, {overscan_name}) }} else {{ ::argui::ui::VirtualList::fixed({destination}_count, {row_height}, {viewport}).overscan({overscan_name}) }};").unwrap();
+            writeln!(output, "{pad}let {window} = {list}.window({offset});").unwrap();
             writeln!(
                 output,
                 "{pad}let {destination}_start = {window}.range.start;"

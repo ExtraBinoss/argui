@@ -10,6 +10,9 @@ use crate::{
 mod effect;
 mod host_effect;
 mod initialize;
+mod model;
+mod reload;
+mod slot;
 mod text_edit;
 mod theme;
 
@@ -38,13 +41,14 @@ pub struct PreparedReload {
 /// Live package, component state, theme state, and retained animation ownership.
 pub struct LiveRuntime {
     pub(crate) package: LivePackage,
-    pub(crate) schema: std::sync::Arc<argui_schema::SchemaRegistry>,
+    pub(crate) schema: std::rc::Rc<argui_schema::SchemaRegistry>,
     pub(crate) instances: HashMap<InstanceId, ComponentInstance>,
     pub(crate) tokens: HashMap<TokenId, DslValue>,
     pub(crate) property_motions: argui_schema::PropertyMotionStore,
     pub(crate) native_cache: argui_schema::NativeElementCache,
     pub(crate) virtual_viewports: argui_schema::VirtualViewportStore,
     root: Option<InstanceId>,
+    pub(crate) root_slots: HashMap<argui_dsl_ir::SlotId, Vec<argui_ui::Element>>,
     next_instance: u64,
     pub(crate) token_revision: u64,
     pub(crate) translator: Option<std::rc::Rc<TranslationResolver>>,
@@ -74,20 +78,37 @@ impl LiveRuntime {
     ///
     /// Returns if native schema construction or theme initialization fails.
     pub fn new(package: LivePackage) -> Result<Self, RuntimeError> {
-        let schema = argui_schema::builtin::registry()
+        let registry = argui_schema::builtin::registry()
             .map_err(|error| RuntimeError::Schema(error.to_string()))?;
+        Self::new_with_registry(package, registry)
+    }
+
+    /// Creates a live runtime with the exact application native registry used at compile time.
+    ///
+    /// * `package` — checked and prepared DSL package.
+    /// * `schema` — built-ins plus the application's versioned native adapters.
+    ///
+    /// # Errors
+    ///
+    /// Returns an ABI error before mounting if native contracts differ, or theme/asset errors.
+    pub fn new_with_registry(
+        package: LivePackage,
+        schema: argui_schema::SchemaRegistry,
+    ) -> Result<Self, RuntimeError> {
+        validate_native_abi(&package, &schema)?;
         let tokens = evaluate_theme_defaults(&package)?;
         let assets = prepare_assets(&package, None)?;
         let effect_revisions = effect::revisions(&package, None);
         Ok(Self {
             package,
-            schema: std::sync::Arc::new(schema),
+            schema: std::rc::Rc::new(schema),
             instances: HashMap::new(),
             tokens,
             property_motions: argui_schema::PropertyMotionStore::new(),
             native_cache: argui_schema::NativeElementCache::new(),
             virtual_viewports: argui_schema::VirtualViewportStore::new(),
             root: None,
+            root_slots: HashMap::new(),
             next_instance: 1,
             token_revision: 1,
             translator: None,
@@ -135,6 +156,7 @@ impl LiveRuntime {
                 .set(value)?;
         }
         self.instances.insert(id, instance);
+        self.root_slots.clear();
         self.root = Some(id);
         Ok(id)
     }
@@ -176,7 +198,7 @@ impl LiveRuntime {
     /// # Errors
     ///
     /// Returns an asset error if the ID has no decoded image or SVG record.
-    pub(crate) fn asset_handle(
+    pub fn asset_handle(
         &self,
         id: argui_dsl_ir::AssetId,
     ) -> Result<argui_assets::AssetHandle, RuntimeError> {
@@ -322,78 +344,6 @@ impl LiveRuntime {
         }
     }
 
-    /// Prepares an all-or-nothing reload and state migration without changing live state.
-    ///
-    /// `package` supplies the next accepted generation. Returns migrated instances
-    /// whose component definitions still exist; removed private children are dropped.
-    ///
-    /// # Errors
-    ///
-    /// Returns for a changed public ABI, a missing mounted root, or invalid defaults
-    /// or assets. On failure, the current generation and its state remain usable.
-    pub fn prepare_reload(&self, package: LivePackage) -> Result<PreparedReload, RuntimeError> {
-        if package.public_api_hash != self.package.public_api_hash {
-            return Err(RuntimeError::RestartRequired {
-                previous: self.package.public_api_hash,
-                next: package.public_api_hash,
-            });
-        }
-        let (tokens, active_theme_mode) = match self.active_theme_mode {
-            Some(mode) => match evaluate_theme_mode(&package, mode) {
-                Ok(values) => (values, Some(mode)),
-                Err(_) => (evaluate_theme_defaults(&package)?, None),
-            },
-            None => (evaluate_theme_defaults(&package)?, None),
-        };
-        let mut instances = HashMap::new();
-        let components = package
-            .ir
-            .components
-            .iter()
-            .map(|component| component.id)
-            .collect::<HashSet<_>>();
-        for (id, previous) in &self.instances {
-            if !components.contains(&previous.component) && Some(*id) != self.root {
-                continue;
-            }
-            let mut replacement = initialize_instance(&package, previous.component, *id, &tokens)?;
-            previous.clone().migrate_into(&mut replacement);
-            instances.insert(*id, replacement);
-        }
-        let assets = prepare_assets(&package, Some(&self.assets))?;
-        Ok(PreparedReload {
-            package,
-            instances,
-            tokens,
-            active_theme_mode,
-            assets,
-        })
-    }
-
-    /// Atomically exposes a previously prepared package and migrated instances.
-    #[must_use]
-    pub fn commit_reload(&mut self, prepared: PreparedReload) -> ReloadOutcome {
-        let previous_generation = self.package.generation;
-        let migrated_instances = prepared.instances.len();
-        self.effect_revisions = effect::revisions(&prepared.package, Some(&self.effect_revisions));
-        self.package = prepared.package;
-        self.instances = prepared.instances;
-        self.tokens = prepared.tokens;
-        self.active_theme_mode = prepared.active_theme_mode;
-        self.assets = prepared.assets;
-        self.render_error = None;
-        self.event_error = None;
-        self.pending_focus = None;
-        self.pending_scroll = None;
-        self.last_valid_element = None;
-        self.token_revision = self.token_revision.wrapping_add(1).max(1);
-        ReloadOutcome {
-            previous_generation,
-            generation: self.package.generation,
-            migrated_instances,
-        }
-    }
-
     /// Returns an immutable instance for inspection.
     #[must_use]
     pub fn instance(&self, id: InstanceId) -> Option<&ComponentInstance> {
@@ -428,6 +378,28 @@ impl LiveRuntime {
         }
         Ok(changed)
     }
+}
+
+/// Checks a package against the application's native contract before any adapter runs.
+///
+/// * `package` — incoming checked IR package.
+/// * `schema` — installed application native registry.
+///
+/// # Errors
+///
+/// Returns an ABI mismatch; hand-built test IR with hash zero has no compiled contract.
+fn validate_native_abi(
+    package: &LivePackage,
+    schema: &argui_schema::SchemaRegistry,
+) -> Result<(), RuntimeError> {
+    let expected = package.ir.native_schema_hash;
+    let actual = schema.abi_hash();
+    if expected != 0 && expected != actual {
+        return Err(RuntimeError::IncompatiblePackage(format!(
+            "native schema ABI mismatch: package {expected:016x}, runtime {actual:016x}"
+        )));
+    }
+    Ok(())
 }
 
 /// Decodes a complete asset generation against stable handles from the prior one.

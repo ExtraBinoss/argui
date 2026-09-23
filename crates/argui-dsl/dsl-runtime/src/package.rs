@@ -284,23 +284,7 @@ fn collect_node(node: &IrNode, programs: &mut HashMap<ExpressionId, Program>) {
             }
             for event in events {
                 for statement in &event.statements {
-                    match statement {
-                        argui_dsl_ir::IrStatement::Expression(value)
-                        | argui_dsl_ir::IrStatement::Assignment { value, .. }
-                        | argui_dsl_ir::IrStatement::Return(Some(value))
-                        | argui_dsl_ir::IrStatement::SetThemeMode(value) => {
-                            collect_expression(value, programs);
-                        }
-                        argui_dsl_ir::IrStatement::ScrollTo { x, y, .. } => {
-                            collect_expression(x, programs);
-                            collect_expression(y, programs);
-                        }
-                        argui_dsl_ir::IrStatement::Return(None)
-                        | argui_dsl_ir::IrStatement::FocusNext
-                        | argui_dsl_ir::IrStatement::FocusPrevious
-                        | argui_dsl_ir::IrStatement::PreventDefault
-                        | argui_dsl_ir::IrStatement::StopPropagation => {}
-                    }
+                    collect_statement(statement, programs);
                 }
             }
             for child in children {
@@ -335,6 +319,40 @@ fn collect_node(node: &IrNode, programs: &mut HashMap<ExpressionId, Program>) {
     }
 }
 
+/// Collects every expression reachable from one lexical handler statement.
+fn collect_statement(
+    statement: &argui_dsl_ir::IrStatement,
+    programs: &mut HashMap<ExpressionId, Program>,
+) {
+    use argui_dsl_ir::IrStatement;
+    match statement {
+        IrStatement::Let { value, .. }
+        | IrStatement::Expression(value)
+        | IrStatement::Assignment { value, .. }
+        | IrStatement::Return(Some(value))
+        | IrStatement::SetThemeMode(value) => collect_expression(value, programs),
+        IrStatement::If {
+            condition,
+            then_body,
+            else_body,
+        } => {
+            collect_expression(condition, programs);
+            for statement in then_body.iter().chain(else_body) {
+                collect_statement(statement, programs);
+            }
+        }
+        IrStatement::ScrollTo { x, y, .. } => {
+            collect_expression(x, programs);
+            collect_expression(y, programs);
+        }
+        IrStatement::Return(None)
+        | IrStatement::FocusNext
+        | IrStatement::FocusPrevious
+        | IrStatement::PreventDefault
+        | IrStatement::StopPropagation => {}
+    }
+}
+
 /// Compiles an expression and all nested expressions as addressable programs.
 fn collect_expression(expression: &IrExpression, programs: &mut HashMap<ExpressionId, Program>) {
     programs
@@ -351,6 +369,15 @@ fn collect_expression(expression: &IrExpression, programs: &mut HashMap<Expressi
             for argument in arguments {
                 collect_expression(argument, programs);
             }
+        }
+        argui_dsl_ir::IrExpressionKind::Struct { fields, .. } => {
+            for (_, value) in fields {
+                collect_expression(value, programs);
+            }
+        }
+        argui_dsl_ir::IrExpressionKind::Index { base, index } => {
+            collect_expression(base, programs);
+            collect_expression(index, programs);
         }
         argui_dsl_ir::IrExpressionKind::Binary { left, right, .. } => {
             collect_expression(left, programs);

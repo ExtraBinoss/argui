@@ -133,6 +133,25 @@ impl LiveRuntime {
     ///
     /// Returns transport, compatibility, initial diagnostics, missing-root, or mount failures.
     pub fn connect(address: impl ToSocketAddrs, timeout: Duration) -> Result<Self, RuntimeError> {
+        let registry = argui_schema::builtin::registry()
+            .map_err(|error| RuntimeError::Schema(error.to_string()))?;
+        Self::connect_with_registry(address, timeout, registry)
+    }
+
+    /// Connects to `argui dev` using the application's native extension registry.
+    ///
+    /// * `address` — native TCP development host address.
+    /// * `timeout` — maximum wait for the first accepted package.
+    /// * `registry` — exact versioned native contract used by the dev compiler.
+    ///
+    /// # Errors
+    ///
+    /// Returns connection, package, ABI, or mount errors before displaying a mismatched UI.
+    pub fn connect_with_registry(
+        address: impl ToSocketAddrs,
+        timeout: Duration,
+        registry: argui_schema::SchemaRegistry,
+    ) -> Result<Self, RuntimeError> {
         let client = LiveClient::connect(address)?;
         let initial = client.receive_timeout(timeout).ok_or_else(|| {
             RuntimeError::IncompatiblePackage(
@@ -150,7 +169,7 @@ impl LiveRuntime {
                 "entry module must export at least one component".into(),
             )
         })?;
-        let mut runtime = Self::new(package)?;
+        let mut runtime = Self::new_with_registry(package, registry)?;
         runtime.mount(root, [])?;
         client.acknowledge(&LiveMessage::Committed {
             generation: runtime.generation(),

@@ -17,11 +17,15 @@ argui.workspace = true
 argui-dsl-runtime = { path = "../../crates/argui-dsl/dsl-runtime", optional = true }
 
 [build-dependencies]
+argui.workspace = true
 argui-dsl-build = { path = "../../crates/argui-dsl/dsl-build" }
 
 [dev-dependencies]
 argui-testing.workspace = true
 argui-dsl-compiler = { path = "../../crates/argui-dsl/dsl-compiler" }
+argui-dsl-ir = { path = "../../crates/argui-dsl/dsl-ir" }
+argui-dsl-lsp = { path = "../../crates/argui-dsl/dsl-lsp" }
+serde_json = "=1.0.151"
 
 [lints]
 workspace = true

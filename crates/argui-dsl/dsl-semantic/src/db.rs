@@ -61,11 +61,21 @@ impl CompilerDatabase {
     ///
     /// Returns a schema error if built-in metadata violates registry invariants.
     pub fn with_builtins() -> Result<Self, argui_schema::SchemaError> {
-        let mut database = Self::new(argui_schema::builtin::registry()?);
+        Ok(Self::with_registry(argui_schema::builtin::registry()?))
+    }
+
+    /// Creates a database with an application-owned native registry and standard DSL modules.
+    ///
+    /// * `schema` — the exact validated registry also installed in AOT/live runtimes.
+    ///
+    /// Returns an incremental database whose native resolution uses `schema`.
+    #[must_use]
+    pub fn with_registry(schema: argui_schema::SchemaRegistry) -> Self {
+        let mut database = Self::new(schema);
         for (path, source) in argui_dsl_stdlib::UI_MODULES {
             database.set_file(path, *source);
         }
-        Ok(database)
+        database
     }
 
     /// Adds or replaces a source file while preserving its stable file ID.

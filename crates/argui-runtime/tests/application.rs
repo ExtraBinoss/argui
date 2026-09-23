@@ -513,6 +513,7 @@ fn single_window_adapter_exposes_every_component_effect_without_a_native_window(
     assert!(model.inspector(&other).is_none());
 }
 
+/// Frame notification rebuilds the view; a layout callback can request paint only.
 #[test]
 fn single_window_adapter_routes_frame_layout_and_ignores_unrelated_events() {
     let main = WindowKey::main();
@@ -540,14 +541,14 @@ fn single_window_adapter_routes_frame_layout_and_ignores_unrelated_events() {
             )
             .windows[0]
             .update,
-        ViewUpdate::Paint
+        ViewUpdate::Rebuild
     );
     assert_eq!(
         model
             .layout_changed(&main, &LayoutSnapshot::default())
             .windows[0]
             .update,
-        ViewUpdate::Rebuild
+        ViewUpdate::Paint
     );
 }
 

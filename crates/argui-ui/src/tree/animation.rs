@@ -14,6 +14,18 @@ struct AnimationEntry {
     impact: BindingImpact,
 }
 
+impl AnimationEntry {
+    /// Returns this binding's invalidation, repainting transforms when `settled`.
+    /// A final paint refreshes retained text at its resting scale and pixel phase.
+    fn impact(&self, settled: bool) -> BindingImpact {
+        if settled && matches!(self.binding, PropertyBinding::Transform(_)) {
+            strongest_impact(self.impact, BindingImpact::Paint)
+        } else {
+            self.impact
+        }
+    }
+}
+
 impl AnimationRegistry {
     pub(super) fn new(root: &Element) -> Self {
         let mut entries = Vec::<AnimationEntry>::new();
@@ -43,23 +55,29 @@ impl AnimationRegistry {
         }
     }
 
+    /// Samples each track at `now`, returning its strongest update including settled transforms.
     fn advance(&self, now: argui_animation::Time) -> TreeUpdate {
         self.entries.iter().fold(TreeUpdate::None, |update, entry| {
-            if entry.binding.track().advance(now) {
-                strongest_tree_update(update, entry.impact)
+            let track = entry.binding.track();
+            let was_active = track.is_active();
+            let changed = track.advance(now);
+            let settled = was_active && !track.is_active();
+            if changed || settled {
+                strongest_tree_update(update, entry.impact(settled))
             } else {
                 update
             }
         })
     }
 
+    /// Finishes active tracks and returns the invalidation for their final presentation.
     fn finish_active(&self) -> TreeUpdate {
         let mut update = TreeUpdate::None;
         for entry in &self.entries {
             let track = entry.binding.track();
             if track.is_active() {
                 track.finish();
-                update = strongest_tree_update(update, entry.impact);
+                update = strongest_tree_update(update, entry.impact(true));
             }
         }
         update
@@ -71,7 +89,8 @@ impl UiTree {
     ///
     /// * `now` — current animation time.
     ///
-    /// Returns the strongest required tree update.
+    /// Returns the strongest required tree update. Transform animations request
+    /// a paint when they settle so retained text is rasterized at its final scale.
     pub fn advance_animations(&mut self, now: argui_animation::Time) -> TreeUpdate {
         let bindings = if self.reduced_motion {
             self.animations.finish_active()

@@ -91,6 +91,7 @@ pub(crate) fn completion_kind(kind: SymbolKind) -> u8 {
         | SymbolKind::Theme
         | SymbolKind::Style
         | SymbolKind::Effect => 7,
+        SymbolKind::Function => 3,
         SymbolKind::Token => 21,
     }
 }
@@ -105,6 +106,7 @@ pub(crate) fn symbol_kind(kind: SymbolKind) -> u8 {
         SymbolKind::Struct => 23,
         SymbolKind::Enum => 10,
         SymbolKind::Theme | SymbolKind::Style | SymbolKind::Effect => 3,
+        SymbolKind::Function => 12,
         SymbolKind::Token => 22,
         SymbolKind::Keyword => 14,
     }

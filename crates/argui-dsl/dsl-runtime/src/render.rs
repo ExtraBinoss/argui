@@ -87,7 +87,7 @@ impl LiveRuntime {
                     ..
                 } => match target {
                     IrElementTarget::Native(native) => {
-                        let registry = std::sync::Arc::clone(&self.schema);
+                        let registry = std::rc::Rc::clone(&self.schema);
                         let schema = registry.schema(*native).ok_or_else(|| {
                             RuntimeError::Schema(format!("unknown native {}", native.raw()))
                         })?;
@@ -106,20 +106,21 @@ impl LiveRuntime {
                             instance.observations.insert(*site, observed);
                         }
                         let (children, virtual_window) = if schema.virtual_window {
-                            let (rows, count, start, viewport) = self.render_virtual_children(
-                                instance,
-                                component,
-                                *site,
-                                children,
-                                properties,
-                                locals,
-                                slots,
-                                template.as_deref_mut(),
-                                identity_owner,
-                                repeater_key,
-                                context,
-                            )?;
-                            (rows, Some((count, start, viewport)))
+                            let (rows, count, start, viewport, list) = self
+                                .render_virtual_children(
+                                    instance,
+                                    component,
+                                    *site,
+                                    children,
+                                    properties,
+                                    locals,
+                                    slots,
+                                    template.as_deref_mut(),
+                                    identity_owner,
+                                    repeater_key,
+                                    context,
+                                )?;
+                            (rows, Some((count, start, viewport, list)))
                         } else {
                             (
                                 self.render_nodes(
@@ -277,8 +278,9 @@ impl LiveRuntime {
                             )?;
                             input = input.property(property, sampled);
                         }
-                        if let Some((count, start, viewport)) = virtual_window {
+                        if let Some((count, start, viewport, list)) = virtual_window {
                             input = input
+                                .virtual_list(list)
                                 .property(
                                     argui_schema::builtin::VIEWPORT_HEIGHT,
                                     argui_schema::SchemaValue::Float(viewport),
@@ -346,17 +348,31 @@ impl LiveRuntime {
                     for (item, key) in rows {
                         let mut nested = locals.clone();
                         nested.insert(*local, item);
-                        output.extend(self.render_nodes(
-                            instance,
-                            component,
-                            body,
-                            &nested,
-                            slots,
-                            template.as_deref_mut(),
-                            owner,
-                            Some(&key),
-                            context,
-                        )?);
+                        let previous_outputs = instance.child_outputs.clone();
+                        let rendered = (|| {
+                            self.prepare_scoped_child_references(
+                                instance,
+                                component,
+                                body,
+                                &nested,
+                                owner,
+                                Some(&key),
+                                context,
+                            )?;
+                            self.render_nodes(
+                                instance,
+                                component,
+                                body,
+                                &nested,
+                                slots,
+                                template.as_deref_mut(),
+                                owner,
+                                Some(&key),
+                                context,
+                            )
+                        })();
+                        instance.child_outputs = previous_outputs;
+                        output.extend(rendered?);
                     }
                 }
                 IrNode::Conditional {

@@ -1,16 +1,60 @@
+mod slot;
+
 use std::collections::HashMap;
 
 use argui_dsl_syntax::{FileId, Span, SyntaxKind, SyntaxNode};
 
 use crate::{
     CallbackDefinition, ComponentDefinition, Diagnostic, DiagnosticCode, EffectDefinition,
-    EffectParameterDefinition, EnumDefinition, FieldDefinition, PropertyDefinition,
-    PropertyDirection, SlotDefinition, StructDefinition, StyleDefinition, ThemeDefinition,
+    EffectParameterDefinition, EnumDefinition, FieldDefinition, FunctionDefinition,
+    PropertyDefinition, PropertyDirection, StructDefinition, StyleDefinition, ThemeDefinition,
     ThemeTokenDefinition, Type,
     lower::{LoweredKind, LoweredModule, compact_text, direct_tokens, unquote},
 };
 
 use super::super::{Scope, expression, is_type_kind, lowered_definition};
+
+/// Extracts a pure function signature before any body is validated.
+///
+/// `syntax` is the declaration, `file` its source, and `scope`/`modules` resolve
+/// user types. `diagnostics` receives duplicate and invalid type reports.
+/// Returns the checked parameter and result types.
+pub(super) fn function_definition(
+    syntax: &SyntaxNode,
+    file: FileId,
+    scope: &Scope,
+    modules: &[LoweredModule],
+    diagnostics: &mut Vec<Diagnostic>,
+) -> FunctionDefinition {
+    let mut names = HashMap::new();
+    let parameters = syntax
+        .children()
+        .filter(|node| node.kind() == SyntaxKind::FunctionParameter)
+        .filter_map(|parameter| {
+            let name = direct_ident(&parameter)?;
+            let span = Span::new(file, parameter.text_range());
+            duplicate_member(&name, span, &mut names, diagnostics);
+            let value_type = parameter
+                .children()
+                .find(|node| node.kind() == SyntaxKind::TypeRef)
+                .map_or(Type::Unknown, |node| {
+                    resolve_type(&node, file, scope, modules, diagnostics)
+                });
+            Some(FieldDefinition {
+                name,
+                value_type,
+                span,
+            })
+        })
+        .collect();
+    let result = syntax
+        .children()
+        .find(|node| node.kind() == SyntaxKind::TypeRef)
+        .map_or(Type::Unknown, |node| {
+            resolve_type(&node, file, scope, modules, diagnostics)
+        });
+    FunctionDefinition { parameters, result }
+}
 
 /// Extracts typed struct fields and duplicate-member diagnostics.
 pub(super) fn struct_definition(
@@ -78,7 +122,6 @@ pub(super) fn component_definition(
 ) -> ComponentDefinition {
     let mut properties = Vec::new();
     let mut callbacks = Vec::new();
-    let mut slots = Vec::new();
     let mut names = HashMap::new();
     for property in syntax
         .children()
@@ -104,6 +147,7 @@ pub(super) fn component_definition(
                 && !has_direct_token(&property, SyntaxKind::Eq),
             span,
             dependencies: Vec::new(),
+            reads_measured: false,
         });
     }
     let property_index = properties
@@ -122,6 +166,29 @@ pub(super) fn component_definition(
         {
             definition.dependencies =
                 expression::property_dependencies(&expression, &property_index);
+            definition.reads_measured = super::visual::binding::reads_measured_bounds(&expression);
+        }
+    }
+    for _ in 0..properties.len() {
+        let measured = properties
+            .iter()
+            .filter(|property| property.reads_measured)
+            .map(|property| property.name.clone())
+            .collect::<std::collections::HashSet<_>>();
+        let mut changed = false;
+        for property in &mut properties {
+            if !property.reads_measured
+                && property
+                    .dependencies
+                    .iter()
+                    .any(|name| measured.contains(name))
+            {
+                property.reads_measured = true;
+                changed = true;
+            }
+        }
+        if !changed {
+            break;
         }
     }
     for callback in syntax
@@ -166,32 +233,7 @@ pub(super) fn component_definition(
             span,
         });
     }
-    for slot in syntax
-        .children()
-        .filter(|node| node.kind() == SyntaxKind::SlotDecl)
-    {
-        if let Some(name) = identifier_after(&slot, SyntaxKind::SlotKw) {
-            let span = Span::new(file, slot.text_range());
-            duplicate_member(&name, span, &mut names, diagnostics);
-            let kind = direct_tokens(&slot)
-                .filter(|token| token.kind() == SyntaxKind::Ident)
-                .nth(1);
-            if let Some(kind) = &kind
-                && kind.text() != "template"
-            {
-                diagnostics.push(Diagnostic::error(
-                    DiagnosticCode::TypeMismatch,
-                    format!("unknown slot kind `{}`; expected `template`", kind.text()),
-                    Span::new(file, kind.text_range()),
-                ));
-            }
-            slots.push(SlotDefinition {
-                name,
-                template: kind.is_some_and(|token| token.text() == "template"),
-                span,
-            });
-        }
-    }
+    let slots = slot::extract(syntax, file, scope, modules, &mut names, diagnostics);
     if slots.iter().any(|slot| slot.template) && slots.len() != 1 {
         diagnostics.push(Diagnostic::error(
             DiagnosticCode::TypeMismatch,

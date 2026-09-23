@@ -44,6 +44,7 @@ pub enum SymbolKind {
     Component,
     Property,
     Callback,
+    Function,
     Slot,
     Struct,
     Enum,

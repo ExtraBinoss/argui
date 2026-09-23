@@ -208,6 +208,7 @@ fn keyword(text: &str) -> Option<SyntaxKind> {
         "theme" => SyntaxKind::ThemeKw,
         "style" => SyntaxKind::StyleKw,
         "effect" => SyntaxKind::EffectKw,
+        "fn" => SyntaxKind::FnKw,
         "for" => SyntaxKind::ForKw,
         "in" => SyntaxKind::InKw,
         "key" => SyntaxKind::KeyKw,

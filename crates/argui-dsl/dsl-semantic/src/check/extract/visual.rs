@@ -9,9 +9,10 @@ use crate::{
 
 use super::super::{Scope, expression};
 use super::animation;
-mod binding;
+pub(super) mod binding;
 mod effect;
 mod helpers;
+mod repeater;
 mod slot;
 mod template_slot;
 mod virtual_list;
@@ -31,7 +32,7 @@ pub(super) fn validate_component(
 ) {
     slot::references(syntax, file, component, diagnostics);
     let references =
-        binding::native_references(syntax, scope, schema, definitions, file, diagnostics);
+        binding::native_references(syntax, scope, schema, definitions, file, diagnostics, false);
     let properties = component
         .properties
         .iter()
@@ -46,10 +47,11 @@ pub(super) fn validate_component(
         .collect::<HashMap<_, _>>();
     let locals = HashMap::new();
     let mut context = expression::Context {
+        symbols: scope.symbols.clone(),
         file,
         properties: &properties,
         callbacks: &callbacks,
-        locals: &locals,
+        locals: locals.clone(),
         definitions,
         theme_tokens,
         references: Some(&references),
@@ -148,89 +150,19 @@ fn validate_visual(
             locals,
             diagnostics,
         ),
-        SyntaxKind::ForExpr => {
-            let collection = node
-                .children()
-                .find(|child| child.kind() == SyntaxKind::Expr);
-            let mut next_locals = locals.clone();
-            if let Some(collection) = collection {
-                let mut context = expression::Context {
-                    file,
-                    properties: component_properties,
-                    callbacks,
-                    locals,
-                    definitions,
-                    theme_tokens,
-                    references: Some(references),
-                    event_handler: false,
-                    diagnostics,
-                };
-                let value = expression::infer(&collection, &mut context);
-                let item = match value {
-                    Type::Model(item) | Type::Array(item) => *item,
-                    Type::Unknown => Type::Unknown,
-                    other => {
-                        context.diagnostics.push(Diagnostic::error(
-                            DiagnosticCode::TypeMismatch,
-                            format!(
-                                "repeater source must be model<T> or array<T>, found `{other}`"
-                            ),
-                            Span::new(file, collection.text_range()),
-                        ));
-                        Type::Unknown
-                    }
-                };
-                if let Some(binding) = identifier_after(node, SyntaxKind::ForKw) {
-                    next_locals.insert(binding, item);
-                }
-            }
-            if !has_direct_token(node, SyntaxKind::KeyKw) {
-                diagnostics.push(Diagnostic::error(
-                    DiagnosticCode::MissingRepeaterKey,
-                    "repeater requires a stable `key` expression of type int or string",
-                    Span::new(file, node.text_range()),
-                ));
-            } else if let Some(key) = node
-                .children()
-                .filter(|child| child.kind() == SyntaxKind::Expr)
-                .nth(1)
-            {
-                let mut context = expression::Context {
-                    file,
-                    properties: component_properties,
-                    callbacks,
-                    locals: &next_locals,
-                    definitions,
-                    theme_tokens,
-                    references: Some(references),
-                    event_handler: false,
-                    diagnostics,
-                };
-                let actual = expression::infer(&key, &mut context);
-                if !matches!(actual, Type::Int | Type::String | Type::Unknown) {
-                    context.diagnostics.push(Diagnostic::error(
-                        DiagnosticCode::TypeMismatch,
-                        "repeater key must be int or string",
-                        Span::new(file, key.text_range()),
-                    ));
-                }
-            }
-            for child in visual_children(node) {
-                validate_visual(
-                    &child,
-                    file,
-                    scope,
-                    definitions,
-                    theme_tokens,
-                    schema,
-                    references,
-                    component_properties,
-                    callbacks,
-                    &next_locals,
-                    diagnostics,
-                );
-            }
-        }
+        SyntaxKind::ForExpr => repeater::validate(
+            node,
+            file,
+            scope,
+            definitions,
+            theme_tokens,
+            schema,
+            references,
+            component_properties,
+            callbacks,
+            locals,
+            diagnostics,
+        ),
         SyntaxKind::IfExpr
         | SyntaxKind::Block
         | SyntaxKind::ElseBranch
@@ -242,10 +174,11 @@ fn validate_visual(
                     .find(|child| child.kind() == SyntaxKind::Expr)
             {
                 let mut context = expression::Context {
+                    symbols: scope.symbols.clone(),
                     file,
                     properties: component_properties,
                     callbacks,
-                    locals,
+                    locals: locals.clone(),
                     definitions,
                     theme_tokens,
                     references: Some(references),
@@ -320,6 +253,50 @@ fn validate_element(
         user.and_then(|component| component.slots.iter().find(|slot| slot.template))
     {
         virtual_list::validate_template_argument(node, file, &template.name, diagnostics);
+        if let Some(parameter) = template.parameters.first() {
+            let supplied = node.children().find(|child| {
+                child.kind() == SyntaxKind::SlotContent
+                    && direct_ident(child).as_deref() == Some(&template.name)
+            });
+            let body = supplied.as_ref().unwrap_or(node);
+            let collection = body
+                .descendants()
+                .find(|child| child.kind() == SyntaxKind::ForExpr)
+                .and_then(|repeater| {
+                    repeater
+                        .children()
+                        .find(|child| child.kind() == SyntaxKind::Expr)
+                });
+            if let Some(collection) = collection {
+                let mut context = expression::Context {
+                    symbols: scope.symbols.clone(),
+                    file,
+                    properties: component_properties,
+                    callbacks,
+                    locals: locals.clone(),
+                    definitions,
+                    theme_tokens,
+                    references: Some(references),
+                    event_handler: false,
+                    diagnostics,
+                };
+                let actual = expression::infer(&collection, &mut context);
+                let item = match actual {
+                    Type::Array(item) | Type::Model(item) => *item,
+                    other => other,
+                };
+                if item != Type::Unknown && !parameter.value_type.accepts(&item) {
+                    context.diagnostics.push(Diagnostic::error(
+                        DiagnosticCode::TypeMismatch,
+                        format!(
+                            "template slot `{}` expects row `{}`, found `{item}`",
+                            template.name, parameter.value_type
+                        ),
+                        Span::new(file, collection.text_range()),
+                    ));
+                }
+            }
+        }
     }
     let styled = super::style::applications(node, file, scope, definitions, diagnostics);
     let mut provided = HashSet::new();
@@ -387,10 +364,11 @@ fn validate_element(
                     .find(|value| value.kind() == SyntaxKind::Expr)
                 {
                     let mut context = expression::Context {
+                        symbols: scope.symbols.clone(),
                         file,
                         properties: component_properties,
                         callbacks,
-                        locals,
+                        locals: locals.clone(),
                         definitions,
                         theme_tokens,
                         references: Some(references),
@@ -398,6 +376,23 @@ fn validate_element(
                         diagnostics,
                     };
                     let actual = expression::infer(&value, &mut context);
+                    if native.is_some()
+                        && binding::drives_layout(&property_name)
+                        && (binding::reads_measured_bounds(&value)
+                            || expression::property_dependencies(&value, component_properties)
+                                .iter()
+                                .any(|name| {
+                                    component_properties
+                                        .get(name)
+                                        .is_some_and(|property| property.reads_measured)
+                                }))
+                    {
+                        context.diagnostics.push(Diagnostic::error(
+                            DiagnosticCode::BindingCycle,
+                            "measured dimensions cannot drive layout geometry; use a container query",
+                            Span::new(file, value.text_range()),
+                        ));
+                    }
                     if !expected.accepts(&actual) {
                         context.diagnostics.push(Diagnostic::error(
                             DiagnosticCode::TypeMismatch,
@@ -524,10 +519,11 @@ fn validate_element(
                     );
                 }
                 let mut context = expression::Context {
+                    symbols: scope.symbols.clone(),
                     file,
                     properties: component_properties,
                     callbacks,
-                    locals: &event_locals,
+                    locals: event_locals,
                     definitions,
                     theme_tokens,
                     references: Some(references),

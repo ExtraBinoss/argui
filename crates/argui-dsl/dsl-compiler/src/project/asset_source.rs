@@ -149,10 +149,21 @@ fn visual_node(node: &IrNode, id: AssetId) -> Option<Span> {
 /// Returns the matching source span, if present.
 fn event_statement(statement: &IrStatement, id: AssetId) -> Option<Span> {
     match statement {
-        IrStatement::Expression(value)
+        IrStatement::Let { value, .. }
+        | IrStatement::Expression(value)
         | IrStatement::SetThemeMode(value)
         | IrStatement::Assignment { value, .. }
         | IrStatement::Return(Some(value)) => expression(value, id),
+        IrStatement::If {
+            condition,
+            then_body,
+            else_body,
+        } => expression(condition, id).or_else(|| {
+            then_body
+                .iter()
+                .chain(else_body)
+                .find_map(|statement| event_statement(statement, id))
+        }),
         IrStatement::ScrollTo { x, y, .. } => expression(x, id).or_else(|| expression(y, id)),
         IrStatement::Return(None)
         | IrStatement::FocusNext
@@ -178,6 +189,12 @@ fn expression(value: &IrExpression, id: AssetId) -> Option<Span> {
         | IrExpressionKind::Array(arguments) => arguments
             .iter()
             .find_map(|argument| expression(argument, id)),
+        IrExpressionKind::Struct { fields, .. } => {
+            fields.iter().find_map(|(_, value)| expression(value, id))
+        }
+        IrExpressionKind::Index { base, index } => {
+            expression(base, id).or_else(|| expression(index, id))
+        }
         IrExpressionKind::Binary { left, right, .. } => {
             expression(left, id).or_else(|| expression(right, id))
         }
@@ -194,6 +211,7 @@ fn expression(value: &IrExpression, id: AssetId) -> Option<Span> {
         | IrExpressionKind::ObservedRead { .. }
         | IrExpressionKind::LocalRead(_)
         | IrExpressionKind::TokenRead(_)
+        | IrExpressionKind::EnumVariant { .. }
         | IrExpressionKind::Asset(_) => None,
     }
 }

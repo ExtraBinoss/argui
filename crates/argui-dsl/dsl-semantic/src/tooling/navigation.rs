@@ -398,6 +398,7 @@ fn definition_kind(kind: &DefinitionKind) -> SymbolKind {
         DefinitionKind::Theme(_) => SymbolKind::Theme,
         DefinitionKind::Style(_) => SymbolKind::Style,
         DefinitionKind::Effect(_) => SymbolKind::Effect,
+        DefinitionKind::Function(_) => SymbolKind::Function,
     }
 }
 
@@ -414,6 +415,7 @@ fn kind_label(kind: SymbolKind) -> &'static str {
         SymbolKind::Token => "token",
         SymbolKind::Style => "style",
         SymbolKind::Effect => "effect",
+        SymbolKind::Function => "function",
         SymbolKind::Native => "native",
         SymbolKind::Keyword => "keyword",
     }

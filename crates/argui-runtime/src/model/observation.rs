@@ -32,6 +32,8 @@ pub struct ObservedInteraction {
     pub pressed_position: Option<Point>,
     /// Bounded scroll geometry when this node owns a layout scroll region.
     pub scroll: Option<ObservedScroll>,
+    /// Size from the last completed layout, in logical pixels.
+    pub measured: Option<Size>,
 }
 
 /// Cloneable view of retained interaction state during render and event dispatch.
@@ -197,6 +199,7 @@ impl ObservedInteraction {
             pointer_position,
             pointer_global_position,
             pressed_position,
+            measured: None,
             scroll: scroll_regions
                 .iter()
                 .find(|region| region.node == node)
@@ -272,6 +275,23 @@ impl InteractionSnapshot {
             primary_touch,
             watched,
         )))
+    }
+
+    /// Adds sizes from the last completed layout for watched retained nodes.
+    ///
+    /// `measurements` pairs source identities with logical sizes. The snapshot
+    /// stays immutable to readers and ignores identities not already watched.
+    pub(crate) fn with_measured(
+        mut self,
+        measurements: impl IntoIterator<Item = (RetainedIdentity, Size)>,
+    ) -> Self {
+        let values = Rc::make_mut(&mut self.0);
+        for (identity, size) in measurements {
+            if let Some(state) = values.get_mut(&identity) {
+                state.measured = Some(size);
+            }
+        }
+        self
     }
 
     /// Returns the state for `identity`, or the idle state if it is absent.

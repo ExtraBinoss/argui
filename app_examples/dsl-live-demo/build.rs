@@ -1,3 +1,6 @@
+#[path = "src/native_extension.rs"]
+mod native_extension;
+
 /// Generates the AOT version of the live demo for normal and release builds.
 fn main() {
     argui_dsl_build::compile("ui/main.argui").expect("DSL live demo must compile");
@@ -9,4 +12,11 @@ fn main() {
         &output.join("conformance.rs"),
     )
     .expect("language conformance fixtures must compile to Rust");
+    argui_dsl_build::compile_to_with_registry(
+        &manifest,
+        std::path::Path::new("tests/native_extension/extension.argui"),
+        &output.join("extension.rs"),
+        native_extension::registry().expect("extension schema must be valid"),
+    )
+    .expect("application extension must compile to Rust");
 }

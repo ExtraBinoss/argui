@@ -340,7 +340,8 @@ impl<A: Render> SingleWindowModel<A> {
     /// `tree` holds current retained interaction state, `regions` supplies local
     /// hit geometry, `scroll_regions` supplies bounded scroll geometry, and
     /// `primary_touch` selects a touch pointer ahead of the
-    /// mouse when one is active. Returns whether watched values changed and a
+    /// mouse when one is active. `layout` supplies completed logical bounds
+    /// for measured outputs. Returns whether watched values changed and a
     /// presentation needs another render. Sampling is limited to identities
     /// watched by this presentation or its descendants.
     pub fn refresh_interaction_observations(
@@ -349,6 +350,7 @@ impl<A: Render> SingleWindowModel<A> {
         regions: &[HitRegion],
         scroll_regions: &[argui_ui::ScrollRegion],
         primary_touch: Option<PointerId>,
+        layout: Option<&LayoutSnapshot>,
     ) -> bool {
         let mut watched = HashSet::<RetainedIdentity>::new();
         self.app.entity.collect_observed(&mut watched);
@@ -359,6 +361,16 @@ impl<A: Render> SingleWindowModel<A> {
             primary_touch,
             &watched,
             &mut self.observation_index.borrow_mut(),
+        );
+        let next = next.with_measured(
+            layout
+                .into_iter()
+                .flat_map(|layout| &layout.nodes)
+                .filter_map(|node| {
+                    node.retained_identity
+                        .clone()
+                        .map(|id| (id, node.bounds.size))
+                }),
         );
         let previous = self.observation_snapshot.replace(next.clone());
         self.app.entity.set_interaction_snapshot(&next);

@@ -54,8 +54,8 @@ pub(super) fn validate_two_way(
 /// * `file` — source file used for duplicate identity diagnostics.
 /// * `diagnostics` — output receiving duplicate identity errors.
 ///
-/// Returns readable properties by source identity. Repeated elements are excluded
-/// because one name would otherwise identify multiple mounted values.
+/// `scoped` allows references inside the given repeater only; nested repeaters are
+/// excluded. Returns readable properties by source identity in this lexical scope.
 pub(super) fn native_references(
     syntax: &SyntaxNode,
     scope: &Scope,
@@ -63,6 +63,7 @@ pub(super) fn native_references(
     definitions: &HashMap<SymbolId, Definition>,
     file: FileId,
     diagnostics: &mut Vec<Diagnostic>,
+    scoped: bool,
 ) -> HashMap<String, HashMap<String, Type>> {
     let mut references = HashMap::new();
     for element in syntax
@@ -78,8 +79,12 @@ pub(super) fn native_references(
         };
         if element
             .ancestors()
+            .take_while(|ancestor| ancestor != syntax)
             .any(|ancestor| ancestor.kind() == SyntaxKind::ForExpr)
         {
+            continue;
+        }
+        if !scoped && syntax.kind() == SyntaxKind::ForExpr {
             continue;
         }
         let Some(element_name) = direct_ident(&element) else {
@@ -114,12 +119,10 @@ pub(super) fn native_references(
             .get(&element_name)
             .and_then(|id| definitions.get(id))
         {
-            if element
+            let conditional = element
                 .ancestors()
-                .any(|ancestor| ancestor.kind() == SyntaxKind::IfExpr)
-            {
-                continue;
-            }
+                .take_while(|ancestor| ancestor != syntax)
+                .any(|ancestor| ancestor.kind() == SyntaxKind::IfExpr);
             component
                 .properties
                 .iter()
@@ -129,7 +132,14 @@ pub(super) fn native_references(
                         PropertyDirection::Output | PropertyDirection::InputOutput
                     )
                 })
-                .map(|property| (property.name.clone(), property.value_type.clone()))
+                .map(|property| {
+                    let value_type = if conditional {
+                        Type::Optional(Box::new(property.value_type.clone()))
+                    } else {
+                        property.value_type.clone()
+                    };
+                    (property.name.clone(), value_type)
+                })
                 .collect()
         } else {
             continue;
@@ -154,4 +164,66 @@ fn direct_ident(node: &SyntaxNode) -> Option<String> {
     direct_tokens(node)
         .find(|token| token.kind() == SyntaxKind::Ident)
         .map(|token| token.text().to_string())
+}
+
+/// Reports whether `value` reads a completed-layout width or height.
+///
+/// `value` is a checked binding expression. The result is true only for member
+/// reads, so string literals mentioning the property do not trigger the guard.
+pub(crate) fn reads_measured_bounds(value: &SyntaxNode) -> bool {
+    value
+        .descendants()
+        .filter(|node| node.kind() == SyntaxKind::MemberExpr)
+        .any(|node| {
+            direct_tokens(&node).any(|token| {
+                token.kind() == SyntaxKind::Ident
+                    && matches!(token.text(), "measured_width" | "measured_height")
+            })
+        })
+}
+
+/// Whether one native property can change measured layout geometry.
+///
+/// `name` is the native assignment target; the result conservatively includes
+/// size, positioning, spacing, grid, and flex controls.
+pub(super) fn drives_layout(name: &str) -> bool {
+    matches!(
+        name,
+        "width"
+            | "height"
+            | "min_width"
+            | "min_height"
+            | "max_width"
+            | "max_height"
+            | "aspect_ratio"
+            | "flex_basis"
+            | "grow"
+            | "shrink"
+            | "wrap"
+            | "x"
+            | "y"
+            | "left"
+            | "right"
+            | "top"
+            | "bottom"
+            | "padding"
+            | "padding_left"
+            | "padding_right"
+            | "padding_top"
+            | "padding_bottom"
+            | "margin"
+            | "margin_left"
+            | "margin_right"
+            | "margin_top"
+            | "margin_bottom"
+            | "gap"
+            | "row_gap"
+            | "column_gap"
+            | "grid_columns"
+            | "grid_rows"
+            | "grid_column"
+            | "grid_row"
+            | "grid_column_span"
+            | "grid_row_span"
+    )
 }

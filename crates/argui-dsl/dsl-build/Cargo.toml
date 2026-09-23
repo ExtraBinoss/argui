@@ -11,6 +11,7 @@ description = "Cargo build-script integration for Argui DSL AOT compilation"
 
 [dependencies]
 argui-dsl-compiler = { path = "../dsl-compiler" }
+argui-schema = { path = "../../argui-schema" }
 
 [dev-dependencies]
 tempfile.workspace = true

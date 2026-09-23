@@ -80,6 +80,13 @@ pub struct EnumDefinition {
     pub variants: Vec<(String, Span)>,
 }
 
+/// Typed, expression-bodied pure function signature.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FunctionDefinition {
+    pub parameters: Vec<FieldDefinition>,
+    pub result: Type,
+}
+
 /// Component property data-flow direction.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -99,6 +106,8 @@ pub struct PropertyDefinition {
     pub required: bool,
     pub span: Span,
     pub dependencies: Vec<String>,
+    /// Whether the default transitively reads a completed layout measurement.
+    pub reads_measured: bool,
 }
 
 /// Typed component callback declaration.
@@ -115,6 +124,9 @@ pub struct CallbackDefinition {
 pub struct SlotDefinition {
     pub name: String,
     pub template: bool,
+    pub required: bool,
+    pub single: bool,
+    pub parameters: Vec<FieldDefinition>,
     pub span: Span,
 }
 
@@ -184,6 +196,7 @@ pub enum DefinitionKind {
     Theme(ThemeDefinition),
     Style(StyleDefinition),
     Effect(EffectDefinition),
+    Function(FunctionDefinition),
 }
 
 /// Resolved module definition.

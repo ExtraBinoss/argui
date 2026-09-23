@@ -113,10 +113,33 @@ fn prefix(parser: &mut Parser<'_>, stops: &[SyntaxKind]) {
         }
     }
     loop {
-        if parser.at(SyntaxKind::Dot) {
+        if parser.at(SyntaxKind::LBrace) && !stops.contains(&SyntaxKind::LBrace) {
+            parser.start_at(checkpoint, SyntaxKind::StructExpr);
+            parser.bump();
+            while !parser.at(SyntaxKind::RBrace) && !parser.at(SyntaxKind::Eof) {
+                parser.start(SyntaxKind::StructFieldExpr);
+                parser.expect(SyntaxKind::Ident, "expected struct field name");
+                parser.expect(SyntaxKind::Colon, "expected `:` after struct field name");
+                expression_until(parser, &[SyntaxKind::Comma, SyntaxKind::RBrace]);
+                parser.finish();
+                if parser.at(SyntaxKind::Comma) {
+                    parser.bump();
+                } else {
+                    break;
+                }
+            }
+            parser.expect(SyntaxKind::RBrace, "expected `}` after struct literal");
+            parser.finish();
+        } else if parser.at(SyntaxKind::Dot) {
             parser.start_at(checkpoint, SyntaxKind::MemberExpr);
             parser.bump();
             parser.expect(SyntaxKind::Ident, "expected member name after `.`");
+            parser.finish();
+        } else if parser.at(SyntaxKind::LBracket) {
+            parser.start_at(checkpoint, SyntaxKind::IndexExpr);
+            parser.bump();
+            expression_until(parser, &[SyntaxKind::RBracket]);
+            parser.expect(SyntaxKind::RBracket, "expected `]` after index");
             parser.finish();
         } else if parser.at(SyntaxKind::LParen) {
             parser.start_at(checkpoint, SyntaxKind::CallExpr);

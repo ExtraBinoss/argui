@@ -292,6 +292,7 @@ name = "argui-dsl-build"
 version = "0.3.2"
 dependencies = [
  "argui-dsl-compiler",
+ "argui-schema",
 ]
 
 [[package]]
@@ -318,6 +319,18 @@ dependencies = [
  "argui-schema",
  "argui-vector",
  "serde",
+]
+
+[[package]]
+name = "argui-dsl-lsp"
+version = "0.3.2"
+dependencies = [
+ "argui-dsl-parser",
+ "argui-dsl-semantic",
+ "argui-dsl-syntax",
+ "argui-schema",
+ "serde_json",
+ "thiserror 2.0.20",
 ]
 
 [[package]]
@@ -348,6 +361,7 @@ dependencies = [
  "argui-dsl-ir",
  "argui-dsl-protocol",
  "argui-paint",
+ "argui-reactive",
  "argui-render",
  "argui-runtime",
  "argui-schema",
@@ -437,8 +451,11 @@ dependencies = [
  "argui",
  "argui-dsl-build",
  "argui-dsl-compiler",
+ "argui-dsl-ir",
+ "argui-dsl-lsp",
  "argui-dsl-runtime",
  "argui-testing",
+ "serde_json",
 ]
 
 [[package]]
@@ -480,7 +497,6 @@ dependencies = [
  "argui-dsl-runtime",
  "argui-effects",
  "argui-testing",
- "pollster 1.0.1",
 ]
 
 [[package]]
@@ -676,6 +692,7 @@ version = "0.3.2"
 dependencies = [
  "argui-core",
  "cosmic-text",
+ "swash",
  "unicode-segmentation",
 ]
 

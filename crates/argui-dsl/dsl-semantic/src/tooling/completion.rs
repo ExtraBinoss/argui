@@ -307,6 +307,7 @@ fn insert_definition(output: &mut BTreeMap<String, Completion>, definition: &cra
         DefinitionKind::Theme(_) => (SymbolKind::Theme, "theme"),
         DefinitionKind::Style(_) => (SymbolKind::Style, "style"),
         DefinitionKind::Effect(_) => (SymbolKind::Effect, "effect"),
+        DefinitionKind::Function(_) => (SymbolKind::Function, "pure function"),
     };
     output.insert(
         definition.name.clone(),

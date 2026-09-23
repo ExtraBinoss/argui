@@ -4,6 +4,8 @@ mod flickable;
 mod focus_scope;
 #[path = "builtin/key_binding.rs"]
 mod key_binding;
+#[path = "builtin/layout.rs"]
+mod layout;
 #[path = "builtin/media.rs"]
 mod media;
 #[path = "builtin/path.rs"]
@@ -26,6 +28,7 @@ fn builtin_catalogue_preserves_stable_names_and_public_members() {
         (builtin::CONTAINER, "Container"),
         (builtin::ROW, "Row"),
         (builtin::COLUMN, "Column"),
+        (builtin::GRID, "Grid"),
         (builtin::TEXT, "Text"),
         (builtin::TEXT_INPUT, "TextInput"),
         (builtin::IMAGE, "Image"),
@@ -65,7 +68,7 @@ fn builtin_catalogue_preserves_stable_names_and_public_members() {
             );
         }
     }
-    assert_eq!(registry.schemas().count(), 15);
+    assert_eq!(registry.schemas().count(), 16);
     for name in [
         "Pressable",
         "PopoverPanel",

@@ -60,6 +60,7 @@ impl Reachability {
                             .effects
                             .insert(EffectId::from_raw(definition.id.raw()));
                     }
+                    DefinitionKind::Function(_) => {}
                 }
             }
         }
@@ -276,6 +277,16 @@ fn visit_expression(expression: &IrExpression, output: &mut Reachability) {
                 visit_expression(argument, output);
             }
         }
+        IrExpressionKind::Struct { symbol, fields } => {
+            output.structs.insert(*symbol);
+            for (_, value) in fields {
+                visit_expression(value, output);
+            }
+        }
+        IrExpressionKind::Index { base, index } => {
+            visit_expression(base, output);
+            visit_expression(index, output);
+        }
         IrExpressionKind::Binary { left, right, .. } => {
             visit_expression(left, output);
             visit_expression(right, output);
@@ -288,6 +299,9 @@ fn visit_expression(expression: &IrExpression, output: &mut Reachability) {
             visit_expression(condition, output);
             visit_expression(then_value, output);
             visit_expression(else_value, output);
+        }
+        IrExpressionKind::EnumVariant { symbol, .. } => {
+            output.enums.insert(*symbol);
         }
         IrExpressionKind::TokenRead(token) => {
             output.tokens.insert(*token);
@@ -303,10 +317,21 @@ fn visit_expression(expression: &IrExpression, output: &mut Reachability) {
 /// Visits expressions nested in one event statement.
 fn visit_statement(statement: &argui_dsl_ir::IrStatement, output: &mut Reachability) {
     match statement {
-        argui_dsl_ir::IrStatement::Expression(value)
+        argui_dsl_ir::IrStatement::Let { value, .. }
+        | argui_dsl_ir::IrStatement::Expression(value)
         | argui_dsl_ir::IrStatement::Assignment { value, .. }
         | argui_dsl_ir::IrStatement::Return(Some(value))
         | argui_dsl_ir::IrStatement::SetThemeMode(value) => visit_expression(value, output),
+        argui_dsl_ir::IrStatement::If {
+            condition,
+            then_body,
+            else_body,
+        } => {
+            visit_expression(condition, output);
+            for statement in then_body.iter().chain(else_body) {
+                visit_statement(statement, output);
+            }
+        }
         argui_dsl_ir::IrStatement::ScrollTo { x, y, .. } => {
             visit_expression(x, output);
             visit_expression(y, output);

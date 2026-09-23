@@ -88,10 +88,16 @@ import { VirtualListPage } from "./pages/virtual-list.argui"
 
 export component Main {
     callback request_file(mode: string) -> string
+    callback request_search(query: string)
+    callback cancel_search()
+    in-out property file_result: string = "No selection yet."
+    in-out property search_status: string = "Search 10,000 local drafts."
+    in-out property search_results: model<string>
+    in-out property search_loading: bool = false
     private property dark: bool = false
     private property accent: int = 0
     private property theme_open: bool = false
-    private property selected: string = "Button"
+    out property selected: string = "Button"
     private property sidebar_offset: float = 0.0
     private property navigation: array<string> = [
         "COMPONENTS", "Accordion", "Alert", "Alert dialog", "Animated text", "Aspect ratio",
@@ -258,7 +264,7 @@ export component Main {
                 if selected == "Direction" { DirectionPage {} }
                 if selected == "Drawer" { DrawerPage {} }
                 if selected == "Field" { FieldPage {} }
-                if selected == "File picker" { FilePickerPage { on request_file(mode) { return request_file(mode) } } }
+                if selected == "File picker" { FilePickerPage { host_status: file_result on request_file(mode) { return request_file(mode) } } }
                 if selected == "Hover card" { HoverCardPage {} }
                 if selected == "Input group" { InputGroupPage {} }
                 if selected == "Input OTP" { InputOtpPage {} }
@@ -316,7 +322,13 @@ export component Main {
                 if selected == "Editing & Password" { EditingPage {} }
                 if selected == "WebView" { WebViewPage {} }
                 if selected == "Animated text" { AnimatedTextPage {} }
-                if selected == "Async tasks" { AsyncTasksPage {} }
+                if selected == "Async tasks" { AsyncTasksPage {
+                    status: search_status
+                    results: search_results
+                    loading: search_loading
+                    on request_search(query) { request_search(query) }
+                    on cancel_search { cancel_search() }
+                } }
                 if selected == "Split Pane" { SplitPanePage {} }
                 if selected == "Custom Timeline" { CustomTimelinePage {} }
                 if selected == "Damage control" { DamageControlPage {} }

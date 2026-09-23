@@ -5,7 +5,6 @@ include!(concat!(env!("OUT_DIR"), "/conformance.rs"));
 use argui::ui::Role;
 use argui_testing::TestApp;
 use std::{cell::Cell, rc::Rc};
-
 /// AOT handlers preserve short-circuiting, widening and self-referential updates.
 #[test]
 fn aot_language_conformance() {
@@ -241,6 +240,62 @@ fn live_styles_are_applied() {
     exercise_styles(TestApp::new(runtime));
 }
 
+/// Style values, inline bindings, authored states, and theme tokens have stable precedence in AOT.
+#[test]
+fn aot_style_state_inline_and_theme_precedence() {
+    exercise_style_cascade(TestApp::new(StyleCascade::new()));
+}
+
+/// The live backend resolves the same style precedence and theme token updates as AOT.
+#[cfg(feature = "argui-live")]
+#[test]
+fn live_style_state_inline_and_theme_precedence() {
+    exercise_style_cascade(TestApp::new(live_fixture("StyleCascade")));
+}
+
+/// Checks style base, style hover, inline, authored state, and theme mode in `app`.
+fn exercise_style_cascade<R: argui::runtime::Render + 'static>(mut app: TestApp<R>) {
+    use argui::core::Point;
+    app.assert_text("base-light");
+    app.assert_text("inline");
+
+    let bounds = app.bounds("token").unwrap();
+    app.pointer_move(Point::new(bounds.origin.x + 2.0, bounds.origin.y + 2.0))
+        .unwrap();
+    app.assert_text("hover-light");
+
+    let bounds = app.bounds("layered").unwrap();
+    app.pointer_move(Point::new(bounds.origin.x + 2.0, bounds.origin.y + 2.0))
+        .unwrap();
+    app.assert_text("hover-light");
+    app.assert_no_text("inline");
+    app.get_by_role(Role::Button, "Choose state")
+        .click()
+        .unwrap();
+    app.assert_text("authored");
+    let bounds = app.bounds("layered").unwrap();
+    app.pointer_move(Point::new(bounds.origin.x + 2.0, bounds.origin.y + 2.0))
+        .unwrap();
+    app.assert_text("authored");
+    app.assert_no_text("hover-light");
+
+    app.get_by_role(Role::Button, "Switch theme")
+        .click()
+        .unwrap();
+    app.assert_text("base-dark");
+    app.assert_no_text("base-light");
+    app.assert_text("authored");
+    let bounds = app.bounds("token").unwrap();
+    app.pointer_move(Point::new(bounds.origin.x + 2.0, bounds.origin.y + 2.0))
+        .unwrap();
+    app.assert_text("hover-dark");
+    let bounds = app.bounds("layered").unwrap();
+    app.pointer_move(Point::new(bounds.origin.x + 2.0, bounds.origin.y + 2.0))
+        .unwrap();
+    app.assert_text("authored");
+    app.assert_no_text("hover-dark");
+}
+
 /// Rust-compiled slots preserve their caller's data and handlers through forwarding.
 #[test]
 fn aot_named_slots_forward_and_default() {
@@ -363,10 +418,10 @@ fn live_fixture(name: &str) -> argui_dsl_runtime::LiveRuntime {
     use argui_dsl_runtime::{LivePackage, LiveRuntime};
     let compiled = Compiler::compile(
         [SourceModule::new(
-            "fixture.argui",
+            "tests/fixtures/language.argui",
             include_str!("fixtures/language.argui"),
         )],
-        "fixture.argui",
+        "tests/fixtures/language.argui",
         |_| Err("no assets".into()),
     )
     .unwrap();
@@ -439,3 +494,107 @@ fn assert_unrelated_layout_is_idle<R: argui::runtime::Render>(root: &mut R) {
         );
     }
 }
+
+/// AOT resolves an identified child output within each repeater row.
+#[test]
+fn aot_row_child_outputs_are_lexically_scoped() {
+    let app = TestApp::new(LexicalRows::new());
+    app.assert_text("2");
+    app.assert_text("4");
+}
+
+/// Live resolves the same output separately for every retained row.
+#[cfg(feature = "argui-live")]
+#[test]
+fn live_row_child_outputs_are_lexically_scoped() {
+    use argui_dsl_compiler::{Compiler, SourceModule};
+    use argui_dsl_runtime::{LivePackage, LiveRuntime};
+    use std::collections::HashMap;
+    let compiled = Compiler::compile(
+        [SourceModule::new(
+            "tests/fixtures/language.argui",
+            include_str!("fixtures/language.argui"),
+        )],
+        "tests/fixtures/language.argui",
+        |_| Err("fixture has no assets".into()),
+    )
+    .unwrap();
+    let symbol = compiled
+        .semantic
+        .modules
+        .iter()
+        .flat_map(|module| &module.definitions)
+        .find(|definition| definition.name == "LexicalRows")
+        .unwrap()
+        .id;
+    let root = compiled
+        .ir
+        .components
+        .iter()
+        .find(|component| component.id.raw() == symbol.raw())
+        .unwrap()
+        .id;
+    let package =
+        LivePackage::prepare(1, compiled.public_api_hash, compiled.ir, HashMap::new()).unwrap();
+    let mut runtime = LiveRuntime::new(package).unwrap();
+    runtime.mount(root, []).unwrap();
+    let app = TestApp::new(runtime);
+    app.assert_text("2");
+    app.assert_text("4");
+}
+
+/// AOT reports a conditional child's absence and reappearance through an optional read.
+#[test]
+fn aot_conditional_child_absence_is_optional() {
+    exercise_optional_child(TestApp::new(OptionalChild::new()));
+}
+
+/// Both backends expose the same presence transition for a conditional child.
+fn exercise_optional_child<R: argui::runtime::Render + 'static>(mut app: TestApp<R>) {
+    app.assert_text("missing");
+    app.get_by_role(Role::Button, "Toggle").click().unwrap();
+    app.assert_text("present");
+    app.get_by_role(Role::Button, "Toggle").click().unwrap();
+    app.assert_text("missing");
+}
+
+/// Live returns null for an absent conditional child and restores its output when mounted.
+#[cfg(feature = "argui-live")]
+#[test]
+fn live_conditional_child_absence_is_optional() {
+    use argui_dsl_compiler::{Compiler, SourceModule};
+    use argui_dsl_runtime::{LivePackage, LiveRuntime};
+    use std::collections::HashMap;
+    let compiled = Compiler::compile(
+        [SourceModule::new(
+            "tests/fixtures/language.argui",
+            include_str!("fixtures/language.argui"),
+        )],
+        "tests/fixtures/language.argui",
+        |_| Err("fixture has no assets".into()),
+    )
+    .unwrap();
+    let symbol = compiled
+        .semantic
+        .modules
+        .iter()
+        .flat_map(|module| &module.definitions)
+        .find(|definition| definition.name == "OptionalChild")
+        .unwrap()
+        .id;
+    let root = compiled
+        .ir
+        .components
+        .iter()
+        .find(|component| component.id.raw() == symbol.raw())
+        .unwrap()
+        .id;
+    let package =
+        LivePackage::prepare(1, compiled.public_api_hash, compiled.ir, HashMap::new()).unwrap();
+    let mut runtime = LiveRuntime::new(package).unwrap();
+    runtime.mount(root, []).unwrap();
+    exercise_optional_child(TestApp::new(runtime));
+}
+
+#[path = "conformance/layout_and_data.rs"]
+mod layout_and_data;

@@ -22,6 +22,12 @@ pub(super) fn contextual_default(expression: &IrExpression) -> bool {
         IrExpressionKind::BuiltinCall { arguments, .. }
         | IrExpressionKind::CallbackCall { arguments, .. }
         | IrExpressionKind::Array(arguments) => arguments.iter().any(contextual_default),
+        IrExpressionKind::Struct { fields, .. } => {
+            fields.iter().any(|(_, value)| contextual_default(value))
+        }
+        IrExpressionKind::Index { base, index } => {
+            contextual_default(base) || contextual_default(index)
+        }
         IrExpressionKind::Binary { left, right, .. } => {
             contextual_default(left) || contextual_default(right)
         }
@@ -43,34 +49,119 @@ impl Context<'_> {
     ///
     /// `output` receives generated Rust; `nodes` are the component's visual
     /// tree; `referenced` contains child sites actually read; and `scope`
-    /// receives `(site, property)` handle names. Returns an error if a checked
-    /// child property cannot be emitted.
+    /// receives `(site, property)` handle names. `repeater_key` scopes retained
+    /// identities to a row when present. Returns an error if a checked child
+    /// property cannot be emitted.
     pub(super) fn emit_child_references(
         &self,
         output: &mut String,
         nodes: &[IrNode],
         referenced: &HashSet<SiteId>,
         scope: &mut Scope,
+        repeater_key: Option<&argui_dsl_ir::IrExpression>,
     ) -> Result<(), CompilerError> {
         for node in nodes {
-            if let IrNode::Element {
-                site,
-                target,
-                source_id,
-                properties,
-                children,
-                ..
-            } = node
-            {
-                if source_id.is_some()
-                    && referenced.contains(site)
-                    && let IrElementTarget::Component(component) = target
-                {
-                    self.emit_child_reference(output, *site, *component, properties, scope)?;
+            match node {
+                IrNode::Element {
+                    site,
+                    target,
+                    source_id,
+                    properties,
+                    children,
+                    ..
+                } => {
+                    if source_id.is_some()
+                        && referenced.contains(site)
+                        && let IrElementTarget::Component(component) = target
+                    {
+                        self.emit_child_reference(
+                            output,
+                            *site,
+                            *component,
+                            properties,
+                            scope,
+                            repeater_key,
+                        )?;
+                    }
+                    if matches!(target, IrElementTarget::Native(_)) {
+                        self.emit_child_references(
+                            output,
+                            children,
+                            referenced,
+                            scope,
+                            repeater_key,
+                        )?;
+                    }
                 }
-                if matches!(target, IrElementTarget::Native(_)) {
-                    self.emit_child_references(output, children, referenced, scope)?;
+                IrNode::Conditional {
+                    site,
+                    condition,
+                    then_body,
+                    else_body,
+                    ..
+                } => {
+                    let mut targets = Vec::new();
+                    collect_conditional_children(then_body, referenced, &mut targets);
+                    collect_conditional_children(else_body, referenced, &mut targets);
+                    targets.sort_by_key(|(site, _)| site.raw());
+                    targets.dedup_by_key(|(site, _)| *site);
+                    if targets.is_empty() {
+                        continue;
+                    }
+                    let mut outputs = Vec::new();
+                    for (child_site, component) in targets {
+                        for property in &self.components[&component].properties {
+                            let variable = format!(
+                                "optional_child_p_{}_{}_{}",
+                                site.raw(),
+                                child_site.raw(),
+                                property.id.raw()
+                            );
+                            let value_type = self.ir_rust_type(&property.value_type)?;
+                            writeln!(output, "let mut {variable}: Option<{value_type}> = None;")
+                                .unwrap();
+                            scope
+                                .optional_child_properties
+                                .insert((child_site, property.id), variable.clone());
+                            outputs.push((child_site, property.id, variable));
+                        }
+                    }
+                    let condition = self.expression(condition, scope)?;
+                    for (body, predicate) in [(then_body, true), (else_body, false)] {
+                        let mut present = Vec::new();
+                        collect_conditional_children(body, referenced, &mut present);
+                        if present.is_empty() {
+                            continue;
+                        }
+                        writeln!(
+                            output,
+                            "if {}({condition}) {{",
+                            if predicate { "" } else { "!" }
+                        )
+                        .unwrap();
+                        let mut inner = scope.clone();
+                        self.emit_child_references(
+                            output,
+                            body,
+                            referenced,
+                            &mut inner,
+                            repeater_key,
+                        )?;
+                        for (child_site, property, variable) in &outputs {
+                            if !present.iter().any(|(site, _)| site == child_site) {
+                                continue;
+                            }
+                            let key = &(*child_site, *property);
+                            if let Some(handle) = inner.child_properties.get(key) {
+                                writeln!(output, "{variable} = Some({handle}.get());").unwrap();
+                            } else if let Some(value) = inner.optional_child_properties.get(key) {
+                                writeln!(output, "{variable} = {value}.clone();").unwrap();
+                            }
+                        }
+                        writeln!(output, "}}").unwrap();
+                    }
                 }
+                _ => {}
             }
         }
         Ok(())
@@ -79,8 +170,9 @@ impl Context<'_> {
     /// Emits the canonical handles for one unconditional identified child call.
     ///
     /// `site` identifies the child, `component` resolves its typed properties,
-    /// `bindings` supply parent inputs, and `scope` receives readable handles.
-    /// Returns a code-generation error for unresolved two-way sources.
+    /// `bindings` supply parent inputs, `scope` receives readable handles, and
+    /// `repeater_key` scopes retained identities to a row. Returns a
+    /// code-generation error for unresolved two-way sources.
     fn emit_child_reference(
         &self,
         output: &mut String,
@@ -88,16 +180,13 @@ impl Context<'_> {
         component: argui_dsl_ir::ComponentId,
         bindings: &[argui_dsl_ir::IrPropertyBinding],
         scope: &mut Scope,
+        repeater_key: Option<&argui_dsl_ir::IrExpression>,
     ) -> Result<(), CompilerError> {
         let source = self.component_definition(component)?;
         let ir = self.components[&component];
         let identity = format!("child_ref_identity_{}", site.raw());
-        writeln!(
-            output,
-            "let {identity} = ::argui::ui::RetainedIdentity::new(owner, {});",
-            site.raw()
-        )
-        .unwrap();
+        let identity_value = self.identity(site.raw(), scope, repeater_key)?;
+        writeln!(output, "let {identity} = {identity_value};").unwrap();
         let mut inner = Scope {
             translator: scope.translator.clone(),
             ..Scope::default()
@@ -149,5 +238,45 @@ impl Context<'_> {
             scope.child_properties.insert((site, lowered.id), variable);
         }
         Ok(())
+    }
+}
+
+/// Collects identified component calls in one conditional branch without entering
+/// nested repeaters. `nodes` is the branch body, `referenced` filters sites read
+/// by expressions, and `output` receives source site/target pairs.
+fn collect_conditional_children(
+    nodes: &[IrNode],
+    referenced: &HashSet<SiteId>,
+    output: &mut Vec<(SiteId, argui_dsl_ir::ComponentId)>,
+) {
+    for node in nodes {
+        match node {
+            IrNode::Element {
+                site,
+                target,
+                source_id,
+                children,
+                ..
+            } => {
+                if source_id.is_some()
+                    && referenced.contains(site)
+                    && let IrElementTarget::Component(component) = target
+                {
+                    output.push((*site, *component));
+                }
+                if matches!(target, IrElementTarget::Native(_)) {
+                    collect_conditional_children(children, referenced, output);
+                }
+            }
+            IrNode::Conditional {
+                then_body,
+                else_body,
+                ..
+            } => {
+                collect_conditional_children(then_body, referenced, output);
+                collect_conditional_children(else_body, referenced, output);
+            }
+            _ => {}
+        }
     }
 }

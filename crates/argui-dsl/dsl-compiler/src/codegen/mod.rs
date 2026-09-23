@@ -3,6 +3,7 @@ mod child_reference;
 mod conversion;
 mod effect;
 mod expression;
+mod live_facade;
 mod node;
 mod statement;
 mod types;
@@ -44,7 +45,7 @@ pub(super) fn emit(
     // Limit this exemption to the generated module; host application code stays checked.
     writeln!(output, "#![allow(clippy::all)]").unwrap();
     // Parentheses emitted around arbitrary DSL expressions preserve precedence at every call site.
-    writeln!(output, "#![allow(unused_parens)]").unwrap();
+    writeln!(output, "#![allow(unused_parens, unused_mut)]").unwrap();
     writeln!(output, "#[allow(unused_imports)] use std::cell::RefCell;").unwrap();
     writeln!(output, "#[allow(unused_imports)] use std::rc::Rc;").unwrap();
     writeln!(output, "use std::sync::atomic::{{AtomicU64, Ordering}};").unwrap();
@@ -75,8 +76,15 @@ pub(super) fn emit(
         "fn next_instance() -> u64 {{ NEXT_INSTANCE.fetch_add(1, Ordering::Relaxed).max(1) }}"
     )
     .unwrap();
-    writeln!(output, "/// Derives a stable nested owner from a component site's retained identity.\nfn child_owner(identity: &::argui::ui::RetainedIdentity) -> u64 {{ use ::std::hash::{{Hash, Hasher}}; let mut hash = ::std::collections::hash_map::DefaultHasher::new(); identity.hash(&mut hash); hash.finish().max(1) }}").unwrap();
-    writeln!(output, "thread_local! {{ static NATIVE_REGISTRY: ::argui::schema::SchemaRegistry = ::argui::schema::builtin::registry().expect(\"generated native schema is valid\"); }}").unwrap();
+    writeln!(output, "/// Derives a stable nested owner from a component site's retained identity.\n#[allow(dead_code)] fn child_owner(identity: &::argui::ui::RetainedIdentity) -> u64 {{ use ::std::hash::{{Hash, Hasher}}; let mut hash = ::std::collections::hash_map::DefaultHasher::new(); identity.hash(&mut hash); hash.finish().max(1) }}").unwrap();
+    writeln!(
+        output,
+        "pub const NATIVE_SCHEMA_HASH: u64 = {};",
+        schema.abi_hash()
+    )
+    .unwrap();
+    writeln!(output, "thread_local! {{ static NATIVE_REGISTRY: RefCell<::argui::schema::SchemaRegistry> = RefCell::new(::argui::schema::builtin::registry().expect(\"generated native schema is valid\")); }}").unwrap();
+    writeln!(output, "/// Installs the native registry used by DSL checking before the first render.\n/// Returns an ABI error if the Rust extension contract differs from the generated UI.\npub fn install_native_registry(registry: ::argui::schema::SchemaRegistry) -> Result<(), String> {{ if registry.abi_hash() != NATIVE_SCHEMA_HASH {{ return Err(format!(\"native schema ABI mismatch: expected {{:016x}}, found {{:016x}}\", NATIVE_SCHEMA_HASH, registry.abi_hash())); }} NATIVE_REGISTRY.with(|slot| *slot.borrow_mut() = registry); Ok(()) }}").unwrap();
     writeln!(output, "thread_local! {{ #[allow(dead_code)] static ACTIVE_THEME_MODE: ::std::cell::Cell<u64> = const {{ ::std::cell::Cell::new(0) }}; }}").unwrap();
     writeln!(output, "#[allow(dead_code)] fn theme_mode_id(name: &str) -> u64 {{ let mut hash = 0xcbf2_9ce4_8422_2325_u64; for byte in name.bytes() {{ hash ^= u64::from(byte); hash = hash.wrapping_mul(0x0000_0100_0000_01b3); }} hash }}").unwrap();
     let mode_ids = ir
@@ -94,8 +102,9 @@ pub(super) fn emit(
         format!("matches!(id, {mode_ids})")
     };
     writeln!(output, "#[allow(dead_code)] fn set_theme_mode(name: String) {{ let id = theme_mode_id(&name); if !{valid_mode} {{ eprintln!(\"unknown theme mode `{{name}}`\"); return; }} ACTIVE_THEME_MODE.with(|active| active.set(id)); }}").unwrap();
-    writeln!(output, "fn construct_native(id: ::argui::schema::NativeTypeId, input: ::argui::schema::NativeElementInput, identity: ::argui::ui::RetainedIdentity, interactive: bool, cache: &mut ::argui::schema::NativeElementCache) -> ::argui::ui::Element {{ NATIVE_REGISTRY.with(|registry| cache.construct(registry, id, identity, input, interactive).expect(\"AOT input was schema checked\")) }}").unwrap();
+    writeln!(output, "fn construct_native(id: ::argui::schema::NativeTypeId, input: ::argui::schema::NativeElementInput, identity: ::argui::ui::RetainedIdentity, interactive: bool, cache: &mut ::argui::schema::NativeElementCache) -> ::argui::ui::Element {{ NATIVE_REGISTRY.with(|registry| cache.construct(&registry.borrow(), id, identity, input, interactive).expect(\"AOT input was schema checked\")) }}").unwrap();
     context.emit_types(&mut output)?;
+    context.emit_live_types(&mut output)?;
     context.emit_tokens(&mut output)?;
     context.emit_assets(&mut output)?;
     context.emit_effects(&mut output)?;
@@ -123,6 +132,12 @@ pub(super) fn emit(
                     ));
                 }
                 context.emit_public_component(&mut output, definition, component, id)?;
+                context.emit_live_component(
+                    &mut output,
+                    definition,
+                    component,
+                    context.components[&id],
+                )?;
             }
         }
     }
@@ -449,12 +464,9 @@ impl<'a> Context<'a> {
                 scope.component_states.push(state.clone());
             }
         }
-        self.emit_child_references(
-            output,
-            &component.body,
-            &component.referenced_child_sites(),
-            &mut scope,
-        )?;
+        scope.referenced_child_sites = component.referenced_child_sites();
+        let referenced = scope.referenced_child_sites.clone();
+        self.emit_child_references(output, &component.body, &referenced, &mut scope, None)?;
         for property in &component.properties {
             if let Some(default) = &property.default
                 && child_reference::contextual_default(default)

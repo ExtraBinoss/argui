@@ -1,16 +1,24 @@
 //! Bounded measurements for virtual windows that use their laid-out height.
-use argui_ui::RetainedIdentity;
+use argui_ui::{RetainedIdentity, VirtualList};
 use std::collections::HashMap;
 
 /// Retains measured heights only for virtual windows mounted in the current tree.
 #[derive(Default)]
 pub struct VirtualViewportStore {
     entries: HashMap<RetainedIdentity, Measurement>,
+    lists: HashMap<RetainedIdentity, RowMeasurement>,
     generation: u64,
 }
 
 struct Measurement {
     height: f32,
+    generation: u64,
+}
+
+struct RowMeasurement {
+    list: VirtualList,
+    row_ids: Vec<u64>,
+    estimate: f32,
     generation: u64,
 }
 
@@ -37,9 +45,60 @@ impl VirtualViewportStore {
         entry.height
     }
 
+    /// Returns a retained variable-height list for the current model row identities.
+    ///
+    /// `identity` selects one mounted window; `row_ids` preserves measurements
+    /// through edits and reordering; `estimate`, `viewport`, and `overscan`
+    /// configure its current logical geometry. Returns a shared measurement
+    /// handle that must also be passed to the native adapter for layout feedback.
+    pub fn list(
+        &mut self,
+        identity: &RetainedIdentity,
+        row_ids: &[u64],
+        estimate: f32,
+        viewport: f32,
+        overscan: usize,
+    ) -> VirtualList {
+        let entry = self
+            .lists
+            .entry(identity.clone())
+            .or_insert_with(|| RowMeasurement {
+                list: VirtualList::variable(row_ids.len(), estimate, viewport),
+                row_ids: row_ids.to_vec(),
+                estimate,
+                generation: self.generation,
+            });
+        if entry.estimate != estimate {
+            entry.list = VirtualList::variable(row_ids.len(), estimate, viewport);
+            entry.row_ids = row_ids.to_vec();
+            entry.estimate = estimate;
+        } else if entry.row_ids != row_ids {
+            let old = entry
+                .row_ids
+                .iter()
+                .copied()
+                .enumerate()
+                .map(|(index, id)| (id, index))
+                .collect::<HashMap<_, _>>();
+            entry
+                .list
+                .remap(row_ids.iter().map(|id| old.get(id).copied()));
+            entry.row_ids = row_ids.to_vec();
+        }
+        entry.list = entry
+            .list
+            .clone()
+            .with_viewport(viewport)
+            .overscan(overscan);
+        entry.generation = self.generation;
+        entry.list.clone()
+    }
+
     /// Removes measurements belonging to windows absent from the completed render.
     pub fn end_render(&mut self) {
         self.entries
+            .retain(|_, entry| entry.generation == self.generation);
+        self.lists
             .retain(|_, entry| entry.generation == self.generation);
     }
 

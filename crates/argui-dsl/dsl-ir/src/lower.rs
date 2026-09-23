@@ -1,3 +1,4 @@
+use argui_dsl_syntax::{FileId, SyntaxKind, SyntaxNode};
 use std::collections::HashMap;
 
 use argui_dsl_semantic::{DefinitionKind, SemanticProject, SymbolId};
@@ -21,6 +22,17 @@ pub(crate) struct Tables {
     pub struct_fields: HashMap<SymbolId, Vec<FieldId>>,
     pub named_fields: HashMap<SymbolId, HashMap<String, (FieldId, IrType)>>,
     pub tokens: HashMap<String, (TokenId, IrType)>,
+    pub functions: HashMap<SymbolId, FunctionBody>,
+}
+
+/// Source retained for typed pure-function expansion into ordinary IR.
+#[derive(Clone)]
+pub(crate) struct FunctionBody {
+    pub file: FileId,
+    pub module_path: String,
+    pub scope: HashMap<String, SymbolId>,
+    pub parameters: Vec<String>,
+    pub body: SyntaxNode,
 }
 
 /// Lowers a valid semantic project to the stable, name-free backend IR.
@@ -68,6 +80,7 @@ pub fn lower(
     let mut assets = assets.into_values().collect::<Vec<_>>();
     assets.sort_unstable_by_key(|asset| asset.id);
     Ok(IrProject {
+        native_schema_hash: schema.abi_hash(),
         modules,
         structs,
         enums,
@@ -115,6 +128,41 @@ impl Tables {
         let mut named_fields = HashMap::new();
         let mut component_members = HashMap::new();
         let mut tokens = HashMap::new();
+        let mut functions = HashMap::new();
+        for module in &project.modules {
+            let Some(syntax) = project.syntax(module.file) else {
+                continue;
+            };
+            for definition in &module.definitions {
+                let DefinitionKind::Function(function) = &definition.kind else {
+                    continue;
+                };
+                let Some(node) = syntax.children().find(|node| {
+                    node.kind() == SyntaxKind::FunctionDecl
+                        && node.text_range() == definition.span.range
+                }) else {
+                    continue;
+                };
+                let Some(body) = node.children().find(|node| node.kind() == SyntaxKind::Expr)
+                else {
+                    continue;
+                };
+                functions.insert(
+                    definition.id,
+                    FunctionBody {
+                        file: module.file,
+                        module_path: module.path.clone(),
+                        scope: module.scope.clone(),
+                        parameters: function
+                            .parameters
+                            .iter()
+                            .map(|value| value.name.clone())
+                            .collect(),
+                        body,
+                    },
+                );
+            }
+        }
         for definition in project
             .modules
             .iter()
@@ -166,6 +214,7 @@ impl Tables {
             struct_fields,
             named_fields,
             tokens,
+            functions,
         }
     }
 }

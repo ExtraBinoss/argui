@@ -16,6 +16,14 @@ pub(super) fn evaluate(
     use BuiltinFunction as Function;
     use DslValue as Value;
     let result = match (function, arguments) {
+        (Function::IsSome, [value]) => Value::Bool(*value != Value::Null),
+        (Function::UnwrapOr, [value, fallback]) => {
+            if *value == Value::Null {
+                fallback.clone()
+            } else {
+                value.clone()
+            }
+        }
         (Function::Contains, [Value::String(text), Value::String(fragment)]) => {
             Value::Bool(text.contains(fragment))
         }

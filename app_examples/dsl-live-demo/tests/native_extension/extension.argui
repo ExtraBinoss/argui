@@ -1,0 +1,11 @@
+import { ProofTile, Text } from "@argui/native"
+
+export component ExtensionProof {
+    private property activated: bool = false
+    ProofTile #tile {
+        label: activated ? "Activated" : "Ready"
+        icon: asset("assets/spark.svg")
+        on activate { activated = true }
+        Text { content: "Slot child" }
+    }
+}

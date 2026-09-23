@@ -47,6 +47,8 @@ pub struct NativeElementInput {
     pub properties: Vec<(PropertyId, SchemaValue)>,
     pub events: Vec<NativeEventValue>,
     pub slots: Vec<NativeSlotValue>,
+    /// Compiler/runtime-owned virtual row measurements, present only for VirtualWindow.
+    pub virtual_list: Option<argui_ui::VirtualList>,
 }
 
 impl NativeElementInput {
@@ -57,6 +59,7 @@ impl NativeElementInput {
             properties: Vec::new(),
             events: Vec::new(),
             slots: Vec::new(),
+            virtual_list: None,
         }
     }
 
@@ -85,6 +88,16 @@ impl NativeElementInput {
     #[must_use]
     pub fn slot(mut self, slot: NativeSlotValue) -> Self {
         self.slots.push(slot);
+        self
+    }
+
+    /// Attaches a retained virtual list whose measured rows match this input.
+    ///
+    /// `list` is the compiler/runtime-owned window and measurement state.
+    /// Returns the input with that list available to its native adapter.
+    #[must_use]
+    pub fn virtual_list(mut self, list: argui_ui::VirtualList) -> Self {
+        self.virtual_list = Some(list);
         self
     }
 

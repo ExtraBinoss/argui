@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use web_time::Instant;
 
-use crate::{DamageProfile, EffectGraphStats, GpuCanvasStats, TexturePoolStats};
+use crate::{DamageProfile, EffectGraphStats, GpuCanvasStats, TextAtlasStats, TexturePoolStats};
 
 use argui_paint::RenderObjectId;
 
@@ -55,6 +55,8 @@ pub struct RenderProfile {
     pub effects: EffectGraphStats,
     pub texture_pool: TexturePoolStats,
     pub vector_atlas: VectorAtlasStats,
+    /// Bounded glyph atlas residency and uploads during the prepared frame.
+    pub text_atlas: TextAtlasStats,
     pub gpu_canvases: GpuCanvasStats,
     pub direct_surface: bool,
     /// Retained-surface damage decision and pixel cost.

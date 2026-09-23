@@ -13,6 +13,7 @@ mod public_errors {
             0,
             17,
             argui_dsl_ir::IrProject {
+                native_schema_hash: 0,
                 modules: Vec::new(),
                 structs: Vec::new(),
                 enums: Vec::new(),

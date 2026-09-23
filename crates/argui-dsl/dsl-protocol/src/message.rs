@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 /// Current framing and message schema version.
 pub const PROTOCOL_VERSION: u16 = 2;
 /// Current serialized typed-IR schema version.
-pub const IR_FORMAT_VERSION: u16 = 11;
+pub const IR_FORMAT_VERSION: u16 = 12;
 /// Engine ABI version accepted by this protocol build.
 pub const ENGINE_COMPATIBILITY_VERSION: &str = env!("CARGO_PKG_VERSION");
 

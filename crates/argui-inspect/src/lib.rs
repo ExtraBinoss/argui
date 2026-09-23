@@ -279,6 +279,12 @@ impl InspectorHandle {
             frame.textures = record.textures;
             frame.reused_textures = record.reused_textures;
             frame.texture_bytes = record.texture_bytes;
+            frame.text_atlas_bytes = record.text_atlas_bytes;
+            frame.text_atlas_entries = record.text_atlas_entries;
+            frame.text_atlas_hits = record.text_atlas_hits;
+            frame.text_raster_requests = record.text_raster_requests;
+            frame.text_upload_bytes = record.text_upload_bytes;
+            frame.text_page_evictions = record.text_page_evictions;
             frame.vector_atlas_bytes = record.vector_atlas_bytes;
             frame.vector_atlas_entries = record.vector_atlas_entries;
             frame.vector_atlas_hits = record.vector_atlas_hits;

@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 
 mod builtin;
+mod inline;
 mod member;
+mod struct_literal;
 mod vector_path;
 
 use argui_dsl_syntax::{FileId, Span, SyntaxKind, SyntaxNode};
@@ -13,6 +15,7 @@ use crate::{
 };
 
 /// Checked output resolved by an explicit visual source identity.
+#[derive(Clone)]
 pub(crate) enum ReferenceProperty {
     Observed {
         site: SiteId,
@@ -24,6 +27,7 @@ pub(crate) enum ReferenceProperty {
         site: SiteId,
         property: PropertyId,
         value_type: IrType,
+        optional: bool,
     },
 }
 
@@ -40,6 +44,9 @@ pub(crate) struct Context<'a> {
     pub locals: &'a HashMap<String, (LocalId, IrType)>,
     pub tokens: &'a HashMap<String, (TokenId, IrType)>,
     pub fields: &'a HashMap<argui_dsl_semantic::SymbolId, HashMap<String, (FieldId, IrType)>>,
+    pub symbols: &'a HashMap<String, argui_dsl_semantic::SymbolId>,
+    pub functions: &'a HashMap<argui_dsl_semantic::SymbolId, crate::lower::FunctionBody>,
+    pub function_arguments: Option<&'a HashMap<String, IrExpression>>,
     pub references: Option<&'a References>,
     pub assets: &'a mut HashMap<String, crate::IrAsset>,
     pub errors: &'a mut Vec<LowerError>,
@@ -64,6 +71,8 @@ pub(crate) fn lower(node: &SyntaxNode, context: &mut Context<'_>) -> IrExpressio
         SyntaxKind::BinaryExpr => binary(node, source, context),
         SyntaxKind::ConditionalExpr => conditional(node, source, context),
         SyntaxKind::ArrayExpr => array(node, source, context),
+        SyntaxKind::IndexExpr => index(node, source, context),
+        SyntaxKind::StructExpr => struct_literal::lower(node, source, context),
         _ => invalid(node, context, "unsupported expression node"),
     }
 }
@@ -103,6 +112,14 @@ fn literal(node: &SyntaxNode, source: SourceInfo, context: &mut Context<'_>) -> 
 /// Resolves a property or scoped local read to its stable ID.
 fn path(node: &SyntaxNode, source: SourceInfo, context: &mut Context<'_>) -> IrExpression {
     let name = direct_name(node).unwrap_or_default();
+    if let Some(value) = context
+        .function_arguments
+        .and_then(|arguments| arguments.get(&name))
+    {
+        let mut value = value.clone();
+        value.id = expression_id(&source);
+        return value;
+    }
     if let Some((id, value_type)) = context.locals.get(&name) {
         return IrExpression {
             id: expression_id(&source),
@@ -144,6 +161,9 @@ fn call(node: &SyntaxNode, source: SourceInfo, context: &mut Context<'_>) -> IrE
         })
         .unwrap_or_default();
     if let Some(expression) = builtin::lower_call(&callee, &argument_nodes, &source, context) {
+        return expression;
+    }
+    if let Some(expression) = inline::lower_call(&callee, &argument_nodes, &source, context) {
         return expression;
     }
     match callee.as_str() {
@@ -362,6 +382,32 @@ fn array(node: &SyntaxNode, source: SourceInfo, context: &mut Context<'_>) -> Ir
     }
 }
 
+/// Lowers one checked safe collection access to an optional typed result.
+fn index(node: &SyntaxNode, source: SourceInfo, context: &mut Context<'_>) -> IrExpression {
+    let mut children = node.children();
+    let Some(base) = children.next() else {
+        return invalid(node, context, "missing indexed value");
+    };
+    let Some(index) = children.find(|child| child.kind() == SyntaxKind::Expr) else {
+        return invalid(node, context, "missing collection index");
+    };
+    let base = lower(&base, context);
+    let index = lower(&index, context);
+    let value_type = match &base.value_type {
+        IrType::Array(inner) | IrType::Model(inner) => IrType::Optional(inner.clone()),
+        _ => IrType::Unknown,
+    };
+    IrExpression {
+        id: expression_id(&source),
+        value_type,
+        kind: IrExpressionKind::Index {
+            base: Box::new(base),
+            index: Box::new(index),
+        },
+        source,
+    }
+}
+
 /// Emits a lowering invariant failure and returns a typed unknown constant.
 fn invalid(
     node: &SyntaxNode,
@@ -502,6 +548,8 @@ fn is_expression(kind: SyntaxKind) -> bool {
             | SyntaxKind::BinaryExpr
             | SyntaxKind::ConditionalExpr
             | SyntaxKind::ArrayExpr
+            | SyntaxKind::IndexExpr
+            | SyntaxKind::StructExpr
     )
 }
 

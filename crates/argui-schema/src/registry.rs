@@ -7,13 +7,14 @@ use crate::{
     NativeAdapter, NativeElementInput, NativeSchema, NativeTypeId, SchemaError, SlotArity,
 };
 
+#[derive(Clone)]
 struct RegisteredNative {
     schema: NativeSchema,
     adapter: Arc<dyn NativeAdapter>,
 }
 
 /// Validated registry that owns canonical schemas and their native construction adapters.
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct SchemaRegistry {
     natives: HashMap<NativeTypeId, RegisteredNative>,
     names: HashMap<Name, NativeTypeId>,
@@ -85,6 +86,72 @@ impl SchemaRegistry {
             .collect::<Vec<_>>();
         schemas.sort_unstable_by_key(|schema| schema.id);
         schemas.into_iter()
+    }
+
+    /// Returns a stable hash of native names, versions, property/event/slot contracts,
+    /// variants, and asset-typed inputs. Documentation and adapter pointers are ignored.
+    ///
+    /// Returns the ABI fingerprint shared by compiler, AOT, live runtime, and tooling.
+    #[must_use]
+    pub fn abi_hash(&self) -> u64 {
+        let mut hash = 0xcbf2_9ce4_8422_2325_u64;
+        for schema in self.schemas() {
+            feed(&mut hash, &schema.id.raw().to_le_bytes());
+            feed(&mut hash, schema.name.as_str().as_bytes());
+            feed(&mut hash, &schema.abi_version.to_le_bytes());
+            for property in &schema.properties {
+                feed(&mut hash, &property.id.raw().to_le_bytes());
+                feed(&mut hash, property.name.as_str().as_bytes());
+                feed(
+                    &mut hash,
+                    &[
+                        property.value_type as u8,
+                        u8::from(property.required),
+                        u8::from(property.read_only),
+                        u8::from(property.default.is_some()),
+                        u8::from(property.animatable),
+                        property.observation.map_or(u8::MAX, |value| value as u8),
+                    ],
+                );
+                feed(
+                    &mut hash,
+                    &property
+                        .change_event
+                        .map_or(0, |event| event.raw())
+                        .to_le_bytes(),
+                );
+            }
+            for event in &schema.events {
+                feed(&mut hash, &event.id.raw().to_le_bytes());
+                feed(&mut hash, event.name.as_str().as_bytes());
+                feed(
+                    &mut hash,
+                    &[event.payload.map_or(u8::MAX, |value| value as u8)],
+                );
+                feed(&mut hash, format!("{:?}", event.event_type).as_bytes());
+            }
+            for slot in &schema.slots {
+                feed(&mut hash, &slot.id.raw().to_le_bytes());
+                feed(&mut hash, slot.name.as_str().as_bytes());
+                feed(
+                    &mut hash,
+                    &[match slot.arity {
+                        SlotArity::Optional => 0,
+                        SlotArity::Required => 1,
+                        SlotArity::Many => 2,
+                    }],
+                );
+            }
+            for variant in &schema.variants {
+                feed(&mut hash, &variant.id.raw().to_le_bytes());
+                feed(&mut hash, variant.name.as_str().as_bytes());
+            }
+            for part in &schema.style_parts {
+                feed(&mut hash, &part.id.raw().to_le_bytes());
+                feed(&mut hash, part.name.as_str().as_bytes());
+            }
+        }
+        hash
     }
 
     /// Validates input and constructs an element through the registered adapter.
@@ -299,4 +366,15 @@ fn validate_input(schema: &NativeSchema, input: &NativeElementInput) -> Result<(
         }
     }
     Ok(())
+}
+
+/// Adds byte content to the stable native ABI fingerprint.
+///
+/// * `hash` — running FNV-1a state, updated in place.
+/// * `bytes` — one length-delimited ABI field.
+fn feed(hash: &mut u64, bytes: &[u8]) {
+    for byte in (bytes.len() as u64).to_le_bytes().iter().chain(bytes) {
+        *hash ^= u64::from(*byte);
+        *hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+    }
 }

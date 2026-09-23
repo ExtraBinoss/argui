@@ -144,6 +144,7 @@ fn classify_identifier(
             DefinitionKind::Theme(_) | DefinitionKind::Style(_) | DefinitionKind::Effect(_) => {
                 SemanticClass::Type
             }
+            DefinitionKind::Function(_) => SemanticClass::Variable,
         };
     }
     if context.module.native_scope.contains_key(token.text()) {
@@ -339,6 +340,7 @@ fn is_keyword(kind: SyntaxKind) -> bool {
             | SyntaxKind::ThemeKw
             | SyntaxKind::StyleKw
             | SyntaxKind::EffectKw
+            | SyntaxKind::FnKw
             | SyntaxKind::ForKw
             | SyntaxKind::InKw
             | SyntaxKind::KeyKw

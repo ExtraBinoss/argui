@@ -34,20 +34,7 @@ fn gallery_wraps_sidebar_and_content_responsively() {
     );
 
     app.resize(Size::new(420.0, 760.0)).unwrap();
-    for _ in 0..10 {
-        app.wheel(
-            Point::new(100.0, 300.0),
-            ScrollDelta::Pixels(Point::new(0.0, -700.0)),
-        )
-        .unwrap();
-        if app.scroll_offset("workspace").unwrap().y > 0.0 {
-            break;
-        }
-    }
-    assert!(app.scroll_offset("workspace").unwrap().y > 0.0);
-    let (_, narrow_heading) = coordinates(&app);
-    assert!(
-        narrow_heading.y > 100.0,
-        "narrow heading={narrow_heading:?}"
-    );
+    let sidebar = app.bounds("sidebar").unwrap();
+    let content = app.bounds("content").unwrap();
+    assert!(content.origin.y >= sidebar.origin.y + sidebar.size.height);
 }

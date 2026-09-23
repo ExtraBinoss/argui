@@ -1,11 +1,15 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use argui_dsl_ir::{
     CallbackId, FieldId, IrAnimation, IrExpression, IrExpressionKind, IrNode, IrState, IrType,
-    IrValue, LocalId, PropertyId, PropertyTargetId, SiteId, SlotId,
+    LocalId, PropertyId, PropertyTargetId, SiteId, SlotId,
 };
 
 use crate::{CompilerError, codegen::Context};
+
+mod helpers;
+mod user_type;
+use helpers::{binary_operator, constant};
 
 /// Resolved generated variable names available at one expression site.
 #[derive(Clone, Default)]
@@ -15,9 +19,12 @@ pub(super) struct Scope {
     pub return_type: Option<IrType>,
     pub properties: HashMap<PropertyId, String>,
     pub child_properties: HashMap<(SiteId, PropertyId), String>,
+    pub optional_child_properties: HashMap<(SiteId, PropertyId), String>,
+    pub referenced_child_sites: HashSet<SiteId>,
     pub rendered_properties: HashMap<PropertyId, String>,
     pub callbacks: HashMap<CallbackId, String>,
     pub locals: HashMap<LocalId, String>,
+    pub local_types: HashMap<LocalId, IrType>,
     pub slots: HashMap<SlotId, String>,
     pub translator: Option<String>,
     pub animations: HashMap<(SiteId, PropertyTargetId), IrAnimation>,
@@ -84,17 +91,34 @@ impl Context<'_> {
                     )
                 }
             }
-            IrExpressionKind::ChildPropertyRead { site, property } => format!(
-                "{}.get()",
-                scope
-                    .child_properties
-                    .get(&(*site, *property))
-                    .ok_or(CompilerError::Codegen(format!(
-                        "child property {} at site {} is outside the generated scope",
-                        property.raw(),
-                        site.raw()
-                    )))?
-            ),
+            IrExpressionKind::ChildPropertyRead {
+                site,
+                property,
+                optional,
+            } => {
+                if *optional {
+                    let value = scope
+                        .optional_child_properties
+                        .get(&(*site, *property))
+                        .ok_or(CompilerError::Codegen(format!(
+                            "optional child property {} at site {} is outside the generated scope",
+                            property.raw(),
+                            site.raw()
+                        )))?;
+                    format!("{value}.clone()")
+                } else {
+                    format!(
+                        "{}.get()",
+                        scope.child_properties.get(&(*site, *property)).ok_or(
+                            CompilerError::Codegen(format!(
+                                "child property {} at site {} is outside the generated scope",
+                                property.raw(),
+                                site.raw()
+                            ))
+                        )?
+                    )
+                }
+            }
             IrExpressionKind::ObservedRead {
                 site, observation, ..
             } => {
@@ -144,6 +168,12 @@ impl Context<'_> {
                     }
                     argui_dsl_ir::IrObservation::ContentWidth => {
                         format!("{state}.scroll.map_or(0.0, |scroll| scroll.content.width)")
+                    }
+                    argui_dsl_ir::IrObservation::MeasuredWidth => {
+                        format!("{state}.measured.map_or(0.0, |size| size.width)")
+                    }
+                    argui_dsl_ir::IrObservation::MeasuredHeight => {
+                        format!("{state}.measured.map_or(0.0, |size| size.height)")
                     }
                     argui_dsl_ir::IrObservation::ContentHeight => {
                         format!("{state}.scroll.map_or(0.0, |scroll| scroll.content.height)")
@@ -196,6 +226,18 @@ impl Context<'_> {
                     .unwrap_or("String::new()".into());
                 format!("({value}).to_string()")
             }
+            IrExpressionKind::BuiltinCall {
+                function: argui_dsl_ir::BuiltinFunction::IsSome,
+                arguments,
+            } => format!("({}).is_some()", self.expression(&arguments[0], scope)?),
+            IrExpressionKind::BuiltinCall {
+                function: argui_dsl_ir::BuiltinFunction::UnwrapOr,
+                arguments,
+            } => format!(
+                "({}).unwrap_or({})",
+                self.expression(&arguments[0], scope)?,
+                self.expression_as(&arguments[1], &value.value_type, scope)?
+            ),
             IrExpressionKind::BuiltinCall {
                 function: argui_dsl_ir::BuiltinFunction::Solid,
                 arguments,
@@ -403,6 +445,19 @@ impl Context<'_> {
                     self.expression_as(else_value, &value.value_type, scope)?
                 )
             }
+            IrExpressionKind::EnumVariant { symbol, variant } => {
+                self.emit_enum_variant(*symbol, *variant)?
+            }
+            IrExpressionKind::Struct { symbol, fields } => {
+                self.emit_struct(*symbol, fields, scope)?
+            }
+            IrExpressionKind::Index { base, index } => {
+                let base = self.expression(base, scope)?;
+                let index = self.expression(index, scope)?;
+                format!(
+                    "{{ let values = {base}; usize::try_from({index}).ok().and_then(|index| values.get(index).cloned()) }}"
+                )
+            }
             IrExpressionKind::Array(values) => format!(
                 "vec![{}]",
                 values
@@ -529,39 +584,5 @@ impl Context<'_> {
                 "unknown struct field {}",
                 field.raw()
             )))
-    }
-}
-
-/// Emits a typed constant value.
-fn constant(value: &IrValue) -> String {
-    match value {
-        IrValue::Null => "None".into(),
-        IrValue::Bool(value) => value.to_string(),
-        IrValue::Int(value) => format!("{value}_i64"),
-        IrValue::Float(value) => format!("{value:?}_f32"),
-        IrValue::String(value) => format!("String::from(\"{}\")", value.escape_default()),
-        IrValue::Color(value) => {
-            let [red, green, blue, alpha] = value.to_be_bytes();
-            format!("::argui::core::Color::from_srgba8({red}, {green}, {blue}, {alpha})")
-        }
-    }
-}
-
-/// Returns the direct Rust operator for one IR binary operator.
-fn binary_operator(operator: argui_dsl_ir::BinaryOperator) -> &'static str {
-    match operator {
-        argui_dsl_ir::BinaryOperator::Add => "+",
-        argui_dsl_ir::BinaryOperator::Subtract => "-",
-        argui_dsl_ir::BinaryOperator::Multiply => "*",
-        argui_dsl_ir::BinaryOperator::Divide => "/",
-        argui_dsl_ir::BinaryOperator::Remainder => "%",
-        argui_dsl_ir::BinaryOperator::Equal => "==",
-        argui_dsl_ir::BinaryOperator::NotEqual => "!=",
-        argui_dsl_ir::BinaryOperator::Less => "<",
-        argui_dsl_ir::BinaryOperator::LessEqual => "<=",
-        argui_dsl_ir::BinaryOperator::Greater => ">",
-        argui_dsl_ir::BinaryOperator::GreaterEqual => ">=",
-        argui_dsl_ir::BinaryOperator::And => "&&",
-        argui_dsl_ir::BinaryOperator::Or => "||",
     }
 }

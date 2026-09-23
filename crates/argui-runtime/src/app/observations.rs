@@ -12,7 +12,7 @@ impl Application {
         &self,
         watched: &HashSet<RetainedIdentity>,
     ) -> InteractionSnapshot {
-        InteractionSnapshot::capture(
+        let snapshot = InteractionSnapshot::capture(
             self.ui_tree.as_ref(),
             self.ui_layout
                 .as_ref()
@@ -23,7 +23,23 @@ impl Application {
             self.primary_touch.or(self.last_touch),
             watched,
             &mut self.source_index.borrow_mut(),
-        )
+        );
+        let measurements = self
+            .ui_layout
+            .iter()
+            .flat_map(|layout| &layout.nodes)
+            .filter_map(|node| {
+                let identity = self
+                    .ui_tree
+                    .as_ref()?
+                    .element_for(node.node)?
+                    .source_identity()?
+                    .clone();
+                watched
+                    .contains(&identity)
+                    .then_some((identity, node.bounds.size))
+            });
+        snapshot.with_measured(measurements)
     }
 
     /// Schedules a rebuild when a state read during rendering has changed.

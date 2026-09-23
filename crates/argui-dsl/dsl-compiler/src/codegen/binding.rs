@@ -119,6 +119,17 @@ impl Context<'_> {
                 )
                 .unwrap();
             }
+            if matches!(
+                property.direction,
+                PropertyDirection::Input | PropertyDirection::InputOutput
+            ) && let argui_dsl_semantic::Type::Model(inner) = &property.value_type
+            {
+                let row_type = self.rust_type(inner)?;
+                writeln!(output, "/// Inserts a row at `index`; returns its stable ID, or `None` outside the model.\npub fn {field}_insert(&self, index: usize, row: {row_type}) -> Option<u64> {{ let mut id = None; self.{field}.mutate(|model| {{ if index > model.len() {{ return false; }} id = Some(model.insert(index, row)); true }}); id }}").unwrap();
+                writeln!(output, "/// Removes a row at `index`; returns its stable ID and value when present.\npub fn {field}_remove(&self, index: usize) -> Option<(u64, {row_type})> {{ let mut removed = None; self.{field}.mutate(|model| {{ removed = model.remove(index); removed.is_some() }}); removed }}").unwrap();
+                writeln!(output, "/// Moves a row from `from` to `to`; returns whether its position changed.\npub fn {field}_move(&self, from: usize, to: usize) -> bool {{ self.{field}.mutate(|model| model.move_row(from, to)) }}").unwrap();
+                writeln!(output, "/// Edits a row at `index`; `edit` reports whether it changed the value. Returns whether a change was committed.\npub fn {field}_update(&self, index: usize, edit: impl FnOnce(&mut {row_type}) -> bool) -> bool {{ self.{field}.mutate(|model| model.update(index, edit)) }}").unwrap();
+            }
         }
         for callback in &source.callbacks {
             let callback_name = types::rust_identifier(&callback.name);

@@ -20,6 +20,7 @@ pub enum Instruction {
     Property(PropertyId),
     Observed(SiteId, IrObservation),
     ChildProperty(SiteId, PropertyId),
+    OptionalChildProperty(SiteId, PropertyId),
     Local(LocalId),
     Field(FieldId),
     Token(TokenId),
@@ -37,6 +38,12 @@ pub enum Instruction {
     JumpIfFalse(usize),
     Jump(usize),
     Array(usize),
+    /// Builds a user struct from named stable-ID field values.
+    Struct(Vec<FieldId>),
+    /// Pushes one stable user enum value.
+    EnumVariant(u64, u64),
+    /// Reads one array/model item or null when the index is invalid.
+    Index,
 }
 
 /// Immutable typed expression bytecode compiled once per accepted package.
@@ -115,6 +122,7 @@ impl Program {
                 Instruction::Local(_)
                     | Instruction::Observed(_, _)
                     | Instruction::ChildProperty(_, _)
+                    | Instruction::OptionalChildProperty(_, _)
                     | Instruction::Callback { .. }
                     | Instruction::Builtin {
                         function: BuiltinFunction::Translate,
@@ -181,6 +189,11 @@ impl Program {
                     context
                         .child_property(*site, *property)
                         .ok_or_else(|| RuntimeError::MissingProperty(property.raw()))?,
+                ),
+                Instruction::OptionalChildProperty(site, property) => stack.push(
+                    context
+                        .child_property(*site, *property)
+                        .unwrap_or(DslValue::Null),
                 ),
                 Instruction::Local(id) => stack.push(context.local(*id).ok_or_else(|| {
                     RuntimeError::InvalidBytecode(format!("local {} is unavailable", id.raw()))
@@ -249,7 +262,9 @@ impl Program {
                         | BuiltinFunction::ColorHex
                         | BuiltinFunction::ColorRed
                         | BuiltinFunction::ColorGreen
-                        | BuiltinFunction::ColorBlue),
+                        | BuiltinFunction::ColorBlue
+                        | BuiltinFunction::IsSome
+                        | BuiltinFunction::UnwrapOr),
                     arguments,
                 } => {
                     let arguments = arguments_from(&mut stack, *arguments)?;
@@ -297,6 +312,31 @@ impl Program {
                 Instruction::Jump(target) => {
                     cursor = checked_target(*target, self.instructions.len())?;
                 }
+                Instruction::Index => {
+                    let index = pop(&mut stack)?;
+                    let values = pop(&mut stack)?;
+                    let (DslValue::Array(values), DslValue::Int(index)) = (values, index) else {
+                        return Err(RuntimeError::InvalidBytecode(
+                            "index requires array/model and int".into(),
+                        ));
+                    };
+                    stack.push(
+                        usize::try_from(index)
+                            .ok()
+                            .and_then(|index| values.get(index).cloned())
+                            .unwrap_or(DslValue::Null),
+                    );
+                }
+                Instruction::EnumVariant(symbol, variant) => stack.push(DslValue::Enum {
+                    symbol: *symbol,
+                    variant: *variant,
+                }),
+                Instruction::Struct(fields) => {
+                    let values = arguments_from(&mut stack, fields.len())?;
+                    stack.push(DslValue::Struct(
+                        fields.iter().copied().zip(values).collect(),
+                    ));
+                }
                 Instruction::Array(length) => {
                     let values = arguments_from(&mut stack, *length)?;
                     stack.push(DslValue::Array(values));
@@ -328,8 +368,16 @@ fn compile_expression(expression: &IrExpression, output: &mut Vec<Instruction>) 
         } => {
             output.push(Instruction::Observed(*site, *observation));
         }
-        IrExpressionKind::ChildPropertyRead { site, property } => {
-            output.push(Instruction::ChildProperty(*site, *property));
+        IrExpressionKind::ChildPropertyRead {
+            site,
+            property,
+            optional,
+        } => {
+            output.push(if *optional {
+                Instruction::OptionalChildProperty(*site, *property)
+            } else {
+                Instruction::ChildProperty(*site, *property)
+            });
         }
         IrExpressionKind::LocalRead(id) => output.push(Instruction::Local(*id)),
         IrExpressionKind::FieldRead { base, field } => {
@@ -411,6 +459,22 @@ fn compile_expression(expression: &IrExpression, output: &mut Vec<Instruction>) 
             let end_target = output.len();
             output[false_jump] = Instruction::JumpIfFalse(false_target);
             output[end_jump] = Instruction::Jump(end_target);
+        }
+        IrExpressionKind::Index { base, index } => {
+            compile_expression(base, output);
+            compile_expression(index, output);
+            output.push(Instruction::Index);
+        }
+        IrExpressionKind::EnumVariant { symbol, variant } => {
+            output.push(Instruction::EnumVariant(symbol.raw(), variant.raw()));
+        }
+        IrExpressionKind::Struct { fields, .. } => {
+            for (_, value) in fields {
+                compile_expression(value, output);
+            }
+            output.push(Instruction::Struct(
+                fields.iter().map(|(id, _)| *id).collect(),
+            ));
         }
         IrExpressionKind::Array(values) => {
             compile_arguments(values, output);

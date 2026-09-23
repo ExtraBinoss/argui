@@ -9,7 +9,8 @@ use argui_dsl_semantic::CompilerDatabase;
 ///
 /// * `source` — complete source of the entry module.
 ///
-/// Returns the resolved IR or panics with semantic diagnostics.
+/// Returns the resolved IR with only this fixture's components, excluding appended
+/// generated icon components. Panics on semantic or lowering errors.
 fn compile(source: &str) -> argui_dsl_ir::IrProject {
     let mut database = CompilerDatabase::with_builtins().unwrap();
     let file = database.set_file("ui/main.argui", source);

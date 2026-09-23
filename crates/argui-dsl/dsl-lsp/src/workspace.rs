@@ -18,10 +18,25 @@ pub(crate) struct Workspace {
 impl Workspace {
     /// Loads a workspace rooted at `root` and all of its `.argui` modules.
     pub(crate) fn load(root: PathBuf) -> Result<Self, Box<dyn std::error::Error>> {
+        Self::load_with_registry(root, argui_schema::builtin::registry()?)
+    }
+
+    /// Loads a workspace using the application's native extension registry.
+    ///
+    /// * `root` — project source root.
+    /// * `registry` — exact native contract used by compiler and runtime.
+    ///
+    /// # Errors
+    ///
+    /// Returns source traversal errors while indexing the workspace.
+    pub(crate) fn load_with_registry(
+        root: PathBuf,
+        registry: argui_schema::SchemaRegistry,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
         let mut workspace = Self {
             root,
             sources: HashMap::new(),
-            database: CompilerDatabase::with_builtins()?,
+            database: CompilerDatabase::with_registry(registry),
         };
         workspace.reload_disk()?;
         Ok(workspace)
@@ -29,7 +44,8 @@ impl Workspace {
 
     /// Replaces the workspace root and reloads its source graph.
     pub(crate) fn set_root(&mut self, root: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
-        *self = Self::load(root)?;
+        let registry = self.database.schema().clone();
+        *self = Self::load_with_registry(root, registry)?;
         Ok(())
     }
 

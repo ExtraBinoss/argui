@@ -60,6 +60,28 @@ pub fn compile(entry: impl AsRef<Path>) -> Result<(), BuildError> {
     compile_to(&manifest, entry.as_ref(), &output)
 }
 
+/// Compiles an app with the same versioned native registry installed at runtime.
+///
+/// * `entry` — manifest-relative DSL entry module.
+/// * `registry` — built-ins plus application native adapters.
+///
+/// # Errors
+///
+/// Returns environment, source, semantic, ABI, asset, or output errors.
+pub fn compile_with_registry(
+    entry: impl AsRef<Path>,
+    registry: argui_schema::SchemaRegistry,
+) -> Result<(), BuildError> {
+    let manifest = env::var_os("CARGO_MANIFEST_DIR")
+        .map(PathBuf::from)
+        .ok_or(BuildError::MissingEnvironment("CARGO_MANIFEST_DIR"))?;
+    let output = env::var_os("OUT_DIR")
+        .map(PathBuf::from)
+        .ok_or(BuildError::MissingEnvironment("OUT_DIR"))?
+        .join("argui_ui.rs");
+    compile_to_with_registry(&manifest, entry.as_ref(), &output, registry)
+}
+
 /// Compiles to an explicit path, primarily for tooling and deterministic tests.
 ///
 /// * `manifest` — project root used for canonical module and asset paths.
@@ -70,6 +92,27 @@ pub fn compile(entry: impl AsRef<Path>) -> Result<(), BuildError> {
 ///
 /// Returns when source discovery, compilation, validation, or atomic output fails.
 pub fn compile_to(manifest: &Path, entry: &Path, output: &Path) -> Result<(), BuildError> {
+    let registry =
+        argui_schema::builtin::registry().map_err(argui_dsl_compiler::CompilerError::from)?;
+    compile_to_with_registry(manifest, entry, output, registry)
+}
+
+/// Compiles one project with a caller-owned registry into a deterministic Rust file.
+///
+/// * `manifest` — project root for module and asset paths.
+/// * `entry` — manifest-relative or absolute DSL entry module.
+/// * `output` — generated Rust destination.
+/// * `registry` — exact native contract used by AOT and live runtimes.
+///
+/// # Errors
+///
+/// Returns source, semantic, ABI, asset, or atomic output errors.
+pub fn compile_to_with_registry(
+    manifest: &Path,
+    entry: &Path,
+    output: &Path,
+    registry: argui_schema::SchemaRegistry,
+) -> Result<(), BuildError> {
     let entry = if entry.is_absolute() {
         entry.to_path_buf()
     } else {
@@ -97,9 +140,10 @@ pub fn compile_to(manifest: &Path, entry: &Path, output: &Path) -> Result<(), Bu
             Ok(SourceModule::new(normalize(relative), source))
         })
         .collect::<Result<Vec<_>, BuildError>>()?;
-    let compiled = Compiler::compile(modules, &normalize(entry_relative), |asset| {
-        fs::read(manifest.join(asset)).map_err(|error| error.to_string())
-    })?;
+    let compiled =
+        Compiler::compile_with_registry(modules, &normalize(entry_relative), registry, |asset| {
+            fs::read(manifest.join(asset)).map_err(|error| error.to_string())
+        })?;
     for dependency in &compiled.dependencies {
         if dependency.starts_with('@') {
             continue;

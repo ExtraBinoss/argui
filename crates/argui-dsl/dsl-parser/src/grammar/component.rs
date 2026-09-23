@@ -90,9 +90,28 @@ fn slot_decl(parser: &mut Parser<'_>) {
     parser.start(SyntaxKind::SlotDecl);
     parser.bump();
     parser.expect(SyntaxKind::Ident, "expected slot name");
+    if parser.at(SyntaxKind::LParen) {
+        parser.bump();
+        while !parser.at(SyntaxKind::RParen) && !parser.at(SyntaxKind::Eof) {
+            parser.start(SyntaxKind::SlotParameter);
+            parser.expect(SyntaxKind::Ident, "expected slot parameter name");
+            parser.expect(SyntaxKind::Colon, "expected `:` after slot parameter");
+            type_ref(parser);
+            parser.finish();
+            if parser.at(SyntaxKind::Comma) {
+                parser.bump();
+            } else {
+                break;
+            }
+        }
+        parser.expect(SyntaxKind::RParen, "expected `)` after slot parameters");
+    }
     if parser.at(SyntaxKind::Colon) {
         parser.bump();
         parser.expect(SyntaxKind::Ident, "expected slot kind after `:`");
+        if parser.at(SyntaxKind::Ident) && parser.text() == "single" {
+            parser.bump();
+        }
     }
     if parser.at(SyntaxKind::LBrace) {
         visual_block(parser);
@@ -228,36 +247,64 @@ fn event(parser: &mut Parser<'_>) {
     }
     parser.expect(SyntaxKind::LBrace, "expected `{` after event name");
     while !parser.at(SyntaxKind::RBrace) && !parser.at(SyntaxKind::Eof) {
-        parser.start(SyntaxKind::Statement);
-        if parser.at(SyntaxKind::LetKw) || parser.at(SyntaxKind::ReturnKw) {
-            let returning = parser.at(SyntaxKind::ReturnKw);
-            parser.bump();
-            if returning && matches!(parser.kind(), SyntaxKind::Semicolon | SyntaxKind::RBrace) {
-                if parser.at(SyntaxKind::Semicolon) {
-                    parser.bump();
-                }
-                parser.finish();
-                continue;
-            }
-        }
-        expression::expression(parser);
-        if matches!(
-            parser.kind(),
-            SyntaxKind::Eq
-                | SyntaxKind::PlusEq
-                | SyntaxKind::MinusEq
-                | SyntaxKind::StarEq
-                | SyntaxKind::SlashEq
-        ) {
-            parser.bump();
-            expression::expression(parser);
-        }
-        if parser.at(SyntaxKind::Semicolon) {
-            parser.bump();
-        }
-        parser.finish();
+        handler_statement(parser);
     }
     parser.expect(SyntaxKind::RBrace, "expected `}` after event handler");
+    parser.finish();
+}
+
+/// Parses one handler statement, including a lexical conditional block.
+fn handler_statement(parser: &mut Parser<'_>) {
+    if parser.at(SyntaxKind::IfKw) {
+        parser.start(SyntaxKind::IfStatement);
+        parser.bump();
+        expression::expression_until(parser, &[SyntaxKind::LBrace]);
+        handler_block(parser);
+        if parser.at(SyntaxKind::ElseKw) {
+            parser.bump();
+            handler_block(parser);
+        }
+        parser.finish();
+        return;
+    }
+    parser.start(SyntaxKind::Statement);
+    if parser.at(SyntaxKind::LetKw) || parser.at(SyntaxKind::ReturnKw) {
+        let returning = parser.at(SyntaxKind::ReturnKw);
+        parser.bump();
+        if returning && matches!(parser.kind(), SyntaxKind::Semicolon | SyntaxKind::RBrace) {
+            if parser.at(SyntaxKind::Semicolon) {
+                parser.bump();
+            }
+            parser.finish();
+            return;
+        }
+    }
+    expression::expression(parser);
+    if matches!(
+        parser.kind(),
+        SyntaxKind::Eq
+            | SyntaxKind::PlusEq
+            | SyntaxKind::MinusEq
+            | SyntaxKind::StarEq
+            | SyntaxKind::SlashEq
+    ) {
+        parser.bump();
+        expression::expression(parser);
+    }
+    if parser.at(SyntaxKind::Semicolon) {
+        parser.bump();
+    }
+    parser.finish();
+}
+
+/// Parses one braced lexical handler block and its nested statements.
+fn handler_block(parser: &mut Parser<'_>) {
+    parser.start(SyntaxKind::Block);
+    parser.expect(SyntaxKind::LBrace, "expected `{` in handler branch");
+    while !parser.at(SyntaxKind::RBrace) && !parser.at(SyntaxKind::Eof) {
+        handler_statement(parser);
+    }
+    parser.expect(SyntaxKind::RBrace, "expected `}` after handler branch");
     parser.finish();
 }
 

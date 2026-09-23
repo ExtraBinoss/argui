@@ -235,6 +235,7 @@ fn symbol_kind(kind: SymbolKind) -> &'static str {
         SymbolKind::Token => "token",
         SymbolKind::Style => "style",
         SymbolKind::Effect => "effect",
+        SymbolKind::Function => "function",
         SymbolKind::Native => "native",
         SymbolKind::Keyword => "keyword",
     }

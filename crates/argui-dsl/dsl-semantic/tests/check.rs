@@ -6,6 +6,9 @@ mod style;
 #[path = "check/statement.rs"]
 mod statement;
 
+#[path = "check/function.rs"]
+mod function;
+
 #[path = "check/extract/animation.rs"]
 mod animation;
 #[path = "check/extract/declaration.rs"]
@@ -15,6 +18,9 @@ mod icons;
 
 #[path = "check/extract/visual/slot.rs"]
 mod slot;
+
+#[path = "check/extract/visual/slot_cardinality.rs"]
+mod slot_cardinality;
 
 #[path = "check/extract/visual/virtual_list.rs"]
 mod virtual_list;

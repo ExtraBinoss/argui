@@ -13,6 +13,9 @@ mod path;
 #[path = "visual/reference.rs"]
 mod reference;
 
+/// Lowers `source`, retaining only its components so generated icon modules cannot
+/// change fixture selection. Returns the IR with all other declaration tables intact.
+/// Panics on semantic or lowering errors.
 fn compile(source: &str) -> argui_dsl_ir::IrProject {
     let mut database = CompilerDatabase::with_builtins().unwrap();
     let file = database.set_file("ui/main.argui", source);
@@ -78,6 +81,7 @@ export component Dashboard {{
     )
 }
 
+/// Fixture references resolve consistently despite additional standard-library assets.
 #[test]
 fn lowering_resolves_every_runtime_reference_to_stable_ids() {
     let project = compile(&source(""));
@@ -93,8 +97,14 @@ fn lowering_resolves_every_runtime_reference_to_stable_ids() {
     assert_eq!(project.styles[0].states.len(), 1);
     assert_eq!(project.effects.len(), 1);
     assert_eq!(project.effects[0].parameters.len(), 1);
-    assert_eq!(project.assets.len(), 1);
-    assert_eq!(project.assets[0].kind, AssetKind::Shader);
+    let assets = project
+        .assets
+        .iter()
+        .filter(|asset| asset.id == project.effects[0].shader)
+        .collect::<Vec<_>>();
+    assert_eq!(assets.len(), 1);
+    assert_eq!(assets[0].path, "ui/effects/frost.wgsl");
+    assert_eq!(assets[0].kind, AssetKind::Shader);
 
     let dashboard = project.components.last().unwrap();
     assert_eq!(dashboard.states.len(), 1);
@@ -257,6 +267,7 @@ export component Stable {
     assert_ne!(before, renamed);
 }
 
+/// User declarations preserve their expression types, referenced assets, and events.
 #[test]
 fn lowering_covers_typed_expressions_assets_and_event_statements() {
     let source = r#"import { Button, Column, Input, Row, Text } from "@argui/ui"
@@ -355,14 +366,18 @@ export component Main {
     );
     let schema = argui_schema::builtin::registry().unwrap();
     let ir = lower(&project, &schema).unwrap();
+    let is_fixture = |source: &argui_dsl_ir::SourceInfo| {
+        source.span.is_some_and(|span| span.file == source_file)
+    };
 
     assert_eq!(ir.structs.len(), 1);
     assert_eq!(ir.enums.len(), 1);
     let app_theme = ir
         .themes
         .iter()
-        .find(|theme| theme.tokens.len() == 3)
-        .expect("fixture AppTheme should contain three tokens");
+        .find(|theme| is_fixture(&theme.source))
+        .expect("fixture Palette theme should be lowered");
+    assert_eq!(app_theme.tokens.len(), 3);
     assert_eq!(app_theme.modes.len(), 1);
     assert_eq!(ir.styles[0].states.len(), 1);
     assert!(matches!(
@@ -373,38 +388,37 @@ export component Main {
         ir.styles[1].properties[0].target,
         PropertyTargetId::Component(_)
     ));
-    assert_eq!(ir.effects[0].parameters.len(), 3);
-    assert_eq!(
-        ir.assets
-            .iter()
-            .filter(|asset| !asset.path.starts_with("@argui/"))
-            .count(),
-        6
-    );
-    assert!(
-        ir.assets
-            .iter()
-            .any(|asset| asset.kind == AssetKind::Shader)
-    );
-    assert!(
-        ir.assets
-            .iter()
-            .any(|asset| asset.kind == AssetKind::Vector)
-    );
-    assert!(ir.assets.iter().any(|asset| asset.kind == AssetKind::Image));
-    assert!(ir.assets.iter().any(|asset| asset.kind == AssetKind::Other));
-
+    let effect = ir
+        .effects
+        .iter()
+        .find(|effect| is_fixture(&effect.source))
+        .unwrap();
+    assert_eq!(effect.parameters.len(), 3);
     let main = ir
         .components
         .iter()
-        .find(|component| {
-            component.properties.len() > 10
-                && component
-                    .source
-                    .span
-                    .is_some_and(|span| span.file == source_file)
-        })
+        .find(|component| component.properties.len() > 10 && is_fixture(&component.source))
         .unwrap();
+    let asset_ids = main
+        .properties
+        .iter()
+        .filter_map(|property| match &property.default.as_ref()?.kind {
+            IrExpressionKind::Asset(id) => Some(*id),
+            _ => None,
+        })
+        .chain(std::iter::once(effect.shader))
+        .collect::<Vec<_>>();
+    let assets = ir
+        .assets
+        .iter()
+        .filter(|asset| asset_ids.contains(&asset.id))
+        .collect::<Vec<_>>();
+    assert_eq!(assets.len(), 6);
+    assert!(assets.iter().any(|asset| asset.kind == AssetKind::Shader));
+    assert!(assets.iter().any(|asset| asset.kind == AssetKind::Vector));
+    assert!(assets.iter().any(|asset| asset.kind == AssetKind::Image));
+    assert!(assets.iter().any(|asset| asset.kind == AssetKind::Other));
+
     assert_eq!(main.states.len(), 1);
     assert_eq!(main.animations.len(), 1);
     assert!(

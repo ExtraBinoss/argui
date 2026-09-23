@@ -36,9 +36,8 @@ impl Context<'_> {
                     "unknown user type {symbol}"
                 )))?,
             Type::Optional(inner) => format!("Option<{}>", self.rust_type(inner)?),
-            Type::Array(inner) | Type::Model(inner) => {
-                format!("Vec<{}>", self.rust_type(inner)?)
-            }
+            Type::Array(inner) => format!("Vec<{}>", self.rust_type(inner)?),
+            Type::Model(inner) => format!("::argui::reactive::Model<{}>", self.rust_type(inner)?),
             Type::Callback { parameters, result } => format!(
                 "Rc<dyn Fn({}) -> {}>",
                 parameters
@@ -82,8 +81,14 @@ impl Context<'_> {
             IrType::Optional(inner) => {
                 return Ok(format!("Option<{}>", self.ir_rust_type(inner)?));
             }
-            IrType::Array(inner) | IrType::Model(inner) => {
+            IrType::Array(inner) => {
                 return Ok(format!("Vec<{}>", self.ir_rust_type(inner)?));
+            }
+            IrType::Model(inner) => {
+                return Ok(format!(
+                    "::argui::reactive::Model<{}>",
+                    self.ir_rust_type(inner)?
+                ));
             }
             IrType::Callback { parameters, result } => {
                 return Ok(format!(
@@ -138,7 +143,8 @@ impl Context<'_> {
             Type::Asset => {
                 "::argui::schema::AssetHandle::Image(::argui::paint::ImageId::fresh())".into()
             }
-            Type::Array(_) | Type::Model(_) => "Vec::new()".into(),
+            Type::Array(_) => "Vec::new()".into(),
+            Type::Model(_) => "::argui::reactive::Model::default()".into(),
             Type::Optional(_) => "None".into(),
             Type::Void => "()".into(),
             Type::Unknown | Type::Callback { .. } => {

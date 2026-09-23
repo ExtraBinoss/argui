@@ -20,8 +20,41 @@ pub(super) fn declaration(parser: &mut Parser<'_>) {
         SyntaxKind::ThemeKw => theme(parser),
         SyntaxKind::StyleKw => style(parser),
         SyntaxKind::EffectKw => effect(parser),
-        _ => parser.recover("expected import, struct, enum, component, theme, style, or effect"),
+        SyntaxKind::FnKw => function(parser),
+        _ => {
+            parser.recover("expected import, struct, enum, component, theme, style, effect, or fn")
+        }
     }
+}
+
+/// Parses a typed, expression-bodied pure function.
+///
+/// `parser` receives the complete top-level declaration.
+fn function(parser: &mut Parser<'_>) {
+    parser.start(SyntaxKind::FunctionDecl);
+    optional_export_and_keyword(parser, SyntaxKind::FnKw);
+    parser.expect(SyntaxKind::Ident, "expected function name");
+    parser.expect(SyntaxKind::LParen, "expected `(` after function name");
+    while !parser.at(SyntaxKind::RParen) && !parser.at(SyntaxKind::Eof) {
+        parser.start(SyntaxKind::FunctionParameter);
+        parser.expect(SyntaxKind::Ident, "expected parameter name");
+        parser.expect(SyntaxKind::Colon, "expected `:` after parameter name");
+        type_ref(parser);
+        parser.finish();
+        if !parser.at(SyntaxKind::Comma) {
+            break;
+        }
+        parser.bump();
+    }
+    parser.expect(SyntaxKind::RParen, "expected `)` after parameters");
+    parser.expect(SyntaxKind::Arrow, "expected `->` before result type");
+    type_ref(parser);
+    parser.expect(SyntaxKind::Eq, "expected `=` before function body");
+    expression::expression(parser);
+    if parser.at(SyntaxKind::Semicolon) {
+        parser.bump();
+    }
+    parser.finish();
 }
 
 /// Parses a named import with optional aliases and a string source.

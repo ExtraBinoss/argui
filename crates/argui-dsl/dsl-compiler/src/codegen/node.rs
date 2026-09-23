@@ -179,7 +179,7 @@ impl Context<'_> {
                         &motion_identity,
                     )?;
                     if native_schema.virtual_window {
-                        writeln!(output, "{pad}{input} = {input}.property(::argui::schema::PropertyId::from_raw({}), ::argui::schema::SchemaValue::Float({children_name}_viewport)).property(::argui::schema::PropertyId::from_raw({}), ::argui::schema::SchemaValue::Int({children_name}_count as i64)).property(::argui::schema::PropertyId::from_raw({}), ::argui::schema::SchemaValue::Int({children_name}_start as i64));", argui_schema::builtin::VIEWPORT_HEIGHT.raw(), argui_schema::builtin::ITEM_COUNT.raw(), argui_schema::builtin::WINDOW_START.raw()).unwrap();
+                        writeln!(output, "{pad}{input} = {input}.property(::argui::schema::PropertyId::from_raw({}), ::argui::schema::SchemaValue::Float({children_name}_viewport)).property(::argui::schema::PropertyId::from_raw({}), ::argui::schema::SchemaValue::Int({children_name}_count as i64)).property(::argui::schema::PropertyId::from_raw({}), ::argui::schema::SchemaValue::Int({children_name}_start as i64)).virtual_list({children_name}_list.clone());", argui_schema::builtin::VIEWPORT_HEIGHT.raw(), argui_schema::builtin::ITEM_COUNT.raw(), argui_schema::builtin::WINDOW_START.raw()).unwrap();
                     }
                     if let Some(slot) = child_slot {
                         writeln!(output, "{pad}{input} = {input}.slot(::argui::schema::NativeSlotValue::new(::argui::schema::SlotId::from_raw({}), {children_name}));", slot.id.raw()).unwrap();
@@ -243,6 +243,8 @@ impl Context<'_> {
                     "{pad}assert!(keys.insert({identity}), \"duplicate repeater key\");"
                 )
                 .unwrap();
+                let referenced = nested.referenced_child_sites.clone();
+                self.emit_child_references(output, body, &referenced, &mut nested, Some(key))?;
                 self.emit_nodes(output, body, destination, depth + 1, &nested, Some(key))?;
                 writeln!(output, "{pad}}} }}").unwrap();
             }
@@ -314,7 +316,7 @@ impl Context<'_> {
     }
 
     /// Emits retained identity with an optional typed repeater key.
-    fn identity(
+    pub(super) fn identity(
         &self,
         site: u64,
         scope: &Scope,
@@ -358,10 +360,26 @@ fn statement_capture_names(
     }
     for statement in statements {
         match statement {
-            argui_dsl_ir::IrStatement::Expression(expression)
+            argui_dsl_ir::IrStatement::Let {
+                value: expression, ..
+            }
+            | argui_dsl_ir::IrStatement::Expression(expression)
             | argui_dsl_ir::IrStatement::Return(Some(expression))
             | argui_dsl_ir::IrStatement::SetThemeMode(expression) => {
                 expression_capture_names(scope, expression, &mut names, &mut observed_sites);
+            }
+            argui_dsl_ir::IrStatement::If {
+                condition,
+                then_body,
+                else_body,
+            } => {
+                expression_capture_names(scope, condition, &mut names, &mut observed_sites);
+                let (nested, sites) = statement_capture_names(scope, then_body, &[]);
+                names.extend(nested);
+                observed_sites.extend(sites);
+                let (nested, sites) = statement_capture_names(scope, else_body, &[]);
+                names.extend(nested);
+                observed_sites.extend(sites);
             }
             argui_dsl_ir::IrStatement::ScrollTo { x, y, .. } => {
                 expression_capture_names(scope, x, &mut names, &mut observed_sites);
@@ -400,6 +418,17 @@ fn statement_capture_names(
 /// `statement` is the lowered handler operation. The result controls closure
 /// capture so handlers without host effects emit no unused variables.
 fn statement_has_host_effect(statement: &argui_dsl_ir::IrStatement) -> bool {
+    if let argui_dsl_ir::IrStatement::If {
+        then_body,
+        else_body,
+        ..
+    } = statement
+    {
+        return then_body
+            .iter()
+            .chain(else_body)
+            .any(statement_has_host_effect);
+    }
     matches!(
         statement,
         argui_dsl_ir::IrStatement::FocusNext
@@ -427,8 +456,14 @@ fn expression_capture_names(
         Kind::PropertyRead(property) => {
             names.extend(scope.properties.get(property).cloned());
         }
-        Kind::ChildPropertyRead { site, property } => {
+        Kind::ChildPropertyRead { site, property, .. } => {
             names.extend(scope.child_properties.get(&(*site, *property)).cloned());
+            names.extend(
+                scope
+                    .optional_child_properties
+                    .get(&(*site, *property))
+                    .cloned(),
+            );
         }
         Kind::ObservedRead { site, .. } => {
             names.insert("observer".into());
@@ -450,6 +485,10 @@ fn expression_capture_names(
         Kind::FieldRead { base, .. } | Kind::Unary { operand: base, .. } => {
             expression_capture_names(scope, base, names, observed_sites);
         }
+        Kind::Index { base, index } => {
+            expression_capture_names(scope, base, names, observed_sites);
+            expression_capture_names(scope, index, names, observed_sites);
+        }
         Kind::Binary { left, right, .. } => {
             expression_capture_names(scope, left, names, observed_sites);
             expression_capture_names(scope, right, names, observed_sites);
@@ -463,6 +502,11 @@ fn expression_capture_names(
             expression_capture_names(scope, then_value, names, observed_sites);
             expression_capture_names(scope, else_value, names, observed_sites);
         }
+        Kind::Struct { fields, .. } => {
+            for (_, value) in fields {
+                expression_capture_names(scope, value, names, observed_sites);
+            }
+        }
         Kind::Array(values)
         | Kind::BuiltinCall {
             arguments: values, ..
@@ -471,6 +515,6 @@ fn expression_capture_names(
                 expression_capture_names(scope, value, names, observed_sites);
             }
         }
-        Kind::Constant(_) | Kind::TokenRead(_) | Kind::Asset(_) => {}
+        Kind::EnumVariant { .. } | Kind::Constant(_) | Kind::TokenRead(_) | Kind::Asset(_) => {}
     }
 }

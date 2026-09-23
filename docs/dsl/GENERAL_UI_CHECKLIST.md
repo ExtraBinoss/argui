@@ -1,7 +1,7 @@
 # Argui DSL — Checklist de consolidation et d’UI générale
 
 Plan de référence : [GENERAL_UI_PLAN.md](GENERAL_UI_PLAN.md).
-Date : 22 septembre 2026. État : implémentation en cours dans le worktree `4a82`.
+Date : 23 septembre 2026. État : checkpoint de sauvegarde sur `codex/dsl-gallery-live` ; développement DSL arrêté à la demande de l’utilisateur.
 
 ## Mode d’emploi
 
@@ -184,23 +184,19 @@ bloquée reste ouverte avec une raison précise et la prochaine action possible.
 
 ## Registre des preuves
 
-Toutes les phases ci-dessous sont à faire. Remplacer « — » par les chemins des
-tests, commandes/résultats et captures au fil de l’implémentation. Les captures
-GUI doivent provenir de l’affichage privé ; une capture blanche est un échec.
+Les cases restent ouvertes lorsqu’une preuve de sortie complète manque. Voir
+[GENERAL_UI_HANDOFF.md](GENERAL_UI_HANDOFF.md) pour les résultats ciblés de ce
+checkpoint ; la fusion `codex/gallery-text-fidelity` est effectuée.
 
 | Phase | État | Fichiers/tests et résultats | Captures/mesures | Limites ou prochaine action |
 | --- | --- | --- | --- | --- |
-| P0 | En cours | [Baseline](GENERAL_UI_BASELINE.md), reproductions sémantiques et live | Pas de capture GUI à ce stade | Compléter slots/styles et inventaire |
-| P1 | En cours | Validation des affectations/directions/clés ; arithmétique contrôlée ; court-circuit ; 18 scénarios AOT/live passent | Conformité ciblée 18/18 | Compléter les cas limites et la passe de régression |
-| P2 | Partiel | Slots nommés, défauts et forwarding ; styles nommés et états ; tests AOT/live | Galerie : 4/4 tests ciblés après virtualisation de la navigation | Cardinalité des slots, templates paramétrés et références lexicales générales encore ouverts |
-| P3 | À faire | — | — | Dépend de P1 |
-| P4 | À faire | — | — | Dépend de P1, P2 |
-| P5 | À faire | — | — | Dépend de P1, P4 |
-| P6 | À faire | — | — | Dépend de P3, P4, P5 |
-| P7 | À faire | — | — | Dépend de P2, P3, P5 |
-| P8 | Partiel | Suppression d’une définition d’enfant monté testée en live | Test de reload ciblé vert | Autres changements structurels et outils à faire |
-| P9 | À faire | — | — | Dépend de P2 à P8 |
-| P10 | À faire | — | — | Dépend de P9 |
+| P0 | Baseline établie | [Baseline](GENERAL_UI_BASELINE.md) | — | Ne pas refaire l’audit. |
+| P1 | Correctifs principaux présents | 18 scénarios AOT/live déjà passés | — | Revenir seulement pour défaut concret. |
+| P2 | Presque complet, preuves ciblées | Slots, templates, refs, styles ; sélections ciblées vertes | — | Portée des tokens et limites à documenter. |
+| P3 | Partiel | Grid, responsive et dimensions mesurées AOT/live ; garde directe testée | Aucune capture finale | Peinture, hit testing et échelles à vérifier. |
+| P4 | Partiel | Modèles, liste riche et fonctions pures AOT/live ; diagnostics ciblés verts | Aucun coût chiffré | Focus/sélection/ancrage et coûts à prouver. |
+| P5 | Partiel | Façade live, `ProofTile`, services hôte ajoutés ; tests ciblés façade/extension verts | Service GUI non vérifié | Test service, ABI mutation et parité complète. |
+| P6–P10 | Non commencés | — | — | Hors de cette conversation ; décider d’abord si le DSL est conservé. |
 
 ## Performance et vérifications ciblées
 
@@ -230,7 +226,7 @@ GUI doivent provenir de l’affichage privé ; une capture blanche est un échec
   `argui dev`, il constate seulement 0,1–0,2 point d’écart CPU. Ces mesures
   manuelles rendent la performance acceptable pour avancer ; elles ne sont
   pas un benchmark automatisé et précèdent la fusion de
-  `codex/gallery-text-fidelity` dans `codex/dsl-gallery-live`.
+  `codex/gallery-text-fidelity` dans `codex/dsl-gallery-live`, maintenant réalisée.
 - Le benchmark headless mesure des temps et des ticks CPU dans un profil de test
   non optimisé ; des compilations concurrentes ont perturbé sa durée.
 - `./scripts/quality.sh` et la couverture LLVM finale n’ont pas été exécutés.

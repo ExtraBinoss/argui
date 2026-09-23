@@ -71,6 +71,7 @@ pub(crate) fn project(
     }
     extract::binding_cycles(&definitions, &mut diagnostics);
     extract::theme_cycles(&definitions, &mut diagnostics);
+    extract::function_cycles(&lowered, &scopes, &definitions, &mut diagnostics);
 
     let syntax = lowered
         .iter()

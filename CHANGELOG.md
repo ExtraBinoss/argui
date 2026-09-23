@@ -8,6 +8,10 @@ that do not use them.
 
 ### Added
 
+- Added separate bounded glyph atlases: four R8 mask pages and two sRGB color
+  pages, with frame-pinned LRU eviction and fresh transparent upload borders.
+  `TextEngine::stats()` and `RenderProfile::text_atlas` expose cache and upload
+  activity; DevTools records glyph memory and uses GPU trace format v5.
 - Added default-on adaptive GPU damage rendering on native and WebAssembly:
   retained scene snapshots detect changed physical regions, merge them on
   tile boundaries, repaint small updates through GPU scissors, and fall back
@@ -35,6 +39,9 @@ that do not use them.
 
 ### Changed
 
+- Reused logical text layouts across recoloring, fractional movement and DPI
+  changes. Added a bounded CPU raster cache and preserved full-precision text
+  colors independently of shaping.
 - Reduced continuous-animation CPU work by keeping compositor-only frames on
   the regional retained path, sampling each typed `Motion` under one lock, and
   moving the Damage Control workload with a transform instead of relayout via
@@ -50,6 +57,10 @@ that do not use them.
 
 ### Fixed
 
+- Corrected fractional-scroll raster keys, alignment-sensitive selection caches,
+  font-change invalidation, and premultiplied color-outline glyph edges.
+  Uniform text transforms now rasterize at their physical size, and settled
+  transform animations repaint text at the final scale.
 - Prevented unbounded offscreen texture growth during page transitions by
   clearing the texture pool on window close and evicting idle textures across
   animation frames.

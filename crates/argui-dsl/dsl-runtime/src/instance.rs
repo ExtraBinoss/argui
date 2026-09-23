@@ -6,6 +6,8 @@ use argui_dsl_ir::{
 
 use crate::{DslValue, RuntimeError};
 
+mod model;
+
 /// Stable process-local live component-instance identity.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct InstanceId(u64);
@@ -32,6 +34,8 @@ pub struct DynamicProperty {
     value: DslValue,
     revision: u64,
     modified: bool,
+    model_ids: Vec<u64>,
+    next_model_id: u64,
 }
 
 impl DynamicProperty {
@@ -40,12 +44,15 @@ impl DynamicProperty {
     #[must_use]
     pub fn new(id: PropertyId, value_type: IrType, value: DslValue) -> Self {
         let value = value.coerce(&value_type);
+        let (model_ids, next_model_id) = model::initial_ids(&value_type, &value);
         Self {
             id,
             value_type,
             value,
             revision: 0,
             modified: false,
+            model_ids,
+            next_model_id,
         }
     }
 
@@ -85,6 +92,7 @@ impl DynamicProperty {
             return Ok(false);
         }
         self.value = value;
+        (self.model_ids, self.next_model_id) = model::initial_ids(&self.value_type, &self.value);
         self.revision = self.revision.wrapping_add(1);
         Ok(true)
     }
@@ -140,6 +148,7 @@ impl DynamicProperty {
             return Ok(false);
         }
         self.value = value;
+        (self.model_ids, self.next_model_id) = model::initial_ids(&self.value_type, &self.value);
         self.revision = self.revision.wrapping_add(1);
         Ok(true)
     }
@@ -322,6 +331,8 @@ impl ComponentInstance {
                 && previous.value.compatible_with(&next.value_type)
             {
                 next.value = previous.value;
+                next.model_ids = previous.model_ids;
+                next.next_model_id = previous.next_model_id;
                 next.revision = previous.revision;
                 next.modified = true;
             }

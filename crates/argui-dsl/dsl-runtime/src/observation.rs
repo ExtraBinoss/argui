@@ -57,6 +57,12 @@ pub(crate) fn value(state: ObservedInteraction, kind: IrObservation) -> DslValue
         IrObservation::ContentWidth => DslValue::Float(f64::from(
             state.scroll.map_or(0.0, |scroll| scroll.content.width),
         )),
+        IrObservation::MeasuredWidth => {
+            DslValue::Float(f64::from(state.measured.map_or(0.0, |size| size.width)))
+        }
+        IrObservation::MeasuredHeight => {
+            DslValue::Float(f64::from(state.measured.map_or(0.0, |size| size.height)))
+        }
         IrObservation::ContentHeight => DslValue::Float(f64::from(
             state.scroll.map_or(0.0, |scroll| scroll.content.height),
         )),

@@ -14,6 +14,13 @@ pub enum DslValue {
     String(String),
     Color(argui_core::Color),
     Brush(argui_paint::Fill),
+    Dimension(argui_ui::Dimension),
+    Insets(argui_core::Insets),
+    Radii(argui_paint::CornerRadii),
+    Border(argui_paint::Border),
+    Shadow(argui_paint::Shadow),
+    Transform(argui_core::Transform2D),
+    AssetHandle(argui_assets::AssetHandle),
     Struct(BTreeMap<FieldId, Self>),
     Enum { symbol: u64, variant: u64 },
     Array(Vec<Self>),
@@ -50,6 +57,13 @@ impl DslValue {
             Self::String(_) => "string",
             Self::Color(_) => "color",
             Self::Brush(_) => "brush",
+            Self::Dimension(_) => "dimension",
+            Self::Insets(_) => "insets",
+            Self::Radii(_) => "radii",
+            Self::Border(_) => "border",
+            Self::Shadow(_) => "shadow",
+            Self::Transform(_) => "transform",
+            Self::AssetHandle(_) => "asset",
             Self::Struct(_) => "struct",
             Self::Enum { .. } => "enum",
             Self::Array(_) => "array",
@@ -97,6 +111,13 @@ impl DslValue {
                 )
                 | (Self::Color(_), IrType::Color)
                 | (Self::Brush(_), IrType::Brush)
+                | (Self::Dimension(_), IrType::Dimension)
+                | (Self::Insets(_), IrType::Insets)
+                | (Self::Radii(_), IrType::Radii)
+                | (Self::Border(_), IrType::Border)
+                | (Self::Shadow(_), IrType::Shadow)
+                | (Self::Transform(_), IrType::Transform)
+                | (Self::AssetHandle(_), IrType::Asset)
                 | (Self::Struct(_), IrType::Struct { .. })
                 | (Self::Enum { .. }, IrType::Enum(_))
                 | (Self::Asset(_), IrType::Asset)
@@ -124,6 +145,13 @@ impl DslValue {
             }
             (Self::Color(value), IrType::Color) => Ok(SchemaValue::Color(*value)),
             (Self::Brush(value), IrType::Brush) => Ok(SchemaValue::Brush(value.clone())),
+            (Self::Dimension(value), IrType::Dimension) => Ok(SchemaValue::Dimension(*value)),
+            (Self::Insets(value), IrType::Insets) => Ok(SchemaValue::Insets(*value)),
+            (Self::Radii(value), IrType::Radii) => Ok(SchemaValue::Radii(*value)),
+            (Self::Border(value), IrType::Border) => Ok(SchemaValue::Border(*value)),
+            (Self::Shadow(value), IrType::Shadow) => Ok(SchemaValue::Shadow(*value)),
+            (Self::Transform(value), IrType::Transform) => Ok(SchemaValue::Transform(*value)),
+            (Self::AssetHandle(value), IrType::Asset) => Ok(SchemaValue::Asset(*value)),
             (Self::Float(value), IrType::Length | IrType::FontSize | IrType::LineHeight) => {
                 Ok(SchemaValue::Dimension(argui_ui::length(*value as f32)))
             }

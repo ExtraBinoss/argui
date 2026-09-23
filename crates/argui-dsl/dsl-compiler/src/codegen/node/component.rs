@@ -189,13 +189,15 @@ impl Context<'_> {
                     handler_scope
                         .locals
                         .insert(*parameter, format!("_parameter_{index}"));
+                    handler_scope
+                        .local_types
+                        .insert(*parameter, lowered.parameters[index].clone());
                 }
-                let statements = event
-                    .statements
-                    .iter()
-                    .map(|statement| self.statement(statement, &handler_scope))
-                    .collect::<Result<Vec<_>, _>>()?
-                    .join(" ");
+                let mut statements = Vec::new();
+                for statement in &event.statements {
+                    statements.push(self.statement(statement, &mut handler_scope)?);
+                }
+                let statements = statements.join(" ");
                 writeln!(output, "{pad}let {variable}: {} = {{ {watches} {captures} Rc::new(RefCell::new(Some(Box::new(move |{parameters}| {{ {statements} }})))) }};", self.callback_type(callback)?).unwrap();
             } else {
                 writeln!(

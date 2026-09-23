@@ -99,8 +99,10 @@ impl TextEngine {
     ) -> std::sync::Arc<TextLayout> {
         let key = TextLayoutKey::new(content, style, viewport);
         if let Some(layout) = self.cache.layout(&key) {
+            self.stats.layout_hits += 1;
             return layout;
         }
+        self.stats.layout_misses += 1;
         let mut buffer = Buffer::new(
             &mut self.fonts,
             cosmic_text::Metrics::new(style.font_size, style.line_height),

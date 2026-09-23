@@ -2,6 +2,7 @@ import { FilePicker } from "@argui/ui"
 import { Column, Rectangle, Row, Text } from "@argui/native"
 
 export component FilePickerPage {
+    in property host_status: string
     callback request_file(mode: string) -> string
     private property file_status: string = "No selection yet."
     private property files_status: string = "No selection yet."
@@ -56,6 +57,7 @@ export component FilePickerPage {
                     on request(mode) { request_count = request_count + 1 save_status = request_file(mode) save_status = save_status == "" ? "Native dialog unavailable in this host." : save_status } }
             }
         }
+        Text { content: host_status color: var(--argui-muted-foreground) font_size: 13.0 }
         Text { content: "Picker requests: " + str(request_count) color: var(--argui-muted-foreground) font_size: 13.0 }
     }
 }

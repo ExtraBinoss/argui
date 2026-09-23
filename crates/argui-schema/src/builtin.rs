@@ -13,9 +13,11 @@ use crate::{
 };
 
 mod common;
+mod container;
 mod flickable;
 mod focus_scope;
 mod key_binding;
+mod layout;
 mod media;
 mod path;
 mod popup_window;
@@ -40,6 +42,7 @@ pub const KEY_BINDING: NativeTypeId = NativeTypeId::from_raw(17);
 pub const POPUP_WINDOW: NativeTypeId = NativeTypeId::from_raw(18);
 pub const FLICKABLE: NativeTypeId = NativeTypeId::from_raw(19);
 pub const VIRTUAL_WINDOW: NativeTypeId = NativeTypeId::from_raw(20);
+pub const GRID: NativeTypeId = NativeTypeId::from_raw(21);
 
 pub const CHILDREN: SlotId = SlotId::from_raw(1);
 pub const KEY: PropertyId = PropertyId::from_raw(1);
@@ -157,9 +160,62 @@ pub const TEXT_OVERFLOW: PropertyId = PropertyId::from_raw(112);
 pub const SHADOW_BLUR: PropertyId = PropertyId::from_raw(113);
 pub const SHADOW_OFFSET_Y: PropertyId = PropertyId::from_raw(114);
 pub const SHADOW_COLOR: PropertyId = PropertyId::from_raw(115);
+pub const POSITION: PropertyId = PropertyId::from_raw(163);
+pub const INSET_LEFT: PropertyId = PropertyId::from_raw(164);
+pub const INSET_RIGHT: PropertyId = PropertyId::from_raw(165);
+pub const INSET_TOP: PropertyId = PropertyId::from_raw(166);
+pub const INSET_BOTTOM: PropertyId = PropertyId::from_raw(167);
+pub const Z_INDEX: PropertyId = PropertyId::from_raw(168);
+pub const VARIABLE_HEIGHT: PropertyId = PropertyId::from_raw(169);
+pub const MEASURED_WIDTH: PropertyId = PropertyId::from_raw(170);
+pub const MEASURED_HEIGHT: PropertyId = PropertyId::from_raw(171);
 pub const MAX_DIGITS: PropertyId = PropertyId::from_raw(116);
 pub const MOUSE_GLOBAL_X: PropertyId = PropertyId::from_raw(117);
 pub const MOUSE_GLOBAL_Y: PropertyId = PropertyId::from_raw(118);
+pub const GRID_ROWS: PropertyId = PropertyId::from_raw(119);
+pub const GRID_COLUMNS: PropertyId = PropertyId::from_raw(120);
+pub const GRID_ROW_START: PropertyId = PropertyId::from_raw(121);
+pub const GRID_ROW_SPAN: PropertyId = PropertyId::from_raw(122);
+pub const GRID_COLUMN_START: PropertyId = PropertyId::from_raw(123);
+pub const GRID_COLUMN_SPAN: PropertyId = PropertyId::from_raw(124);
+pub const MAX_WIDTH: PropertyId = PropertyId::from_raw(125);
+pub const MAX_HEIGHT: PropertyId = PropertyId::from_raw(126);
+pub const ASPECT_RATIO: PropertyId = PropertyId::from_raw(127);
+pub const FLEX_BASIS: PropertyId = PropertyId::from_raw(128);
+pub const ROW_GAP: PropertyId = PropertyId::from_raw(129);
+pub const COLUMN_GAP: PropertyId = PropertyId::from_raw(130);
+pub const PADDING_LEFT: PropertyId = PropertyId::from_raw(131);
+pub const PADDING_RIGHT: PropertyId = PropertyId::from_raw(132);
+pub const PADDING_TOP: PropertyId = PropertyId::from_raw(133);
+pub const PADDING_BOTTOM: PropertyId = PropertyId::from_raw(134);
+pub const MARGIN_LEFT: PropertyId = PropertyId::from_raw(135);
+pub const MARGIN_RIGHT: PropertyId = PropertyId::from_raw(136);
+pub const MARGIN_TOP: PropertyId = PropertyId::from_raw(137);
+pub const MARGIN_BOTTOM: PropertyId = PropertyId::from_raw(138);
+pub const SCALE_X: PropertyId = PropertyId::from_raw(139);
+pub const SCALE_Y: PropertyId = PropertyId::from_raw(140);
+pub const TRANSLATE_X: PropertyId = PropertyId::from_raw(141);
+pub const TRANSLATE_Y: PropertyId = PropertyId::from_raw(142);
+pub const ORIGIN_X: PropertyId = PropertyId::from_raw(143);
+pub const ORIGIN_Y: PropertyId = PropertyId::from_raw(144);
+pub const QUERY_SCOPE: PropertyId = PropertyId::from_raw(145);
+pub const QUERY_MIN_WIDTH: PropertyId = PropertyId::from_raw(146);
+pub const QUERY_COLUMNS: PropertyId = PropertyId::from_raw(147);
+pub const ALIGN_SELF: PropertyId = PropertyId::from_raw(148);
+pub const JUSTIFY_ITEMS: PropertyId = PropertyId::from_raw(149);
+pub const JUSTIFY_SELF: PropertyId = PropertyId::from_raw(150);
+pub const ALIGN_CONTENT: PropertyId = PropertyId::from_raw(151);
+pub const GRID_AUTO_FLOW: PropertyId = PropertyId::from_raw(152);
+pub const RADIUS_TOP_LEFT: PropertyId = PropertyId::from_raw(153);
+pub const RADIUS_TOP_RIGHT: PropertyId = PropertyId::from_raw(154);
+pub const RADIUS_BOTTOM_RIGHT: PropertyId = PropertyId::from_raw(155);
+pub const RADIUS_BOTTOM_LEFT: PropertyId = PropertyId::from_raw(156);
+pub const BORDER_LEFT: PropertyId = PropertyId::from_raw(157);
+pub const BORDER_RIGHT: PropertyId = PropertyId::from_raw(158);
+pub const BORDER_TOP: PropertyId = PropertyId::from_raw(159);
+pub const BORDER_BOTTOM: PropertyId = PropertyId::from_raw(160);
+pub const SHADOW_OFFSET_X: PropertyId = PropertyId::from_raw(161);
+pub const SHADOW_SPREAD: PropertyId = PropertyId::from_raw(162);
 
 pub const CLICK: EventId = EventId::from_raw(1);
 pub const FOCUS: EventId = EventId::from_raw(2);
@@ -192,9 +248,10 @@ pub const TEXT_EDIT: EventId = EventId::from_raw(23);
 /// Returns a schema error if the built-in definitions violate registry invariants.
 pub fn registry() -> Result<SchemaRegistry, SchemaError> {
     let mut registry = SchemaRegistry::new();
-    register_container(&mut registry, CONTAINER, "Container", Element::container)?;
-    register_container(&mut registry, ROW, "Row", Element::row)?;
-    register_container(&mut registry, COLUMN, "Column", Element::column)?;
+    container::register(&mut registry, CONTAINER, "Container", Element::container)?;
+    container::register(&mut registry, ROW, "Row", Element::row)?;
+    container::register(&mut registry, COLUMN, "Column", Element::column)?;
+    container::register(&mut registry, GRID, "Grid", Element::grid)?;
     rectangle::register(&mut registry)?;
     touch_area::register(&mut registry)?;
     focus_scope::register(&mut registry)?;
@@ -391,161 +448,4 @@ pub fn registry() -> Result<SchemaRegistry, SchemaError> {
     media::register(&mut registry)?;
     virtual_window::register(&mut registry)?;
     Ok(registry)
-}
-
-fn register_container(
-    registry: &mut SchemaRegistry,
-    id: NativeTypeId,
-    name: &'static str,
-    constructor: fn(Vec<Element>) -> Element,
-) -> Result<(), SchemaError> {
-    let schema = NativeSchema::new(id, name, format!("Native {name} layout primitive."))
-        .property(common_property(CommonProperty::Key))
-        .property(common_property(CommonProperty::Tooltip))
-        .property(common_property(CommonProperty::Width))
-        .property(common_property(CommonProperty::Height))
-        .property(common_property(CommonProperty::X))
-        .property(common_property(CommonProperty::Y))
-        .property(common_property(CommonProperty::Rotation))
-        .property(common_property(CommonProperty::Opacity))
-        .property(common_property(CommonProperty::BackdropFilter))
-        .property(common_property(CommonProperty::Visible))
-        .property(common_property(CommonProperty::MinWidth))
-        .property(common_property(CommonProperty::MinHeight))
-        .property(common_property(CommonProperty::Background))
-        .property(common_property(CommonProperty::SelectionFill))
-        .property(common_property(CommonProperty::SelectionColor))
-        .property(common_property(CommonProperty::SelectionRadius))
-        .property(common_property(CommonProperty::Gap))
-        .property(common_property(CommonProperty::Padding))
-        .property(PropertySchema::new(
-            SCROLL_Y,
-            "scroll_y",
-            ValueType::Bool,
-            "Enable vertical scrolling and a visible scrollbar.",
-        ))
-        .property(PropertySchema::new(
-            SCROLLBAR_THUMB,
-            "scrollbar_thumb",
-            ValueType::Color,
-            "Color of the vertical scrollbar thumb.",
-        ))
-        .property(PropertySchema::new(
-            WRAP,
-            "wrap",
-            ValueType::Bool,
-            "Wrap children when space is narrow.",
-        ))
-        .property(PropertySchema::new(
-            GROW,
-            "grow",
-            ValueType::Float,
-            "Flex growth factor.",
-        ))
-        .property(PropertySchema::new(
-            SHRINK,
-            "shrink",
-            ValueType::Float,
-            "Flex shrink factor.",
-        ))
-        .property(PropertySchema::new(
-            BORDER_COLOR,
-            "border_color",
-            ValueType::Color,
-            "Outline color.",
-        ))
-        .property(PropertySchema::new(
-            RADIUS,
-            "radius",
-            ValueType::Float,
-            "Corner radius in logical pixels.",
-        ))
-        .property(PropertySchema::new(
-            ALIGN_ITEMS,
-            "align_items",
-            ValueType::String,
-            "Cross-axis alignment of children.",
-        ))
-        .property(PropertySchema::new(
-            JUSTIFY_CONTENT,
-            "justify_content",
-            ValueType::String,
-            "Main-axis distribution of children.",
-        ))
-        .event(common_event(CLICK, "click", EventType::Click))
-        .event(common_event(FOCUS, "focus", EventType::Focus))
-        .event(common_event(BLUR, "blur", EventType::Blur))
-        .slot(SlotSchema {
-            id: CHILDREN,
-            name: "children".into(),
-            arity: SlotArity::Many,
-            documentation: "Ordered visual children.".into(),
-        });
-    registry.register(schema, move |input: &NativeElementInput| {
-        let children = input.children(CHILDREN).to_vec();
-        let mut element = apply_container(apply_common(constructor(children), input)?, input);
-        if optional_bool(input, WRAP) == Some(true) {
-            element = element.flex_wrap(FlexWrap::Wrap);
-        }
-        if let Some(SchemaValue::Float(grow)) = input.get(GROW) {
-            element = element.grow(*grow);
-        }
-        if let Some(SchemaValue::Float(shrink)) = input.get(SHRINK) {
-            element = element.shrink(*shrink);
-        }
-        if let Some(SchemaValue::Color(color)) = input.get(BORDER_COLOR) {
-            element = element.border(Border::all(1.0, *color));
-        }
-        if let Some(SchemaValue::Float(radius)) = input.get(RADIUS) {
-            element = element.radius(CornerRadii::all(*radius));
-        }
-        if let Some(SchemaValue::String(value)) = input.get(ALIGN_ITEMS) {
-            element = element.align_items(match value.as_str() {
-                "start" => AlignItems::START,
-                "center" => AlignItems::CENTER,
-                "end" => AlignItems::END,
-                "stretch" => AlignItems::STRETCH,
-                _ => {
-                    return Err(SchemaError::Adapter(format!(
-                        "{name} does not support align_items `{value}`"
-                    )));
-                }
-            });
-        }
-        if let Some(SchemaValue::String(value)) = input.get(JUSTIFY_CONTENT) {
-            element = element.justify_content(match value.as_str() {
-                "start" => JustifyContent::START,
-                "center" => JustifyContent::CENTER,
-                "end" => JustifyContent::END,
-                "space_between" => JustifyContent::SPACE_BETWEEN,
-                "space_around" => JustifyContent::SPACE_AROUND,
-                "space_evenly" => JustifyContent::SPACE_EVENLY,
-                _ => {
-                    return Err(SchemaError::Adapter(format!(
-                        "{name} does not support justify_content `{value}`"
-                    )));
-                }
-            });
-        }
-        if optional_bool(input, SCROLL_Y) == Some(true) {
-            let thumb = match input.get(SCROLLBAR_THUMB) {
-                Some(SchemaValue::Color(color)) => *color,
-                _ => argui_core::Color::srgba(0.45, 0.50, 0.57, 0.75),
-            };
-            let scrollbar = argui_ui::ScrollbarStyle::new(
-                argui_ui::ScrollbarPartStyle::new(argui_paint::QuadStyle::default()),
-                argui_ui::ScrollbarPartStyle::new(argui_paint::QuadStyle::solid(thumb)),
-            )
-            .width(8.0)
-            .visibility(argui_ui::ScrollbarVisibility::Always);
-            element = element
-                .overflow(argui_ui::Axes {
-                    x: argui_ui::Overflow::Hidden,
-                    y: argui_ui::Overflow::Auto,
-                })
-                .scroll_config(argui_ui::ScrollConfig::default().scrollbar(scrollbar))
-                .scrollbar_gutter(argui_ui::ScrollbarGutter::Stable);
-        }
-        Ok(apply_events(element, input))
-    })
 }

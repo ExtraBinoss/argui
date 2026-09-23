@@ -152,3 +152,55 @@ fn effectful_callbacks_are_restricted_to_handlers() {
             .any(|issue| issue.message.contains("only be invoked in a handler"))
     );
 }
+
+/// Handler locals can be assigned and read within their lexical branch.
+#[test]
+fn accepts_typed_handler_locals_and_branches() {
+    let source = "import { TouchArea } from \"@argui/native\" export component App { private property count: int = 0 TouchArea { on click { let next = count + 1; if next > 2 { let increment = 2; next += increment } else { next += 1 } count = next } } }";
+    assert!(diagnostics(source).is_empty(), "{:?}", diagnostics(source));
+}
+
+/// Branch locals disappear after the block and return checks inspect both paths.
+#[test]
+fn rejects_leaked_branch_locals_and_partial_returns() {
+    let leaked = "import { TouchArea } from \"@argui/native\" export component App { TouchArea { on click { if true { let inside = 2 } else { let other = 3 } inside = 4 } } }";
+    assert!(
+        diagnostics(leaked)
+            .iter()
+            .any(|issue| issue.code == DiagnosticCode::UnknownName)
+    );
+    let partial = "component Child { callback compute() -> int } export component App { Child { on compute { if true { return 1 } else { let x = 2 } } } }";
+    assert!(
+        diagnostics(partial)
+            .iter()
+            .any(|issue| issue.message.contains("handler must return"))
+    );
+}
+
+/// User struct literals check complete named fields before IR lowering.
+#[test]
+fn checks_typed_struct_literals() {
+    let header = "struct Pair { left: int right: string } export component App {";
+    let valid =
+        format!("{header} private property pair: Pair = Pair {{ left: 1, right: \"ok\" }} }}");
+    assert!(diagnostics(&valid).is_empty(), "{:?}", diagnostics(&valid));
+    for (fields, code) in [
+        ("left: 1", DiagnosticCode::TypeMismatch),
+        ("left: true, right: \"ok\"", DiagnosticCode::TypeMismatch),
+        (
+            "left: 1, right: \"ok\", extra: 3",
+            DiagnosticCode::UnknownName,
+        ),
+        (
+            "left: 1, left: 2, right: \"ok\"",
+            DiagnosticCode::DuplicateMember,
+        ),
+    ] {
+        let source = format!("{header} private property pair: Pair = Pair {{ {fields} }} }}");
+        assert!(
+            diagnostics(&source).iter().any(|issue| issue.code == code),
+            "{source}: {:?}",
+            diagnostics(&source)
+        );
+    }
+}

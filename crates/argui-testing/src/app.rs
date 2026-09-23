@@ -270,9 +270,14 @@ impl<A: Render> TestApp<A> {
             .layout
             .as_ref()
             .map_or(&[][..], |layout| layout.scroll_regions.as_slice());
-        let changed =
-            self.model
-                .refresh_interaction_observations(ui, regions, scroll_regions, None);
+        let snapshot = self.layout_snapshot();
+        let changed = self.model.refresh_interaction_observations(
+            ui,
+            regions,
+            scroll_regions,
+            None,
+            Some(&snapshot),
+        );
         self.pending |= changed;
     }
 

@@ -126,10 +126,11 @@ pub(super) fn validate(
             .find(|child| child.kind() == SyntaxKind::Expr)
         {
             let mut context = expression::Context {
+                symbols: scope.symbols.clone(),
                 file,
                 properties,
                 callbacks,
-                locals,
+                locals: locals.clone(),
                 definitions,
                 theme_tokens,
                 references: Some(references),

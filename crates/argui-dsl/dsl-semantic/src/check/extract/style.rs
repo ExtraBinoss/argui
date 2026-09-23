@@ -42,10 +42,11 @@ pub(super) fn validate(
     let callbacks = HashMap::new();
     let locals = HashMap::new();
     let mut context = expression::Context {
+        symbols: HashMap::new(),
         file,
         properties: &properties,
         callbacks: &callbacks,
-        locals: &locals,
+        locals: locals.clone(),
         definitions,
         theme_tokens: tokens,
         references: None,

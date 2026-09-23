@@ -49,6 +49,25 @@ impl LanguageServer {
         })
     }
 
+    /// Creates a language server with the application's exact native registry.
+    ///
+    /// * `root` — project source root.
+    /// * `registry` — built-ins plus application primitive contracts.
+    ///
+    /// # Errors
+    ///
+    /// Returns workspace traversal errors while indexing sources.
+    pub fn with_registry(
+        root: PathBuf,
+        registry: argui_schema::SchemaRegistry,
+    ) -> Result<Self, ServerError> {
+        Ok(Self {
+            workspace: Workspace::load_with_registry(root, registry)?,
+            shutdown: false,
+            exited: false,
+        })
+    }
+
     /// Processes one decoded JSON-RPC message and returns outbound messages.
     ///
     /// Requests produce one response; document notifications may produce diagnostics.

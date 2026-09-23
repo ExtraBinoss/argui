@@ -34,6 +34,26 @@ export component Main { FocusScope #focus_area { has_focus: true } }"#,
     );
 }
 
+/// Completed layout measurements cannot feed geometry in the same render pass.
+#[test]
+fn measured_bounds_cannot_drive_layout_directly() {
+    let mut database = CompilerDatabase::with_builtins().unwrap();
+    database.set_file(
+        "app.argui",
+        r#"import { Column } from "@argui/native"
+export component Main { Column #box { width: box.measured_width } }"#,
+    );
+    let checked = database.check();
+    assert!(
+        checked
+            .diagnostics
+            .iter()
+            .any(|item| item.code == DiagnosticCode::BindingCycle),
+        "{:?}",
+        checked.diagnostics
+    );
+}
+
 #[test]
 fn explicitly_identified_native_outputs_are_typed_in_sibling_bindings() {
     let mut database = CompilerDatabase::with_builtins().unwrap();

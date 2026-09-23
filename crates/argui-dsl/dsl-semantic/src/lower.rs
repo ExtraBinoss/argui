@@ -40,6 +40,7 @@ pub(crate) enum LoweredKind {
     Theme,
     Style,
     Effect,
+    Function,
 }
 
 /// Extracts declaration shells while preserving source syntax for later typed passes.
@@ -86,6 +87,7 @@ fn definition_header(declaration: &Declaration) -> Option<(LoweredKind, String, 
         Declaration::Theme(_) => (LoweredKind::Theme, "theme"),
         Declaration::Style(_) => (LoweredKind::Style, "style"),
         Declaration::Effect(_) => (LoweredKind::Effect, "effect"),
+        Declaration::Function(_) => (LoweredKind::Function, "function"),
         Declaration::Import(_) => return None,
     };
     let name = direct_tokens(declaration.syntax())

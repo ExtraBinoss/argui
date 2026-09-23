@@ -185,6 +185,7 @@ fn package(generation: u64) -> LiveMessage {
         header: PackageHeader::current(42, generation),
         roots: Vec::new(),
         ir: argui_dsl_ir::IrProject {
+            native_schema_hash: 0,
             modules: Vec::new(),
             structs: Vec::new(),
             enums: Vec::new(),

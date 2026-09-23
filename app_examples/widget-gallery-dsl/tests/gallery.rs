@@ -66,6 +66,7 @@ fn gallery_navigation_opens_component_pages() {
         ("Input & Search", "Controlled values, search"),
         ("Card", "A composable surface"),
         ("Badge", "Compact status markers"),
+        ("Typography & selection", "Small text, precise detail"),
         ("Separator", "A quiet divider"),
         ("Switch", "A theme-aware toggle"),
         ("Media", "Project images and SVGs"),

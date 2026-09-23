@@ -287,3 +287,23 @@ fn parser_reports_an_expression_missing_at_end_of_file() {
             .any(|diagnostic| diagnostic.message.contains("expected expression"))
     );
 }
+
+#[test]
+fn handler_locals_branches_and_safe_index_round_trip_losslessly() {
+    let source = "component Main { Button { on click { let selected = values[0]; if is_some(selected) { let next = unwrap_or(selected, 0); count += next } else { count += 1 } } } }";
+    let parsed = parse(source);
+    assert!(
+        parsed.diagnostics().is_empty(),
+        "{:#?}",
+        parsed.diagnostics()
+    );
+    assert_eq!(parsed.syntax().to_string(), source);
+    assert_eq!(
+        parsed
+            .syntax()
+            .descendants()
+            .filter(|node| node.kind() == argui_dsl_syntax::SyntaxKind::IfStatement)
+            .count(),
+        1
+    );
+}

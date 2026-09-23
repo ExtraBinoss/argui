@@ -18,6 +18,7 @@ argui-dsl-protocol = { path = "../dsl-protocol" }
 argui-schema.workspace = true
 argui-paint.workspace = true
 argui-render.workspace = true
+argui-reactive.workspace = true
 argui-shader.workspace = true
 argui-ui.workspace = true
 argui-runtime = { workspace = true, features = ["tasks"] }

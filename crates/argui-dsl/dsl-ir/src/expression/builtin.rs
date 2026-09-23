@@ -18,6 +18,34 @@ pub(super) fn lower_call(
     context: &mut Context<'_>,
 ) -> Option<IrExpression> {
     use BuiltinFunction as Function;
+    if name == "is_some" || name == "unwrap_or" {
+        let arguments = arguments
+            .iter()
+            .map(|argument| lower(argument, context))
+            .collect::<Vec<_>>();
+        let function = if name == "is_some" {
+            Function::IsSome
+        } else {
+            Function::UnwrapOr
+        };
+        let value_type = if name == "is_some" {
+            IrType::Bool
+        } else {
+            match arguments.first().map(|argument| &argument.value_type) {
+                Some(IrType::Optional(inner)) => (**inner).clone(),
+                _ => IrType::Unknown,
+            }
+        };
+        return Some(IrExpression {
+            id: expression_id(source),
+            value_type,
+            kind: IrExpressionKind::BuiltinCall {
+                function,
+                arguments,
+            },
+            source: source.clone(),
+        });
+    }
     let (function, value_type) = match name {
         "solid" => (Function::Solid, IrType::Brush),
         "linear_gradient" => (Function::LinearGradient, IrType::Brush),

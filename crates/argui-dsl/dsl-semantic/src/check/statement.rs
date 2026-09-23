@@ -12,6 +12,41 @@ pub(super) fn check(node: &SyntaxNode, result: &Type, context: &mut Context<'_, 
         .children()
         .filter(|child| child.kind() == SyntaxKind::Expr)
         .collect::<Vec<_>>();
+    if direct_tokens(node).any(|token| token.kind() == SyntaxKind::LetKw) {
+        let [destination, value] = values.as_slice() else {
+            context.diagnostics.push(Diagnostic::error(
+                DiagnosticCode::TypeMismatch,
+                "let requires a name and initializer",
+                Span::new(context.file, node.text_range()),
+            ));
+            return;
+        };
+        let Some(name) = property_name(destination) else {
+            context.diagnostics.push(Diagnostic::error(
+                DiagnosticCode::ReadOnlyProperty,
+                "let requires a bare local name",
+                Span::new(context.file, destination.text_range()),
+            ));
+            return;
+        };
+        if context.locals.contains_key(&name) || context.properties.contains_key(&name) {
+            context.diagnostics.push(Diagnostic::error(
+                DiagnosticCode::DuplicateMember,
+                format!("local `{name}` already exists in this scope"),
+                Span::new(context.file, destination.text_range()),
+            ));
+        }
+        if !direct_tokens(node).any(|token| token.kind() == SyntaxKind::Eq) {
+            context.diagnostics.push(Diagnostic::error(
+                DiagnosticCode::TypeMismatch,
+                "let requires `=` before its initializer",
+                Span::new(context.file, node.text_range()),
+            ));
+        }
+        let actual = expression::infer(value, context);
+        context.locals.insert(name, actual);
+        return;
+    }
     if direct_tokens(node).any(|token| token.kind() == SyntaxKind::ReturnKw) {
         let actual = values
             .first()
@@ -42,8 +77,8 @@ pub(super) fn check(node: &SyntaxNode, result: &Type, context: &mut Context<'_, 
     let expected = expression::infer(destination, context);
     let actual = expression::infer(value, context);
     let writable = target.as_ref().is_some_and(|name| {
-        !context.locals.contains_key(name)
-            && context
+        context.locals.contains_key(name)
+            || context
                 .properties
                 .get(name)
                 .is_some_and(|property| property.direction != PropertyDirection::Input)

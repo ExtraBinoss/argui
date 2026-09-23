@@ -26,6 +26,7 @@ pub(super) fn collect_sites(
         .filter(|element| {
             !element
                 .ancestors()
+                .take_while(|ancestor| ancestor != node)
                 .any(|ancestor| ancestor.kind() == SyntaxKind::ForExpr)
         })
         .filter_map(|element| {
@@ -66,6 +67,7 @@ pub(crate) fn collect(
         };
         if element
             .ancestors()
+            .take_while(|ancestor| ancestor != node)
             .any(|ancestor| ancestor.kind() == SyntaxKind::ForExpr)
         {
             continue;
@@ -107,12 +109,10 @@ pub(crate) fn collect(
             .get(&element_name)
             .and_then(|id| tables.component_members.get(id))
         {
-            if element
+            let conditional = element
                 .ancestors()
-                .any(|ancestor| ancestor.kind() == SyntaxKind::IfExpr)
-            {
-                continue;
-            }
+                .take_while(|ancestor| ancestor != node)
+                .any(|ancestor| ancestor.kind() == SyntaxKind::IfExpr);
             members
                 .properties
                 .iter()
@@ -122,7 +122,12 @@ pub(crate) fn collect(
                         expression::ReferenceProperty::Child {
                             site,
                             property: *property,
-                            value_type: value_type.clone(),
+                            value_type: if conditional {
+                                IrType::Optional(Box::new(value_type.clone()))
+                            } else {
+                                value_type.clone()
+                            },
+                            optional: conditional,
                         },
                     )
                 })

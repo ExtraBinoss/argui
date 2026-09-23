@@ -30,6 +30,7 @@ mod client_behavior {
 
     fn empty_project() -> IrProject {
         IrProject {
+            native_schema_hash: 0,
             modules: Vec::new(),
             structs: Vec::new(),
             enums: Vec::new(),

@@ -38,7 +38,16 @@ impl LiveRuntime {
         identity_owner: InstanceId,
         repeater_key: Option<&DslValue>,
         context: &mut Option<&mut argui_runtime::Context<Self>>,
-    ) -> Result<(Vec<argui_ui::Element>, usize, usize, f32), RuntimeError> {
+    ) -> Result<
+        (
+            Vec<argui_ui::Element>,
+            usize,
+            usize,
+            f32,
+            argui_ui::VirtualList,
+        ),
+        RuntimeError,
+    > {
         let row_height = self.virtual_float(
             instance,
             properties,
@@ -72,6 +81,13 @@ impl LiveRuntime {
             argui_schema::builtin::OVERSCAN,
             locals,
             3,
+        )?;
+        let variable = self.virtual_bool(
+            instance,
+            properties,
+            argui_schema::builtin::VARIABLE_HEIGHT,
+            locals,
+            false,
         )?;
         if !row_height.is_finite()
             || row_height <= 0.0
@@ -120,43 +136,61 @@ impl LiveRuntime {
                 "VirtualWindow template requires one keyed repeater".into(),
             ));
         };
-        let mounted = |items: &[DslValue]| {
-            let window = argui_ui::VirtualList::fixed(items.len(), row_height, viewport)
-                .overscan(overscan)
-                .window(offset);
+        let mounted = |items: &[DslValue],
+                       ids: &[u64],
+                       viewports: &mut argui_schema::VirtualViewportStore| {
+            let list = if variable {
+                viewports.list(&viewport_identity, ids, row_height, viewport, overscan)
+            } else {
+                argui_ui::VirtualList::fixed(items.len(), row_height, viewport).overscan(overscan)
+            };
+            let window = list.window(offset);
             let first = window.range.start;
             let selected = window
                 .range
                 .map(|index| items[index].clone())
                 .collect::<Vec<_>>();
-            (items.len(), first, selected)
+            (items.len(), first, selected, list)
         };
-        let (count, start, selected) = if let IrExpressionKind::PropertyRead(property) = &model.kind
-        {
-            let value = row_instance
-                .properties
-                .get(property)
-                .ok_or(RuntimeError::MissingProperty(property.raw()))?
-                .get();
-            let DslValue::Array(items) = value else {
-                return Err(RuntimeError::TypeMismatch {
-                    expected: "model/array".into(),
-                    actual: value.type_name().into(),
-                });
+        let (count, start, selected, list) =
+            if let IrExpressionKind::PropertyRead(property) = &model.kind {
+                let model_property = row_instance
+                    .properties
+                    .get(property)
+                    .ok_or(RuntimeError::MissingProperty(property.raw()))?;
+                let value = model_property.get();
+                let DslValue::Array(items) = value else {
+                    return Err(RuntimeError::TypeMismatch {
+                        expected: "model/array".into(),
+                        actual: value.type_name().into(),
+                    });
+                };
+                let ids = if variable {
+                    model_property.model_row_ids().map_or_else(
+                        || (1..=items.len() as u64).collect::<Vec<_>>(),
+                        <[u64]>::to_vec,
+                    )
+                } else {
+                    Vec::new()
+                };
+                mounted(items, &ids, &mut self.virtual_viewports)
+            } else {
+                // Computed model expressions currently evaluate into an owned array;
+                // direct model properties above clone only the mounted window.
+                let value = self.evaluate(row_instance, model, row_locals)?;
+                let DslValue::Array(items) = value else {
+                    return Err(RuntimeError::TypeMismatch {
+                        expected: "model/array".into(),
+                        actual: value.type_name().into(),
+                    });
+                };
+                let ids = if variable {
+                    (1..=items.len() as u64).collect::<Vec<_>>()
+                } else {
+                    Vec::new()
+                };
+                mounted(&items, &ids, &mut self.virtual_viewports)
             };
-            mounted(items)
-        } else {
-            // Computed model expressions currently evaluate into an owned array;
-            // direct model properties above clone only the mounted window.
-            let value = self.evaluate(row_instance, model, row_locals)?;
-            let DslValue::Array(items) = value else {
-                return Err(RuntimeError::TypeMismatch {
-                    expected: "model/array".into(),
-                    actual: value.type_name().into(),
-                });
-            };
-            mounted(&items)
-        };
         let mut rows = Vec::with_capacity(selected.len());
         let mut keys = std::collections::HashSet::new();
         let row_owner = super::identity::child_instance_id(identity_owner, site, repeater_key);
@@ -189,7 +223,40 @@ impl LiveRuntime {
                 argui_ui::Element::column(rendered)
             });
         }
-        Ok((rows, count, start, viewport))
+        Ok((rows, count, start, viewport, list))
+    }
+
+    /// Reads an optional boolean VirtualWindow feature assignment.
+    ///
+    /// `instance` owns the expression; `properties` contain assignments;
+    /// `id` selects the property; `locals` resolve lexical values; `fallback`
+    /// applies when it is omitted. Returns the checked boolean.
+    ///
+    /// # Errors
+    ///
+    /// Returns a type mismatch for a non-boolean expression.
+    fn virtual_bool(
+        &mut self,
+        instance: &mut ComponentInstance,
+        properties: &[IrPropertyBinding],
+        id: argui_schema::PropertyId,
+        locals: &HashMap<LocalId, DslValue>,
+        fallback: bool,
+    ) -> Result<bool, RuntimeError> {
+        let Some(binding) = properties
+            .iter()
+            .find(|binding| binding.target == PropertyTargetId::Native(id))
+        else {
+            return Ok(fallback);
+        };
+        let value = self.evaluate(instance, &binding.value, locals)?;
+        match value {
+            DslValue::Bool(value) => Ok(value),
+            _ => Err(RuntimeError::TypeMismatch {
+                expected: "bool".into(),
+                actual: value.type_name().into(),
+            }),
+        }
     }
 
     /// Evaluates one VirtualWindow float property, with a fallback for optional values.

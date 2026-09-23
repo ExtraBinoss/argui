@@ -13,6 +13,7 @@ pub(super) fn supplied(
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     let mut seen = HashSet::new();
+    let mut supplied_counts = HashMap::new();
     for supplied in node
         .children()
         .filter(|node| node.kind() == SyntaxKind::SlotContent)
@@ -26,6 +27,28 @@ pub(super) fn supplied(
                 "slot is supplied more than once",
             );
         }
+        let visuals = supplied
+            .children()
+            .find(|child| child.kind() == SyntaxKind::Block)
+            .into_iter()
+            .flat_map(|block| block.children())
+            .filter(|child| {
+                matches!(
+                    child.kind(),
+                    SyntaxKind::Element
+                        | SyntaxKind::PathExpr
+                        | SyntaxKind::ForExpr
+                        | SyntaxKind::IfExpr
+                )
+            })
+            .collect::<Vec<_>>();
+        let dynamic = visuals.iter().any(|child| {
+            matches!(
+                child.kind(),
+                SyntaxKind::PathExpr | SyntaxKind::ForExpr | SyntaxKind::IfExpr
+            )
+        });
+        supplied_counts.insert(name.clone(), (visuals.len(), dynamic));
         if !component.is_some_and(|component| component.slots.iter().any(|slot| slot.name == name))
         {
             issue(
@@ -57,6 +80,60 @@ pub(super) fn supplied(
             node,
             "component does not declare a content slot",
         );
+    }
+    if let Some(component) = component {
+        for (index, slot) in component.slots.iter().enumerate() {
+            let count = supplied_counts.get(&slot.name).copied().or_else(|| {
+                (index == 0 && implicit && seen.is_empty()).then(|| {
+                    let visuals = node
+                        .children()
+                        .filter(|child| {
+                            matches!(
+                                child.kind(),
+                                SyntaxKind::Element
+                                    | SyntaxKind::PathExpr
+                                    | SyntaxKind::ForExpr
+                                    | SyntaxKind::IfExpr
+                            )
+                        })
+                        .collect::<Vec<_>>();
+                    let dynamic = visuals.iter().any(|child| {
+                        matches!(
+                            child.kind(),
+                            SyntaxKind::PathExpr | SyntaxKind::ForExpr | SyntaxKind::IfExpr
+                        )
+                    });
+                    (visuals.len(), dynamic)
+                })
+            });
+            if slot.required && count.is_none_or(|(count, _)| count == 0) {
+                issue(
+                    diagnostics,
+                    file,
+                    node,
+                    format!("required slot `{}` is missing", slot.name),
+                );
+            }
+            if slot.single && count.is_some_and(|(count, _)| count > 1) {
+                issue(
+                    diagnostics,
+                    file,
+                    node,
+                    format!("slot `{}` accepts one visual child", slot.name),
+                );
+            }
+            if slot.single && count.is_some_and(|(_, dynamic)| dynamic) {
+                issue(
+                    diagnostics,
+                    file,
+                    node,
+                    format!(
+                        "slot `{}` cannot prove single-child cardinality with dynamic content",
+                        slot.name
+                    ),
+                );
+            }
+        }
     }
 }
 

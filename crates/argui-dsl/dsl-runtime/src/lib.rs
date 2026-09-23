@@ -7,6 +7,7 @@ mod error;
 mod event;
 mod inspection;
 mod instance;
+mod live_value;
 mod native;
 mod observation;
 mod package;
@@ -17,12 +18,14 @@ mod value;
 #[cfg(target_arch = "wasm32")]
 mod web_client;
 
+pub use argui_dsl_ir as ir;
 pub use bytecode::{EvaluationContext, Instruction, Program};
 #[cfg(not(target_arch = "wasm32"))]
 pub use client::LiveClient;
 pub use error::RuntimeError;
 pub use inspection::{InstanceInspection, RuntimeInspection};
 pub use instance::{ComponentInstance, DynamicProperty, InstanceId};
+pub use live_value::LiveValue;
 pub use package::{AssetPayload, LivePackage};
 pub use runtime::{LiveRuntime, PreparedReload, ReloadOutcome};
 pub use transport::ClientEvent;

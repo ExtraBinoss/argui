@@ -343,6 +343,7 @@ name = "argui-dsl-build"
 version = "0.3.2"
 dependencies = [
  "argui-dsl-compiler",
+ "argui-schema",
  "tempfile",
 ]
 
@@ -418,6 +419,7 @@ dependencies = [
  "argui-dsl-stdlib",
  "argui-dsl-syntax",
  "argui-paint",
+ "argui-reactive",
  "argui-render",
  "argui-runtime",
  "argui-schema",
@@ -705,6 +707,7 @@ version = "0.3.2"
 dependencies = [
  "argui-core",
  "cosmic-text",
+ "swash",
  "unicode-segmentation",
 ]
 

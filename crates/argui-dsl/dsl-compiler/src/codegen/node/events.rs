@@ -108,6 +108,14 @@ impl Context<'_> {
                     };
                 writeln!(output, "{pad}        let {value} = {extraction};").unwrap();
                 handler_scope.locals.insert(*parameter, value);
+                handler_scope.local_types.insert(
+                    *parameter,
+                    match event_schema.payload {
+                        Some(argui_schema::ValueType::String) => argui_dsl_ir::IrType::String,
+                        Some(argui_schema::ValueType::Float) => argui_dsl_ir::IrType::Float,
+                        _ => argui_dsl_ir::IrType::Unknown,
+                    },
+                );
             }
             for (binding, value_type) in updates {
                 self.emit_two_way_update(output, binding, value_type, event_schema.id, pad, scope)?;
@@ -117,7 +125,7 @@ impl Context<'_> {
                     writeln!(
                         output,
                         "{pad}        {}",
-                        self.statement(statement, &handler_scope)?
+                        self.statement(statement, &mut handler_scope)?
                     )
                     .unwrap();
                 }

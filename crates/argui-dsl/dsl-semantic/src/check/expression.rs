@@ -10,10 +10,13 @@ use crate::{
 mod builtins;
 mod control;
 mod focus;
+mod function;
 mod gradient;
+mod index;
 mod member;
 mod operator;
 mod scroll;
+mod struct_literal;
 
 use operator::direct_operator;
 
@@ -21,7 +24,8 @@ pub(super) struct Context<'a, 'd> {
     pub file: FileId,
     pub properties: &'a HashMap<String, PropertyDefinition>,
     pub callbacks: &'a HashMap<String, CallbackDefinition>,
-    pub locals: &'a HashMap<String, Type>,
+    pub locals: HashMap<String, Type>,
+    pub symbols: HashMap<String, crate::SymbolId>,
     pub definitions: &'a HashMap<crate::SymbolId, Definition>,
     pub theme_tokens: &'a HashMap<String, Type>,
     pub references: Option<&'a HashMap<String, HashMap<String, Type>>>,
@@ -43,6 +47,8 @@ pub(super) fn infer(node: &SyntaxNode, context: &mut Context<'_, '_>) -> Type {
         SyntaxKind::BinaryExpr => binary(node, context),
         SyntaxKind::ConditionalExpr => conditional(node, context),
         SyntaxKind::ArrayExpr => array(node, context),
+        SyntaxKind::IndexExpr => index::infer(node, context),
+        SyntaxKind::StructExpr => struct_literal::infer(node, context),
         _ => expression_child(node).map_or(Type::Unknown, |child| infer(&child, context)),
     }
 }
@@ -143,6 +149,11 @@ fn call(node: &SyntaxNode, context: &mut Context<'_, '_>) -> Type {
         .unwrap_or_default();
     if let Some(name) = callee_name.as_deref()
         && let Some(result) = builtins::check(name, node, &arguments, context)
+    {
+        return result;
+    }
+    if let Some(name) = callee_name.as_deref()
+        && let Some(result) = function::check(name, node, &arguments, context)
     {
         return result;
     }
@@ -520,6 +531,8 @@ fn is_expression_kind(kind: SyntaxKind) -> bool {
             | SyntaxKind::BinaryExpr
             | SyntaxKind::ConditionalExpr
             | SyntaxKind::ArrayExpr
+            | SyntaxKind::IndexExpr
+            | SyntaxKind::StructExpr
     )
 }
 

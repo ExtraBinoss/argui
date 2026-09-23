@@ -97,9 +97,20 @@ fn collect_node(node: &IrNode, sites: &mut HashSet<SiteId>) {
 /// Collects child reads in a restricted event handler statement.
 fn collect_statement(statement: &IrStatement, sites: &mut HashSet<SiteId>) {
     match statement {
-        IrStatement::Expression(value)
+        IrStatement::Let { value, .. }
+        | IrStatement::Expression(value)
         | IrStatement::SetThemeMode(value)
         | IrStatement::Assignment { value, .. } => collect_expression(value, sites),
+        IrStatement::If {
+            condition,
+            then_body,
+            else_body,
+        } => {
+            collect_expression(condition, sites);
+            for statement in then_body.iter().chain(else_body) {
+                collect_statement(statement, sites);
+            }
+        }
         IrStatement::ScrollTo { x, y, .. } => {
             collect_expression(x, sites);
             collect_expression(y, sites);
@@ -127,6 +138,15 @@ fn collect_expression(expression: &IrExpression, sites: &mut HashSet<SiteId>) {
             for argument in arguments {
                 collect_expression(argument, sites);
             }
+        }
+        IrExpressionKind::Struct { fields, .. } => {
+            for (_, value) in fields {
+                collect_expression(value, sites);
+            }
+        }
+        IrExpressionKind::Index { base, index } => {
+            collect_expression(base, sites);
+            collect_expression(index, sites);
         }
         IrExpressionKind::Binary { left, right, .. } => {
             collect_expression(left, sites);
