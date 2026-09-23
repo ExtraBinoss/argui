@@ -59,7 +59,7 @@ pub enum SlotArity {
     Many,
 }
 
-/// Declarative property metadata shared by all DSL tooling and runtimes.
+/// Declarative property metadata shared by native hosts and runtimes.
 #[derive(Clone, Debug, PartialEq)]
 pub struct PropertySchema {
     pub id: PropertyId,
@@ -236,7 +236,7 @@ pub struct NativeSchema {
     pub slots: Vec<SlotSchema>,
     pub variants: Vec<VariantSchema>,
     pub style_parts: Vec<StylePartSchema>,
-    /// The adapter consumes a compiler-mounted keyed virtual row window.
+    /// The adapter consumes a host-mounted keyed virtual row window.
     pub virtual_window: bool,
 }
 
@@ -308,7 +308,7 @@ impl NativeSchema {
         self
     }
 
-    /// Marks this adapter as consuming a compiler-mounted virtual row window.
+    /// Marks this adapter as consuming a host-mounted virtual row window.
     #[must_use]
     pub const fn virtual_window(mut self) -> Self {
         self.virtual_window = true;

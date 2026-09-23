@@ -12,6 +12,155 @@ use crate::{
     event::UserEvent, multi::MultiApplication,
 };
 
+/// Runs one native UI tree driven by batches from a JavaScript actor.
+///
+/// * `window` — native window configuration.
+/// * `renderer` — renderer configuration.
+/// * `host` — validated primitive graph initially owned by the UI thread.
+/// * `assets` — decoded images and SVGs referenced by the host graph.
+/// * `batches` — batches received from the JavaScript actor.
+/// * `events` — callback deliveries posted back to that actor.
+/// * `on_event` — observer for platform and renderer events.
+///
+/// # Errors
+///
+/// Returns an error if the native window or event loop cannot start or run.
+#[cfg(not(target_arch = "wasm32"))]
+#[cfg_attr(coverage_nightly, coverage(off))]
+pub fn run_native_host(
+    window: WindowConfig,
+    renderer: RendererConfig,
+    host: crate::NativeHost,
+    assets: crate::NativeHostAssets,
+    batches: std::sync::mpsc::Receiver<crate::NativeHostBatch>,
+    events: std::sync::mpsc::Sender<crate::NativeHostDelivery>,
+    on_event: impl FnMut(RuntimeEvent) + 'static,
+) -> Result<(), RuntimeError> {
+    let event_loop = native_event_loop()?;
+    run_native_host_with_event_loop(
+        event_loop,
+        NativeHostLaunch {
+            window,
+            renderer,
+            text_engine: TextEngine::new(),
+            host,
+            assets,
+            batches,
+            events,
+            on_event,
+        },
+    )
+}
+
+/// Runs the native JavaScript presentation with embedded fonts on Android.
+///
+/// * `android_app` — activity handle supplied by Android NativeActivity.
+/// * `window` — native window configuration.
+/// * `renderer` — GPU renderer configuration.
+/// * `text_engine` — text shaper with at least one installed Android font.
+/// * `host` — validated primitive graph owned by the UI thread.
+/// * `assets` — decoded images and SVGs referenced by the host graph.
+/// * `batches` — batches received from the JavaScript actor.
+/// * `events` — callback deliveries posted back to that actor.
+/// * `on_event` — observer for platform and renderer events.
+///
+/// # Errors
+///
+/// Returns an error if Android initialization, the window, or event loop fails.
+#[cfg(target_os = "android")]
+#[cfg_attr(coverage_nightly, coverage(off))]
+pub fn run_android_native_host_with_text_engine(
+    android_app: AndroidApp,
+    window: WindowConfig,
+    renderer: RendererConfig,
+    text_engine: TextEngine,
+    host: crate::NativeHost,
+    assets: crate::NativeHostAssets,
+    batches: std::sync::mpsc::Receiver<crate::NativeHostBatch>,
+    events: std::sync::mpsc::Sender<crate::NativeHostDelivery>,
+    on_event: impl FnMut(RuntimeEvent) + 'static,
+) -> Result<(), RuntimeError> {
+    argui_platform::mobile::initialize_android(&android_app)
+        .map_err(|error| RuntimeError::NativeHost(error.to_string()))?;
+    let mut builder = EventLoop::<UserEvent>::with_user_event();
+    builder.with_android_app(android_app);
+    let event_loop = builder.build().map_err(PlatformError::from)?;
+    run_native_host_with_event_loop(
+        event_loop,
+        NativeHostLaunch {
+            window,
+            renderer,
+            text_engine,
+            host,
+            assets,
+            batches,
+            events,
+            on_event,
+        },
+    )
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+struct NativeHostLaunch<F> {
+    window: WindowConfig,
+    renderer: RendererConfig,
+    text_engine: TextEngine,
+    host: crate::NativeHost,
+    assets: crate::NativeHostAssets,
+    batches: std::sync::mpsc::Receiver<crate::NativeHostBatch>,
+    events: std::sync::mpsc::Sender<crate::NativeHostDelivery>,
+    on_event: F,
+}
+
+/// Connects an already configured native event loop to the JavaScript actor.
+///
+/// The event loop owns the UI thread; the batch forwarding thread exits when
+/// the event loop closes.
+///
+/// * `event_loop` — platform-configured loop that owns the native window.
+/// * `launch` — native host, renderer, assets, channels, fonts, and observer.
+///
+/// # Errors
+///
+/// Returns an error when the event loop fails or the native host reports a fatal error.
+#[cfg(not(target_arch = "wasm32"))]
+#[cfg_attr(coverage_nightly, coverage(off))]
+fn run_native_host_with_event_loop<F: FnMut(RuntimeEvent) + 'static>(
+    event_loop: EventLoop<UserEvent>,
+    launch: NativeHostLaunch<F>,
+) -> Result<(), RuntimeError> {
+    let NativeHostLaunch {
+        window,
+        renderer,
+        text_engine,
+        host,
+        assets,
+        batches,
+        events,
+        on_event,
+    } = launch;
+    let initial = host.root_element().map(UiTree::new);
+    let mut application =
+        Application::new(window, renderer, text_engine, None, initial, None, on_event);
+    application.install_native_host_assets(assets);
+    application.native_host = Some(host);
+    application.native_host_events = Some(events);
+    let proxy = event_loop.create_proxy();
+    application.set_event_proxy(proxy.clone());
+    std::thread::spawn(move || {
+        for batch in batches {
+            if proxy.send_event(UserEvent::HostCommit(batch)).is_err() {
+                break;
+            }
+        }
+    });
+    event_loop.set_control_flow(ControlFlow::Wait);
+    event_loop
+        .run_app(&mut application)
+        .map_err(PlatformError::from)?;
+    application.fatal_error.take().map_or(Ok(()), Err)
+}
+
 #[cfg_attr(coverage_nightly, coverage(off))]
 /// Runs a multi-window application with the default text engine.
 ///
@@ -293,9 +442,7 @@ pub fn run_app_with_text_engine(
 
 #[cfg(not(target_arch = "wasm32"))]
 fn launch(mut application: Application) -> Result<(), RuntimeError> {
-    let event_loop = EventLoop::<UserEvent>::with_user_event()
-        .build()
-        .map_err(PlatformError::from)?;
+    let event_loop = native_event_loop()?;
     let proxy = event_loop.create_proxy();
     application.set_event_proxy(proxy);
     event_loop.set_control_flow(ControlFlow::Wait);
@@ -309,14 +456,34 @@ fn launch(mut application: Application) -> Result<(), RuntimeError> {
 fn launch_multi(application: MultiApplication) -> Result<(), RuntimeError> {
     #[cfg(all(feature = "webview", target_os = "linux"))]
     if std::env::var_os("WAYLAND_DISPLAY").is_some()
+        && std::env::var("DISPLAY")
+            .ok()
+            .is_none_or(|display| display.is_empty())
         && std::env::var("GDK_BACKEND").map_or(true, |backend| backend != "x11")
     {
         return crate::multi::gtk::launch(application);
     }
-    let event_loop = EventLoop::<UserEvent>::with_user_event()
-        .build()
-        .map_err(PlatformError::from)?;
+    let event_loop = native_event_loop()?;
     run_event_loop(event_loop, application)
+}
+
+/// Builds a native event loop, choosing X11 when a display is available.
+///
+/// Wayland remains the fallback on Linux without `DISPLAY`; other platforms
+/// retain winit's native backend selection.
+///
+/// # Errors
+/// Returns a platform error if the selected event loop cannot be created.
+#[cfg(not(target_arch = "wasm32"))]
+#[cfg_attr(coverage_nightly, coverage(off))]
+fn native_event_loop() -> Result<EventLoop<UserEvent>, PlatformError> {
+    let mut builder = EventLoop::<UserEvent>::with_user_event();
+    #[cfg(target_os = "linux")]
+    if std::env::var("DISPLAY").is_ok_and(|display| !display.is_empty()) {
+        use winit::platform::x11::EventLoopBuilderExtX11;
+        builder.with_x11();
+    }
+    builder.build().map_err(PlatformError::from)
 }
 
 #[cfg(target_os = "android")]

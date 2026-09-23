@@ -1,15 +1,19 @@
 //! Unpainted focus and keyboard boundary for declarative controls.
 
 use argui_ui::{
-    CheckedState, Element, EventType, FocusContainment, FocusPolicy, FocusScope, FocusTarget,
-    InitialFocus, Interaction, KeyboardActivation, Role, SemanticAction, SemanticState, Semantics,
+    CheckedState, Current, Element, EventType, FocusContainment, FocusPolicy, FocusScope,
+    FocusTarget, InitialFocus, Interaction, KeyboardActivation, LiveRegion, Role, SemanticAction,
+    SemanticState, SemanticValue, Semantics, UserSelect,
 };
 
 use super::{
     BLUR, BUSY, CAPTURE_KEY_INPUT, CHECKED, CHILDREN, CLICK, CommonProperty, ENABLED, EXPANDED,
     FOCUS, FOCUS_CONTAINMENT, FOCUS_ON_CLICK, FOCUS_ON_TAB, FOCUS_VISIBLE, HAS_FOCUS,
-    INITIAL_FOCUS, KEY_INPUT, KEYBOARD_ACTIVATION, RESTORE_FOCUS, SEMANTIC_EXPANDABLE,
-    SEMANTIC_LABEL, SEMANTIC_ROLE, apply_common, common_event, common_property, optional_bool,
+    INITIAL_FOCUS, KEY_INPUT, KEYBOARD_ACTIVATION, RESTORE_FOCUS, SEMANTIC_ACTIVE_DESCENDANT,
+    SEMANTIC_CONTROLS, SEMANTIC_CURRENT, SEMANTIC_DESCRIBED_BY, SEMANTIC_DESCRIPTION,
+    SEMANTIC_EXPANDABLE, SEMANTIC_INVALID, SEMANTIC_LABEL, SEMANTIC_LABELLED_BY, SEMANTIC_LIVE,
+    SEMANTIC_ROLE, SEMANTIC_SELECTED, SEMANTIC_VALUE, apply_common, common_event, common_property,
+    optional_bool,
 };
 use crate::{
     NativeElementInput, NativeSchema, ObservationKind, PropertySchema, SchemaError, SchemaRegistry,
@@ -121,6 +125,66 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
         "Accessible name for a composed control.",
     ))
     .property(PropertySchema::new(
+        SEMANTIC_DESCRIPTION,
+        "accessible_description",
+        ValueType::String,
+        "Accessible description for a composed control.",
+    ))
+    .property(PropertySchema::new(
+        SEMANTIC_VALUE,
+        "accessible_value",
+        ValueType::String,
+        "Current text value announced by assistive technology.",
+    ))
+    .property(PropertySchema::new(
+        SEMANTIC_SELECTED,
+        "selected",
+        ValueType::Bool,
+        "Whether this item is selected in its set.",
+    ))
+    .property(PropertySchema::new(
+        SEMANTIC_CURRENT,
+        "current",
+        ValueType::String,
+        "Current item kind: true, page, step, location, date, or time.",
+    ))
+    .property(PropertySchema::new(
+        SEMANTIC_CONTROLS,
+        "controls",
+        ValueType::String,
+        "Key of the element controlled by this control.",
+    ))
+    .property(PropertySchema::new(
+        SEMANTIC_ACTIVE_DESCENDANT,
+        "active_descendant",
+        ValueType::String,
+        "Key of the active child in a composite control.",
+    ))
+    .property(PropertySchema::new(
+        SEMANTIC_LABELLED_BY,
+        "labelled_by",
+        ValueType::String,
+        "Key of the element providing this control's accessible name.",
+    ))
+    .property(PropertySchema::new(
+        SEMANTIC_DESCRIBED_BY,
+        "described_by",
+        ValueType::String,
+        "Key of the element providing this control's description.",
+    ))
+    .property(PropertySchema::new(
+        SEMANTIC_INVALID,
+        "invalid",
+        ValueType::Bool,
+        "Whether the composed control has an invalid value.",
+    ))
+    .property(PropertySchema::new(
+        SEMANTIC_LIVE,
+        "live",
+        ValueType::String,
+        "Announcement policy: off, polite, or assertive.",
+    ))
+    .property(PropertySchema::new(
         BUSY,
         "busy",
         ValueType::Bool,
@@ -198,7 +262,28 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
             apply_common(Element::container(input.children(CHILDREN).to_vec()), input)?
                 .focus_scope(focus_scope)
                 .interaction(interaction);
-        if input.get(SEMANTIC_ROLE).is_some() || input.get(SEMANTIC_LABEL).is_some() {
+        if activation != KeyboardActivation::None
+            || input.events.iter().any(|event| event.id == CLICK)
+        {
+            element = element.user_select(UserSelect::None);
+        }
+        let has_semantics = [
+            SEMANTIC_ROLE,
+            SEMANTIC_LABEL,
+            SEMANTIC_DESCRIPTION,
+            SEMANTIC_VALUE,
+            SEMANTIC_SELECTED,
+            SEMANTIC_CURRENT,
+            SEMANTIC_CONTROLS,
+            SEMANTIC_ACTIVE_DESCENDANT,
+            SEMANTIC_LABELLED_BY,
+            SEMANTIC_DESCRIBED_BY,
+            SEMANTIC_INVALID,
+            SEMANTIC_LIVE,
+        ]
+        .iter()
+        .any(|id| input.get(*id).is_some());
+        if has_semantics {
             let role = match input.get(SEMANTIC_ROLE) {
                 Some(SchemaValue::String(name)) => parse_role(name)?,
                 _ => Role::Generic,
@@ -207,6 +292,12 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
                 .state(SemanticState {
                     disabled: !enabled,
                     busy: optional_bool(input, BUSY).unwrap_or(false),
+                    selected: optional_bool(input, SEMANTIC_SELECTED).unwrap_or(false),
+                    invalid: optional_bool(input, SEMANTIC_INVALID).unwrap_or(false),
+                    current: match input.get(SEMANTIC_CURRENT) {
+                        Some(SchemaValue::String(value)) => Some(parse_current(value)?),
+                        _ => None,
+                    },
                     checked: optional_bool(input, CHECKED).map(|value| {
                         if value {
                             CheckedState::Checked
@@ -223,10 +314,31 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
             if let Some(SchemaValue::String(name)) = input.get(SEMANTIC_LABEL) {
                 semantics = semantics.label(name.clone());
             }
+            if let Some(SchemaValue::String(description)) = input.get(SEMANTIC_DESCRIPTION) {
+                semantics = semantics.description(description.clone());
+            }
+            if let Some(SchemaValue::String(value)) = input.get(SEMANTIC_VALUE) {
+                semantics = semantics.value(SemanticValue::Text(value.clone()));
+            }
+            if let Some(SchemaValue::String(value)) = input.get(SEMANTIC_LIVE) {
+                semantics = semantics.live(parse_live(value)?);
+            }
             if activation != KeyboardActivation::None {
                 semantics = semantics.action(SemanticAction::Click);
             }
             element = element.semantics(semantics);
+            if let Some(SchemaValue::String(key)) = input.get(SEMANTIC_CONTROLS) {
+                element = element.controls([key.as_str()]);
+            }
+            if let Some(SchemaValue::String(key)) = input.get(SEMANTIC_ACTIVE_DESCENDANT) {
+                element = element.active_descendant(key.as_str());
+            }
+            if let Some(SchemaValue::String(key)) = input.get(SEMANTIC_LABELLED_BY) {
+                element = element.labelled_by([key.as_str()]);
+            }
+            if let Some(SchemaValue::String(key)) = input.get(SEMANTIC_DESCRIBED_BY) {
+                element = element.described_by([key.as_str()]);
+            }
         }
         for event in &input.events {
             let listener = match event.id {
@@ -275,6 +387,45 @@ fn parse_activation(name: &str) -> Result<KeyboardActivation, SchemaError> {
         "enter_or_space" => Ok(KeyboardActivation::EnterOrSpace),
         _ => Err(SchemaError::Adapter(format!(
             "FocusScope does not support keyboard_activation `{name}`"
+        ))),
+    }
+}
+
+/// Parses the current-item category announced by accessibility adapters.
+///
+/// * `name` — canonical current-item spelling.
+///
+/// # Errors
+///
+/// Returns an adapter error for an unsupported category.
+fn parse_current(name: &str) -> Result<Current, SchemaError> {
+    match name {
+        "true" => Ok(Current::True),
+        "page" => Ok(Current::Page),
+        "step" => Ok(Current::Step),
+        "location" => Ok(Current::Location),
+        "date" => Ok(Current::Date),
+        "time" => Ok(Current::Time),
+        _ => Err(SchemaError::Adapter(format!(
+            "FocusScope does not support current `{name}`"
+        ))),
+    }
+}
+
+/// Parses a live-region announcement policy.
+///
+/// * `name` — canonical live-region spelling.
+///
+/// # Errors
+///
+/// Returns an adapter error for an unsupported policy.
+fn parse_live(name: &str) -> Result<LiveRegion, SchemaError> {
+    match name {
+        "off" => Ok(LiveRegion::Off),
+        "polite" => Ok(LiveRegion::Polite),
+        "assertive" => Ok(LiveRegion::Assertive),
+        _ => Err(SchemaError::Adapter(format!(
+            "FocusScope does not support live `{name}`"
         ))),
     }
 }

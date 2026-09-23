@@ -133,6 +133,9 @@ impl VectorGpu {
                 self.hits_this_frame += 1;
                 entry
             } else {
+                if !self.atlas.can_insert(requested) {
+                    return Err(RendererError::VectorAtlasFull);
+                }
                 let pixels = rasterize(asset, width, height)?;
                 let entry = self.atlas.insert(queue, requested, &pixels)?;
                 self.rasterizations_this_frame += 1;

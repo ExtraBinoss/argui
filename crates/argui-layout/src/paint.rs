@@ -8,6 +8,7 @@ mod cache;
 use cache::CachedFragment;
 pub(crate) use cache::PaintCache;
 mod backdrop;
+mod cull;
 mod effects;
 mod geometry;
 mod gpu_canvas;
@@ -107,10 +108,18 @@ pub(super) fn paint_node(
     if element.portal.is_some() && parent.active_portal != Some(node.node) {
         return true;
     }
-    cache.visited += 1;
     if parent.clips.is_empty() {
         return true;
     }
+    if cull::outside_visible_clip(map, elements, node, element, parent) {
+        output.semantic_bounds.extend(
+            output.nodes[map.index..map.index + map.subtree_len]
+                .iter()
+                .map(|node| (node.node, Rect::default())),
+        );
+        return true;
+    }
+    cache.visited += 1;
     let selection_active = ui.document_selection_intersects(map.index, map.subtree_len);
     if let Some(fragment) = cache.fragments.get(&node.node)
         && fragment.element.ptr_eq(element)

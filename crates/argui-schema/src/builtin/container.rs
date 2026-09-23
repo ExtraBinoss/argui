@@ -50,6 +50,9 @@ pub(super) fn register(
         .property(common_property(CommonProperty::SelectionColor))
         .property(common_property(CommonProperty::SelectionRadius))
         .property(common_property(CommonProperty::Gap))
+        .property(loop_motion::properties()[1].clone())
+        .property(loop_motion::properties()[2].clone())
+        .property(loop_motion::properties()[11].clone())
         .property(common_property(CommonProperty::Padding))
         .property(PropertySchema::new(
             SCROLL_Y,
@@ -117,6 +120,9 @@ pub(super) fn register(
     for property in layout::properties() {
         schema = schema.property(property);
     }
+    for property in transition::properties() {
+        schema = schema.property(property);
+    }
     registry.register(schema, move |input: &NativeElementInput| {
         let children = input.children(CHILDREN).to_vec();
         let mut element = apply_container(apply_common(constructor(children), input)?, input);
@@ -182,6 +188,12 @@ pub(super) fn register(
                 .scroll_config(argui_ui::ScrollConfig::default().scrollbar(scrollbar))
                 .scrollbar_gutter(argui_ui::ScrollbarGutter::Stable);
         }
-        Ok(apply_events(layout::apply(element, input, name)?, input))
+        Ok(apply_events(
+            loop_motion::apply(
+                transition::apply(layout::apply(element, input, name)?, input, name)?,
+                input,
+            )?,
+            input,
+        ))
     })
 }

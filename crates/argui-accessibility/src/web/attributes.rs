@@ -85,6 +85,18 @@ pub(super) fn apply_attributes(
         },
     )?;
     set_bool(element, "aria-selected", node.semantics.state.selected)?;
+    set_optional(
+        element,
+        "aria-current",
+        node.semantics.state.current.map(|current| match current {
+            crate::Current::True => "true",
+            crate::Current::Page => "page",
+            crate::Current::Step => "step",
+            crate::Current::Location => "location",
+            crate::Current::Date => "date",
+            crate::Current::Time => "time",
+        }),
+    )?;
     set_optional_bool(
         element,
         "aria-multiselectable",

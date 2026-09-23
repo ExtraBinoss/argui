@@ -1,0 +1,16 @@
+{
+  "name": "@argui/gallery",
+  "version": "0.3.2",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@argui/host": "workspace:*",
+    "@argui/react": "workspace:*",
+    "@argui/solid": "workspace:*",
+    "react": "19.2.0",
+    "solid-js": "1.9.15"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.0"
+  }
+}

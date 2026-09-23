@@ -17,7 +17,7 @@ fn authored_effect_attaches_to_each_visual_kind_without_special_routing() {
         let visual = apply_visual_effect(
             visual,
             EffectInstance::new(
-                EffectId::new("dsl.glow"),
+                EffectId::new("native.glow"),
                 [EffectArgument::new("intensity", EffectValue::F32(0.35))],
             ),
         );
@@ -26,7 +26,7 @@ fn authored_effect_attaches_to_each_visual_kind_without_special_routing() {
         assert!(matches!(
             visual.effects[0].layer.filters.as_slice(),
             [Filter::Effect(instance)]
-                if instance.id.as_str() == "dsl.glow"
+                if instance.id.as_str() == "native.glow"
                     && instance.parameters[0].value == EffectValue::F32(0.35)
         ));
     }
@@ -36,7 +36,7 @@ fn authored_effect_attaches_to_each_visual_kind_without_special_routing() {
 fn authored_effect_keeps_order_and_current_parameter_values() {
     let make = |intensity| {
         EffectInstance::new(
-            EffectId::new("dsl.glow"),
+            EffectId::new("native.glow"),
             [EffectArgument::new(
                 "intensity",
                 EffectValue::F32(intensity),

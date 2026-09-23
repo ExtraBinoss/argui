@@ -323,7 +323,7 @@ impl SurfaceRenderer {
                 self.text_ranges = draw.ranges().to_vec();
                 self.text_bounds = draw.bounds().to_vec();
                 build_batches(display_list, &self.text_ranges, &mut self.batches);
-                let graph = EffectGraph::build(
+                let mut graph = EffectGraph::build(
                     display_list,
                     &self.text_ranges,
                     viewport,
@@ -351,6 +351,20 @@ impl SurfaceRenderer {
                     if content_changed && damage_plan == DamagePlan::Unchanged {
                         damage_plan = DamagePlan::Full;
                     }
+                    graph.retain_layer_revisions(
+                        self.scene_snapshot.as_ref(),
+                        &snapshot,
+                        content_changed
+                            && self.scene_snapshot.as_ref().is_some_and(|previous| {
+                                previous
+                                    .unchanged_range(&snapshot, 0..display_list.commands().len())
+                            }),
+                        &|profile| {
+                            self.layer_cache
+                                .get(&profile)
+                                .map(|cached| cached.layer.content_revision)
+                        },
+                    );
                     scene_update = Some((snapshot, damage_plan));
                 }
                 effect_graph = Some(graph);

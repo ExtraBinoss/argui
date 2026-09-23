@@ -14,9 +14,12 @@ use crate::{
 
 use super::SurfaceRenderer;
 
+mod helpers;
+use helpers::{blur_downsample, built_in_label, clear_view, same_layer_content, skipped_layer};
+
 #[derive(Clone, Debug)]
 pub(super) struct CachedLayer {
-    layer: crate::effect_graph::EffectLayer,
+    pub(super) layer: crate::effect_graph::EffectLayer,
     pub(super) target: TextureTarget,
 }
 
@@ -94,6 +97,11 @@ impl SurfaceRenderer {
         Ok(additional_passes)
     }
 
+    /// Encodes `nodes` into `target` within `clip` and the current `backdrop_stack`.
+    /// `encoder` records GPU work, `viewport` supplies output size, `profiler` and
+    /// `owner` label passes, and `cache_stats` tracks reuse. `clear_first_draw`
+    /// clears the attachment in the first Draw pass when the caller already
+    /// established that the graph begins with Draw.
     pub(super) fn render_effect_nodes(
         &mut self,
         encoder: &mut wgpu::CommandEncoder,
@@ -105,6 +113,7 @@ impl SurfaceRenderer {
         cache_stats: &mut CacheFrameStats,
         clip: Option<PixelRegion>,
         backdrop_stack: &[TextureTarget],
+        clear_first_draw: Option<wgpu::Color>,
     ) {
         let mut index = 0;
         while index < nodes.len() {
@@ -112,17 +121,44 @@ impl SurfaceRenderer {
             index += 1;
             match &nodes[start] {
                 EffectNode::Draw(_) => {
-                    while index < nodes.len() && matches!(nodes[index], EffectNode::Draw(_)) {
+                    let mut merged: Option<Vec<EffectNode>> = None;
+                    while let Some(node) = nodes.get(index) {
+                        match node {
+                            EffectNode::Draw(_) => {
+                                if let Some(draws) = &mut merged {
+                                    draws.push(node.clone());
+                                }
+                            }
+                            EffectNode::Layer(layer)
+                                if skipped_layer(layer, target.region, clip) =>
+                            {
+                                merged.get_or_insert_with(|| nodes[start..index].to_vec());
+                            }
+                            _ => break,
+                        }
                         index += 1;
                     }
-                    self.draw_offscreen(
-                        encoder,
-                        target,
-                        &nodes[start..index],
-                        profiler,
-                        owner,
-                        clip,
-                    );
+                    if let Some(draws) = merged {
+                        self.draw_offscreen(
+                            encoder,
+                            target,
+                            &draws,
+                            profiler,
+                            owner,
+                            clip,
+                            (start == 0).then_some(clear_first_draw).flatten(),
+                        );
+                    } else {
+                        self.draw_offscreen(
+                            encoder,
+                            target,
+                            &nodes[start..index],
+                            profiler,
+                            owner,
+                            clip,
+                            (start == 0).then_some(clear_first_draw).flatten(),
+                        );
+                    }
                 }
                 EffectNode::Layer(layer) if layer.style.opacity <= 0.0 => {
                     if let Some(profile) = layer.style.profile {
@@ -140,6 +176,7 @@ impl SurfaceRenderer {
                         cache_stats,
                         clip,
                         backdrop_stack,
+                        None,
                     );
                 }
                 EffectNode::Layer(layer) => {
@@ -175,12 +212,32 @@ impl SurfaceRenderer {
                         cache_stats.damaged_pixels +=
                             u64::from(region.size[0]) * u64::from(region.size[1]);
                         let layer_target = self.acquire_target(region, region.size);
-                        self.clear_target(encoder, layer_target, wgpu::Color::TRANSPARENT);
+                        let children =
+                            if matches!(layer.children.first(), Some(EffectNode::Draw(_))) {
+                                let first_draws = layer
+                                    .children
+                                    .iter()
+                                    .take_while(|node| matches!(node, EffectNode::Draw(_)))
+                                    .count();
+                                self.draw_offscreen(
+                                    encoder,
+                                    layer_target,
+                                    &layer.children[..first_draws],
+                                    profiler,
+                                    layer.style.profile,
+                                    None,
+                                    Some(wgpu::Color::TRANSPARENT),
+                                );
+                                &layer.children[first_draws..]
+                            } else {
+                                self.clear_target(encoder, layer_target, wgpu::Color::TRANSPARENT);
+                                &layer.children[..]
+                            };
                         let mut child_backdrops = backdrop_stack.to_vec();
                         child_backdrops.push(target);
                         self.render_effect_nodes(
                             encoder,
-                            &layer.children,
+                            children,
                             layer_target,
                             viewport,
                             profiler,
@@ -188,6 +245,7 @@ impl SurfaceRenderer {
                             cache_stats,
                             None,
                             &child_backdrops,
+                            None,
                         );
                         let foreground = self.apply_filters(
                             encoder,
@@ -203,7 +261,7 @@ impl SurfaceRenderer {
                             self.layer_cache.insert(
                                 profile,
                                 CachedLayer {
-                                    layer: layer.clone(),
+                                    layer: layer.as_ref().clone(),
                                     target: foreground,
                                 },
                             );
@@ -225,6 +283,8 @@ impl SurfaceRenderer {
         }
     }
 
+    /// Records `nodes` in `encoder` for `target`, clearing it with `clear` when supplied.
+    /// `profiler` and `owner` attribute GPU work; `clip` restricts output pixels.
     fn draw_offscreen(
         &mut self,
         encoder: &mut wgpu::CommandEncoder,
@@ -233,6 +293,7 @@ impl SurfaceRenderer {
         profiler: Option<&GpuFrameCapture>,
         owner: Option<argui_paint::RenderObjectId>,
         clip: Option<PixelRegion>,
+        clear: Option<wgpu::Color>,
     ) {
         let region = target.region.as_f32();
         let quad_offset = self.quad.target_offset(&self.queue, region);
@@ -245,7 +306,7 @@ impl SurfaceRenderer {
             depth_slice: None,
             resolve_target: None,
             ops: Operations {
-                load: LoadOp::Load,
+                load: clear.map_or(LoadOp::Load, LoadOp::Clear),
                 store: StoreOp::Store,
             },
         });
@@ -528,59 +589,5 @@ impl SurfaceRenderer {
         color: wgpu::Color,
     ) {
         clear_view(encoder, self.offscreen.view(target.texture), color);
-    }
-}
-
-/// Returns whether a cached foreground remains valid across composition-only changes.
-fn same_layer_content(
-    cached: &crate::effect_graph::EffectLayer,
-    current: &crate::effect_graph::EffectLayer,
-) -> bool {
-    cached.region == current.region
-        && cached.content_revision == current.content_revision
-        && cached.children == current.children
-        && cached.style.bounds == current.style.bounds
-        && cached.style.filters == current.style.filters
-        && cached.style.mask == current.style.mask
-}
-
-fn clear_view(encoder: &mut wgpu::CommandEncoder, view: &wgpu::TextureView, color: wgpu::Color) {
-    let attachment = Some(RenderPassColorAttachment {
-        view,
-        depth_slice: None,
-        resolve_target: None,
-        ops: Operations {
-            load: LoadOp::Clear(color),
-            store: StoreOp::Store,
-        },
-    });
-    drop(encoder.begin_render_pass(&RenderPassDescriptor {
-        label: Some("argui-effect-clear"),
-        color_attachments: &[attachment],
-        ..Default::default()
-    }));
-}
-
-fn blur_downsample(radius: f32, bias: u32) -> u32 {
-    let base = if radius >= 12.0 {
-        4
-    } else if radius >= 6.0 {
-        2
-    } else {
-        1
-    };
-    base * bias.max(1)
-}
-
-const fn built_in_label(mode: u32) -> &'static str {
-    match mode {
-        1 => "effect.blur-horizontal",
-        2 => "effect.blur-vertical",
-        8 => "effect.color-matrix",
-        9 => "effect.refraction",
-        10 => "composite.drop-shadow",
-        11 => "composite.inset-shadow",
-        12 => "composite.backdrop",
-        _ => "composite.copy",
     }
 }

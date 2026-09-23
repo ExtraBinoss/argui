@@ -1,4 +1,4 @@
-//! Typed, retained property motion shared by generated and live DSL bindings.
+//! Typed, retained property motion for native elements.
 
 use std::collections::{HashMap, HashSet};
 

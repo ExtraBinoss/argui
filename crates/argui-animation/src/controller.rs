@@ -10,6 +10,8 @@ use std::{
     },
 };
 
+mod timeline_retention;
+
 #[derive(Clone, Debug, PartialEq)]
 /// Parameters for a finite, eased transition between two values.
 pub struct Tween {
@@ -528,6 +530,10 @@ pub trait MotionTrack {
     fn finish(&self);
     /// Cancels the track without moving it to its target.
     fn cancel(&self);
+    /// Freezes the track at its last sampled presentation value.
+    fn pause(&self);
+    /// Resumes a paused track without counting time spent paused.
+    fn resume(&self);
 }
 
 impl<T> MotionTrack for Motion<T>
@@ -568,5 +574,13 @@ where
 
     fn cancel(&self) {
         self.cancel();
+    }
+
+    fn pause(&self) {
+        self.pause();
+    }
+
+    fn resume(&self) {
+        self.resume();
     }
 }

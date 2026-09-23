@@ -1,10 +1,12 @@
 # Run the Argui Widget Gallery on Android
 
-This project packages the existing Rust Widget Gallery as a native Android app.
-Android's built-in `NativeActivity` starts Winit and Argui; the app contains no
-Java or Kotlin UI. A small Java service provides the optional ongoing background
-activity notification. The Rust shared library is built from the workspace and
-included in the APK or AAB by Gradle.
+This project packages either the Rust Widget Gallery or the Solid gallery driven
+by embedded QuickJS as a native Android app.
+Android's built-in `NativeActivity` starts the widget profile. The Solid profile
+uses a small `NativeActivity` subclass to draw behind the system bars. Both
+start Winit and Argui and contain no Java or Kotlin UI. A Java service provides
+the optional ongoing background activity notification. The Rust shared library
+is built from the workspace and included in the APK or AAB by Gradle.
 
 ## Background activity UI
 
@@ -21,11 +23,15 @@ foreground-service permissions, notification permission, and monochrome small
 icon. Applications that never call `MobileActivity::begin` may omit all of
 those optional pieces.
 
-The shell renders edge to edge. Its status and navigation bars are transparent,
-the current theme background is painted underneath them, and Android
-`WindowInsets` keep interactive content outside system icons, gesture handles,
-and display cutouts. An overlay that reaches a system edge should paint its own
-safe-area padding instead of exposing the renderer clear color.
+The Solid profile renders edge to edge. Its status and navigation bars are
+transparent, and the current theme background is painted underneath them. The
+native host pads text and controls by the detected Android `WindowInsets`,
+including display cutouts. Native callers can override those values in logical
+pixels with `WindowConfig::with_safe_area_insets(Insets)`; the Solid gallery uses
+automatic detection and does not currently expose a JavaScript inset control.
+An overlay that reaches a system edge should paint its own safe-area padding
+instead of exposing the renderer clear color. The widget profile retains its
+existing Android activity and window behavior.
 
 To test the reference integration, open **Background activity** in the mobile
 gallery and start the demo. Android 13 or newer asks for notification
@@ -77,6 +83,23 @@ emulators. To build only for an ARM64 phone, pass a Gradle property:
 ARGUI_ANDROID_ABIS=arm64-v8a ./scripts/android-gallery.sh apk
 ```
 
+To install the Solid gallery on an ARM64 phone, select its Gradle profile:
+
+```sh
+./scripts/android-gallery.sh install -ParguiAbis=arm64-v8a -ParguiGallery=solid
+./scripts/android-gallery.sh launch -ParguiGallery=solid
+```
+
+The Solid profile builds the shared JavaScript bundle with Bun, embeds it in
+the QuickJS Rust library, and installs as `dev.argui.solidgallery.debug`. The
+default widget profile keeps `dev.argui.widgetgallery.debug`, so both apps can
+coexist on the device. Set `ARGUI_ANDROID_GALLERY=solid` to select the profile
+without passing a Gradle property.
+
+The JavaScript gallery uses QuickJS on Android. Bun remains the build tool for
+its TSX bundle. The runtime decision and measured memory are documented in
+`docs/solid-react-native.md`.
+
 Launch the installed gallery from the device, or use:
 
 ```sh
@@ -103,9 +126,10 @@ bundle to Google Play. Do not commit keystores or passwords.
 
 ## What Gradle builds
 
-The Android manifest declares the platform `NativeActivity` and loads `main`.
-Gradle invokes `cargo ndk` for the selected Android ABIs, builds the
-`argui-widget-gallery` library with its `android_main` entry point, and places
+The Android manifest selects the platform `NativeActivity` for widgets and an
+edge-to-edge `NativeActivity` subclass for Solid; both load `main`.
+Gradle invokes `cargo ndk` for the selected Android ABIs, builds the selected
+gallery library with its `android_main` entry point, and places
 the result in the ABI-specific `jniLibs` folder as `libmain.so`. Debug builds
 use Cargo's development profile; the AAB uses `--release`. The shared Cargo
 target directory stays at the repository root, so incremental Rust artifacts

@@ -1,4 +1,4 @@
-use argui_core::{Color, ColorInterpolation, ParseColorError};
+use argui_core::{Color, ColorInterpolation, ColorScheme, ParseColorError};
 
 fn close(left: f32, right: f32) {
     assert!((left - right).abs() < 0.000_01, "{left} != {right}");
@@ -15,6 +15,24 @@ fn colors_keep_linear_channels_explicit() {
     assert_eq!(
         Color::linear_rgba(0.1, 0.2, 0.3, 0.4).to_linear_rgba(),
         [0.1, 0.2, 0.3, 0.4]
+    );
+}
+
+#[test]
+fn system_bar_icons_follow_background_contrast() {
+    assert_eq!(Color::WHITE.preferred_contrast_scheme(), ColorScheme::Light);
+    assert_eq!(Color::BLACK.preferred_contrast_scheme(), ColorScheme::Dark);
+    assert_eq!(
+        Color::from_hex("#f7f9ff")
+            .unwrap()
+            .preferred_contrast_scheme(),
+        ColorScheme::Light
+    );
+    assert_eq!(
+        Color::from_hex("#141824")
+            .unwrap()
+            .preferred_contrast_scheme(),
+        ColorScheme::Dark
     );
 }
 

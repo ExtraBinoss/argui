@@ -185,6 +185,20 @@ impl DamageSnapshot {
         self.compare_regions(current, tracking, Some(effects))
     }
 
+    /// Returns whether the commands in `range` retained identical visual content.
+    ///
+    /// * `current` — new scene replacing this snapshot.
+    /// * `range` — indexes of the display commands to compare.
+    ///
+    /// Returns false when command count, viewport, or scale changes.
+    pub(crate) fn unchanged_range(&self, current: &Self, range: std::ops::Range<usize>) -> bool {
+        self.viewport == current.viewport
+            && self.scale_factor == current.scale_factor
+            && self.items.len() == current.items.len()
+            && range.end <= self.items.len()
+            && self.items.get(range.clone()) == current.items.get(range)
+    }
+
     /// Resolves raw scene differences with optional effect dependency propagation.
     fn compare_regions(
         &self,

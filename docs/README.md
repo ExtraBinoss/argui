@@ -7,11 +7,10 @@ testing, and releases.
 
 Start with:
 
-1. [Argui DSL getting started](dsl/getting-started.md) for the public learning path.
-2. [DSL language](dsl/language.md) and [live development](dsl/development.md).
-3. [Architecture](architecture.md) for the frame and event flow.
-4. [Repository structure](repo/structure.md) to find the crate that owns a change.
-5. [Development guide](contributing/development.md) and [code quality](contributing/code-quality.md) before opening a pull request.
+1. [Architecture](architecture.md) for the frame and event flow.
+2. [Repository structure](repo/structure.md) to find the crate that owns a change.
+3. [Solid and React native gallery](solid-react-native.md) for the shared host, selected QuickJS runtime, and measured limits.
+4. [Development guide](contributing/development.md) and [code quality](contributing/code-quality.md) before opening a pull request.
 
 ## Engine and application contracts
 
@@ -21,7 +20,6 @@ Start with:
 | Layout and input | [Styling](ui/styling.md) · [Interaction](ui/interaction.md) · [Scroll](ui/scroll.md) |
 | UI behavior | [Editing](ui/editing.md) · [Animation](ui/animation.md) · [Custom elements](ui/custom-elements.md) |
 | Rendering | [Primitives](rendering/primitives.md) · [Text fidelity](rendering/text.md) · [Adaptive damage](rendering/damage.md) · [Compositor](rendering/compositor.md) · [Effects](rendering/effects.md) · [GPU canvases](rendering/gpu-canvas.md) |
-| Application authoring | [DSL quickstart](dsl/getting-started.md) · [Language](dsl/language.md) · [Transactional reload and tooling](dsl/development.md) |
 | Optional capabilities | [Localization](i18n.md) |
 | Widgets | [Interaction APIs](widgets/interaction-api.md) · [Builder inventory](widgets/builder-inventory.md) · [Catalogue](widgets/shadcn.md) · [Lists and tables](widgets/lists-tables.md) · [Overlays](widgets/overlays.md) |
 

@@ -1,5 +1,7 @@
 use core::fmt;
 
+use crate::ColorScheme;
+
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 /// An RGBA color stored in linear-light sRGB coordinates.
 pub struct Color([f32; 4]);
@@ -263,6 +265,18 @@ impl Color {
         let lighter = self.relative_luminance().max(other.relative_luminance());
         let darker = self.relative_luminance().min(other.relative_luminance());
         (lighter + 0.05) / (darker + 0.05)
+    }
+
+    #[must_use]
+    /// Chooses the system-bar icon scheme with higher contrast against this background.
+    ///
+    /// A light background requests dark icons; a dark background requests light icons.
+    pub fn preferred_contrast_scheme(self) -> ColorScheme {
+        if self.contrast_ratio(Self::BLACK) >= self.contrast_ratio(Self::WHITE) {
+            ColorScheme::Light
+        } else {
+            ColorScheme::Dark
+        }
     }
 }
 

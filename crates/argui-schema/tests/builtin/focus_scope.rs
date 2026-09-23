@@ -1,7 +1,11 @@
 use argui_schema::{
-    NativeElementInput, NativeSlotValue, ObservationKind, SchemaError, SchemaValue, builtin,
+    NativeElementInput, NativeEventValue, NativeSlotValue, ObservationKind, SchemaError,
+    SchemaValue, builtin,
 };
-use argui_ui::{Element, FocusContainment, FocusPolicy, InitialFocus, KeyboardActivation, Role};
+use argui_ui::{
+    Current, Element, EventHandler, EventHandlerId, EventOwnerId, FocusContainment, FocusPolicy,
+    InitialFocus, KeyboardActivation, Role, SemanticValue, TreeUpdate, UiTree, UserSelect,
+};
 
 #[test]
 fn focus_scope_exposes_keyboard_focus_without_painting_a_control() {
@@ -35,6 +39,7 @@ fn focus_scope_exposes_keyboard_focus_without_painting_a_control() {
     assert_eq!(scope.semantics.as_ref().unwrap().role, Role::Button);
     assert!(scope.paint.quad.background.is_none());
     assert_eq!(scope.children.len(), 1);
+    assert_eq!(scope.user_select, UserSelect::None);
     let schema = registry.schema(builtin::FOCUS_SCOPE).unwrap();
     assert_eq!(
         schema
@@ -45,6 +50,28 @@ fn focus_scope_exposes_keyboard_focus_without_painting_a_control() {
             .observation,
         Some(ObservationKind::Focused)
     );
+}
+
+#[test]
+fn clickable_combo_scope_prevents_text_selection_without_keyboard_activation() {
+    let handler = EventHandler::from_identity(EventHandlerId::new(EventOwnerId(1), 1));
+    let scope = builtin::registry()
+        .unwrap()
+        .construct(
+            builtin::FOCUS_SCOPE,
+            &NativeElementInput::new()
+                .property(
+                    builtin::SEMANTIC_ROLE,
+                    SchemaValue::String("combo_box".into()),
+                )
+                .event(NativeEventValue::new(builtin::CLICK, handler))
+                .slot(NativeSlotValue::new(
+                    builtin::CHILDREN,
+                    [Element::text("Choice")],
+                )),
+        )
+        .unwrap();
+    assert_eq!(scope.user_select, UserSelect::None);
 }
 
 #[test]
@@ -133,4 +160,76 @@ fn focus_scope_validates_policies_and_exposes_disabled_semantics() {
             .unwrap_err();
         assert!(matches!(error, SchemaError::Adapter(_)), "{value}");
     }
+}
+
+#[test]
+fn focus_scope_exposes_current_page_select_value_and_key_relations() {
+    let registry = builtin::registry().unwrap();
+    let target = registry
+        .construct(
+            builtin::FOCUS_SCOPE,
+            &NativeElementInput::new()
+                .property(builtin::KEY, SchemaValue::String("options".into()))
+                .property(
+                    builtin::SEMANTIC_ROLE,
+                    SchemaValue::String("list_box".into()),
+                ),
+        )
+        .unwrap();
+    let control = |current: bool| {
+        let mut input = NativeElementInput::new()
+            .property(builtin::KEY, SchemaValue::String("select".into()))
+            .property(
+                builtin::SEMANTIC_ROLE,
+                SchemaValue::String("combo_box".into()),
+            )
+            .property(
+                builtin::SEMANTIC_LABEL,
+                SchemaValue::String("Framework".into()),
+            )
+            .property(
+                builtin::SEMANTIC_DESCRIPTION,
+                SchemaValue::String("Choose a framework".into()),
+            )
+            .property(builtin::SEMANTIC_VALUE, SchemaValue::String("Solid".into()))
+            .property(builtin::SEMANTIC_EXPANDABLE, SchemaValue::Bool(true))
+            .property(builtin::EXPANDED, SchemaValue::Bool(true))
+            .property(
+                builtin::SEMANTIC_CONTROLS,
+                SchemaValue::String("options".into()),
+            );
+        if current {
+            input = input.property(
+                builtin::SEMANTIC_CURRENT,
+                SchemaValue::String("page".into()),
+            );
+        }
+        registry.construct(builtin::FOCUS_SCOPE, &input).unwrap()
+    };
+    let mut tree = UiTree::new(Element::column([control(true), target.clone()]));
+    let semantic = tree.semantic_tree(&[], 1.0);
+    let select = semantic
+        .nodes
+        .iter()
+        .find(|node| node.semantics.role == Role::ComboBox)
+        .unwrap();
+    let options = semantic
+        .nodes
+        .iter()
+        .find(|node| node.semantics.role == Role::ListBox)
+        .unwrap();
+    assert_eq!(select.semantics.state.current, Some(Current::Page));
+    assert_eq!(
+        select.semantics.description.as_deref(),
+        Some("Choose a framework")
+    );
+    assert_eq!(
+        select.semantics.value,
+        Some(SemanticValue::Text("Solid".into()))
+    );
+    assert_eq!(select.semantics.relations.controls, vec![options.id]);
+    assert_eq!(
+        tree.update(Element::column([control(false), target])),
+        TreeUpdate::Semantics
+    );
 }

@@ -31,6 +31,44 @@ pub(super) fn exercise(
     assert_eq!(renderer.last_profile().damage.mode, DamageMode::Partial);
 }
 
+/// Verifies that moving an unrelated primitive preserves static effect layers.
+///
+/// `renderer` owns the cached GPU layers; `render` presents each test scene.
+pub(super) fn exercise_unrelated_layer_cache(
+    renderer: &mut SurfaceRenderer,
+    render: &mut impl FnMut(&mut SurfaceRenderer, &DisplayList) -> Result<(), RendererError>,
+) {
+    let scene = |x, first_color| {
+        let mut list = DisplayList::new();
+        list.push_quad(colored_quad(x, Color::WHITE));
+        for (index, left) in [8.0, 80.0].into_iter().enumerate() {
+            let bounds = Rect::new(Point::new(left, 8.0), Size::new(48.0, 48.0));
+            list.begin_layer(
+                LayerStyle::new(bounds)
+                    .filter(Filter::Brightness(0.9))
+                    .profile(RenderObjectId::new(ProfileDomain::Ui, index as u64 + 100)),
+            );
+            list.push_quad(colored_quad(
+                left,
+                if index == 0 {
+                    first_color
+                } else {
+                    Color::WHITE
+                },
+            ));
+            list.end_layer();
+        }
+        list
+    };
+    render(renderer, &scene(8.0, Color::WHITE)).unwrap();
+    render(renderer, &scene(90.0, Color::WHITE)).unwrap();
+    assert_eq!(renderer.last_profile().effects.cached_layers, 2);
+    assert_eq!(renderer.last_profile().effects.damaged_pixels, 0);
+    render(renderer, &scene(8.0, Color::BLACK)).unwrap();
+    assert_eq!(renderer.last_profile().effects.cached_layers, 1);
+    assert!(renderer.last_profile().effects.damaged_pixels > 0);
+}
+
 /// Verifies that composition-only frames retain scene damage and cached layers.
 pub(super) fn exercise_compositor(
     renderer: &mut SurfaceRenderer,

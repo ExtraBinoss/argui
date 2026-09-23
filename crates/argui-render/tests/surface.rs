@@ -11,7 +11,7 @@ use std::{
 use argui_core::{Affine2D, Color, Point, Rect, Size};
 use argui_paint::{
     Border, ClipChain, CornerRadii, DisplayList, EffectId, EffectInstance, Fill, Filter,
-    GpuCanvasId, GpuCanvasPrimitive, LayerStyle, Quad,
+    GpuCanvasId, GpuCanvasPrimitive, LayerStyle, ProfileDomain, Quad, RenderObjectId,
 };
 use argui_render::{
     DamageMode, DamageTracking, EffectDamage, EffectDefinition, EffectPassDefinition,
@@ -204,6 +204,7 @@ fn exercise(
     assert_eq!(renderer.last_profile().damage.mode, DamageMode::Seed);
 
     effect_damage::exercise(&mut renderer, effect.clone(), &mut render);
+    effect_damage::exercise_unrelated_layer_cache(&mut renderer, &mut render);
 
     let assets: Vec<_> = (0..20).map(|_| asset()).collect();
     for asset in &assets {

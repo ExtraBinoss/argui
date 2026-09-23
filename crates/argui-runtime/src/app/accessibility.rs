@@ -175,6 +175,40 @@ impl Application {
         adapter.update_if_active(|| AccessKitTree::patch(&patch, &next));
     }
 
+    /// Refreshes accessibility when semantic content, focus, or bounds changed.
+    ///
+    /// `presentation_only` indicates that only compositor presentation changed.
+    /// `focus_unchanged` indicates that focus processing made no semantic change.
+    pub(super) fn sync_accessibility_if_needed(
+        &mut self,
+        presentation_only: bool,
+        focus_unchanged: bool,
+    ) {
+        let (Some(snapshot), Some(layout)) =
+            (self.semantic_snapshot.as_ref(), self.ui_layout.as_ref())
+        else {
+            self.sync_accessibility();
+            return;
+        };
+        let Ok(current) = snapshot.lock() else {
+            return;
+        };
+        let needs_sync = super::semantic_sync::needs_semantic_sync(
+            &current,
+            layout
+                .semantic_bounds
+                .iter()
+                .map(|(node, rect)| (node.get(), *rect)),
+            self.scale_factor,
+            presentation_only,
+            focus_unchanged,
+        );
+        drop(current);
+        if needs_sync {
+            self.sync_accessibility();
+        }
+    }
+
     pub(super) fn accessibility_event(
         &mut self,
         event: accesskit_winit::Event,

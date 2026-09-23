@@ -1,0 +1,5195 @@
+{
+  "abiHash": "12694392223694503046",
+  "natives": [
+    {
+      "events": [
+        {
+          "id": 1,
+          "name": "click",
+          "payload": null
+        },
+        {
+          "id": 2,
+          "name": "focus",
+          "payload": null
+        },
+        {
+          "id": 3,
+          "name": "blur",
+          "payload": null
+        }
+      ],
+      "id": 1,
+      "name": "Container",
+      "properties": [
+        {
+          "default": null,
+          "id": 1,
+          "name": "key",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 2,
+          "name": "tooltip",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 3,
+          "name": "width",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 4,
+          "name": "height",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 170,
+          "name": "measured_width",
+          "readOnly": true,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 171,
+          "name": "measured_height",
+          "readOnly": true,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 74,
+          "name": "x",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 75,
+          "name": "y",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": "Float(0.0)",
+          "id": 41,
+          "name": "rotation",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": "Float(1.0)",
+          "id": 44,
+          "name": "opacity",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": "String(\"none\")",
+          "id": 104,
+          "name": "backdrop_filter",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": "Bool(true)",
+          "id": 76,
+          "name": "visible",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 32,
+          "name": "min_width",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 40,
+          "name": "min_height",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 5,
+          "name": "background",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Color"
+        },
+        {
+          "default": null,
+          "id": 54,
+          "name": "selection_fill",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Brush"
+        },
+        {
+          "default": null,
+          "id": 42,
+          "name": "selection_color",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Color"
+        },
+        {
+          "default": null,
+          "id": 55,
+          "name": "selection_radius",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": "Float(0.0)",
+          "id": 6,
+          "name": "gap",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 185,
+          "name": "loop_ms",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 186,
+          "name": "loop_playing",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 195,
+          "name": "loop_gap",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": "Float(0.0)",
+          "id": 7,
+          "name": "padding",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 36,
+          "name": "scroll_y",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 37,
+          "name": "scrollbar_thumb",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Color"
+        },
+        {
+          "default": null,
+          "id": 25,
+          "name": "wrap",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 26,
+          "name": "grow",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 102,
+          "name": "shrink",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 18,
+          "name": "border_color",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Color"
+        },
+        {
+          "default": null,
+          "id": 22,
+          "name": "radius",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 88,
+          "name": "align_items",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 89,
+          "name": "justify_content",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 119,
+          "name": "grid_rows",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 120,
+          "name": "grid_columns",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 121,
+          "name": "grid_row_start",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Int"
+        },
+        {
+          "default": null,
+          "id": 122,
+          "name": "grid_row_span",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Int"
+        },
+        {
+          "default": null,
+          "id": 123,
+          "name": "grid_column_start",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Int"
+        },
+        {
+          "default": null,
+          "id": 124,
+          "name": "grid_column_span",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Int"
+        },
+        {
+          "default": null,
+          "id": 125,
+          "name": "max_width",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 126,
+          "name": "max_height",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 127,
+          "name": "aspect_ratio",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 128,
+          "name": "flex_basis",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 129,
+          "name": "row_gap",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 130,
+          "name": "column_gap",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 131,
+          "name": "padding_left",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 132,
+          "name": "padding_right",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 133,
+          "name": "padding_top",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 134,
+          "name": "padding_bottom",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 135,
+          "name": "margin_left",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 136,
+          "name": "margin_right",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 137,
+          "name": "margin_top",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 138,
+          "name": "margin_bottom",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 139,
+          "name": "scale_x",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 140,
+          "name": "scale_y",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 141,
+          "name": "translate_x",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 142,
+          "name": "translate_y",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 143,
+          "name": "origin_x",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 144,
+          "name": "origin_y",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 163,
+          "name": "position",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 164,
+          "name": "inset_left",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 165,
+          "name": "inset_right",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 166,
+          "name": "inset_top",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 167,
+          "name": "inset_bottom",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 168,
+          "name": "z_index",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Int"
+        },
+        {
+          "default": null,
+          "id": 145,
+          "name": "query_scope",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 146,
+          "name": "query_min_width",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 147,
+          "name": "query_columns",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 148,
+          "name": "align_self",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 149,
+          "name": "justify_items",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 150,
+          "name": "justify_self",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 151,
+          "name": "align_content",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 152,
+          "name": "grid_auto_flow",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 153,
+          "name": "radius_top_left",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 154,
+          "name": "radius_top_right",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 155,
+          "name": "radius_bottom_right",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 156,
+          "name": "radius_bottom_left",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 157,
+          "name": "border_left",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 158,
+          "name": "border_right",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 159,
+          "name": "border_top",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 160,
+          "name": "border_bottom",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 161,
+          "name": "shadow_offset_x",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 162,
+          "name": "shadow_spread",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 66,
+          "name": "clip",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 113,
+          "name": "shadow_blur",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 114,
+          "name": "shadow_offset_y",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 115,
+          "name": "shadow_color",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Color"
+        },
+        {
+          "default": null,
+          "id": 182,
+          "name": "transition_ms",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 183,
+          "name": "transition_spring",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        }
+      ]
+    },
+    {
+      "events": [
+        {
+          "id": 1,
+          "name": "click",
+          "payload": null
+        },
+        {
+          "id": 2,
+          "name": "focus",
+          "payload": null
+        },
+        {
+          "id": 3,
+          "name": "blur",
+          "payload": null
+        }
+      ],
+      "id": 2,
+      "name": "Row",
+      "properties": [
+        {
+          "default": null,
+          "id": 1,
+          "name": "key",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 2,
+          "name": "tooltip",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 3,
+          "name": "width",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 4,
+          "name": "height",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 170,
+          "name": "measured_width",
+          "readOnly": true,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 171,
+          "name": "measured_height",
+          "readOnly": true,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 74,
+          "name": "x",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 75,
+          "name": "y",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": "Float(0.0)",
+          "id": 41,
+          "name": "rotation",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": "Float(1.0)",
+          "id": 44,
+          "name": "opacity",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": "String(\"none\")",
+          "id": 104,
+          "name": "backdrop_filter",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": "Bool(true)",
+          "id": 76,
+          "name": "visible",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 32,
+          "name": "min_width",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 40,
+          "name": "min_height",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 5,
+          "name": "background",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Color"
+        },
+        {
+          "default": null,
+          "id": 54,
+          "name": "selection_fill",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Brush"
+        },
+        {
+          "default": null,
+          "id": 42,
+          "name": "selection_color",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Color"
+        },
+        {
+          "default": null,
+          "id": 55,
+          "name": "selection_radius",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": "Float(0.0)",
+          "id": 6,
+          "name": "gap",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 185,
+          "name": "loop_ms",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 186,
+          "name": "loop_playing",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 195,
+          "name": "loop_gap",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": "Float(0.0)",
+          "id": 7,
+          "name": "padding",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 36,
+          "name": "scroll_y",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 37,
+          "name": "scrollbar_thumb",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Color"
+        },
+        {
+          "default": null,
+          "id": 25,
+          "name": "wrap",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 26,
+          "name": "grow",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 102,
+          "name": "shrink",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 18,
+          "name": "border_color",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Color"
+        },
+        {
+          "default": null,
+          "id": 22,
+          "name": "radius",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 88,
+          "name": "align_items",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 89,
+          "name": "justify_content",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 119,
+          "name": "grid_rows",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 120,
+          "name": "grid_columns",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 121,
+          "name": "grid_row_start",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Int"
+        },
+        {
+          "default": null,
+          "id": 122,
+          "name": "grid_row_span",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Int"
+        },
+        {
+          "default": null,
+          "id": 123,
+          "name": "grid_column_start",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Int"
+        },
+        {
+          "default": null,
+          "id": 124,
+          "name": "grid_column_span",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Int"
+        },
+        {
+          "default": null,
+          "id": 125,
+          "name": "max_width",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 126,
+          "name": "max_height",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 127,
+          "name": "aspect_ratio",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 128,
+          "name": "flex_basis",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 129,
+          "name": "row_gap",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 130,
+          "name": "column_gap",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 131,
+          "name": "padding_left",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 132,
+          "name": "padding_right",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 133,
+          "name": "padding_top",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 134,
+          "name": "padding_bottom",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 135,
+          "name": "margin_left",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 136,
+          "name": "margin_right",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 137,
+          "name": "margin_top",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 138,
+          "name": "margin_bottom",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 139,
+          "name": "scale_x",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 140,
+          "name": "scale_y",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 141,
+          "name": "translate_x",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 142,
+          "name": "translate_y",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 143,
+          "name": "origin_x",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 144,
+          "name": "origin_y",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 163,
+          "name": "position",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 164,
+          "name": "inset_left",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 165,
+          "name": "inset_right",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 166,
+          "name": "inset_top",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 167,
+          "name": "inset_bottom",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 168,
+          "name": "z_index",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Int"
+        },
+        {
+          "default": null,
+          "id": 145,
+          "name": "query_scope",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 146,
+          "name": "query_min_width",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 147,
+          "name": "query_columns",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 148,
+          "name": "align_self",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 149,
+          "name": "justify_items",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 150,
+          "name": "justify_self",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 151,
+          "name": "align_content",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 152,
+          "name": "grid_auto_flow",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 153,
+          "name": "radius_top_left",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 154,
+          "name": "radius_top_right",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 155,
+          "name": "radius_bottom_right",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 156,
+          "name": "radius_bottom_left",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 157,
+          "name": "border_left",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 158,
+          "name": "border_right",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 159,
+          "name": "border_top",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 160,
+          "name": "border_bottom",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 161,
+          "name": "shadow_offset_x",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 162,
+          "name": "shadow_spread",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 66,
+          "name": "clip",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 113,
+          "name": "shadow_blur",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 114,
+          "name": "shadow_offset_y",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 115,
+          "name": "shadow_color",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Color"
+        },
+        {
+          "default": null,
+          "id": 182,
+          "name": "transition_ms",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 183,
+          "name": "transition_spring",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        }
+      ]
+    },
+    {
+      "events": [
+        {
+          "id": 1,
+          "name": "click",
+          "payload": null
+        },
+        {
+          "id": 2,
+          "name": "focus",
+          "payload": null
+        },
+        {
+          "id": 3,
+          "name": "blur",
+          "payload": null
+        }
+      ],
+      "id": 3,
+      "name": "Column",
+      "properties": [
+        {
+          "default": null,
+          "id": 1,
+          "name": "key",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 2,
+          "name": "tooltip",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 3,
+          "name": "width",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 4,
+          "name": "height",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 170,
+          "name": "measured_width",
+          "readOnly": true,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 171,
+          "name": "measured_height",
+          "readOnly": true,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 74,
+          "name": "x",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 75,
+          "name": "y",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": "Float(0.0)",
+          "id": 41,
+          "name": "rotation",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": "Float(1.0)",
+          "id": 44,
+          "name": "opacity",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": "String(\"none\")",
+          "id": 104,
+          "name": "backdrop_filter",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": "Bool(true)",
+          "id": 76,
+          "name": "visible",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 32,
+          "name": "min_width",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 40,
+          "name": "min_height",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 5,
+          "name": "background",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Color"
+        },
+        {
+          "default": null,
+          "id": 54,
+          "name": "selection_fill",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Brush"
+        },
+        {
+          "default": null,
+          "id": 42,
+          "name": "selection_color",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Color"
+        },
+        {
+          "default": null,
+          "id": 55,
+          "name": "selection_radius",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": "Float(0.0)",
+          "id": 6,
+          "name": "gap",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 185,
+          "name": "loop_ms",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 186,
+          "name": "loop_playing",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 195,
+          "name": "loop_gap",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": "Float(0.0)",
+          "id": 7,
+          "name": "padding",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 36,
+          "name": "scroll_y",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 37,
+          "name": "scrollbar_thumb",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Color"
+        },
+        {
+          "default": null,
+          "id": 25,
+          "name": "wrap",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 26,
+          "name": "grow",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 102,
+          "name": "shrink",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 18,
+          "name": "border_color",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Color"
+        },
+        {
+          "default": null,
+          "id": 22,
+          "name": "radius",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 88,
+          "name": "align_items",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 89,
+          "name": "justify_content",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 119,
+          "name": "grid_rows",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 120,
+          "name": "grid_columns",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 121,
+          "name": "grid_row_start",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Int"
+        },
+        {
+          "default": null,
+          "id": 122,
+          "name": "grid_row_span",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Int"
+        },
+        {
+          "default": null,
+          "id": 123,
+          "name": "grid_column_start",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Int"
+        },
+        {
+          "default": null,
+          "id": 124,
+          "name": "grid_column_span",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Int"
+        },
+        {
+          "default": null,
+          "id": 125,
+          "name": "max_width",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 126,
+          "name": "max_height",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 127,
+          "name": "aspect_ratio",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 128,
+          "name": "flex_basis",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 129,
+          "name": "row_gap",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 130,
+          "name": "column_gap",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 131,
+          "name": "padding_left",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 132,
+          "name": "padding_right",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 133,
+          "name": "padding_top",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 134,
+          "name": "padding_bottom",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 135,
+          "name": "margin_left",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 136,
+          "name": "margin_right",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 137,
+          "name": "margin_top",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 138,
+          "name": "margin_bottom",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 139,
+          "name": "scale_x",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 140,
+          "name": "scale_y",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 141,
+          "name": "translate_x",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 142,
+          "name": "translate_y",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 143,
+          "name": "origin_x",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 144,
+          "name": "origin_y",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 163,
+          "name": "position",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 164,
+          "name": "inset_left",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 165,
+          "name": "inset_right",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 166,
+          "name": "inset_top",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 167,
+          "name": "inset_bottom",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 168,
+          "name": "z_index",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Int"
+        },
+        {
+          "default": null,
+          "id": 145,
+          "name": "query_scope",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 146,
+          "name": "query_min_width",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 147,
+          "name": "query_columns",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 148,
+          "name": "align_self",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 149,
+          "name": "justify_items",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 150,
+          "name": "justify_self",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 151,
+          "name": "align_content",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 152,
+          "name": "grid_auto_flow",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 153,
+          "name": "radius_top_left",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 154,
+          "name": "radius_top_right",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 155,
+          "name": "radius_bottom_right",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 156,
+          "name": "radius_bottom_left",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 157,
+          "name": "border_left",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 158,
+          "name": "border_right",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 159,
+          "name": "border_top",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 160,
+          "name": "border_bottom",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 161,
+          "name": "shadow_offset_x",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 162,
+          "name": "shadow_spread",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 66,
+          "name": "clip",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 113,
+          "name": "shadow_blur",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 114,
+          "name": "shadow_offset_y",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 115,
+          "name": "shadow_color",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Color"
+        },
+        {
+          "default": null,
+          "id": 182,
+          "name": "transition_ms",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 183,
+          "name": "transition_spring",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        }
+      ]
+    },
+    {
+      "events": [],
+      "id": 4,
+      "name": "Text",
+      "properties": [
+        {
+          "default": null,
+          "id": 8,
+          "name": "content",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 9,
+          "name": "text",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 1,
+          "name": "key",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 2,
+          "name": "tooltip",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 3,
+          "name": "width",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 4,
+          "name": "height",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 74,
+          "name": "x",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 75,
+          "name": "y",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": "Float(0.0)",
+          "id": 41,
+          "name": "rotation",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": "Float(1.0)",
+          "id": 44,
+          "name": "opacity",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": "String(\"none\")",
+          "id": 104,
+          "name": "backdrop_filter",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": "Bool(true)",
+          "id": 76,
+          "name": "visible",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 5,
+          "name": "background",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Color"
+        },
+        {
+          "default": null,
+          "id": 185,
+          "name": "loop_ms",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 186,
+          "name": "loop_playing",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 190,
+          "name": "loop_opacity",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 182,
+          "name": "transition_ms",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 183,
+          "name": "transition_spring",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 54,
+          "name": "selection_fill",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Brush"
+        },
+        {
+          "default": null,
+          "id": 42,
+          "name": "selection_color",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Color"
+        },
+        {
+          "default": null,
+          "id": 55,
+          "name": "selection_radius",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 23,
+          "name": "color",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Color"
+        },
+        {
+          "default": null,
+          "id": 24,
+          "name": "weight",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Int"
+        },
+        {
+          "default": null,
+          "id": 30,
+          "name": "font_size",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 31,
+          "name": "no_wrap",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 105,
+          "name": "line_height",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 106,
+          "name": "font_style",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 107,
+          "name": "letter_spacing",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 108,
+          "name": "underline",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 109,
+          "name": "strikethrough",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 110,
+          "name": "text_align",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 111,
+          "name": "line_clamp",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Int"
+        },
+        {
+          "default": null,
+          "id": 112,
+          "name": "text_overflow",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        }
+      ]
+    },
+    {
+      "events": [],
+      "id": 8,
+      "name": "Image",
+      "properties": [
+        {
+          "default": null,
+          "id": 1,
+          "name": "key",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 2,
+          "name": "tooltip",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 3,
+          "name": "width",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 4,
+          "name": "height",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 74,
+          "name": "x",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 75,
+          "name": "y",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": "Float(0.0)",
+          "id": 41,
+          "name": "rotation",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": "Float(1.0)",
+          "id": 44,
+          "name": "opacity",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": "String(\"none\")",
+          "id": 104,
+          "name": "backdrop_filter",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": "Bool(true)",
+          "id": 76,
+          "name": "visible",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 33,
+          "name": "source",
+          "readOnly": false,
+          "required": true,
+          "valueType": "Asset"
+        },
+        {
+          "default": null,
+          "id": 34,
+          "name": "fit",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 35,
+          "name": "sampling",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        }
+      ]
+    },
+    {
+      "events": [],
+      "id": 9,
+      "name": "Svg",
+      "properties": [
+        {
+          "default": null,
+          "id": 1,
+          "name": "key",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 2,
+          "name": "tooltip",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 3,
+          "name": "width",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 4,
+          "name": "height",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 74,
+          "name": "x",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 75,
+          "name": "y",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": "Float(0.0)",
+          "id": 41,
+          "name": "rotation",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": "Float(1.0)",
+          "id": 44,
+          "name": "opacity",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": "String(\"none\")",
+          "id": 104,
+          "name": "backdrop_filter",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": "Bool(true)",
+          "id": 76,
+          "name": "visible",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 33,
+          "name": "source",
+          "readOnly": false,
+          "required": true,
+          "valueType": "Asset"
+        },
+        {
+          "default": null,
+          "id": 34,
+          "name": "fit",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 23,
+          "name": "color",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Color"
+        }
+      ]
+    },
+    {
+      "events": [],
+      "id": 12,
+      "name": "Rectangle",
+      "properties": [
+        {
+          "default": null,
+          "id": 1,
+          "name": "key",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 2,
+          "name": "tooltip",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 3,
+          "name": "width",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 4,
+          "name": "height",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 74,
+          "name": "x",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 75,
+          "name": "y",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 32,
+          "name": "min_width",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 40,
+          "name": "min_height",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": "Float(0.0)",
+          "id": 41,
+          "name": "rotation",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 184,
+          "name": "rotation_loop_ms",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 185,
+          "name": "loop_ms",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 186,
+          "name": "loop_playing",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 187,
+          "name": "loop_translate_x",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 188,
+          "name": "loop_translate_y",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 189,
+          "name": "loop_scale",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 190,
+          "name": "loop_opacity",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 191,
+          "name": "loop_background",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Color"
+        },
+        {
+          "default": null,
+          "id": 192,
+          "name": "loop_hold",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 193,
+          "name": "loop_width",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 194,
+          "name": "loop_radius",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": "Float(1.0)",
+          "id": 44,
+          "name": "opacity",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 182,
+          "name": "transition_ms",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 183,
+          "name": "transition_spring",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": "String(\"none\")",
+          "id": 104,
+          "name": "backdrop_filter",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": "Bool(true)",
+          "id": 76,
+          "name": "visible",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 5,
+          "name": "background",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Brush"
+        },
+        {
+          "default": null,
+          "id": 18,
+          "name": "border_color",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Color"
+        },
+        {
+          "default": null,
+          "id": 65,
+          "name": "border_width",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 22,
+          "name": "radius",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 66,
+          "name": "clip",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 113,
+          "name": "shadow_blur",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 114,
+          "name": "shadow_offset_y",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 115,
+          "name": "shadow_color",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Color"
+        }
+      ]
+    },
+    {
+      "events": [
+        {
+          "id": 1,
+          "name": "click",
+          "payload": null
+        },
+        {
+          "id": 20,
+          "name": "context_menu",
+          "payload": null
+        },
+        {
+          "id": 16,
+          "name": "double_clicked",
+          "payload": null
+        },
+        {
+          "id": 8,
+          "name": "pointer_enter",
+          "payload": null
+        },
+        {
+          "id": 9,
+          "name": "pointer_leave",
+          "payload": null
+        },
+        {
+          "id": 10,
+          "name": "pointer_down",
+          "payload": null
+        },
+        {
+          "id": 11,
+          "name": "pointer_up",
+          "payload": null
+        },
+        {
+          "id": 12,
+          "name": "pointer_move",
+          "payload": null
+        },
+        {
+          "id": 13,
+          "name": "pointer_cancel",
+          "payload": null
+        },
+        {
+          "id": 15,
+          "name": "moved",
+          "payload": null
+        },
+        {
+          "id": 21,
+          "name": "drag_x",
+          "payload": "Float"
+        },
+        {
+          "id": 22,
+          "name": "drag_y",
+          "payload": "Float"
+        },
+        {
+          "id": 14,
+          "name": "wheel",
+          "payload": null
+        }
+      ],
+      "id": 13,
+      "name": "TouchArea",
+      "properties": [
+        {
+          "default": null,
+          "id": 1,
+          "name": "key",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 3,
+          "name": "width",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 4,
+          "name": "height",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 74,
+          "name": "x",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 75,
+          "name": "y",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": "Float(0.0)",
+          "id": 41,
+          "name": "rotation",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": "Float(1.0)",
+          "id": 44,
+          "name": "opacity",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": "String(\"none\")",
+          "id": 104,
+          "name": "backdrop_filter",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": "Bool(true)",
+          "id": 76,
+          "name": "visible",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": "Bool(true)",
+          "id": 12,
+          "name": "enabled",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 73,
+          "name": "mouse_cursor",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 67,
+          "name": "has_hover",
+          "readOnly": true,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 68,
+          "name": "pressed",
+          "readOnly": true,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 69,
+          "name": "mouse_x",
+          "readOnly": true,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 70,
+          "name": "mouse_y",
+          "readOnly": true,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 117,
+          "name": "mouse_global_x",
+          "readOnly": true,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 118,
+          "name": "mouse_global_y",
+          "readOnly": true,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 71,
+          "name": "pressed_x",
+          "readOnly": true,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 72,
+          "name": "pressed_y",
+          "readOnly": true,
+          "required": false,
+          "valueType": "Dimension"
+        }
+      ]
+    },
+    {
+      "events": [
+        {
+          "id": 1,
+          "name": "click",
+          "payload": null
+        },
+        {
+          "id": 2,
+          "name": "focus",
+          "payload": null
+        },
+        {
+          "id": 3,
+          "name": "blur",
+          "payload": null
+        },
+        {
+          "id": 17,
+          "name": "key",
+          "payload": null
+        },
+        {
+          "id": 18,
+          "name": "capture_key",
+          "payload": null
+        }
+      ],
+      "id": 14,
+      "name": "FocusScope",
+      "properties": [
+        {
+          "default": null,
+          "id": 1,
+          "name": "key",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 2,
+          "name": "tooltip",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 3,
+          "name": "width",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 4,
+          "name": "height",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 74,
+          "name": "x",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 75,
+          "name": "y",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": "Float(0.0)",
+          "id": 41,
+          "name": "rotation",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": "Float(1.0)",
+          "id": 44,
+          "name": "opacity",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": "String(\"none\")",
+          "id": 104,
+          "name": "backdrop_filter",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": "Bool(true)",
+          "id": 76,
+          "name": "visible",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": "Bool(true)",
+          "id": 12,
+          "name": "enabled",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": "Bool(true)",
+          "id": 77,
+          "name": "focus_on_click",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": "Bool(true)",
+          "id": 78,
+          "name": "focus_on_tab_navigation",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 79,
+          "name": "has_focus",
+          "readOnly": true,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 80,
+          "name": "focus_visible",
+          "readOnly": true,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 81,
+          "name": "containment",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 82,
+          "name": "restore_focus",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 83,
+          "name": "initial_focus",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 84,
+          "name": "keyboard_activation",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 85,
+          "name": "role",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 86,
+          "name": "accessible_name",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 172,
+          "name": "accessible_description",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 173,
+          "name": "accessible_value",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 174,
+          "name": "selected",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 175,
+          "name": "current",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 176,
+          "name": "controls",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 177,
+          "name": "active_descendant",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 178,
+          "name": "labelled_by",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 179,
+          "name": "described_by",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 180,
+          "name": "invalid",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 181,
+          "name": "live",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 17,
+          "name": "busy",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 38,
+          "name": "checked",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 87,
+          "name": "expandable",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 29,
+          "name": "expanded",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        }
+      ]
+    },
+    {
+      "events": [],
+      "id": 15,
+      "name": "Path",
+      "properties": [
+        {
+          "default": null,
+          "id": 1,
+          "name": "key",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 2,
+          "name": "tooltip",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 3,
+          "name": "width",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 4,
+          "name": "height",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 74,
+          "name": "x",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 75,
+          "name": "y",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": "Float(0.0)",
+          "id": 41,
+          "name": "rotation",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": "Float(1.0)",
+          "id": 44,
+          "name": "opacity",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": "String(\"none\")",
+          "id": 104,
+          "name": "backdrop_filter",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": "Bool(true)",
+          "id": 76,
+          "name": "visible",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 33,
+          "name": "source",
+          "readOnly": false,
+          "required": true,
+          "valueType": "Asset"
+        },
+        {
+          "default": null,
+          "id": 34,
+          "name": "fit",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 23,
+          "name": "color",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Color"
+        }
+      ]
+    },
+    {
+      "events": [
+        {
+          "id": 4,
+          "name": "input",
+          "payload": "String"
+        },
+        {
+          "id": 23,
+          "name": "edit",
+          "payload": null
+        },
+        {
+          "id": 5,
+          "name": "submit",
+          "payload": "String"
+        },
+        {
+          "id": 2,
+          "name": "focus",
+          "payload": null
+        },
+        {
+          "id": 3,
+          "name": "blur",
+          "payload": null
+        }
+      ],
+      "id": 16,
+      "name": "TextInput",
+      "properties": [
+        {
+          "default": null,
+          "id": 1,
+          "name": "key",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": "String(\"\")",
+          "id": 10,
+          "name": "value",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": "String(\"\")",
+          "id": 11,
+          "name": "placeholder",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": "Bool(true)",
+          "id": 12,
+          "name": "enabled",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": "Bool(false)",
+          "id": 13,
+          "name": "read_only",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": "Bool(false)",
+          "id": 64,
+          "name": "search",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": "Bool(false)",
+          "id": 90,
+          "name": "multiline",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": "Int(0)",
+          "id": 116,
+          "name": "max_digits",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Int"
+        },
+        {
+          "default": null,
+          "id": 14,
+          "name": "label",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 15,
+          "name": "description",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": "Bool(false)",
+          "id": 16,
+          "name": "invalid",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 3,
+          "name": "width",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 4,
+          "name": "height",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 74,
+          "name": "x",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 75,
+          "name": "y",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": "Float(0.0)",
+          "id": 41,
+          "name": "rotation",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": "Float(1.0)",
+          "id": 44,
+          "name": "opacity",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": "String(\"none\")",
+          "id": 104,
+          "name": "backdrop_filter",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": "Bool(true)",
+          "id": 76,
+          "name": "visible",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 5,
+          "name": "background",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Color"
+        },
+        {
+          "default": null,
+          "id": 54,
+          "name": "selection_fill",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Brush"
+        },
+        {
+          "default": null,
+          "id": 55,
+          "name": "selection_radius",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 23,
+          "name": "text_color",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Color"
+        },
+        {
+          "default": null,
+          "id": 39,
+          "name": "placeholder_color",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Color"
+        },
+        {
+          "default": null,
+          "id": 42,
+          "name": "selection_color",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Color"
+        },
+        {
+          "default": null,
+          "id": 43,
+          "name": "caret_color",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Color"
+        },
+        {
+          "default": null,
+          "id": 56,
+          "name": "caret_fill",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Brush"
+        },
+        {
+          "default": null,
+          "id": 57,
+          "name": "caret_width",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 58,
+          "name": "caret_height",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 59,
+          "name": "caret_radius",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 60,
+          "name": "caret_count",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Int"
+        },
+        {
+          "default": null,
+          "id": 61,
+          "name": "caret_spacing",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 62,
+          "name": "caret_offset_y",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 63,
+          "name": "caret_blink",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        }
+      ]
+    },
+    {
+      "events": [
+        {
+          "id": 19,
+          "name": "activated",
+          "payload": null
+        }
+      ],
+      "id": 17,
+      "name": "KeyBinding",
+      "properties": [
+        {
+          "default": null,
+          "id": 1,
+          "name": "key",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": "Float(1.0)",
+          "id": 44,
+          "name": "opacity",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": "Bool(true)",
+          "id": 76,
+          "name": "visible",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 91,
+          "name": "shortcut",
+          "readOnly": false,
+          "required": true,
+          "valueType": "String"
+        },
+        {
+          "default": "Bool(true)",
+          "id": 12,
+          "name": "enabled",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        }
+      ]
+    },
+    {
+      "events": [
+        {
+          "id": 6,
+          "name": "dismiss",
+          "payload": null
+        }
+      ],
+      "id": 18,
+      "name": "PopupWindow",
+      "properties": [
+        {
+          "default": null,
+          "id": 1,
+          "name": "key",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 3,
+          "name": "width",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 4,
+          "name": "height",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": "Float(1.0)",
+          "id": 44,
+          "name": "opacity",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": "String(\"none\")",
+          "id": 104,
+          "name": "backdrop_filter",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": "Bool(true)",
+          "id": 76,
+          "name": "visible",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 27,
+          "name": "anchor",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 92,
+          "name": "placement",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": "String(\"outside_pointer_or_escape\")",
+          "id": 93,
+          "name": "dismiss_policy",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": "String(\"popover\")",
+          "id": 94,
+          "name": "window_layer",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 81,
+          "name": "containment",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": "Bool(true)",
+          "id": 82,
+          "name": "restore_focus",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 83,
+          "name": "initial_focus",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        }
+      ]
+    },
+    {
+      "events": [
+        {
+          "id": 7,
+          "name": "scroll",
+          "payload": "Float"
+        }
+      ],
+      "id": 19,
+      "name": "Flickable",
+      "properties": [
+        {
+          "default": null,
+          "id": 1,
+          "name": "key",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 2,
+          "name": "tooltip",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 3,
+          "name": "width",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 4,
+          "name": "height",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 74,
+          "name": "x",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 75,
+          "name": "y",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 32,
+          "name": "min_width",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 40,
+          "name": "min_height",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": "Float(0.0)",
+          "id": 41,
+          "name": "rotation",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": "Float(1.0)",
+          "id": 44,
+          "name": "opacity",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": "String(\"none\")",
+          "id": 104,
+          "name": "backdrop_filter",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": "Bool(true)",
+          "id": 76,
+          "name": "visible",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": "Bool(true)",
+          "id": 12,
+          "name": "enabled",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": "Bool(false)",
+          "id": 95,
+          "name": "scroll_x",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": "Bool(true)",
+          "id": 36,
+          "name": "scroll_y",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 26,
+          "name": "grow",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 96,
+          "name": "offset_x",
+          "readOnly": true,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 97,
+          "name": "offset_y",
+          "readOnly": true,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 98,
+          "name": "viewport_width",
+          "readOnly": true,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 99,
+          "name": "viewport_height",
+          "readOnly": true,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 100,
+          "name": "content_width",
+          "readOnly": true,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 101,
+          "name": "content_height",
+          "readOnly": true,
+          "required": false,
+          "valueType": "Dimension"
+        }
+      ]
+    },
+    {
+      "events": [
+        {
+          "id": 7,
+          "name": "scroll",
+          "payload": "Float"
+        }
+      ],
+      "id": 20,
+      "name": "VirtualWindow",
+      "properties": [
+        {
+          "default": null,
+          "id": 1,
+          "name": "key",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 2,
+          "name": "tooltip",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 3,
+          "name": "width",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 4,
+          "name": "height",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 74,
+          "name": "x",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 75,
+          "name": "y",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 32,
+          "name": "min_width",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 40,
+          "name": "min_height",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": "Float(0.0)",
+          "id": 41,
+          "name": "rotation",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": "Float(1.0)",
+          "id": 44,
+          "name": "opacity",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": "String(\"none\")",
+          "id": 104,
+          "name": "backdrop_filter",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": "Bool(true)",
+          "id": 76,
+          "name": "visible",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 26,
+          "name": "grow",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 45,
+          "name": "row_height",
+          "readOnly": false,
+          "required": true,
+          "valueType": "Float"
+        },
+        {
+          "default": "Bool(false)",
+          "id": 169,
+          "name": "variable_height",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 46,
+          "name": "viewport_height",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": "Float(0.0)",
+          "id": 47,
+          "name": "offset",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 37,
+          "name": "scrollbar_thumb",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Color"
+        },
+        {
+          "default": null,
+          "id": 97,
+          "name": "offset_y",
+          "readOnly": true,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 103,
+          "name": "visible_height",
+          "readOnly": true,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 101,
+          "name": "content_height",
+          "readOnly": true,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": "Int(3)",
+          "id": 48,
+          "name": "overscan",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Int"
+        },
+        {
+          "default": null,
+          "id": 49,
+          "name": "__item_count",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Int"
+        },
+        {
+          "default": null,
+          "id": 50,
+          "name": "__window_start",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Int"
+        }
+      ]
+    },
+    {
+      "events": [
+        {
+          "id": 1,
+          "name": "click",
+          "payload": null
+        },
+        {
+          "id": 2,
+          "name": "focus",
+          "payload": null
+        },
+        {
+          "id": 3,
+          "name": "blur",
+          "payload": null
+        }
+      ],
+      "id": 21,
+      "name": "Grid",
+      "properties": [
+        {
+          "default": null,
+          "id": 1,
+          "name": "key",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 2,
+          "name": "tooltip",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 3,
+          "name": "width",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 4,
+          "name": "height",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 170,
+          "name": "measured_width",
+          "readOnly": true,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 171,
+          "name": "measured_height",
+          "readOnly": true,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 74,
+          "name": "x",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 75,
+          "name": "y",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": "Float(0.0)",
+          "id": 41,
+          "name": "rotation",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": "Float(1.0)",
+          "id": 44,
+          "name": "opacity",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": "String(\"none\")",
+          "id": 104,
+          "name": "backdrop_filter",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": "Bool(true)",
+          "id": 76,
+          "name": "visible",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 32,
+          "name": "min_width",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 40,
+          "name": "min_height",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 5,
+          "name": "background",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Color"
+        },
+        {
+          "default": null,
+          "id": 54,
+          "name": "selection_fill",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Brush"
+        },
+        {
+          "default": null,
+          "id": 42,
+          "name": "selection_color",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Color"
+        },
+        {
+          "default": null,
+          "id": 55,
+          "name": "selection_radius",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": "Float(0.0)",
+          "id": 6,
+          "name": "gap",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 185,
+          "name": "loop_ms",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 186,
+          "name": "loop_playing",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 195,
+          "name": "loop_gap",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": "Float(0.0)",
+          "id": 7,
+          "name": "padding",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 36,
+          "name": "scroll_y",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 37,
+          "name": "scrollbar_thumb",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Color"
+        },
+        {
+          "default": null,
+          "id": 25,
+          "name": "wrap",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 26,
+          "name": "grow",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 102,
+          "name": "shrink",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 18,
+          "name": "border_color",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Color"
+        },
+        {
+          "default": null,
+          "id": 22,
+          "name": "radius",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 88,
+          "name": "align_items",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 89,
+          "name": "justify_content",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 119,
+          "name": "grid_rows",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 120,
+          "name": "grid_columns",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 121,
+          "name": "grid_row_start",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Int"
+        },
+        {
+          "default": null,
+          "id": 122,
+          "name": "grid_row_span",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Int"
+        },
+        {
+          "default": null,
+          "id": 123,
+          "name": "grid_column_start",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Int"
+        },
+        {
+          "default": null,
+          "id": 124,
+          "name": "grid_column_span",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Int"
+        },
+        {
+          "default": null,
+          "id": 125,
+          "name": "max_width",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 126,
+          "name": "max_height",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 127,
+          "name": "aspect_ratio",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 128,
+          "name": "flex_basis",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 129,
+          "name": "row_gap",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 130,
+          "name": "column_gap",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 131,
+          "name": "padding_left",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 132,
+          "name": "padding_right",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 133,
+          "name": "padding_top",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 134,
+          "name": "padding_bottom",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 135,
+          "name": "margin_left",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 136,
+          "name": "margin_right",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 137,
+          "name": "margin_top",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 138,
+          "name": "margin_bottom",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 139,
+          "name": "scale_x",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 140,
+          "name": "scale_y",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 141,
+          "name": "translate_x",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 142,
+          "name": "translate_y",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 143,
+          "name": "origin_x",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 144,
+          "name": "origin_y",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 163,
+          "name": "position",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 164,
+          "name": "inset_left",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 165,
+          "name": "inset_right",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 166,
+          "name": "inset_top",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 167,
+          "name": "inset_bottom",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 168,
+          "name": "z_index",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Int"
+        },
+        {
+          "default": null,
+          "id": 145,
+          "name": "query_scope",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 146,
+          "name": "query_min_width",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 147,
+          "name": "query_columns",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 148,
+          "name": "align_self",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 149,
+          "name": "justify_items",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 150,
+          "name": "justify_self",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 151,
+          "name": "align_content",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 152,
+          "name": "grid_auto_flow",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 153,
+          "name": "radius_top_left",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 154,
+          "name": "radius_top_right",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 155,
+          "name": "radius_bottom_right",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 156,
+          "name": "radius_bottom_left",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 157,
+          "name": "border_left",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 158,
+          "name": "border_right",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 159,
+          "name": "border_top",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 160,
+          "name": "border_bottom",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 161,
+          "name": "shadow_offset_x",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 162,
+          "name": "shadow_spread",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 66,
+          "name": "clip",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 113,
+          "name": "shadow_blur",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 114,
+          "name": "shadow_offset_y",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 115,
+          "name": "shadow_color",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Color"
+        },
+        {
+          "default": null,
+          "id": 182,
+          "name": "transition_ms",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 183,
+          "name": "transition_spring",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        }
+      ]
+    }
+  ]
+}

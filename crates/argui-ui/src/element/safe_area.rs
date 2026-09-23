@@ -4,6 +4,8 @@ use crate::{Element, Sides, length};
 
 impl Element {
     /// Wraps this element in padding for the supplied logical-pixel safe area.
+    /// Copies the element background to the wrapper so it also paints behind
+    /// system bars when the host draws edge to edge.
     ///
     /// * `insets` — safe-area distances from the top, right, bottom, and left edges.
     #[must_use]
@@ -17,7 +19,10 @@ impl Element {
         if insets == Insets::ZERO {
             return self;
         }
-        Self::container([self]).padding(Sides {
+        let background = self.paint.quad.background.clone();
+        let mut wrapper = Self::container([self]);
+        wrapper.paint.quad.background = background;
+        wrapper.padding(Sides {
             top: length(insets.top),
             right: length(insets.right),
             bottom: length(insets.bottom),

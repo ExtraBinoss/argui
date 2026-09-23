@@ -15,7 +15,7 @@ impl Render for ShaderModel {
 
     fn effect_definitions(&self) -> Vec<EffectDefinition> {
         vec![EffectDefinition::new(
-            EffectId::new("dsl.tint"),
+            EffectId::new("native.tint"),
             Vec::<EffectParameter>::new(),
             [EffectPassDefinition::fragment(
                 "tint",
@@ -32,7 +32,7 @@ fn effect_definitions_follow_retained_model_revisions() {
     let model = SingleWindowModel::from_entity(entity.clone()).unwrap();
     let first = model.effect_definitions();
     assert_eq!(first.len(), 1);
-    assert_eq!(first[0].id.as_str(), "dsl.tint");
+    assert_eq!(first[0].id.as_str(), "native.tint");
     assert_eq!(first[0].revision, 1);
 
     entity.update(|model, cx| {

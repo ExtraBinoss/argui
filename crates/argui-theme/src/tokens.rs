@@ -5,7 +5,7 @@ pub use crate::value::ThemeValue;
 
 /// Sparse named overrides accepted by existing Rust theme factories.
 ///
-/// Compiled DSL themes use [`crate::ThemeRuntime`] and numeric token IDs. This
+/// [`crate::ThemeRuntime`] uses numeric token IDs for typed themes. This
 /// string-keyed adapter remains at the Rust theme-provider boundary.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct ThemeOverrides(BTreeMap<String, ThemeValue>);

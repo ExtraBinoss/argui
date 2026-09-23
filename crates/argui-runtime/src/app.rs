@@ -19,11 +19,14 @@ mod cursor;
 #[cfg(all(feature = "desktop-backdrop", not(target_arch = "wasm32")))]
 mod desktop_backdrop;
 mod frame;
+mod frame_route;
 #[cfg(all(feature = "webview", target_os = "linux"))]
 mod gtk;
 mod inspect;
 mod layout;
 mod model_updates;
+#[cfg(not(target_arch = "wasm32"))]
+mod native_host;
 mod visibility;
 pub use inspect::{Inspection, InspectionCache};
 mod inertia;
@@ -45,6 +48,8 @@ mod popups;
 mod preferences;
 mod renderer;
 mod scroll;
+#[cfg(not(target_arch = "wasm32"))]
+mod semantic_sync;
 mod text_selection;
 mod touch_scroll;
 mod ui_zoom;
@@ -108,6 +113,10 @@ pub(crate) struct Application {
     pub(super) text_engine: TextEngine,
     text_scene: Option<TextScene>,
     pub(super) ui_tree: Option<UiTree>,
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(super) native_host: Option<crate::NativeHost>,
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(super) native_host_events: Option<std::sync::mpsc::Sender<crate::NativeHostDelivery>>,
     pub(super) interaction_snapshot: crate::model::InteractionSnapshot,
     pub(super) source_index: RefCell<crate::SourceIdentityIndex>,
     pub(super) animations: RuntimeAnimations,
@@ -249,6 +258,10 @@ impl Application {
             text_engine,
             text_scene,
             ui_tree,
+            #[cfg(not(target_arch = "wasm32"))]
+            native_host: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            native_host_events: None,
             interaction_snapshot: crate::model::InteractionSnapshot::default(),
             source_index: RefCell::default(),
             animations: RuntimeAnimations::new(model.as_ref()),
@@ -427,6 +440,15 @@ impl Application {
                 pointer_capture.extend(effects.pointer_capture);
                 ui_commands.extend(effects.ui_commands);
             }
+            #[cfg(not(target_arch = "wasm32"))]
+            if let (Some(host), Some(sender)) = (&self.native_host, &self.native_host_events)
+                && let Some(callback) = host.callback_for(event)
+            {
+                let _ = sender.send(crate::NativeHostDelivery {
+                    callback,
+                    kind: event.kind.clone(),
+                });
+            }
             let published = self
                 .ui_tree
                 .as_ref()
@@ -549,35 +571,5 @@ impl Application {
             self.apply_ui_update(update, window, event_loop);
             self.update_ime(window);
         }
-    }
-}
-
-impl Drop for Application {
-    fn drop(&mut self) {
-        if let Some(model) = &self.model {
-            if self.exit_on_close {
-                crate::shutdown_presentations(std::slice::from_ref(model));
-            } else {
-                model.close_presentation();
-            }
-        }
-        #[cfg(feature = "tasks")]
-        {
-            if self.exit_on_close
-                && let Some(tasks) = &self.tasks
-            {
-                tasks.shutdown();
-            }
-        }
-        #[cfg(all(
-            feature = "webview",
-            any(
-                target_arch = "wasm32",
-                target_os = "linux",
-                target_os = "windows",
-                target_os = "macos"
-            )
-        ))]
-        self.native_views.take();
     }
 }

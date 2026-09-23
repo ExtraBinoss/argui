@@ -531,6 +531,7 @@ impl SurfaceRenderer {
     /// Returns a renderer error if the asset cannot be uploaded or registered.
     pub fn register_image(&mut self, asset: &ImageAsset) -> Result<(), RendererError> {
         self.image.register(&self.device, &self.queue, asset)?;
+        self.layer_cache.clear();
         self.damage.invalidate();
         self.effect_root = None;
         Ok(())
@@ -542,6 +543,7 @@ impl SurfaceRenderer {
     /// Returns a renderer error if the asset cannot be rasterized or registered.
     pub fn register_vector(&mut self, asset: &VectorAsset) -> Result<(), RendererError> {
         self.vector.register(asset)?;
+        self.layer_cache.clear();
         self.damage.invalidate();
         self.effect_root = None;
         Ok(())

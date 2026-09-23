@@ -177,7 +177,7 @@ An ordinary button does not require this pattern. See
 
 Compose `Interaction`, semantics, gestures, and listeners directly when a
 control is not represented by a widget. Keep the renderer/runtime independent
-from application DSLs, provide keyboard and accessibility equivalents, and test
+from framework adapters, provide keyboard and accessibility equivalents, and test
 pointer activation with `TestApp::click` so real hit testing remains covered.
 The [custom-element guide](ui/custom-elements.md) covers custom layout and paint.
 

@@ -91,6 +91,16 @@ impl<T> Timeline<T> {
         self.timing
     }
 
+    /// Returns whether `other` has the same keyframes and timing, ignoring playback position.
+    /// `other` is the timeline to compare against this timeline.
+    #[must_use]
+    pub fn same_definition(&self, other: &Self) -> bool
+    where
+        T: PartialEq,
+    {
+        self.keyframes == other.keyframes && self.timing == other.timing
+    }
+
     /// Returns whether playback is running and needs another frame.
     #[must_use]
     pub fn needs_frame(&self) -> bool {

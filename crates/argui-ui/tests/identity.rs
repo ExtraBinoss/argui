@@ -97,6 +97,30 @@ fn repeater_keys_preserve_items_across_reordering() {
 }
 
 #[test]
+fn moving_shared_subtrees_reorders_descendant_ids_and_retains_editor_focus() {
+    let editor = Element::container([input(71)]).retained_identity(source(70));
+    let caption = Element::container([Element::text("caption")]).retained_identity(source(72));
+    let mut tree = UiTree::new(
+        Element::column([editor.clone(), caption.clone()]).retained_identity(source(1)),
+    );
+    let before = tree.node_ids().to_vec();
+    let editor_id = before[2];
+    tree.sync_focus(
+        &[focus_region(editor_id)],
+        Some(FocusRequest::Focus(editor_id.into())),
+    );
+
+    tree.update(Element::column([caption, editor]).retained_identity(source(1)));
+
+    assert_eq!(
+        tree.node_ids(),
+        &[before[0], before[3], before[4], before[1], before[2]]
+    );
+    assert_eq!(tree.focused_node(), Some(editor_id));
+    assert_eq!(tree.text_input_value(editor_id), Some("retained text"));
+}
+
+#[test]
 fn retained_identity_target_requires_a_unique_current_node() {
     let identity = source(50);
     let mut tree = UiTree::new(Element::container([

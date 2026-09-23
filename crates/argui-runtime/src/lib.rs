@@ -14,6 +14,8 @@ mod input;
 mod launch;
 mod model;
 mod multi;
+#[cfg(not(target_arch = "wasm32"))]
+mod native_host;
 #[cfg(feature = "tasks")]
 pub mod tasks;
 mod translate;
@@ -22,23 +24,37 @@ pub use app::{Inspection, InspectionCache};
 pub use application::{
     AppCommand, AppEvent, AppModel, AppUpdate, SingleWindowModel, WindowInvalidation,
 };
+pub use argui_host::{
+    CallbackDelivery, CallbackId, CommitResult as HostCommitResult, Host as NativeHost, HostError,
+    HostId, Operation as HostOperation,
+};
 pub use effect::{VisualEffectTarget, apply_visual_effect, apply_visual_effect_scoped};
 pub use environment::{ThemeRequest, WindowEnvironment};
 pub use error::RuntimeError;
 pub use event::{AnimationProfile, RuntimeEvent, WindowRuntimeEvent};
+#[cfg(not(target_arch = "wasm32"))]
+pub use launch::run_native_host;
 pub use launch::{
     run, run_app, run_app_with_text_engine, run_application, run_application_with_text_engine,
     run_ui, run_ui_with_text_engine, run_with_text, run_with_text_engine,
 };
 #[cfg(target_os = "android")]
 #[doc(hidden)]
-pub use launch::{run_android_application, run_android_application_with_text_engine};
+pub use launch::{
+    run_android_application, run_android_application_with_text_engine,
+    run_android_native_host_with_text_engine,
+};
 pub use model::{
     AnyEntity, Context, Entity, EntityId, EventEmitter, EventError, LayoutBounds, LayoutSnapshot,
     ModelContext, ModelRuntime, Mount, MountEvent, MountId, MountTransition, ObservationReader,
     ObservedInteraction, ObservedScroll, Render, ResourceLease, ResourceScope, ScopeClosed,
     ScrollRequest, ServiceAlreadyRegistered, ServiceRegistration, SourceIdentityIndex,
     Subscription, ViewUpdate, WeakEntity, WeakMount,
+};
+#[cfg(not(target_arch = "wasm32"))]
+pub use native_host::{
+    NativeHostAssets, NativeHostBatch, NativeHostCommit, NativeHostDelivery, WireHostId,
+    WireOperation, WireValue, validate_native_host_assets,
 };
 
 pub use model::shutdown_presentations;

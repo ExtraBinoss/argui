@@ -288,6 +288,9 @@ impl Application {
                 return false;
             }
         };
+        // A scroll repaints primitive geometry even when a compositor motion
+        // was sampled earlier in this redraw cycle.
+        self.composite_frame = false;
         if refreshed_text {
             self.prepared_text = self
                 .ui_layout

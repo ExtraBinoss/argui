@@ -61,6 +61,34 @@ impl TreeIndex {
         index
     }
 
+    /// Reuses dense column allocations when child order or tree shape changes.
+    ///
+    /// * `root` — replacement element hierarchy in preorder.
+    /// * `ids` — stable node identities in the same preorder.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the tree cannot fit in the compact index representation.
+    pub(super) fn rebuild(&mut self, root: &Element, ids: &[NodeId]) {
+        assert!(
+            ids.len() < NONE as usize,
+            "UI tree exceeds compact index capacity"
+        );
+        self.elements.clear();
+        self.positions.clear();
+        self.identities.clear();
+        self.parents.clear();
+        self.subtree_ends.clear();
+        self.selection.clear();
+        self.selection_owners.clear();
+        self.selection_highlight_owners.clear();
+        self.directions.clear();
+        self.transition_nodes = 0;
+        self.layout_roots.clear();
+        self.visit(root, ids, NONE);
+        self.sync_identities();
+    }
+
     fn visit(&mut self, element: &Element, ids: &[NodeId], parent: u32) {
         let position = self.elements.len();
         let inherited = (parent != NONE).then_some(parent as usize);
@@ -114,9 +142,7 @@ impl TreeIndex {
     /// Refresh descriptions while identities and topology are unchanged. Shared
     /// subtrees need no visit unless their inherited selection/direction changed.
     pub(super) fn sync(&mut self, root: &Element) -> bool {
-        let bindings_changed = self.sync_node(root, 0).1;
-        self.sync_identities();
-        bindings_changed
+        self.sync_node(root, 0).1
     }
 
     /// Rebuilds unique source-identity targets after element descriptions change.
@@ -135,7 +161,7 @@ impl TreeIndex {
 
     /// Resolves a source identity only when exactly one retained node owns it.
     ///
-    /// * `identity` — compiler/runtime identity of a current element.
+    /// * `identity` — producer identity of a current element.
     pub(super) fn identity(&self, identity: &RetainedIdentity) -> Option<NodeId> {
         self.identities.get(identity).copied().flatten()
     }

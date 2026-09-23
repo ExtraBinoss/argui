@@ -1,4 +1,8 @@
 /target/
+/node_modules/
+/packages/*/node_modules/
+/apps/*/node_modules/
+/apps/*/dist/
 /app_examples/target/
 /app_examples/*/target/
 *.profraw

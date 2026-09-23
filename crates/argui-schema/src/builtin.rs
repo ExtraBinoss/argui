@@ -18,12 +18,14 @@ mod flickable;
 mod focus_scope;
 mod key_binding;
 mod layout;
+mod loop_motion;
 mod media;
 mod path;
 mod popup_window;
 mod rectangle;
 mod text_editor;
 mod touch_area;
+mod transition;
 mod virtual_window;
 use common::*;
 
@@ -169,6 +171,30 @@ pub const Z_INDEX: PropertyId = PropertyId::from_raw(168);
 pub const VARIABLE_HEIGHT: PropertyId = PropertyId::from_raw(169);
 pub const MEASURED_WIDTH: PropertyId = PropertyId::from_raw(170);
 pub const MEASURED_HEIGHT: PropertyId = PropertyId::from_raw(171);
+pub const SEMANTIC_DESCRIPTION: PropertyId = PropertyId::from_raw(172);
+pub const SEMANTIC_VALUE: PropertyId = PropertyId::from_raw(173);
+pub const SEMANTIC_SELECTED: PropertyId = PropertyId::from_raw(174);
+pub const SEMANTIC_CURRENT: PropertyId = PropertyId::from_raw(175);
+pub const SEMANTIC_CONTROLS: PropertyId = PropertyId::from_raw(176);
+pub const SEMANTIC_ACTIVE_DESCENDANT: PropertyId = PropertyId::from_raw(177);
+pub const SEMANTIC_LABELLED_BY: PropertyId = PropertyId::from_raw(178);
+pub const SEMANTIC_DESCRIBED_BY: PropertyId = PropertyId::from_raw(179);
+pub const SEMANTIC_INVALID: PropertyId = PropertyId::from_raw(180);
+pub const SEMANTIC_LIVE: PropertyId = PropertyId::from_raw(181);
+pub const TRANSITION_MS: PropertyId = PropertyId::from_raw(182);
+pub const TRANSITION_SPRING: PropertyId = PropertyId::from_raw(183);
+pub const ROTATION_LOOP_MS: PropertyId = PropertyId::from_raw(184);
+pub const LOOP_MS: PropertyId = PropertyId::from_raw(185);
+pub const LOOP_PLAYING: PropertyId = PropertyId::from_raw(186);
+pub const LOOP_TRANSLATE_X: PropertyId = PropertyId::from_raw(187);
+pub const LOOP_TRANSLATE_Y: PropertyId = PropertyId::from_raw(188);
+pub const LOOP_SCALE: PropertyId = PropertyId::from_raw(189);
+pub const LOOP_OPACITY: PropertyId = PropertyId::from_raw(190);
+pub const LOOP_BACKGROUND: PropertyId = PropertyId::from_raw(191);
+pub const LOOP_HOLD: PropertyId = PropertyId::from_raw(192);
+pub const LOOP_WIDTH: PropertyId = PropertyId::from_raw(193);
+pub const LOOP_RADIUS: PropertyId = PropertyId::from_raw(194);
+pub const LOOP_GAP: PropertyId = PropertyId::from_raw(195);
 pub const MAX_DIGITS: PropertyId = PropertyId::from_raw(116);
 pub const MOUSE_GLOBAL_X: PropertyId = PropertyId::from_raw(117);
 pub const MOUSE_GLOBAL_Y: PropertyId = PropertyId::from_raw(118);
@@ -282,7 +308,12 @@ pub fn registry() -> Result<SchemaRegistry, SchemaError> {
         .property(common_property(CommonProperty::Opacity))
         .property(common_property(CommonProperty::BackdropFilter))
         .property(common_property(CommonProperty::Visible))
-        .property(common_property(CommonProperty::Background));
+        .property(common_property(CommonProperty::Background))
+        .property(loop_motion::properties()[1].clone())
+        .property(loop_motion::properties()[2].clone())
+        .property(loop_motion::properties()[6].clone())
+        .property(transition::properties()[0].clone())
+        .property(transition::properties()[1].clone());
     let text = text
         .property(common_property(CommonProperty::SelectionFill))
         .property(common_property(CommonProperty::SelectionColor))
@@ -442,7 +473,14 @@ pub fn registry() -> Result<SchemaRegistry, SchemaError> {
                 }
             };
         }
-        apply_common(Element::text(content.clone()).text_style(style), input)
+        loop_motion::apply(
+            transition::apply(
+                apply_common(Element::text(content.clone()).text_style(style), input)?,
+                input,
+                "Text",
+            )?,
+            input,
+        )
     })?;
     text_editor::register(&mut registry)?;
     media::register(&mut registry)?;

@@ -9,14 +9,14 @@
     <application
         android:hasCode="true"
         android:icon="@mipmap/ic_launcher"
-        android:label="Argui Widget Gallery"
+        android:label="${galleryLabel}"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:theme="@style/ArguiTheme">
         <activity
-            android:name="android.app.NativeActivity"
+            android:name="${galleryActivity}"
             android:configChanges="orientation|keyboardHidden|screenSize|screenLayout|uiMode"
             android:exported="true"
-            android:label="Argui Widget Gallery"
+            android:label="${galleryLabel}"
             android:screenOrientation="unspecified"
             android:windowSoftInputMode="adjustResize">
             <meta-data

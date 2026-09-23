@@ -128,6 +128,7 @@ fn rich_nodes_lower_every_value_state_and_relation() {
             protected: false,
             disabled: true,
             selected: true,
+            current: Some(argui_accessibility::Current::Page),
             multiselectable: true,
             checked: Some(argui_accessibility::CheckedState::Checked),
             expanded: Some(false),
@@ -210,6 +211,7 @@ fn rich_nodes_lower_every_value_state_and_relation() {
     assert!(node.is_disabled());
     assert!(node.is_modal());
     assert_eq!(node.is_selected(), Some(true));
+    assert_eq!(node.aria_current(), Some(accesskit::AriaCurrent::Page));
     assert_eq!(node.level(), Some(3));
     assert_eq!(node.position_in_set(), Some(2));
     assert_eq!(node.size_of_set(), Some(5));

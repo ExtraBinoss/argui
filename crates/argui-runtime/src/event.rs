@@ -104,6 +104,8 @@ impl RuntimeEvent {
 #[derive(Debug)]
 pub(crate) enum UserEvent {
     ModelsReady,
+    #[cfg(not(target_arch = "wasm32"))]
+    HostCommit(crate::NativeHostBatch),
     #[cfg(feature = "tasks")]
     TasksReady,
     #[cfg(all(feature = "webview", target_os = "linux"))]

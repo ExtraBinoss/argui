@@ -78,6 +78,17 @@ pub enum LiveRegion {
     Assertive,
 }
 
+/// Meaning of the current item within a related set.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Current {
+    True,
+    Page,
+    Step,
+    Location,
+    Date,
+    Time,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Orientation {
     Horizontal,
@@ -89,6 +100,7 @@ pub struct SemanticState {
     pub protected: bool,
     pub disabled: bool,
     pub selected: bool,
+    pub current: Option<Current>,
     pub multiselectable: bool,
     pub checked: Option<CheckedState>,
     /// Persistent pressed state of a toggle button, independent from pointer press.
@@ -141,6 +153,7 @@ impl Semantics {
                 protected: false,
                 disabled: false,
                 selected: false,
+                current: None,
                 multiselectable: false,
                 checked: None,
                 pressed: None,

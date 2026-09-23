@@ -5,7 +5,7 @@ use argui_ui::{
     EventHandler, EventHandlerId, EventOwnerId, EventType, Overflow, ScrollAxes, length,
 };
 
-/// Flickable leaves the scrollbar and effects to surrounding DSL components.
+/// Flickable leaves the scrollbar and effects to surrounding components.
 #[test]
 fn flickable_scrolls_both_axes_without_prescribed_paint() {
     let element = builtin::registry()

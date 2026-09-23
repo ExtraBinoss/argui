@@ -70,24 +70,37 @@ impl VectorAtlas {
         self.entries.get(&key).copied()
     }
 
+    /// Reports whether `key` fits at the current shelf cursor without changing atlas state.
+    pub fn can_insert(&self, key: RasterKey) -> bool {
+        let allocated_width = key.width + GUTTER * 2;
+        let allocated_height = key.height + GUTTER * 2;
+        if allocated_width + GUTTER > self.size || allocated_height + GUTTER > self.size {
+            return false;
+        }
+        let next_y = if self.cursor_x + allocated_width > self.size {
+            self.cursor_y + self.row_height
+        } else {
+            self.cursor_y
+        };
+        next_y + allocated_height <= self.size
+    }
+
+    /// Uploads `pixels` for `key`, returning its atlas entry or a capacity error.
     pub fn insert(
         &mut self,
         queue: &wgpu::Queue,
         key: RasterKey,
         pixels: &[u8],
     ) -> Result<AtlasEntry, RendererError> {
-        let allocated_width = key.width + GUTTER * 2;
-        let allocated_height = key.height + GUTTER * 2;
-        if allocated_width + GUTTER > self.size || allocated_height + GUTTER > self.size {
+        if !self.can_insert(key) {
             return Err(RendererError::VectorAtlasFull);
         }
+        let allocated_width = key.width + GUTTER * 2;
+        let allocated_height = key.height + GUTTER * 2;
         if self.cursor_x + allocated_width > self.size {
             self.cursor_x = GUTTER;
             self.cursor_y += self.row_height;
             self.row_height = 0;
-        }
-        if self.cursor_y + allocated_height > self.size {
-            return Err(RendererError::VectorAtlasFull);
         }
         let padded = pad_pixels(pixels, key.width, key.height);
         let x = self.cursor_x + GUTTER;

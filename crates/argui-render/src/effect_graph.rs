@@ -10,7 +10,7 @@ use crate::{effect_plan::plan_filters, target::PixelRegion};
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum EffectNode {
     Draw(DrawBatch),
-    Layer(EffectLayer),
+    Layer(Box<EffectLayer>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -19,6 +19,7 @@ pub(crate) struct EffectLayer {
     pub children: Vec<EffectNode>,
     pub region: Option<PixelRegion>,
     pub content_revision: u64,
+    pub command_range: Range<usize>,
 }
 
 impl EffectLayer {
@@ -110,7 +111,7 @@ impl EffectGraph {
         let mut image = 0_u32;
         let mut vector = 0_u32;
         let mut gpu_canvas = 0_u32;
-        for command in display_list.commands() {
+        for (command_index, command) in display_list.commands().iter().enumerate() {
             match command {
                 DisplayCommand::Quad(_) => {
                     push_draw(&mut roots, &mut stack, DrawKind::Quad, quad..quad + 1);
@@ -158,6 +159,7 @@ impl EffectGraph {
                         style,
                         children: Vec::new(),
                         content_revision,
+                        command_range: command_index..command_index + 1,
                     });
                 }
                 DisplayCommand::BeginCompositor(layer) => {
@@ -174,15 +176,72 @@ impl EffectGraph {
                         style,
                         children: Vec::new(),
                         content_revision,
+                        command_range: command_index..command_index + 1,
                     });
                 }
                 DisplayCommand::EndLayer | DisplayCommand::EndCompositor => {
-                    let layer = stack.pop().expect("validated layer stack");
-                    push_node(&mut roots, &mut stack, EffectNode::Layer(layer));
+                    let mut layer = stack.pop().expect("validated layer stack");
+                    layer.command_range.end = command_index + 1;
+                    push_node(&mut roots, &mut stack, EffectNode::Layer(Box::new(layer)));
                 }
             }
         }
         Ok(Self { roots })
+    }
+
+    /// Retains cached revisions for layers whose display commands did not change.
+    ///
+    /// * `previous`, `current` — adjacent scene snapshots.
+    /// * `force_refresh` — whether GPU content changed without a matching
+    ///   command change, requiring every layer to keep the new revision.
+    /// * `cached_revision` — returns a previously rendered layer's revision
+    ///   for its profile identity, or `None` when it has no cached content.
+    pub(crate) fn retain_layer_revisions(
+        &mut self,
+        previous: Option<&crate::DamageSnapshot>,
+        current: &crate::DamageSnapshot,
+        force_refresh: bool,
+        cached_revision: &impl Fn(argui_paint::RenderObjectId) -> Option<u64>,
+    ) {
+        /// Recursively preserves the revision of each visually unchanged layer.
+        ///
+        /// `nodes` is the graph subtree; `previous` and `current` are adjacent
+        /// snapshots. `force_refresh` denies reuse after untracked GPU changes.
+        /// `cached_revision` looks up a prior revision by profile identity.
+        fn visit(
+            nodes: &mut [EffectNode],
+            previous: Option<&crate::DamageSnapshot>,
+            current: &crate::DamageSnapshot,
+            force_refresh: bool,
+            cached_revision: &impl Fn(argui_paint::RenderObjectId) -> Option<u64>,
+        ) {
+            for node in nodes {
+                if let EffectNode::Layer(layer) = node {
+                    if !force_refresh
+                        && previous.is_some_and(|previous| {
+                            previous.unchanged_range(current, layer.command_range.clone())
+                        })
+                        && let Some(revision) = layer.style.profile.and_then(cached_revision)
+                    {
+                        layer.content_revision = revision;
+                    }
+                    visit(
+                        &mut layer.children,
+                        previous,
+                        current,
+                        force_refresh,
+                        cached_revision,
+                    );
+                }
+            }
+        }
+        visit(
+            &mut self.roots,
+            previous,
+            current,
+            force_refresh,
+            cached_revision,
+        );
     }
 
     #[must_use]

@@ -1,8 +1,8 @@
 //! Typed, language-independent reactive properties for Argui.
 //!
 //! The graph is deliberately single-threaded: UI properties are mutated on the
-//! owning application thread. Dynamic DSL values live in higher-level crates;
-//! this crate only defines typed properties, computed values, transactions,
+//! owning application thread. This crate defines typed properties, computed
+//! values, transactions,
 //! observers, and two-way links.
 
 mod computed;

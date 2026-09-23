@@ -6,7 +6,7 @@ use argui_ui::Element;
 
 use super::{
     BACKGROUND, BORDER_COLOR, BORDER_WIDTH, CHILDREN, CLIP, CommonProperty, RADIUS, SHADOW_BLUR,
-    SHADOW_COLOR, SHADOW_OFFSET_Y, apply_common, common_property,
+    SHADOW_COLOR, SHADOW_OFFSET_Y, apply_common, common_property, loop_motion, transition,
 };
 use crate::{
     NativeElementInput, NativeSchema, SchemaError, SchemaRegistry, SchemaValue, SlotArity,
@@ -35,7 +35,20 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     .property(common_property(CommonProperty::MinWidth))
     .property(common_property(CommonProperty::MinHeight))
     .property(common_property(CommonProperty::Rotation))
+    .property(loop_motion::properties()[0].clone())
+    .property(loop_motion::properties()[1].clone())
+    .property(loop_motion::properties()[2].clone())
+    .property(loop_motion::properties()[3].clone())
+    .property(loop_motion::properties()[4].clone())
+    .property(loop_motion::properties()[5].clone())
+    .property(loop_motion::properties()[6].clone())
+    .property(loop_motion::properties()[7].clone())
+    .property(loop_motion::properties()[8].clone())
+    .property(loop_motion::properties()[9].clone())
+    .property(loop_motion::properties()[10].clone())
     .property(common_property(CommonProperty::Opacity))
+    .property(transition::properties()[0].clone())
+    .property(transition::properties()[1].clone())
     .property(common_property(CommonProperty::BackdropFilter))
     .property(common_property(CommonProperty::Visible))
     .property(crate::PropertySchema::new(
@@ -105,8 +118,11 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
             }
             _ => 0.0,
         };
-        let mut element =
-            apply_common(Element::container(input.children(CHILDREN).to_vec()), input)?;
+        let mut element = transition::apply(
+            apply_common(Element::container(input.children(CHILDREN).to_vec()), input)?,
+            input,
+            "Rectangle",
+        )?;
         if let Some(SchemaValue::Brush(brush)) = input.get(BACKGROUND) {
             element = element.fill(brush.clone());
         }
@@ -130,7 +146,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
             };
             element = element.shadow(Shadow::drop([0.0, shadow_offset_y], shadow_blur, color));
         }
-        Ok(element)
+        loop_motion::apply(element, input)
     })
 }
 

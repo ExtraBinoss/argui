@@ -129,8 +129,7 @@ application rather than a minimal example:
 
 The base gallery includes its widgets, localization, tasks, effects, and
 DevTools. The complete build adds the updater, WebView, native popups, desktop
-backdrop, and hardware sensors. The external DSL compiler, watcher, live
-runtime and language server are not linked into normal release applications.
+backdrop, and hardware sensors. The optional development tools are not linked into normal release applications.
 
 Build a configuration with:
 

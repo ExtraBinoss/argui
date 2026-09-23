@@ -138,6 +138,19 @@ fn safe_area_builder_pads_all_edges_and_clamps_negative_adapter_values() {
 }
 
 #[test]
+fn safe_area_paints_the_content_background_under_its_padding() {
+    let color = argui_paint::Color::WHITE;
+    let element = Element::container([]).background(color);
+    let wrapper = element.clone().safe_area(Insets::new(10.0, 0.0, 5.0, 0.0));
+
+    assert_eq!(wrapper.paint.quad.background, element.paint.quad.background);
+    assert_eq!(
+        wrapper.children[0].paint.quad.background,
+        element.paint.quad.background
+    );
+}
+
+#[test]
 fn empty_safe_area_keeps_the_original_element_identity() {
     let element = Element::container([]).keyed("content");
 

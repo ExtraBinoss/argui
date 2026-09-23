@@ -25,6 +25,7 @@ serde = { workspace = true, optional = true }
 
 [dev-dependencies]
 argui-layout.workspace = true
+serde_json.workspace = true
 
 [lints]
 workspace = true

@@ -1,0 +1,13 @@
+{
+  "name": "@argui/solid",
+  "version": "0.3.2",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./jsx-runtime": "./src/jsx-runtime.ts"
+  },
+  "dependencies": {
+    "@argui/host": "workspace:*",
+    "solid-js": "1.9.15"
+  }
+}

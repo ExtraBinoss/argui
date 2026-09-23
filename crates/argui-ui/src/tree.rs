@@ -439,7 +439,7 @@ impl UiTree {
 
     fn sync_animation_registry(&mut self, structure_changed: bool) {
         let bindings_changed = if structure_changed {
-            self.index = index::TreeIndex::new(&self.root, &self.node_ids);
+            self.index.rebuild(&self.root, &self.node_ids);
             true
         } else {
             self.index.sync(&self.root)

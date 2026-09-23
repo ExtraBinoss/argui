@@ -1,4 +1,6 @@
 use argui_core::{Point, Size};
+#[path = "paint/cull.rs"]
+mod cull;
 #[path = "paint/effects.rs"]
 mod effects;
 #[path = "paint/geometry.rs"]

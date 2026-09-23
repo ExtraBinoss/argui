@@ -7,8 +7,8 @@ members = [
     "crates/argui-assets",
     "crates/argui-core",
     "crates/argui-devtools",
-    "crates/argui-dsl/*",
     "crates/argui-effects",
+    "crates/argui-host",
     "crates/argui-i18n",
     "crates/argui-image",
     "crates/argui-inspect",
@@ -36,7 +36,6 @@ members = [
     "crates/argui-widgets",
 ]
 resolver = "3"
-exclude = ["crates/argui-dsl/aot-fixture"]
 
 [workspace.package]
 version = "0.3.2"
@@ -56,6 +55,7 @@ argui-animation = { path = "crates/argui-animation", version = "0.3.2" }
 argui-core = { path = "crates/argui-core", version = "0.3.2" }
 argui-devtools = { path = "crates/argui-devtools", version = "0.3.2" }
 argui-effects = { path = "crates/argui-effects", version = "0.3.2" }
+argui-host = { path = "crates/argui-host", version = "0.3.2" }
 argui-layout = { path = "crates/argui-layout", version = "0.3.2" }
 argui-image = { path = "crates/argui-image", version = "0.3.2" }
 argui-i18n = { path = "crates/argui-i18n", version = "0.3.2" }
@@ -91,7 +91,6 @@ pollster = "=1.0.1"
 taffy = { version = "=0.14.0", default-features = false, features = ["std", "taffy_tree", "flexbox", "grid", "block_layout", "content_size"] }
 thiserror = "=2.0.20"
 reqwest = { version = "=0.12.28", default-features = false, features = ["blocking", "rustls-tls"] }
-rowan = "=0.17.0"
 semver = { version = "=1.0.28", features = ["serde"] }
 minisign-verify = "=0.2.5"
 tempfile = "=3.27.0"
@@ -111,8 +110,6 @@ sysinfo = { version = "=0.37.2", default-features = false }
 unicode-segmentation = "=1.13.3"
 unic-langid = { version = "=0.9.6", features = ["macros"] }
 image = { version = "=0.25.10", default-features = false, features = ["png", "jpeg"] }
-notify = "=8.2.0"
-tungstenite = { version = "=0.28.0", default-features = false, features = ["handshake"] }
 ksni = { version = "=0.3.6", default-features = false, features = ["async-io", "blocking"] }
 tray-icon = { version = "=0.24.2", default-features = false }
 global-hotkey = "=0.8.0"

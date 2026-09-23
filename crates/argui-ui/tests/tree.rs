@@ -53,7 +53,7 @@ fn replacing_editor_value_obeys_read_only_filters_and_emits_input() {
 }
 
 #[test]
-fn rust_builders_form_the_future_dsl_lowering_target() {
+fn rust_builders_form_a_native_retained_tree() {
     let root = Element::row([Element::text("hello")
         .keyed("greeting")
         .width(percent(0.5))

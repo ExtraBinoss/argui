@@ -29,10 +29,10 @@ def entry(branches, count):
 
 
 class SourceCoverage(unittest.TestCase):
-    def test_nested_dsl_packages_are_individually_gated(self):
+    def test_nested_packages_are_individually_gated(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)
-            for crate in ("argui-core", "argui-dsl/dsl-runtime"):
+            for crate in ("argui-core", "extensions/runtime"):
                 manifest = root / "crates" / crate / "Cargo.toml"
                 manifest.parent.mkdir(parents=True)
                 manifest.write_text("[package]\nname = \"example\"\n")
@@ -40,7 +40,7 @@ class SourceCoverage(unittest.TestCase):
             try:
                 os.chdir(root)
                 self.assertEqual(gate.workspace_crates(),
-                                 ["argui-core", "argui-dsl/dsl-runtime"])
+                                 ["argui-core", "extensions/runtime"])
             finally:
                 os.chdir(previous)
 
@@ -61,41 +61,6 @@ class SourceCoverage(unittest.TestCase):
             try:
                 os.chdir(root)
                 self.assertTrue(gate.only_reexports("facade"))
-            finally:
-                os.chdir(previous)
-
-    def test_facade_include_macro_has_no_instrumentable_runtime_code(self):
-        with TemporaryDirectory() as directory:
-            root = Path(directory)
-            source = root / "crates" / "facade" / "src"
-            source.mkdir(parents=True)
-            (source / "lib.rs").write_text(
-                "pub use dependency as api;\n"
-                "#[macro_export]\n"
-                "macro_rules! include_ui {\n"
-                "    () => { include!(concat!(env!(\"OUT_DIR\"), \"/ui.rs\")); };\n"
-                "}\n"
-            )
-            previous = Path.cwd()
-            try:
-                os.chdir(root)
-                self.assertTrue(gate.only_reexports("facade"))
-            finally:
-                os.chdir(previous)
-
-    def test_embedded_dsl_source_has_no_instrumentable_runtime_code(self):
-        with TemporaryDirectory() as directory:
-            root = Path(directory)
-            source = root / "crates" / "stdlib" / "src"
-            source.mkdir(parents=True)
-            (source / "lib.rs").write_text(
-                "/// DSL source.\n"
-                "pub const UI_SOURCE: &str = include_str!(\"../ui.argui\");\n"
-            )
-            previous = Path.cwd()
-            try:
-                os.chdir(root)
-                self.assertTrue(gate.only_reexports("stdlib"))
             finally:
                 os.chdir(previous)
 

@@ -1,4 +1,4 @@
-//! Canonical, DSL-independent metadata and adapters for Argui native primitives.
+//! Canonical metadata and adapters for Argui native primitives.
 
 mod adapter;
 pub mod backdrop_filter;

@@ -11,9 +11,6 @@ packages and dependency graphs do not include them.
 | [Documentation examples](docs-examples/) | Twenty-two exact-source applications compiled into the interactive learning site. Each guide displays the Rust module it actually runs.       |
 | [GPU Canvas Lab](gpu-canvas/)            | A retained WGPU compute/render viewport with Argui controls, pan/zoom, pause, overlays, effects, diagnostics, native and WebAssembly builds.  |
 | [Spotlight](spotlight/)                  | A translucent launcher with animated filtering, native desktop backdrop, tray lifecycle, and a global activation shortcut.                    |
-| [Widget Gallery DSL](widget-gallery-dsl/) | Responsive DSL-authored component gallery with theme modes, virtual navigation, live reload, and bundled image/SVG assets.                |
-| [DSL Live Demo](dsl-live-demo/)          | Small focused application for trying transactional `argui dev` updates.                                                                 |
-| [VirtualList DSL](dsl-virtual-list/)     | Standalone large-data list sharing the gallery's reusable DSL ListView and row-template API.                                            |
 
 Run an application from the repository root:
 
@@ -23,16 +20,6 @@ cargo run --manifest-path app_examples/Cargo.toml -p argui-example-ai-harness
 
 GPU Canvas Lab has its own native and browser commands in its
 [README](gpu-canvas/README.md).
-
-To edit the DSL gallery with live reload:
-
-```sh
-cd app_examples/widget-gallery-dsl
-cargo run --manifest-path ../../Cargo.toml -p argui-cli --bin argui -- dev
-```
-
-See the gallery's [README](widget-gallery-dsl/README.md) for release builds and
-the component checklist.
 
 Run the editor from the repository root:
 

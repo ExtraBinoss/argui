@@ -23,6 +23,36 @@ use super::Application;
 #[path = "safe_area.rs"]
 mod safe_area;
 
+impl Drop for Application {
+    fn drop(&mut self) {
+        if let Some(model) = &self.model {
+            if self.exit_on_close {
+                crate::shutdown_presentations(std::slice::from_ref(model));
+            } else {
+                model.close_presentation();
+            }
+        }
+        #[cfg(feature = "tasks")]
+        {
+            if self.exit_on_close
+                && let Some(tasks) = &self.tasks
+            {
+                tasks.shutdown();
+            }
+        }
+        #[cfg(all(
+            feature = "webview",
+            any(
+                target_arch = "wasm32",
+                target_os = "linux",
+                target_os = "windows",
+                target_os = "macos"
+            )
+        ))]
+        self.native_views.take();
+    }
+}
+
 impl Application {
     pub(super) fn initialize_model_tree(&mut self) {
         if self.model.is_none() {
@@ -160,6 +190,14 @@ impl ApplicationHandler<UserEvent> for Application {
         {
             match event {
                 UserEvent::ModelsReady => self.models_ready(event_loop),
+                UserEvent::HostCommit(batch) => {
+                    let result = if batch.window == self.window_key {
+                        self.commit_native_host(batch.operations)
+                    } else {
+                        Err("native host batch targeted another window".into())
+                    };
+                    let _ = batch.reply.send(result);
+                }
                 #[cfg(feature = "tasks")]
                 UserEvent::TasksReady => {
                     if let Some(tasks) = &self.tasks {

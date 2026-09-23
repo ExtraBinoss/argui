@@ -34,6 +34,20 @@ impl Application {
             return;
         }
         self.environment.safe_area_insets = insets;
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(root) = self
+            .native_host
+            .as_ref()
+            .and_then(|host| host.root_element())
+        {
+            let root = crate::app::native_host::native_host_root_with_safe_area(root, insets);
+            if let Some(tree) = &mut self.ui_tree {
+                tree.update(root);
+            } else {
+                self.ui_tree = Some(argui_ui::UiTree::new(root));
+            }
+            self.pending_ui_frame.request_layout();
+        }
         self.pending_ui_frame.request_rebuild();
         if let Some(window) = &self.window {
             window.request_redraw();

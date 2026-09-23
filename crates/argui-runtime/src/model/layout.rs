@@ -9,7 +9,7 @@ pub struct LayoutBounds {
     pub node: NodeId,
     /// Optional application key assigned to the element.
     pub key: Option<String>,
-    /// Private DSL source identity, independent of the public application key.
+    /// Stable producer identity, independent of the public application key.
     #[doc(hidden)]
     pub retained_identity: Option<RetainedIdentity>,
     /// Bounds in logical window coordinates.

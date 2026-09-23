@@ -120,8 +120,17 @@ ABI shells, while the model, layout, text, paint, and renderer remain shared.
 Target-specific code belongs at the platform edge. Do not put Winit handles in
 UI state, WGPU resources in paint descriptions, or OS policy in reusable
 widgets. Optional integrations such as localization, WebView, updater and
-DevTools remain feature-gated. DSL compilation and transactional development
-reload live outside the engine and never become release runtime dependencies.
+DevTools remain feature-gated. JavaScript framework adapters communicate with
+the native UI through the shared host transaction contract.
+
+For the Solid and React gallery, QuickJS is the selected embedded JavaScript
+runtime on desktop and Android. Bun is used to build and test the TSX bundles;
+it is not embedded in the app. The same Rust transaction host and `UiTree`
+serve both framework adapters. The [native gallery architecture and
+measurements](solid-react-native.md) record the runtime decision, mobile
+limits, and performance data. The earlier
+[architecture plan](SOLID_REACT_ARCHITECTURE_PLAN.md) preserves the candidate
+comparison that led to this decision.
 
 ## Where to change code
 
@@ -134,7 +143,6 @@ reload live outside the engine and never become release runtime dependencies.
 | Add a paint primitive | `argui-paint`, then `argui-render` |
 | Add an OS capability | `crates/argui-platform`, then expose it through the runtime |
 | Change model lifetime or scheduling | `crates/argui-runtime` |
-| Change DSL syntax, semantics, AOT or live development | `argui-dsl` |
 | Add an application example | `app_examples` or `crates/argui-widget-gallery` |
 
 Follow the [development guide](contributing/development.md) before crossing a

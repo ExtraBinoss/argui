@@ -1,4 +1,4 @@
-//! Layout properties shared by DSL containers, including native grid tracks.
+//! Layout properties shared by native containers, including grid tracks.
 
 use argui_core::{Transform2D, TransformOrigin};
 use argui_ui::{
@@ -234,7 +234,7 @@ pub(super) fn properties() -> Vec<PropertySchema> {
     properties
 }
 
-/// Applies validated DSL layout input to a native container.
+/// Applies validated layout input to a native container.
 /// `name` appears in adapter diagnostics. Returns an error for malformed
 /// track definitions, grid placement, or incomplete responsive declarations.
 pub(super) fn apply(

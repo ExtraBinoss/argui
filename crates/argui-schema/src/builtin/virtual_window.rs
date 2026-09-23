@@ -135,13 +135,13 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
         ITEM_COUNT,
         "__item_count",
         ValueType::Int,
-        "Compiler-provided collection length.",
+        "Host-provided collection length.",
     ))
     .property(PropertySchema::new(
         WINDOW_START,
         "__window_start",
         ValueType::Int,
-        "Compiler-provided first mounted row index.",
+        "Host-provided first mounted row index.",
     ))
     .event(
         EventSchema::new(

@@ -234,6 +234,12 @@ impl Application {
             TreeUpdate::None
         };
         self.frame_record.tree += tree_started.elapsed();
+        self.composite_frame = super::frame_route::retain_compositor_frame(
+            self.composite_frame,
+            tree_update,
+            pending.layout,
+            assets_changed,
+        );
         match tree_update {
             TreeUpdate::Layout => {
                 let started = Instant::now();
@@ -303,10 +309,22 @@ impl Application {
         if let Some(request) = pending.scroll_request {
             self.apply_scroll_request(request, event_loop);
         }
+        #[cfg(not(target_arch = "wasm32"))]
+        let presentation_only = tree_update == TreeUpdate::None
+            && pending.composite
+            && !pending.rebuild
+            && !pending.layout
+            && !pending.text_input
+            && !pending.scroll
+            && !pending.paint
+            && pending.focus_request.is_none()
+            && pending.text_selection_request.is_none();
         let focus_update = match (&mut self.ui_tree, &self.ui_layout) {
             (Some(ui), Some(layout)) => ui.sync_focus(&layout.hit_regions, pending.focus_request),
             _ => InteractionUpdate::default(),
         };
+        #[cfg(not(target_arch = "wasm32"))]
+        let focus_unchanged = focus_update.is_empty();
         if !focus_update.is_empty()
             && let Some(window) = self.window.clone()
         {
@@ -325,6 +343,9 @@ impl Application {
         if tree_update != TreeUpdate::None {
             (self.on_event)(RuntimeEvent::ViewUpdated(tree_update));
         }
+        #[cfg(not(target_arch = "wasm32"))]
+        self.sync_accessibility_if_needed(presentation_only, focus_unchanged);
+        #[cfg(target_arch = "wasm32")]
         self.sync_accessibility();
         self.refresh_observed_interactions();
         if (self.sync_animations() || self.pending_ui_frame.needs_frame())

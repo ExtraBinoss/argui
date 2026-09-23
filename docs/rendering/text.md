@@ -1,7 +1,7 @@
 # Text fidelity
 
 Argui shapes logical text with `cosmic-text 0.19` and renders physical glyphs
-with `wgpu 30`. Widgets and the DSL use the same renderer. Text layout,
+with `wgpu 30`. Widgets and native primitives use the same renderer. Text layout,
 CPU raster images, and GPU atlas residency have independent caches.
 
 ## Layout and positioning
@@ -84,7 +84,7 @@ logical shaping.
 
 ## Visual checks
 
-The DSL gallery's Typography page includes identical small text on light
+The widget gallery's Typography page includes identical small text on light
 and dark surfaces, with ligatures, diacritics, mixed scripts, and muted text.
 GPU regression captures exercise scales 1, 1.25, 1.5, and 2, fractional
 positions, and repeated rendering. Run graphical checks through the private

@@ -187,6 +187,16 @@ fn lower_node(node: &SemanticNode) -> (NodeId, Node) {
         output.set_disabled();
     }
     output.set_selected(node.semantics.state.selected);
+    if let Some(current) = node.semantics.state.current {
+        output.set_aria_current(match current {
+            crate::Current::True => accesskit::AriaCurrent::True,
+            crate::Current::Page => accesskit::AriaCurrent::Page,
+            crate::Current::Step => accesskit::AriaCurrent::Step,
+            crate::Current::Location => accesskit::AriaCurrent::Location,
+            crate::Current::Date => accesskit::AriaCurrent::Date,
+            crate::Current::Time => accesskit::AriaCurrent::Time,
+        });
+    }
     if node.semantics.state.multiselectable {
         output.set_multiselectable();
     }

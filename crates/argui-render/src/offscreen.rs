@@ -55,11 +55,9 @@ impl TexturePool {
         for entry in &mut self.entries {
             entry.used = false;
         }
-        let current_frame = self.frame;
         let initial_count = self.entries.len();
-        const MAX_IDLE_FRAMES: u64 = 60;
-        self.entries
-            .retain(|entry| current_frame.saturating_sub(entry.last_frame) <= MAX_IDLE_FRAMES);
+        // Keep spare textures while they fit the budget. Evicting one otherwise
+        // invalidates the retained effect root and forces a full repaint.
         while self.allocated_bytes() > self.budget && self.entries.len() > 1 {
             let oldest = self
                 .entries
@@ -199,8 +197,12 @@ impl TexturePool {
     }
 }
 
+/// Rounds one texture dimension to a reusable 64-pixel class.
+///
+/// `size` is the requested dimension in pixels. The returned dimension is at
+/// least 64 pixels and never smaller than the request.
 fn size_class(size: u32) -> u32 {
-    size.max(64).next_power_of_two()
+    size.max(64).div_ceil(64).saturating_mul(64)
 }
 
 fn texture_bytes(format: TextureFormat, width: u32, height: u32) -> u64 {

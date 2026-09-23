@@ -3,7 +3,7 @@ use wgpu::{LoadOp, Operations, RenderPassColorAttachment, RenderPassDescriptor, 
 use crate::{
     DamageMode, DamagePlan, DamageProfile, DamageRegion,
     effect::{EffectDraw, uniform},
-    effect_graph::EffectGraph,
+    effect_graph::{EffectGraph, EffectNode},
     gpu_profile::GpuFrameCapture,
     target::{PixelRegion, TextureTarget},
 };
@@ -62,6 +62,7 @@ impl SurfaceRenderer {
                         &mut cache_stats,
                         Some(clip),
                         &[],
+                        None,
                     );
                 }
                 DamageProfile {
@@ -77,7 +78,12 @@ impl SurfaceRenderer {
                 ..DamageProfile::default()
             },
             _ => {
-                self.clear_target(encoder, root, self.renderer_config.wgpu_clear_color());
+                let clear = self.renderer_config.wgpu_clear_color();
+                let clear_first_draw =
+                    matches!(graph.roots.first(), Some(EffectNode::Draw(_))).then_some(clear);
+                if clear_first_draw.is_none() {
+                    self.clear_target(encoder, root, clear);
+                }
                 self.render_effect_nodes(
                     encoder,
                     &graph.roots,
@@ -88,6 +94,7 @@ impl SurfaceRenderer {
                     &mut cache_stats,
                     None,
                     &[],
+                    clear_first_draw,
                 );
                 DamageProfile {
                     mode: if matches!(plan, DamagePlan::Full) {

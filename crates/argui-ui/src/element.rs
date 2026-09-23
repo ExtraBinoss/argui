@@ -152,13 +152,12 @@ impl Element {
         self
     }
 
-    /// Assigns the private compiled source identity used by retained reconciliation.
+    /// Assigns an owner-local identity used by retained reconciliation.
     ///
-    /// Application code should use [`Self::keyed`]. This channel exists for the
-    /// Argui DSL live runtime and generated AOT code, so source edits do not
-    /// overload public keys or focus identities.
+    /// Application code should normally use [`Self::keyed`]. Hosts may use this
+    /// channel to preserve native state when a node moves between parents.
     ///
-    /// * `identity` — component-instance and stable source-site identity.
+    /// * `identity` — stable owner and node identity.
     #[doc(hidden)]
     #[must_use]
     pub fn retained_identity(mut self, identity: crate::RetainedIdentity) -> Self {
@@ -166,10 +165,10 @@ impl Element {
         self
     }
 
-    /// Returns the private compiled source identity, if this element has one.
+    /// Returns the retained producer identity, if this element has one.
     ///
-    /// Hosts use this read-only identity to associate layout measurements with
-    /// the correct DSL instance without changing public element keys.
+    /// Hosts use this identity to associate layout measurements with the
+    /// correct node without changing public element keys.
     #[doc(hidden)]
     #[must_use]
     pub fn source_identity(&self) -> Option<&crate::RetainedIdentity> {

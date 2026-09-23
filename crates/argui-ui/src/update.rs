@@ -1,4 +1,4 @@
-use crate::{BindingImpact, Element, ElementKind, TreeUpdate, TreeUpdateStats};
+use crate::{BindingImpact, Element, ElementKind, PropertyBinding, TreeUpdate, TreeUpdateStats};
 
 pub(crate) fn classify_update(
     old: &Element,
@@ -10,10 +10,11 @@ pub(crate) fn classify_update(
         stats.shared_subtrees += 1;
         return TreeUpdate::None;
     }
+    let playback_update = retain_matching_loops(old, new);
     if old == new {
         // Equal descriptions keep the retained allocation used by the paint cache.
         *new = old.clone();
-        return TreeUpdate::None;
+        return playback_update;
     }
     let binding_update = binding_update(old, new);
     let state_update = state_update(old, new);
@@ -32,6 +33,7 @@ pub(crate) fn classify_update(
         || old.portal != new.portal
         || old.virtual_item != new.virtual_item
         || old.children.len() != new.children.len()
+        || children_reordered(old, new)
         || binding_update == TreeUpdate::Layout
         || state_update == TreeUpdate::Layout
     {
@@ -46,7 +48,7 @@ pub(crate) fn classify_update(
         .unwrap_or(TreeUpdate::None);
     let visual_update = visual_update(old, new).unwrap_or(TreeUpdate::None);
     let local = strongest_update(
-        state_update,
+        strongest_update(state_update, playback_update),
         strongest_update(visual_update, binding_update),
     );
     let local = if local == TreeUpdate::Composite && !old.needs_compositor_layer() {
@@ -66,6 +68,71 @@ pub(crate) fn classify_update(
         TreeUpdate::None
     };
     strongest_update(children, local)
+}
+
+/// Keeps matching native timeline handles across a rebuilt element and applies pause or resume.
+/// `old` supplies the retained phase; `new` receives its handles. Returns the strongest
+/// invalidation needed when playback activity changes.
+fn retain_matching_loops(old: &Element, new: &mut Element) -> TreeUpdate {
+    let mut update = TreeUpdate::None;
+    for (before, after) in old.bindings.iter().zip(&mut new.bindings) {
+        let was_active = before.track().is_active();
+        macro_rules! reuse {
+            ($old:expr, $new:expr) => {{
+                if $old.motion.retain_timeline(&$new.motion) {
+                    $new.motion = $old.motion.clone();
+                    true
+                } else {
+                    false
+                }
+            }};
+        }
+        let retained = match (before, after) {
+            (PropertyBinding::Transform(old), PropertyBinding::Transform(new)) => reuse!(old, new),
+            (PropertyBinding::BackgroundColor(old), PropertyBinding::BackgroundColor(new)) => {
+                reuse!(old, new)
+            }
+            (PropertyBinding::CornerRadii(old), PropertyBinding::CornerRadii(new)) => {
+                reuse!(old, new)
+            }
+            (PropertyBinding::LayerOpacity(old), PropertyBinding::LayerOpacity(new)) => {
+                reuse!(old, new)
+            }
+            (
+                PropertyBinding::Layout(old_target, old),
+                PropertyBinding::Layout(new_target, new),
+            ) if old_target == new_target => reuse!(old, new),
+            _ => false,
+        };
+        if retained && was_active != before.track().is_active() {
+            update = strongest_update(
+                update,
+                match before.impact() {
+                    BindingImpact::Composite => TreeUpdate::Composite,
+                    BindingImpact::Paint => TreeUpdate::Paint,
+                    BindingImpact::Scroll => TreeUpdate::Scroll,
+                    BindingImpact::Layout => TreeUpdate::Layout,
+                },
+            );
+        }
+    }
+    update
+}
+
+/// Detects a move of an explicitly identified child before comparing sibling descriptions.
+///
+/// * `old` — currently retained parent.
+/// * `new` — replacement parent with the same number of children.
+///
+/// Returns true when a retained identity or key occupies a different position.
+fn children_reordered(old: &Element, new: &Element) -> bool {
+    old.children.iter().zip(&new.children).any(|(old, new)| {
+        (old.retained_identity.is_some() || new.retained_identity.is_some())
+            && old.retained_identity != new.retained_identity
+            || (old.retained_identity.is_none()
+                && new.retained_identity.is_none()
+                && old.key != new.key)
+    })
 }
 
 const fn update_priority(update: TreeUpdate) -> u8 {

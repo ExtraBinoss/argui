@@ -9,8 +9,8 @@ mod native;
 #[cfg(not(target_arch = "wasm32"))]
 pub use native::AccessKitTree;
 pub use schema::{
-    CheckedState, FocusPolicy, LiveRegion, Orientation, Role, SemanticAction, SemanticRequest,
-    SemanticState, SemanticValue, Semantics,
+    CheckedState, Current, FocusPolicy, LiveRegion, Orientation, Role, SemanticAction,
+    SemanticRequest, SemanticState, SemanticValue, Semantics,
 };
 pub use tree::{SemanticNode, SemanticNodeId, SemanticPatch, SemanticTree};
 

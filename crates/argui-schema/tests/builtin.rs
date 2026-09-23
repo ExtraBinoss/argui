@@ -6,6 +6,8 @@ mod focus_scope;
 mod key_binding;
 #[path = "builtin/layout.rs"]
 mod layout;
+#[path = "builtin/loop_motion.rs"]
+mod loop_motion;
 #[path = "builtin/media.rs"]
 mod media;
 #[path = "builtin/path.rs"]
@@ -18,6 +20,8 @@ mod rectangle;
 mod text_editor;
 #[path = "builtin/touch_area.rs"]
 mod touch_area;
+#[path = "builtin/transition.rs"]
+mod transition;
 #[path = "builtin/virtual_window.rs"]
 mod virtual_window;
 

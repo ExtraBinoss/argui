@@ -6,7 +6,6 @@ import {
   Languages,
   PanelTop,
   RefreshCw,
-  RotateCw,
   Sparkles,
 } from '@lucide/vue'
 import { sourceUrl } from '~/data/project'
@@ -22,7 +21,6 @@ const features = [
   { key: 'popovers', icon: PanelTop, path: 'docs/widgets/overlays.md' },
   { key: 'updater', icon: RefreshCw, path: 'docs/platform/updater.md' },
   { key: 'platforms', icon: Globe, path: 'docs/architecture.md' },
-  { key: 'hotReload', icon: RotateCw, path: 'docs/dsl/development.md' },
   { key: 'i18n', icon: Languages, path: 'docs/i18n.md' },
 ]
 </script>

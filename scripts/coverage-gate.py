@@ -9,7 +9,6 @@ METRICS = ("branches", "functions", "lines", "regions")
 
 
 def workspace_crates():
-    # Workspace packages include both engine crates and the nested DSL toolchain.
     return sorted(str(path.parent.relative_to("crates"))
                   for path in Path("crates").glob("**/Cargo.toml"))
 

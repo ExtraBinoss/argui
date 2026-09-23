@@ -72,10 +72,6 @@
       "title": "The same UI, in more places.",
       "body": "A WGPU renderer for desktop and WebAssembly. Native window integration on Linux, macOS and Windows; WebGPU in the browser."
     },
-    "hotReload": {
-      "title": "Keep state while UI changes.",
-      "body": "The Argui DSL compiler reloads UI, WGSL and assets transactionally while retaining compatible application and interface state."
-    },
     "i18n": {
       "title": "Internationalization",
       "body": "Optional Fluent catalogs provide locale negotiation, message fallback, variables, plurals and writing direction for native and WebAssembly applications."

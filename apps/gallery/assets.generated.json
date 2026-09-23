@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "assets": [
+    {
+      "key": "illustration/orbit.png",
+      "kind": "image",
+      "id": 2571842761405680
+    },
+    {
+      "key": "illustration/orbit.svg",
+      "kind": "svg",
+      "id": 6003398377895504
+    },
+    {
+      "key": "photo/saturn.jpg",
+      "kind": "image",
+      "id": 182680722277923
+    },
+    {
+      "key": "tabler/chevron-down.svg",
+      "kind": "svg",
+      "id": 5981616865338806
+    },
+    {
+      "key": "tabler/heart.svg",
+      "kind": "svg",
+      "id": 4333451266351680
+    },
+    {
+      "key": "tabler/loader-2.svg",
+      "kind": "svg",
+      "id": 5035487383804796
+    },
+    {
+      "key": "tabler/photo.svg",
+      "kind": "svg",
+      "id": 1456439125952080
+    },
+    {
+      "key": "tabler/player-play.svg",
+      "kind": "svg",
+      "id": 6833585511893982
+    },
+    {
+      "key": "tabler/star-filled.svg",
+      "kind": "svg",
+      "id": 6122411386721923
+    },
+    {
+      "key": "tabler/star.svg",
+      "kind": "svg",
+      "id": 1326099470823436
+    }
+  ]
+}

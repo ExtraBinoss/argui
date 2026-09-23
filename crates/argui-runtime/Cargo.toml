@@ -23,13 +23,17 @@ argui-accessibility.workspace = true
 argui-inspect.workspace = true
 argui-animation.workspace = true
 argui-core.workspace = true
+argui-host.workspace = true
 argui-theme.workspace = true
 argui-layout.workspace = true
 argui-paint.workspace = true
 argui-platform.workspace = true
 argui-render.workspace = true
+argui-schema.workspace = true
 argui-text.workspace = true
 argui-ui.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 web-time.workspace = true
 winit.workspace = true
 futures-util = { workspace = true, features = ["sink"], optional = true }

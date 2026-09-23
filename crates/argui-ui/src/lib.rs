@@ -1,4 +1,4 @@
-//! Retained UI description consumed by the runtime and produced by Rust or a DSL.
+//! Retained UI description consumed by the runtime and produced by native hosts.
 
 mod action;
 mod activation;
@@ -52,7 +52,7 @@ mod virtual_list;
 
 pub use activation::{ActivationSource, ClickEvent};
 pub use argui_accessibility::{
-    CheckedState, GridPosition, LiveRegion, Orientation, PopupKind, Role, SemanticAction,
+    CheckedState, Current, GridPosition, LiveRegion, Orientation, PopupKind, Role, SemanticAction,
     SemanticState, SemanticValue, Semantics, SortDirection,
 };
 pub use argui_animation::{Motion, MotionBinding, MotionState, Transition, Tween};

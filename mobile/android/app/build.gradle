@@ -8,7 +8,23 @@ abstract class CargoNdkBuild extends Exec {
 }
 
 def repositoryRoot = rootProject.projectDir.toPath().resolve('../..').normalize().toFile()
-def cargoManifest = new File(repositoryRoot, 'Cargo.toml')
+def galleryProfile = providers.gradleProperty('arguiGallery')
+        .orElse(providers.environmentVariable('ARGUI_ANDROID_GALLERY'))
+        .getOrElse('widgets')
+if (!['widgets', 'solid'].contains(galleryProfile)) {
+    throw new GradleException("arguiGallery must be widgets or solid; got ${galleryProfile}")
+}
+def cargoManifest = new File(repositoryRoot,
+        galleryProfile == 'solid' ? 'apps/gallery/quickjs-host/Cargo.toml' : 'Cargo.toml')
+def rustPackage = galleryProfile == 'solid' ? 'argui-gallery-quickjs' : 'argui-widget-gallery'
+def rustLibrary = galleryProfile == 'solid' ? 'libargui_gallery_quickjs.so' : 'libargui_widget_gallery.so'
+def comparisonProfile = providers.gradleProperty('arguiComparison').getOrElse('off')
+if (!['off', 'rust', 'quickjs'].contains(comparisonProfile)) {
+    throw new GradleException("arguiComparison must be off, rust, or quickjs; got ${comparisonProfile}")
+}
+if (galleryProfile != 'solid' && comparisonProfile != 'off') {
+    throw new GradleException('arguiComparison requires -ParguiGallery=solid')
+}
 def requestedAbis = providers.gradleProperty('arguiAbis')
         .orElse(providers.environmentVariable('ARGUI_ANDROID_ABIS'))
         .getOrElse('arm64-v8a,x86_64')
@@ -32,7 +48,11 @@ android {
     }
 
     defaultConfig {
-        applicationId = 'dev.argui.widgetgallery'
+        applicationId = galleryProfile == 'solid' ? 'dev.argui.solidgallery' : 'dev.argui.widgetgallery'
+        manifestPlaceholders = [
+                galleryLabel: galleryProfile == 'solid' ? 'Argui Solid Gallery' : 'Argui Widget Gallery',
+                galleryActivity: galleryProfile == 'solid' ? 'dev.argui.gallery.EdgeToEdgeNativeActivity' : 'android.app.NativeActivity'
+        ]
         minSdk = 26
         targetSdk = 36
         versionCode = 1
@@ -52,18 +72,34 @@ android {
     }
 }
 
+def prepareJsGallery = tasks.register('prepareJsGallery', Exec) {
+    onlyIf { galleryProfile != 'widgets' }
+    workingDir repositoryRoot
+    commandLine 'bun', 'run', 'build:gallery'
+}
+
 def registerRustBuild = { String variant, boolean optimized ->
     tasks.register("buildArguiRust${variant.capitalize()}", CargoNdkBuild) {
         workingDir repositoryRoot
         inputs.file(cargoManifest)
-        inputs.file(new File(repositoryRoot, 'Cargo.lock'))
+        inputs.file(new File(cargoManifest.parentFile, 'Cargo.lock'))
         inputs.dir(new File(repositoryRoot, 'crates'))
         inputs.dir(new File(repositoryRoot, 'crates/argui-android/android'))
         inputs.dir(new File(repositoryRoot, '.cargo'))
+        if (galleryProfile != 'widgets') {
+            dependsOn prepareJsGallery
+            inputs.dir(new File(repositoryRoot, 'apps/gallery/quickjs-host/src'))
+            inputs.dir(new File(repositoryRoot, 'apps/gallery/assets-host/src'))
+            inputs.file(new File(repositoryRoot, 'apps/gallery/dist/gallery-core.mjs'))
+            inputs.file(new File(repositoryRoot, 'apps/gallery/assets.generated.rs'))
+            inputs.file(new File(repositoryRoot, 'packages/host/src/contract.generated.json'))
+        }
         inputs.property('androidAbis', requestedAbis)
         inputs.property('androidApiLevel', 26)
         inputs.property('androidNdkVersion', '28.2.13676358')
         inputs.property('releaseProfile', optimized)
+        inputs.property('galleryProfile', galleryProfile)
+        inputs.property('comparisonProfile', comparisonProfile)
 
         doFirst {
             def rustOutput = outputDirectory.get().asFile
@@ -73,16 +109,19 @@ def registerRustBuild = { String variant, boolean optimized ->
             requestedAbis.each { abi -> command.addAll(['-t', abi]) }
             command.addAll(['--platform', '26', '-o', rustOutput.absolutePath,
                             'build', '--locked', '--manifest-path', cargoManifest.absolutePath,
-                            '--package', 'argui-widget-gallery', '--lib'])
+                            '--package', rustPackage, '--lib'])
             if (optimized) {
                 command.add('--release')
+            }
+            if (comparisonProfile != 'off') {
+                command.addAll(['--features', "comparison-${comparisonProfile}"])
             }
             setCommandLine(command)
         }
         doLast {
             def rustOutput = outputDirectory.get().asFile
             requestedAbis.each { abi ->
-                def galleryLibrary = new File(rustOutput, "${abi}/libargui_widget_gallery.so")
+                def galleryLibrary = new File(rustOutput, "${abi}/${rustLibrary}")
                 if (!galleryLibrary.isFile()) {
                     throw new GradleException("cargo-ndk did not produce ${galleryLibrary}")
                 }

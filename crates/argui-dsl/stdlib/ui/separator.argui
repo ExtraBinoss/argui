@@ -1,8 +1,0 @@
-import { Container } from "@argui/native"
-
-export component Separator {
-    Container {
-        height: 1px
-        background: var(--argui-border)
-    }
-}

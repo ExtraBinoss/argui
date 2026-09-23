@@ -1,4 +1,4 @@
-//! Alignment and painted edges of native DSL containers.
+//! Alignment and painted edges of native containers.
 
 use argui_paint::{Border, BorderWidths, Shadow};
 use argui_ui::{AlignContent, AlignSelf, Element, GridAutoFlow, JustifyItems, JustifySelf};
@@ -6,7 +6,7 @@ use argui_ui::{AlignContent, AlignSelf, Element, GridAutoFlow, JustifyItems, Jus
 use super::*;
 
 /// Declares native alignment and painted-edge properties.
-/// Returns properties with stable IDs for DSL checking.
+/// Returns properties with stable IDs for host validation.
 pub(super) fn properties() -> Vec<PropertySchema> {
     let defs = [
         (

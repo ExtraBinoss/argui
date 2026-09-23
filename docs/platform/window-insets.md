@@ -5,7 +5,9 @@ Argui exposes `argui_core::Insets` as renderer-independent window geometry.
 and `Render` through `Context::environment()`. Values use logical pixels,
 matching Argui layout coordinates. `Element::safe_area(insets)` wraps an element
 with padding on those four edges, moving the child content into the safe region.
-Put any background that should extend beneath system bars on a full-window parent.
+It copies the element's background onto the wrapper so that background can
+continue under transparent system bars while text and controls remain inset.
+The containing window still needs to draw edge to edge on the platform.
 
 On Android, the Winit host compares `WindowExtAndroid::content_rect()` with the
 full drawable window. It samples the rect after each platform event batch

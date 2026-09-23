@@ -49,6 +49,16 @@ impl ApplicationHandler<UserEvent> for MultiApplication {
         let _ = event_loop;
         match event {
             UserEvent::ModelsReady => self.models_ready(event_loop),
+            #[cfg(not(target_arch = "wasm32"))]
+            UserEvent::HostCommit(batch) => {
+                if let Some(entry) = self.windows.get_mut(&batch.window) {
+                    entry
+                        .runtime
+                        .user_event(event_loop, UserEvent::HostCommit(batch));
+                } else {
+                    let _ = batch.reply.send(Err("unknown native host window".into()));
+                }
+            }
             #[cfg(feature = "tasks")]
             UserEvent::TasksReady => self.tasks_ready(event_loop),
             #[cfg(all(feature = "webview", target_os = "linux"))]

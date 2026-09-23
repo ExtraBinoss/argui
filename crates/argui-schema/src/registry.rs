@@ -91,7 +91,7 @@ impl SchemaRegistry {
     /// Returns a stable hash of native names, versions, property/event/slot contracts,
     /// variants, and asset-typed inputs. Documentation and adapter pointers are ignored.
     ///
-    /// Returns the ABI fingerprint shared by compiler, AOT, live runtime, and tooling.
+    /// Returns the ABI fingerprint shared by native hosts and tooling.
     #[must_use]
     pub fn abi_hash(&self) -> u64 {
         let mut hash = 0xcbf2_9ce4_8422_2325_u64;
