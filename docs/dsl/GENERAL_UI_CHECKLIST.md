@@ -220,14 +220,17 @@ GUI doivent provenir de l’affichage privé ; une capture blanche est un échec
   Galerie : 25/26 avant correction du délai de fin de transition de navigation.
 - La navigation de la galerie monte maintenant seulement les lignes visibles dans
   un `VirtualWindow` ; la molette à petites impulsions et le scrollbar ont été
-  vérifiés sur l’affichage privé. Les premières mesures y donnaient 4,2 % puis
-  0,2 % d’un cœur sur Button et ~99 % puis ~1,0 % sur Damage Control. **Ces
-  chiffres ne valident pas encore le gain en animation réelle** : après quelques
-  frames, la surface privée renvoie `RenderStatus::Skipped` et les captures
-  restent fixes. Le même phénomène touche le spinner de la galerie Rust native.
-  Une trace temporaire, retirée ensuite, a confirmé que les motions DSL avancent,
-  que l’arbre se recalcule et que le renderer présente les premières frames.
-  Refaire la comparaison CPU et fluidité sur une surface qui présente durablement.
+  vérifiés sur l’affichage privé. Ses mesures CPU sont non concluantes car la
+  surface renvoie ensuite `RenderStatus::Skipped`, y compris pour le spinner de
+  la galerie Rust native. Une trace temporaire, retirée ensuite, a confirmé
+  que les motions DSL avancent et que les premières frames sont présentées.
+- L’utilisateur a testé sur son bureau la galerie AOT : ~0,8 % CPU sur Button,
+  1,5 % maximum dans Animation Lab, 0 % quand aucune animation ne joue et
+  ~1,1 % dans Damage Control. Toutes les animations fonctionnent. Avec
+  `argui dev`, il constate seulement 0,1–0,2 point d’écart CPU. Ces mesures
+  manuelles rendent la performance acceptable pour avancer ; elles ne sont
+  pas un benchmark automatisé et précèdent la fusion de
+  `codex/gallery-text-fidelity` dans `codex/dsl-gallery-live`.
 - Le benchmark headless mesure des temps et des ticks CPU dans un profil de test
   non optimisé ; des compilations concurrentes ont perturbé sa durée.
 - `./scripts/quality.sh` et la couverture LLVM finale n’ont pas été exécutés.

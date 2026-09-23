@@ -6,7 +6,8 @@ For the consolidation work identified by the 2026-09-22 audit, use the
 capabilities from missing contracts and verification work; the phases below
 remain the historical implementation tracker.
 The [current handoff](GENERAL_UI_HANDOFF.md) records partial progress,
-performance limits, manual test commands, and the remaining phases.
+user CPU measurements, manual test commands, the text-fidelity merge to do,
+and the remaining phases.
 
 This is the delivery tracker for the [implementation plan](ARGUI_DSL_IMPLEMENTATION_PLAN.md),
 not a claim that every phase is finished. A checked item names an implemented path;

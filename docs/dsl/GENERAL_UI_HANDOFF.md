@@ -9,6 +9,13 @@ passation est destiné à cette même branche. **Le plan P0–P10 n'est pas term
 Les cases non cochées de la checklist restent ouvertes, même quand une partie
 de leur comportement a été implémentée.
 
+**Action Git pour la prochaine conversation :** travailler dans le checkout de
+`codex/dsl-gallery-live`, puis fusionner la branche locale propre
+`codex/gallery-text-fidelity` (actuellement `2968031`) dans cette branche.
+Résoudre les éventuels conflits et vérifier les zones touchées avant de
+poursuivre le plan. Cette fusion text-fidelity **n'est pas encore faite** ; les
+mesures utilisateur ci-dessous portent sur la galerie avant cette fusion.
+
 ## État par phase
 
 | Phase | État réel | Travail restant principal |
@@ -29,24 +36,29 @@ de leur comportement a été implémentée.
 
 - Les 14 pistes d'Animation Lab changent sur plusieurs cycles dans le test
   headless AOT et live ; pause/reprise est aussi vérifiée. Le runtime conserve
-  la phase des motions lors de la pause. Cela prouve les valeurs calculées,
-  **pas** la fluidité visible sur un écran réel.
+  la phase des motions lors de la pause. L'utilisateur confirme aussi que
+  toutes les animations fonctionnent sur son bureau.
 - La sidebar DSL ne monte plus que les lignes visibles via `VirtualWindow` ;
   les petites impulsions de molette et le thumb ont été vus sur l'affichage
   privé. Le cache des éléments natifs, la surveillance ciblée des hauteurs,
   le partage de l'IR live, les références d'enfants précalculées et le chemin
   rapide des valeurs littérales réduisent les recalculs identifiés.
-- Les mesures CPU de l'affichage privé sont **non concluantes** : après quelques
-  frames, wgpu retourne `RenderStatus::Skipped` et l'image se fige. Le spinner
-  de la galerie Rust native a présenté le même problème dans cet environnement.
-  Ne pas présenter les baisses observées comme une preuve de performance en
-  animation réelle. Aucun objectif CPU comparable au ~1 % Rust n'est validé.
-- Si Animation Lab ou Damage Control reste figé sur le bureau normal, vérifier
-  séparément l'avancement des valeurs DSL, la demande de frames et la
-  présentation GPU. Comparer les deux galeries au même profil de compilation,
-  avec une fenêtre visible et le même taux de rafraîchissement.
+- **Mesures manuelles communiquées par l'utilisateur sur son bureau :** avec
+  `cargo run --manifest-path app_examples/Cargo.toml -p argui-example-widget-gallery-dsl`,
+  Button consomme environ **0,8 % CPU**, Animation Lab **1,5 % maximum** et
+  **0 % quand aucune animation ne joue**, Damage Control environ **1,1 %**.
+  Toutes les animations tournent. Avec `argui dev` (commande ci-dessous), il
+  ne voit presque aucune différence CPU : **0,1–0,2 point** de marge observée.
+  Ces chiffres sont des observations utilisateur, pas un benchmark automatisé.
+  Ils lèvent le blocage pratique de performance signalé pour avancer dans le
+  plan ; vérifier de nouveau après la fusion text-fidelity ou une régression.
+- Les anciennes mesures de l'affichage privé restent **non concluantes** :
+  après quelques frames, wgpu retourne `RenderStatus::Skipped` et l'image se
+  fige, y compris pour le spinner de la galerie Rust native. Ne pas confondre
+  ce défaut de l'environnement de test avec les résultats sur le bureau de
+  l'utilisateur.
 
-## Essai manuel demandé à l'utilisateur
+## Commandes de reproduction
 
 Depuis la racine de ce dépôt, lancer la galerie DSL compilée :
 
@@ -60,8 +72,16 @@ Pour comparer avec la galerie Rust native :
 cargo run -p argui-widget-gallery --all-features
 ```
 
-Option live : deux terminaux, le premier depuis
-`app_examples/widget-gallery-dsl`, le second depuis la racine :
+Commande dev utilisée par l'utilisateur depuis
+`app_examples/widget-gallery-dsl` ; elle démarre le client automatiquement :
+
+```sh
+cd app_examples/widget-gallery-dsl
+cargo run --manifest-path ../../Cargo.toml -p argui-cli --bin argui -- dev
+```
+
+Pour lancer séparément le client live, utiliser deux terminaux, le premier
+depuis `app_examples/widget-gallery-dsl`, le second depuis la racine :
 
 ```sh
 cargo run --manifest-path ../../Cargo.toml -p argui-cli --bin argui -- dev ui/main.argui 127.0.0.1:4777 --no-run
@@ -71,27 +91,27 @@ cargo run --manifest-path ../../Cargo.toml -p argui-cli --bin argui -- dev ui/ma
 ARGUI_DEV_ADDRESS=127.0.0.1:4777 cargo run --manifest-path app_examples/Cargo.toml -p argui-example-widget-gallery-dsl --features argui-live
 ```
 
-Dans chaque version, faire défiler la sidebar, laisser Animation Lab tourner
-au moins 20 secondes sans interaction, utiliser Pause/Resume, puis observer
-Damage Control au moins 20 secondes. Noter les animations qui se figent, si
-elles repartent au mouvement de souris, la fréquence perçue, le CPU du
-processus et celui du compositeur, ainsi que le mode AOT ou live. Signaler
-également si le clic d'une page de la sidebar n'apparaît qu'après un scroll :
-ce symptôme n'a pas été isolé de la surface privée qui saute les présentations.
+En cas de régression, faire défiler la sidebar, laisser Animation Lab et
+Damage Control tourner sans interaction, utiliser Pause/Resume et comparer les
+mesures avec les chiffres utilisateur ci-dessus. Signaler aussi si le clic
+d'une page de la sidebar n'apparaît qu'après un scroll : ce symptôme n'a pas
+été isolé de la surface privée qui saute les présentations.
 
 ## Priorités pour la prochaine conversation
 
-1. Recueillir le résultat de l'essai manuel ci-dessus ; reproduire le défaut
-   visible sur une surface qui présente durablement avant de conclure sur CPU
-   ou boucle d'animation. Le problème de `RenderStatus::Skipped` observé en
-   session privée peut être distinct du défaut rapporté sur le bureau.
-2. Finir P1 et P2 avec régression ciblée, puis suivre les dépendances P3–P10
+1. Se placer sur `codex/dsl-gallery-live`, fusionner
+   `codex/gallery-text-fidelity` et traiter les conflits éventuels. Vérifier
+   ensuite les parties concernées par cette fusion.
+2. Prendre les mesures utilisateur ci-dessus comme nouveau point de référence.
+   La performance ne bloque plus la suite ; ne rouvrir l'enquête CPU que si
+   une régression apparaît, notamment après la fusion.
+3. Finir P0/P1 et P2 avec régression ciblée, puis suivre les dépendances P3–P10
    du plan, sans déduire qu'une phase est finie de quelques fixtures vertes.
-3. Mettre à jour les cases et le registre de preuves seulement après validation.
+4. Mettre à jour les cases et le registre de preuves seulement après validation.
    Appliquer `docs/contributing/code-quality.md` et
    `docs/contributing/linux-testing.md`. Les contrôles GUI de l'agent vont
    sur l'affichage privé, avec inspection de captures non blanches.
-4. Faire le gate global et la couverture seulement quand P10 est vraiment
+5. Faire le gate global et la couverture seulement quand P10 est vraiment
    prêt. `./scripts/quality.sh` n'a pas été exécuté dans cette passation à la
    demande de l'utilisateur d'arrêter les tests ; ne pas déclarer 85 % acquis.
 
@@ -112,6 +132,7 @@ ce symptôme n'a pas été isolé de la surface privée qui saute les présentat
   d'une transition de navigation, corrigée puis vérifiée par le 3/3 ci-dessus.
 - Contrôle structurel : aucun fichier Rust de `crates/` ou `app_examples/`
   ne dépasse 600 lignes après extraction du test responsive.
-- Aucune mesure CPU sur écran normal, aucun gate global ni couverture LLVM
-  validés. La passe de galerie lancée juste avant la demande d'arrêt des tests
-  n'est pas utilisée comme preuve de validation finale.
+- Les mesures CPU sur écran normal rapportées par l'utilisateur figurent
+  ci-dessus ; aucun gate global ni couverture LLVM n'est validé. La passe de
+  galerie lancée juste avant la demande d'arrêt des tests n'est pas utilisée
+  comme preuve de validation finale.
