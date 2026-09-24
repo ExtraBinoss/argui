@@ -14,6 +14,7 @@ export interface ButtonProps {
   disabled?: boolean
   busy?: boolean
   selected?: boolean
+  role?: 'button' | 'switch'
   current?: SemanticCurrent
   kind?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'destructive' | 'quiet'
   icon?: AssetRef
@@ -34,7 +35,8 @@ export function Button(props: ButtonProps): JSX.Element {
     : props.kind === 'primary'
     ? pressed() ? props.theme.accentPressed : hovered() ? props.theme.accentHover : props.theme.accent
     : props.kind === 'ghost'
-      ? pressed() ? props.theme.surfacePressed : hovered() ? props.theme.surfaceHover : '#00000000'
+      ? pressed() || focused() ? props.theme.surfacePressed
+        : hovered() || props.selected ? props.theme.surfaceHover : '#00000000'
     : pressed() ? props.theme.surfacePressed : hovered() ? props.theme.surfaceHover
       : props.kind === 'secondary' ? props.theme.surfaceRaised : props.theme.surface
   const color = () => props.disabled ? props.theme.muted
@@ -42,8 +44,9 @@ export function Button(props: ButtonProps): JSX.Element {
   return (
     <focusScope
       key={props.id}
-      role="button"
+      role={props.role ?? 'button'}
       accessible_name={props.label}
+      checked_state={props.role === 'switch' ? props.selected ? 'checked' : 'unchecked' : undefined}
       current={props.current}
       expandable={props.expanded !== undefined ? true : undefined}
       expanded={props.expanded}
@@ -67,8 +70,8 @@ export function Button(props: ButtonProps): JSX.Element {
       >
         <rectangle
           background={fill()}
-          border_color={focused() || (!mobile && props.selected) ? props.theme.accent : props.theme.border}
-          border_width={props.kind === 'ghost' ? 0 : 1}
+          border_color={focused() ? props.theme.foreground : !mobile && props.selected ? props.theme.accent : props.theme.border}
+          border_width={props.kind === 'ghost' ? 0 : focused() ? 2 : 1}
           radius={9}
           opacity={props.disabled ? 0.48 : props.busy ? 0.72 : 1}
         >
@@ -98,6 +101,7 @@ export interface SelectProps {
 export function Select(props: SelectProps): JSX.Element {
   const [expanded, setExpanded] = createLocalSignal(false)
   const [activeIndex, setActiveIndex] = createLocalSignal(0)
+  const [focused, setFocused] = createLocalSignal(false)
   const open = () => {
     setActiveIndex(Math.max(0, props.options.indexOf(props.value)))
     setExpanded(true)
@@ -137,10 +141,14 @@ export function Select(props: SelectProps): JSX.Element {
         expandable={true}
         expanded={expanded()}
         keyboard_activation="none"
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
         onClick={() => expanded() ? setExpanded(false) : open()}
         onKey={onKey}
       >
-        <rectangle width={240} height={40} background={props.theme.surface} border_color={props.theme.border} border_width={1} radius={8}>
+        <rectangle width={240} height={40} background={props.theme.surface}
+          border_color={focused() ? props.theme.accent : props.theme.border}
+          border_width={focused() ? 2 : 1} radius={8}>
           <row width="fill" height="fill" padding={10} align_items="center">
             <text text={props.value} color={props.theme.foreground} font_size={14} />
             <container grow={1} />

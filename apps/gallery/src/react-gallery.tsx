@@ -36,7 +36,7 @@ export function ReactGallery(): ReactElement {
     setStarActive((value) => label === 'Star' ? !value : false)
   }, [])
   const menuButton = <ReactButton id="menu" label={menuOpen ? 'Hide navigation' : 'Show navigation'}
-    theme={theme} kind="quiet" onClick={() => setMenuOpen((value) => !value)} />
+    theme={theme} kind="ghost" onClick={() => setMenuOpen((value) => !value)} />
   const themeControls = (
     <row wrap={true} gap={8}>
       <ReactButton id="theme-toggle" label={mode === 'light' ? 'Dark theme' : 'Light theme'}
@@ -49,7 +49,7 @@ export function ReactGallery(): ReactElement {
     <focusScope role="navigation" accessible_name="Gallery pages" focusable={false}
       width={mobile ? 'fill' : 220} height={mobile ? undefined : 'fill'}>
       <column width={mobile ? 'fill' : 220} height={mobile ? undefined : 'fill'} min_height={0}
-        gap={8} padding={8} background={theme.surface}>
+        gap={8} padding={8}>
         <ReactInputField id="gallery-search" label="Search components" search theme={theme}
           value={search} placeholder="Search components" onChange={setSearch} />
         <ReactVirtualList id="gallery-navigation" count={navigationItems.length} estimate={mobile ? 112 : 47}
@@ -57,14 +57,14 @@ export function ReactGallery(): ReactElement {
           variable={true} axis={mobile ? 'horizontal' : 'vertical'} overscan={3}
           width="fill" height={mobile ? 56 : 'fill'}
           scrollbarWidth={3} scrollbarColor={mode === 'dark' ? '#ffffff66' : '#0000003d'}
-          shadow={{ color: theme.surface, intensity: 1,
+          shadow={{ color: theme.background, intensity: 1,
             width: 36, left: true, right: true, top: true, bottom: true }}
           renderItem={(index) => {
             const item = navigationItems[index]!
             if (item.kind === 'heading') return <column height={mobile ? 56 : 30} padding={7}
               justify_content="center"><text text={item.label} color={theme.muted} font_size={11} /></column>
             return <ReactButton id={navigationKey(item)} label={item.page} theme={theme}
-              kind={page === item.page ? 'secondary' : 'quiet'} selected={page === item.page}
+              kind="ghost" selected={page === item.page}
               current={page === item.page ? 'page' : undefined} onClick={() => setPage(item.page)} />
           }} />
         {navigationItems.length === 0 ? <text text="No components found" color={theme.muted} font_size={12} /> : null}
