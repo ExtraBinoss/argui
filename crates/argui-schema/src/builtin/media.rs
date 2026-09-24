@@ -2,10 +2,11 @@
 
 use argui_assets::AssetHandle;
 use argui_paint::{ImageFit, ImageSampling};
-use argui_ui::Element;
+use argui_ui::{Element, Role, Semantics};
 
 use super::{
-    CommonProperty, FIT, IMAGE, SAMPLING, SOURCE, SVG, TEXT_COLOR, apply_common, common_property,
+    ALT, CommonProperty, FIT, IMAGE, SAMPLING, SOURCE, SVG, TEXT_COLOR, apply_common,
+    common_property,
 };
 use crate::{
     NativeElementInput, NativeSchema, PropertySchema, SchemaError, SchemaRegistry, SchemaValue,
@@ -31,6 +32,12 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
         .property(common_property(CommonProperty::Opacity))
         .property(common_property(CommonProperty::BackdropFilter))
         .property(common_property(CommonProperty::Visible))
+        .property(PropertySchema::new(
+            ALT,
+            "alt",
+            ValueType::String,
+            "Alternative text; an empty value marks the image decorative.",
+        ))
         .property(
             PropertySchema::new(SOURCE, "source", ValueType::Asset, "Imported image asset.")
                 .required(),
@@ -65,10 +72,11 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
             }
             _ => ImageSampling::Linear,
         };
-        apply_common(
+        let element = apply_common(
             Element::image(id).image_fit(fit).image_sampling(sampling),
             input,
-        )
+        )?;
+        Ok(apply_alt(element, input))
     })?;
 
     let svg = NativeSchema::new(SVG, "Svg", "Displays an imported SVG vector.")
@@ -82,6 +90,12 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
         .property(common_property(CommonProperty::Opacity))
         .property(common_property(CommonProperty::BackdropFilter))
         .property(common_property(CommonProperty::Visible))
+        .property(PropertySchema::new(
+            ALT,
+            "alt",
+            ValueType::String,
+            "Alternative text; an empty value marks the SVG decorative.",
+        ))
         .property(
             PropertySchema::new(SOURCE, "source", ValueType::Asset, "Imported SVG asset.")
                 .required(),
@@ -108,8 +122,18 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
         if let Some(SchemaValue::Color(color)) = input.get(TEXT_COLOR) {
             element = element.vector_color(*color);
         }
-        apply_common(element, input)
+        Ok(apply_alt(apply_common(element, input)?, input))
     })
+}
+
+/// Gives media `element` image semantics from the optional `alt` property in `input`.
+/// An empty alternative hides the decorative image from assistive technology.
+fn apply_alt(element: Element, input: &NativeElementInput) -> Element {
+    match input.get(ALT) {
+        Some(SchemaValue::String(alt)) if alt.is_empty() => element.semantic_hidden(true),
+        Some(SchemaValue::String(alt)) => element.semantics(Semantics::new(Role::Image).label(alt)),
+        _ => element,
+    }
 }
 
 /// Reads the required, schema-checked asset handle.

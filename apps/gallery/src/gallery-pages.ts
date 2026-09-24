@@ -1,6 +1,6 @@
 /** Ordered gallery destinations shared by the Solid and React shells. */
 export const pages = [
-  'Button', 'Input', 'Select', 'Popover', 'Media', 'Overlay', 'Animation Lab', 'Damage Control', 'WGSL Lab',
+  'Button', 'Input', 'Select', 'Popover', 'Media', 'Accessibility', 'Overlay', 'Animation Lab', 'Damage Control', 'WGSL Lab',
 ] as const
 
 export type Page = typeof pages[number]
@@ -16,6 +16,7 @@ export const navigationItems: readonly NavigationItem[] = [
   { kind: 'page', page: 'Select' },
   { kind: 'page', page: 'Popover' },
   { kind: 'page', page: 'Media' },
+  { kind: 'page', page: 'Accessibility' },
   { kind: 'page', page: 'Overlay' },
   { kind: 'page', page: 'Animation Lab' },
   { kind: 'heading', label: 'EXAMPLES' },

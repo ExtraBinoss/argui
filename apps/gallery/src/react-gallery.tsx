@@ -6,6 +6,7 @@ import { ReactAnimationLab } from './react-animation-lab'
 import { ReactOverlayPage, ReactPopoverPage } from './react-overlay'
 import { ReactDamageControl } from './react-damage-control'
 import { ReactInputField } from './react-input-field'
+import { ReactAccessibilityPage } from './react-accessibility-page'
 import { ReactInputsPage } from './react-inputs'
 import { ReactWgslLab } from './react-wgsl-lab'
 import { pages, filteredNavigation, navigationKey, navigationVersion, type Page } from './gallery-pages'
@@ -137,6 +138,7 @@ const ReactPageContent = memo(function ReactPageContent(props: ReactPageContentP
       {item === 'Popover' ? <ReactPopoverPage theme={theme} /> : null}
       {item === 'Animation Lab' ? <ReactAnimationLab theme={theme} /> : null}
       {item === 'Media' ? <ReactMediaPage theme={theme} /> : null}
+      {item === 'Accessibility' ? <ReactAccessibilityPage theme={theme} /> : null}
       {item === 'Overlay' ? <ReactOverlayPage theme={theme} /> : null}
       {item === 'Damage Control' ? <ReactDamageControl theme={theme} active={props.active ?? false} /> : null}
       {item === 'WGSL Lab' ? <ReactWgslLab theme={theme} active={props.active ?? false} /> : null}
@@ -202,15 +204,11 @@ function ReactMediaPage(props: { theme: Palette }): ReactElement {
         </column>
         <column width={mobile ? 'fill' : 240} height={mobile ? 260 : 200} gap={8}>
           <text text="Multicolor SVG pre-rendered as PNG" color={props.theme.foreground} font_size={16} />
-          <focusScope role="image" accessible_name="Colorful orbit illustration" focusable={false} width="fill" height={160}>
-            <image source={mediaAssets['illustration/orbit.png']} width="fill" height={160} fit="contain" />
-          </focusScope>
+          <image source={mediaAssets['illustration/orbit.png']} alt="Colorful orbit illustration" width="fill" height={160} fit="contain" />
         </column>
         <column width={mobile ? 'fill' : 240} height={mobile ? 260 : 200} gap={8}>
           <text text="Imported JPEG image" color={props.theme.foreground} font_size={16} />
-          <focusScope role="image" accessible_name="Saturn with its rings" focusable={false} width="fill" height={160}>
-            <image source={mediaAssets['photo/saturn.jpg']} width="fill" height={160} fit="cover" />
-          </focusScope>
+          <image source={mediaAssets['photo/saturn.jpg']} alt="Saturn with its rings" width="fill" height={160} fit="cover" />
         </column>
       </row>
     </column>

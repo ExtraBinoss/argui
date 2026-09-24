@@ -4,8 +4,44 @@ use argui_paint::{ImageFit, ImageId, ImageSampling, VectorId};
 use argui_schema::{AssetHandle, NativeElementInput, SchemaError, SchemaValue, builtin};
 use argui_text::TextEngine;
 use argui_ui::{
-    CheckedState, Element, ElementKind, Overflow, ScrollbarVisibility, UiTree, length, percent,
+    CheckedState, Element, ElementKind, Overflow, Role, ScrollbarVisibility, UiTree, length,
+    percent,
 };
+
+#[test]
+fn alternative_text_names_images_and_empty_alt_hides_decoration() {
+    let registry = builtin::registry().unwrap();
+    let image = registry
+        .construct(
+            builtin::IMAGE,
+            &NativeElementInput::new()
+                .property(
+                    builtin::SOURCE,
+                    SchemaValue::Asset(AssetHandle::Image(ImageId::fresh())),
+                )
+                .property(
+                    builtin::ALT,
+                    SchemaValue::String("Saturn and its rings".into()),
+                ),
+        )
+        .unwrap();
+    let semantics = image.semantics.as_ref().unwrap();
+    assert_eq!(semantics.role, Role::Image);
+    assert_eq!(semantics.label.as_deref(), Some("Saturn and its rings"));
+
+    let decorative = registry
+        .construct(
+            builtin::SVG,
+            &NativeElementInput::new()
+                .property(
+                    builtin::SOURCE,
+                    SchemaValue::Asset(AssetHandle::Vector(VectorId::fresh())),
+                )
+                .property(builtin::ALT, SchemaValue::String(String::new())),
+        )
+        .unwrap();
+    assert!(decorative.semantic_hidden);
+}
 
 #[test]
 fn image_and_svg_accept_typed_handles_and_reject_wrong_media_kinds() {

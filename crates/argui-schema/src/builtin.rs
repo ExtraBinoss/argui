@@ -234,6 +234,7 @@ pub const SEMANTIC_SET_SIZE: PropertyId = PropertyId::from_raw(228);
 pub const SEMANTIC_MODAL: PropertyId = PropertyId::from_raw(229);
 pub const SEMANTIC_HAS_POPUP: PropertyId = PropertyId::from_raw(230);
 pub const SEMANTIC_SORT: PropertyId = PropertyId::from_raw(231);
+pub const ALT: PropertyId = PropertyId::from_raw(232);
 pub const MAX_DIGITS: PropertyId = PropertyId::from_raw(116);
 pub const MOUSE_GLOBAL_X: PropertyId = PropertyId::from_raw(117);
 pub const MOUSE_GLOBAL_Y: PropertyId = PropertyId::from_raw(118);

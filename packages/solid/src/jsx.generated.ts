@@ -504,6 +504,7 @@ export namespace JSX {
       opacity?: number
       backdrop_filter?: string
       visible?: boolean
+      alt?: string
       source: AssetRef
       fit?: string
       sampling?: string
@@ -565,6 +566,7 @@ export namespace JSX {
       opacity?: number
       backdrop_filter?: string
       visible?: boolean
+      alt?: string
       source: AssetRef
       fit?: string
       color?: string

@@ -5,6 +5,7 @@ import { AnimationLab } from './animation-lab'
 import { OverlayPage, PopoverPage } from './overlay'
 import { DamageControl } from './damage-control'
 import { InputField } from './input-field'
+import { AccessibilityPage } from './accessibility-page'
 import { InputsPage } from './inputs'
 import { WgslLab } from './wgsl-lab'
 import { pages, filteredNavigation, navigationKey, navigationVersion, type Page } from './gallery-pages'
@@ -82,6 +83,7 @@ export function Gallery(): JSX.Element {
       {item === 'Popover' ? <PopoverPage theme={theme()} /> : null}
       {item === 'Animation Lab' ? <AnimationLab theme={theme()} /> : null}
       {item === 'Media' ? <MediaPage theme={theme()} /> : null}
+      {item === 'Accessibility' ? <AccessibilityPage theme={theme()} /> : null}
       {item === 'Overlay' ? <OverlayPage theme={theme()} /> : null}
       {item === 'Damage Control' ? <DamageControl theme={theme()} active={page() === item} /> : null}
       {item === 'WGSL Lab' ? <WgslLab theme={theme()} active={page() === item} /> : null}
@@ -177,15 +179,11 @@ function MediaPage(props: { theme: Palette }): JSX.Element {
         </column>
         <column width={mobile ? 'fill' : 240} height={mobile ? 260 : 200} gap={8}>
           <text text="Multicolor SVG pre-rendered as PNG" color={props.theme.foreground} font_size={16} />
-          <focusScope role="image" accessible_name="Colorful orbit illustration" focusable={false} width="fill" height={160}>
-            <image source={mediaAssets['illustration/orbit.png']} width="fill" height={160} fit="contain" />
-          </focusScope>
+          <image source={mediaAssets['illustration/orbit.png']} alt="Colorful orbit illustration" width="fill" height={160} fit="contain" />
         </column>
         <column width={mobile ? 'fill' : 240} height={mobile ? 260 : 200} gap={8}>
           <text text="Imported JPEG image" color={props.theme.foreground} font_size={16} />
-          <focusScope role="image" accessible_name="Saturn with its rings" focusable={false} width="fill" height={160}>
-            <image source={mediaAssets['photo/saturn.jpg']} width="fill" height={160} fit="cover" />
-          </focusScope>
+          <image source={mediaAssets['photo/saturn.jpg']} alt="Saturn with its rings" width="fill" height={160} fit="cover" />
         </column>
       </row>
     </column>
