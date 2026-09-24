@@ -4,6 +4,7 @@ import solid from 'vite-plugin-solid'
 
 const entry = process.env.ARGUI_GALLERY_ENTRY
 const react = entry === 'react'
+const minimal = entry === 'minimal'
 const allTabler = process.env.ARGUI_GALLERY_ALL_TABLER === '1'
 
 export default defineConfig({
@@ -19,7 +20,7 @@ export default defineConfig({
   ssr: { noExternal: react ? ['react', 'react-reconciler', 'scheduler', '@argui/react'] : ['solid-js'],
     resolve: { conditions: ['browser'] } },
   build: {
-    ssr: react ? 'src/react-main.tsx' : 'src/main.tsx',
+    ssr: react ? 'src/react-main.tsx' : minimal ? 'src/minimal-main.tsx' : 'src/main.tsx',
     outDir: 'dist',
     emptyOutDir: !react,
     target: 'es2022',

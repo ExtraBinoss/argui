@@ -115,11 +115,12 @@ impl EffectQuality {
 #[derive(Clone, Debug)]
 pub struct RendererConfig {
     pub power_preference: wgpu::PowerPreference,
-    /// Whether Windows may retry compatible renderer configurations after the preferred
-    /// DirectX 12 DirectComposition configuration fails.
+    /// Whether renderer initialization may retry a compatible backend after the preferred one fails.
     pub renderer_fallback: bool,
     pub present_mode: wgpu::PresentMode,
     pub maximum_frame_latency: u32,
+    /// Wait for submitted GPU work after each frame when bounded memory matters more than throughput.
+    pub wait_for_submitted_gpu_work: bool,
     pub clear_color: Color,
     pub surface_alpha: SurfaceAlphaMode,
     pub profiling: bool,
@@ -142,6 +143,7 @@ impl Default for RendererConfig {
             renderer_fallback: true,
             present_mode: wgpu::PresentMode::AutoVsync,
             maximum_frame_latency: 2,
+            wait_for_submitted_gpu_work: false,
             clear_color: Color::srgb(0.055, 0.065, 0.09),
             surface_alpha: SurfaceAlphaMode::Opaque,
             profiling: false,
@@ -157,10 +159,11 @@ impl Default for RendererConfig {
 }
 
 impl RendererConfig {
-    /// Enables or disables renderer fallback during Windows GPU initialization.
+    /// Enables or disables renderer fallback during GPU initialization.
     ///
     /// When `enabled` is `false`, Windows only attempts DirectX 12 with
-    /// DirectComposition. Other platforms currently ignore this setting.
+    /// DirectComposition, while Linux and Android only attempt Vulkan.
+    /// `enabled` has no effect on other platforms.
     #[must_use]
     pub fn renderer_fallback(mut self, enabled: bool) -> Self {
         self.renderer_fallback = enabled;
@@ -172,6 +175,15 @@ impl RendererConfig {
     #[must_use]
     pub fn maximum_frame_latency(mut self, frames: u32) -> Self {
         self.maximum_frame_latency = frames.clamp(1, 3);
+        self
+    }
+
+    /// Waits for each submitted frame to complete before rendering another one when `enabled`.
+    ///
+    /// * `enabled` — whether to bound outstanding GPU command buffers at the cost of throughput.
+    #[must_use]
+    pub fn wait_for_submitted_gpu_work(mut self, enabled: bool) -> Self {
+        self.wait_for_submitted_gpu_work = enabled;
         self
     }
 

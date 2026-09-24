@@ -1,5 +1,30 @@
 use wgpu::{CompositeAlphaMode, TextureFormat};
 
+/// Describes failed backends in the warning shown after a compatibility fallback succeeds.
+///
+/// `failures` are earlier initialization errors, and `selected` names the backend in use.
+#[cfg(any(target_os = "windows", target_os = "linux", target_os = "android"))]
+pub(super) fn fallback_message(
+    failures: &[crate::RendererAttemptFailure],
+    selected: &str,
+) -> String {
+    let failures = failures
+        .iter()
+        .map(|failure| format!("{} failed: {}", failure.renderer, failure.error))
+        .collect::<Vec<_>>()
+        .join("; ");
+    #[cfg(target_os = "windows")]
+    {
+        format!(
+            "Renderer fallback activated. {failures}. Continuing with {selected}. Desktop backdrop effects are disabled for this session."
+        )
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        format!("Renderer fallback activated. {failures}. Continuing with {selected}.")
+    }
+}
+
 #[cfg(target_os = "windows")]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum WindowsRenderer {
@@ -39,8 +64,30 @@ impl WindowsRenderer {
 }
 
 #[cfg(not(target_os = "windows"))]
+/// Creates the preferred GPU instance for the current platform.
 pub(super) fn instance() -> wgpu::Instance {
-    wgpu::Instance::default()
+    let mut descriptor = wgpu::InstanceDescriptor::new_without_display_handle();
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    {
+        descriptor.backends = wgpu::Backends::VULKAN;
+    }
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    {
+        descriptor.backends = wgpu::Backends::METAL;
+    }
+    #[cfg(target_arch = "wasm32")]
+    {
+        descriptor.backends = wgpu::Backends::BROWSER_WEBGPU | wgpu::Backends::GL;
+    }
+    wgpu::Instance::new(descriptor)
+}
+
+/// Creates the OpenGL compatibility instance after Vulkan initialization fails.
+#[cfg(any(target_os = "linux", target_os = "android"))]
+pub(super) fn fallback_instance() -> wgpu::Instance {
+    let mut descriptor = wgpu::InstanceDescriptor::new_without_display_handle();
+    descriptor.backends = wgpu::Backends::GL;
+    wgpu::Instance::new(descriptor)
 }
 
 /// Creates a Windows WGPU instance for one renderer initialization attempt.

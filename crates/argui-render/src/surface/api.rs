@@ -1,21 +1,5 @@
 use super::*;
 
-/// Builds the warning emitted after Windows selects a compatibility renderer.
-///
-/// `failures` contains earlier initialization errors and `selected` names the
-/// renderer configuration that succeeded.
-#[cfg(target_os = "windows")]
-fn fallback_message(failures: &[crate::RendererAttemptFailure], selected: &str) -> String {
-    let failures = failures
-        .iter()
-        .map(|failure| format!("{} failed: {}", failure.renderer, failure.error))
-        .collect::<Vec<_>>()
-        .join("; ");
-    format!(
-        "Renderer fallback activated. {failures}. Continuing with {selected}. Desktop backdrop effects are disabled for this session."
-    )
-}
-
 #[cfg_attr(coverage_nightly, coverage(off))]
 impl SurfaceRenderer {
     /// Returns whether the surface uses premultiplied transparency.
@@ -54,8 +38,8 @@ impl SurfaceRenderer {
             let mut failures = Vec::new();
             for renderer in configure::WindowsRenderer::attempts(renderer_config.renderer_fallback)
             {
-                let fallback_message =
-                    (!failures.is_empty()).then(|| fallback_message(&failures, renderer.label()));
+                let fallback_message = (!failures.is_empty())
+                    .then(|| configure::fallback_message(&failures, renderer.label()));
                 let result = Self::new_with_instance(
                     target.clone(),
                     width,
@@ -79,7 +63,59 @@ impl SurfaceRenderer {
             })
         }
 
-        #[cfg(not(target_os = "windows"))]
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        {
+            let primary = Self::new_with_instance(
+                target.clone(),
+                width,
+                height,
+                renderer_config.clone(),
+                configure::instance(),
+                None,
+            )
+            .await;
+            match primary {
+                Ok(renderer) => Ok(renderer),
+                Err(error)
+                    if renderer_config.renderer_fallback
+                        && matches!(
+                            &error,
+                            RendererError::SurfaceCreation(_)
+                                | RendererError::AdapterRequest(_)
+                                | RendererError::DeviceRequest(_)
+                                | RendererError::UnsupportedSurface
+                                | RendererError::UnsupportedSurfaceTransparency
+                        ) =>
+                {
+                    let failures = [crate::RendererAttemptFailure {
+                        renderer: "Vulkan".into(),
+                        error: error.to_string(),
+                    }];
+                    Self::new_with_instance(
+                        target,
+                        width,
+                        height,
+                        renderer_config,
+                        configure::fallback_instance(),
+                        Some(configure::fallback_message(&failures, "OpenGL")),
+                    )
+                    .await
+                    .map_err(|error| RendererError::Initialization {
+                        attempts: vec![
+                            failures[0].clone(),
+                            crate::RendererAttemptFailure {
+                                renderer: "OpenGL".into(),
+                                error: error.to_string(),
+                            },
+                        ],
+                        fallback_enabled: true,
+                    })
+                }
+                Err(error) => Err(error),
+            }
+        }
+
+        #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "android")))]
         Self::new_with_instance(
             target,
             width,

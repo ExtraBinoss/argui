@@ -14,6 +14,13 @@ fn renderer_defaults_to_vsync_and_a_discrete_gpu() {
     assert!(!config.clone().renderer_fallback(false).renderer_fallback);
     assert_eq!(config.present_mode, wgpu::PresentMode::AutoVsync);
     assert_eq!(config.maximum_frame_latency, 2);
+    assert!(!config.wait_for_submitted_gpu_work);
+    assert!(
+        config
+            .clone()
+            .wait_for_submitted_gpu_work(true)
+            .wait_for_submitted_gpu_work
+    );
     assert_eq!(
         config.clear_color,
         argui_core::Color::srgb(0.055, 0.065, 0.09)

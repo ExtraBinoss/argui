@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ $# -ne 2 || ! "$1" =~ ^(desktop|android)$ || ! "$2" =~ ^(solid|react)$ ]]; then
-  echo "usage: $0 {desktop|android} {solid|react}" >&2
+if [[ $# -ne 2 || ! "$1" =~ ^(desktop|android)$ || ! "$2" =~ ^(solid|react|minimal)$ ]]; then
+  echo "usage: $0 {desktop|android} {solid|react|minimal}" >&2
   exit 2
 fi
 

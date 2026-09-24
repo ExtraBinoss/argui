@@ -119,6 +119,16 @@ pub struct SurfaceRenderer {
 
 #[cfg_attr(coverage_nightly, coverage(off))]
 impl SurfaceRenderer {
+    /// Reclaims completed GPU submissions, waiting for the current frame when configured.
+    fn poll_submitted_gpu_work(&self) {
+        let poll_type = if self.renderer_config.wait_for_submitted_gpu_work {
+            wgpu::PollType::wait_indefinitely()
+        } else {
+            wgpu::PollType::Poll
+        };
+        let _ = self.device.poll(poll_type);
+    }
+
     fn from_existing_device(
         instance: wgpu::Instance,
         surface: wgpu::Surface<'static>,
@@ -445,7 +455,7 @@ impl SurfaceRenderer {
             }
             canvas_commands.push(encoder.finish());
             self.queue.submit(canvas_commands);
-            let _ = self.device.poll(wgpu::PollType::Poll);
+            self.poll_submitted_gpu_work();
             self.finish_profile(profiler, viewport, graph_stats, damage_profile, false);
             self.queue.present(frame);
             return Ok(status);
@@ -503,7 +513,7 @@ impl SurfaceRenderer {
         }
         canvas_commands.push(encoder.finish());
         self.queue.submit(canvas_commands);
-        let _ = self.device.poll(wgpu::PollType::Poll);
+        self.poll_submitted_gpu_work();
         self.finish_profile(
             profiler,
             viewport,
