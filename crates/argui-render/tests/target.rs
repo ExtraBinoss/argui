@@ -33,3 +33,24 @@ fn blur_and_shadow_keep_the_entire_output_in_the_snapshot() {
     assert_eq!(sample.intersection(output), Some(output));
     assert_eq!(sample, output);
 }
+
+/// Exact composition clips do not expand to the 32-pixel damage tile boundary.
+#[test]
+fn effect_clip_keeps_exact_scroll_viewport_edges() {
+    let viewport = PixelRegion::viewport(256, 256);
+    let clip = Rect::new(Point::new(13.0, 47.0), Size::new(80.0, 90.0));
+    let region = PixelRegion::from_clip_rect(clip, viewport).unwrap();
+    assert_eq!(region.origin, [13, 47]);
+    assert_eq!(region.size, [80, 90]);
+    assert_eq!(
+        region.intersection(PixelRegion::from_rect(clip, viewport).unwrap()),
+        Some(region)
+    );
+    assert!(
+        PixelRegion::from_clip_rect(
+            Rect::new(Point::new(300.0, 300.0), Size::new(10.0, 10.0)),
+            viewport,
+        )
+        .is_none()
+    );
+}

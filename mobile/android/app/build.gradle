@@ -19,6 +19,7 @@ def cargoManifest = new File(repositoryRoot,
 def rustPackage = galleryProfile == 'solid' ? 'argui-gallery-quickjs' : 'argui-widget-gallery'
 def rustLibrary = galleryProfile == 'solid' ? 'libargui_gallery_quickjs.so' : 'libargui_widget_gallery.so'
 def comparisonProfile = providers.gradleProperty('arguiComparison').getOrElse('off')
+def devTabler = providers.gradleProperty('arguiDevTabler').getOrElse('false').toBoolean()
 if (!['off', 'rust', 'quickjs'].contains(comparisonProfile)) {
     throw new GradleException("arguiComparison must be off, rust, or quickjs; got ${comparisonProfile}")
 }
@@ -100,6 +101,7 @@ def registerRustBuild = { String variant, boolean optimized ->
         inputs.property('releaseProfile', optimized)
         inputs.property('galleryProfile', galleryProfile)
         inputs.property('comparisonProfile', comparisonProfile)
+        inputs.property('devTabler', devTabler)
 
         doFirst {
             def rustOutput = outputDirectory.get().asFile
@@ -115,6 +117,9 @@ def registerRustBuild = { String variant, boolean optimized ->
             }
             if (comparisonProfile != 'off') {
                 command.addAll(['--features', "comparison-${comparisonProfile}"])
+            }
+            if (devTabler && galleryProfile == 'solid' && !optimized) {
+                command.addAll(['--features', 'dev-tabler-icons'])
             }
             setCommandLine(command)
         }

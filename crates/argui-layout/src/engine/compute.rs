@@ -160,7 +160,7 @@ impl LayoutEngine {
             }
         }
         drop(elements);
-        output.virtualization_changed = crate::virtual_list::measure(root, &output, ui);
+        output.virtualization_changed = crate::virtual_list::measure(root, &mut output, ui);
         let anchored = crate::anchor::apply(&self.scroll_anchors, ui, &output);
         for region in &output.text_inputs {
             ui.set_scroll_offset(region.node, Point::new(region.scroll_x, region.scroll_y));

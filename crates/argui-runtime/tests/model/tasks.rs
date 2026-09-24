@@ -25,6 +25,29 @@ fn runtime() -> (TaskRuntime, mpsc::Receiver<()>) {
     )
 }
 
+/// A model closing its resources rejects work before its mount cleanup runs.
+#[test]
+fn model_scope_closure_rejects_mount_work_before_presentation_cleanup() {
+    let (runtime, _) = runtime();
+    let model = Entity::new(Model::default());
+    model.set_task_runtime(runtime.clone());
+    let mount = model.mount().unwrap();
+    let pending = mount.clone();
+    let _lease = model
+        .resources()
+        .defer(move || {
+            assert!(!pending.resources().is_closed());
+            assert!(matches!(
+                pending.spawn(async {}, |_, _, _| {}),
+                Err(TaskError::ScopeClosed)
+            ));
+        })
+        .unwrap();
+    model.resources().close();
+    assert!(mount.resources().is_closed());
+    assert_eq!(runtime.pending(), 0);
+}
+
 #[test]
 fn closing_a_mount_during_update_rejects_work_in_the_existing_context() {
     let (runtime, _) = runtime();

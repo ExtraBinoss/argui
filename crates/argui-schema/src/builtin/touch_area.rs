@@ -201,11 +201,15 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
                     .delivery(GestureDelivery::FrameCoalesced),
             );
         }
+        // Ordinary taps leave touch scrolling available to an ancestor viewport.
+        // Pressed-pointer movement and explicit pans retain their drag capture.
+        let captures_drag =
+            gestures.captures_on_press() || input.events.iter().any(|event| event.id == MOVED);
         let interaction = Interaction::default()
             .enabled(optional_bool(input, ENABLED).unwrap_or(true))
             .cursor(cursor)
             .gestures(gestures)
-            .capture_on_press(true);
+            .capture_on_press(captures_drag);
         let mut element =
             apply_common(Element::container(input.children(CHILDREN).to_vec()), input)?
                 .interaction(interaction)

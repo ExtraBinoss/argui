@@ -1,8 +1,10 @@
 import { createContext, type ReactNode } from 'react'
+export { VirtualList } from './vlist'
+export type { VirtualListProps } from './vlist'
 import Reconciler from 'react-reconciler'
 import { ConcurrentRoot, DefaultEventPriority } from 'react-reconciler/constants'
 import type { NativeHost } from '@argui/host'
-import { commitWork, detach, markDirty, nativeInstance, place, workNode, type WorkNode, type WorkRoot } from './tree'
+import { commitWork, detach, markDirty, nativeInstance, place, updateProps, workNode, type WorkNode, type WorkRoot } from './tree'
 
 type Props = Record<string, unknown>
 type Timeout = ReturnType<typeof setTimeout>
@@ -44,10 +46,7 @@ const config: Config = {
   clearContainer: (root) => {
     for (const child of [...root.children]) detach(root, child)
   },
-  commitUpdate: (instance, _type, _previous, next) => {
-    instance.props = next
-    markDirty(instance)
-  },
+  commitUpdate: (instance, _type, previous, next) => updateProps(instance, previous, next),
   commitTextUpdate: (instance, _previous, next) => {
     instance.text = next
     markDirty(instance)

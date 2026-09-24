@@ -112,14 +112,15 @@ fn visible_row_identity_survives_a_small_scroll() {
 }
 
 #[test]
-fn virtual_window_rejects_mismatched_or_invalid_windows() {
+fn virtual_window_accepts_a_stale_bounded_window_but_rejects_invalid_values() {
     let registry = builtin::registry().unwrap();
     let mut wrong = input(100, 0.0);
     wrong.slots[0].elements.pop();
-    assert!(matches!(
-        registry.construct(builtin::VIRTUAL_WINDOW, &wrong),
-        Err(SchemaError::Adapter(_))
-    ));
+    let root = registry.construct(builtin::VIRTUAL_WINDOW, &wrong).unwrap();
+    assert_eq!(
+        root.virtual_viewport().unwrap().mounted.len(),
+        wrong.slots[0].elements.len()
+    );
     let mut invalid = input(100, 0.0);
     invalid
         .properties
@@ -165,9 +166,34 @@ fn virtual_window_rejects_invalid_dimensions_indices_and_counts() {
         .iter_mut()
         .find(|(id, _)| *id == builtin::WINDOW_START)
         .unwrap()
-        .1 = SchemaValue::Int(1);
+        .1 = SchemaValue::Int(101);
     assert!(matches!(
         registry.construct(builtin::VIRTUAL_WINDOW, &wrong_start),
         Err(SchemaError::Adapter(_))
     ));
+}
+
+#[test]
+fn horizontal_window_uses_widths_and_axis_specific_scroll_effects() {
+    let registry = builtin::registry().unwrap();
+    let input = NativeElementInput::new()
+        .property(builtin::KEY, SchemaValue::String("horizontal".into()))
+        .property(builtin::ROW_HEIGHT, SchemaValue::Float(30.0))
+        .property(builtin::VIRTUAL_HORIZONTAL, SchemaValue::Bool(true))
+        .property(builtin::VIRTUAL_VIEWPORT_WIDTH, SchemaValue::Float(90.0))
+        .property(builtin::ITEM_COUNT, SchemaValue::Int(100))
+        .property(builtin::WINDOW_START, SchemaValue::Int(0))
+        .property(builtin::VIRTUAL_SHADOW_WIDTH, SchemaValue::Float(12.0))
+        .property(builtin::VIRTUAL_SCROLLBAR_VISIBLE, SchemaValue::Bool(true))
+        .slot(NativeSlotValue::new(
+            builtin::CHILDREN,
+            (0..12).map(|index| Element::text(index.to_string()).keyed(index.to_string())),
+        ));
+    let root = registry.construct(builtin::VIRTUAL_WINDOW, &input).unwrap();
+    let scroll = root.scroll.as_ref().unwrap();
+    assert_eq!(scroll.axes, argui_ui::ScrollAxes::Horizontal);
+    assert_eq!(scroll.effects.len(), 1);
+    assert!(scroll.scrollbar.is_some());
+    assert_eq!(root.virtual_viewport().unwrap().mounted, 0..12);
+    assert_eq!(root.children[0].children[1].style.size.width.value(), 30.0);
 }

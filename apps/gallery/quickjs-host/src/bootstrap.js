@@ -1,5 +1,7 @@
 const schema = JSON.parse(globalThis.__arguiContractJson)
+globalThis.__arguiNativeEffects = []
 let subscriber = null
+let profileSubscriber = null
 let nextTimer = 1
 const timers = new Map()
 
@@ -31,14 +33,33 @@ globalThis.__arguiTick = (now) => {
   }
 }
 globalThis.__arguiDeliver = (json) => { subscriber?.(JSON.parse(json)) }
+globalThis.__arguiDeliverProfile = (json) => { profileSubscriber?.(JSON.parse(json)) }
 globalThis.__arguiBridge = {
   contract: () => schema,
   commit: (operations) => {
-    const error = globalThis.__arguiSend(JSON.stringify(operations))
+    const error = globalThis.__arguiSend(JSON.stringify(operations.map((op) => {
+      switch (op.kind) {
+        case 'create': return [0, op.id.slot, op.id.generation, op.nativeType]
+        case 'setProperty': return [1, op.id.slot, op.id.generation, op.property, op.value?.type ?? null, op.value?.value ?? null]
+        case 'setListener': return [2, op.id.slot, op.id.generation, op.event, op.callback]
+        case 'insert': return [3, op.parent.slot, op.parent.generation, op.child.slot, op.child.generation, op.before?.slot ?? null, op.before?.generation ?? null]
+        case 'remove': return [4, op.id.slot, op.id.generation]
+        case 'setRoot': return [5, op.id?.slot ?? null, op.id?.generation ?? null]
+        default: throw new Error(`Unknown native operation: ${op.kind}`)
+      }
+    })))
     if (error) throw new Error(error)
   },
   subscribe: (callback) => {
     subscriber = callback
     return () => { if (subscriber === callback) subscriber = null }
+  },
+  control: (request) => {
+    const error = globalThis.__arguiControl(JSON.stringify(request))
+    if (error) throw new Error(error)
+  },
+  subscribeProfile: (callback) => {
+    profileSubscriber = callback
+    return () => { if (profileSubscriber === callback) profileSubscriber = null }
   },
 }

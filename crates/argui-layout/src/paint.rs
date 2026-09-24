@@ -442,7 +442,13 @@ fn paint_enter(
                 layer.mask = LayerMask::Rounded(radii);
             }
         }
-        begin_layer(&mut output.display_list, layer, visual_bounds, node.node);
+        begin_layer(
+            &mut output.display_list,
+            layer,
+            visual_bounds,
+            context.clip_bounds,
+            node.node,
+        );
     }
     begin_scope(
         ui,
@@ -450,6 +456,7 @@ fn paint_enter(
         element,
         EffectScope::WholeElement,
         visual_bounds,
+        context.clip_bounds,
         node.node,
     );
     geometry::push_hit_region(element, node, output, context);
@@ -470,10 +477,18 @@ fn paint_enter(
         element,
         EffectScope::Content,
         visual_bounds,
+        context.clip_bounds,
         node.node,
     );
 
-    let scroll_layers = effects::begin_scroll(ui, element, node, output, context.transform);
+    let scroll_layers = effects::begin_scroll(
+        ui,
+        element,
+        node,
+        output,
+        context.transform,
+        context.clip_bounds,
+    );
     let content_clips = if clips_content {
         context.clips.appended(owned_clip(
             ClipRegion::new(node.bounds, context.transform),
@@ -512,6 +527,7 @@ fn paint_enter(
             element,
             EffectScope::Text,
             visual_bounds,
+            context.clip_bounds,
             node.node,
         );
         output.display_list.push_text_with_backdrop(

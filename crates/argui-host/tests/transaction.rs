@@ -6,6 +6,10 @@ use web_time::Instant;
 
 #[path = "transaction/descendant.rs"]
 mod descendant;
+#[path = "transaction/validation.rs"]
+mod validation;
+#[path = "transaction/virtual_list.rs"]
+mod virtual_list;
 
 /// Builds a first-generation presentation ID for a test slot.
 fn id(slot: u32) -> HostId {

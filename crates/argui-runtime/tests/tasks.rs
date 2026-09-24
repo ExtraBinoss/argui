@@ -232,6 +232,32 @@ fn closing_one_attached_scope_cancels_work_and_releases_all_leases() {
     assert_eq!(runtime.pending(), 0);
 }
 
+/// A later cleanup may release the task owner before its saved cancellation hook runs.
+#[test]
+#[cfg(not(target_arch = "wasm32"))]
+fn closing_scope_with_reentrant_shutdown_tolerates_expired_task_handles() {
+    use argui_runtime::{Entity, ResourceScope, tasks::TaskRuntime};
+    let runtime = TaskRuntime::new(|| {});
+    let model = Entity::new(());
+    model.set_task_runtime(runtime.clone());
+    let scope = ResourceScope::default();
+    let handle = model
+        .update(|_, cx| cx.spawn(std::future::pending::<()>(), |_, _, _| {}))
+        .unwrap()
+        .in_scope(&scope)
+        .unwrap();
+    let shutdown = runtime.clone();
+    let _cleanup = scope
+        .defer(move || {
+            drop(handle);
+            shutdown.shutdown();
+        })
+        .unwrap();
+    scope.close();
+    assert_eq!(runtime.pending(), 0);
+    assert_eq!(model.resources().resource_count(), 0);
+}
+
 #[test]
 #[cfg(not(target_arch = "wasm32"))]
 fn cancellation_and_shutdown_release_all_scope_registrations() {

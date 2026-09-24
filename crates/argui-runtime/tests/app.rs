@@ -2,6 +2,7 @@ mod app {
     mod frame_route;
     mod inertia;
     mod inspect;
+    mod observations;
     mod semantic_sync;
     mod scroll {
         mod request;

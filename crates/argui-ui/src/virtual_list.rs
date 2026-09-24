@@ -1,7 +1,8 @@
 use std::{cell::RefCell, ops::Range, rc::Rc};
 
-use crate::{Axes, Dimension, Element, Overflow, ScrollConfig};
+use crate::ScrollConfig;
 
+mod build;
 mod fenwick;
 use fenwick::Fenwick;
 
@@ -28,10 +29,29 @@ pub struct MeasurementUpdate {
     pub corrected_offset: f32,
 }
 
+/// One measured item extent reported to a virtual-list presenter.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct VirtualMeasurement {
+    /// Zero-based index of the measured item.
+    pub index: usize,
+    /// Item width or height along the list axis, in logical pixels.
+    pub extent: f32,
+}
+
+/// Native window state carried by a mounted scroll container.
+#[derive(Clone, Debug, PartialEq)]
+pub struct VirtualViewport {
+    /// List estimates and retained measurements used for window calculation.
+    pub list: VirtualList,
+    /// Half-open item range currently mounted by the presenter.
+    pub mounted: Range<usize>,
+}
+
 #[derive(Clone, Debug)]
 pub struct VirtualItem {
     index: usize,
     viewport_extent: f32,
+    horizontal: bool,
     state: Rc<RefCell<VariableExtents>>,
 }
 
@@ -39,6 +59,7 @@ impl PartialEq for VirtualItem {
     fn eq(&self, other: &Self) -> bool {
         self.index == other.index
             && self.viewport_extent == other.viewport_extent
+            && self.horizontal == other.horizontal
             && Rc::ptr_eq(&self.state, &other.state)
     }
 }
@@ -47,6 +68,7 @@ impl PartialEq for VirtualItem {
 pub struct VirtualList {
     item_count: usize,
     viewport_extent: f32,
+    horizontal: bool,
     overscan: usize,
     scroll: ScrollConfig,
     extents: Extents,
@@ -87,6 +109,10 @@ impl VirtualList {
 
     /// Creates a list with variable item extents initialized to one estimate.
     ///
+    /// The finite `item_count` can grow with [`Self::insert`]. Measurement
+    /// storage is proportional to that count, while mounted elements remain
+    /// bounded by the visible window and overscan.
+    ///
     /// # Arguments
     ///
     /// * `item_count` — initial number of items.
@@ -114,10 +140,46 @@ impl VirtualList {
         Self {
             item_count,
             viewport_extent: viewport_extent.max(0.0),
+            horizontal: false,
             overscan: 3,
             scroll: ScrollConfig::default().line_size(line_size),
             extents,
         }
+    }
+
+    /// Selects horizontal scrolling and width measurements for this list.
+    ///
+    /// Returns the list with its existing item extents and viewport extent
+    /// interpreted along the horizontal axis.
+    #[must_use]
+    pub const fn horizontal(mut self) -> Self {
+        self.horizontal = true;
+        self
+    }
+
+    /// Returns whether item extents are measured along the horizontal axis.
+    #[must_use]
+    pub const fn is_horizontal(&self) -> bool {
+        self.horizontal
+    }
+
+    /// Returns whether mounted items update their measured extents.
+    #[must_use]
+    pub const fn is_variable(&self) -> bool {
+        matches!(self.extents, Extents::Variable { .. })
+    }
+
+    /// Copies variable measurements into an independent list for atomic host edits.
+    ///
+    /// Returns a list whose later insertions and removals cannot mutate this list.
+    #[must_use]
+    pub fn detached(&self) -> Self {
+        let mut next = self.clone();
+        if let Extents::Variable { state, .. } = &mut next.extents {
+            let measurements = state.borrow().clone();
+            *state = Rc::new(RefCell::new(measurements));
+        }
+        next
     }
 
     /// Returns the current number of items in the list.
@@ -405,79 +467,6 @@ impl VirtualList {
             }
         }
     }
-
-    /// Builds a scrollable element containing the mounted window.
-    ///
-    /// * `key` — stable key for the list container.
-    /// * `offset` — current content offset along the list axis.
-    /// * `item` — callback that builds each mounted item by index.
-    #[must_use]
-    pub fn build(
-        &self,
-        key: impl Into<String>,
-        offset: f32,
-        item: impl FnMut(usize) -> Element,
-    ) -> Element {
-        self.build_pinned(key, offset, None, item)
-    }
-
-    /// Keeps one active or edited row mounted outside the visible window.
-    /// Only the window and the pinned row are visited; gaps retain their measured extent.
-    ///
-    /// # Arguments
-    ///
-    /// * `key` — stable key for the list container.
-    /// * `offset` — current content offset along the list axis.
-    /// * `pinned` — optional item index to keep mounted outside the visible window.
-    /// * `item` — callback that builds a mounted item by index.
-    #[must_use]
-    pub fn build_pinned(
-        &self,
-        key: impl Into<String>,
-        offset: f32,
-        pinned: Option<usize>,
-        mut item: impl FnMut(usize) -> Element,
-    ) -> Element {
-        let window = self.window(offset);
-        let pinned = pinned.filter(|index| *index < self.item_count());
-        let before = pinned.filter(|index| *index < window.range.start);
-        let after = pinned.filter(|index| *index >= window.range.end);
-        let indices = before.into_iter().chain(window.range.clone()).chain(after);
-        let mut children = Vec::with_capacity(window.range.len() + 4);
-        let mut previous_end = None;
-        for index in indices {
-            if previous_end != Some(index) {
-                children.push(spacer(
-                    self.offset_of(index) - self.offset_of(previous_end.unwrap_or(0)),
-                ));
-            }
-            let mut element = item(index).shrink(0.0);
-            match &self.extents {
-                Extents::Fixed(extent) => element.style.size.height = Dimension::length(*extent),
-                Extents::Variable { state, .. } => {
-                    element.virtual_item = Some(VirtualItem {
-                        index,
-                        viewport_extent: self.viewport_extent,
-                        state: state.clone(),
-                    });
-                }
-            }
-            children.push(element);
-            previous_end = Some(index + 1);
-        }
-        children.push(spacer(
-            (window.total - self.offset_of(previous_end.unwrap_or(0))).max(0.0),
-        ));
-        Element::column([Element::column(children).shrink(0.0)])
-            .keyed(key)
-            .height(Dimension::length(self.viewport_extent))
-            .overflow(Axes {
-                x: Overflow::Hidden,
-                y: Overflow::Auto,
-            })
-            .scroll_config(self.scroll.clone())
-            .scroll_offset(argui_core::Point::new(0.0, offset))
-    }
 }
 
 impl Extents {
@@ -508,6 +497,18 @@ impl Extents {
 }
 
 impl VirtualItem {
+    /// Returns whether this item's measured extent is its width.
+    #[must_use]
+    pub const fn is_horizontal(&self) -> bool {
+        self.horizontal
+    }
+
+    /// Returns this item's zero-based index in its virtual list.
+    #[must_use]
+    pub const fn index(&self) -> usize {
+        self.index
+    }
+
     /// Records the measured extent for this mounted item.
     ///
     /// * `extent` — measured extent in logical pixels.
@@ -553,13 +554,6 @@ fn measure_variable(
         changed,
         corrected_offset: (state.prefix.sum(anchor) + within).clamp(0.0, maximum),
     }
-}
-
-fn spacer(height: f32) -> Element {
-    Element::container([])
-        .height(Dimension::length(height))
-        .shrink(0.0)
-        .semantic_hidden(true)
 }
 
 fn sanitize_extent(extent: f32) -> f32 {

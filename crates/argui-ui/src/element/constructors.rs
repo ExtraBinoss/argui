@@ -42,6 +42,7 @@ impl Element {
             scroll: None,
             declared_scroll_offset: None,
             virtual_item: None,
+            virtual_viewport: None,
             portal: None,
             focus_scope: None,
             text_privacy: crate::TextPrivacy::Public,

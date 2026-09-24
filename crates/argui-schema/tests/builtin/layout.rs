@@ -46,6 +46,28 @@ fn grid_tracks_placement_and_common_layout_reach_the_element() {
 }
 
 #[test]
+fn independent_layout_limits_and_origin_reach_the_element() {
+    let panel = builtin::registry()
+        .unwrap()
+        .construct(
+            builtin::CONTAINER,
+            &NativeElementInput::new()
+                .property(builtin::MAX_HEIGHT, SchemaValue::Float(240.0))
+                .property(builtin::FLEX_BASIS, SchemaValue::Dimension(length(40.0)))
+                .property(builtin::ROW_GAP, SchemaValue::Float(11.0))
+                .property(builtin::ORIGIN_Y, SchemaValue::Float(0.25)),
+        )
+        .unwrap();
+    assert_eq!(
+        panel.style.max_size.height,
+        LengthPercentageAuto::length(240.0)
+    );
+    assert_eq!(panel.style.flex_basis, length(40.0));
+    assert_eq!(panel.style.gap.height, length(11.0));
+    assert_eq!(panel.transform_origin.y, 0.25);
+}
+
+#[test]
 fn grid_child_placement_is_explicit_and_checked() {
     let registry = builtin::registry().unwrap();
     let cell = registry

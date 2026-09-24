@@ -387,13 +387,23 @@ fn command_bounds(
             transformed_bounds(vector.bounds, vector.transform, &vector.clips, scale)
         }
         DisplayCommand::Text { block, .. } => text_bounds.get(*block).copied().flatten(),
-        DisplayCommand::BeginLayer(layer) => Some(layer.scaled(scale).transformed_bounds()),
-        DisplayCommand::BeginCompositor(layer) => {
-            Some(layer.style().scaled(scale).transformed_bounds())
-        }
+        DisplayCommand::BeginLayer(layer) => layer_output_bounds(&layer.scaled(scale)),
+        DisplayCommand::BeginCompositor(layer) => layer_output_bounds(&layer.style().scaled(scale)),
         DisplayCommand::EndLayer | DisplayCommand::EndCompositor => None,
     }?;
     DamageRegion::from_rect(bounds, viewport)
+}
+
+/// Returns the visible output of a scaled layer after its surface-space clip.
+///
+/// * `style` — layer style already expressed in physical surface coordinates.
+///
+/// Returns `None` when the layer cannot change a pixel inside its clip.
+fn layer_output_bounds(style: &LayerStyle) -> Option<Rect> {
+    let bounds = style.transformed_bounds();
+    style
+        .clip
+        .map_or(Some(bounds), |clip| bounds.intersection(clip))
 }
 
 /// Scales, transforms and clips a logical primitive rectangle.

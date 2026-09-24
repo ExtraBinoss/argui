@@ -12,6 +12,7 @@ description = "Native Argui gallery window driven by embedded QuickJS"
 [features]
 comparison-rust = []
 comparison-quickjs = []
+dev-tabler-icons = []
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -19,6 +20,7 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 argui-gallery-assets = { path = "../assets-host", version = "0.3.2" }
 argui-core = { path = "../../../crates/argui-core", version = "0.3.2" }
+argui-effects = { path = "../../../crates/argui-effects", version = "0.3.2", features = ["scroll"] }
 argui-host = { path = "../../../crates/argui-host", version = "0.3.2" }
 argui-paint = { path = "../../../crates/argui-paint", version = "0.3.2" }
 argui-platform = { path = "../../../crates/argui-platform", version = "0.3.2" }
@@ -35,3 +37,23 @@ argui-text = { path = "../../../crates/argui-text", version = "0.3.2" }
 
 [workspace]
 resolver = "3"
+
+# This manifest is its own workspace, so it cannot inherit the root profiles.
+# Keep interactive desktop and Android debug builds optimized like the engine.
+[profile.dev]
+opt-level = 1
+debug = "line-tables-only"
+incremental = false
+
+[profile.dev.package."*"]
+opt-level = 2
+debug = false
+
+[profile.test]
+opt-level = 0
+debug = "line-tables-only"
+incremental = false
+
+[profile.test.package."*"]
+opt-level = 0
+debug = false

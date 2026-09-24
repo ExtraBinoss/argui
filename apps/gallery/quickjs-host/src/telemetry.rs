@@ -25,8 +25,8 @@ pub(crate) fn mark_commit_for_presentation() {
 
 /// Counters separating one-time mount work from live JavaScript transactions.
 pub(crate) struct JsCounts {
-    batches: Arc<AtomicU64>,
-    operations: Arc<AtomicU64>,
+    pub(crate) batches: Arc<AtomicU64>,
+    pub(crate) operations: Arc<AtomicU64>,
     startup_batches: u64,
     startup_operations: u64,
 }
@@ -147,6 +147,7 @@ impl ProfileSummary {
                 self.sample.render_ns += profile.cpu_time.as_nanos();
                 self.sample.render_max_ns =
                     self.sample.render_max_ns.max(profile.cpu_time.as_nanos());
+                self.sample.render_cpu.push(profile.cpu_time);
                 self.sample.damaged_pixels += u128::from(profile.damage.damaged_pixels);
                 self.sample.viewport_pixels += u128::from(profile.viewport_pixels);
                 self.sample.damage_full += u64::from(matches!(
@@ -164,6 +165,7 @@ impl ProfileSummary {
                 if let Some(gpu) = &profile.gpu {
                     self.sample.gpu_frames += 1;
                     self.sample.gpu_total_ns += gpu.total.as_nanos();
+                    self.sample.gpu_total.push(gpu.total);
                     for pass in &gpu.passes {
                         let key = (pass.label.clone(), pass.object);
                         let entry = self.sample.gpu_passes.entry(key).or_default();
@@ -193,6 +195,7 @@ struct ProfileSample {
     paint_ns: u128,
     render_ns: u128,
     render_max_ns: u128,
+    render_cpu: Vec<Duration>,
     damaged_pixels: u128,
     viewport_pixels: u128,
     damage_full: u64,
@@ -205,6 +208,7 @@ struct ProfileSample {
     timestamp_queries: bool,
     gpu_frames: u64,
     gpu_total_ns: u128,
+    gpu_total: Vec<Duration>,
     gpu_passes: HashMap<(String, Option<RenderObjectId>), GpuPassSample>,
 }
 
@@ -224,10 +228,32 @@ impl ProfileSample {
             .get(self.intervals.len().saturating_mul(95) / 100)
             .copied()
             .unwrap_or_default();
+        self.render_cpu.sort_unstable();
+        self.gpu_total.sort_unstable();
+        let cpu_p95 = self
+            .render_cpu
+            .get(self.render_cpu.len().saturating_mul(95) / 100)
+            .copied()
+            .unwrap_or_default();
+        let gpu_p95 = self
+            .gpu_total
+            .get(self.gpu_total.len().saturating_mul(95) / 100)
+            .copied()
+            .unwrap_or_default();
+        let cpu_over_8ms = self
+            .render_cpu
+            .iter()
+            .filter(|duration| **duration > Duration::from_nanos(8_333_333))
+            .count();
+        let cpu_over_16ms = self
+            .render_cpu
+            .iter()
+            .filter(|duration| **duration > Duration::from_nanos(16_666_667))
+            .count();
         let frames = u128::from(self.frames.max(1));
         let renders = u128::from(self.renders.max(1));
         eprintln!(
-            "argui-comparison mode={label} frames={} renders={} interval_p95_ms={:.3} model_mean_ms={:.3} tree_mean_ms={:.3} paint_mean_ms={:.3} render_mean_ms={:.3} render_max_ms={:.3} damaged_fraction={:.3} damage_full={} damage_partial={} cached_layers_mean={:.2} offscreen_layers_mean={:.2} filter_passes_mean={:.2} draw_batches_mean={:.2} offscreen_pixels_mean={:.0} timestamp_queries={} gpu_frames={} gpu_total_mean_ms={:.3}",
+            "argui-comparison mode={label} frames={} renders={} interval_p95_ms={:.3} model_mean_ms={:.3} tree_mean_ms={:.3} paint_mean_ms={:.3} render_mean_ms={:.3} render_p95_ms={:.3} render_max_ms={:.3} render_over_8ms={} render_over_16ms={} damaged_fraction={:.3} damage_full={} damage_partial={} cached_layers_mean={:.2} offscreen_layers_mean={:.2} filter_passes_mean={:.2} draw_batches_mean={:.2} offscreen_pixels_mean={:.0} timestamp_queries={} gpu_frames={} gpu_total_mean_ms={:.3} gpu_total_p95_ms={:.3}",
             self.frames,
             self.renders,
             p95.as_secs_f64() * 1000.0,
@@ -235,7 +261,10 @@ impl ProfileSample {
             self.tree_ns as f64 / frames as f64 / 1e6,
             self.paint_ns as f64 / frames as f64 / 1e6,
             self.render_ns as f64 / renders as f64 / 1e6,
+            cpu_p95.as_secs_f64() * 1000.0,
             self.render_max_ns as f64 / 1e6,
+            cpu_over_8ms,
+            cpu_over_16ms,
             self.damaged_pixels as f64 / self.viewport_pixels.max(1) as f64,
             self.damage_full,
             self.damage_partial,
@@ -247,6 +276,7 @@ impl ProfileSample {
             self.timestamp_queries,
             self.gpu_frames,
             self.gpu_total_ns as f64 / f64::from(self.gpu_frames.max(1) as u32) / 1e6,
+            gpu_p95.as_secs_f64() * 1000.0,
         );
         let mut passes = self.gpu_passes.into_iter().collect::<Vec<_>>();
         passes.sort_unstable_by_key(|entry| std::cmp::Reverse(entry.1.duration_ns));

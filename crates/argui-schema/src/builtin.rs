@@ -195,6 +195,17 @@ pub const LOOP_HOLD: PropertyId = PropertyId::from_raw(192);
 pub const LOOP_WIDTH: PropertyId = PropertyId::from_raw(193);
 pub const LOOP_RADIUS: PropertyId = PropertyId::from_raw(194);
 pub const LOOP_GAP: PropertyId = PropertyId::from_raw(195);
+pub const VIRTUAL_HORIZONTAL: PropertyId = PropertyId::from_raw(196);
+pub const VIRTUAL_VIEWPORT_WIDTH: PropertyId = PropertyId::from_raw(197);
+pub const VIRTUAL_SHADOW_COLOR: PropertyId = PropertyId::from_raw(198);
+pub const VIRTUAL_SHADOW_INTENSITY: PropertyId = PropertyId::from_raw(199);
+pub const VIRTUAL_SHADOW_WIDTH: PropertyId = PropertyId::from_raw(200);
+pub const VIRTUAL_SHADOW_START: PropertyId = PropertyId::from_raw(201);
+pub const VIRTUAL_SHADOW_END: PropertyId = PropertyId::from_raw(202);
+pub const VIRTUAL_VISIBLE_WIDTH: PropertyId = PropertyId::from_raw(203);
+pub const VIRTUAL_SCROLLBAR_VISIBLE: PropertyId = PropertyId::from_raw(204);
+pub const VIRTUAL_SCROLLBAR_WIDTH: PropertyId = PropertyId::from_raw(205);
+pub const VIRTUAL_DATA_VERSION: PropertyId = PropertyId::from_raw(206);
 pub const MAX_DIGITS: PropertyId = PropertyId::from_raw(116);
 pub const MOUSE_GLOBAL_X: PropertyId = PropertyId::from_raw(117);
 pub const MOUSE_GLOBAL_Y: PropertyId = PropertyId::from_raw(118);
@@ -266,6 +277,8 @@ pub const CONTEXT_MENU: EventId = EventId::from_raw(20);
 pub const DRAG_X: EventId = EventId::from_raw(21);
 pub const DRAG_Y: EventId = EventId::from_raw(22);
 pub const TEXT_EDIT: EventId = EventId::from_raw(23);
+pub const VIRTUAL_MEASURE: EventId = EventId::from_raw(24);
+pub const VIRTUAL_WINDOW_CHANGE: EventId = EventId::from_raw(25);
 
 /// Creates the canonical registry of built-in native visual primitives.
 ///

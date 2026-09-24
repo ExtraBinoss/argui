@@ -77,7 +77,7 @@ fn unchanged_static_subtree_reuses_its_retained_paint_fragment() {
     assert_eq!(output.display_list, commands);
     assert_eq!(output.paint_stats.visited_subtrees, 1);
     assert_eq!(output.paint_stats.reused_subtrees, 1);
-    assert!(output.paint_stats.reused_commands >= 10_000);
+    assert_eq!(output.paint_stats.reused_commands, commands.len());
 }
 
 #[test]

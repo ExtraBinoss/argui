@@ -1,10 +1,19 @@
 //! Embedded QuickJS execution for the runtime-neutral gallery module.
 
 mod comparison;
+mod delivery;
+mod effects;
+mod hot_reload;
+mod native_metrics;
 mod runner;
 mod telemetry;
+mod wire;
 
 pub use comparison::AnimationSnapshot;
+pub use delivery::{coalesce_virtual_windows, ui_event_payload};
+pub use effects::registry_from_json;
+pub use native_metrics::{parse_control, profile_json};
+pub use wire::decode_wire_operations;
 
 pub use runner::run_desktop;
 
@@ -33,6 +42,26 @@ impl QuickJsGallery {
         entry: &str,
         commit: impl Fn(String) -> String + 'static,
     ) -> Result<Self, String> {
+        Self::new_with_control(source, contract_json, entry, commit, |_| {
+            "native controls unavailable".into()
+        })
+    }
+
+    /// Loads a gallery module with a native control callback in addition to commits.
+    ///
+    /// `source`, `contract_json`, and `entry` identify the JavaScript module;
+    /// `commit` forwards host operations and `control` forwards renderer controls.
+    /// Returns the mounted session.
+    ///
+    /// # Errors
+    /// Returns an error when the script, contract, or initial mount fails.
+    pub fn new_with_control(
+        source: &str,
+        contract_json: &str,
+        entry: &str,
+        commit: impl Fn(String) -> String + 'static,
+        control: impl Fn(String) -> String + 'static,
+    ) -> Result<Self, String> {
         let runtime = Runtime::new().map_err(js_error)?;
         let context = Context::full(&runtime).map_err(js_error)?;
         context.with(|ctx| {
@@ -47,6 +76,12 @@ impl QuickJsGallery {
                 .set(
                     "__arguiSend",
                     Function::new(ctx.clone(), commit).map_err(js_error)?,
+                )
+                .map_err(js_error)?;
+            globals
+                .set(
+                    "__arguiControl",
+                    Function::new(ctx.clone(), control).map_err(js_error)?,
                 )
                 .map_err(js_error)?;
             let _: () = ctx.eval(include_str!("bootstrap.js")).map_err(js_error)?;
@@ -80,6 +115,37 @@ impl QuickJsGallery {
             deliver.call::<_, ()>((delivery_json,)).map_err(js_error)
         })?;
         self.drain_jobs()
+    }
+
+    /// Delivers a real renderer profile encoded as JSON to the active subscriber.
+    ///
+    /// `profile_json` contains the latest native CPU/GPU/damage sample. Returns
+    /// after its JavaScript callback and queued microtasks complete.
+    ///
+    /// # Errors
+    /// Returns an error if the profile callback fails.
+    pub fn deliver_profile(&self, profile_json: &str) -> Result<(), String> {
+        self.context.with(|ctx| {
+            let deliver: Function = ctx
+                .globals()
+                .get("__arguiDeliverProfile")
+                .map_err(js_error)?;
+            deliver.call::<_, ()>((profile_json,)).map_err(js_error)
+        })?;
+        self.drain_jobs()
+    }
+
+    /// Returns definitions registered by imported JavaScript WGSL modules.
+    ///
+    /// Returns the JSON array accumulated before the module mounted.
+    ///
+    /// # Errors
+    /// Returns an error if the QuickJS registry cannot be serialized.
+    pub fn effect_definitions_json(&self) -> Result<String, String> {
+        self.context.with(|ctx| {
+            ctx.eval("JSON.stringify(globalThis.__arguiNativeEffects)")
+                .map_err(js_error)
+        })
     }
 
     /// Fires due JavaScript interval callbacks at `elapsed_ms` since startup.

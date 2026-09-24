@@ -68,6 +68,41 @@ impl Application {
         Ok(true)
     }
 
+    /// Replaces JavaScript-owned custom effects on the active window.
+    ///
+    /// `effects` is the validated base registry. Model effects, when present,
+    /// are retained. The active GPU pipelines are prepared before the stored
+    /// registry is changed, so a preparation failure keeps the previous set.
+    ///
+    /// # Errors
+    /// Returns a renderer error for conflicting definitions, GPU limits, or
+    /// a WGSL pipeline that cannot be prepared.
+    pub(crate) fn replace_native_effects(
+        &mut self,
+        effects: EffectRegistry,
+    ) -> Result<(), argui_render::RendererError> {
+        let complete = combine_effect_definitions(&effects, &self.effect_definitions)?;
+        if let RendererState::Ready(renderer) = &mut *self.renderer.borrow_mut() {
+            renderer.replace_effect_registry(complete.clone())?;
+        }
+        #[cfg(all(feature = "native-popups", not(target_arch = "wasm32")))]
+        if let Err(error) = self.popups.replace_effect_registry(&complete) {
+            let previous = self.renderer_config.effects.clone();
+            let _ = self.popups.replace_effect_registry(&previous);
+            if let RendererState::Ready(renderer) = &mut *self.renderer.borrow_mut() {
+                let _ = renderer.replace_effect_registry(previous);
+            }
+            return Err(error);
+        }
+        self.base_effects = effects;
+        self.renderer_config.effects = complete;
+        self.pending_ui_frame.request_paint();
+        if let Some(window) = &self.window {
+            window.request_redraw();
+        }
+        Ok(())
+    }
+
     /// Changes damage tracking for the main surface and any existing native popups.
     ///
     /// `tracking` controls whether subsequent frames may reuse retained pixels.

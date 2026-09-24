@@ -1,4 +1,8 @@
-use argui_ui::{Element, VirtualAlignment, VirtualList};
+use argui_core::Point;
+use argui_ui::{
+    Element, EventHandlerId, EventListener, EventOwnerId, EventType, UiEventKind, UiTree,
+    VirtualAlignment, VirtualList,
+};
 
 #[test]
 fn million_row_lists_only_build_the_visible_window() {
@@ -146,7 +150,7 @@ fn pinned_rows_keep_their_position_without_traversing_the_gap() {
 
 #[test]
 fn virtual_rows_compare_their_measurement_owner_without_scanning_the_collection() {
-    use argui_ui::{TreeUpdate, UiTree};
+    use argui_ui::TreeUpdate;
     let list = VirtualList::variable(100_000, 30.0, 300.0);
     let build = |list: &VirtualList| list.build("rows", 0.0, |i| Element::text(i.to_string()));
     let first = build(&list);
@@ -156,4 +160,57 @@ fn virtual_rows_compare_their_measurement_owner_without_scanning_the_collection(
     // Equal initial sizes must still route future measurements to the replacement owner.
     let replacement = VirtualList::variable(100_000, 30.0, 300.0);
     assert_eq!(tree.update(build(&replacement)), TreeUpdate::Layout);
+}
+
+#[test]
+fn horizontal_variable_widths_keep_the_anchor_and_mount_only_a_bounded_range() {
+    let mut list = VirtualList::variable(100_000, 40.0, 240.0).horizontal();
+    let offset = 40_000.0;
+    let anchor = list.item_at_offset(offset).unwrap();
+    let changed = list.measure(anchor - 10, 90.0, offset);
+    assert!(changed.changed);
+    assert_eq!(list.item_at_offset(changed.corrected_offset), Some(anchor));
+    let window = list.window(changed.corrected_offset);
+    let root = list.build("horizontal", changed.corrected_offset, |index| {
+        Element::text(index.to_string()).keyed(index.to_string())
+    });
+    assert!(window.range.len() < 32);
+    assert_eq!(
+        root.scroll.as_ref().unwrap().axes,
+        argui_ui::ScrollAxes::Horizontal
+    );
+    assert_eq!(root.children[0].children.len(), window.range.len() + 2);
+    assert!(
+        root.children[0].children[1]
+            .virtual_item()
+            .unwrap()
+            .is_horizontal()
+    );
+}
+
+#[test]
+fn native_window_requests_emit_once_per_scroll_chunk() {
+    let list = VirtualList::fixed(100_000, 20.0, 60.0).overscan(2);
+    let mounted = list.window(0.0).range;
+    let root = list
+        .build_range("rows", 0.0, mounted, |index| {
+            Element::text(index.to_string()).keyed(index.to_string())
+        })
+        .on(EventListener::new(
+            EventType::VirtualWindow,
+            EventHandlerId::new(EventOwnerId(1), 1),
+        ));
+    let mut tree = UiTree::new(root);
+    let node = tree.node_id_at(0).unwrap();
+    assert!(tree.request_virtual_window(node, 60.0).is_empty());
+    tree.set_scroll_offset(node, Point::new(0.0, 1.0));
+    assert!(tree.request_virtual_window(node, 60.0).is_empty());
+    tree.set_scroll_offset(node, Point::new(0.0, 200.0));
+    let events = tree.request_virtual_window(node, 60.0);
+    assert_eq!(events.len(), 1);
+    assert!(matches!(
+        events[0].kind,
+        UiEventKind::VirtualWindowChanged { offset: 200.0, .. }
+    ));
+    assert!(tree.request_virtual_window(node, 60.0).is_empty());
 }

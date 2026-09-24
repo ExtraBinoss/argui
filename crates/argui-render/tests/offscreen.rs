@@ -1,3 +1,5 @@
+#![cfg_attr(coverage_nightly, feature(coverage_attribute))]
+
 #[path = "../src/offscreen.rs"]
 mod offscreen;
 
@@ -50,8 +52,15 @@ fn idle_spares_within_budget_do_not_discard_retained_root() {
 
     let mut constrained = TexturePool::new(TextureFormat::Rgba8Unorm, 64 * 64 * 4);
     assert!(!constrained.begin_frame());
-    constrained.acquire(&device, 64, 64);
-    constrained.acquire(&device, 64, 128);
+    let root = constrained.acquire(&device, 64, 64);
+    let spare = constrained.acquire(&device, 64, 128);
+    // The active working set may exceed the soft budget without evicting live textures.
+    assert!(!constrained.begin_frame());
+    assert_eq!(constrained.stats().textures, 2);
+    assert!(constrained.retain(root));
+    // Only the spare expires, and eviction preserves the root's stable index.
     assert!(constrained.begin_frame());
     assert_eq!(constrained.stats().textures, 1);
+    assert!(constrained.retain(root));
+    assert!(!constrained.retain(spare));
 }

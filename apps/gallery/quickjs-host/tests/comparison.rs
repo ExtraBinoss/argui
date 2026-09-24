@@ -1,11 +1,11 @@
 use std::{sync::mpsc, time::Instant};
 
-use argui_gallery_quickjs::{AnimationSnapshot, QuickJsGallery};
+use argui_gallery_quickjs::{AnimationSnapshot, QuickJsGallery, decode_wire_operations};
 use argui_host::Host;
 use argui_platform::WindowKey;
 use argui_runtime::{AppModel, WindowEnvironment, WireOperation};
 use argui_ui::UiTree;
-use serde_json::{Value, json};
+use serde_json::json;
 
 #[test]
 #[ignore = "requires bun run build:gallery"]
@@ -29,27 +29,44 @@ fn rust_snapshot_matches_live_animation_lab_and_loops_emit_no_js_commits() {
     })
     .expect("live gallery");
     let initial = batches.recv().expect("mount transaction");
-    let initial_operations: Vec<Value> = serde_json::from_str(&initial).expect("mount JSON");
-    let node = &initial_operations
+    let initial_operations = decode_wire_operations(&initial).expect("mount JSON");
+    let node = initial_operations
         .iter()
-        .find(|operation| {
-            operation["kind"] == "setProperty"
-                && operation["value"]["value"] == "page-animation-lab"
+        .find_map(|operation| {
+            if let WireOperation::SetProperty {
+                id,
+                value: Some(value),
+                ..
+            } = operation
+                && value.value == "page-animation-lab"
+            {
+                Some(*id)
+            } else {
+                None
+            }
         })
-        .expect("Animation Lab control")["id"];
-    let callback = &initial_operations
+        .expect("Animation Lab control");
+    let callback = initial_operations
         .iter()
-        .find(|operation| {
-            operation["kind"] == "setListener"
-                && operation["id"] == *node
-                && operation["event"] == 1
+        .find_map(|operation| {
+            if let WireOperation::SetListener {
+                id,
+                event: 1,
+                callback,
+            } = operation
+                && *id == node
+            {
+                *callback
+            } else {
+                None
+            }
         })
-        .expect("Animation Lab click listener")["callback"];
+        .expect("Animation Lab click listener");
     let navigation_started = Instant::now();
     gallery
         .deliver(
             &json!({
-                "node": node, "callback": callback, "payload": {"kind": "click"}
+                "node": {"slot": node.slot, "generation": node.generation}, "callback": callback, "payload": {"kind": "click"}
             })
             .to_string(),
         )
@@ -66,7 +83,7 @@ fn rust_snapshot_matches_live_animation_lab_and_loops_emit_no_js_commits() {
     let mut host = Host::with_builtins().expect("schema");
     let live_wire = std::iter::once(&initial)
         .chain(navigation_batches.iter())
-        .map(|batch| serde_json::from_str::<Vec<WireOperation>>(batch).expect("wire batch"))
+        .map(|batch| decode_wire_operations(batch).expect("wire batch"))
         .collect::<Vec<_>>();
     assert_eq!(snapshot.wire_batches(), live_wire);
     let mut tree: Option<UiTree> = None;

@@ -20,6 +20,20 @@ pub(super) struct Popup {
     pub(super) shown: bool,
 }
 
+impl Popup {
+    /// Registers `vector` in an already-open native popup renderer.
+    /// Returns an error if GPU registration fails.
+    ///
+    /// # Errors
+    /// Returns the underlying renderer error.
+    pub(super) fn register_vector(
+        &mut self,
+        vector: &argui_paint::VectorAsset,
+    ) -> Result<(), argui_render::RendererError> {
+        self.renderer.register_vector(vector)
+    }
+}
+
 #[derive(Default)]
 pub(super) struct Popups {
     pub(super) entries: Vec<Popup>,

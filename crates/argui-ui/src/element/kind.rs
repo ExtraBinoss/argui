@@ -50,6 +50,7 @@ pub struct ElementNode {
     pub scroll: Option<Box<crate::ScrollConfig>>,
     pub(crate) declared_scroll_offset: Option<argui_core::Point>,
     pub(crate) virtual_item: Option<crate::VirtualItem>,
+    pub(crate) virtual_viewport: Option<crate::VirtualViewport>,
     pub portal: Option<crate::Portal>,
     pub focus_scope: Option<crate::FocusScope>,
     pub text_privacy: crate::TextPrivacy,

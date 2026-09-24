@@ -19,6 +19,8 @@ export interface ButtonProps {
   icon?: AssetRef
   activeIcon?: AssetRef
   iconOnly?: boolean
+  expanded?: boolean
+  controls?: string
 }
 
 /** Composes a keyboard, touch, pointer and accessibility activated native button. */
@@ -43,11 +45,15 @@ export function Button(props: ButtonProps): JSX.Element {
       role="button"
       accessible_name={props.label}
       current={props.current}
+      expandable={props.expanded !== undefined ? true : undefined}
+      expanded={props.expanded}
+      controls={props.controls}
       enabled={!inactive()}
       busy={!!props.busy}
       keyboard_activation="enter_or_space"
       onClick={() => { if (!inactive()) props.onClick() }}
-      onFocus={() => setFocused(true)}
+      onFocus={() => { if (!mobile) setFocused(true) }}
+      onKey={() => { if (mobile) setFocused(true) }}
       onBlur={() => setFocused(false)}
     >
       <touchArea
@@ -55,14 +61,14 @@ export function Button(props: ButtonProps): JSX.Element {
         mouse_cursor={inactive() ? 'not_allowed' : 'pointer'}
         onPointerEnter={() => { if (!mobile) setHovered(true) }}
         onPointerLeave={() => { setHovered(false); setPressed(false) }}
-        onPointerDown={() => setPressed(true)}
+        onPointerDown={() => { setPressed(true); if (mobile) setFocused(false) }}
         onPointerUp={() => setPressed(false)}
         onPointerCancel={() => setPressed(false)}
       >
         <rectangle
           background={fill()}
-          border_color={props.selected || focused() ? props.theme.accent : props.theme.border}
-          border_width={props.selected || focused() ? 2 : props.kind === 'ghost' ? 0 : 1}
+          border_color={focused() || (!mobile && props.selected) ? props.theme.accent : props.theme.border}
+          border_width={props.kind === 'ghost' ? 0 : 1}
           radius={9}
           opacity={props.disabled ? 0.48 : props.busy ? 0.72 : 1}
         >
@@ -144,11 +150,12 @@ export function Select(props: SelectProps): JSX.Element {
       </focusScope>
       {expanded() ? (
         <popupWindow key={`${props.id}-popup`} anchor={props.id} placement="bottom_start" width={240}
-          dismiss_policy="outside_pointer_or_escape" containment="trap" initial_focus="first"
+          window_layer="popover" dismiss_policy="outside_pointer_or_escape" containment="trap" initial_focus="first"
           restore_focus={true} onDismiss={() => setExpanded(false)}>
           <focusScope role="list_box" accessible_name={props.label} focus_on_tab_navigation={false}>
-            <rectangle width={240} background={props.theme.surface} border_color={props.theme.border}
-              border_width={1} radius={8} shadow_blur={12} shadow_offset_y={5} shadow_color="#00000026">
+            <rectangle width={240} background={props.theme.surface}
+              border_color={props.theme.border} border_width={1} radius={8}
+              shadow_blur={14} shadow_offset_y={5} shadow_color={props.theme.overlayShadow}>
               <column width="fill" gap={2} padding={4}>
                 {props.options.map((option, index) => (
                   <focusScope key={`${props.id}-option-${index}`} role="option"
@@ -172,6 +179,45 @@ export function Select(props: SelectProps): JSX.Element {
       ) : null}
     </column>
   )
+}
+
+export interface PopoverProps {
+  id: string
+  label: string
+  theme: Palette
+  blur?: boolean
+  opaque?: boolean
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  children: JSX.Element
+}
+
+/** Presents arbitrary content in a themed, anchored native popover. */
+export function Popover(props: PopoverProps): JSX.Element {
+  const [localExpanded, setLocalExpanded] = createLocalSignal(false)
+  const expanded = () => props.open ?? localExpanded()
+  const setExpanded = (open: boolean) => {
+    if (props.onOpenChange) props.onOpenChange(open)
+    else setLocalExpanded(open)
+  }
+  return <column>
+    <Button id={props.id} label={props.label} theme={props.theme} kind="secondary"
+      expanded={expanded()} controls={`${props.id}-popup`} onClick={() => setExpanded(!expanded())} />
+    {expanded() ? <popupWindow key={`${props.id}-popup`} anchor={props.id} placement="bottom_start" width={260}
+      window_layer="popover" dismiss_policy="outside_pointer_or_escape" containment="trap"
+      initial_focus="first" restore_focus={true} onDismiss={() => setExpanded(false)}>
+      <rectangle width={260} background={props.opaque ? props.theme.surface : props.theme.overlaySurface}
+        backdrop_filter={props.opaque || props.blur === false ? undefined : 'blur(10px)'}
+        border_color={props.theme.border} border_width={1} radius={10}
+        shadow_blur={14} shadow_offset_y={5} shadow_color={props.theme.overlayShadow}>
+        <column width="fill" gap={12} padding={16}>
+          {props.children}
+          <Button id={`${props.id}-close`} label="Close" theme={props.theme} kind="outline"
+            onClick={() => setExpanded(false)} />
+        </column>
+      </rectangle>
+    </popupWindow> : null}
+  </column>
 }
 
 /** Creates a local Solid signal while keeping control state outside the native host. */

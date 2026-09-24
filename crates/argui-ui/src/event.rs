@@ -40,6 +40,8 @@ pub enum EventType {
     Key,
     Wheel,
     Scroll,
+    VirtualMeasure,
+    VirtualWindow,
     Focus,
     Blur,
     Input,
@@ -52,7 +54,7 @@ pub enum EventType {
 
 impl EventType {
     /// Event kinds that can be emitted by the UI event system.
-    pub const ALL: [Self; 24] = [
+    pub const ALL: [Self; 26] = [
         Self::Action,
         Self::PointerEnter,
         Self::PointerLeave,
@@ -69,6 +71,8 @@ impl EventType {
         Self::Key,
         Self::Wheel,
         Self::Scroll,
+        Self::VirtualMeasure,
+        Self::VirtualWindow,
         Self::Focus,
         Self::Blur,
         Self::Input,
@@ -120,6 +124,19 @@ pub enum UiEventKind {
         delta: Point,
         offset: Point,
     },
+    /// Mounted virtual items changed size or the effective viewport changed.
+    VirtualMeasured {
+        items: Vec<crate::VirtualMeasurement>,
+        corrected_offset: f32,
+        viewport_extent: f32,
+    },
+    /// The native viewport selected a new bounded item range.
+    VirtualWindowChanged {
+        start: usize,
+        end: usize,
+        offset: f32,
+        viewport_extent: f32,
+    },
     Focused,
     Blurred,
     TextChanged(String),
@@ -161,6 +178,8 @@ impl UiEventKind {
             Self::KeyInput(_) => EventType::Key,
             Self::Wheel { .. } => EventType::Wheel,
             Self::Scrolled { .. } => EventType::Scroll,
+            Self::VirtualMeasured { .. } => EventType::VirtualMeasure,
+            Self::VirtualWindowChanged { .. } => EventType::VirtualWindow,
             Self::Focused => EventType::Focus,
             Self::Blurred => EventType::Blur,
             Self::TextChanged(_) => EventType::Input,

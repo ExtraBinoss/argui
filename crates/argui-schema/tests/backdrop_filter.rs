@@ -1,5 +1,5 @@
 use argui_core::Color;
-use argui_paint::Filter;
+use argui_paint::{EffectValue, Filter};
 use argui_schema::backdrop_filter::parse;
 
 #[test]
@@ -57,6 +57,29 @@ fn omitted_css_function_values_use_standard_defaults() {
             Filter::Opacity(1.0),
         ]
     );
+}
+
+#[test]
+fn custom_effect_keeps_imported_shader_identity_and_live_parameters() {
+    let filters = parse("blur(2px) effect(gallery.examples.prism strength=0.35 phase=1.25)")
+        .expect("custom effect filter");
+    let Filter::Effect(effect) = &filters[1] else {
+        panic!("expected custom effect");
+    };
+    assert_eq!(effect.id.as_str(), "gallery.examples.prism");
+    assert_eq!(effect.parameters.len(), 2);
+    assert_eq!(effect.parameters[0].name.as_str(), "strength");
+    assert_eq!(effect.parameters[0].value, EffectValue::F32(0.35));
+    assert_eq!(effect.parameters[1].value, EffectValue::F32(1.25));
+    for invalid in [
+        "effect()",
+        "effect(prism strength=0.4)",
+        "effect(gallery.prism strength=NaN)",
+        "effect(gallery.prism strength)",
+        "effect(gallery.prism a/b=1)",
+    ] {
+        assert!(parse(invalid).is_err(), "{invalid}");
+    }
 }
 
 #[test]

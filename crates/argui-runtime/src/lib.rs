@@ -53,8 +53,8 @@ pub use model::{
 };
 #[cfg(not(target_arch = "wasm32"))]
 pub use native_host::{
-    NativeHostAssets, NativeHostBatch, NativeHostCommit, NativeHostDelivery, WireHostId,
-    WireOperation, WireValue, validate_native_host_assets,
+    NativeHostAssets, NativeHostBatch, NativeHostCommit, NativeHostControl, NativeHostDelivery,
+    WireHostId, WireOperation, WireValue, validate_native_host_assets,
 };
 
 pub use model::shutdown_presentations;

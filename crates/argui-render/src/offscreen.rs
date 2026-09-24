@@ -28,7 +28,7 @@ impl Drop for Entry {
 }
 
 pub(crate) struct TexturePool {
-    entries: Vec<Entry>,
+    entries: Vec<Option<Entry>>,
     format: TextureFormat,
     budget: u64,
     frame: u64,
@@ -49,26 +49,36 @@ impl TexturePool {
         }
     }
 
+    /// Starts a frame and evicts only idle textures when the pool exceeds its budget.
+    ///
+    /// Textures used in the preceding frame form the active working set and remain
+    /// valid even when they exceed the soft budget. Returns whether any idle
+    /// texture was evicted; stable slots preserve references to other textures.
     pub fn begin_frame(&mut self) -> bool {
         self.frame = self.frame.wrapping_add(1);
         self.reused = 0;
-        for entry in &mut self.entries {
-            entry.used = false;
-        }
-        let initial_count = self.entries.len();
-        // Keep spare textures while they fit the budget. Evicting one otherwise
-        // invalidates the retained effect root and forces a full repaint.
-        while self.allocated_bytes() > self.budget && self.entries.len() > 1 {
+        let mut evicted = false;
+        while self.allocated_bytes() > self.budget {
             let oldest = self
                 .entries
                 .iter()
                 .enumerate()
-                .min_by_key(|(_, entry)| entry.last_frame)
-                .map(|(index, _)| index)
-                .unwrap_or(0);
-            self.entries.swap_remove(oldest);
+                .filter_map(|(index, entry)| {
+                    entry
+                        .as_ref()
+                        .filter(|entry| !entry.used)
+                        .map(|entry| (index, entry.last_frame))
+                })
+                .min_by_key(|(_, frame)| *frame)
+                .map(|(index, _)| index);
+            let Some(index) = oldest else { break };
+            self.entries[index] = None;
+            evicted = true;
         }
-        self.entries.len() != initial_count
+        for entry in self.entries.iter_mut().flatten() {
+            entry.used = false;
+        }
+        evicted
     }
 
     /// Drops and destroys every allocated texture in the pool.
@@ -84,6 +94,7 @@ impl TexturePool {
             .entries
             .iter_mut()
             .enumerate()
+            .filter_map(|(index, entry)| entry.as_mut().map(|entry| (index, entry)))
             .find(|(_, entry)| !entry.used && entry.width == width && entry.height == height)
         {
             entry.used = true;
@@ -96,6 +107,7 @@ impl TexturePool {
             .entries
             .iter_mut()
             .enumerate()
+            .filter_map(|(index, entry)| entry.as_mut().map(|entry| (index, entry)))
             .filter(|(_, entry)| {
                 !entry.used
                     && entry.width >= width
@@ -128,7 +140,7 @@ impl TexturePool {
         });
         let view = texture.create_view(&TextureViewDescriptor::default());
         let bytes = texture_bytes(self.format, width, height);
-        self.entries.push(Entry {
+        let entry = Entry {
             texture,
             view,
             width,
@@ -136,13 +148,20 @@ impl TexturePool {
             bytes,
             used: true,
             last_frame: self.frame,
-        });
+        };
+        let index = if let Some(index) = self.entries.iter().position(Option::is_none) {
+            self.entries[index] = Some(entry);
+            index
+        } else {
+            self.entries.push(Some(entry));
+            self.entries.len() - 1
+        };
         self.peak = self.peak.max(self.allocated_bytes());
-        self.entries.len() - 1
+        index
     }
 
     pub fn retain(&mut self, index: usize) -> bool {
-        let Some(entry) = self.entries.get_mut(index) else {
+        let Some(entry) = self.entries.get_mut(index).and_then(Option::as_mut) else {
             return false;
         };
         if entry.used {
@@ -154,25 +173,29 @@ impl TexturePool {
     }
 
     pub fn texture(&self, index: usize) -> &Texture {
-        &self.entries[index].texture
+        &self.entries[index].as_ref().expect("live texture").texture
     }
 
     pub fn view(&self, index: usize) -> &TextureView {
-        &self.entries[index].view
+        &self.entries[index].as_ref().expect("live texture").view
     }
 
     pub fn extent(&self, index: usize) -> [u32; 2] {
-        [self.entries[index].width, self.entries[index].height]
+        let entry = self.entries[index].as_ref().expect("live texture");
+        [entry.width, entry.height]
     }
 
     /// Returns the bytes allocated by the entry at `index`, or zero when it is absent.
     pub fn bytes(&self, index: usize) -> u64 {
-        self.entries.get(index).map_or(0, |entry| entry.bytes)
+        self.entries
+            .get(index)
+            .and_then(Option::as_ref)
+            .map_or(0, |entry| entry.bytes)
     }
 
     pub fn stats(&self) -> TexturePoolStats {
         TexturePoolStats {
-            textures: self.entries.len(),
+            textures: self.entries.iter().flatten().count(),
             allocated_bytes: self.allocated_bytes(),
             peak_bytes: self.peak,
             reused_this_frame: self.reused,
@@ -185,7 +208,7 @@ impl TexturePool {
     /// reuse counters still describe the complete pool.
     pub fn stats_excluding(&self, index: usize) -> TexturePoolStats {
         let mut stats = self.stats();
-        if let Some(entry) = self.entries.get(index) {
+        if let Some(entry) = self.entries.get(index).and_then(Option::as_ref) {
             stats.textures = stats.textures.saturating_sub(1);
             stats.allocated_bytes = stats.allocated_bytes.saturating_sub(entry.bytes);
         }
@@ -193,7 +216,7 @@ impl TexturePool {
     }
 
     fn allocated_bytes(&self) -> u64 {
-        self.entries.iter().map(|entry| entry.bytes).sum()
+        self.entries.iter().flatten().map(|entry| entry.bytes).sum()
     }
 }
 

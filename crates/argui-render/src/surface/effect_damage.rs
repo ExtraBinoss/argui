@@ -116,10 +116,7 @@ impl SurfaceRenderer {
 
     /// Begins a texture-pool frame and retains compatible effect resources.
     fn prepare_effect_pool(&mut self, region: PixelRegion) {
-        if self.offscreen.begin_frame() {
-            self.layer_cache.clear();
-            self.effect_root = None;
-        }
+        self.offscreen.begin_frame();
         if self
             .effect_root
             .is_some_and(|root| root.region != region || !self.offscreen.retain(root.texture))

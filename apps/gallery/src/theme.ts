@@ -5,6 +5,8 @@ export interface Palette {
   background: string
   surface: string
   surfaceRaised: string
+  overlaySurface: string
+  overlayShadow: string
   border: string
   foreground: string
   muted: string
@@ -30,6 +32,7 @@ export function palette(mode: ThemeMode, accent: Accent): Palette {
   return mode === 'dark'
     ? {
         background: '#101116', surface: '#1a1b23', surfaceRaised: '#252735',
+        overlaySurface: '#1a1b23d0', overlayShadow: '#00000066',
         border: '#383b4b', foreground: '#f5f6fa', muted: '#a3a8b9',
         accent: accents[accent][0], accentHover: accents[accent][1],
         accentPressed: accents[accent][2], accentText: '#ffffff',
@@ -38,6 +41,7 @@ export function palette(mode: ThemeMode, accent: Accent): Palette {
       }
     : {
         background: '#f5f7fb', surface: '#ffffff', surfaceRaised: '#edf0f7',
+        overlaySurface: '#ffffffc0', overlayShadow: '#17243b38',
         border: '#d8deea', foreground: '#171a24', muted: '#596377',
         accent: accents[accent][0], accentHover: accents[accent][1],
         accentPressed: accents[accent][2], accentText: '#ffffff',

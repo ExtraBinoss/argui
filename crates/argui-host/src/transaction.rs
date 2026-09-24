@@ -4,11 +4,15 @@ use argui_schema::{
     EventId, NativeElementInput, NativeEventValue, NativeSlotValue, NativeTypeId, PropertyId,
     SchemaError, SchemaRegistry, SchemaValue, builtin,
 };
-use argui_ui::{Element, EventHandler, EventHandlerId, EventOwnerId, RetainedIdentity, UiEvent};
+use argui_ui::{
+    Element, EventHandler, EventHandlerId, EventOwnerId, RetainedIdentity, UiEvent, VirtualList,
+};
 
 use crate::{CallbackDelivery, CallbackId, HostId, Operation};
 
 mod descendant;
+mod validation;
+mod virtual_list;
 
 /// A rejected batch leaves both the host graph and its visible root unchanged.
 #[derive(Debug, thiserror::Error, PartialEq)]
@@ -51,6 +55,7 @@ struct HostNode {
     parent: Option<HostId>,
     handler_owner: usize,
     element: Option<Element>,
+    virtual_list: Option<VirtualList>,
     dirty: bool,
 }
 
@@ -236,15 +241,12 @@ impl Host {
         let node_id = *self.owners.get(&handler.owner().0)?;
         let node = self.nodes.get(&node_id)?;
         let callback = CallbackId(handler.slot());
-        let schema = self.registry.schema(node.native_type)?;
+        // Adapters can bind one declared callback to several native event kinds.
+        // The UiTree delivery identifies the handler; only its live registration
+        // must be checked here.
         node.listeners
             .iter()
-            .any(|(id, registered)| {
-                *registered == callback
-                    && schema.events.iter().any(|event_schema| {
-                        event_schema.id == *id && event_schema.event_type == event.kind.event_type()
-                    })
-            })
+            .any(|(_, registered)| *registered == callback)
             .then_some(CallbackDelivery {
                 node: node_id,
                 callback,
@@ -292,9 +294,17 @@ impl<'a> Stage<'a> {
             .ok_or(HostError::UnknownId(id))
     }
 
+    /// Invalidates `id` and its ancestors until reaching one already invalidated.
+    ///
+    /// Earlier operations in the same transaction have already invalidated
+    /// every ancestor of a dirty node, so repeated properties need no walk.
+    /// Returns an error only if the node or an ancestor is absent.
     fn mark_dirty(&mut self, mut id: HostId) -> Result<(), HostError> {
         loop {
             let node = self.get_mut(id)?;
+            if node.dirty {
+                return Ok(());
+            }
             node.dirty = true;
             node.element = None;
             match node.parent {
@@ -393,6 +403,7 @@ impl<'a> Stage<'a> {
                 parent: None,
                 handler_owner: owner,
                 element: None,
+                virtual_list: None,
                 dirty: true,
             }),
         );
@@ -496,6 +507,12 @@ impl<'a> Stage<'a> {
             .flatten()
             .collect::<Vec<_>>();
         let mut input = NativeElementInput::new();
+        let reset_virtual_measurements = self.host.nodes.get(&id).is_some_and(|previous| {
+            previous.properties.get(&builtin::VIRTUAL_DATA_VERSION)
+                != node.properties.get(&builtin::VIRTUAL_DATA_VERSION)
+        });
+        let virtual_list = virtual_list::retained(&node, reset_virtual_measurements);
+        input.virtual_list = virtual_list.clone();
         for (property, value) in &node.properties {
             input.properties.push((*property, value.clone()));
         }
@@ -551,6 +568,7 @@ impl<'a> Stage<'a> {
         };
         let entry = self.get_mut(id)?;
         entry.element = Some(element.clone());
+        entry.virtual_list = virtual_list;
         entry.dirty = false;
         Ok(element)
     }

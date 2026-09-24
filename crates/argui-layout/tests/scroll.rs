@@ -4,9 +4,10 @@ use argui_layout::LayoutEngine;
 use argui_paint::{CornerRadii, DisplayCommand, LayerStyle, QuadStyle};
 use argui_text::TextEngine;
 use argui_ui::{
-    Axes, Color, Element, FlexWrap, Overflow, Position, ScrollAnchoring, ScrollAxes, ScrollConfig,
-    ScrollbarPartStyle, ScrollbarStyle, ScrollbarVisibility, Sides, StylePatch, StyleTransition,
-    Transition, UiTree, VisualState, length, percent, property,
+    Axes, Color, Element, EventHandlerId, EventListener, EventOwnerId, EventType, FlexWrap,
+    Overflow, Position, ScrollAnchoring, ScrollAxes, ScrollConfig, ScrollbarPartStyle,
+    ScrollbarStyle, ScrollbarVisibility, Sides, StylePatch, StyleTransition, Transition,
+    UiEventKind, UiTree, VisualState, length, percent, property,
 };
 
 const NOTO_SANS: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
@@ -522,43 +523,43 @@ fn variable_virtual_lists_measure_visible_rows_during_layout() {
 }
 
 #[test]
-fn variable_virtual_list_keeps_a_user_scroll_when_a_new_window_is_measured() {
-    let list = argui_ui::VirtualList::variable(80, 176.0, 400.0).overscan(10);
-    let view = |offset| {
-        list.build("variable-list", offset, |index| {
+fn horizontal_virtual_lists_measure_widths_and_request_a_bounded_window() {
+    let list = argui_ui::VirtualList::variable(100, 20.0, 90.0)
+        .horizontal()
+        .overscan(2);
+    let root = list
+        .build_range("horizontal-list", 0.0, 0..12, |index| {
             Element::container([])
-                .keyed(format!("variable-{index}"))
-                .height(length(80.0 + (index % 3) as f32 * 24.0))
+                .keyed(format!("item-{index}"))
+                .width(length(12.0 + index as f32 * 3.0))
+                .height(length(24.0))
         })
-        .width(length(600.0))
-    };
-    let mut ui = UiTree::new(view(0.0));
-    let viewport = ui.node_id_at(0).unwrap();
+        .width(length(90.0))
+        .on(EventListener::new(
+            EventType::VirtualMeasure,
+            EventHandlerId::new(EventOwnerId(1), 1),
+        ))
+        .on(EventListener::new(
+            EventType::VirtualWindow,
+            EventHandlerId::new(EventOwnerId(1), 2),
+        ));
+    let mut ui = UiTree::new(root);
     let mut layout = LayoutEngine::new();
     let mut text = text_engine();
-    let mut output = layout
-        .compute(&mut ui, &mut text, Size::new(600.0, 400.0))
+    let first = layout
+        .compute(&mut ui, &mut text, Size::new(90.0, 40.0))
         .unwrap();
-
-    ui.set_scroll_offset(viewport, Point::new(0.0, 3_000.0));
-    layout.apply_scroll(&ui, &mut output).unwrap();
-    ui.update(view(3_000.0));
-    output = layout
-        .compute(&mut ui, &mut text, Size::new(600.0, 400.0))
-        .unwrap();
-    let before = ui.scroll_offset(viewport).y;
-
-    let requested = before + 400.0;
-    ui.set_scroll_offset(viewport, Point::new(0.0, requested));
-    layout.apply_scroll(&ui, &mut output).unwrap();
-    ui.update(view(requested));
-    layout
-        .compute(&mut ui, &mut text, Size::new(600.0, 400.0))
-        .unwrap();
-
-    assert!(
-        ui.scroll_offset(viewport).y > before + 100.0,
-        "offset stayed at {before}: {:?}",
-        ui.scroll_offset(viewport),
-    );
+    assert!(first.virtualization_changed);
+    assert_eq!(list.item_extent(0), Some(12.0));
+    assert_eq!(list.item_extent(3), Some(21.0));
+    assert!(list.window(0.0).range.len() < 24);
+    assert!(first.virtual_events.iter().any(|event| matches!(
+        &event.kind,
+        UiEventKind::VirtualMeasured { items, viewport_extent: 90.0, .. }
+            if items.iter().any(|item| item.index == 3 && item.extent == 21.0)
+    )));
+    assert!(first.virtual_events.iter().any(|event| matches!(
+        event.kind,
+        UiEventKind::VirtualWindowChanged { start: 0, end, .. } if end < 24
+    )));
 }

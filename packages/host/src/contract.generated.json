@@ -1,5 +1,5 @@
 {
-  "abiHash": "12694392223694503046",
+  "abiHash": "6271548251572095581",
   "natives": [
     {
       "events": [
@@ -4265,6 +4265,16 @@
           "id": 7,
           "name": "scroll",
           "payload": "Float"
+        },
+        {
+          "id": 24,
+          "name": "measure",
+          "payload": null
+        },
+        {
+          "id": 25,
+          "name": "window",
+          "payload": null
         }
       ],
       "id": 20,
@@ -4391,6 +4401,22 @@
           "valueType": "Bool"
         },
         {
+          "default": "Bool(false)",
+          "id": 196,
+          "name": "horizontal",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 197,
+          "name": "viewport_width",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
           "default": null,
           "id": 46,
           "name": "viewport_height",
@@ -4413,6 +4439,86 @@
           "readOnly": false,
           "required": false,
           "valueType": "Color"
+        },
+        {
+          "default": null,
+          "id": 204,
+          "name": "scrollbar_visible",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 205,
+          "name": "scrollbar_width",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 198,
+          "name": "shadow_color",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Color"
+        },
+        {
+          "default": null,
+          "id": 199,
+          "name": "shadow_intensity",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 200,
+          "name": "shadow_width",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 201,
+          "name": "shadow_start",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 202,
+          "name": "shadow_end",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 96,
+          "name": "offset_x",
+          "readOnly": true,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 203,
+          "name": "visible_width",
+          "readOnly": true,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 100,
+          "name": "content_width",
+          "readOnly": true,
+          "required": false,
+          "valueType": "Dimension"
         },
         {
           "default": null,
@@ -4458,6 +4564,14 @@
           "default": null,
           "id": 50,
           "name": "__window_start",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Int"
+        },
+        {
+          "default": null,
+          "id": 206,
+          "name": "__data_version",
           "readOnly": false,
           "required": false,
           "valueType": "Int"

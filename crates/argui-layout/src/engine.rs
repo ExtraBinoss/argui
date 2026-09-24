@@ -44,6 +44,8 @@ pub struct LayoutOutput {
     pub desktop_backdrops: Vec<crate::DesktopBackdropRegion>,
     pub paint_stats: PaintStats,
     pub virtualization_changed: bool,
+    /// Native virtual-list measurement and bounded-window listener deliveries.
+    pub virtual_events: Vec<argui_ui::UiEvent>,
     pub(crate) compositor_owners: HashMap<UiNodeId, argui_paint::CompositorId>,
     pub(crate) composite_geometry: crate::composite::CompositeGeometry,
     pub(crate) input_sources: HashMap<UiNodeId, argui_text::TextContent>,

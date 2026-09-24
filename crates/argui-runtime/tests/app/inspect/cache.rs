@@ -2,13 +2,38 @@ use argui_core::{Color, Point, Rect, Size, Transform2D};
 use argui_layout::{LayoutNode, LayoutOutput, PortalLayout};
 use argui_paint::LayerStyle;
 use argui_runtime::{Inspection, InspectionCache};
-use argui_ui::{EffectScope, Element, UiTree, WindowLayer, length};
+use argui_ui::{EffectScope, Element, RetainedIdentity, UiTree, WindowLayer, length};
 
 fn view(label: &str, tools: &str) -> Element {
     Element::column([
         Element::text(label).keyed("app"),
         Element::text(tools).keyed("tools").inspectable(false),
     ])
+}
+
+/// A retained node moved to a different depth must refresh the inspector hierarchy.
+#[test]
+fn retained_node_depth_change_republishes_snapshot() {
+    let wrapper = RetainedIdentity::new(7, 1);
+    let leaf = RetainedIdentity::new(7, 2);
+    let mut tree = UiTree::new(Element::column([Element::column([
+        Element::text("leaf").retained_identity(leaf.clone())
+    ])
+    .retained_identity(wrapper.clone())]));
+    let original_leaf = tree.node_ids()[2];
+    let mut cache = InspectionCache::default();
+    let layout = LayoutOutput::default();
+    assert!(cache.snapshot(&tree, &layout).is_some());
+    tree.update(Element::column([
+        Element::column([]).retained_identity(wrapper),
+        Element::text("leaf").retained_identity(leaf),
+    ]));
+    assert_eq!(tree.node_ids()[2], original_leaf);
+    assert_eq!(
+        cache.snapshot(&tree, &layout),
+        Some(Inspection::snapshot(&tree, &layout))
+    );
+    assert!(cache.snapshot(&tree, &layout).is_none());
 }
 
 #[test]

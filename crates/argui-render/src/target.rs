@@ -40,6 +40,26 @@ impl PixelRegion {
         }
     }
 
+    /// Clips `rect` to `viewport` without expanding to retained-surface tiles.
+    ///
+    /// `rect` is in physical pixels and `viewport` bounds the returned region.
+    /// Returns `None` when the rectangles do not overlap. Exact edges keep
+    /// composited filters inside scroll viewports.
+    pub fn from_clip_rect(rect: Rect, viewport: Self) -> Option<Self> {
+        let left = rect.origin.x.floor().max(viewport.origin[0] as f32) as u32;
+        let top = rect.origin.y.floor().max(viewport.origin[1] as f32) as u32;
+        let right = (rect.origin.x + rect.size.width)
+            .ceil()
+            .min(viewport.right() as f32) as u32;
+        let bottom = (rect.origin.y + rect.size.height)
+            .ceil()
+            .min(viewport.bottom() as f32) as u32;
+        (right > left && bottom > top).then_some(Self {
+            origin: [left, top],
+            size: [right.saturating_sub(left), bottom.saturating_sub(top)],
+        })
+    }
+
     pub const fn right(self) -> u32 {
         self.origin[0] + self.size[0]
     }

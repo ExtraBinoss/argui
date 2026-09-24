@@ -603,13 +603,25 @@ export namespace JSX {
       grow?: number
       row_height: number
       variable_height?: boolean
+      horizontal?: boolean
+      viewport_width?: number
       viewport_height?: number
       offset?: number
       scrollbar_thumb?: string
+      scrollbar_visible?: boolean
+      scrollbar_width?: number
+      shadow_color?: string
+      shadow_intensity?: number
+      shadow_width?: number
+      shadow_start?: boolean
+      shadow_end?: boolean
       overscan?: number
       __item_count?: number
       __window_start?: number
+      __data_version?: number
       onScroll?: (payload: unknown) => void
+      onMeasure?: (payload: unknown) => void
+      onWindow?: (payload: unknown) => void
       key?: import('react').Key
       ref?: Ref<WorkNode>
       children?: ReactNode

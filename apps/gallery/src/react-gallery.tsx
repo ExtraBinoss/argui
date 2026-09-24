@@ -1,12 +1,17 @@
 /** @jsxImportSource @argui/react */
-import { useMemo, useState, type ReactElement } from 'react'
+import { memo, useCallback, useMemo, useState, type ReactElement } from 'react'
+import { VirtualList as ReactVirtualList } from '@argui/react'
 import { ReactButton, ReactSelect } from './react-controls'
 import { ReactAnimationLab } from './react-animation-lab'
+import { ReactOverlayPage, ReactPopoverPage } from './react-overlay'
+import { ReactDamageControl } from './react-damage-control'
+import { ReactInputField } from './react-input-field'
+import { ReactInputsPage } from './react-inputs'
+import { ReactWgslLab } from './react-wgsl-lab'
+import { pages, filteredNavigation, navigationKey, navigationVersion, type Page } from './gallery-pages'
 import { mediaAssets } from './assets.generated'
 import { palette, type Accent, type Palette, type ThemeMode } from './theme'
 
-type Page = 'Button' | 'Select' | 'Animation Lab' | 'Media'
-const pages: readonly Page[] = ['Button', 'Select', 'Animation Lab', 'Media']
 const accents: readonly Accent[] = ['blue', 'violet', 'emerald']
 const choices = ['Vulkan', 'DirectX 12', 'Metal', 'WebGPU'] as const
 const mobile = (globalThis as { __arguiMobile?: boolean }).__arguiMobile === true
@@ -17,16 +22,18 @@ export function ReactGallery(): ReactElement {
   const [mode, setMode] = useState<ThemeMode>('light')
   const [accent, setAccent] = useState<Accent>('blue')
   const [menuOpen, setMenuOpen] = useState(true)
+  const [search, setSearch] = useState('')
   const [clicks, setClicks] = useState(0)
   const [lastUsed, setLastUsed] = useState('None')
   const [starActive, setStarActive] = useState(false)
   const [choice, setChoice] = useState<string>(choices[0])
   const theme = useMemo(() => palette(mode, accent), [mode, accent])
-  const activate = (label: string) => {
+  const navigationItems = useMemo(() => filteredNavigation(search), [search])
+  const activate = useCallback((label: string) => {
     setClicks((value) => value + 1)
     setLastUsed(label)
     setStarActive((value) => label === 'Star' ? !value : false)
-  }
+  }, [])
   const menuButton = <ReactButton id="menu" label={menuOpen ? 'Hide navigation' : 'Show navigation'}
     theme={theme} kind="quiet" onClick={() => setMenuOpen((value) => !value)} />
   const themeControls = (
@@ -37,30 +44,46 @@ export function ReactGallery(): ReactElement {
         theme={theme} kind="quiet" selected={accent === option} onClick={() => setAccent(option)} />)}
     </row>
   )
-  const pageButtons = pages.map((item) => <ReactButton key={item}
-    id={`page-${item.replaceAll(' ', '-').toLowerCase()}`}
-    label={item} theme={theme}
-    kind={page === item ? 'secondary' : 'quiet'} selected={page === item}
-    current={page === item ? 'page' : undefined} onClick={() => setPage(item)} />)
   const navigation = menuOpen ? (
-    <focusScope role="navigation" accessible_name="Gallery pages" focus_on_tab_navigation={false} width={mobile ? 'fill' : 150}>
-      <column width={mobile ? 'fill' : 150} gap={7} padding={mobile ? 0 : 10}>
-        <text text="EXPLORE" color={theme.muted} font_size={11} />
-        {mobile ? <row width="fill" wrap={true} gap={7}>{pageButtons}</row>
-          : <column gap={7}>{pageButtons}</column>}
+    <focusScope role="navigation" accessible_name="Gallery pages" focus_on_tab_navigation={false}
+      width={mobile ? 'fill' : 220} height={mobile ? undefined : 'fill'}>
+      <column width={mobile ? 'fill' : 220} height={mobile ? undefined : 'fill'} min_height={0}
+        gap={8} padding={8} background={theme.surface}>
+        <ReactInputField id="gallery-search" label="Search components" search theme={theme}
+          value={search} placeholder="Search components" onChange={setSearch} />
+        <ReactVirtualList id="gallery-navigation" count={navigationItems.length} estimate={mobile ? 112 : 47}
+          itemKey={(index) => navigationKey(navigationItems[index]!)} dataVersion={navigationVersion(search)}
+          variable={true} axis={mobile ? 'horizontal' : 'vertical'} overscan={3}
+          width="fill" height={mobile ? 56 : 'fill'}
+          scrollbarWidth={3} scrollbarColor={mode === 'dark' ? '#ffffff66' : '#0000003d'}
+          shadow={{ color: theme.surface, intensity: 1,
+            width: 36, left: true, right: true, top: true, bottom: true }}
+          renderItem={(index) => {
+            const item = navigationItems[index]!
+            if (item.kind === 'heading') return <column height={mobile ? 56 : 30} padding={7}
+              justify_content="center"><text text={item.label} color={theme.muted} font_size={11} /></column>
+            return <ReactButton id={navigationKey(item)} label={item.page} theme={theme}
+              kind={page === item.page ? 'secondary' : 'quiet'} selected={page === item.page}
+              current={page === item.page ? 'page' : undefined} onClick={() => setPage(item.page)} />
+          }} />
+        {navigationItems.length === 0 ? <text text="No components found" color={theme.muted} font_size={12} /> : null}
       </column>
     </focusScope>
   ) : null
-  const content = (
-    <column width="fill" min_width={mobile ? 0 : 260} shrink={1} gap={16} padding={mobile ? 4 : 18}>
-      <text text={page} color={theme.foreground} font_size={26} />
-      {page === 'Button' ? <ReactButtonPage theme={theme} clicks={clicks}
-        lastUsed={lastUsed} starActive={starActive} activate={activate} /> : null}
-      {page === 'Select' ? <ReactSelectPage theme={theme} value={choice} onChange={setChoice} /> : null}
-      {page === 'Animation Lab' ? <ReactAnimationLab theme={theme} /> : null}
-      {page === 'Media' ? <ReactMediaPage theme={theme} /> : null}
+  // Preserve page subtrees across tab changes; invisible native branches do not animate.
+  const panes = pages.map((item) => (
+    <column key={`scroll-${item}`} nativeKey={`scroll-${item}`} visible={page === item}
+      width="fill" grow={1} min_width={0} min_height={0} scroll_y={true}>
+      <ReactPageContent item={item} theme={theme}
+        clicks={item === 'Button' ? clicks : undefined}
+        lastUsed={item === 'Button' ? lastUsed : undefined}
+        starActive={item === 'Button' ? starActive : undefined}
+        activate={activate}
+        choice={item === 'Select' ? choice : undefined}
+        onChoiceChange={setChoice}
+        active={item === 'Damage Control' || item === 'WGSL Lab' ? page === item : undefined} />
     </column>
-  )
+  ))
 
   return (
     <column width="fill" height="fill" background={theme.background}>
@@ -76,20 +99,50 @@ export function ReactGallery(): ReactElement {
           {themeControls}
         </row>
       )}
-      {mobile ? <column width="fill" height="fill" shrink={1} min_height={0} gap={16} padding={12}>
+      {mobile ? <column width="fill" height="fill" shrink={1} min_height={0} gap={16}>
         {navigation}
-        <column key={`scroll-${page}`} nativeKey={`scroll-${page}`} width="fill" grow={1} min_height={0} scroll_y={true}>
-          {content}
-        </column>
+        <column width="fill" grow={1} shrink={1} min_height={0}
+          padding_left={12} padding_right={12} padding_bottom={12}>{panes}</column>
       </column> : <row width="fill" height="fill" shrink={1} min_height={0} gap={16} padding={16}>
         {navigation}
-        <column key={`scroll-${page}`} nativeKey={`scroll-${page}`} grow={1} min_width={0} min_height={0} scroll_y={true}>
-          {content}
-        </column>
+        {panes}
       </row>}
     </column>
   )
 }
+
+interface ReactPageContentProps {
+  item: Page
+  theme: Palette
+  clicks?: number
+  lastUsed?: string
+  starActive?: boolean
+  activate: (label: string) => void
+  choice?: string
+  onChoiceChange: (value: string) => void
+  active?: boolean
+}
+
+/** Keeps retained page content stable while the shell changes native visibility. */
+const ReactPageContent = memo(function ReactPageContent(props: ReactPageContentProps): ReactElement {
+  const { item, theme } = props
+  return (
+    <column width="fill" min_width={mobile ? 0 : 260} shrink={1} gap={16} padding={mobile ? 4 : 18}>
+      <text text={item} color={theme.foreground} font_size={26} />
+      {item === 'Input' ? <ReactInputsPage theme={theme} /> : null}
+      {item === 'Button' ? <ReactButtonPage theme={theme} clicks={props.clicks ?? 0}
+        lastUsed={props.lastUsed ?? 'None'} starActive={props.starActive ?? false} activate={props.activate} /> : null}
+      {item === 'Select' ? <ReactSelectPage theme={theme} value={props.choice ?? choices[0]}
+        onChange={props.onChoiceChange} /> : null}
+      {item === 'Popover' ? <ReactPopoverPage theme={theme} /> : null}
+      {item === 'Animation Lab' ? <ReactAnimationLab theme={theme} /> : null}
+      {item === 'Media' ? <ReactMediaPage theme={theme} /> : null}
+      {item === 'Overlay' ? <ReactOverlayPage theme={theme} /> : null}
+      {item === 'Damage Control' ? <ReactDamageControl theme={theme} active={props.active ?? false} /> : null}
+      {item === 'WGSL Lab' ? <ReactWgslLab theme={theme} active={props.active ?? false} /> : null}
+    </column>
+  )
+}) as (props: ReactPageContentProps) => ReactElement
 
 /** Keeps button activation state in the shell while demonstrating every variant. */
 function ReactButtonPage(props: { theme: Palette; clicks: number; lastUsed: string; starActive: boolean; activate: (label: string) => void }): ReactElement {

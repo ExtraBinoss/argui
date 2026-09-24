@@ -5,6 +5,7 @@ use std::sync::mpsc::Sender;
 use argui_host::Operation;
 use argui_paint::{ImageAsset, VectorAsset};
 use argui_platform::WindowKey;
+use argui_render::{DamageTracking, EffectRegistry};
 use argui_schema::{AssetHandle, SchemaValue};
 use argui_ui::{TreeUpdate, UiEventKind};
 
@@ -59,7 +60,22 @@ pub fn validate_native_host_assets(
 pub struct NativeHostBatch {
     pub window: WindowKey,
     pub operations: Vec<WireOperation>,
+    /// Renderer controls applied after the operations in this UI-thread batch.
+    pub controls: Vec<NativeHostControl>,
     pub reply: Sender<Result<NativeHostCommit, String>>,
+}
+
+/// A renderer control sent by a native JavaScript presentation host.
+#[derive(Clone, Debug)]
+pub enum NativeHostControl {
+    /// Changes the damage policy for subsequent frames of the target window.
+    SetDamageTracking(DamageTracking),
+    /// Enables or disables frame profile work for the target window.
+    SetRendererProfiling(bool),
+    /// Replaces all host-supplied custom effects after preparing GPU pipelines.
+    ReplaceEffects(EffectRegistry),
+    /// Registers one SVG vector before a host batch can reference it.
+    RegisterVector(VectorAsset),
 }
 
 /// Work performed by a native host commit on the UI thread.

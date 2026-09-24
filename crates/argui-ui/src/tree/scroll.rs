@@ -1,10 +1,65 @@
 use argui_core::{Point, ScrollDelta};
 
-use crate::{InteractionUpdate, NodeId, ScrollRegion, UiEventKind};
+use crate::{InteractionUpdate, NodeId, ScrollRegion, UiEvent, UiEventKind};
 
 use super::UiTree;
 
 impl UiTree {
+    /// Requests a presenter update when native scrolling selects another item chunk.
+    ///
+    /// * `node` — virtual scroll container.
+    /// * `viewport_extent` — measured width or height along its active axis.
+    ///
+    /// Returns listener deliveries only when the selected range or viewport
+    /// differs from both the mounted range and the most recently requested one.
+    pub fn request_virtual_window(&mut self, node: NodeId, viewport_extent: f32) -> Vec<UiEvent> {
+        let Some(viewport) = self
+            .element_for(node)
+            .and_then(|element| element.virtual_viewport())
+            .cloned()
+        else {
+            return Vec::new();
+        };
+        let viewport_extent = viewport_extent.max(0.0);
+        self.virtual_viewport_extents.insert(node, viewport_extent);
+        let offset = self.scroll_offset(node);
+        let offset = if viewport.list.is_horizontal() {
+            offset.x
+        } else {
+            offset.y
+        };
+        let configured_extent = viewport.list.viewport_extent();
+        let range = viewport
+            .list
+            .with_viewport(viewport_extent)
+            .window(offset)
+            .range;
+        if range == viewport.mounted && (viewport_extent - configured_extent).abs() <= 0.5 {
+            self.virtual_requests.remove(&node);
+            return Vec::new();
+        }
+        if self
+            .virtual_requests
+            .get(&node)
+            .is_some_and(|(requested, extent)| {
+                *requested == range && (*extent - viewport_extent).abs() <= 0.5
+            })
+        {
+            return Vec::new();
+        }
+        self.virtual_requests
+            .insert(node, (range.clone(), viewport_extent));
+        self.event_deliveries(
+            node,
+            UiEventKind::VirtualWindowChanged {
+                start: range.start,
+                end: range.end,
+                offset,
+                viewport_extent,
+            },
+        )
+    }
+
     /// Applies newly declared offsets while preserving user scrolling between declarations.
     ///
     /// Returns whether any retained scroll position changed.
@@ -351,14 +406,18 @@ impl UiTree {
 
     fn scroll_update(&mut self, change: crate::scroll::ScrollChange) -> InteractionUpdate {
         let text_input_changed = self.text_inputs.get(change.node).is_some();
+        let mut events = self.event_deliveries(
+            change.node,
+            UiEventKind::Scrolled {
+                delta: change.delta,
+                offset: change.offset,
+            },
+        );
+        if let Some(extent) = self.virtual_viewport_extents.get(&change.node).copied() {
+            events.extend(self.request_virtual_window(change.node, extent));
+        }
         InteractionUpdate {
-            events: self.event_deliveries(
-                change.node,
-                UiEventKind::Scrolled {
-                    delta: change.delta,
-                    offset: change.offset,
-                },
-            ),
+            events,
             paint_changed: true,
             scroll_changed: true,
             text_input_changed,

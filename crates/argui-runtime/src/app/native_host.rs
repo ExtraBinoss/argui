@@ -3,11 +3,12 @@
 use argui_core::Insets;
 #[cfg(target_os = "android")]
 use argui_paint::Fill;
+use argui_paint::VectorAsset;
 use argui_ui::{Element, TreeUpdate, UiTree, percent};
 
 use super::Application;
 use crate::{
-    HostCommitResult, NativeHostAssets, NativeHostCommit, WireOperation,
+    HostCommitResult, NativeHostAssets, NativeHostCommit, NativeHostControl, WireOperation,
     validate_native_host_assets,
 };
 
@@ -43,7 +44,8 @@ impl Application {
         self.vector_assets = assets.vectors;
     }
 
-    /// Validates and applies `operations`, returning the resulting tree invalidation.
+    /// Validates and applies `operations`, then applies `controls`, returning the
+    /// resulting tree invalidation.
     ///
     /// The wire values are decoded here because layout dimensions cannot cross the
     /// event-loop thread boundary as Rust values. An invalid batch leaves the tree intact.
@@ -51,21 +53,73 @@ impl Application {
     pub(super) fn commit_native_host(
         &mut self,
         operations: Vec<WireOperation>,
+        controls: Vec<NativeHostControl>,
     ) -> Result<NativeHostCommit, String> {
+        if operations.is_empty() {
+            for control in controls {
+                self.apply_native_host_control(control)?;
+            }
+            return Ok(NativeHostCommit {
+                update: TreeUpdate::None,
+                changed_nodes: 0,
+            });
+        }
         let operations = operations
             .into_iter()
             .map(WireOperation::into_native)
             .collect::<Result<Vec<_>, _>>()?;
-        validate_native_host_assets(&operations, &self.image_assets, &self.vector_assets)?;
-        let host = self
+        let mut next_vectors = self.vector_assets.clone();
+        for control in &controls {
+            if let NativeHostControl::RegisterVector(vector) = control {
+                if let Some(existing) = next_vectors.iter().find(|asset| asset.id == vector.id) {
+                    if existing != vector {
+                        return Err(format!("conflicting native vector id {:?}", vector.id));
+                    }
+                } else {
+                    next_vectors.push(vector.clone());
+                }
+            }
+        }
+        validate_native_host_assets(&operations, &self.image_assets, &next_vectors)?;
+        let replacement = controls.iter().find_map(|control| match control {
+            NativeHostControl::ReplaceEffects(effects) => Some(effects.clone()),
+            _ => None,
+        });
+        if replacement.is_some() {
+            self.native_host
+                .as_ref()
+                .ok_or_else(|| "window has no native presentation host".to_string())?
+                .validate(&operations)
+                .map_err(|error| error.to_string())?;
+        }
+        let previous_effects = replacement.as_ref().map(|_| self.base_effects.clone());
+        for vector in next_vectors.iter().skip(self.vector_assets.len()) {
+            self.register_native_vector(vector.clone())?;
+        }
+        if let Some(effects) = replacement {
+            self.replace_native_effects(effects)
+                .map_err(|error| error.to_string())?;
+        }
+        let committed = self
             .native_host
             .as_mut()
-            .ok_or_else(|| "window has no native presentation host".to_string())?;
-        let HostCommitResult { changed_nodes, .. } = host
-            .commit(&operations)
-            .map_err(|error| error.to_string())?;
-        let root = host
-            .root_element()
+            .ok_or_else(|| "window has no native presentation host".to_string())?
+            .commit(&operations);
+        let HostCommitResult { changed_nodes, .. } = match committed {
+            Ok(commit) => commit,
+            Err(error) => {
+                if let Some(previous) = previous_effects {
+                    self.replace_native_effects(previous).map_err(|rollback| {
+                        format!("{error}; effect rollback failed: {rollback}")
+                    })?;
+                }
+                return Err(error.to_string());
+            }
+        };
+        let root = self
+            .native_host
+            .as_ref()
+            .and_then(|host| host.root_element())
             .map(|root| native_host_root_with_safe_area(root, self.environment.safe_area_insets));
         let update = match (self.ui_tree.as_mut(), root) {
             (Some(tree), Some(root)) => tree.update(root),
@@ -97,9 +151,68 @@ impl Application {
         {
             window.request_redraw();
         }
+        for control in controls {
+            if !matches!(
+                control,
+                NativeHostControl::ReplaceEffects(_) | NativeHostControl::RegisterVector(_)
+            ) {
+                self.apply_native_host_control(control)?;
+            }
+        }
         Ok(NativeHostCommit {
             update,
             changed_nodes,
         })
+    }
+
+    /// Registers a validated SVG in the active renderer and layout engine.
+    /// `vector` supplies its stable ID and source. Returns an error if an ID
+    /// names different bytes or GPU registration fails; equal repeats do no work.
+    ///
+    /// # Errors
+    /// Returns a conflict or renderer registration error.
+    fn register_native_vector(&mut self, vector: VectorAsset) -> Result<(), String> {
+        if let Some(existing) = self
+            .vector_assets
+            .iter()
+            .find(|asset| asset.id == vector.id)
+        {
+            return if existing == &vector {
+                Ok(())
+            } else {
+                Err(format!("conflicting native vector id {:?}", vector.id))
+            };
+        }
+        if let super::RendererState::Ready(renderer) = &mut *self.renderer.borrow_mut() {
+            renderer
+                .register_vector(&vector)
+                .map_err(|error| error.to_string())?;
+        }
+        #[cfg(all(feature = "native-popups", not(target_arch = "wasm32")))]
+        for popup in &mut self.popups.entries {
+            popup
+                .register_vector(&vector)
+                .map_err(|error| error.to_string())?;
+        }
+        self.vector_assets.push(vector);
+        self.layout_engine
+            .set_assets(&self.image_assets, &self.vector_assets);
+        Ok(())
+    }
+
+    /// Applies `control` to the active renderer and requests any needed redraw.
+    /// Applies one renderer `control` and returns an error if GPU preparation fails.
+    fn apply_native_host_control(&mut self, control: NativeHostControl) -> Result<(), String> {
+        match control {
+            NativeHostControl::SetDamageTracking(tracking) => self.set_damage_tracking(tracking),
+            NativeHostControl::SetRendererProfiling(enabled) => {
+                self.set_renderer_profiling(enabled)
+            }
+            NativeHostControl::ReplaceEffects(effects) => self
+                .replace_native_effects(effects)
+                .map_err(|error| error.to_string())?,
+            NativeHostControl::RegisterVector(vector) => self.register_native_vector(vector)?,
+        }
+        Ok(())
     }
 }

@@ -23,6 +23,7 @@ mod kind;
 mod overrides;
 mod portal;
 mod safe_area;
+mod virtual_list;
 pub use kind::{ElementKind, ElementNode, TextEditorSpec};
 
 #[derive(Clone)]
@@ -55,12 +56,6 @@ impl Element {
     #[must_use]
     pub fn ptr_eq(&self, other: &Self) -> bool {
         Rc::ptr_eq(&self.0, &other.0)
-    }
-
-    /// Returns this element's virtual-list item metadata, if present.
-    #[must_use]
-    pub fn virtual_item(&self) -> Option<&crate::VirtualItem> {
-        self.virtual_item.as_ref()
     }
 
     /// Creates an image element for the supplied asset.

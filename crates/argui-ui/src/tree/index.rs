@@ -141,6 +141,8 @@ impl TreeIndex {
 
     /// Refresh descriptions while identities and topology are unchanged. Shared
     /// subtrees need no visit unless their inherited selection/direction changed.
+    ///
+    /// Returns whether animation bindings or subtree visibility changed.
     pub(super) fn sync(&mut self, root: &Element) -> bool {
         self.sync_node(root, 0).1
     }
@@ -204,7 +206,9 @@ impl TreeIndex {
                     Err(slot) => self.layout_roots.insert(slot, position),
                 }
             }
-            bindings_changed = self.elements[position].bindings != element.bindings;
+            bindings_changed = self.elements[position].bindings != element.bindings
+                || (self.elements[position].style.display == crate::Display::None)
+                    != (element.style.display == crate::Display::None);
             self.transition_nodes += has_transitions(element) as usize;
             self.transition_nodes -= has_transitions(&self.elements[position]) as usize;
             self.elements[position] = element.clone();

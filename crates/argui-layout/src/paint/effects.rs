@@ -3,12 +3,18 @@ use argui_core::{Affine2D, Rect};
 use argui_paint::{DisplayList, LayerStyle, ProfileDomain, RenderObjectId};
 use argui_ui::{EffectScope, Element, NodeId, ScrollAxes, ScrollMetrics, UiTree};
 
+/// Opens all authored effects in `scope` for `element`.
+///
+/// `ui` resolves animated styles, `display_list` receives layers, `bounds` and
+/// `clip` describe surface geometry, and `node` supplies stable identity.
+/// Returns the number of layers that the caller must close.
 pub(super) fn begin_scope(
     ui: &UiTree,
     display_list: &mut DisplayList,
     element: &Element,
     scope: EffectScope,
     bounds: Rect,
+    clip: Rect,
     node: NodeId,
 ) -> usize {
     let effects = element
@@ -21,6 +27,7 @@ pub(super) fn begin_scope(
             display_list,
             ui.resolved_layer(node, element, &effect.layer),
             bounds,
+            clip,
             node,
         );
         count += 1;
@@ -28,13 +35,19 @@ pub(super) fn begin_scope(
     count
 }
 
+/// Begins one effect layer at `bounds`, constrained by the ancestor `clip`.
+///
+/// `display_list` receives the command, `layer` supplies filter style, and
+/// `node` supplies a stable profile identity when the layer lacks one.
 pub(super) fn begin_layer(
     display_list: &mut DisplayList,
     mut layer: LayerStyle,
     bounds: Rect,
+    clip: Rect,
     node: NodeId,
 ) {
     layer.bounds = bounds;
+    layer.clip = Some(clip);
     if layer.profile.is_none() {
         layer.profile = Some(RenderObjectId::new(ProfileDomain::Ui, node.get()));
     }
@@ -55,12 +68,18 @@ pub(super) fn scope_count(element: &Element, scope: EffectScope) -> usize {
         .count()
 }
 
+/// Opens active scroll effects around the scrollable content of `element`.
+///
+/// `ui` supplies scroll offset, `node` and `output` supply viewport geometry,
+/// `transform` places the viewport, and `clip` bounds the composed result.
+/// Returns the number of layers that the caller must close.
 pub(super) fn begin_scroll(
     ui: &UiTree,
     element: &Element,
     node: LayoutNode,
     output: &mut LayoutOutput,
     transform: Affine2D,
+    clip: Rect,
 ) -> usize {
     if element
         .scroll
@@ -97,6 +116,7 @@ pub(super) fn begin_scroll(
                 &mut output.display_list,
                 layer,
                 transform.transform_rect(viewport),
+                clip,
                 node.node,
             );
             count += 1;

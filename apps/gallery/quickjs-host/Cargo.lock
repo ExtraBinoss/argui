@@ -280,6 +280,7 @@ version = "0.3.2"
 dependencies = [
  "argui-android",
  "argui-core",
+ "argui-effects",
  "argui-gallery-assets",
  "argui-host",
  "argui-paint",

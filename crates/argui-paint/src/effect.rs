@@ -357,6 +357,8 @@ pub struct LayerStyle {
     pub backdrop_filters: Vec<Filter>,
     pub shadows: Vec<Shadow>,
     pub mask: LayerMask,
+    /// Surface-space rectangle that constrains final layer composition.
+    pub clip: Option<Rect>,
     pub profile: Option<RenderObjectId>,
 }
 
@@ -374,6 +376,7 @@ impl LayerStyle {
             backdrop_filters: Vec::new(),
             shadows: Vec::new(),
             mask: LayerMask::None,
+            clip: None,
             profile: None,
         }
     }
@@ -438,6 +441,16 @@ impl LayerStyle {
     #[must_use]
     pub const fn mask(mut self, mask: LayerMask) -> Self {
         self.mask = mask;
+        self
+    }
+
+    /// Constrains the composed result to `clip` in logical surface coordinates.
+    ///
+    /// `clip` is the visible ancestor region; effects may still sample pixels
+    /// outside it, but cannot overdraw earlier surface layers beyond it.
+    #[must_use]
+    pub const fn clip_to(mut self, clip: Rect) -> Self {
+        self.clip = Some(clip);
         self
     }
 
@@ -515,6 +528,12 @@ impl LayerStyle {
             ),
         );
         scaled.transform = self.transform.scaled(factor);
+        scaled.clip = self.clip.map(|clip| {
+            Rect::new(
+                Point::new(clip.origin.x * factor, clip.origin.y * factor),
+                Size::new(clip.size.width * factor, clip.size.height * factor),
+            )
+        });
         scaled.filters = self
             .filters
             .iter()

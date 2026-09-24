@@ -329,6 +329,7 @@ name = "argui-host"
 version = "0.3.2"
 dependencies = [
  "argui-animation",
+ "argui-core",
  "argui-schema",
  "argui-ui",
  "thiserror 2.0.20",

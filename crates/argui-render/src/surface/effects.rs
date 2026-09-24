@@ -1,10 +1,8 @@
 use argui_core::Rect;
 use argui_paint::{EffectId, Filter, LayerMask};
-use wgpu::{LoadOp, Operations, RenderPassColorAttachment, RenderPassDescriptor, StoreOp};
 
 use crate::{
     RendererError,
-    batch::DrawKind,
     effect::{EffectDraw, EffectUniform, layer_radii, uniform},
     effect_graph::{EffectGraph, EffectNode},
     effect_plan::{PlannedFilter, plan_filters},
@@ -14,8 +12,12 @@ use crate::{
 
 use super::SurfaceRenderer;
 
+mod draw;
 mod helpers;
-use helpers::{blur_downsample, built_in_label, clear_view, same_layer_content, skipped_layer};
+use helpers::{
+    blur_downsample, built_in_label, clear_view, clipped_output_region, same_layer_content,
+    skipped_layer,
+};
 
 #[derive(Clone, Debug)]
 pub(super) struct CachedLayer {
@@ -65,7 +67,6 @@ impl EffectPass {
         }
     }
 }
-
 #[cfg_attr(coverage_nightly, coverage(off))]
 #[allow(clippy::too_many_arguments)]
 impl SurfaceRenderer {
@@ -183,8 +184,7 @@ impl SurfaceRenderer {
                     let Some(region) = layer.region else {
                         continue;
                     };
-                    let Some(output_region) =
-                        PixelRegion::from_rect(layer.style.transformed_bounds(), target.region)
+                    let Some(output_region) = clipped_output_region(&layer.style, target.region)
                     else {
                         continue;
                     };
@@ -278,95 +278,6 @@ impl SurfaceRenderer {
                         profiler,
                         backdrop_stack,
                     );
-                }
-            }
-        }
-    }
-
-    /// Records `nodes` in `encoder` for `target`, clearing it with `clear` when supplied.
-    /// `profiler` and `owner` attribute GPU work; `clip` restricts output pixels.
-    fn draw_offscreen(
-        &mut self,
-        encoder: &mut wgpu::CommandEncoder,
-        target: TextureTarget,
-        nodes: &[EffectNode],
-        profiler: Option<&GpuFrameCapture>,
-        owner: Option<argui_paint::RenderObjectId>,
-        clip: Option<PixelRegion>,
-        clear: Option<wgpu::Color>,
-    ) {
-        let region = target.region.as_f32();
-        let quad_offset = self.quad.target_offset(&self.queue, region);
-        let text_offset = self.text.target_offset(&self.queue, region);
-        let image_offset = self.image.target_offset(&self.queue, region);
-        let vector_offset = self.vector.target_offset(&self.queue, region);
-        let canvas_offset = self.gpu_canvas.target_offset(&self.queue, region);
-        let attachment = Some(RenderPassColorAttachment {
-            view: self.offscreen.view(target.texture),
-            depth_slice: None,
-            resolve_target: None,
-            ops: Operations {
-                load: clear.map_or(LoadOp::Load, LoadOp::Clear),
-                store: StoreOp::Store,
-            },
-        });
-        let timestamp_writes = profiler.and_then(|profiler| {
-            profiler.timestamp_writes(
-                "layer.content",
-                owner,
-                u64::from(target.region.size[0]) * u64::from(target.region.size[1]),
-            )
-        });
-        let mut pass = encoder.begin_render_pass(&RenderPassDescriptor {
-            label: Some("argui-layer-content"),
-            color_attachments: &[attachment],
-            timestamp_writes,
-            ..Default::default()
-        });
-        pass.set_viewport(
-            0.0,
-            0.0,
-            target.extent[0] as f32,
-            target.extent[1] as f32,
-            0.0,
-            1.0,
-        );
-        let Some(clip) = clip.map_or(Some(target.region), |clip| target.region.intersection(clip))
-        else {
-            return;
-        };
-        let viewport = target.viewport_for(clip);
-        pass.set_scissor_rect(
-            viewport[0] as u32,
-            viewport[1] as u32,
-            (viewport[2] as u32).max(1),
-            (viewport[3] as u32).max(1),
-        );
-        for node in nodes {
-            let EffectNode::Draw(batch) = node else {
-                continue;
-            };
-            match batch.kind {
-                DrawKind::Quad => self
-                    .quad
-                    .draw(&mut pass, batch.instances.clone(), quad_offset),
-                DrawKind::Text => self
-                    .text
-                    .draw(&mut pass, batch.instances.clone(), text_offset),
-                DrawKind::Image(image, sampling) => self.image.draw(
-                    &mut pass,
-                    image,
-                    sampling,
-                    batch.instances.clone(),
-                    image_offset,
-                ),
-                DrawKind::GpuCanvas(index) => {
-                    self.gpu_canvas
-                        .draw(&mut pass, index, batch.instances.clone(), canvas_offset)
-                }
-                DrawKind::Vector => {
-                    self.vector
-                        .draw(&mut pass, batch.instances.clone(), vector_offset);
                 }
             }
         }

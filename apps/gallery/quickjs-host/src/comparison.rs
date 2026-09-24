@@ -8,9 +8,9 @@ use argui_runtime::{
     AppEvent, AppModel, AppUpdate, NativeHostAssets, WindowEnvironment, WireOperation,
 };
 use argui_ui::{Element, percent};
-use serde_json::{Value, json};
+use serde_json::json;
 
-use crate::QuickJsGallery;
+use crate::{QuickJsGallery, decode_wire_operations};
 
 /// Rust-owned immutable view and media for the same Animation Lab scene as QuickJS.
 pub struct AnimationSnapshot {
@@ -44,8 +44,7 @@ impl AnimationSnapshot {
         let mut host = Host::with_builtins().map_err(|error| error.to_string())?;
         let mut wire_batches = Vec::new();
         for batch in batches.borrow().iter() {
-            let operations: Vec<WireOperation> = serde_json::from_str(batch)
-                .map_err(|error| format!("invalid gallery operation batch: {error}"))?;
+            let operations = decode_wire_operations(batch)?;
             wire_batches.push(operations.clone());
             let operations = operations
                 .into_iter()
@@ -106,29 +105,47 @@ impl AppModel for AnimationSnapshot {
 }
 
 /// Locates the initial gallery navigation callback without depending on generated numeric IDs.
-pub(crate) fn navigation_callback(batches: &[String]) -> Result<Value, String> {
+pub(crate) fn navigation_callback(batches: &[String]) -> Result<serde_json::Value, String> {
     let operations = batches
         .iter()
-        .map(|batch| serde_json::from_str::<Vec<Value>>(batch))
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|error| error.to_string())?
+        .map(|batch| decode_wire_operations(batch))
+        .collect::<Result<Vec<_>, _>>()?
         .into_iter()
         .flatten()
         .collect::<Vec<_>>();
-    let node = &operations
+    let node = operations
         .iter()
-        .find(|operation| {
-            operation["kind"] == "setProperty"
-                && operation["value"]["value"] == "page-animation-lab"
+        .find_map(|operation| {
+            if let WireOperation::SetProperty {
+                id,
+                value: Some(value),
+                ..
+            } = operation
+                && value.value == "page-animation-lab"
+            {
+                Some(*id)
+            } else {
+                None
+            }
         })
-        .ok_or("Animation Lab navigation key is absent")?["id"];
-    let callback = &operations
+        .ok_or("Animation Lab navigation key is absent")?;
+    let callback = operations
         .iter()
-        .find(|operation| {
-            operation["kind"] == "setListener"
-                && operation["id"] == *node
-                && operation["event"] == 1
+        .find_map(|operation| {
+            if let WireOperation::SetListener {
+                id,
+                event: 1,
+                callback,
+            } = operation
+                && *id == node
+            {
+                *callback
+            } else {
+                None
+            }
         })
-        .ok_or("Animation Lab navigation callback is absent")?["callback"];
-    Ok(json!({"node": node, "callback": callback, "payload": {"kind": "click"}}))
+        .ok_or("Animation Lab navigation callback is absent")?;
+    Ok(
+        json!({"node": {"slot": node.slot, "generation": node.generation}, "callback": callback, "payload": {"kind": "click"}}),
+    )
 }

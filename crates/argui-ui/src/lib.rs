@@ -129,7 +129,8 @@ pub use text_selection::{
 };
 pub use tree::{TreeUpdate, TreeUpdateStats, UiTree};
 pub use virtual_list::{
-    MeasurementUpdate, VirtualAlignment, VirtualItem, VirtualList, VirtualWindow,
+    MeasurementUpdate, VirtualAlignment, VirtualItem, VirtualList, VirtualMeasurement,
+    VirtualViewport, VirtualWindow,
 };
 
 mod semantic_relations;

@@ -61,6 +61,29 @@ export function detach(parent: WorkNode | WorkRoot, child: WorkNode): void {
   markDirty(parent)
 }
 
+/** Applies committed React props, refreshing mounted callbacks without walking unchanged subtrees. */
+export function updateProps(node: WorkNode, previous: Record<string, unknown>, next: Record<string, unknown>): void {
+  node.props = next
+  let changed = false
+  for (const key of Object.keys(previous)) {
+    if (key === 'children' || key === 'key' || key === 'ref') continue
+    const oldValue = previous[key]
+    const newValue = next[key]
+    if (Object.is(oldValue, newValue)) continue
+    if (key.startsWith('on') && key.length > 2 && node.native
+      && typeof oldValue === 'function' && typeof newValue === 'function') {
+      node.root.host.setProperty(node.native, key, newValue)
+    } else {
+      changed = true
+    }
+  }
+  for (const key of Object.keys(next)) {
+    if (key === 'children' || key === 'key' || key === 'ref') continue
+    if (!(key in previous)) changed = true
+  }
+  if (changed || !node.native) markDirty(node)
+}
+
 /** Marks a changed node and its ancestors for the next native transaction. */
 export function markDirty(node: WorkNode | WorkRoot): void {
   for (let current: WorkNode | WorkRoot | null = node; current; current = isWorkNode(current) ? current.parent : null) {

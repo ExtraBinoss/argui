@@ -89,6 +89,26 @@ function activate(capture, key) {
   capture.deliver({ node: { slot, generation }, callback })
 }
 
+function edit(capture, key, eventName, text) {
+  const { nodes } = replay(capture.batches)
+  const target = [...nodes].find(([, node]) => node.properties.get(1)?.value === key)
+  assert.ok(target, `native key ${key} must exist`)
+  const [identity, node] = target
+  const event = node.type.events.find((entry) => entry.name === eventName)
+  assert.ok(event, `${key} must support ${eventName}`)
+  const callback = node.listeners.get(event.id)
+  assert.ok(callback, `${key} must have a ${eventName} listener`)
+  const [slot, generation] = identity.split(':').map(Number)
+  capture.deliver({ node: { slot, generation }, callback, payload: { kind: eventName, text } })
+}
+
+function nativeIdentity(capture, key) {
+  const { nodes } = replay(capture.batches)
+  const entry = [...nodes].find(([, node]) => node.properties.get(1)?.value === key)
+  assert.ok(entry, `native key ${key} must remain mounted`)
+  return entry[0]
+}
+
 const animatedProperties = new Set(['x', 'y', 'width', 'height', 'gap', 'rotation', 'opacity', 'radius', 'background', 'color'])
 
 function stableTree(node) {
@@ -168,6 +188,39 @@ test('Solid and React keep native structure, stable properties, and blocked butt
       compare(key)
     }
     compare('initial Button page')
+    const type = async (key, eventName, value) => {
+      edit(solid, key, eventName, value)
+      edit(react, key, eventName, value)
+      for (let attempt = 0; attempt < 100; attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, 10))
+        if (isDeepStrictEqual(tree(react), tree(solid))) break
+      }
+      compare(`${key} ${eventName}`)
+    }
+    const searchIdentities = [solid, react].map((presentation) => nativeIdentity(presentation, 'gallery-search'))
+    for (const value of ['i', 'in', 'inp']) {
+      await type('gallery-search', 'input', value)
+      for (const [index, presentation] of [solid, react].entries()) {
+        assert.equal(nativeIdentity(presentation, 'gallery-search'), searchIdentities[index],
+          `search input must retain focusable native identity after ${value}`)
+      }
+    }
+    for (const presentation of [solid, react]) {
+      const current = tree(presentation)
+      const navigation = allNodes(current).find((node) => node.properties.key?.value === 'gallery-navigation')
+      assert.equal(navigation?.properties.__item_count?.value, 2)
+      assert.ok(allNodes(current).some((node) => node.properties.key?.value === 'page-input'))
+      assert.ok(!allNodes(current).some((node) => node.properties.key?.value === 'page-button'))
+    }
+    await click('page-input')
+    await type('input-name', 'input', 'Ada')
+    await type('input-name', 'submit', 'Ada')
+    for (const presentation of [solid, react]) {
+      assert.ok(allNodes(tree(presentation)).some((node) => node.type === 'Text'
+        && node.properties.text?.value === 'Submitted: Ada'))
+    }
+    await type('gallery-search', 'input', '')
+    await click('page-button')
     activate(solid, 'button-disabled')
     activate(react, 'button-disabled')
     activate(solid, 'button-busy')
@@ -180,10 +233,53 @@ test('Solid and React keep native structure, stable properties, and blocked butt
     await click('accent-violet')
     await click('page-select')
     await click('topic-select')
+    for (const presentation of [solid, react]) {
+      const popup = allNodes(tree(presentation)).find((node) => node.properties.key?.value === 'topic-select-popup')
+      assert.equal(popup?.type, 'PopupWindow')
+      assert.ok(allNodes(popup).some((node) => node.properties.background?.value === '#1a1b23'
+        && node.properties.shadow_color?.value === '#00000066'))
+      assert.ok(allNodes(popup).every((node) => !node.properties.backdrop_filter))
+    }
     await click('topic-select-option-2')
     for (const presentation of [solid, react]) {
       assert.equal(keyedText(tree(presentation), 'topic-select'), 'Metal')
     }
+    await click('page-popover')
+    await click('demo-popover')
+    for (const presentation of [solid, react]) {
+      const current = tree(presentation)
+      const popup = allNodes(current).find((node) => node.properties.key?.value === 'demo-popover-popup')
+      assert.equal(popup?.type, 'PopupWindow')
+      assert.equal(popup.properties.anchor?.value, 'demo-popover')
+      assert.equal(popup.properties.window_layer?.value, 'popover')
+      assert.ok(allNodes(popup).some((node) => node.properties.backdrop_filter?.value === 'blur(10px)'
+        && node.properties.shadow_color?.value === '#00000066'))
+      assert.equal(allNodes(current).find((node) => node.properties.key?.value === 'demo-popover')
+        ?.properties.expanded?.value, true)
+    }
+    await click('demo-popover-solid')
+    for (const presentation of [solid, react]) {
+      const nodes = allNodes(tree(presentation))
+      const popup = nodes.find((node) => node.properties.key?.value === 'demo-popover-solid-popup')
+      assert.equal(popup?.type, 'PopupWindow')
+      assert.ok(!nodes.some((node) => node.properties.key?.value === 'demo-popover-popup'))
+      assert.ok(allNodes(popup).some((node) => node.properties.shadow_color?.value === '#00000066'
+        && node.properties.border_color?.value === '#383b4b'
+        && node.properties.background?.value === '#1a1b23d0'))
+      assert.ok(allNodes(popup).every((node) => !node.properties.backdrop_filter))
+    }
+    await click('demo-popover-opaque')
+    for (const presentation of [solid, react]) {
+      const nodes = allNodes(tree(presentation))
+      const popup = nodes.find((node) => node.properties.key?.value === 'demo-popover-opaque-popup')
+      assert.equal(popup?.type, 'PopupWindow')
+      assert.ok(!nodes.some((node) => node.properties.key?.value === 'demo-popover-solid-popup'))
+      assert.ok(allNodes(popup).some((node) => node.properties.shadow_color?.value === '#00000066'
+        && node.properties.border_color?.value === '#383b4b'
+        && node.properties.background?.value === '#1a1b23'))
+      assert.ok(allNodes(popup).every((node) => !node.properties.backdrop_filter))
+    }
+    await click('demo-popover-opaque-close')
     await click('page-animation-lab')
     for (const presentation of [solid, react]) {
       const current = tree(presentation)
@@ -202,10 +298,21 @@ test('Solid and React keep native structure, stable properties, and blocked butt
     assert.ok(orbit && saturn)
     for (const presentation of [solid, react]) {
       const nodes = allNodes(tree(presentation))
-      assert.deepEqual(nodes.filter((node) => node.type === 'Image')
+      const mediaPane = nodes.find((node) => node.properties.key?.value === 'scroll-Media')
+      assert.ok(mediaPane)
+      assert.deepEqual(allNodes(mediaPane).filter((node) => node.type === 'Image')
         .map((node) => node.properties.source?.value.id).sort(), [orbit.id, saturn.id].sort())
-      assert.equal(nodes.filter((node) => node.type === 'Svg').length, 3)
+      assert.equal(allNodes(mediaPane).filter((node) => node.type === 'Svg').length, 3)
+      const navigation = nodes.find((node) => node.type === 'VirtualWindow'
+        && node.properties.key?.value === 'gallery-navigation')
+      assert.ok(navigation, 'gallery navigation must use the native virtual list')
+      assert.ok(navigation.children.length <= 12, 'only a bounded navigation range mounts')
+      assert.ok(nodes.some((node) => node.type === 'Text' && node.properties.text?.value === 'EXAMPLES'))
+      const overlayPane = nodes.find((node) => node.properties.key?.value === 'scroll-Overlay')
+      assert.ok(overlayPane)
+      assert.equal(allNodes(overlayPane).filter((node) => node.properties.backdrop_filter?.value).length, 12)
     }
+    await click('page-overlay')
     await click('menu')
     await click('menu')
   } finally {
@@ -236,6 +343,9 @@ test('mobile Solid and React keep navigation fixed above the content scroll', as
       const tree = replay(presentation.batches).tree
       assert.equal(scrollingAncestors(tree, 'page-animation-lab'), 0)
       assert.equal(scrollingAncestors(tree, 'motion-target'), 1)
+      const navigation = allNodes(tree).find((node) => node.type === 'VirtualWindow'
+        && node.properties.key?.value === 'gallery-navigation')
+      assert.equal(navigation?.properties.horizontal?.value, true)
     }
   } finally {
     solid?.dispose()

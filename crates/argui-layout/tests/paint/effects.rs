@@ -226,3 +226,50 @@ fn rounded_content_keeps_clips_and_portals_escape_scroll_layers() {
     assert!(saw_clipped && saw_portal);
     assert_eq!(depth, 0);
 }
+
+/// A descendant backdrop filter inherits the scroll viewport's surface clip.
+#[test]
+fn scrolling_backdrop_layer_is_clipped_before_fixed_header() {
+    let card = Element::container([])
+        .width(length(100.0))
+        .height(length(120.0))
+        .layer(LayerStyle::new(Rect::default()).backdrop(Filter::Blur(8.0)));
+    let scroll = Element::column([card])
+        .width(length(100.0))
+        .height(length(80.0))
+        .overflow(Axes {
+            x: Overflow::Hidden,
+            y: Overflow::Auto,
+        });
+    let root = Element::column([
+        Element::container([])
+            .width(length(100.0))
+            .height(length(32.0)),
+        scroll,
+    ]);
+    let mut ui = UiTree::new(root);
+    let mut engine = LayoutEngine::new();
+    let mut output = engine
+        .compute(&mut ui, &mut TextEngine::new(), Size::new(100.0, 112.0))
+        .unwrap();
+    let node = output.scroll_regions[0].node;
+    for offset in [0.0, 20.0, 40.0] {
+        ui.set_scroll_offset(node, Point::new(0.0, offset));
+        engine.apply_scroll(&ui, &mut output).unwrap();
+        let filtered = output
+            .display_list
+            .commands()
+            .iter()
+            .find_map(|command| match command {
+                DisplayCommand::BeginLayer(layer) if !layer.backdrop_filters.is_empty() => {
+                    Some(layer)
+                }
+                _ => None,
+            })
+            .unwrap();
+        assert_eq!(
+            filtered.clip,
+            Some(Rect::new(Point::new(0.0, 32.0), Size::new(100.0, 80.0)))
+        );
+    }
+}

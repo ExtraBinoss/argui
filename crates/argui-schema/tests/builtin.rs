@@ -89,7 +89,9 @@ fn builtin_catalogue_preserves_stable_names_and_public_members() {
 use argui_core::Color;
 use argui_paint::Filter;
 use argui_schema::{NativeElementInput, NativeSlotValue, SchemaValue, builtin};
-use argui_text::TextWrap;
+use argui_text::{
+    EllipsisPosition, FontStyle, LetterSpacing, TextAlign, TextOverflow, TextWrap, UnderlineStyle,
+};
 use argui_ui::{
     AlignItems, Display, Element, ElementKind, FlexWrap, JustifyContent, Overflow, length,
 };
@@ -155,6 +157,49 @@ fn text_alias_takes_precedence_and_clamps_font_weight() {
         )
         .unwrap();
     assert!(matches!(&low_weight.kind, ElementKind::Text { style, .. } if style.weight == 1));
+}
+
+#[test]
+fn optional_text_typography_reaches_the_text_style() {
+    let text = builtin::registry()
+        .unwrap()
+        .construct(
+            builtin::TEXT,
+            &NativeElementInput::new()
+                .property(builtin::TEXT_VALUE, SchemaValue::String("styled".into()))
+                .property(builtin::TEXT_LINE_HEIGHT, SchemaValue::Float(28.0))
+                .property(
+                    builtin::TEXT_FONT_STYLE,
+                    SchemaValue::String("italic".into()),
+                )
+                .property(builtin::TEXT_LETTER_SPACING, SchemaValue::Float(1.5))
+                .property(
+                    builtin::TEXT_UNDERLINE,
+                    SchemaValue::String("double".into()),
+                )
+                .property(builtin::TEXT_STRIKETHROUGH, SchemaValue::Bool(true))
+                .property(builtin::TEXT_ALIGN, SchemaValue::String("center".into()))
+                .property(builtin::TEXT_LINE_CLAMP, SchemaValue::Int(2))
+                .property(
+                    builtin::TEXT_OVERFLOW,
+                    SchemaValue::String("ellipsis_end".into()),
+                ),
+        )
+        .unwrap();
+    let ElementKind::Text { style, .. } = &text.kind else {
+        panic!("expected text")
+    };
+    assert_eq!(style.line_height, 28.0);
+    assert_eq!(style.font_style, FontStyle::Italic);
+    assert_eq!(style.letter_spacing, LetterSpacing::Px(1.5));
+    assert_eq!(style.decoration.underline, UnderlineStyle::Double);
+    assert!(style.decoration.strikethrough);
+    assert_eq!(style.align, TextAlign::Center);
+    assert_eq!(style.line_clamp.unwrap().get(), 2);
+    assert_eq!(
+        style.overflow,
+        TextOverflow::Ellipsis(EllipsisPosition::End)
+    );
 }
 
 #[test]

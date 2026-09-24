@@ -1,6 +1,31 @@
 use wgpu::{LoadOp, Operations, RenderPassColorAttachment, RenderPassDescriptor, StoreOp};
 
-use crate::{effect_graph::EffectLayer, target::PixelRegion};
+use argui_paint::LayerStyle;
+
+use crate::{
+    batch::DrawKind,
+    effect_graph::{EffectLayer, EffectNode},
+    target::PixelRegion,
+};
+
+/// Returns the bit mask of primitive pipelines used by `nodes`.
+///
+/// Layer nodes do not draw in the current pass. The return value uses bits
+/// 0–4 for quad, text, image, vector, and canvas draws respectively.
+pub(super) fn draw_kind_mask(nodes: &[EffectNode]) -> u8 {
+    nodes.iter().fold(0, |mask, node| {
+        mask | match node {
+            EffectNode::Layer(_) => 0,
+            EffectNode::Draw(batch) => match batch.kind {
+                DrawKind::Quad => 1,
+                DrawKind::Text => 2,
+                DrawKind::Image(..) => 4,
+                DrawKind::Vector => 8,
+                DrawKind::GpuCanvas(..) => 16,
+            },
+        }
+    })
+}
 
 /// Returns whether `cached` and `current` have identical rendered foregrounds.
 /// Composition-only style changes can reuse the cached foreground.
@@ -64,6 +89,21 @@ pub(super) const fn built_in_label(mode: u32) -> &'static str {
     }
 }
 
+/// Resolves a layer's output to its exact ancestor clip inside `target`.
+///
+/// `style` supplies transformed layer bounds and the optional scroll clip;
+/// `target` bounds the render attachment. Returns `None` when no pixels remain.
+pub(super) fn clipped_output_region(
+    style: &LayerStyle,
+    target: PixelRegion,
+) -> Option<PixelRegion> {
+    PixelRegion::from_rect(style.transformed_bounds(), target).and_then(|output| {
+        style.clip.map_or(Some(output), |clip| {
+            PixelRegion::from_clip_rect(clip, target).and_then(|clip| output.intersection(clip))
+        })
+    })
+}
+
 /// Returns whether `layer` cannot affect `target` inside the optional damage `clip`.
 /// Non-offscreen layers are kept because their children can overdraw their bounds.
 pub(super) fn skipped_layer(
@@ -78,7 +118,7 @@ pub(super) fn skipped_layer(
         return false;
     }
     layer.region.is_none()
-        || PixelRegion::from_rect(layer.style.transformed_bounds(), target)
+        || clipped_output_region(&layer.style, target)
             .and_then(|region| clip.map_or(Some(region), |clip| region.intersection(clip)))
             .is_none()
 }

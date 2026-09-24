@@ -1,11 +1,18 @@
 import { defineConfig } from 'vite'
+import { resolve } from 'node:path'
 import solid from 'vite-plugin-solid'
 
 const entry = process.env.ARGUI_GALLERY_ENTRY
 const react = entry === 'react'
+const allTabler = process.env.ARGUI_GALLERY_ALL_TABLER === '1'
 
 export default defineConfig({
   root: import.meta.dirname,
+  resolve: { alias: [{
+    find: './tabler-catalog.generated',
+    replacement: resolve(import.meta.dirname, 'src', allTabler
+      ? 'tabler-catalog.generated.ts' : 'tabler-catalog.empty.ts'),
+  }] },
   plugins: react ? [] : [solid({ solid: { moduleName: '@argui/solid', generate: 'universal' }, hot: false })],
   oxc: react ? { jsx: { runtime: 'automatic', importSource: '@argui/react' } } : undefined,
   define: react ? { 'process.env.NODE_ENV': JSON.stringify('production') } : undefined,

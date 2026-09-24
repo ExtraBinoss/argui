@@ -91,18 +91,19 @@ test('a failed React render never creates native primitives', () => {
   root.unmount()
 })
 
-test('React replaces event callbacks without retaining stale handlers', () => {
-  const { host, deliver } = recorder()
+test('React refreshes a mounted event callback without resending its native listener', () => {
+  const { host, deliver, batches } = recorder()
   const root = createRoot(host)
   let first = 0
   let second = 0
   root.render(createElement('focusScope', { onClick: () => { first++ } }))
   const control = root.nativeRoot().children[0]!
   const oldCallback = control.listeners.get(1)!
+  const before = batches.length
   root.render(createElement('focusScope', { onClick: () => { second++ } }))
   const newCallback = control.listeners.get(1)!
-  expect(newCallback).not.toBe(oldCallback)
-  deliver({ node: control.id, callback: oldCallback })
+  expect(newCallback).toBe(oldCallback)
+  expect(batches).toHaveLength(before)
   deliver({ node: control.id, callback: newCallback })
   expect(first).toBe(0)
   expect(second).toBe(1)

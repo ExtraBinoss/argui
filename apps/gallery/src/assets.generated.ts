@@ -9,6 +9,7 @@ export const mediaAssets = {
   "tabler/loader-2.svg": { kind: 'svg', id: 5035487383804796 },
   "tabler/photo.svg": { kind: 'svg', id: 1456439125952080 },
   "tabler/player-play.svg": { kind: 'svg', id: 6833585511893982 },
+  "tabler/search.svg": { kind: 'svg', id: 2000023927804256 },
   "tabler/star-filled.svg": { kind: 'svg', id: 6122411386721923 },
   "tabler/star.svg": { kind: 'svg', id: 1326099470823436 },
 } as const satisfies Record<string, AssetRef>

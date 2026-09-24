@@ -192,7 +192,7 @@ impl ApplicationHandler<UserEvent> for Application {
                 UserEvent::ModelsReady => self.models_ready(event_loop),
                 UserEvent::HostCommit(batch) => {
                     let result = if batch.window == self.window_key {
-                        self.commit_native_host(batch.operations)
+                        self.commit_native_host(batch.operations, batch.controls)
                     } else {
                         Err("native host batch targeted another window".into())
                     };

@@ -287,6 +287,44 @@ fn bounded_effects_expand_only_intersecting_damage_to_layer_bounds() {
 }
 
 #[test]
+fn clipped_effect_damage_stays_within_visible_output() {
+    let scene = |moving_x| {
+        let mut list = DisplayList::new();
+        list.push_quad(quad(moving_x, 24.0, 16.0));
+        list.begin_layer(
+            LayerStyle::new(Rect::new(Point::new(0.0, 0.0), Size::new(512.0, 256.0)))
+                .backdrop(Filter::Blur(8.0))
+                .clip_to(Rect::new(Point::new(96.0, 0.0), Size::new(96.0, 96.0))),
+        );
+        list.push_quad(quad(112.0, 24.0, 16.0));
+        list.end_layer();
+        list
+    };
+    let previous = scene(104.0);
+    let current = scene(120.0);
+    for (viewport, scale) in [([512, 256], 1.0), ([1024, 512], 2.0)] {
+        let plan = snapshot(&previous, viewport, scale).compare_with_effects(
+            &snapshot(&current, viewport, scale),
+            DamageTracking::enabled(),
+            &EffectRegistry::default(),
+        );
+        let DamagePlan::Partial(regions) = plan else {
+            panic!("the clipped output must not dirty the complete viewport");
+        };
+        assert!(
+            regions
+                .iter()
+                .all(|region| region.x >= 96 * scale as u32 - 32)
+        );
+        assert!(
+            regions
+                .iter()
+                .all(|region| region.right() <= 192 * scale as u32 + 32)
+        );
+    }
+}
+
+#[test]
 fn custom_effect_damage_policy_is_conservative_by_default() {
     const WGSL: &str = r#"
 fn argui_effect(_uv: vec2<f32>, source: vec4<f32>, _backdrop: vec4<f32>) -> vec4<f32> {

@@ -72,6 +72,7 @@ fn push_scoped_quad(
         element,
         scope,
         visual_bounds,
+        context.clip_bounds,
         node.node,
     );
     output

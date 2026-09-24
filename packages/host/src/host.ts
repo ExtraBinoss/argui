@@ -175,14 +175,21 @@ export class NativeHost {
       if (event) this.events.set(key, event)
     }
     if (!event) throw new Error(`${node.type.name} has no event ${name}`)
+    if (value != null && typeof value !== 'function') {
+      throw new TypeError(`${name} listener must be a function`)
+    }
     const old = node.listeners.get(event.id)
-    if (old) this.callbacks.delete(old)
     if (value == null) {
+      if (old === undefined) return
+      this.callbacks.delete(old)
       node.listeners.delete(event.id)
       this.enqueue({ kind: 'setListener', id: node.id, event: event.id, callback: null })
       return
     }
-    if (typeof value !== 'function') throw new TypeError(`${name} listener must be a function`)
+    if (old !== undefined) {
+      this.callbacks.set(old, value as (payload: unknown) => void)
+      return
+    }
     const callback = this.nextCallback++
     this.callbacks.set(callback, value as (payload: unknown) => void)
     node.listeners.set(event.id, callback)

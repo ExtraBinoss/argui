@@ -1,12 +1,16 @@
-import { createSignal } from '@argui/solid'
+import { createMemo, createSignal, VirtualList } from '@argui/solid'
 import type { JSX } from '@argui/solid/jsx-runtime'
 import { Button, Select } from './controls'
 import { AnimationLab } from './animation-lab'
+import { OverlayPage, PopoverPage } from './overlay'
+import { DamageControl } from './damage-control'
+import { InputField } from './input-field'
+import { InputsPage } from './inputs'
+import { WgslLab } from './wgsl-lab'
+import { pages, filteredNavigation, navigationKey, navigationVersion, type Page } from './gallery-pages'
 import { mediaAssets } from './assets.generated'
 import { palette, type Accent, type Palette, type ThemeMode } from './theme'
 
-type Page = 'Button' | 'Select' | 'Animation Lab' | 'Media'
-const pages: readonly Page[] = ['Button', 'Select', 'Animation Lab', 'Media']
 const accents: readonly Accent[] = ['blue', 'violet', 'emerald']
 const choices = ['Vulkan', 'DirectX 12', 'Metal', 'WebGPU'] as const
 const mobile = (globalThis as { __arguiMobile?: boolean }).__arguiMobile === true
@@ -17,6 +21,7 @@ export function Gallery(): JSX.Element {
   const [mode, setMode] = createSignal<ThemeMode>('light')
   const [accent, setAccent] = createSignal<Accent>('blue')
   const [menuOpen, setMenuOpen] = createSignal(true)
+  const [search, setSearch] = createSignal('')
   const [clicks, setClicks] = createSignal(0)
   const [lastUsed, setLastUsed] = createSignal('None')
   const [starActive, setStarActive] = createSignal(false)
@@ -37,34 +42,57 @@ export function Gallery(): JSX.Element {
         kind="quiet" selected={accent() === option} onClick={() => setAccent(option)} />)}
     </row>
   )
-  const navigation = () => menuOpen() ? (
-    <focusScope role="navigation" accessible_name="Gallery pages" focus_on_tab_navigation={false} width={mobile ? 'fill' : 150}>
-      <column width={mobile ? 'fill' : 150} gap={7} padding={mobile ? 0 : 10}>
-        <text text="EXPLORE" color={theme().muted} font_size={11} />
-        {mobile ? <row width="fill" wrap={true} gap={7}>
-          {pages.map((item) => <Button id={`page-${item.replaceAll(' ', '-').toLowerCase()}`}
-            label={item} theme={theme()}
-            kind={page() === item ? 'secondary' : 'quiet'} selected={page() === item}
-            current={page() === item ? 'page' : undefined} onClick={() => setPage(item)} />)}
-        </row> : <column gap={7}>
-          {pages.map((item) => <Button id={`page-${item.replaceAll(' ', '-').toLowerCase()}`}
-            label={item} theme={theme()}
-            kind={page() === item ? 'secondary' : 'quiet'} selected={page() === item}
-            current={page() === item ? 'page' : undefined} onClick={() => setPage(item)} />)}
-        </column>}
+  const navigation = () => {
+    if (!menuOpen()) return null
+    const items = createMemo(() => filteredNavigation(search()))
+    return <focusScope role="navigation" accessible_name="Gallery pages" focus_on_tab_navigation={false}
+      width={mobile ? 'fill' : 220} height={mobile ? undefined : 'fill'}>
+      <column width={mobile ? 'fill' : 220} height={mobile ? undefined : 'fill'} min_height={0}
+        gap={8} padding={8} background={theme().surface}>
+        <InputField id="gallery-search" label="Search components" search theme={theme()}
+          value={search()} placeholder="Search components" onChange={setSearch} />
+        <VirtualList id="gallery-navigation" count={items().length} estimate={mobile ? 112 : 47}
+          itemKey={(index) => navigationKey(items()[index]!)} dataVersion={navigationVersion(search())}
+          variable={true} axis={mobile ? 'horizontal' : 'vertical'} overscan={3}
+          width="fill" height={mobile ? 56 : 'fill'}
+          scrollbarWidth={3} scrollbarColor={mode() === 'dark' ? '#ffffff66' : '#0000003d'}
+          shadow={{ color: theme().surface, intensity: 1,
+            width: 36, left: true, right: true, top: true, bottom: true }}
+          renderItem={(index) => {
+            const item = items()[index]!
+            if (item.kind === 'heading') return <column height={mobile ? 56 : 30} padding={7}
+              justify_content="center"><text text={item.label} color={theme().muted} font_size={11} /></column>
+            return <Button id={navigationKey(item)} label={item.page} theme={theme()}
+              kind={page() === item.page ? 'secondary' : 'quiet'} selected={page() === item.page}
+              current={page() === item.page ? 'page' : undefined} onClick={() => setPage(item.page)} />
+          }} />
+        {items().length === 0 ? <text text="No components found" color={theme().muted} font_size={12} /> : null}
       </column>
     </focusScope>
-  ) : null
-  const content = () => (
+  }
+  // Keep each destination mounted so switching only updates visibility and selection.
+  // The native tree suspends animation bindings beneath invisible branches.
+  const content = (item: Page) => (
     <column width="fill" min_width={mobile ? 0 : 260} shrink={1} gap={16} padding={mobile ? 4 : 18}>
-      <text text={page()} color={theme().foreground} font_size={26} />
-      {page() === 'Button' ? <ButtonPage theme={theme()} clicks={clicks()}
+      <text text={item} color={theme().foreground} font_size={26} />
+      {item === 'Input' ? <InputsPage theme={theme()} /> : null}
+      {item === 'Button' ? <ButtonPage theme={theme()} clicks={clicks()}
         lastUsed={lastUsed()} starActive={starActive()} activate={activate} /> : null}
-      {page() === 'Select' ? <SelectPage theme={theme()} value={choice()} onChange={setChoice} /> : null}
-      {page() === 'Animation Lab' ? <AnimationLab theme={theme()} /> : null}
-      {page() === 'Media' ? <MediaPage theme={theme()} /> : null}
+      {item === 'Select' ? <SelectPage theme={theme()} value={choice()} onChange={setChoice} /> : null}
+      {item === 'Popover' ? <PopoverPage theme={theme()} /> : null}
+      {item === 'Animation Lab' ? <AnimationLab theme={theme()} /> : null}
+      {item === 'Media' ? <MediaPage theme={theme()} /> : null}
+      {item === 'Overlay' ? <OverlayPage theme={theme()} /> : null}
+      {item === 'Damage Control' ? <DamageControl theme={theme()} active={page() === item} /> : null}
+      {item === 'WGSL Lab' ? <WgslLab theme={theme()} active={page() === item} /> : null}
     </column>
   )
+  const panes = () => pages.map((item) => (
+    <column key={`scroll-${item}`} visible={page() === item}
+      width="fill" grow={1} min_width={0} min_height={0} scroll_y={true}>
+      {content(item)}
+    </column>
+  ))
   return (
     <column width="fill" height="fill" background={theme().background}>
       {mobile ? (
@@ -80,18 +108,15 @@ export function Gallery(): JSX.Element {
         </row>
       )}
       {mobile ? (
-        <column width="fill" height="fill" shrink={1} min_height={0} gap={16} padding={12}>
+        <column width="fill" height="fill" shrink={1} min_height={0} gap={16}>
           {navigation()}
-          <column key={`scroll-${page()}`} width="fill" grow={1} min_height={0} scroll_y={true}>
-            {content()}
-          </column>
+          <column width="fill" grow={1} shrink={1} min_height={0}
+            padding_left={12} padding_right={12} padding_bottom={12}>{panes()}</column>
         </column>
       ) : (
         <row width="fill" height="fill" shrink={1} min_height={0} gap={16} padding={16}>
           {navigation()}
-          <column key={`scroll-${page()}`} grow={1} min_width={0} min_height={0} scroll_y={true}>
-            {content()}
-          </column>
+          {panes()}
         </row>
       )}
     </column>

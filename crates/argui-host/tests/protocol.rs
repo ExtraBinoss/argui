@@ -1,3 +1,4 @@
+use argui_core::{Point, PointerEvent, PointerPhase};
 use argui_host::{CallbackDelivery, CallbackId, Host, HostId, Operation};
 use argui_schema::builtin;
 use argui_ui::{ClickEvent, UiEventKind, UiTree};
@@ -66,4 +67,56 @@ fn callback_resolution_rejects_replaced_and_removed_listeners() {
 
     host.commit(&[Operation::Remove { id: id(1) }]).unwrap();
     assert_eq!(host.callback_for(current), None);
+}
+
+#[test]
+fn popup_dismiss_callback_accepts_outside_pointer_and_rejects_stale_handlers() {
+    let mut host = Host::with_builtins().unwrap();
+    host.commit(&[
+        create(1, builtin::POPUP_WINDOW),
+        Operation::SetListener {
+            id: id(1),
+            event: builtin::DISMISS,
+            callback: Some(CallbackId(11)),
+        },
+        Operation::SetRoot { id: Some(id(1)) },
+    ])
+    .unwrap();
+    let mut tree = UiTree::new(host.root_element().unwrap());
+    let node = tree.node_ids()[0];
+    for kind in [
+        UiEventKind::DismissRequested,
+        UiEventKind::PointerOutside(PointerEvent::mouse(
+            PointerPhase::Pressed,
+            Point::new(300.0, 300.0),
+        )),
+    ] {
+        let delivery = tree
+            .event_deliveries(node, kind)
+            .into_iter()
+            .find(|event| event.current_handler().is_some())
+            .expect("popup dismissal listener");
+        assert_eq!(
+            host.callback_for(&delivery),
+            Some(CallbackDelivery {
+                node: id(1),
+                callback: CallbackId(11),
+            })
+        );
+        host.commit(&[Operation::SetListener {
+            id: id(1),
+            event: builtin::DISMISS,
+            callback: Some(CallbackId(12)),
+        }])
+        .unwrap();
+        assert_eq!(host.callback_for(&delivery), None);
+        tree.update(host.root_element().unwrap());
+        host.commit(&[Operation::SetListener {
+            id: id(1),
+            event: builtin::DISMISS,
+            callback: Some(CallbackId(11)),
+        }])
+        .unwrap();
+        tree.update(host.root_element().unwrap());
+    }
 }

@@ -1,6 +1,6 @@
 use argui_animation::{Duration, Motion, Time, Tween};
 use argui_core::Transform2D;
-use argui_ui::{Element, TreeUpdate, UiTree, property};
+use argui_ui::{Display, Element, TreeUpdate, UiTree, property};
 
 /// A completed transform repaints even while an unrelated compositor track continues.
 #[test]
@@ -73,4 +73,37 @@ fn reduced_motion_finishes_transform_with_paint_and_opacity_with_composition() {
     let mut tree = UiTree::new(Element::text("Text").bind(property::LayerOpacity, opacity.clone()));
     opacity.animate_to(0.5, Tween::new(Duration::from_secs(1)));
     assert_eq!(tree.set_reduced_motion(true), TreeUpdate::Composite);
+}
+
+/// Hidden retained pages do not schedule frames for their native loops.
+#[test]
+fn hidden_binding_suspends_frames_until_page_is_visible() {
+    let motion = Motion::new(Transform2D::IDENTITY);
+    let page =
+        Element::container([Element::container([]).bind(property::Transform, motion.clone())]);
+    let mut tree = UiTree::new(page.clone().display(Display::None));
+    motion.animate_to(
+        Transform2D::IDENTITY.translate(100.0, 0.0),
+        Tween::new(Duration::from_secs(1)),
+    );
+    assert!(!tree.wants_animation_frame());
+    assert_eq!(
+        tree.advance_animations(Time::from_nanos(1)),
+        TreeUpdate::None
+    );
+
+    tree.update(page.clone());
+    assert!(tree.wants_animation_frame());
+    tree.advance_animations(Time::from_nanos(2));
+    assert_eq!(
+        tree.advance_animations(Time::from_nanos(50_000_002)),
+        TreeUpdate::Composite
+    );
+
+    tree.update(page.display(Display::None));
+    assert!(!tree.wants_animation_frame());
+    assert_eq!(
+        tree.advance_animations(Time::from_nanos(100_000_002)),
+        TreeUpdate::None
+    );
 }

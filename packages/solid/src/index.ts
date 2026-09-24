@@ -32,3 +32,5 @@ export const {
   createElement, createTextNode, insertNode, use,
 } = renderer
 export { For, Show, Switch, Match, createSignal, createMemo, onCleanup } from 'solid-js'
+export { VirtualList } from './vlist'
+export type { VirtualListProps } from './vlist'

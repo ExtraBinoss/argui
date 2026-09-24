@@ -57,6 +57,7 @@ impl Application {
                 };
                 layout = next;
             }
+            self.publish_virtual_events(std::mem::take(&mut layout.virtual_events));
             self.ui_layout = Some(layout);
             if let Some(request) = scroll_request {
                 self.prepared_text = None;
@@ -99,16 +100,44 @@ impl Application {
                 .expect("a computed layout retains its UI tree")
                 .update(root);
         }
-        let Some(layout) = self.compute_ui_layout()? else {
+        let Some(mut next) = self.compute_ui_layout()? else {
             return Ok(None);
         };
-        if request_if_unsettled && layout.virtualization_changed {
+        let mut prior_events = layout.virtual_events;
+        prior_events.append(&mut next.virtual_events);
+        next.virtual_events = prior_events;
+        if request_if_unsettled && next.virtualization_changed {
             self.pending_ui_frame.request_rebuild();
             if let Some(window) = &self.window {
                 window.request_redraw();
             }
         }
-        Ok(Some(layout))
+        Ok(Some(next))
+    }
+
+    /// Publishes layout-driven virtual-list events to native and application listeners.
+    ///
+    /// * `events` — measured extents and bounded-window requests from this layout.
+    fn publish_virtual_events(&mut self, events: Vec<argui_ui::UiEvent>) {
+        for event in events {
+            if !event.should_dispatch() {
+                continue;
+            }
+            #[cfg(not(target_arch = "wasm32"))]
+            if let (Some(host), Some(sender)) = (&self.native_host, &self.native_host_events)
+                && let Some(callback) = host.callback_for(&event)
+            {
+                let _ = sender.send(crate::NativeHostDelivery {
+                    callback,
+                    kind: event.kind.clone(),
+                });
+            }
+            let published = self
+                .ui_tree
+                .as_ref()
+                .map_or_else(|| event.clone(), |ui| ui.inspect_event(&event));
+            (self.on_event)(RuntimeEvent::Ui(published));
+        }
     }
 
     pub(super) fn update_viewport(&mut self, width: u32, height: u32) {

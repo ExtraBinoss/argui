@@ -1,7 +1,9 @@
 //! Parsing of ordered CSS-style backdrop filters into renderer-independent paint filters.
 
 use argui_core::Color;
-use argui_paint::{Filter, Refraction, Shadow};
+use argui_paint::{
+    EffectArgument, EffectId, EffectInstance, EffectValue, Filter, Refraction, Shadow,
+};
 
 /// Parses `value` as a space-separated CSS-style filter function list.
 ///
@@ -100,10 +102,56 @@ fn parse_function(name: &str, arguments: &str) -> Result<Filter, String> {
         "sepia" => Ok(Filter::ColorMatrix(sepia(ratio(arguments, true)?))),
         "drop-shadow" => Ok(Filter::DropShadow(drop_shadow(arguments)?)),
         "refraction" => Ok(Filter::Refraction(refraction(arguments)?)),
+        "effect" => Ok(Filter::Effect(custom_effect(arguments)?)),
         "color-matrix" => Ok(Filter::ColorMatrix(color_matrix(arguments)?)),
         "url" => Err("SVG url() backdrop filters are unsupported".into()),
         _ => Err(format!("unsupported backdrop-filter function `{name}`")),
     }
+}
+
+/// Parses a registered custom effect and its live scalar parameters.
+///
+/// `arguments` starts with a namespaced effect ID followed by zero or more
+/// `name=value` finite f32 parameters. Returns the effect instance used by
+/// the renderer, or an error for malformed names and values.
+///
+/// # Errors
+/// Returns an error when the ID, parameter syntax, or scalar is invalid.
+fn custom_effect(arguments: &str) -> Result<EffectInstance, String> {
+    let mut parts = arguments.split_whitespace();
+    let id = parts.next().ok_or("effect() needs an identifier")?;
+    if !valid_effect_name(id) || !id.contains('.') {
+        return Err("effect() needs a namespaced identifier".into());
+    }
+    let parameters = parts
+        .map(|part| {
+            let (name, value) = part
+                .split_once('=')
+                .ok_or("effect() parameters need name=value")?;
+            if !valid_effect_name(name) {
+                return Err("invalid effect() parameter name".into());
+            }
+            Ok(EffectArgument::from_owned(
+                name.to_string(),
+                EffectValue::F32(finite(value)?),
+            ))
+        })
+        .collect::<Result<Vec<_>, String>>()?;
+    Ok(EffectInstance::new(
+        EffectId::from_owned(id.to_string()),
+        parameters,
+    ))
+}
+
+/// Returns whether `name` uses only identifier characters accepted by effect IDs.
+///
+/// `name` is an effect or parameter identifier. Returns false for empty names
+/// or punctuation that would make the filter syntax ambiguous.
+fn valid_effect_name(name: &str) -> bool {
+    !name.is_empty()
+        && name
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'))
 }
 
 /// Parses `text` as a finite CSS length in logical pixels; `negative` permits offsets.

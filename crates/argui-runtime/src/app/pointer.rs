@@ -563,7 +563,7 @@ impl Application {
             PointerPhase::Entered | PointerPhase::Pressed => {}
         }
         if event.phase == PointerPhase::Pressed
-            && pointer_default.is_some_and(|event| !event.default_prevented())
+            && !default_prevented
             && let (Some(ui), Some(layout)) = (&mut self.ui_tree, &self.ui_layout)
         {
             let update = ui.focus_pointer_default(event.id, &layout.hit_regions);

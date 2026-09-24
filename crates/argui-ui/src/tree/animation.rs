@@ -1,4 +1,4 @@
-use crate::{BindingImpact, Element, PropertyBinding, TreeUpdate, traversal::flattened};
+use crate::{BindingImpact, Element, PropertyBinding, TreeUpdate, traversal::flattened_visible};
 
 use super::UiTree;
 
@@ -30,7 +30,7 @@ impl AnimationRegistry {
     pub(super) fn new(root: &Element) -> Self {
         let mut entries = Vec::<AnimationEntry>::new();
         let mut layout_indices = Vec::new();
-        for (index, element) in flattened(root).into_iter().enumerate() {
+        for (index, element) in flattened_visible(root) {
             for binding in &element.bindings {
                 let identity = binding.track().identity();
                 if let Some(existing) = entries

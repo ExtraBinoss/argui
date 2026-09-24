@@ -194,3 +194,39 @@ fn property_model_mutation_updates_a_row_without_copying_the_collection() {
     assert_eq!(property.with(|model| model[2048].value), 2049);
     assert_eq!(property.revision(), 1);
 }
+
+/// Imported identities reject malformed rows and preserve revision and ordering when valid.
+#[test]
+fn imported_model_rows_validate_identity_and_exhaustion() {
+    use std::hint::black_box;
+
+    assert!(Model::from_identified_rows([(black_box(0), "zero")], 3).is_none());
+    assert!(Model::from_identified_rows([(black_box(7), "first"), (7, "again")], 3).is_none());
+    assert!(Model::from_identified_rows([(black_box(u64::MAX), "last")], 3).is_none());
+
+    let restored = Model::from_identified_rows([(black_box(12), "alpha"), (4, "beta")], 9)
+        .expect("distinct nonzero identities should restore");
+    assert_eq!(restored.row_ids(), &[12, 4]);
+    assert_eq!(restored.revision(), 9);
+    assert_eq!(&*restored, &["alpha", "beta"]);
+}
+
+/// Rejected moves preserve snapshot identity; no-op edits preserve values and revision.
+#[test]
+fn rejected_model_edits_leave_snapshot_and_revision_unchanged() {
+    use std::hint::black_box;
+
+    let mut model = Model::new(["alpha", "beta"]);
+    let snapshot = model.clone();
+    for (from, to) in [(2, 0), (0, 2), (1, 1)] {
+        assert!(!model.move_row(black_box(from), black_box(to)));
+    }
+    assert!(!model.update(black_box(2), |_| panic!("out-of-range edit ran")));
+    assert_eq!(model, snapshot);
+    assert!(!model.update(black_box(0), |_| false));
+    assert_ne!(model, snapshot);
+    assert_eq!(&*model, &*snapshot);
+    assert_eq!(model.revision(), 0);
+    assert_eq!(model.row_ids(), snapshot.row_ids());
+    assert_eq!(model.project(|_| true, None), [0, 1]);
+}

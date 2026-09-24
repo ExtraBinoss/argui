@@ -1,4 +1,6 @@
-use argui_core::{Affine2D, Point, PointerButton, PointerEvent, PointerPhase, Rect, Size};
+use argui_core::{
+    Affine2D, Point, PointerButton, PointerEvent, PointerId, PointerKind, PointerPhase, Rect, Size,
+};
 use argui_paint::ClipChain;
 use argui_schema::{NativeElementInput, NativeEventValue, SchemaError, SchemaValue, builtin};
 use argui_ui::{
@@ -163,4 +165,83 @@ fn touch_area_drag_coalesces_pointer_samples_per_frame() {
             .count(),
         1
     );
+}
+
+/// A tap on a passive touch area activates, while a drag can be owned by a scroll ancestor.
+#[test]
+fn passive_touch_area_keeps_parent_scroll_available_and_cancels_drag_activation() {
+    let registry = builtin::registry().unwrap();
+    let handler = EventHandler::from_identity(EventHandlerId::new(EventOwnerId(1), 1));
+    let area = registry
+        .construct(
+            builtin::TOUCH_AREA,
+            &NativeElementInput::new()
+                .event(NativeEventValue::new(builtin::CLICK, handler))
+                .event(NativeEventValue::new(builtin::POINTER_DOWN, handler))
+                .event(NativeEventValue::new(builtin::POINTER_UP, handler)),
+        )
+        .unwrap();
+    assert!(!area.interaction.as_ref().unwrap().capture_on_press);
+    let mut tree = UiTree::new(area);
+    let node = tree.node_ids()[0];
+    let region = HitRegion {
+        node,
+        bounds: Rect::new(Point::default(), Size::new(100.0, 100.0)),
+        transform: Affine2D::IDENTITY,
+        clips: ClipChain::default(),
+        shape: HitShape::Bounds,
+        slop: Sides::default(),
+        enabled: true,
+        focus_policy: FocusPolicy::None,
+        cursor: CursorIcon::Default,
+        gestures: tree
+            .element_for(node)
+            .unwrap()
+            .interaction
+            .as_ref()
+            .unwrap()
+            .gestures,
+        window_drag: None,
+    };
+    let pointer = PointerId::new(77);
+    let contact = |phase, x| PointerEvent {
+        id: pointer,
+        kind: PointerKind::Touch,
+        button: Some(PointerButton::Primary),
+        buttons: u16::from(matches!(phase, PointerPhase::Pressed | PointerPhase::Moved)),
+        ..PointerEvent::mouse(phase, Point::new(x, 20.0))
+    };
+    for (end_x, expected_click) in [(20.0, true), (60.0, false)] {
+        let down = tree.pointer_event(
+            contact(PointerPhase::Pressed, 20.0),
+            std::slice::from_ref(&region),
+        );
+        let pressed = down.events.iter().find(|event| {
+            matches!(
+                event.kind,
+                UiEventKind::Pointer(PointerEvent {
+                    phase: PointerPhase::Pressed,
+                    ..
+                })
+            )
+        });
+        tree.pointer_press_default(pointer, pressed, std::slice::from_ref(&region));
+        assert!(!tree.pointer_captured(pointer));
+        if end_x != 20.0 {
+            tree.pointer_event(
+                contact(PointerPhase::Moved, end_x),
+                std::slice::from_ref(&region),
+            );
+        }
+        let up = tree.pointer_event(
+            contact(PointerPhase::Released, end_x),
+            std::slice::from_ref(&region),
+        );
+        assert_eq!(
+            up.events
+                .iter()
+                .any(|event| matches!(event.kind, UiEventKind::Click(_))),
+            expected_click
+        );
+    }
 }

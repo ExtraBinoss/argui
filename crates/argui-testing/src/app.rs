@@ -259,7 +259,9 @@ impl<A: Render> TestApp<A> {
 
     /// Publishes UI state before handlers run and schedules watched visual changes.
     fn refresh_interaction_observations(&mut self) {
-        let Some(ui) = self.ui.as_ref() else {
+        // A scroll invalidates the layout before the next settle pass. Publish
+        // its new bounds and offsets after layout has been recomputed.
+        let (Some(ui), Some(_)) = (self.ui.as_ref(), self.layout.as_ref()) else {
             return;
         };
         let regions = self
