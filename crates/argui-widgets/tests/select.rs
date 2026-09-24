@@ -234,6 +234,7 @@ fn select_behavior_decorates_disabled_and_invalid_options_without_activation() {
         argui_ui::CursorIcon::NotAllowed
     );
     assert!(disabled.semantics.as_ref().unwrap().state.disabled);
+    assert!(disabled.semantics.as_ref().unwrap().actions.is_empty());
     let invalid = behavior.decorate(SelectPart::Option(10), Element::container([]));
     assert!(
         !invalid

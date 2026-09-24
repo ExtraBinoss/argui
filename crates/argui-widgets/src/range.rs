@@ -238,8 +238,8 @@ impl RangeBehavior {
                                 ),
                             ),
                     )
-                    .semantics(
-                        Semantics::new(Role::Slider)
+                    .semantics({
+                        let mut semantics = Semantics::new(Role::Slider)
                             .label(self.label.clone())
                             .orientation(match self.config.axis {
                                 RangeAxis::Horizontal => Orientation::Horizontal,
@@ -254,12 +254,16 @@ impl RangeBehavior {
                             .state(SemanticState {
                                 disabled: !self.enabled,
                                 ..SemanticState::default()
-                            })
-                            .action(SemanticAction::Focus)
-                            .action(SemanticAction::Increment)
-                            .action(SemanticAction::Decrement)
-                            .action(SemanticAction::SetValue),
-                    )
+                            });
+                        if self.enabled {
+                            semantics = semantics
+                                .action(SemanticAction::Focus)
+                                .action(SemanticAction::Increment)
+                                .action(SemanticAction::Decrement)
+                                .action(SemanticAction::SetValue);
+                        }
+                        semantics
+                    })
             }
         }
     }

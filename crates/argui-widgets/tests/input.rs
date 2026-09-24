@@ -1,6 +1,8 @@
 use argui_core::{Color, ColorScheme};
 use argui_text::{TextContent, TextSpan, TextSpanStyle, TextWrap};
-use argui_ui::{Dimension, ElementKind, Overflow, Role, ScrollPropagation, TextInputFilter};
+use argui_ui::{
+    Dimension, ElementKind, Overflow, Role, ScrollPropagation, SemanticAction, TextInputFilter,
+};
 use argui_widgets::{Input, InputKind, TablerIcon, TextArea, WidgetAssets, shadcn};
 
 #[test]
@@ -19,6 +21,7 @@ fn controlled_inputs_keep_semantics_and_editor_configuration_together() {
     assert_eq!(semantics.label.as_deref(), Some("Search components"));
     assert_eq!(semantics.description.as_deref(), Some("Command K"));
     assert!(semantics.state.read_only);
+    assert!(!semantics.actions.contains(&SemanticAction::SetValue));
     assert!(semantics.state.invalid);
     assert!(matches!(
         input.kind,

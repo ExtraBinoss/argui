@@ -1,6 +1,6 @@
 /** @jsxImportSource @argui/react */
 import { useState, type ReactElement, type ReactNode } from 'react'
-import type { AssetRef } from '@argui/host'
+import type { AssetRef, SemanticCurrent } from '@argui/host'
 import { mediaAssets } from './assets.generated'
 import type { Palette } from './theme'
 
@@ -14,7 +14,7 @@ export interface ReactButtonProps {
   disabled?: boolean
   busy?: boolean
   selected?: boolean
-  current?: string
+  current?: SemanticCurrent
   kind?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'destructive' | 'quiet'
   icon?: AssetRef
   activeIcon?: AssetRef

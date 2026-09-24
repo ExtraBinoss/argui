@@ -241,3 +241,5 @@ fn layout_primitives_apply_optional_spacing_shape_and_scroll_policy() {
         assert_eq!(element.style.overflow.y, Overflow::Auto);
     }
 }
+#[path = "builtin/accessibility.rs"]
+mod accessibility;

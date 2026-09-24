@@ -94,9 +94,13 @@ impl TextFieldBehavior {
                         read_only: self.read_only,
                         invalid: self.invalid,
                         ..SemanticState::default()
-                    })
-                    .action(SemanticAction::Focus)
-                    .action(SemanticAction::SetValue);
+                    });
+                if self.enabled {
+                    semantics = semantics.action(SemanticAction::Focus);
+                    if !self.read_only {
+                        semantics = semantics.action(SemanticAction::SetValue);
+                    }
+                }
                 if let Some(description) = &self.description {
                     semantics = semantics.description(description.clone());
                 }

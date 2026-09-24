@@ -149,18 +149,22 @@ impl SelectBehavior {
                             .gestures(GestureSet::default().tap(argui_ui::TapGesture::default()))
                             .keyboard_activation(KeyboardActivation::EnterOrSpace),
                     )
-                    .semantics(
-                        Semantics::new(Role::Option)
+                    .semantics({
+                        let mut semantics = Semantics::new(Role::Option)
                             .label(label)
                             .state(SemanticState {
                                 selected: self.selected == Some(index),
                                 disabled: !enabled,
                                 ..SemanticState::default()
                             })
-                            .position_in_set((index + 1) as u32, self.options.len() as u32)
-                            .action(SemanticAction::Click)
-                            .action(SemanticAction::Focus),
-                    )
+                            .position_in_set((index + 1) as u32, self.options.len() as u32);
+                        if enabled {
+                            semantics = semantics
+                                .action(SemanticAction::Click)
+                                .action(SemanticAction::Focus);
+                        }
+                        semantics
+                    })
             }
         }
     }

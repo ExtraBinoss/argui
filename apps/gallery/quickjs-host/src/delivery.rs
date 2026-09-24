@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use argui_core::{Key, KeyState};
 use argui_runtime::{HostId, NativeHostDelivery};
-use argui_ui::UiEventKind;
+use argui_ui::{SemanticAction, SemanticValue, UiEventKind};
 use serde_json::{Value, json};
 
 /// Keeps the newest virtual-window callback for each native node in a burst.
@@ -91,7 +91,25 @@ pub fn ui_event_payload(kind: &UiEventKind) -> Value {
             "offset": offset,
             "viewportExtent": viewport_extent,
         }),
-        UiEventKind::SemanticAction { .. } => json!({"kind": "semantic_action"}),
+        UiEventKind::SemanticAction { action, value } => json!({
+            "kind": "semantic_action",
+            "action": match action {
+                SemanticAction::Click => "click",
+                SemanticAction::Focus => "focus",
+                SemanticAction::Blur => "blur",
+                SemanticAction::Increment => "increment",
+                SemanticAction::Decrement => "decrement",
+                SemanticAction::Expand => "expand",
+                SemanticAction::Collapse => "collapse",
+                SemanticAction::SetValue => "set_value",
+                SemanticAction::ScrollIntoView => "scroll_into_view",
+            },
+            "value": match value {
+                Some(SemanticValue::Text(text)) => json!(text),
+                Some(SemanticValue::Number { value, .. }) => json!(value),
+                None => Value::Null,
+            },
+        }),
         other => json!({"kind": format!("{:?}", other.event_type())}),
     }
 }

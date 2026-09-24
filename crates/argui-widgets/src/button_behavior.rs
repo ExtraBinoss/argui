@@ -68,6 +68,18 @@ impl ButtonBehavior {
         } else {
             CursorIcon::Pointer
         };
+        let mut semantics = Semantics::new(Role::Button)
+            .label(self.label.clone())
+            .state(SemanticState {
+                disabled: !enabled,
+                busy: self.busy,
+                ..SemanticState::default()
+            });
+        if enabled {
+            semantics = semantics
+                .action(SemanticAction::Click)
+                .action(SemanticAction::Focus);
+        }
         element
             .keyed(self.key.clone())
             .user_select(UserSelect::None)
@@ -85,17 +97,7 @@ impl ButtonBehavior {
                     .gestures(GestureSet::default().tap(argui_ui::TapGesture::default()))
                     .keyboard_activation(KeyboardActivation::EnterOrSpace),
             )
-            .semantics(
-                Semantics::new(Role::Button)
-                    .label(self.label.clone())
-                    .state(SemanticState {
-                        disabled: !enabled,
-                        busy: self.busy,
-                        ..SemanticState::default()
-                    })
-                    .action(SemanticAction::Click)
-                    .action(SemanticAction::Focus),
-            )
+            .semantics(semantics)
     }
 
     #[must_use]

@@ -73,6 +73,10 @@ fn accessibility_action_update(
         .iter()
         .copied()
         .find(|node| node.get() == request.target.get())?;
+    let semantics = ui.element_for(target)?.semantics.as_ref()?;
+    if semantics.state.disabled || !semantics.actions.contains(&request.action) {
+        return None;
+    }
     if matches!(request.action, SemanticAction::Focus | SemanticAction::Blur) {
         return Some(layout.map_or_else(InteractionUpdate::default, |layout| {
             ui.sync_focus(

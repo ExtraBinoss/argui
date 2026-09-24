@@ -242,9 +242,13 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
                 read_only,
                 invalid,
                 ..SemanticState::default()
-            })
-            .action(SemanticAction::Focus)
-            .action(SemanticAction::SetValue);
+            });
+        if enabled {
+            semantics = semantics.action(SemanticAction::Focus);
+            if !read_only {
+                semantics = semantics.action(SemanticAction::SetValue);
+            }
+        }
         if let Some(description) = optional_string(input, DESCRIPTION) {
             semantics = semantics.description(description.clone());
         }

@@ -1,19 +1,26 @@
 //! Unpainted focus and keyboard boundary for declarative controls.
 
 use argui_ui::{
-    CheckedState, Current, Element, EventType, FocusContainment, FocusPolicy, FocusScope,
-    FocusTarget, InitialFocus, Interaction, KeyboardActivation, LiveRegion, Role, SemanticAction,
-    SemanticState, SemanticValue, Semantics, UserSelect,
+    CheckedState, Element, EventType, FocusContainment, FocusPolicy, FocusScope, FocusTarget,
+    InitialFocus, Interaction, KeyboardActivation, Role, SemanticAction, SemanticState,
+    SemanticValue, Semantics, UserSelect,
 };
 
+use super::focus_scope_parse::{
+    parse_activation, parse_containment, parse_current, parse_live, parse_role,
+};
 use super::{
     BLUR, BUSY, CAPTURE_KEY_INPUT, CHECKED, CHILDREN, CLICK, CommonProperty, ENABLED, EXPANDED,
     FOCUS, FOCUS_CONTAINMENT, FOCUS_ON_CLICK, FOCUS_ON_TAB, FOCUS_VISIBLE, HAS_FOCUS,
-    INITIAL_FOCUS, KEY_INPUT, KEYBOARD_ACTIVATION, RESTORE_FOCUS, SEMANTIC_ACTIVE_DESCENDANT,
+    INITIAL_FOCUS, KEY_INPUT, KEYBOARD_ACTIVATION, RESTORE_FOCUS, SEMANTIC_ACTION,
+    SEMANTIC_ACTIVE_DESCENDANT, SEMANTIC_CAN_COLLAPSE, SEMANTIC_CAN_DECREMENT, SEMANTIC_CAN_EXPAND,
+    SEMANTIC_CAN_INCREMENT, SEMANTIC_CAN_SCROLL_INTO_VIEW, SEMANTIC_CAN_SET_VALUE,
     SEMANTIC_CONTROLS, SEMANTIC_CURRENT, SEMANTIC_DESCRIBED_BY, SEMANTIC_DESCRIPTION,
-    SEMANTIC_EXPANDABLE, SEMANTIC_INVALID, SEMANTIC_LABEL, SEMANTIC_LABELLED_BY, SEMANTIC_LIVE,
-    SEMANTIC_ROLE, SEMANTIC_SELECTED, SEMANTIC_VALUE, apply_common, common_event, common_property,
-    optional_bool,
+    SEMANTIC_EXPANDABLE, SEMANTIC_FOCUSABLE, SEMANTIC_INVALID, SEMANTIC_LABEL,
+    SEMANTIC_LABELLED_BY, SEMANTIC_LIVE, SEMANTIC_MAXIMUM_VALUE, SEMANTIC_MINIMUM_VALUE,
+    SEMANTIC_MULTISELECTABLE, SEMANTIC_NUMERIC_VALUE, SEMANTIC_PRESSED, SEMANTIC_READ_ONLY,
+    SEMANTIC_REQUIRED, SEMANTIC_ROLE, SEMANTIC_SELECTED, SEMANTIC_VALUE, SEMANTIC_VALUE_STEP,
+    apply_common, common_event, common_property, optional_bool,
 };
 use crate::{
     NativeElementInput, NativeSchema, ObservationKind, PropertySchema, SchemaError, SchemaRegistry,
@@ -137,6 +144,96 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
         "Current text value announced by assistive technology.",
     ))
     .property(PropertySchema::new(
+        SEMANTIC_NUMERIC_VALUE,
+        "numeric_value",
+        ValueType::Float,
+        "Current numeric value announced by assistive technology.",
+    ))
+    .property(PropertySchema::new(
+        SEMANTIC_MINIMUM_VALUE,
+        "minimum_value",
+        ValueType::Float,
+        "Lower bound of numeric_value.",
+    ))
+    .property(PropertySchema::new(
+        SEMANTIC_MAXIMUM_VALUE,
+        "maximum_value",
+        ValueType::Float,
+        "Upper bound of numeric_value.",
+    ))
+    .property(PropertySchema::new(
+        SEMANTIC_VALUE_STEP,
+        "value_step",
+        ValueType::Float,
+        "Increment of numeric_value.",
+    ))
+    .property(PropertySchema::new(
+        SEMANTIC_FOCUSABLE,
+        "focusable",
+        ValueType::Bool,
+        "Whether this scope can receive programmatic or accessibility focus.",
+    ))
+    .property(PropertySchema::new(
+        SEMANTIC_PRESSED,
+        "pressed_state",
+        ValueType::Bool,
+        "Persistent pressed state of a toggle button.",
+    ))
+    .property(PropertySchema::new(
+        SEMANTIC_REQUIRED,
+        "required",
+        ValueType::Bool,
+        "Whether a value is required.",
+    ))
+    .property(PropertySchema::new(
+        SEMANTIC_READ_ONLY,
+        "read_only",
+        ValueType::Bool,
+        "Whether the value cannot be edited.",
+    ))
+    .property(PropertySchema::new(
+        SEMANTIC_MULTISELECTABLE,
+        "multiselectable",
+        ValueType::Bool,
+        "Whether the set supports multiple selections.",
+    ))
+    .property(PropertySchema::new(
+        SEMANTIC_CAN_INCREMENT,
+        "can_increment",
+        ValueType::Bool,
+        "Expose an accessible increment action.",
+    ))
+    .property(PropertySchema::new(
+        SEMANTIC_CAN_DECREMENT,
+        "can_decrement",
+        ValueType::Bool,
+        "Expose an accessible decrement action.",
+    ))
+    .property(PropertySchema::new(
+        SEMANTIC_CAN_SET_VALUE,
+        "can_set_value",
+        ValueType::Bool,
+        "Expose an accessible set-value action.",
+    ))
+    .property(PropertySchema::new(
+        SEMANTIC_CAN_EXPAND,
+        "can_expand",
+        ValueType::Bool,
+        "Expose an accessible expand action.",
+    ))
+    .property(PropertySchema::new(
+        SEMANTIC_CAN_COLLAPSE,
+        "can_collapse",
+        ValueType::Bool,
+        "Expose an accessible collapse action.",
+    ))
+    .property(PropertySchema::new(
+        SEMANTIC_CAN_SCROLL_INTO_VIEW,
+        "can_scroll_into_view",
+        ValueType::Bool,
+        "Expose an accessible scroll-into-view action.",
+    ))
+    .property(PropertySchema::new(
         SEMANTIC_SELECTED,
         "selected",
         ValueType::Bool,
@@ -209,6 +306,11 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
         "Current expanded state when expandable is true.",
     ))
     .event(common_event(CLICK, "click", EventType::Click))
+    .event(common_event(
+        SEMANTIC_ACTION,
+        "semantic_action",
+        EventType::SemanticAction,
+    ))
     .event(common_event(FOCUS, "focus", EventType::Focus))
     .event(common_event(BLUR, "blur", EventType::Blur))
     .event(common_event(KEY_INPUT, "key", EventType::Key))
@@ -224,8 +326,10 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
         documentation: "Visual and interaction descendants in this focus boundary.".into(),
     });
     registry.register(schema, |input: &NativeElementInput| {
-        let enabled = optional_bool(input, ENABLED).unwrap_or(true);
-        let focus_policy = if !enabled {
+        let enabled = optional_bool(input, ENABLED).unwrap_or(true)
+            && !optional_bool(input, super::SEMANTIC_DISABLED).unwrap_or(false);
+        let focusable = optional_bool(input, SEMANTIC_FOCUSABLE).unwrap_or(true);
+        let focus_policy = if !enabled || !focusable {
             FocusPolicy::None
         } else if optional_bool(input, FOCUS_ON_TAB).unwrap_or(true) {
             FocusPolicy::TabStop
@@ -269,9 +373,26 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
         }
         let has_semantics = [
             SEMANTIC_ROLE,
+            SEMANTIC_FOCUSABLE,
+            super::SEMANTIC_DISABLED,
             SEMANTIC_LABEL,
             SEMANTIC_DESCRIPTION,
             SEMANTIC_VALUE,
+            SEMANTIC_NUMERIC_VALUE,
+            SEMANTIC_PRESSED,
+            SEMANTIC_REQUIRED,
+            SEMANTIC_READ_ONLY,
+            SEMANTIC_MULTISELECTABLE,
+            BUSY,
+            CHECKED,
+            SEMANTIC_EXPANDABLE,
+            EXPANDED,
+            SEMANTIC_CAN_INCREMENT,
+            SEMANTIC_CAN_DECREMENT,
+            SEMANTIC_CAN_SET_VALUE,
+            SEMANTIC_CAN_EXPAND,
+            SEMANTIC_CAN_COLLAPSE,
+            SEMANTIC_CAN_SCROLL_INTO_VIEW,
             SEMANTIC_SELECTED,
             SEMANTIC_CURRENT,
             SEMANTIC_CONTROLS,
@@ -288,29 +409,34 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
                 Some(SchemaValue::String(name)) => parse_role(name)?,
                 _ => Role::Generic,
             };
-            let mut semantics = Semantics::new(role)
-                .state(SemanticState {
-                    disabled: !enabled,
-                    busy: optional_bool(input, BUSY).unwrap_or(false),
-                    selected: optional_bool(input, SEMANTIC_SELECTED).unwrap_or(false),
-                    invalid: optional_bool(input, SEMANTIC_INVALID).unwrap_or(false),
-                    current: match input.get(SEMANTIC_CURRENT) {
-                        Some(SchemaValue::String(value)) => Some(parse_current(value)?),
-                        _ => None,
-                    },
-                    checked: optional_bool(input, CHECKED).map(|value| {
-                        if value {
-                            CheckedState::Checked
-                        } else {
-                            CheckedState::Unchecked
-                        }
-                    }),
-                    expanded: optional_bool(input, SEMANTIC_EXPANDABLE)
-                        .filter(|value| *value)
-                        .map(|_| optional_bool(input, EXPANDED).unwrap_or(false)),
-                    ..SemanticState::default()
-                })
-                .action(SemanticAction::Focus);
+            let mut semantics = Semantics::new(role).state(SemanticState {
+                disabled: !enabled,
+                busy: optional_bool(input, BUSY).unwrap_or(false),
+                selected: optional_bool(input, SEMANTIC_SELECTED).unwrap_or(false),
+                pressed: optional_bool(input, SEMANTIC_PRESSED),
+                required: optional_bool(input, SEMANTIC_REQUIRED).unwrap_or(false),
+                read_only: optional_bool(input, SEMANTIC_READ_ONLY).unwrap_or(false),
+                multiselectable: optional_bool(input, SEMANTIC_MULTISELECTABLE).unwrap_or(false),
+                invalid: optional_bool(input, SEMANTIC_INVALID).unwrap_or(false),
+                current: match input.get(SEMANTIC_CURRENT) {
+                    Some(SchemaValue::String(value)) => Some(parse_current(value)?),
+                    _ => None,
+                },
+                checked: optional_bool(input, CHECKED).map(|value| {
+                    if value {
+                        CheckedState::Checked
+                    } else {
+                        CheckedState::Unchecked
+                    }
+                }),
+                expanded: optional_bool(input, SEMANTIC_EXPANDABLE)
+                    .filter(|value| *value)
+                    .map(|_| optional_bool(input, EXPANDED).unwrap_or(false)),
+                ..SemanticState::default()
+            });
+            if focus_policy.is_focusable() {
+                semantics = semantics.action(SemanticAction::Focus);
+            }
             if let Some(SchemaValue::String(name)) = input.get(SEMANTIC_LABEL) {
                 semantics = semantics.label(name.clone());
             }
@@ -320,11 +446,46 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
             if let Some(SchemaValue::String(value)) = input.get(SEMANTIC_VALUE) {
                 semantics = semantics.value(SemanticValue::Text(value.clone()));
             }
+            if let Some(SchemaValue::Float(value)) = input.get(SEMANTIC_NUMERIC_VALUE) {
+                if input.get(SEMANTIC_VALUE).is_some() {
+                    return Err(SchemaError::Adapter(
+                        "FocusScope accepts either accessible_value or numeric_value".into(),
+                    ));
+                }
+                let bound = |id| match input.get(id) {
+                    Some(SchemaValue::Float(value)) => Some(f64::from(*value)),
+                    _ => None,
+                };
+                semantics = semantics.value(SemanticValue::Number {
+                    value: f64::from(*value),
+                    minimum: bound(SEMANTIC_MINIMUM_VALUE),
+                    maximum: bound(SEMANTIC_MAXIMUM_VALUE),
+                    step: bound(SEMANTIC_VALUE_STEP),
+                });
+            }
             if let Some(SchemaValue::String(value)) = input.get(SEMANTIC_LIVE) {
                 semantics = semantics.live(parse_live(value)?);
             }
-            if activation != KeyboardActivation::None {
+            if enabled
+                && (activation != KeyboardActivation::None
+                    || input.events.iter().any(|event| event.id == CLICK))
+            {
                 semantics = semantics.action(SemanticAction::Click);
+            }
+            for (property, action) in [
+                (SEMANTIC_CAN_INCREMENT, SemanticAction::Increment),
+                (SEMANTIC_CAN_DECREMENT, SemanticAction::Decrement),
+                (SEMANTIC_CAN_SET_VALUE, SemanticAction::SetValue),
+                (SEMANTIC_CAN_EXPAND, SemanticAction::Expand),
+                (SEMANTIC_CAN_COLLAPSE, SemanticAction::Collapse),
+                (
+                    SEMANTIC_CAN_SCROLL_INTO_VIEW,
+                    SemanticAction::ScrollIntoView,
+                ),
+            ] {
+                if enabled && optional_bool(input, property) == Some(true) {
+                    semantics = semantics.action(action);
+                }
             }
             element = element.semantics(semantics);
             if let Some(SchemaValue::String(key)) = input.get(SEMANTIC_CONTROLS) {
@@ -343,6 +504,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
         for event in &input.events {
             let listener = match event.id {
                 CLICK => event.handler.listener(EventType::Click),
+                SEMANTIC_ACTION => event.handler.listener(EventType::SemanticAction),
                 FOCUS => event.handler.direct_listener(EventType::Focus),
                 BLUR => event.handler.direct_listener(EventType::Blur),
                 KEY_INPUT => event.handler.listener(EventType::Key),
@@ -353,140 +515,4 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
         }
         Ok(element)
     })
-}
-
-/// Parses a focus containment policy from its declarative spelling.
-///
-/// * `name` — policy name supplied by the author.
-///
-/// # Errors
-///
-/// Returns an adapter error for unknown policies.
-fn parse_containment(name: &str) -> Result<FocusContainment, SchemaError> {
-    match name {
-        "none" => Ok(FocusContainment::None),
-        "trap" => Ok(FocusContainment::Trap),
-        "modal" => Ok(FocusContainment::Modal),
-        _ => Err(SchemaError::Adapter(format!(
-            "FocusScope does not support containment `{name}`"
-        ))),
-    }
-}
-
-/// Parses generic keyboard activation without choosing a control style.
-///
-/// * `name` — activation policy name supplied by the author.
-///
-/// # Errors
-///
-/// Returns an adapter error for unknown policies.
-fn parse_activation(name: &str) -> Result<KeyboardActivation, SchemaError> {
-    match name {
-        "none" => Ok(KeyboardActivation::None),
-        "enter" => Ok(KeyboardActivation::Enter),
-        "enter_or_space" => Ok(KeyboardActivation::EnterOrSpace),
-        _ => Err(SchemaError::Adapter(format!(
-            "FocusScope does not support keyboard_activation `{name}`"
-        ))),
-    }
-}
-
-/// Parses the current-item category announced by accessibility adapters.
-///
-/// * `name` — canonical current-item spelling.
-///
-/// # Errors
-///
-/// Returns an adapter error for an unsupported category.
-fn parse_current(name: &str) -> Result<Current, SchemaError> {
-    match name {
-        "true" => Ok(Current::True),
-        "page" => Ok(Current::Page),
-        "step" => Ok(Current::Step),
-        "location" => Ok(Current::Location),
-        "date" => Ok(Current::Date),
-        "time" => Ok(Current::Time),
-        _ => Err(SchemaError::Adapter(format!(
-            "FocusScope does not support current `{name}`"
-        ))),
-    }
-}
-
-/// Parses a live-region announcement policy.
-///
-/// * `name` — canonical live-region spelling.
-///
-/// # Errors
-///
-/// Returns an adapter error for an unsupported policy.
-fn parse_live(name: &str) -> Result<LiveRegion, SchemaError> {
-    match name {
-        "off" => Ok(LiveRegion::Off),
-        "polite" => Ok(LiveRegion::Polite),
-        "assertive" => Ok(LiveRegion::Assertive),
-        _ => Err(SchemaError::Adapter(format!(
-            "FocusScope does not support live `{name}`"
-        ))),
-    }
-}
-
-/// Parses an accessible role supported by the engine.
-///
-/// * `name` — role spelling supplied by the author.
-///
-/// # Errors
-///
-/// Returns an adapter error for unknown roles.
-fn parse_role(name: &str) -> Result<Role, SchemaError> {
-    let role = match name {
-        "generic" => Role::Generic,
-        "window" => Role::Window,
-        "group" => Role::Group,
-        "navigation" => Role::Navigation,
-        "text" => Role::Text,
-        "heading" => Role::Heading,
-        "image" => Role::Image,
-        "link" => Role::Link,
-        "button" => Role::Button,
-        "check_box" => Role::CheckBox,
-        "radio_button" => Role::RadioButton,
-        "switch" => Role::Switch,
-        "text_input" => Role::TextInput,
-        "text_area" => Role::TextArea,
-        "search_input" => Role::SearchInput,
-        "table" => Role::Table,
-        "grid" => Role::Grid,
-        "row" => Role::Row,
-        "column_header" => Role::ColumnHeader,
-        "cell" => Role::Cell,
-        "list" => Role::List,
-        "list_item" => Role::ListItem,
-        "tree" => Role::Tree,
-        "tree_item" => Role::TreeItem,
-        "list_box" => Role::ListBox,
-        "option" => Role::Option,
-        "menu" => Role::Menu,
-        "menu_item" => Role::MenuItem,
-        "menu_bar" => Role::MenuBar,
-        "menu_item_check_box" => Role::MenuItemCheckBox,
-        "menu_item_radio" => Role::MenuItemRadio,
-        "combo_box" => Role::ComboBox,
-        "tooltip" => Role::Tooltip,
-        "status" => Role::Status,
-        "alert_dialog" => Role::AlertDialog,
-        "slider" => Role::Slider,
-        "progress" => Role::Progress,
-        "tab" => Role::Tab,
-        "tab_list" => Role::TabList,
-        "tab_panel" => Role::TabPanel,
-        "dialog" => Role::Dialog,
-        "alert" => Role::Alert,
-        "separator" => Role::Separator,
-        _ => {
-            return Err(SchemaError::Adapter(format!(
-                "FocusScope does not support role `{name}`"
-            )));
-        }
-    };
-    Ok(role)
 }

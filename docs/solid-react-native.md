@@ -10,6 +10,11 @@ Applications written directly in Rust still use the existing `Render`/`AppModel`
 path and need no JavaScript engine. QuickJS is required only when the application
 uses the Solid or React TSX adapters; both paths share the native renderer.
 
+Every built-in TSX primitive accepts the same typed accessibility properties.
+Custom components can compose roles, labels, states, relations, focus and
+actions without a framework-specific accessibility tree. See the
+[accessibility guide](ui/accessibility.md).
+
 ## Build and run
 
 Build the QuickJS application:

@@ -88,6 +88,11 @@ it through the layout context. Add ordinary `.on(...)` listeners, action binding
 focus styles or paint. Regions are ordinary retained UI nodes, not a parallel
 identity registry, hit-test system or semantic tree.
 
+Solid and React components can add the shared semantic properties directly to
+any native primitive, including `rectangle` and `text`. See the
+[accessibility guide](accessibility.md) for roles, states, key relations, focus
+and accessible action callbacks.
+
 Regions therefore use normal hit shapes, cursors, focus, gestures, capture,
 keyboard/action routing and native/Web semantic updates. Use a group role on a
 semantic container; a button/slider role intentionally represents a semantic leaf.

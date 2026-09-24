@@ -99,3 +99,64 @@ fn virtual_measurements_survive_host_commits_and_atomic_count_edits() {
     assert!(!reordered.is_measured(3));
     assert_eq!(appended.item_extent(3), Some(75.0));
 }
+
+#[test]
+fn changing_virtual_list_shape_discards_incompatible_measurements() {
+    let mut host = Host::with_builtins().unwrap();
+    host.commit(&[
+        Operation::Create {
+            id: HostId::new(1, 1),
+            native_type: builtin::VIRTUAL_WINDOW,
+        },
+        set(builtin::KEY, SchemaValue::String("list".into())),
+        set(builtin::ROW_HEIGHT, SchemaValue::Float(20.0)),
+        set(builtin::VARIABLE_HEIGHT, SchemaValue::Bool(true)),
+        set(builtin::ITEM_COUNT, SchemaValue::Int(5)),
+        set(builtin::WINDOW_START, SchemaValue::Int(0)),
+        Operation::SetRoot {
+            id: Some(HostId::new(1, 1)),
+        },
+    ])
+    .unwrap();
+    let root = host.root_element().unwrap();
+    let list = &root.virtual_viewport().unwrap().list;
+    assert_eq!(list.viewport_extent(), 0.0);
+    assert!(list.is_variable());
+    assert!(!list.is_horizontal());
+
+    host.commit(&[set(builtin::ITEM_COUNT, SchemaValue::Int(2))])
+        .unwrap();
+    assert_eq!(
+        host.root_element()
+            .unwrap()
+            .virtual_viewport()
+            .unwrap()
+            .list
+            .item_count(),
+        2
+    );
+    host.commit(&[set(builtin::VARIABLE_HEIGHT, SchemaValue::Bool(false))])
+        .unwrap();
+    assert!(
+        !host
+            .root_element()
+            .unwrap()
+            .virtual_viewport()
+            .unwrap()
+            .list
+            .is_variable()
+    );
+    host.commit(&[
+        set(builtin::VIRTUAL_HORIZONTAL, SchemaValue::Bool(true)),
+        set(builtin::VIRTUAL_VIEWPORT_WIDTH, SchemaValue::Float(100.0)),
+    ])
+    .unwrap();
+    assert!(
+        host.root_element()
+            .unwrap()
+            .virtual_viewport()
+            .unwrap()
+            .list
+            .is_horizontal()
+    );
+}

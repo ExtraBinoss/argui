@@ -12,10 +12,13 @@ use crate::{
     SchemaError, SchemaRegistry, SchemaValue, SlotArity, SlotId, SlotSchema, ValueType,
 };
 
+pub(crate) mod accessibility;
+mod accessibility_contract;
 mod common;
 mod container;
 mod flickable;
 mod focus_scope;
+mod focus_scope_parse;
 mod key_binding;
 mod layout;
 mod loop_motion;
@@ -206,6 +209,31 @@ pub const VIRTUAL_VISIBLE_WIDTH: PropertyId = PropertyId::from_raw(203);
 pub const VIRTUAL_SCROLLBAR_VISIBLE: PropertyId = PropertyId::from_raw(204);
 pub const VIRTUAL_SCROLLBAR_WIDTH: PropertyId = PropertyId::from_raw(205);
 pub const VIRTUAL_DATA_VERSION: PropertyId = PropertyId::from_raw(206);
+pub const SEMANTIC_FOCUSABLE: PropertyId = PropertyId::from_raw(207);
+pub const SEMANTIC_PRESSED: PropertyId = PropertyId::from_raw(208);
+pub const SEMANTIC_REQUIRED: PropertyId = PropertyId::from_raw(209);
+pub const SEMANTIC_READ_ONLY: PropertyId = PropertyId::from_raw(210);
+pub const SEMANTIC_MULTISELECTABLE: PropertyId = PropertyId::from_raw(211);
+pub const SEMANTIC_NUMERIC_VALUE: PropertyId = PropertyId::from_raw(212);
+pub const SEMANTIC_MINIMUM_VALUE: PropertyId = PropertyId::from_raw(213);
+pub const SEMANTIC_MAXIMUM_VALUE: PropertyId = PropertyId::from_raw(214);
+pub const SEMANTIC_VALUE_STEP: PropertyId = PropertyId::from_raw(215);
+pub const SEMANTIC_CAN_INCREMENT: PropertyId = PropertyId::from_raw(216);
+pub const SEMANTIC_CAN_DECREMENT: PropertyId = PropertyId::from_raw(217);
+pub const SEMANTIC_CAN_SET_VALUE: PropertyId = PropertyId::from_raw(218);
+pub const SEMANTIC_CAN_EXPAND: PropertyId = PropertyId::from_raw(219);
+pub const SEMANTIC_CAN_COLLAPSE: PropertyId = PropertyId::from_raw(220);
+pub const SEMANTIC_CAN_SCROLL_INTO_VIEW: PropertyId = PropertyId::from_raw(221);
+pub const SEMANTIC_DISABLED: PropertyId = PropertyId::from_raw(222);
+pub const SEMANTIC_CHECKED_STATE: PropertyId = PropertyId::from_raw(223);
+pub const SEMANTIC_HIDDEN: PropertyId = PropertyId::from_raw(224);
+pub const SEMANTIC_ORIENTATION: PropertyId = PropertyId::from_raw(225);
+pub const SEMANTIC_LEVEL: PropertyId = PropertyId::from_raw(226);
+pub const SEMANTIC_POSITION_IN_SET: PropertyId = PropertyId::from_raw(227);
+pub const SEMANTIC_SET_SIZE: PropertyId = PropertyId::from_raw(228);
+pub const SEMANTIC_MODAL: PropertyId = PropertyId::from_raw(229);
+pub const SEMANTIC_HAS_POPUP: PropertyId = PropertyId::from_raw(230);
+pub const SEMANTIC_SORT: PropertyId = PropertyId::from_raw(231);
 pub const MAX_DIGITS: PropertyId = PropertyId::from_raw(116);
 pub const MOUSE_GLOBAL_X: PropertyId = PropertyId::from_raw(117);
 pub const MOUSE_GLOBAL_Y: PropertyId = PropertyId::from_raw(118);
@@ -279,6 +307,7 @@ pub const DRAG_Y: EventId = EventId::from_raw(22);
 pub const TEXT_EDIT: EventId = EventId::from_raw(23);
 pub const VIRTUAL_MEASURE: EventId = EventId::from_raw(24);
 pub const VIRTUAL_WINDOW_CHANGE: EventId = EventId::from_raw(25);
+pub const SEMANTIC_ACTION: EventId = EventId::from_raw(26);
 
 /// Creates the canonical registry of built-in native visual primitives.
 ///
@@ -498,5 +527,6 @@ pub fn registry() -> Result<SchemaRegistry, SchemaError> {
     text_editor::register(&mut registry)?;
     media::register(&mut registry)?;
     virtual_window::register(&mut registry)?;
+    registry.enable_builtin_accessibility()?;
     Ok(registry)
 }

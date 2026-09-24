@@ -18,6 +18,7 @@ struct RegisteredNative {
 pub struct SchemaRegistry {
     natives: HashMap<NativeTypeId, RegisteredNative>,
     names: HashMap<Name, NativeTypeId>,
+    builtin_accessibility: bool,
 }
 
 impl SchemaRegistry {
@@ -172,7 +173,46 @@ impl SchemaRegistry {
             .get(&id)
             .ok_or(SchemaError::UnknownNative(id))?;
         validate_input(&registered.schema, input)?;
-        registered.adapter.construct(input)
+        let element = registered.adapter.construct(input)?;
+        if self.builtin_accessibility {
+            crate::builtin::accessibility::apply(element, input)
+        } else {
+            Ok(element)
+        }
+    }
+
+    /// Adds the shared accessibility contract to every registered built-in primitive.
+    ///
+    /// Existing properties and events keep their original IDs and behavior. Returns a
+    /// schema error if the resulting metadata is invalid.
+    pub(crate) fn enable_builtin_accessibility(&mut self) -> Result<(), SchemaError> {
+        for native in self.natives.values_mut() {
+            for property in crate::builtin::accessibility::properties() {
+                if !native
+                    .schema
+                    .properties
+                    .iter()
+                    .any(|existing| existing.id == property.id || existing.name == property.name)
+                {
+                    native.schema.properties.push(property);
+                }
+            }
+            for event in crate::builtin::accessibility::events() {
+                if !native
+                    .schema
+                    .events
+                    .iter()
+                    .any(|existing| existing.id == event.id || existing.name == event.name)
+                {
+                    native.schema.events.push(event);
+                }
+            }
+        }
+        for native in self.natives.values() {
+            self.validate_schema(&native.schema)?;
+        }
+        self.builtin_accessibility = true;
+        Ok(())
     }
 
     fn validate_schema(&self, schema: &NativeSchema) -> Result<(), SchemaError> {

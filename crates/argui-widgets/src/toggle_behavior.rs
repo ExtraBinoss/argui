@@ -74,15 +74,19 @@ impl ToggleBehavior {
         if part != TogglePart::Root {
             return element.semantic_hidden(true);
         }
-        let mut semantics = Semantics::new(self.role)
-            .label(self.label.clone())
-            .state(SemanticState {
-                checked: Some(self.checked),
-                disabled: !self.enabled,
-                ..SemanticState::default()
-            })
-            .action(SemanticAction::Click)
-            .action(SemanticAction::Focus);
+        let mut semantics =
+            Semantics::new(self.role)
+                .label(self.label.clone())
+                .state(SemanticState {
+                    checked: Some(self.checked),
+                    disabled: !self.enabled,
+                    ..SemanticState::default()
+                });
+        if self.enabled {
+            semantics = semantics
+                .action(SemanticAction::Click)
+                .action(SemanticAction::Focus);
+        }
         if let Some((position, size)) = self.position {
             semantics = semantics.position_in_set(position, size);
         }

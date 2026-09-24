@@ -1,7 +1,7 @@
 use argui_core::{Point, PointerEvent, PointerPhase};
 use argui_host::{CallbackDelivery, CallbackId, Host, HostId, Operation};
-use argui_schema::builtin;
-use argui_ui::{ClickEvent, UiEventKind, UiTree};
+use argui_schema::{SchemaValue, builtin};
+use argui_ui::{ClickEvent, Role, UiEventKind, UiTree};
 
 /// Builds a first-generation presentation ID for one test slot.
 fn id(slot: u32) -> HostId {
@@ -14,6 +14,44 @@ fn create(slot: u32, native_type: argui_schema::NativeTypeId) -> Operation {
         id: id(slot),
         native_type,
     }
+}
+
+#[test]
+fn semantic_properties_on_visual_nodes_survive_host_transactions() {
+    let mut host = Host::with_builtins().unwrap();
+    host.commit(&[
+        create(1, builtin::RECTANGLE),
+        Operation::SetProperty {
+            id: id(1),
+            property: builtin::SEMANTIC_ROLE,
+            value: Some(SchemaValue::String("button".into())),
+        },
+        Operation::SetProperty {
+            id: id(1),
+            property: builtin::SEMANTIC_LABEL,
+            value: Some(SchemaValue::String("Save".into())),
+        },
+        Operation::SetRoot { id: Some(id(1)) },
+    ])
+    .unwrap();
+    let original = host.root_element().unwrap();
+    assert_eq!(original.semantics.as_ref().unwrap().role, Role::Button);
+    assert_eq!(
+        original.semantics.as_ref().unwrap().label.as_deref(),
+        Some("Save")
+    );
+
+    host.commit(&[Operation::SetProperty {
+        id: id(1),
+        property: builtin::SEMANTIC_LABEL,
+        value: Some(SchemaValue::String("Saved".into())),
+    }])
+    .unwrap();
+    let changed = host.root_element().unwrap();
+    assert_eq!(
+        changed.semantics.as_ref().unwrap().label.as_deref(),
+        Some("Saved")
+    );
 }
 
 #[test]

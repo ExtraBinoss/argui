@@ -45,7 +45,7 @@ export function ReactGallery(): ReactElement {
     </row>
   )
   const navigation = menuOpen ? (
-    <focusScope role="navigation" accessible_name="Gallery pages" focus_on_tab_navigation={false}
+    <focusScope role="navigation" accessible_name="Gallery pages" focusable={false}
       width={mobile ? 'fill' : 220} height={mobile ? undefined : 'fill'}>
       <column width={mobile ? 'fill' : 220} height={mobile ? undefined : 'fill'} min_height={0}
         gap={8} padding={8} background={theme.surface}>
@@ -202,13 +202,13 @@ function ReactMediaPage(props: { theme: Palette }): ReactElement {
         </column>
         <column width={mobile ? 'fill' : 240} height={mobile ? 260 : 200} gap={8}>
           <text text="Multicolor SVG pre-rendered as PNG" color={props.theme.foreground} font_size={16} />
-          <focusScope role="image" accessible_name="Colorful orbit illustration" focus_on_tab_navigation={false} width="fill" height={160}>
+          <focusScope role="image" accessible_name="Colorful orbit illustration" focusable={false} width="fill" height={160}>
             <image source={mediaAssets['illustration/orbit.png']} width="fill" height={160} fit="contain" />
           </focusScope>
         </column>
         <column width={mobile ? 'fill' : 240} height={mobile ? 260 : 200} gap={8}>
           <text text="Imported JPEG image" color={props.theme.foreground} font_size={16} />
-          <focusScope role="image" accessible_name="Saturn with its rings" focus_on_tab_navigation={false} width="fill" height={160}>
+          <focusScope role="image" accessible_name="Saturn with its rings" focusable={false} width="fill" height={160}>
             <image source={mediaAssets['photo/saturn.jpg']} width="fill" height={160} fit="cover" />
           </focusScope>
         </column>

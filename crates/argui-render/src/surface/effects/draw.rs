@@ -13,6 +13,7 @@ use super::{SurfaceRenderer, helpers};
 impl SurfaceRenderer {
     /// Records `nodes` in `encoder` for `target`, clearing it with `clear` when supplied.
     /// `profiler` and `owner` attribute GPU work; `clip` restricts output pixels.
+    #[allow(clippy::too_many_arguments)] // GPU encoder, target, draw data, and capture context stay separate.
     pub(super) fn draw_offscreen(
         &mut self,
         encoder: &mut wgpu::CommandEncoder,

@@ -1,5 +1,5 @@
 use argui_core::{Color, ColorScheme};
-use argui_ui::{ClickEvent, Element, UiEvent, UiEventKind, UiTree};
+use argui_ui::{ClickEvent, Element, SemanticAction, UiEvent, UiEventKind, UiTree};
 use argui_widgets::{Toggle, shadcn};
 
 #[test]
@@ -17,6 +17,7 @@ fn pressed_state_is_accessible_and_only_enabled_clicks_change_it() {
                 assert_eq!(semantics.state.pressed, Some(pressed));
                 assert_eq!(semantics.state.checked, None);
                 assert_eq!(semantics.state.disabled, !enabled);
+                assert_eq!(semantics.actions.contains(&SemanticAction::Click), enabled);
                 for (key, kind, click) in [
                     (
                         "bold",

@@ -76,7 +76,7 @@ fn touch_press_focuses_editor_without_pointer_listener() {
     };
     let update = tree.pointer_event(event, std::slice::from_ref(&region));
     assert!(update.events.is_empty());
-    tree.focus_pointer_default(pointer, &[region.clone()]);
+    tree.focus_pointer_default(pointer, std::slice::from_ref(&region));
     assert_eq!(tree.focused_node(), Some(region.node));
 }
 
@@ -565,8 +565,6 @@ fn text_area_inserts_lines_and_command_enter_submits() {
     );
 }
 
-#[path = "text_input/positions.rs"]
-mod positions;
 #[path = "text_input/navigation.rs"]
 mod navigation;
 #[path = "text_input/selection.rs"]

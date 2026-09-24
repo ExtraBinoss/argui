@@ -1,5 +1,6 @@
 use argui_core::Point;
 use argui_gallery_quickjs::{coalesce_virtual_windows, ui_event_payload};
+use argui_ui::{SemanticAction, SemanticValue};
 use argui_runtime::{CallbackDelivery, CallbackId, HostId, NativeHostDelivery};
 use argui_ui::{UiEventKind, VirtualMeasurement};
 use serde_json::json;
@@ -98,4 +99,19 @@ fn obsolete_window_ranges_coalesce_without_dropping_other_events() {
         burst[2].kind,
         UiEventKind::VirtualWindowChanged { start: 12, .. }
     ));
+}
+#[test]
+fn semantic_action_delivery_keeps_action_and_requested_value() {
+    let payload = ui_event_payload(&UiEventKind::SemanticAction {
+        action: SemanticAction::SetValue,
+        value: Some(SemanticValue::Number {
+            value: 55.0,
+            minimum: None,
+            maximum: None,
+            step: None,
+        }),
+    });
+    assert_eq!(payload["kind"], "semantic_action");
+    assert_eq!(payload["action"], "set_value");
+    assert_eq!(payload["value"], 55.0);
 }
