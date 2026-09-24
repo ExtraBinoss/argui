@@ -7,13 +7,14 @@ use argui_ui::{
     EventType, FocusPolicy, GestureSet, Interaction, Overflow, Role, ScrollConfig,
     ScrollPropagation, ScrollbarGutter, ScrollbarPartStyle, ScrollbarStyle, ScrollbarVisibility,
     SemanticAction, SemanticState, SemanticValue, Semantics, TextEditorSpec, TextInputFilter,
+    TextPrivacy,
 };
 
 use super::{
     BLUR, CARET_BLINK, CARET_COLOR, CARET_COUNT, CARET_FILL, CARET_HEIGHT, CARET_OFFSET_Y,
-    CARET_RADIUS, CARET_SPACING, CARET_WIDTH, DESCRIPTION, ENABLED, FOCUS, INPUT_CHANGED,
+    CARET_RADIUS, CARET_SPACING, CARET_WIDTH, CLIP, DESCRIPTION, ENABLED, FOCUS, INPUT_CHANGED,
     INPUT_PLACEHOLDER, INVALID, KEY, LABEL, MAX_DIGITS, MULTILINE, PLACEHOLDER_COLOR, READ_ONLY,
-    SEARCH_INPUT, SELECTION_COLOR, SUBMIT, TEXT_COLOR, TEXT_EDIT, TEXT_INPUT, VALUE,
+    SEARCH_INPUT, SELECTION_COLOR, SUBMIT, TEXT_COLOR, TEXT_EDIT, TEXT_INPUT, TEXT_PRIVACY, VALUE,
     common::{
         CommonProperty, apply_common, apply_events, common_event, common_property, optional_bool,
         optional_string, required_string,
@@ -90,6 +91,15 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     )
     .property(
         PropertySchema::new(
+            TEXT_PRIVACY,
+            "privacy",
+            ValueType::String,
+            "Editor privacy: public, password, or revealed_password. Revealed passwords remain protected from clipboard and history.",
+        )
+        .default_value(SchemaValue::String("public".into())),
+    )
+    .property(
+        PropertySchema::new(
             MAX_DIGITS,
             "max_digits",
             ValueType::Int,
@@ -125,8 +135,19 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     .property(common_property(CommonProperty::Rotation))
     .property(common_property(CommonProperty::Opacity))
     .property(common_property(CommonProperty::BackdropFilter))
+    .property(common_property(CommonProperty::DesktopBackdropTint))
+    .property(common_property(CommonProperty::DesktopBackdropFallback))
     .property(common_property(CommonProperty::Visible))
     .property(common_property(CommonProperty::Background))
+    .property(
+        PropertySchema::new(
+            CLIP,
+            "clip",
+            ValueType::Bool,
+            "Clip text, selection, and caret to the input's own bounds.",
+        )
+        .default_value(SchemaValue::Bool(true)),
+    )
     .property(common_property(CommonProperty::SelectionFill))
     .property(common_property(CommonProperty::SelectionRadius))
     .property(PropertySchema::new(
@@ -222,6 +243,10 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
         }
         let multiline = optional_bool(input, MULTILINE).unwrap_or(false);
         let mut input_style = TextStyle::default();
+        if !multiline {
+            input_style.wrap = TextWrap::None;
+            placeholder_style.wrap = TextWrap::None;
+        }
         if let Some(SchemaValue::Color(color)) = input.get(TEXT_COLOR) {
             input_style.color = *color;
         }
@@ -339,6 +364,20 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
                 ),
         )
         .semantics(semantics);
+        let privacy = match optional_string(input, TEXT_PRIVACY).map(String::as_str) {
+            None | Some("public") => TextPrivacy::Public,
+            Some("password") => TextPrivacy::Password,
+            Some("revealed_password") => TextPrivacy::RevealedPassword,
+            Some(value) => {
+                return Err(SchemaError::Adapter(format!(
+                    "TextInput does not support privacy `{value}`"
+                )));
+            }
+        };
+        element = element.text_privacy(privacy);
+        if optional_bool(input, CLIP).unwrap_or(true) {
+            element = element.clip(CornerRadii::default());
+        }
         if multiline {
             let thumb_color = match input.get(TEXT_COLOR) {
                 Some(SchemaValue::Color(color)) => color.with_alpha(0.48),

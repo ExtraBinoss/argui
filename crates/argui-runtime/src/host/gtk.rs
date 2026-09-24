@@ -55,6 +55,22 @@ impl WindowHost for GtkHost {
     fn set_title(&self, title: &str) {
         self.platform.native().set_title(title);
     }
+    fn set_decorations(&self, decorations: bool) {
+        self.platform.native().set_decorations(decorations);
+    }
+    fn logical_size(&self) -> (f64, f64) {
+        let (width, height, scale) = self.platform.client_size();
+        (
+            f64::from(width) / f64::from(scale),
+            f64::from(height) / f64::from(scale),
+        )
+    }
+    fn request_inner_size(&self, width: f64, height: f64) -> Result<(), String> {
+        self.platform
+            .native()
+            .set_inner_size(tao::dpi::LogicalSize::new(width, height));
+        Ok(())
+    }
     fn is_minimized(&self) -> Option<bool> {
         Some(self.platform.native().is_minimized())
     }

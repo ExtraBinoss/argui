@@ -49,3 +49,10 @@ export function palette(mode: ThemeMode, accent: Accent): Palette {
         destructive: '#dc2626', destructiveHover: '#b91c1c', destructivePressed: '#991b1b',
       }
 }
+
+/** Gives a hex accent the same 38% alpha as native text selection. */
+export function selectionTint(accent: string): string {
+  if (/^#[0-9a-fA-F]{6}$/.test(accent)) return `${accent}61`
+  if (/^#[0-9a-fA-F]{8}$/.test(accent)) return `${accent.slice(0, 7)}61`
+  return '#337af561'
+}

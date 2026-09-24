@@ -1,4 +1,4 @@
-import { createMemo, createSignal, VirtualList } from '@argui/solid'
+import { createMemo, createSignal, onCleanup, VirtualList } from '@argui/solid'
 import type { JSX } from '@argui/solid/jsx-runtime'
 import { Button, InputField, Select, palette, type Accent, type Palette, type ThemeMode } from '@argui/widgets/solid'
 import { AnimationLab } from './animation-lab'
@@ -10,13 +10,17 @@ import { WgslLab } from './wgsl-lab'
 import { pages, filteredNavigation, navigationKey, navigationVersion, type Page } from './gallery-pages'
 import { mediaAssets } from './assets.generated'
 import { I18nPage } from './i18n-page'
+import { ServicesPage } from './services-page'
+import { ThemingPage } from './theming-page'
+import { DialogPage } from './dialog-page'
+import type { ApplicationServices } from '@argui/host'
 
 const accents: readonly Accent[] = ['blue', 'violet', 'emerald']
 const choices = ['Vulkan', 'DirectX 12', 'Metal', 'WebGPU'] as const
 const mobile = (globalThis as { __arguiMobile?: boolean }).__arguiMobile === true
 
 /** The navigable native gallery shell with shared theme and page state. */
-export function Gallery(): JSX.Element {
+export function Gallery(props: { services: ApplicationServices }): JSX.Element {
   const [page, setPage] = createSignal<Page>('Button')
   const [mode, setMode] = createSignal<ThemeMode>('light')
   const [accent, setAccent] = createSignal<Accent>('blue')
@@ -26,6 +30,12 @@ export function Gallery(): JSX.Element {
   const [lastUsed, setLastUsed] = createSignal('None')
   const [starActive, setStarActive] = createSignal(false)
   const [choice, setChoice] = createSignal<string>(choices[0])
+  onCleanup(props.services.onEvent((event) => {
+    if ((event.type === 'menu' && event.id === 'open-services')
+      || (event.type === 'shortcut' && event.id === 'wake' && event.state === 'pressed')) {
+      setPage('Services')
+    }
+  }))
   const theme = () => palette(mode(), accent())
   const activate = (label: string) => {
     setClicks((value) => value + 1)
@@ -49,8 +59,8 @@ export function Gallery(): JSX.Element {
       width={mobile ? 'fill' : 220} height={mobile ? undefined : 'fill'}>
       <column width={mobile ? 'fill' : 220} height={mobile ? undefined : 'fill'} min_height={0}
         gap={8} padding={8}>
-        <InputField id="gallery-search" label="Search components" search theme={theme()}
-          value={search()} placeholder="Search components" onChange={setSearch} />
+        <InputField id="gallery-search" label="Search gallery" search theme={theme()}
+          value={search()} placeholder="Search gallery" onChange={setSearch} />
         <VirtualList id="gallery-navigation" count={items().length} estimate={mobile ? 112 : 47}
           itemKey={(index) => navigationKey(items()[index]!)} dataVersion={navigationVersion(search())}
           variable={true} axis={mobile ? 'horizontal' : 'vertical'} overscan={3}
@@ -66,7 +76,7 @@ export function Gallery(): JSX.Element {
               kind="ghost" selected={page() === item.page}
               current={page() === item.page ? 'page' : undefined} onClick={() => setPage(item.page)} />
           }} />
-        {items().length === 0 ? <text text="No components found" color={theme().muted} font_size={12} /> : null}
+        {items().length === 0 ? <text text="No pages found" color={theme().muted} font_size={12} /> : null}
       </column>
     </focusScope>
   }
@@ -81,8 +91,11 @@ export function Gallery(): JSX.Element {
         lastUsed={lastUsed()} starActive={starActive()} activate={activate} /> : null}
       {item === 'Select' ? <SelectPage theme={theme()} value={choice()} onChange={setChoice} /> : null}
       {item === 'Popover' ? <PopoverPage theme={theme()} /> : null}
+      {item === 'Dialog' ? <DialogPage theme={theme()} /> : null}
       {item === 'Animation Lab' ? <AnimationLab theme={theme()} /> : null}
       {item === 'Media' ? <MediaPage theme={theme()} /> : null}
+      {item === 'Services' ? <ServicesPage services={props.services} theme={theme()} /> : null}
+      {item === 'Theming' ? <ThemingPage theme={theme()} /> : null}
       {item === 'Accessibility' ? <AccessibilityPage theme={theme()} /> : null}
       {item === 'Overlay' ? <OverlayPage theme={theme()} /> : null}
       {item === 'Damage Control' ? <DamageControl theme={theme()} active={page() === item} /> : null}

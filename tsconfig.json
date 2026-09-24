@@ -3,6 +3,16 @@
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "Bundler",
+    "baseUrl": ".",
+    "paths": {
+      "@argui/host": ["packages/host/src/index.ts"],
+      "@argui/solid": ["packages/solid/src/index.ts"],
+      "@argui/solid/jsx-runtime": ["packages/solid/src/jsx-runtime.ts"],
+      "@argui/react": ["packages/react/src/index.ts"],
+      "@argui/react/jsx-runtime": ["packages/react/src/jsx-runtime.ts"],
+      "@argui/widgets/solid": ["packages/widgets/src/solid/index.ts"],
+      "@argui/widgets/react": ["packages/widgets/src/react/index.ts"]
+    },
     "lib": ["ES2022", "DOM"],
     "jsx": "preserve",
     "jsxImportSource": "@argui/solid",

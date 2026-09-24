@@ -49,6 +49,8 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     .property(common_property(CommonProperty::Rotation))
     .property(common_property(CommonProperty::Opacity))
     .property(common_property(CommonProperty::BackdropFilter))
+    .property(common_property(CommonProperty::DesktopBackdropTint))
+    .property(common_property(CommonProperty::DesktopBackdropFallback))
     .property(common_property(CommonProperty::Visible))
     .property(
         PropertySchema::new(

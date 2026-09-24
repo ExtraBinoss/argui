@@ -8,6 +8,7 @@ export function ReactInputsPage(props: { theme: Palette }): ReactElement {
   const [email, setEmail] = useState('')
   const [invalidEmail, setInvalidEmail] = useState('invalid@')
   const [search, setSearch] = useState('')
+  const [password, setPassword] = useState('')
   const [submitted, setSubmitted] = useState(false)
   const invalid = submitted && name.trim().length < 3
   return <column width="fill" gap={16}>
@@ -25,6 +26,8 @@ export function ReactInputsPage(props: { theme: Palette }): ReactElement {
         placeholder="name@example.com" onChange={setEmail} />
       <ReactInputField id="input-search-example" label="Search" showLabel search theme={props.theme}
         value={search} placeholder="Search examples" onChange={setSearch} />
+      <ReactInputField id="input-password" label="Password" showLabel password theme={props.theme}
+        value={password} placeholder="Enter a password" onChange={setPassword} />
       <ReactInputField id="input-invalid-email" label="Invalid email" showLabel theme={props.theme}
         value={invalidEmail} invalid={!/^[^@]+@[^@]+\.[^@]+$/.test(invalidEmail)}
         placeholder="name@example.com" onChange={setInvalidEmail} />

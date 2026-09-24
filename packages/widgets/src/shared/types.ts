@@ -49,6 +49,8 @@ export interface InputFieldProps {
   readOnly?: boolean
   invalid?: boolean
   search?: boolean
+  password?: boolean
+  selectionColor?: string
   showLabel?: boolean
   onSubmit?: (value: string) => void
 }
@@ -63,4 +65,21 @@ export interface PopoverProps<TChildren> {
   open?: boolean
   onOpenChange?: (open: boolean) => void
   children: TChildren
+}
+
+/** Props shared by centered, accessible native modal dialogs. */
+export interface DialogProps<TChildren> {
+  id: string
+  title: string
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  theme: Palette
+  children: TChildren
+  width?: number
+  radius?: number
+  padding?: number
+  blur?: number
+  scrimColor?: string
+  surfaceColor?: string
+  closeLabel?: string
 }

@@ -4,7 +4,7 @@ use std::sync::mpsc::Sender;
 
 use argui_host::Operation;
 use argui_paint::{GpuCanvasId, ImageAsset, VectorAsset};
-use argui_platform::WindowKey;
+use argui_platform::{CloseBehavior, GlobalShortcut, TrayConfig, WindowKey, WindowSpec};
 use argui_render::{DamageTracking, EffectRegistry, GpuCanvasRegistry};
 use argui_schema::{AssetHandle, SchemaValue, builtin};
 use argui_ui::{TreeUpdate, UiEventKind};
@@ -98,6 +98,54 @@ pub struct NativeHostBatch {
     /// Renderer controls applied after the operations in this UI-thread batch.
     pub controls: Vec<NativeHostControl>,
     pub reply: Sender<Result<NativeHostCommit, String>>,
+}
+
+/// An application-level change requested by a native JavaScript presentation.
+#[derive(Debug)]
+pub enum NativeHostApplicationRequest {
+    /// Replaces the tray configuration; `None` removes the tray icon.
+    SetTray(Option<TrayConfig>, Sender<Result<(), String>>),
+    /// Replaces all system-wide keyboard shortcuts.
+    SetGlobalShortcuts(Vec<GlobalShortcut>, Sender<Result<(), String>>),
+    /// Changes what happens when the main window receives a close request.
+    SetCloseBehavior(CloseBehavior, Sender<Result<(), String>>),
+    /// Makes the main window visible and requests keyboard focus.
+    FocusWindow(Sender<Result<(), String>>),
+    /// Opens a new application window with its own model-provided view.
+    OpenWindow(WindowSpec, Sender<Result<(), String>>),
+    /// Sends a text message to the model associated with an existing window.
+    SendWindowMessage(WindowKey, String, Sender<Result<(), String>>),
+    /// Reads the current title, logical client size, and visibility of one window.
+    GetWindowInfo(WindowKey, Sender<Result<NativeWindowInfo, String>>),
+    /// Changes one window's native title.
+    SetWindowTitle(WindowKey, String, Sender<Result<(), String>>),
+    /// Requests a new logical client size for one window.
+    SetWindowSize(WindowKey, f64, f64, Sender<Result<(), String>>),
+    /// Enables or removes a window's native decorations.
+    SetWindowDecorations(WindowKey, bool, Sender<Result<(), String>>),
+}
+
+/// Current information about one native application window.
+#[derive(Clone, Debug, PartialEq)]
+pub struct NativeWindowInfo {
+    /// Stable application window key.
+    pub window: WindowKey,
+    /// Last title requested by the application.
+    pub title: String,
+    /// Current drawable client width in logical pixels.
+    pub width: f64,
+    /// Current drawable client height in logical pixels.
+    pub height: f64,
+    /// Native visibility when the backend reports it.
+    pub visible: Option<bool>,
+    /// Whether the native title bar and borders are requested.
+    pub decorations: bool,
+    /// Whether native window transparency was requested at creation.
+    pub transparent: bool,
+    /// Requested desktop backdrop material, if any.
+    pub backdrop: Option<argui_core::BackdropMaterial>,
+    /// Whether the compositor currently provides desktop backdrop blur.
+    pub backdrop_available: bool,
 }
 
 /// A renderer control sent by a native JavaScript presentation host.

@@ -1,14 +1,15 @@
 //! Shared schema declarations and style application for built-in primitives.
 
 use argui_ui::{
-    Dimension, Display, Element, EventType, ExpandedDimension, LengthPercentageAuto, Sides,
-    TextSelectionHighlight,
+    DesktopBackdrop, Dimension, Display, Element, EventType, ExpandedDimension,
+    LengthPercentageAuto, Sides, TextSelectionHighlight,
 };
 
 use super::{
-    BACKDROP_FILTER, BACKGROUND, BLUR, CLICK, DISMISS, FOCUS, GAP, HEIGHT, INPUT_CHANGED, KEY,
-    MIN_HEIGHT, MIN_WIDTH, OPACITY, PADDING, ROTATION, SCROLL, SELECTION_COLOR, SELECTION_FILL,
-    SELECTION_RADIUS, SUBMIT, TEXT_EDIT, TOOLTIP, VISIBLE, WIDTH, X, Y,
+    BACKDROP_FILTER, BACKGROUND, BLUR, CLICK, DESKTOP_BACKDROP_FALLBACK, DESKTOP_BACKDROP_TINT,
+    DISMISS, FOCUS, GAP, HEIGHT, INPUT_CHANGED, KEY, MIN_HEIGHT, MIN_WIDTH, OPACITY, PADDING,
+    ROTATION, SCROLL, SELECTION_COLOR, SELECTION_FILL, SELECTION_RADIUS, SUBMIT, TEXT_EDIT,
+    TOOLTIP, VISIBLE, WIDTH, X, Y,
 };
 use crate::{
     EventId, EventSchema, NativeElementInput, PropertyId, PropertySchema, SchemaError, SchemaValue,
@@ -27,6 +28,8 @@ pub(super) enum CommonProperty {
     Rotation,
     Opacity,
     BackdropFilter,
+    DesktopBackdropTint,
+    DesktopBackdropFallback,
     Visible,
     MinWidth,
     MinHeight,
@@ -91,6 +94,18 @@ pub(super) fn common_property(property: CommonProperty) -> PropertySchema {
             "CSS-like ordered filters applied to pixels already painted behind this element.",
         )
         .default_value(SchemaValue::String("none".into())),
+        CommonProperty::DesktopBackdropTint => PropertySchema::new(
+            DESKTOP_BACKDROP_TINT,
+            "desktop_backdrop_tint",
+            ValueType::Color,
+            "Tint painted over a native desktop blur; pair with desktop_backdrop_fallback.",
+        ),
+        CommonProperty::DesktopBackdropFallback => PropertySchema::new(
+            DESKTOP_BACKDROP_FALLBACK,
+            "desktop_backdrop_fallback",
+            ValueType::Color,
+            "Color painted when native desktop blur is unavailable; pair with desktop_backdrop_tint.",
+        ),
         CommonProperty::Visible => PropertySchema::new(
             VISIBLE,
             "visible",
@@ -183,7 +198,7 @@ pub(super) fn apply_events(mut element: Element, input: &NativeElementInput) -> 
 ///
 /// # Errors
 ///
-/// Returns an adapter error when `backdrop_filter` has invalid syntax or values.
+/// Returns an adapter error when `backdrop_filter` is invalid or desktop backdrop colors are unpaired.
 pub(super) fn apply_common(
     mut element: Element,
     input: &NativeElementInput,
@@ -224,6 +239,20 @@ pub(super) fn apply_common(
     }
     if let Some(SchemaValue::Color(value)) = input.get(BACKGROUND) {
         element = element.background(*value);
+    }
+    match (
+        input.get(DESKTOP_BACKDROP_TINT),
+        input.get(DESKTOP_BACKDROP_FALLBACK),
+    ) {
+        (Some(SchemaValue::Color(tint)), Some(SchemaValue::Color(fallback))) => {
+            element = element.desktop_backdrop(DesktopBackdrop::new(*tint, *fallback));
+        }
+        (None, None) => {}
+        _ => {
+            return Err(SchemaError::Adapter(
+                "desktop_backdrop_tint and desktop_backdrop_fallback must be set together".into(),
+            ));
+        }
     }
     let selection_fill = match input.get(SELECTION_FILL) {
         Some(SchemaValue::Brush(value)) => Some(value.clone()),

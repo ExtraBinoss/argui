@@ -20,6 +20,7 @@ use crate::{
     effects::registry_from_json,
     native_metrics::{control_request, parse_control},
     runner::RelayBatch,
+    services::ServiceChannels,
     telemetry::JsCounts,
 };
 
@@ -193,23 +194,39 @@ pub(crate) fn dev_bundle_path() -> Option<PathBuf> {
     std::env::var_os("ARGUI_GALLERY_BUNDLE").map(PathBuf::from)
 }
 
-/// Builds `source` against `contract_json`, then atomically replaces the native root.
-/// `gallery` and `dispatch` are the active session; `sender` sends the swap to
-/// the native host, `counts` shares profiling counters, and `profile_enabled`
-/// gates candidate renderer samples.
-/// The old session remains live when compilation, mounting, or native validation fails.
+/// Native channels and counters needed to swap a JavaScript session.
+pub(crate) struct ReloadContext<'a> {
+    /// Native batch channel used for the atomic tree swap.
+    pub(crate) sender: &'a Sender<RelayBatch>,
+    /// Counters shared with the active actor.
+    pub(crate) counts: &'a JsCounts,
+    /// Whether the candidate requests renderer samples.
+    pub(crate) profile_enabled: &'a Arc<AtomicBool>,
+    /// Application service registry and response channel.
+    pub(crate) services: ServiceChannels<'a>,
+}
+
+/// Atomically replaces the active gallery from `source` using `context`.
+/// `gallery` and `dispatch` are the currently active session and transaction route;
+/// `contract_json` is the native ABI contract.
 ///
 /// # Errors
-/// Returns a JavaScript, native commit, or transport error without replacing the old session.
+/// Returns a module, native commit, or transport error without replacing the old session.
 pub(crate) fn reload_gallery(
     gallery: &mut QuickJsGallery,
     dispatch: &mut Rc<RefCell<Dispatch>>,
     source: &str,
     contract_json: &str,
-    sender: &Sender<RelayBatch>,
-    counts: &JsCounts,
-    profile_enabled: &Arc<AtomicBool>,
+    context: ReloadContext<'_>,
 ) -> Result<(), String> {
+    let ReloadContext {
+        sender,
+        counts,
+        profile_enabled,
+        services: service_channels,
+    } = context;
+    let services = service_channels.registry;
+    let service_sender = service_channels.sender;
     let generation = dispatch
         .borrow()
         .generation
@@ -226,7 +243,16 @@ pub(crate) fn reload_gallery(
     let control_sender = Rc::new(RefCell::new(None::<Sender<RelayBatch>>));
     let active_control_sender = Rc::clone(&control_sender);
     let control_enabled = Arc::clone(profile_enabled);
-    let candidate = QuickJsGallery::new_with_control(
+    let staged_requests = Rc::new(RefCell::new(Vec::<String>::new()));
+    let request_queue = Rc::clone(&staged_requests);
+    let cancel_queue = Rc::clone(&staged_requests);
+    let service_active = Rc::new(RefCell::new(false));
+    let request_active = Rc::clone(&service_active);
+    let cancel_active = Rc::clone(&service_active);
+    let request_registry = Arc::clone(services);
+    let cancel_registry = Arc::clone(services);
+    let response_sender = service_sender.clone();
+    let candidate = QuickJsGallery::new_with_services(
         source,
         contract_json,
         "mountGallery",
@@ -238,6 +264,37 @@ pub(crate) fn reload_gallery(
                 controls.borrow_mut().push(json);
                 String::new()
             }
+        },
+        move |json| {
+            if *request_active.borrow() {
+                request_registry
+                    .submit(generation, &json, response_sender.clone())
+                    .err()
+                    .unwrap_or_default()
+            } else {
+                request_queue.borrow_mut().push(json);
+                String::new()
+            }
+        },
+        move |json| {
+            if *cancel_active.borrow() {
+                return cancel_registry
+                    .cancel_json(generation, &json)
+                    .err()
+                    .unwrap_or_default();
+            }
+            let cancel: serde_json::Value = match serde_json::from_str(&json) {
+                Ok(cancel) => cancel,
+                Err(error) => return error.to_string(),
+            };
+            cancel_queue.borrow_mut().retain(|request| {
+                let Ok(request): Result<serde_json::Value, _> = serde_json::from_str(request)
+                else {
+                    return true;
+                };
+                request["window"] != cancel["window"] || request["requestId"] != cancel["requestId"]
+            });
+            String::new()
         },
     )?;
     let effects = registry_from_json(&candidate.effect_definitions_json()?)?;
@@ -278,6 +335,7 @@ pub(crate) fn reload_gallery(
         .map_err(|error| error.to_string())?;
     ack.recv().map_err(|error| error.to_string())??;
     dispatch.borrow_mut().disable();
+    services.cancel_session(dispatch.borrow().generation);
     if let Err(error) = gallery.dispose() {
         eprintln!("argui-hot-reload: old disposer: {error}");
     }
@@ -289,6 +347,13 @@ pub(crate) fn reload_gallery(
         );
     }
     candidate_route.borrow_mut().activate(sender.clone());
+    *service_active.borrow_mut() = true;
+    for request in std::mem::take(&mut *staged_requests.borrow_mut()) {
+        let error = services.submit(generation, &request, service_sender.clone());
+        if let Err(error) = error {
+            eprintln!("argui-hot-reload: staged service request: {error}");
+        }
+    }
     *control_sender.borrow_mut() = Some(sender.clone());
     *dispatch = candidate_route;
     *gallery = candidate;

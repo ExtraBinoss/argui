@@ -34,6 +34,8 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     .property(common_property(CommonProperty::Height))
     .property(common_property(CommonProperty::Opacity))
     .property(common_property(CommonProperty::BackdropFilter))
+        .property(common_property(CommonProperty::DesktopBackdropTint))
+        .property(common_property(CommonProperty::DesktopBackdropFallback))
     .property(common_property(CommonProperty::Visible))
     .property(PropertySchema::new(
         ANCHOR,
@@ -129,8 +131,8 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
             initial,
             restore: optional_bool(input, RESTORE_FOCUS).unwrap_or(true),
         });
-        if dismiss == DismissPolicy::OutsideHoverOrEscape {
-            element = element.interaction(Interaction::default());
+        if layer == WindowLayer::Modal || dismiss == DismissPolicy::OutsideHoverOrEscape {
+            element = element.interaction(Interaction::blocker());
         }
         if let Some(handler) = input.event_handler(DISMISS) {
             element = element

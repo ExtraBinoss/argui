@@ -1,11 +1,12 @@
 use argui_core::{Point, Rect, Size};
+use argui_layout::LayoutEngine;
 use argui_schema::{
     NativeElementInput, NativeEventValue, NativeSlotValue, SchemaError, SchemaValue, builtin,
 };
 use argui_ui::{
     DismissPolicy, Element, EventHandler, EventHandlerId, EventOwnerId, EventType,
-    FocusContainment, InitialFocus, Placement, PortalTarget, ViewportPlacement, WindowLayer,
-    WritingDirection,
+    FocusContainment, InitialFocus, Interaction, Placement, PortalTarget, ViewportPlacement,
+    VisualState, WindowLayer, WritingDirection, length, percent,
 };
 
 #[test]
@@ -61,6 +62,65 @@ fn anchored_popup_uses_portal_and_focus_policies_without_paint() {
             .iter()
             .any(|event| event.event == EventType::PointerOutside)
     );
+}
+
+#[test]
+fn modal_popup_blocks_hover_behind_it_and_keeps_child_interaction() {
+    let registry = builtin::registry().unwrap();
+    let popup = registry
+        .construct(
+            builtin::POPUP_WINDOW,
+            &NativeElementInput::new()
+                .property(builtin::PLACEMENT, SchemaValue::String("fill".into()))
+                .property(builtin::WINDOW_LAYER, SchemaValue::String("modal".into()))
+                .property(builtin::WIDTH, SchemaValue::Dimension(percent(1.0)))
+                .property(builtin::HEIGHT, SchemaValue::Dimension(percent(1.0)))
+                .slot(NativeSlotValue::new(
+                    builtin::CHILDREN,
+                    [Element::container([])
+                        .keyed("dialog-button")
+                        .width(length(40.0))
+                        .height(length(30.0))
+                        .interaction(Interaction::default())],
+                )),
+        )
+        .unwrap()
+        .keyed("modal");
+    let underlay = Element::container([])
+        .keyed("underlay")
+        .width(length(200.0))
+        .height(length(120.0))
+        .interaction(Interaction::default());
+    let mut ui = argui_ui::UiTree::new(Element::container([underlay, popup]));
+    let output = LayoutEngine::new()
+        .compute(
+            &mut ui,
+            &mut argui_text::TextEngine::from_embedded_fonts(
+                [],
+                "sans-serif",
+                "serif",
+                "monospace",
+            ),
+            Size::new(200.0, 120.0),
+        )
+        .unwrap();
+    let node = |key| {
+        ui.node_ids()
+            .iter()
+            .copied()
+            .find(|id| ui.key(*id) == Some(key))
+            .unwrap()
+    };
+    let underlay = node("underlay");
+    let modal = node("modal");
+    let button = node("dialog-button");
+    assert_eq!(output.hit_regions.last().map(|hit| hit.node), Some(button));
+    ui.pointer_moved(Point::new(180.0, 100.0), &output.hit_regions);
+    assert!(ui.visual_states(modal).contains(VisualState::Hovered));
+    assert!(!ui.visual_states(underlay).contains(VisualState::Hovered));
+    ui.pointer_moved(Point::new(20.0, 15.0), &output.hit_regions);
+    assert!(ui.visual_states(button).contains(VisualState::Hovered));
+    assert!(!ui.visual_states(underlay).contains(VisualState::Hovered));
 }
 
 #[test]

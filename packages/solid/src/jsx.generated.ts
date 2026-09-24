@@ -14,6 +14,8 @@ export namespace JSX {
       rotation?: number
       opacity?: number
       backdrop_filter?: string
+      desktop_backdrop_tint?: string
+      desktop_backdrop_fallback?: string
       visible?: boolean
       min_width?: number
       min_height?: number
@@ -150,6 +152,8 @@ export namespace JSX {
       rotation?: number
       opacity?: number
       backdrop_filter?: string
+      desktop_backdrop_tint?: string
+      desktop_backdrop_fallback?: string
       visible?: boolean
       min_width?: number
       min_height?: number
@@ -286,6 +290,8 @@ export namespace JSX {
       rotation?: number
       opacity?: number
       backdrop_filter?: string
+      desktop_backdrop_tint?: string
+      desktop_backdrop_fallback?: string
       visible?: boolean
       min_width?: number
       min_height?: number
@@ -424,8 +430,12 @@ export namespace JSX {
       rotation?: number
       opacity?: number
       backdrop_filter?: string
+      desktop_backdrop_tint?: string
+      desktop_backdrop_fallback?: string
       visible?: boolean
       background?: string
+      padding?: number
+      radius?: number
       loop_ms?: number
       loop_playing?: boolean
       loop_opacity?: number
@@ -503,6 +513,8 @@ export namespace JSX {
       rotation?: number
       opacity?: number
       backdrop_filter?: string
+      desktop_backdrop_tint?: string
+      desktop_backdrop_fallback?: string
       visible?: boolean
       alt?: string
       source: AssetRef
@@ -565,6 +577,8 @@ export namespace JSX {
       rotation?: number
       opacity?: number
       backdrop_filter?: string
+      desktop_backdrop_tint?: string
+      desktop_backdrop_fallback?: string
       visible?: boolean
       alt?: string
       source: AssetRef
@@ -642,6 +656,8 @@ export namespace JSX {
       transition_ms?: number
       transition_spring?: boolean
       backdrop_filter?: string
+      desktop_backdrop_tint?: string
+      desktop_backdrop_fallback?: string
       visible?: boolean
       background?: string
       border_color?: string
@@ -707,6 +723,8 @@ export namespace JSX {
       rotation?: number
       opacity?: number
       backdrop_filter?: string
+      desktop_backdrop_tint?: string
+      desktop_backdrop_fallback?: string
       visible?: boolean
       enabled?: boolean
       mouse_cursor?: string
@@ -779,6 +797,8 @@ export namespace JSX {
       rotation?: number
       opacity?: number
       backdrop_filter?: string
+      desktop_backdrop_tint?: string
+      desktop_backdrop_fallback?: string
       visible?: boolean
       enabled?: boolean
       focus_on_click?: boolean
@@ -847,6 +867,8 @@ export namespace JSX {
       rotation?: number
       opacity?: number
       backdrop_filter?: string
+      desktop_backdrop_tint?: string
+      desktop_backdrop_fallback?: string
       visible?: boolean
       source: AssetRef
       fit?: string
@@ -906,6 +928,7 @@ export namespace JSX {
       read_only?: boolean
       search?: boolean
       multiline?: boolean
+      privacy?: string
       max_digits?: number
       label?: string
       description?: string
@@ -917,8 +940,11 @@ export namespace JSX {
       rotation?: number
       opacity?: number
       backdrop_filter?: string
+      desktop_backdrop_tint?: string
+      desktop_backdrop_fallback?: string
       visible?: boolean
       background?: string
+      clip?: boolean
       selection_fill?: string
       selection_radius?: number
       text_color?: string
@@ -1043,6 +1069,8 @@ export namespace JSX {
       height?: number | string
       opacity?: number
       backdrop_filter?: string
+      desktop_backdrop_tint?: string
+      desktop_backdrop_fallback?: string
       visible?: boolean
       anchor?: string
       placement?: string
@@ -1111,6 +1139,8 @@ export namespace JSX {
       rotation?: number
       opacity?: number
       backdrop_filter?: string
+      desktop_backdrop_tint?: string
+      desktop_backdrop_fallback?: string
       visible?: boolean
       enabled?: boolean
       scroll_x?: boolean
@@ -1176,6 +1206,8 @@ export namespace JSX {
       rotation?: number
       opacity?: number
       backdrop_filter?: string
+      desktop_backdrop_tint?: string
+      desktop_backdrop_fallback?: string
       visible?: boolean
       grow?: number
       row_height: number
@@ -1256,6 +1288,8 @@ export namespace JSX {
       rotation?: number
       opacity?: number
       backdrop_filter?: string
+      desktop_backdrop_tint?: string
+      desktop_backdrop_fallback?: string
       visible?: boolean
       min_width?: number
       min_height?: number
@@ -1392,6 +1426,8 @@ export namespace JSX {
       rotation?: number
       opacity?: number
       backdrop_filter?: string
+      desktop_backdrop_tint?: string
+      desktop_backdrop_fallback?: string
       visible?: boolean
       canvas_id: number
       revision?: number

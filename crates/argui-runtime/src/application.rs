@@ -36,6 +36,11 @@ pub enum AppEvent {
     Tray(TrayEvent),
     /// A registered system-wide keyboard shortcut changed state.
     GlobalShortcut(GlobalShortcutEvent),
+    /// Text sent by a native presentation to a named application window.
+    HostMessage {
+        window: WindowKey,
+        message: String,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq)]

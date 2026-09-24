@@ -59,6 +59,10 @@ impl ApplicationHandler<UserEvent> for MultiApplication {
                     let _ = batch.reply.send(Err("unknown native host window".into()));
                 }
             }
+            #[cfg(not(target_arch = "wasm32"))]
+            UserEvent::NativeHostApplication(request) => {
+                self.native_host_application_request(event_loop, request);
+            }
             UserEvent::GpuCanvasReady(id) => {
                 for entry in self.windows.values_mut() {
                     entry.runtime.gpu_canvas_ready(id);

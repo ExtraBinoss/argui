@@ -65,4 +65,34 @@ export interface NativeBridge {
   contract(): NativeContract
   commit(operations: readonly Operation[]): void
   subscribe(deliver: (event: NativeDelivery) => void): () => void
+  /** Starts an application request separately from UI transactions. */
+  request?(request: ServiceRequest): void
+  /** Marks a pending application request as cancelled. */
+  cancelRequest?(window: string, requestId: number): void
+  /** Subscribes to application responses for this JavaScript session. */
+  subscribeResponses?(deliver: (response: ServiceResponse) => void): () => void
 }
+
+/** One service call owned by a native window and a JavaScript session. */
+export interface ServiceRequest {
+  requestId: number
+  window: string
+  service: string
+  method: string
+  payload: unknown
+}
+
+/** A terminal response. Cancellation and platform support are explicit. */
+export type ServiceResponse =
+  | { requestId: number; window: string; status: 'ok'; value: unknown }
+  | { requestId: number; window: string; status: 'cancelled' }
+  | { requestId: number; window: string; status: 'error' | 'unsupported'; message: string }
+  | { requestId: 0; window: string; status: 'event'; value: ApplicationEvent }
+
+/** Native tray, global shortcut, and registration-failure events. */
+export type ApplicationEvent =
+  | { type: 'menu'; id: string }
+  | { type: 'shortcut'; id: string; state: 'pressed' | 'released' }
+  | { type: 'shortcutError' | 'trayError'; message: string }
+  | { type: 'window'; window: string; message: string }
+  | { type: 'windowAppearanceError'; window: string; message: string }

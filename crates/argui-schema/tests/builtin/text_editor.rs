@@ -2,7 +2,10 @@ use argui_core::Color;
 use argui_paint::Fill;
 use argui_schema::{NativeElementInput, SchemaError, SchemaValue, ValueType, builtin};
 use argui_text::TextWrap;
-use argui_ui::{CaretHeight, ElementKind, Overflow, Role, ScrollbarGutter, ScrollbarVisibility};
+use argui_ui::{
+    CaretHeight, ElementKind, Overflow, Role, ScrollbarGutter, ScrollbarVisibility, TextPrivacy,
+    UiTree,
+};
 
 /// Controlled text uses the delta event while the full-value event stays optional.
 #[test]
@@ -41,6 +44,72 @@ fn text_input_can_expose_search_semantics() {
         )
         .unwrap();
     assert_eq!(editor.semantics.as_ref().unwrap().role, Role::SearchInput);
+    let ElementKind::TextEditor {
+        text,
+        placeholder_text,
+        ..
+    } = &editor.kind
+    else {
+        panic!("search input must use a text editor");
+    };
+    assert_eq!(text.wrap, TextWrap::None);
+    assert_eq!(placeholder_text.wrap, TextWrap::None);
+    assert_eq!(editor.style.overflow.x, Overflow::Hidden);
+    assert_eq!(editor.style.overflow.y, Overflow::Hidden);
+}
+
+/// Applications can opt out of the default input-bound clipping from TSX.
+#[test]
+fn text_input_clip_property_controls_its_own_paint_boundary() {
+    let editor = builtin::registry()
+        .unwrap()
+        .construct(
+            builtin::TEXT_INPUT,
+            &NativeElementInput::new()
+                .property(builtin::KEY, SchemaValue::String("search".into()))
+                .property(builtin::CLIP, SchemaValue::Bool(false)),
+        )
+        .unwrap();
+    assert_eq!(editor.style.overflow.x, Overflow::Visible);
+    assert_eq!(editor.style.overflow.y, Overflow::Visible);
+}
+
+/// Password and revealed-password TSX values keep protected native semantics.
+#[test]
+fn text_input_privacy_masks_passwords_and_protects_revealed_text() {
+    let registry = builtin::registry().unwrap();
+    for (name, expected, privacy) in [
+        ("password", "••••••", TextPrivacy::Password),
+        ("revealed_password", "secret", TextPrivacy::RevealedPassword),
+    ] {
+        let editor = registry
+            .construct(
+                builtin::TEXT_INPUT,
+                &NativeElementInput::new()
+                    .property(builtin::KEY, SchemaValue::String("login".into()))
+                    .property(builtin::VALUE, SchemaValue::String("secret".into()))
+                    .property(builtin::TEXT_PRIVACY, SchemaValue::String(name.into())),
+            )
+            .unwrap();
+        assert_eq!(editor.text_privacy, privacy);
+        let semantics = editor.semantics.as_ref().unwrap();
+        assert!(semantics.state.protected);
+        assert!(semantics.value.is_none());
+        let tree = UiTree::new(editor);
+        assert_eq!(
+            tree.text_input_display(tree.node_ids()[0]).as_deref(),
+            Some(expected)
+        );
+    }
+    let error = registry
+        .construct(
+            builtin::TEXT_INPUT,
+            &NativeElementInput::new()
+                .property(builtin::KEY, SchemaValue::String("login".into()))
+                .property(builtin::TEXT_PRIVACY, SchemaValue::String("unknown".into())),
+        )
+        .unwrap_err();
+    assert!(error.to_string().contains("privacy `unknown`"));
 }
 
 /// TextInput exposes multiline editing without supplying a surrounding frame.

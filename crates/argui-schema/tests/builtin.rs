@@ -72,6 +72,12 @@ fn builtin_catalogue_preserves_stable_names_and_public_members() {
                     .any(|property| property.id == builtin::BACKDROP_FILTER),
                 "{name} must support backdrop_filter"
             );
+            for property in [
+                builtin::DESKTOP_BACKDROP_TINT,
+                builtin::DESKTOP_BACKDROP_FALLBACK,
+            ] {
+                assert!(schema.properties.iter().any(|entry| entry.id == property));
+            }
         }
     }
     #[cfg(feature = "media")]
@@ -96,13 +102,14 @@ fn builtin_catalogue_preserves_stable_names_and_public_members() {
     }
 }
 use argui_core::Color;
-use argui_paint::Filter;
+use argui_paint::{Fill, Filter};
 use argui_schema::{NativeElementInput, NativeSlotValue, SchemaValue, builtin};
 use argui_text::{
     EllipsisPosition, FontStyle, LetterSpacing, TextAlign, TextOverflow, TextWrap, UnderlineStyle,
 };
 use argui_ui::{
-    AlignItems, Display, Element, ElementKind, FlexWrap, JustifyContent, Overflow, length,
+    AlignItems, DesktopBackdropState, Display, Element, ElementKind, FlexWrap, JustifyContent,
+    Overflow, UiTree, length,
 };
 
 #[test]
@@ -136,6 +143,64 @@ fn ordered_backdrop_filters_apply_to_text_and_layout_surfaces() {
             vec![Filter::Blur(4.0), Filter::Brightness(0.6)]
         );
     }
+}
+
+#[test]
+fn desktop_backdrop_colors_apply_to_a_region_or_full_window_root() {
+    let registry = builtin::registry().unwrap();
+    let tint = Color::srgba(0.1, 0.2, 0.3, 0.45);
+    let fallback = Color::srgb(0.1, 0.2, 0.3);
+    for id in [builtin::RECTANGLE, builtin::COLUMN] {
+        let element = registry
+            .construct(
+                id,
+                &NativeElementInput::new()
+                    .property(builtin::DESKTOP_BACKDROP_TINT, SchemaValue::Color(tint))
+                    .property(
+                        builtin::DESKTOP_BACKDROP_FALLBACK,
+                        SchemaValue::Color(fallback),
+                    ),
+            )
+            .unwrap();
+        let mut tree = UiTree::new(element.clone());
+        let root = tree.node_ids()[0];
+        assert_eq!(
+            tree.resolved_quad(root, &element).background,
+            Some(Fill::Solid(fallback))
+        );
+        tree.set_desktop_backdrop_state(DesktopBackdropState {
+            available: true,
+            focused: true,
+        });
+        assert_eq!(
+            tree.resolved_quad(root, &element).background,
+            Some(Fill::Solid(tint))
+        );
+    }
+    let error = registry
+        .construct(
+            builtin::COLUMN,
+            &NativeElementInput::new()
+                .property(builtin::DESKTOP_BACKDROP_TINT, SchemaValue::Color(tint)),
+        )
+        .unwrap_err();
+    assert!(error.to_string().contains("must be set together"));
+}
+
+#[test]
+fn text_accepts_runtime_padding_and_corner_radius() {
+    let registry = builtin::registry().unwrap();
+    let text = registry
+        .construct(
+            builtin::TEXT,
+            &NativeElementInput::new()
+                .property(builtin::CONTENT, SchemaValue::String("Theme".into()))
+                .property(builtin::PADDING, SchemaValue::Float(14.0))
+                .property(builtin::RADIUS, SchemaValue::Float(11.0)),
+        )
+        .unwrap();
+    assert_eq!(text.style.padding, argui_ui::Sides::length(14.0));
+    assert_eq!(text.paint.quad.radii, argui_paint::CornerRadii::all(11.0));
 }
 
 #[test]
