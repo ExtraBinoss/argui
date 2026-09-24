@@ -441,3 +441,50 @@ fn a_resize_handle_painted_over_a_scrollbar_keeps_pointer_priority() {
             )
     }));
 }
+
+#[test]
+fn hit_testing_and_empty_regions_have_exact_boundaries() {
+    let populated = region(vec![stop(0, 0.0, 0.0, true), stop(1, 20.0, 0.0, true)]);
+    assert_eq!(
+        populated.hit_position(Point::new(18.0, 2.0)),
+        Some(TextPosition::new(1, CaretAffinity::Before))
+    );
+    assert_eq!(populated.hit_index(Point::new(18.0, 2.0)), Some(1));
+    assert_eq!(populated.hit_position(Point::new(90.0, 2.0)), None);
+    assert_eq!(populated.hit_position(Point::new(110.0, 2.0)), None);
+
+    let empty = region(Vec::new());
+    assert_eq!(
+        empty.closest_position(Point::new(4.0, 4.0)),
+        TextPosition::default()
+    );
+    assert_eq!(empty.closest_index(Point::new(4.0, 4.0)), 0);
+}
+
+#[test]
+fn resizing_a_text_area_preserves_its_scroll_position() {
+    let value = (0..30)
+        .map(|line| format!("line {line:02}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let editor = |height| {
+        multiline_editor("notes", &value, "notes", TextStyle::default()).height(length(height))
+    };
+    let mut ui = UiTree::new(editor(96.0));
+    let node = ui.node_id_at(0).unwrap();
+    let mut layout = LayoutEngine::new();
+    let mut text = text_engine();
+    layout
+        .compute(&mut ui, &mut text, Size::new(260.0, 160.0))
+        .unwrap();
+    ui.set_scroll_offset(node, Point::new(0.0, 40.0));
+
+    ui.update(editor(120.0));
+    let output = layout
+        .compute(&mut ui, &mut text, Size::new(260.0, 160.0))
+        .unwrap();
+
+    assert!(output.scroll_regions[0].max_offset.y > 40.0);
+    assert_eq!(ui.scroll_offset(node), Point::new(0.0, 40.0));
+    assert_eq!(output.text_inputs[0].scroll_y, 40.0);
+}

@@ -203,6 +203,51 @@ fn unchanged_authored_value_keeps_history_during_layout_rebuild_external_change_
 }
 
 #[test]
+fn delayed_controlled_values_do_not_rewind_newer_native_edits() {
+    let (mut tree, region) = editor("", TextInputFilter::Any);
+    type_text(&mut tree, "a");
+    type_text(&mut tree, "b");
+    assert_eq!(tree.text_input_value(region.node), Some("ab"));
+    assert_eq!(tree.text_input_cursor(region.node), Some(2));
+
+    tree.replace(field("a", TextInputFilter::Any));
+    assert_eq!(tree.text_input_value(region.node), Some("ab"));
+    assert_eq!(tree.text_input_cursor(region.node), Some(2));
+    tree.replace(field("ab", TextInputFilter::Any));
+    assert_eq!(tree.text_input_value(region.node), Some("ab"));
+    assert_eq!(tree.text_input_cursor(region.node), Some(2));
+
+    tree.replace(field("remote", TextInputFilter::Any));
+    assert_eq!(tree.text_input_value(region.node), Some("remote"));
+    assert!(!tree.can_undo(region.node));
+}
+
+#[test]
+fn burst_typing_preserves_the_latest_caret_through_delayed_echoes() {
+    let (mut tree, region) = editor("", TextInputFilter::Any);
+    let mut value = String::new();
+    let mut echoes = Vec::new();
+    for index in 0..48 {
+        let character = char::from(b'a' + (index % 26) as u8);
+        type_text(&mut tree, &character.to_string());
+        value.push(character);
+        echoes.push(value.clone());
+    }
+    assert_eq!(tree.text_input_value(region.node), Some(value.as_str()));
+    assert_eq!(tree.text_input_cursor(region.node), Some(value.len()));
+
+    for echo in echoes {
+        tree.replace(field(&echo, TextInputFilter::Any));
+        assert_eq!(tree.text_input_value(region.node), Some(value.as_str()));
+        assert_eq!(tree.text_input_cursor(region.node), Some(value.len()));
+    }
+    type_text(&mut tree, "é");
+    value.push('é');
+    assert_eq!(tree.text_input_value(region.node), Some(value.as_str()));
+    assert_eq!(tree.text_input_cursor(region.node), Some(value.len()));
+}
+
+#[test]
 fn preedit_has_no_history_and_commit_is_one_atomic_edit() {
     let (mut tree, region) = editor("", TextInputFilter::Any);
     tree.ime_input(ImeInput::Preedit {

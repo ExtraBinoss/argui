@@ -11,6 +11,7 @@ export function Button(props: ButtonProps): JSX.Element {
   const [hovered, setHovered] = createLocalSignal(false)
   const [pressed, setPressed] = createLocalSignal(false)
   const [focused, setFocused] = createLocalSignal(false)
+  let pointerFocus = false
   const inactive = () => !!props.disabled || !!props.busy
   const fill = () => props.kind === 'destructive'
     ? pressed() ? props.theme.destructivePressed : hovered() ? props.theme.destructiveHover : props.theme.destructive
@@ -37,23 +38,23 @@ export function Button(props: ButtonProps): JSX.Element {
       busy={!!props.busy}
       keyboard_activation="enter_or_space"
       onClick={() => { if (!inactive()) props.onClick() }}
-      onFocus={() => { if (!mobile) setFocused(true) }}
-      onKey={() => { if (mobile) setFocused(true) }}
-      onBlur={() => setFocused(false)}
+      onFocus={() => { if (!pointerFocus) setFocused(true) }}
+      onKey={() => { pointerFocus = false; setFocused(true) }}
+      onBlur={() => { pointerFocus = false; setFocused(false) }}
     >
       <touchArea
         enabled={!inactive()}
         mouse_cursor={inactive() ? 'not_allowed' : 'pointer'}
         onPointerEnter={() => { if (!mobile) setHovered(true) }}
         onPointerLeave={() => { setHovered(false); setPressed(false) }}
-        onPointerDown={() => { setPressed(true); if (mobile) setFocused(false) }}
+        onPointerDown={() => { pointerFocus = true; setPressed(true); setFocused(false) }}
         onPointerUp={() => setPressed(false)}
         onPointerCancel={() => setPressed(false)}
       >
         <rectangle
           background={fill()}
           border_color={focused() ? props.theme.foreground : !mobile && props.selected ? props.theme.accent : props.theme.border}
-          border_width={props.kind === 'ghost' ? 0 : focused() ? 2 : 1}
+          border_width={props.kind === 'ghost' ? 0 : 1}
           radius={9}
           opacity={props.disabled ? 0.48 : props.busy ? 0.72 : 1}
         >

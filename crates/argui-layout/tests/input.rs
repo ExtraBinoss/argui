@@ -331,25 +331,6 @@ fn region(stops: Vec<CaretStop>) -> TextInputRegion {
 }
 
 #[test]
-fn hit_testing_and_empty_regions_have_exact_boundaries() {
-    let populated = region(vec![stop(0, 0.0, 0.0, true), stop(1, 20.0, 0.0, true)]);
-    assert_eq!(
-        populated.hit_position(Point::new(18.0, 2.0)),
-        Some(TextPosition::new(1, CaretAffinity::Before))
-    );
-    assert_eq!(populated.hit_index(Point::new(18.0, 2.0)), Some(1));
-    assert_eq!(populated.hit_position(Point::new(90.0, 2.0)), None);
-    assert_eq!(populated.hit_position(Point::new(110.0, 2.0)), None);
-
-    let empty = region(Vec::new());
-    assert_eq!(
-        empty.closest_position(Point::new(4.0, 4.0)),
-        TextPosition::default()
-    );
-    assert_eq!(empty.closest_index(Point::new(4.0, 4.0)), 0);
-}
-
-#[test]
 fn text_area_shapes_and_clips_scrollable_content_with_a_live_scrollbar() {
     let value = (0..30)
         .map(|line| format!("line {line:02} keeps enough text to exercise wrapping"))
@@ -482,34 +463,6 @@ fn a_single_line_input_clips_its_text_after_a_retained_resize() {
 }
 
 #[test]
-fn resizing_a_text_area_preserves_its_scroll_position() {
-    let value = (0..30)
-        .map(|line| format!("line {line:02}"))
-        .collect::<Vec<_>>()
-        .join("\n");
-    let editor = |height| {
-        multiline_editor("notes", &value, "notes", TextStyle::default()).height(length(height))
-    };
-    let mut ui = UiTree::new(editor(96.0));
-    let node = ui.node_id_at(0).unwrap();
-    let mut layout = LayoutEngine::new();
-    let mut text = text_engine();
-    layout
-        .compute(&mut ui, &mut text, Size::new(260.0, 160.0))
-        .unwrap();
-    ui.set_scroll_offset(node, Point::new(0.0, 40.0));
-
-    ui.update(editor(120.0));
-    let output = layout
-        .compute(&mut ui, &mut text, Size::new(260.0, 160.0))
-        .unwrap();
-
-    assert!(output.scroll_regions[0].max_offset.y > 40.0);
-    assert_eq!(ui.scroll_offset(node), Point::new(0.0, 40.0));
-    assert_eq!(output.text_inputs[0].scroll_y, 40.0);
-}
-
-#[test]
 fn empty_or_degenerate_custom_carets_do_not_emit_invalid_quads() {
     use argui_ui::{CaretHeight, CaretPrimitive, CaretStyle, CaretVisual, FocusRequest};
     let color = Color::srgb(0.3, 0.8, 0.4);
@@ -575,6 +528,56 @@ fn empty_or_degenerate_custom_carets_do_not_emit_invalid_quads() {
             .count();
         assert_eq!(painted, expected, "caret {width} x {height}, empty={empty}");
     }
+}
+
+#[test]
+fn narrow_search_row_clips_long_text_and_reveals_its_caret() {
+    let value = "searchcomponents".repeat(3);
+    let input = single_line_editor("search", &value, "Search components", TextStyle::default())
+        .width(percent(1.0))
+        .height(length(22.0))
+        .padding(argui_ui::sides(0.0, 0.0));
+    let input_slot = Element::container([input]).grow(1.0).min_width(length(0.0));
+    let icon = Element::container([])
+        .width(length(17.0))
+        .height(length(17.0))
+        .shrink(0.0);
+    let row = Element::row([icon, input_slot])
+        .width(percent(1.0))
+        .min_width(length(0.0))
+        .padding(argui_ui::Sides {
+            left: length(10.0),
+            right: length(10.0),
+            top: length(0.0),
+            bottom: length(0.0),
+        })
+        .gap(8.0);
+    let frame = Element::container([row])
+        .width(length(204.0))
+        .height(length(42.0))
+        .clip(argui_ui::CornerRadii::all(8.0));
+    let mut ui = UiTree::new(frame);
+    let mut layout = LayoutEngine::new();
+    let mut text = text_engine();
+    let output = layout
+        .compute(&mut ui, &mut text, Size::new(400.0, 80.0))
+        .unwrap();
+    let region = &output.text_inputs[0];
+    let frame = output.nodes[0].bounds;
+    assert!(region.bounds.origin.x >= frame.origin.x);
+    assert!(
+        region.bounds.origin.x + region.bounds.size.width <= frame.origin.x + frame.size.width,
+        "region={region:?}, frame={frame:?}"
+    );
+    assert!(region.scroll_x > 0.0);
+    let end = region
+        .stops
+        .iter()
+        .find(|stop| stop.position.index == value.len())
+        .unwrap();
+    assert!(end.point.x >= region.viewport.origin.x);
+    assert!(end.point.x <= region.viewport.origin.x + region.viewport.size.width);
+    assert!(output.text.blocks()[0].clip.size.width <= region.bounds.size.width);
 }
 
 #[path = "input/navigation.rs"]

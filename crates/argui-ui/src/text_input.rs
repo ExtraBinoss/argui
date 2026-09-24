@@ -1,4 +1,8 @@
-use std::borrow::Cow;
+use std::{
+    borrow::Cow,
+    collections::VecDeque,
+    hash::{DefaultHasher, Hash, Hasher},
+};
 
 use argui_core::{CaretAffinity, ImeInput, Key, KeyInput, KeyState, TextPosition};
 use unicode_segmentation::UnicodeSegmentation;
@@ -25,6 +29,7 @@ pub(crate) use states::{RetainedInput, TextInputStates};
 pub(crate) struct TextInputState {
     value: String,
     authored_value: String,
+    pending_values: VecDeque<(usize, u64)>,
     cursor: usize,
     affinity: CaretAffinity,
     anchor: Option<TextPosition>,
@@ -177,6 +182,15 @@ impl TextInputState {
             return;
         }
         self.authored_value = value.to_owned();
+        if let Some(index) = self
+            .pending_values
+            .iter()
+            .position(|pending| *pending == value_stamp(value))
+        {
+            self.pending_values.drain(..=index);
+            return;
+        }
+        self.pending_values.clear();
         if self.value == value {
             return;
         }
@@ -195,6 +209,17 @@ impl TextInputState {
         });
         self.preedit = None;
         self.reveal_cursor = true;
+    }
+
+    /// Records a native edit awaiting acknowledgement from controlled properties.
+    ///
+    /// * `value` — full value emitted by the input event.
+    pub(crate) fn note_emitted_value(&mut self, value: &str) {
+        const MAX_PENDING_VALUES: usize = 128;
+        self.pending_values.push_back(value_stamp(value));
+        if self.pending_values.len() > MAX_PENDING_VALUES {
+            self.pending_values.pop_front();
+        }
     }
 
     pub fn display_cursor(&self) -> usize {
@@ -543,4 +568,15 @@ impl TextInputState {
             self.anchor = None;
         }
     }
+}
+
+/// Returns a compact fingerprint for an emitted controlled value.
+///
+/// * `value` — text that may be acknowledged by a later UI transaction.
+///
+/// Returns its byte length and hash without retaining copies of input contents.
+fn value_stamp(value: &str) -> (usize, u64) {
+    let mut hasher = DefaultHasher::new();
+    value.hash(&mut hasher);
+    (value.len(), hasher.finish())
 }

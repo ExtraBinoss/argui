@@ -388,6 +388,9 @@ impl UiTree {
                     .text_inputs
                     .get(node)
                     .map_or_else(String::new, |state| state.value().to_owned());
+                if let Some(state) = self.text_inputs.get_mut(node) {
+                    state.note_emitted_value(&value);
+                }
                 events.extend(self.event_deliveries(node, UiEventKind::TextChanged(value)));
             }
         }

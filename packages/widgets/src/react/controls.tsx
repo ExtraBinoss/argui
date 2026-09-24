@@ -1,5 +1,5 @@
 /** @jsxImportSource @argui/react */
-import { useState, type ReactElement, type ReactNode } from 'react'
+import { useRef, useState, type ReactElement, type ReactNode } from 'react'
 import type { ButtonProps, PopoverProps as SharedPopoverProps, SelectProps } from '../shared/types'
 import { useWidgetIcons } from './assets'
 
@@ -13,6 +13,7 @@ export function ReactButton(props: ReactButtonProps): ReactElement {
   const [hovered, setHovered] = useState(false)
   const [pressed, setPressed] = useState(false)
   const [focused, setFocused] = useState(false)
+  const pointerFocus = useRef(false)
   const inactive = !!props.disabled || !!props.busy
   const fill = props.kind === 'destructive'
     ? pressed ? props.theme.destructivePressed : hovered ? props.theme.destructiveHover : props.theme.destructive
@@ -39,17 +40,17 @@ export function ReactButton(props: ReactButtonProps): ReactElement {
       busy={!!props.busy}
       keyboard_activation="enter_or_space"
       onClick={() => { if (!inactive) props.onClick() }}
-      onFocus={() => { if (!mobile) setFocused(true) }}
-      onKey={() => { if (mobile) setFocused(true) }}
-      onBlur={() => setFocused(false)}
+      onFocus={() => { if (!pointerFocus.current) setFocused(true) }}
+      onKey={() => { pointerFocus.current = false; setFocused(true) }}
+      onBlur={() => { pointerFocus.current = false; setFocused(false) }}
     >
       <touchArea enabled={!inactive} mouse_cursor={inactive ? 'not_allowed' : 'pointer'}
         onPointerEnter={() => { if (!mobile) setHovered(true) }}
         onPointerLeave={() => { setHovered(false); setPressed(false) }}
-        onPointerDown={() => { setPressed(true); if (mobile) setFocused(false) }} onPointerUp={() => setPressed(false)}
+        onPointerDown={() => { pointerFocus.current = true; setPressed(true); setFocused(false) }} onPointerUp={() => setPressed(false)}
         onPointerCancel={() => setPressed(false)}>
         <rectangle background={fill} border_color={focused ? props.theme.foreground : !mobile && props.selected ? props.theme.accent : props.theme.border}
-          border_width={props.kind === 'ghost' ? 0 : focused ? 2 : 1} radius={9}
+          border_width={props.kind === 'ghost' ? 0 : 1} radius={9}
           opacity={props.disabled ? 0.48 : props.busy ? 0.72 : 1}>
           <row gap={8} padding={10} align_items="center">
             {props.busy ? <rectangle width={16} height={16} rotation_loop_ms={800}>
