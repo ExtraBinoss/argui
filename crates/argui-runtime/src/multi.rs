@@ -1,21 +1,17 @@
-#[cfg(all(feature = "tray", not(target_arch = "wasm32")))]
-use std::sync::Arc;
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-#[cfg(all(feature = "tray", not(target_arch = "wasm32")))]
-use crate::AppCommand;
-#[cfg(any(feature = "tasks", all(feature = "tray", not(target_arch = "wasm32"))))]
+#[cfg(feature = "tasks")]
 use crate::event::UserEvent;
 use crate::{
     AppEvent, AppModel, AppUpdate, Context, Entity, LayoutSnapshot, Render, RuntimeError,
     RuntimeEvent, ViewUpdate, app::Application,
 };
 use argui_platform::{ApplicationConfig, WindowKey, WindowLevel, WindowSpec};
-#[cfg(all(feature = "tray", not(target_arch = "wasm32")))]
-use argui_platform::{TrayAction, TrayEvent};
 use argui_render::RendererConfig;
 use argui_text::TextEngine;
 use argui_ui::Element;
+#[cfg(not(target_arch = "wasm32"))]
+use argui_ui::UiTree;
 
 mod command;
 mod event_loop;
@@ -24,6 +20,9 @@ mod global_shortcuts;
 pub(crate) mod gtk;
 mod lifecycle;
 mod model_updates;
+#[cfg(not(target_arch = "wasm32"))]
+mod native_host_application;
+mod tray;
 
 type SharedModel = Rc<RefCell<Box<dyn AppModel>>>;
 type SharedUpdates = Rc<RefCell<Vec<AppUpdate>>>;
@@ -40,6 +39,13 @@ struct WindowEntry {
     runtime: Application,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+struct NativeHostPresentation {
+    host: crate::NativeHost,
+    assets: crate::NativeHostAssets,
+    events: std::sync::mpsc::Sender<crate::NativeHostDelivery>,
+}
+
 pub(crate) struct MultiApplication {
     #[cfg(feature = "tasks")]
     tasks: Option<crate::tasks::TaskRuntime>,
@@ -53,6 +59,8 @@ pub(crate) struct MultiApplication {
     windows: HashMap<WindowKey, WindowEntry>,
     retired: Vec<crate::ModelRuntime>,
     by_native: HashMap<crate::host::HostId, WindowKey>,
+    #[cfg(not(target_arch = "wasm32"))]
+    native_host: Option<NativeHostPresentation>,
     event_proxy: Option<crate::host::EventProxy>,
     #[cfg(all(feature = "tray", not(target_arch = "wasm32")))]
     native_tray: Option<argui_platform::NativeTray>,
@@ -124,6 +132,8 @@ impl MultiApplication {
             windows: HashMap::new(),
             retired: Vec::new(),
             by_native: HashMap::new(),
+            #[cfg(not(target_arch = "wasm32"))]
+            native_host: None,
             event_proxy: None,
             #[cfg(feature = "tasks")]
             tasks: None,
@@ -162,6 +172,22 @@ impl MultiApplication {
         self.event_proxy = Some(proxy);
     }
 
+    /// Installs the presentation and its assets for the initial main window.
+    /// `host` owns the UI graph, `assets` resolve its media, and `events` returns UI callbacks.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) fn install_native_host(
+        &mut self,
+        host: crate::NativeHost,
+        assets: crate::NativeHostAssets,
+        events: std::sync::mpsc::Sender<crate::NativeHostDelivery>,
+    ) {
+        self.native_host = Some(NativeHostPresentation {
+            host,
+            assets,
+            events,
+        });
+    }
+
     #[cfg_attr(coverage_nightly, coverage(off))]
     fn open_window(&mut self, event_loop: &dyn crate::host::WindowFactory, spec: WindowSpec) {
         if self.windows.contains_key(&spec.key) {
@@ -183,12 +209,33 @@ impl MultiApplication {
             Rc::clone(&self.pending),
             Rc::clone(&self.callback),
         );
+        #[cfg(not(target_arch = "wasm32"))]
+        let presentation = (key == WindowKey::main())
+            .then(|| self.native_host.take())
+            .flatten();
+        #[cfg(not(target_arch = "wasm32"))]
+        let initial = presentation
+            .as_ref()
+            .and_then(|presentation| presentation.host.root_element())
+            .map(UiTree::new);
         let mut runtime = Application::new(
             spec.window.clone(),
             self.renderer_config.clone(),
             self.initial_text_engine.take().unwrap_or_default(),
             None,
+            #[cfg(not(target_arch = "wasm32"))]
+            initial,
+            #[cfg(target_arch = "wasm32")]
             None,
+            #[cfg(not(target_arch = "wasm32"))]
+            presentation.is_none().then(|| {
+                Entity::new(adapter)
+                    .mount()
+                    .expect("new window model is open")
+                    .entity
+                    .erase()
+            }),
+            #[cfg(target_arch = "wasm32")]
             Some(
                 Entity::new(adapter)
                     .mount()
@@ -203,6 +250,12 @@ impl MultiApplication {
         .ui_zoom(self.config.ui_zoom.enabled, self.ui_zoom_factor)
         .preference_overrides(self.config.preferences)
         .shared_renderer_device(Rc::clone(&self.renderer_device));
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(presentation) = presentation {
+            runtime.install_native_host_assets(presentation.assets);
+            runtime.native_host = Some(presentation.host);
+            runtime.native_host_events = Some(presentation.events);
+        }
         if let Some(proxy) = &self.event_proxy {
             #[cfg(feature = "tasks")]
             {
@@ -293,90 +346,8 @@ impl MultiApplication {
         ));
     }
 
-    #[cfg(all(feature = "tray", not(target_arch = "wasm32")))]
-    #[cfg_attr(coverage_nightly, coverage(off))]
-    fn tray_event(&mut self, event_loop: &dyn crate::host::WindowFactory, event: TrayEvent) {
-        self.emit(RuntimeEvent::Tray(event.clone()));
-        if let TrayEvent::Action { action, .. } = &event
-            && let Some(command) = tray_command(action.clone())
-        {
-            self.apply_command(event_loop, command);
-            return;
-        }
-        let update = self.model.borrow_mut().update(&AppEvent::Tray(event));
-        self.pending.borrow_mut().push(update);
-        self.process_pending(event_loop);
-    }
-
-    #[cfg_attr(coverage_nightly, coverage(off))]
-    fn sync_tray(&mut self) {
-        let config = self
-            .model
-            .borrow()
-            .tray()
-            .or_else(|| self.config.tray.clone());
-        let Some(config) = config else {
-            #[cfg(all(feature = "tray", not(target_arch = "wasm32")))]
-            {
-                self.native_tray = None;
-            }
-            return;
-        };
-
-        #[cfg(all(feature = "tray", not(target_arch = "wasm32")))]
-        {
-            let result = if let Some(tray) = &mut self.native_tray {
-                tray.sync(config, &self.config.identity.icons)
-            } else {
-                let Some(proxy) = self.event_proxy.clone() else {
-                    return;
-                };
-                let handler = Arc::new(move |event| {
-                    let _ = proxy.send_event(UserEvent::Tray(event));
-                });
-                argui_platform::NativeTray::new(
-                    &self.config.identity.id,
-                    config,
-                    &self.config.identity.icons,
-                    handler,
-                )
-                .map(|tray| self.native_tray = Some(tray))
-            };
-            if let Err(error) = result {
-                self.emit(RuntimeEvent::TrayFailed(error));
-            }
-        }
-
-        #[cfg(any(not(feature = "tray"), target_arch = "wasm32"))]
-        if !self.tray_unavailable_announced {
-            let _ = config;
-            self.tray_unavailable_announced = true;
-            self.emit(RuntimeEvent::TrayUnavailable(
-                if cfg!(target_arch = "wasm32") {
-                    "system tray is unavailable on the Web"
-                } else {
-                    "rebuild Argui with the `tray` feature"
-                }
-                .into(),
-            ));
-        }
-    }
-
     fn emit(&self, event: RuntimeEvent) {
         (self.callback.borrow_mut())(event);
-    }
-}
-
-#[cfg(all(feature = "tray", not(target_arch = "wasm32")))]
-fn tray_command(action: TrayAction) -> Option<AppCommand> {
-    match action {
-        TrayAction::Custom(_) => None,
-        TrayAction::ShowWindow(key) => Some(AppCommand::ShowWindow(key)),
-        TrayAction::HideWindow(key) => Some(AppCommand::HideWindow(key)),
-        TrayAction::ToggleWindow(key) => Some(AppCommand::ToggleWindow(key)),
-        TrayAction::FocusWindow(key) => Some(AppCommand::FocusWindow(key)),
-        TrayAction::CloseWindow(key) => Some(AppCommand::CloseWindow(key)),
-        TrayAction::Quit => Some(AppCommand::Quit),
     }
 }
 

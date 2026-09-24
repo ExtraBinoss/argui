@@ -34,6 +34,8 @@ use winit::{
 
 #[path = "surface/effect_damage.rs"]
 mod effect_damage;
+#[path = "surface/effects.rs"]
+mod effects;
 #[path = "surface/composite.rs"]
 mod headless;
 #[path = "surface/api.rs"]

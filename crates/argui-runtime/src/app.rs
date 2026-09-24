@@ -348,6 +348,11 @@ impl Application {
         self.window.as_deref()
     }
 
+    /// Returns whether the compositor currently provides native backdrop blur.
+    pub(crate) fn desktop_backdrop_available(&self) -> bool {
+        self.environment.desktop_backdrop_available
+    }
+
     pub(crate) fn invalidate(&mut self, update: ViewUpdate) {
         match update {
             ViewUpdate::None => return,

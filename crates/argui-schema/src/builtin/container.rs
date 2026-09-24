@@ -42,6 +42,8 @@ pub(super) fn register(
         .property(common_property(CommonProperty::Rotation))
         .property(common_property(CommonProperty::Opacity))
         .property(common_property(CommonProperty::BackdropFilter))
+        .property(common_property(CommonProperty::DesktopBackdropTint))
+        .property(common_property(CommonProperty::DesktopBackdropFallback))
         .property(common_property(CommonProperty::Visible))
         .property(common_property(CommonProperty::MinWidth))
         .property(common_property(CommonProperty::MinHeight))

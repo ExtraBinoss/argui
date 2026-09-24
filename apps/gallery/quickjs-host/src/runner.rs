@@ -12,22 +12,31 @@ use std::{
     time::{Duration, Instant},
 };
 
+#[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
+use crate::desktop_application::{
+    GalleryApp, gallery_config, register_application_services, runtime_service_event,
+};
 use crate::{
     QuickJsGallery,
     delivery::{coalesce_virtual_windows, event_json},
     effects::registry_from_json,
-    hot_reload::{BundleWatcher, Dispatch, dev_bundle_path, reload_gallery},
+    hot_reload::{BundleWatcher, Dispatch, ReloadContext, dev_bundle_path, reload_gallery},
     native_metrics::{control_request, forward_profile},
+    services::{ServiceChannels, ServiceRegistry, ServiceResponse},
     telemetry::{
         JsCounts, ProfileSummary, mark_commit_for_presentation, observe_profile, report_remaining,
     },
 };
 use argui_host::Host;
-use argui_platform::{WindowConfig, WindowKey};
+#[cfg(target_os = "android")]
+use argui_platform::WindowConfig;
+use argui_platform::WindowKey;
 use argui_render::{EffectRegistry, RendererConfig};
+#[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
+use argui_runtime::{NativeHostApplicationChannels, run_native_host_application};
 use argui_runtime::{
     NativeHostAssets, NativeHostBatch, NativeHostControl, NativeHostDelivery, RuntimeError,
-    WireOperation, run_native_host,
+    WireOperation,
 };
 use argui_ui::UiEventKind;
 use serde_json::Value;
@@ -39,31 +48,60 @@ const NOTO_SANS: &[u8] = include_bytes!("../../../../assets/fonts/NotoSans-Regul
 ///
 /// # Errors
 /// Returns an error if the schema, gallery bundle, QuickJS engine, or native window cannot start.
+#[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
 pub fn run_desktop() -> Result<(), Box<dyn std::error::Error>> {
+    run_desktop_with_services(Arc::new(ServiceRegistry::with_builtins()))
+}
+
+/// Runs the desktop gallery with application-registered native services.
+/// `services` contains the operations available to its TSX components.
+///
+/// # Errors
+/// Returns an error if the gallery, native window, or JavaScript engine fails.
+#[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
+pub fn run_desktop_with_services(
+    services: Arc<ServiceRegistry>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let config = gallery_config()?;
+    let (application_sender, application_requests) = mpsc::channel();
+    let appearance =
+        register_application_services(&services, application_sender, config.tray.clone());
     let profiles = Arc::new(Mutex::new(ProfileSummary::default()));
     let observed = Arc::clone(&profiles);
     let bundle_path = dev_bundle_path();
     let wait_for_submitted_gpu_work = bundle_path.is_some();
     let result = run_gallery(
         bundle_path,
-        |host, assets, batches, deliveries, effects, profile_sender, profile_enabled| {
+        services,
+        |host,
+         assets,
+         batches,
+         deliveries,
+         effects,
+         profile_sender,
+         profile_enabled,
+         service_sender| {
             let frames = AtomicU64::new(0);
-            run_native_host(
-                WindowConfig {
-                    title: "Argui Gallery / QuickJS".into(),
-                    ..WindowConfig::default()
-                },
+            run_native_host_application(
+                config,
                 RendererConfig::default()
                     .profiling(true)
                     .wait_for_submitted_gpu_work(wait_for_submitted_gpu_work)
                     .effects(effects),
                 host,
                 assets,
-                batches,
-                deliveries,
+                NativeHostApplicationChannels {
+                    batches,
+                    events: deliveries,
+                    requests: application_requests,
+                },
+                GalleryApp::with_appearance(service_sender.clone(), appearance),
                 move |event| {
                     forward_profile(&event, &profile_sender, &profile_enabled, &frames);
                     observe_profile(&observed, &event, "quickjs");
+                    if let Some(response) = runtime_service_event(&event) {
+                        let _ = service_sender.send(response);
+                    }
                 },
             )
         },
@@ -95,7 +133,15 @@ pub fn run_android(
     let wait_for_submitted_gpu_work = bundle_path.is_some();
     let result = run_gallery(
         bundle_path,
-        |host, assets, batches, deliveries, effects, profile_sender, profile_enabled| {
+        Arc::new(ServiceRegistry::with_builtins()),
+        |host,
+         assets,
+         batches,
+         deliveries,
+         effects,
+         profile_sender,
+         profile_enabled,
+         _service_sender| {
             let frames = AtomicU64::new(0);
             let text_engine = argui_text::TextEngine::from_embedded_fonts(
                 [NOTO_SANS],
@@ -139,6 +185,7 @@ pub fn run_android(
 /// Returns an error if the schema, embedded bundle, QuickJS engine, or native window cannot start.
 fn run_gallery(
     bundle_path: Option<PathBuf>,
+    services: Arc<ServiceRegistry>,
     launch: impl FnOnce(
         Host,
         NativeHostAssets,
@@ -147,6 +194,7 @@ fn run_gallery(
         EffectRegistry,
         Sender<String>,
         Arc<AtomicBool>,
+        Sender<ServiceResponse>,
     ) -> Result<(), RuntimeError>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let host = Host::with_builtins()?;
@@ -163,6 +211,9 @@ fn run_gallery(
     std::thread::spawn(move || relay_batches(wire_receiver, batch_sender, errors_sender));
 
     let (deliveries, events) = mpsc::channel();
+    let (service_sender, service_responses) = mpsc::channel();
+    let runtime_service_sender = service_sender.clone();
+    let actor_services = Arc::clone(&services);
     let (profile_sender, profile_events) = mpsc::channel();
     let profile_enabled = Arc::new(AtomicBool::new(false));
     let actor_profile_enabled = Arc::clone(&profile_enabled);
@@ -175,12 +226,27 @@ fn run_gallery(
         let route = Rc::clone(&dispatch);
         let control_sender = wire_sender.clone();
         let control_enabled = Arc::clone(&actor_profile_enabled);
-        let gallery = QuickJsGallery::new_with_control(
+        let request_services = Arc::clone(&actor_services);
+        let cancel_services = Arc::clone(&actor_services);
+        let request_sender = service_sender.clone();
+        let gallery = QuickJsGallery::new_with_services(
             source,
             contract_json,
             "mountGallery",
             move |json| route.borrow_mut().accept(&json),
             move |json| control_request(&json, &control_sender, &control_enabled),
+            move |json| {
+                request_services
+                    .submit(1, &json, request_sender.clone())
+                    .err()
+                    .unwrap_or_default()
+            },
+            move |json| {
+                cancel_services
+                    .cancel_json(1, &json)
+                    .err()
+                    .unwrap_or_default()
+            },
         );
         let mut gallery = match gallery {
             Ok(gallery) => gallery,
@@ -245,15 +311,21 @@ fn run_gallery(
                 profiles: profile_events,
                 errors,
                 stop,
+                services: service_responses,
             },
             &actor_profile_enabled,
             &counts,
+            ServiceChannels {
+                registry: &actor_services,
+                sender: &service_sender,
+            },
         ) {
             eprintln!("{error}");
         }
         if let Err(error) = gallery.dispose() {
             eprintln!("{error}");
         }
+        actor_services.cancel_session(dispatch.borrow().generation);
     });
     let effects = ready.recv().map_err(|error| error.to_string())??;
 
@@ -266,6 +338,7 @@ fn run_gallery(
         effects,
         profile_sender,
         profile_enabled,
+        runtime_service_sender,
     );
     let _ = stop_sender.send(());
     result?;
@@ -336,6 +409,7 @@ struct JsLoopInbox {
     profiles: Receiver<String>,
     errors: Receiver<String>,
     stop: Receiver<()>,
+    services: Receiver<ServiceResponse>,
 }
 
 /// Pumps native events, timer callbacks, and QuickJS microtasks until shutdown.
@@ -353,6 +427,7 @@ fn run_js_loop(
     inbox: JsLoopInbox,
     profile_enabled: &Arc<AtomicBool>,
     counts: &JsCounts,
+    services: ServiceChannels<'_>,
 ) -> Result<(), String> {
     let started = Instant::now();
     let mut work = Duration::ZERO;
@@ -374,9 +449,15 @@ fn run_js_loop(
                         dispatch,
                         &source,
                         reload.contract_json,
-                        reload.sender,
-                        counts,
-                        profile_enabled,
+                        ReloadContext {
+                            sender: reload.sender,
+                            counts,
+                            profile_enabled,
+                            services: ServiceChannels {
+                                registry: services.registry,
+                                sender: services.sender,
+                            },
+                        },
                     ) {
                         eprintln!("argui-hot-reload: {error}; keeping previous scene");
                     } else {
@@ -387,8 +468,11 @@ fn run_js_loop(
                 Err(error) => eprintln!("argui-hot-reload: {error}"),
             }
         }
+        deliver_services(gallery, &inbox.services, dispatch.borrow().generation)?;
         let entered = Instant::now();
-        let maximum_delay = if profile_enabled.load(Ordering::Relaxed) {
+        let maximum_delay = if profile_enabled.load(Ordering::Relaxed)
+            || services.registry.has_pending(dispatch.borrow().generation)
+        {
             50
         } else if reload.watcher.is_some() {
             100
@@ -427,6 +511,7 @@ fn run_js_loop(
                 UiEventKind::VirtualWindowChanged { .. }
             ));
         }
+        deliver_services(gallery, &inbox.services, dispatch.borrow().generation)?;
         let mut latest_profile = None;
         while let Ok(profile) = inbox.profiles.try_recv() {
             latest_profile = Some(profile);
@@ -447,6 +532,25 @@ fn run_js_loop(
     }
     if profile_enabled.load(Ordering::Relaxed) {
         counts.report(deliveries, ticks, work, started.elapsed());
+    }
+    Ok(())
+}
+
+/// Delivers completed requests only to their still-live JavaScript generation.
+/// `gallery` receives JSON, `responses` is the native worker channel, and
+/// `session` identifies the current mounted application.
+///
+/// # Errors
+/// Returns an error if a response callback fails in QuickJS.
+fn deliver_services(
+    gallery: &QuickJsGallery,
+    responses: &Receiver<ServiceResponse>,
+    session: u32,
+) -> Result<(), String> {
+    for response in responses.try_iter() {
+        if response.session == session || response.session == u32::MAX {
+            gallery.deliver_service(&response.json().to_string())?;
+        }
     }
     Ok(())
 }

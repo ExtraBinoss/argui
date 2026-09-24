@@ -34,6 +34,8 @@ pub use error::RuntimeError;
 pub use event::{AnimationProfile, RuntimeEvent, WindowRuntimeEvent};
 #[cfg(not(target_arch = "wasm32"))]
 pub use launch::run_native_host;
+#[cfg(not(target_arch = "wasm32"))]
+pub use launch::{NativeHostApplicationChannels, run_native_host_application};
 pub use launch::{
     run, run_app, run_app_with_text_engine, run_application, run_application_with_text_engine,
     run_ui, run_ui_with_text_engine, run_with_text, run_with_text_engine,
@@ -53,9 +55,9 @@ pub use model::{
 };
 #[cfg(not(target_arch = "wasm32"))]
 pub use native_host::{
-    NativeHostAssets, NativeHostBatch, NativeHostCommit, NativeHostControl, NativeHostDelivery,
-    WireHostId, WireOperation, WireValue, validate_native_host_assets,
-    validate_native_host_canvases,
+    NativeHostApplicationRequest, NativeHostAssets, NativeHostBatch, NativeHostCommit,
+    NativeHostControl, NativeHostDelivery, NativeWindowInfo, WireHostId, WireOperation, WireValue,
+    validate_native_host_assets, validate_native_host_canvases,
 };
 
 pub use model::shutdown_presentations;

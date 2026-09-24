@@ -50,6 +50,8 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
     .property(transition::properties()[0].clone())
     .property(transition::properties()[1].clone())
     .property(common_property(CommonProperty::BackdropFilter))
+    .property(common_property(CommonProperty::DesktopBackdropTint))
+    .property(common_property(CommonProperty::DesktopBackdropFallback))
     .property(common_property(CommonProperty::Visible))
     .property(crate::PropertySchema::new(
         BACKGROUND,

@@ -11,7 +11,11 @@ runtime.
 The gallery's reusable controls live in the workspace package
 [`@argui/widgets`](../../packages/widgets/package.json). Import them from
 `@argui/widgets/solid` or `@argui/widgets/react`; both entries expose
-`Button`, `InputField`, `Select`, `Popover`, `palette`, and `inputText`.
+`Button`, `InputField`, `Select`, `Popover`, `Dialog`, `palette`, and `inputText`.
+Each widget has its own Solid and React source file under
+`packages/widgets/src/solid/` and `packages/widgets/src/react/`. Shared types,
+colors, input text extraction, and asset providers stay separate so component
+installers can copy one widget and its declared dependencies.
 Applications provide their own native asset references through
 `WidgetAssetProvider`, so the package does not depend on the gallery's generated
 asset manifest:
@@ -32,6 +36,11 @@ function App() {
 ```
 
 For React, import the same names from `@argui/widgets/react`.
+`InputField` accepts `password` and adds a Show/Hide button. The native editor
+masks the text until revealed and keeps both states protected from clipboard,
+undo history, and accessibility value export. `selectionColor` overrides its
+selection highlight; otherwise the theme accent uses the native selection's
+38% opacity.
 
 ## Native internationalization
 
@@ -145,3 +154,68 @@ The Android script uses `run-as` to atomically update the app's private
 Release builds always use the embedded Solid bundle. For a custom desktop
 build loop, set `ARGUI_GALLERY_BUNDLE` to an absolute path to a Solid or React
 bundle and run `vite build --watch` separately.
+
+## Desktop application services
+
+Run `./scripts/gallery-hot-reload.sh desktop solid` on your own desktop, then
+open **Examples → Services**. This gallery opts into a tray icon and hiding its
+main window on close. Other Argui applications keep the normal quit behavior
+unless they configure a tray and close policy. The page can change its
+translated tray menu, enable or disable the tray, and register a global shortcut
+to bring the gallery back. Native registration errors appear in the page status.
+
+The page also opens a companion native window. Its initial title, logical size,
+decorations, transparency, and desktop blur area come from TSX. Use **Send to
+companion**, then click the companion to deliver its reply to the main gallery.
+`ApplicationServices` in `@argui/host` reads live window information and changes
+title, size, and decorations on either window. Transparency and backdrop are
+creation options, so close and reopen the companion to change them. A requested
+backdrop paints a solid color if the desktop cannot supply blur; window info
+reports `backdropAvailable`, and native initialization failures emit an error event.
+
+For an application that opts into a transparent window with a native desktop
+backdrop, any TSX visual element can request that effect with
+`desktop_backdrop_tint` and `desktop_backdrop_fallback`. Apply the pair to the
+root element to cover the whole window, or to a child for a smaller region:
+
+```tsx
+<column width="fill" height="fill"
+  desktop_backdrop_tint="#202c4599"
+  desktop_backdrop_fallback="#202c45">
+  <text text="Welcome" />
+</column>
+```
+
+Keep the ancestors of a smaller region transparent. The separate
+`backdrop_filter="blur(12px)"` property blurs content already painted inside
+the Argui window; it does not request desktop compositor blur.
+
+## Runtime theming
+
+Open **Examples → Theming** in either the Solid or React gallery. The three
+presets and the JSON editor change color, text size, padding, corner radius,
+shadow, and blur while the native tree is mounted. The variable names are
+defined by the application; Argui does not maintain an allowed token list.
+A variable can be passed to any TSX property accepting its value type, so the
+same `radius` value can style a container, a rectangle, and a text background.
+
+The example parses a flat JSON object of string, finite number, and boolean
+values. It accepts additional variable names. It validates only the variables
+that this particular view uses before applying them to native properties.
+The application can persist `themeJson(variables)` and later load it with
+`parseThemeVariables(json)`; file reading and writing stay in application code.
+The blur control drives `backdrop_filter="blur(Npx)"` on a translucent native
+rectangle above colored shapes, so increasing it visibly softens the shapes.
+
+The search widget gives its inner `textInput` `clip={true}` in TSX. This clips
+glyphs, selection, and caret at the editor's own bounds after the search icon;
+the outer rounded frame clips the complete field separately.
+
+## Dialog widget
+
+Open **Components → Dialog** to try the reusable `Dialog` widget from
+`@argui/widgets/solid` or `@argui/widgets/react`. It uses a full-window native
+modal portal, a blurred scrim, a centered panel, focus containment, Escape
+dismissal, and a close button. Pass `open`, `onOpenChange`, `title`, `theme`,
+and child content. `blur`, `radius`, `padding`, `scrimColor`, and `surfaceColor`
+can be set from any application theme variables of the matching types.

@@ -203,6 +203,12 @@ test('Solid and React keep native structure, stable properties, and blocked butt
       for (const [index, presentation] of [solid, react].entries()) {
         assert.equal(nativeIdentity(presentation, 'gallery-search'), searchIdentities[index],
           `search input must retain focusable native identity after ${value}`)
+        const searchNode = [...replay(presentation.batches).nodes.values()]
+          .find((node) => node.properties.get(1)?.value === 'gallery-search')
+        const clipProperty = searchNode.type.properties.find((property) => property.name === 'clip')
+        assert.equal(searchNode.properties.get(clipProperty.id)?.value, true)
+        assert.equal(searchNode.properties.get(searchNode.type.properties.find((property) => property.name === 'selection_color').id)?.value,
+          '#2563eb61')
       }
     }
     for (const presentation of [solid, react]) {
@@ -215,6 +221,23 @@ test('Solid and React keep native structure, stable properties, and blocked butt
     await click('page-input')
     await type('input-name', 'input', 'Ada')
     await type('input-name', 'submit', 'Ada')
+    await type('input-password', 'input', 'secret')
+    const passwordIdentities = [solid, react].map((presentation) => nativeIdentity(presentation, 'input-password'))
+    for (const presentation of [solid, react]) {
+      const node = allNodes(tree(presentation)).find((candidate) => candidate.properties.key?.value === 'input-password')
+      assert.equal(node?.properties.privacy?.value, 'password')
+    }
+    await click('input-password-visibility')
+    for (const [index, presentation] of [solid, react].entries()) {
+      assert.equal(nativeIdentity(presentation, 'input-password'), passwordIdentities[index])
+      const node = allNodes(tree(presentation)).find((candidate) => candidate.properties.key?.value === 'input-password')
+      assert.equal(node?.properties.privacy?.value, 'revealed_password')
+    }
+    await click('input-password-visibility')
+    for (const presentation of [solid, react]) {
+      const node = allNodes(tree(presentation)).find((candidate) => candidate.properties.key?.value === 'input-password')
+      assert.equal(node?.properties.privacy?.value, 'password')
+    }
     for (const presentation of [solid, react]) {
       assert.ok(allNodes(tree(presentation)).some((node) => node.type === 'Text'
         && node.properties.text?.value === 'Submitted: Ada'))
@@ -280,6 +303,18 @@ test('Solid and React keep native structure, stable properties, and blocked butt
       assert.ok(allNodes(popup).every((node) => !node.properties.backdrop_filter))
     }
     await click('demo-popover-opaque-close')
+    await click('page-dialog')
+    await click('dialog-open')
+    for (const presentation of [solid, react]) {
+      const nodes = allNodes(tree(presentation))
+      const dialog = nodes.find((node) => node.properties.key?.value === 'gallery-dialog-dialog')
+      assert.equal(dialog?.properties.window_layer?.value, 'modal')
+      assert.equal(dialog?.properties.placement?.value, 'fill')
+      assert.equal(dialog?.properties.containment?.value, 'modal')
+      assert.ok(allNodes(dialog).some((node) => node.properties.backdrop_filter?.value === 'blur(18px)'))
+    }
+    await click('gallery-dialog-close')
+    await type('gallery-search', 'input', 'Animation')
     await click('page-animation-lab')
     for (const presentation of [solid, react]) {
       const current = tree(presentation)
@@ -292,6 +327,7 @@ test('Solid and React keep native structure, stable properties, and blocked butt
     await click('motion-step')
     await click('motion-play')
     await click('motion-play')
+    await type('gallery-search', 'input', '')
     await click('page-media')
     const orbit = assets.assets.find((asset) => asset.key === 'illustration/orbit.png')
     const saturn = assets.assets.find((asset) => asset.key === 'photo/saturn.jpg')
@@ -312,6 +348,33 @@ test('Solid and React keep native structure, stable properties, and blocked butt
       assert.ok(overlayPane)
       assert.equal(allNodes(overlayPane).filter((node) => node.properties.backdrop_filter?.value).length, 12)
     }
+    await type('gallery-search', 'input', 'Theming')
+    await click('page-theming')
+    await click('theme-preset-Paper')
+    await click('theme-blur')
+    for (const presentation of [solid, react]) {
+      const pane = allNodes(tree(presentation)).find((node) => node.properties.key?.value === 'scroll-Theming')
+      assert.ok(allNodes(pane).some((node) => node.type === 'Rectangle'
+        && node.properties.backdrop_filter?.value === 'blur(10px)'
+        && node.properties.background?.value === '#fffdf899'))
+    }
+    const customTheme = { canvas: '#eee9df', panel: '#fffdf899', ink: '#282e35', muted: '#69737d',
+      accent: '#123456', radius: 12, padding: 10, blur: 7, fontSize: 21,
+      shadowBlur: 5, shadowColor: '#282e3544', appSpecificVariable: 31 }
+    await type('theme-json', 'input', JSON.stringify(customTheme))
+    await click('theme-load-json')
+    for (const presentation of [solid, react]) {
+      const pane = allNodes(tree(presentation)).find((node) => node.properties.key?.value === 'scroll-Theming')
+      assert.ok(pane)
+      const nodes = allNodes(pane)
+      assert.ok(nodes.some((node) => node.type === 'Text' && node.properties.text?.value === 'Themed text surface'
+        && node.properties.padding?.value === 10 && node.properties.radius?.value === 12
+        && node.properties.background?.value === '#123456'))
+      assert.ok(nodes.some((node) => node.type === 'Rectangle'
+        && node.properties.backdrop_filter?.value === 'blur(7px)'
+        && node.properties.background?.value === '#fffdf899'))
+    }
+    await type('gallery-search', 'input', 'Overlay')
     await click('page-overlay')
     await click('menu')
     await click('menu')
@@ -331,6 +394,13 @@ test('mobile Solid and React keep navigation fixed above the content scroll', as
     const { mountReactGallery: mountMobileReact } = await import('../dist/gallery-react-core.mjs?mobile-navigation')
     solid = capture(mountMobileSolid)
     react = capture(mountMobileReact)
+    edit(solid, 'gallery-search', 'input', 'Animation')
+    edit(react, 'gallery-search', 'input', 'Animation')
+    for (let attempt = 0; attempt < 100; attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      if ([solid, react].every((presentation) => [...replay(presentation.batches).nodes.values()]
+        .some((node) => node.properties.get(1)?.value === 'page-animation-lab'))) break
+    }
     activate(solid, 'page-animation-lab')
     activate(react, 'page-animation-lab')
     for (let attempt = 0; attempt < 100; attempt++) {

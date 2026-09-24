@@ -8,6 +8,7 @@ export function InputsPage(props: { theme: Palette }): JSX.Element {
   const [email, setEmail] = createSignal('')
   const [invalidEmail, setInvalidEmail] = createSignal('invalid@')
   const [search, setSearch] = createSignal('')
+  const [password, setPassword] = createSignal('')
   const [submitted, setSubmitted] = createSignal(false)
   const invalid = () => submitted() && name().trim().length < 3
   return <column width="fill" gap={16}>
@@ -25,6 +26,8 @@ export function InputsPage(props: { theme: Palette }): JSX.Element {
         placeholder="name@example.com" onChange={setEmail} />
       <InputField id="input-search-example" label="Search" showLabel search theme={props.theme}
         value={search()} placeholder="Search examples" onChange={setSearch} />
+      <InputField id="input-password" label="Password" showLabel password theme={props.theme}
+        value={password()} placeholder="Enter a password" onChange={setPassword} />
       <InputField id="input-invalid-email" label="Invalid email" showLabel theme={props.theme}
         value={invalidEmail()} invalid={!/^[^@]+@[^@]+\.[^@]+$/.test(invalidEmail())}
         placeholder="name@example.com" onChange={setInvalidEmail} />

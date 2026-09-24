@@ -157,6 +157,9 @@ pub const CONTENT_HEIGHT: PropertyId = PropertyId::from_raw(101);
 pub const SHRINK: PropertyId = PropertyId::from_raw(102);
 pub const VISIBLE_HEIGHT: PropertyId = PropertyId::from_raw(103);
 pub const BACKDROP_FILTER: PropertyId = PropertyId::from_raw(104);
+pub const DESKTOP_BACKDROP_TINT: PropertyId = PropertyId::from_raw(236);
+pub const DESKTOP_BACKDROP_FALLBACK: PropertyId = PropertyId::from_raw(237);
+pub const TEXT_PRIVACY: PropertyId = PropertyId::from_raw(238);
 pub const TEXT_LINE_HEIGHT: PropertyId = PropertyId::from_raw(105);
 pub const TEXT_FONT_STYLE: PropertyId = PropertyId::from_raw(106);
 pub const TEXT_LETTER_SPACING: PropertyId = PropertyId::from_raw(107);
@@ -357,8 +360,17 @@ pub fn registry() -> Result<SchemaRegistry, SchemaError> {
         .property(common_property(CommonProperty::Rotation))
         .property(common_property(CommonProperty::Opacity))
         .property(common_property(CommonProperty::BackdropFilter))
+        .property(common_property(CommonProperty::DesktopBackdropTint))
+        .property(common_property(CommonProperty::DesktopBackdropFallback))
         .property(common_property(CommonProperty::Visible))
         .property(common_property(CommonProperty::Background))
+        .property(common_property(CommonProperty::Padding))
+        .property(PropertySchema::new(
+            RADIUS,
+            "radius",
+            ValueType::Float,
+            "Corner radius for a text background in logical pixels.",
+        ))
         .property(loop_motion::properties()[1].clone())
         .property(loop_motion::properties()[2].clone())
         .property(loop_motion::properties()[6].clone())
@@ -523,14 +535,14 @@ pub fn registry() -> Result<SchemaRegistry, SchemaError> {
                 }
             };
         }
-        loop_motion::apply(
-            transition::apply(
-                apply_common(Element::text(content.clone()).text_style(style), input)?,
-                input,
-                "Text",
-            )?,
+        let mut element = apply_container(
+            apply_common(Element::text(content.clone()).text_style(style), input)?,
             input,
-        )
+        );
+        if let Some(SchemaValue::Float(radius)) = input.get(RADIUS) {
+            element = element.radius(CornerRadii::all((*radius).max(0.0)));
+        }
+        loop_motion::apply(transition::apply(element, input, "Text")?, input)
     })?;
     text_editor::register(&mut registry)?;
     #[cfg(feature = "media")]

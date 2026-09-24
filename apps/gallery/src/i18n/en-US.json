@@ -2,5 +2,6 @@
   "welcome": "Hello, { $name }!",
   "currentLocale": "Current locale: { $locale }",
   "switchToFrench": "Switch to French",
-  "switchToEnglish": "Switch to English"
+  "switchToEnglish": "Switch to English",
+  "trayOpenServices": "Open services"
 }

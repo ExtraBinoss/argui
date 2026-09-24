@@ -34,6 +34,12 @@ pub(crate) trait WindowHost {
         Ok(false)
     }
     fn set_title(&self, title: &str);
+    /// Enables or removes the native title bar and borders.
+    fn set_decorations(&self, decorations: bool);
+    /// Returns the drawable client size in logical pixels.
+    fn logical_size(&self) -> (f64, f64);
+    /// Requests a client size; compositors may apply the change later.
+    fn request_inner_size(&self, width: f64, height: f64) -> Result<(), String>;
     fn set_minimized(&self, minimized: bool);
     fn is_minimized(&self) -> Option<bool>;
     fn set_window_level(&self, level: winit::window::WindowLevel);
@@ -92,6 +98,22 @@ impl WindowHost for Arc<Window> {
     }
     fn set_title(&self, title: &str) {
         self.as_ref().set_title(title);
+    }
+    fn set_decorations(&self, decorations: bool) {
+        self.as_ref().set_decorations(decorations);
+    }
+    fn logical_size(&self) -> (f64, f64) {
+        let size: LogicalSize<f64> = self
+            .as_ref()
+            .inner_size()
+            .to_logical(self.as_ref().scale_factor());
+        (size.width, size.height)
+    }
+    fn request_inner_size(&self, width: f64, height: f64) -> Result<(), String> {
+        let _ = self
+            .as_ref()
+            .request_inner_size(LogicalSize::new(width, height));
+        Ok(())
     }
     fn set_minimized(&self, minimized: bool) {
         self.as_ref().set_minimized(minimized);
@@ -201,6 +223,15 @@ impl<T: WindowHost + ?Sized> WindowHost for std::rc::Rc<T> {
     }
     fn set_title(&self, title: &str) {
         self.as_ref().set_title(title);
+    }
+    fn set_decorations(&self, decorations: bool) {
+        self.as_ref().set_decorations(decorations);
+    }
+    fn logical_size(&self) -> (f64, f64) {
+        self.as_ref().logical_size()
+    }
+    fn request_inner_size(&self, width: f64, height: f64) -> Result<(), String> {
+        self.as_ref().request_inner_size(width, height)
     }
     fn set_minimized(&self, minimized: bool) {
         self.as_ref().set_minimized(minimized);

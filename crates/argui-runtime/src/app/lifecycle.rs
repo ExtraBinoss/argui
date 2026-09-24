@@ -198,6 +198,7 @@ impl ApplicationHandler<UserEvent> for Application {
                     };
                     let _ = batch.reply.send(result);
                 }
+                UserEvent::NativeHostApplication(_) => {}
                 UserEvent::GpuCanvasReady(id) => self.gpu_canvas_ready(id),
                 #[cfg(feature = "tasks")]
                 UserEvent::TasksReady => {

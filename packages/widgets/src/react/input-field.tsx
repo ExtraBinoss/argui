@@ -1,12 +1,15 @@
 /** @jsxImportSource @argui/react */
 import { useState, type ReactElement } from 'react'
 import { inputText } from '../shared/input-text'
+import { selectionTint } from '../shared/theme'
 import type { InputFieldProps } from '../shared/types'
 import { useWidgetIcons } from './assets'
+import { ReactButton } from './button'
 
 /** Renders the same themed native input through the React adapter. */
 export function ReactInputField(props: InputFieldProps): ReactElement {
   const [focused, setFocused] = useState(false)
+  const [revealed, setRevealed] = useState(false)
   const icons = useWidgetIcons()
   return <column width="fill" gap={6}>
     {props.showLabel ? <text text={props.label} color={props.theme.muted} font_size={12} /> : null}
@@ -17,12 +20,13 @@ export function ReactInputField(props: InputFieldProps): ReactElement {
         {props.search && icons.search ? <svg source={icons.search} color={props.theme.muted}
           width={17} height={17} /> : null}
         <container grow={1} min_width={0}>
-          <textInput nativeKey={props.id} width="fill" height={22} value={props.value}
+          <textInput nativeKey={props.id} width="fill" height={22} clip={true} value={props.value}
             placeholder={props.placeholder ?? ''} label={props.label} search={!!props.search}
+            privacy={props.password ? revealed ? 'revealed_password' : 'password' : 'public'}
             enabled={!props.disabled} read_only={!!props.readOnly} invalid={!!props.invalid} background="#00000000"
             text_color={props.disabled ? props.theme.muted : props.theme.foreground}
             placeholder_color={props.theme.muted} caret_color={props.theme.accent}
-            selection_color={props.theme.accent}
+            selection_color={props.selectionColor ?? selectionTint(props.theme.accent)}
             onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} onInput={(payload) => {
               const value = inputText(payload)
               if (value !== undefined) props.onChange(value)
@@ -31,6 +35,9 @@ export function ReactInputField(props: InputFieldProps): ReactElement {
               props.onSubmit?.(value ?? props.value)
             }} />
         </container>
+        {props.password ? <ReactButton id={`${props.id}-visibility`} label={revealed ? 'Hide' : 'Show'}
+          theme={props.theme} kind="ghost" disabled={props.disabled}
+          onClick={() => setRevealed((current) => !current)} /> : null}
       </row>
     </rectangle>
   </column>

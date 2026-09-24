@@ -118,21 +118,24 @@ fn composite(source: vec4<f32>, backdrop: vec4<f32>, pixel: vec2<f32>) -> vec4<f
 
 fn sample_blur(pixel: vec2<f32>, axis: vec2<f32>) -> vec4<f32> {
     let source_size = vec2<f32>(textureDimensions(source_texture));
-    let step = axis * max(params.data.x, 0.0) / source_size;
+    let sigma = max(params.data.x, 0.01);
+    let step = axis / source_size;
     let uv = allocated_uv(pixel, params.source, params.source_uv);
     let half_texel = vec2<f32>(0.5) / source_size;
     let min_uv = params.source_uv.xy + half_texel;
     let max_uv = params.source_uv.xy + params.source_uv.zw - half_texel;
-    let weights = array<f32, 7>(
-        0.137023, 0.129618, 0.109719, 0.083108, 0.056331, 0.034167, 0.018544
-    );
-    var color = textureSampleLevel(source_texture, linear_sampler, clamp(uv, min_uv, max_uv), 0.0) * weights[0];
-    for (var tap = 1u; tap < 7u; tap += 1u) {
+    let taps = min(u32(ceil(sigma * 3.0)), 12u);
+    var color = textureSampleLevel(source_texture, linear_sampler, clamp(uv, min_uv, max_uv), 0.0);
+    var total_weight = 1.0;
+    for (var tap = 1u; tap <= taps; tap += 1u) {
+        let distance = f32(tap) / sigma;
+        let weight = exp(-0.5 * distance * distance);
         let offset = step * f32(tap);
-        color += textureSampleLevel(source_texture, linear_sampler, clamp(uv + offset, min_uv, max_uv), 0.0) * weights[tap];
-        color += textureSampleLevel(source_texture, linear_sampler, clamp(uv - offset, min_uv, max_uv), 0.0) * weights[tap];
+        color += textureSampleLevel(source_texture, linear_sampler, clamp(uv + offset, min_uv, max_uv), 0.0) * weight;
+        color += textureSampleLevel(source_texture, linear_sampler, clamp(uv - offset, min_uv, max_uv), 0.0) * weight;
+        total_weight += 2.0 * weight;
     }
-    return color;
+    return color / total_weight;
 }
 
 @fragment

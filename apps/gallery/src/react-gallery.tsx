@@ -1,5 +1,5 @@
 /** @jsxImportSource @argui/react */
-import { memo, useCallback, useMemo, useState, type ReactElement } from 'react'
+import { memo, useCallback, useEffect, useMemo, useState, type ReactElement } from 'react'
 import { VirtualList as ReactVirtualList } from '@argui/react'
 import { Button as ReactButton, InputField as ReactInputField, Select as ReactSelect, palette, type Accent, type Palette, type ThemeMode } from '@argui/widgets/react'
 import { ReactAnimationLab } from './react-animation-lab'
@@ -11,13 +11,17 @@ import { ReactWgslLab } from './react-wgsl-lab'
 import { pages, filteredNavigation, navigationKey, navigationVersion, type Page } from './gallery-pages'
 import { mediaAssets } from './assets.generated'
 import { ReactI18nPage } from './react-i18n-page'
+import { ReactServicesPage } from './react-services-page'
+import { ReactThemingPage } from './react-theming-page'
+import { ReactDialogPage } from './react-dialog-page'
+import type { ApplicationServices } from '@argui/host'
 
 const accents: readonly Accent[] = ['blue', 'violet', 'emerald']
 const choices = ['Vulkan', 'DirectX 12', 'Metal', 'WebGPU'] as const
 const mobile = (globalThis as { __arguiMobile?: boolean }).__arguiMobile === true
 
 /** Renders the same native gallery shell and pages through the React adapter. */
-export function ReactGallery(): ReactElement {
+export function ReactGallery(props: { services: ApplicationServices }): ReactElement {
   const [page, setPage] = useState<Page>('Button')
   const [mode, setMode] = useState<ThemeMode>('light')
   const [accent, setAccent] = useState<Accent>('blue')
@@ -27,6 +31,12 @@ export function ReactGallery(): ReactElement {
   const [lastUsed, setLastUsed] = useState('None')
   const [starActive, setStarActive] = useState(false)
   const [choice, setChoice] = useState<string>(choices[0])
+  useEffect(() => props.services.onEvent((event) => {
+    if ((event.type === 'menu' && event.id === 'open-services')
+      || (event.type === 'shortcut' && event.id === 'wake' && event.state === 'pressed')) {
+      setPage('Services')
+    }
+  }), [props.services])
   const theme = useMemo(() => palette(mode, accent), [mode, accent])
   const navigationItems = useMemo(() => filteredNavigation(search), [search])
   const activate = useCallback((label: string) => {
@@ -49,8 +59,8 @@ export function ReactGallery(): ReactElement {
       width={mobile ? 'fill' : 220} height={mobile ? undefined : 'fill'}>
       <column width={mobile ? 'fill' : 220} height={mobile ? undefined : 'fill'} min_height={0}
         gap={8} padding={8}>
-        <ReactInputField id="gallery-search" label="Search components" search theme={theme}
-          value={search} placeholder="Search components" onChange={setSearch} />
+        <ReactInputField id="gallery-search" label="Search gallery" search theme={theme}
+          value={search} placeholder="Search gallery" onChange={setSearch} />
         <ReactVirtualList id="gallery-navigation" count={navigationItems.length} estimate={mobile ? 112 : 47}
           itemKey={(index) => navigationKey(navigationItems[index]!)} dataVersion={navigationVersion(search)}
           variable={true} axis={mobile ? 'horizontal' : 'vertical'} overscan={3}
@@ -66,7 +76,7 @@ export function ReactGallery(): ReactElement {
               kind="ghost" selected={page === item.page}
               current={page === item.page ? 'page' : undefined} onClick={() => setPage(item.page)} />
           }} />
-        {navigationItems.length === 0 ? <text text="No components found" color={theme.muted} font_size={12} /> : null}
+        {navigationItems.length === 0 ? <text text="No pages found" color={theme.muted} font_size={12} /> : null}
       </column>
     </focusScope>
   ) : null
@@ -75,6 +85,7 @@ export function ReactGallery(): ReactElement {
     <column key={`scroll-${item}`} nativeKey={`scroll-${item}`} visible={page === item}
       width="fill" grow={1} min_width={0} min_height={0} scroll_y={true}>
       <ReactPageContent item={item} theme={theme}
+        services={props.services}
         selected={page === item}
         clicks={item === 'Button' ? clicks : undefined}
         lastUsed={item === 'Button' ? lastUsed : undefined}
@@ -115,6 +126,7 @@ export function ReactGallery(): ReactElement {
 interface ReactPageContentProps {
   item: Page
   theme: Palette
+  services: ApplicationServices
   clicks?: number
   lastUsed?: string
   starActive?: boolean
@@ -138,8 +150,11 @@ const ReactPageContent = memo(function ReactPageContent(props: ReactPageContentP
       {item === 'Select' ? <ReactSelectPage theme={theme} value={props.choice ?? choices[0]}
         onChange={props.onChoiceChange} /> : null}
       {item === 'Popover' ? <ReactPopoverPage theme={theme} /> : null}
+      {item === 'Dialog' ? <ReactDialogPage theme={theme} /> : null}
       {item === 'Animation Lab' ? <ReactAnimationLab theme={theme} /> : null}
       {item === 'Media' ? <ReactMediaPage theme={theme} /> : null}
+      {item === 'Services' ? <ReactServicesPage services={props.services} theme={theme} /> : null}
+      {item === 'Theming' ? <ReactThemingPage theme={theme} /> : null}
       {item === 'Accessibility' ? <ReactAccessibilityPage theme={theme} /> : null}
       {item === 'Overlay' ? <ReactOverlayPage theme={theme} /> : null}
       {item === 'Damage Control' ? <ReactDamageControl theme={theme} active={props.active ?? false} /> : null}

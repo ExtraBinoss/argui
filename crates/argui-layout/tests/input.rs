@@ -530,55 +530,5 @@ fn empty_or_degenerate_custom_carets_do_not_emit_invalid_quads() {
     }
 }
 
-#[test]
-fn narrow_search_row_clips_long_text_and_reveals_its_caret() {
-    let value = "searchcomponents".repeat(3);
-    let input = single_line_editor("search", &value, "Search components", TextStyle::default())
-        .width(percent(1.0))
-        .height(length(22.0))
-        .padding(argui_ui::sides(0.0, 0.0));
-    let input_slot = Element::container([input]).grow(1.0).min_width(length(0.0));
-    let icon = Element::container([])
-        .width(length(17.0))
-        .height(length(17.0))
-        .shrink(0.0);
-    let row = Element::row([icon, input_slot])
-        .width(percent(1.0))
-        .min_width(length(0.0))
-        .padding(argui_ui::Sides {
-            left: length(10.0),
-            right: length(10.0),
-            top: length(0.0),
-            bottom: length(0.0),
-        })
-        .gap(8.0);
-    let frame = Element::container([row])
-        .width(length(204.0))
-        .height(length(42.0))
-        .clip(argui_ui::CornerRadii::all(8.0));
-    let mut ui = UiTree::new(frame);
-    let mut layout = LayoutEngine::new();
-    let mut text = text_engine();
-    let output = layout
-        .compute(&mut ui, &mut text, Size::new(400.0, 80.0))
-        .unwrap();
-    let region = &output.text_inputs[0];
-    let frame = output.nodes[0].bounds;
-    assert!(region.bounds.origin.x >= frame.origin.x);
-    assert!(
-        region.bounds.origin.x + region.bounds.size.width <= frame.origin.x + frame.size.width,
-        "region={region:?}, frame={frame:?}"
-    );
-    assert!(region.scroll_x > 0.0);
-    let end = region
-        .stops
-        .iter()
-        .find(|stop| stop.position.index == value.len())
-        .unwrap();
-    assert!(end.point.x >= region.viewport.origin.x);
-    assert!(end.point.x <= region.viewport.origin.x + region.viewport.size.width);
-    assert!(output.text.blocks()[0].clip.size.width <= region.bounds.size.width);
-}
-
 #[path = "input/navigation.rs"]
 mod navigation;

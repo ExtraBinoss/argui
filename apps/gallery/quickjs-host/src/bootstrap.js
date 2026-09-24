@@ -2,10 +2,31 @@ const schema = JSON.parse(globalThis.__arguiContractJson)
 globalThis.__arguiNativeEffects = []
 let subscriber = null
 let profileSubscriber = null
+const serviceSubscribers = new Set()
 let nextTimer = 1
 const timers = new Map()
 
 globalThis.queueMicrotask = (callback) => Promise.resolve().then(callback)
+globalThis.AbortController ??= class AbortController {
+  constructor() {
+    const listeners = new Set()
+    this.signal = {
+      aborted: false,
+      addEventListener: (type, listener) => {
+        if (type === 'abort' && typeof listener === 'function') listeners.add(listener)
+      },
+      removeEventListener: (type, listener) => {
+        if (type === 'abort') listeners.delete(listener)
+      },
+    }
+    this.abort = () => {
+      if (this.signal.aborted) return
+      this.signal.aborted = true
+      for (const listener of listeners) listener()
+      listeners.clear()
+    }
+  }
+}
 const scheduleTimer = (callback, delay, repeat) => {
   const id = nextTimer++
   timers.set(id, { callback, delay: Math.max(1, Number(delay) || 0), due: 0, repeat })
@@ -34,6 +55,10 @@ globalThis.__arguiTick = (now) => {
 }
 globalThis.__arguiDeliver = (json) => { subscriber?.(JSON.parse(json)) }
 globalThis.__arguiDeliverProfile = (json) => { profileSubscriber?.(JSON.parse(json)) }
+globalThis.__arguiDeliverService = (json) => {
+  const response = JSON.parse(json)
+  for (const subscriber of serviceSubscribers) subscriber(response)
+}
 const i18nResponse = (json) => {
   const response = JSON.parse(json)
   if (response.error) throw new Error(response.error)
@@ -58,6 +83,18 @@ globalThis.__arguiBridge = {
   subscribe: (callback) => {
     subscriber = callback
     return () => { if (subscriber === callback) subscriber = null }
+  },
+  request: (request) => {
+    const error = globalThis.__arguiService(JSON.stringify(request))
+    if (error) throw new Error(error)
+  },
+  cancelRequest: (window, requestId) => {
+    const error = globalThis.__arguiCancelService(JSON.stringify({ window, requestId }))
+    if (error) throw new Error(error)
+  },
+  subscribeResponses: (callback) => {
+    serviceSubscribers.add(callback)
+    return () => { serviceSubscribers.delete(callback) }
   },
   control: (request) => {
     const error = globalThis.__arguiControl(JSON.stringify(request))

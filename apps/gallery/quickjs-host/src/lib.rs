@@ -1,20 +1,27 @@
 //! Embedded QuickJS execution for the runtime-neutral gallery module.
 
 mod delivery;
+#[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
+mod desktop_application;
+#[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
+pub use desktop_application::GalleryApp;
 mod effects;
 mod hot_reload;
 mod i18n;
 mod native_metrics;
 mod runner;
+mod services;
 mod telemetry;
 mod wire;
 
 pub use delivery::{coalesce_virtual_windows, ui_event_payload};
 pub use effects::registry_from_json;
 pub use native_metrics::{parse_control, profile_json};
+pub use services::{ServiceOutcome, ServiceRegistry, ServiceResponse};
 pub use wire::decode_wire_operations;
 
-pub use runner::run_desktop;
+#[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
+pub use runner::{run_desktop, run_desktop_with_services};
 
 #[cfg(target_os = "android")]
 argui_android::android_main!(runner::run_android);
@@ -61,6 +68,34 @@ impl QuickJsGallery {
         commit: impl Fn(String) -> String + 'static,
         control: impl Fn(String) -> String + 'static,
     ) -> Result<Self, String> {
+        Self::new_with_services(
+            source,
+            contract_json,
+            entry,
+            commit,
+            control,
+            |_| "application services unavailable".into(),
+            |_| String::new(),
+        )
+    }
+
+    /// Loads a module with separate application request and cancellation callbacks.
+    /// `source`, `contract_json`, and `entry` select the module; `commit` sends UI
+    /// transactions, `control` sends renderer controls, `request` starts an
+    /// asynchronous native service operation, and `cancel` abandons one result.
+    /// Returns the mounted session.
+    ///
+    /// # Errors
+    /// Returns a JavaScript or schema error when mounting fails.
+    pub fn new_with_services(
+        source: &str,
+        contract_json: &str,
+        entry: &str,
+        commit: impl Fn(String) -> String + 'static,
+        control: impl Fn(String) -> String + 'static,
+        request: impl Fn(String) -> String + 'static,
+        cancel: impl Fn(String) -> String + 'static,
+    ) -> Result<Self, String> {
         let runtime = Runtime::new().map_err(js_error)?;
         let context = Context::full(&runtime).map_err(js_error)?;
         let i18n = Rc::new(RefCell::new(i18n::NativeI18n::default()));
@@ -82,6 +117,18 @@ impl QuickJsGallery {
                 .set(
                     "__arguiControl",
                     Function::new(ctx.clone(), control).map_err(js_error)?,
+                )
+                .map_err(js_error)?;
+            globals
+                .set(
+                    "__arguiService",
+                    Function::new(ctx.clone(), request).map_err(js_error)?,
+                )
+                .map_err(js_error)?;
+            globals
+                .set(
+                    "__arguiCancelService",
+                    Function::new(ctx.clone(), cancel).map_err(js_error)?,
                 )
                 .map_err(js_error)?;
             let loader = Rc::clone(&i18n);
@@ -160,6 +207,22 @@ impl QuickJsGallery {
                 .get("__arguiDeliverProfile")
                 .map_err(js_error)?;
             deliver.call::<_, ()>((profile_json,)).map_err(js_error)
+        })?;
+        self.drain_jobs()
+    }
+
+    /// Delivers one completed application request to this live QuickJS session.
+    /// `response_json` is a terminal response with request and window identity.
+    ///
+    /// # Errors
+    /// Returns an error if the response handler or its microtasks fail.
+    pub fn deliver_service(&self, response_json: &str) -> Result<(), String> {
+        self.context.with(|ctx| {
+            let deliver: Function = ctx
+                .globals()
+                .get("__arguiDeliverService")
+                .map_err(js_error)?;
+            deliver.call::<_, ()>((response_json,)).map_err(js_error)
         })?;
         self.drain_jobs()
     }
