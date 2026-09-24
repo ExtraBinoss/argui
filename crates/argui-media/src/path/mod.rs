@@ -3,8 +3,6 @@ use core::fmt::Write;
 use argui_core::{Point, Size};
 use argui_paint::{VectorAsset, VectorId};
 
-use crate::{VectorError, parse_svg};
-
 /// An absolute command in a vector path's local coordinate system.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum PathCommand {
@@ -57,7 +55,7 @@ impl PathStyle {
     }
 }
 
-/// Validation or SVG parsing error while constructing a path asset.
+/// Validation error while constructing a path asset.
 #[derive(Debug, thiserror::Error)]
 pub enum PathError {
     #[error("path view size must be finite and positive")]
@@ -72,8 +70,6 @@ pub enum PathError {
     InvalidStroke,
     #[error("path style must have a fill or stroke")]
     EmptyStyle,
-    #[error(transparent)]
-    Svg(#[from] VectorError),
 }
 
 /// Builds a resolution-independent path asset from absolute geometry.
@@ -86,7 +82,7 @@ pub enum PathError {
 ///
 /// # Errors
 /// Returns [`PathError`] for invalid dimensions, coordinates, command order,
-/// or paint, or if the generated SVG cannot be parsed.
+/// or paint.
 pub fn path_asset(
     id: VectorId,
     size: Size,
@@ -172,7 +168,12 @@ pub fn path_asset(
         "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{}\" height=\"{}\" viewBox=\"0 0 {} {}\"><path d=\"{}\" fill=\"{}\" fill-rule=\"{}\" stroke=\"{}\" stroke-width=\"{}\"/></svg>",
         size.width, size.height, size.width, size.height, data, fill, rule, stroke, width
     );
-    Ok(parse_svg(id, svg.as_bytes())?)
+    Ok(VectorAsset {
+        id,
+        size,
+        svg: svg.into_bytes().into(),
+        tintable: true,
+    })
 }
 
 /// Rejects non-finite points before their coordinates are written to SVG.

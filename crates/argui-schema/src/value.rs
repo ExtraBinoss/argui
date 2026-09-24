@@ -1,5 +1,5 @@
-use argui_assets::AssetHandle;
 use argui_core::{Color, Insets, Name, Transform2D};
+use argui_media::AssetHandle;
 use argui_paint::{Border, CornerRadii, Fill, Shadow};
 use argui_ui::Dimension;
 

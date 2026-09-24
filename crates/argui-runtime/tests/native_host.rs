@@ -7,8 +7,43 @@ mod wire;
 
 use argui_core::Size;
 use argui_paint::{ImageAsset, ImageId, VectorAsset, VectorId};
-use argui_runtime::{HostId, HostOperation, validate_native_host_assets};
-use argui_schema::{AssetHandle, PropertyId, SchemaValue};
+use argui_render::{
+    GpuCanvasDeviceContext, GpuCanvasError, GpuCanvasFactory, GpuCanvasRegistration,
+    GpuCanvasRegistry, GpuCanvasRenderer,
+};
+use argui_runtime::{
+    HostId, HostOperation, validate_native_host_assets, validate_native_host_canvases,
+};
+use argui_schema::{AssetHandle, PropertyId, SchemaValue, builtin};
+
+struct CanvasFactory;
+
+impl GpuCanvasFactory for CanvasFactory {
+    fn create(
+        &self,
+        _context: &GpuCanvasDeviceContext<'_>,
+    ) -> Result<Box<dyn GpuCanvasRenderer>, GpuCanvasError> {
+        Err(GpuCanvasError::new("not used by validation test"))
+    }
+}
+
+#[test]
+fn canvas_ids_must_be_registered_before_a_native_commit() {
+    let registration = GpuCanvasRegistration::new("preview", CanvasFactory);
+    let registry = GpuCanvasRegistry::new([registration.clone()]).unwrap();
+    let operation = |raw| HostOperation::SetProperty {
+        id: HostId::new(1, 1),
+        property: builtin::CANVAS_ID,
+        value: Some(SchemaValue::Int(raw)),
+    };
+    assert!(
+        validate_native_host_canvases(&[operation(registration.id().get() as i64)], &registry)
+            .is_ok()
+    );
+    for raw in [0, -1, registration.id().get() as i64 + 1] {
+        assert!(validate_native_host_canvases(&[operation(raw)], &registry).is_err());
+    }
+}
 
 #[test]
 fn registered_image_and_vector_handles_are_required_before_commit() {

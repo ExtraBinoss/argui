@@ -13,7 +13,7 @@ mod value;
 mod virtual_viewport;
 
 pub use adapter::{NativeAdapter, NativeElementInput, NativeEventValue, NativeSlotValue};
-pub use argui_assets::{AssetHandle, AssetKey, AssetRecord, AssetRegistry};
+pub use argui_media::{AssetHandle, AssetKey, AssetRecord, AssetRegistry};
 pub use error::SchemaError;
 pub use id::{EventId, NativeTypeId, PropertyId, SlotId, StylePartId, VariantId};
 pub use metadata::{

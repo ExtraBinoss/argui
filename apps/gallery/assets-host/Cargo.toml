@@ -10,10 +10,9 @@ readme = "../../../README.md"
 description = "Embedded raster and SVG imports for the native Argui gallery"
 
 [dependencies]
-argui-image = { path = "../../../crates/argui-image", version = "0.3.2" }
+argui-media = { path = "../../../crates/argui-media", version = "0.3.2", features = ["media"] }
 argui-paint = { path = "../../../crates/argui-paint", version = "0.3.2" }
 argui-runtime = { path = "../../../crates/argui-runtime", version = "0.3.2" }
-argui-vector = { path = "../../../crates/argui-vector", version = "0.3.2" }
 
 [workspace]
 resolver = "3"

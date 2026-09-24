@@ -1,6 +1,6 @@
 //! Native rendering adapter for authored vector path assets.
 
-use argui_assets::AssetHandle;
+use argui_media::AssetHandle;
 use argui_paint::ImageFit;
 use argui_ui::Element;
 

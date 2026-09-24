@@ -5,7 +5,10 @@ mod gpu_canvas;
 
 use std::{
     cell::Cell,
-    sync::{Arc, atomic::Ordering},
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
 };
 
 use argui_core::{Affine2D, Color, Point, Rect, Size};
@@ -15,8 +18,8 @@ use argui_paint::{
 };
 use argui_render::{
     DamageMode, DamageTracking, EffectDamage, EffectDefinition, EffectPassDefinition,
-    EffectRegistry, GpuCanvasDiagnosticKind, GpuCanvasRegistration, GpuCanvasRegistry,
-    RenderStatus, RendererConfig, RendererError, SurfaceRenderer,
+    EffectRegistry, GpuCanvasDiagnosticKind, GpuCanvasMailbox, GpuCanvasRegistration,
+    GpuCanvasRegistry, RenderStatus, RendererConfig, RendererError, SurfaceRenderer,
 };
 use winit::{
     application::ApplicationHandler,
@@ -141,6 +144,14 @@ fn exercise(
     let canvas_registration =
         GpuCanvasRegistration::new("test.compute-canvas", ComputeFactory(probe.clone()));
     let canvas_id = canvas_registration.id();
+    let canvas_registration_handle = canvas_registration.clone();
+    let wake_count = Arc::new(AtomicUsize::new(0));
+    let counted = Arc::clone(&wake_count);
+    canvas_registration_handle.set_wake(move |_| {
+        counted.fetch_add(1, Ordering::Relaxed);
+    });
+    let mailbox = GpuCanvasMailbox::new();
+    mailbox.bind(&canvas_registration_handle);
     probe.canvas.store(canvas_id.get(), Ordering::Relaxed);
     let retry_probe = Arc::new(CanvasProbe::default());
     retry_probe.create_fail.store(true, Ordering::Relaxed);
@@ -316,6 +327,26 @@ fn exercise(
         &window,
         &mut render,
     );
+
+    let mut native_frame = DisplayList::new();
+    native_frame.push_gpu_canvas(canvas_primitive(canvas_id, 9, Size::new(8.0, 6.0), 35));
+    render(&mut renderer, &native_frame).unwrap();
+    assert!(canvas_registration_handle.is_mounted());
+    let before_native_frame = probe.renders.load(Ordering::Relaxed);
+    assert_eq!(mailbox.publish(1_u8), None);
+    assert_eq!(mailbox.publish(2_u8), Some(1));
+    assert_eq!(wake_count.load(Ordering::Relaxed), 1);
+    assert_eq!(mailbox.take(), Some(2));
+    render(&mut renderer, &native_frame).unwrap();
+    assert_eq!(
+        probe.renders.load(Ordering::Relaxed),
+        before_native_frame + 1
+    );
+    render(&mut renderer, &DisplayList::new()).unwrap();
+    assert!(!canvas_registration_handle.is_mounted());
+    assert_eq!(mailbox.publish(3_u8), None);
+    assert_eq!(wake_count.load(Ordering::Relaxed), 1);
+    mailbox.clear();
 
     let mut canvas_only = DisplayList::new();
     canvas_only.push_gpu_canvas(canvas_primitive(canvas_id, 9, Size::new(8.0, 6.0), 35));

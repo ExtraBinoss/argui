@@ -29,9 +29,9 @@ pub use effect_graph::{EffectGraphAnalysis, EffectGraphStats, analyze_display_li
 pub use error::{RendererAttemptFailure, RendererError};
 pub use gpu_canvas::{
     GpuCanvasDeviceContext, GpuCanvasDiagnostic, GpuCanvasDiagnosticKind, GpuCanvasError,
-    GpuCanvasFactory, GpuCanvasFailureStage, GpuCanvasRegistration, GpuCanvasRegistry,
-    GpuCanvasRegistryError, GpuCanvasRenderContext, GpuCanvasRenderer, GpuCanvasRequirements,
-    GpuCanvasStats,
+    GpuCanvasFactory, GpuCanvasFailureStage, GpuCanvasMailbox, GpuCanvasRegistration,
+    GpuCanvasRegistry, GpuCanvasRegistryError, GpuCanvasRenderContext, GpuCanvasRenderer,
+    GpuCanvasRequirements, GpuCanvasStats,
 };
 pub use offscreen::TexturePoolStats;
 pub use profile::{

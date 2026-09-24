@@ -1,9 +1,9 @@
 #[cfg(not(target_arch = "wasm32"))]
 use argui_render::SurfaceRenderer;
 use argui_render::{
-    GpuCanvasDeviceContext, GpuCanvasError, GpuCanvasFactory, GpuCanvasRegistration,
-    GpuCanvasRegistry, GpuCanvasRegistryError, GpuCanvasRenderContext, GpuCanvasRenderer,
-    GpuCanvasRequirements, RendererConfig, wgpu,
+    GpuCanvasDeviceContext, GpuCanvasError, GpuCanvasFactory, GpuCanvasMailbox,
+    GpuCanvasRegistration, GpuCanvasRegistry, GpuCanvasRegistryError, GpuCanvasRenderContext,
+    GpuCanvasRenderer, GpuCanvasRequirements, RendererConfig, wgpu,
 };
 
 #[derive(Clone, Copy)]
@@ -42,6 +42,24 @@ impl GpuCanvasRenderer for Renderer {
 
 fn registration(label: &str) -> GpuCanvasRegistration {
     GpuCanvasRegistration::new(label, Factory { requirements: None })
+}
+
+#[test]
+fn mailbox_keeps_only_the_latest_frame_and_does_not_retain_registration() {
+    let mailbox = GpuCanvasMailbox::new();
+    let registration = registration("mailbox");
+    mailbox.bind(&registration);
+    assert!(!registration.is_mounted());
+    assert_eq!(mailbox.publish(1_u8), None);
+    assert_eq!(mailbox.publish(2_u8), Some(1));
+    assert_eq!(mailbox.take(), Some(2));
+    assert_eq!(mailbox.take(), None);
+    assert_eq!(mailbox.publish(3), None);
+    mailbox.clear();
+    assert_eq!(mailbox.take(), None);
+    drop(registration);
+    assert_eq!(mailbox.publish(4), None);
+    assert_eq!(mailbox.take(), Some(4));
 }
 
 #[test]

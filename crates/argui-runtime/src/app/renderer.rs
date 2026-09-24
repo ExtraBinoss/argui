@@ -16,6 +16,17 @@ use super::RendererState;
 
 #[cfg_attr(coverage_nightly, coverage(off))]
 impl Application {
+    /// Schedules a retained paint frame when `id` belongs to this window's registry.
+    pub(crate) fn gpu_canvas_ready(&mut self, id: argui_paint::GpuCanvasId) {
+        if self.renderer_config.gpu_canvases.get(id).is_none() {
+            return;
+        }
+        self.pending_ui_frame.request_paint();
+        if let Some(window) = &self.window {
+            window.request_redraw();
+        }
+    }
+
     /// Synchronizes changed model assets and effects into the GPU surfaces.
     ///
     /// Returns whether resources changed and the frame should be recomputed.

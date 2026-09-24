@@ -1,4 +1,5 @@
-use argui_core::Size;
+use super::top_right;
+use argui_core::{Point, Size};
 use argui_layout::{LayoutEngine, LayoutError};
 use argui_text::TextEngine;
 use argui_ui::{
@@ -209,4 +210,30 @@ fn sticky_edges_constrain_both_axes_and_allow_auto_edges() {
         .compute(&mut ui, &mut text_engine(), Size::new(200.0, 200.0))
         .unwrap();
     assert_eq!(output.nodes[0].bounds.size, Size::new(20.0, 20.0));
+}
+
+#[test]
+fn absolute_overlays_do_not_participate_in_flex_flow() {
+    let mut ui = UiTree::new(
+        Element::column([
+            Element::container([])
+                .width(length(80.0))
+                .height(length(30.0)),
+            Element::container([])
+                .width(length(50.0))
+                .height(length(20.0))
+                .absolute(top_right(5.0, 7.0))
+                .z_index(10),
+        ])
+        .width(length(200.0))
+        .height(length(100.0)),
+    );
+    let mut layout = LayoutEngine::new();
+    let mut text = text_engine();
+    let output = layout
+        .compute(&mut ui, &mut text, Size::new(200.0, 100.0))
+        .unwrap();
+
+    assert_eq!(output.nodes[1].bounds.origin, Point::default());
+    assert_eq!(output.nodes[2].bounds.origin, Point::new(143.0, 5.0));
 }

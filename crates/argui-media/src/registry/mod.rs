@@ -2,7 +2,11 @@ use std::collections::HashMap;
 
 use argui_paint::{ImageAsset, ImageId, VectorAsset, VectorId};
 
-use crate::{AssetKey, AssetRegistryError, AssetRevision};
+mod error;
+mod key;
+
+pub use error::AssetRegistryError;
+pub use key::{AssetKey, AssetRevision};
 
 /// Runtime representation stored under a stable source key.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -70,6 +74,7 @@ impl AssetRecord {
         }
     }
 
+    #[cfg(feature = "media")]
     fn content_hash(&self) -> u64 {
         match self {
             Self::Image { content_hash, .. } | Self::Vector { content_hash, .. } => *content_hash,
@@ -109,6 +114,7 @@ impl AssetRegistry {
     ///
     /// Returns an error without modifying the prior record when decoding fails,
     /// the key is already a vector, or revision space is exhausted.
+    #[cfg(feature = "media")]
     pub fn upsert_image(
         &mut self,
         key: AssetKey,
@@ -131,7 +137,7 @@ impl AssetRegistry {
             None => (ImageId::fresh(), AssetRevision::INITIAL),
         };
         let asset =
-            argui_image::decode(id, encoded).map_err(|source| AssetRegistryError::Image {
+            crate::image::decode(id, encoded).map_err(|source| AssetRegistryError::Image {
                 key: key.clone(),
                 source,
             })?;
@@ -155,6 +161,7 @@ impl AssetRegistry {
     ///
     /// Returns an error without modifying the prior record when parsing fails,
     /// the key is already an image, or revision space is exhausted.
+    #[cfg(feature = "media")]
     pub fn upsert_vector(
         &mut self,
         key: AssetKey,
@@ -177,7 +184,7 @@ impl AssetRegistry {
             None => (VectorId::fresh(), AssetRevision::INITIAL),
         };
         let asset =
-            argui_vector::parse_svg(id, svg).map_err(|source| AssetRegistryError::Vector {
+            crate::svg::parse_svg(id, svg).map_err(|source| AssetRegistryError::Vector {
                 key: key.clone(),
                 source,
             })?;
@@ -223,6 +230,7 @@ impl AssetRegistry {
     }
 }
 
+#[cfg(feature = "media")]
 fn change(record: &AssetRecord, changed: bool) -> AssetChange {
     AssetChange {
         key: record.key().clone(),
@@ -233,6 +241,7 @@ fn change(record: &AssetRecord, changed: bool) -> AssetChange {
     }
 }
 
+#[cfg(feature = "media")]
 fn kind_mismatch(key: &AssetKey, existing: AssetKind, requested: AssetKind) -> AssetRegistryError {
     AssetRegistryError::KindMismatch {
         key: key.clone(),
@@ -241,6 +250,7 @@ fn kind_mismatch(key: &AssetKey, existing: AssetKind, requested: AssetKind) -> A
     }
 }
 
+#[cfg(feature = "media")]
 fn content_hash(bytes: &[u8]) -> u64 {
     let mut hash = 0xcbf2_9ce4_8422_2325_u64;
     for byte in bytes {

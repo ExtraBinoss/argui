@@ -156,6 +156,51 @@ compose above it. Canvas pixels do not generate semantics: give the leaf a
 label and focus policy, and provide accessible Argui controls or semantic
 overlays for important actions.
 
+## Place a native viewport from TSX
+
+The built-in `GpuCanvas` schema is available to both Solid and React as
+`<gpuCanvas>`. The `canvas_id` is `registration.id().get()` from the same
+process; the native host rejects an ID absent from the renderer registry.
+The element accepts the normal width, height, position, rotation, opacity,
+visibility and backdrop filter properties. `alt` supplies accessible image
+semantics; `alt=""` marks purely decorative output.
+
+```tsx
+<gpuCanvas
+  canvas_id={previewCanvasId}
+  width="100%"
+  height={360}
+  resolution_scale={1}
+  sampling="linear"
+  alt="Video preview"
+/>
+```
+
+TSX sends only the ID and control values. Frames stay in the application's
+native producer. A `GpuCanvasMailbox<Frame>` holds at most one pending frame:
+
+```rust,ignore
+let mailbox = GpuCanvasMailbox::<Frame>::new();
+let registration = GpuCanvasRegistration::new(
+    "editor.preview",
+    PreviewFactory { mailbox: mailbox.clone() },
+);
+mailbox.bind(&registration);
+// The native decoder/sink publishes; an unconsumed older frame is replaced.
+let old_frame = mailbox.publish(decoded_frame);
+// The GPU callback takes only the newest frame during a dirty render.
+let newest = mailbox.take();
+```
+
+`publish` increments the native revision and coalesces wakeups while the
+viewport is mounted. `registration.is_mounted()` lets the editor pause decoding
+when no surface displays it. On playback stop, call `mailbox.clear()`. No
+decoded pixels, texture handles or player clock cross the JS host boundary.
+When layout or DPI changes, `GpuCanvasRenderContext::physical_extent()` gives
+the exact new target size to the callback. The producer may use that size to
+request a different decoder output resolution. Argui reallocates the retained
+target only when its physical extent changes.
+
 `CustomPaintContext::gpu_canvas(slot, bounds, spec)` is the advanced path for a
 custom element that emits several primitives. The local `slot` distinguishes
 canvases owned by the same retained node. Reusing a slot in one frame is a
@@ -206,6 +251,8 @@ callback when any pixel-producing input changes:
 - `content_revision` changes;
 - logical size, DPI scale or `resolution_scale` changes;
 - output format or device changes.
+- a native producer calls `GpuCanvasRegistration::invalidate()` or publishes
+  through a bound `GpuCanvasMailbox`.
 
 Composition-only changes such as transform, clip, rounded corners and opacity
 update the textured quad without rerunning the callback. Cached effect layers

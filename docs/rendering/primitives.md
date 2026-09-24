@@ -68,7 +68,7 @@ the current contract.
 ## Images
 
 `ImageAsset` contains a stable `ImageId`, dimensions, and RGBA8 pixels.
-`argui-image` optionally decodes PNG and JPEG; applications can register pixels
+`argui-media` with its `media` feature decodes PNG, JPEG, and WebP; applications can register pixels
 from another decoder.
 
 ```rust,ignore
@@ -85,7 +85,7 @@ A scene without images allocates no image texture.
 
 ## Vectors
 
-`argui-vector` parses SVG into immutable `VectorAsset` values:
+`argui-media` with its `media` feature parses SVG into immutable `VectorAsset` values:
 
 ```rust,ignore
 let mut vectors = VectorLibrary::new();

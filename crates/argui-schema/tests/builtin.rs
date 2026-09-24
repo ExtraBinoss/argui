@@ -2,12 +2,15 @@
 mod flickable;
 #[path = "builtin/focus_scope.rs"]
 mod focus_scope;
+#[path = "builtin/gpu_canvas.rs"]
+mod gpu_canvas;
 #[path = "builtin/key_binding.rs"]
 mod key_binding;
 #[path = "builtin/layout.rs"]
 mod layout;
 #[path = "builtin/loop_motion.rs"]
 mod loop_motion;
+#[cfg(feature = "media")]
 #[path = "builtin/media.rs"]
 mod media;
 #[path = "builtin/path.rs"]
@@ -35,8 +38,7 @@ fn builtin_catalogue_preserves_stable_names_and_public_members() {
         (builtin::GRID, "Grid"),
         (builtin::TEXT, "Text"),
         (builtin::TEXT_INPUT, "TextInput"),
-        (builtin::IMAGE, "Image"),
-        (builtin::SVG, "Svg"),
+        (builtin::GPU_CANVAS, "GpuCanvas"),
         (builtin::RECTANGLE, "Rectangle"),
         (builtin::TOUCH_AREA, "TouchArea"),
         (builtin::FOCUS_SCOPE, "FocusScope"),
@@ -72,7 +74,14 @@ fn builtin_catalogue_preserves_stable_names_and_public_members() {
             );
         }
     }
-    assert_eq!(registry.schemas().count(), 16);
+    #[cfg(feature = "media")]
+    for (id, name) in [(builtin::IMAGE, "Image"), (builtin::SVG, "Svg")] {
+        assert_eq!(registry.schema(id).unwrap().name.as_str(), name);
+    }
+    assert_eq!(
+        registry.schemas().count(),
+        if cfg!(feature = "media") { 17 } else { 15 }
+    );
     for name in [
         "Pressable",
         "PopoverPanel",

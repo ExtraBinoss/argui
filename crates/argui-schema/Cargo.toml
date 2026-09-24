@@ -10,11 +10,13 @@ readme.workspace = true
 description = "Canonical declarative native schema and adapters for Argui"
 
 [features]
+default = []
+media = []
 serde = ["dep:serde"]
 
 [dependencies]
 argui-animation.workspace = true
-argui-assets.workspace = true
+argui-media.workspace = true
 argui-core.workspace = true
 argui-effects = { workspace = true, features = ["scroll"] }
 argui-paint.workspace = true

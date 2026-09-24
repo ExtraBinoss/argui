@@ -9,6 +9,10 @@ homepage.workspace = true
 readme.workspace = true
 description = "Transactional native tree host shared by JavaScript framework adapters"
 
+[features]
+default = []
+media = ["argui-schema/media"]
+
 [dependencies]
 argui-schema.workspace = true
 argui-ui.workspace = true

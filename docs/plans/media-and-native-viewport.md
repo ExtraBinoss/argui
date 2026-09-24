@@ -14,10 +14,9 @@ and platform video package are outside this change.
    `argui-paint`, and WGPU rasterization in `argui-render`.
 2. Expose one application-facing `media` feature, disabled by default. Enabling
    it includes both raster images and SVG. The gallery enables `media`; apps
-   that omit it do not compile the file decoders. Internal `image` and `svg`
-   switches may isolate dependencies for tests and future consumers, but normal
-   applications should only have to choose `media` or no media. Authored paths
-   stay available without a file decoder.
+   that omit it do not compile the file decoders. There are no separate
+   application-facing image and SVG switches: choose `media` or no media.
+   Authored paths stay available without a file decoder.
 3. Replace all imports, manifests, release metadata, generated lockfiles, tests,
    and documentation in the same change. Delete the three replaced crate
    directories after all consumers use `argui-media`. No compatibility shim.

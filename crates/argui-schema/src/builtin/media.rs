@@ -1,6 +1,6 @@
 //! Native image and SVG surfaces backed by typed asset handles.
 
-use argui_assets::AssetHandle;
+use argui_media::AssetHandle;
 use argui_paint::{ImageFit, ImageSampling};
 use argui_ui::{Element, Role, Semantics};
 

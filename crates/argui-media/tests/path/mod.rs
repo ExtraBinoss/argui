@@ -1,6 +1,6 @@
 use argui_core::{Point, Size};
+use argui_media::{PathCommand, PathError, PathStyle, VectorLibrary, path_asset};
 use argui_paint::VectorId;
-use argui_vector::{PathCommand, PathError, PathStyle, VectorLibrary, path_asset};
 
 #[test]
 fn filled_path_preserves_geometry_as_tintable_vector() {

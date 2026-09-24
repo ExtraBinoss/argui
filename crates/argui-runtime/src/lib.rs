@@ -55,6 +55,7 @@ pub use model::{
 pub use native_host::{
     NativeHostAssets, NativeHostBatch, NativeHostCommit, NativeHostControl, NativeHostDelivery,
     WireHostId, WireOperation, WireValue, validate_native_host_assets,
+    validate_native_host_canvases,
 };
 
 pub use model::shutdown_presentations;

@@ -1,4 +1,4 @@
-use argui_image::{ImageLibrary, decode};
+use argui_media::image::{ImageLibrary, decode};
 use argui_paint::ImageId;
 use image::ImageEncoder;
 

@@ -198,6 +198,7 @@ impl ApplicationHandler<UserEvent> for Application {
                     };
                     let _ = batch.reply.send(result);
                 }
+                UserEvent::GpuCanvasReady(id) => self.gpu_canvas_ready(id),
                 #[cfg(feature = "tasks")]
                 UserEvent::TasksReady => {
                     if let Some(tasks) = &self.tasks {
@@ -235,6 +236,7 @@ impl ApplicationHandler<UserEvent> for Application {
             };
             match event {
                 UserEvent::ModelsReady => self.models_ready(event_loop),
+                UserEvent::GpuCanvasReady(id) => self.gpu_canvas_ready(id),
                 #[cfg(feature = "tasks")]
                 UserEvent::TasksReady => {
                     if let Some(tasks) = &self.tasks {

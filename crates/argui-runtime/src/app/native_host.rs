@@ -9,7 +9,7 @@ use argui_ui::{Element, TreeUpdate, UiTree, percent};
 use super::Application;
 use crate::{
     HostCommitResult, NativeHostAssets, NativeHostCommit, NativeHostControl, WireOperation,
-    validate_native_host_assets,
+    validate_native_host_assets, validate_native_host_canvases,
 };
 
 /// Wraps a native presentation root in full-window safe-area padding.
@@ -81,6 +81,7 @@ impl Application {
             }
         }
         validate_native_host_assets(&operations, &self.image_assets, &next_vectors)?;
+        validate_native_host_canvases(&operations, &self.renderer_config.gpu_canvases)?;
         let replacement = controls.iter().find_map(|control| match control {
             NativeHostControl::ReplaceEffects(effects) => Some(effects.clone()),
             _ => None,

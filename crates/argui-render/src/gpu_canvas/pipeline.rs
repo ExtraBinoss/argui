@@ -14,7 +14,7 @@ use super::{
 
 enum RendererSlot {
     Ready(Box<dyn GpuCanvasRenderer>),
-    Failed { revision: u64, message: String },
+    Failed { revision: u128, message: String },
 }
 
 #[derive(Clone, Debug)]
@@ -66,6 +66,7 @@ pub(crate) struct CanvasGpu {
     generation: u64,
     max_dimension: u32,
     frame: u64,
+    active: HashSet<GpuCanvasId>,
 }
 
 #[cfg_attr(coverage_nightly, coverage(off))]
@@ -102,6 +103,7 @@ impl CanvasGpu {
             generation,
             max_dimension: device.limits().max_texture_dimension_2d,
             frame: 0,
+            active: HashSet::new(),
         }
     }
 
@@ -128,6 +130,7 @@ impl CanvasGpu {
                 _ => None,
             })
             .collect::<Vec<_>>();
+        self.sync_active(&canvases);
         let (plans, required) = self.plan(&canvases, scale_factor);
         self.cache.reserve(&required);
         for (key, extent) in &required {
@@ -191,6 +194,30 @@ impl CanvasGpu {
             changed,
             command_buffers,
         }
+    }
+
+    /// Tracks registrations mounted on this surface and releases removed ones.
+    fn sync_active(&mut self, canvases: &[&GpuCanvasPrimitive]) {
+        let next = canvases
+            .iter()
+            .map(|canvas| canvas.canvas)
+            .collect::<HashSet<_>>();
+        for id in self.active.difference(&next) {
+            if let Some(registration) = self.registry.get(*id) {
+                registration.deactivate();
+            }
+        }
+        for id in next.difference(&self.active) {
+            if let Some(registration) = self.registry.get(*id) {
+                registration.activate();
+            }
+        }
+        for id in &next {
+            if let Some(registration) = self.registry.get(*id) {
+                registration.begin_frame();
+            }
+        }
+        self.active = next;
     }
 
     /// Selects a deterministic within-budget subset of visible `canvases`.
@@ -288,7 +315,13 @@ impl CanvasGpu {
         command_buffers: &mut Vec<wgpu::CommandBuffer>,
         changed: &mut bool,
     ) -> DrawSource {
-        self.ensure_renderer(device, queue, canvas.canvas, canvas.content_revision);
+        let native_revision = self
+            .registry
+            .get(canvas.canvas)
+            .expect("validated registration")
+            .native_revision();
+        let revision = (u128::from(canvas.content_revision) << 64) | u128::from(native_revision);
+        self.ensure_renderer(device, queue, canvas.canvas, revision);
         let renderer_error = match self.renderers.get(&canvas.canvas) {
             Some(RendererSlot::Failed { message, .. }) => Some(message.clone()),
             _ => None,
@@ -311,7 +344,7 @@ impl CanvasGpu {
         let needs_render = self
             .cache
             .get(key)
-            .is_some_and(|entry| entry.needs_render(canvas.content_revision));
+            .is_some_and(|entry| entry.needs_render(revision));
         if !needs_render {
             let valid = self
                 .cache
@@ -370,7 +403,7 @@ impl CanvasGpu {
                 self.cache
                     .get_mut(key)
                     .expect("reserved canvas target")
-                    .mark_success(canvas.content_revision);
+                    .mark_success(revision);
                 self.record_recovery(key, canvas, label);
                 DrawSource {
                     key: Some(key),
@@ -381,7 +414,7 @@ impl CanvasGpu {
                 self.cache
                     .get_mut(key)
                     .expect("reserved canvas target")
-                    .mark_failure(canvas.content_revision);
+                    .mark_failure(revision);
                 self.stats.failures_this_frame += 1;
                 self.record_failure(
                     key,
@@ -404,7 +437,7 @@ impl CanvasGpu {
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         id: GpuCanvasId,
-        revision: u64,
+        revision: u128,
     ) {
         let reusable = match self.renderers.get(&id) {
             Some(RendererSlot::Ready(_)) => true,
@@ -552,5 +585,16 @@ impl CanvasGpu {
     /// Drains failure and recovery diagnostics accumulated since the last call.
     pub fn take_diagnostics(&mut self) -> Vec<GpuCanvasDiagnostic> {
         std::mem::take(&mut self.diagnostics)
+    }
+}
+
+impl Drop for CanvasGpu {
+    /// Releases surface membership so an unmounted canvas cannot wake an idle app.
+    fn drop(&mut self) {
+        for id in self.active.drain() {
+            if let Some(registration) = self.registry.get(id) {
+                registration.deactivate();
+            }
+        }
     }
 }

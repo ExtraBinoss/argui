@@ -1,5 +1,5 @@
 {
-  "abiHash": "15961631536955704802",
+  "abiHash": "992184787112443877",
   "natives": [
     {
       "events": [
@@ -10341,6 +10341,480 @@
           "readOnly": false,
           "required": false,
           "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 85,
+          "name": "role",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 86,
+          "name": "accessible_name",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 172,
+          "name": "accessible_description",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 173,
+          "name": "accessible_value",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 212,
+          "name": "numeric_value",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 213,
+          "name": "minimum_value",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 214,
+          "name": "maximum_value",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 215,
+          "name": "value_step",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 222,
+          "name": "accessible_disabled",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 224,
+          "name": "accessible_hidden",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 207,
+          "name": "focusable",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 78,
+          "name": "focus_on_tab_navigation",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 84,
+          "name": "keyboard_activation",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 174,
+          "name": "selected",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 38,
+          "name": "checked",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 223,
+          "name": "checked_state",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 29,
+          "name": "expanded",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 17,
+          "name": "busy",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 175,
+          "name": "current",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 208,
+          "name": "pressed_state",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 209,
+          "name": "required",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 210,
+          "name": "read_only",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 211,
+          "name": "multiselectable",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 180,
+          "name": "invalid",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 181,
+          "name": "live",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 229,
+          "name": "modal",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 225,
+          "name": "orientation",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 226,
+          "name": "level",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Int"
+        },
+        {
+          "default": null,
+          "id": 227,
+          "name": "position_in_set",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Int"
+        },
+        {
+          "default": null,
+          "id": 228,
+          "name": "set_size",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Int"
+        },
+        {
+          "default": null,
+          "id": 230,
+          "name": "has_popup",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 231,
+          "name": "sort",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 176,
+          "name": "controls",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 177,
+          "name": "active_descendant",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 178,
+          "name": "labelled_by",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 179,
+          "name": "described_by",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 216,
+          "name": "can_increment",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 217,
+          "name": "can_decrement",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 218,
+          "name": "can_set_value",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 219,
+          "name": "can_expand",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 220,
+          "name": "can_collapse",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 221,
+          "name": "can_scroll_into_view",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        }
+      ]
+    },
+    {
+      "events": [
+        {
+          "id": 1,
+          "name": "click",
+          "payload": null
+        },
+        {
+          "id": 26,
+          "name": "semantic_action",
+          "payload": null
+        }
+      ],
+      "id": 22,
+      "name": "GpuCanvas",
+      "properties": [
+        {
+          "default": null,
+          "id": 1,
+          "name": "key",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 2,
+          "name": "tooltip",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 3,
+          "name": "width",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 4,
+          "name": "height",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 74,
+          "name": "x",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": null,
+          "id": 75,
+          "name": "y",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Dimension"
+        },
+        {
+          "default": "Float(0.0)",
+          "id": 41,
+          "name": "rotation",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": "Float(1.0)",
+          "id": 44,
+          "name": "opacity",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": "String(\"none\")",
+          "id": 104,
+          "name": "backdrop_filter",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": "Bool(true)",
+          "id": 76,
+          "name": "visible",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Bool"
+        },
+        {
+          "default": null,
+          "id": 233,
+          "name": "canvas_id",
+          "readOnly": false,
+          "required": true,
+          "valueType": "Int"
+        },
+        {
+          "default": null,
+          "id": 234,
+          "name": "revision",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Int"
+        },
+        {
+          "default": null,
+          "id": 235,
+          "name": "resolution_scale",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Float"
+        },
+        {
+          "default": null,
+          "id": 35,
+          "name": "sampling",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
+        },
+        {
+          "default": null,
+          "id": 232,
+          "name": "alt",
+          "readOnly": false,
+          "required": false,
+          "valueType": "String"
         },
         {
           "default": null,

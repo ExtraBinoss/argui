@@ -1,0 +1,51 @@
+[package]
+name = "argui-media"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+description = "Optional raster and SVG decoding with stable media asset identities for Argui"
+
+[features]
+default = []
+media = ["dep:image", "dep:usvg"]
+
+[dependencies]
+argui-core.workspace = true
+argui-paint.workspace = true
+image = { workspace = true, features = ["webp"], optional = true }
+thiserror.workspace = true
+usvg = { workspace = true, optional = true }
+
+[dev-dependencies]
+image.workspace = true
+
+[[test]]
+name = "image"
+path = "tests/image/mod.rs"
+required-features = ["media"]
+
+[[test]]
+name = "svg"
+path = "tests/svg/mod.rs"
+required-features = ["media"]
+
+[[test]]
+name = "registry"
+path = "tests/registry/mod.rs"
+required-features = ["media"]
+
+[[test]]
+name = "vector"
+path = "tests/vector.rs"
+required-features = ["media"]
+
+[[test]]
+name = "path"
+path = "tests/path/mod.rs"
+
+[lints]
+workspace = true

@@ -106,6 +106,8 @@ pub(crate) enum UserEvent {
     ModelsReady,
     #[cfg(not(target_arch = "wasm32"))]
     HostCommit(crate::NativeHostBatch),
+    /// A native producer updated a mounted application-owned GPU canvas.
+    GpuCanvasReady(argui_paint::GpuCanvasId),
     #[cfg(feature = "tasks")]
     TasksReady,
     #[cfg(all(feature = "webview", target_os = "linux"))]
@@ -146,6 +148,12 @@ pub(crate) enum UserEvent {
 impl Application {
     pub(crate) fn set_event_proxy(&mut self, proxy: impl Into<crate::host::EventProxy>) {
         let proxy = proxy.into();
+        for registration in self.renderer_config.gpu_canvases.registrations() {
+            let wake = proxy.clone();
+            registration.set_wake(move |id| {
+                let _ = wake.send_event(UserEvent::GpuCanvasReady(id));
+            });
+        }
         if let Some(model) = &self.model {
             let wake = proxy.clone();
             model.set_model_wake(move || {

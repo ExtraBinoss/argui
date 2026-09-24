@@ -1,4 +1,4 @@
-use crate::{AssetKey, AssetKind};
+use super::{AssetKey, AssetKind};
 
 /// Source asset validation or registry update failure.
 #[derive(Debug, thiserror::Error)]
@@ -14,15 +14,17 @@ pub enum AssetRegistryError {
     #[error("asset revision space exhausted for `{0}`")]
     RevisionExhausted(AssetKey),
     #[error("image `{key}` could not be decoded: {source}")]
+    #[cfg(feature = "media")]
     Image {
         key: AssetKey,
         #[source]
-        source: argui_image::DecodeError,
+        source: crate::image::DecodeError,
     },
     #[error("vector `{key}` could not be parsed: {source}")]
+    #[cfg(feature = "media")]
     Vector {
         key: AssetKey,
         #[source]
-        source: argui_vector::VectorError,
+        source: crate::svg::VectorError,
     },
 }

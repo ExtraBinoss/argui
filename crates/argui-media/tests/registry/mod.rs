@@ -1,6 +1,6 @@
 use std::io::Cursor;
 
-use argui_assets::{AssetHandle, AssetKey, AssetRecord, AssetRegistry, AssetRegistryError};
+use argui_media::{AssetHandle, AssetKey, AssetRecord, AssetRegistry, AssetRegistryError};
 use image::{DynamicImage, ImageFormat, Rgba, RgbaImage};
 
 fn png(color: [u8; 4]) -> Vec<u8> {

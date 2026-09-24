@@ -46,11 +46,11 @@ pub fn decode_assets(sources: &[AssetInput<'_>]) -> Result<NativeHostAssets, Str
     for asset in sources {
         match asset.kind {
             AssetKind::Image => assets.images.push(
-                argui_image::decode(ImageId(asset.id), asset.bytes)
+                argui_media::image::decode(ImageId(asset.id), asset.bytes)
                     .map_err(|error| format!("{}: {error}", asset.key))?,
             ),
             AssetKind::Svg => assets.vectors.push(
-                argui_vector::parse_svg(VectorId(asset.id), asset.bytes)
+                argui_media::svg::parse_svg(VectorId(asset.id), asset.bytes)
                     .map_err(|error| format!("{}: {error}", asset.key))?,
             ),
         }

@@ -54,7 +54,7 @@ when the purpose already names the integration.
 | `argui-animation` | Timelines, interpolation, springs, and decay | core |
 | `argui-inspect` | Renderer-independent inspection records | core |
 | `argui-paint` | Ordered renderer-independent display list | core |
-| `argui-image` | Image decoding and paint resources | paint |
+| `argui-media` | Stable media assets and optional image/SVG decoding | core, paint |
 | `argui-platform` | Winit windows, input, clipboard, tray, and OS adapters | core, paint |
 | `argui-text` | Shaping, bidi, fallback, cursor geometry, and glyphs | core |
 | `argui-render` | WGPU surfaces, resources, batching, and effects | core, paint, text |
@@ -62,7 +62,6 @@ when the purpose already names the integration.
 | `argui-ui` | Retained elements, styles, events, focus, and semantics | core, accessibility, animation, paint, text |
 | `argui-layout` | Retained Taffy Flexbox and Grid adapter | core, paint, text, ui |
 | `argui-effects` | Optional WGSL effect definitions | paint, render, ui |
-| `argui-vector` | SVG parsing and vector paint resources | core, paint |
 | `argui-i18n` | Optional Fluent catalogs and locale negotiation | — |
 | `argui-updater` | Signed update checks, downloads, and installation | — |
 | `argui-webview` | Retained native WebViews and browser frames | core, layout, ui |

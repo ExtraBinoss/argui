@@ -19,7 +19,7 @@ crate-type = ["cdylib", "rlib"]
 argui-gallery-assets = { path = "../assets-host", version = "0.3.2" }
 argui-core = { path = "../../../crates/argui-core", version = "0.3.2" }
 argui-effects = { path = "../../../crates/argui-effects", version = "0.3.2", features = ["scroll"] }
-argui-host = { path = "../../../crates/argui-host", version = "0.3.2" }
+argui-host = { path = "../../../crates/argui-host", version = "0.3.2", features = ["media"] }
 argui-i18n = { path = "../../../crates/argui-i18n", version = "0.3.2" }
 argui-paint = { path = "../../../crates/argui-paint", version = "0.3.2" }
 argui-platform = { path = "../../../crates/argui-platform", version = "0.3.2" }

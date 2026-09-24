@@ -1,7 +1,9 @@
 use argui_core::Size;
 use argui_paint::{VectorAsset, VectorId};
 
-use crate::{PathCommand, PathError, PathStyle, VectorError, parse_svg, path_asset};
+use crate::{PathCommand, PathError, PathStyle, path_asset};
+#[cfg(feature = "media")]
+use crate::{VectorError, parse_svg};
 
 /// Owns immutable vector assets and generates their stable handles.
 #[derive(Clone, Debug, Default)]
@@ -23,6 +25,7 @@ impl VectorLibrary {
     ///
     /// # Errors
     /// Returns an error if the SVG cannot be parsed.
+    #[cfg(feature = "media")]
     pub fn insert_svg(&mut self, svg: &[u8]) -> Result<VectorId, VectorError> {
         let id = VectorId::fresh();
         self.assets.push(parse_svg(id, svg)?);

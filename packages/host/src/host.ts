@@ -237,6 +237,8 @@ function encodeValue(property: NativeProperty, value: unknown): WireValue {
       if (typeof value !== 'boolean') break
       return { type: 'Bool', value }
     case 'Int':
+      if (typeof value !== 'number' || !Number.isSafeInteger(value)) break
+      return { type: 'Int', value }
     case 'Float':
       if (typeof value !== 'number' || !Number.isFinite(value)) break
       return { type: property.valueType, value }

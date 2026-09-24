@@ -1382,5 +1382,68 @@ export namespace JSX {
       ref?: (node: NativeNode) => void
       children?: Element | readonly Element[]
     }
+    gpuCanvas: {
+      key?: string
+      tooltip?: string
+      width?: number | string
+      height?: number | string
+      x?: number | string
+      y?: number | string
+      rotation?: number
+      opacity?: number
+      backdrop_filter?: string
+      visible?: boolean
+      canvas_id: number
+      revision?: number
+      resolution_scale?: number
+      sampling?: string
+      alt?: string
+      role?: SemanticRole
+      accessible_name?: string
+      accessible_description?: string
+      accessible_value?: string
+      numeric_value?: number
+      minimum_value?: number
+      maximum_value?: number
+      value_step?: number
+      accessible_disabled?: boolean
+      accessible_hidden?: boolean
+      focusable?: boolean
+      focus_on_tab_navigation?: boolean
+      keyboard_activation?: KeyboardActivation
+      selected?: boolean
+      checked?: boolean
+      checked_state?: SemanticCheckedState
+      expanded?: boolean
+      busy?: boolean
+      current?: SemanticCurrent
+      pressed_state?: boolean
+      required?: boolean
+      read_only?: boolean
+      multiselectable?: boolean
+      invalid?: boolean
+      live?: SemanticLive
+      modal?: boolean
+      orientation?: SemanticOrientation
+      level?: number
+      position_in_set?: number
+      set_size?: number
+      has_popup?: SemanticPopup
+      sort?: SemanticSort
+      controls?: string
+      active_descendant?: string
+      labelled_by?: string
+      described_by?: string
+      can_increment?: boolean
+      can_decrement?: boolean
+      can_set_value?: boolean
+      can_expand?: boolean
+      can_collapse?: boolean
+      can_scroll_into_view?: boolean
+      onClick?: (payload: unknown) => void
+      onSemanticAction?: (payload: SemanticActionPayload) => void
+      ref?: (node: NativeNode) => void
+      children?: Element | readonly Element[]
+    }
   }
 }

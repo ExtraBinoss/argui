@@ -59,6 +59,11 @@ impl ApplicationHandler<UserEvent> for MultiApplication {
                     let _ = batch.reply.send(Err("unknown native host window".into()));
                 }
             }
+            UserEvent::GpuCanvasReady(id) => {
+                for entry in self.windows.values_mut() {
+                    entry.runtime.gpu_canvas_ready(id);
+                }
+            }
             #[cfg(feature = "tasks")]
             UserEvent::TasksReady => self.tasks_ready(event_loop),
             #[cfg(all(feature = "webview", target_os = "linux"))]

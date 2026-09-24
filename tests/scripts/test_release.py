@@ -182,7 +182,7 @@ class ReleasePolicyTests(unittest.TestCase):
         packages = [
             package('argui-host', 'argui-render', 'argui-ui'),
             package('argui-ui', 'argui-core'),
-            package('argui-image', 'argui-core'),
+            package('argui-media', 'argui-core'),
             package('argui-render', 'argui-core'),
             package('argui-core'),
         ]

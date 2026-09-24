@@ -11,7 +11,8 @@ use argui_core::Rect;
 use argui_paint::{GpuCanvasId, RenderObjectId};
 
 pub use registry::{
-    GpuCanvasRegistration, GpuCanvasRegistry, GpuCanvasRegistryError, GpuCanvasRequirements,
+    GpuCanvasMailbox, GpuCanvasRegistration, GpuCanvasRegistry, GpuCanvasRegistryError,
+    GpuCanvasRequirements,
 };
 
 /// Error explicitly returned by an application GPU-canvas factory or renderer.

@@ -60,6 +60,7 @@ impl std::fmt::Display for AssetKey {
 pub struct AssetRevision(u64);
 
 impl AssetRevision {
+    #[cfg(feature = "media")]
     pub(crate) const INITIAL: Self = Self(1);
 
     /// Returns the numeric revision used by development protocols and caches.
@@ -68,6 +69,7 @@ impl AssetRevision {
         self.0
     }
 
+    #[cfg(feature = "media")]
     pub(crate) fn next(self, key: &AssetKey) -> Result<Self, AssetRegistryError> {
         self.0
             .checked_add(1)

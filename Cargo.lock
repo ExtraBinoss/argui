@@ -246,18 +246,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "argui-assets"
-version = "0.3.2"
-dependencies = [
- "argui-core",
- "argui-image",
- "argui-paint",
- "argui-vector",
- "image",
- "thiserror 2.0.20",
-]
-
-[[package]]
 name = "argui-core"
 version = "0.3.2"
 
@@ -297,15 +285,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "argui-image"
-version = "0.3.2"
-dependencies = [
- "argui-paint",
- "image",
- "thiserror 2.0.20",
-]
-
-[[package]]
 name = "argui-inspect"
 version = "0.3.2"
 dependencies = [
@@ -332,6 +311,17 @@ dependencies = [
  "argui-ui",
  "taffy",
  "web-time",
+]
+
+[[package]]
+name = "argui-media"
+version = "0.3.2"
+dependencies = [
+ "argui-core",
+ "argui-paint",
+ "image",
+ "thiserror 2.0.20",
+ "usvg",
 ]
 
 [[package]]
@@ -443,10 +433,10 @@ name = "argui-schema"
 version = "0.3.2"
 dependencies = [
  "argui-animation",
- "argui-assets",
  "argui-core",
  "argui-effects",
  "argui-layout",
+ "argui-media",
  "argui-paint",
  "argui-text",
  "argui-ui",
@@ -511,16 +501,6 @@ dependencies = [
  "tar",
  "tempfile",
  "thiserror 2.0.20",
-]
-
-[[package]]
-name = "argui-vector"
-version = "0.3.2"
-dependencies = [
- "argui-core",
- "argui-paint",
- "thiserror 2.0.20",
- "usvg",
 ]
 
 [[package]]

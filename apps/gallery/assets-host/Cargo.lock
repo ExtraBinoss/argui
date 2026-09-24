@@ -221,17 +221,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "argui-assets"
-version = "0.3.2"
-dependencies = [
- "argui-core",
- "argui-image",
- "argui-paint",
- "argui-vector",
- "thiserror 2.0.20",
-]
-
-[[package]]
 name = "argui-core"
 version = "0.3.2"
 
@@ -248,10 +237,9 @@ dependencies = [
 name = "argui-gallery-assets"
 version = "0.3.2"
 dependencies = [
- "argui-image",
+ "argui-media",
  "argui-paint",
  "argui-runtime",
- "argui-vector",
 ]
 
 [[package]]
@@ -260,15 +248,6 @@ version = "0.3.2"
 dependencies = [
  "argui-schema",
  "argui-ui",
- "thiserror 2.0.20",
-]
-
-[[package]]
-name = "argui-image"
-version = "0.3.2"
-dependencies = [
- "argui-paint",
- "image",
  "thiserror 2.0.20",
 ]
 
@@ -290,6 +269,17 @@ dependencies = [
  "argui-text",
  "argui-ui",
  "taffy",
+]
+
+[[package]]
+name = "argui-media"
+version = "0.3.2"
+dependencies = [
+ "argui-core",
+ "argui-paint",
+ "image",
+ "thiserror 2.0.20",
+ "usvg",
 ]
 
 [[package]]
@@ -374,9 +364,9 @@ name = "argui-schema"
 version = "0.3.2"
 dependencies = [
  "argui-animation",
- "argui-assets",
  "argui-core",
  "argui-effects",
+ "argui-media",
  "argui-paint",
  "argui-text",
  "argui-ui",
@@ -423,16 +413,6 @@ dependencies = [
  "taffy",
  "unicode-segmentation",
  "web-time",
-]
-
-[[package]]
-name = "argui-vector"
-version = "0.3.2"
-dependencies = [
- "argui-core",
- "argui-paint",
- "thiserror 2.0.20",
- "usvg",
 ]
 
 [[package]]
@@ -3476,6 +3456,7 @@ dependencies = [
  "thiserror 2.0.20",
  "wgpu-core-deps-apple",
  "wgpu-core-deps-emscripten",
+ "wgpu-core-deps-wasm",
  "wgpu-core-deps-windows-linux-android",
  "wgpu-hal",
  "wgpu-naga-bridge",
@@ -3496,6 +3477,15 @@ name = "wgpu-core-deps-emscripten"
 version = "30.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d98b86cf4abf524a902dd35f18ca6a3f08fc2ae9847c8f10b48e30491b1f0b86"
+dependencies = [
+ "wgpu-hal",
+]
+
+[[package]]
+name = "wgpu-core-deps-wasm"
+version = "30.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d260ca2ca8adc654f513a869bf3cac0b47f5b8d3f87803d6942015f8de597aae"
 dependencies = [
  "wgpu-hal",
 ]

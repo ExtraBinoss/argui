@@ -3,10 +3,10 @@
 use std::sync::mpsc::Sender;
 
 use argui_host::Operation;
-use argui_paint::{ImageAsset, VectorAsset};
+use argui_paint::{GpuCanvasId, ImageAsset, VectorAsset};
 use argui_platform::WindowKey;
-use argui_render::{DamageTracking, EffectRegistry};
-use argui_schema::{AssetHandle, SchemaValue};
+use argui_render::{DamageTracking, EffectRegistry, GpuCanvasRegistry};
+use argui_schema::{AssetHandle, SchemaValue, builtin};
 use argui_ui::{TreeUpdate, UiEventKind};
 
 use crate::CallbackDelivery;
@@ -49,6 +49,41 @@ pub fn validate_native_host_assets(
             };
             if !registered {
                 return Err(format!("unregistered native asset {handle:?}"));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Rejects native viewport IDs absent from the renderer's validated registry.
+///
+/// `operations` is an uncommitted native transaction; `canvases` contains the
+/// registrations installed in the target renderer. Missing or malformed IDs
+/// are rejected before the host tree can change.
+///
+/// # Errors
+///
+/// Returns the first invalid or unregistered canvas identity.
+pub fn validate_native_host_canvases(
+    operations: &[Operation],
+    canvases: &GpuCanvasRegistry,
+) -> Result<(), String> {
+    for operation in operations {
+        if let Operation::SetProperty {
+            property,
+            value: Some(value),
+            ..
+        } = operation
+            && *property == builtin::CANVAS_ID
+        {
+            let SchemaValue::Int(raw) = value else {
+                return Err("invalid native canvas identity".into());
+            };
+            let Some(id) = u64::try_from(*raw).ok().and_then(GpuCanvasId::from_raw) else {
+                return Err("invalid native canvas identity".into());
+            };
+            if canvases.get(id).is_none() {
+                return Err(format!("unregistered native canvas {}", id.get()));
             }
         }
     }

@@ -19,9 +19,11 @@ mod container;
 mod flickable;
 mod focus_scope;
 mod focus_scope_parse;
+mod gpu_canvas;
 mod key_binding;
 mod layout;
 mod loop_motion;
+#[cfg(feature = "media")]
 mod media;
 mod path;
 mod popup_window;
@@ -48,6 +50,7 @@ pub const POPUP_WINDOW: NativeTypeId = NativeTypeId::from_raw(18);
 pub const FLICKABLE: NativeTypeId = NativeTypeId::from_raw(19);
 pub const VIRTUAL_WINDOW: NativeTypeId = NativeTypeId::from_raw(20);
 pub const GRID: NativeTypeId = NativeTypeId::from_raw(21);
+pub const GPU_CANVAS: NativeTypeId = NativeTypeId::from_raw(22);
 
 pub const CHILDREN: SlotId = SlotId::from_raw(1);
 pub const KEY: PropertyId = PropertyId::from_raw(1);
@@ -235,6 +238,9 @@ pub const SEMANTIC_MODAL: PropertyId = PropertyId::from_raw(229);
 pub const SEMANTIC_HAS_POPUP: PropertyId = PropertyId::from_raw(230);
 pub const SEMANTIC_SORT: PropertyId = PropertyId::from_raw(231);
 pub const ALT: PropertyId = PropertyId::from_raw(232);
+pub const CANVAS_ID: PropertyId = PropertyId::from_raw(233);
+pub const CANVAS_REVISION: PropertyId = PropertyId::from_raw(234);
+pub const RESOLUTION_SCALE: PropertyId = PropertyId::from_raw(235);
 pub const MAX_DIGITS: PropertyId = PropertyId::from_raw(116);
 pub const MOUSE_GLOBAL_X: PropertyId = PropertyId::from_raw(117);
 pub const MOUSE_GLOBAL_Y: PropertyId = PropertyId::from_raw(118);
@@ -325,6 +331,7 @@ pub fn registry() -> Result<SchemaRegistry, SchemaError> {
     touch_area::register(&mut registry)?;
     focus_scope::register(&mut registry)?;
     path::register(&mut registry)?;
+    gpu_canvas::register(&mut registry)?;
     flickable::register(&mut registry)?;
     key_binding::register(&mut registry)?;
     popup_window::register(&mut registry)?;
@@ -526,6 +533,7 @@ pub fn registry() -> Result<SchemaRegistry, SchemaError> {
         )
     })?;
     text_editor::register(&mut registry)?;
+    #[cfg(feature = "media")]
     media::register(&mut registry)?;
     virtual_window::register(&mut registry)?;
     registry.enable_builtin_accessibility()?;

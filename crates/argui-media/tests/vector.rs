@@ -1,4 +1,4 @@
-use argui_vector::VectorLibrary;
+use argui_media::VectorLibrary;
 
 const ICON: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><path fill="none" stroke="white" stroke-width="2" d="M9 6l6 6l-6 6"/></svg>"#;
 

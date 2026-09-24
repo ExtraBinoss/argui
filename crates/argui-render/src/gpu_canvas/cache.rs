@@ -35,8 +35,8 @@ pub(crate) struct CacheEntry {
     nearest: wgpu::BindGroup,
     extent: CanvasExtent,
     last_used: u64,
-    attempted_revision: Option<u64>,
-    rendered_revision: Option<u64>,
+    attempted_revision: Option<u128>,
+    rendered_revision: Option<u128>,
 }
 
 impl CacheEntry {
@@ -54,18 +54,18 @@ impl CacheEntry {
     }
 
     /// Returns whether `revision` has not yet been attempted for this exact target.
-    pub fn needs_render(&self, revision: u64) -> bool {
+    pub fn needs_render(&self, revision: u128) -> bool {
         self.attempted_revision != Some(revision)
     }
 
     /// Records `revision` as the valid pixels currently stored in the target.
-    pub fn mark_success(&mut self, revision: u64) {
+    pub fn mark_success(&mut self, revision: u128) {
         self.attempted_revision = Some(revision);
         self.rendered_revision = Some(revision);
     }
 
     /// Records a failed `revision` so an unchanged frame does not retry it.
-    pub fn mark_failure(&mut self, revision: u64) {
+    pub fn mark_failure(&mut self, revision: u128) {
         self.attempted_revision = Some(revision);
         self.rendered_revision = None;
     }

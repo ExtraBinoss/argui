@@ -3,12 +3,11 @@ members = [
     "crates/argui-accessibility",
     "crates/argui-android",
     "crates/argui-animation",
-    "crates/argui-assets",
     "crates/argui-core",
     "crates/argui-effects",
     "crates/argui-host",
     "crates/argui-i18n",
-    "crates/argui-image",
+    "crates/argui-media",
     "crates/argui-inspect",
     "crates/argui-ios",
     "crates/argui-layout",
@@ -23,7 +22,6 @@ members = [
     "crates/argui-theme",
     "crates/argui-ui",
     "crates/argui-updater",
-    "crates/argui-vector",
     "crates/argui-webview",
 ]
 resolver = "3"
@@ -40,13 +38,12 @@ readme = "README.md"
 [workspace.dependencies]
 argui-android = { path = "crates/argui-android", version = "0.3.2" }
 argui-accessibility = { path = "crates/argui-accessibility", version = "0.3.2" }
-argui-assets = { path = "crates/argui-assets", version = "0.3.2" }
 argui-animation = { path = "crates/argui-animation", version = "0.3.2" }
 argui-core = { path = "crates/argui-core", version = "0.3.2" }
 argui-effects = { path = "crates/argui-effects", version = "0.3.2" }
 argui-host = { path = "crates/argui-host", version = "0.3.2" }
 argui-layout = { path = "crates/argui-layout", version = "0.3.2" }
-argui-image = { path = "crates/argui-image", version = "0.3.2" }
+argui-media = { path = "crates/argui-media", version = "0.3.2", default-features = false }
 argui-i18n = { path = "crates/argui-i18n", version = "0.3.2" }
 argui-ios = { path = "crates/argui-ios", version = "0.3.2" }
 argui-inspect = { path = "crates/argui-inspect", version = "0.3.2" }
@@ -61,7 +58,6 @@ argui-text = { path = "crates/argui-text", version = "0.3.2" }
 argui-theme = { path = "crates/argui-theme", version = "0.3.2" }
 argui-ui = { path = "crates/argui-ui", version = "0.3.2" }
 argui-updater = { path = "crates/argui-updater", version = "0.3.2" }
-argui-vector = { path = "crates/argui-vector", version = "0.3.2" }
 argui-webview = { path = "crates/argui-webview", version = "0.3.2" }
 
 bytemuck = { version = "=1.25.2", features = ["derive"] }

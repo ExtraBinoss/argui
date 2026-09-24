@@ -1,4 +1,11 @@
-use std::{collections::HashMap, fmt, sync::Arc};
+use std::{
+    collections::HashMap,
+    fmt,
+    sync::{
+        Arc, Mutex, Weak,
+        atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
+    },
+};
 
 use argui_paint::GpuCanvasId;
 
@@ -65,11 +72,17 @@ impl GpuCanvasRequirements {
     }
 }
 
+type CanvasWake = Arc<dyn Fn(GpuCanvasId) + Send + Sync>;
+
 struct RegistrationInner {
     id: GpuCanvasId,
     label: String,
     factory: Arc<dyn GpuCanvasFactory>,
     requirements: GpuCanvasRequirements,
+    native_revision: AtomicU64,
+    active_surfaces: AtomicUsize,
+    wake_pending: AtomicBool,
+    wake: Mutex<Option<CanvasWake>>,
 }
 
 /// Cloneable GPU-canvas registration with stable process-local identity.
@@ -100,6 +113,10 @@ impl GpuCanvasRegistration {
             label: label.into(),
             factory: Arc::new(factory),
             requirements,
+            native_revision: AtomicU64::new(0),
+            active_surfaces: AtomicUsize::new(0),
+            wake_pending: AtomicBool::new(false),
+            wake: Mutex::new(None),
         }))
     }
 
@@ -121,6 +138,68 @@ impl GpuCanvasRegistration {
         &self.0.requirements
     }
 
+    /// Marks newer application-owned pixels ready for the mounted canvas.
+    ///
+    /// The producer can keep its newest frame in a one-slot mailbox; this method
+    /// passes no pixels through JavaScript and coalesces redraw wakeups. An
+    /// unmounted canvas retains the revision without waking an idle window.
+    pub fn invalidate(&self) {
+        self.0.native_revision.fetch_add(1, Ordering::AcqRel);
+        if self.0.active_surfaces.load(Ordering::Acquire) == 0
+            || self.0.wake_pending.swap(true, Ordering::AcqRel)
+        {
+            return;
+        }
+        if let Some(wake) = self
+            .0
+            .wake
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .as_ref()
+        {
+            wake(self.id());
+        }
+    }
+
+    /// Returns whether at least one renderer surface currently displays this canvas.
+    #[must_use]
+    pub fn is_mounted(&self) -> bool {
+        self.0.active_surfaces.load(Ordering::Acquire) > 0
+    }
+
+    /// Returns the current native frame revision for retained texture caching.
+    #[must_use]
+    pub(crate) fn native_revision(&self) -> u64 {
+        self.0.native_revision.load(Ordering::Acquire)
+    }
+
+    /// Records that one renderer surface now displays this registration.
+    pub(crate) fn activate(&self) {
+        self.0.active_surfaces.fetch_add(1, Ordering::AcqRel);
+    }
+
+    /// Records that one renderer surface no longer displays this registration.
+    pub(crate) fn deactivate(&self) {
+        self.0.active_surfaces.fetch_sub(1, Ordering::AcqRel);
+    }
+
+    /// Clears a coalesced wake before the renderer snapshots the revision.
+    pub(crate) fn begin_frame(&self) {
+        self.0.wake_pending.store(false, Ordering::Release);
+    }
+
+    /// Installs the native event-loop callback that wakes a mounted canvas.
+    ///
+    /// The callback receives the registered canvas ID and must schedule a
+    /// retained paint frame. Replacing it when a window closes is allowed.
+    pub fn set_wake(&self, wake: impl Fn(GpuCanvasId) + Send + Sync + 'static) {
+        *self
+            .0
+            .wake
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(Arc::new(wake));
+    }
+
     /// Returns the immutable application factory owned by this registration.
     pub(crate) fn factory(&self) -> &dyn GpuCanvasFactory {
         self.0.factory.as_ref()
@@ -129,6 +208,94 @@ impl GpuCanvasRegistration {
     /// Returns whether `other` is a clone of this exact registration.
     fn same_registration(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.0, &other.0)
+    }
+}
+
+struct MailboxInner<T> {
+    latest: Mutex<Option<T>>,
+    registration: Mutex<Weak<RegistrationInner>>,
+}
+
+/// One-slot native frame mailbox for an application-owned canvas producer.
+///
+/// The producer and GPU callback each keep a clone. Publishing replaces an
+/// unconsumed frame and wakes the mounted canvas at most once before its next
+/// render. The payload never enters a JavaScript transaction.
+pub struct GpuCanvasMailbox<T>(Arc<MailboxInner<T>>);
+
+impl<T> Clone for GpuCanvasMailbox<T> {
+    fn clone(&self) -> Self {
+        Self(Arc::clone(&self.0))
+    }
+}
+
+impl<T> Default for GpuCanvasMailbox<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<T> GpuCanvasMailbox<T> {
+    /// Creates an empty, unbound mailbox with capacity for one frame.
+    #[must_use]
+    pub fn new() -> Self {
+        Self(Arc::new(MailboxInner {
+            latest: Mutex::new(None),
+            registration: Mutex::new(Weak::new()),
+        }))
+    }
+
+    /// Binds this mailbox to `registration` after the factory has been created.
+    ///
+    /// The mailbox retains a weak registration reference, so a factory may own
+    /// a clone of the mailbox without creating a reference cycle.
+    pub fn bind(&self, registration: &GpuCanvasRegistration) {
+        *self
+            .0
+            .registration
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Arc::downgrade(&registration.0);
+    }
+
+    /// Replaces the pending frame and signals the registered native viewport.
+    ///
+    /// Returns the displaced unconsumed frame, if any. The caller may recycle
+    /// its backing storage instead of allocating for every decoded frame.
+    pub fn publish(&self, frame: T) -> Option<T> {
+        let displaced = self
+            .0
+            .latest
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .replace(frame);
+        if let Some(registration) = self
+            .0
+            .registration
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .upgrade()
+        {
+            GpuCanvasRegistration(registration).invalidate();
+        }
+        displaced
+    }
+
+    /// Takes the newest pending frame for the GPU callback, if present.
+    pub fn take(&self) -> Option<T> {
+        self.0
+            .latest
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .take()
+    }
+
+    /// Drops the pending frame when playback stops or the viewport unmounts.
+    pub fn clear(&self) {
+        self.0
+            .latest
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .take();
     }
 }
 
@@ -245,8 +412,11 @@ impl GpuCanvasRegistry {
         &self.registrations
     }
 
-    /// Finds the registration for opaque `id`, if the registry contains it.
-    pub(crate) fn get(&self, id: GpuCanvasId) -> Option<&GpuCanvasRegistration> {
+    /// Finds the registration for opaque `id`, if this validated registry contains it.
+    ///
+    /// `id` may originate from a native host transaction; an unknown ID
+    /// returns `None` and must not be rendered.
+    pub fn get(&self, id: GpuCanvasId) -> Option<&GpuCanvasRegistration> {
         self.registrations
             .binary_search_by_key(&id, GpuCanvasRegistration::id)
             .ok()

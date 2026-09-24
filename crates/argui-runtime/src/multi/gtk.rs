@@ -107,6 +107,11 @@ pub(crate) fn launch(mut application: MultiApplication) -> Result<(), RuntimeErr
             Event::UserEvent(UserEvent::ModelsReady) => {
                 application.models_ready(&context);
             }
+            Event::UserEvent(UserEvent::GpuCanvasReady(id)) => {
+                for entry in application.windows.values_mut() {
+                    entry.runtime.gpu_canvas_ready(id);
+                }
+            }
             Event::UserEvent(UserEvent::NativeInput { window }) => {
                 if let Some(entry) = application.windows.get_mut(&window) {
                     entry.runtime.gtk_pointer_boundary(&context);

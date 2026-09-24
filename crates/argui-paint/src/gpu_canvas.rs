@@ -11,6 +11,15 @@ pub struct GpuCanvasId(u64);
 static NEXT_GPU_CANVAS_ID: AtomicU64 = AtomicU64::new(1);
 
 impl GpuCanvasId {
+    /// Converts a nonzero process-local numeric identity received over the native host wire.
+    ///
+    /// `raw` must come from a registration in this process. A caller must still
+    /// check membership in its renderer's canvas registry before using the ID.
+    #[must_use]
+    pub const fn from_raw(raw: u64) -> Option<Self> {
+        if raw == 0 { None } else { Some(Self(raw)) }
+    }
+
     /// Allocates a process-local opaque GPU-canvas identity.
     ///
     /// Registrations normally call this on behalf of applications.
