@@ -5,8 +5,7 @@ use argui_ui::{
     ContainerQuery, ContainerScopeId, Element, FlexDirection, StylePatch, UiTree, length, percent,
 };
 
-const NOTO_SANS: &[u8] =
-    include_bytes!("../../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
+const NOTO_SANS: &[u8] = include_bytes!("../../../../assets/fonts/NotoSans-Regular.ttf");
 
 fn text_engine() -> TextEngine {
     TextEngine::from_embedded_fonts([NOTO_SANS], "Noto Sans", "Noto Sans", "Noto Sans")

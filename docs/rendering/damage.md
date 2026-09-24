@@ -49,11 +49,9 @@ let always_full = RendererConfig::default()
 The same policy can be changed later for an individual window:
 
 ```rust
-use argui::{
-    platform::WindowKey,
-    render::DamageTracking,
-    runtime::{AppCommand, Context},
-};
+use argui_platform::WindowKey;
+use argui_render::DamageTracking;
+use argui_runtime::{AppCommand, Context};
 
 fn use_full_frames<App: 'static>(cx: &mut Context<App>) {
     cx.command(AppCommand::SetDamageTracking {
@@ -76,7 +74,7 @@ The runtime inspector forwards the repainted count as `damaged_pixels`.
 
 ## Live comparison
 
-Open **Examples → Damage control** in the Widget Gallery to compare the real
+Open **Damage Control** in the native TSX gallery to compare the real
 renderer paths without changing the workload. The **Auto** tab uses the default
 adaptive policy; **Off** forces full-surface redraws. Switching tabs invalidates
 the retained root once, clears the rolling sample window, and then reports:

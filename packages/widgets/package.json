@@ -1,0 +1,16 @@
+{
+  "name": "@argui/widgets",
+  "version": "0.3.2",
+  "type": "module",
+  "exports": {
+    "./react": "./src/react/index.ts",
+    "./solid": "./src/solid/index.ts"
+  },
+  "dependencies": {
+    "@argui/host": "workspace:*",
+    "@argui/react": "workspace:*",
+    "@argui/solid": "workspace:*",
+    "react": "19.2.0",
+    "solid-js": "1.9.15"
+  }
+}

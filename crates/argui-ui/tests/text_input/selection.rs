@@ -39,15 +39,7 @@ fn word_drag_expands_in_both_directions_and_stops_on_release() {
 
 #[test]
 fn triple_click_and_drag_select_complete_lines_including_the_newline() {
-    let (mut ui, region) = with_region(UiTree::new(
-        TextArea::new(
-            "field",
-            "one\ntwo\nthree",
-            "",
-            InputStyle::new(PaintStyle::default(), TextStyle::default()),
-        )
-        .build(),
-    ));
+    let (mut ui, region) = with_region(UiTree::new(multiline_field("one\ntwo\nthree", "")));
     let node = region.node;
     ui.begin_text_selection(node, position(5), false, Line);
     assert_eq!(ui.text_input_selection(node), Some((4, 8)));
@@ -81,7 +73,8 @@ fn readonly_is_selectable_password_words_are_private_and_composition_is_untouche
     assert_eq!(ui.text_input_selection(region.node), Some((4, 7)));
     assert!(!ui.paste_text(Some(region.node), "changed").layout_changed);
 
-    let (mut ui, region) = filtered_tree("one 👩‍🚀", InputKind::Password);
+    let (mut ui, region) =
+        editor_with_privacy("one 👩‍🚀", TextInputFilter::Any, TextPrivacy::Password);
     ui.begin_text_selection(region.node, position(3), false, Word);
     assert_eq!(ui.text_input_selection(region.node), Some((0, 15)));
     focus(&mut ui, &region);

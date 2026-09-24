@@ -1,90 +1,30 @@
 # Animation
 
-`argui::animation` provides typed timelines, keyframes, motion and physics on
-native and WASM. The runtime supplies one monotonic frame clock; an idle
+`argui-animation` provides typed timelines, keyframes, motion and physics on
+native and WebAssembly. The runtime supplies one monotonic frame clock; an idle
 application requests no animation frames.
 
-Argui exposes four layers. Start with the first one and move down only when the
-interaction needs more control:
-
-1. `AnimatedOpacity` and `AnimatedContainer` animate target changes implicitly.
-2. `Motion<T>` gives application code pause, retarget and spring control.
-3. `Timeline<T>` and `Keyframes<T>` describe multi-stage playback.
-4. `Spring`, `Decay`, `Inertia`, schedules and composition build physical or
-   coordinated systems.
+`argui-ui` binds animation values to typed properties with `Element::bind`.
 
 ## Five-minute start
 
-Enable `widget-implicit-animation` on the `argui` facade, or
-`implicit-animation` when depending on `argui-widgets` directly.
-
-```toml
-argui = { version = "0.3.2", features = ["widget-implicit-animation"] }
-```
-
-### Fade a complete subtree
-
-Rebuild the same keyed element with a different target opacity. The first build
-is immediate; every later change begins at the value currently on screen.
+Create a motion, set its target, and bind it to a retained element property:
 
 ```rust
-use argui::{
-    animation::{Duration, curves},
-    ui::Element,
-    widgets::AnimatedOpacity,
-};
+use argui_animation::{Duration, Motion, Tween};
+use argui_ui::{Element, property};
 
-fn details(visible: bool) -> Element {
-    AnimatedOpacity::new(
-        "details-fade",
-        if visible { 1.0 } else { 0.0 },
-        Element::text("Saved locally"),
-    )
-    .duration(Duration::from_millis(220))
-    .curve(curves::EASE_OUT)
-    .build()
-}
+let opacity = Motion::new(1.0_f32);
+opacity.animate_to(0.4, Tween::new(Duration::from_millis(240)));
+let panel = Element::container([])
+    .opacity(1.0)
+    .bind(property::LayerOpacity, opacity);
 ```
 
-`AnimatedOpacity` uses group opacity, so the element and all descendants fade
-together. Opacity does not change hit testing or semantics. Disable interaction
-or hide semantics explicitly when invisible content must be inert.
-
-### Animate a container
-
-Compatible values animate together. This example changes layout, paint and
-corner geometry without maintaining an animation controller in the model.
-
-```rust
-use argui::{
-    animation::{Duration, curves},
-    core::Color,
-    paint::CornerRadii,
-    ui::{Element, length},
-    widgets::AnimatedContainer,
-};
-
-fn project_card(expanded: bool) -> Element {
-    AnimatedContainer::new("project-card", [Element::text("Argui")])
-        .width(length(if expanded { 320.0 } else { 180.0 }))
-        .height(length(if expanded { 150.0 } else { 72.0 }))
-        .background(if expanded {
-            Color::srgb(0.55, 0.30, 0.96)
-        } else {
-            Color::srgb(0.18, 0.48, 0.98)
-        })
-        .radius(CornerRadii::all(if expanded { 28.0 } else { 12.0 }))
-        .duration(Duration::from_millis(420))
-        .curve(curves::EMPHASIZED)
-        .build()
-}
-```
-
-Pixels interpolate with pixels and percentages with percentages. Switching
-between incompatible units, gradient kinds or other discrete representations
-snaps safely instead of inventing an ambiguous interpolation. Use
-`AnimatedContainer::from_element` or `configure` when row, column, grid or
-advanced element configuration is required.
+Retargeting starts from the currently presented value; spring drivers also
+preserve velocity. Group opacity changes do not change hit testing or semantics,
+so disable interaction or hide semantics separately when invisible content
+must be inert.
 
 ## Curves
 
@@ -93,11 +33,7 @@ The `curves` module includes `LINEAR`, `EASE_IN`, `EASE_OUT`, `EASE_IN_OUT`,
 curve implements one small trait. Input is normalized; output may overshoot.
 
 ```rust
-use argui::{
-    animation::{Curve, Easing},
-    ui::Element,
-    widgets::AnimatedOpacity,
-};
+use argui_animation::{Curve, Easing};
 
 struct Anticipate;
 
@@ -109,10 +45,6 @@ impl Curve for Anticipate {
 
 let easing = Easing::curve(Anticipate);
 assert!(easing.sample(0.25) < 0.0);
-
-let _element = AnimatedOpacity::new("notice", 1.0, Element::text("Ready"))
-    .curve(Anticipate)
-    .build();
 ```
 
 Springs intentionally remain separate from curves. A spring carries velocity
@@ -136,22 +68,13 @@ Explicit `Element::bind` motions have final precedence over implicit style
 transitions. This makes it safe to give one property direct application control
 while the remaining container values animate implicitly.
 
-## Gallery cookbook
+## Gallery example
 
-The Widget Gallery's **Animation laboratory** contains twenty live examples:
-
-| Group | Examples |
-| --- | --- |
-| Implicit | subtree opacity; size; color and radius; padding and gap; composed transform; border and shadow; interrupted retargeting |
-| Keyframes | typed multi-property morph; multiple stops; holds; steps; alternate direction; stagger schedule |
-| Physics | analytical spring; bounded inertia; velocity-preserving retarget; squash and stretch |
-| Composition | additive tracks; a user-defined `Curve`; synchronized layer, glow and compositor properties |
-
-The laboratory starts all twenty examples automatically and loops them forever.
-Use **Stop animations** to pause the shared clock, then **Run animations** to
-resume from the same phase. Enabling the platform reduced-motion preference
-snaps every example to its destination and returns the application to an idle
-frame schedule.
+The Solid/React TSX gallery's **Animation Lab** demonstrates native loops,
+implicit transitions, composition, spring retargeting and held keyframes. Its
+current source is [`animation-lab.tsx`](../../apps/gallery/src/animation-lab.tsx);
+gallery build and hot-reload instructions are in the
+[gallery README](../../apps/gallery/README.md).
 
 ## Ownership and scheduling
 
@@ -188,10 +111,8 @@ layout dimensions, scroll offsets, layers, shadows, gradients or effect paramete
 Retargeting starts at the presented value; springs also preserve velocity.
 
 ```rust
-use argui::{
-    animation::{Duration, Motion, Tween},
-    ui::{Element, property},
-};
+use argui_animation::{Duration, Motion, Tween};
+use argui_ui::{Element, property};
 
 let opacity = Motion::new(1.0_f32);
 opacity.animate_to(0.4, Tween::new(Duration::from_millis(240)));
@@ -203,44 +124,6 @@ let panel = Element::container([])
 `Schedule`, `ScheduleBuilder` and `Cue` compose sequences, parallel groups,
 dependencies and staggered timing. Typed `Contribution<T>` values resolve replace,
 add and accumulate composition in stable `(priority, order)` order.
-
-## Animated text
-
-Enable `widget-animated-text` on `argui` (or `animated-text` on `argui-widgets`).
-`AnimatedText` animates only changing Unicode graphemes: `10 → 11` keeps the
-first digit still. `TextAnimation::Roll` passes through intermediate digits,
-`Slide` moves directly to the next character, and `Fade` crossfades both
-characters at the same baseline, without a blank midpoint.
-The **Animated text** gallery page demonstrates all three, carries and reversals.
-
-```rust
-use argui::{runtime::Entity, widgets::AnimatedText};
-
-let count = Entity::new(AnimatedText::new("count", "10").font_size(32.0));
-// In a parent Render implementation: cx.entity(&count)
-count.update(|text, cx| {
-    text.set_text("11");
-    cx.notify();
-});
-```
-
-The default duration is 420 ms with cubic ease-out and right-aligned character
-positions; use `align_end(false)` for labels. `text_style` replaces the default
-theme-colored monospace style; `font_size` sizes that default style. The widget
-is single-line and aligns grapheme positions, without parsing locale-specific
-number formatting. Updates during a transition coalesce into the latest target
-for the following transition; toggling a fade back reverses its current opacity
-immediately. Mounted entities honor reduced motion automatically;
-manual hosts can use `set_reduced_motion`, `advance` and `build`.
-
-Digit substitutions reuse layout; appearing, disappearing and nonnumeric columns
-interpolate their measured widths during the transition. This prevents the final
-horizontal jump on `100 → 99` and accommodates proportional status labels.
-Fades change text alpha directly without allocating effect layers per glyph.
-Unchanged columns are shared, completed reels are released, and idle entities
-request no frames. One accessible text node exposes the requested value; intermediate
-digits are hidden. `unicode-segmentation` is an optional dependency owned by
-this widget to keep combining characters and emoji intact.
 
 ## Physics
 
@@ -275,6 +158,5 @@ See [preferences](interaction.md#system-preferences) and
 
 Explicit layout-property animation is supported. Captured before/after geometry
 transitions for insertion, removal and reordering remain in the
-[roadmap](../roadmap.md). The Widget Gallery's
-[Motion Lab](../../crates/argui-widget-gallery/src/pages/motion.rs) and
+[roadmap](../roadmap.md). The
 [animation tests](../../crates/argui-animation/tests/) exercise the current API.

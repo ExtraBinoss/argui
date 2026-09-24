@@ -169,7 +169,7 @@ class ReleasePolicyTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, 'must be path-only'):
                     release.workspace()
 
-    def test_publication_order_follows_dependencies_and_keeps_facade_last(self):
+    def test_publication_order_follows_dependencies(self):
         def package(name, *dependencies):
             return {
                 'name': name,
@@ -180,29 +180,32 @@ class ReleasePolicyTests(unittest.TestCase):
             }
 
         packages = [
-            package('argui', 'argui-render', 'argui-widgets'),
-            package('argui-widgets', 'argui-core'),
+            package('argui-host', 'argui-render', 'argui-ui'),
+            package('argui-ui', 'argui-core'),
             package('argui-image', 'argui-core'),
             package('argui-render', 'argui-core'),
             package('argui-core'),
         ]
         order = release.publication_order(packages)
         self.assertLess(order.index('argui-core'), order.index('argui-render'))
-        self.assertLess(order.index('argui-core'), order.index('argui-widgets'))
-        self.assertEqual(order[-1], 'argui')
+        self.assertLess(order.index('argui-core'), order.index('argui-ui'))
+        self.assertLess(order.index('argui-ui'), order.index('argui-host'))
+        self.assertLess(order.index('argui-render'), order.index('argui-host'))
 
-    def test_publication_order_rejects_cycles_and_facade_dependents(self):
+    def test_publication_order_rejects_cycles_and_allows_dependents(self):
         dependency = lambda name: {'name': name, 'path': f'../{name}', 'kind': None}
         with self.assertRaises(ValueError):
             release.publication_order([
                 {'name': 'argui-a', 'dependencies': [dependency('argui-b')]},
                 {'name': 'argui-b', 'dependencies': [dependency('argui-a')]},
             ])
-        with self.assertRaises(ValueError):
+        self.assertEqual(
             release.publication_order([
-                {'name': 'argui', 'dependencies': []},
-                {'name': 'argui-extension', 'dependencies': [dependency('argui')]},
-            ])
+                {'name': 'argui-ui', 'dependencies': []},
+                {'name': 'argui-extension', 'dependencies': [dependency('argui-ui')]},
+            ]),
+            ['argui-ui', 'argui-extension'],
+        )
 
     def test_package_verifies_every_archive_in_publication_order(self):
         names = ['argui-core', 'argui-render', 'argui']

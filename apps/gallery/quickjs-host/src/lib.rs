@@ -1,15 +1,14 @@
 //! Embedded QuickJS execution for the runtime-neutral gallery module.
 
-mod comparison;
 mod delivery;
 mod effects;
 mod hot_reload;
+mod i18n;
 mod native_metrics;
 mod runner;
 mod telemetry;
 mod wire;
 
-pub use comparison::AnimationSnapshot;
 pub use delivery::{coalesce_virtual_windows, ui_event_payload};
 pub use effects::registry_from_json;
 pub use native_metrics::{parse_control, profile_json};
@@ -21,7 +20,7 @@ pub use runner::run_desktop;
 argui_android::android_main!(runner::run_android);
 
 use rquickjs::{CaughtError, Context, Function, Module, Object, Runtime};
-use std::time::Duration;
+use std::{cell::RefCell, rc::Rc, time::Duration};
 
 /// A gallery session with its own QuickJS runtime and pending-job queue.
 pub struct QuickJsGallery {
@@ -64,6 +63,7 @@ impl QuickJsGallery {
     ) -> Result<Self, String> {
         let runtime = Runtime::new().map_err(js_error)?;
         let context = Context::full(&runtime).map_err(js_error)?;
+        let i18n = Rc::new(RefCell::new(i18n::NativeI18n::default()));
         context.with(|ctx| {
             let globals = ctx.globals();
             globals
@@ -82,6 +82,35 @@ impl QuickJsGallery {
                 .set(
                     "__arguiControl",
                     Function::new(ctx.clone(), control).map_err(js_error)?,
+                )
+                .map_err(js_error)?;
+            let loader = Rc::clone(&i18n);
+            globals
+                .set(
+                    "__arguiI18nLoad",
+                    Function::new(ctx.clone(), move |json: String| {
+                        loader.borrow_mut().load(&json)
+                    })
+                    .map_err(js_error)?,
+                )
+                .map_err(js_error)?;
+            let selector = Rc::clone(&i18n);
+            globals
+                .set(
+                    "__arguiI18nSelect",
+                    Function::new(ctx.clone(), move |locale: String| {
+                        selector.borrow_mut().select(&locale)
+                    })
+                    .map_err(js_error)?,
+                )
+                .map_err(js_error)?;
+            globals
+                .set(
+                    "__arguiI18nTr",
+                    Function::new(ctx.clone(), move |id: String, args: String| {
+                        i18n.borrow().translate(&id, &args)
+                    })
+                    .map_err(js_error)?,
                 )
                 .map_err(js_error)?;
             let _: () = ctx.eval(include_str!("bootstrap.js")).map_err(js_error)?;

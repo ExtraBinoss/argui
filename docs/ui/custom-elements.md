@@ -26,31 +26,14 @@ without changing the corresponding revision violates the invalidation contract.
 State is not application data; a full layout-engine reset (including asset-metric
 replacement) can reconstruct it. Keep durable application data in an `Entity`.
 
-## Gallery example
+## Example: timeline ruler
 
-Open **Examples → Custom Timeline**. The consumer implementation is in
-[`pages/timeline.rs`](../../crates/argui-widget-gallery/src/pages/timeline.rs).
-The ruler is a custom container: it paints the grid and places ordinary Button
-children and accessible resize regions. The latter are implemented in
-[`timeline/regions.rs`](../../crates/argui-widget-gallery/src/pages/timeline/regions.rs).
-
-Drag a clip to move it, or its right handle to resize. Cancel a gesture to restore
-the edited dimension. Tab to
-a clip and use Left/Right to move it; Shift+Left/Right adjusts its duration.
-The duration buttons act on the selected clip. Zoom changes the intrinsic width;
-the viewport scrolls horizontally. Two timeline views observe the same render-free
-clip entity; their detail lists update together, while selection and zoom remain
-local to each view. Cancelling a drag restores its starting position without
-discarding a duration edit performed in the other view.
-
-Resize handles also support keyboard Left/Right, and accessible increment,
-decrement and numeric-value actions through the same model update. Non-finite
-values are rejected; edits are clamped to the timeline's duration.
-
-```sh
-cargo run -p argui-widget-gallery --all-features
-./scripts/serve-widget-gallery.sh
-```
+A timeline ruler is one use for a custom container: paint its grid, then place
+ordinary Argui controls and transparent custom regions for clip resizing. A
+clip region can handle drag, cancel, keyboard movement and accessible
+increment/decrement actions through the same model update. Keep selection and
+zoom in application state; expose the ruler's intrinsic width to layout so its
+viewport can scroll horizontally.
 
 ## Layout contract
 
@@ -113,9 +96,9 @@ DevTools includes these in custom-node summaries when requesting a snapshot;
 there is no continuous snapshot allocation with inspection inactive. Regions
 remain inspectable descendants with their own identities and bounds.
 
-Tests cover nested ordinary children, invalid layouts and recovery, duplicate
-identities, clipping/transforms, captured drags outside bounds, removal during a
-drag, semantic removal, shared presentations and cache counters. The gallery's
-`tests/pages/timeline.mjs` verifies Web execution and accessible actions. Inspect
-its saved captures using the [Linux testing procedure](../contributing/linux-testing.md);
-a successful interaction assertion alone does not establish visual correctness.
+The [custom layout tests](../../crates/argui-layout/tests/custom.rs) cover state
+lifetime, measurement and paint invalidation, invalid sizes, duplicate keys and
+retained GPU canvas slots. Check host-specific pointer, focus and accessibility
+behavior in the consuming application. Follow the [Linux testing procedure](../contributing/linux-testing.md)
+and inspect saved captures; a successful interaction assertion alone does not
+establish visual correctness.

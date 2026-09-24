@@ -6,10 +6,10 @@ use argui_text::{
     TextOverflow, TextScene, TextSpan, TextSpanStyle, TextStyle, TextWrap, UnderlineStyle,
 };
 
-const NOTO_SANS: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
-const NOTO_ARABIC: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSansArabic.ttf");
-const NOTO_HEBREW: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSansHebrew.ttf");
-const NOTO_EMOJI: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoEmoji-Regular.ttf");
+const NOTO_SANS: &[u8] = include_bytes!("../../../assets/fonts/NotoSans-Regular.ttf");
+const NOTO_ARABIC: &[u8] = include_bytes!("../../../assets/fonts/NotoSansArabic.ttf");
+const NOTO_HEBREW: &[u8] = include_bytes!("../../../assets/fonts/NotoSansHebrew.ttf");
+const NOTO_EMOJI: &[u8] = include_bytes!("../../../assets/fonts/NotoEmoji-Regular.ttf");
 
 fn bounds(x: f32, y: f32, width: f32, height: f32) -> Rect {
     Rect::new(Point::new(x, y), Size::new(width, height))

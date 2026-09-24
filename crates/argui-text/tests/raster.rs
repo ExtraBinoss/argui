@@ -1,7 +1,7 @@
 use argui_core::{Point, Rect, Size};
 use argui_text::{GlyphContent, TextBlock, TextEngine, TextScene};
 
-const FONT: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
+const FONT: &[u8] = include_bytes!("../../../assets/fonts/NotoSans-Regular.ttf");
 
 /// Creates one glyph in a scene large enough to test physical raster variants.
 fn scene(text: &str) -> TextScene {

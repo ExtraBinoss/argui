@@ -34,6 +34,11 @@ globalThis.__arguiTick = (now) => {
 }
 globalThis.__arguiDeliver = (json) => { subscriber?.(JSON.parse(json)) }
 globalThis.__arguiDeliverProfile = (json) => { profileSubscriber?.(JSON.parse(json)) }
+const i18nResponse = (json) => {
+  const response = JSON.parse(json)
+  if (response.error) throw new Error(response.error)
+  return response
+}
 globalThis.__arguiBridge = {
   contract: () => schema,
   commit: (operations) => {
@@ -61,5 +66,10 @@ globalThis.__arguiBridge = {
   subscribeProfile: (callback) => {
     profileSubscriber = callback
     return () => { if (profileSubscriber === callback) profileSubscriber = null }
+  },
+  i18n: {
+    load: (config) => i18nResponse(globalThis.__arguiI18nLoad(JSON.stringify(config))),
+    select: (locale) => i18nResponse(globalThis.__arguiI18nSelect(locale)),
+    tr: (id, args = {}) => i18nResponse(globalThis.__arguiI18nTr(id, JSON.stringify(args))).value,
   },
 }

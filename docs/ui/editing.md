@@ -137,8 +137,10 @@ constraints, reset behavior, and persistence.
 
 ## Examples and tests
 
-The Widget Gallery contains **Actions**, **Editing & Password**, and
-**Async tasks** examples. The browser scenario
-`crates/argui-widget-gallery/tests/pages/inputs.mjs` compares keyboard,
-selection, pointer, and overlay behavior with HTML controls. Run it through the
-[private display](../contributing/linux-testing.md).
+The Solid and React TSX gallery's **Input** page demonstrates native editing,
+search, disabled state, and submit validation in
+[`apps/gallery/src/inputs.tsx`](../../apps/gallery/src/inputs.tsx). Rust editor
+behavior is covered by the [text-input tests](../../crates/argui-ui/tests/text_input.rs)
+and the tests under `crates/argui-ui/tests/text_input/`. For GUI checks, follow
+the [private display procedure](../contributing/linux-testing.md) and inspect
+saved captures.

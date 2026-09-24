@@ -1,7 +1,6 @@
 /** @jsxImportSource @argui/react */
 import { useState, type ReactElement, type ReactNode } from 'react'
-import { ReactButton } from './react-controls'
-import type { Palette } from './theme'
+import { Button as ReactButton, type Palette } from '@argui/widgets/react'
 
 interface MotionCardProps {
   title: string

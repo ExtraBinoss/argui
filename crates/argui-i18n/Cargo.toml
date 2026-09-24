@@ -12,6 +12,7 @@ description = "Fluent localization and locale negotiation for Argui applications
 [dependencies]
 fluent-bundle.workspace = true
 fluent-langneg.workspace = true
+serde_json.workspace = true
 thiserror.workspace = true
 unic-langid.workspace = true
 

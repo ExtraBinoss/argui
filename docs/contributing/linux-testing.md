@@ -22,93 +22,56 @@ the Ubuntu packages.
 `ARGUI_TEST_MONITOR` changes the virtual monitor; the default is
 `1600x1200@60`.
 
-## Native application
+## Native TSX gallery
+
+The gallery uses Solid or React TSX, a Rust transaction host, and embedded
+QuickJS. Install the JS workspace dependencies once with `bun install`. Run
+the native gallery and keep it open while Vite watches for bundle changes:
 
 ```sh
-cargo build -p argui-widget-gallery --all-features
-./scripts/linux-hidden-display.sh \
-  timeout 15s target/debug/argui-widget-gallery
+./scripts/linux-hidden-display.sh ./scripts/gallery-hot-reload.sh desktop solid
+# Use react for the React adapter.
 ```
 
-Startup alone does not verify drawing or input. Use a scenario that saves PNGs
-or inspect a Wayland capture.
+The window runs until interrupted. The watcher rebuilds only the selected TSX
+bundle; successful updates are delivered to the running host. See the
+[gallery guide](../../apps/gallery/README.md#native-tsx-hot-reload) for the
+reload behavior and Android workflow.
 
-For native X11, let the helper create a private rootful Xwayland server:
+Run static and behavior checks without opening a window:
 
 ```sh
-ARGUI_TEST_BACKEND=x11 ./scripts/linux-hidden-display.sh \
-  timeout 20s target/debug/argui-widget-gallery
-
-ARGUI_NATIVE_TESTS=1 cargo nextest run \
-  -p argui-runtime --all-features --test native_popups
+bun run check:ts
+bun run test:ts
 ```
 
-`native_popups` creates its own private display and writes captures to
-`target/native-popups/`.
+## Runtime scenarios
 
-## Browser application
-
-Build and serve the gallery:
+The native popup regression test creates its own private display and writes
+captures to `target/native-popups/`:
 
 ```sh
-wasm-pack build crates/argui-widget-gallery --target web --dev \
-  --out-dir ../../web/widgets/pkg --all-features
-python3 scripts/dev_server.py 8793 --directory web --entry /widgets/
+./scripts/linux-hidden-display.sh env ARGUI_NATIVE_TESTS=1 \
+  cargo nextest run -p argui-runtime --all-features --test native_popups
 ```
 
-Run a fresh Chromium process inside the private display:
-
-```sh
-CHROME_PATH=/path/to/chrome \
-PUPPETEER_MODULE=/path/to/puppeteer/lib/esm/puppeteer/puppeteer.js \
-GALLERY_URL=http://127.0.0.1:8793/widgets/ \
-./scripts/linux-hidden-display.sh \
-  node crates/argui-widget-gallery/tests/pages.mjs
-```
-
-The browser checks use visible Chromium inside the hidden compositor, Wayland,
-Vulkan WebGPU, and ANGLE Vulkan. A populated accessibility tree does not prove
-that the GPU canvas painted.
-
-Common scenario entry points:
-
-| Area | Script under `crates/argui-widget-gallery/tests/` |
-| --- | --- |
-| General widgets | `pages.mjs` |
-| Editors and selection | `pages/inputs.mjs` |
-| Overlays and effects | `pages/overlay_effects.mjs` |
-| Widget catalogue | `pages/catalogue.mjs` |
-| Animation and scrolling | `pages/motion.mjs` |
-| Localization | `pages/i18n.mjs` |
-| Virtual lists | `pages/data.mjs` |
-| Application navigation | `app/navigation.mjs` |
-| Desktop backdrop | `app/desktop_backdrop.mjs` |
-
-Accessibility and DevTools have separate entry points:
-
-```text
-crates/argui-accessibility/tests/web.mjs
-crates/argui-devtools/tests/view.mjs
-```
-
-Set `GALLERY_URL` explicitly and use `SCREENSHOT_DIR` when supported. Inspect
-the resulting PNGs for content, contrast, clipping, focus, and frame changes.
-
-## Native Wayland capture
-
-`scripts/linux-wayland-capture.py` uses ScreenCast and RemoteDesktop inside the
-private session:
+For renderer/runtime investigation, capture the live QuickJS gallery through
+Wayland:
 
 ```sh
 ./scripts/linux-hidden-display.sh timeout --signal=INT --kill-after=3s 55s \
   python3 scripts/linux-wayland-capture.py \
     --output target/capture \
-    -- target/debug/argui-widget-gallery
+    -- cargo run --manifest-path apps/gallery/quickjs-host/Cargo.toml --locked
 ```
 
-It needs PyGObject, Pillow, GStreamer with `pipewiresrc`, PipeWire, and
-WirePlumber. It rejects a non-private display and a capture without contrasting
-content.
+`scripts/linux-wayland-capture.py` uses ScreenCast and RemoteDesktop inside the
+private session. It needs PyGObject, Pillow, GStreamer with `pipewiresrc`,
+PipeWire, and WirePlumber. It rejects a non-private display and a capture
+without contrasting content.
+
+The TSX gallery's shared host and framework behavior is exercised by
+`bun run test:ts`; it is not a browser application.
 
 ## Final gate
 

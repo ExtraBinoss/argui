@@ -44,7 +44,7 @@ else
           previous=$signature
           echo "Pushed $framework bundle to Android"
           if [[ "$launched" == 0 ]]; then
-            ./scripts/android-gallery.sh launch -ParguiGallery=solid
+            ./scripts/android-gallery.sh launch
             launched=1
           fi
         fi

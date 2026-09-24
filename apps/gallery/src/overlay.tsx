@@ -1,8 +1,7 @@
 import { createSignal } from '@argui/solid'
 import type { JSX } from '@argui/solid/jsx-runtime'
-import { Popover } from './controls'
 import { overlayFilters } from './overlay-filters'
-import type { Palette } from './theme'
+import { Popover, type Palette } from '@argui/widgets/solid'
 
 const mobile = (globalThis as { __arguiMobile?: boolean }).__arguiMobile === true
 const popoverVariants = [

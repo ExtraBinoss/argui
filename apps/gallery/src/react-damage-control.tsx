@@ -1,11 +1,10 @@
 /** @jsxImportSource @argui/react */
 import { useEffect, useState, type ReactElement } from 'react'
-import { ReactButton } from './react-controls'
 import {
   setNativeDamageTracking, subscribeRendererProfiles,
   type RendererProfileSample,
 } from './native-runtime'
-import type { Palette } from './theme'
+import { Button as ReactButton, type Palette } from '@argui/widgets/react'
 
 /** React adapter for the measured native damage comparison. */
 export function ReactDamageControl(props: { theme: Palette; active?: boolean }): ReactElement {

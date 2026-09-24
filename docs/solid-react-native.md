@@ -29,11 +29,28 @@ not shipped as an application runtime. Use `./scripts/linux-hidden-display.sh`
 for native Linux checks and inspect a saved capture. The application uses
 neither a browser nor a WebView.
 
+## Shared TSX widgets
+
+Gallery controls are provided by the workspace package
+[`@argui/widgets`](../packages/widgets/package.json). It has `/solid` and
+`/react` entry points for `Button`, `InputField`, `Select`, `Popover`, the
+palette helper, and the input-text parser. The package accepts native asset
+references from its host application through `WidgetAssetProvider`; it does not
+read the gallery's generated asset manifest.
+
+## TSX internationalization
+
+[`@argui/i18n`](../packages/i18n/README.md) loads flat JSON catalogs into the
+Rust Fluent localizer. Its core entry provides `loadI18n(config)`, `tr(id, args?)`, and
+`selectLocale(locale)`. Import the framework adapter from
+`@argui/i18n/solid` or `@argui/i18n/react` and call `useI18n()` in a component to
+subscribe to locale changes. Message parsing and formatting stay in Rust; JSON
+catalogs imported by Vite participate in hot reload with the TSX bundle.
+
 ## Runtime decision
 
 QuickJS is the sole JavaScript runtime for the native gallery and the current
-mobile path. This supersedes the Bun/`deno_core` runtime comparison in the
-committed [architecture plan](SOLID_REACT_ARCHITECTURE_PLAN.md). Both desktop
+mobile path. Earlier desktop
 prototypes ran the same Solid bundle, but neither produced a viable mobile
 package here: Bun's standalone targets do not include Android or iOS, and the
 pinned `rusty_v8` Android ARM64 archive needed by `deno_core` returned HTTP
@@ -42,15 +59,16 @@ add code without validating the cross-platform target, so their runner code
 and Gradle profile were removed. This is a project selection based on this
 prototype, not a claim that V8 is inherently unavailable on mobile.
 
-The gallery starts with Button, Select, Animation Lab, and a Media page. Its
+The gallery opens on Button and also includes Select, Media,
+Internationalization, Accessibility, Overlay, and Animation Lab pages. Its
 topbar changes light/dark mode and blue/violet/emerald accent. The sidebar
 navigates without discarding global page state. Animation Lab covers the
-implicit, timeline, composition, spring, and held-keyframe scenes from the
-former widget gallery. Continuous motion is declared through typed native loop
-properties. Rust advances the timelines on display frames; pause and resume
-preserve their phase without a JavaScript timer or a host transaction per frame.
-User actions retarget the discrete examples, and the engine interpolates those
-changes. Leaving the page unmounts its native motions.
+implicit, timeline, composition, spring, and held-keyframe scenes.
+Continuous motion is declared through typed native loop properties. Rust
+advances the timelines on display frames; pause and resume preserve their phase
+without a JavaScript timer or a host transaction per frame. User actions retarget
+the discrete examples, and the engine interpolates those changes. Leaving the
+page unmounts its native motions.
 
 ## Media imports
 
@@ -77,15 +95,17 @@ component or video-file import in this release.
 
 ## Platform validation boundary
 
-The desktop Linux gallery uses the native Argui renderer. The Android
-`quickjs` profile launches the same Solid TSX gallery through `NativeActivity`
-with embedded fonts and assets. On a Pixel 8a (Android API 37, 1080 × 2400),
+The desktop Linux gallery uses the native Argui renderer. Android launches the
+same Solid TSX gallery through `NativeActivity` with embedded fonts and assets.
+On a Pixel 8a (Android API 37, 1080 × 2400),
 the app filled the available viewport, navigated between pages, opened Select,
 changed its value by touch, and rendered SVG and raster media. Button activation
 updated its counter; disabled and busy buttons did not activate. Animation Lab
 scrolled to its spring and held-keyframe scenes. These checks used saved
 captures, direct touch input, and an Android log without a fatal app error.
-The default Android profile still runs the Rust widget gallery.
+Android runs the QuickJS Solid gallery by default. During development, the
+gallery hot-reload script can load either the Solid or React bundle into the
+same QuickJS host; release builds embed the Solid bundle.
 
 The [Bun executable targets](https://bun.sh/docs/bundler/executables) omit
 Android and iOS. The pinned `rusty_v8` archive required for this Android ARM64
@@ -97,9 +117,8 @@ not expose individual Button, Select, or navigation nodes. The installed
 AccessKit Winit Android adapter expects `GameActivity$InputEnabledSurfaceView`,
 and TalkBack was not enabled for this test. Accessibility semantics and keyboard
 behavior are covered by host and desktop tests, but Android screen-reader
-behavior remains unverified. The iOS shell still packages the Rust widget
-gallery; this JavaScript gallery has not been launched under UIKit or tested
-with VoiceOver.
+behavior remains unverified. The native TSX gallery has not been launched on
+iOS or tested with VoiceOver.
 
 After the full-viewport correction, `dumpsys meminfo` reported the following
 QuickJS gallery samples on the Pixel. PSS and RSS include native rendering,
@@ -152,19 +171,6 @@ path, the user confirmed that scrolling no longer breaks the layout. This
 does not resolve the remaining frame stutter or prove that the experimental
 path was the only cause of the visual defect.
 
-The earlier Rust Widget Gallery and the new QuickJS gallery share the Rust
-renderer, but they are different scenes and were measured with different
-surface sizes, feature sets, and visual effects. The old gallery appearing
-smoother is plausible; the available comparison cannot attribute that
-difference to QuickJS. To test that claim, render the *same* Animation Lab
-scene with a direct Rust `AppModel` and with the TSX host on the same device,
-build profile, viewport, and animation state. Record JS execution/host
-transactions, UI time, prepare/encode/present time, damage area, and
-SurfaceFlinger frame intervals for both runs. If no per-frame host transaction
-appears and both runs miss frames in native rendering, the fix belongs in the
-Rust renderer or frame scheduling. A Rust `AppModel` path remains available
-without QuickJS.
-
 Accessibility updates also needed separation from the frame loop. The
 retained semantic tree now skips rebuilding when only decorative compositor
 motion changes. A direct diagnostic measured about 195–263 microseconds for
@@ -211,21 +217,13 @@ QuickJS row was resampled after the responsive gallery changes on a private
 Bun and Deno rows remain older prototype samples and are not directly
 comparable to this build.
 
-A separate same-display run started the Rust Widget Gallery and QuickJS gallery
-in sequence, sampling `/proc/<pid>/smaps_rollup` at five seconds and CPU time
-for the following ten seconds. Both are development builds; the Rust gallery
-uses all Cargo features, while the QuickJS gallery has its own dependency set.
-They show process cost for two different Button pages, not an isolated JS heap
-or a matched widget workload.
-
-| App | RSS | PSS | Private clean + dirty | CPU, fraction of one core |
-| --- | ---: | ---: | ---: | ---: |
-| Rust Widget Gallery, all features | 173,820 KiB | 113,954 KiB | 97,360 KiB | 0.2% |
-| QuickJS Solid gallery, Button | 134,648 KiB | 104,614 KiB | 94,056 KiB | 1.2% |
-
 The QuickJS Button page still used a JavaScript timer for its loading icon in
 this historical sample. The current loading icon uses a native rotation loop;
-its device CPU and frame cost are measured separately.
+its device CPU and frame cost are measured separately. Another development
+sample for the QuickJS Solid Button page recorded RSS 134,648 KiB, PSS
+104,614 KiB, private clean plus dirty memory 94,056 KiB, and 1.2% CPU over ten
+seconds. These are process measurements, not an isolated JavaScript heap or a
+release memory budget.
 
 The benchmark is reproducible with
 `cargo nextest run --release -p argui-host --all-features --test transaction --offline --nocapture`.

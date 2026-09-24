@@ -11,13 +11,6 @@ an Argui layout slot, native Wry views, and browser iframes. Enable the
 | WebAssembly | retained iframe above the canvas | implemented and browser-tested |
 | Linux X11 | — | unsupported by the GTK host |
 
-```sh
-GDK_BACKEND=wayland cargo run -p argui-widget-gallery --features webview
-./scripts/serve-widget-gallery.sh
-```
-
-Open **Examples → WebView** in the gallery.
-
 ## Linux dependencies
 
 Fedora:
@@ -134,7 +127,7 @@ PUPPETEER_MODULE=/path/to/puppeteer/puppeteer.js \
 node crates/argui-webview/tests/browser/dom.mjs
 ```
 
-`crates/argui-widget-gallery/tests/pages/webview.mjs` covers the complete
-WebAssembly path with `GALLERY_URL` pointing to the running gallery. Rust tests
-cover sanitization, navigation, mounts, options, and cache policy. Run browser
-and native checks through the [private Linux display](../contributing/linux-testing.md).
+Rust tests in `crates/argui-webview/tests` cover sanitization, navigation,
+mounts, options, and cache policy. `tests/browser/dom.mjs` exercises the browser
+integration with `CHROME_PATH` and `PUPPETEER_MODULE` set. Run browser and native
+checks through the [private Linux display](../contributing/linux-testing.md).

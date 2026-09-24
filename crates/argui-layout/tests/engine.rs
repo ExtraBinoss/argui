@@ -1,18 +1,18 @@
 use argui_core::{Point, Rect, ScrollDelta, Size, TextPosition};
 use argui_layout::LayoutEngine;
-use argui_paint::{DisplayCommand, PaintStyle, QuadStyle};
-use argui_text::{TextEngine, TextStyle};
+use argui_paint::{DisplayCommand, QuadStyle};
+use argui_text::{TextEngine, TextOverflow, TextStyle, TextWrap};
 use argui_ui::{
-    AlignItems, Axes, Color, Element, FlexWrap, FloatingPlacement, Interaction,
-    LengthPercentageAuto, Overflow, Placement, ScrollConfig, Sides, StylePatch, UiTree,
-    VisualState, WindowDragBehavior, WindowLayer, auto, length, percent, sides,
+    AlignItems, Axes, CaretStyle, Color, CursorIcon, Element, FlexWrap, FloatingPlacement,
+    FocusPolicy, Interaction, LengthPercentageAuto, Overflow, Placement, ScrollConfig, Sides,
+    StylePatch, TextEditorSpec, TextInputFilter, UiTree, VisualState, WindowDragBehavior,
+    WindowLayer, auto, length, percent, sides,
 };
-use argui_widgets::{Button, ButtonStyle, Input, InputStyle};
 
 #[path = "engine/compute.rs"]
 mod compute_tests;
 
-const NOTO_SANS: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
+const NOTO_SANS: &[u8] = include_bytes!("../../../assets/fonts/NotoSans-Regular.ttf");
 
 fn text_engine() -> TextEngine {
     TextEngine::from_embedded_fonts([NOTO_SANS], "Noto Sans", "Noto Sans", "Noto Sans")
@@ -25,6 +25,30 @@ fn top_right(top: f32, right: f32) -> Sides<LengthPercentageAuto> {
         top: length(top),
         bottom: auto(),
     }
+}
+
+fn single_line_editor(key: &str, value: &str, placeholder: &str, mut text: TextStyle) -> Element {
+    text.wrap = TextWrap::None;
+    let mut placeholder_text = text.clone();
+    placeholder_text.overflow = TextOverflow::Ellipsis(argui_text::EllipsisPosition::End);
+    Element::text_editor(TextEditorSpec {
+        value: value.to_owned(),
+        placeholder: placeholder.to_owned(),
+        multiline: false,
+        read_only: false,
+        filter: TextInputFilter::Any,
+        text,
+        placeholder_text,
+        selection: Color::srgba(0.20, 0.68, 0.94, 0.38),
+        caret: CaretStyle::default(),
+    })
+    .keyed(key)
+    .width(percent(1.0))
+    .interaction(
+        Interaction::default()
+            .focus_policy(FocusPolicy::TabStop)
+            .cursor(CursorIcon::Text),
+    )
 }
 
 #[test]
@@ -109,27 +133,23 @@ fn wrapped_rows_move_whole_items_instead_of_clipping_them() {
 }
 
 #[test]
-fn wrapped_button_labels_keep_every_glyph() {
-    let button = |key, label| {
-        Button::new(
-            key,
-            label,
-            ButtonStyle::new(
-                PaintStyle::new(QuadStyle::solid(Color::srgb(0.1, 0.2, 0.3))),
-                TextStyle {
-                    font_size: 17.0,
-                    line_height: 22.0,
-                    ..TextStyle::default()
-                },
-            ),
-        )
-        .build()
+fn wrapped_flex_labels_keep_every_glyph() {
+    let item = |key, label| {
+        Element::row([Element::text(label).text_style(TextStyle {
+            font_size: 17.0,
+            line_height: 22.0,
+            wrap: TextWrap::None,
+            ..TextStyle::default()
+        })])
+        .keyed(key)
+        .padding(sides(18.0, 11.0))
+        .background(Color::srgb(0.1, 0.2, 0.3))
     };
     let mut ui = UiTree::new(
         Element::row([
-            button("primary", "Primary action"),
-            button("confirm", "Confirm"),
-            button("delete", "Delete"),
+            item("primary", "Primary action"),
+            item("confirm", "Confirm"),
+            item("delete", "Delete"),
         ])
         .width(percent(1.0))
         .flex_wrap(FlexWrap::Wrap)
@@ -380,20 +400,17 @@ fn anchored_overlay_follows_a_scrolling_anchor_without_relayout() {
 
 #[test]
 fn focused_text_inputs_emit_cosmic_caret_selection_and_hit_geometry() {
-    let input = Input::new(
+    let input = single_line_editor(
         "field",
         "Hello مرحباً 👋🏽",
         "hint",
-        InputStyle::new(
-            PaintStyle::new(QuadStyle::solid(Color::srgb(0.1, 0.1, 0.1))),
-            TextStyle {
-                font_size: 18.0,
-                line_height: 24.0,
-                ..TextStyle::default()
-            },
-        ),
+        TextStyle {
+            font_size: 18.0,
+            line_height: 24.0,
+            ..TextStyle::default()
+        },
     )
-    .build();
+    .background(Color::srgb(0.1, 0.1, 0.1));
     let mut ui = UiTree::new(input);
     let mut layout = LayoutEngine::new();
     let mut text = text_engine();
@@ -438,15 +455,9 @@ fn focused_text_inputs_emit_cosmic_caret_selection_and_hit_geometry() {
 
 #[test]
 fn scrolling_repositions_text_input_hit_geometry_without_reshaping() {
-    let input = Input::new(
-        "field",
-        "Editable",
-        "hint",
-        InputStyle::new(PaintStyle::default(), TextStyle::default()),
-    )
-    .build()
-    .height(length(40.0))
-    .shrink(0.0);
+    let input = single_line_editor("field", "Editable", "hint", TextStyle::default())
+        .height(length(40.0))
+        .shrink(0.0);
     let root = Element::column([
         Element::container([]).height(length(40.0)).shrink(0.0),
         input,
@@ -476,13 +487,7 @@ fn scrolling_repositions_text_input_hit_geometry_without_reshaping() {
 
 #[test]
 fn caret_and_selection_updates_skip_taffy_and_prepared_text_rebuilds() {
-    let input = Input::new(
-        "field",
-        "Latin العربية Latin",
-        "hint",
-        InputStyle::new(PaintStyle::default(), TextStyle::default()),
-    )
-    .build();
+    let input = single_line_editor("field", "Latin العربية Latin", "hint", TextStyle::default());
     let mut ui = UiTree::new(Element::column([Element::text("Label"), input]));
     let mut layout = LayoutEngine::new();
     let mut text = text_engine();

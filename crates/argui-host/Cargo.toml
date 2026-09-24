@@ -15,8 +15,8 @@ argui-ui.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
-argui-animation.workspace = true
-argui-core.workspace = true
+argui-animation = { path = "../argui-animation" }
+argui-core = { path = "../argui-core" }
 web-time.workspace = true
 
 [lints]

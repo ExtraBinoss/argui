@@ -1,9 +1,7 @@
 import { createSignal } from '@argui/solid'
 import type { JSX } from '@argui/solid/jsx-runtime'
 import { mediaAssets } from './assets.generated'
-import { Button, Select } from './controls'
-import { InputField } from './input-field'
-import type { Palette } from './theme'
+import { Button, InputField, Select, type Palette } from '@argui/widgets/solid'
 
 /** Shows accessible components and a custom native slider in Solid. */
 export function AccessibilityPage(props: { theme: Palette }): JSX.Element {

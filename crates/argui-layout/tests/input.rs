@@ -3,28 +3,110 @@ use argui_core::{
     Rect, ScrollDelta, Size, TextPosition,
 };
 use argui_layout::{LayoutEngine, TextInputRegion};
-use argui_paint::{PaintStyle, QuadStyle};
+use argui_paint::QuadStyle;
 use argui_text::{CaretStop, TextEngine, TextOverflow, TextStyle, TextWrap};
 use argui_ui::{
-    CursorIcon, Element, EventHandlerId, EventListener, EventOwnerId, EventType, GestureCapture,
-    GestureKind, GestureSet, Interaction, PanGesture, Position, ScrollbarPartStyle, ScrollbarStyle,
-    Sides, UiEventKind, UiTree, auto, length, percent, scrollbar_at,
+    Axes, CaretStyle, CursorIcon, Element, EventHandlerId, EventListener, EventOwnerId, EventType,
+    FocusPolicy, GestureCapture, GestureKind, GestureSet, Interaction, Overflow, PanGesture,
+    Position, ScrollConfig, ScrollPropagation, ScrollbarGutter, ScrollbarPartStyle, ScrollbarStyle,
+    Sides, TextEditorSpec, TextInputFilter, TextPrivacy, UiEventKind, UiTree, auto, length,
+    percent, scrollbar_at,
 };
-use argui_widgets::{Input, InputStyle, TextArea};
 
-const NOTO_SANS: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
+const NOTO_SANS: &[u8] = include_bytes!("../../../assets/fonts/NotoSans-Regular.ttf");
+
+fn text_editor(
+    key: &str,
+    value: impl AsRef<str>,
+    placeholder: &str,
+    multiline: bool,
+    filter: TextInputFilter,
+    text: TextStyle,
+    placeholder_text: TextStyle,
+) -> Element {
+    Element::text_editor(TextEditorSpec {
+        value: value.as_ref().to_owned(),
+        placeholder: placeholder.to_owned(),
+        multiline,
+        read_only: false,
+        filter,
+        text,
+        placeholder_text,
+        selection: Color::srgba(0.20, 0.68, 0.94, 0.38),
+        caret: CaretStyle::default(),
+    })
+    .keyed(key)
+    .width(percent(1.0))
+    .interaction(
+        Interaction::default()
+            .focus_policy(FocusPolicy::TabStop)
+            .cursor(CursorIcon::Text),
+    )
+}
+
+fn single_line_editor(
+    key: &str,
+    value: impl AsRef<str>,
+    placeholder: &str,
+    mut text: TextStyle,
+) -> Element {
+    text.wrap = TextWrap::None;
+    let mut placeholder_text = text.clone();
+    placeholder_text.color = Color::srgba(0.55, 0.60, 0.68, 1.0);
+    placeholder_text.overflow = TextOverflow::Ellipsis(argui_text::EllipsisPosition::End);
+    text_editor(
+        key,
+        value,
+        placeholder,
+        false,
+        TextInputFilter::Any,
+        text,
+        placeholder_text,
+    )
+    .padding(argui_ui::sides(13.0, 10.0))
+    .align_items(argui_ui::AlignItems::CENTER)
+    .shrink(0.0)
+}
+
+fn multiline_editor(
+    key: &str,
+    value: impl AsRef<str>,
+    placeholder: &str,
+    text: TextStyle,
+) -> Element {
+    let mut placeholder_text = text.clone();
+    placeholder_text.color = Color::srgba(0.55, 0.60, 0.68, 1.0);
+    placeholder_text.overflow = TextOverflow::Clip;
+    let horizontal_overflow = if text.wrap == TextWrap::None {
+        Overflow::Auto
+    } else {
+        Overflow::Hidden
+    };
+    text_editor(
+        key,
+        value,
+        placeholder,
+        true,
+        TextInputFilter::Any,
+        text,
+        placeholder_text,
+    )
+    .padding(argui_ui::sides(13.0, 10.0))
+    .align_items(argui_ui::AlignItems::START)
+    .shrink(0.0)
+    .overflow(Axes {
+        x: horizontal_overflow,
+        y: Overflow::Auto,
+    })
+    .scrollbar_gutter(ScrollbarGutter::Stable)
+    .scroll_config(ScrollConfig::default().propagation(ScrollPropagation::Contain))
+}
 
 #[test]
 fn password_layout_caret_stops_map_back_to_graphemes_without_shaping_the_secret() {
     let mut ui = UiTree::new(
-        Input::new(
-            "password",
-            "A👩‍🚀e\u{301}",
-            "Password",
-            InputStyle::new(PaintStyle::default(), TextStyle::default()),
-        )
-        .kind(argui_widgets::InputKind::Password)
-        .build(),
+        single_line_editor("password", "A👩‍🚀e\u{301}", "Password", TextStyle::default())
+            .text_privacy(TextPrivacy::Password),
     );
     let mut engine = LayoutEngine::new();
     let mut text = text_engine();
@@ -62,11 +144,24 @@ fn text_engine() -> TextEngine {
 fn placeholder_keeps_its_authored_color_on_the_first_frame() {
     let text = TextStyle {
         color: Color::BLACK,
+        wrap: TextWrap::None,
         ..TextStyle::default()
     };
-    let mut style = InputStyle::new(PaintStyle::default(), text);
-    style.placeholder.color = Color::WHITE;
-    let mut ui = UiTree::new(Input::new("search", "", "Search components", style).build());
+    let placeholder = TextStyle {
+        color: Color::WHITE,
+        overflow: TextOverflow::Ellipsis(argui_text::EllipsisPosition::End),
+        ..text.clone()
+    };
+    let input = text_editor(
+        "search",
+        "",
+        "Search components",
+        false,
+        TextInputFilter::Any,
+        text,
+        placeholder,
+    );
+    let mut ui = UiTree::new(input);
     let output = LayoutEngine::new()
         .compute(&mut ui, &mut text_engine(), Size::new(320.0, 80.0))
         .unwrap();
@@ -76,13 +171,7 @@ fn placeholder_keeps_its_authored_color_on_the_first_frame() {
 
 #[test]
 fn retained_text_edits_refresh_painted_content_without_a_tree_rebuild() {
-    let area = TextArea::new(
-        "code",
-        "before",
-        "Code",
-        InputStyle::new(PaintStyle::default(), TextStyle::default()),
-    )
-    .build();
+    let area = multiline_editor("code", "before", "Code", TextStyle::default());
     let mut ui = UiTree::new(area);
     let node = ui.node_id_at(0).unwrap();
     let mut layout = LayoutEngine::new();
@@ -104,14 +193,15 @@ fn non_wrapping_text_area_scrolls_both_axes_without_leaking_past_its_viewport() 
     let value = std::iter::repeat_n(long_line, 24)
         .collect::<Vec<_>>()
         .join("\n");
-    let area = TextArea::new(
+    let area = multiline_editor(
         "code",
         value,
         "",
-        InputStyle::new(PaintStyle::default(), TextStyle::default()),
+        TextStyle {
+            wrap: TextWrap::None,
+            ..TextStyle::default()
+        },
     )
-    .wrap(TextWrap::None)
-    .build()
     .width(length(240.0))
     .height(length(96.0));
     let mut ui = UiTree::new(area);
@@ -130,20 +220,16 @@ fn large_non_wrapping_text_areas_shape_only_the_scrolled_viewport() {
         .map(|line| format!("line {line:04}: let value = compute();"))
         .collect::<Vec<_>>()
         .join("\n");
-    let area = TextArea::new(
+    let area = multiline_editor(
         "code",
         &value,
         "",
-        InputStyle::new(
-            PaintStyle::default(),
-            TextStyle {
-                line_height: 20.0,
-                ..TextStyle::default()
-            },
-        ),
+        TextStyle {
+            line_height: 20.0,
+            wrap: TextWrap::None,
+            ..TextStyle::default()
+        },
     )
-    .wrap(TextWrap::None)
-    .build()
     .width(length(320.0))
     .height(length(100.0));
     let mut ui = UiTree::new(area);
@@ -171,19 +257,19 @@ fn repeated_virtual_editor_scrolls_keep_the_viewport_and_reach_the_last_line() {
         .map(|line| format!("line {line:04}: let value = compute();"))
         .collect::<Vec<_>>()
         .join("\n");
-    let mut style = InputStyle::new(
-        PaintStyle::default(),
+    let area = multiline_editor(
+        "code",
+        &value,
+        "",
         TextStyle {
             line_height: 20.0,
+            wrap: TextWrap::None,
             ..TextStyle::default()
         },
-    );
-    style.layout.padding = argui_ui::sides(20.0, 16.0);
-    let area = TextArea::new("code", &value, "", style)
-        .wrap(TextWrap::None)
-        .build()
-        .width(length(640.0))
-        .height(length(420.0));
+    )
+    .padding(argui_ui::sides(20.0, 16.0))
+    .width(length(640.0))
+    .height(length(420.0));
     let mut ui = UiTree::new(area);
     let node = ui.node_id_at(0).unwrap();
     let mut layout = LayoutEngine::new();
@@ -269,26 +355,23 @@ fn text_area_shapes_and_clips_scrollable_content_with_a_live_scrollbar() {
         .map(|line| format!("line {line:02} keeps enough text to exercise wrapping"))
         .collect::<Vec<_>>()
         .join("\n");
-    let area = TextArea::new(
-        "notes",
-        &value,
-        "notes",
-        InputStyle::new(PaintStyle::default(), TextStyle::default()),
+    let scrollbar = ScrollbarStyle::new(
+        ScrollbarPartStyle::new(QuadStyle::default()),
+        ScrollbarPartStyle::new(QuadStyle::solid(Color::WHITE)),
     )
-    .scrollbar(
-        ScrollbarStyle::new(
-            ScrollbarPartStyle::new(QuadStyle::default()),
-            ScrollbarPartStyle::new(QuadStyle::solid(Color::WHITE)),
+    .insets(Sides {
+        left: 3.0,
+        right: 5.0,
+        top: 7.0,
+        bottom: 21.0,
+    });
+    let area = multiline_editor("notes", &value, "notes", TextStyle::default())
+        .scroll_config(
+            ScrollConfig::default()
+                .propagation(ScrollPropagation::Contain)
+                .scrollbar(scrollbar),
         )
-        .insets(Sides {
-            left: 3.0,
-            right: 5.0,
-            top: 7.0,
-            bottom: 21.0,
-        }),
-    )
-    .build()
-    .height(length(96.0));
+        .height(length(96.0));
     let mut ui = UiTree::new(area);
     let mut layout = LayoutEngine::new();
     let mut text = text_engine();
@@ -363,13 +446,12 @@ fn text_area_shapes_and_clips_scrollable_content_with_a_live_scrollbar() {
 
 #[test]
 fn a_single_line_input_clips_its_text_after_a_retained_resize() {
-    let input = Input::new(
+    let input = single_line_editor(
         "search",
         "",
         "Search components with a deliberately long placeholder",
-        InputStyle::new(PaintStyle::default(), TextStyle::default()),
+        TextStyle::default(),
     )
-    .build()
     .height(length(40.0));
     let mut ui = UiTree::new(Element::column([input]).width(percent(0.5)));
     let mut layout = LayoutEngine::new();
@@ -406,18 +488,7 @@ fn resizing_a_text_area_preserves_its_scroll_position() {
         .collect::<Vec<_>>()
         .join("\n");
     let editor = |height| {
-        TextArea::new(
-            "notes",
-            &value,
-            "notes",
-            InputStyle::new(PaintStyle::default(), TextStyle::default()),
-        )
-        .scrollbar(ScrollbarStyle::new(
-            ScrollbarPartStyle::new(QuadStyle::default()),
-            ScrollbarPartStyle::new(QuadStyle::solid(Color::WHITE)),
-        ))
-        .build()
-        .height(length(height))
+        multiline_editor("notes", &value, "notes", TextStyle::default()).height(length(height))
     };
     let mut ui = UiTree::new(editor(96.0));
     let node = ui.node_id_at(0).unwrap();
@@ -444,14 +515,15 @@ fn a_resize_handle_painted_over_a_scrollbar_keeps_pointer_priority() {
         .map(|line| format!("line {line:02}"))
         .collect::<Vec<_>>()
         .join("\n");
-    let mut style = InputStyle::new(PaintStyle::default(), TextStyle::default());
-    style.layout.size.height = percent(1.0);
-    let area = TextArea::new("notes", value, "notes", style)
-        .scrollbar(ScrollbarStyle::new(
-            ScrollbarPartStyle::new(QuadStyle::default()),
-            ScrollbarPartStyle::new(QuadStyle::solid(Color::WHITE)),
-        ))
-        .build();
+    let area = multiline_editor("notes", value, "notes", TextStyle::default()).height(percent(1.0));
+    let area = area.scroll_config(
+        ScrollConfig::default()
+            .propagation(ScrollPropagation::Contain)
+            .scrollbar(ScrollbarStyle::new(
+                ScrollbarPartStyle::new(QuadStyle::default()),
+                ScrollbarPartStyle::new(QuadStyle::solid(Color::WHITE)),
+            )),
+    );
     let handle = Element::container([])
         .keyed("resize")
         .absolute(Sides {
@@ -552,8 +624,7 @@ fn empty_or_degenerate_custom_carets_do_not_emit_invalid_quads() {
         (2.0, -10.0, false, 0),
         (2.0, 10.0, false, 1),
     ] {
-        let mut style = InputStyle::new(PaintStyle::default(), TextStyle::default());
-        style.caret = CaretStyle::new(CaretVisual::new(if empty {
+        let caret = CaretStyle::new(CaretVisual::new(if empty {
             vec![]
         } else {
             vec![CaretPrimitive::new(
@@ -562,7 +633,29 @@ fn empty_or_degenerate_custom_carets_do_not_emit_invalid_quads() {
                 QuadStyle::solid(color),
             )]
         }));
-        let mut ui = UiTree::new(Input::new("custom-caret", "hello", "", style).build());
+        let mut ui = UiTree::new(
+            Element::text_editor(TextEditorSpec {
+                value: "hello".to_owned(),
+                placeholder: String::new(),
+                multiline: false,
+                read_only: false,
+                filter: TextInputFilter::Any,
+                text: TextStyle {
+                    wrap: TextWrap::None,
+                    ..TextStyle::default()
+                },
+                placeholder_text: TextStyle::default(),
+                selection: Color::WHITE,
+                caret,
+            })
+            .keyed("custom-caret")
+            .width(percent(1.0))
+            .interaction(
+                Interaction::default()
+                    .focus_policy(FocusPolicy::TabStop)
+                    .cursor(CursorIcon::Text),
+            ),
+        );
         let mut engine = LayoutEngine::new();
         let mut text = text_engine();
         let mut output = engine

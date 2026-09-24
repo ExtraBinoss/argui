@@ -13,7 +13,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("before", type=Path)
     parser.add_argument("after", type=Path)
-    parser.add_argument("--cases", nargs="+", required=True)
+    parser.add_argument("--cases", nargs="+", required=True,
+                        choices=["paint", "batch", "panel", "structure", "wide", "boundary"])
     parser.add_argument("--frames", type=int, default=100)
     parser.add_argument("--runs", type=int, default=3)
     parser.add_argument("--cpu", type=int, default=0)
@@ -24,9 +25,7 @@ def main():
     directories = {"before": args.before, "after": args.after}
     results = []
     for case in args.cases:
-        binary = "incremental_profile" if case in {"paint", "batch", "panel", "structure", "wide"} else "update_profile"
-        if case == "boundary":
-            binary = "boundary_profile"
+        binary = "boundary_profile" if case == "boundary" else "incremental_profile"
         samples = {label: [] for label in directories}
         for run in range(args.runs + 1):
             labels = list(directories)

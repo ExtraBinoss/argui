@@ -2,13 +2,7 @@ use super::*;
 
 #[test]
 fn code_filters_apply_before_paste_ime_and_typing() {
-    let mut input = Input::new(
-        "field",
-        "",
-        "",
-        InputStyle::new(PaintStyle::default(), TextStyle::default()),
-    )
-    .build();
+    let mut input = field("", TextInputFilter::Any);
     if let ElementKind::TextEditor { filter, .. } = &mut input.kind {
         *filter = argui_ui::TextInputFilter::Digits { max_length: 6 };
     }

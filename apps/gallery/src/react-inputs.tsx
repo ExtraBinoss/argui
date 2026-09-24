@@ -1,7 +1,6 @@
 /** @jsxImportSource @argui/react */
 import { useState, type ReactElement } from 'react'
-import { ReactInputField } from './react-input-field'
-import type { Palette } from './theme'
+import { InputField as ReactInputField, type Palette } from '@argui/widgets/react'
 
 /** Demonstrates the same native input states through the React adapter. */
 export function ReactInputsPage(props: { theme: Palette }): ReactElement {

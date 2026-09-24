@@ -2,16 +2,15 @@ use argui_core::{Affine2D, CaretAffinity, Point, Rect, Size, TextPosition};
 use argui_layout::LayoutEngine;
 use argui_paint::{
     ClipChain, ClipRegion, CornerRadii, DisplayCommand, Fill, GradientStop, LinearGradient,
-    PaintStyle,
 };
 use argui_text::{TextEngine, TextStyle};
 use argui_ui::{
-    DocumentSelectionEndpoint, DocumentTextPoint, Element, SelectionGranularity, TextSelection,
-    TextSelectionHighlight, TextSelectionRequest, TextSelectionStyle, UiTree, UserSelect, percent,
+    CaretStyle, DocumentSelectionEndpoint, DocumentTextPoint, Element, SelectionGranularity,
+    TextEditorSpec, TextInputFilter, TextSelection, TextSelectionHighlight, TextSelectionRequest,
+    TextSelectionStyle, UiTree, UserSelect, percent,
 };
-use argui_widgets::{InputStyle, TextArea};
 
-const NOTO_SANS: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
+const NOTO_SANS: &[u8] = include_bytes!("../../../assets/fonts/NotoSans-Regular.ttf");
 
 fn text_engine() -> TextEngine {
     TextEngine::from_embedded_fonts([NOTO_SANS], "Noto Sans", "Noto Sans", "Noto Sans")
@@ -20,13 +19,19 @@ fn text_engine() -> TextEngine {
 #[test]
 fn text_editor_selection_highlight_keeps_authored_corner_radii() {
     let color = argui_core::Color::srgba(0.2, 0.5, 0.9, 0.4);
-    let area = TextArea::new(
-        "rounded-selection",
-        "select me",
-        "",
-        InputStyle::new(PaintStyle::default(), TextStyle::default()),
-    )
-    .build()
+    let area = Element::text_editor(TextEditorSpec {
+        value: "select me".to_owned(),
+        placeholder: String::new(),
+        multiline: true,
+        read_only: false,
+        filter: TextInputFilter::Any,
+        text: TextStyle::default(),
+        placeholder_text: TextStyle::default(),
+        selection: argui_core::Color::WHITE,
+        caret: CaretStyle::default(),
+    })
+    .keyed("rounded-selection")
+    .width(percent(1.0))
     .selection_highlight(TextSelectionHighlight::solid(color).radius(5.0));
     let mut ui = UiTree::new(area);
     let mut layout = LayoutEngine::new();

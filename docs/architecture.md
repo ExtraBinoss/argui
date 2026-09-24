@@ -20,9 +20,9 @@ argui-runtime ---- platform events and windows
  argui-render ---- WGPU surface
 ```
 
-`argui-core` supplies dependency-light types to these layers. `argui` is the
-public facade; it contains no second implementation. See
-[repository structure](repo/structure.md) for the complete crate graph.
+`argui-core` supplies dependency-light types to these layers. Applications
+depend on the engine and runtime crates directly. See [repository
+structure](repo/structure.md) for the complete crate graph.
 
 ## One update
 
@@ -94,7 +94,8 @@ own tasks, subscriptions, and cleanup. The full lifetime contract is in
 | GPU resources, batching, effects, presentation | `argui-render` |
 | Windows, native input, clipboard and OS adapters | `argui-platform` |
 | Models, scheduling, composition, multi-window lifecycle | `argui-runtime` |
-| Reusable controlled components | `argui-widgets` |
+| TSX host transactions and schema | `argui-host`, `argui-schema` |
+| Reusable Solid and React components | `packages/widgets`, `packages/solid`, `packages/react` |
 
 Text shaping does not own editing. Selection, IME, clipboard commands, and undo
 cross UI and platform layers. The renderer does not own timelines. Animation
@@ -113,37 +114,39 @@ by native windows, native popups, and WebAssembly.
 
 ## Platform boundary
 
-Applications implement `Render` or `AppModel` once. Native and WebAssembly
-launchers differ only at the executable entry point. Android and iOS add small
-ABI shells, while the model, layout, text, paint, and renderer remain shared.
+Rust applications implement `Render` or `AppModel` once. Native and WebAssembly
+launchers differ at the executable entry point. Android has a checked-in
+`NativeActivity` shell for the TSX gallery; `argui-android` and `argui-ios` also
+provide entry crates for native integrations. The repository no longer includes
+an iOS app shell or Xcode project.
 
 Target-specific code belongs at the platform edge. Do not put Winit handles in
 UI state, WGPU resources in paint descriptions, or OS policy in reusable
-widgets. Optional integrations such as localization, WebView, updater and
-DevTools remain feature-gated. JavaScript framework adapters communicate with
-the native UI through the shared host transaction contract.
+components. Optional integrations such as localization, WebView, and updater
+remain feature-gated. JavaScript framework adapters communicate with the native
+UI through the shared `argui-host` transaction contract and `argui-schema`.
 
 For the Solid and React gallery, QuickJS is the selected embedded JavaScript
-runtime on desktop and Android. Bun is used to build and test the TSX bundles;
-it is not embedded in the app. The same Rust transaction host and `UiTree`
-serve both framework adapters. The [native gallery architecture and
-measurements](solid-react-native.md) record the runtime decision, mobile
-limits, and performance data. The earlier
-[architecture plan](SOLID_REACT_ARCHITECTURE_PLAN.md) preserves the candidate
-comparison that led to this decision.
+runtime on desktop and Android. Bun builds and tests the TSX bundles; it is not
+embedded in the app. The same Rust transaction host and `UiTree` serve both
+framework adapters. Reusable components live in `@argui/widgets`. The
+[native gallery architecture and measurements](solid-react-native.md) record
+the runtime decision, mobile limits, and performance data.
 
 ## Where to change code
 
 | Goal | Start in |
 | --- | --- |
-| Add a widget or change widget behavior | `crates/argui-widgets` |
+| Add or change a reusable TSX component | `packages/widgets/src/` |
+| Change Solid or React host rendering | `packages/solid/` or `packages/react/` |
+| Change the JS/Rust transaction contract | `packages/host/`, `crates/argui-host`, and `crates/argui-schema` |
 | Change style resolution, focus, input, or reconciliation | `crates/argui-ui` |
 | Change Flexbox/Grid integration | `crates/argui-layout` |
 | Change shaping or glyph preparation | `crates/argui-text` |
 | Add a paint primitive | `argui-paint`, then `argui-render` |
 | Add an OS capability | `crates/argui-platform`, then expose it through the runtime |
 | Change model lifetime or scheduling | `crates/argui-runtime` |
-| Add an application example | `app_examples` or `crates/argui-widget-gallery` |
+| Add a TSX application example | `apps/gallery/` |
 
 Follow the [development guide](contributing/development.md) before crossing a
 crate boundary.

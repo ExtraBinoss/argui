@@ -4,8 +4,8 @@ use argui_text::{
     TextScene, TextSpan, TextSpanStyle, TextStyle, UnderlineStyle,
 };
 
-const FONT: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
-const MONO: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/FiraMono-Medium.ttf");
+const FONT: &[u8] = include_bytes!("../../../assets/fonts/NotoSans-Regular.ttf");
+const MONO: &[u8] = include_bytes!("../../../assets/fonts/FiraMono-Medium.ttf");
 
 /// Creates a deterministic engine with two font families for invalidation checks.
 fn engine() -> TextEngine {

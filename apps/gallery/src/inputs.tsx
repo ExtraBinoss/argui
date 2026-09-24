@@ -1,7 +1,6 @@
 import { createSignal } from '@argui/solid'
 import type { JSX } from '@argui/solid/jsx-runtime'
-import { InputField } from './input-field'
-import type { Palette } from './theme'
+import { InputField, type Palette } from '@argui/widgets/solid'
 
 /** Demonstrates native editing, search, disabled state and submit validation. */
 export function InputsPage(props: { theme: Palette }): JSX.Element {

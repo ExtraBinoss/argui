@@ -1,7 +1,7 @@
 use argui_core::{Affine2D, Point, Rect, Size};
 use argui_text::{PreparedGlyph, TextBlock, TextEngine, TextScene};
 
-const FONT: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
+const FONT: &[u8] = include_bytes!("../../../assets/fonts/NotoSans-Regular.ttf");
 
 /// Creates a deterministic engine and a multiline scene with fractional baselines.
 fn fixture() -> (TextEngine, TextScene) {

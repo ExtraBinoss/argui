@@ -1,15 +1,14 @@
-use argui_core::{ColorScheme, Point, Size};
+use argui_core::{Point, Size};
 use argui_layout::LayoutEngine;
-use argui_paint::{Color, DisplayCommand, Fill, PaintStyle, QuadStyle};
+use argui_paint::{Color, DisplayCommand, Fill, QuadStyle};
 use argui_text::{TextEngine, TextStyle};
 use argui_ui::{
-    Axes, Element, FloatingPlacement, Interaction, Overflow, Placement, ScrollConfig,
-    ScrollbarPartStyle, ScrollbarStyle, UiTree, ViewportPlacement, VisualState, WindowLayer,
-    length,
+    Axes, CaretStyle, Element, FloatingPlacement, Interaction, Overflow, Placement, ScrollConfig,
+    ScrollbarPartStyle, ScrollbarStyle, StylePatch, TextEditorSpec, TextInputFilter, UiTree,
+    ViewportPlacement, VisualState, WindowLayer, length,
 };
-use argui_widgets::{Input, InputStyle, Select, SelectOption, shadcn};
 
-const NOTO_SANS: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
+const NOTO_SANS: &[u8] = include_bytes!("../../../assets/fonts/NotoSans-Regular.ttf");
 
 fn text_engine() -> TextEngine {
     TextEngine::from_embedded_fonts([NOTO_SANS], "Noto Sans", "Noto Sans", "Noto Sans")
@@ -240,13 +239,20 @@ fn scrollable_overlay_translates_its_input_region_and_scrollbar() {
         .width(length(60.0))
         .height(length(24.0));
     let overlay = Element::column([
-        Input::new(
-            "overlay-input",
-            "value",
-            "placeholder",
-            InputStyle::new(PaintStyle::default(), TextStyle::default()),
-        )
-        .build()
+        Element::text_editor(TextEditorSpec {
+            value: "value".to_owned(),
+            placeholder: "placeholder".to_owned(),
+            multiline: false,
+            read_only: false,
+            filter: TextInputFilter::Any,
+            text: TextStyle::default(),
+            placeholder_text: TextStyle::default(),
+            selection: Color::WHITE,
+            caret: CaretStyle::default(),
+        })
+        .keyed("overlay-input")
+        .width(length(140.0))
+        .interaction(Interaction::default())
         .height(length(28.0))
         .shrink(0.0),
         Element::container([]).height(length(180.0)).shrink(0.0),
@@ -290,17 +296,23 @@ fn scrollable_overlay_translates_its_input_region_and_scrollbar() {
 
 #[test]
 fn portal_descendants_receive_hover_and_resolve_their_state_style() {
-    let themes = shadcn(argui_core::Color::srgb(0.2, 0.5, 0.9));
-    let theme = themes.resolve(ColorScheme::Dark);
-    let select = Select::new(
-        "backend",
-        "Backend",
-        [SelectOption::new("Vulkan"), SelectOption::new("Metal")],
-        Some(0),
-    )
-    .open(true)
-    .build(theme);
-    let mut ui = UiTree::new(Element::column([select]).width(length(280.0)));
+    let hover_color = Color::srgb(0.2, 0.5, 0.9).with_alpha(0.20);
+    let option = Element::container([Element::text("Metal")])
+        .keyed("backend::option::1")
+        .width(length(180.0))
+        .height(length(32.0))
+        .background(Color::TRANSPARENT)
+        .interaction(Interaction::default())
+        .when(
+            VisualState::Hovered,
+            StylePatch::from_quad(QuadStyle::solid(hover_color)),
+        );
+    let popup = Element::column([option])
+        .keyed("backend::popup")
+        .width(length(200.0))
+        .height(length(48.0))
+        .viewport_portal(WindowLayer::Popover, ViewportPlacement::centered());
+    let mut ui = UiTree::new(Element::container([popup]));
     let mut layout = LayoutEngine::new();
     let mut output = layout
         .compute(&mut ui, &mut text_engine(), Size::new(480.0, 320.0))
@@ -334,7 +346,7 @@ fn portal_descendants_receive_hover_and_resolve_their_state_style() {
     assert_eq!(
         ui.resolved_quad(option, ui.element_at(index).unwrap())
             .background,
-        Some(Fill::Solid(theme.primary.with_alpha(0.20)))
+        Some(Fill::Solid(hover_color))
     );
 }
 

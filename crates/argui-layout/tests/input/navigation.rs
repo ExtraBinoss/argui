@@ -3,14 +3,7 @@ use super::*;
 #[test]
 fn repeated_newlines_keep_the_multiline_caret_visible_and_scroll_monotonic() {
     let editor = |value: &str| {
-        TextArea::new(
-            "notes",
-            value,
-            "notes",
-            InputStyle::new(PaintStyle::default(), TextStyle::default()),
-        )
-        .build()
-        .height(length(96.0))
+        multiline_editor("notes", value, "notes", TextStyle::default()).height(length(96.0))
     };
     let mut ui = UiTree::new(editor("start"));
     let node = ui.node_id_at(0).unwrap();
@@ -53,15 +46,7 @@ fn repeated_newlines_keep_the_multiline_caret_visible_and_scroll_monotonic() {
 #[test]
 fn transformed_editor_hits_and_drags_resolve_the_same_text_positions() {
     use argui_core::Affine2D;
-    let field = |key, value| {
-        Input::new(
-            key,
-            value,
-            "",
-            InputStyle::new(PaintStyle::default(), TextStyle::default()),
-        )
-        .build()
-    };
+    let field = |key, value| single_line_editor(key, value, "", TextStyle::default());
     let mut ui = UiTree::new(Element::column([
         field("first", "other field"),
         field("second", "alpha beta gamma"),
@@ -142,15 +127,9 @@ struct Editor {
 impl Editor {
     fn new(value: &str, width: f32, height: f32) -> Self {
         let ui = UiTree::new(
-            TextArea::new(
-                "field",
-                value,
-                "",
-                InputStyle::new(PaintStyle::default(), TextStyle::default()),
-            )
-            .build()
-            .width(length(width))
-            .height(length(height)),
+            multiline_editor("field", value, "", TextStyle::default())
+                .width(length(width))
+                .height(length(height)),
         );
         let node = ui.node_ids()[0];
         let mut editor = Self {

@@ -5,8 +5,10 @@
   "type": "module",
   "dependencies": {
     "@argui/host": "workspace:*",
+    "@argui/i18n": "workspace:*",
     "@argui/react": "workspace:*",
     "@argui/solid": "workspace:*",
+    "@argui/widgets": "workspace:*",
     "react": "19.2.0",
     "solid-js": "1.9.15"
   },

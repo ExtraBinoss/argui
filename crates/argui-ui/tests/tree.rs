@@ -1,10 +1,11 @@
 use argui_text::TextStyle;
 use argui_ui::{
-    Axes, Border, Color, ContainerQuery, ContainerScopeId, CornerRadii, EffectScope, Element,
-    ElementKind, FlexDirection, Interaction, LayerStyle, Overflow, Role, ScrollConfig,
-    ScrollbarPartStyle, ScrollbarStyle, Semantics, StateName, StateScopeId, StylePatch,
-    StyleTransition, TextSelectionHighlight, TextSelectionStyle, TransformOrigin, TreeUpdate,
-    UiTree, UserSelect, VectorId, VisualState, WindowLayer, length, percent, property,
+    Axes, Border, CaretStyle, Color, ContainerQuery, ContainerScopeId, CornerRadii, EffectScope,
+    Element, ElementKind, FlexDirection, FocusPolicy, Interaction, LayerStyle, Overflow, Role,
+    ScrollConfig, ScrollbarPartStyle, ScrollbarStyle, Semantics, StateName, StateScopeId,
+    StylePatch, StyleTransition, TextEditorSpec, TextInputFilter, TextSelectionHighlight,
+    TextSelectionStyle, TransformOrigin, TreeUpdate, UiTree, UserSelect, VectorId, VisualState,
+    WindowLayer, length, percent, property,
 };
 
 #[path = "tree/event.rs"]
@@ -16,16 +17,23 @@ mod animation;
 #[test]
 fn replacing_editor_value_obeys_read_only_filters_and_emits_input() {
     use argui_ui::{EventHandlerId, EventListener, EventOwnerId, EventType, UiEventKind};
-    use argui_widgets::{Input, InputKind, shadcn};
-    let themes = shadcn(Color::BLACK);
-    let theme = themes.resolve(argui_core::ColorScheme::Light);
-    let editor = Input::new("number", "12", "", theme.input())
-        .kind(InputKind::Number)
-        .build()
-        .on(EventListener::new(
-            EventType::Input,
-            EventHandlerId::new(EventOwnerId(1), 0),
-        ));
+    let editor = Element::text_editor(TextEditorSpec {
+        value: "12".to_owned(),
+        placeholder: String::new(),
+        multiline: false,
+        read_only: false,
+        filter: TextInputFilter::Decimal,
+        text: TextStyle::default(),
+        placeholder_text: TextStyle::default(),
+        selection: Color::WHITE,
+        caret: CaretStyle::default(),
+    })
+    .keyed("number")
+    .interaction(Interaction::default().focus_policy(FocusPolicy::TabStop))
+    .on(EventListener::new(
+        EventType::Input,
+        EventHandlerId::new(EventOwnerId(1), 0),
+    ));
     let mut tree = UiTree::new(editor.clone());
     let node = tree.node_ids()[0];
     let changed = tree.replace_text_input(node, "34");
@@ -44,9 +52,19 @@ fn replacing_editor_value_obeys_read_only_filters_and_emits_input() {
     tree.update(disabled);
     assert!(tree.replace_text_input(node, "56").events.is_empty());
     assert_eq!(tree.text_input_value(node), Some("34"));
-    let readonly = Input::new("number", "12", "", theme.input())
-        .read_only(true)
-        .build();
+    let readonly = Element::text_editor(TextEditorSpec {
+        value: "12".to_owned(),
+        placeholder: String::new(),
+        multiline: false,
+        read_only: true,
+        filter: TextInputFilter::Decimal,
+        text: TextStyle::default(),
+        placeholder_text: TextStyle::default(),
+        selection: Color::WHITE,
+        caret: CaretStyle::default(),
+    })
+    .keyed("number")
+    .interaction(Interaction::default().focus_policy(FocusPolicy::TabStop));
     tree.update(readonly);
     assert!(tree.replace_text_input(node, "56").events.is_empty());
     assert_eq!(tree.text_input_value(node), Some("34"));

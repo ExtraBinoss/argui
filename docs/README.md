@@ -1,9 +1,7 @@
 # Repository documentation
 
-The [documentation website](https://extrabinoss.github.io/argui/docs) teaches
-the public API with runnable examples. The files in this directory explain the
-repository: ownership boundaries, implementation contracts, platform limits,
-testing, and releases.
+These guides explain repository boundaries, engine contracts, platform limits,
+testing, and releases. The website will be rebuilt for the TSX API separately.
 
 Start with:
 
@@ -20,8 +18,8 @@ Start with:
 | Layout and input | [Styling](ui/styling.md) · [Interaction](ui/interaction.md) · [Scroll](ui/scroll.md) |
 | UI behavior | [Editing](ui/editing.md) · [Animation](ui/animation.md) · [Custom elements](ui/custom-elements.md) |
 | Rendering | [Primitives](rendering/primitives.md) · [Text fidelity](rendering/text.md) · [Adaptive damage](rendering/damage.md) · [Compositor](rendering/compositor.md) · [Effects](rendering/effects.md) · [GPU canvases](rendering/gpu-canvas.md) |
-| Optional capabilities | [Localization](i18n.md) |
-| Widgets | [Interaction APIs](widgets/interaction-api.md) · [Builder inventory](widgets/builder-inventory.md) · [Catalogue](widgets/shadcn.md) · [Lists and tables](widgets/lists-tables.md) · [Overlays](widgets/overlays.md) |
+| Localization | [Internationalization](i18n.md) |
+| TSX widgets | [Gallery and framework adapters](../apps/gallery/README.md) |
 
 ## Platform integration
 
@@ -34,14 +32,10 @@ Start with:
 
 ## Maintainer guides
 
-- [Performance](performance/optimizations.md): contracts, measurements, and
-  reproducible profiling commands. The [feature profile measurements](performance/feature-profiles.md)
-  cover the facade's convenience aliases.
-- [DevTools](contributing/devtools.md): inspection and profiling behavior.
+- [Performance](performance/optimizations.md): contracts and measurements.
 - [Linux graphical testing](contributing/linux-testing.md): private displays and
   capture-based checks.
 - [Releases](contributing/releases.md): packaging, crates.io, and GitHub automation.
-- [Website](../website/README.md): local development and GitHub Pages.
 - [Roadmap](roadmap.md): open work only.
 
 Commands in these guides run from the repository root unless stated otherwise.

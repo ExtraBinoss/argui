@@ -1,11 +1,30 @@
 use argui_core::{Affine2D, Point, Rect, Size};
 use argui_paint::ClipChain;
 use argui_ui::{
-    Color, CursorIcon, Element, EventHandlerId, EventListener, EventOwnerId, EventType,
+    CaretStyle, CursorIcon, Element, EventHandlerId, EventListener, EventOwnerId, EventType,
     FocusPolicy, FocusRequest, FocusScope, GestureSet, HitRegion, InitialFocus, Interaction,
-    UiEventKind, UiTree,
+    TextEditorSpec, TextInputFilter, UiEventKind, UiTree,
 };
-use argui_widgets::{Input, shadcn};
+
+fn text_field(key: &str, value: &str) -> Element {
+    Element::text_editor(TextEditorSpec {
+        value: value.to_owned(),
+        placeholder: String::new(),
+        multiline: false,
+        read_only: false,
+        filter: TextInputFilter::Any,
+        text: Default::default(),
+        placeholder_text: Default::default(),
+        selection: argui_ui::Color::WHITE,
+        caret: CaretStyle::default(),
+    })
+    .keyed(key)
+    .interaction(
+        Interaction::default()
+            .focus_policy(FocusPolicy::TabStop)
+            .cursor(CursorIcon::Text),
+    )
+}
 
 fn listen(element: Element) -> Element {
     EventType::ALL
@@ -37,15 +56,13 @@ fn region(node: argui_ui::NodeId, x: f32, focus_policy: FocusPolicy) -> HitRegio
 
 #[test]
 fn outside_press_blurs_input_without_consuming_the_clicked_action() {
-    let themes = shadcn(Color::BLACK);
-    let theme = themes.resolve(argui_core::ColorScheme::Dark);
     for (x, policy) in [
         (55.0, FocusPolicy::None),
         (55.0, FocusPolicy::TabStop),
         (150.0, FocusPolicy::None),
     ] {
         let mut tree = UiTree::new(Element::row([
-            listen(Input::new("value", "112", "", theme.input()).build()),
+            listen(text_field("value", "112")),
             listen(
                 Element::container([])
                     .keyed("action")
@@ -95,12 +112,8 @@ fn outside_press_blurs_input_without_consuming_the_clicked_action() {
 
 #[test]
 fn click_inside_input_preserves_focus_and_blank_area_respects_modal_traps() {
-    let themes = shadcn(Color::BLACK);
-    let theme = themes.resolve(argui_core::ColorScheme::Dark);
     for trapped in [false, true] {
-        let root = Element::column([listen(
-            Input::new("value", "112", "", theme.input()).build(),
-        )]);
+        let root = Element::column([listen(text_field("value", "112"))]);
         let root = if trapped {
             root.focus_scope(FocusScope::trapped(InitialFocus::First))
         } else {

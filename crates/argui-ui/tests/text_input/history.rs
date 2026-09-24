@@ -1,11 +1,11 @@
 use super::{editor, field, key, type_text};
-use argui_core::{CaretAffinity, ImeInput, Key, TextPosition};
+use argui_core::{CaretAffinity, ImeInput, Key, Modifiers, TextPosition};
+use argui_ui::TextInputFilter;
 use argui_ui::{HistoryConfig, SelectionCommand, TextSelection, TextSelectionRequest, UiEventKind};
-use argui_widgets::InputKind;
 
 #[test]
 fn explicit_actions_cancel_preedit_even_without_an_undo_transaction() {
-    let (mut tree, region) = editor("", InputKind::Text);
+    let (mut tree, region) = editor("", TextInputFilter::Any);
     for id in [argui_ui::ActionId::UNDO, argui_ui::ActionId::REDO] {
         tree.ime_input(ImeInput::Preedit {
             text: "preedit".into(),
@@ -21,13 +21,13 @@ fn explicit_actions_cancel_preedit_even_without_an_undo_transaction() {
 
 #[test]
 fn delayed_paste_and_ime_cannot_modify_a_disabled_editor() {
-    let (mut tree, region) = editor("initial", InputKind::Text);
+    let (mut tree, region) = editor("initial", TextInputFilter::Any);
     tree.paste_text(None, "!");
     tree.ime_input(ImeInput::Preedit {
         text: "composing".into(),
         cursor: None,
     });
-    let mut disabled = field("initial", InputKind::Text);
+    let mut disabled = field("initial", TextInputFilter::Any);
     disabled.interaction.as_mut().unwrap().enabled = false;
     tree.replace(disabled);
     assert!(!tree.can_undo(region.node));
@@ -46,29 +46,31 @@ fn delayed_paste_and_ime_cannot_modify_a_disabled_editor() {
 
 #[test]
 fn authored_history_configuration_is_retained_and_zero_disables_recording() {
-    let (mut tree, region) = editor("", InputKind::Text);
+    let (mut tree, region) = editor("", TextInputFilter::Any);
     let config = HistoryConfig {
         transactions: 1,
         ..Default::default()
     };
-    tree.replace(field("", InputKind::Text).text_history(config));
+    tree.replace(field("", TextInputFilter::Any).text_history(config));
     tree.paste_text(None, "a");
     tree.paste_text(None, "b");
-    tree.replace(field("ab", InputKind::Text).text_history(config));
+    tree.replace(field("ab", TextInputFilter::Any).text_history(config));
     tree.undo_text_input(region.node);
     assert_eq!(tree.text_input_value(region.node), Some("a"));
     assert!(!tree.can_undo(region.node));
-    tree.replace(field("a", InputKind::Text).text_history(HistoryConfig {
-        transactions: 0,
-        ..config
-    }));
+    tree.replace(
+        field("a", TextInputFilter::Any).text_history(HistoryConfig {
+            transactions: 0,
+            ..config
+        }),
+    );
     tree.paste_text(None, "x");
     assert!(!tree.can_undo(region.node));
 }
 
 #[test]
 fn typing_groups_and_redo_branches_are_discarded_by_a_new_edit() {
-    let (mut tree, region) = editor("", InputKind::Text);
+    let (mut tree, region) = editor("", TextInputFilter::Any);
     for value in ["A", "👋🏽", "é"] {
         type_text(&mut tree, value);
     }
@@ -86,7 +88,7 @@ fn typing_groups_and_redo_branches_are_discarded_by_a_new_edit() {
 
 #[test]
 fn paste_and_programmatic_replacement_are_separate_transactions() {
-    let (mut tree, region) = editor("start", InputKind::Text);
+    let (mut tree, region) = editor("start", TextInputFilter::Any);
     type_text(&mut tree, "!");
     tree.paste_text(None, " paste");
     tree.replace_text_input(region.node, "entire");
@@ -102,7 +104,7 @@ fn paste_and_programmatic_replacement_are_separate_transactions() {
 
 #[test]
 fn transactions_restore_selection_direction_and_affinity() {
-    let (mut tree, region) = editor("A👩‍🚀Z", InputKind::Text);
+    let (mut tree, region) = editor("A👩‍🚀Z", TextInputFilter::Any);
     let anchor = TextPosition::new("A👩‍🚀".len(), CaretAffinity::After);
     let cursor = TextPosition::new(1, CaretAffinity::Before);
     tree.select_text(TextSelectionRequest::new(
@@ -120,9 +122,9 @@ fn transactions_restore_selection_direction_and_affinity() {
 
 #[test]
 fn navigation_and_change_of_delete_direction_break_groups() {
-    let (mut tree, region) = editor("abcd", InputKind::Text);
-    tree.edit_text_input(&key(Key::Backspace, None, false, false));
-    tree.edit_text_input(&key(Key::Backspace, None, false, false));
+    let (mut tree, region) = editor("abcd", TextInputFilter::Any);
+    tree.edit_text_input(&key(Key::Backspace, None, Modifiers::default()));
+    tree.edit_text_input(&key(Key::Backspace, None, Modifiers::default()));
     tree.undo_text_input(region.node);
     assert_eq!(tree.text_input_value(region.node), Some("abcd"));
     tree.move_text_position(
@@ -130,8 +132,8 @@ fn navigation_and_change_of_delete_direction_break_groups() {
         TextPosition::new(1, CaretAffinity::Before),
         false,
     );
-    tree.edit_text_input(&key(Key::Delete, None, false, false));
-    tree.edit_text_input(&key(Key::Backspace, None, false, false));
+    tree.edit_text_input(&key(Key::Delete, None, Modifiers::default()));
+    tree.edit_text_input(&key(Key::Backspace, None, Modifiers::default()));
     tree.undo_text_input(region.node);
     assert_eq!(tree.text_input_value(region.node), Some("acd"));
     tree.undo_text_input(region.node);
@@ -140,7 +142,7 @@ fn navigation_and_change_of_delete_direction_break_groups() {
 
 #[test]
 fn grouping_interval_is_configurable_without_sleeping_in_tests() {
-    let (mut tree, region) = editor("", InputKind::Text);
+    let (mut tree, region) = editor("", TextInputFilter::Any);
     tree.configure_text_history(
         region.node,
         HistoryConfig {
@@ -156,7 +158,7 @@ fn grouping_interval_is_configurable_without_sleeping_in_tests() {
 
 #[test]
 fn count_and_byte_limits_evict_old_history_and_oversized_edits_clear_it() {
-    let (mut tree, region) = editor("", InputKind::Text);
+    let (mut tree, region) = editor("", TextInputFilter::Any);
     tree.configure_text_history(
         region.node,
         HistoryConfig {
@@ -188,21 +190,21 @@ fn count_and_byte_limits_evict_old_history_and_oversized_edits_clear_it() {
 
 #[test]
 fn unchanged_authored_value_keeps_history_during_layout_rebuild_external_change_resets() {
-    let (mut tree, region) = editor("base", InputKind::Text);
+    let (mut tree, region) = editor("base", TextInputFilter::Any);
     type_text(&mut tree, "!");
-    tree.replace(field("base", InputKind::Text).width(argui_ui::length(450.0)));
+    tree.replace(field("base", TextInputFilter::Any).width(argui_ui::length(450.0)));
     assert_eq!(tree.text_input_value(region.node), Some("base!"));
     assert!(tree.can_undo(region.node));
-    tree.replace(field("base!", InputKind::Text));
+    tree.replace(field("base!", TextInputFilter::Any));
     assert!(tree.can_undo(region.node));
-    tree.replace(field("remote", InputKind::Text));
+    tree.replace(field("remote", TextInputFilter::Any));
     assert_eq!(tree.text_input_value(region.node), Some("remote"));
     assert!(!tree.can_undo(region.node));
 }
 
 #[test]
 fn preedit_has_no_history_and_commit_is_one_atomic_edit() {
-    let (mut tree, region) = editor("", InputKind::Text);
+    let (mut tree, region) = editor("", TextInputFilter::Any);
     tree.ime_input(ImeInput::Preedit {
         text: "に".into(),
         cursor: None,
@@ -226,7 +228,7 @@ fn preedit_has_no_history_and_commit_is_one_atomic_edit() {
 
 #[test]
 fn rejected_filtered_edits_preserve_redo_and_clear_preedit_paint() {
-    let (mut tree, region) = editor("", InputKind::Number);
+    let (mut tree, region) = editor("", TextInputFilter::Decimal);
     tree.paste_text(None, "-");
     tree.paste_text(None, "12.5");
     tree.undo_text_input(region.node);
@@ -244,13 +246,28 @@ fn rejected_filtered_edits_preserve_redo_and_clear_preedit_paint() {
 
 #[test]
 fn cut_undo_redo_and_keyboard_shortcuts_share_state() {
-    let (mut tree, region) = editor("selected", InputKind::Text);
+    let (mut tree, region) = editor("selected", TextInputFilter::Any);
     tree.selection_command(Some(region.node), SelectionCommand::SelectAll);
     let cut = tree.selection_command(Some(region.node), SelectionCommand::Cut);
     assert!(cut.clipboard.is_some());
-    tree.edit_text_input(&key(Key::Character("z".into()), None, true, false));
+    tree.edit_text_input(&key(
+        Key::Character("z".into()),
+        None,
+        Modifiers {
+            control: true,
+            ..Modifiers::default()
+        },
+    ));
     assert_eq!(tree.text_input_value(region.node), Some("selected"));
-    tree.edit_text_input(&key(Key::Character("z".into()), None, true, true));
+    tree.edit_text_input(&key(
+        Key::Character("z".into()),
+        None,
+        Modifiers {
+            control: true,
+            shift: true,
+            ..Modifiers::default()
+        },
+    ));
     assert_eq!(tree.text_input_value(region.node), Some(""));
     tree.selection_command(Some(region.node), SelectionCommand::Undo);
     tree.selection_command(Some(region.node), SelectionCommand::Redo);
@@ -259,16 +276,16 @@ fn cut_undo_redo_and_keyboard_shortcuts_share_state() {
 
 #[test]
 fn read_only_and_disabled_history_commands_do_not_mutate() {
-    let (mut tree, region) = editor("base", InputKind::Text);
+    let (mut tree, region) = editor("base", TextInputFilter::Any);
     tree.paste_text(None, "!");
-    let mut input = field("base", InputKind::Text);
+    let mut input = field("base", TextInputFilter::Any);
     if let argui_ui::ElementKind::TextEditor { read_only, .. } = &mut input.kind {
         *read_only = true;
     }
     tree.replace(input);
     assert!(!tree.can_undo(region.node));
     assert!(!tree.undo_text_input(region.node).layout_changed);
-    let mut input = field("base", InputKind::Text);
+    let mut input = field("base", TextInputFilter::Any);
     input.interaction.as_mut().unwrap().enabled = false;
     tree.replace(input);
     assert!(!tree.undo_text_input(region.node).layout_changed);

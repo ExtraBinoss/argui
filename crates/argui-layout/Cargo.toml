@@ -18,7 +18,6 @@ taffy.workspace = true
 
 [dev-dependencies]
 argui-animation = { path = "../argui-animation" }
-argui-widgets = { path = "../argui-widgets", features = ["all"] }
 web-time.workspace = true
 
 [lints]

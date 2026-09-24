@@ -3,11 +3,11 @@
 The `file-picker` feature exposes system dialogs independently of widgets:
 
 ```toml
-argui = { version = "0.3.2", features = ["file-picker"] }
+argui-platform = { version = "0.3.2", features = ["file-picker"] }
 ```
 
 ```rust
-use argui::platform::file_picker::{FileDialog, FileFilter, FilePickerMode};
+use argui_platform::file_picker::{FileDialog, FileFilter, FilePickerMode};
 
 let selected = FileDialog::new(FilePickerMode::Files)
     .title("Choose images")
@@ -34,8 +34,8 @@ even if its result is abandoned. Without a parent the dialog is standalone;
 provide one when you need a modal ownership relationship.
 
 `FileDialogBackend` is the shared interface. The default `NativeFileDialog` uses
-[RFD](https://docs.rs/rfd/0.17.2/rfd/). Supply another backend through `open_with`
-or the widget's `.backend(...)`.
+[RFD](https://docs.rs/rfd/0.17.2/rfd/). Supply another backend through
+`open_with`.
 
 | Platform | Dialog |
 | --- | --- |
@@ -53,47 +53,11 @@ launch errors. RFD cannot distinguish user cancellation from every internal
 failure: `Ok(None)` means no files were returned. NUL-containing strings,
 filenames containing paths and invalid filters are rejected before native calls.
 
-## Widget
-
-```toml
-argui = { version = "0.3.2", features = ["widget-file-picker"] }
-```
-
-`widgets-all` and `argui-widgets/all` also include it. All are disabled by
-default; the dialog API alone does not load widgets or their tasks.
-
-```rust
-use argui::{
-    platform::file_picker::{FileDialog, FilePickerMode},
-    widgets::FilePicker,
-};
-
-// Create once in your component and retain the Entity in its state.
-let picker = cx.new_entity(FilePicker::new(
-    "project-folder",
-    "Choose a project",
-    FileDialog::new(FilePickerMode::Folder).title("Project folder"),
-));
-// Inside render:
-let element = cx.entity(&picker);
-```
-
-The component handles clicks, keyboard activation and accessibility. It displays
-actual selections and errors, prevents duplicate openings and keeps the previous
-selection when no new choice is returned. Read state through `selection()`,
-`status()` and `is_open()`, or open from a command with `open(cx)`.
-`build(theme, cx)` accepts an explicit theme.
-
-Subscribe to `FilePickerEvent::{Selected, Dismissed, Failed}` with
-`cx.subscribe(&picker, callback)` and retain the returned `Subscription`.
-Subscribers and the component must share a `ModelRuntime`.
-
-The gallery's File picker page demonstrates all five modes. The export example
-selects a destination without modifying the chosen file.
+The dialog API is independent of UI components. Compose it with an application
+control or workflow as needed; the caller owns file I/O and selection state.
 
 ## Validation
 
-Tests isolate the native provider and cover option forwarding, validation,
-selection, unchanged dismissal, errors, duplicate activation and a missing
-executor. They do not capture the desktop. Check native appearance and file
-selection in the gallery on each operating system.
+The platform tests cover option validation and unsupported modes. They do not
+capture the desktop. Check the native chooser and file selection from an
+application on each operating system.

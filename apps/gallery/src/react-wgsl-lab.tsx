@@ -1,9 +1,8 @@
 /** @jsxImportSource @argui/react */
 import { useState, type ReactElement } from 'react'
-import { ReactButton } from './react-controls'
 import { registerNativeEffect } from './native-runtime'
 import prismSource from './prism.wgsl?raw'
-import type { Palette } from './theme'
+import { Button as ReactButton, type Palette } from '@argui/widgets/react'
 
 registerNativeEffect({
   id: 'gallery.examples.prism',

@@ -1,26 +1,30 @@
 # Native Android and iOS
 
-Argui uses the same models, widgets, layout, text, and WGPU renderer on desktop,
-WebAssembly, Android, and iOS. Mobile needs a small native shell for the process
-entry point and packaging; application UI remains Rust.
+Argui's Rust engine can be embedded in native applications. The repository's
+maintained mobile sample is the Solid TSX gallery on Android: its Gradle shell
+starts a Rust QuickJS host, which runs the gallery bundle through the shared
+host contract. The `argui-android` and `argui-ios` crates remain available for
+applications that build their own native integrations. This repository does
+not include an iOS app shell or Xcode project.
 
 ## Support status
 
-CI proves:
+CI currently proves that:
 
-- the supported feature set cross-compiles for Android and iOS;
-- Gradle creates a debug APK and unsigned release AAB;
-- Xcode creates a device/simulator XCFramework and unsigned Simulator app;
-- the Widget Gallery uses the same shared application on both targets;
-- safe-area values reach `WindowEnvironment`.
+- `argui-android` and the gallery QuickJS host cross-compile for Android;
+- Gradle creates a debug APK and unsigned release AAB for the Android gallery;
+- the `argui-ios` entry crate cross-compiles for iOS.
 
-Physical-device startup, input, lifecycle, TalkBack/VoiceOver, document services,
-and owner signing still need device validation. Treat mobile as opt-in preview
-support until those checks are complete.
+CI does not package an iOS application. Physical-device startup, input,
+lifecycle, TalkBack/VoiceOver, document services, and owner signing still need
+device validation. Treat the mobile integrations as opt-in preview support
+until those checks are complete.
 
-## Share the application
+## Rust application integration
 
-Keep models, views, fonts, and renderer configuration in a normal Rust library:
+For a Rust application, keep its model and view in a normal Rust library. The
+library can expose the construction function used by its desktop or mobile
+launchers:
 
 ```rust,ignore
 pub fn build() -> (
@@ -33,24 +37,29 @@ pub fn build() -> (
 }
 ```
 
-Desktop calls `argui::runtime::run_application_with_text_engine`. Android and
-iOS call the equivalent function from their entry crates. Embed resources needed
-at startup with `include_bytes!`.
+A native Rust launcher calls `argui_runtime::run_application_with_text_engine`;
+mobile launchers call the equivalent function through their entry crates.
+Embed resources needed at startup with `include_bytes!`.
 
-Mobile entry crates are explicit dependencies. They are not enabled by
-`argui --all-features`:
+Mobile entry crates are explicit dependencies. A Rust application selects the
+engine and platform crates it uses:
 
 ```toml
 [dependencies]
-argui = { version = "0.3.2", features = ["widgets-all"] }
+argui-core = "0.3.2"
+argui-runtime = "0.3.2"
 argui-android = "0.3.2" # Android application only
 # argui-ios = "0.3.2"  # iOS application only
 ```
 
+The TSX application path is separate: `apps/gallery` shares the Rust host and
+renderer while its Solid or React bundle defines the application UI. See the
+[gallery guide](../apps/gallery/README.md).
+
 ## Android
 
 `argui-android` connects Android's `NativeActivity` to the Winit lifecycle.
-The application crate builds a `cdylib` named `main` and exports the activity
+A Rust application crate builds a `cdylib` named `main` and exports the activity
 entry symbol:
 
 ```toml
@@ -78,48 +87,47 @@ fn launch(android_app: AndroidApp) -> Result<(), Box<dyn std::error::Error>> {
 argui_android::android_main!(launch);
 ```
 
-The repository shell is in `mobile/android`. It uses `NativeActivity`, so the
-UI itself needs no Java or Kotlin layer. The optional background-activity
-example includes a small Java foreground service; applications that do not use
-that API can omit the helper sources, service declaration, and permissions.
+The repository shell is in `mobile/android`. Its small Java `NativeActivity`
+subclass sets up the edge-to-edge gallery; Winit and Argui render the UI. The
+Gradle build compiles `apps/gallery/quickjs-host` for the selected ABIs and
+packages it as `libmain.so`. Bun builds the Solid or React TSX bundle; it is not
+embedded in the app.
 
 ```sh
-./scripts/android-gallery.sh apk      # debug-signed installable APK
+./scripts/android-gallery.sh apk
 ./scripts/android-gallery.sh install
 ./scripts/android-gallery.sh launch
-ARGUI_ANDROID_ABIS=arm64-v8a ./scripts/android-gallery.sh aab
+./scripts/android-gallery.sh aab
 ```
 
 Install the Android SDK, NDK, JDK 17, Rust target, and `cargo-ndk` first. See
 [the Android shell guide](../mobile/android/README.md) for versions, artifact
-paths, emulator ABIs, and signing.
+paths, emulator ABIs, and signing. After installing a debug APK once, TSX edits
+can use [native hot reload](../apps/gallery/README.md#native-tsx-hot-reload)
+without rebuilding Rust or reinstalling the app.
 
 The runtime creates the window when Android resumes. Suspension drops the WGPU
-surface before the native window and recreates both on resume.
+surface before the native window and recreates both on resume. Text fields use
+Winit's native IME path; focusing a field requests Android's soft keyboard, and
+losing window focus hides it. A custom iOS host using Winit uses its UIKit
+first-responder path when the app loses and regains focus.
 
-Text fields use Winit's native IME path. When an Argui text field gains focus,
-the runtime enables IME input and explicitly requests Android's soft keyboard;
-losing window focus hides it. iOS uses Winit's UIKit first-responder path and
-resigns/restores it as the app loses and regains focus.
-
-The shell also declares a `dataSync` foreground service for explicitly started
-background work. `argui::platform::mobile::MobileActivity` starts it with an
-ongoing progress notification and a monochrome notification icon. On Android
-13 and later, the app asks for notification permission before starting; if the
-user declines, enable notifications in the app's system settings and try again.
-Start this API from a visible user action. Android 15 and later limit background
-`dataSync` foreground-service use to a cumulative six hours per 24-hour period;
-the notification does not make arbitrary or indefinite background work
-permitted. The Java helper/service is included by the repository's Gradle
-source set and declared in its manifest. Other Android shells do not need that
-helper to run Argui, but must package
-`crates/argui-android/android/src/main/java` and declare the service,
+The Android shell also packages a `dataSync` foreground service for explicitly
+started background work. `argui_platform::mobile::MobileActivity` starts it
+with an ongoing progress notification and a monochrome icon. On Android 13 and
+later, the app asks for notification permission before starting; if the user
+declines, enable notifications in system settings and try again. Start this API
+from a visible user action. Android 15 and later limit background `dataSync`
+foreground-service use to a cumulative six hours per 24-hour period; the
+notification does not make arbitrary or indefinite background work permitted.
+Other Android shells do not need the repository helper to run Argui, but must
+package `crates/argui-android/android/src/main/java` and declare the service,
 permissions, and notification icon before calling `MobileActivity::begin`.
 
 ## iOS
 
-`argui-ios` exports a C-callable Rust entry point. The application crate builds
-a static library:
+`argui-ios` exports a C-callable Rust entry point. A consuming application
+builds a static library:
 
 ```toml
 [lib]
@@ -142,17 +150,11 @@ fn launch() -> Result<(), Box<dyn std::error::Error>> {
 argui_ios::ios_main!(start_argui_app, launch);
 ```
 
-The Xcode target calls `start_argui_app()`; Winit starts `UIApplicationMain`
-and owns the UIKit window. Xcode still owns bundle identity, icons, deployment
-target, signing, and provisioning.
-
-```sh
-./scripts/ios-widget-gallery.sh all
-```
-
-This creates the device/simulator XCFramework and an unsigned Simulator app.
-A physical-device archive or TestFlight upload needs an Apple certificate and
-provisioning profile. See [the iOS shell guide](../mobile/ios/README.md).
+The consuming Xcode project calls `start_argui_app()`; Winit starts
+`UIApplicationMain` and owns the UIKit window. The application owner provides
+the Xcode project, bundle identity, icons, deployment target, signing, and
+provisioning. There is no iOS sample shell or packaging script in this
+repository.
 
 ## Safe areas
 
@@ -170,16 +172,14 @@ fn view(environment: WindowEnvironment) -> Element {
 
 Android reads current `WindowInsets` from the native activity, including system
 bars and display cutouts, then converts physical pixels to logical pixels using
-the current scale. Older Android versions use the legacy window-inset API. iOS
-compares the window with Winit's safe-area bounds. Insets refresh with geometry
-and scale. Android's shell uses transparent system bars and iOS renders against
-Winit's outer surface, so an application can paint edge to edge on both systems.
-Paint the safe-area wrapper with the current theme background: padding protects
-interactive content while the background continues behind status, navigation,
-home-indicator, and cutout regions. Overlays that are visually closed must not
-reserve an inset-sized flex item; an open overlay should paint its own safe-area
-padding rather than exposing the renderer clear color.
-`WindowConfig::with_safe_area_insets` and
+the current scale. Older Android versions use the legacy window-inset API. A
+Winit iOS host compares the window with its safe-area bounds. Insets refresh
+with geometry and scale. The repository Android shell uses transparent system
+bars, so an application can paint edge to edge. Pad interactive content while
+continuing the themed background behind system bars, the home indicator, and
+cutouts. Overlays that are visually closed must not reserve an inset-sized flex
+item; an open overlay should paint its own safe-area padding rather than
+exposing the renderer clear color. `WindowConfig::with_safe_area_insets` and
 `AppCommand::SetSafeAreaInsets` support custom hosts and previews. See
 [safe areas](platform/window-insets.md) for the coordinate contract.
 
@@ -187,13 +187,12 @@ padding rather than exposing the renderer clear color.
 
 Touch scrolling follows the finger and keeps momentum by default. This affects
 direct touch only; mouse wheels and trackpads retain their platform direction.
-The runtime keeps a contact pending until it exceeds `PointerSettings::touch_slop`:
-small finger jitter therefore remains a tap. Once scrolling starts, Argui locks
-the contact to the topmost scroll viewport matching its dominant axis. A
-widget-owned captured drag, such as a slider or table column separator, wins
-over default scrolling for the lifetime of that contact.
-Applications that intentionally want reversed touch movement can opt out per
-scroll region:
+The runtime keeps a contact pending until it exceeds
+`PointerSettings::touch_slop`: small finger jitter therefore remains a tap.
+Once scrolling starts, Argui locks the contact to the topmost scroll viewport
+matching its dominant axis. A captured drag, such as a slider or table column
+separator, wins over default scrolling for that contact. Applications that
+intentionally want reversed touch movement can opt out per scroll region:
 
 ```rust,ignore
 let config = ScrollConfig::default().natural_touch_scroll(false);
@@ -205,7 +204,7 @@ The shared API offers one owner for a native progress surface and a cloneable
 reporter suitable for background work:
 
 ```rust,ignore
-let mut activity = argui::platform::mobile::MobileActivity::begin(
+let mut activity = argui_platform::mobile::MobileActivity::begin(
     "Download",
     "Starting",
 )?;
@@ -216,39 +215,30 @@ activity.finish()?;
 
 The portable contract is semantic rather than visual. Rust shares the activity
 title, current message, bounded progress, completion, and lifetime. Each native
-shell renders that state according to its operating system:
+adapter renders that state according to its operating system:
 
 | Concern | Shared Rust | Android | iOS |
 | --- | --- | --- | --- |
-| Task state and updates | `MobileActivity` and `MobileActivityProgress` | consumed by JNI adapter | consumed by C/Swift bridge |
-| System surface | common title/message/progress | ongoing notification | Lock Screen and Dynamic Island |
-| Native layout | no platform markup | Android notification template | SwiftUI `ActivityConfiguration` |
-| Background lifetime | explicit owner and finish | foreground service rules | ActivityKit plus finite UIKit fallback |
+| Task state and updates | `MobileActivity` and `MobileActivityProgress` | foreground-service adapter | ActivityKit/UIKit adapter |
+| System surface | common title/message/progress | ongoing notification | Live Activity or time-limited background task |
+| Background lifetime | explicit owner and finish | foreground-service rules | ActivityKit and UIKit limits |
 
-This boundary keeps application logic portable without pretending the native
-surfaces are interchangeable. Add future shared fields to the Rust state and
-bridge contract, then map them independently in the Android notification and
-iOS SwiftUI extension. Platform-only decoration—notification channels, small
-icons, SF Symbols, Dynamic Island regions, colors, and accessibility
-descriptions—belongs to the corresponding native adapter.
-
-Android uses the foreground service and ongoing notification. iOS uses an
-ActivityKit Live Activity when the device and user settings allow it. If a Live
-Activity cannot be started, iOS falls back to UIKit's bounded background-task
-time allowance; that fallback has no ongoing notification and does not keep the
-process alive indefinitely. iOS background execution can be suspended or ended
-by the system, so persist resumable work and treat native progress as a status
-surface rather than a durable job scheduler. The gallery's **Background
-activity** example is available only on Android and iOS.
+Applications should map platform-only decoration—notification channels, small
+icons, colors, accessibility descriptions, and Dynamic Island regions—in their
+native adapter. If a Live Activity cannot be started, iOS falls back to UIKit's
+bounded background-task time allowance; that fallback does not keep the process
+alive indefinitely. Persist resumable work and treat native progress as a
+status surface rather than a durable job scheduler. This repository no longer
+ships a gallery page demonstrating background activity.
 
 ## Feature limits
 
-Models, layout, text, images, vectors, effects, i18n, tasks, widgets, WGPU,
-touch, keyboard, and IME cross-compile on mobile.
-
-Desktop backdrops, native popovers, tray, desktop WebView and updater are
-desktop integrations. The file-picker widget compiles but has no mobile
-document-provider adapter; clipboard requests report unavailable. One
+The Rust engine, layout, text, image/vector resources, effects, tasks, WGPU,
+touch, keyboard, and IME are shared across supported native targets. The TSX
+gallery currently packages desktop and Android hosts; CI only cross-checks the
+iOS entry crate. Desktop backdrops, native popovers, tray, desktop WebView, and
+updater are platform integrations. File-picker requests have no mobile
+document-provider adapter, and clipboard requests report unavailable. One
 full-screen Argui window is the supported mobile application model.
 
 ## Verify cross-compilation
@@ -256,15 +246,13 @@ full-screen Argui window is the supported mobile application model.
 ```sh
 rustup target add aarch64-linux-android aarch64-apple-ios
 
-cargo check --target aarch64-linux-android -p argui -p argui-android \
-  --features argui/i18n,argui/tasks,argui/widgets-all,argui/devtools
-cargo check --target aarch64-linux-android -p argui-widget-gallery --lib
+cargo check --locked --target aarch64-linux-android -p argui-android
+cargo check --locked --manifest-path apps/gallery/quickjs-host/Cargo.toml \
+  --target aarch64-linux-android --lib
 
-cargo check --target aarch64-apple-ios -p argui -p argui-ios \
-  --features argui/i18n,argui/tasks,argui/widgets-all,argui/devtools
-cargo check --target aarch64-apple-ios -p argui-widget-gallery --lib
+cargo check --locked --target aarch64-apple-ios -p argui-ios
 ```
 
-CI also packages Android and iOS artifacts. Device validation must cover startup,
+CI packages Android artifacts only. Device validation must cover startup,
 touch, text entry, rotation, background/foreground, surface recovery, shutdown,
 and the platform screen reader before mobile support leaves preview status.

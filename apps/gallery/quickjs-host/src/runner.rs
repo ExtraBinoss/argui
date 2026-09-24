@@ -13,8 +13,7 @@ use std::{
 };
 
 use crate::{
-    AnimationSnapshot, QuickJsGallery,
-    comparison::navigation_callback,
+    QuickJsGallery,
     delivery::{coalesce_virtual_windows, event_json},
     effects::registry_from_json,
     hot_reload::{BundleWatcher, Dispatch, dev_bundle_path, reload_gallery},
@@ -24,34 +23,23 @@ use crate::{
     },
 };
 use argui_host::Host;
-use argui_platform::{
-    ApplicationConfig, ApplicationId, ApplicationIdentity, IconSet, WindowConfig, WindowKey,
-};
+use argui_platform::{WindowConfig, WindowKey};
 use argui_render::{EffectRegistry, RendererConfig};
 use argui_runtime::{
     NativeHostAssets, NativeHostBatch, NativeHostControl, NativeHostDelivery, RuntimeError,
-    WireOperation, run_application, run_native_host,
+    WireOperation, run_native_host,
 };
 use argui_ui::UiEventKind;
 use serde_json::Value;
 
-mod comparison;
 #[cfg(target_os = "android")]
-use comparison::run_snapshot_android;
-use comparison::{comparison_mode, run_snapshot_desktop};
-
-#[cfg(target_os = "android")]
-const NOTO_SANS: &[u8] =
-    include_bytes!("../../../../crates/argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
+const NOTO_SANS: &[u8] = include_bytes!("../../../../assets/fonts/NotoSans-Regular.ttf");
 
 /// Runs the embedded Solid gallery in a desktop native window.
 ///
 /// # Errors
 /// Returns an error if the schema, gallery bundle, QuickJS engine, or native window cannot start.
 pub fn run_desktop() -> Result<(), Box<dyn std::error::Error>> {
-    if comparison_mode() == Some("rust") {
-        return run_snapshot_desktop();
-    }
     let profiles = Arc::new(Mutex::new(ProfileSummary::default()));
     let observed = Arc::clone(&profiles);
     let bundle_path = dev_bundle_path();
@@ -80,9 +68,7 @@ pub fn run_desktop() -> Result<(), Box<dyn std::error::Error>> {
             )
         },
     );
-    if comparison_mode().is_some() {
-        report_remaining(&profiles, "quickjs");
-    }
+    report_remaining(&profiles, "quickjs");
     result
 }
 
@@ -97,9 +83,6 @@ pub fn run_desktop() -> Result<(), Box<dyn std::error::Error>> {
 pub fn run_android(
     android_app: argui_android::AndroidApp,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    if comparison_mode() == Some("rust") {
-        return run_snapshot_android(android_app);
-    }
     let profiles = Arc::new(Mutex::new(ProfileSummary::default()));
     let observed = Arc::clone(&profiles);
     let bundle_path = cfg!(debug_assertions)
@@ -142,9 +125,7 @@ pub fn run_android(
             )
         },
     );
-    if comparison_mode().is_some() {
-        report_remaining(&profiles, "quickjs");
-    }
+    report_remaining(&profiles, "quickjs");
     result
 }
 
@@ -188,8 +169,6 @@ fn run_gallery(
     let (stop_sender, stop) = mpsc::channel();
     let (ready_sender, ready) = mpsc::channel();
     std::thread::spawn(move || {
-        let initial = Rc::new(RefCell::new(Some(Vec::<String>::new())));
-        let captured = Rc::clone(&initial);
         let batch_count = Arc::new(AtomicU64::new(0));
         let operation_count = Arc::new(AtomicU64::new(0));
         let mut dispatch = Dispatch::new(1, Arc::clone(&batch_count), Arc::clone(&operation_count));
@@ -200,12 +179,7 @@ fn run_gallery(
             source,
             contract_json,
             "mountGallery",
-            move |json| {
-                if let Some(initial) = captured.borrow_mut().as_mut() {
-                    initial.push(json.clone());
-                }
-                route.borrow_mut().accept(&json)
-            },
+            move |json| route.borrow_mut().accept(&json),
             move |json| control_request(&json, &control_sender, &control_enabled),
         );
         let mut gallery = match gallery {
@@ -215,22 +189,10 @@ fn run_gallery(
                 return;
             }
         };
-        if comparison_mode().is_some() {
-            let navigation = initial.borrow().as_ref().cloned().unwrap_or_default();
-            if let Err(error) = navigation_callback(&navigation)
-                .and_then(|callback| gallery.deliver(&callback.to_string()))
-            {
-                let _ = ready_sender.send(Err(error));
-                return;
-            }
-        }
-        *initial.borrow_mut() = None;
         if wire_sender
             .send(RelayBatch {
                 operations: Vec::new(),
-                controls: vec![NativeHostControl::SetRendererProfiling(
-                    comparison_mode().is_some(),
-                )],
+                controls: vec![NativeHostControl::SetRendererProfiling(false)],
                 acknowledgement: None,
             })
             .is_err()
@@ -260,11 +222,9 @@ fn run_gallery(
         };
         let counts = JsCounts::new(batch_count, operation_count);
         let (startup_batches, startup_operations) = counts.startup();
-        if comparison_mode().is_some() {
-            eprintln!(
-                "argui-comparison mode=quickjs startup_batches={startup_batches} startup_operations={startup_operations}"
-            );
-        }
+        eprintln!(
+            "argui-gallery-profile mode=quickjs startup_batches={startup_batches} startup_operations={startup_operations}"
+        );
         let effects = gallery
             .effect_definitions_json()
             .and_then(|json| registry_from_json(&json));
@@ -329,7 +289,6 @@ fn relay_batches(
     for message in wire {
         batch_sequence += 1;
         let operation_count = message.operations.len();
-        let submitted = Instant::now();
         let (reply, completion) = mpsc::channel();
         if batches
             .send(NativeHostBatch {
@@ -343,20 +302,12 @@ fn relay_batches(
             break;
         }
         match completion.recv() {
-            Ok(Ok(commit)) => {
+            Ok(Ok(_commit)) => {
                 if let Some(ack) = message.acknowledgement {
                     let _ = ack.send(Ok(()));
                 }
-                if comparison_mode().is_some() {
-                    if batch_sequence > 1 && operation_count >= 50 {
-                        mark_commit_for_presentation();
-                    }
-                    eprintln!(
-                        "argui-comparison host_batch_operations={operation_count} host_changed_nodes={} host_update={:?} queue_and_commit_ms={:.3}",
-                        commit.changed_nodes,
-                        commit.update,
-                        submitted.elapsed().as_secs_f64() * 1000.0
-                    );
+                if batch_sequence > 1 && operation_count >= 50 {
+                    mark_commit_for_presentation();
                 }
             }
             Ok(Err(error)) => {
@@ -461,9 +412,11 @@ fn run_js_loop(
             }
             let entered = Instant::now();
             gallery.deliver(&event_json(&delivery).to_string())?;
-            if comparison_mode().is_some() && matches!(delivery.kind, UiEventKind::Click(_)) {
+            if profile_enabled.load(Ordering::Relaxed)
+                && matches!(delivery.kind, UiEventKind::Click(_))
+            {
                 eprintln!(
-                    "argui-comparison click_js_callback_ms={:.3}",
+                    "argui-gallery-profile click_js_callback_ms={:.3}",
                     entered.elapsed().as_secs_f64() * 1000.0
                 );
             }
@@ -487,12 +440,12 @@ fn run_js_loop(
         gallery.tick(started.elapsed().as_secs_f64() * 1000.0)?;
         work += entered.elapsed();
         ticks += 1;
-        if comparison_mode().is_some() && ticks.is_multiple_of(5) {
+        if profile_enabled.load(Ordering::Relaxed) && ticks.is_multiple_of(5) {
             counts.report(deliveries, ticks, work, started.elapsed());
-            eprintln!("argui-comparison virtual_window_deliveries={window_deliveries}");
+            eprintln!("argui-gallery-profile virtual_window_deliveries={window_deliveries}");
         }
     }
-    if comparison_mode().is_some() {
+    if profile_enabled.load(Ordering::Relaxed) {
         counts.report(deliveries, ticks, work, started.elapsed());
     }
     Ok(())

@@ -406,10 +406,7 @@ mod native {
             config,
             Default::default(),
             argui_text::TextEngine::from_embedded_fonts(
-                [
-                    include_bytes!("../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf")
-                        .as_slice(),
-                ],
+                [include_bytes!("../../../assets/fonts/NotoSans-Regular.ttf").as_slice()],
                 "Noto Sans",
                 "Noto Sans",
                 "Noto Sans",

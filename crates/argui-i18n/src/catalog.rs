@@ -1,4 +1,5 @@
 use fluent_bundle::{FluentBundle, FluentError, FluentResource};
+use std::collections::BTreeMap;
 use unic_langid::LanguageIdentifier;
 
 /// One locale's immutable collection of Fluent resources.
@@ -8,6 +9,44 @@ pub struct Catalog {
 }
 
 impl Catalog {
+    /// Parses a flat JSON object whose string values are Fluent message patterns.
+    ///
+    /// * `locale` — language identifier associated with the JSON catalog.
+    /// * `source` — JSON object mapping Fluent message IDs to pattern strings.
+    ///
+    /// # Errors
+    /// Returns an error for invalid JSON, unsupported message IDs, or invalid
+    /// Fluent patterns. Message IDs must start with an ASCII letter and contain
+    /// only ASCII letters, digits, underscores, or hyphens.
+    pub fn from_json(locale: LanguageIdentifier, source: &str) -> Result<Self, JsonCatalogError> {
+        let messages: BTreeMap<String, String> = serde_json::from_str(source)
+            .map_err(|error| JsonCatalogError::InvalidJson(error.to_string()))?;
+        let mut fluent = String::new();
+        for (id, pattern) in messages {
+            let mut characters = id.chars();
+            if !characters
+                .next()
+                .is_some_and(|character| character.is_ascii_alphabetic())
+                || !characters.all(|character| {
+                    character.is_ascii_alphanumeric() || matches!(character, '_' | '-')
+                })
+            {
+                return Err(JsonCatalogError::InvalidId(id));
+            }
+            let pattern = pattern.replace("\r\n", "\n").replace('\r', "\n");
+            let pattern = if pattern.is_empty() {
+                "{ \"\" }"
+            } else {
+                &pattern
+            };
+            fluent.push_str(&id);
+            fluent.push_str(" = ");
+            fluent.push_str(&pattern.replace('\n', "\n    "));
+            fluent.push('\n');
+        }
+        Self::parse(locale, fluent).map_err(JsonCatalogError::Fluent)
+    }
+
     /// Parses one Fluent resource for `locale`.
     ///
     /// # Arguments
@@ -63,6 +102,17 @@ impl Catalog {
     pub const fn locale(&self) -> &LanguageIdentifier {
         &self.locale
     }
+}
+
+/// Invalid JSON, unsupported message ID, or Fluent syntax in a JSON catalog.
+#[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
+pub enum JsonCatalogError {
+    #[error("invalid JSON catalog: {0}")]
+    InvalidJson(String),
+    #[error("invalid Fluent message ID `{0}` in JSON catalog")]
+    InvalidId(String),
+    #[error(transparent)]
+    Fluent(#[from] CatalogError),
 }
 
 impl std::fmt::Debug for Catalog {

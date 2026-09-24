@@ -19,8 +19,5 @@ taffy.workspace = true
 unicode-segmentation.workspace = true
 web-time.workspace = true
 
-[dev-dependencies]
-argui-widgets = { path = "../argui-widgets", features = ["all"] }
-
 [lints]
 workspace = true

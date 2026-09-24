@@ -16,8 +16,10 @@
       "version": "0.3.2",
       "dependencies": {
         "@argui/host": "workspace:*",
+        "@argui/i18n": "workspace:*",
         "@argui/react": "workspace:*",
         "@argui/solid": "workspace:*",
+        "@argui/widgets": "workspace:*",
         "react": "19.2.0",
         "solid-js": "1.9.15",
       },
@@ -28,6 +30,18 @@
     "packages/host": {
       "name": "@argui/host",
       "version": "0.3.2",
+    },
+    "packages/i18n": {
+      "name": "@argui/i18n",
+      "version": "0.3.2",
+      "peerDependencies": {
+        "react": "19.2.0",
+        "solid-js": "1.9.15",
+      },
+      "peerDependenciesMeta": {
+        "react": { "optional": true },
+        "solid-js": { "optional": true },
+      },
     },
     "packages/react": {
       "name": "@argui/react",
@@ -50,15 +64,30 @@
         "solid-js": "1.9.15",
       },
     },
+    "packages/widgets": {
+      "name": "@argui/widgets",
+      "version": "0.3.2",
+      "dependencies": {
+        "@argui/host": "workspace:*",
+        "@argui/react": "workspace:*",
+        "@argui/solid": "workspace:*",
+        "react": "19.2.0",
+        "solid-js": "1.9.15",
+      },
+    },
   },
   "packages": {
     "@argui/gallery": ["@argui/gallery@workspace:apps/gallery"],
 
     "@argui/host": ["@argui/host@workspace:packages/host"],
 
+    "@argui/i18n": ["@argui/i18n@workspace:packages/i18n"],
+
     "@argui/react": ["@argui/react@workspace:packages/react"],
 
     "@argui/solid": ["@argui/solid@workspace:packages/solid"],
+
+    "@argui/widgets": ["@argui/widgets@workspace:packages/widgets"],
 
     "@babel/code-frame": ["@babel/code-frame@7.29.7", "", { "dependencies": { "@babel/helper-validator-identifier": "^7.29.7", "js-tokens": "^4.0.0", "picocolors": "^1.1.1" } }, "sha512-Aup7aUOfpbAUg2ROOJN6Iw5f9DMBlzu0mIkm/malLQFN/YQgO48wCj0Kxa3sEHJvPVFg7siR+qRInwXd2qhQKw=="],
 

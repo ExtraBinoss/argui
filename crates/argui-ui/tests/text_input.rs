@@ -4,29 +4,73 @@ use argui_core::{
     Affine2D, CaretAffinity, ImeInput, Key, KeyInput, KeyState, Modifiers, Point, PointerButton,
     PointerEvent, PointerId, PointerKind, PointerPhase, Rect, Size, TextPosition,
 };
-use argui_paint::{ClipChain, ClipRegion, PaintStyle, QuadStyle};
+use argui_paint::{ClipChain, ClipRegion};
 use argui_text::TextStyle;
 use argui_ui::{
-    ClipboardRequest, CursorIcon, Element, ElementKind, EventHandlerId, EventListener,
-    EventOwnerId, EventType, HitRegion, Overflow, TextSelection, TextSelectionRequest, UiEventKind,
-    UiTree,
+    CaretStyle, ClipboardRequest, CursorIcon, Element, ElementKind, EventHandlerId, EventListener,
+    EventOwnerId, EventType, FocusPolicy, HitRegion, Interaction, TextEditorSpec, TextInputFilter,
+    TextPrivacy, TextSelection, TextSelectionRequest, UiEventKind, UiTree,
 };
-use argui_widgets::{Input, InputKind, InputStyle, TextArea};
 
 fn tree(value: &str) -> (UiTree, HitRegion) {
-    filtered_tree(value, InputKind::Text)
+    filtered_tree(value, TextInputFilter::Any)
 }
 
-fn filtered_tree(value: &str, kind: InputKind) -> (UiTree, HitRegion) {
-    let input = Input::new(
-        "field",
-        value,
-        "placeholder",
-        InputStyle::new(PaintStyle::default(), TextStyle::default()),
+fn filtered_tree(value: &str, filter: TextInputFilter) -> (UiTree, HitRegion) {
+    with_region(UiTree::new(listens(field(value, filter))))
+}
+
+fn editor_with_privacy(
+    value: &str,
+    filter: TextInputFilter,
+    privacy: TextPrivacy,
+) -> (UiTree, HitRegion) {
+    let element = field(value, filter).text_privacy(privacy);
+    let (mut tree, region) = with_region(UiTree::new(listens(element)));
+    focus(&mut tree, &region);
+    (tree, region)
+}
+
+fn field(value: &str, filter: TextInputFilter) -> Element {
+    text_editor("field", value, "placeholder", false, false, filter)
+}
+
+fn text_editor(
+    key: &str,
+    value: &str,
+    placeholder: &str,
+    multiline: bool,
+    read_only: bool,
+    filter: TextInputFilter,
+) -> Element {
+    Element::text_editor(TextEditorSpec {
+        value: value.to_owned(),
+        placeholder: placeholder.to_owned(),
+        multiline,
+        read_only,
+        filter,
+        text: TextStyle::default(),
+        placeholder_text: TextStyle::default(),
+        selection: argui_ui::Color::WHITE,
+        caret: CaretStyle::default(),
+    })
+    .keyed(key)
+    .interaction(
+        Interaction::default()
+            .focus_policy(FocusPolicy::TabStop)
+            .cursor(CursorIcon::Text),
     )
-    .kind(kind)
-    .build();
-    with_region(UiTree::new(listens(input)))
+}
+
+fn multiline_field(value: &str, placeholder: &str) -> Element {
+    text_editor(
+        "notes",
+        value,
+        placeholder,
+        true,
+        false,
+        TextInputFilter::Any,
+    )
 }
 
 fn with_region(tree: UiTree) -> (UiTree, HitRegion) {
@@ -53,13 +97,7 @@ fn with_region(tree: UiTree) -> (UiTree, HitRegion) {
 /// A native editor with no PointerDown listener still has a focusable touch target.
 #[test]
 fn touch_press_focuses_editor_without_pointer_listener() {
-    let input = Input::new(
-        "field",
-        "",
-        "Search",
-        InputStyle::new(PaintStyle::default(), TextStyle::default()),
-    )
-    .build();
+    let input = text_editor("field", "", "Search", false, false, TextInputFilter::Any);
     let (mut tree, region) = with_region(UiTree::new(input));
     let pointer = PointerId::new(7);
     let event = PointerEvent {
@@ -82,7 +120,7 @@ fn touch_press_focuses_editor_without_pointer_listener() {
 
 #[test]
 fn numeric_filters_reject_invalid_keyboard_ime_and_paste_edits() {
-    let (mut decimal, region) = filtered_tree("", InputKind::Number);
+    let (mut decimal, region) = filtered_tree("", TextInputFilter::Decimal);
     focus(&mut decimal, &region);
     let letter = decimal.edit_text_input(&key(
         Key::Character("x".into()),
@@ -100,7 +138,7 @@ fn numeric_filters_reject_invalid_keyboard_ime_and_paste_edits() {
     );
     assert_eq!(decimal.text_input_value(region.node), Some("12.5"));
 
-    let (mut expression, region) = filtered_tree("", InputKind::Arithmetic);
+    let (mut expression, region) = filtered_tree("", TextInputFilter::Arithmetic);
     focus(&mut expression, &region);
     assert!(expression.paste_text(None, "(50 + 10) / 2").layout_changed);
     assert!(!expression.paste_text(None, "px").layout_changed);
@@ -111,14 +149,14 @@ fn numeric_filters_reject_invalid_keyboard_ime_and_paste_edits() {
 }
 
 fn read_only_tree(value: &str) -> (UiTree, HitRegion) {
-    let input = Input::new(
+    let input = text_editor(
         "field",
         value,
         "placeholder",
-        InputStyle::new(PaintStyle::default(), TextStyle::default()),
-    )
-    .read_only(true)
-    .build();
+        false,
+        true,
+        TextInputFilter::Any,
+    );
     with_region(UiTree::new(listens(input)))
 }
 
@@ -185,13 +223,14 @@ fn editing_respects_graphemes_selection_and_clipboard_requests() {
 
 #[test]
 fn incremental_listener_receives_a_delta_without_a_full_value_event() {
-    let input = Input::new(
+    let input = text_editor(
         "field",
         "hello world",
         "placeholder",
-        InputStyle::new(PaintStyle::default(), TextStyle::default()),
+        false,
+        false,
+        TextInputFilter::Any,
     )
-    .build()
     .on(EventListener::new(
         EventType::TextEdit,
         EventHandlerId::new(EventOwnerId(1), 0),
@@ -234,16 +273,6 @@ fn ime_preedit_is_visible_but_only_commit_changes_the_value() {
         UiEventKind::TextChanged(value) if value == "é"
     ));
     assert_eq!(tree.text_input_value(node), Some("é"));
-}
-
-#[test]
-fn text_input_style_remains_composed_from_existing_primitives() {
-    let style = InputStyle::new(PaintStyle::new(QuadStyle::default()), TextStyle::default());
-    let input = Input::new("field", "", "hint", style).build();
-    let interaction = input.interaction.as_ref().unwrap();
-    assert!(interaction.focus_policy.is_focusable());
-    assert_eq!(interaction.cursor, CursorIcon::Text);
-    assert!(input.children.is_empty());
 }
 
 #[test]
@@ -461,41 +490,34 @@ fn controlled_value_replaces_internal_state_only_when_it_differs() {
     let node = region.node;
     tree.paste_text(None, " value");
 
-    let replacement = Input::new(
+    let replacement = text_editor(
         "field",
         "ignored initial value",
         "new placeholder",
-        InputStyle::new(PaintStyle::default(), TextStyle::default()),
-    )
-    .build();
+        false,
+        false,
+        TextInputFilter::Any,
+    );
     tree.update(replacement);
 
     assert_eq!(tree.text_input_value(node), Some("ignored initial value"));
 
     tree.place_text_cursor(node, 7, false);
-    let same = Input::new(
+    let same = text_editor(
         "field",
         "ignored initial value",
         "same value",
-        InputStyle::new(PaintStyle::default(), TextStyle::default()),
-    )
-    .build();
+        false,
+        false,
+        TextInputFilter::Any,
+    );
     tree.update(same);
     assert_eq!(tree.text_input_cursor(node), Some(7));
 }
 
 #[test]
 fn text_area_inserts_lines_and_command_enter_submits() {
-    let area = TextArea::new(
-        "notes",
-        "first",
-        "notes",
-        InputStyle::new(PaintStyle::default(), TextStyle::default()),
-    )
-    .build();
-    assert_eq!(area.style.overflow.x, Overflow::Hidden);
-    assert_eq!(area.style.overflow.y, Overflow::Auto);
-    assert!(area.scroll.is_some());
+    let area = multiline_field("first", "notes");
     let mut tree = UiTree::new(listens(area));
     let node = tree.node_ids()[0];
     let bounds = Rect::new(Point::default(), Size::new(300.0, 140.0));
@@ -529,15 +551,7 @@ fn text_area_inserts_lines_and_command_enter_submits() {
         UiEventKind::Submitted(value) if value == "first\n"
     ));
 
-    tree.update(
-        TextArea::new(
-            "notes",
-            "first\nsecond",
-            "notes",
-            InputStyle::new(PaintStyle::default(), TextStyle::default()),
-        )
-        .build(),
-    );
+    tree.update(multiline_field("first\nsecond", "notes"));
     tree.place_text_cursor(node, 9, false);
     tree.edit_text_input(&key(Key::Home, None, Modifiers::default()));
     assert_eq!(tree.text_input_cursor(node), Some(6));

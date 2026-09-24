@@ -4,8 +4,8 @@ use argui_text::{
     TextWrap,
 };
 
-const NOTO_SANS: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
-const NOTO_ARABIC: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSansArabic.ttf");
+const NOTO_SANS: &[u8] = include_bytes!("../../../assets/fonts/NotoSans-Regular.ttf");
+const NOTO_ARABIC: &[u8] = include_bytes!("../../../assets/fonts/NotoSansArabic.ttf");
 
 fn engine() -> TextEngine {
     TextEngine::from_embedded_fonts(

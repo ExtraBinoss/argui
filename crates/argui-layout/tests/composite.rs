@@ -1,10 +1,12 @@
 use argui_animation::{Duration, Motion, Time, Tween};
 use argui_core::{Affine2D, Point, Size, Transform2D};
 use argui_layout::LayoutEngine;
-use argui_paint::{CompositorId, DisplayCommand, LayerStyle, PaintStyle};
-use argui_text::{TextEngine, TextStyle};
-use argui_ui::{Color, Element, FocusRequest, Interaction, TreeUpdate, UiTree, length, property};
-use argui_widgets::{Input, InputStyle};
+use argui_paint::{CompositorId, DisplayCommand, LayerStyle};
+use argui_text::TextEngine;
+use argui_ui::{
+    CaretStyle, Color, Element, FocusPolicy, FocusRequest, Interaction, TextEditorSpec,
+    TextInputFilter, TreeUpdate, UiTree, length, property,
+};
 
 fn scene(transform: Transform2D, opacity: f32) -> Element {
     Element::container([Element::container([])
@@ -190,15 +192,21 @@ fn layer_opacity_binding_promotes_plain_content_without_an_effect_layer() {
 
 #[test]
 fn caret_blink_updates_its_retained_layer_without_repainting_text() {
-    let input = Input::new(
-        "editor",
-        "hello",
-        "",
-        InputStyle::new(PaintStyle::default(), TextStyle::default()),
-    )
-    .build()
+    let input = Element::text_editor(TextEditorSpec {
+        value: "hello".to_owned(),
+        placeholder: String::new(),
+        multiline: false,
+        read_only: false,
+        filter: TextInputFilter::Any,
+        text: Default::default(),
+        placeholder_text: Default::default(),
+        selection: Color::WHITE,
+        caret: CaretStyle::default(),
+    })
+    .keyed("editor")
     .width(length(180.0))
-    .height(length(32.0));
+    .height(length(32.0))
+    .interaction(Interaction::default().focus_policy(FocusPolicy::TabStop));
     let mut ui = UiTree::new(input);
     let node = ui.node_id_at(0).unwrap();
     let mut engine = LayoutEngine::new();

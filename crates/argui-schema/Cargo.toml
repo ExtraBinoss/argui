@@ -24,7 +24,7 @@ thiserror.workspace = true
 serde = { workspace = true, optional = true }
 
 [dev-dependencies]
-argui-layout.workspace = true
+argui-layout = { path = "../argui-layout" }
 serde_json.workspace = true
 
 [lints]

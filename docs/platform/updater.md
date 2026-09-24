@@ -6,18 +6,17 @@ It is UI-independent and blocking; run operations on a worker and forward cloned
 
 | Capability | Feature |
 | --- | --- |
-| Engine through the facade | `argui/updater` |
 | Custom backend | `argui-updater` with no feature |
 | HTTPS and desktop installation | `argui-updater/native` |
-| Controlled dialog | `argui/widget-updater` |
 
-The dialog does not enable networking. WebAssembly can use the engine and
-dialog, but normal web deployment owns browser application updates.
+The engine contains no Rust UI. A TSX application can show update state with
+its own components; the native host must call the engine on a worker and send
+state changes to the UI. Web deployment owns browser application updates.
 
 ## Application flow
 
 ```rust,no_run
-use argui::updater::{
+use argui_updater::{
     Updater,
     http::{Config, HttpBackend},
     install::NativeInstaller,
@@ -31,12 +30,11 @@ let config = Config::new(
 let backend = HttpBackend::new(config, NativeInstaller::detect()?)?;
 let mut updater = Updater::new(backend);
 let available = updater.check(|state| eprintln!("{state:?}"))?;
-# Ok::<(), argui::updater::Error>(())
+# Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-Run `check`, `download`, and `install` through
-`Context::spawn_blocking` or another worker. Keep the updater for the next
-operation and keep the task handle in the model.
+Run `check`, `download`, and `install` on a worker. Keep the updater for the
+next operation and forward each `State` to the application.
 
 The valid sequence is:
 
@@ -109,20 +107,6 @@ The engine does not elevate privileges or exit the application. After
 `RestartRequired`, save state and restart. After `InstallerLaunched`, save
 state and exit so the installer can finish. Other package systems implement the
 `Installer` or `Backend` trait.
-
-## Optional dialog
-
-`UpdateDialog::new(key, &state, open, trigger).build(theme)` renders controlled
-release notes, status, and progress. Forward Click and Key events to
-`dialog.action(event)` and handle `Open`, `Close`, `Check`, `Download`,
-`Cancel`, and `Install` in the owning model.
-
-The dialog never performs network or OS work. Unknown totals use indeterminate
-progress. The gallery example simulates the complete state machine:
-
-```sh
-cargo run -p argui-widget-gallery --features updater
-```
 
 Engine tests use a local server and signed fixture. Installer tests replace
 temporary files and bundles. Windows installer completion and execution of an

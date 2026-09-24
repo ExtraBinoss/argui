@@ -77,7 +77,7 @@ fn layers(output: &LayoutOutput) -> Vec<&LayerStyle> {
 fn scroll_layers_exclude_background_and_scrollbars_and_preserve_effect_order() {
     let mut ui = UiTree::new(content(300.0, ScrollbarGutter::Stable, false));
     let mut text = TextEngine::from_embedded_fonts(
-        [include_bytes!("../../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf").as_slice()],
+        [include_bytes!("../../../../assets/fonts/NotoSans-Regular.ttf").as_slice()],
         "Noto Sans",
         "Noto Sans",
         "Noto Sans",
@@ -127,7 +127,7 @@ fn scroll_layers_exclude_background_and_scrollbars_and_preserve_effect_order() {
 #[test]
 fn fitting_content_skips_effects_and_active_effects_cover_the_full_viewport() {
     let mut text = TextEngine::from_embedded_fonts(
-        [include_bytes!("../../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf").as_slice()],
+        [include_bytes!("../../../../assets/fonts/NotoSans-Regular.ttf").as_slice()],
         "Noto Sans",
         "Noto Sans",
         "Noto Sans",

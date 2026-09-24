@@ -58,9 +58,6 @@ def publication_order(packages):
             and dependency.get('path') is not None
             and dependency['name'] in by_name
         }
-    if any('argui' in required for name, required in dependencies.items() if name != 'argui'):
-        raise ValueError('argui must remain the final facade in the publication graph')
-
     remaining = set(by_name)
     ordered = []
     while remaining:
@@ -68,9 +65,7 @@ def publication_order(packages):
         if not ready:
             cycle = ', '.join(sorted(remaining))
             raise ValueError(f'Internal dependency cycle: {cycle}')
-        # The root facade is a leaf. Holding it until every internal crate has
-        # been packaged makes the release contract explicit and deterministic.
-        name = min(ready, key=lambda candidate: (candidate == 'argui', candidate))
+        name = min(ready)
         ordered.append(name)
         remaining.remove(name)
     return ordered

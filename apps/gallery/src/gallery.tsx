@@ -1,16 +1,15 @@
 import { createMemo, createSignal, VirtualList } from '@argui/solid'
 import type { JSX } from '@argui/solid/jsx-runtime'
-import { Button, Select } from './controls'
+import { Button, InputField, Select, palette, type Accent, type Palette, type ThemeMode } from '@argui/widgets/solid'
 import { AnimationLab } from './animation-lab'
 import { OverlayPage, PopoverPage } from './overlay'
 import { DamageControl } from './damage-control'
-import { InputField } from './input-field'
 import { AccessibilityPage } from './accessibility-page'
 import { InputsPage } from './inputs'
 import { WgslLab } from './wgsl-lab'
 import { pages, filteredNavigation, navigationKey, navigationVersion, type Page } from './gallery-pages'
 import { mediaAssets } from './assets.generated'
-import { palette, type Accent, type Palette, type ThemeMode } from './theme'
+import { I18nPage } from './i18n-page'
 
 const accents: readonly Accent[] = ['blue', 'violet', 'emerald']
 const choices = ['Vulkan', 'DirectX 12', 'Metal', 'WebGPU'] as const
@@ -77,6 +76,7 @@ export function Gallery(): JSX.Element {
     <column width="fill" min_width={mobile ? 0 : 260} shrink={1} gap={16} padding={mobile ? 4 : 18}>
       <text text={item} color={theme().foreground} font_size={26} />
       {item === 'Input' ? <InputsPage theme={theme()} /> : null}
+      {item === 'Internationalization' && page() === item ? <I18nPage theme={theme()} /> : null}
       {item === 'Button' ? <ButtonPage theme={theme()} clicks={clicks()}
         lastUsed={lastUsed()} starActive={starActive()} activate={activate} /> : null}
       {item === 'Select' ? <SelectPage theme={theme()} value={choice()} onChange={setChoice} /> : null}

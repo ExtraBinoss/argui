@@ -68,15 +68,7 @@ fn word_deletion_handles_only_spaces_edges_newlines_and_unicode() {
         ("one\ntwo", 4, Key::Backspace, "onetwo"),
         ("one\ntwo", 3, Key::Delete, "onetwo"),
     ] {
-        let (mut ui, region) = with_region(UiTree::new(
-            TextArea::new(
-                "field",
-                value,
-                "",
-                InputStyle::new(PaintStyle::default(), TextStyle::default()),
-            )
-            .build(),
-        ));
+        let (mut ui, region) = with_region(UiTree::new(multiline_field(value, "")));
         focus(&mut ui, &region);
         ui.move_text_cursor(region.node, cursor, false);
         ui.edit_text_input(&key(key_value, None, command));

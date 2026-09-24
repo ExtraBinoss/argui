@@ -4,8 +4,6 @@
 import argparse
 import hashlib
 import json
-import os
-import re
 import statistics
 import subprocess
 import sys
@@ -19,10 +17,8 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--runs", type=int, default=7)
     parser.add_argument("--cpu", type=int, default=0)
-    parser.add_argument("--gallery", action="store_true", help="also run the gallery's scrolling test binary")
-    parser.add_argument("--gallery-runs", type=int, default=3)
     args = parser.parse_args()
-    if args.runs < 3 or args.gallery_runs < 3:
+    if args.runs < 3:
         parser.error("use at least three runs")
     directories = {"before": args.baseline, "after": args.candidate}
     cases = [
@@ -32,11 +28,9 @@ def main():
         ("layout_profile", ["1000"]),
         ("layout_profile", ["10000"]),
     ]
-    if args.gallery:
-        cases.append(("gallery-pages", ["--ignored", "--exact", "data::profile_virtual_scrolling", "--nocapture", "--test-threads=1"]))
     results = []
     for binary, workload in cases:
-        runs = args.gallery_runs if binary == "gallery-pages" else args.runs
+        runs = args.runs
         samples = {label: [] for label in directories}
         # One unrecorded warm-up, then alternating order to limit thermal/order bias.
         for run in range(runs + 1):
@@ -49,23 +43,7 @@ def main():
                     "taskset", "-c", str(args.cpu),
                     str((directories[label] / binary).resolve()), *workload,
                 ]
-                if binary == "gallery-pages":
-                    measured = subprocess.run(
-                        ["/usr/bin/time", "-f", "RESOURCE %U %M", *command],
-                        env={**os.environ, "ARGUI_PROFILE_FRAMES": "6000"},
-                        capture_output=True, text=True, check=True,
-                    )
-                    value = {}
-                    for page, opened, elapsed, layouts, nodes in re.findall(
-                        r"([\w-]+): open=([\d.]+)ms, 6000 scroll frames=([\d.]+)ms, layouts=(\d+), nodes=(\d+)",
-                        measured.stderr,
-                    ):
-                        value.update({f"{page}_open_ms": float(opened), f"{page}_scroll_ms": float(elapsed), f"{page}_layouts": int(layouts), f"{page}_nodes": int(nodes)})
-                    assert len(value) == 12, measured.stderr
-                    user, rss = re.search(r"RESOURCE ([\d.]+) (\d+)", measured.stderr).groups()
-                    value.update(user_s=float(user), rss_kib=int(rss))
-                else:
-                    value = json.loads(subprocess.check_output(command, text=True))
+                value = json.loads(subprocess.check_output(command, text=True))
                 if run:
                     samples[label].append(value)
         medians = {

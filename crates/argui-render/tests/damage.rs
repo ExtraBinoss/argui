@@ -11,7 +11,7 @@ use argui_render::{
 };
 use argui_text::{PreparedText, TextBlock, TextDecoration, TextEngine, TextScene, UnderlineStyle};
 
-const NOTO_SANS: &[u8] = include_bytes!("../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf");
+const NOTO_SANS: &[u8] = include_bytes!("../../../assets/fonts/NotoSans-Regular.ttf");
 
 #[test]
 fn empty_damage_is_unchanged_and_disabled_tracking_is_full() {

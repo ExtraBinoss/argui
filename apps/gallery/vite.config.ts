@@ -17,7 +17,9 @@ export default defineConfig({
   plugins: react ? [] : [solid({ solid: { moduleName: '@argui/solid', generate: 'universal' }, hot: false })],
   oxc: react ? { jsx: { runtime: 'automatic', importSource: '@argui/react' } } : undefined,
   define: react ? { 'process.env.NODE_ENV': JSON.stringify('production') } : undefined,
-  ssr: { noExternal: react ? ['react', 'react-reconciler', 'scheduler', '@argui/react'] : ['solid-js'],
+  ssr: { noExternal: react
+    ? ['react', 'react-reconciler', 'scheduler', '@argui/react', '@argui/widgets']
+    : ['solid-js', '@argui/widgets'],
     resolve: { conditions: ['browser'] } },
   build: {
     ssr: react ? 'src/react-main.tsx' : minimal ? 'src/minimal-main.tsx' : 'src/main.tsx',

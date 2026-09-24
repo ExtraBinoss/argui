@@ -1,17 +1,16 @@
 /** @jsxImportSource @argui/react */
 import { memo, useCallback, useMemo, useState, type ReactElement } from 'react'
 import { VirtualList as ReactVirtualList } from '@argui/react'
-import { ReactButton, ReactSelect } from './react-controls'
+import { Button as ReactButton, InputField as ReactInputField, Select as ReactSelect, palette, type Accent, type Palette, type ThemeMode } from '@argui/widgets/react'
 import { ReactAnimationLab } from './react-animation-lab'
 import { ReactOverlayPage, ReactPopoverPage } from './react-overlay'
 import { ReactDamageControl } from './react-damage-control'
-import { ReactInputField } from './react-input-field'
 import { ReactAccessibilityPage } from './react-accessibility-page'
 import { ReactInputsPage } from './react-inputs'
 import { ReactWgslLab } from './react-wgsl-lab'
 import { pages, filteredNavigation, navigationKey, navigationVersion, type Page } from './gallery-pages'
 import { mediaAssets } from './assets.generated'
-import { palette, type Accent, type Palette, type ThemeMode } from './theme'
+import { ReactI18nPage } from './react-i18n-page'
 
 const accents: readonly Accent[] = ['blue', 'violet', 'emerald']
 const choices = ['Vulkan', 'DirectX 12', 'Metal', 'WebGPU'] as const
@@ -76,6 +75,7 @@ export function ReactGallery(): ReactElement {
     <column key={`scroll-${item}`} nativeKey={`scroll-${item}`} visible={page === item}
       width="fill" grow={1} min_width={0} min_height={0} scroll_y={true}>
       <ReactPageContent item={item} theme={theme}
+        selected={page === item}
         clicks={item === 'Button' ? clicks : undefined}
         lastUsed={item === 'Button' ? lastUsed : undefined}
         starActive={item === 'Button' ? starActive : undefined}
@@ -122,6 +122,7 @@ interface ReactPageContentProps {
   choice?: string
   onChoiceChange: (value: string) => void
   active?: boolean
+  selected: boolean
 }
 
 /** Keeps retained page content stable while the shell changes native visibility. */
@@ -131,6 +132,7 @@ const ReactPageContent = memo(function ReactPageContent(props: ReactPageContentP
     <column width="fill" min_width={mobile ? 0 : 260} shrink={1} gap={16} padding={mobile ? 4 : 18}>
       <text text={item} color={theme.foreground} font_size={26} />
       {item === 'Input' ? <ReactInputsPage theme={theme} /> : null}
+      {item === 'Internationalization' && props.selected ? <ReactI18nPage theme={theme} /> : null}
       {item === 'Button' ? <ReactButtonPage theme={theme} clicks={props.clicks ?? 0}
         lastUsed={props.lastUsed ?? 'None'} starActive={props.starActive ?? false} activate={props.activate} /> : null}
       {item === 'Select' ? <ReactSelectPage theme={theme} value={props.choice ?? choices[0]}

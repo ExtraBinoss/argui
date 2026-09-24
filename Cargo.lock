@@ -217,32 +217,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "argui"
-version = "0.3.2"
-dependencies = [
- "argui-accessibility",
- "argui-animation",
- "argui-core",
- "argui-devtools",
- "argui-i18n",
- "argui-layout",
- "argui-paint",
- "argui-platform",
- "argui-reactive",
- "argui-render",
- "argui-runtime",
- "argui-schema",
- "argui-showcase",
- "argui-text",
- "argui-theme",
- "argui-ui",
- "argui-updater",
- "argui-vector",
- "argui-webview",
- "argui-widgets",
-]
-
-[[package]]
 name = "argui-accessibility"
 version = "0.3.2"
 dependencies = [
@@ -288,32 +262,6 @@ name = "argui-core"
 version = "0.3.2"
 
 [[package]]
-name = "argui-devtools"
-version = "0.3.2"
-dependencies = [
- "argui-animation",
- "argui-core",
- "argui-effects",
- "argui-inspect",
- "argui-layout",
- "argui-paint",
- "argui-platform",
- "argui-render",
- "argui-runtime",
- "argui-showcase",
- "argui-text",
- "argui-theme",
- "argui-ui",
- "argui-vector",
- "argui-widgets",
- "icondata_core",
- "icondata_tb",
- "serde_json",
- "sysinfo",
- "web-time",
-]
-
-[[package]]
 name = "argui-effects"
 version = "0.3.2"
 dependencies = [
@@ -343,6 +291,7 @@ dependencies = [
  "argui-ui",
  "fluent-bundle",
  "fluent-langneg",
+ "serde_json",
  "thiserror 2.0.20",
  "unic-langid",
 ]
@@ -381,7 +330,6 @@ dependencies = [
  "argui-paint",
  "argui-text",
  "argui-ui",
- "argui-widgets",
  "taffy",
  "web-time",
 ]
@@ -391,14 +339,6 @@ name = "argui-paint"
 version = "0.3.2"
 dependencies = [
  "argui-core",
-]
-
-[[package]]
-name = "argui-perf-showcase"
-version = "0.3.2"
-dependencies = [
- "argui",
- "wasm-bindgen",
 ]
 
 [[package]]
@@ -525,51 +465,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "argui-showcase"
-version = "0.3.2"
-dependencies = [
- "argui-animation",
- "argui-core",
- "argui-image",
- "argui-layout",
- "argui-paint",
- "argui-platform",
- "argui-runtime",
- "argui-text",
- "argui-theme",
- "argui-ui",
- "argui-widgets",
-]
-
-[[package]]
-name = "argui-state-app"
-version = "0.3.2"
-dependencies = [
- "argui",
- "argui-devtools",
- "argui-showcase",
- "web-time",
- "winresource",
-]
-
-[[package]]
-name = "argui-testing"
-version = "0.3.2"
-dependencies = [
- "argui-accessibility",
- "argui-animation",
- "argui-core",
- "argui-layout",
- "argui-platform",
- "argui-runtime",
- "argui-text",
- "argui-ui",
- "argui-widgets",
- "epaint_default_fonts",
- "thiserror 2.0.20",
-]
-
-[[package]]
 name = "argui-text"
 version = "0.3.2"
 dependencies = [
@@ -597,7 +492,6 @@ dependencies = [
  "argui-core",
  "argui-paint",
  "argui-text",
- "argui-widgets",
  "taffy",
  "unicode-segmentation",
  "web-time",
@@ -630,16 +524,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "argui-web-demo"
-version = "0.3.2"
-dependencies = [
- "argui",
- "argui-devtools",
- "argui-showcase",
- "wasm-bindgen",
-]
-
-[[package]]
 name = "argui-webview"
 version = "0.3.2"
 dependencies = [
@@ -655,44 +539,6 @@ dependencies = [
  "web-sys",
  "web-time",
  "wry",
-]
-
-[[package]]
-name = "argui-widget-gallery"
-version = "0.3.2"
-dependencies = [
- "argui",
- "argui-android",
- "argui-devtools",
- "argui-effects",
- "argui-image",
- "argui-ios",
- "argui-updater",
- "wasm-bindgen",
- "web-time",
-]
-
-[[package]]
-name = "argui-widgets"
-version = "0.3.2"
-dependencies = [
- "argui-animation",
- "argui-core",
- "argui-inspect",
- "argui-layout",
- "argui-paint",
- "argui-platform",
- "argui-runtime",
- "argui-text",
- "argui-theme",
- "argui-ui",
- "argui-updater",
- "argui-vector",
- "icondata_core",
- "icondata_tb",
- "time",
- "unicode-segmentation",
- "web-time",
 ]
 
 [[package]]
@@ -1659,12 +1505,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "epaint_default_fonts"
-version = "0.31.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fc7e7a64c02cf7a5b51e745a9e45f60660a286f151c238b9d397b3e923f5082f"
-
-[[package]]
 name = "equivalent"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2570,21 +2410,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "icondata_core"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6c97be924215abd5e630d84e95a47c710138a6559b4c55039f4f33aa897fa859"
-
-[[package]]
-name = "icondata_tb"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "16f08d4ae577034728dc8856d3bdbced6a406aadfd7386e0e24e5efb7be98685"
-dependencies = [
- "icondata_core",
-]
-
-[[package]]
 name = "icu_collections"
 version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3240,15 +3065,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ntapi"
-version = "0.4.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c3b335231dfd352ffb0f8017f3b6027a4917f7df785ea2143d8af2adc66980ae"
-dependencies = [
- "winapi",
-]
-
-[[package]]
 name = "num-conv"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3517,16 +3333,6 @@ dependencies = [
  "bitflags 2.13.1",
  "block2 0.6.2",
  "objc2 0.6.4",
- "objc2-core-foundation",
-]
-
-[[package]]
-name = "objc2-io-kit"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "33fafba39597d6dc1fb709123dfa8289d39406734be322956a69f0931c73bb15"
-dependencies = [
- "libc",
  "objc2-core-foundation",
 ]
 
@@ -4758,15 +4564,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "serde_spanned"
-version = "1.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6662b5879511e06e8999a8a235d848113e942c9124f211511b16466ee2995f26"
-dependencies = [
- "serde_core",
-]
-
-[[package]]
 name = "serde_urlencoded"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5139,20 +4936,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "sysinfo"
-version = "0.37.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "16607d5caffd1c07ce073528f9ed972d88db15dd44023fa57142963be3feb11f"
-dependencies = [
- "libc",
- "memchr",
- "ntapi",
- "objc2-core-foundation",
- "objc2-io-kit",
- "windows 0.61.3",
-]
-
-[[package]]
 name = "system-deps"
 version = "6.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5161,7 +4944,7 @@ dependencies = [
  "cfg-expr",
  "heck 0.5.0",
  "pkg-config",
- "toml 0.8.2",
+ "toml",
  "version-compare",
 ]
 
@@ -5476,24 +5259,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "185d8ab0dfbb35cf1399a6344d8484209c088f75f8f68230da55d48d95d43e3d"
 dependencies = [
  "serde",
- "serde_spanned 0.6.9",
+ "serde_spanned",
  "toml_datetime 0.6.3",
  "toml_edit 0.20.2",
-]
-
-[[package]]
-name = "toml"
-version = "1.1.4+spec-1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3aace63f4bbcdfc2c965b059de67119c89c4017a70d633be6c104910f67056f5"
-dependencies = [
- "indexmap",
- "serde_core",
- "serde_spanned 1.1.1",
- "toml_datetime 1.1.1+spec-1.1.0",
- "toml_parser",
- "toml_writer",
- "winnow 1.0.4",
 ]
 
 [[package]]
@@ -5533,7 +5301,7 @@ checksum = "396e4d48bbb2b7554c944bde63101b5ae446cff6ec4a24227428f15eb72ef338"
 dependencies = [
  "indexmap",
  "serde",
- "serde_spanned 0.6.9",
+ "serde_spanned",
  "toml_datetime 0.6.3",
  "winnow 0.5.40",
 ]
@@ -5558,12 +5326,6 @@ checksum = "1d38ac1cf9b95face32296c0a3ede1fdc270627c9d9c02a7274dd6d960dc4d56"
 dependencies = [
  "winnow 1.0.4",
 ]
-
-[[package]]
-name = "toml_writer"
-version = "1.1.2+spec-1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d56353a2a665ad0f41a421187180aab746c8c325620617ad883a99a1cbe66d2"
 
 [[package]]
 name = "tower"
@@ -6916,16 +6678,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "23b97319f7b8343df12cc98938e5c3eb436064524c8d2b4e30a1d3a36eecdf81"
 dependencies = [
  "memchr",
-]
-
-[[package]]
-name = "winresource"
-version = "0.1.31"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0986a8b1d586b7d3e4fe3d9ea39fb451ae22869dcea4aa109d287a374d866087"
-dependencies = [
- "toml 1.1.4+spec-1.1.0",
- "version_check",
 ]
 
 [[package]]

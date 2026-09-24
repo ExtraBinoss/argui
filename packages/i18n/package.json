@@ -1,0 +1,18 @@
+{
+  "name": "@argui/i18n",
+  "version": "0.3.2",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./react": "./src/react.ts",
+    "./solid": "./src/solid.ts"
+  },
+  "peerDependencies": {
+    "react": "19.2.0",
+    "solid-js": "1.9.15"
+  },
+  "peerDependenciesMeta": {
+    "react": { "optional": true },
+    "solid-js": { "optional": true }
+  }
+}

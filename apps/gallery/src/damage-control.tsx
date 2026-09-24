@@ -1,12 +1,11 @@
 import { createRenderEffect } from 'solid-js'
 import { createSignal, onCleanup } from '@argui/solid'
 import type { JSX } from '@argui/solid/jsx-runtime'
-import { Button } from './controls'
 import {
   setNativeDamageTracking, subscribeRendererProfiles,
   type RendererProfileSample,
 } from './native-runtime'
-import type { Palette } from './theme'
+import { Button, type Palette } from '@argui/widgets/solid'
 
 /** Compares actual adaptive and full-frame renderer decisions on one workload. */
 export function DamageControl(props: { theme: Palette; active?: boolean }): JSX.Element {

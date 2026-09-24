@@ -1,9 +1,8 @@
 import { createSignal } from '@argui/solid'
 import type { JSX } from '@argui/solid/jsx-runtime'
-import { Button } from './controls'
 import { registerNativeEffect } from './native-runtime'
 import prismSource from './prism.wgsl?raw'
-import type { Palette } from './theme'
+import { Button, type Palette } from '@argui/widgets/solid'
 
 registerNativeEffect({
   id: 'gallery.examples.prism',

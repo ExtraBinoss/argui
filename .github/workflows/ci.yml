@@ -105,10 +105,8 @@ jobs:
           cache-directories: ${{ env.SCCACHE_DIR }}
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Compare publishable APIs with crates.io
-        # A registry baseline does not exist for argui-testing until its first release.
         run: >-
           cargo semver-checks check-release --workspace
-          --exclude argui-testing
           --release-type major
 
   coverage:
@@ -198,6 +196,27 @@ jobs:
       - name: Compile the complete workspace
         run: cargo check --workspace --all-targets --all-features --locked
 
+  gallery:
+    name: Solid and React gallery
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: '1.4.0'
+      - name: Install locked JavaScript dependencies
+        run: bun install --frozen-lockfile
+      - name: Typecheck, build, and test TSX gallery
+        run: |
+          bun run check:ts
+          bun run test:ts
+
   mobile:
     name: Mobile cross-check
     runs-on: ubuntu-24.04
@@ -219,20 +238,16 @@ jobs:
           cache-targets: false
           cache-directories: ${{ env.SCCACHE_DIR }}
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - name: Check every supported Android capability and gallery entry point
+      - name: Check Android engine
         run: |
-          cargo check --locked --target aarch64-linux-android -p argui -p argui-android \
-            --features argui/i18n,argui/tasks,argui/widgets-all,argui/devtools
-          cargo check --locked --target aarch64-linux-android -p argui-widget-gallery --lib
-      - name: Check every supported iOS capability and gallery entry point
+          cargo check --locked --target aarch64-linux-android -p argui-android
+      - name: Check iOS engine
         run: |
-          cargo check --locked --target aarch64-apple-ios -p argui -p argui-ios \
-            --features argui/i18n,argui/tasks,argui/widgets-all,argui/devtools
-          cargo check --locked --target aarch64-apple-ios -p argui-widget-gallery --lib
+          cargo check --locked --target aarch64-apple-ios -p argui-ios
 
   android-package:
     name: Android APK and AAB
-    needs: mobile
+    needs: [mobile, gallery]
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
@@ -253,6 +268,9 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: '1.4.0'
       - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
         with:
           key: android-package
@@ -264,6 +282,8 @@ jobs:
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
         with:
           cache-provider: basic
+      - name: Install locked JavaScript dependencies
+        run: bun install --frozen-lockfile
       - name: Build the ARM64 debug APK and release AAB
         env:
           ARGUI_ANDROID_ABIS: arm64-v8a
@@ -277,54 +297,10 @@ jobs:
       - name: Upload installable Android packages
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: argui-widget-gallery-android
+          name: argui-solid-gallery-android
           path: |
             mobile/android/app/build/outputs/apk/debug/app-debug.apk
             mobile/android/app/build/outputs/bundle/release/app-release.aab
-          compression-level: 0
-          retention-days: 14
-          if-no-files-found: error
-
-  ios-package:
-    name: iOS XCFramework and Simulator app
-    runs-on: macos-15
-    timeout-minutes: 90
-    steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          persist-credentials: false
-      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
-        with:
-          toolchain: '1.98.0'
-          targets: aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios
-      - uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
-        with:
-          version: v0.16.0
-      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
-        with:
-          key: ios-package
-          cache-on-failure: true
-          cache-targets: false
-          cache-directories: ${{ env.SCCACHE_DIR }}
-          save-if: ${{ github.ref == 'refs/heads/main' }}
-      - name: Build the XCFramework and unsigned Simulator app
-        run: |
-          ./scripts/ios-widget-gallery.sh all
-          test -d mobile/ios/build/ArguiWidgetGallery.xcframework
-          app='mobile/ios/build/DerivedData/Build/Products/Debug-iphonesimulator/ArguiWidgetGallery.app'
-          test -x "$app/ArguiWidgetGallery"
-          ditto -c -k --sequesterRsrc --keepParent \
-            mobile/ios/build/ArguiWidgetGallery.xcframework \
-            mobile/ios/build/ArguiWidgetGallery-xcframework.zip
-          ditto -c -k --sequesterRsrc --keepParent \
-            "$app" mobile/ios/build/ArguiWidgetGallery-simulator.zip
-      - name: Upload reusable iOS artifacts
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: argui-widget-gallery-ios
-          path: |
-            mobile/ios/build/ArguiWidgetGallery-xcframework.zip
-            mobile/ios/build/ArguiWidgetGallery-simulator.zip
           compression-level: 0
           retention-days: 14
           if-no-files-found: error
@@ -355,84 +331,9 @@ jobs:
       - name: Package and compile every publishable crate archive
         run: python3 scripts/release.py package
 
-  website:
-    name: Website
-    runs-on: ubuntu-24.04
-    timeout-minutes: 45
-    env:
-      ARGUI_WASM_BUILD_CONCURRENCY: '2'
-      NUXT_APP_BASE_URL: /argui/
-      NUXT_PUBLIC_SITE_URL: https://extrabinoss.github.io/argui
-    steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          persist-credentials: false
-      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
-        with:
-          package_json_file: website/package.json
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
-        with:
-          node-version: '24'
-          cache: pnpm
-          cache-dependency-path: website/pnpm-lock.yaml
-      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
-        with:
-          toolchain: '1.98.0'
-          targets: wasm32-unknown-unknown
-      - uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
-        with:
-          version: v0.16.0
-      - uses: taiki-e/install-action@3f74d7c16a4242f1c95561e98edc25d36adb4375 # v2
-        with:
-          tool: wasm-pack@0.15.0
-      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
-        with:
-          key: website-wasm
-          cache-targets: false
-          cache-directories: ${{ env.SCCACHE_DIR }}
-          save-if: ${{ github.ref == 'refs/heads/main' }}
-      - name: Install website dependencies
-        run: pnpm --dir website install --frozen-lockfile
-      - name: Check the website
-        run: |
-          pnpm --dir website format:check
-          pnpm --dir website typecheck
-          pnpm --dir website test
-      - name: Build the real WASM gallery and static site
-        run: |
-          pnpm --dir website gallery:build
-          pnpm --dir website generate
-          pnpm --dir website test:generated
-      - name: Upload GitHub Pages site
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-        uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4
-        with:
-          path: website/.output/public
-
-  pages:
-    name: Deploy website
-    needs: [security, website]
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
-    concurrency:
-      group: github-pages
-      cancel-in-progress: false
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
-
   release:
     name: Publish crates and GitHub release
-    needs: [security, quality, semver, coverage, desktop, mobile, android-package, ios-package, packages, website]
+    needs: [security, quality, semver, coverage, desktop, gallery, mobile, android-package, packages]
     if: >-
       github.event_name == 'push' && github.ref == 'refs/heads/main' &&
       github.repository == 'ExtraBinoss/argui' && github.actor == 'ExtraBinoss' &&

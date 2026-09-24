@@ -115,14 +115,5 @@ extra layer, and idle effects request no animation frames. Active effects still
 have an offscreen/filter cost in the existing render graph; custom shaders retain
 their usual responsibility for output alpha and any expansion beyond the source.
 
-The DevTools enable a subtle fade by default. Pass
-`.scroll_effect(None)` to `DevtoolsApp` or `DevtoolsHost` to disable it, or pass
-`Some(effect)` to replace it. Configure the renderer with
-`argui_devtools::configure_renderer(config)?`; this adds the required presets
-without removing application shader definitions. The gallery's **Effects → Scroll shadow**
-page includes virtual, horizontal and nested scroll examples, with live shadow
-width and intensity controls.
-
-For a CPU-only resize comparison, run the DevTools `profiling` example with
-`--resize`, then `--resize --no-scroll-effects`. This does not measure GPU or
-presentation latency.
+The TSX gallery's **Effects → Scroll shadow** page demonstrates virtual,
+horizontal, and nested scrolling with adjustable shadow width and intensity.

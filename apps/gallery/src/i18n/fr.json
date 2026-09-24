@@ -1,0 +1,6 @@
+{
+  "welcome": "Bonjour, { $name } !",
+  "currentLocale": "Langue actuelle : { $locale }",
+  "switchToFrench": "Passer au français",
+  "switchToEnglish": "Passer à l’anglais"
+}

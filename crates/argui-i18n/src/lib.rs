@@ -30,7 +30,7 @@
 mod catalog;
 mod localizer;
 
-pub use catalog::{Catalog, CatalogError};
+pub use catalog::{Catalog, CatalogError, JsonCatalogError};
 pub use fluent_bundle::{FluentArgs, FluentError, FluentValue};
 pub use localizer::{Localizer, LocalizerError, TranslationError};
 pub use unic_langid::{CharacterDirection, LanguageIdentifier, langid};

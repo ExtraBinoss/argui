@@ -50,7 +50,7 @@ Registry labels are stable diagnostic names; they are not cache keys.
 
 ```rust,ignore
 use std::sync::{Arc, RwLock};
-use argui::render::{
+use argui_render::{
     GpuCanvasDeviceContext, GpuCanvasError, GpuCanvasFactory,
     GpuCanvasRegistration, GpuCanvasRegistry, GpuCanvasRenderContext,
     GpuCanvasRenderer, RendererConfig, wgpu,
@@ -123,7 +123,7 @@ let renderer = RendererConfig::default()
     .gpu_canvases(registry);
 ```
 
-Use `argui::render::wgpu`, not a separately versioned direct WGPU dependency.
+Use `argui_render::wgpu`, not a separately versioned direct WGPU dependency.
 The re-export is the exact version used by the public contexts and descriptor
 types.
 
@@ -137,7 +137,7 @@ format are unchanged; a new device creates factories and textures again.
 Pass the registration ID and the scene's current pixel-content revision:
 
 ```rust,ignore
-use argui::ui::{Element, GpuCanvasSpec};
+use argui_ui::{Element, GpuCanvasSpec, percent};
 
 let viewport = Element::gpu_canvas(
     GpuCanvasSpec::new(canvas_id)
@@ -145,8 +145,8 @@ let viewport = Element::gpu_canvas(
         .resolution_scale(1.0),
 )
 .keyed("document-viewport")
-.width(argui::ui::percent(1.0))
-.height(argui::ui::percent(1.0));
+.width(percent(1.0))
+.height(percent(1.0));
 ```
 
 It is an ordinary leaf. Width, height, transforms, opacity, rounded corners,
@@ -214,8 +214,7 @@ are invalidated when canvas content or composition changes.
 Animation remains model-driven. While running, request animation frames,
 advance the scene and revision, then notify the model. While paused, request no
 frames and keep the revision fixed. Unrelated Argui redraws then count as cache
-hits and do not invoke custom GPU work. The [GPU Canvas Lab](../../app_examples/gpu-canvas/)
-demonstrates this pattern.
+hits and do not invoke custom GPU work.
 
 ## Texture size and memory
 
@@ -238,10 +237,10 @@ keys include registration, retained node identity and custom slot, so remounts
 do not accidentally reuse another node's pixels.
 
 `RenderProfile::gpu_canvases` reports retained entries and bytes, dirty renders,
-cache hits, failures and callback CPU encode time. Inspector records, strict GPU
-trace JSON and DevTools expose the same values. This is CPU timing, not a claim
-about the application's custom GPU pass duration; use WGPU timestamp queries
-when that measurement is required.
+cache hits, failures and callback CPU encode time. Inspector records and strict
+GPU trace JSON expose the same values. This is CPU timing, not a claim about
+the application's custom GPU pass duration; use WGPU timestamp queries when
+that measurement is required.
 
 ## Color, alpha and sampling
 
@@ -263,6 +262,8 @@ Factories that need more than the WebGPU baseline declare requirements before
 device creation:
 
 ```rust,ignore
+use argui_render::{GpuCanvasRequirements, wgpu};
+
 fn requirements(&self) -> GpuCanvasRequirements {
     GpuCanvasRequirements::default()
         .required_features(wgpu::Features::TEXTURE_COMPRESSION_BC)
@@ -313,10 +314,9 @@ as Argui buttons or semantic overlays; pixels alone have no accessible meaning.
 
 GPU-free UI/layout tests treat the element as an opaque leaf and can verify
 layout, hit testing, focus, handlers and semantics without a renderer.
-Downstream GPU-free harnesses, including `argui-testing` integrations, should
-keep that boundary rather than execute WGPU callbacks. Renderer pixel,
-blending, effect and callback-order correctness belongs in `argui-render` GPU
-tests. On Linux, run graphical checks through
+Downstream GPU-free harnesses should keep that boundary rather than execute
+WGPU callbacks. Renderer pixel, blending, effect and callback-order correctness
+belongs in `argui-render` GPU tests. On Linux, run graphical checks through
 `scripts/linux-hidden-display.sh` and inspect saved captures.
 
 ## Acceptance measurements
@@ -340,7 +340,3 @@ pan/zoom, the clipped effect layer and overlay, failure placeholder, recovery,
 pause, resize and a 2× device scale. The exact timings and artifact sizes vary
 by toolchain and target; the required invariants are the zero unchanged
 callback, bounded cache bytes and stopped paused animation loop.
-
-For a native and WebAssembly reference including compute, render, pan, zoom,
-pause/resume, clipping, an effect, overlays and in-app recovery diagnostics,
-see [GPU Canvas Lab](../../app_examples/gpu-canvas/README.md).

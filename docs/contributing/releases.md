@@ -1,24 +1,22 @@
 # Releases
 
 The [CI workflow](../../.github/workflows/ci.yml) runs independent jobs for
-security, static Rust quality, public API/SemVer compatibility, Rust coverage,
-desktop targets, mobile targets, package archives, and the website. Keeping
-static checks and instrumented coverage separate gives each expensive build its
-own timeout without weakening the local combined gate. Independent jobs start
-immediately; GitHub Pages waits for both security and the website, while crate
-publication waits for every required job. Rust jobs use `sccache` for compiler
-outputs and cache Cargo's registry separately instead of uploading complete
-`target/` directories.
+security, Rust quality, public API compatibility, coverage, desktop targets,
+mobile cross-checks, Android packages, and crate archives. Keeping static
+checks and instrumented coverage separate gives each expensive build its own
+timeout without weakening the local combined gate. The release job waits for
+the required checks. Rust jobs use `sccache` for compiler outputs and cache
+Cargo's registry separately instead of uploading complete `target/`
+directories.
 
-The public API job compares every previously published crate with its latest
-crates.io release. A new crate without a registry baseline is explicitly
-excluded until its first release; currently this applies only to
-`argui-testing`.
+The public API job compares the Rust workspace APIs with their latest
+crates.io releases.
 
 ## Prepare a version
 
-All 24 public crates share one workspace version. Application and showcase
-crates set `publish = false`.
+Publishable crates in the root Rust workspace share one workspace version.
+Application-only crates under `apps/` use their own manifests and release
+policy.
 
 ```sh
 python3 scripts/release.py bump VERSION
@@ -56,8 +54,7 @@ Publication runs only for a push to this repository's `main` branch by
 1. repeats manifest and package validation;
 2. checks ownership and existing versions on crates.io;
 3. publishes missing crates in dependency order;
-4. publishes the `argui` facade last;
-5. creates `vVERSION` and a GitHub release at the checked commit.
+4. creates `vVERSION` and a GitHub release at the checked commit.
 
 The token comes from `CRATE_REGISTRY_TOKEN`, falling back to
 `CARGO_REGISTRY_TOKEN`, and is exposed only to the publish step. Prerelease
@@ -73,10 +70,11 @@ ownership, or a registry error stops the release.
 
 ## Protected main
 
-The repository rules require the security, quality, public API, desktop,
-mobile, package, and website checks, a current branch, resolved review threads,
-and code-owner approval. Force pushes and branch deletion are blocked. The checked-in policy is
-[.github/main-ruleset.json](../../.github/main-ruleset.json).
+The checked-in repository rules require Security, Rust quality, Public API,
+Rust coverage, both desktop compile checks, Mobile cross-check, Solid and React
+gallery, and Crates.io archives, along with a current branch, resolved review
+threads, and code-owner approval. Force pushes and branch deletion are blocked.
+The checked-in policy is [.github/main-ruleset.json](../../.github/main-ruleset.json).
 
 The current crate graph is documented in
 [repository structure](../repo/structure.md); the script remains the source of

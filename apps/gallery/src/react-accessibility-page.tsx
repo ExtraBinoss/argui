@@ -1,9 +1,7 @@
 /** @jsxImportSource @argui/react */
 import { useState, type ReactElement } from 'react'
 import { mediaAssets } from './assets.generated'
-import { ReactButton, ReactSelect } from './react-controls'
-import { ReactInputField } from './react-input-field'
-import type { Palette } from './theme'
+import { Button as ReactButton, InputField as ReactInputField, Select as ReactSelect, type Palette } from '@argui/widgets/react'
 
 /** Shows accessible components and a custom native slider in React. */
 export function ReactAccessibilityPage(props: { theme: Palette }): ReactElement {

@@ -6,22 +6,21 @@ Multiple regions can use different tints.
 
 ## Enable the feature
 
-`desktop-backdrop` is disabled by default in `argui`, `argui-runtime`,
-`argui-platform` and the gallery. It is included by `--all-features` and is
-independent of native popovers, widgets and WGSL effects.
+`desktop-backdrop` is disabled by default in `argui-runtime` and
+`argui-platform`. Enable the feature in both crates; it is independent of native
+popovers and WGSL effects.
 
 ```toml
-argui = { version = "0.3.2", features = ["desktop-backdrop"] }
+argui-platform = { version = "0.3.2", features = ["desktop-backdrop"] }
+argui-runtime = { version = "0.3.2", features = ["desktop-backdrop"] }
 ```
 
 Configure the window at creation, then choose regions while rendering:
 
 ```rust
-use argui::{
-    core::{BackdropMaterial, Color},
-    platform::WindowConfig,
-    ui::{DesktopBackdrop, Element, length},
-};
+use argui_core::{BackdropMaterial, Color};
+use argui_platform::WindowConfig;
+use argui_ui::{DesktopBackdrop, Element, length};
 
 let window = WindowConfig {
     desktop_backdrop: Some(BackdropMaterial::Sidebar),
@@ -92,7 +91,7 @@ can require only the preferred DirectX 12 DirectComposition path when diagnosing
 or driver failures:
 
 ```rust
-let renderer = argui::render::RendererConfig::default().renderer_fallback(false);
+let renderer = argui_render::RendererConfig::default().renderer_fallback(false);
 ```
 
 If every enabled configuration fails, `RuntimeEvent::RendererFailed` contains each
@@ -106,22 +105,12 @@ References: [Wayland protocol](https://gitlab.freedesktop.org/wayland/wayland-pr
 [DWM backdrop types](https://learn.microsoft.com/en-us/windows/win32/api/dwmapi/ne-dwmapi-dwm_systembackdrop_type),
 [NSVisualEffectView](https://developer.apple.com/documentation/appkit/nsvisualeffectview).
 
-## Gallery and validation
-
-```sh
-cargo run -p argui-widget-gallery --features desktop-backdrop
-```
-
-In **Appearance → Sidebar appearance**, **Desktop glass** controls native blur
-and is disabled when unavailable. **Accent tint** changes the tint directly.
-Changing **Surface opacity** or **Inactive opacity** enables transparency when
-blur is inactive. **Allow transparency without blur** controls that mode separately.
-Both switches start off; the main content and top bar remain opaque.
+## Validation
 
 Paint and layout tests cover invalidation, clipping, transforms, fallback and
 content opacity. The opt-in `native_desktop_backdrop` test verifies X11 requests
 and capability removal on a private server; it does not simulate visible blur.
-The browser scenario checks controls, alpha and responsive themes. Follow
-[Linux graphical testing](../contributing/linux-testing.md) for every GUI launch.
+Check actual backdrop appearance on each compositor and operating system. Follow
+[Linux graphical testing](../contributing/linux-testing.md) for GUI checks.
 Windows and macOS adapters have been cross-compiled; their appearance still
 needs validation on those systems.

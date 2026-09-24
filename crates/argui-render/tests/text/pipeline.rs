@@ -19,11 +19,11 @@ const WIDTH: u32 = 768;
 const HEIGHT: u32 = 424;
 const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
 const FONTS: [&[u8]; 5] = [
-    include_bytes!("../../../argui-web-demo/assets/fonts/NotoSans-Regular.ttf"),
-    include_bytes!("../../../argui-web-demo/assets/fonts/NotoSansArabic.ttf"),
-    include_bytes!("../../../argui-web-demo/assets/fonts/NotoSansHebrew.ttf"),
-    include_bytes!("../../../argui-web-demo/assets/fonts/NotoEmoji-Regular.ttf"),
-    include_bytes!("../../../argui-web-demo/assets/fonts/FiraMono-Medium.ttf"),
+    include_bytes!("../../../../assets/fonts/NotoSans-Regular.ttf"),
+    include_bytes!("../../../../assets/fonts/NotoSansArabic.ttf"),
+    include_bytes!("../../../../assets/fonts/NotoSansHebrew.ttf"),
+    include_bytes!("../../../../assets/fonts/NotoEmoji-Regular.ttf"),
+    include_bytes!("../../../../assets/fonts/FiraMono-Medium.ttf"),
 ];
 
 struct Fixture {

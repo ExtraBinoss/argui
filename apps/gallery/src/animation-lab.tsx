@@ -1,7 +1,6 @@
 import { createSignal } from '@argui/solid'
 import type { JSX } from '@argui/solid/jsx-runtime'
-import { Button } from './controls'
-import type { Palette } from './theme'
+import { Button, type Palette } from '@argui/widgets/solid'
 
 interface MotionCardProps {
   title: string

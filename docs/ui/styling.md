@@ -88,13 +88,10 @@ normal horizontally scrolling editor behavior.
 
 `argui-theme` contains no global singleton. `Theme<T>` owns typed light and dark
 values and resolves them with `ThemeMode::Light`, `Dark`, or `System`. Any
-application data can be themed; `WidgetTheme` is only the standard preset pack
-for buttons and text editors.
+application data can be themed; TSX components can provide their own tokens.
 
-Theme colors are authored in sRGB and stored internally as linear sRGB. The
-standard `default_theme` preset uses Zinc light/dark tokens and derives hover,
-pressed, scrollbar, and focus colors in OKLab. See [Color](../rendering/primitives.md#color) for the
-renderer-wide contract.
+Theme colors are authored in sRGB and stored internally as linear sRGB. See
+[Color](../rendering/primitives.md#color) for the renderer-wide contract.
 
 The runtime exposes `WindowEnvironment` through `Context::environment()`. It
 contains the effective color scheme, reduced-motion preference, and
@@ -102,24 +99,15 @@ high-contrast preference, plus optional shared `ThemeOverrides`. It is `Clone`;
 an environment without overrides allocates no token map. Components that read it are retained and rebuilt when
 the environment changes; unrelated component caches remain valid.
 
-Resolve widgets with `let environment = cx.environment(); let themes =
-default_theme(&environment); let theme = themes.resolve(environment.color_scheme);`.
-`default_theme` accepts any `ThemeSource`, including a plain primary `Color` when scoped
-tokens are not needed. `WidgetTheme::tokens()` exposes the editable palette;
-`apply_overrides` applies typed `ThemeValue::Color`/`Number` entries. Primary
-overrides also derive the matching foreground unless explicitly overridden.
 `Context::entity_in(&entity, environment)` scopes an environment to a mounted
-child and its descendants. The [DevTools Theme tab](../contributing/devtools.md#theme)
-uses this to preview tokens without changing the inspector's own palette.
-The older `shadcn` name remains an equivalent compatibility alias.
+child and its descendants. `ThemeOverrides` holds typed color and number
+overrides for applications that expose theme editing.
 
 System mode uses Winit theme notifications on Windows, macOS, and Web. Linux
 reads and continuously watches the XDG desktop portal. An unknown or explicitly
 neutral system preference resolves to Light. `PreferenceOverrides` always wins
 and is applied before the first visible frame.
 
-Standard widget icons use SVG `currentColor`. Their alpha masks are cached in the
-shared vector atlas while `Element::vector_color` supplies the resolved theme
-color per instance. Theme changes therefore repaint existing vectors without
-duplicating or rerasterizing their assets. Applications register the assets
-through `Render::vector_assets` and may replace every preset or asset.
+SVG icons using `currentColor` can share cached alpha masks while
+`Element::vector_color` supplies the color per instance. Theme changes repaint
+existing vectors without duplicating or rerasterizing their assets.

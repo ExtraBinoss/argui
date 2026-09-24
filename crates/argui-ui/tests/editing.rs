@@ -1,33 +1,49 @@
 use argui_core::{Affine2D, Key, KeyInput, KeyState, Modifiers, Point, Rect, Size};
-use argui_paint::{ClipChain, PaintStyle};
+use argui_paint::ClipChain;
 use argui_text::TextStyle;
 use argui_ui::{
-    CursorIcon, Element, EventHandlerId, EventListener, EventOwnerId, EventType, HitRegion,
-    HitShape, UiTree,
+    CaretStyle, CursorIcon, Element, EventHandlerId, EventListener, EventOwnerId, EventType,
+    FocusPolicy, HitRegion, HitShape, Interaction, TextEditorSpec, TextInputFilter, TextPrivacy,
+    UiTree,
 };
-use argui_widgets::{Input, InputKind, InputStyle};
 
 #[path = "text_input/history.rs"]
 mod history;
 #[path = "text_input/privacy.rs"]
 mod privacy;
 
-fn field(value: &str, kind: InputKind) -> Element {
-    Input::new(
-        "field",
-        value,
-        "Field",
-        InputStyle::new(PaintStyle::default(), TextStyle::default()),
+fn field(value: &str, filter: TextInputFilter) -> Element {
+    Element::text_editor(TextEditorSpec {
+        value: value.to_owned(),
+        placeholder: "Field".to_owned(),
+        multiline: false,
+        read_only: false,
+        filter,
+        text: TextStyle::default(),
+        placeholder_text: TextStyle::default(),
+        selection: argui_ui::Color::WHITE,
+        caret: CaretStyle::default(),
+    })
+    .keyed("field")
+    .interaction(
+        Interaction::default()
+            .focus_policy(FocusPolicy::TabStop)
+            .cursor(CursorIcon::Text),
     )
-    .kind(kind)
-    .build()
     .on(EventListener::new(
         EventType::Input,
         EventHandlerId::new(EventOwnerId(1), 0),
     ))
 }
-fn editor(value: &str, kind: InputKind) -> (UiTree, HitRegion) {
-    let mut tree = UiTree::new(field(value, kind));
+fn editor(value: &str, filter: TextInputFilter) -> (UiTree, HitRegion) {
+    editor_with_privacy(value, filter, TextPrivacy::Public)
+}
+fn editor_with_privacy(
+    value: &str,
+    filter: TextInputFilter,
+    privacy: TextPrivacy,
+) -> (UiTree, HitRegion) {
+    let mut tree = UiTree::new(field(value, filter).text_privacy(privacy));
     let region = HitRegion {
         node: tree.node_ids()[0],
         bounds: Rect::new(Point::default(), Size::new(300.0, 40.0)),
@@ -47,15 +63,11 @@ fn editor(value: &str, kind: InputKind) -> (UiTree, HitRegion) {
     );
     (tree, region)
 }
-fn key(key: Key, text: Option<&str>, command: bool, shift: bool) -> KeyInput {
+fn key(key: Key, text: Option<&str>, modifiers: Modifiers) -> KeyInput {
     KeyInput {
         key,
         text: text.map(str::to_owned),
-        modifiers: Modifiers {
-            control: command,
-            shift,
-            ..Default::default()
-        },
+        modifiers,
         state: KeyState::Pressed,
         repeat: false,
     }
@@ -64,14 +76,13 @@ fn type_text(tree: &mut UiTree, value: &str) {
     tree.edit_text_input(&key(
         Key::Character(value.into()),
         Some(value),
-        false,
-        false,
+        Modifiers::default(),
     ));
 }
 
 #[test]
 fn deferred_replacements_resolve_keys_and_refuse_missing_or_ambiguous_targets() {
-    let (mut tree, region) = editor("before", InputKind::Text);
+    let (mut tree, region) = editor("before", TextInputFilter::Any);
     assert!(
         tree.apply_command(argui_ui::UiCommand::ReplaceText {
             target: "field".into(),
@@ -91,8 +102,8 @@ fn deferred_replacements_resolve_keys_and_refuse_missing_or_ambiguous_targets() 
             .layout_changed
     );
     tree.replace(Element::column([
-        field("a", InputKind::Text),
-        field("b", InputKind::Text),
+        field("a", TextInputFilter::Any),
+        field("b", TextInputFilter::Any),
     ]));
     assert!(
         !tree

@@ -1,14 +1,15 @@
-use super::{editor, field, key};
-use argui_core::{CaretAffinity, ImeInput, Key, TextPosition};
+use super::{editor, editor_with_privacy, field, key};
+use argui_core::{CaretAffinity, ImeInput, Key, Modifiers, TextPosition};
+use argui_ui::TextInputFilter;
 use argui_ui::{
     SelectionCommand, TextEdit, TextPrivacy, TextSelection, TextSelectionRequest, UiEvent,
     UiEventKind,
 };
-use argui_widgets::InputKind;
 
 #[test]
 fn passwords_mask_graphemes_and_map_mouse_positions_to_real_offsets() {
-    let (mut tree, region) = editor("A👩‍🚀e\u{301}", InputKind::Password);
+    let (mut tree, region) =
+        editor_with_privacy("A👩‍🚀e\u{301}", TextInputFilter::Any, TextPrivacy::Password);
     assert_eq!(tree.text_input_display(region.node).as_deref(), Some("•••"));
     assert_eq!(tree.text_input_cursor(region.node), Some(9));
     tree.move_text_position(
@@ -27,8 +28,9 @@ fn passwords_mask_graphemes_and_map_mouse_positions_to_real_offsets() {
 #[test]
 fn password_copy_cut_and_history_are_disabled_including_revealed_mode() {
     for privacy in [TextPrivacy::Password, TextPrivacy::RevealedPassword] {
-        let (mut tree, region) = editor("secret", InputKind::Password);
-        tree.replace(field("secret", InputKind::Password).text_privacy(privacy));
+        let (mut tree, region) =
+            editor_with_privacy("secret", TextInputFilter::Any, TextPrivacy::Password);
+        tree.replace(field("secret", TextInputFilter::Any).text_privacy(privacy));
         tree.selection_command(Some(region.node), SelectionCommand::SelectAll);
         let caps = tree.selection_capabilities(region.node);
         assert!(!caps.copy && !caps.cut && caps.paste && caps.select_all);
@@ -46,7 +48,8 @@ fn password_copy_cut_and_history_are_disabled_including_revealed_mode() {
 
 #[test]
 fn password_semantics_debug_and_telemetry_do_not_export_plaintext() {
-    let (tree, region) = editor("topsecret", InputKind::Password);
+    let (tree, region) =
+        editor_with_privacy("topsecret", TextInputFilter::Any, TextPrivacy::Password);
     let snapshot = tree.semantic_tree(&[], 1.0);
     assert!(snapshot.nodes[0].semantics.state.protected);
     assert!(snapshot.nodes[0].semantics.value.is_none());
@@ -58,8 +61,7 @@ fn password_semantics_debug_and_telemetry_do_not_export_plaintext() {
         UiEventKind::KeyInput(key(
             Key::Character("topsecret".into()),
             Some("topsecret"),
-            false,
-            false,
+            Modifiers::default(),
         )),
     ] {
         let event = UiEvent::new(region.node, None, kind);
@@ -69,7 +71,7 @@ fn password_semantics_debug_and_telemetry_do_not_export_plaintext() {
 
 #[test]
 fn password_preedit_is_masked_and_never_undoable() {
-    let (mut tree, region) = editor("a", InputKind::Password);
+    let (mut tree, region) = editor_with_privacy("a", TextInputFilter::Any, TextPrivacy::Password);
     tree.ime_input(ImeInput::Preedit {
         text: "日本".into(),
         cursor: None,
@@ -78,7 +80,7 @@ fn password_preedit_is_masked_and_never_undoable() {
     assert_eq!(tree.text_input_cursor(region.node), Some(9));
     tree.ime_input(ImeInput::Commit("日本".into()));
     assert!(!tree.can_undo(region.node));
-    tree.replace(field("a日本", InputKind::Password).text_privacy(TextPrivacy::RevealedPassword));
+    tree.replace(field("a日本", TextInputFilter::Any).text_privacy(TextPrivacy::RevealedPassword));
     assert_eq!(
         tree.text_input_display(region.node).as_deref(),
         Some("a日本")
@@ -93,11 +95,11 @@ fn password_preedit_is_masked_and_never_undoable() {
 
 #[test]
 fn entering_password_policy_erases_existing_public_history() {
-    let (mut tree, region) = editor("", InputKind::Text);
+    let (mut tree, region) = editor("", TextInputFilter::Any);
     tree.paste_text(None, "secret");
     assert!(tree.can_undo(region.node));
-    tree.replace(field("secret", InputKind::Password));
+    tree.replace(field("secret", TextInputFilter::Any).text_privacy(TextPrivacy::Password));
     assert!(!tree.can_undo(region.node));
-    tree.replace(field("secret", InputKind::Text));
+    tree.replace(field("secret", TextInputFilter::Any));
     assert!(!tree.can_undo(region.node));
 }

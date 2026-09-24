@@ -1,11 +1,10 @@
 use argui_core::{Affine2D, Point, Rect, Size};
-use argui_paint::{ClipChain, PaintStyle};
-use argui_text::TextStyle;
+use argui_paint::ClipChain;
 use argui_ui::{
-    CursorIcon, Display, Element, FocusRequest, GestureSet, HitRegion, Interaction, Role,
-    SemanticAction, SemanticValue, Semantics, TreeUpdate, UiTree,
+    CaretStyle, CursorIcon, Display, Element, FocusRequest, GestureSet, HitRegion, Interaction,
+    KeyboardActivation, Role, SemanticAction, SemanticValue, Semantics, TextEditorSpec,
+    TextInputFilter, TreeUpdate, UiTree,
 };
-use argui_widgets::{Button, ButtonStyle, Input, InputStyle};
 
 #[test]
 fn semantic_changes_do_not_dirty_layout_or_paint() {
@@ -22,12 +21,17 @@ fn semantic_changes_do_not_dirty_layout_or_paint() {
 
 #[test]
 fn buttons_publish_one_actionable_semantic_leaf() {
-    let button = Button::new(
-        "save",
-        "Save changes",
-        ButtonStyle::new(PaintStyle::default(), TextStyle::default()),
-    )
-    .build();
+    let button = Element::container([Element::text("Save changes")])
+        .interaction(
+            Interaction::default()
+                .focus_policy(argui_ui::FocusPolicy::TabStop)
+                .keyboard_activation(KeyboardActivation::EnterOrSpace),
+        )
+        .semantics(
+            Semantics::new(Role::Button)
+                .label("Save changes")
+                .action(SemanticAction::Click),
+        );
     let tree = UiTree::new(button);
     let root = tree.node_id_at(0).unwrap();
     let semantics = tree.semantic_tree(
@@ -115,14 +119,23 @@ fn display_none_removes_the_entire_semantic_subtree() {
 
 #[test]
 fn text_inputs_publish_retained_values_and_disabled_state() {
-    let style = InputStyle::new(PaintStyle::default(), TextStyle::default());
-    let input = Input::new("query", "Argui", "Search", style)
-        .build()
-        .interaction(
-            Interaction::default()
-                .focus_policy(argui_ui::FocusPolicy::TabStop)
-                .enabled(false),
-        );
+    let input = Element::text_editor(TextEditorSpec {
+        value: "Argui".to_owned(),
+        placeholder: "Search".to_owned(),
+        multiline: false,
+        read_only: false,
+        filter: TextInputFilter::Any,
+        text: Default::default(),
+        placeholder_text: Default::default(),
+        selection: argui_ui::Color::WHITE,
+        caret: CaretStyle::default(),
+    })
+    .interaction(
+        Interaction::default()
+            .focus_policy(argui_ui::FocusPolicy::TabStop)
+            .enabled(false),
+    )
+    .semantics(Semantics::new(Role::TextInput));
     let tree = UiTree::new(input);
     let semantics = tree.semantic_tree(&[], 1.0);
     let node = &semantics.nodes[0];

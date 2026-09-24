@@ -1,12 +1,11 @@
 use argui_animation::{Duration, Keyframe, Keyframes, Time};
 use argui_core::{Affine2D, Color, Key, KeyInput, KeyState, Modifiers, Point, Rect, Size};
-use argui_paint::{ClipChain, PaintStyle, QuadStyle};
-use argui_text::TextStyle;
+use argui_paint::{ClipChain, QuadStyle};
 use argui_ui::{
     CaretAlign, CaretAnimation, CaretFrame, CaretHeight, CaretPrimitive, CaretStyle, CaretVisual,
-    CursorIcon, FocusRequest, GestureSet, HitRegion, TreeUpdate, UiTree,
+    CursorIcon, Element, FocusPolicy, FocusRequest, GestureSet, HitRegion, Interaction,
+    TextEditorSpec, TextInputFilter, TreeUpdate, UiTree,
 };
-use argui_widgets::{Input, InputStyle};
 
 fn region(node: argui_ui::NodeId) -> HitRegion {
     HitRegion {
@@ -25,13 +24,19 @@ fn region(node: argui_ui::NodeId) -> HitRegion {
 }
 
 fn input(caret: CaretStyle) -> argui_ui::Element {
-    Input::new(
-        "editor",
-        "text",
-        "",
-        InputStyle::new(PaintStyle::default(), TextStyle::default()).caret(caret),
-    )
-    .build()
+    Element::text_editor(TextEditorSpec {
+        value: "text".to_owned(),
+        placeholder: String::new(),
+        multiline: false,
+        read_only: false,
+        filter: TextInputFilter::Any,
+        text: Default::default(),
+        placeholder_text: Default::default(),
+        selection: Color::WHITE,
+        caret,
+    })
+    .keyed("editor")
+    .interaction(Interaction::default().focus_policy(FocusPolicy::TabStop))
 }
 
 #[test]

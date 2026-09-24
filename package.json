@@ -3,7 +3,7 @@
   "private": true,
   "workspaces": ["packages/*", "apps/*"],
   "scripts": {
-    "test:ts": "bun run build:gallery && bun test packages/host/tests packages/react/tests && node --test apps/gallery/tests/*.mjs",
+    "test:ts": "bun run build:gallery && bun test packages/host/tests packages/react/tests packages/i18n/tests && node --test apps/gallery/tests/*.mjs",
     "check:ts": "tsc --noEmit -p tsconfig.json",
     "generate:jsx": "bun packages/solid/scripts/generate-jsx.mjs && bun packages/react/scripts/generate-jsx.mjs",
     "generate:assets": "bun apps/gallery/scripts/generate-assets.mjs",
