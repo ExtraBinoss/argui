@@ -52,13 +52,13 @@ export function ReactResizable(props: SurfaceEResizableProps<ReactElement>): Rea
     onKey={handleKey} onSemanticAction={semanticAction}>
     {orientation === 'horizontal'
       ? <touchArea width={handleSize} height={crossExtent} mouse_cursor="col_resize"
-        onDragX={(payload) => commit(surfaceEResizeByPixels(valueRef.current, surfaceEDragPixels(payload), panelExtent, min, max))}>
+        onDragX={(payload) => commit(surfaceEResizeByPixels(valueRef.current, surfaceEDragPixels(payload, 'x'), panelExtent, min, max))}>
         <rectangle width="fill" height="fill" background="#00000000">
           <rectangle width={4} height={48} radius={2} background={focused ? props.theme.accent : props.theme.border} />
         </rectangle>
       </touchArea>
       : <touchArea width={crossExtent} height={handleSize} mouse_cursor="row_resize"
-        onDragY={(payload) => commit(surfaceEResizeByPixels(valueRef.current, surfaceEDragPixels(payload), panelExtent, min, max))}>
+        onDragY={(payload) => commit(surfaceEResizeByPixels(valueRef.current, surfaceEDragPixels(payload, 'y'), panelExtent, min, max))}>
         <rectangle width="fill" height="fill" background="#00000000">
           <rectangle width={48} height={4} radius={2} background={focused ? props.theme.accent : props.theme.border} />
         </rectangle>

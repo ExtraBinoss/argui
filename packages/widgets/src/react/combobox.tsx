@@ -4,6 +4,7 @@ import { foundationIKey } from '../shared/foundation-i'
 import { InputEditController } from '../shared/input-edit'
 import { nextSelectIndex, resolveSelectOptions, type SelectOption } from '../shared/select-options'
 import { selectionTint, type Palette } from '../shared/theme'
+import { useWidgetIcons } from './assets'
 
 /** Props for a searchable, single-value native combobox. */
 export interface ComboboxProps {
@@ -39,6 +40,8 @@ export interface ComboboxProps {
   width?: number
   /** Whether to show a keyboard-accessible clear action. */
   clearable?: boolean
+  /** Whether to draw the accessible label above the editor. */
+  showLabel?: boolean
 }
 
 /** Props alias retained to name the React adapter explicitly. */
@@ -46,6 +49,7 @@ export type ReactComboboxProps = ComboboxProps
 
 /** Filters and selects one value using a native text editor and anchored popup. */
 export function ReactCombobox(props: ReactComboboxProps): ReactElement {
+  const icons = useWidgetIcons()
   const [expanded, setExpanded] = useState(false)
   const [focused, setFocused] = useState(false)
   const [activeIndex, setActiveIndex] = useState(-1)
@@ -107,11 +111,11 @@ export function ReactCombobox(props: ReactComboboxProps): ReactElement {
   const active = () => filtered().find(({ option, index }) => index === activeIndex && !option.disabled)?.index
     ?? filtered().find(({ option }) => !option.disabled)?.index
   return <column width="fill" gap={6}>
-    <text text={props.label} color={props.theme.muted} font_size={12} />
+    {props.showLabel !== false ? <text text={props.label} color={props.theme.muted} font_size={12} /> : null}
     <focusScope nativeKey={props.id} role="combo_box" accessible_name={props.label}
       accessible_value={chosen?.label ?? ''} controls={`${props.id}-popup`} has_popup="list_box"
       expandable={true} expanded={expanded} active_descendant={expanded && active() !== undefined ? `${props.id}-option-${active()}` : undefined}
-      enabled={!props.disabled} onKey={onKey}>
+      enabled={!props.disabled} onKey={onKey} onClick={() => { if (!expanded) open() }}>
       <rectangle width={width} height={props.theme.inputHeight}
         background={props.disabled ? props.theme.surfaceRaised : props.theme.surface}
         border_color={focused ? props.theme.accent : props.theme.border} border_width={focused ? 2 : 1}
@@ -123,7 +127,7 @@ export function ReactCombobox(props: ReactComboboxProps): ReactElement {
               value={displayValue} placeholder={expanded ? props.searchPlaceholder ?? props.placeholder ?? 'Search options…' : props.placeholder ?? 'Choose an option…'}
               label={props.label} enabled={!props.disabled} background="#00000000" text_color={props.theme.foreground}
               placeholder_color={props.theme.muted} caret_color={props.theme.accent} selection_color={selectionTint(props.theme.accent)}
-              onClick={() => { if (!expanded) open() }} onFocus={() => { setFocused(true); if (!expanded) open() }}
+              onFocus={() => { setFocused(true); if (!expanded) open() }}
               onBlur={() => setFocused(false)} onEdit={(payload) => edits.current!.apply(payload, displayValue, setQuery)} />
           </container>
           {props.clearable && value ? <focusScope role="button" accessible_name={`Clear ${props.label}`} enabled={!props.disabled}
@@ -133,10 +137,13 @@ export function ReactCombobox(props: ReactComboboxProps): ReactElement {
               setQuery('')
             }}>
             <touchArea enabled={!props.disabled} mouse_cursor="pointer">
-              <text text="×" color={props.theme.muted} font_size={18} />
+              {icons.x ? <svg source={icons.x} color={props.theme.muted} width={16} height={16} />
+                : <text text="×" color={props.theme.muted} font_size={18} />}
             </touchArea>
           </focusScope> : null}
-          <text text={expanded ? '⌃' : '⌄'} color={props.theme.muted} font_size={14} accessible_hidden={true} />
+          {icons.chevronDown ? <svg source={icons.chevronDown} color={props.theme.muted}
+            width={16} height={16} rotation={expanded ? 180 : 0} accessible_hidden={true} />
+            : <text text={expanded ? '⌃' : '⌄'} color={props.theme.muted} font_size={14} accessible_hidden={true} />}
         </row>
       </rectangle>
     </focusScope>
@@ -169,7 +176,9 @@ export function ReactCombobox(props: ReactComboboxProps): ReactElement {
                         <text text={option.label} color={option.disabled ? props.theme.muted : props.theme.foreground}
                           font_size={props.theme.controlFontSize} />
                         <container grow={1} />
-                        {value === option.value ? <text text="✓" color={props.theme.accent} font_size={14} /> : null}
+                        {value === option.value ? icons.check
+                          ? <svg source={icons.check} color={props.theme.foreground} width={16} height={16} accessible_hidden={true} />
+                          : <text text="✓" color={props.theme.foreground} font_size={14} accessible_hidden={true} /> : null}
                       </row>
                     </rectangle>
                   </touchArea>

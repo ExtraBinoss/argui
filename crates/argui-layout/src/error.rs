@@ -7,6 +7,7 @@ pub enum LayoutError {
     Taffy(taffy::TaffyError),
     MissingRoot,
     MissingNodeIdentity(usize),
+    StaleOutput,
     NonConvergentContainerQueries,
 }
 
@@ -20,6 +21,7 @@ impl fmt::Display for LayoutError {
             Self::MissingNodeIdentity(index) => {
                 write!(formatter, "UI node {index} has no stable identity")
             }
+            Self::StaleOutput => formatter.write_str("scroll layout belongs to an older UI tree"),
             Self::NonConvergentContainerQueries => {
                 formatter.write_str("container queries did not converge after four layout passes")
             }
@@ -35,6 +37,7 @@ impl Error for LayoutError {
             | Self::InvalidBoundary(_)
             | Self::MissingRoot
             | Self::MissingNodeIdentity(_)
+            | Self::StaleOutput
             | Self::NonConvergentContainerQueries => None,
         }
     }

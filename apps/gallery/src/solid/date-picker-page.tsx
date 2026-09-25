@@ -1,6 +1,7 @@
 import { createSignal } from '@argui/solid'
 import type { JSX } from '@argui/solid/jsx-runtime'
 import { Button, Calendar, InputField, Popover, type Palette } from '@argui/widgets/solid'
+import { surfaceEFormatCalendarDate } from '../../../../packages/widgets/src/shared/surface-e'
 
 function dateKey(date: Date): string {
   return `${String(date.getFullYear()).padStart(4, '0')}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
@@ -22,7 +23,7 @@ export function DatePickerPage(props: { theme: Palette }): JSX.Element {
   const [invalid, setInvalid] = createSignal(false)
   const [open, setOpen] = createSignal(false)
   const [locale, setLocale] = createSignal<'en-US' | 'fr-FR'>('en-US')
-  const formatted = () => new Intl.DateTimeFormat(locale(), { dateStyle: 'long' }).format(date())
+  const formatted = () => surfaceEFormatCalendarDate(date(), locale(), 'long')
   const choose = (next: Date) => {
     setDate(next)
     setInput(dateKey(next))

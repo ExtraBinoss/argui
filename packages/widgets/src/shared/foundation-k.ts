@@ -172,14 +172,18 @@ export function foundationKSortRows(
 ): FoundationKTableRow[] {
   if (!sort) return [...rows]
   const direction = sort.direction === 'ascending' ? 1 : -1
-  const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' })
+  const collator = typeof Intl !== 'undefined' && typeof Intl.Collator === 'function'
+    ? new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' }) : undefined
+  const compare = (a: string, b: string) => collator
+    ? collator.compare(a, b)
+    : a.toLowerCase() < b.toLowerCase() ? -1 : a.toLowerCase() > b.toLowerCase() ? 1 : 0
   return [...rows].sort((left, right) => {
     const a = left.cells[sort.columnId] ?? ''
     const b = right.cells[sort.columnId] ?? ''
     const comparison = typeof a === 'number' && typeof b === 'number'
       ? a - b
-      : collator.compare(String(a), String(b))
-    return comparison * direction || left.id.localeCompare(right.id)
+      : compare(String(a), String(b))
+    return comparison * direction || compare(left.id, right.id)
   })
 }
 

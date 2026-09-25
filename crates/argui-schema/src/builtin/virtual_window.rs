@@ -1,6 +1,6 @@
 //! Native vertical or horizontal virtual viewport fed by a keyed presenter.
 
-use argui_effects::EdgeShadow;
+use argui_effects::{EdgeFade, EdgeShadow};
 use argui_ui::{
     EventType, ScrollbarGutter, ScrollbarPartStyle, ScrollbarStyle, ScrollbarVisibility,
     VirtualList,
@@ -135,7 +135,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
         VIRTUAL_SHADOW_COLOR,
         "shadow_color",
         ValueType::Color,
-        "Scroll edge shadow color.",
+        "Optional scroll edge shadow color; omitted color fades into the backdrop.",
     ))
     .property(PropertySchema::new(
         VIRTUAL_SHADOW_INTENSITY,
@@ -348,10 +348,6 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
             ));
         }
         if shadow_width > 0.0 {
-            let color = match input.get(VIRTUAL_SHADOW_COLOR) {
-                Some(SchemaValue::Color(color)) => *color,
-                _ => argui_core::Color::srgba(0.0, 0.0, 0.0, 1.0),
-            };
             let start = f32::from(optional_bool(input, VIRTUAL_SHADOW_START).unwrap_or(true));
             let end = f32::from(optional_bool(input, VIRTUAL_SHADOW_END).unwrap_or(true));
             let strengths = if horizontal {
@@ -359,12 +355,17 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
             } else {
                 [0.0, start, 0.0, end]
             };
-            scroll = scroll.effect(
-                EdgeShadow::new(shadow_width, color)
+            let effect = match input.get(VIRTUAL_SHADOW_COLOR) {
+                Some(SchemaValue::Color(color)) => EdgeShadow::new(shadow_width, *color)
                     .intensity(shadow_intensity)
                     .strengths(strengths)
                     .scroll(),
-            );
+                _ => EdgeFade::new(shadow_width)
+                    .intensity(shadow_intensity)
+                    .strengths(strengths)
+                    .scroll(),
+            };
+            scroll = scroll.effect(effect);
         }
         element = element.scroll_config(scroll);
         if let Some(SchemaValue::Float(grow)) = input.get(GROW) {

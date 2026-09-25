@@ -14,6 +14,7 @@ impl LayoutEngine {
     /// # Errors
     ///
     /// Returns [`LayoutError::MissingRoot`] if layout has not been computed yet,
+    /// [`LayoutError::StaleOutput`] if `ui` changed since the output was built,
     /// or propagates errors from scroll and portal layout.
     pub fn apply_scroll(
         &mut self,
@@ -31,19 +32,24 @@ impl LayoutEngine {
     /// * `text_engine` — shaping engine used to prepare newly visible editor lines.
     /// * `output` — retained layout output updated in place.
     ///
-    /// Returns whether editor text was reshaped. Callers can use this result to
-    /// rebuild prepared glyph data only when the visible text window changed.
+    /// Returns whether prepared glyph data must be rebuilt. A stale UI tree
+    /// triggers a full layout and returns true; otherwise only a newly visible
+    /// editor text window does so.
     ///
     /// # Errors
     ///
     /// Returns [`LayoutError::MissingRoot`] if layout has not been computed yet,
-    /// or propagates errors from scroll and portal layout.
+    /// or propagates errors from layout, scroll, and portal placement.
     pub fn apply_scroll_with_text(
         &mut self,
         ui: &mut UiTree,
         text_engine: &mut TextEngine,
         output: &mut LayoutOutput,
     ) -> Result<bool, LayoutError> {
+        if self.revision != Some(ui.revision()) || output.nodes.len() != ui.node_ids().len() {
+            *output = self.compute(ui, text_engine, output.viewport.size)?;
+            return Ok(true);
+        }
         let refresh_text = needs_scroll_refresh(ui, output);
         self.apply_scroll_geometry(ui, output)?;
         if refresh_text {
@@ -54,11 +60,15 @@ impl LayoutEngine {
     }
 
     /// Updates retained scroll and overlay geometry without repainting the output.
+    /// Returns an error when the output belongs to an older UI revision.
     fn apply_scroll_geometry(
         &mut self,
         ui: &UiTree,
         output: &mut LayoutOutput,
     ) -> Result<(), LayoutError> {
+        if self.revision != Some(ui.revision()) || output.nodes.len() != ui.node_ids().len() {
+            return Err(LayoutError::StaleOutput);
+        }
         let elements = flattened(ui.root());
         let root = self.root.as_ref().ok_or(LayoutError::MissingRoot)?;
         output.scroll_regions.clear();

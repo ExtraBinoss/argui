@@ -46,11 +46,11 @@ impl WireValue {
                 .map(|s| SchemaValue::Name(Name::from_owned(s.to_owned()))),
             "Color" => value
                 .as_str()
-                .and_then(|s| Color::from_hex(s).ok())
+                .and_then(|s| Color::from_literal(s).ok())
                 .map(SchemaValue::Color),
             "Brush" => value
                 .as_str()
-                .and_then(|s| Color::from_hex(s).ok())
+                .and_then(|s| Color::from_literal(s).ok())
                 .map(|c| SchemaValue::Brush(Fill::Solid(c))),
             "Dimension" => dimension(value).map(SchemaValue::Dimension),
             "Insets" => insets(value).map(SchemaValue::Insets),
@@ -59,7 +59,12 @@ impl WireValue {
             "Asset" => asset(value).map(SchemaValue::Asset),
             _ => None,
         }
-        .ok_or_else(|| format!("invalid or unsupported {} wire value", self.value_type))
+        .ok_or_else(|| {
+            format!(
+                "invalid or unsupported {} wire value: {}",
+                self.value_type, self.value
+            )
+        })
     }
 }
 
@@ -115,7 +120,15 @@ impl WireOperation {
             } => Operation::SetProperty {
                 id: id.into(),
                 property: PropertyId::from_raw(property),
-                value: value.map(WireValue::into_native).transpose()?,
+                value: value
+                    .map(WireValue::into_native)
+                    .transpose()
+                    .map_err(|error| {
+                        format!(
+                            "node {}:{} property {}: {error}",
+                            id.slot, id.generation, property
+                        )
+                    })?,
             },
             Self::SetListener {
                 id,
@@ -153,7 +166,7 @@ fn dimension(value: &Value) -> Option<Dimension> {
         return Some(Dimension::length(number));
     }
     let text = value.as_str()?;
-    if text == "auto" {
+    if text == "auto" || text == "fit" {
         return Some(Dimension::auto());
     }
     if text == "fill" {

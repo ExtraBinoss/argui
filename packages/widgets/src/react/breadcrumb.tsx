@@ -68,7 +68,7 @@ export function ReactBreadcrumbLink(props: BreadcrumbLinkProps): ReactElement {
   const [focused, setFocused] = useState(false)
   const [hovered, setHovered] = useState(false)
   const activate = () => { if (!props.disabled) props.onNavigate() }
-  const color = props.disabled ? props.theme.muted : hovered || focused ? props.theme.accent : props.theme.foreground
+  const color = hovered || focused ? props.theme.foreground : props.theme.muted
   return <focusScope nativeKey={props.id} role="link" accessible_name={props.label} enabled={!props.disabled}
     keyboard_activation="enter" onClick={activate}
     onFocus={() => setFocused(true)} onKey={() => setFocused(true)} onBlur={() => setFocused(false)}>

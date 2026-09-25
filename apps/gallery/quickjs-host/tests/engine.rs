@@ -125,6 +125,51 @@ fn quickjs_executes_module_bridge_events_microtasks_and_timers() {
 }
 
 #[test]
+fn quickjs_reports_callback_message_and_stack() {
+    let source = r#"
+        export function mountGallery(bridge) {
+            bridge.subscribe(() => { throw new Error('breadcrumb callback failed') })
+            return () => {}
+        }
+    "#;
+    let gallery = QuickJsGallery::new(source, r#"{"abiHash":"test","natives":[]}"#, "mountGallery", |_| String::new())
+        .expect("QuickJS should mount the callback");
+    let error = gallery.deliver("{}").expect_err("callback must fail");
+    assert!(error.contains("breadcrumb callback failed"), "{error}");
+    assert!(error.contains("gallery-core.mjs"), "{error}");
+}
+
+#[test]
+fn quickjs_reports_timer_message_and_stack() {
+    let source = r#"
+        export function mountGallery() {
+            setTimeout(() => { throw new Error('breadcrumb timer failed') }, 1)
+            return () => {}
+        }
+    "#;
+    let gallery = QuickJsGallery::new(source, r#"{"abiHash":"test","natives":[]}"#, "mountGallery", |_| String::new())
+        .expect("timer should mount");
+    gallery.tick(0.0).expect("timer should initialize");
+    let error = gallery.tick(1.0).expect_err("timer must fail");
+    assert!(error.contains("breadcrumb timer failed"), "{error}");
+    assert!(error.contains("gallery-core.mjs"), "{error}");
+}
+
+#[test]
+fn quickjs_reports_microtask_message_and_stack() {
+    let source = r#"
+        export function mountGallery() {
+            queueMicrotask(() => { throw new Error('breadcrumb effect failed') })
+            return () => {}
+        }
+    "#;
+    let error = QuickJsGallery::new(source, r#"{"abiHash":"test","natives":[]}"#, "mountGallery", |_| String::new())
+        .err().expect("microtask must fail");
+    assert!(error.contains("breadcrumb effect failed"), "{error}");
+    assert!(error.contains("gallery-core.mjs"), "{error}");
+}
+
+#[test]
 #[ignore = "requires bun run build:gallery"]
 fn neutral_solid_gallery_runs_in_quickjs() {
     let bundle = std::fs::read_to_string(concat!(

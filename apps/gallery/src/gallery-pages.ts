@@ -1,10 +1,12 @@
-import { widgetGroups, widgetPages } from './widget-pages'
+import { widgetPages } from './widget-pages'
 
-/** Ordered gallery destinations shared by the Solid and React shells. */
-export const pages = [
-  'Button', 'Input', 'Select', 'Popover', 'Dialog', ...widgetPages,
+const componentPages = ['Button', 'Input', 'Select', 'Popover', 'Dialog', ...widgetPages] as const
+const examplePages = [
   'Media', 'Services', 'Theming', 'Typography', 'Date Picker', 'Data Table', 'Internationalization', 'Accessibility', 'Overlay', 'Animation Lab', 'Damage Control', 'WGSL Lab',
 ] as const
+
+/** Ordered gallery destinations shared by the Solid and React shells. */
+export const pages = [...componentPages, ...examplePages] as const
 
 export type Page = typeof pages[number]
 
@@ -14,28 +16,9 @@ export type NavigationItem = { kind: 'page'; page: Page } | { kind: 'heading'; l
 /** Ordered navigation rows, including a distinct Examples section. */
 export const navigationItems: readonly NavigationItem[] = [
   { kind: 'heading', label: 'COMPONENTS' },
-  { kind: 'page', page: 'Button' },
-  { kind: 'page', page: 'Input' },
-  { kind: 'page', page: 'Select' },
-  { kind: 'page', page: 'Popover' },
-  { kind: 'page', page: 'Dialog' },
-  ...widgetGroups.flatMap((group): NavigationItem[] => [
-    { kind: 'heading', label: group.label },
-    ...group.pages.map((page): NavigationItem => ({ kind: 'page', page })),
-  ]),
+  ...componentPages.slice().sort().map((page): NavigationItem => ({ kind: 'page', page })),
   { kind: 'heading', label: 'EXAMPLES' },
-  { kind: 'page', page: 'Media' },
-  { kind: 'page', page: 'Services' },
-  { kind: 'page', page: 'Theming' },
-  { kind: 'page', page: 'Typography' },
-  { kind: 'page', page: 'Date Picker' },
-  { kind: 'page', page: 'Data Table' },
-  { kind: 'page', page: 'Internationalization' },
-  { kind: 'page', page: 'Accessibility' },
-  { kind: 'page', page: 'Overlay' },
-  { kind: 'page', page: 'Animation Lab' },
-  { kind: 'page', page: 'Damage Control' },
-  { kind: 'page', page: 'WGSL Lab' },
+  ...examplePages.slice().sort().map((page): NavigationItem => ({ kind: 'page', page })),
 ]
 
 /** Returns the stable key for a navigation row or heading. */

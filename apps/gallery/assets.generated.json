@@ -17,9 +17,19 @@
       "id": 182680722277923
     },
     {
+      "key": "tabler/check.svg",
+      "kind": "svg",
+      "id": 4418227052333180
+    },
+    {
       "key": "tabler/chevron-down.svg",
       "kind": "svg",
       "id": 5981616865338806
+    },
+    {
+      "key": "tabler/chevron-right.svg",
+      "kind": "svg",
+      "id": 8016896629891356
     },
     {
       "key": "tabler/heart.svg",
@@ -55,6 +65,11 @@
       "key": "tabler/star.svg",
       "kind": "svg",
       "id": 1326099470823436
+    },
+    {
+      "key": "tabler/x.svg",
+      "kind": "svg",
+      "id": 8953272632637284
     }
   ]
 }

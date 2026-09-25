@@ -4,23 +4,19 @@ import type { Palette } from '@argui/widgets/react'
 import { ReactCombobox as Combobox } from '../../../../packages/widgets/src/react/combobox'
 
 const frameworks = [
-  { value: 'next.js', label: 'Next.js', group: 'React' },
-  { value: 'remix', label: 'Remix', group: 'React' },
-  { value: 'sveltekit', label: 'SvelteKit', group: 'Svelte' },
-  { value: 'astro', label: 'Astro', group: 'Other' },
-  { value: 'nuxt.js', label: 'Nuxt.js', group: 'Vue' },
-  { value: 'angular', label: 'Angular', group: 'Other', disabled: true },
+  { value: 'next.js', label: 'Next.js' },
+  { value: 'sveltekit', label: 'SvelteKit' },
+  { value: 'nuxt.js', label: 'Nuxt.js' },
+  { value: 'remix', label: 'Remix' },
+  { value: 'astro', label: 'Astro' },
 ]
 
-/** Demonstrates searchable grouped options, controlled selection, keyboard movement, and clearing. */
+/** Demonstrates a searchable framework picker with an optional selected value. */
 export function ComboboxPage(props: { theme: Palette }): ReactElement {
-  const [framework, setFramework] = useState('next.js')
+  const [framework, setFramework] = useState('')
   return <column width="fill" gap={14}>
-    <text width="fill" text="Type to filter grouped options. Use Up and Down to move, Enter to select, Escape to close, or the clear button to reset the value."
-      color={props.theme.muted} font_size={13} />
     <Combobox id="foundation-j-framework" label="Framework" theme={props.theme} options={frameworks}
-      value={framework} onValueChange={setFramework} placeholder="Choose a framework…"
-      searchPlaceholder="Search frameworks…" emptyLabel="No framework found." clearable />
-    <text text={`Selected framework value: ${framework || 'none'}`} color={props.theme.foreground} font_size={13} />
+      value={framework} onValueChange={setFramework} placeholder="Select a framework"
+      emptyLabel="No framework found." width={300} showLabel={false} />
   </column>
 }

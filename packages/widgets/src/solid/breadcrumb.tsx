@@ -68,7 +68,7 @@ export function BreadcrumbLink(props: BreadcrumbLinkProps): JSX.Element {
   const [focused, setFocused] = createSignal(false)
   const [hovered, setHovered] = createSignal(false)
   const activate = () => { if (!props.disabled) props.onNavigate() }
-  const color = () => props.disabled ? props.theme.muted : hovered() || focused() ? props.theme.accent : props.theme.foreground
+  const color = () => hovered() || focused() ? props.theme.foreground : props.theme.muted
   return <focusScope key={props.id} role="link" accessible_name={props.label} enabled={!props.disabled}
     keyboard_activation="enter" onClick={activate}
     onFocus={() => setFocused(true)} onKey={() => setFocused(true)} onBlur={() => setFocused(false)}>

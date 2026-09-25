@@ -31,7 +31,7 @@ export function Carousel(props: CarouselProps): JSX.Element {
   }
   const drag = (payload: unknown) => {
     if (swiped()) return
-    const nextDistance = dragDistance() + surfaceEDragPixels(payload)
+    const nextDistance = dragDistance() + surfaceEDragPixels(payload, orientation === 'horizontal' ? 'x' : 'y')
     setDragDistance(nextDistance)
     const forward = nextDistance < -48
     const backward = nextDistance > 48

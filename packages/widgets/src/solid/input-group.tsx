@@ -4,6 +4,7 @@ import { createContext, useContext, type JSX as SolidJSX } from 'solid-js'
 import { InputEditController } from '../shared/input-edit'
 import { selectionTint } from '../shared/theme'
 import type { Palette } from '../shared/theme'
+import { useButtonGroupJoined } from './button-group'
 
 /** Horizontal or vertical arrangement for an input group. */
 export type InputGroupOrientation = 'horizontal' | 'vertical'
@@ -37,15 +38,17 @@ export interface InputGroupProps {
 
 /** Renders a themed input-group frame and highlights it while one of its editors is focused. */
 export function InputGroup(props: InputGroupProps): JSX.Element {
+  const joined = useButtonGroupJoined()
   const [focused, setFocused] = createSignal(false)
   const orientation = props.orientation ?? 'horizontal'
   const content = (
     <focusScope width="fill" role="group" accessible_name={props.label} invalid={!!props.invalid}
       accessible_disabled={!!props.disabled}>
-      <rectangle width="fill" min_height={props.theme.inputHeight}
+      <rectangle width="fill" min_height={joined ? 36 : props.theme.inputHeight}
         background={props.disabled ? props.theme.surfaceRaised : props.theme.surface}
         border_color={props.invalid ? props.theme.destructive : focused() ? props.theme.accent : props.theme.border}
-        border_width={1} radius={props.theme.controlRadius}>
+        border_width={joined && !focused() && !props.invalid ? 0 : 1}
+        radius={joined ? 0 : props.theme.controlRadius}>
         {orientation === 'vertical'
           ? <column width="fill" min_width={0} gap={props.gap ?? 6} padding={props.theme.controlPadding}>{props.children}</column>
           : <row width="fill" min_width={0} gap={props.gap ?? 6} padding_left={props.theme.controlPadding}
@@ -206,11 +209,12 @@ interface InputGroupControlInternalProps extends InputGroupControlProps {
 }
 
 function InputGroupControl(props: InputGroupControlInternalProps): JSX.Element {
+  const joined = useButtonGroupJoined()
   const [uncontrolled, setUncontrolled] = createSignal(props.value ?? props.defaultValue ?? '')
   const group = useContext(InputGroupContext)
   const value = () => props.value !== undefined ? props.value : uncontrolled()
   const edits = new InputEditController(value())
-  const height = props.height ?? (props.multiline ? 112 : props.theme.inputHeight)
+  const height = props.height ?? (props.multiline ? 112 : joined ? 36 : props.theme.inputHeight)
   return <container width="fill" min_width={0} grow={1} height={height}>
     <textInput key={props.id} width="fill" height="fill" clip={true} role={props.multiline ? 'text_area' : 'text_input'}
       multiline={props.multiline} value={value()} placeholder={props.placeholder ?? ''}

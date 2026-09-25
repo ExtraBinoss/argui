@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 import { existsSync, readFileSync } from 'node:fs'
-import { pages } from '../src/gallery-pages'
+import { filteredNavigation, navigationItems, pages } from '../src/gallery-pages'
 
 const catalog = JSON.parse(readFileSync(new URL('../../../components/catalog.json', import.meta.url), 'utf8')) as string[]
 
@@ -19,4 +19,18 @@ test('every installable component has its own Solid and React gallery page', () 
       }
     }
   }
+})
+
+test('gallery navigation includes every page in alphabetical order within each section', () => {
+  const sections = navigationItems.reduce((result, item) => {
+    if (item.kind === 'heading') result.push([])
+    else result.at(-1)?.push(item.page)
+    return result
+  }, [] as string[][])
+  expect(sections).toHaveLength(2)
+  for (const section of sections) expect(section).toEqual([...section].sort())
+  expect(sections.flat().sort()).toEqual([...pages].sort())
+  expect(filteredNavigation('tooltip').filter((item) => item.kind === 'page')).toEqual([
+    { kind: 'page', page: 'Tooltip' },
+  ])
 })

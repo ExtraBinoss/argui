@@ -1,7 +1,7 @@
 //! Native application launch and source rebuilds for development.
 
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     fs,
     path::{Path, PathBuf},
     process::Command,
@@ -72,13 +72,21 @@ fn watch_tsx(root: &Path, app: &Path, stopped: &AtomicBool) {
         if current == previous {
             continue;
         }
-        previous = current;
         thread::sleep(Duration::from_millis(300));
         let stable = source_snapshot(app);
-        if stable != previous {
-            previous = stable;
-        }
-        eprintln!("TSX sources changed; rebuilding Argui native bundle…");
+        let changed = previous
+            .keys()
+            .chain(stable.keys())
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .filter(|path| previous.get(*path) != stable.get(*path))
+            .map(|path| path.strip_prefix(app).unwrap_or(path).display().to_string())
+            .collect::<Vec<_>>();
+        previous = stable;
+        eprintln!(
+            "TSX changed ({}); rebuilding Argui native bundle…",
+            changed.join(", ")
+        );
         let result = Command::new("bun")
             .arg(root.join("node_modules/vite/bin/vite.js"))
             .args(["build", "--config", "vite.config.ts"])

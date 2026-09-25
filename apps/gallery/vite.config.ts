@@ -1,5 +1,5 @@
 import { defineConfig } from 'vite'
-import { resolve } from 'node:path'
+import { relative, resolve } from 'node:path'
 import solid from 'vite-plugin-solid'
 
 const entry = process.env.ARGUI_GALLERY_ENTRY
@@ -15,7 +15,15 @@ export default defineConfig({
     replacement: resolve(import.meta.dirname, 'src', allTabler
       ? 'tabler-catalog.generated.ts' : 'tabler-catalog.empty.ts'),
   }] },
-  plugins: react ? [] : [solid({ solid: { moduleName: '@argui/solid', generate: 'universal' }, hot: false })],
+  plugins: [
+    ...(react ? [] : [solid({ solid: { moduleName: '@argui/solid', generate: 'universal' }, hot: false })]),
+    {
+      name: 'argui-gallery-watch-reason',
+      watchChange(id, change) {
+        console.log(`argui-hot-reload: source ${change.event} ${relative(import.meta.dirname, id)}`)
+      },
+    },
+  ],
   oxc: react ? { jsx: { runtime: 'automatic', importSource: '@argui/react' } } : undefined,
   define: react ? { 'process.env.NODE_ENV': JSON.stringify('production') } : undefined,
   ssr: { noExternal: react

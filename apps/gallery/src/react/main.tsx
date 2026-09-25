@@ -28,7 +28,10 @@ export function mountReactGallery(bridge: NativeBridge, expectedAbiHash: string)
   root.render(
     <WidgetAssetProvider icons={{
       search: mediaAssets['tabler/search.svg'],
+      check: mediaAssets['tabler/check.svg'],
+      x: mediaAssets['tabler/x.svg'],
       chevronDown: mediaAssets['tabler/chevron-down.svg'],
+      chevronRight: mediaAssets['tabler/chevron-right.svg'],
       loader: mediaAssets['tabler/loader-2.svg'],
     }}>
       <ReactGallery services={services} runtime={runtime} />

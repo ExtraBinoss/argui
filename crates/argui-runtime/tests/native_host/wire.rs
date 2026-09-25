@@ -1,5 +1,7 @@
 //! Checks the sendable protocol used by the Solid and React native host.
 
+use argui_core::Color;
+use argui_paint::Fill;
 use argui_runtime::{HostOperation, WireOperation};
 use argui_schema::{AssetHandle, SchemaValue};
 
@@ -34,10 +36,40 @@ fn invalid_wire_value_rejects_entire_decode() {
 }
 
 #[test]
+fn transparent_literal_decodes_for_color_and_brush() {
+    for value_type in ["Color", "Brush"] {
+        let wire = serde_json::from_value(serde_json::json!({
+            "type": value_type, "value": "transparent"
+        }))
+        .expect("transparent wire shape");
+        let value = argui_runtime::WireValue::into_native(wire).expect("transparent literal");
+        let expected = if value_type == "Color" {
+            SchemaValue::Color(Color::TRANSPARENT)
+        } else {
+            SchemaValue::Brush(Fill::Solid(Color::TRANSPARENT))
+        };
+        assert_eq!(value, expected);
+    }
+}
+
+#[test]
+fn invalid_dimension_reports_node_property_and_value() {
+    let operation: WireOperation = serde_json::from_value(serde_json::json!({
+        "kind":"setProperty","id":{"slot":14,"generation":2},"property":5,
+        "value":{"type":"Dimension","value":null}
+    }))
+    .expect("transport shape");
+    let error = operation.into_native().expect_err("invalid dimension");
+    assert!(error.contains("node 14:2 property 5"), "{error}");
+    assert!(error.contains("Dimension wire value: null"), "{error}");
+}
+
+#[test]
 fn dimension_and_semantic_values_decode_without_cross_thread_schema_objects() {
     for value in [
         serde_json::json!({"type":"Dimension","value":"75%"}),
         serde_json::json!({"type":"Dimension","value":"auto"}),
+        serde_json::json!({"type":"Dimension","value":"fit"}),
         serde_json::json!({"type":"Dimension","value":"fill"}),
         serde_json::json!({"type":"Name","value":"page"}),
         serde_json::json!({"type":"Bool","value":true}),

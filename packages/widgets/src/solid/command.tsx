@@ -129,13 +129,12 @@ export function Command(props: CommandProps): JSX.Element {
     groupHasResults: (group) => matches().some((entry) => group === undefined || entry.group === group),
     emptyLabel: () => props.emptyLabel ?? 'No matching commands.', onKey,
   }
-  const content = <focusScope width="fill" role="group" accessible_name={props.label} enabled={!props.disabled} onKey={onKey}>
+  return <CommandContext.Provider value={context}>{(<focusScope width="fill" role="group" accessible_name={props.label} enabled={!props.disabled} onKey={onKey}>
     <rectangle width="fill" background={props.theme.surface} border_color={props.theme.border} border_width={1}
       radius={props.theme.overlayRadius} shadow_blur={props.theme.overlayShadowBlur} shadow_color={props.theme.overlayShadow}>
       <column width="fill" gap={0}>{props.children}</column>
     </rectangle>
-  </focusScope> as SolidJSX.Element
-  return <CommandContext.Provider value={context}>{content}</CommandContext.Provider>
+  </focusScope>) as SolidJSX.Element}</CommandContext.Provider>
 }
 
 /** Props for the searchable command input. */
@@ -191,13 +190,12 @@ export interface CommandGroupProps { /** Optional heading and inherited search g
 export function CommandGroup(props: CommandGroupProps): JSX.Element {
   const command = useCommand()
   const visible = () => command.groupHasResults(props.heading)
-  const content = <focusScope role="group" accessible_name={props.heading} enabled={true} focusable={false}>
+  return <CommandGroupContext.Provider value={props.heading}>{(<focusScope role="group" accessible_name={props.heading} enabled={true} focusable={false}>
     <column width="fill" visible={visible()} gap={2}>
       {props.heading ? <text text={props.heading} color={command.theme().muted} font_size={11} weight={600} /> : null}
       {props.children}
     </column>
-  </focusScope> as SolidJSX.Element
-  return <CommandGroupContext.Provider value={props.heading}>{content}</CommandGroupContext.Provider>
+  </focusScope>) as SolidJSX.Element}</CommandGroupContext.Provider>
 }
 
 /** Props for one searchable command item. */

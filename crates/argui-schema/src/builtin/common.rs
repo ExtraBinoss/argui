@@ -9,7 +9,7 @@ use super::{
     BACKDROP_FILTER, BACKGROUND, BLUR, CLICK, DESKTOP_BACKDROP_FALLBACK, DESKTOP_BACKDROP_TINT,
     DISMISS, FOCUS, GAP, HEIGHT, INPUT_CHANGED, KEY, MIN_HEIGHT, MIN_WIDTH, OPACITY, PADDING,
     ROTATION, SCROLL, SELECTION_COLOR, SELECTION_FILL, SELECTION_RADIUS, SUBMIT, TEXT_EDIT,
-    TOOLTIP, VISIBLE, WIDTH, X, Y,
+    TOOLTIP, VIRTUAL_MEASURE, VIRTUAL_WINDOW_CHANGE, VISIBLE, WIDTH, X, Y,
 };
 use crate::{
     EventId, EventSchema, NativeElementInput, PropertyId, PropertySchema, SchemaError, SchemaValue,
@@ -184,6 +184,8 @@ pub(super) fn apply_events(mut element: Element, input: &NativeElementInput) -> 
             SUBMIT => EventType::Submit,
             DISMISS => EventType::Dismiss,
             SCROLL => EventType::Scroll,
+            VIRTUAL_MEASURE => EventType::VirtualMeasure,
+            VIRTUAL_WINDOW_CHANGE => EventType::VirtualWindow,
             _ => continue,
         };
         element = element.on(event.handler.direct_listener(event_type));

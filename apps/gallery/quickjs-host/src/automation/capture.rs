@@ -42,7 +42,9 @@ impl<'a> CaptureState<'a> {
             let mut gpu = pollster::block_on(SurfaceRenderer::new_offscreen(
                 width,
                 height,
-                RendererConfig::default().profiling(true),
+                RendererConfig::default()
+                    .profiling(true)
+                    .effects(argui_effects::registry().map_err(|error| error.to_string())?),
             ))
             .map_err(|error| format!("screenshot GPU: {error}"))?;
             for image in &self.assets.images {

@@ -26,7 +26,7 @@ use crate::{
 
 /// A development bundle polled only while a runtime file is configured.
 pub(crate) struct BundleWatcher {
-    path: PathBuf,
+    pub(crate) path: PathBuf,
     seen: Option<(SystemTime, u64)>,
     pending: Option<(SystemTime, u64)>,
 }

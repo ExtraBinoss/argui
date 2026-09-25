@@ -179,6 +179,13 @@ impl Application {
         if (self.pending_ui_frame.needs_frame() || animation_changed)
             && let Some(window) = &self.window
         {
+            #[cfg(all(feature = "native-popups", not(target_arch = "wasm32")))]
+            if let Some(popup) = self.popups.entries.last() {
+                popup.native.window().request_redraw();
+            } else {
+                window.request_redraw();
+            }
+            #[cfg(not(all(feature = "native-popups", not(target_arch = "wasm32"))))]
             window.request_redraw();
         }
         for control in controls {

@@ -1,3 +1,4 @@
+import { surfaceDragDelta } from './surface-d'
 import type { Palette } from './theme'
 
 /** Orientation used by the split-pane and slide controls. */
@@ -53,7 +54,7 @@ export interface SurfaceECalendarProps {
   defaultMonth?: Date
   /** First weekday index, Sunday 0 through Saturday 6. Defaults to 0. */
   weekStartsOn?: number
-  /** Locale passed to Intl.DateTimeFormat. Defaults to `en-US`. */
+  /** Date label locale. Defaults to `en-US`; QuickJS uses English or French fallback labels. */
   locale?: string
   /** Whether adjacent-month dates remain visible and selectable. Defaults to true. */
   showOutsideDays?: boolean
@@ -140,6 +141,46 @@ export function surfaceEValidDate(value: Date | undefined): Date | undefined {
   return new Date(value.getFullYear(), value.getMonth(), value.getDate(), 12)
 }
 
+const calendarNames = {
+  en: {
+    months: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
+    weekdays: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+    shortWeekdays: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+  },
+  fr: {
+    months: ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'],
+    weekdays: ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'],
+    shortWeekdays: ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'],
+  },
+} as const
+
+/** Formats a calendar label with native Intl when available and a QuickJS-safe fallback. */
+export function surfaceEFormatCalendarDate(
+  date: Date,
+  locale: string,
+  style: 'month' | 'month-name' | 'full' | 'long' | 'weekday-short' | 'weekday-long',
+): string {
+  if (typeof Intl !== 'undefined' && typeof Intl.DateTimeFormat === 'function') {
+    const options: Intl.DateTimeFormatOptions = style === 'month' ? { month: 'long', year: 'numeric' }
+      : style === 'month-name' ? { month: 'long' }
+      : style === 'full' ? { dateStyle: 'full' }
+        : style === 'long' ? { dateStyle: 'long' }
+          : { weekday: style === 'weekday-short' ? 'short' : 'long' }
+    return new Intl.DateTimeFormat(locale, options).format(date)
+  }
+  const french = locale.toLowerCase().startsWith('fr')
+  const names = french ? calendarNames.fr : calendarNames.en
+  const month = names.months[date.getMonth()]
+  const weekday = names.weekdays[date.getDay()]
+  if (style === 'month') return `${month} ${date.getFullYear()}`
+  if (style === 'month-name') return month
+  if (style === 'weekday-short') return names.shortWeekdays[date.getDay()]
+  if (style === 'weekday-long') return weekday
+  const longDate = french ? `${date.getDate()} ${month} ${date.getFullYear()}`
+    : `${month} ${date.getDate()}, ${date.getFullYear()}`
+  return style === 'full' ? `${weekday}${french ? ' ' : ', '}${longDate}` : longDate
+}
+
 /** Moves one date by calendar days without relying on a fixed day duration. */
 export function surfaceEAddDays(date: Date, amount: number): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate() + amount, 12)
@@ -212,9 +253,9 @@ export function surfaceEResizeByPixels(
     : value
 }
 
-/** Extracts a finite logical-pixel displacement from a native drag callback. */
-export function surfaceEDragPixels(payload: unknown): number {
-  return typeof payload === 'number' && Number.isFinite(payload) ? payload : 0
+/** Extracts a finite logical-pixel displacement along `axis` from a native drag callback. */
+export function surfaceEDragPixels(payload: unknown, axis: 'x' | 'y'): number {
+  return surfaceDragDelta(payload, axis)
 }
 
 /** Advances a slide index while respecting a bounded or wrapping carousel. */

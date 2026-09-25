@@ -12,6 +12,10 @@ impl Driver {
     pub fn act(&mut self, action: Action) -> Result<(), String> {
         let _dispatch = self.metrics.span("input.dispatch");
         match action {
+            Action::Move { target } => {
+                let point = self.point(&target)?;
+                self.pointer(point, PointerPhase::Moved, None)?;
+            }
             Action::Click { target, right } => {
                 let point = self.point(&target)?;
                 self.pointer(point, PointerPhase::Moved, None)?;

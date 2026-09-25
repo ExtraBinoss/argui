@@ -44,9 +44,7 @@ impl Application {
                 return;
             }
             WindowEvent::RedrawRequested => {
-                if let Some(window) = &self.window {
-                    window.request_redraw();
-                }
+                self.redraw(event_loop);
                 return;
             }
             WindowEvent::Resized(size) => {

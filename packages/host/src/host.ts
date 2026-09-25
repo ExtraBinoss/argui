@@ -29,7 +29,7 @@ function textValueStamp(value: string): TextValueStamp {
 
 /** A presentation node used only for framework navigation and pending mutations. */
 export interface NativeNode {
-  readonly id: HostId
+  id: HostId
   readonly type: NativeType
   parent: NativeNode | null
   children: NativeNode[]
@@ -44,6 +44,8 @@ export class NativeHost {
   private readonly properties = new Map<string, NativeProperty>()
   private readonly events = new Map<string, NativeEvent>()
   private readonly callbacks = new Map<number, { node: NativeNode, event: string, handler: (payload: unknown) => void }>()
+  private readonly handlers = new WeakMap<NativeNode, Map<number, { event: string, handler: (payload: unknown) => void }>>()
+  private readonly removed = new WeakSet<NativeNode>()
   private readonly textAscii = new WeakMap<NativeNode, boolean>()
   private readonly textHistory = new WeakMap<NativeNode, TextValueHistory>()
   private readonly pending: Operation[] = []
@@ -134,7 +136,7 @@ export class NativeHost {
     }
     if (wire) node.values.set(property.id, wire)
     else node.values.delete(property.id)
-    this.enqueue({ kind: 'setProperty', id: node.id, property: property.id, value: wire })
+    if (!this.removed.has(node)) this.enqueue({ kind: 'setProperty', id: node.id, property: property.id, value: wire })
   }
 
   /** Inserts or moves `child` under `parent` before an optional sibling. */
@@ -149,7 +151,12 @@ export class NativeHost {
     const index = before ? parent.children.indexOf(before) : parent.children.length
     parent.children.splice(index, 0, child)
     child.parent = parent
-    this.enqueue({ kind: 'insert', parent: parent.id, child: child.id, before: before?.id ?? null })
+    const parentWasRemoved = this.removed.has(parent)
+    this.revive(parent)
+    this.revive(child)
+    if (!parentWasRemoved) {
+      this.enqueue({ kind: 'insert', parent: parent.id, child: child.id, before: before?.id ?? null })
+    }
   }
 
   /** Removes `child` and all of its descendants from the native host. */
@@ -157,8 +164,10 @@ export class NativeHost {
     if (child.parent !== parent) throw new Error('Node is not a child of parent')
     parent.children.splice(parent.children.indexOf(child), 1)
     child.parent = null
-    this.forgetCallbacks(child)
-    this.enqueue({ kind: 'remove', id: child.id })
+    if (!this.removed.has(child)) {
+      this.retire(child)
+      this.enqueue({ kind: 'remove', id: child.id })
+    }
   }
 
   /** Returns whether `node` is a native text node. */
@@ -180,10 +189,11 @@ export class NativeHost {
   setRoot(node: NativeNode | null): void {
     if (node?.parent) throw new Error('Native root must be detached')
     const old = this.root
+    if (node) this.revive(node)
     this.root = node
     this.enqueue({ kind: 'setRoot', id: node?.id ?? null })
     if (old && old !== node) {
-      this.forgetCallbacks(old)
+      this.retire(old)
       this.enqueue({ kind: 'remove', id: old.id })
     }
     this.flush()
@@ -223,18 +233,27 @@ export class NativeHost {
     if (value == null) {
       if (old === undefined) return
       this.callbacks.delete(old)
+      this.handlers.get(node)?.delete(event.id)
       node.listeners.delete(event.id)
-      this.enqueue({ kind: 'setListener', id: node.id, event: event.id, callback: null })
+      if (!this.removed.has(node)) this.enqueue({ kind: 'setListener', id: node.id, event: event.id, callback: null })
       return
     }
+    let handlers = this.handlers.get(node)
+    if (!handlers) {
+      handlers = new Map()
+      this.handlers.set(node, handlers)
+    }
+    handlers.set(event.id, { event: name, handler: value as (payload: unknown) => void })
     if (old !== undefined) {
-      this.callbacks.set(old, { node, event: name, handler: value as (payload: unknown) => void })
+      if (!this.removed.has(node)) this.callbacks.set(old, { node, event: name, handler: value as (payload: unknown) => void })
       return
     }
     const callback = this.nextCallback++
-    this.callbacks.set(callback, { node, event: name, handler: value as (payload: unknown) => void })
     node.listeners.set(event.id, callback)
-    this.enqueue({ kind: 'setListener', id: node.id, event: event.id, callback })
+    if (!this.removed.has(node)) {
+      this.callbacks.set(callback, { node, event: name, handler: value as (payload: unknown) => void })
+      this.enqueue({ kind: 'setListener', id: node.id, event: event.id, callback })
+    }
   }
 
   private enqueue(operation: Operation): void {
@@ -289,9 +308,31 @@ export class NativeHost {
     this.textAscii.set(node, this.textAscii.get(node) === true && /^[\x00-\x7f]*$/.test(edit.text))
   }
 
-  private forgetCallbacks(node: NativeNode): void {
+  /** Retires a removed subtree and its callbacks until it is mounted again. */
+  private retire(node: NativeNode): void {
+    this.removed.add(node)
     for (const callback of node.listeners.values()) this.callbacks.delete(callback)
-    for (const child of node.children) this.forgetCallbacks(child)
+    for (const child of node.children) this.retire(child)
+  }
+
+  /** Recreates a previously removed subtree with fresh native identities. */
+  private revive(node: NativeNode): void {
+    if (!this.removed.delete(node)) return
+    node.id = { slot: this.nextSlot++, generation: 1 }
+    this.enqueue({ kind: 'create', id: node.id, nativeType: node.type.id })
+    for (const [property, value] of node.values) {
+      this.enqueue({ kind: 'setProperty', id: node.id, property, value })
+    }
+    for (const [event, callback] of node.listeners) {
+      const saved = this.handlers.get(node)?.get(event)
+      if (!saved) continue
+      this.callbacks.set(callback, { node, ...saved })
+      this.enqueue({ kind: 'setListener', id: node.id, event, callback })
+    }
+    for (const child of node.children) {
+      this.revive(child)
+      this.enqueue({ kind: 'insert', parent: node.id, child: child.id, before: null })
+    }
   }
 }
 

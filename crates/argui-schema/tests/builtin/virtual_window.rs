@@ -1,5 +1,10 @@
-use argui_schema::{NativeElementInput, NativeSlotValue, SchemaError, SchemaValue, builtin};
-use argui_ui::{Element, RetainedIdentity, UiTree, VirtualList};
+use argui_schema::{
+    NativeElementInput, NativeEventValue, NativeSlotValue, SchemaError, SchemaValue, builtin,
+};
+use argui_ui::{
+    Element, EventHandler, EventHandlerId, EventOwnerId, EventType, RetainedIdentity, UiTree,
+    VirtualList,
+};
 
 /// Builds the compiler-shaped input for a keyed million-row model.
 ///
@@ -82,6 +87,33 @@ fn virtual_window_can_expose_an_explicit_scrollbar() {
         )
         .unwrap();
     assert!(root.scroll.as_ref().unwrap().scrollbar.is_some());
+}
+
+#[test]
+fn virtual_window_connects_native_range_and_measurement_events() {
+    let registry = builtin::registry().unwrap();
+    let handler = EventHandler::from_identity(EventHandlerId::new(EventOwnerId(7), 1));
+    let root = registry
+        .construct(
+            builtin::VIRTUAL_WINDOW,
+            &input(100, 0.0)
+                .event(NativeEventValue::new(builtin::VIRTUAL_MEASURE, handler))
+                .event(NativeEventValue::new(
+                    builtin::VIRTUAL_WINDOW_CHANGE,
+                    handler,
+                )),
+        )
+        .unwrap();
+    assert!(
+        root.event_listeners
+            .iter()
+            .any(|listener| listener.event == EventType::VirtualMeasure)
+    );
+    assert!(
+        root.event_listeners
+            .iter()
+            .any(|listener| listener.event == EventType::VirtualWindow)
+    );
 }
 
 #[test]

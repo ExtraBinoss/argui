@@ -452,7 +452,7 @@ pub fn registry() -> Result<SchemaRegistry, SchemaError> {
             TEXT_OVERFLOW,
             "text_overflow",
             ValueType::String,
-            "Overflow behavior: clip or ellipsis_end.",
+            "CSS-like overflow behavior: clip or ellipsis; ellipsis_start, ellipsis_middle, and ellipsis_end are also supported.",
         ));
     registry.register(text, |input: &NativeElementInput| {
         let content = optional_string(input, TEXT_VALUE)
@@ -528,7 +528,9 @@ pub fn registry() -> Result<SchemaRegistry, SchemaError> {
         if let Some(SchemaValue::String(value)) = input.get(TEXT_OVERFLOW) {
             style.overflow = match value.as_str() {
                 "clip" => TextOverflow::Clip,
-                "ellipsis_end" => TextOverflow::Ellipsis(EllipsisPosition::End),
+                "ellipsis" | "ellipsis_end" => TextOverflow::Ellipsis(EllipsisPosition::End),
+                "ellipsis_start" => TextOverflow::Ellipsis(EllipsisPosition::Start),
+                "ellipsis_middle" => TextOverflow::Ellipsis(EllipsisPosition::Middle),
                 _ => {
                     return Err(SchemaError::Adapter(format!(
                         "unsupported text_overflow `{value}`"

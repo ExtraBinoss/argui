@@ -1,8 +1,9 @@
-use argui_core::Color;
-use argui_paint::{Fill, Filter};
+use argui_core::{Affine2D, Color, Point, PointerButton, PointerEvent, PointerPhase, Rect, Size};
+use argui_paint::{ClipChain, Fill, Filter};
 use argui_schema::{NativeElementInput, NativeSlotValue, SchemaValue, builtin};
 use argui_ui::{
-    Element, ExpandedLengthPercentageAuto, Overflow, Position, PropertyBinding, UiTree, length,
+    CursorIcon, Element, ExpandedLengthPercentageAuto, FocusPolicy, HitRegion, HitShape, Overflow,
+    Position, PropertyBinding, Sides, UiTree, length,
 };
 
 #[test]
@@ -50,6 +51,73 @@ fn rectangle_paints_brush_border_and_clips_rounded_children() {
         rectangle.style.inset.top.expand(),
         ExpandedLengthPercentageAuto::Length(4.0)
     );
+}
+
+#[test]
+fn rectangle_uses_native_touch_area_hover_and_press_colors() {
+    let registry = builtin::registry().unwrap();
+    let base = Fill::Solid(Color::BLACK);
+    let hover = Fill::Solid(Color::srgb(0.2, 0.4, 0.6));
+    let pressed = Fill::Solid(Color::WHITE);
+    let rectangle = registry
+        .construct(
+            builtin::RECTANGLE,
+            &NativeElementInput::new()
+                .property(builtin::BACKGROUND, SchemaValue::Brush(base.clone()))
+                .property(builtin::HOVER_BACKGROUND, SchemaValue::Brush(hover.clone()))
+                .property(
+                    builtin::PRESSED_BACKGROUND,
+                    SchemaValue::Brush(pressed.clone()),
+                ),
+        )
+        .unwrap();
+    let area = registry
+        .construct(
+            builtin::TOUCH_AREA,
+            &NativeElementInput::new().slot(NativeSlotValue::new(builtin::CHILDREN, [rectangle])),
+        )
+        .unwrap();
+    let mut tree = UiTree::new(area);
+    let area_node = tree.node_ids()[0];
+    let rectangle_node = tree.node_ids()[1];
+    let region = HitRegion {
+        node: area_node,
+        bounds: Rect::new(Point::default(), Size::new(100.0, 40.0)),
+        transform: Affine2D::IDENTITY,
+        clips: ClipChain::default(),
+        shape: HitShape::Bounds,
+        slop: Sides::default(),
+        enabled: true,
+        focus_policy: FocusPolicy::None,
+        cursor: CursorIcon::Default,
+        gestures: tree
+            .element_for(area_node)
+            .unwrap()
+            .interaction
+            .as_ref()
+            .unwrap()
+            .gestures,
+        window_drag: None,
+    };
+    let color = |tree: &UiTree| {
+        tree.resolved_quad(rectangle_node, tree.element_for(rectangle_node).unwrap())
+            .background
+    };
+    assert_eq!(color(&tree), Some(base));
+    let hover_update = tree.pointer_moved(Point::new(10.0, 10.0), std::slice::from_ref(&region));
+    assert!(hover_update.events.is_empty());
+    assert!(hover_update.paint_changed);
+    assert!(!hover_update.layout_changed);
+    assert_eq!(color(&tree), Some(hover));
+    tree.pointer_event(
+        PointerEvent {
+            button: Some(PointerButton::Primary),
+            buttons: 1,
+            ..PointerEvent::mouse(PointerPhase::Pressed, Point::new(10.0, 10.0))
+        },
+        &[region],
+    );
+    assert_eq!(color(&tree), Some(pressed));
 }
 
 #[test]

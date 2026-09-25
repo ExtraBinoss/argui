@@ -6,9 +6,11 @@ import { selectionTint } from '../shared/theme'
 import type { InputFieldProps } from '../shared/types'
 import { useWidgetIcons } from './assets'
 import { ReactButton } from './button'
+import { useButtonGroupJoined } from './button-group'
 
 /** Renders the same themed native input through the React adapter. */
 export function ReactInputField(props: InputFieldProps): ReactElement {
+  const joined = useButtonGroupJoined()
   const [uncontrolled, setUncontrolled] = useState(props.defaultValue ?? '')
   const value = props.value ?? uncontrolled
   const edits = useRef<InputEditController | null>(null)
@@ -18,9 +20,9 @@ export function ReactInputField(props: InputFieldProps): ReactElement {
   const icons = useWidgetIcons()
   return <column width="fill" gap={6}>
     {props.showLabel ? <text text={props.label} color={props.theme.muted} font_size={12} /> : null}
-    <rectangle width="fill" height={props.theme.inputHeight} clip={true} background={props.disabled ? props.theme.surfaceRaised : props.theme.surface}
+    <rectangle width="fill" height={joined ? 36 : props.theme.inputHeight} clip={true} background={props.disabled ? props.theme.surfaceRaised : props.theme.surface}
       border_color={props.invalid ? props.theme.destructive : focused ? props.theme.accent : props.theme.border}
-      border_width={1} radius={props.theme.controlRadius}>
+      border_width={joined && !focused && !props.invalid ? 0 : 1} radius={joined ? 0 : props.theme.controlRadius}>
       <row width="fill" height="fill" min_width={0} padding_left={props.theme.controlPadding} padding_right={props.theme.controlPadding} gap={8} align_items="center">
         {props.search && icons.search ? <svg source={icons.search} color={props.theme.muted}
           width={17} height={17} /> : null}

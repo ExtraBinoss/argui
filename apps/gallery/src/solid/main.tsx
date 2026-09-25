@@ -30,7 +30,10 @@ export function mountGallery(bridge: NativeBridge, expectedAbiHash: string): () 
   const dispose = render(() => (
     <WidgetAssetProvider icons={{
       search: mediaAssets['tabler/search.svg'],
+      check: mediaAssets['tabler/check.svg'],
+      x: mediaAssets['tabler/x.svg'],
       chevronDown: mediaAssets['tabler/chevron-down.svg'],
+      chevronRight: mediaAssets['tabler/chevron-right.svg'],
       loader: mediaAssets['tabler/loader-2.svg'],
     }}>
       <Gallery services={services} runtime={runtime} />

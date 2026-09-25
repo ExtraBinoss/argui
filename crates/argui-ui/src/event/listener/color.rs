@@ -160,7 +160,7 @@ fn update_field(
     text: &str,
 ) -> Option<()> {
     if format == ColorValueFormat::Hex {
-        let color = Color::from_hex(text.trim()).ok()?;
+        let color = Color::from_literal(text.trim()).ok()?;
         let [r, g, b, next_alpha] = color.to_srgba();
         *hsv = rgb_to_hsv([r, g, b], hsv[0]);
         *alpha = next_alpha;

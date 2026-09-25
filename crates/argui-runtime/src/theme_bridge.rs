@@ -378,10 +378,10 @@ fn parse_value(kind: ThemeValueType, value: &Value) -> Result<ThemeValue, String
             .ok_or("expected a finite number".to_owned())
     };
     match kind {
-        ThemeValueType::Color => Color::from_hex(string()?)
+        ThemeValueType::Color => Color::from_literal(string()?)
             .map(ThemeValue::Color)
             .map_err(|error| error.to_string()),
-        ThemeValueType::Brush => Color::from_hex(string()?)
+        ThemeValueType::Brush => Color::from_literal(string()?)
             .map(|color| ThemeValue::Brush(Fill::Solid(color)))
             .map_err(|error| error.to_string()),
         ThemeValueType::Float => Ok(ThemeValue::Float(number()?)),

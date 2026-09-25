@@ -93,9 +93,9 @@ pub(super) fn run_js_loop(
                             },
                         },
                     ) {
-                        eprintln!("argui-hot-reload: {error}; keeping previous scene");
+                        eprintln!("argui-hot-reload: {}: {error}; keeping previous scene", watcher.path.display());
                     } else {
-                        eprintln!("argui-hot-reload: bundle applied");
+                        eprintln!("argui-hot-reload: bundle applied from {}", watcher.path.display());
                     }
                 }
                 Ok(None) => {}

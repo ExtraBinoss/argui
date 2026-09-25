@@ -34,7 +34,7 @@ export function ReactCarousel(props: ReactCarouselProps): ReactElement {
   }
   const drag = (payload: unknown) => {
     if (swiped.current) return
-    dragDistance.current += surfaceEDragPixels(payload)
+    dragDistance.current += surfaceEDragPixels(payload, orientation === 'horizontal' ? 'x' : 'y')
     const forward = dragDistance.current < -48
     const backward = dragDistance.current > 48
     if (forward || backward) {

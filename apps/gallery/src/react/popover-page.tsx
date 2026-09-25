@@ -1,6 +1,6 @@
 /** @jsxImportSource @argui/react */
 import { useState, type ReactElement } from 'react'
-import { Popover as ReactPopover, type Palette } from '@argui/widgets/react'
+import { MarqueeText, Popover as ReactPopover, type Palette } from '@argui/widgets/react'
 
 const mobile = (globalThis as { __arguiMobile?: boolean }).__arguiMobile === true
 
@@ -38,6 +38,9 @@ export function ReactPopoverPage(props: { theme: Palette }): ReactElement {
               theme={props.theme}>
               <text text={variant.title} color={props.theme.foreground} font_size={16} weight={600} />
               <text text={variant.detail} width="fill" color={props.theme.foreground} font_size={13} />
+              <MarqueeText id={`${variant.id}-long-text`} theme={props.theme} width={220} speed={55}
+                shadowOnHover={true}
+                text="This deliberately very long sentence demonstrates a native overflow shadow, then scrolls across the popover when you hover over it." />
             </ReactPopover>
           </column>
         </rectangle>

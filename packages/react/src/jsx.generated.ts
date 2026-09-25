@@ -672,6 +672,8 @@ export namespace JSX {
       desktop_backdrop_fallback?: string
       visible?: boolean
       background?: string
+      hover_background?: string
+      pressed_background?: string
       border_color?: string
       border_width?: number
       radius?: number

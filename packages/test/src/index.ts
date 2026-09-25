@@ -76,6 +76,11 @@ export interface PerformanceBudget {
 export class Locator {
   constructor(private readonly target: string) {}
 
+  /** Moves the pointer to the element center without activating it. */
+  async move(): Promise<void> {
+    await request('move', this.target, {})
+  }
+
   /** Presses and releases a mouse button at the element center. */
   async click(options: ClickOptions = {}): Promise<void> {
     await request('click', this.target, options)

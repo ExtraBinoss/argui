@@ -1,6 +1,6 @@
 import { createSignal } from '@argui/solid'
 import type { JSX } from '@argui/solid/jsx-runtime'
-import { Popover, type Palette } from '@argui/widgets/solid'
+import { MarqueeText, Popover, type Palette } from '@argui/widgets/solid'
 
 const mobile = (globalThis as { __arguiMobile?: boolean }).__arguiMobile === true
 
@@ -37,6 +37,9 @@ export function PopoverPage(props: { theme: Palette }): JSX.Element {
               theme={props.theme}>
               <text text={variant.title} color={props.theme.foreground} font_size={16} weight={600} />
               <text text={variant.detail} width="fill" color={props.theme.foreground} font_size={13} />
+              <MarqueeText id={`${variant.id}-long-text`} theme={props.theme} width={220} speed={55}
+                shadowOnHover={true}
+                text="This deliberately very long sentence demonstrates a native overflow shadow, then scrolls across the popover when you hover over it." />
             </Popover>
           </column>
         </rectangle>

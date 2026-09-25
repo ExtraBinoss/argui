@@ -1,6 +1,7 @@
 /** @jsxImportSource @argui/react */
 import { useEffect, useRef, useState, type ReactElement } from 'react'
 import type { Palette } from '../shared/theme'
+import { useButtonGroupJoined } from './button-group'
 import {
   surfaceBFlatten, surfaceBFocusable, surfaceBIsSpaceKey, surfaceBKey, surfaceBKeyPart, surfaceBMove, surfaceBSearch,
   type SurfaceMenuAction, type SurfaceMenuCheckbox, type SurfaceMenuController, type SurfaceMenuItem,
@@ -39,6 +40,7 @@ export interface SurfaceMenuPopupProps {
 
 /** Shows an accessible button and an anchored menu of actions and controls. */
 export function DropdownMenu(props: DropdownMenuProps): ReactElement {
+  const joined = useButtonGroupJoined()
   const [uncontrolledOpen, setUncontrolledOpen] = useState(props.defaultOpen ?? false)
   const [internalChecked, setInternalChecked] = useState<Record<string, boolean>>({ ...(props.defaultChecked ?? {}) })
   const [internalRadios, setInternalRadios] = useState<Record<string, string>>({ ...(props.defaultRadioValues ?? {}) })
@@ -99,7 +101,8 @@ export function DropdownMenu(props: DropdownMenuProps): ReactElement {
       <touchArea enabled={!props.disabled} mouse_cursor={props.disabled ? 'not_allowed' : 'pointer'}>
         <rectangle width={props.width ?? 176} height={36}
           background={open ? props.theme.surfaceRaised : props.theme.surface}
-          border_color={props.theme.border} border_width={1} radius={props.theme.controlRadius}
+          border_color={props.theme.border} border_width={joined ? 0 : 1}
+          radius={joined ? 0 : props.theme.controlRadius}
           opacity={props.disabled ? 0.52 : 1}>
           <row width="fill" height="fill" gap={10} padding={12} align_items="center">
             <text text={props.triggerLabel} color={props.theme.foreground} font_size={props.theme.controlFontSize} />

@@ -4,7 +4,9 @@ export const mediaAssets = {
   "illustration/orbit.png": { kind: 'image', id: 2571842761405680 },
   "illustration/orbit.svg": { kind: 'svg', id: 6003398377895504 },
   "photo/saturn.jpg": { kind: 'image', id: 182680722277923 },
+  "tabler/check.svg": { kind: 'svg', id: 4418227052333180 },
   "tabler/chevron-down.svg": { kind: 'svg', id: 5981616865338806 },
+  "tabler/chevron-right.svg": { kind: 'svg', id: 8016896629891356 },
   "tabler/heart.svg": { kind: 'svg', id: 4333451266351680 },
   "tabler/loader-2.svg": { kind: 'svg', id: 5035487383804796 },
   "tabler/photo.svg": { kind: 'svg', id: 1456439125952080 },
@@ -12,4 +14,5 @@ export const mediaAssets = {
   "tabler/search.svg": { kind: 'svg', id: 2000023927804256 },
   "tabler/star-filled.svg": { kind: 'svg', id: 6122411386721923 },
   "tabler/star.svg": { kind: 'svg', id: 1326099470823436 },
+  "tabler/x.svg": { kind: 'svg', id: 8953272632637284 },
 } as const satisfies Record<string, AssetRef>

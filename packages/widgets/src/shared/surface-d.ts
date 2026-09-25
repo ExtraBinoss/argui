@@ -97,12 +97,36 @@ export function surfacePanelBounds(
   return { width, height: 'fill', insetRight: 0, insetTop: 0, insetBottom: 0 }
 }
 
-/** Extracts one finite logical-pixel displacement from a drag event payload. */
-export function surfaceDragDelta(payload: unknown): number {
+/** Extracts a finite logical-pixel displacement along `axis` from a drag callback. */
+export function surfaceDragDelta(payload: unknown, axis: 'x' | 'y'): number {
   if (typeof payload === 'number' && Number.isFinite(payload)) return payload
-  if (typeof payload === 'object' && payload !== null && 'delta' in payload
-    && typeof payload.delta === 'number' && Number.isFinite(payload.delta)) {
-    return payload.delta
+  if (typeof payload === 'object' && payload !== null) {
+    const values = payload as Record<string, unknown>
+    const delta = values[axis === 'x' ? 'deltaX' : 'deltaY'] ?? values.delta
+    if (typeof delta === 'number' && Number.isFinite(delta)) return delta
   }
   return 0
+}
+
+/** Uses the native total displacement when available, otherwise accumulates `previous`. */
+export function surfaceDragDistance(payload: unknown, axis: 'x' | 'y', previous: number): number {
+  if (typeof payload === 'object' && payload !== null) {
+    const total = (payload as Record<string, unknown>)[axis === 'x' ? 'totalX' : 'totalY']
+    if (typeof total === 'number' && Number.isFinite(total)) return total
+  }
+  return previous + surfaceDragDelta(payload, axis)
+}
+
+/** Returns whether the native pan has finished and its visual offset must clear. */
+export function surfaceDragFinished(payload: unknown): boolean {
+  if (typeof payload !== 'object' || payload === null) return false
+  const phase = (payload as Record<string, unknown>).phase
+  return phase === 'ended' || phase === 'cancelled'
+}
+
+/** Projects a released pan briefly using native velocity to recognize a flick. */
+export function surfaceDragProjected(payload: unknown, axis: 'x' | 'y', distance: number): number {
+  if (typeof payload !== 'object' || payload === null) return distance
+  const velocity = (payload as Record<string, unknown>)[axis === 'x' ? 'velocityX' : 'velocityY']
+  return typeof velocity === 'number' && Number.isFinite(velocity) ? distance + velocity * 0.18 : distance
 }

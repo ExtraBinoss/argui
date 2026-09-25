@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use argui_core::{Key, KeyState};
 use argui_runtime::{HostId, NativeHostDelivery};
-use argui_ui::{SemanticAction, SemanticValue, UiEventKind};
+use argui_ui::{GestureKind, GesturePhase, SemanticAction, SemanticValue, UiEventKind};
 use serde_json::{Value, json};
 
 /// Keeps the newest virtual-window callback for each native node in a burst.
@@ -58,7 +58,8 @@ pub fn event_json(delivery: &NativeHostDelivery) -> Value {
 /// Encodes the public fields of `kind` for a JavaScript event handler.
 ///
 /// Returns a JSON payload with a stable `kind` string. Text edits carry UTF-8
-/// byte range endpoints and replacement text; scroll events carry logical pixels.
+/// byte range endpoints and replacement text. Scroll and pan distances use
+/// logical pixels, while pan velocity uses logical pixels per second.
 pub fn ui_event_payload(kind: &UiEventKind) -> Value {
     match kind {
         UiEventKind::KeyInput(input) => json!({
@@ -81,6 +82,20 @@ pub fn ui_event_payload(kind: &UiEventKind) -> Value {
         UiEventKind::Scrolled { offset, .. } => {
             json!({"kind": "scroll", "offsetX": offset.x, "offsetY": offset.y})
         }
+        UiEventKind::Gesture(gesture) => match gesture.kind {
+            GestureKind::Pan { delta, total, velocity, .. } => json!({
+                "kind": "pan", "deltaX": delta.x, "deltaY": delta.y,
+                "totalX": total.x, "totalY": total.y,
+                "velocityX": velocity.x, "velocityY": velocity.y,
+                "phase": match gesture.phase {
+                    GesturePhase::Started => "started",
+                    GesturePhase::Changed => "changed",
+                    GesturePhase::Ended => "ended",
+                    GesturePhase::Cancelled => "cancelled",
+                },
+            }),
+            _ => json!({"kind": "gesture"}),
+        },
         UiEventKind::VirtualMeasured {
             items,
             corrected_offset,

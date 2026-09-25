@@ -7,7 +7,14 @@ const themeSubscribers = new Map()
 let nextTimer = 1
 const timers = new Map()
 
-globalThis.queueMicrotask = (callback) => Promise.resolve().then(callback)
+globalThis.__arguiMicrotaskError = null
+globalThis.queueMicrotask = (callback) => Promise.resolve().then(() => {
+  try { callback() }
+  catch (error) {
+    globalThis.__arguiMicrotaskError = error instanceof Error
+      ? `${error.message}\n${error.stack ?? ''}` : String(error)
+  }
+})
 globalThis.AbortController ??= class AbortController {
   constructor() {
     const listeners = new Set()

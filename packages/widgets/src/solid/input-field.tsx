@@ -6,11 +6,13 @@ import { selectionTint } from '../shared/theme'
 import type { InputFieldProps } from '../shared/types'
 import { useWidgetIcons } from './assets'
 import { Button } from './button'
+import { useButtonGroupJoined } from './button-group'
 
 export { inputText } from '../shared/input-text'
 
 /** Renders a themed native text input with an optional embedded search icon. */
 export function InputField(props: InputFieldProps): JSX.Element {
+  const joined = useButtonGroupJoined()
   const [uncontrolled, setUncontrolled] = createSignal(props.defaultValue ?? '')
   const value = () => props.value ?? uncontrolled()
   const edits = new InputEditController(value())
@@ -19,9 +21,9 @@ export function InputField(props: InputFieldProps): JSX.Element {
   const icons = useWidgetIcons()
   return <column width="fill" gap={6}>
     {props.showLabel ? <text text={props.label} color={props.theme.muted} font_size={12} /> : null}
-    <rectangle width="fill" height={props.theme.inputHeight} clip={true} background={props.disabled ? props.theme.surfaceRaised : props.theme.surface}
+    <rectangle width="fill" height={joined ? 36 : props.theme.inputHeight} clip={true} background={props.disabled ? props.theme.surfaceRaised : props.theme.surface}
       border_color={props.invalid ? props.theme.destructive : focused() ? props.theme.accent : props.theme.border}
-      border_width={1} radius={props.theme.controlRadius}>
+      border_width={joined && !focused() && !props.invalid ? 0 : 1} radius={joined ? 0 : props.theme.controlRadius}>
       <row width="fill" height="fill" min_width={0} padding_left={props.theme.controlPadding} padding_right={props.theme.controlPadding} gap={8} align_items="center">
         {props.search && icons.search ? <svg source={icons.search} color={props.theme.muted}
           width={17} height={17} /> : null}

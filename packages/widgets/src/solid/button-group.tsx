@@ -1,5 +1,13 @@
 import type { JSX } from '@argui/solid/jsx-runtime'
+import { createContext, useContext, type JSX as SolidJSX } from 'solid-js'
 import type { Palette } from '../shared/theme'
+
+const ButtonGroupContext = createContext(false)
+
+/** Reports whether a button is inside a joined button group. */
+export function useButtonGroupJoined(): boolean {
+  return useContext(ButtonGroupContext)
+}
 
 /** Direction used to arrange controls within a button group. */
 export type ButtonGroupOrientation = 'horizontal' | 'vertical'
@@ -14,18 +22,25 @@ export interface ButtonGroupProps {
   orientation?: ButtonGroupOrientation
   /** Space between controls in native layout units. */
   gap?: number
+  /** Palette used for the joined group border and rounded corners. */
+  theme?: Palette
 }
 
 /** Renders related controls in one labelled native group without merging their focus stops. */
 export function ButtonGroup(props: ButtonGroupProps): JSX.Element {
   const orientation = props.orientation ?? 'horizontal'
-  const requestedGap = props.gap ?? 4
-  const gap = Number.isFinite(requestedGap) ? Math.max(0, requestedGap) : 4
+  const requestedGap = props.gap ?? 0
+  const gap = Number.isFinite(requestedGap) ? Math.max(0, requestedGap) : 0
   const label = props.label
-  return orientation === 'vertical'
-    ? <column gap={gap} role="group" accessible_name={label}>{props.children}</column>
-    : <row gap={gap} wrap={true} align_items="center" role="group"
-      accessible_name={label}>{props.children}</row>
+  const joined = !!props.theme && gap === 0
+  const content = (orientation === 'vertical'
+    ? <column width="fit" gap={gap} align_items="stretch" role="group" accessible_name={label}>{props.children}</column>
+    : <row width="fit" gap={gap} align_items="center" role="group" accessible_name={label}>{props.children}</row>) as SolidJSX.Element
+  return <ButtonGroupContext.Provider value={joined}>
+    {joined ? <rectangle width="fit" background={props.theme!.surface}
+      border_color={props.theme!.border} border_width={1}
+      radius={props.theme!.controlRadius} clip={true}>{content}</rectangle> : content}
+  </ButtonGroupContext.Provider>
 }
 
 /** Props for a themed text segment in a button group. */
@@ -40,10 +55,9 @@ export interface ButtonGroupTextProps {
 
 /** Renders a non-interactive, muted label alongside grouped controls. */
 export function ButtonGroupText(props: ButtonGroupTextProps): JSX.Element {
-  return <rectangle background={props.theme.surfaceRaised} border_color={props.theme.border}
-    border_width={1} radius={props.theme.controlRadius} role="text"
+  return <rectangle height={36} background={props.theme.surfaceRaised} role="text"
     accessible_name={props.label ?? props.text}>
-    <row padding_left={props.theme.controlPadding} padding_right={props.theme.controlPadding}
+    <row height="fill" padding_left={props.theme.controlPadding} padding_right={props.theme.controlPadding}
       align_items="center">
       <text text={props.text} color={props.theme.foreground} font_size={props.theme.controlFontSize}
         weight={500} no_wrap={true} />

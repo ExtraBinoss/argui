@@ -12,8 +12,10 @@ export interface VirtualListProps extends VirtualListOptions {
 export function VirtualList(props: VirtualListProps): JSX.Element {
   const generatedId = `virtual-list-${createUniqueId()}`
   const id = () => props.id ?? generatedId
+  const initial = Math.max(0, Math.min(props.count - 1,
+    Number.isFinite(props.initialIndex) ? Math.trunc(props.initialIndex!) : 0))
   const [window, setWindow] = createSignal<NativeWindowRange>({
-    start: 0, end: Math.min(props.count, 12), offset: 0, viewportExtent: 0,
+    start: initial, end: Math.min(props.count, initial + 12), offset: initial * (props.estimate ?? 48), viewportExtent: 0,
   })
   const axis = () => props.axis ?? 'vertical'
   const shadow = () => props.shadow
@@ -51,8 +53,12 @@ export function VirtualList(props: VirtualListProps): JSX.Element {
     __window_start={current().start}
     onWindow={(payload: unknown) => {
       const next = nativeWindowRange(payload, props.count)
-      if (next && (next.start !== window().start || next.end !== window().end
-        || next.viewportExtent !== window().viewportExtent)) setWindow(next)
+      if (next) {
+        if (next.start !== window().start || next.end !== window().end
+          || next.viewportExtent !== window().viewportExtent) setWindow(next)
+        props.onWindowChange?.(next)
+      }
     }}
+    onMeasure={props.onMeasure}
   >{rows()}</virtualWindow>
 }

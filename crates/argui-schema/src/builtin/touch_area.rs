@@ -2,7 +2,7 @@
 
 use argui_ui::{
     CursorIcon, Element, EventFilter, EventType, GestureCapture, GestureDelivery, GestureSet,
-    HitTestStyle, Interaction, PanGesture, PointerEvents, TapGesture, UserSelect,
+    HitTestStyle, Interaction, PanGesture, PointerEvents, StateScopeId, TapGesture, UserSelect,
 };
 
 use super::{
@@ -15,6 +15,9 @@ use crate::{
     EventSchema, NativeElementInput, NativeSchema, ObservationKind, PropertySchema, SchemaError,
     SchemaRegistry, SchemaValue, SlotArity, SlotSchema, ValueType,
 };
+
+/// Scope consumed by visual descendants for pointer hover and press styles.
+pub(super) const TOUCH_AREA_SCOPE: &str = "argui.touch-area";
 
 /// Registers a paint-free hit region with read-only pointer state and events.
 ///
@@ -216,6 +219,7 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
             apply_common(Element::container(input.children(CHILDREN).to_vec()), input)?
                 .interaction(interaction)
                 .user_select(UserSelect::None)
+                .state_scope(StateScopeId::new(TOUCH_AREA_SCOPE))
                 .hit_test(HitTestStyle::default().pointer_events(PointerEvents::BoxOnly));
         for event in &input.events {
             let event_type = match event.id {

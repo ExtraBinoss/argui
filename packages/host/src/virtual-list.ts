@@ -1,6 +1,6 @@
 /** Per-edge controls for a native feathered scroll shadow. */
 export interface ScrollShadowOptions {
-  /** CSS color used for the native shadow, including optional alpha. */
+  /** Optional tint; omit to fade content into the underlying backdrop. */
   color?: string
   /** Strength from zero to one; native geometry fades it at the scroll ends. */
   intensity?: number
@@ -20,6 +20,12 @@ export interface ScrollShadowOptions {
 export interface VirtualListOptions {
   /** Logical item count; only a bounded native-requested range is rendered. */
   count: number
+  /** Row placed at the top when the virtual viewport first mounts. */
+  initialIndex?: number
+  /** Observe native range changes without replacing the list's internal presenter. */
+  onWindowChange?: (range: NativeWindowRange) => void
+  /** Observe native item measurements, including the viewport extent. */
+  onMeasure?: (payload: unknown) => void
   /** Stable item identity across inserts and reordering; defaults to its index. */
   itemKey?: (index: number) => string | number
   /** Increment after middle inserts, removals, or reorder to reset native size measurements. */

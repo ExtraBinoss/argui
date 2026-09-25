@@ -3,11 +3,13 @@ import { useState, type ReactElement } from 'react'
 import type { SelectProps } from '../shared/types'
 import { nextSelectIndex, resolveSelectOptions } from '../shared/select-options'
 import { useWidgetIcons } from './assets'
+import { useButtonGroupJoined } from './button-group'
 
 export type ReactSelectProps = SelectProps
 
 /** Composes the same accessible, scrollable native combobox as Solid. */
 export function ReactSelect(props: ReactSelectProps): ReactElement {
+  const joined = useButtonGroupJoined()
   const icons = useWidgetIcons()
   const [expanded, setExpanded] = useState(false)
   const [activeIndex, setActiveIndex] = useState(-1)
@@ -52,8 +54,8 @@ export function ReactSelect(props: ReactSelectProps): ReactElement {
       if (next >= 0) { setActiveIndex(next); setExpanded(true) }
     }
   }
-  return <column gap={8}>
-    <text text={props.label} color={props.theme.muted} font_size={12} />
+  return <column gap={joined ? 0 : 8}>
+    {joined ? null : <text text={props.label} color={props.theme.muted} font_size={12} />}
     <focusScope nativeKey={props.id} role="combo_box"
       accessible_name={`${props.label}: ${chosen?.label ?? props.placeholder ?? 'Choose an option'}`}
       accessible_value={chosen?.label ?? ''} enabled={!props.disabled}
@@ -62,10 +64,11 @@ export function ReactSelect(props: ReactSelectProps): ReactElement {
       expandable={true} expanded={expanded} keyboard_activation="none"
       onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
       onClick={() => { if (!props.disabled) expanded ? setExpanded(false) : open() }} onKey={onKey}>
-      <rectangle width={width} height={props.theme.inputHeight}
+      <rectangle width={width} height={joined ? 36 : props.theme.inputHeight}
         background={props.disabled ? props.theme.surfaceRaised : props.theme.surface}
         border_color={focused ? props.theme.accent : props.theme.border}
-        border_width={focused ? 2 : 1} radius={props.theme.controlRadius}
+        border_width={joined ? focused ? 2 : 0 : focused ? 2 : 1}
+        radius={joined ? 0 : props.theme.controlRadius}
         opacity={props.disabled ? 0.55 : 1}>
         <row width="fill" height="fill" padding={props.theme.controlPadding} align_items="center">
           <text text={chosen?.label ?? props.placeholder ?? 'Choose an option'}

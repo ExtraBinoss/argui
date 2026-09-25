@@ -2,11 +2,12 @@
 
 use argui_core::Color;
 use argui_paint::{Border, CornerRadii, Shadow};
-use argui_ui::Element;
+use argui_ui::{Element, StateScopeId, StateSelector, StylePatch, VisualState, property};
 
 use super::{
-    BACKGROUND, BORDER_COLOR, BORDER_WIDTH, CHILDREN, CLIP, CommonProperty, RADIUS, SHADOW_BLUR,
-    SHADOW_COLOR, SHADOW_OFFSET_Y, apply_common, common_property, loop_motion, transition,
+    BACKGROUND, BORDER_COLOR, BORDER_WIDTH, CHILDREN, CLIP, CommonProperty, HOVER_BACKGROUND,
+    PRESSED_BACKGROUND, RADIUS, SHADOW_BLUR, SHADOW_COLOR, SHADOW_OFFSET_Y, apply_common,
+    common_property, loop_motion, touch_area::TOUCH_AREA_SCOPE, transition,
 };
 use crate::{
     NativeElementInput, NativeSchema, SchemaError, SchemaRegistry, SchemaValue, SlotArity,
@@ -58,6 +59,18 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
         "background",
         ValueType::Brush,
         "Brush painted inside the rectangle.",
+    ))
+    .property(crate::PropertySchema::new(
+        HOVER_BACKGROUND,
+        "hover_background",
+        ValueType::Brush,
+        "Brush painted while the nearest TouchArea is hovered.",
+    ))
+    .property(crate::PropertySchema::new(
+        PRESSED_BACKGROUND,
+        "pressed_background",
+        ValueType::Brush,
+        "Brush painted while the nearest TouchArea is pressed.",
     ))
     .property(crate::PropertySchema::new(
         BORDER_COLOR,
@@ -127,6 +140,17 @@ pub(super) fn register(registry: &mut SchemaRegistry) -> Result<(), SchemaError>
         )?;
         if let Some(SchemaValue::Brush(brush)) = input.get(BACKGROUND) {
             element = element.fill(brush.clone());
+        }
+        for (id, state) in [
+            (HOVER_BACKGROUND, VisualState::Hovered),
+            (PRESSED_BACKGROUND, VisualState::Pressed),
+        ] {
+            if let Some(SchemaValue::Brush(brush)) = input.get(id) {
+                element = element.when(
+                    StateSelector::scope(StateScopeId::new(TOUCH_AREA_SCOPE), state),
+                    StylePatch::new().set(property::Background, Some(brush.clone())),
+                );
+            }
         }
         if width > 0.0 {
             let color = match input.get(BORDER_COLOR) {

@@ -178,6 +178,19 @@ impl Color {
         ))
     }
 
+    /// Parses a hexadecimal color or the CSS `transparent` keyword.
+    /// * `value` — color literal to parse; other named colors are unsupported.
+    ///
+    /// # Errors
+    /// Returns [`ParseColorError`] for an unsupported or invalid literal.
+    pub fn from_literal(value: &str) -> Result<Self, ParseColorError> {
+        if value.eq_ignore_ascii_case("transparent") {
+            Ok(Self::TRANSPARENT)
+        } else {
+            Self::from_hex(value)
+        }
+    }
+
     #[must_use]
     /// Returns the stored linear-light RGBA channels.
     pub const fn to_linear_rgba(self) -> [f32; 4] {

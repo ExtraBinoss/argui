@@ -3,6 +3,7 @@ import { useRef, useState, type ReactElement } from 'react'
 import type { ButtonProps } from '../shared/types'
 import { buttonSize } from '../shared/button-size'
 import { useWidgetIcons } from './assets'
+import { useButtonGroupJoined } from './button-group'
 
 const mobile = (globalThis as { __arguiMobile?: boolean }).__arguiMobile === true
 
@@ -11,21 +12,21 @@ export type ReactButtonProps = ButtonProps
 /** Composes the same native button semantics as the Solid gallery. */
 export function ReactButton(props: ReactButtonProps): ReactElement {
   const icons = useWidgetIcons()
+  const joined = useButtonGroupJoined()
   const [hovered, setHovered] = useState(false)
-  const [pressed, setPressed] = useState(false)
   const [focused, setFocused] = useState(false)
   const pointerFocus = useRef(false)
   const inactive = !!props.disabled || !!props.busy
   const metrics = buttonSize(props.size ?? (props.iconOnly ? 'icon' : 'default'), props.theme)
-  const fill = props.kind === 'destructive'
-    ? pressed ? props.theme.destructivePressed : hovered ? props.theme.destructiveHover : props.theme.destructive
+  const fill = (hover: boolean, press: boolean) => props.kind === 'destructive'
+    ? press ? props.theme.destructivePressed : hover ? props.theme.destructiveHover : props.theme.destructive
     : props.kind === 'primary'
-    ? pressed ? props.theme.accentPressed : hovered ? props.theme.accentHover : props.theme.accent
+    ? press ? props.theme.accentPressed : hover ? props.theme.accentHover : props.theme.accent
     : props.kind === 'link' || props.kind === 'quiet' ? '#00000000'
     : props.kind === 'ghost'
-      ? pressed || focused ? props.theme.surfacePressed
-        : hovered || props.selected ? props.theme.surfaceHover : '#00000000'
-    : pressed ? props.theme.surfacePressed : hovered ? props.theme.surfaceHover
+      ? press || focused ? props.theme.surfacePressed
+        : hover || props.selected ? props.theme.surfaceHover : '#00000000'
+    : press ? props.theme.surfacePressed : hover ? props.theme.surfaceHover
       : props.kind === 'secondary' ? props.theme.surfaceRaised : props.theme.surface
   const color = props.disabled ? props.theme.muted
     : props.kind === 'link' ? props.theme.accent
@@ -34,7 +35,7 @@ export function ReactButton(props: ReactButtonProps): ReactElement {
     <focusScope
       nativeKey={props.id}
       role={props.role ?? 'button'}
-      accessible_name={props.label}
+      accessible_name={props.accessibleLabel ?? props.label}
       checked_state={props.role === 'switch' ? props.selected ? 'checked' : 'unchecked' : undefined}
       current={props.current}
       expandable={props.expanded !== undefined ? true : undefined}
@@ -49,20 +50,23 @@ export function ReactButton(props: ReactButtonProps): ReactElement {
       onBlur={() => { pointerFocus.current = false; setFocused(false) }}
     >
       <touchArea enabled={!inactive} mouse_cursor={inactive ? 'not_allowed' : 'pointer'}
-        onPointerEnter={() => { if (!mobile) setHovered(true) }}
-        onPointerLeave={() => { setHovered(false); setPressed(false) }}
-        onPointerDown={() => { pointerFocus.current = true; setPressed(true); setFocused(false) }} onPointerUp={() => setPressed(false)}
-        onPointerCancel={() => setPressed(false)}>
+        onPointerEnter={props.icon ? () => { if (!mobile) setHovered(true) } : undefined}
+        onPointerLeave={props.icon ? () => setHovered(false) : undefined}
+        onPointerDown={() => { pointerFocus.current = true; setFocused(false) }}>
         <rectangle width={metrics.iconOnly ? metrics.height : undefined} height={metrics.height}
-          background={fill} border_color={focused ? props.theme.foreground : !mobile && props.selected ? props.theme.accent : props.theme.border}
-          border_width={props.kind === 'ghost' || props.kind === 'quiet' || props.kind === 'link' ? 0 : 1} radius={props.theme.controlRadius}
+          background={fill(false, false)} hover_background={mobile ? undefined : fill(true, false)}
+          pressed_background={fill(false, true)}
+          border_color={focused ? props.theme.foreground : !mobile && props.selected ? props.theme.accent : props.theme.border}
+          border_width={joined ? focused ? 1 : 0 : props.kind === 'ghost' || props.kind === 'quiet' || props.kind === 'link' ? 0 : 1}
+          radius={joined ? 0 : props.theme.controlRadius}
           opacity={props.disabled ? 0.48 : props.busy ? 0.72 : 1}>
           <row width="fill" height="fill" gap={metrics.gap} padding_left={metrics.padding}
             padding_right={metrics.padding} align_items="center" justify_content="center">
             {props.busy ? <rectangle width={16} height={16} rotation_loop_ms={800}>
               {icons.loader ? <svg source={icons.loader} color={color} width={16} height={16} /> : null}
             </rectangle> : props.icon ? <svg source={(props.selected || hovered) && props.activeIcon ? props.activeIcon : props.icon}
-              color={props.selected || hovered ? props.theme.accent : color} width={metrics.icon} height={metrics.icon} /> : null}
+              color={props.selected || hovered ? props.theme.accent : color} width={metrics.icon} height={metrics.icon}
+              rotation={props.iconRotation} /> : null}
             {!metrics.iconOnly && !props.iconOnly ? <text text={props.label} color={color} font_size={metrics.font} /> : null}
           </row>
         </rectangle>

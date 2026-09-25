@@ -3,7 +3,9 @@ pub(crate) const EMBEDDED: &[AssetInput<'static>] = &[
     AssetInput { key: "illustration/orbit.png", kind: AssetKind::Image, id: 2571842761405680, bytes: include_bytes!("assets/illustration/orbit.png") },
     AssetInput { key: "illustration/orbit.svg", kind: AssetKind::Svg, id: 6003398377895504, bytes: include_bytes!("assets/illustration/orbit.svg") },
     AssetInput { key: "photo/saturn.jpg", kind: AssetKind::Image, id: 182680722277923, bytes: include_bytes!("assets/photo/saturn.jpg") },
+    AssetInput { key: "tabler/check.svg", kind: AssetKind::Svg, id: 4418227052333180, bytes: include_bytes!("assets/tabler/check.svg") },
     AssetInput { key: "tabler/chevron-down.svg", kind: AssetKind::Svg, id: 5981616865338806, bytes: include_bytes!("assets/tabler/chevron-down.svg") },
+    AssetInput { key: "tabler/chevron-right.svg", kind: AssetKind::Svg, id: 8016896629891356, bytes: include_bytes!("assets/tabler/chevron-right.svg") },
     AssetInput { key: "tabler/heart.svg", kind: AssetKind::Svg, id: 4333451266351680, bytes: include_bytes!("assets/tabler/heart.svg") },
     AssetInput { key: "tabler/loader-2.svg", kind: AssetKind::Svg, id: 5035487383804796, bytes: include_bytes!("assets/tabler/loader-2.svg") },
     AssetInput { key: "tabler/photo.svg", kind: AssetKind::Svg, id: 1456439125952080, bytes: include_bytes!("assets/tabler/photo.svg") },
@@ -11,4 +13,5 @@ pub(crate) const EMBEDDED: &[AssetInput<'static>] = &[
     AssetInput { key: "tabler/search.svg", kind: AssetKind::Svg, id: 2000023927804256, bytes: include_bytes!("assets/tabler/search.svg") },
     AssetInput { key: "tabler/star-filled.svg", kind: AssetKind::Svg, id: 6122411386721923, bytes: include_bytes!("assets/tabler/star-filled.svg") },
     AssetInput { key: "tabler/star.svg", kind: AssetKind::Svg, id: 1326099470823436, bytes: include_bytes!("assets/tabler/star.svg") },
+    AssetInput { key: "tabler/x.svg", kind: AssetKind::Svg, id: 8953272632637284, bytes: include_bytes!("assets/tabler/x.svg") },
 ];

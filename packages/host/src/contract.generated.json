@@ -1,5 +1,5 @@
 {
-  "abiHash": "6166683198449346737",
+  "abiHash": "692955004464143160",
   "natives": [
     {
       "events": [
@@ -5127,6 +5127,22 @@
           "default": null,
           "id": 5,
           "name": "background",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Brush"
+        },
+        {
+          "default": null,
+          "id": 19,
+          "name": "hover_background",
+          "readOnly": false,
+          "required": false,
+          "valueType": "Brush"
+        },
+        {
+          "default": null,
+          "id": 20,
+          "name": "pressed_background",
           "readOnly": false,
           "required": false,
           "valueType": "Brush"

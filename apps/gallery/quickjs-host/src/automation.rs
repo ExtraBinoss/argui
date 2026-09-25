@@ -238,6 +238,9 @@ fn execute(
         ));
     }
     match request.method.as_str() {
+        "move" => driver.borrow_mut().act(Action::Move {
+            target: request.target.clone(),
+        })?,
         "click" => driver.borrow_mut().act(Action::Click {
             target: request.target.clone(),
             right: args["button"] == "right",

@@ -27,6 +27,8 @@ pub use viewport::Viewport;
 /// Everyday automation inputs sent through Argui's retained event APIs.
 #[derive(Clone, Debug)]
 pub enum Action {
+    /// Move the mouse to one keyed element or point without pressing it.
+    Move { target: String },
     /// Click a keyed element or point; secondary clicks also dispatch context menu.
     Click { target: String, right: bool },
     /// Scroll at a keyed element or point in pixels or lines; positive y moves down.
@@ -150,7 +152,7 @@ impl Driver {
         self.engine.set_assets(&assets.images, &assets.vectors);
     }
 
-    /// Applies a normal `argui-host` operation batch and refreshes retained layout.
+    /// Applies a normal `argui-host` operation batch and presents its classified change.
     /// `operations` are the application's native transactions.
     ///
     /// # Errors
@@ -168,16 +170,17 @@ impl Driver {
         }
         let reconcile = self.metrics.span("tree.reconcile");
         let root = self.host.root_element();
-        self.tree = match (self.tree.take(), root) {
+        let (tree, update) = match (self.tree.take(), root) {
             (Some(mut tree), Some(root)) => {
-                tree.update(root);
-                Some(tree)
+                let update = tree.update(root);
+                (Some(tree), update)
             }
-            (_, Some(root)) => Some(UiTree::new(root)),
-            (_, None) => None,
+            (_, Some(root)) => (Some(UiTree::new(root)), TreeUpdate::Layout),
+            (_, None) => (None, TreeUpdate::Layout),
         };
+        self.tree = tree;
         drop(reconcile);
-        self.refresh(began)
+        self.present(update, false, began)
     }
 
     /// Returns an inspector snapshot of the current retained UI.
